@@ -30,7 +30,7 @@ export function buildServeSkillRunOptions(
   args: readonly string[] | undefined
 ): { scriptArgs: string[]; skillEnv: SkillRunEnv | undefined } {
   const scriptArgs = args ? [...args] : [];
-  const skillEnv = deviceId && deviceId.length > 0
+  const skillEnv = deviceId !== undefined
     ? { CLAWPERATOR_DEVICE_ID: deviceId }
     : undefined;
   return { scriptArgs, skillEnv };
@@ -142,6 +142,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
       return;
     }
+    if (typeof deviceId === "string" && deviceId.trim().length === 0) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a non-empty string when provided" } });
+      return;
+    }
 
     if (operatorPackage !== undefined && typeof operatorPackage !== "string") {
       res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a string" } });
@@ -181,6 +185,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     
     if (deviceId !== undefined && typeof deviceId !== "string") {
       res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
+      return;
+    }
+    if (typeof deviceId === "string" && deviceId.trim().length === 0) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a non-empty string when provided" } });
       return;
     }
 
@@ -229,6 +237,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
 
     if (deviceId !== undefined && typeof deviceId !== "string") {
       res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
+      return;
+    }
+    if (typeof deviceId === "string" && deviceId.trim().length === 0) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a non-empty string when provided" } });
       return;
     }
 
@@ -448,6 +460,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
 
       if (deviceId !== undefined && typeof deviceId !== "string") {
         res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
+        return;
+      }
+      if (typeof deviceId === "string" && deviceId.trim().length === 0) {
+        res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a non-empty string when provided" } });
         return;
       }
 

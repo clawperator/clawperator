@@ -18,4 +18,13 @@ describe("buildServeSkillRunOptions", () => {
     assert.deepStrictEqual(result.scriptArgs, ["40"]);
     assert.strictEqual(result.skillEnv, undefined);
   });
+
+  it("preserves an explicitly provided blank deviceId so the boundary can reject it", () => {
+    const result = buildServeSkillRunOptions("", ["40"]);
+
+    assert.deepStrictEqual(result.scriptArgs, ["40"]);
+    assert.deepStrictEqual(result.skillEnv, {
+      CLAWPERATOR_DEVICE_ID: "",
+    });
+  });
 });

@@ -298,7 +298,13 @@ export async function cmdSkillsRun(
     [CLAWPERATOR_BIN_ENV_VAR]: resolvedBin,
     [CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR]: resolvedOperatorPackage,
   };
-  if (options.deviceId) {
+  if (options.deviceId !== undefined) {
+    if (options.deviceId.trim().length === 0) {
+      return formatError({
+        code: "INVALID_DEVICE_ID",
+        message: "'deviceId' must be a non-empty string when provided",
+      }, options);
+    }
     env[CLAWPERATOR_DEVICE_ID_ENV_VAR] = options.deviceId;
   }
 

@@ -281,7 +281,7 @@ describe("Doctor: hostChecks", () => {
                 await mkdir(scriptsDir, { recursive: true });
                 const launcherPath = join(scriptsDir, "fake-agent");
                 await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
-                await writeFile(join(scriptsDir, "run.js"), "console.log('ok');\n", "utf8");
+                await writeFile(join(scriptsDir, "main.js"), "console.log('ok');\n", "utf8");
                 await writeFile(launcherPath, "#!/bin/sh\nexit 0\n", "utf8");
                 await chmod(launcherPath, 0o755);
                 await writeFile(
@@ -314,7 +314,7 @@ describe("Doctor: hostChecks", () => {
                             summary: "Doctor test skill",
                             path: `skills/${skillId}`,
                             skillFile: `skills/${skillId}/SKILL.md`,
-                            scripts: [`skills/${skillId}/scripts/run.js`],
+                            scripts: [`skills/${skillId}/scripts/main.js`],
                             artifacts: [],
                         }],
                     }),
@@ -349,7 +349,7 @@ describe("Doctor: hostChecks", () => {
                 await mkdir(scriptsDir, { recursive: true });
                 const launcherPath = join(scriptsDir, "fake-agent");
                 await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
-                await writeFile(join(scriptsDir, "run.js"), "console.log('ok');\n", "utf8");
+                await writeFile(join(scriptsDir, "main.js"), "console.log('ok');\n", "utf8");
                 await writeFile(launcherPath, "#!/bin/sh\nexit 0\n", "utf8");
                 await chmod(launcherPath, 0o755);
                 await writeFile(
@@ -416,7 +416,7 @@ describe("Doctor: hostChecks", () => {
             try {
                 await mkdir(scriptsDir, { recursive: true });
                 await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
-                await writeFile(join(scriptsDir, "run.js"), "console.log('ok');\n", "utf8");
+                await writeFile(join(scriptsDir, "main.js"), "console.log('ok');\n", "utf8");
                 await writeFile(
                     join(skillDir, "skill.json"),
                     JSON.stringify({
@@ -447,7 +447,7 @@ describe("Doctor: hostChecks", () => {
                             summary: "Doctor missing cliPath skill",
                             path: `skills/${skillId}`,
                             skillFile: `skills/${skillId}/SKILL.md`,
-                            scripts: [`skills/${skillId}/scripts/run.js`],
+                            scripts: [`skills/${skillId}/scripts/main.js`],
                             artifacts: [],
                         }],
                     }),
@@ -518,6 +518,56 @@ describe("Doctor: hostChecks", () => {
                     checkedSkills: 0,
                     unreadableSkills: [skillId],
                     failingSkills: [skillId],
+                });
+            } finally {
+                await rm(root, { recursive: true, force: true });
+                if (originalRegistry === undefined) {
+                    delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+                } else {
+                    process.env.CLAWPERATOR_SKILLS_REGISTRY = originalRegistry;
+                }
+            }
+        });
+
+        it("ignores unreadable non-orchestrated skill metadata for the orchestrated agent readiness check", async () => {
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const originalRegistry = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+            const root = await mkdtemp(join(tmpdir(), "clawperator-doctor-skills-bad-non-agent-"));
+            const skillId = "com.test.doctor-bad-non-agent";
+            const skillDir = join(root, "skills", skillId);
+            const scriptsDir = join(skillDir, "scripts");
+            const registryPath = join(root, "skills", "skills-registry.json");
+
+            try {
+                await mkdir(scriptsDir, { recursive: true });
+                await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+                await writeFile(join(scriptsDir, "main.js"), "console.log('ok');\n", "utf8");
+                await writeFile(join(skillDir, "skill.json"), "{not-json", "utf8");
+                await writeFile(
+                    registryPath,
+                    JSON.stringify({
+                        schemaVersion: "1.0",
+                        generatedAt: "2026-04-13T00:00:00Z",
+                        skills: [{
+                            id: skillId,
+                            applicationId: "com.test",
+                            intent: "doctor-bad-non-agent",
+                            summary: "Doctor bad non-agent skill",
+                            path: `skills/${skillId}`,
+                            skillFile: `skills/${skillId}/SKILL.md`,
+                            scripts: [`skills/${skillId}/scripts/main.js`],
+                            artifacts: [],
+                        }],
+                    }),
+                    "utf8"
+                );
+                process.env.CLAWPERATOR_SKILLS_REGISTRY = registryPath;
+
+                const result = await checkInstalledOrchestratedSkillAgentCliAvailability(config);
+                assert.strictEqual(result.status, "pass");
+                assert.match(result.summary, /No orchestrated skills/i);
+                assert.deepStrictEqual(result.evidence, {
+                    checkedSkills: 0,
                 });
             } finally {
                 await rm(root, { recursive: true, force: true });

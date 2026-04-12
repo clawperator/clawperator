@@ -155,13 +155,16 @@ async function createTempRegistryWithSkill(options: {
   extraScriptSourcePaths?: string[];
   omitSkillFile?: boolean;
   skillFileRelativePath?: string;
+  scriptRelativePath?: string;
 }): Promise<{ registryPath: string; cleanup: () => Promise<void> }> {
   const root = await mkdtemp(join(tmpdir(), "clawperator-skill-result-source-"));
   const skillDir = join(root, "skills", options.skillId);
   const scriptsDir = join(skillDir, "scripts");
   await mkdir(scriptsDir, { recursive: true });
 
-  const scriptDest = join(scriptsDir, "run.js");
+  const scriptRelativePath = options.scriptRelativePath ?? "scripts/run.js";
+  const scriptDest = join(root, "skills", options.skillId, scriptRelativePath.replace(/^scripts\//, "scripts/"));
+  await mkdir(dirname(scriptDest), { recursive: true });
   await copyFile(options.scriptSourcePath, scriptDest);
   for (const extraSourcePath of options.extraScriptSourcePaths ?? []) {
     await copyFile(extraSourcePath, join(scriptsDir, basename(extraSourcePath)));
@@ -189,7 +192,7 @@ async function createTempRegistryWithSkill(options: {
           summary: "Temporary test skill",
           path: `skills/${options.skillId}`,
           skillFile: options.skillFileRelativePath ?? `skills/${options.skillId}/SKILL.md`,
-          scripts: [`skills/${options.skillId}/scripts/run.js`],
+          scripts: [`skills/${options.skillId}/${scriptRelativePath}`],
           artifacts: [],
         },
       ],
@@ -2946,6 +2949,7 @@ describe("runSkill", () => {
         "run.js"
       ),
       skillJsonContents: "{not-json",
+      scriptRelativePath: "scripts/main.js",
     });
 
     try {

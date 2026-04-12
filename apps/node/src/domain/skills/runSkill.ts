@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { access, readFile } from "node:fs/promises";
+import { access } from "node:fs/promises";
 import { extname } from "node:path";
 import { loadRegistry, findSkillById, getRepoRoot } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import type { Logger } from "../../adapters/logger.js";
@@ -23,7 +23,10 @@ import {
   type SkillResult,
   type SkillResultSource,
 } from "../../contracts/skillResult.js";
-import { readSkillManifestMetadata, type SkillManifestReadResult } from "./skillManifest.js";
+import {
+  readSkillManifestMetadata,
+  type SkillManifestReadResult,
+} from "./skillManifest.js";
 import {
   resolveConfiguredAgentCli,
   resolveAgentCliExecutable,
@@ -39,11 +42,6 @@ const SKILL_INPUTS_ENV_VAR = "CLAWPERATOR_SKILL_INPUTS";
 const SKILL_PROGRAM_ENV_VAR = "CLAWPERATOR_SKILL_PROGRAM";
 const SKILL_ID_ENV_VAR = "CLAWPERATOR_SKILL_ID";
 const SKILLS_REGISTRY_ENV_VAR = "CLAWPERATOR_SKILLS_REGISTRY";
-const AGENT_HARNESS_SIGNATURES = [
-  SKILL_AGENT_CLI_PATH_ENV_VAR,
-  SKILL_PROGRAM_ENV_VAR,
-  SKILL_RESULT_FRAME_PREFIX,
-];
 
 export interface SkillRunResult {
   ok: true;
@@ -126,15 +124,6 @@ function signalSkillChildWithLogging(
     }
   }
   child.kill(signal);
-}
-
-async function scriptRequiresTrustedManifestMetadata(scriptPath: string): Promise<boolean> {
-  try {
-    const contents = await readFile(scriptPath, "utf8");
-    return AGENT_HARNESS_SIGNATURES.some((signature) => contents.includes(signature));
-  } catch {
-    return false;
-  }
 }
 
 function parseSemver(version: string): { major: number; minor: number; patch: number } | null {
@@ -334,18 +323,17 @@ export async function runSkill(
     }
 
     const harnessScriptRelative = skill.scripts.find((scriptPath) => isOrchestratedHarnessScriptPath(scriptPath));
-    const trustedManifestScriptRelative = harnessScriptRelative ?? scriptRelative;
-    resolvedPath = resolveRepoRelativeSkillPath(repoRoot, trustedManifestScriptRelative);
     const manifestResult = await readSkillManifestMetadata(repoRoot, skill.path);
-    const requiresTrustedManifest = await scriptRequiresTrustedManifestMetadata(resolvedPath);
-    if (!manifestResult.ok && requiresTrustedManifest) {
-      return {
-        ok: false,
-        code: SKILL_VALIDATION_FAILED,
-        message: manifestResult.message,
-        skillId,
-        skillResult: null,
-      };
+    if (!manifestResult.ok) {
+      if (harnessScriptRelative) {
+        return {
+          ok: false,
+          code: SKILL_VALIDATION_FAILED,
+          message: manifestResult.message,
+          skillId,
+          skillResult: null,
+        };
+      }
     }
     if (manifestResult.ok) {
       sourceResolution = await resolveSkillResultSource(manifestResult);

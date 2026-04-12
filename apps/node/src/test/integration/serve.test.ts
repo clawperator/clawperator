@@ -218,6 +218,23 @@ describe("serve API integration", () => {
     assert.ok(body.error.stderr?.includes("FAIL_OUTPUT:intentional"));
   });
 
+  test("POST /skills/:skillId/run rejects blank deviceId", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.fail/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId: "" }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as {
+      ok: boolean;
+      error: { code: string; message: string };
+    };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "INVALID_DEVICE_ID");
+    assert.match(body.error.message, /non-empty string/i);
+  });
+
   test("POST /skills/:skillId/run returns skillResult on framed success", async () => {
     const res = await fetch(`http://localhost:${port}/skills/com.test.skill-result/run`, {
       method: "POST",

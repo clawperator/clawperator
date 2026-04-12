@@ -20,6 +20,20 @@ export interface SkillManifestReadFailure {
 
 export type SkillManifestReadResult = SkillManifestReadSuccess | SkillManifestReadFailure;
 
+export interface SkillManifestFileReadSuccess {
+  ok: true;
+  skillJsonPath: string;
+  raw: string;
+}
+
+export interface SkillManifestFileReadFailure {
+  ok: false;
+  skillJsonPath: string;
+  message: string;
+}
+
+export type SkillManifestFileReadResult = SkillManifestFileReadSuccess | SkillManifestFileReadFailure;
+
 function formatSkillJsonError(skillJsonPath: string, detail: string): string {
   return `Unable to read trusted skill result source metadata from ${skillJsonPath}: ${detail}`;
 }
@@ -115,14 +129,41 @@ export async function readSkillManifestMetadata(
   repoRoot: string,
   skillPath: string
 ): Promise<SkillManifestReadResult> {
-  const skillJsonPath = resolveRepoRelativeSkillPath(repoRoot, join(skillPath, "skill.json"));
+  const fileResult = await readSkillManifestFile(repoRoot, skillPath);
+  if (!fileResult.ok) {
+    return {
+      ok: false,
+      message: fileResult.message,
+    };
+  }
+
   try {
-    const raw = await readFile(skillJsonPath, "utf-8");
-    const parsedUnknown = JSON.parse(raw) as unknown;
-    return parseSkillManifestMetadata(skillJsonPath, parsedUnknown);
+    const parsedUnknown = JSON.parse(fileResult.raw) as unknown;
+    return parseSkillManifestMetadata(fileResult.skillJsonPath, parsedUnknown);
   } catch (error) {
     return {
       ok: false,
+      message: formatSkillJsonError(fileResult.skillJsonPath, error instanceof Error ? error.message : String(error)),
+    };
+  }
+}
+
+export async function readSkillManifestFile(
+  repoRoot: string,
+  skillPath: string
+): Promise<SkillManifestFileReadResult> {
+  const skillJsonPath = resolveRepoRelativeSkillPath(repoRoot, join(skillPath, "skill.json"));
+  try {
+    const raw = await readFile(skillJsonPath, "utf-8");
+    return {
+      ok: true,
+      skillJsonPath,
+      raw,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      skillJsonPath,
       message: formatSkillJsonError(skillJsonPath, error instanceof Error ? error.message : String(error)),
     };
   }

@@ -10,7 +10,7 @@ import {
   resolveConfiguredAgentCli,
   resolveAgentCliExecutable,
 } from "../../skills/agentCli.js";
-import { resolveRepoRelativeSkillPath } from "../../skills/pathUtils.js";
+import { isOrchestratedHarnessScriptPath, resolveRepoRelativeSkillPath } from "../../skills/pathUtils.js";
 import { readSkillManifestMetadata } from "../../skills/skillManifest.js";
 
 const DEFAULT_ORCHESTRATED_SKILL_AGENT_CLI = "codex";
@@ -207,7 +207,9 @@ export async function checkInstalledOrchestratedSkillAgentCliAvailability(_confi
   for (const skill of registryResult.registry.skills) {
     const manifestResult = await readSkillManifestMetadata(repoRoot, skill.path);
     if (!manifestResult.ok) {
-      manifestFailures.push(`${skill.id}: ${manifestResult.message}`);
+      if (skill.scripts.some((scriptPath) => isOrchestratedHarnessScriptPath(scriptPath))) {
+        manifestFailures.push(`${skill.id}: ${manifestResult.message}`);
+      }
       continue;
     }
     if (!manifestResult.metadata.agent) {
