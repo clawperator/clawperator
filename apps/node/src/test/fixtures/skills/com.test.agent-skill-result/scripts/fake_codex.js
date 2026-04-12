@@ -19,6 +19,22 @@ if (
   process.exit(4);
 }
 
+if (
+  process.env.EXPECTED_SKILLS_REGISTRY !== undefined &&
+  process.env.CLAWPERATOR_SKILLS_REGISTRY !== process.env.EXPECTED_SKILLS_REGISTRY
+) {
+  console.error("unexpected skills registry path");
+  process.exit(6);
+}
+
+if (
+  process.env.EXPECTED_SKILL_TIMEOUT_MS !== undefined &&
+  process.env.CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS !== process.env.EXPECTED_SKILL_TIMEOUT_MS
+) {
+  console.error("unexpected skill timeout env");
+  process.exit(7);
+}
+
 const basePayload = {
   contractVersion: "1.0.0",
   skillId,
@@ -119,6 +135,11 @@ switch (mode) {
       console.log(JSON.stringify(basePayload));
       process.exit(0);
     }, 1000);
+    break;
+  case "env-check":
+    console.log(prefix);
+    console.log(JSON.stringify(basePayload));
+    process.exit(0);
     break;
   default:
     console.error(`unknown mode:${mode}`);

@@ -33,6 +33,7 @@ const SKILL_AGENT_TIMEOUT_MS_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS";
 const SKILL_INPUTS_ENV_VAR = "CLAWPERATOR_SKILL_INPUTS";
 const SKILL_PROGRAM_ENV_VAR = "CLAWPERATOR_SKILL_PROGRAM";
 const SKILL_ID_ENV_VAR = "CLAWPERATOR_SKILL_ID";
+const SKILLS_REGISTRY_ENV_VAR = "CLAWPERATOR_SKILLS_REGISTRY";
 
 export interface SkillRunResult {
   ok: true;
@@ -301,9 +302,11 @@ export async function runSkill(
   let resolvedAgentConfig: SkillAgentConfig | null = null;
   let resolvedAgentExecutablePath: string | null = null;
   let skillProgramPath: string | null = null;
+  let resolvedRegistryPath: string | null = null;
   let effectiveTimeoutMs = timeoutMs ?? DEFAULT_TIMEOUT_MS;
   try {
     const loaded = await loadRegistry(registryPath);
+    resolvedRegistryPath = loaded.resolvedPath;
     const skill = findSkillById(loaded.registry, skillId);
     if (!skill) {
       return { ok: false, code: SKILL_NOT_FOUND, message: `Skill not found: ${skillId}`, skillId, skillResult: null };
@@ -366,6 +369,20 @@ export async function runSkill(
     };
   }
 
+  if (resolvedAgentConfig && skillProgramPath !== null) {
+    try {
+      await access(skillProgramPath);
+    } catch {
+      return {
+        ok: false,
+        code: SKILL_SCRIPT_NOT_FOUND,
+        message: `SKILL.md not found: ${skillProgramPath}`,
+        skillId,
+        skillResult: null,
+      };
+    }
+  }
+
   const ext = extname(resolvedPath);
   const cmd = ext === ".js" ? process.execPath : resolvedPath;
   const cmdArgs = ext === ".js" ? [resolvedPath, ...args] : args;
@@ -384,6 +401,9 @@ export async function runSkill(
     childEnv[SKILL_INPUTS_ENV_VAR] = JSON.stringify(args);
     childEnv[SKILL_PROGRAM_ENV_VAR] = skillProgramPath;
     childEnv[SKILL_ID_ENV_VAR] = skillId;
+    if (resolvedRegistryPath !== null) {
+      childEnv[SKILLS_REGISTRY_ENV_VAR] = resolvedRegistryPath;
+    }
   }
 
   const start = Date.now();

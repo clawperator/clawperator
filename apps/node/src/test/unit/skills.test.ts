@@ -2,7 +2,7 @@ import { describe, it, before, after, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
 import { chmod, mkdtemp, mkdir, copyFile, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, join, normalize } from "node:path";
+import { basename, dirname, join, normalize } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import {
@@ -151,6 +151,8 @@ async function createTempRegistryWithSkill(options: {
   skillId: string;
   scriptSourcePath: string;
   skillJsonContents: string;
+  extraScriptSourcePaths?: string[];
+  omitSkillFile?: boolean;
 }): Promise<{ registryPath: string; cleanup: () => Promise<void> }> {
   const root = await mkdtemp(join(tmpdir(), "clawperator-skill-result-source-"));
   const skillDir = join(root, "skills", options.skillId);
@@ -159,7 +161,12 @@ async function createTempRegistryWithSkill(options: {
 
   const scriptDest = join(scriptsDir, "run.js");
   await copyFile(options.scriptSourcePath, scriptDest);
-  await writeFile(join(skillDir, "SKILL.md"), `# ${options.skillId}\n`);
+  for (const extraSourcePath of options.extraScriptSourcePaths ?? []) {
+    await copyFile(extraSourcePath, join(scriptsDir, basename(extraSourcePath)));
+  }
+  if (!options.omitSkillFile) {
+    await writeFile(join(skillDir, "SKILL.md"), `# ${options.skillId}\n`);
+  }
   await writeFile(join(skillDir, "skill.json"), options.skillJsonContents);
 
   const registryPath = join(root, "skills", "skills-registry.json");
@@ -1884,6 +1891,46 @@ describe("runSkill", () => {
     assert.strictEqual(result.skillResult, null);
   });
 
+  it("fails cleanly when an agent-driven skill is missing SKILL.md", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.missing-skill-program",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.missing-skill-program",
+        applicationId: "com.test",
+        intent: "missing-skill-program",
+        summary: "Temporary test skill",
+        path: "skills/com.test.missing-skill-program",
+        skillFile: "skills/com.test.missing-skill-program/SKILL.md",
+        scripts: ["skills/com.test.missing-skill-program/scripts/run.js"],
+        artifacts: [],
+        agent: {
+          cli: "codex",
+        },
+      }),
+      omitSkillFile: true,
+    });
+
+    try {
+      const result = await runSkill("com.test.missing-skill-program", ["valid"], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_SCRIPT_NOT_FOUND);
+      assert.match(result.message, /SKILL\.md not found/);
+      assert.strictEqual(result.skillResult, null);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
   it("rejects malformed framed SkillResult output from an orchestrated harness", async () => {
     const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["malformed-json"]);
 
@@ -1915,6 +1962,68 @@ describe("runSkill", () => {
     );
     assert.match(result.skillResult.checkpoints[0].note ?? "", /reopened once/i);
     assert.match(result.skillResult.terminalVerification?.note ?? "", /recovery branch/i);
+  });
+
+  it("forwards the resolved registry path and timeout env to the orchestrated harness", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.agent-env-check",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.agent-env-check",
+        applicationId: "com.test",
+        intent: "agent-env-check",
+        summary: "Temporary test skill",
+        path: "skills/com.test.agent-env-check",
+        skillFile: "skills/com.test.agent-env-check/SKILL.md",
+        scripts: ["skills/com.test.agent-env-check/scripts/run.js"],
+        artifacts: [],
+        agent: {
+          cli: "fake_codex.js",
+          cliPath: "scripts/fake_codex.js",
+          timeoutMs: 4321,
+        },
+      }),
+      extraScriptSourcePaths: [
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "fake_codex.js"
+        ),
+      ],
+    });
+
+    try {
+      const result = await runSkill(
+        "com.test.agent-env-check",
+        ["env-check"],
+        temp.registryPath,
+        undefined,
+        {
+          EXPECTED_SKILLS_REGISTRY: temp.registryPath,
+          EXPECTED_SKILL_TIMEOUT_MS: "4321",
+        }
+      );
+
+      assert.ok(result.ok, `Expected env-check agent skill to succeed: ${"message" in result ? result.message : ""}`);
+      assert.ok(result.skillResult);
+      assert.strictEqual(result.skillResult.source.kind, "agent");
+    } finally {
+      await temp.cleanup();
+    }
   });
 
   it("returns SKILL_OUTPUT_ASSERTION_FAILED when expectContains is missing from output", async () => {
@@ -2849,7 +2958,7 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.match(parsed.message ?? "", /Skill not found/);
   });
 
-  it("prepends the selected device id to forwarded skill args in cmdSkillsRun", async () => {
+  it("passes forwarded skill args through unchanged in cmdSkillsRun", async () => {
     let observedArgs: string[] | null = null;
     const fakeRunSkill = async (_skillId: string, args: string[]) => {
       observedArgs = args;
@@ -2880,7 +2989,7 @@ describe("cmdSkillsRun preflight gate", () => {
     const parsed = JSON.parse(stdout) as { skillId?: string; output?: string };
     assert.strictEqual(parsed.skillId, TEST_SKILL_VALID_ARTIFACT);
     assert.strictEqual(parsed.output, "RUN_OK");
-    assert.deepStrictEqual(observedArgs, ["device-123", "--limit", "40"]);
+    assert.deepStrictEqual(observedArgs, ["--limit", "40"]);
   });
 
   it("keeps cmdSkillsRun silent in JSON mode without a logger", async () => {

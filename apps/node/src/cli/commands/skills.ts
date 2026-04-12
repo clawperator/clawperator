@@ -365,8 +365,6 @@ export async function cmdSkillsRun(
     }
   }
 
-  const forwardedSkillArgs = options.deviceId ? [options.deviceId, ...args] : args;
-
   const result = options.format !== "json"
     ? await (async () => {
         const removeStdoutErrorListener = suppressStreamPipeErrors(process.stdout);
@@ -381,7 +379,7 @@ export async function cmdSkillsRun(
           }
         });
         try {
-          const runResult = await runSkillImpl(skillId, forwardedSkillArgs, undefined, timeoutMs, env, {
+          const runResult = await runSkillImpl(skillId, args, undefined, timeoutMs, env, {
             onOutput: (chunk, stream) => {
               try {
                 if (stream === "stdout") {
@@ -406,7 +404,7 @@ export async function cmdSkillsRun(
           removeStderrErrorListener();
         }
       })()
-    : await runSkillImpl(skillId, forwardedSkillArgs, undefined, timeoutMs, env, { logger: cliLogger }, expectContains);
+    : await runSkillImpl(skillId, args, undefined, timeoutMs, env, { logger: cliLogger }, expectContains);
   if (result.ok) {
     return formatSuccess({
       skillId: result.skillId,
