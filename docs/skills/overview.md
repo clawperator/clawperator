@@ -580,6 +580,7 @@ Common ones:
 | `SKILL_SCRIPT_NOT_FOUND` | registry exists but the chosen script file does not |
 | `SKILL_EXECUTION_FAILED` | subprocess exited non-zero or failed to spawn |
 | `SKILL_EXECUTION_TIMEOUT` | wrapper timeout elapsed |
+| `SKILL_AGENT_CLI_UNAVAILABLE` | orchestrated skill declared `agent.cli` but the configured agent CLI could not be resolved |
 | `SKILL_OUTPUT_ASSERTION_FAILED` | `--expect-contains` was set and the output did not contain the text |
 | `SKILL_RESULT_PARSE_FAILED` | a framed `SkillResult` was malformed or could not be trusted |
 

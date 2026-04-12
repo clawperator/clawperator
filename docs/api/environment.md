@@ -201,6 +201,64 @@ clawperator skills run com.test.echo --device emulator-5554
 # the skill script receives CLAWPERATOR_BIN=/usr/local/bin/clawperator-nightly
 ```
 
+## Orchestrated Skill Runtime Env Vars
+
+`runSkill()` injects these env vars when a skill declares `skill.json.agent`
+and runs through `scripts/run.js`. The harness reads them directly. This is
+the runtime contract for agent-driven orchestrated skills.
+
+| Variable | Default if unset | Where it takes effect |
+| --- | --- | --- |
+| `CLAWPERATOR_SKILL_AGENT_CLI` | `skill.json.agent.cli` | injected into the orchestrated harness so it knows the configured CLI name |
+| `CLAWPERATOR_SKILL_AGENT_CLI_PATH` | none | injected into the orchestrated harness after `runSkill()` resolves the executable path |
+| `CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS` | caller `--timeout`, otherwise `skill.json.agent.timeoutMs`, otherwise `120000` | injected into the orchestrated harness as the effective timeout in milliseconds |
+| `CLAWPERATOR_SKILL_PROGRAM` | none | absolute path to the skill's `SKILL.md` runtime program |
+| `CLAWPERATOR_SKILL_INPUTS` | JSON serialization of the forwarded skill args array | injected into the orchestrated harness for agent input parity checks |
+| `CLAWPERATOR_SKILL_ID` | none | injected into the orchestrated harness as the invoked skill id |
+| `CLAWPERATOR_DEVICE_ID` | none | selected device serial that the wrapper or CLI passed into the skill run |
+
+Behavior details:
+
+- `CLAWPERATOR_SKILL_AGENT_CLI` comes from `skill.json.agent.cli` unless the
+  caller overrides it with the same env var before `runSkill()` resolves the
+  effective agent config
+- `CLAWPERATOR_SKILL_AGENT_CLI_PATH` is present only after
+  `resolveAgentCliExecutable()` succeeds
+- `CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS` always reflects the effective timeout
+  that `runSkill()` will enforce around the harness
+- `CLAWPERATOR_SKILL_PROGRAM`, `CLAWPERATOR_SKILL_INPUTS`, and
+  `CLAWPERATOR_SKILL_ID` are only present for agent-driven orchestrated runs
+- `CLAWPERATOR_DEVICE_ID` is skill-scoped consumption: the CLI wrapper sets it
+  when `skills run --device <serial>` is used, and `runSkill()` forwards it to
+  the child process environment
+
+Verification:
+
+```bash
+CLAWPERATOR_SKILLS_REGISTRY=/abs/path/to/skills/skills-registry.json \
+node apps/node/dist/cli/index.js skills run com.test.agent-skill-result \
+  --device emulator-5554 \
+  --json -- valid
+```
+
+Check the parsed `skillResult.source` and the successful JSON envelope. The
+fixture harness under `apps/node/src/test/fixtures/skills/com.test.agent-skill-result/`
+only succeeds when `CLAWPERATOR_SKILL_AGENT_CLI_PATH`,
+`CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS`, `CLAWPERATOR_SKILL_INPUTS`,
+`CLAWPERATOR_SKILL_ID`, and `CLAWPERATOR_DEVICE_ID` are all populated as the
+runtime expects.
+
+Failure cases:
+
+- if `CLAWPERATOR_SKILL_AGENT_CLI` resolves to an unavailable executable,
+  `skills run` fails with `SKILL_AGENT_CLI_UNAVAILABLE`
+- if `CLAWPERATOR_SKILL_AGENT_CLI_PATH` or `CLAWPERATOR_SKILL_PROGRAM` are
+  missing inside the harness, the harness exits non-zero and `runSkill()`
+  returns `SKILL_EXECUTION_FAILED`
+- if `CLAWPERATOR_SKILL_INPUTS` is malformed JSON, the current harness pattern
+  falls back to an empty args array and the skill should fail its own input
+  validation truthfully
+
 ## `ADB_PATH`
 
 Overrides the adb binary used by the entire runtime. Affects device listing, doctor checks, execution dispatch, recording, operator setup, permission grants, emulator management, package listing, and the serve server.

@@ -315,6 +315,10 @@ The harness should not absorb skill logic that belongs in `SKILL.md`. If the
 wrapper starts containing the real navigation or verification policy, the skill
 has drifted away from the W2b runtime shape.
 
+`clawperator skills run` injects the orchestrated runtime env vars that the
+harness reads. For the exact variable list and defaults, see
+[Environment Variables](../api/environment.md#orchestrated-skill-runtime-env-vars).
+
 If `skill.json` drifts from the registry, validation fails with `SKILL_VALIDATION_FAILED` and names the mismatched fields:
 
 ```json
