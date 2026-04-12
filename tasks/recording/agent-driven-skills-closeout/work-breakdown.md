@@ -8,11 +8,9 @@ Four phases (C1, C2.0, C2, C3) ship across two PRs. The Clawperator PR carries
 C1 (runtime strictness, docs gaps), C2.0 (bypass-dependency probe evidence),
 and C3 (10-run reliability evidence). The skills PR carries C2 (thin the Solax
 orchestrated harness, harden `SKILL.md` with strict-agentic rules, document the
-codex-only v1 limitation). C1 is next. C2 cannot start until C2.0 is committed.
-The skills PR is practically gated on the Clawperator PR's reliability commits
-landing first, because reliability evidence lives under
-`docs/internal/design/reliability/` in the Clawperator repo by existing
-convention.
+codex-only v1 limitation). C1 is next. C2 cannot start until C2.0 is complete.
+Reliability evidence remains committed in the Clawperator repo under
+`docs/internal/design/reliability/`.
 
 ## Status
 
@@ -78,31 +76,31 @@ then existing artifact state.
 | 5 | `.agents/skills/task-author/SKILL.md` | Quality bar this pack must honor (context only, no edits) |
 | 6 | `.agents/skills/docs-author/SKILL.md` | Required for any public-docs edit in C1 Step 3, C1 Step 4, C2 Step 6 |
 | 7 | `.agents/skills/docs-build/SKILL.md` | Required to regenerate `sites/docs/.build/` after docs edits |
-| 8 | `apps/node/src/domain/skills/runSkill.ts` lines 280-335 | The silent-downgrade site (C1 Step 1) and the orchestrated spawn shape (informs C2) |
+| 8 | `apps/node/src/domain/skills/runSkill.ts` | The silent-downgrade site (C1 Step 1) and the orchestrated spawn shape (informs C2) |
 | 9 | `apps/node/src/domain/skills/skillManifest.ts` | Manifest parse contract and the `ok: false` return path C1 Step 1 must check |
-| 10 | `apps/node/src/domain/skills/validateSkill.ts` lines 176-199 | Validation-time manifest rejection (confirms the runtime gap C1 closes) |
+| 10 | `apps/node/src/domain/skills/validateSkill.ts` | Validation-time manifest rejection (confirms the runtime gap C1 closes) |
 | 11 | `apps/node/src/contracts/skills.ts` | Error codes and contract types; the bucket-B contract extension (if any) lands here |
 | 12 | `apps/node/src/contracts/result.ts` | SkillResult frame shape; the C2 harness must not re-implement this |
-| 13 | `apps/node/src/test/unit/skills.test.ts` | Existing "rejects framed SkillResults when skill.json has a malformed agent block" test and the `legacy-output-only` permissive assertion (C1 Step 2) |
-| 14 | `apps/node/src/test/fixtures/skills/com.test.agent-skill-result/scripts/run.js` | Thin-harness exemplar for C2. 56 lines. The Solax harness target shape. |
+| 13 | `apps/node/src/test/unit/skills.test.ts` | Existing malformed-agent permissive regression coverage (C1 Step 2) |
+| 14 | `apps/node/src/test/fixtures/skills/com.test.agent-skill-result/scripts/run.js` | Thin-harness exemplar for C2 |
 | 15 | `docs/skills/overview.md` | Error Codes table (C1 Step 3) and orchestrated-skill guidance (C2 Step 6) |
 | 16 | `docs/skills/authoring.md` | Orchestrated authoring surface; cross-reference destination for C1 Step 4 and C2 Step 5 |
 | 17 | `docs/api/environment.md` | Env-var reference surface for C1 Step 4 |
 | 18 | `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/SKILL.md` | Existing Solax runtime program. C2 Step 5 appends to this without disturbing existing content. |
-| 19 | `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/scripts/run.js` | Current 637-line harness. The deletion target for C2 Steps 1-4. |
+| 19 | `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/scripts/run.js` | Current harness. The deletion target for C2 Steps 1-4. |
 | 20 | `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/skill.json` | Current `agent` manifest. May gain a declared field on bucket B. |
 | 21 | `../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-replay/` (listing only) | Control surface for reliability testing. Confirm untouched before and after C2. |
 
 ## PR / Phase Plan
 
-| PR | Repo | Purpose | Included phases | Default agent tier | Merge gate |
-| --- | --- | --- | --- | --- | --- |
-| PR-clawperator | clawperator | Runtime strictness, public docs gaps, probe evidence, 10-run reliability evidence | C1, C2.0, C3 | default (escalate C2.0 to thinking on bucket B; escalate C3 synthesis pass to thinking if classification is contested) | None. May be opened once C1 validation is green; additional commits (C2.0, C3) append to the same branch. |
-| PR-skills | clawperator-skills | Thin the orchestrated harness, harden `SKILL.md`, document codex-only v1 | C2 | thinking | Wait for the Clawperator PR's reliability commits (C3) to land in `main` (or at least in a shared base) before marking PR-skills ready. The skills PR's reliability claim is not independently verifiable. |
+| PR | Repo | Purpose | Included phases | Default agent tier |
+| --- | --- | --- | --- | --- |
+| PR-clawperator | clawperator | Runtime strictness, public docs gaps, probe evidence, 10-run reliability evidence | C1, C2.0, C3 | default |
+| PR-skills | clawperator-skills | Thin the orchestrated harness, harden `SKILL.md`, document codex-only v1 | C2 | thinking |
 
-Do not start C2 before C2.0 is committed in the Clawperator PR. Do not mark
-PR-skills ready before C3 is complete and the ≥8/10 evidence-backed threshold
-either held or the PR was re-scoped to reflect the true outcome.
+Do not start C2 before C2.0 is complete. Do not mark the skills-side PR ready
+before C3 is complete and the ≥8/10 evidence-backed threshold either held or
+the PR was re-scoped to reflect the true outcome.
 
 ## Phase C1: Close Clawperator Runtime And Docs Gaps
 
@@ -135,14 +133,12 @@ and the orchestrated env-var contract is documented.
    `SKILL_VALIDATION_FAILED` error code before attempting to spawn anything.
    Do not silently fall through to scripted execution. Do not invent a new
    error code.
-2. Update the "legacy permissive" regression test so it only covers the case
-   where `skill.json.agent` is absent. Add a new positive-assert test that
-   runs `runSkill` directly (bypassing CLI validation, mirroring the serve
-   API path) with a malformed `skill.json.agent` and asserts a typed error is
-   returned even when the script emits no frame. The new test must locate
-   and replace the `legacy-output-only` assertion in the existing
-   "rejects framed SkillResults when skill.json has a malformed agent block"
-   test case. Co-locate the new test in the same phase commit as the
+2. Update the malformed-agent regression coverage so permissive behavior only
+   applies when `skill.json.agent` is absent. Add a new positive-assert test
+   that runs `runSkill` directly (bypassing CLI validation, mirroring the
+   serve API path) with a malformed `skill.json.agent` and asserts a typed
+   error is returned even when the script emits no frame. Replace the current
+   permissive malformed-agent assertion in the same phase commit as the
    `runSkill` change; do not defer.
 3. Add `SKILL_AGENT_CLI_UNAVAILABLE` as a new row to the Error Codes table in
    `docs/skills/overview.md` with a short meaning line (e.g. "orchestrated
@@ -175,8 +171,8 @@ Mechanical:
 - The new regression test in `apps/node/src/test/unit/skills.test.ts`
   asserts a typed error on a malformed agent manifest with a non-framed
   script, and passes.
-- The former `legacy-output-only` permissive assertion applies only when
-  `agent` is absent.
+- The former permissive malformed-agent assertion applies only when `agent`
+  is absent.
 - `rg "SKILL_AGENT_CLI_UNAVAILABLE" docs/skills/overview.md` matches at
   least one Error Codes table row.
 - `rg "CLAWPERATOR_SKILL_AGENT_CLI_PATH" docs/api/environment.md` matches
@@ -289,7 +285,7 @@ evidence is committed.
 
    | Bucket | Observation | C2 Step 4 action |
    | --- | --- | --- |
-   | A: bypass-independent success | `probe.json` contains `status: "success"` and `terminalVerification.status: "verified"` | Delete `CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS` in C2 Step 4 with no contract change. The probe run may count as `run-00` in C3. |
+| A: bypass-independent success | `probe.json` contains `status: "success"` and `terminalVerification.status: "verified"` | Delete `CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS` in C2 Step 4 with no contract change. The probe run may be retained as supplemental evidence but does not replace the required C3 run set. |
    | B: sandbox/approval-cited failure | `probe.stderr` cites codex sandbox, approval, "denied", "read-only", "cannot write", subprocess-blocked, or codex refuses to spawn the Clawperator child | Stop. Do not delete. Escalate to declared-contract design (new field on `skill.json.agent`, runtime support in `apps/node/src/contracts/skills.ts`, `skillManifest.ts`, `runSkill.ts`, docs in `docs/skills/authoring.md` and `docs/skills/overview.md`). Only after that lands may `CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS` be removed from `scripts/run.js` and replaced with a read of the new declared field. |
    | C: inconclusive failure | Failure real but unrelated to sandbox/approval (flake, timeout, layout drift, app state). Stderr shows no sandbox/approval signal. | Retry the probe up to 2 more times from the same clean baseline. If all 3 attempts fail without citing sandbox/approval, treat as bypass-independent unreliability: proceed with C2 Step 4 deletion AND flag reliability as at-risk in the probe `README.md`. All three probe attempts must be committed. |
 
@@ -386,17 +382,15 @@ Do not touch:
 
 ### Steps
 
-1. Move or delete Solax-specific logic from `scripts/run.js`:
-   - remove the hardcoded `CHECKPOINT_IDS` array
-   - remove `parseFinalSkillResultFrame` and all duplicated contract
-     checks; trust `runSkill` to validate the final frame
-   - remove the Samsung-specific tap-coordinate hints `860,1399` and
-     `875,1548` from the prompt builder; if any of those hints are
-     genuinely required for reliability, move them into `SKILL.md` as part
-     of the runtime program and cite the recorded source, not harness code
-   - remove the `percent`-specific validation path from the harness;
-     argv parsing that belongs to the skill's semantics belongs in the
-     agent's reasoning over `CLAWPERATOR_SKILL_INPUTS`, not in the harness
+1. Move or delete Solax-specific logic from `scripts/run.js`. After this
+   step, the harness must no longer be the authority on:
+   - checkpoint schema or checkpoint ordering
+   - final `SkillResult` contract validation
+   - Solax navigation policy or recovery policy
+   - device-layout-specific coordinates or taps
+   - skill-semantic input validation beyond minimal harness safety checks
+   If any of that logic remains necessary, it belongs in `SKILL.md` as part
+   of the runtime program, not in the harness.
 2. Reduce `scripts/run.js` to codex-oriented harness duties only:
    - read the required env vars (`CLAWPERATOR_SKILL_AGENT_CLI_PATH`,
      `CLAWPERATOR_SKILL_PROGRAM`, `CLAWPERATOR_SKILL_INPUTS`,
@@ -410,12 +404,9 @@ Do not touch:
    - forward `SIGTERM` / `SIGINT` as a process-group signal
    - preserve the final framed result exactly as codex produced it and
      let `runSkill` validate it
-   - target a materially smaller line count. The current harness is 637
-     lines. Aim for "reads like the test fixture
-     `apps/node/src/test/fixtures/skills/com.test.agent-skill-result/scripts/run.js`
-     (56 lines) plus the codex-specific spawn shape". The intent is a
-     deliberate order-of-magnitude reduction. The author should be able
-     to defend any line that remains.
+   - target a materially smaller implementation that reads like the thin-
+     harness test fixture plus the minimal codex-specific spawn shape. The
+     author should be able to defend any line that remains.
 3. Remove sibling-repo and branch-local build assumptions:
    - delete `clawperatorRepoRoot` and the `../clawperator` resolution
    - do not synthesise `clawperatorBinCommand` from
@@ -440,12 +431,10 @@ Do not touch:
    - Under no circumstances may the bypass path continue to exist as a
      private, undocumented env var in `scripts/run.js`.
 5. Harden `SKILL.md` with strict-agentic discipline rules. Motivation:
-   public OpenClaw documentation and field reports describe a lazy-mode
-   pattern in which GPT-5-family runs (which codex uses at runtime) emit
-   plan-only turns instead of calling tools, and then treat the plan as
-   progress. W2b v1 is codex-only, so this pattern is directly applicable.
-   SKILL.md is the single surface where this discipline lives for W2b v1;
-   the runtime does not yet enforce it.
+   codex/GPT-5-family runs can produce plan-heavy turns that overstate
+   progress. For W2b v1 this is a skills-side operational risk, not a new
+   Clawperator runtime contract. The discipline therefore lives in `SKILL.md`
+   and in C3 evidence review, not in `runSkill`.
 
    Add (or reconcile against existing wording) exactly these five rules
    to
@@ -498,10 +487,9 @@ Do not touch:
 
 Mechanical:
 
-- `wc -l ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/scripts/run.js`
-  is materially smaller than 637 and the remaining content is codex
+- `scripts/run.js` is materially smaller and the remaining content is codex
   spawn shape only.
-- `rg "CHECKPOINT_IDS|parseFinalSkillResultFrame|860,1399|875,1548|\\.\\./clawperator|apps/node/dist/cli/index\\.js|CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS|SAFE_ENV_KEYS|OPENAI_API_KEY" ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/scripts/run.js`
+- `rg "CHECKPOINT_IDS|parseFinalSkillResultFrame|\\.\\./clawperator|apps/node/dist/cli/index\\.js|CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS|SAFE_ENV_KEYS|OPENAI_API_KEY" ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/scripts/run.js`
   returns zero matches.
 - `rg "Planning in prose is not progress" ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/SKILL.md`
   matches (all five rule keywords match on separate greps).
@@ -559,7 +547,7 @@ commit from C2.0 precedes these.
 ### Agent Tier
 
 default. Escalate to thinking if the lazy-mode classification pass is
-contested (e.g. a run's status is ambiguous between `lazy-success` and
+contested (e.g. a run's status is ambiguous between `weak-evidence success` and
 `evidence-backed success`).
 
 ### Goal
@@ -617,17 +605,17 @@ threshold.
    record it alongside the nominal runs. The forced-failure run must
    produce a truthful `failed` or `indeterminate` `SkillResult` without
    leaving the runtime in a `runtime_poisoned` state.
-6. Run a lazy-success detection pass over every captured run using the
+6. Run a strict-agentic evidence review over every captured run using the
    classification table from `plan.md` "Decision Rules > C3 Per-Run
-   Lazy-Mode Classification". Reproduced here for implementer
+   Strict-Agentic Evidence Classification". Reproduced here for implementer
    convenience; the plan.md version is authoritative. First-match-wins.
 
    | Observed in the run | Classification | Counts toward ≥8/10 threshold? |
    | --- | --- | --- |
    | `status: success` AND ≥5 distinct Clawperator invocations AND a `read` call of `Discharge to <percent>%` AND checkpoint notes cite concrete commands | evidence-backed success | Yes |
-   | `status: success` AND fewer than 5 distinct Clawperator invocations | lazy-success | No |
-   | `status: success` AND no terminal `read` of `Discharge to <percent>%` | lazy-success | No |
-   | `status: success` AND checkpoint notes do not cite the concrete commands used | lazy-success | No |
+   | `status: success` AND fewer than 5 distinct Clawperator invocations | weak-evidence success | No |
+   | `status: success` AND no terminal `read` of `Discharge to <percent>%` | weak-evidence success | No |
+   | `status: success` AND checkpoint notes do not cite the concrete commands used | weak-evidence success | No |
    | `status: failed` | failed | No |
    | `status: indeterminate` | indeterminate | No |
    | Frame parse failure, `SKILL_RESULT_PARSE_FAILED`, or any `runtime_poisoned` state | runtime_poisoned | No. Blocks ship. |
@@ -638,8 +626,8 @@ threshold.
    - raw `status: success` count
    - evidence-backed success count (this is the number compared against
      the ≥8/10 threshold)
-   - per-run lazy-mode classification table, with the reasoning for each
-     `lazy-success` exclusion (quote the specific stderr or frame
+   - per-run strict-agentic evidence classification table, with the reasoning
+     for each `weak-evidence success` exclusion (quote the specific stderr or frame
      evidence)
    - failure modes observed
    - whether any `runtime_poisoned` state occurred
@@ -670,7 +658,7 @@ Mechanical:
   count from evidence-backed success count.
 - `summary.md` states whether the ≥8/10 evidence-backed threshold was
   met and whether any `runtime_poisoned` state occurred.
-- No run classified as `lazy-success` is counted toward the threshold.
+- No run classified as `weak-evidence success` is counted toward the threshold.
 - `replay-control.md` exists and records a passing replay run from the
   same device.
 - `rg "Completed" tasks/recording/agent-driven-skills-closeout/plan.md
