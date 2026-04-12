@@ -112,3 +112,20 @@ only in `tasks/`.
 - Keep the C3 evidence truthful even if the threshold is not met. These
   findings are here to improve the next iteration, not to soften the current
   outcome.
+- 2026-04-12: The save path was still incomplete even when the agent marked
+  `save_completed`. A direct `snapshot` taken immediately after the failed
+  verification attempt showed the `Peak Export` editor with a modal prompt:
+  `The save operation will cancel the currently executing scenario. Confirm saving？`
+  plus visible `Cancel` and `Confirm` actions. The correct live sequence is:
+  toolbar `Save` if present -> lower `Save` -> prompt `Confirm` -> wait for the
+  app shell to resume -> reopen the route and read the `Discharge to ...` row.
+  After manually clicking that prompt `Confirm`, the direct verification route
+  succeeded and read `Discharge to 40% `. The orchestrated prompt and SKILL.md
+  must treat the prompt confirm as part of save completion, not as an optional
+  postcondition.
+- 2026-04-12: After updating the orchestrated prompt and SKILL.md to include
+  the save-confirm prompt, a full live orchestrated run succeeded end to end:
+  `40 -> 43`, with exact terminal verification from
+  `com.solaxcloud.starter.set-discharge-to-limit-orchestrated-verify-route`
+  reading `Discharge to 43% `. This establishes the repaired save contract as
+  the new baseline before restarting the 10-run C3 reliability loop.
