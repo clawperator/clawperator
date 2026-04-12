@@ -562,8 +562,6 @@ threshold.
 ### Files Or Surfaces To Change
 
 - `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/baseline.md`
-- `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/run-01/` through `run-10/` (each with `result.json`, `stderr.txt`, `frame.json`, `metadata.json`)
-- `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/run-forced-failure/` (at least one)
 - `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/summary.md`
 - `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/replay-control.md`
 - `tasks/recording/agent-driven-skills-closeout/plan.md` (Status row only)
@@ -588,25 +586,26 @@ threshold.
    (`node apps/node/dist/cli/index.js` or `./bin/clawperator` depending
    on repo state), not the globally installed binary. Use the `.dev`
    operator package.
-3. For each run, capture into `run-NN/`:
-   - `result.json`: the full structured JSON output from
-     `clawperator skills run`
-   - `stderr.txt`: the stderr transcript
-   - `frame.json`: the final framed `SkillResult`
-   - `metadata.json`: run index, start time, end time, whether the run
+3. Capture per-run raw artifacts locally while the loop is executing:
+   - the full structured JSON output from `clawperator skills run`
+   - the stderr transcript
+   - the final framed `SkillResult`
+   - small metadata including run index, timestamps, whether the run
      hit the recovery branch, and the count of distinct Clawperator CLI
      invocations observed in stderr (e.g. `open`, `click`, `type`,
-     `read`, `press`, `snapshot`, `scroll`, `wait`). The invocation
-     count is the lazy-mode detector input for Step 6.
-4. Save the captured artifacts under
-   `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/`
-   with one subdirectory per run. Do not collapse runs into a single
-   combined log; individual run artifacts must be inspectable.
+     `read`, `press`, `snapshot`, `scroll`, `wait`)
+   These raw artifacts are local debugging evidence, not default repo
+   content.
+4. Promote only synthesized durable evidence into
+   `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/`:
+   `baseline.md`, `summary.md`, and `replay-control.md`. If a specific
+   sanitized excerpt is needed to justify a claim, include only that
+   excerpt rather than whole per-run scratch directories.
 5. Include at least one deliberate forced-failure run (e.g. start from a
-   wrong tab, or wrong initial value) under `run-forced-failure/` and
-   record it alongside the nominal runs. The forced-failure run must
-   produce a truthful `failed` or `indeterminate` `SkillResult` without
-   leaving the runtime in a `runtime_poisoned` state.
+   wrong tab, or wrong initial value) in the local capture set and record
+   its outcome in `summary.md`. The forced-failure run must produce a
+   truthful `failed` or `indeterminate` `SkillResult` without leaving the
+   runtime in a `runtime_poisoned` state.
 6. Run a strict-agentic evidence review over every captured run using the
    classification table from `plan.md` "Decision Rules > C3 Per-Run
    Strict-Agentic Evidence Classification". Reproduced here for implementer
@@ -652,9 +651,6 @@ threshold.
 
 Mechanical:
 
-- At least 10 `run-NN/` directories exist, each containing
-  `result.json`, `stderr.txt`, `frame.json`, `metadata.json`.
-- At least one `run-forced-failure/` directory exists.
 - `baseline.md` exists and covers the required fields.
 - `summary.md` exists and explicitly distinguishes raw `status: success`
   count from evidence-backed success count.
@@ -670,7 +666,7 @@ Mechanical:
 Human review:
 
 - Output accuracy: every classification in `summary.md` is traceable to
-  a concrete stderr line or frame field.
+  concrete per-run evidence captured during the loop.
 - Scope completeness: all 10 runs came from the same baseline; any
   baseline drift would have been a re-probe trigger.
 - Evidence grounding: the replay control is from the same device and
@@ -682,7 +678,6 @@ Human review:
 
 ```bash
 ls docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/
-ls docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/run-01/
 rg "evidence-backed success count" docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/summary.md
 rg "runtime_poisoned" docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/summary.md
 ```

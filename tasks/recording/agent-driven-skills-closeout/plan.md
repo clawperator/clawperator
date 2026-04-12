@@ -324,12 +324,10 @@ At the end of this pack, the following must exist.
   `codex-version.txt`, and `codex-sandbox-flags.txt`.
 - `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/baseline.md`
   defines the clean pre-run device state.
-- `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/run-01/`
-  through `run-10/` each contain `result.json`, `stderr.txt`,
-  `frame.json`, `metadata.json`.
 - `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/summary.md`
   classifies every run and states whether the ≥8/10 evidence-backed
-  threshold held.
+  threshold held. Raw per-run logs are local scratch evidence and are not
+  expected repo artifacts.
 - `tasks/recording/agent-driven-skills-closeout/plan.md` and
   `work-breakdown.md` Status tables match the committed evidence.
 - `tasks/recording/agent-driven-skills/plan.md` and `work-breakdown.md`

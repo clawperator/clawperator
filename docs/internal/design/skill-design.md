@@ -77,6 +77,11 @@ This proved especially important for flows where the app returns to an editor
 screen after `Confirm` and requires another save-confirm cycle before the
 change actually persists.
 
+For repeated reliability runs, carry forward the last known persisted value and
+choose a different target on the next run. Repeating the same requested value
+can create a false-confidence no-op that looks green without proving a real
+state change.
+
 ### Decorative UI Text Must Not Cause False Failures
 
 Some UI rows include decorative trailing glyphs such as chevrons.
@@ -102,6 +107,21 @@ Those artifacts made it possible to distinguish:
 - strictness bugs in the emitted verification rule
 - transport or runtime-controller mistakes
 - lazy-mode agent behavior that looked superficially clean
+
+Keep those artifacts as local debugging output, not as default committed
+repository content. Durable docs should preserve the method, the thresholds,
+and the synthesized conclusions. Raw per-run transcripts are scratch evidence
+unless a specific sanitized excerpt is needed to support a durable claim.
+
+When building local reliability runners around `clawperator skills run --json`,
+parse the actual result from `skillResult`. The top-level JSON wrapper can
+carry controller metadata, so checking only a top-level `.status` field can
+misclassify a successful run as empty or failed.
+
+On macOS, pay attention to child process groups when capturing orchestrated
+runtime output. If the wrapper does not terminate and reap the spawned group
+cleanly, `codex exec` can outlive the parent skill run and muddy later
+observations, making stalls and retries look more mysterious than they are.
 
 ### Prefer Current-State Continuation Over Blind Restarts
 
