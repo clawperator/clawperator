@@ -2480,6 +2480,41 @@ describe("runSkill", () => {
     assert.strictEqual(parsed.timeoutMs, undefined);
   });
 
+  it("CLI skills run forwards --device exactly once on the real CLI path", async () => {
+    const fakeAdbDir = await createFakeAdb({
+      installed: true,
+      operatorPackage: "com.clawperator.operator.dev",
+    });
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      "com.test.echo-all",
+      "--device",
+      "device-123",
+      "--operator-package",
+      "com.clawperator.operator.dev",
+      "--output",
+      "json",
+      "--",
+      "--limit",
+      "40",
+    ], {
+      env: {
+        ...process.env,
+        PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+      },
+    });
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { output?: string };
+    const outputLines = (parsed.output ?? "").trim().split(/\r?\n/);
+    assert.deepStrictEqual(outputLines, [
+      "TEST_OUTPUT:device-123",
+      "TEST_OUTPUT:--limit",
+      "TEST_OUTPUT:40",
+    ]);
+  });
+
   it("CLI skills run rejects a typo in a known wrapper flag after the skill id", async () => {
     const { stdout, code } = await runCli([
       "skills",

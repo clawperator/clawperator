@@ -1,3 +1,6 @@
+import { access } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
+import { delimiter, join } from "node:path";
 import { isAdbAvailable, runAdb } from "../../../adapters/android-bridge/adbClient.js";
 import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { type DoctorCheckResult } from "../../../contracts/doctor.js";
@@ -6,6 +9,27 @@ import { DOCTOR_DOCS_URLS } from "../docsUrls.js";
 
 const DEFAULT_ORCHESTRATED_SKILL_AGENT_CLI = "codex";
 const ORCHESTRATED_SKILL_AGENT_CLI_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_CLI";
+const EXECUTABLE_NAME_PATTERN = /^[A-Za-z0-9._+-]+$/;
+
+async function canExecute(path: string): Promise<boolean> {
+  try {
+    await access(path, fsConstants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveExecutableOnPath(executableName: string): Promise<string | null> {
+  const pathEntries = (process.env.PATH ?? "").split(delimiter).filter((entry) => entry.length > 0);
+  for (const entry of pathEntries) {
+    const candidate = join(entry, executableName);
+    if (await canExecute(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+}
 
 export async function checkNodeVersion(): Promise<DoctorCheckResult> {
   const version = process.version;
@@ -97,12 +121,33 @@ export async function checkAdbServer(config: RuntimeConfig): Promise<DoctorCheck
   };
 }
 
-export async function checkOrchestratedSkillAgentCli(config: RuntimeConfig): Promise<DoctorCheckResult> {
+export async function checkOrchestratedSkillAgentCli(_config: RuntimeConfig): Promise<DoctorCheckResult> {
   const configuredCli = process.env[ORCHESTRATED_SKILL_AGENT_CLI_ENV_VAR]?.trim() || DEFAULT_ORCHESTRATED_SKILL_AGENT_CLI;
-  const shellCommand = `command -v ${configuredCli}`;
-  const result = await config.runner.runShell(shellCommand);
 
-  if (result.code !== 0 || !result.stdout.trim()) {
+  if (!EXECUTABLE_NAME_PATTERN.test(configuredCli)) {
+    return {
+      id: "host.skill-agent-cli.presence",
+      status: "warn",
+      code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
+      summary: `Configured orchestrated-skill agent CLI '${configuredCli}' is not a plain executable name.`,
+      detail: `Set ${ORCHESTRATED_SKILL_AGENT_CLI_ENV_VAR} to an executable name without slashes, spaces, or shell syntax.`,
+      fix: {
+        title: "Configure a plain executable name for the orchestrated skill agent CLI",
+        platform: "any",
+        steps: [
+          { kind: "manual", value: `Set ${ORCHESTRATED_SKILL_AGENT_CLI_ENV_VAR} to an executable name such as '${DEFAULT_ORCHESTRATED_SKILL_AGENT_CLI}'.` },
+        ],
+        docsUrl: DOCTOR_DOCS_URLS.setup,
+      },
+      evidence: {
+        configuredCli,
+      },
+    };
+  }
+
+  const resolvedPath = await resolveExecutableOnPath(configuredCli);
+
+  if (resolvedPath === null) {
     return {
       id: "host.skill-agent-cli.presence",
       status: "warn",
@@ -130,7 +175,7 @@ export async function checkOrchestratedSkillAgentCli(config: RuntimeConfig): Pro
     summary: `Default orchestrated-skill agent CLI '${configuredCli}' is available.`,
     evidence: {
       configuredCli,
-      resolvedPath: result.stdout.trim(),
+      resolvedPath,
     },
   };
 }

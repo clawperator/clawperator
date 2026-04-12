@@ -1,5 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { delimiter, join } from "node:path";
+import { tmpdir } from "node:os";
 import { checkAdbPresence, checkAdbServer, checkNodeVersion, checkOrchestratedSkillAgentCli } from "../../../domain/doctor/checks/hostChecks.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
@@ -114,36 +117,73 @@ describe("Doctor: hostChecks", () => {
         it("returns a warning when the default orchestrated skill agent CLI is missing", async () => {
             const runner = new FakeProcessRunner();
             const config = getDefaultRuntimeConfig({ runner });
+            const originalPath = process.env.PATH;
 
-            runner.queueResult({ code: 1, stdout: "", stderr: "" });
+            try {
+                process.env.PATH = "";
+                const result = await checkOrchestratedSkillAgentCli(config);
 
-            const result = await checkOrchestratedSkillAgentCli(config);
-
-            assert.strictEqual(result.status, "warn");
-            assert.strictEqual(result.code, ERROR_CODES.HOST_DEPENDENCY_MISSING);
-            assert.match(result.summary, /codex/);
-            assert.deepStrictEqual(result.evidence, { configuredCli: "codex" });
+                assert.strictEqual(result.status, "warn");
+                assert.strictEqual(result.code, ERROR_CODES.HOST_DEPENDENCY_MISSING);
+                assert.match(result.summary, /codex/);
+                assert.deepStrictEqual(result.evidence, { configuredCli: "codex" });
+            } finally {
+                if (originalPath === undefined) {
+                    delete process.env.PATH;
+                } else {
+                    process.env.PATH = originalPath;
+                }
+            }
         });
 
         it("respects CLAWPERATOR_SKILL_AGENT_CLI when set", async () => {
-            const runner = new FakeProcessRunner();
-            const config = getDefaultRuntimeConfig({ runner });
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
             const original = process.env.CLAWPERATOR_SKILL_AGENT_CLI;
+            const originalPath = process.env.PATH;
+            const fakeDir = await mkdtemp(join(tmpdir(), "clawperator-agent-cli-"));
+            const fakeAgentPath = join(fakeDir, "my-agent");
+            await writeFile(fakeAgentPath, "#!/bin/sh\nexit 0\n", "utf8");
+            await chmod(fakeAgentPath, 0o755);
             process.env.CLAWPERATOR_SKILL_AGENT_CLI = "my-agent";
-            runner.queueResult({ code: 0, stdout: "/usr/local/bin/my-agent\n", stderr: "" });
 
             try {
+                process.env.PATH = `${fakeDir}${delimiter}${originalPath ?? ""}`;
                 const result = await checkOrchestratedSkillAgentCli(config);
 
                 assert.strictEqual(result.status, "pass");
                 assert.match(result.summary, /my-agent/);
                 assert.deepStrictEqual(result.evidence, {
                     configuredCli: "my-agent",
-                    resolvedPath: "/usr/local/bin/my-agent",
+                    resolvedPath: fakeAgentPath,
                 });
-                assert.deepStrictEqual(runner.calls[0], {
-                    command: "bash",
-                    args: ["-lc", "command -v my-agent"],
+            } finally {
+                await rm(fakeDir, { recursive: true, force: true });
+                if (original === undefined) {
+                    delete process.env.CLAWPERATOR_SKILL_AGENT_CLI;
+                } else {
+                    process.env.CLAWPERATOR_SKILL_AGENT_CLI = original;
+                }
+                if (originalPath === undefined) {
+                    delete process.env.PATH;
+                } else {
+                    process.env.PATH = originalPath;
+                }
+            }
+        });
+
+        it("warns when CLAWPERATOR_SKILL_AGENT_CLI contains shell syntax instead of a plain executable name", async () => {
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const original = process.env.CLAWPERATOR_SKILL_AGENT_CLI;
+            process.env.CLAWPERATOR_SKILL_AGENT_CLI = "codex; echo pwned";
+
+            try {
+                const result = await checkOrchestratedSkillAgentCli(config);
+
+                assert.strictEqual(result.status, "warn");
+                assert.strictEqual(result.code, ERROR_CODES.HOST_DEPENDENCY_MISSING);
+                assert.match(result.summary, /not a plain executable name/);
+                assert.deepStrictEqual(result.evidence, {
+                    configuredCli: "codex; echo pwned",
                 });
             } finally {
                 if (original === undefined) {

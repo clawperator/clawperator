@@ -397,7 +397,7 @@ export async function runSkill(
   if (resolvedAgentConfig && resolvedAgentExecutablePath && skillProgramPath) {
     childEnv[SKILL_AGENT_CLI_ENV_VAR] = resolvedAgentConfig.cli;
     childEnv[SKILL_AGENT_CLI_PATH_ENV_VAR] = resolvedAgentExecutablePath;
-    childEnv[SKILL_AGENT_TIMEOUT_MS_ENV_VAR] = String(resolvedAgentConfig.timeoutMs ?? timeout);
+    childEnv[SKILL_AGENT_TIMEOUT_MS_ENV_VAR] = String(effectiveTimeoutMs);
     childEnv[SKILL_INPUTS_ENV_VAR] = JSON.stringify(args);
     childEnv[SKILL_PROGRAM_ENV_VAR] = skillProgramPath;
     childEnv[SKILL_ID_ENV_VAR] = skillId;
