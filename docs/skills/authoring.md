@@ -210,7 +210,8 @@ program. In that shape:
 - the harness spawns the configured agent CLI from `skill.json.agent`
 - the runtime agent uses Clawperator as the hand
 - the runtime agent emits exactly one terminal `[Clawperator-Skill-Result]` frame
-- W2b v1 orchestrated skills are codex-only at runtime and currently run codex with `danger-full-access` so the runtime agent can reach live adb targets
+- the currently supported orchestrated runtime path uses `codex` as the agent CLI
+- orchestrated skills currently run codex with `danger-full-access` so the runtime agent can reach live adb targets
 
 ## `skill.json` Contract
 
@@ -314,7 +315,7 @@ When a skill is agent-driven at runtime, the authoring split is:
 
 The harness should not absorb skill logic that belongs in `SKILL.md`. If the
 wrapper starts containing the real navigation or verification policy, the skill
-has drifted away from the W2b runtime shape.
+has drifted away from the current orchestrated runtime contract.
 
 `clawperator skills run` injects the orchestrated runtime env vars that the
 harness reads. For the exact variable list and defaults, see
