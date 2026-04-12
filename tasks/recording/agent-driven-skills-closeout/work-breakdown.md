@@ -8,26 +8,29 @@ Four phases (C1, C2.0, C2, C3) ship across two PRs. The Clawperator PR carries
 C1 (runtime strictness, docs gaps), C2.0 (bypass-dependency probe evidence),
 and C3 (10-run reliability evidence). The skills PR carries C2 (thin the Solax
 orchestrated harness, harden `SKILL.md` with strict-agentic rules, document the
-codex-only v1 limitation). C1 is next. C2 cannot start until C2.0 is complete.
-Reliability evidence remains committed in the Clawperator repo under
-`docs/internal/design/reliability/`.
+codex-only runtime limitation). All four phases are now complete. Reliability
+evidence remains committed in the Clawperator repo under
+`docs/internal/design/reliability/`, and the authoring lessons from the Solax
+repair pass have been migrated into durable docs.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | active |
+| State | completed |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | C1, C2.0, C2 |
-| Remaining | C3 |
-| Current / Next | C3 reliability evidence |
-| Blockers | codex-path live runs still lose the Samsung device inside the orchestrated runtime path, and the replay control still times out after save |
+| Completed | C1, C2.0, C2, C3 |
+| Remaining | none |
+| Current / Next | done |
+| Blockers | none |
 
 ## Hard Rules
 
-- Do not mark the skills-side PR ready before C3 is complete.
-- Do not declare P4 reliability passed on fewer than 10 recorded runs.
+- Do not rewrite the recorded outcome after completion. The measured result is
+  a 10/10 successful reliability pack.
+- Do not move durable authoring guidance back into `tasks/`. It now lives in
+  `docs/skills/authoring.md` and `docs/internal/design/skill-design.md`.
 - Do not leave codex-only as an implicit implementation detail. If it is the
   shipped W2b v1 reality, document it in the skill and in the public skill
   docs with the exact phrasing "W2b v1 orchestrated skills are codex-only at
@@ -98,9 +101,8 @@ then existing artifact state.
 | PR-clawperator | clawperator | Runtime strictness, public docs gaps, probe evidence, 10-run reliability evidence | C1, C2.0, C3 | default |
 | PR-skills | clawperator-skills | Thin the orchestrated harness, harden `SKILL.md`, document codex-only v1 | C2 | thinking |
 
-Do not start C2 before C2.0 is complete. Do not mark the skills-side PR ready
-before C3 is complete and the ≥8/10 evidence-backed threshold either held or
-the PR was re-scoped to reflect the true outcome.
+The measured C3 outcome met the threshold and exceeded it: 10 of 10 runs
+reached terminal verification with `status: success`.
 
 ## Phase C1: Close Clawperator Runtime And Docs Gaps
 

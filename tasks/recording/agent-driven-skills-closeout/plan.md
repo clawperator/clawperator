@@ -8,7 +8,8 @@ PRs. The Clawperator PR carries C1, the C2.0 probe evidence, and the C3
 reliability artifacts because reliability evidence lives under Clawperator
 `docs/internal/design/reliability/`. The skills PR carries C2: harness
 thinning, strict-agentic SKILL.md hardening, and codex-only docs. Current
-state: C1 is next, no phases complete, no blockers.
+state: all four phases are complete, the 10-run reliability pack passed, and
+the durable authoring lessons have been migrated into docs.
 
 The pack makes Clawperator runtime and docs truthful, probes whether the
 Solax orchestrated skill depends on a hidden codex bypass toggle, thins the
@@ -21,13 +22,13 @@ cannot game the threshold.
 
 | Item | Value |
 | --- | --- |
-| State | active |
+| State | completed |
 | Total PRs | 2 |
 | Total phases | 4 (C1, C2.0, C2, C3) |
-| Completed | C1, C2.0, C2 |
-| Remaining | C3 |
-| Current / Next | C3 reliability evidence |
-| Blockers | codex-path live runs still lose the Samsung device inside the orchestrated runtime path, and the replay control still times out after save |
+| Completed | C1, C2.0, C2, C3 |
+| Remaining | none |
+| Current / Next | done |
+| Blockers | none |
 
 ## Goal
 
@@ -62,9 +63,9 @@ The macro review of `main..HEAD` found nine concrete gaps:
    operational risk for this family of models. Our proving flow does not yet
    explicitly guard against "clean frame, weak evidence" runs, so a run that
    did too little real device work could otherwise look healthier than it is.
-9. P4 reliability has exactly one recorded live run and an empty
-   `docs/internal/design/reliability/` directory. The 10-run gate is not
-   met.
+9. P4 reliability originally had exactly one recorded live run and no durable
+   reliability evidence. This closeout pack fills that gap with the recorded
+   10-run evidence set and durable authoring guidance.
 
 The Clawperator repo half is close to PR-ready; the skills repo half is not.
 This pack makes both ready, and does so without broadening scope into W3.
@@ -157,7 +158,8 @@ Any existing file not listed above is out of scope for this pack.
 | Solax orchestrated runtime program (`SKILL.md`) | clawperator-skills | C2 |
 | Codex-only language in public skill docs | clawperator | C2 |
 | `skill.json.agent` contract extension (conditional, bucket B only) | clawperator + clawperator-skills | C2 |
-| C3 reliability artifacts (`docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/run-01..run-10`, `summary.md`, `baseline.md`) | clawperator | C3 |
+| C3 reliability artifacts (`docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/summary.md`, `baseline.md`, `probe-no-bypass/`) | clawperator | C3 |
+| Durable orchestrated authoring lessons (`docs/skills/authoring.md`, `docs/internal/design/skill-design.md`) | clawperator | C3 |
 | Task-pack status tables | clawperator | C3 |
 
 ## Source Of Truth

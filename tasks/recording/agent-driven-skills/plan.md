@@ -22,12 +22,12 @@ runtime shape of orchestrated skills.
 
 | Item | Value |
 | --- | --- |
-| State | active |
+| State | completed |
 | Total PRs | 2 |
 | Total phases | 5 |
-| Completed | P1, P2, P3 |
-| Remaining | P4, P5 |
-| Current / Next | P4 reliability validation |
+| Completed | P1, P2, P3, P4, P5 |
+| Remaining | none |
+| Current / Next | done |
 | Blockers | none |
 
 ## Current Reality
@@ -41,8 +41,9 @@ The W2b runtime shape now exists in code and in the Solax proving skill:
 - the Solax orchestrated proving skill exists in `../clawperator-skills`
 - one branch-local live proving run has succeeded on the physical Samsung target
 
-What remains is repeated-run reliability validation and the durable handoff/docs
-phase. W2b should no longer be described as blocked on W2.
+The repeated-run reliability validation and the durable handoff/docs phase are
+now complete. W2b should no longer be described as active work on these
+branches.
 
 ## Goal
 

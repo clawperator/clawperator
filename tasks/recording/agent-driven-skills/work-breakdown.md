@@ -13,9 +13,9 @@ architectural framing.
 | --- | --- |
 | Total PRs | 2 |
 | Total phases | 5 |
-| Completed | P1, P2, P3 |
-| Remaining | P4, P5 |
-| Current / Next | P4 reliability validation |
+| Completed | P1, P2, P3, P4, P5 |
+| Remaining | none |
+| Current / Next | done |
 | Blockers | none |
 
 ## Hard Rules
@@ -76,8 +76,11 @@ the docs changes end up.
 - P3 is complete for the first proving case: the Solax orchestrated skill now
   exists and has produced one successful branch-local live run on the physical
   Samsung target.
-- P4 remains open: repeated-run reliability measurement has not been completed.
-- P5 remains open: durable docs and handoff cleanup still need to be finished.
+- P4 is complete: the repeated-run reliability measurement completed with
+  10 of 10 runs reaching terminal verification with `status: success`.
+- P5 is complete: durable docs and handoff cleanup have been migrated into
+  `docs/skills/authoring.md`, `docs/skills/overview.md`, and
+  `docs/internal/design/skill-design.md`.
 
 ## Phase P1: Commit The Agent-Driven Runtime Contract
 
