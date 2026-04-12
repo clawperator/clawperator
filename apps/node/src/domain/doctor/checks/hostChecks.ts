@@ -3,7 +3,6 @@ import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConf
 import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { DOCTOR_DOCS_URLS } from "../docsUrls.js";
-import { join } from "node:path";
 import { loadRegistry, getRepoRoot } from "../../../adapters/skills-repo/localSkillsRegistry.js";
 import {
   EXECUTABLE_NAME_PATTERN,
@@ -11,6 +10,7 @@ import {
   resolveConfiguredAgentCli,
   resolveAgentCliExecutable,
 } from "../../skills/agentCli.js";
+import { resolveRepoRelativeSkillPath } from "../../skills/pathUtils.js";
 import { readSkillManifestMetadata } from "../../skills/skillManifest.js";
 
 const DEFAULT_ORCHESTRATED_SKILL_AGENT_CLI = "codex";
@@ -223,7 +223,7 @@ export async function checkInstalledOrchestratedSkillAgentCliAvailability(_confi
 
     const resolution = await resolveAgentCliExecutable(
       effectiveAgent.agent,
-      join(repoRoot, skill.path),
+      resolveRepoRelativeSkillPath(repoRoot, skill.path),
       process.env
     );
     if (!resolution.ok) {

@@ -1,6 +1,6 @@
 import { constants as fsConstants } from "node:fs";
 import { access } from "node:fs/promises";
-import { delimiter, extname, join, resolve, isAbsolute } from "node:path";
+import { delimiter, extname, join, resolve, relative, isAbsolute } from "node:path";
 import type { SkillAgentConfig } from "../../contracts/skills.js";
 
 export const SKILL_AGENT_CLI_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_CLI";
@@ -117,7 +117,20 @@ export async function resolveAgentCliExecutable(
   resolvedEnv: NodeJS.ProcessEnv
 ): Promise<AgentCliResolution> {
   if (agent.cliPath && agent.cliPath.length > 0) {
-    const resolvedCliPath = isAbsolute(agent.cliPath) ? agent.cliPath : resolve(skillDir, agent.cliPath);
+    if (isAbsolute(agent.cliPath)) {
+      return {
+        ok: false,
+        message: "Configured agent cliPath must be relative to the skill directory",
+      };
+    }
+    const resolvedCliPath = resolve(skillDir, agent.cliPath);
+    const relativeCliPath = relative(skillDir, resolvedCliPath);
+    if (relativeCliPath.startsWith("..") || isAbsolute(relativeCliPath)) {
+      return {
+        ok: false,
+        message: "Configured agent cliPath must stay within the skill directory",
+      };
+    }
     if (await canResolveAgentTarget(resolvedCliPath)) {
       return { ok: true, executablePath: resolvedCliPath };
     }

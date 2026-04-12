@@ -1798,8 +1798,8 @@ describe("runSkill", () => {
     // The fixture registry entry points at a skill folder that is not present on disk.
     const result = await runSkill("com.android.settings.capture-overview", []);
     assert.ok(!result.ok);
-    assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
-    assert.match(result.message, /Unable to read trusted skill result source metadata/i);
+    assert.strictEqual(result.code, SKILL_SCRIPT_NOT_FOUND);
+    assert.match(result.message, /Script not found/i);
   });
 
   it("runs script and captures output on success", async () => {
@@ -2927,6 +2927,32 @@ describe("runSkill", () => {
       assert.ok(legacyResult.ok, `Expected legacy path to stay permissive: ${"message" in legacyResult ? legacyResult.message : ""}`);
       assert.strictEqual(legacyResult.skillResult, null);
       assert.strictEqual(legacyResult.output, "legacy-output-only\n");
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("keeps the legacy path permissive for script-only skills when skill.json is malformed", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.legacy-malformed-skill-json",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        TEST_SKILL_SCRIPT_ONLY,
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: "{not-json",
+    });
+
+    try {
+      const result = await runSkill("com.test.legacy-malformed-skill-json", [], temp.registryPath);
+      assert.ok(result.ok, `Expected legacy script skill to run despite malformed skill.json: ${"message" in result ? result.message : ""}`);
+      assert.match(result.output, /fixture run/);
+      assert.strictEqual(result.skillResult, null);
     } finally {
       await temp.cleanup();
     }

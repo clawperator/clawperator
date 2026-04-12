@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { extname } from "node:path";
 import { loadRegistry, findSkillById, getRepoRoot } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import type { Logger } from "../../adapters/logger.js";
@@ -39,6 +39,11 @@ const SKILL_INPUTS_ENV_VAR = "CLAWPERATOR_SKILL_INPUTS";
 const SKILL_PROGRAM_ENV_VAR = "CLAWPERATOR_SKILL_PROGRAM";
 const SKILL_ID_ENV_VAR = "CLAWPERATOR_SKILL_ID";
 const SKILLS_REGISTRY_ENV_VAR = "CLAWPERATOR_SKILLS_REGISTRY";
+const AGENT_HARNESS_SIGNATURES = [
+  SKILL_AGENT_CLI_PATH_ENV_VAR,
+  SKILL_PROGRAM_ENV_VAR,
+  SKILL_RESULT_FRAME_PREFIX,
+];
 
 export interface SkillRunResult {
   ok: true;
@@ -121,6 +126,15 @@ function signalSkillChildWithLogging(
     }
   }
   child.kill(signal);
+}
+
+async function scriptRequiresTrustedManifestMetadata(scriptPath: string): Promise<boolean> {
+  try {
+    const contents = await readFile(scriptPath, "utf8");
+    return AGENT_HARNESS_SIGNATURES.some((signature) => contents.includes(signature));
+  } catch {
+    return false;
+  }
 }
 
 function parseSemver(version: string): { major: number; minor: number; patch: number } | null {
@@ -306,8 +320,23 @@ export async function runSkill(
     }
 
     const repoRoot = getRepoRoot(loaded.resolvedPath);
+    const scriptRelative = skill.scripts.find((s) => extname(s) === ".js") ??
+      skill.scripts.find((s) => extname(s) === ".sh") ??
+      skill.scripts[0];
+    if (!scriptRelative) {
+      return {
+        ok: false,
+        code: SKILL_SCRIPT_NOT_FOUND,
+        message: `Skill ${skillId} has no runnable script defined`,
+        skillId,
+        skillResult: null,
+      };
+    }
+
+    resolvedPath = resolveRepoRelativeSkillPath(repoRoot, scriptRelative);
     const manifestResult = await readSkillManifestMetadata(repoRoot, skill.path);
-    if (!manifestResult.ok) {
+    const requiresTrustedManifest = await scriptRequiresTrustedManifestMetadata(resolvedPath);
+    if (!manifestResult.ok && requiresTrustedManifest) {
       return {
         ok: false,
         code: SKILL_VALIDATION_FAILED,
@@ -316,19 +345,23 @@ export async function runSkill(
         skillResult: null,
       };
     }
-
-    sourceResolution = await resolveSkillResultSource(manifestResult);
+    if (manifestResult.ok) {
+      sourceResolution = await resolveSkillResultSource(manifestResult);
+    } else {
+      sourceResolution = {
+        ok: false,
+        message: manifestResult.message,
+      };
+    }
     skillProgramPath = resolveRepoRelativeSkillPath(repoRoot, skill.skillFile);
 
-    const manifestAgent = manifestResult.metadata.agent;
+    const manifestAgent = manifestResult.ok ? manifestResult.metadata.agent : undefined;
     const isAgentDriven = manifestAgent !== null && manifestAgent !== undefined;
-    const scriptRelative = isAgentDriven
+    const runnableScriptRelative = isAgentDriven
       ? skill.scripts.find((scriptPath) => isOrchestratedHarnessScriptPath(scriptPath))
-      : (skill.scripts.find((s) => extname(s) === ".js") ??
-        skill.scripts.find((s) => extname(s) === ".sh") ??
-        skill.scripts[0]);
+      : scriptRelative;
 
-    if (!scriptRelative) {
+    if (!runnableScriptRelative) {
       return {
         ok: false,
         code: SKILL_SCRIPT_NOT_FOUND,
@@ -340,7 +373,7 @@ export async function runSkill(
       };
     }
 
-    resolvedPath = resolveRepoRelativeSkillPath(repoRoot, scriptRelative);
+    resolvedPath = resolveRepoRelativeSkillPath(repoRoot, runnableScriptRelative);
 
     if (isAgentDriven) {
       const effectiveAgentConfig = resolveConfiguredAgentCli(manifestAgent, childEnv);
@@ -522,8 +555,14 @@ export async function runSkill(
       });
     });
 
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       const durationMs = Date.now() - start;
+      if (forwardedSignal !== undefined) {
+        process.removeListener("SIGINT", sigintListener);
+        process.removeListener("SIGTERM", sigtermListener);
+        process.kill(process.pid, forwardedSignal);
+        return;
+      }
       if (timedOut) {
         finish({
           ok: false,
@@ -538,7 +577,7 @@ export async function runSkill(
       }
 
       const requireTerminalFrame =
-        code === 0 && sourceResolution.ok && sourceResolution.source.kind === "agent";
+        code === 0 && signal === null && sourceResolution.ok && sourceResolution.source.kind === "agent";
       const parsedSkillResult = parseSkillResultFrame(
         stdout,
         skillId,

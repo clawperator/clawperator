@@ -336,6 +336,74 @@ describe("Doctor: hostChecks", () => {
             }
         });
 
+        it("passes when installed orchestrated skills use backslash-separated skill paths with cliPath", async () => {
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const originalRegistry = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+            const root = await mkdtemp(join(tmpdir(), "clawperator-doctor-skills-win-path-"));
+            const skillId = "com.test.doctor-agent-win-path";
+            const skillDir = join(root, "skills", skillId);
+            const scriptsDir = join(skillDir, "scripts");
+            const registryPath = join(root, "skills", "skills-registry.json");
+
+            try {
+                await mkdir(scriptsDir, { recursive: true });
+                const launcherPath = join(scriptsDir, "fake-agent");
+                await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+                await writeFile(join(scriptsDir, "run.js"), "console.log('ok');\n", "utf8");
+                await writeFile(launcherPath, "#!/bin/sh\nexit 0\n", "utf8");
+                await chmod(launcherPath, 0o755);
+                await writeFile(
+                    join(skillDir, "skill.json"),
+                    JSON.stringify({
+                        id: skillId,
+                        applicationId: "com.test",
+                        intent: "doctor-agent-win-path",
+                        summary: "Doctor test skill",
+                        path: `skills\\${skillId}`,
+                        skillFile: `skills\\${skillId}\\SKILL.md`,
+                        scripts: [`skills\\${skillId}\\scripts\\run.js`],
+                        artifacts: [],
+                        agent: {
+                            cli: "codex",
+                            cliPath: "scripts/fake-agent",
+                        },
+                    }),
+                    "utf8"
+                );
+                await writeFile(
+                    registryPath,
+                    JSON.stringify({
+                        schemaVersion: "1.0",
+                        generatedAt: "2026-04-13T00:00:00Z",
+                        skills: [{
+                            id: skillId,
+                            applicationId: "com.test",
+                            intent: "doctor-agent-win-path",
+                            summary: "Doctor test skill",
+                            path: `skills\\${skillId}`,
+                            skillFile: `skills\\${skillId}\\SKILL.md`,
+                            scripts: [`skills\\${skillId}\\scripts\\run.js`],
+                            artifacts: [],
+                        }],
+                    }),
+                    "utf8"
+                );
+                process.env.CLAWPERATOR_SKILLS_REGISTRY = registryPath;
+
+                const result = await checkInstalledOrchestratedSkillAgentCliAvailability(config);
+                assert.strictEqual(result.status, "pass");
+                assert.match(result.summary, /resolved their configured agent CLI/i);
+                assert.deepStrictEqual(result.evidence, { checkedSkills: 1 });
+            } finally {
+                await rm(root, { recursive: true, force: true });
+                if (originalRegistry === undefined) {
+                    delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+                } else {
+                    process.env.CLAWPERATOR_SKILLS_REGISTRY = originalRegistry;
+                }
+            }
+        });
+
         it("warns when an installed orchestrated skill has an unresolved cliPath", async () => {
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
             const originalRegistry = process.env.CLAWPERATOR_SKILLS_REGISTRY;
