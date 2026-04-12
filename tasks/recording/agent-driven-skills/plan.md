@@ -128,7 +128,10 @@ the gap between that promise and the current plans.
   fallback. No graceful degradation. If the agent CLI is missing,
   `runSkill` refuses with `SKILL_AGENT_CLI_UNAVAILABLE`.
 - The default agent CLI is `codex`. Other CLIs must be nameable in
-  `skill.json` but `codex` is the v1 baseline.
+  `skill.json` but `codex` is the W2b v1 baseline. This pack may ship as
+  codex-only in practice if that limitation is documented honestly in code,
+  docs, and the proving skill. W2b does not need to prove runtime portability
+  across multiple agent CLIs.
 - The thin-harness pattern is boilerplate by design. It does not
   contain skill logic. If a harness starts growing skill-specific
   code, that code belongs in SKILL.md as an instruction for the
@@ -176,6 +179,10 @@ the gap between that promise and the current plans.
 - The authoring-time agent (W6) and the runtime agent (this pack)
   are the same binary (`codex`) with different prompts. Plans that
   split them across different CLIs need owner approval.
+- Hidden runtime switches are out of bounds. Any security-relevant or execution-
+  mode-affecting behavior, including approval or sandbox posture, must either
+  be declared in committed skill/runtime metadata and documented, or not ship
+  as part of W2b.
 - Reliability is measured, not assumed. The reliability validation
   phase (P4) must run at least 10 invocations against a live Samsung
   target with a cleaned starting state and record success rate,
