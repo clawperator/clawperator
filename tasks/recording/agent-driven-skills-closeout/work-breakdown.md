@@ -19,10 +19,10 @@ Reliability evidence remains committed in the Clawperator repo under
 | State | active |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | C1, C2.0, C2, C3 |
-| Current / Next | C1 |
-| Blockers | none; C2 gated on C2.0 probe commit; C3 gated on C2 and on physical Samsung device availability |
+| Completed | C1, C2.0, C2 |
+| Remaining | C3 |
+| Current / Next | C3 reliability evidence |
+| Blockers | codex-path live runs still lose the Samsung device inside the orchestrated runtime path, and the replay control still times out after save |
 
 ## Hard Rules
 

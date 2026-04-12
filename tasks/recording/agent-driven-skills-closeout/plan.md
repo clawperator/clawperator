@@ -24,10 +24,10 @@ cannot game the threshold.
 | State | active |
 | Total PRs | 2 |
 | Total phases | 4 (C1, C2.0, C2, C3) |
-| Completed | none |
-| Remaining | C1, C2.0, C2, C3 |
-| Current / Next | C1 |
-| Blockers | none; C2 is gated on C2.0 probe commit, C3 is gated on C2 shipping and on a physical Samsung device being available |
+| Completed | C1, C2.0, C2 |
+| Remaining | C3 |
+| Current / Next | C3 reliability evidence |
+| Blockers | codex-path live runs still lose the Samsung device inside the orchestrated runtime path, and the replay control still times out after save |
 
 ## Goal
 
