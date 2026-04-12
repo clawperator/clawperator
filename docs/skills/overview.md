@@ -44,7 +44,7 @@ Important current caveats:
 - the `-replay` / `-orchestrated` suffix split is still primarily a naming and authoring convention, not a dedicated registry enum
 - runtime behavior for orchestrated skills is currently driven by the presence of `skill.json.agent`, not by suffix inspection alone
 - the currently supported orchestrated runtime path uses `codex` as the agent CLI
-- orchestrated skills currently run codex with `danger-full-access` so the runtime agent can reach live adb targets
+- some orchestrated harnesses currently run codex with `danger-full-access` so the runtime agent can reach live adb targets, but that is a harness-specific choice rather than a Node runtime guarantee
 - some legacy skills predate the suffix convention and may still have unsuffixed ids
 - unsuffixed legacy ids should not be read as proof that a skill is already orchestrated
 
@@ -122,7 +122,7 @@ truthful in real device runs, see
 Current implementation notes:
 
 - the currently supported orchestrated runtime path uses `codex` as the agent CLI
-- orchestrated skills currently run codex with `danger-full-access` so the runtime agent can reach live adb targets
+- some orchestrated harnesses currently run codex with `danger-full-access` so the runtime agent can reach live adb targets, but that is a harness-specific choice rather than a Node runtime guarantee
 
 ## Registry
 

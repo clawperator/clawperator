@@ -211,7 +211,7 @@ program. In that shape:
 - the runtime agent uses Clawperator as the hand
 - the runtime agent emits exactly one terminal `[Clawperator-Skill-Result]` frame
 - the currently supported orchestrated runtime path uses `codex` as the agent CLI
-- orchestrated skills currently run codex with `danger-full-access` so the runtime agent can reach live adb targets
+- some orchestrated harnesses currently run codex with `danger-full-access` so the runtime agent can reach live adb targets, but that is a harness-specific choice rather than a Node runtime guarantee
 
 ## `skill.json` Contract
 

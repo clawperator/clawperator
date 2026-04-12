@@ -1920,6 +1920,34 @@ describe("runSkill", () => {
     assert.strictEqual(result.skillResult.diagnostics?.runtimeState, "healthy");
   });
 
+  it("keeps framed scripted SkillResult parsing permissive when skill.json is unreadable", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: TEST_SKILL_RESULT,
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.skill-result",
+        "scripts",
+        "emit_skill_result.js"
+      ),
+      skillJsonContents: "{\n  \"id\": \"broken\"\n",
+      scriptRelativePath: "scripts/skill-result.js",
+    });
+
+    try {
+      const result = await runSkill(TEST_SKILL_RESULT, ["valid"], temp.registryPath);
+      assert.ok(result.ok, `Expected framed scripted run to stay permissive: ${"message" in result ? result.message : ""}`);
+      assert.ok(result.skillResult);
+      assert.strictEqual(result.skillResult.source.kind, "script");
+      assert.strictEqual(result.skillResult.status, "success");
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
   it("parses a valid framed SkillResult for agent-driven skills and injects agent source metadata", async () => {
     const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["valid"]);
 

@@ -338,10 +338,17 @@ export async function runSkill(
     if (manifestResult.ok) {
       sourceResolution = await resolveSkillResultSource(manifestResult);
     } else {
-      sourceResolution = {
-        ok: false,
-        message: manifestResult.message,
-      };
+      sourceResolution = harnessScriptRelative
+        ? {
+            ok: false,
+            message: manifestResult.message,
+          }
+        : {
+            ok: true,
+            source: {
+              kind: "script",
+            },
+          };
     }
     skillProgramPath = resolveRepoRelativeSkillPath(repoRoot, skill.skillFile);
 

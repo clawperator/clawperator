@@ -255,9 +255,10 @@ Failure cases:
 - if `CLAWPERATOR_SKILL_AGENT_CLI_PATH` or `CLAWPERATOR_SKILL_PROGRAM` are
   missing inside the harness, the harness exits non-zero and `runSkill()`
   returns `SKILL_EXECUTION_FAILED`
-- if `CLAWPERATOR_SKILL_INPUTS` is malformed JSON, the current harness pattern
-  falls back to an empty args array and the skill should fail its own input
-  validation truthfully
+- if `CLAWPERATOR_SKILL_INPUTS` is malformed JSON, behavior depends on the
+  harness that parses it; this runtime only defines the environment variable
+  contract, so malformed input should be treated as a harness-specific failure
+  rather than a guaranteed fallback to empty args
 
 ## `ADB_PATH`
 
