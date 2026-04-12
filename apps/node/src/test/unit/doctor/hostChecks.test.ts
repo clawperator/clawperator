@@ -171,6 +171,40 @@ describe("Doctor: hostChecks", () => {
             }
         });
 
+        it("accepts .js agent launchers on PATH using the same resolution rules as runtime", async () => {
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const original = process.env.CLAWPERATOR_SKILL_AGENT_CLI;
+            const originalPath = process.env.PATH;
+            const fakeDir = await mkdtemp(join(tmpdir(), "clawperator-agent-cli-js-"));
+            const fakeAgentPath = join(fakeDir, "my-agent.js");
+            await writeFile(fakeAgentPath, "console.log('ok');\n", "utf8");
+            process.env.CLAWPERATOR_SKILL_AGENT_CLI = "my-agent.js";
+
+            try {
+                process.env.PATH = `${fakeDir}${delimiter}${originalPath ?? ""}`;
+                const result = await checkOrchestratedSkillAgentCli(config);
+
+                assert.strictEqual(result.status, "pass");
+                assert.match(result.summary, /my-agent\.js/);
+                assert.deepStrictEqual(result.evidence, {
+                    configuredCli: "my-agent.js",
+                    resolvedPath: fakeAgentPath,
+                });
+            } finally {
+                await rm(fakeDir, { recursive: true, force: true });
+                if (original === undefined) {
+                    delete process.env.CLAWPERATOR_SKILL_AGENT_CLI;
+                } else {
+                    process.env.CLAWPERATOR_SKILL_AGENT_CLI = original;
+                }
+                if (originalPath === undefined) {
+                    delete process.env.PATH;
+                } else {
+                    process.env.PATH = originalPath;
+                }
+            }
+        });
+
         it("warns when CLAWPERATOR_SKILL_AGENT_CLI contains shell syntax instead of a plain executable name", async () => {
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
             const original = process.env.CLAWPERATOR_SKILL_AGENT_CLI;

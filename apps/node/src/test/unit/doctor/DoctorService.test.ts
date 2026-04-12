@@ -105,6 +105,26 @@ describe("DoctorService", () => {
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
   });
 
+  it("still reports the orchestrated agent CLI advisory when adb server startup fails", async () => {
+    const runner = new FakeProcessRunner();
+    const config = getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" });
+
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    runner.queueResult({ code: 1, stdout: "", stderr: "cannot start adb server" });
+
+    const report = await new DoctorService().run({ config });
+
+    const agentCliCheck = report.checks.find(check => check.id === "host.skill-agent-cli.presence");
+    assert.ok(agentCliCheck);
+    assert.strictEqual(agentCliCheck.status, "pass");
+
+    const adbServer = report.checks.find(check => check.id === "host.adb.server");
+    assert.ok(adbServer);
+    assert.strictEqual(adbServer.status, "fail");
+    assert.strictEqual(adbServer.code, ERROR_CODES.ADB_SERVER_FAILED);
+  });
+
   it("fails clearly when the installed APK version cannot be read", async () => {
     const runner = new FakeProcessRunner();
     const config = getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" });

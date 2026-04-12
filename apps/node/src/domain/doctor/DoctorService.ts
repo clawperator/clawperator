@@ -49,12 +49,12 @@ export class DoctorService {
     checks.push(adbPresence);
     if (this.shouldHaltOnFailure(adbPresence)) return this.finalize(checks, config, options.fix);
 
+    const orchestratedSkillAgentCli = await checkOrchestratedSkillAgentCli(config);
+    checks.push(orchestratedSkillAgentCli);
+
     const adbServer = await checkAdbServer(config);
     checks.push(adbServer);
     if (this.shouldHaltOnFailure(adbServer)) return this.finalize(checks, config, options.fix);
-
-    const orchestratedSkillAgentCli = await checkOrchestratedSkillAgentCli(config);
-    checks.push(orchestratedSkillAgentCli);
 
     if (full) {
       const javaVersion = await checkJavaVersion(config);

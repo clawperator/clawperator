@@ -1,8 +1,6 @@
 import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
-import { constants as fsConstants } from "node:fs";
-import { delimiter } from "node:path";
-import { join, extname, isAbsolute, resolve } from "node:path";
+import { join, extname } from "node:path";
 import { loadRegistry, findSkillById, getRepoRoot } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import type { Logger } from "../../adapters/logger.js";
 import {
@@ -25,16 +23,19 @@ import {
   type SkillResultSource,
 } from "../../contracts/skillResult.js";
 import { readSkillManifestMetadata, type SkillManifestReadResult } from "./skillManifest.js";
+import {
+  resolveConfiguredAgentCli,
+  resolveAgentCliExecutable,
+  SKILL_AGENT_CLI_ENV_VAR,
+} from "./agentCli.js";
 
 const DEFAULT_TIMEOUT_MS = 120_000;
-const SKILL_AGENT_CLI_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_CLI";
 const SKILL_AGENT_CLI_PATH_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_CLI_PATH";
 const SKILL_AGENT_TIMEOUT_MS_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS";
 const SKILL_INPUTS_ENV_VAR = "CLAWPERATOR_SKILL_INPUTS";
 const SKILL_PROGRAM_ENV_VAR = "CLAWPERATOR_SKILL_PROGRAM";
 const SKILL_ID_ENV_VAR = "CLAWPERATOR_SKILL_ID";
 const SKILLS_REGISTRY_ENV_VAR = "CLAWPERATOR_SKILLS_REGISTRY";
-const EXECUTABLE_NAME_PATTERN = /^[A-Za-z0-9._+-]+$/;
 
 export interface SkillRunResult {
   ok: true;
@@ -71,25 +72,6 @@ export interface SkillRunCallbacks {
   onOutput?: (chunk: string, stream: "stdout" | "stderr") => void;
   logger?: Logger;
 }
-
-interface AgentCliResolutionSuccess {
-  ok: true;
-  executablePath: string;
-}
-
-interface AgentCliResolutionFailure {
-  ok: false;
-  message: string;
-}
-
-type AgentCliResolution = AgentCliResolutionSuccess | AgentCliResolutionFailure;
-
-interface EffectiveAgentConfigSuccess {
-  ok: true;
-  agent: SkillAgentConfig;
-}
-
-type EffectiveAgentConfigResolution = EffectiveAgentConfigSuccess | AgentCliResolutionFailure;
 
 interface SkillSourceResolutionSuccess {
   ok: true;
@@ -140,67 +122,6 @@ async function resolveSkillResultSource(
   }
 
   return { ok: true, source: { kind: "agent", agentCli: manifestResult.metadata.agent.cli } };
-}
-
-async function canResolveAgentTarget(path: string): Promise<boolean> {
-  const requiredMode = extname(path) === ".js" ? fsConstants.F_OK : fsConstants.X_OK;
-  try {
-    await access(path, requiredMode);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function resolveConfiguredAgentCli(agent: SkillAgentConfig, resolvedEnv: NodeJS.ProcessEnv): EffectiveAgentConfigResolution {
-  const overriddenCli = resolvedEnv[SKILL_AGENT_CLI_ENV_VAR]?.trim();
-  if (!overriddenCli) {
-    return { ok: true, agent };
-  }
-  if (!EXECUTABLE_NAME_PATTERN.test(overriddenCli)) {
-    return {
-      ok: false,
-      message: `Configured ${SKILL_AGENT_CLI_ENV_VAR} value '${overriddenCli}' is not a plain executable name`,
-    };
-  }
-  return {
-    ok: true,
-    agent: {
-      ...agent,
-      cli: overriddenCli,
-      cliPath: undefined,
-    },
-  };
-}
-
-async function resolveAgentCliExecutable(
-  agent: SkillAgentConfig,
-  skillDir: string,
-  resolvedEnv: NodeJS.ProcessEnv
-): Promise<AgentCliResolution> {
-  if (agent.cliPath && agent.cliPath.length > 0) {
-    const resolvedCliPath = isAbsolute(agent.cliPath) ? agent.cliPath : resolve(skillDir, agent.cliPath);
-    if (await canResolveAgentTarget(resolvedCliPath)) {
-      return { ok: true, executablePath: resolvedCliPath };
-    }
-    return {
-      ok: false,
-      message: `Configured agent CLI was not found or is not executable at ${resolvedCliPath}`,
-    };
-  }
-
-  const pathEntries = (resolvedEnv.PATH ?? "").split(delimiter).filter((entry) => entry.length > 0);
-  for (const entry of pathEntries) {
-    const candidate = join(entry, agent.cli);
-    if (await canResolveAgentTarget(candidate)) {
-      return { ok: true, executablePath: candidate };
-    }
-  }
-
-  return {
-    ok: false,
-    message: `Configured agent CLI '${agent.cli}' was not found on PATH`,
-  };
 }
 
 function parseSkillResultFrame(
@@ -353,24 +274,39 @@ export async function runSkill(
     }
 
     const repoRoot = getRepoRoot(loaded.resolvedPath);
-    skillProgramPath = join(repoRoot, skill.skillFile);
-    // Prefer .js script over .sh for direct node invocation
-    const scriptRelative =
-      skill.scripts.find((s) => extname(s) === ".js") ??
-      skill.scripts.find((s) => extname(s) === ".sh") ??
-      skill.scripts[0];
-
-    resolvedPath = join(repoRoot, scriptRelative);
     const manifestResult = await readSkillManifestMetadata(repoRoot, skill.path);
     sourceResolution = await resolveSkillResultSource(manifestResult);
+    skillProgramPath = join(repoRoot, skill.skillFile);
 
-    if (manifestResult.ok && manifestResult.metadata.agent) {
-      const effectiveAgentConfig = resolveConfiguredAgentCli(manifestResult.metadata.agent, childEnv);
+    const manifestAgent = manifestResult.ok ? manifestResult.metadata.agent : undefined;
+    const isAgentDriven = manifestAgent !== null && manifestAgent !== undefined;
+    const scriptRelative = isAgentDriven
+      ? skill.scripts.find((scriptPath) => scriptPath.endsWith("/scripts/run.js"))
+      : (skill.scripts.find((s) => extname(s) === ".js") ??
+        skill.scripts.find((s) => extname(s) === ".sh") ??
+        skill.scripts[0]);
+
+    if (!scriptRelative) {
+      return {
+        ok: false,
+        code: SKILL_SCRIPT_NOT_FOUND,
+        message: isAgentDriven
+          ? `Agent-driven skill ${skillId} requires scripts/run.js`
+          : `Skill ${skillId} has no runnable script defined`,
+        skillId,
+        skillResult: null,
+      };
+    }
+
+    resolvedPath = join(repoRoot, scriptRelative);
+
+    if (isAgentDriven) {
+      const effectiveAgentConfig = resolveConfiguredAgentCli(manifestAgent, childEnv);
       if (!effectiveAgentConfig.ok) {
         return {
           ok: false,
           code: SKILL_AGENT_CLI_UNAVAILABLE,
-          message: `Skill ${skillId} requires agent CLI '${manifestResult.metadata.agent.cli}', but it is unavailable. ${effectiveAgentConfig.message}`,
+          message: `Skill ${skillId} requires agent CLI '${manifestAgent.cli}', but it is unavailable. ${effectiveAgentConfig.message}`,
           skillId,
           skillResult: null,
         };

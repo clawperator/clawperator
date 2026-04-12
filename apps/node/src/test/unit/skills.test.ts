@@ -2137,6 +2137,76 @@ describe("runSkill", () => {
     }
   });
 
+  it("requires agent-driven skills to execute scripts/run.js even when other scripts are listed first", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.agent-run-harness",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.agent-run-harness",
+        applicationId: "com.test",
+        intent: "agent-run-harness",
+        summary: "Temporary test skill",
+        path: "skills/com.test.agent-run-harness",
+        skillFile: "skills/com.test.agent-run-harness/SKILL.md",
+        scripts: [
+          "skills/com.test.agent-run-harness/scripts/other.sh",
+          "skills/com.test.agent-run-harness/scripts/run.js",
+        ],
+        artifacts: [],
+        agent: {
+          cli: "fake_codex.js",
+          cliPath: "scripts/fake_codex.js",
+        },
+      }),
+      extraScriptSourcePaths: [
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "fake_codex.js"
+        ),
+      ],
+    });
+
+    const skillRoot = join(getRepoRoot(temp.registryPath), "skills", "com.test.agent-run-harness");
+    const registryPath = temp.registryPath;
+    const otherScriptPath = join(skillRoot, "scripts", "other.sh");
+
+    try {
+      await writeFile(otherScriptPath, "#!/bin/sh\necho WRONG_SCRIPT\nexit 42\n", "utf8");
+      await chmod(otherScriptPath, 0o755);
+
+      const registry = JSON.parse(await readFile(registryPath, "utf8")) as { skills: Array<Record<string, unknown>> };
+      registry.skills[0].scripts = [
+        "skills/com.test.agent-run-harness/scripts/other.sh",
+        "skills/com.test.agent-run-harness/scripts/run.js",
+      ];
+      await writeFile(registryPath, JSON.stringify(registry), "utf8");
+
+      const result = await runSkill("com.test.agent-run-harness", ["valid"], registryPath);
+
+      assert.ok(result.ok, `Expected agent harness selection to succeed: ${"message" in result ? result.message : ""}`);
+      assert.ok(result.skillResult);
+      assert.strictEqual(result.skillResult.source.kind, "agent");
+      assert.ok(!result.output.includes("WRONG_SCRIPT"));
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
   it("resolves the agent CLI from the caller-provided PATH override", async () => {
     const temp = await createTempRegistryWithSkill({
       skillId: "com.test.agent-path-override",
