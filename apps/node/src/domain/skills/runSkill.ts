@@ -150,7 +150,8 @@ async function canExecute(path: string): Promise<boolean> {
 
 async function resolveAgentCliExecutable(
   agent: SkillAgentConfig,
-  skillDir: string
+  skillDir: string,
+  resolvedEnv: NodeJS.ProcessEnv
 ): Promise<AgentCliResolution> {
   if (agent.cliPath && agent.cliPath.length > 0) {
     const resolvedCliPath = isAbsolute(agent.cliPath) ? agent.cliPath : resolve(skillDir, agent.cliPath);
@@ -163,7 +164,7 @@ async function resolveAgentCliExecutable(
     };
   }
 
-  const pathEntries = (process.env.PATH ?? "").split(delimiter).filter((entry) => entry.length > 0);
+  const pathEntries = (resolvedEnv.PATH ?? "").split(delimiter).filter((entry) => entry.length > 0);
   for (const entry of pathEntries) {
     const candidate = join(entry, agent.cli);
     if (await canExecute(candidate)) {
@@ -304,6 +305,10 @@ export async function runSkill(
   let skillProgramPath: string | null = null;
   let resolvedRegistryPath: string | null = null;
   let effectiveTimeoutMs = timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const childEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    ...env,
+  };
   try {
     const loaded = await loadRegistry(registryPath);
     resolvedRegistryPath = loaded.resolvedPath;
@@ -339,7 +344,8 @@ export async function runSkill(
       effectiveTimeoutMs = timeoutMs ?? resolvedAgentConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
       const agentResolution = await resolveAgentCliExecutable(
         resolvedAgentConfig,
-        join(repoRoot, skill.path)
+        join(repoRoot, skill.path),
+        childEnv
       );
       if (!agentResolution.ok) {
         return {
@@ -390,10 +396,6 @@ export async function runSkill(
   const skillLogger = callbacks?.logger?.child({ skillId });
 
   // Merge provided env with process.env, with provided env taking precedence
-  const childEnv: NodeJS.ProcessEnv = {
-    ...process.env,
-    ...env,
-  };
   if (resolvedAgentConfig && resolvedAgentExecutablePath && skillProgramPath) {
     childEnv[SKILL_AGENT_CLI_ENV_VAR] = resolvedAgentConfig.cli;
     childEnv[SKILL_AGENT_CLI_PATH_ENV_VAR] = resolvedAgentExecutablePath;

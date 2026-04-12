@@ -2026,6 +2026,83 @@ describe("runSkill", () => {
     }
   });
 
+  it("resolves the agent CLI from the caller-provided PATH override", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.agent-path-override",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.agent-path-override",
+        applicationId: "com.test",
+        intent: "agent-path-override",
+        summary: "Temporary test skill",
+        path: "skills/com.test.agent-path-override",
+        skillFile: "skills/com.test.agent-path-override/SKILL.md",
+        scripts: ["skills/com.test.agent-path-override/scripts/run.js"],
+        artifacts: [],
+        agent: {
+          cli: "my-agent",
+          timeoutMs: 4321,
+        },
+      }),
+    });
+
+    const fakeAgentDir = await mkdtemp(join(tmpdir(), "clawperator-agent-path-override-"));
+    const fakeAgentPath = join(fakeAgentDir, "my-agent");
+    const fakeAgentSourcePath = join(
+      packageRoot,
+      "src",
+      "test",
+      "fixtures",
+      "skills",
+      "com.test.agent-skill-result",
+      "scripts",
+      "fake_codex.js"
+    );
+
+    try {
+      await writeFile(
+        fakeAgentPath,
+        `#!/bin/sh\nexec "${process.execPath}" "${fakeAgentSourcePath}" "$@"\n`,
+        "utf8"
+      );
+      await chmod(fakeAgentPath, 0o755);
+
+      const originalPath = process.env.PATH;
+      process.env.PATH = "";
+      try {
+        const result = await runSkill(
+          "com.test.agent-path-override",
+          ["env-check"],
+          temp.registryPath,
+          undefined,
+          {
+            PATH: fakeAgentDir,
+            EXPECTED_SKILLS_REGISTRY: temp.registryPath,
+            EXPECTED_SKILL_TIMEOUT_MS: "4321",
+          }
+        );
+
+        assert.ok(result.ok, `Expected PATH override agent skill to succeed: ${"message" in result ? result.message : ""}`);
+        assert.ok(result.skillResult);
+        assert.strictEqual(result.skillResult.source.kind, "agent");
+      } finally {
+        process.env.PATH = originalPath;
+      }
+    } finally {
+      await rm(fakeAgentDir, { recursive: true, force: true });
+      await temp.cleanup();
+    }
+  });
+
   it("returns SKILL_OUTPUT_ASSERTION_FAILED when expectContains is missing from output", async () => {
     const result = await runSkill(
       "com.test.echo",
