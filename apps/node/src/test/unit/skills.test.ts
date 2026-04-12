@@ -2496,6 +2496,88 @@ describe("runSkill", () => {
     }
   });
 
+  it("accepts mixed-separator parity between registry metadata and skill.json", async () => {
+    const root = await mkdtemp(join(tmpdir(), "clawperator-agent-mixed-paths-"));
+    const skillId = "com.test.agent-mixed-paths";
+    const skillDir = join(root, "skills", skillId);
+    const scriptsDir = join(skillDir, "scripts");
+    const registryPath = join(root, "skills", "skills-registry.json");
+
+    try {
+      await mkdir(scriptsDir, { recursive: true });
+      await copyFile(
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "run.js"
+        ),
+        join(scriptsDir, "run.js")
+      );
+      await copyFile(
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "fake_codex.js"
+        ),
+        join(scriptsDir, "fake_codex.js")
+      );
+      await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+      await writeFile(
+        join(skillDir, "skill.json"),
+        JSON.stringify({
+          id: skillId,
+          applicationId: "com.test",
+          intent: "temp",
+          summary: "Temporary test skill",
+          path: "skills\\com.test.agent-mixed-paths",
+          skillFile: "skills\\com.test.agent-mixed-paths/SKILL.md",
+          scripts: ["skills/com.test.agent-mixed-paths\\scripts/run.js"],
+          artifacts: [],
+          agent: {
+            cli: "codex",
+            cliPath: "scripts/fake_codex.js",
+          },
+        }),
+        "utf8"
+      );
+      await writeFile(
+        registryPath,
+        JSON.stringify({
+          schemaVersion: "1.0",
+          generatedAt: "2026-04-13T00:00:00Z",
+          skills: [
+            {
+              id: skillId,
+              applicationId: "com.test",
+              intent: "temp",
+              summary: "Temporary test skill",
+              path: "skills/com.test.agent-mixed-paths",
+              skillFile: "skills/com.test.agent-mixed-paths/SKILL.md",
+              scripts: ["skills/com.test.agent-mixed-paths/scripts/run.js"],
+              artifacts: [],
+            },
+          ],
+        }),
+        "utf8"
+      );
+
+      const result = await validateSkill(skillId, registryPath);
+      assert.ok(result.ok, `Expected mixed-separator metadata to validate: ${!result.ok ? result.message : ""}`);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it("resolves the agent CLI from the caller-provided PATH override", async () => {
     const temp = await createTempRegistryWithSkill({
       skillId: "com.test.agent-path-override",

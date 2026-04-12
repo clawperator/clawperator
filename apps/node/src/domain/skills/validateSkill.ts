@@ -13,7 +13,11 @@ import {
 } from "../../contracts/skills.js";
 import { validateExecution, type ValidationFailure } from "../executions/validateExecution.js";
 import { parseSkillManifestMetadata } from "./skillManifest.js";
-import { isOrchestratedHarnessScriptPath, resolveRepoRelativeSkillPath } from "./pathUtils.js";
+import {
+  isOrchestratedHarnessScriptPath,
+  normalizeSkillPathSeparators,
+  resolveRepoRelativeSkillPath,
+} from "./pathUtils.js";
 
 const SKILL_DRY_RUN_SKIP_REASON =
   "skill has no pre-compiled artifacts; payload is generated at runtime by the skill script";
@@ -87,16 +91,20 @@ function getSkillJsonRelativePath(skill: SkillEntry): string {
   return join(skill.path, "skill.json");
 }
 
+function normalizeSkillPathArray(paths: string[] | undefined): string[] {
+  return (paths ?? []).map((path) => normalizeSkillPathSeparators(path));
+}
+
 function findMismatchFields(skill: SkillEntry, parsed: Partial<SkillEntry>): string[] {
   const mismatches: string[] = [];
   if (parsed.id !== skill.id) mismatches.push("id");
   if (parsed.applicationId !== skill.applicationId) mismatches.push("applicationId");
   if (parsed.intent !== skill.intent) mismatches.push("intent");
   if (parsed.summary !== skill.summary) mismatches.push("summary");
-  if (parsed.path !== skill.path) mismatches.push("path");
-  if (parsed.skillFile !== skill.skillFile) mismatches.push("skillFile");
-  if (JSON.stringify(parsed.scripts ?? []) !== JSON.stringify(skill.scripts)) mismatches.push("scripts");
-  if (JSON.stringify(parsed.artifacts ?? []) !== JSON.stringify(skill.artifacts)) mismatches.push("artifacts");
+  if (normalizeSkillPathSeparators(parsed.path ?? "") !== normalizeSkillPathSeparators(skill.path)) mismatches.push("path");
+  if (normalizeSkillPathSeparators(parsed.skillFile ?? "") !== normalizeSkillPathSeparators(skill.skillFile)) mismatches.push("skillFile");
+  if (JSON.stringify(normalizeSkillPathArray(parsed.scripts)) !== JSON.stringify(normalizeSkillPathArray(skill.scripts))) mismatches.push("scripts");
+  if (JSON.stringify(normalizeSkillPathArray(parsed.artifacts)) !== JSON.stringify(normalizeSkillPathArray(skill.artifacts))) mismatches.push("artifacts");
   return mismatches;
 }
 
