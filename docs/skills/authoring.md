@@ -301,7 +301,10 @@ Success response:
 
 ## Authoring Agent-Driven Orchestrated Skills
 
-When a skill is agent-driven at runtime, the authoring split is:
+The authoritative definition of this runtime shape lives in
+[Skills Overview](overview.md#orchestrated-runtime-contract).
+
+When a skill follows the orchestrated runtime contract, the authoring split is:
 
 - `SKILL.md` contains the runtime program for the agent
 - `skill.json` carries the trusted `agent` metadata
@@ -315,7 +318,8 @@ When a skill is agent-driven at runtime, the authoring split is:
 
 The harness should not absorb skill logic that belongs in `SKILL.md`. If the
 wrapper starts containing the real navigation or verification policy, the skill
-has drifted away from the current orchestrated runtime contract.
+has left the orchestrated runtime contract described in
+[Skills Overview](overview.md#orchestrated-runtime-contract).
 
 `clawperator skills run` injects the orchestrated runtime env vars that the
 harness reads. For the exact variable list and defaults, see

@@ -102,6 +102,23 @@ Current behavior:
 - the harness is responsible for spawning the configured agent CLI on `SKILL.md`
 - framed `SkillResult` output must omit `source`; `runSkill()` injects trusted source metadata from `skill.json.agent`
 
+## Orchestrated Runtime Contract
+
+An orchestrated skill is an agent-driven runtime shape with these durable rules:
+
+- `skill.json.agent` is the trusted runtime metadata. It names the agent CLI and timeout policy that `runSkill()` enforces.
+- `SKILL.md` is the skill authority. It contains the app-specific runtime program, navigation policy, checkpoints, and terminal verification expectations.
+- `scripts/run.js` is a thin harness. It reads the injected Clawperator env vars, spawns the configured agent CLI on `SKILL.md`, and forwards stdout and stderr.
+- the harness must not absorb the real skill logic. If app-specific decision policy, navigation authority, or terminal verification rules migrate into the harness, the skill has left this contract.
+- `runSkill()` remains the Clawperator-owned boundary. It validates the skill, injects runtime env vars, executes the harness, parses the framed result, and injects trusted `source` metadata.
+- orchestrated output is contract-bound. The runtime agent must emit exactly one terminal `[Clawperator-Skill-Result]` frame with a valid `SkillResult` object.
+- replay skills remain first-class. Orchestrated skills are an additional runtime shape, not a replacement for replay-driven skills.
+
+Current implementation notes:
+
+- the currently supported orchestrated runtime path uses `codex` as the agent CLI
+- orchestrated skills currently run codex with `danger-full-access` so the runtime agent can reach live adb targets
+
 ## Registry
 
 The registry file is a JSON object with:
