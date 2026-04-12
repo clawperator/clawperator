@@ -129,3 +129,11 @@ only in `tasks/`.
   `com.solaxcloud.starter.set-discharge-to-limit-orchestrated-verify-route`
   reading `Discharge to 43% `. This establishes the repaired save contract as
   the new baseline before restarting the 10-run C3 reliability loop.
+- 2026-04-12: The first restarted reliability run then exposed a verification
+  contract bug rather than a route bug. The skill changed `43 -> 42`, reopened
+  the route, and `read_text` returned `Discharge to 42% `, but the agent still
+  emitted `status: failed` because it required full-string equality with
+  `Discharge to 42%`. On this screen the trailing chevron is decorative UI
+  chrome, not a semantic mismatch. The verification rule must accept observed
+  text that contains `Discharge to <percent>%` even when the row also includes
+  the trailing glyph.
