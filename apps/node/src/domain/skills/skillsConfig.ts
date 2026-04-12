@@ -9,6 +9,7 @@ export const DEFAULT_SKILLS_REGISTRY_SUBPATH = join("skills", "skills-registry.j
 
 export const CLAWPERATOR_BIN_ENV_VAR = "CLAWPERATOR_BIN";
 export const CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR = "CLAWPERATOR_OPERATOR_PACKAGE";
+export const CLAWPERATOR_DEVICE_ID_ENV_VAR = "CLAWPERATOR_DEVICE_ID";
 export const DEFAULT_OPERATOR_PACKAGE = "com.clawperator.operator";
 
 export function getDefaultSkillsRegistryPath(): string {

@@ -1848,6 +1848,91 @@ describe("runSkill", () => {
     assert.ok(result.output.includes("[Clawperator-Skill-Result]"));
   });
 
+  it("keeps agent source provenance pinned to skill.json even when CLAWPERATOR_SKILL_AGENT_CLI overrides execution", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.agent-source-trust",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.agent-source-trust",
+        applicationId: "com.test",
+        intent: "agent-source-trust",
+        summary: "Temporary test skill",
+        path: "skills/com.test.agent-source-trust",
+        skillFile: "skills/com.test.agent-source-trust/SKILL.md",
+        scripts: ["skills/com.test.agent-source-trust/scripts/run.js"],
+        artifacts: [],
+        agent: {
+          cli: "codex",
+          cliPath: "scripts/fake_codex.js",
+        },
+      }),
+      extraScriptSourcePaths: [
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "fake_codex.js"
+        ),
+      ],
+    });
+
+    const fakeAgentDir = await mkdtemp(join(tmpdir(), "clawperator-agent-source-trust-"));
+    const fakeAgentPath = join(fakeAgentDir, "override-agent");
+    const fakeAgentSourcePath = join(
+      packageRoot,
+      "src",
+      "test",
+      "fixtures",
+      "skills",
+      "com.test.agent-skill-result",
+      "scripts",
+      "fake_codex.js"
+    );
+
+    try {
+      await writeFile(
+        fakeAgentPath,
+        `#!/bin/sh\nexec "${process.execPath}" "${fakeAgentSourcePath}" "$@"\n`,
+        "utf8"
+      );
+      await chmod(fakeAgentPath, 0o755);
+
+      const result = await runSkill(
+        "com.test.agent-source-trust",
+        ["valid"],
+        temp.registryPath,
+        undefined,
+        {
+          CLAWPERATOR_SKILL_AGENT_CLI: "override-agent",
+          PATH: fakeAgentDir,
+        }
+      );
+
+      assert.ok(result.ok, `Expected trusted source result to succeed: ${"message" in result ? result.message : ""}`);
+      assert.ok(result.skillResult);
+      assert.deepStrictEqual(result.skillResult.source, {
+        kind: "agent",
+        agentCli: "codex",
+      });
+    } finally {
+      await rm(fakeAgentDir, { recursive: true, force: true });
+      await temp.cleanup();
+    }
+  });
+
   it("fails before spawn when an orchestrated skill's configured agent CLI is unavailable", async () => {
     const temp = await createTempRegistryWithSkill({
       skillId: "com.test.missing-agent-cli",
@@ -2204,6 +2289,64 @@ describe("runSkill", () => {
       assert.ok(!result.output.includes("WRONG_SCRIPT"));
     } finally {
       await temp.cleanup();
+    }
+  });
+
+  it("fails validation when an agent-driven skill does not declare scripts/run.js", async () => {
+    const root = await mkdtemp(join(tmpdir(), "clawperator-agent-missing-run-harness-"));
+    const skillId = "com.test.agent-missing-run-harness";
+    const skillPath = `skills/${skillId}`;
+    const skillDir = join(root, skillPath);
+    const scriptsDir = join(skillDir, "scripts");
+    const invalidScripts = [`${skillPath}/scripts/not-run.js`];
+    const skillManifest = {
+      id: skillId,
+      applicationId: "com.test",
+      intent: "agent-missing-run-harness",
+      summary: "Temporary test skill",
+      path: skillPath,
+      skillFile: `${skillPath}/SKILL.md`,
+      scripts: invalidScripts,
+      artifacts: [],
+      agent: {
+        cli: "codex",
+      },
+    };
+
+    try {
+      await mkdir(scriptsDir, { recursive: true });
+      await copyFile(
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "run.js"
+        ),
+        join(scriptsDir, "not-run.js")
+      );
+      await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+      await writeFile(join(skillDir, "skill.json"), JSON.stringify(skillManifest), "utf8");
+      const registryPath = join(root, "skills", "skills-registry.json");
+      await writeFile(
+        registryPath,
+        JSON.stringify({
+          schemaVersion: "1.0",
+          generatedAt: "2026-04-12T00:00:00Z",
+          skills: [skillManifest],
+        }),
+        "utf8"
+      );
+
+      const result = await validateSkill(skillId, registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, "SKILL_VALIDATION_FAILED");
+      assert.match(result.message, /required orchestrated harness/i);
+    } finally {
+      await rm(root, { recursive: true, force: true });
     }
   });
 
@@ -2772,6 +2915,36 @@ describe("runSkill", () => {
       "TEST_OUTPUT:--limit",
       "TEST_OUTPUT:40",
     ]);
+  });
+
+  it("CLI skills run keeps --device out of CLAWPERATOR_SKILL_INPUTS for agent-driven skills", async () => {
+    const fakeAdbDir = await createFakeAdb({
+      installed: true,
+      operatorPackage: "com.clawperator.operator.dev",
+    });
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      "com.test.agent-skill-result",
+      "--device",
+      "device-123",
+      "--operator-package",
+      "com.clawperator.operator.dev",
+      "--output",
+      "json",
+      "--",
+      "env-check",
+    ], {
+      env: {
+        ...process.env,
+        PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+        EXPECTED_DEVICE_ID: "device-123",
+      },
+    });
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { skillResult?: { source?: { kind?: string } } | null };
+    assert.strictEqual(parsed.skillResult?.source?.kind, "agent");
   });
 
   it("CLI skills run rejects a typo in a known wrapper flag after the skill id", async () => {

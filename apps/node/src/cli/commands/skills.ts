@@ -21,6 +21,7 @@ import type { Logger } from "../../adapters/logger.js";
 import type { LogEvent } from "../../contracts/logging.js";
 import {
   CLAWPERATOR_BIN_ENV_VAR,
+  CLAWPERATOR_DEVICE_ID_ENV_VAR,
   CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR,
   resolveSkillBinCommand,
   resolveOperatorPackage,
@@ -297,6 +298,9 @@ export async function cmdSkillsRun(
     [CLAWPERATOR_BIN_ENV_VAR]: resolvedBin,
     [CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR]: resolvedOperatorPackage,
   };
+  if (options.deviceId) {
+    env[CLAWPERATOR_DEVICE_ID_ENV_VAR] = options.deviceId;
+  }
 
   const runSkillImpl = options.runSkillImpl ?? runSkill;
   const validateSkillImpl = options.validateSkillImpl ?? validateSkill;

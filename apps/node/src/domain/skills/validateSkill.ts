@@ -186,6 +186,18 @@ async function validateLoadedSkill(
     };
   }
 
+  if (manifestResult.metadata.agent && !skill.scripts.some((scriptPath) => scriptPath.endsWith("/scripts/run.js"))) {
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} is missing the required orchestrated harness`,
+      details: {
+        skillJsonPath,
+        reason: "Agent-driven skills must declare scripts/run.js in the registry scripts list.",
+      },
+    };
+  }
+
   if (options?.dryRun) {
     if (artifactPaths.length === 0) {
       return {

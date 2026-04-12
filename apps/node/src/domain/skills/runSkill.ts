@@ -28,6 +28,7 @@ import {
   resolveAgentCliExecutable,
   SKILL_AGENT_CLI_ENV_VAR,
 } from "./agentCli.js";
+import { CLAWPERATOR_DEVICE_ID_ENV_VAR } from "./skillsConfig.js";
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 const SKILL_AGENT_CLI_PATH_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_CLI_PATH";
@@ -65,6 +66,8 @@ export interface SkillRunEnv {
   CLAWPERATOR_BIN?: string;
   /** Operator package passed as --operator-package on every CLI call within a skill */
   CLAWPERATOR_OPERATOR_PACKAGE?: string;
+  /** Selected device id propagated by the CLI wrapper */
+  CLAWPERATOR_DEVICE_ID?: string;
   [key: string]: string | undefined;
 }
 
@@ -312,7 +315,6 @@ export async function runSkill(
         };
       }
       resolvedAgentConfig = effectiveAgentConfig.agent;
-      sourceResolution = { ok: true, source: { kind: "agent", agentCli: resolvedAgentConfig.cli } };
       effectiveTimeoutMs = timeoutMs ?? resolvedAgentConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
       const agentResolution = await resolveAgentCliExecutable(
         resolvedAgentConfig,
@@ -363,7 +365,12 @@ export async function runSkill(
 
   const ext = extname(resolvedPath);
   const cmd = ext === ".js" ? process.execPath : resolvedPath;
-  const cmdArgs = ext === ".js" ? [resolvedPath, ...args] : args;
+  const forwardedArgs = resolvedAgentConfig
+    ? args
+    : childEnv[CLAWPERATOR_DEVICE_ID_ENV_VAR]
+      ? [childEnv[CLAWPERATOR_DEVICE_ID_ENV_VAR], ...args]
+      : args;
+  const cmdArgs = ext === ".js" ? [resolvedPath, ...forwardedArgs] : forwardedArgs;
   const timeout = effectiveTimeoutMs;
   const skillLogger = callbacks?.logger?.child({ skillId });
 

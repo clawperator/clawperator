@@ -43,6 +43,14 @@ if (
   process.exit(7);
 }
 
+if (
+  process.env.EXPECTED_DEVICE_ID !== undefined &&
+  process.env.CLAWPERATOR_DEVICE_ID !== process.env.EXPECTED_DEVICE_ID
+) {
+  console.error("unexpected device id env");
+  process.exit(10);
+}
+
 const basePayload = {
   contractVersion: "1.0.0",
   skillId,

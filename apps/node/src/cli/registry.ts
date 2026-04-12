@@ -2141,7 +2141,6 @@ Usage:
         });
       } else {
         const scriptArgs: string[] = [];
-        if (deviceId) scriptArgs.push(deviceId);
         let localTimeoutMs: number | undefined;
         let expectContains: string | undefined;
         let skipValidate = false;
