@@ -114,6 +114,10 @@ An orchestrated skill is an agent-driven runtime shape with these durable rules:
 - orchestrated output is contract-bound. The runtime agent must emit exactly one terminal `[Clawperator-Skill-Result]` frame with a valid `SkillResult` object.
 - replay skills remain first-class. Orchestrated skills are an additional runtime shape, not a replacement for replay-driven skills.
 
+For the practical authoring rules that keep orchestrated skills debuggable and
+truthful in real device runs, see
+[Authoring](authoring.md#authoring-agent-driven-orchestrated-skills).
+
 Current implementation notes:
 
 - the currently supported orchestrated runtime path uses `codex` as the agent CLI

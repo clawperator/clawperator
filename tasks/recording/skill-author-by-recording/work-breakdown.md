@@ -43,6 +43,7 @@ Current state: blocked until the earlier recording workstreams have landed.
 | `tasks/recording/agent-driven-skills/` | Runtime-agent shape the authored skill must target |
 | `docs/api/recording.md` | Recording lifecycle commands and artifacts |
 | `docs/skills/authoring.md` | Scaffold and authoring contract |
+| `docs/internal/design/skill-design.md` | Durable orchestrated skill design lessons and failure modes |
 | `tasks/recording/skill-result-contract/` | Universal `SkillResult` return shape |
 | `tasks/recording/skill-contract-declaration/` | Declared contract expectations |
 | `tasks/recording/compare/` | How replay and orchestrated output are later compared |

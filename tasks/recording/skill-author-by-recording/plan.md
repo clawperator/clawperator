@@ -171,6 +171,7 @@ the docs have not yet been updated.
 | Skill scaffolding and authoring | `docs/skills/authoring.md` | `tasks/recording/graduate-demo-findings/` |
 | Replay/orchestrated proving pattern | `docs/skills/authoring.md` | `tasks/recording/plan.md` |
 | Runtime-agent shape for orchestrated skills | `docs/skills/overview.md`, `docs/skills/authoring.md` | `tasks/recording/agent-driven-skills/` |
+| Orchestrated skill design lessons and failure modes | `docs/internal/design/skill-design.md`, `docs/skills/authoring.md` | `tasks/recording/agent-driven-skills-closeout/` |
 | Structured skill results | `docs/skills/authoring.md`, `apps/node/src/contracts/` | `tasks/recording/skill-result-contract/` |
 | Contract declaration | `docs/skills/authoring.md` | `tasks/recording/skill-contract-declaration/` |
 | Compare workflow | `docs/api/recording.md` | `tasks/recording/compare/` |

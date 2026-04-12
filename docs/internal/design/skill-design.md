@@ -33,6 +33,89 @@ Practical note:
 - Even accurate automations are inherently fuzzy because user/account UI state varies (feature flags, rollout state, number of devices, personalization).
 - Skills should encode preferred strategy plus fallbacks, not brittle assumptions.
 
+## Orchestrated Skill Authoring Lessons
+
+The first stabilized orchestrated skills surfaced several durable design
+lessons for future authors.
+
+### Keep Skill Authority In `SKILL.md`
+
+The durable contract is:
+
+- `skill.json` declares trusted runtime metadata
+- `SKILL.md` is the app-specific runtime program
+- `scripts/run.js` is a thin launcher
+
+When app navigation, coordinates, checkpoint rules, or verification semantics
+move into the harness, authors create a split-brain design where the runtime
+agent reads one contract and the wrapper enforces another. That drift slows
+debugging and makes later maintenance unsafe.
+
+### Require Serialized Device Actions
+
+Orchestrated skills should require one live Clawperator device command at a
+time.
+
+If the runtime agent pipelines multiple live commands in the same turn, the UI
+can be driven out of order and the resulting failure is hard to diagnose.
+Serialized execution keeps the transcript readable and preserves a clean
+evidence trail for each checkpoint.
+
+### Verification Must Prove The Persisted State
+
+Do not treat "the dialog accepted the input" as success.
+
+For state-changing flows, the runtime program should:
+
+- read the current value before editing
+- choose a target value that differs from the current value
+- complete the save path, including any confirmation prompts
+- reopen the persisted screen state
+- read the terminal UI again
+
+This proved especially important for flows where the app returns to an editor
+screen after `Confirm` and requires another save-confirm cycle before the
+change actually persists.
+
+### Decorative UI Text Must Not Cause False Failures
+
+Some UI rows include decorative trailing glyphs such as chevrons.
+
+Verification rules should match the semantic text that proves the state change,
+not require brittle full-string equality when the row also includes a glyph
+that does not change the meaning. For example, a read of
+`Discharge to 45% ` is semantically sufficient to prove `Discharge to 45%`.
+
+### Preserve Debug Artifacts
+
+The most useful harness-level debugging artifacts were:
+
+- the exact prompt given to the runtime agent
+- the runtime agent stdout transcript
+- the runtime agent stderr stream
+- a small metadata file with device id, operator package, and forwarded args
+
+Those artifacts made it possible to distinguish:
+
+- route failures
+- save-flow prompt mismatches
+- strictness bugs in the emitted verification rule
+- transport or runtime-controller mistakes
+- lazy-mode agent behavior that looked superficially clean
+
+### Prefer Current-State Continuation Over Blind Restarts
+
+Real apps often resume inside the middle of a flow:
+
+- already on the target editor
+- already inside a nested dialog
+- already showing the post-confirm save surface
+
+The runtime program should tell the agent to continue from the current valid
+state when possible, not blindly force the same top-level entry path every
+time. That reduces unnecessary UI churn and avoids failures caused by assuming
+the app always restarts from the same surface.
+
 Important scope boundary:
 
 - Skill artifacts are accelerators, not a hard dependency.

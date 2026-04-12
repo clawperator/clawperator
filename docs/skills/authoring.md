@@ -321,6 +321,83 @@ wrapper starts containing the real navigation or verification policy, the skill
 has left the orchestrated runtime contract described in
 [Skills Overview](overview.md#orchestrated-runtime-contract).
 
+### Practical Authoring Rules
+
+These rules are the durable lessons from building and stabilizing the first
+real orchestrated skills.
+
+- Keep the harness thin.
+- Put app-specific route authority in `SKILL.md`, not in `scripts/run.js`.
+- Make `SKILL.md` name the exact checkpoints and the terminal verification rule
+  the runtime agent must satisfy.
+- Require one live Clawperator device command at a time.
+- Do not pipeline multiple live device commands for the same run.
+- Make success depend on post-save or post-action verification, not on the
+  input value that was requested.
+- When the UI includes decorative trailing glyphs on a verified row, treat the
+  semantic text as authoritative. For example, a read like
+  `Discharge to 45% ` still verifies `Discharge to 45%`.
+- Prefer several small `exec` payloads over one oversized payload when a flow
+  crosses multiple app states.
+- When the current UI is already inside the target app flow, continue from the
+  current state instead of forcing a full restart path every time.
+- If the flow changes persisted state, choose a target value that is different
+  from the currently observed value so the verification proves a real change.
+
+### What The Harness Should Do
+
+For orchestrated skills, `scripts/run.js` should be responsible for runtime
+plumbing only:
+
+- read the injected env vars
+- invoke the configured agent CLI on `SKILL.md`
+- preserve stdout and stderr
+- optionally retain per-run logs for local debugging
+
+The harness should not become the second source of truth for:
+
+- app navigation policy
+- app-specific selectors or coordinates
+- checkpoint names or checkpoint success criteria
+- terminal verification semantics
+- `SkillResult` schema authority
+
+If the harness starts owning those concerns, future updates drift because the
+agent is reading one definition while the wrapper is enforcing another.
+
+### Debugging A Failed Orchestrated Run
+
+When an orchestrated skill misbehaves, read these in order:
+
+1. The forwarded agent stderr stream.
+2. The emitted `SkillResult.checkpoints`.
+3. The retained agent stdout and stderr logs, if the harness kept them.
+4. A direct `clawperator snapshot` from the current screen, when the run ended
+   in an unexpected UI state.
+5. Compare or replay artifacts, if a baseline exists for the same flow.
+
+Recommended current debugging support for orchestrated harnesses:
+
+- keep a per-run `prompt.txt`
+- keep the runtime agent stdout log
+- keep the runtime agent stderr log
+- keep a small metadata file describing device id, operator package, forwarded
+  args, and output paths
+
+This matters because many orchestrated failures are not pure route failures.
+Common failure shapes include:
+
+- the agent planned but did not act enough
+- the save flow had an extra confirmation prompt
+- the app resumed from a mid-flow state the prompt did not account for
+- the post-save verification read was correct but the matching rule was too
+  strict
+- two live commands overlapped and drove the UI out of order
+
+The fastest path out of "flying blind" is to preserve the exact runtime prompt,
+agent transcript, and final `SkillResult`, then confirm the visible device
+state with a direct `snapshot`.
+
 `clawperator skills run` injects the orchestrated runtime env vars that the
 harness reads. For the exact variable list and defaults, see
 [Environment Variables](../api/environment.md#orchestrated-skill-runtime-env-vars).
