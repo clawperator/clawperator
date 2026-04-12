@@ -99,13 +99,24 @@ interface SkillFrameParseFailure {
   message: string;
 }
 
-function signalSkillChild(child: ReturnType<typeof spawn>, signal: NodeJS.Signals): void {
+function signalSkillChildWithLogging(
+  child: ReturnType<typeof spawn>,
+  signal: NodeJS.Signals,
+  logger: Logger | undefined,
+  skillId: string
+): void {
   if (process.platform !== "win32" && child.pid !== undefined) {
     try {
       process.kill(-child.pid, signal);
       return;
     } catch {
-      // Fall through to direct child termination when process-group signaling is unavailable.
+      logger?.emit({
+        ts: new Date().toISOString(),
+        level: "warn",
+        event: "skills.run.signal_fallback",
+        skillId,
+        message: `Skill ${skillId} could not signal its detached process group with ${signal}; falling back to direct child termination`,
+      });
     }
   }
   child.kill(signal);
@@ -438,7 +449,7 @@ export async function runSkill(
         return;
       }
       forwardedSignal = signal;
-      signalSkillChild(child, signal);
+      signalSkillChildWithLogging(child, signal, skillLogger, skillId);
     };
 
     const sigintListener = () => {
@@ -605,7 +616,7 @@ export async function runSkill(
         skillId,
         message: `Skill ${skillId} timed out after ${timeout}ms`,
       });
-      signalSkillChild(child, "SIGTERM");
+      signalSkillChildWithLogging(child, "SIGTERM", skillLogger, skillId);
     }, timeout);
   });
 }

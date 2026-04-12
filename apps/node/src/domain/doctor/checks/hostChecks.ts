@@ -180,11 +180,13 @@ export async function checkInstalledOrchestratedSkillAgentCliAvailability(_confi
 
   const repoRoot = getRepoRoot(registryResult.resolvedPath);
   const failures: string[] = [];
+  const manifestFailures: string[] = [];
   let orchestratedSkills = 0;
 
   for (const skill of registryResult.registry.skills) {
     const manifestResult = await readSkillManifestMetadata(repoRoot, skill.path);
     if (!manifestResult.ok) {
+      manifestFailures.push(`${skill.id}: ${manifestResult.message}`);
       continue;
     }
     if (!manifestResult.metadata.agent) {
@@ -208,7 +210,7 @@ export async function checkInstalledOrchestratedSkillAgentCliAvailability(_confi
     }
   }
 
-  if (orchestratedSkills === 0) {
+  if (orchestratedSkills === 0 && manifestFailures.length === 0) {
     return {
       id: "host.skill-agent-cli.skills",
       status: "pass",
@@ -219,25 +221,42 @@ export async function checkInstalledOrchestratedSkillAgentCliAvailability(_confi
     };
   }
 
-  if (failures.length > 0) {
+  if (failures.length > 0 || manifestFailures.length > 0) {
+    const detailLines = [
+      ...manifestFailures,
+      ...failures,
+    ];
+    const failingSkills = [
+      ...manifestFailures.map((failure) => failure.split(":")[0]),
+      ...failures.map((failure) => failure.split(":")[0]),
+    ];
     return {
       id: "host.skill-agent-cli.skills",
       status: "warn",
       code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
-      summary: `${failures.length} of ${orchestratedSkills} orchestrated skills have unresolved agent CLI dependencies.`,
-      detail: failures.join("\n"),
+      summary: [
+        failures.length > 0
+          ? `${failures.length} of ${orchestratedSkills} orchestrated skills have unresolved agent CLI dependencies.`
+          : undefined,
+        manifestFailures.length > 0
+          ? `${manifestFailures.length} installed skills could not be inspected because their skill metadata is unreadable.`
+          : undefined,
+      ].filter((line): line is string => line !== undefined).join(" "),
+      detail: detailLines.join("\n"),
       fix: {
         title: "Align installed orchestrated skills with reachable agent CLIs",
         platform: "any",
         steps: [
           { kind: "manual", value: "Install the required agent CLI on PATH for skills that use agent.cli." },
           { kind: "manual", value: "Or fix skill.json.agent.cliPath for skills that pin an explicit launcher path." },
+          { kind: "manual", value: "If doctor reports unreadable skill metadata, repair the affected skill.json before relying on the readiness result." },
         ],
         docsUrl: DOCTOR_DOCS_URLS.setup,
       },
       evidence: {
         checkedSkills: orchestratedSkills,
-        failingSkills: failures.map((failure) => failure.split(":")[0]),
+        unreadableSkills: manifestFailures.map((failure) => failure.split(":")[0]),
+        failingSkills,
       },
     };
   }

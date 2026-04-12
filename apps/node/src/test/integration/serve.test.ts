@@ -337,7 +337,7 @@ describe("serve API integration", () => {
     assert.strictEqual(body.ok, false);
     assert.strictEqual(body.error.code, "SKILL_EXECUTION_TIMEOUT");
     assert.strictEqual(body.error.skillResult, null);
-    assert.ok(body.error.stdout?.includes("[Clawperator-Skill-Result]"));
+    assert.ok(body.error.stdout?.includes("progress:before-frame"));
   });
 
   test("POST /skills/:skillId/run accepts timeoutMs override", async () => {

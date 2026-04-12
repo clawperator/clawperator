@@ -3998,12 +3998,14 @@ describe("CLI skills run streaming", () => {
 
 describe("runSkill logging", () => {
   let tempRoot: string;
+  const originalProcessKill = process.kill;
 
   beforeEach(async () => {
     tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-log-"));
   });
 
   afterEach(async () => {
+    process.kill = originalProcessKill;
     await rm(tempRoot, { recursive: true, force: true });
   });
 
@@ -4102,5 +4104,29 @@ describe("runSkill logging", () => {
     assert.ok(lines.some((line) => line.event === "skills.run.start"));
     assert.ok(lines.some((line) => line.event === "skills.run.failed"));
     assert.ok(lines.some((line) => line.event === "skills.run.complete"));
+  });
+
+  it("logs when detached process-group signaling falls back to direct child termination", async () => {
+    const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });
+    process.kill = ((pid: number | bigint, signal?: number | NodeJS.Signals) => {
+      if (typeof pid === "number" && pid < 0) {
+        throw new Error("process-group kill unavailable");
+      }
+      return typeof pid === "bigint"
+        ? originalProcessKill(Number(pid), signal)
+        : originalProcessKill(pid, signal);
+    }) as typeof process.kill;
+
+    const result = await runSkill("com.test.partial-timeout", [], undefined, 150, undefined, {
+      logger,
+    });
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
+    const contents = await readFile(logger.logPath()!, "utf8");
+    const lines = parseLogEvents(contents);
+    const fallbackLine = lines.find((line) => line.event === "skills.run.signal_fallback");
+    assert.strictEqual(fallbackLine?.skillId, "com.test.partial-timeout");
+    assert.match(fallbackLine?.message ?? "", /falling back to direct child termination/i);
   });
 });
