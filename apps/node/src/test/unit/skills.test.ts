@@ -3770,6 +3770,23 @@ describe("runSkill env vars", () => {
     assert.ok(result.output.includes("CLAWPERATOR_BIN:undefined"), `Expected CLAWPERATOR_BIN to be undefined when not passed, got: ${result.output}`);
     assert.ok(result.output.includes("CLAWPERATOR_OPERATOR_PACKAGE:undefined"), `Expected CLAWPERATOR_OPERATOR_PACKAGE to be undefined when not passed, got: ${result.output}`);
   });
+
+  it("keeps device selection in env for agent-driven skills instead of polluting forwarded inputs", async () => {
+    const result = await runSkill(
+      TEST_AGENT_SKILL_RESULT,
+      ["env-check", "40"],
+      undefined,
+      undefined,
+      {
+        CLAWPERATOR_DEVICE_ID: "device-123",
+        EXPECTED_DEVICE_ID: "device-123",
+      }
+    );
+
+    assert.ok(result.ok, `Expected device env split to succeed: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.source.kind, "agent");
+  });
 });
 
 describe("CLI skills run env vars", () => {

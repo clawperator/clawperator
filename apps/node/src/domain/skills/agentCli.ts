@@ -26,7 +26,11 @@ export interface EffectiveAgentConfigSuccess {
 export type EffectiveAgentConfigResolution = EffectiveAgentConfigSuccess | AgentCliResolutionFailure;
 
 export async function canResolveAgentTarget(path: string): Promise<boolean> {
-  const requiredMode = extname(path) === ".js" ? fsConstants.F_OK : fsConstants.X_OK;
+  return canResolveAgentTargetForPlatform(path, process.platform);
+}
+
+async function canResolveAgentTargetForPlatform(path: string, platform: NodeJS.Platform): Promise<boolean> {
+  const requiredMode = platform === "win32" || extname(path) === ".js" ? fsConstants.F_OK : fsConstants.X_OK;
   try {
     await access(path, requiredMode);
     return true;
@@ -63,14 +67,48 @@ export async function resolveExecutableOnPath(
   executableName: string,
   pathValue: string | undefined
 ): Promise<string | null> {
-  const pathEntries = (pathValue ?? "").split(delimiter).filter((entry) => entry.length > 0);
+  return resolveExecutableOnPathForPlatform(executableName, pathValue, process.platform, process.env.PATHEXT);
+}
+
+export async function resolveExecutableOnPathForPlatform(
+  executableName: string,
+  pathValue: string | undefined,
+  platform: NodeJS.Platform,
+  pathExtValue?: string
+): Promise<string | null> {
+  const pathDelimiter = platform === "win32" ? ";" : delimiter;
+  const pathEntries = (pathValue ?? "").split(pathDelimiter).filter((entry) => entry.length > 0);
+  const candidates = getExecutableCandidatesForPlatform(executableName, platform, pathExtValue);
   for (const entry of pathEntries) {
-    const candidate = join(entry, executableName);
-    if (await canResolveAgentTarget(candidate)) {
-      return candidate;
+    for (const candidateName of candidates) {
+      const candidate = join(entry, candidateName);
+      if (await canResolveAgentTargetForPlatform(candidate, platform)) {
+        return candidate;
+      }
     }
   }
   return null;
+}
+
+function getExecutableCandidatesForPlatform(
+  executableName: string,
+  platform: NodeJS.Platform,
+  pathExtValue?: string
+): string[] {
+  if (platform !== "win32" || extname(executableName).length > 0) {
+    return [executableName];
+  }
+
+  const extensions = (pathExtValue ?? ".COM;.EXE;.BAT;.CMD")
+    .split(";")
+    .map((extension) => extension.trim())
+    .filter((extension) => extension.length > 0)
+    .map((extension) => extension.startsWith(".") ? extension : `.${extension}`);
+
+  return [
+    executableName,
+    ...extensions.map((extension) => `${executableName}${extension}`),
+  ];
 }
 
 export async function resolveAgentCliExecutable(

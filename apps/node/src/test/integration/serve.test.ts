@@ -242,6 +242,34 @@ describe("serve API integration", () => {
     assert.strictEqual(body.skillResult?.source?.kind, "script");
   });
 
+  test("POST /skills/:skillId/run passes device selection via env for agent-driven skills", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.agent-skill-result/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        deviceId: "device-123",
+        args: ["env-check", "40"],
+      }),
+    });
+
+    assert.strictEqual(res.status, 200);
+    const body = await res.json() as {
+      ok: boolean;
+      skillId?: string;
+      skillResult?: {
+        skillId?: string;
+        status?: string;
+        source?: { kind?: string; agentCli?: string };
+      } | null;
+    };
+    assert.strictEqual(body.ok, true);
+    assert.strictEqual(body.skillId, "com.test.agent-skill-result");
+    assert.strictEqual(body.skillResult?.skillId, "com.test.agent-skill-result");
+    assert.strictEqual(body.skillResult?.status, "success");
+    assert.strictEqual(body.skillResult?.source?.kind, "agent");
+    assert.strictEqual(body.skillResult?.source?.agentCli, "codex");
+  });
+
   test("POST /skills/:skillId/run returns skillResult on framed non-zero failure", async () => {
     const res = await fetch(`http://localhost:${port}/skills/com.test.skill-result/run`, {
       method: "POST",

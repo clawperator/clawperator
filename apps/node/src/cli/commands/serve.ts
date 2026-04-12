@@ -5,7 +5,7 @@ import { listDevices } from "../../domain/devices/listDevices.js";
 import { listSkills } from "../../domain/skills/listSkills.js";
 import { getSkill } from "../../domain/skills/getSkill.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
-import { runSkill } from "../../domain/skills/runSkill.js";
+import { runSkill, type SkillRunEnv } from "../../domain/skills/runSkill.js";
 import { clawperatorEvents, CLAWPERATOR_EVENT_TYPES } from "../../domain/observe/events.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { SKILL_NOT_FOUND, SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
@@ -23,6 +23,17 @@ interface ServeOptions {
   host: string;
   verbose: boolean;
   logger?: Logger;
+}
+
+export function buildServeSkillRunOptions(
+  deviceId: string | undefined,
+  args: readonly string[] | undefined
+): { scriptArgs: string[]; skillEnv: SkillRunEnv | undefined } {
+  const scriptArgs = args ? [...args] : [];
+  const skillEnv = deviceId && deviceId.length > 0
+    ? { CLAWPERATOR_DEVICE_ID: deviceId }
+    : undefined;
+  return { scriptArgs, skillEnv };
 }
 
 export async function cmdServe(options: ServeOptions): Promise<void> {
@@ -455,9 +466,11 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         return;
       }
 
-      const scriptArgs: string[] = [];
-      if (typeof deviceId === "string" && deviceId.length > 0) scriptArgs.push(deviceId);
-      if (Array.isArray(args)) scriptArgs.push(...args.map(String));
+      const requestedArgs = Array.isArray(args) ? args.map(String) : undefined;
+      const { scriptArgs, skillEnv } = buildServeSkillRunOptions(
+        typeof deviceId === "string" ? deviceId : undefined,
+        requestedArgs
+      );
 
       const expectContainsArg =
         typeof expectContains === "string" ? expectContains : undefined;
@@ -466,7 +479,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         scriptArgs,
         undefined,
         typeof timeoutMs === "number" ? timeoutMs : undefined,
-        undefined,
+        skillEnv,
         { logger: options.logger },
         expectContainsArg
       );

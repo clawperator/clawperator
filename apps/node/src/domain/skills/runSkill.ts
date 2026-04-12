@@ -99,6 +99,18 @@ interface SkillFrameParseFailure {
   message: string;
 }
 
+function signalSkillChild(child: ReturnType<typeof spawn>, signal: NodeJS.Signals): void {
+  if (process.platform !== "win32" && child.pid !== undefined) {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch {
+      // Fall through to direct child termination when process-group signaling is unavailable.
+    }
+  }
+  child.kill(signal);
+}
+
 function parseSemver(version: string): { major: number; minor: number; patch: number } | null {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version.trim());
   if (!match) {
@@ -419,6 +431,25 @@ export async function runSkill(
     let settled = false;
     let timedOut = false;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let forwardedSignal: NodeJS.Signals | undefined;
+
+    const handleTerminationSignal = (signal: NodeJS.Signals) => {
+      if (settled || forwardedSignal !== undefined) {
+        return;
+      }
+      forwardedSignal = signal;
+      signalSkillChild(child, signal);
+    };
+
+    const sigintListener = () => {
+      handleTerminationSignal("SIGINT");
+    };
+    const sigtermListener = () => {
+      handleTerminationSignal("SIGTERM");
+    };
+
+    process.once("SIGINT", sigintListener);
+    process.once("SIGTERM", sigtermListener);
 
     const finish = (result: SkillRunResult | SkillRunError) => {
       if (settled) return;
@@ -426,6 +457,8 @@ export async function runSkill(
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId);
       }
+      process.removeListener("SIGINT", sigintListener);
+      process.removeListener("SIGTERM", sigtermListener);
       resolve(result);
     };
 
@@ -572,15 +605,7 @@ export async function runSkill(
         skillId,
         message: `Skill ${skillId} timed out after ${timeout}ms`,
       });
-      if (process.platform !== "win32" && child.pid !== undefined) {
-        try {
-          process.kill(-child.pid, "SIGTERM");
-          return;
-        } catch {
-          // Fall through to direct child termination when process-group signaling is unavailable.
-        }
-      }
-      child.kill("SIGTERM");
+      signalSkillChild(child, "SIGTERM");
     }, timeout);
   });
 }
