@@ -65,6 +65,7 @@ Use:
 - [Timeouts](api/timeouts.md) - execution and action timeout budgeting
 - [Environment Variables](api/environment.md) - current `CLAWPERATOR_*` and runtime environment controls
 - [Serve API](api/serve.md) - local HTTP and SSE contract
+- [MCP Server](api/mcp.md) - stdio MCP server for MCP clients such as Claude Desktop
 - [Navigation Patterns](api/navigation.md) - composed navigation workflows for agents
 - [Recording Format](api/recording.md) - raw NDJSON recording schema and parsed step log
 

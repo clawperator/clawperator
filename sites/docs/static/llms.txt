@@ -17,6 +17,7 @@ This site contains the canonical technical documentation for Clawperator, a dete
 - Timeouts: https://docs.clawperator.com/api/timeouts/
 - Environment variables: https://docs.clawperator.com/api/environment/
 - Serve API: https://docs.clawperator.com/api/serve/
+- MCP server: https://docs.clawperator.com/api/mcp/
 - Navigation patterns: https://docs.clawperator.com/api/navigation/
 - Recording format: https://docs.clawperator.com/api/recording/
 - Skills overview: https://docs.clawperator.com/skills/overview/
