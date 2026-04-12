@@ -108,10 +108,16 @@ function getExecutableCandidatesForPlatform(
     .filter((extension) => extension.length > 0)
     .map((extension) => extension.startsWith(".") ? extension : `.${extension}`);
 
-  return [
+  return Array.from(new Set([
     executableName,
-    ...extensions.map((extension) => `${executableName}${extension}`),
-  ];
+    ...extensions.flatMap((extension) => {
+      const lower = extension.toLowerCase();
+      const upper = extension.toUpperCase();
+      return lower === upper
+        ? [`${executableName}${extension}`]
+        : [`${executableName}${extension}`, `${executableName}${lower}`, `${executableName}${upper}`];
+    }),
+  ]));
 }
 
 export async function resolveAgentCliExecutable(

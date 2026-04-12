@@ -2051,11 +2051,14 @@ describe("runSkill", () => {
         scripts: ["skills/com.test.missing-skill-program/scripts/run.js"],
         artifacts: [],
         agent: {
-          cli: "codex",
+          cli: "fake-agent",
+          cliPath: "scripts/fake-agent.sh",
         },
       }),
       omitSkillFile: true,
     });
+    const fakeAgentPath = join(dirname(temp.registryPath), "com.test.missing-skill-program", "scripts", "fake-agent.sh");
+    await writeFile(fakeAgentPath, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
 
     try {
       const result = await runSkill("com.test.missing-skill-program", ["valid"], temp.registryPath);
