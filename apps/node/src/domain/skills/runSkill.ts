@@ -34,6 +34,7 @@ const SKILL_INPUTS_ENV_VAR = "CLAWPERATOR_SKILL_INPUTS";
 const SKILL_PROGRAM_ENV_VAR = "CLAWPERATOR_SKILL_PROGRAM";
 const SKILL_ID_ENV_VAR = "CLAWPERATOR_SKILL_ID";
 const SKILLS_REGISTRY_ENV_VAR = "CLAWPERATOR_SKILLS_REGISTRY";
+const EXECUTABLE_NAME_PATTERN = /^[A-Za-z0-9._+-]+$/;
 
 export interface SkillRunResult {
   ok: true;
@@ -82,6 +83,13 @@ interface AgentCliResolutionFailure {
 }
 
 type AgentCliResolution = AgentCliResolutionSuccess | AgentCliResolutionFailure;
+
+interface EffectiveAgentConfigSuccess {
+  ok: true;
+  agent: SkillAgentConfig;
+}
+
+type EffectiveAgentConfigResolution = EffectiveAgentConfigSuccess | AgentCliResolutionFailure;
 
 interface SkillSourceResolutionSuccess {
   ok: true;
@@ -134,18 +142,35 @@ async function resolveSkillResultSource(
   return { ok: true, source: { kind: "agent", agentCli: manifestResult.metadata.agent.cli } };
 }
 
-async function canExecute(path: string): Promise<boolean> {
+async function canResolveAgentTarget(path: string): Promise<boolean> {
+  const requiredMode = extname(path) === ".js" ? fsConstants.F_OK : fsConstants.X_OK;
   try {
-    await access(path, fsConstants.X_OK);
+    await access(path, requiredMode);
     return true;
   } catch {
-    try {
-      await access(path, fsConstants.F_OK);
-      return true;
-    } catch {
-      return false;
-    }
+    return false;
   }
+}
+
+function resolveConfiguredAgentCli(agent: SkillAgentConfig, resolvedEnv: NodeJS.ProcessEnv): EffectiveAgentConfigResolution {
+  const overriddenCli = resolvedEnv[SKILL_AGENT_CLI_ENV_VAR]?.trim();
+  if (!overriddenCli) {
+    return { ok: true, agent };
+  }
+  if (!EXECUTABLE_NAME_PATTERN.test(overriddenCli)) {
+    return {
+      ok: false,
+      message: `Configured ${SKILL_AGENT_CLI_ENV_VAR} value '${overriddenCli}' is not a plain executable name`,
+    };
+  }
+  return {
+    ok: true,
+    agent: {
+      ...agent,
+      cli: overriddenCli,
+      cliPath: undefined,
+    },
+  };
 }
 
 async function resolveAgentCliExecutable(
@@ -155,7 +180,7 @@ async function resolveAgentCliExecutable(
 ): Promise<AgentCliResolution> {
   if (agent.cliPath && agent.cliPath.length > 0) {
     const resolvedCliPath = isAbsolute(agent.cliPath) ? agent.cliPath : resolve(skillDir, agent.cliPath);
-    if (await canExecute(resolvedCliPath)) {
+    if (await canResolveAgentTarget(resolvedCliPath)) {
       return { ok: true, executablePath: resolvedCliPath };
     }
     return {
@@ -167,7 +192,7 @@ async function resolveAgentCliExecutable(
   const pathEntries = (resolvedEnv.PATH ?? "").split(delimiter).filter((entry) => entry.length > 0);
   for (const entry of pathEntries) {
     const candidate = join(entry, agent.cli);
-    if (await canExecute(candidate)) {
+    if (await canResolveAgentTarget(candidate)) {
       return { ok: true, executablePath: candidate };
     }
   }
@@ -328,7 +353,7 @@ export async function runSkill(
     }
 
     const repoRoot = getRepoRoot(loaded.resolvedPath);
-    skillProgramPath = join(repoRoot, skill.path, "SKILL.md");
+    skillProgramPath = join(repoRoot, skill.skillFile);
     // Prefer .js script over .sh for direct node invocation
     const scriptRelative =
       skill.scripts.find((s) => extname(s) === ".js") ??
@@ -340,7 +365,18 @@ export async function runSkill(
     sourceResolution = await resolveSkillResultSource(manifestResult);
 
     if (manifestResult.ok && manifestResult.metadata.agent) {
-      resolvedAgentConfig = manifestResult.metadata.agent;
+      const effectiveAgentConfig = resolveConfiguredAgentCli(manifestResult.metadata.agent, childEnv);
+      if (!effectiveAgentConfig.ok) {
+        return {
+          ok: false,
+          code: SKILL_AGENT_CLI_UNAVAILABLE,
+          message: `Skill ${skillId} requires agent CLI '${manifestResult.metadata.agent.cli}', but it is unavailable. ${effectiveAgentConfig.message}`,
+          skillId,
+          skillResult: null,
+        };
+      }
+      resolvedAgentConfig = effectiveAgentConfig.agent;
+      sourceResolution = { ok: true, source: { kind: "agent", agentCli: resolvedAgentConfig.cli } };
       effectiveTimeoutMs = timeoutMs ?? resolvedAgentConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
       const agentResolution = await resolveAgentCliExecutable(
         resolvedAgentConfig,
@@ -382,7 +418,7 @@ export async function runSkill(
       return {
         ok: false,
         code: SKILL_SCRIPT_NOT_FOUND,
-        message: `SKILL.md not found: ${skillProgramPath}`,
+        message: `Skill program not found: ${skillProgramPath}`,
         skillId,
         skillResult: null,
       };
@@ -419,6 +455,7 @@ export async function runSkill(
     });
 
     const child = spawn(cmd, cmdArgs, {
+      detached: process.platform !== "win32",
       stdio: ["ignore", "pipe", "pipe"],
       env: childEnv,
     });
@@ -581,6 +618,14 @@ export async function runSkill(
         skillId,
         message: `Skill ${skillId} timed out after ${timeout}ms`,
       });
+      if (process.platform !== "win32" && child.pid !== undefined) {
+        try {
+          process.kill(-child.pid, "SIGTERM");
+          return;
+        } catch {
+          // Fall through to direct child termination when process-group signaling is unavailable.
+        }
+      }
       child.kill("SIGTERM");
     }, timeout);
   });

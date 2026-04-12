@@ -20,6 +20,20 @@ const child = spawn(extname(agentCliPath) === ".js" ? process.execPath : agentCl
   env: process.env,
 });
 
+function forwardTermination(signal) {
+  if (child.exitCode === null && child.signalCode === null) {
+    child.kill(signal);
+  }
+}
+
+process.on("SIGTERM", () => {
+  forwardTermination("SIGTERM");
+});
+
+process.on("SIGINT", () => {
+  forwardTermination("SIGINT");
+});
+
 child.stdout?.on("data", (chunk) => {
   process.stdout.write(chunk);
 });

@@ -14,6 +14,7 @@ import {
   resolveSkillBinCommand,
   resolveOperatorPackage,
 } from "../../domain/skills/skillsConfig.js";
+import { getRepoRoot } from "../../adapters/skills-repo/localSkillsRegistry.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 import { listSkills } from "../../domain/skills/listSkills.js";
@@ -153,6 +154,7 @@ async function createTempRegistryWithSkill(options: {
   skillJsonContents: string;
   extraScriptSourcePaths?: string[];
   omitSkillFile?: boolean;
+  skillFileRelativePath?: string;
 }): Promise<{ registryPath: string; cleanup: () => Promise<void> }> {
   const root = await mkdtemp(join(tmpdir(), "clawperator-skill-result-source-"));
   const skillDir = join(root, "skills", options.skillId);
@@ -165,7 +167,11 @@ async function createTempRegistryWithSkill(options: {
     await copyFile(extraSourcePath, join(scriptsDir, basename(extraSourcePath)));
   }
   if (!options.omitSkillFile) {
-    await writeFile(join(skillDir, "SKILL.md"), `# ${options.skillId}\n`);
+    const skillProgramPath = options.skillFileRelativePath === undefined
+      ? join(skillDir, "SKILL.md")
+      : join(root, options.skillFileRelativePath);
+    await mkdir(dirname(skillProgramPath), { recursive: true });
+    await writeFile(skillProgramPath, `# ${options.skillId}\n`);
   }
   await writeFile(join(skillDir, "skill.json"), options.skillJsonContents);
 
@@ -182,7 +188,7 @@ async function createTempRegistryWithSkill(options: {
           intent: "temp",
           summary: "Temporary test skill",
           path: `skills/${options.skillId}`,
-          skillFile: `skills/${options.skillId}/SKILL.md`,
+          skillFile: options.skillFileRelativePath ?? `skills/${options.skillId}/SKILL.md`,
           scripts: [`skills/${options.skillId}/scripts/run.js`],
           artifacts: [],
         },
@@ -1881,6 +1887,48 @@ describe("runSkill", () => {
     }
   });
 
+  it("fails before spawn when an orchestrated skill's configured cliPath exists but is not executable", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.non-executable-agent-cli",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.non-executable-agent-cli",
+        applicationId: "com.test",
+        intent: "non-executable-agent-cli",
+        summary: "Temporary test skill",
+        path: "skills/com.test.non-executable-agent-cli",
+        skillFile: "skills/com.test.non-executable-agent-cli/SKILL.md",
+        scripts: ["skills/com.test.non-executable-agent-cli/scripts/run.js"],
+        artifacts: [],
+        agent: {
+          cli: "fake-agent",
+          cliPath: "scripts/not-executable.sh",
+        },
+      }),
+    });
+
+    const nonExecutablePath = join(dirname(temp.registryPath), "com.test.non-executable-agent-cli", "scripts", "not-executable.sh");
+    await writeFile(nonExecutablePath, "#!/bin/sh\nexit 0\n", "utf8");
+
+    try {
+      const result = await runSkill("com.test.non-executable-agent-cli", ["valid"], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_AGENT_CLI_UNAVAILABLE);
+      assert.match(result.message, /not found or is not executable/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
   it("returns a typed execution failure when the orchestrated harness forwards a non-zero agent exit", async () => {
     const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["agent-fail"]);
 
@@ -1924,7 +1972,7 @@ describe("runSkill", () => {
       const result = await runSkill("com.test.missing-skill-program", ["valid"], temp.registryPath);
       assert.ok(!result.ok);
       assert.strictEqual(result.code, SKILL_SCRIPT_NOT_FOUND);
-      assert.match(result.message, /SKILL\.md not found/);
+      assert.match(result.message, /Skill program not found/);
       assert.strictEqual(result.skillResult, null);
     } finally {
       await temp.cleanup();
@@ -2026,6 +2074,69 @@ describe("runSkill", () => {
     }
   });
 
+  it("uses the registry skillFile path for agent-driven skill programs", async () => {
+    const skillFileRelativePath = "skills/com.test.custom-skill-file/RUNTIME.md";
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.custom-skill-file",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.custom-skill-file",
+        applicationId: "com.test",
+        intent: "custom-skill-file",
+        summary: "Temporary test skill",
+        path: "skills/com.test.custom-skill-file",
+        skillFile: skillFileRelativePath,
+        scripts: ["skills/com.test.custom-skill-file/scripts/run.js"],
+        artifacts: [],
+        agent: {
+          cli: "fake_codex.js",
+          cliPath: "scripts/fake_codex.js",
+        },
+      }),
+      extraScriptSourcePaths: [
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "fake_codex.js"
+        ),
+      ],
+      skillFileRelativePath,
+    });
+
+    try {
+      const expectedSkillProgramPath = join(getRepoRoot(temp.registryPath), skillFileRelativePath);
+      const result = await runSkill(
+        "com.test.custom-skill-file",
+        ["env-check"],
+        temp.registryPath,
+        undefined,
+        {
+          EXPECTED_SKILL_PROGRAM_PATH: expectedSkillProgramPath,
+        }
+      );
+
+      assert.ok(result.ok, `Expected custom skillFile agent skill to succeed: ${"message" in result ? result.message : ""}`);
+      assert.ok(result.skillResult);
+      assert.strictEqual(result.skillResult.source.kind, "agent");
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
   it("resolves the agent CLI from the caller-provided PATH override", async () => {
     const temp = await createTempRegistryWithSkill({
       skillId: "com.test.agent-path-override",
@@ -2086,6 +2197,7 @@ describe("runSkill", () => {
           undefined,
           {
             PATH: fakeAgentDir,
+            CLAWPERATOR_SKILL_AGENT_CLI: "my-agent",
             EXPECTED_SKILLS_REGISTRY: temp.registryPath,
             EXPECTED_SKILL_TIMEOUT_MS: "4321",
           }

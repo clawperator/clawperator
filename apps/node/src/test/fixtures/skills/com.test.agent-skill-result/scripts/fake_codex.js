@@ -12,6 +12,14 @@ if (!skillProgramPath) {
 }
 
 if (
+  process.env.EXPECTED_SKILL_PROGRAM_PATH !== undefined &&
+  skillProgramPath !== process.env.EXPECTED_SKILL_PROGRAM_PATH
+) {
+  console.error("unexpected skill program path");
+  process.exit(8);
+}
+
+if (
   process.env.CLAWPERATOR_SKILL_INPUTS !== undefined &&
   process.env.CLAWPERATOR_SKILL_INPUTS !== JSON.stringify(args.slice(1))
 ) {
