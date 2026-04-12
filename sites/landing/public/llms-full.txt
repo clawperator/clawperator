@@ -8145,6 +8145,7 @@ Important current caveats:
 
 - the `-replay` / `-orchestrated` suffix split is still primarily a naming and authoring convention, not a dedicated registry enum
 - runtime behavior for orchestrated skills is currently driven by the presence of `skill.json.agent`, not by suffix inspection alone
+- W2b v1 orchestrated skills are codex-only at runtime
 - some legacy skills predate the suffix convention and may still have unsuffixed ids
 - unsuffixed legacy ids should not be read as proof that a skill is already orchestrated
 
@@ -8915,6 +8916,7 @@ program. In that shape:
 - the harness spawns the configured agent CLI from `skill.json.agent`
 - the runtime agent uses Clawperator as the hand
 - the runtime agent emits exactly one terminal `[Clawperator-Skill-Result]` frame
+- W2b v1 orchestrated skills are codex-only at runtime
 
 ## `skill.json` Contract
 

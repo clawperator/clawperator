@@ -43,6 +43,7 @@ Important current caveats:
 
 - the `-replay` / `-orchestrated` suffix split is still primarily a naming and authoring convention, not a dedicated registry enum
 - runtime behavior for orchestrated skills is currently driven by the presence of `skill.json.agent`, not by suffix inspection alone
+- W2b v1 orchestrated skills are codex-only at runtime
 - some legacy skills predate the suffix convention and may still have unsuffixed ids
 - unsuffixed legacy ids should not be read as proof that a skill is already orchestrated
 

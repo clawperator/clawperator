@@ -210,6 +210,7 @@ program. In that shape:
 - the harness spawns the configured agent CLI from `skill.json.agent`
 - the runtime agent uses Clawperator as the hand
 - the runtime agent emits exactly one terminal `[Clawperator-Skill-Result]` frame
+- W2b v1 orchestrated skills are codex-only at runtime
 
 ## `skill.json` Contract
 
