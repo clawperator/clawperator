@@ -2074,6 +2074,15 @@ describe("runSkill", () => {
     assert.strictEqual(result.skillResult, null);
   });
 
+  it("rejects agent-driven exit-0 runs that omit the required terminal SkillResult frame", async () => {
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["no-frame-success"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /must emit a terminal SkillResult frame/i);
+    assert.strictEqual(result.skillResult, null);
+  });
+
   it("preserves indeterminate SkillResult status for orchestrated skills", async () => {
     const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["indeterminate"]);
 
@@ -2397,6 +2406,93 @@ describe("runSkill", () => {
       assert.ok(result.ok, `Expected validation to ignore registry parity for agent metadata: ${!result.ok ? result.message : ""}`);
     } finally {
       await temp.cleanup();
+    }
+  });
+
+  it("accepts backslash-separated orchestrated harness paths in registry metadata", async () => {
+    const root = await mkdtemp(join(tmpdir(), "clawperator-agent-windows-paths-"));
+    const skillId = "com.test.agent-windows-paths";
+    const skillDir = join(root, "skills", skillId);
+    const scriptsDir = join(skillDir, "scripts");
+    const registryPath = join(root, "skills", "skills-registry.json");
+
+    try {
+      await mkdir(scriptsDir, { recursive: true });
+      await copyFile(
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "run.js"
+        ),
+        join(scriptsDir, "run.js")
+      );
+      await copyFile(
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "fake_codex.js"
+        ),
+        join(scriptsDir, "fake_codex.js")
+      );
+      await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+      await writeFile(
+        join(skillDir, "skill.json"),
+        JSON.stringify({
+          id: skillId,
+          applicationId: "com.test",
+          intent: "temp",
+          summary: "Temporary test skill",
+          path: "skills\\com.test.agent-windows-paths",
+          skillFile: "skills\\com.test.agent-windows-paths\\SKILL.md",
+          scripts: ["skills\\com.test.agent-windows-paths\\scripts\\run.js"],
+          artifacts: [],
+          agent: {
+            cli: "codex",
+            cliPath: "scripts/fake_codex.js",
+          },
+        }),
+        "utf8"
+      );
+      await writeFile(
+        registryPath,
+        JSON.stringify({
+          schemaVersion: "1.0",
+          generatedAt: "2026-04-13T00:00:00Z",
+          skills: [
+            {
+              id: skillId,
+              applicationId: "com.test",
+              intent: "temp",
+              summary: "Temporary test skill",
+              path: "skills\\com.test.agent-windows-paths",
+              skillFile: "skills\\com.test.agent-windows-paths\\SKILL.md",
+              scripts: ["skills\\com.test.agent-windows-paths\\scripts\\run.js"],
+              artifacts: [],
+            },
+          ],
+        }),
+        "utf8"
+      );
+
+      const valid = await validateSkill(skillId, registryPath);
+      assert.ok(valid.ok, `Expected backslash-separated registry paths to validate: ${!valid.ok ? valid.message : ""}`);
+
+      const result = await runSkill(skillId, ["valid"], registryPath);
+      assert.ok(result.ok, `Expected backslash-separated registry paths to run: ${"message" in result ? result.message : ""}`);
+      assert.ok(result.skillResult);
+      assert.strictEqual(result.skillResult.source.kind, "agent");
+    } finally {
+      await rm(root, { recursive: true, force: true });
     }
   });
 

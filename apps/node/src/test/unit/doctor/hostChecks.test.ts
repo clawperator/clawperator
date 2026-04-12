@@ -460,5 +460,30 @@ describe("Doctor: hostChecks", () => {
                 }
             }
         });
+
+        it("warns when the configured skills registry is unreadable", async () => {
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const originalRegistry = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+            const root = await mkdtemp(join(tmpdir(), "clawperator-doctor-bad-registry-"));
+            const registryPath = join(root, "skills-registry.json");
+
+            try {
+                await writeFile(registryPath, "{not-json", "utf8");
+                process.env.CLAWPERATOR_SKILLS_REGISTRY = registryPath;
+
+                const result = await checkInstalledOrchestratedSkillAgentCliAvailability(config);
+                assert.strictEqual(result.status, "warn");
+                assert.strictEqual(result.code, ERROR_CODES.HOST_DEPENDENCY_MISSING);
+                assert.match(result.summary, /could not inspect the local skills registry/i);
+                assert.match(result.detail ?? "", /Unexpected token|JSON/i);
+            } finally {
+                await rm(root, { recursive: true, force: true });
+                if (originalRegistry === undefined) {
+                    delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+                } else {
+                    process.env.CLAWPERATOR_SKILLS_REGISTRY = originalRegistry;
+                }
+            }
+        });
     });
 });

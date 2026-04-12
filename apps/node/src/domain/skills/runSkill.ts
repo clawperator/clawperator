@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
-import { join, extname } from "node:path";
+import { extname } from "node:path";
 import { loadRegistry, findSkillById, getRepoRoot } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import type { Logger } from "../../adapters/logger.js";
 import {
@@ -30,6 +30,7 @@ import {
   SKILL_AGENT_CLI_ENV_VAR,
 } from "./agentCli.js";
 import { CLAWPERATOR_DEVICE_ID_ENV_VAR } from "./skillsConfig.js";
+import { isOrchestratedHarnessScriptPath, resolveRepoRelativeSkillPath } from "./pathUtils.js";
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 const SKILL_AGENT_CLI_PATH_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_CLI_PATH";
@@ -155,6 +156,7 @@ function parseSkillResultFrame(
   stdout: string,
   expectedSkillId: string,
   sourceResolution: SkillSourceResolution,
+  requireTerminalFrame: boolean,
   logger?: Logger
 ): SkillFrameParseSuccess | SkillFrameParseFailure {
   const lines = stdout.split(/\r?\n/);
@@ -164,13 +166,16 @@ function parseSkillResultFrame(
   const markerIndexes = nonEmptyLines
     .map((line, index) => (line.raw === SKILL_RESULT_FRAME_PREFIX ? index : -1))
     .filter((index) => index >= 0);
-
   if (nonEmptyLines.length === 0) {
-    return { ok: true, skillResult: null };
+    return requireTerminalFrame
+      ? { ok: false, message: "Agent-driven skills must emit a terminal SkillResult frame" }
+      : { ok: true, skillResult: null };
   }
 
   if (markerIndexes.length === 0) {
-    return { ok: true, skillResult: null };
+    return requireTerminalFrame
+      ? { ok: false, message: "Agent-driven skills must emit a terminal SkillResult frame" }
+      : { ok: true, skillResult: null };
   }
 
   if (nonEmptyLines.length === 1) {
@@ -313,12 +318,12 @@ export async function runSkill(
     }
 
     sourceResolution = await resolveSkillResultSource(manifestResult);
-    skillProgramPath = join(repoRoot, skill.skillFile);
+    skillProgramPath = resolveRepoRelativeSkillPath(repoRoot, skill.skillFile);
 
     const manifestAgent = manifestResult.metadata.agent;
     const isAgentDriven = manifestAgent !== null && manifestAgent !== undefined;
     const scriptRelative = isAgentDriven
-      ? skill.scripts.find((scriptPath) => scriptPath.endsWith("/scripts/run.js"))
+      ? skill.scripts.find((scriptPath) => isOrchestratedHarnessScriptPath(scriptPath))
       : (skill.scripts.find((s) => extname(s) === ".js") ??
         skill.scripts.find((s) => extname(s) === ".sh") ??
         skill.scripts[0]);
@@ -335,7 +340,7 @@ export async function runSkill(
       };
     }
 
-    resolvedPath = join(repoRoot, scriptRelative);
+    resolvedPath = resolveRepoRelativeSkillPath(repoRoot, scriptRelative);
 
     if (isAgentDriven) {
       const effectiveAgentConfig = resolveConfiguredAgentCli(manifestAgent, childEnv);
@@ -352,7 +357,7 @@ export async function runSkill(
       effectiveTimeoutMs = timeoutMs ?? resolvedAgentConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
       const agentResolution = await resolveAgentCliExecutable(
         resolvedAgentConfig,
-        join(repoRoot, skill.path),
+        resolveRepoRelativeSkillPath(repoRoot, skill.path),
         childEnv
       );
       if (!agentResolution.ok) {
@@ -532,7 +537,15 @@ export async function runSkill(
         return;
       }
 
-      const parsedSkillResult = parseSkillResultFrame(stdout, skillId, sourceResolution, skillLogger);
+      const requireTerminalFrame =
+        code === 0 && sourceResolution.ok && sourceResolution.source.kind === "agent";
+      const parsedSkillResult = parseSkillResultFrame(
+        stdout,
+        skillId,
+        sourceResolution,
+        requireTerminalFrame,
+        skillLogger
+      );
       if (!parsedSkillResult.ok) {
         finish({
           ok: false,

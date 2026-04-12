@@ -13,6 +13,7 @@ import {
 } from "../../contracts/skills.js";
 import { validateExecution, type ValidationFailure } from "../executions/validateExecution.js";
 import { parseSkillManifestMetadata } from "./skillManifest.js";
+import { isOrchestratedHarnessScriptPath, resolveRepoRelativeSkillPath } from "./pathUtils.js";
 
 const SKILL_DRY_RUN_SKIP_REASON =
   "skill has no pre-compiled artifacts; payload is generated at runtime by the skill script";
@@ -105,8 +106,8 @@ async function validateLoadedSkill(
   options?: { dryRun?: boolean }
 ): Promise<ValidateSkillResult | ValidateSkillError> {
   const repoRoot = getRepoRoot(resolvedRegistryPath);
-  const skillJsonPath = join(repoRoot, getSkillJsonRelativePath(skill));
-  const skillFilePath = join(repoRoot, skill.skillFile);
+  const skillJsonPath = resolveRepoRelativeSkillPath(repoRoot, getSkillJsonRelativePath(skill));
+  const skillFilePath = resolveRepoRelativeSkillPath(repoRoot, skill.skillFile);
 
   if (!Array.isArray(skill.scripts)) {
     return {
@@ -133,9 +134,9 @@ async function validateLoadedSkill(
     };
   }
 
-  const scriptPaths = skill.scripts.map((file) => join(repoRoot, file));
+  const scriptPaths = skill.scripts.map((file) => resolveRepoRelativeSkillPath(repoRoot, file));
   // Artifacts are optional for script-only skills, but when present they must be explicit arrays.
-  const artifactPaths = skill.artifacts === undefined ? [] : skill.artifacts.map((file) => join(repoRoot, file));
+  const artifactPaths = skill.artifacts === undefined ? [] : skill.artifacts.map((file) => resolveRepoRelativeSkillPath(repoRoot, file));
   const missingFiles: string[] = [];
 
   for (const file of [skillJsonPath, skillFilePath, ...scriptPaths, ...artifactPaths]) {
@@ -186,7 +187,7 @@ async function validateLoadedSkill(
     };
   }
 
-  if (manifestResult.metadata.agent && !skill.scripts.some((scriptPath) => scriptPath.endsWith("/scripts/run.js"))) {
+  if (manifestResult.metadata.agent && !skill.scripts.some((scriptPath) => isOrchestratedHarnessScriptPath(scriptPath))) {
     return {
       ok: false,
       code: SKILL_VALIDATION_FAILED,

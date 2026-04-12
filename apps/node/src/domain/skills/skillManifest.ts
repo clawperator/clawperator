@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { SkillAgentConfig } from "../../contracts/skills.js";
+import { resolveRepoRelativeSkillPath } from "./pathUtils.js";
 
 export interface SkillManifestMetadata {
   skillJsonPath: string;
@@ -114,7 +115,7 @@ export async function readSkillManifestMetadata(
   repoRoot: string,
   skillPath: string
 ): Promise<SkillManifestReadResult> {
-  const skillJsonPath = join(repoRoot, skillPath, "skill.json");
+  const skillJsonPath = resolveRepoRelativeSkillPath(repoRoot, join(skillPath, "skill.json"));
   try {
     const raw = await readFile(skillJsonPath, "utf-8");
     const parsedUnknown = JSON.parse(raw) as unknown;

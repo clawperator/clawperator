@@ -170,11 +170,32 @@ export async function checkInstalledOrchestratedSkillAgentCliAvailability(_confi
   try {
     registryResult = await loadRegistry();
   } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    const registryNotConfigured = process.env.CLAWPERATOR_SKILLS_REGISTRY === undefined
+      && detail.startsWith("Registry not found at default path:");
+    if (registryNotConfigured) {
+      return {
+        id: "host.skill-agent-cli.skills",
+        status: "pass",
+        summary: "Skipping skill-aware orchestrated agent CLI check because no local skills registry is configured.",
+        detail,
+      };
+    }
     return {
       id: "host.skill-agent-cli.skills",
-      status: "pass",
-      summary: "Skipping skill-aware orchestrated agent CLI check because no local skills registry is configured.",
-      detail: error instanceof Error ? error.message : String(error),
+      status: "warn",
+      code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
+      summary: "Skill-aware orchestrated agent CLI readiness could not inspect the local skills registry.",
+      detail,
+      fix: {
+        title: "Repair the local skills registry before relying on orchestrated skill readiness",
+        platform: "any",
+        steps: [
+          { kind: "manual", value: "Fix the configured skills-registry.json path or repair the registry JSON contents." },
+          { kind: "manual", value: "If no registry is installed yet, run clawperator skills install first." },
+        ],
+        docsUrl: DOCTOR_DOCS_URLS.setup,
+      },
     };
   }
 

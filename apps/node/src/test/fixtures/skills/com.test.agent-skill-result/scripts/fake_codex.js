@@ -157,6 +157,10 @@ switch (mode) {
     console.log(JSON.stringify(basePayload));
     process.exit(0);
     break;
+  case "no-frame-success":
+    console.log("agent completed without framed result");
+    process.exit(0);
+    break;
   default:
     console.error(`unknown mode:${mode}`);
     process.exit(5);
