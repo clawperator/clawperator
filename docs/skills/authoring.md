@@ -210,7 +210,7 @@ program. In that shape:
 - the harness spawns the configured agent CLI from `skill.json.agent`
 - the runtime agent uses Clawperator as the hand
 - the runtime agent emits exactly one terminal `[Clawperator-Skill-Result]` frame
-- W2b v1 orchestrated skills are codex-only at runtime
+- W2b v1 orchestrated skills are codex-only at runtime and currently run codex with `danger-full-access` so the runtime agent can reach live adb targets
 
 ## `skill.json` Contract
 
