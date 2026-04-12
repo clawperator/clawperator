@@ -55,6 +55,18 @@ This pack keeps the remaining work narrow:
   executed against a physical Samsung device.
 - `runSkill` is the single authority on the `SkillResult` contract. Orchestrated
   harnesses must not re-implement the parser.
+- Strict-agentic discipline: SKILL.md is the execution contract for the
+  runtime agent. Prose-only planning is not progress. A `status: success`
+  frame without tool-call evidence for every `ok` checkpoint and for the
+  terminal verification is a lazy-mode failure, not a success, and must
+  not count toward reliability. This discipline is motivated by the
+  documented GPT-5-family pattern of emitting plan-only turns under
+  tool-use and applies to W2b v1 specifically because the runtime is
+  codex (GPT-5 family). SKILL.md hardening and reliability-evidence
+  classification are the two places where this rule takes effect in this
+  closeout pack. Turn-level retry, runtime tool-call enforcement, and a
+  new `blocked` frame status are explicitly out of scope and belong to
+  later contract work.
 
 ## In Scope
 
@@ -127,9 +139,19 @@ This pack keeps the remaining work narrow:
    `docs/skills/overview.md`) must explicitly state that W2b v1 orchestrated
    skills are currently codex-only at runtime. The limitation must be visible,
    not implicit.
-7. P4 reliability evidence must be captured and committed under
+7. `SKILL.md` must include strict-agentic discipline rules that forbid
+   prose-only planning, require tool-call evidence for every `ok` checkpoint
+   and for terminal verification, and require a truthful `failed` or
+   `indeterminate` result when the agent cannot reach the terminal state
+   through actual Clawperator tool calls. Lazy-mode (prose planning in place
+   of action) must be classified as a failed run, not as success or as
+   silent indeterminacy.
+8. P4 reliability evidence must be captured and committed under
    `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/`
-   before the skills-side PR can be called ready.
+   before the skills-side PR can be called ready. The capture must include
+   a lazy-success detection pass, and any run that reaches
+   `status: success` without tool-call evidence must be excluded from the
+   threshold count.
 
 ## Expected Outputs
 
@@ -225,14 +247,20 @@ This closeout pack is done only when all of the following are true:
   instead of the env var)
 - the codex-only W2b v1 limitation is documented honestly in the skill and in
   the public skill docs
+- `SKILL.md` encodes strict-agentic discipline rules that forbid
+  prose-only planning and require tool-call evidence for every `ok`
+  checkpoint and for terminal verification
 - the 10-run P4 reliability protocol has been executed on a physical Samsung
   device and recorded under
   `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/`
-- the reliability threshold is either met (≥8/10 runs reached terminal
-  verification with `status: success`, zero `runtime_poisoned` states, and at
-  least one forced-failure run produced a truthful failed/indeterminate result
-  without poisoning the runtime) and recorded, or clearly not met and W2b
-  remains open
+- a lazy-success detection pass has been run over the captured evidence,
+  every flagged lazy run is excluded from the threshold count, and the
+  exclusion reasoning is written up in `summary.md`
+- the reliability threshold is either met (≥8/10 non-lazy runs reached
+  terminal verification with `status: success`, zero `runtime_poisoned`
+  states, and at least one forced-failure run produced a truthful
+  failed/indeterminate result without poisoning the runtime) and recorded,
+  or clearly not met and W2b remains open
 - the replay sibling still runs end-to-end without regression
 - this closeout pack and the original `agent-driven-skills/` pack both reflect
   reality without mixing completed W2b work with in-flight closeout work

@@ -30,6 +30,12 @@ W2b runtime work. This pack should be used for implementation. The older
   `CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS` must be backed by the C2.0 probe
   evidence, not by recollection.
 - Do not begin C2 edits to `scripts/run.js` before C2.0 is committed.
+- Do not treat a `status: success` SkillResult as a reliability success
+  unless the captured stderr shows the runtime agent actually called the
+  Clawperator CLI to produce evidence for each `ok` checkpoint and the
+  terminal verification. Lazy-mode successes (prose planning without tool
+  use) must be excluded from the reliability threshold even if the frame
+  schema parsed cleanly.
 - Do not broaden this pack into W3 or W4.
 - Do not touch the replay sibling
   (`com.solaxcloud.starter.set-discharge-to-limit-replay`) as part of this
@@ -300,7 +306,35 @@ not.
      `scripts/run.js` and replaced with a read of the new declared field.
    - under no circumstances may the bypass path continue to exist as a
      private, undocumented env var in `scripts/run.js`
-5. Update the skill and public docs so the codex-only W2b v1 limitation is
+5. Harden `SKILL.md` with strict-agentic discipline rules. Motivation:
+   public OpenClaw documentation and field reports describe a lazy-mode
+   pattern in which GPT-5-family runs (which codex uses at runtime) emit
+   plan-only turns instead of calling tools, and then treat the plan as
+   progress. W2b v1 is codex-only, so this pattern is directly applicable.
+   SKILL.md is the single surface where this discipline lives for W2b v1;
+   the runtime does not yet enforce it.
+
+   Add (or reconcile against existing wording) at least these rules to
+   `skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/SKILL.md`:
+   - "Planning in prose is not progress. Never emit a final SkillResult
+     frame unless you have actually called the Clawperator CLI to produce
+     evidence for every checkpoint you mark `status: ok`."
+   - "Never emit `status: "success"` unless the post-save UI was read
+     through a Clawperator `read` call and contained the exact text
+     `Discharge to <percent>%`. A success frame without that evidence is a
+     lazy-mode failure and must be reported as `failed`, not as success."
+   - "If you find yourself describing what you would do instead of doing
+     it, stop the run, mark the current checkpoint `status: skipped`, and
+     emit a `failed` SkillResult with a truthful note."
+   - "Indeterminate is not an escape hatch for laziness. Use
+     `indeterminate` only when the run reached a real ambiguity in the
+     observed UI state, not when the agent chose to stop acting."
+   - "Every checkpoint marked `status: ok` must include a `note` that
+     references the concrete Clawperator command and the observed
+     evidence (e.g. the tapped selector or the read text)."
+   The exact phrasing may be tightened; the rules are the non-negotiable
+   content.
+6. Update the skill and public docs so the codex-only W2b v1 limitation is
    explicit:
    - add a short note at the top of
      `skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/SKILL.md`
@@ -311,7 +345,7 @@ not.
      orchestrated-skill guidance, so public docs reflect the current codex-only
      reality
    - do not claim portability the code does not deliver
-6. Re-run validation for both skills after editing:
+7. Re-run validation for both skills after editing:
    - `skills validate com.solaxcloud.starter.set-discharge-to-limit-orchestrated`
    - `skills validate com.solaxcloud.starter.set-discharge-to-limit-replay`
    - one live proving invocation of the orchestrated skill on the physical
@@ -320,12 +354,17 @@ not.
 ### Acceptance Criteria
 
 - `SKILL.md` is the clear authority on Solax skill behavior
+- `SKILL.md` encodes the strict-agentic discipline rules listed in Step 5
+  (no prose-only planning, evidence-backed `ok` checkpoints, truthful
+  `failed` on laziness, no indeterminate-as-escape-hatch, per-checkpoint
+  notes citing the concrete Clawperator command used)
 - `scripts/run.js` no longer contains the duplicated SkillResult contract
   parser, the hardcoded checkpoint IDs, the Solax-specific prompt, or the
   Samsung coordinate hints
 - `scripts/run.js` no longer references `../clawperator` or
   `apps/node/dist/cli/index.js`
 - `CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS` is removed from the repository
+  (or promoted to declared contract per the C2.0 bucket-B path)
 - the codex-only W2b v1 limitation is documented in the skill itself and on
   the public Clawperator skills docs
 - the replay sibling still runs end-to-end without regression
@@ -357,6 +396,10 @@ skill under the thinned harness from C2.
    - the final framed `SkillResult`
    - run index, start time, and end time
    - whether the run hit the recovery branch
+   - the count of distinct Clawperator CLI invocations observed in stderr
+     during the run (e.g. `open`, `click`, `type`, `read`, `press`,
+     `snapshot`, `scroll`, `wait`). This number is the lazy-mode detector
+     for Step 6 below.
 4. Save the captured artifacts under
    `docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/`
    with one subdirectory per run (e.g. `run-01/`, `run-02/`, ...). Do not
@@ -367,18 +410,41 @@ skill under the thinned harness from C2.
    runs. The forced-failure run must produce a truthful `failed` or
    `indeterminate` `SkillResult` without leaving the runtime in a
    `runtime_poisoned` state.
-6. Write a `summary.md` in the reliability directory capturing:
-   - success count
+6. Run a lazy-success detection pass over every captured run. Motivation:
+   the documented GPT-5-family lazy-mode pattern means a run can produce a
+   well-formed `status: success` SkillResult while the runtime agent never
+   actually touched the device. Lazy successes must be excluded from the
+   threshold count, not counted. Classification rule for each run:
+   - a run with `status: success` and fewer than 5 distinct Clawperator CLI
+     invocations in stderr is classified `lazy-success` and does not count
+     toward the threshold
+   - a run with `status: success` whose stderr does not show a Clawperator
+     `read` call targeting `Discharge to <percent>%` (or equivalent terminal
+     verification read) is classified `lazy-success` regardless of
+     invocation count
+   - a run with `status: success` whose checkpoint notes do not cite the
+     concrete Clawperator commands used is classified `lazy-success`
+   - any other `status: success` run is classified `evidence-backed success`
+     and counts toward the threshold
+   - the threshold count for this protocol is the number of
+     `evidence-backed success` runs, not the raw count of `status: success`
+     frames
+7. Write a `summary.md` in the reliability directory capturing:
+   - raw `status: success` count
+   - evidence-backed success count (this is the number compared against the
+     ≥8/10 threshold)
+   - per-run lazy-mode classification table, with the reasoning for each
+     lazy-success exclusion
    - failure modes observed
    - whether any `runtime_poisoned` state occurred
    - time-to-terminal-state per run
    - the forced-failure run outcome
-   - whether the ≥8/10 threshold was met and the zero-`runtime_poisoned`
-     requirement held
-7. Cross-check that the replay sibling still passes on the same device
+   - whether the ≥8/10 evidence-backed threshold was met and the
+     zero-`runtime_poisoned` requirement held
+8. Cross-check that the replay sibling still passes on the same device
    during the reliability window, as a control for device/app health. Record
    the replay control run outcome in `summary.md`.
-8. Only after the evidence exists, update both the closeout pack and the
+9. Only after the evidence exists, update both the closeout pack and the
    original `agent-driven-skills/` pack status tables to reflect the true
    state. Do not update pre-emptively. If the threshold is not met, mark P4
    as `not met` and leave W2b open; do not soften the plan language.
@@ -389,8 +455,14 @@ skill under the thinned harness from C2.
 - at least one forced-failure run is recorded and produced a truthful
   non-poisoned result
 - the baseline starting state is documented alongside the runs
-- `summary.md` explicitly states whether the ≥8/10 threshold was met and
-  whether any `runtime_poisoned` state occurred
+- every captured run has a lazy-mode classification (`lazy-success`,
+  `evidence-backed success`, `failed`, `indeterminate`, or
+  `runtime_poisoned`)
+- `summary.md` explicitly distinguishes raw `status: success` count from
+  evidence-backed success count and states whether the ≥8/10
+  evidence-backed threshold was met and whether any `runtime_poisoned`
+  state occurred
+- no `lazy-success` run is counted toward the threshold
 - the replay control run is captured alongside the orchestrated runs
 - PR readiness for the skills repo is based on committed evidence, not
   recollection
