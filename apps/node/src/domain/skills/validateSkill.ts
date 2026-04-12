@@ -168,7 +168,21 @@ async function validateLoadedSkill(
   }
 
   const raw = await readFile(skillJsonPath, "utf8");
-  const parsed = JSON.parse(raw) as Partial<SkillEntry>;
+  let parsed: Partial<SkillEntry>;
+  try {
+    parsed = JSON.parse(raw) as Partial<SkillEntry>;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} has an invalid skill.json payload`,
+      details: {
+        skillJsonPath,
+        reason,
+      },
+    };
+  }
   const mismatchFields = findMismatchFields(skill, parsed);
   if (mismatchFields.length > 0) {
     return {

@@ -16,8 +16,8 @@ successful live run was bypass-free. The live probe remained required.
 
 ## Host Baseline
 
-- codex version: see [codex-version.txt](/<local_user>/src/clawperator/docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/probe-no-bypass/codex-version.txt)
-- codex sandbox flags: see [codex-sandbox-flags.txt](/<local_user>/src/clawperator/docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/probe-no-bypass/codex-sandbox-flags.txt)
+- codex version: see [codex-version.txt](./codex-version.txt)
+- codex sandbox flags: see [codex-sandbox-flags.txt](./codex-sandbox-flags.txt)
 - branch-local Clawperator CLI: `/<local_user>/src/clawperator/apps/node/dist/cli/index.js`
 - skills registry: `/<local_user>/src/clawperator-skills/skills/skills-registry.json`
 
@@ -65,12 +65,12 @@ node /<local_user>/src/clawperator/apps/node/dist/cli/index.js close \
 
 ## Evidence
 
-- [probe-attempt-1.json](/<local_user>/src/clawperator/docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/probe-no-bypass/probe-attempt-1.json)
-- [probe-attempt-1.stderr](/<local_user>/src/clawperator/docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/probe-no-bypass/probe-attempt-1.stderr)
-- [probe-attempt-2.json](/<local_user>/src/clawperator/docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/probe-no-bypass/probe-attempt-2.json)
-- [probe-attempt-2.stderr](/<local_user>/src/clawperator/docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/probe-no-bypass/probe-attempt-2.stderr)
-- [probe-attempt-3.json](/<local_user>/src/clawperator/docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/probe-no-bypass/probe-attempt-3.json)
-- [probe-attempt-3.stderr](/<local_user>/src/clawperator/docs/internal/design/reliability/solax-discharge-to-limit-orchestrated/probe-no-bypass/probe-attempt-3.stderr)
+- [probe-attempt-1.json](./probe-attempt-1.json)
+- [probe-attempt-1.stderr](./probe-attempt-1.stderr)
+- [probe-attempt-2.json](./probe-attempt-2.json)
+- [probe-attempt-2.stderr](./probe-attempt-2.stderr)
+- [probe-attempt-3.json](./probe-attempt-3.json)
+- [probe-attempt-3.stderr](./probe-attempt-3.stderr)
 
 ## Classification
 

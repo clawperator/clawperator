@@ -556,6 +556,87 @@ describe("validateSkill", () => {
       await rm(tempRoot, { recursive: true, force: true });
     }
   });
+
+  it("returns SKILL_VALIDATION_FAILED when skill.json is malformed JSON", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-bad-json-"));
+    const skillsDir = join(tempRoot, "skills");
+    const skillId = "com.test.invalid-skill-json";
+    const skillDir = join(skillsDir, skillId);
+    const scriptsDir = join(skillDir, "scripts");
+    const registryPath = join(skillsDir, "skills-registry.json");
+
+    await mkdir(scriptsDir, { recursive: true });
+    await copyFile(
+      join(packageRoot, "src", "test", "fixtures", "skills", "com.test.echo", "scripts", "echo.js"),
+      join(scriptsDir, "echo.js")
+    );
+    await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+    await writeFile(join(skillDir, "skill.json"), "{\n  \"id\": \"broken\"\n", "utf8");
+    await writeFile(
+      registryPath,
+      `${JSON.stringify({
+        skills: [
+          {
+            id: skillId,
+            applicationId: "com.test",
+            intent: "temp",
+            summary: "Temporary test skill",
+            path: `skills/${skillId}`,
+            skillFile: `skills/${skillId}/SKILL.md`,
+            scripts: [`skills/${skillId}/scripts/echo.js`],
+            artifacts: [],
+          },
+        ],
+      }, null, 2)}\n`,
+      "utf8"
+    );
+
+    try {
+      const result = await validateSkill(skillId, registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /invalid skill\.json payload/i);
+      assert.strictEqual(result.details?.skillJsonPath, join(skillDir, "skill.json"));
+      assert.match(result.details?.reason ?? "", /json/i);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects path traversal in registry-relative skill metadata", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-traversal-"));
+    const skillsDir = join(tempRoot, "skills");
+    const registryPath = join(skillsDir, "skills-registry.json");
+
+    await mkdir(skillsDir, { recursive: true });
+    await writeFile(
+      registryPath,
+      `${JSON.stringify({
+        skills: [
+          {
+            id: "com.test.path-traversal",
+            applicationId: "com.test",
+            intent: "temp",
+            summary: "Temporary test skill",
+            path: "../outside-skill",
+            skillFile: "../outside-skill/SKILL.md",
+            scripts: ["../outside-skill/scripts/echo.js"],
+            artifacts: [],
+          },
+        ],
+      }, null, 2)}\n`,
+      "utf8"
+    );
+
+    try {
+      const result = await validateSkill("com.test.path-traversal", registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, REGISTRY_READ_FAILED);
+      assert.match(result.message, /parent directory traversal/i);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("skills validate dry-run", () => {
