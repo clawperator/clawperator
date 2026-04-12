@@ -228,6 +228,7 @@ Important current rule:
   - `skillFile`
   - `scripts`
   - `artifacts`
+- `agent` is intentionally excluded from this parity check. `skill.json.agent` is trusted runtime config, not registry identity metadata.
 - other `skill.json` fields are allowed, but the current validator does not
   compare or enforce them
 

@@ -115,9 +115,13 @@ describe("DoctorService", () => {
 
     const report = await new DoctorService().run({ config });
 
-    const agentCliCheck = report.checks.find(check => check.id === "host.skill-agent-cli.presence");
-    assert.ok(agentCliCheck);
-    assert.strictEqual(agentCliCheck.status, "pass");
+    const defaultAgentCliCheck = report.checks.find(check => check.id === "host.skill-agent-cli.default");
+    assert.ok(defaultAgentCliCheck);
+    assert.strictEqual(defaultAgentCliCheck.status, "pass");
+
+    const installedAgentCliCheck = report.checks.find(check => check.id === "host.skill-agent-cli.skills");
+    assert.ok(installedAgentCliCheck);
+    assert.strictEqual(installedAgentCliCheck.status, "pass");
 
     const adbServer = report.checks.find(check => check.id === "host.adb.server");
     assert.ok(adbServer);

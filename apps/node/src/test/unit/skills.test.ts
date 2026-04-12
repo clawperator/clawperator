@@ -2351,6 +2351,55 @@ describe("runSkill", () => {
     }
   });
 
+  it("treats skill.json.agent as runtime metadata rather than a registry parity field", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.agent-validation-source-of-truth",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.agent-validation-source-of-truth",
+        applicationId: "com.test",
+        intent: "temp",
+        summary: "Temporary test skill",
+        path: "skills/com.test.agent-validation-source-of-truth",
+        skillFile: "skills/com.test.agent-validation-source-of-truth/SKILL.md",
+        scripts: ["skills/com.test.agent-validation-source-of-truth/scripts/run.js"],
+        artifacts: [],
+        agent: {
+          cli: "codex",
+          cliPath: "scripts/fake_codex.js",
+        },
+      }),
+      extraScriptSourcePaths: [
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "fake_codex.js"
+        ),
+      ],
+    });
+
+    try {
+      const result = await validateSkill("com.test.agent-validation-source-of-truth", temp.registryPath);
+      assert.ok(result.ok, `Expected validation to ignore registry parity for agent metadata: ${!result.ok ? result.message : ""}`);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
   it("resolves the agent CLI from the caller-provided PATH override", async () => {
     const temp = await createTempRegistryWithSkill({
       skillId: "com.test.agent-path-override",

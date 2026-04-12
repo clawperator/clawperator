@@ -5,7 +5,8 @@ import {
   checkNodeVersion,
   checkAdbPresence,
   checkAdbServer,
-  checkOrchestratedSkillAgentCli,
+  checkDefaultOrchestratedSkillAgentCli,
+  checkInstalledOrchestratedSkillAgentCliAvailability,
 } from "./checks/hostChecks.js";
 import {
   checkDeviceDiscovery,
@@ -49,8 +50,11 @@ export class DoctorService {
     checks.push(adbPresence);
     if (this.shouldHaltOnFailure(adbPresence)) return this.finalize(checks, config, options.fix);
 
-    const orchestratedSkillAgentCli = await checkOrchestratedSkillAgentCli(config);
-    checks.push(orchestratedSkillAgentCli);
+    const defaultOrchestratedSkillAgentCli = await checkDefaultOrchestratedSkillAgentCli(config);
+    checks.push(defaultOrchestratedSkillAgentCli);
+
+    const installedOrchestratedSkillAgentCli = await checkInstalledOrchestratedSkillAgentCliAvailability(config);
+    checks.push(installedOrchestratedSkillAgentCli);
 
     const adbServer = await checkAdbServer(config);
     checks.push(adbServer);

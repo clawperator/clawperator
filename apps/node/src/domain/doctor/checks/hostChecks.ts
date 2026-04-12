@@ -3,10 +3,15 @@ import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConf
 import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { DOCTOR_DOCS_URLS } from "../docsUrls.js";
+import { join } from "node:path";
+import { loadRegistry, getRepoRoot } from "../../../adapters/skills-repo/localSkillsRegistry.js";
 import {
   EXECUTABLE_NAME_PATTERN,
   resolveExecutableOnPath,
+  resolveConfiguredAgentCli,
+  resolveAgentCliExecutable,
 } from "../../skills/agentCli.js";
+import { readSkillManifestMetadata } from "../../skills/skillManifest.js";
 
 const DEFAULT_ORCHESTRATED_SKILL_AGENT_CLI = "codex";
 const ORCHESTRATED_SKILL_AGENT_CLI_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_CLI";
@@ -101,12 +106,12 @@ export async function checkAdbServer(config: RuntimeConfig): Promise<DoctorCheck
   };
 }
 
-export async function checkOrchestratedSkillAgentCli(_config: RuntimeConfig): Promise<DoctorCheckResult> {
+export async function checkDefaultOrchestratedSkillAgentCli(_config: RuntimeConfig): Promise<DoctorCheckResult> {
   const configuredCli = process.env[ORCHESTRATED_SKILL_AGENT_CLI_ENV_VAR]?.trim() || DEFAULT_ORCHESTRATED_SKILL_AGENT_CLI;
 
   if (!EXECUTABLE_NAME_PATTERN.test(configuredCli)) {
     return {
-      id: "host.skill-agent-cli.presence",
+      id: "host.skill-agent-cli.default",
       status: "warn",
       code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
       summary: `Configured orchestrated-skill agent CLI '${configuredCli}' is not a plain executable name.`,
@@ -129,11 +134,11 @@ export async function checkOrchestratedSkillAgentCli(_config: RuntimeConfig): Pr
 
   if (resolvedPath === null) {
     return {
-      id: "host.skill-agent-cli.presence",
+      id: "host.skill-agent-cli.default",
       status: "warn",
       code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
       summary: `Default orchestrated-skill agent CLI '${configuredCli}' was not found on PATH.`,
-      detail: "Agent-driven skills can still be validated, but `skills run` for orchestrated skills will fail until the configured agent CLI is installed or overridden.",
+      detail: "This is a host-level advisory for PATH-based resolution only. Some orchestrated skills may still run via skill.json.agent.cliPath, but PATH-based agent resolution will fail until the configured CLI is installed or overridden.",
       fix: {
         title: "Install or configure the orchestrated skill agent CLI",
         platform: "any",
@@ -150,12 +155,99 @@ export async function checkOrchestratedSkillAgentCli(_config: RuntimeConfig): Pr
   }
 
   return {
-    id: "host.skill-agent-cli.presence",
+    id: "host.skill-agent-cli.default",
     status: "pass",
     summary: `Default orchestrated-skill agent CLI '${configuredCli}' is available.`,
     evidence: {
       configuredCli,
       resolvedPath,
+    },
+  };
+}
+
+export async function checkInstalledOrchestratedSkillAgentCliAvailability(_config: RuntimeConfig): Promise<DoctorCheckResult> {
+  let registryResult;
+  try {
+    registryResult = await loadRegistry();
+  } catch (error) {
+    return {
+      id: "host.skill-agent-cli.skills",
+      status: "pass",
+      summary: "Skipping skill-aware orchestrated agent CLI check because no local skills registry is configured.",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  const repoRoot = getRepoRoot(registryResult.resolvedPath);
+  const failures: string[] = [];
+  let orchestratedSkills = 0;
+
+  for (const skill of registryResult.registry.skills) {
+    const manifestResult = await readSkillManifestMetadata(repoRoot, skill.path);
+    if (!manifestResult.ok) {
+      continue;
+    }
+    if (!manifestResult.metadata.agent) {
+      continue;
+    }
+
+    orchestratedSkills += 1;
+    const effectiveAgent = resolveConfiguredAgentCli(manifestResult.metadata.agent, process.env);
+    if (!effectiveAgent.ok) {
+      failures.push(`${skill.id}: ${effectiveAgent.message}`);
+      continue;
+    }
+
+    const resolution = await resolveAgentCliExecutable(
+      effectiveAgent.agent,
+      join(repoRoot, skill.path),
+      process.env
+    );
+    if (!resolution.ok) {
+      failures.push(`${skill.id}: ${resolution.message}`);
+    }
+  }
+
+  if (orchestratedSkills === 0) {
+    return {
+      id: "host.skill-agent-cli.skills",
+      status: "pass",
+      summary: "No orchestrated skills in the local registry require agent CLI resolution.",
+      evidence: {
+        checkedSkills: 0,
+      },
+    };
+  }
+
+  if (failures.length > 0) {
+    return {
+      id: "host.skill-agent-cli.skills",
+      status: "warn",
+      code: ERROR_CODES.HOST_DEPENDENCY_MISSING,
+      summary: `${failures.length} of ${orchestratedSkills} orchestrated skills have unresolved agent CLI dependencies.`,
+      detail: failures.join("\n"),
+      fix: {
+        title: "Align installed orchestrated skills with reachable agent CLIs",
+        platform: "any",
+        steps: [
+          { kind: "manual", value: "Install the required agent CLI on PATH for skills that use agent.cli." },
+          { kind: "manual", value: "Or fix skill.json.agent.cliPath for skills that pin an explicit launcher path." },
+        ],
+        docsUrl: DOCTOR_DOCS_URLS.setup,
+      },
+      evidence: {
+        checkedSkills: orchestratedSkills,
+        failingSkills: failures.map((failure) => failure.split(":")[0]),
+      },
+    };
+  }
+
+  return {
+    id: "host.skill-agent-cli.skills",
+    status: "pass",
+    summary: `All ${orchestratedSkills} orchestrated skills in the local registry resolved their configured agent CLI.`,
+    evidence: {
+      checkedSkills: orchestratedSkills,
     },
   };
 }

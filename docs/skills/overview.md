@@ -107,6 +107,7 @@ Current behavior:
 An orchestrated skill is an agent-driven runtime shape with these durable rules:
 
 - `skill.json.agent` is the trusted runtime metadata. It names the agent CLI and timeout policy that `runSkill()` enforces.
+- registry parity validation does not police `skill.json.agent`. The registry covers distributable skill identity and file layout, while `skill.json.agent` remains the trusted runtime execution config that `runSkill()` reads directly.
 - `SKILL.md` is the skill authority. It contains the app-specific runtime program, navigation policy, checkpoints, and terminal verification expectations.
 - `scripts/run.js` is a thin harness. It reads the injected Clawperator env vars, spawns the configured agent CLI on `SKILL.md`, and forwards stdout and stderr.
 - the harness must not absorb the real skill logic. If app-specific decision policy, navigation authority, or terminal verification rules migrate into the harness, the skill has left this contract.

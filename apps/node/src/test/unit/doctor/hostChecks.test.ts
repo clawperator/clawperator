@@ -1,9 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { tmpdir } from "node:os";
-import { checkAdbPresence, checkAdbServer, checkNodeVersion, checkOrchestratedSkillAgentCli } from "../../../domain/doctor/checks/hostChecks.js";
+import {
+  checkAdbPresence,
+  checkAdbServer,
+  checkNodeVersion,
+  checkDefaultOrchestratedSkillAgentCli,
+  checkInstalledOrchestratedSkillAgentCliAvailability,
+} from "../../../domain/doctor/checks/hostChecks.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
@@ -113,7 +119,7 @@ describe("Doctor: hostChecks", () => {
         });
     });
 
-    describe("checkOrchestratedSkillAgentCli", () => {
+    describe("checkDefaultOrchestratedSkillAgentCli", () => {
         it("returns a warning when the default orchestrated skill agent CLI is missing", async () => {
             const runner = new FakeProcessRunner();
             const config = getDefaultRuntimeConfig({ runner });
@@ -121,7 +127,7 @@ describe("Doctor: hostChecks", () => {
 
             try {
                 process.env.PATH = "";
-                const result = await checkOrchestratedSkillAgentCli(config);
+                const result = await checkDefaultOrchestratedSkillAgentCli(config);
 
                 assert.strictEqual(result.status, "warn");
                 assert.strictEqual(result.code, ERROR_CODES.HOST_DEPENDENCY_MISSING);
@@ -148,7 +154,7 @@ describe("Doctor: hostChecks", () => {
 
             try {
                 process.env.PATH = `${fakeDir}${delimiter}${originalPath ?? ""}`;
-                const result = await checkOrchestratedSkillAgentCli(config);
+                const result = await checkDefaultOrchestratedSkillAgentCli(config);
 
                 assert.strictEqual(result.status, "pass");
                 assert.match(result.summary, /my-agent/);
@@ -182,7 +188,7 @@ describe("Doctor: hostChecks", () => {
 
             try {
                 process.env.PATH = `${fakeDir}${delimiter}${originalPath ?? ""}`;
-                const result = await checkOrchestratedSkillAgentCli(config);
+                const result = await checkDefaultOrchestratedSkillAgentCli(config);
 
                 assert.strictEqual(result.status, "pass");
                 assert.match(result.summary, /my-agent\.js/);
@@ -211,7 +217,7 @@ describe("Doctor: hostChecks", () => {
             process.env.CLAWPERATOR_SKILL_AGENT_CLI = "codex; echo pwned";
 
             try {
-                const result = await checkOrchestratedSkillAgentCli(config);
+                const result = await checkDefaultOrchestratedSkillAgentCli(config);
 
                 assert.strictEqual(result.status, "warn");
                 assert.strictEqual(result.code, ERROR_CODES.HOST_DEPENDENCY_MISSING);
@@ -224,6 +230,108 @@ describe("Doctor: hostChecks", () => {
                     delete process.env.CLAWPERATOR_SKILL_AGENT_CLI;
                 } else {
                     process.env.CLAWPERATOR_SKILL_AGENT_CLI = original;
+                }
+            }
+        });
+    });
+
+    describe("checkInstalledOrchestratedSkillAgentCliAvailability", () => {
+        it("passes when the local registry has no orchestrated skills", async () => {
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const originalRegistry = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+            const root = await mkdtemp(join(tmpdir(), "clawperator-doctor-skills-none-"));
+            const registryPath = join(root, "skills", "skills-registry.json");
+
+            try {
+                await mkdir(join(root, "skills"), { recursive: true });
+                await writeFile(
+                    registryPath,
+                    JSON.stringify({
+                        schemaVersion: "1.0",
+                        generatedAt: "2026-04-13T00:00:00Z",
+                        skills: [],
+                    }),
+                    "utf8"
+                );
+                process.env.CLAWPERATOR_SKILLS_REGISTRY = registryPath;
+
+                const result = await checkInstalledOrchestratedSkillAgentCliAvailability(config);
+                assert.strictEqual(result.status, "pass");
+                assert.match(result.summary, /No orchestrated skills/i);
+            } finally {
+                await rm(root, { recursive: true, force: true });
+                if (originalRegistry === undefined) {
+                    delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+                } else {
+                    process.env.CLAWPERATOR_SKILLS_REGISTRY = originalRegistry;
+                }
+            }
+        });
+
+        it("passes when installed orchestrated skills resolve via cliPath", async () => {
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const originalRegistry = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+            const root = await mkdtemp(join(tmpdir(), "clawperator-doctor-skills-ok-"));
+            const skillId = "com.test.doctor-agent-cli-path";
+            const skillDir = join(root, "skills", skillId);
+            const scriptsDir = join(skillDir, "scripts");
+            const registryPath = join(root, "skills", "skills-registry.json");
+
+            try {
+                await mkdir(scriptsDir, { recursive: true });
+                const launcherPath = join(scriptsDir, "fake-agent");
+                await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+                await writeFile(join(scriptsDir, "run.js"), "console.log('ok');\n", "utf8");
+                await writeFile(launcherPath, "#!/bin/sh\nexit 0\n", "utf8");
+                await chmod(launcherPath, 0o755);
+                await writeFile(
+                    join(skillDir, "skill.json"),
+                    JSON.stringify({
+                        id: skillId,
+                        applicationId: "com.test",
+                        intent: "doctor-agent-cli-path",
+                        summary: "Doctor test skill",
+                        path: `skills/${skillId}`,
+                        skillFile: `skills/${skillId}/SKILL.md`,
+                        scripts: [`skills/${skillId}/scripts/run.js`],
+                        artifacts: [],
+                        agent: {
+                            cli: "codex",
+                            cliPath: "scripts/fake-agent",
+                        },
+                    }),
+                    "utf8"
+                );
+                await writeFile(
+                    registryPath,
+                    JSON.stringify({
+                        schemaVersion: "1.0",
+                        generatedAt: "2026-04-13T00:00:00Z",
+                        skills: [{
+                            id: skillId,
+                            applicationId: "com.test",
+                            intent: "doctor-agent-cli-path",
+                            summary: "Doctor test skill",
+                            path: `skills/${skillId}`,
+                            skillFile: `skills/${skillId}/SKILL.md`,
+                            scripts: [`skills/${skillId}/scripts/run.js`],
+                            artifacts: [],
+                        }],
+                    }),
+                    "utf8"
+                );
+                process.env.CLAWPERATOR_SKILLS_REGISTRY = registryPath;
+
+                const result = await checkInstalledOrchestratedSkillAgentCliAvailability(config);
+                assert.strictEqual(result.status, "pass");
+                assert.match(result.summary, /resolved their configured agent CLI/i);
+                assert.deepStrictEqual(result.evidence, { checkedSkills: 1 });
+            } finally {
+                await rm(root, { recursive: true, force: true });
+                if (originalRegistry === undefined) {
+                    delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+                } else {
+                    process.env.CLAWPERATOR_SKILLS_REGISTRY = originalRegistry;
                 }
             }
         });
