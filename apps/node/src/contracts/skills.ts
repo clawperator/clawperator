@@ -1,6 +1,12 @@
 /**
  * Skills registry contract (aligns with skills-registry.json schema).
  */
+export interface SkillAgentConfig {
+  cli: string;
+  cliPath?: string | null;
+  timeoutMs?: number;
+}
+
 export interface SkillEntry {
   id: string;
   applicationId: string;
@@ -10,6 +16,7 @@ export interface SkillEntry {
   skillFile: string;
   scripts: string[];
   artifacts: string[];
+  agent?: SkillAgentConfig;
 }
 
 export interface SkillsRegistry {
@@ -32,6 +39,7 @@ export const SKILL_EXECUTION_FAILED = "SKILL_EXECUTION_FAILED";
 export const SKILL_EXECUTION_TIMEOUT = "SKILL_EXECUTION_TIMEOUT";
 export const SKILL_OUTPUT_ASSERTION_FAILED = "SKILL_OUTPUT_ASSERTION_FAILED";
 export const SKILL_RESULT_PARSE_FAILED = "SKILL_RESULT_PARSE_FAILED";
+export const SKILL_AGENT_CLI_UNAVAILABLE = "SKILL_AGENT_CLI_UNAVAILABLE";
 export const SKILL_ALREADY_EXISTS = "SKILL_ALREADY_EXISTS";
 export const SKILL_ID_INVALID = "SKILL_ID_INVALID";
 export const SKILLS_SCAFFOLD_FAILED = "SKILLS_SCAFFOLD_FAILED";

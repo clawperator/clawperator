@@ -9,19 +9,21 @@ Total PRs: 2. Total phases: 4.
 - PR-1: contract definition, runtime parsing, tests
 - PR-2: Solax retrofit and downstream handoff update
 
-Current state: ready after `tasks/recording/skill-checkpoints/` lands.
+Current state: complete. PR-1 and PR-2 landed across the Clawperator and
+skills repos, so W2 is now the upstream contract source of truth for W2b, W3,
+and W4.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | active |
+| State | complete |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | P1, P2, P3, P4 |
-| Current / Next | P1 after W1 |
-| Blockers | `tasks/recording/skill-checkpoints/` should land first |
+| Completed | P1, P2, P3, P4 |
+| Remaining | none |
+| Current / Next | complete; next active engineering work is W2b |
+| Blockers | none |
 
 ## Hard Rules
 

@@ -11,6 +11,11 @@ delegate to narrower helper skills internally. We should not add a separate
 top-level `skill-author-orchestrator` skill because that would be redundant and
 too easy to confuse with `...-orchestrated`.
 
+The authoring skill must reuse the named orchestrated runtime contract from
+`docs/skills/overview.md#orchestrated-runtime-contract`. It must not invent a
+parallel definition in its own words when durable docs already define the
+runtime shape.
+
 This task exists because the current recording plans already define the replay
 baseline, the agent-driven orchestrated runtime, and the compare/contract
 story. Until this workflow is explicitly owned, the developer-facing "how"
@@ -165,7 +170,8 @@ the docs have not yet been updated.
 | Recording lifecycle | `docs/api/recording.md` | `tasks/recording/demo/` |
 | Skill scaffolding and authoring | `docs/skills/authoring.md` | `tasks/recording/graduate-demo-findings/` |
 | Replay/orchestrated proving pattern | `docs/skills/authoring.md` | `tasks/recording/plan.md` |
-| Runtime-agent shape for orchestrated skills | `docs/skills/authoring.md` | `tasks/recording/agent-driven-skills/` |
+| Runtime-agent shape for orchestrated skills | `docs/skills/overview.md`, `docs/skills/authoring.md` | `tasks/recording/agent-driven-skills/` |
+| Orchestrated skill design lessons and failure modes | `docs/internal/design/skill-design.md`, `docs/skills/authoring.md` | `tasks/recording/agent-driven-skills-closeout/` |
 | Structured skill results | `docs/skills/authoring.md`, `apps/node/src/contracts/` | `tasks/recording/skill-result-contract/` |
 | Contract declaration | `docs/skills/authoring.md` | `tasks/recording/skill-contract-declaration/` |
 | Compare workflow | `docs/api/recording.md` | `tasks/recording/compare/` |

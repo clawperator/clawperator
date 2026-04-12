@@ -35,11 +35,16 @@ Current authoring practice recognizes two categories of skills:
   - may rely on tighter device or layout assumptions
 - `-orchestrated` skills:
   - agent-controlled skills intended to better match the Clawperator brain/hand model
-  - expected to expose structured checkpoints, terminal verification, and clearer result semantics as that contract work lands
+  - may declare an `agent` block in `skill.json`
+  - run through their `scripts/run.js` harness, which spawns the configured agent CLI
+  - can emit structured `SkillResult` frames with checkpoints and terminal verification that `runSkill` parses and returns
 
 Important current caveats:
 
-- this category split is a documented naming and authoring convention, not yet a machine-enforced runtime field
+- the `-replay` / `-orchestrated` suffix split is still primarily a naming and authoring convention, not a dedicated registry enum
+- runtime behavior for orchestrated skills is currently driven by the presence of `skill.json.agent`, not by suffix inspection alone
+- the currently supported orchestrated runtime path uses `codex` as the agent CLI
+- some orchestrated harnesses currently run codex with `danger-full-access` so the runtime agent can reach live adb targets, but that is a harness-specific choice rather than a Node runtime guarantee
 - some legacy skills predate the suffix convention and may still have unsuffixed ids
 - unsuffixed legacy ids should not be read as proof that a skill is already orchestrated
 
@@ -77,6 +82,47 @@ Meaning of the fields:
 | `skillFile` | `SKILL.md` path |
 | `scripts` | runnable script paths |
 | `artifacts` | deterministic recipe payload files |
+
+Orchestrated skills may also include an `agent` block in `skill.json`:
+
+```json
+{
+  "agent": {
+    "cli": "codex",
+    "timeoutMs": 300000
+  }
+}
+```
+
+Current behavior:
+
+- `runSkill()` detects agent-driven orchestrated skills from `skill.json.agent`
+- `runSkill()` validates agent CLI availability before spawn and returns `SKILL_AGENT_CLI_UNAVAILABLE` when it is missing
+- `runSkill()` executes the skill's `scripts/run.js` harness
+- the harness is responsible for spawning the configured agent CLI on `SKILL.md`
+- framed `SkillResult` output must omit `source`; `runSkill()` injects trusted source metadata from `skill.json.agent`
+
+## Orchestrated Runtime Contract
+
+An orchestrated skill is an agent-driven runtime shape with these durable rules:
+
+- `skill.json.agent` is the trusted runtime metadata. It names the agent CLI and timeout policy that `runSkill()` enforces.
+- registry parity validation does not police `skill.json.agent`. The registry covers distributable skill identity and file layout, while `skill.json.agent` remains the trusted runtime execution config that `runSkill()` reads directly.
+- `SKILL.md` is the skill authority. It contains the app-specific runtime program, navigation policy, checkpoints, and terminal verification expectations.
+- `scripts/run.js` is a thin harness. It reads the injected Clawperator env vars, spawns the configured agent CLI on `SKILL.md`, and forwards stdout and stderr.
+- the harness must not absorb the real skill logic. If app-specific decision policy, navigation authority, or terminal verification rules migrate into the harness, the skill has left this contract.
+- `runSkill()` remains the Clawperator-owned boundary. It validates the skill, injects runtime env vars, executes the harness, parses the framed result, and injects trusted `source` metadata.
+- orchestrated output is contract-bound. The runtime agent must emit exactly one terminal `[Clawperator-Skill-Result]` frame with a valid `SkillResult` object.
+- replay skills remain first-class. Orchestrated skills are an additional runtime shape, not a replacement for replay-driven skills.
+
+For the practical authoring rules that keep orchestrated skills debuggable and
+truthful in real device runs, see
+[Authoring](authoring.md#authoring-agent-driven-orchestrated-skills).
+
+Current implementation notes:
+
+- the currently supported orchestrated runtime path uses `codex` as the agent CLI
+- some orchestrated harnesses currently run codex with `danger-full-access` so the runtime agent can reach live adb targets, but that is a harness-specific choice rather than a Node runtime guarantee
 
 ## Registry
 
@@ -558,6 +604,7 @@ Common ones:
 | `SKILL_SCRIPT_NOT_FOUND` | registry exists but the chosen script file does not |
 | `SKILL_EXECUTION_FAILED` | subprocess exited non-zero or failed to spawn |
 | `SKILL_EXECUTION_TIMEOUT` | wrapper timeout elapsed |
+| `SKILL_AGENT_CLI_UNAVAILABLE` | orchestrated skill declared `agent.cli` but the configured agent CLI could not be resolved |
 | `SKILL_OUTPUT_ASSERTION_FAILED` | `--expect-contains` was set and the output did not contain the text |
 | `SKILL_RESULT_PARSE_FAILED` | a framed `SkillResult` was malformed or could not be trusted |
 

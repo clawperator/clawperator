@@ -15,13 +15,13 @@ The agent-driven orchestrated proving skill moved to W2b.
 
 | Item | Value |
 | --- | --- |
-| State | active |
+| State | complete |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | P1, P2, P3, P4 |
-| Current / Next | P1 |
-| Blockers | `tasks/recording/skill-checkpoints/` must land first |
+| Completed | P1, P2, P3, P4 |
+| Remaining | none |
+| Current / Next | complete; hand off to W2b / W3 / W4 dependents |
+| Blockers | none |
 
 ## Goal
 

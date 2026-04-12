@@ -5,7 +5,7 @@ import { listDevices } from "../../domain/devices/listDevices.js";
 import { listSkills } from "../../domain/skills/listSkills.js";
 import { getSkill } from "../../domain/skills/getSkill.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
-import { runSkill } from "../../domain/skills/runSkill.js";
+import { runSkill, type SkillRunEnv } from "../../domain/skills/runSkill.js";
 import { clawperatorEvents, CLAWPERATOR_EVENT_TYPES } from "../../domain/observe/events.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { SKILL_NOT_FOUND, SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
@@ -23,6 +23,17 @@ interface ServeOptions {
   host: string;
   verbose: boolean;
   logger?: Logger;
+}
+
+export function buildServeSkillRunOptions(
+  deviceId: string | undefined,
+  args: readonly string[] | undefined
+): { scriptArgs: string[]; skillEnv: SkillRunEnv | undefined } {
+  const scriptArgs = args ? [...args] : [];
+  const skillEnv = deviceId !== undefined
+    ? { CLAWPERATOR_DEVICE_ID: deviceId }
+    : undefined;
+  return { scriptArgs, skillEnv };
 }
 
 export async function cmdServe(options: ServeOptions): Promise<void> {
@@ -131,6 +142,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
       return;
     }
+    if (typeof deviceId === "string" && deviceId.trim().length === 0) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a non-empty string when provided" } });
+      return;
+    }
 
     if (operatorPackage !== undefined && typeof operatorPackage !== "string") {
       res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a string" } });
@@ -170,6 +185,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     
     if (deviceId !== undefined && typeof deviceId !== "string") {
       res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
+      return;
+    }
+    if (typeof deviceId === "string" && deviceId.trim().length === 0) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a non-empty string when provided" } });
       return;
     }
 
@@ -218,6 +237,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
 
     if (deviceId !== undefined && typeof deviceId !== "string") {
       res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
+      return;
+    }
+    if (typeof deviceId === "string" && deviceId.trim().length === 0) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a non-empty string when provided" } });
       return;
     }
 
@@ -439,6 +462,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
         return;
       }
+      if (typeof deviceId === "string" && deviceId.trim().length === 0) {
+        res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a non-empty string when provided" } });
+        return;
+      }
 
       if (args !== undefined && !Array.isArray(args)) {
         res.status(400).json({ ok: false, error: { code: "INVALID_ARGS", message: "'args' must be an array" } });
@@ -455,9 +482,11 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         return;
       }
 
-      const scriptArgs: string[] = [];
-      if (typeof deviceId === "string" && deviceId.length > 0) scriptArgs.push(deviceId);
-      if (Array.isArray(args)) scriptArgs.push(...args.map(String));
+      const requestedArgs = Array.isArray(args) ? args.map(String) : undefined;
+      const { scriptArgs, skillEnv } = buildServeSkillRunOptions(
+        typeof deviceId === "string" ? deviceId : undefined,
+        requestedArgs
+      );
 
       const expectContainsArg =
         typeof expectContains === "string" ? expectContains : undefined;
@@ -466,7 +495,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         scriptArgs,
         undefined,
         typeof timeoutMs === "number" ? timeoutMs : undefined,
-        undefined,
+        skillEnv,
         { logger: options.logger },
         expectContainsArg
       );

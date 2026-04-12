@@ -2,7 +2,7 @@ import { describe, it, before, after, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
 import { spawn } from "node:child_process";
 import { chmod, mkdtemp, mkdir, copyFile, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, join, normalize } from "node:path";
+import { basename, dirname, join, normalize } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { tmpdir } from "node:os";
 import {
@@ -14,6 +14,7 @@ import {
   resolveSkillBinCommand,
   resolveOperatorPackage,
 } from "../../domain/skills/skillsConfig.js";
+import { getRepoRoot } from "../../adapters/skills-repo/localSkillsRegistry.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 import { listSkills } from "../../domain/skills/listSkills.js";
@@ -22,6 +23,7 @@ import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill } from "../../domain/skills/runSkill.js";
 import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
+import { parseSkillManifestMetadata } from "../../domain/skills/skillManifest.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 import { cmdSkillsRun } from "../../cli/commands/skills.js";
@@ -35,6 +37,7 @@ import {
   SKILL_EXECUTION_TIMEOUT,
   SKILL_OUTPUT_ASSERTION_FAILED,
   SKILL_RESULT_PARSE_FAILED,
+  SKILL_AGENT_CLI_UNAVAILABLE,
   SKILL_ALREADY_EXISTS,
   SKILL_ID_INVALID,
   REGISTRY_READ_FAILED,
@@ -149,15 +152,30 @@ async function createTempRegistryWithSkill(options: {
   skillId: string;
   scriptSourcePath: string;
   skillJsonContents: string;
+  extraScriptSourcePaths?: string[];
+  omitSkillFile?: boolean;
+  skillFileRelativePath?: string;
+  scriptRelativePath?: string;
 }): Promise<{ registryPath: string; cleanup: () => Promise<void> }> {
   const root = await mkdtemp(join(tmpdir(), "clawperator-skill-result-source-"));
   const skillDir = join(root, "skills", options.skillId);
   const scriptsDir = join(skillDir, "scripts");
   await mkdir(scriptsDir, { recursive: true });
 
-  const scriptDest = join(scriptsDir, "run.js");
+  const scriptRelativePath = options.scriptRelativePath ?? "scripts/run.js";
+  const scriptDest = join(root, "skills", options.skillId, scriptRelativePath.replace(/^scripts\//, "scripts/"));
+  await mkdir(dirname(scriptDest), { recursive: true });
   await copyFile(options.scriptSourcePath, scriptDest);
-  await writeFile(join(skillDir, "SKILL.md"), `# ${options.skillId}\n`);
+  for (const extraSourcePath of options.extraScriptSourcePaths ?? []) {
+    await copyFile(extraSourcePath, join(scriptsDir, basename(extraSourcePath)));
+  }
+  if (!options.omitSkillFile) {
+    const skillProgramPath = options.skillFileRelativePath === undefined
+      ? join(skillDir, "SKILL.md")
+      : join(root, options.skillFileRelativePath);
+    await mkdir(dirname(skillProgramPath), { recursive: true });
+    await writeFile(skillProgramPath, `# ${options.skillId}\n`);
+  }
   await writeFile(join(skillDir, "skill.json"), options.skillJsonContents);
 
   const registryPath = join(root, "skills", "skills-registry.json");
@@ -173,8 +191,8 @@ async function createTempRegistryWithSkill(options: {
           intent: "temp",
           summary: "Temporary test skill",
           path: `skills/${options.skillId}`,
-          skillFile: `skills/${options.skillId}/SKILL.md`,
-          scripts: [`skills/${options.skillId}/scripts/run.js`],
+          skillFile: options.skillFileRelativePath ?? `skills/${options.skillId}/SKILL.md`,
+          scripts: [`skills/${options.skillId}/${scriptRelativePath}`],
           artifacts: [],
         },
       ],
@@ -534,6 +552,87 @@ describe("validateSkill", () => {
       assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
       assert.deepStrictEqual(result.details?.missingFields, ["scripts"]);
       assert.strictEqual(result.details?.mismatchFields, undefined);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("returns SKILL_VALIDATION_FAILED when skill.json is malformed JSON", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-bad-json-"));
+    const skillsDir = join(tempRoot, "skills");
+    const skillId = "com.test.invalid-skill-json";
+    const skillDir = join(skillsDir, skillId);
+    const scriptsDir = join(skillDir, "scripts");
+    const registryPath = join(skillsDir, "skills-registry.json");
+
+    await mkdir(scriptsDir, { recursive: true });
+    await copyFile(
+      join(packageRoot, "src", "test", "fixtures", "skills", "com.test.echo", "scripts", "echo.js"),
+      join(scriptsDir, "echo.js")
+    );
+    await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+    await writeFile(join(skillDir, "skill.json"), "{\n  \"id\": \"broken\"\n", "utf8");
+    await writeFile(
+      registryPath,
+      `${JSON.stringify({
+        skills: [
+          {
+            id: skillId,
+            applicationId: "com.test",
+            intent: "temp",
+            summary: "Temporary test skill",
+            path: `skills/${skillId}`,
+            skillFile: `skills/${skillId}/SKILL.md`,
+            scripts: [`skills/${skillId}/scripts/echo.js`],
+            artifacts: [],
+          },
+        ],
+      }, null, 2)}\n`,
+      "utf8"
+    );
+
+    try {
+      const result = await validateSkill(skillId, registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /invalid skill\.json payload/i);
+      assert.strictEqual(result.details?.skillJsonPath, join(skillDir, "skill.json"));
+      assert.match(result.details?.reason ?? "", /json/i);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects path traversal in registry-relative skill metadata", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-traversal-"));
+    const skillsDir = join(tempRoot, "skills");
+    const registryPath = join(skillsDir, "skills-registry.json");
+
+    await mkdir(skillsDir, { recursive: true });
+    await writeFile(
+      registryPath,
+      `${JSON.stringify({
+        skills: [
+          {
+            id: "com.test.path-traversal",
+            applicationId: "com.test",
+            intent: "temp",
+            summary: "Temporary test skill",
+            path: "../outside-skill",
+            skillFile: "../outside-skill/SKILL.md",
+            scripts: ["../outside-skill/scripts/echo.js"],
+            artifacts: [],
+          },
+        ],
+      }, null, 2)}\n`,
+      "utf8"
+    );
+
+    try {
+      const result = await validateSkill("com.test.path-traversal", registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, REGISTRY_READ_FAILED);
+      assert.match(result.message, /parent directory traversal/i);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
@@ -1780,10 +1879,11 @@ describe("runSkill", () => {
   });
 
   it("returns SKILL_SCRIPT_NOT_FOUND when script file missing", async () => {
-    // The fixture registry has a script path that doesn't exist on disk
+    // The fixture registry entry points at a skill folder that is not present on disk.
     const result = await runSkill("com.android.settings.capture-overview", []);
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_SCRIPT_NOT_FOUND);
+    assert.match(result.message, /Script not found/i);
   });
 
   it("runs script and captures output on success", async () => {
@@ -1820,8 +1920,36 @@ describe("runSkill", () => {
     assert.strictEqual(result.skillResult.diagnostics?.runtimeState, "healthy");
   });
 
+  it("keeps framed scripted SkillResult parsing permissive when skill.json is unreadable", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: TEST_SKILL_RESULT,
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.skill-result",
+        "scripts",
+        "emit_skill_result.js"
+      ),
+      skillJsonContents: "{\n  \"id\": \"broken\"\n",
+      scriptRelativePath: "scripts/skill-result.js",
+    });
+
+    try {
+      const result = await runSkill(TEST_SKILL_RESULT, ["valid"], temp.registryPath);
+      assert.ok(result.ok, `Expected framed scripted run to stay permissive: ${"message" in result ? result.message : ""}`);
+      assert.ok(result.skillResult);
+      assert.strictEqual(result.skillResult.source.kind, "script");
+      assert.strictEqual(result.skillResult.status, "success");
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
   it("parses a valid framed SkillResult for agent-driven skills and injects agent source metadata", async () => {
-    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["valid", "--skill-id", TEST_AGENT_SKILL_RESULT]);
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["valid"]);
 
     assert.ok(result.ok, `Expected agent SkillResult to succeed: ${"message" in result ? result.message : ""}`);
     assert.ok(result.skillResult);
@@ -1830,6 +1958,817 @@ describe("runSkill", () => {
       agentCli: "codex",
     });
     assert.strictEqual(result.skillResult.skillId, TEST_AGENT_SKILL_RESULT);
+    assert.ok(result.output.includes("[Clawperator-Skill-Result]"));
+  });
+
+  it("keeps agent source provenance pinned to skill.json even when CLAWPERATOR_SKILL_AGENT_CLI overrides execution", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.agent-source-trust",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.agent-source-trust",
+        applicationId: "com.test",
+        intent: "agent-source-trust",
+        summary: "Temporary test skill",
+        path: "skills/com.test.agent-source-trust",
+        skillFile: "skills/com.test.agent-source-trust/SKILL.md",
+        scripts: ["skills/com.test.agent-source-trust/scripts/run.js"],
+        artifacts: [],
+        agent: {
+          cli: "codex",
+          cliPath: "scripts/fake_codex.js",
+        },
+      }),
+      extraScriptSourcePaths: [
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "fake_codex.js"
+        ),
+      ],
+    });
+
+    const fakeAgentDir = await mkdtemp(join(tmpdir(), "clawperator-agent-source-trust-"));
+    const fakeAgentPath = join(fakeAgentDir, "override-agent");
+    const fakeAgentSourcePath = join(
+      packageRoot,
+      "src",
+      "test",
+      "fixtures",
+      "skills",
+      "com.test.agent-skill-result",
+      "scripts",
+      "fake_codex.js"
+    );
+
+    try {
+      await writeFile(
+        fakeAgentPath,
+        `#!/bin/sh\nexec "${process.execPath}" "${fakeAgentSourcePath}" "$@"\n`,
+        "utf8"
+      );
+      await chmod(fakeAgentPath, 0o755);
+
+      const result = await runSkill(
+        "com.test.agent-source-trust",
+        ["valid"],
+        temp.registryPath,
+        undefined,
+        {
+          CLAWPERATOR_SKILL_AGENT_CLI: "override-agent",
+          PATH: fakeAgentDir,
+        }
+      );
+
+      assert.ok(result.ok, `Expected trusted source result to succeed: ${"message" in result ? result.message : ""}`);
+      assert.ok(result.skillResult);
+      assert.deepStrictEqual(result.skillResult.source, {
+        kind: "agent",
+        agentCli: "codex",
+      });
+    } finally {
+      await rm(fakeAgentDir, { recursive: true, force: true });
+      await temp.cleanup();
+    }
+  });
+
+  it("fails before spawn when an orchestrated skill's configured agent CLI is unavailable", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.missing-agent-cli",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.missing-agent-cli",
+        applicationId: "com.test",
+        intent: "missing-agent-cli",
+        summary: "Temporary test skill",
+        path: "skills/com.test.missing-agent-cli",
+        skillFile: "skills/com.test.missing-agent-cli/SKILL.md",
+        scripts: ["skills/com.test.missing-agent-cli/scripts/run.js"],
+        artifacts: [],
+        agent: {
+          cli: "missing-agent-cli-for-tests",
+        },
+      }),
+    });
+
+    try {
+      const result = await runSkill("com.test.missing-agent-cli", ["valid"], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_AGENT_CLI_UNAVAILABLE);
+      assert.match(result.message, /missing-agent-cli-for-tests/);
+      assert.strictEqual(result.skillResult, null);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("fails before spawn when an orchestrated skill's configured cliPath exists but is not executable", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.non-executable-agent-cli",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.non-executable-agent-cli",
+        applicationId: "com.test",
+        intent: "non-executable-agent-cli",
+        summary: "Temporary test skill",
+        path: "skills/com.test.non-executable-agent-cli",
+        skillFile: "skills/com.test.non-executable-agent-cli/SKILL.md",
+        scripts: ["skills/com.test.non-executable-agent-cli/scripts/run.js"],
+        artifacts: [],
+        agent: {
+          cli: "fake-agent",
+          cliPath: "scripts/not-executable.sh",
+        },
+      }),
+    });
+
+    const nonExecutablePath = join(dirname(temp.registryPath), "com.test.non-executable-agent-cli", "scripts", "not-executable.sh");
+    await writeFile(nonExecutablePath, "#!/bin/sh\nexit 0\n", "utf8");
+
+    try {
+      const result = await runSkill("com.test.non-executable-agent-cli", ["valid"], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_AGENT_CLI_UNAVAILABLE);
+      assert.match(result.message, /not found or is not executable/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("returns a typed execution failure when the orchestrated harness forwards a non-zero agent exit", async () => {
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["agent-fail"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_EXECUTION_FAILED);
+    assert.strictEqual(result.exitCode, 17);
+    assert.match(result.stderr ?? "", /agent failed intentionally/);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("fails cleanly when an agent-driven skill is missing SKILL.md", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.missing-skill-program",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.missing-skill-program",
+        applicationId: "com.test",
+        intent: "missing-skill-program",
+        summary: "Temporary test skill",
+        path: "skills/com.test.missing-skill-program",
+        skillFile: "skills/com.test.missing-skill-program/SKILL.md",
+        scripts: ["skills/com.test.missing-skill-program/scripts/run.js"],
+        artifacts: [],
+        agent: {
+          cli: "fake-agent",
+          cliPath: "scripts/fake-agent.sh",
+        },
+      }),
+      omitSkillFile: true,
+    });
+    const fakeAgentPath = join(dirname(temp.registryPath), "com.test.missing-skill-program", "scripts", "fake-agent.sh");
+    await writeFile(fakeAgentPath, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+
+    try {
+      const result = await runSkill("com.test.missing-skill-program", ["valid"], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_SCRIPT_NOT_FOUND);
+      assert.match(result.message, /Skill program not found/);
+      assert.strictEqual(result.skillResult, null);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("rejects malformed framed SkillResult output from an orchestrated harness", async () => {
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["malformed-json"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /invalid JSON/i);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("rejects agent-driven exit-0 runs that omit the required terminal SkillResult frame", async () => {
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["no-frame-success"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /must emit a terminal SkillResult frame/i);
+    assert.strictEqual(result.skillResult, null);
+  });
+
+  it("preserves indeterminate SkillResult status for orchestrated skills", async () => {
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["indeterminate"]);
+
+    assert.ok(result.ok, `Expected orchestrated indeterminate result to parse: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.source.kind, "agent");
+    assert.strictEqual(result.skillResult.status, "indeterminate");
+    assert.strictEqual(result.skillResult.terminalVerification?.status, "not_run");
+  });
+
+  it("reports success for orchestrated skills that take a recovery path but still reach terminal verification", async () => {
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["recovery-success"]);
+
+    assert.ok(result.ok, `Expected orchestrated recovery-path success to parse: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.status, "success");
+    assert.deepStrictEqual(
+      result.skillResult.checkpoints.map((checkpoint) => checkpoint.status),
+      ["ok", "ok", "ok", "ok", "ok"]
+    );
+    assert.match(result.skillResult.checkpoints[0].note ?? "", /reopened once/i);
+    assert.match(result.skillResult.terminalVerification?.note ?? "", /recovery branch/i);
+  });
+
+  it("forwards the resolved registry path and timeout env to the orchestrated harness", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.agent-env-check",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.agent-env-check",
+        applicationId: "com.test",
+        intent: "agent-env-check",
+        summary: "Temporary test skill",
+        path: "skills/com.test.agent-env-check",
+        skillFile: "skills/com.test.agent-env-check/SKILL.md",
+        scripts: ["skills/com.test.agent-env-check/scripts/run.js"],
+        artifacts: [],
+        agent: {
+          cli: "fake_codex.js",
+          cliPath: "scripts/fake_codex.js",
+          timeoutMs: 4321,
+        },
+      }),
+      extraScriptSourcePaths: [
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "fake_codex.js"
+        ),
+      ],
+    });
+
+    try {
+      const result = await runSkill(
+        "com.test.agent-env-check",
+        ["env-check"],
+        temp.registryPath,
+        undefined,
+        {
+          EXPECTED_SKILLS_REGISTRY: temp.registryPath,
+          EXPECTED_SKILL_TIMEOUT_MS: "4321",
+        }
+      );
+
+      assert.ok(result.ok, `Expected env-check agent skill to succeed: ${"message" in result ? result.message : ""}`);
+      assert.ok(result.skillResult);
+      assert.strictEqual(result.skillResult.source.kind, "agent");
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("uses the registry skillFile path for agent-driven skill programs", async () => {
+    const skillFileRelativePath = "skills/com.test.custom-skill-file/RUNTIME.md";
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.custom-skill-file",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.custom-skill-file",
+        applicationId: "com.test",
+        intent: "custom-skill-file",
+        summary: "Temporary test skill",
+        path: "skills/com.test.custom-skill-file",
+        skillFile: skillFileRelativePath,
+        scripts: ["skills/com.test.custom-skill-file/scripts/run.js"],
+        artifacts: [],
+        agent: {
+          cli: "fake_codex.js",
+          cliPath: "scripts/fake_codex.js",
+        },
+      }),
+      extraScriptSourcePaths: [
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "fake_codex.js"
+        ),
+      ],
+      skillFileRelativePath,
+    });
+
+    try {
+      const expectedSkillProgramPath = join(getRepoRoot(temp.registryPath), skillFileRelativePath);
+      const result = await runSkill(
+        "com.test.custom-skill-file",
+        ["env-check"],
+        temp.registryPath,
+        undefined,
+        {
+          EXPECTED_SKILL_PROGRAM_PATH: expectedSkillProgramPath,
+        }
+      );
+
+      assert.ok(result.ok, `Expected custom skillFile agent skill to succeed: ${"message" in result ? result.message : ""}`);
+      assert.ok(result.skillResult);
+      assert.strictEqual(result.skillResult.source.kind, "agent");
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("requires agent-driven skills to execute scripts/run.js even when other scripts are listed first", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.agent-run-harness",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.agent-run-harness",
+        applicationId: "com.test",
+        intent: "agent-run-harness",
+        summary: "Temporary test skill",
+        path: "skills/com.test.agent-run-harness",
+        skillFile: "skills/com.test.agent-run-harness/SKILL.md",
+        scripts: [
+          "skills/com.test.agent-run-harness/scripts/other.sh",
+          "skills/com.test.agent-run-harness/scripts/run.js",
+        ],
+        artifacts: [],
+        agent: {
+          cli: "fake_codex.js",
+          cliPath: "scripts/fake_codex.js",
+        },
+      }),
+      extraScriptSourcePaths: [
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "fake_codex.js"
+        ),
+      ],
+    });
+
+    const skillRoot = join(getRepoRoot(temp.registryPath), "skills", "com.test.agent-run-harness");
+    const registryPath = temp.registryPath;
+    const otherScriptPath = join(skillRoot, "scripts", "other.sh");
+
+    try {
+      await writeFile(otherScriptPath, "#!/bin/sh\necho WRONG_SCRIPT\nexit 42\n", "utf8");
+      await chmod(otherScriptPath, 0o755);
+
+      const registry = JSON.parse(await readFile(registryPath, "utf8")) as { skills: Array<Record<string, unknown>> };
+      registry.skills[0].scripts = [
+        "skills/com.test.agent-run-harness/scripts/other.sh",
+        "skills/com.test.agent-run-harness/scripts/run.js",
+      ];
+      await writeFile(registryPath, JSON.stringify(registry), "utf8");
+
+      const result = await runSkill("com.test.agent-run-harness", ["valid"], registryPath);
+
+      assert.ok(result.ok, `Expected agent harness selection to succeed: ${"message" in result ? result.message : ""}`);
+      assert.ok(result.skillResult);
+      assert.strictEqual(result.skillResult.source.kind, "agent");
+      assert.ok(!result.output.includes("WRONG_SCRIPT"));
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("fails validation when an agent-driven skill does not declare scripts/run.js", async () => {
+    const root = await mkdtemp(join(tmpdir(), "clawperator-agent-missing-run-harness-"));
+    const skillId = "com.test.agent-missing-run-harness";
+    const skillPath = `skills/${skillId}`;
+    const skillDir = join(root, skillPath);
+    const scriptsDir = join(skillDir, "scripts");
+    const invalidScripts = [`${skillPath}/scripts/not-run.js`];
+    const skillManifest = {
+      id: skillId,
+      applicationId: "com.test",
+      intent: "agent-missing-run-harness",
+      summary: "Temporary test skill",
+      path: skillPath,
+      skillFile: `${skillPath}/SKILL.md`,
+      scripts: invalidScripts,
+      artifacts: [],
+      agent: {
+        cli: "codex",
+      },
+    };
+
+    try {
+      await mkdir(scriptsDir, { recursive: true });
+      await copyFile(
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "run.js"
+        ),
+        join(scriptsDir, "not-run.js")
+      );
+      await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+      await writeFile(join(skillDir, "skill.json"), JSON.stringify(skillManifest), "utf8");
+      const registryPath = join(root, "skills", "skills-registry.json");
+      await writeFile(
+        registryPath,
+        JSON.stringify({
+          schemaVersion: "1.0",
+          generatedAt: "2026-04-12T00:00:00Z",
+          skills: [skillManifest],
+        }),
+        "utf8"
+      );
+
+      const result = await validateSkill(skillId, registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, "SKILL_VALIDATION_FAILED");
+      assert.match(result.message, /required orchestrated harness/i);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("treats skill.json.agent as runtime metadata rather than a registry parity field", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.agent-validation-source-of-truth",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.agent-validation-source-of-truth",
+        applicationId: "com.test",
+        intent: "temp",
+        summary: "Temporary test skill",
+        path: "skills/com.test.agent-validation-source-of-truth",
+        skillFile: "skills/com.test.agent-validation-source-of-truth/SKILL.md",
+        scripts: ["skills/com.test.agent-validation-source-of-truth/scripts/run.js"],
+        artifacts: [],
+        agent: {
+          cli: "codex",
+          cliPath: "scripts/fake_codex.js",
+        },
+      }),
+      extraScriptSourcePaths: [
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "fake_codex.js"
+        ),
+      ],
+    });
+
+    try {
+      const result = await validateSkill("com.test.agent-validation-source-of-truth", temp.registryPath);
+      assert.ok(result.ok, `Expected validation to ignore registry parity for agent metadata: ${!result.ok ? result.message : ""}`);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("accepts backslash-separated orchestrated harness paths in registry metadata", async () => {
+    const root = await mkdtemp(join(tmpdir(), "clawperator-agent-windows-paths-"));
+    const skillId = "com.test.agent-windows-paths";
+    const skillDir = join(root, "skills", skillId);
+    const scriptsDir = join(skillDir, "scripts");
+    const registryPath = join(root, "skills", "skills-registry.json");
+
+    try {
+      await mkdir(scriptsDir, { recursive: true });
+      await copyFile(
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "run.js"
+        ),
+        join(scriptsDir, "run.js")
+      );
+      await copyFile(
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "fake_codex.js"
+        ),
+        join(scriptsDir, "fake_codex.js")
+      );
+      await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+      await writeFile(
+        join(skillDir, "skill.json"),
+        JSON.stringify({
+          id: skillId,
+          applicationId: "com.test",
+          intent: "temp",
+          summary: "Temporary test skill",
+          path: "skills\\com.test.agent-windows-paths",
+          skillFile: "skills\\com.test.agent-windows-paths\\SKILL.md",
+          scripts: ["skills\\com.test.agent-windows-paths\\scripts\\run.js"],
+          artifacts: [],
+          agent: {
+            cli: "codex",
+            cliPath: "scripts/fake_codex.js",
+          },
+        }),
+        "utf8"
+      );
+      await writeFile(
+        registryPath,
+        JSON.stringify({
+          schemaVersion: "1.0",
+          generatedAt: "2026-04-13T00:00:00Z",
+          skills: [
+            {
+              id: skillId,
+              applicationId: "com.test",
+              intent: "temp",
+              summary: "Temporary test skill",
+              path: "skills\\com.test.agent-windows-paths",
+              skillFile: "skills\\com.test.agent-windows-paths\\SKILL.md",
+              scripts: ["skills\\com.test.agent-windows-paths\\scripts\\run.js"],
+              artifacts: [],
+            },
+          ],
+        }),
+        "utf8"
+      );
+
+      const valid = await validateSkill(skillId, registryPath);
+      assert.ok(valid.ok, `Expected backslash-separated registry paths to validate: ${!valid.ok ? valid.message : ""}`);
+
+      const result = await runSkill(skillId, ["valid"], registryPath);
+      assert.ok(result.ok, `Expected backslash-separated registry paths to run: ${"message" in result ? result.message : ""}`);
+      assert.ok(result.skillResult);
+      assert.strictEqual(result.skillResult.source.kind, "agent");
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("accepts mixed-separator parity between registry metadata and skill.json", async () => {
+    const root = await mkdtemp(join(tmpdir(), "clawperator-agent-mixed-paths-"));
+    const skillId = "com.test.agent-mixed-paths";
+    const skillDir = join(root, "skills", skillId);
+    const scriptsDir = join(skillDir, "scripts");
+    const registryPath = join(root, "skills", "skills-registry.json");
+
+    try {
+      await mkdir(scriptsDir, { recursive: true });
+      await copyFile(
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "run.js"
+        ),
+        join(scriptsDir, "run.js")
+      );
+      await copyFile(
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "fake_codex.js"
+        ),
+        join(scriptsDir, "fake_codex.js")
+      );
+      await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+      await writeFile(
+        join(skillDir, "skill.json"),
+        JSON.stringify({
+          id: skillId,
+          applicationId: "com.test",
+          intent: "temp",
+          summary: "Temporary test skill",
+          path: "skills\\com.test.agent-mixed-paths",
+          skillFile: "skills\\com.test.agent-mixed-paths/SKILL.md",
+          scripts: ["skills/com.test.agent-mixed-paths\\scripts/run.js"],
+          artifacts: [],
+          agent: {
+            cli: "codex",
+            cliPath: "scripts/fake_codex.js",
+          },
+        }),
+        "utf8"
+      );
+      await writeFile(
+        registryPath,
+        JSON.stringify({
+          schemaVersion: "1.0",
+          generatedAt: "2026-04-13T00:00:00Z",
+          skills: [
+            {
+              id: skillId,
+              applicationId: "com.test",
+              intent: "temp",
+              summary: "Temporary test skill",
+              path: "skills/com.test.agent-mixed-paths",
+              skillFile: "skills/com.test.agent-mixed-paths/SKILL.md",
+              scripts: ["skills/com.test.agent-mixed-paths/scripts/run.js"],
+              artifacts: [],
+            },
+          ],
+        }),
+        "utf8"
+      );
+
+      const result = await validateSkill(skillId, registryPath);
+      assert.ok(result.ok, `Expected mixed-separator metadata to validate: ${!result.ok ? result.message : ""}`);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("resolves the agent CLI from the caller-provided PATH override", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.agent-path-override",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.agent-skill-result",
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.agent-path-override",
+        applicationId: "com.test",
+        intent: "agent-path-override",
+        summary: "Temporary test skill",
+        path: "skills/com.test.agent-path-override",
+        skillFile: "skills/com.test.agent-path-override/SKILL.md",
+        scripts: ["skills/com.test.agent-path-override/scripts/run.js"],
+        artifacts: [],
+        agent: {
+          cli: "my-agent",
+          timeoutMs: 4321,
+        },
+      }),
+    });
+
+    const fakeAgentDir = await mkdtemp(join(tmpdir(), "clawperator-agent-path-override-"));
+    const fakeAgentPath = join(fakeAgentDir, "my-agent");
+    const fakeAgentSourcePath = join(
+      packageRoot,
+      "src",
+      "test",
+      "fixtures",
+      "skills",
+      "com.test.agent-skill-result",
+      "scripts",
+      "fake_codex.js"
+    );
+
+    try {
+      await writeFile(
+        fakeAgentPath,
+        `#!/bin/sh\nexec "${process.execPath}" "${fakeAgentSourcePath}" "$@"\n`,
+        "utf8"
+      );
+      await chmod(fakeAgentPath, 0o755);
+
+      const originalPath = process.env.PATH;
+      process.env.PATH = "";
+      try {
+        const result = await runSkill(
+          "com.test.agent-path-override",
+          ["env-check"],
+          temp.registryPath,
+          undefined,
+          {
+            PATH: fakeAgentDir,
+            CLAWPERATOR_SKILL_AGENT_CLI: "my-agent",
+            EXPECTED_SKILLS_REGISTRY: temp.registryPath,
+            EXPECTED_SKILL_TIMEOUT_MS: "4321",
+          }
+        );
+
+        assert.ok(result.ok, `Expected PATH override agent skill to succeed: ${"message" in result ? result.message : ""}`);
+        assert.ok(result.skillResult);
+        assert.strictEqual(result.skillResult.source.kind, "agent");
+      } finally {
+        process.env.PATH = originalPath;
+      }
+    } finally {
+      await rm(fakeAgentDir, { recursive: true, force: true });
+      await temp.cleanup();
+    }
   });
 
   it("returns SKILL_OUTPUT_ASSERTION_FAILED when expectContains is missing from output", async () => {
@@ -2001,13 +2940,15 @@ describe("runSkill", () => {
     try {
       const framedResult = await runSkill("com.test.invalid-source-skill", ["valid"], temp.registryPath);
       assert.ok(!framedResult.ok);
-      assert.strictEqual(framedResult.code, SKILL_RESULT_PARSE_FAILED);
+      assert.strictEqual(framedResult.code, SKILL_VALIDATION_FAILED);
       assert.match(framedResult.message, /trusted skill result source metadata/i);
+      assert.strictEqual(framedResult.skillResult, null);
 
       const legacyResult = await runSkill("com.test.invalid-source-skill", ["legacy"], temp.registryPath);
-      assert.ok(legacyResult.ok, `Expected legacy path to stay permissive: ${"message" in legacyResult ? legacyResult.message : ""}`);
+      assert.ok(!legacyResult.ok);
+      assert.strictEqual(legacyResult.code, SKILL_VALIDATION_FAILED);
+      assert.match(legacyResult.message, /trusted skill result source metadata/i);
       assert.strictEqual(legacyResult.skillResult, null);
-      assert.strictEqual(legacyResult.output, "legacy-output-only\n");
     } finally {
       await temp.cleanup();
     }
@@ -2033,7 +2974,7 @@ describe("runSkill", () => {
     try {
       const result = await runSkill("com.test.non-object-source-skill", ["valid"], temp.registryPath);
       assert.ok(!result.ok);
-      assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
       assert.match(result.message, /skill\.json must contain a JSON object/i);
       assert.strictEqual(result.skillResult, null);
     } finally {
@@ -2065,16 +3006,127 @@ describe("runSkill", () => {
     try {
       const framedResult = await runSkill("com.test.invalid-agent-source-skill", ["valid"], temp.registryPath);
       assert.ok(!framedResult.ok);
-      assert.strictEqual(framedResult.code, SKILL_RESULT_PARSE_FAILED);
+      assert.strictEqual(framedResult.code, SKILL_VALIDATION_FAILED);
       assert.match(framedResult.message, /agent\.cli must be a non-empty string/i);
+      assert.strictEqual(framedResult.skillResult, null);
 
       const legacyResult = await runSkill("com.test.invalid-agent-source-skill", ["legacy"], temp.registryPath);
+      assert.ok(!legacyResult.ok);
+      assert.strictEqual(legacyResult.code, SKILL_VALIDATION_FAILED);
+      assert.match(legacyResult.message, /agent\.cli must be a non-empty string/i);
+      assert.strictEqual(legacyResult.skillResult, null);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("keeps the legacy path permissive when skill.json has no agent block", async () => {
+    const fixtureScript = join(
+      packageRoot,
+      "src",
+      "test",
+      "fixtures",
+      "skills",
+      "com.test.skill-result",
+      "scripts",
+      "emit_skill_result.js"
+    );
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.absent-agent-source-skill",
+      scriptSourcePath: fixtureScript,
+      skillJsonContents: JSON.stringify({}),
+    });
+
+    try {
+      const legacyResult = await runSkill("com.test.absent-agent-source-skill", ["legacy"], temp.registryPath);
       assert.ok(legacyResult.ok, `Expected legacy path to stay permissive: ${"message" in legacyResult ? legacyResult.message : ""}`);
       assert.strictEqual(legacyResult.skillResult, null);
       assert.strictEqual(legacyResult.output, "legacy-output-only\n");
     } finally {
       await temp.cleanup();
     }
+  });
+
+  it("keeps the legacy path permissive for script-only skills when skill.json is malformed", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.legacy-malformed-skill-json",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        TEST_SKILL_SCRIPT_ONLY,
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: "{not-json",
+      scriptRelativePath: "scripts/main.js",
+    });
+
+    try {
+      const result = await runSkill("com.test.legacy-malformed-skill-json", [], temp.registryPath);
+      assert.ok(result.ok, `Expected legacy script skill to run despite malformed skill.json: ${"message" in result ? result.message : ""}`);
+      assert.match(result.output, /fixture run/);
+      assert.strictEqual(result.skillResult, null);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("fails closed for malformed orchestrated manifests using the runnable harness script", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.malformed-agent-manifest",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        TEST_SKILL_SCRIPT_ONLY,
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: "{not-json",
+      extraScriptSourcePaths: [
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.agent-skill-result",
+          "scripts",
+          "fake_codex.js"
+        ),
+      ],
+    });
+
+    const root = dirname(dirname(temp.registryPath));
+    const skillDir = join(root, "skills", "com.test.malformed-agent-manifest");
+    const harnessPath = join(skillDir, "scripts", "run.js");
+
+    try {
+      await writeFile(harnessPath, "#!/usr/bin/env node\nprocess.env.CLAWPERATOR_SKILL_AGENT_CLI_PATH ??= 'missing';\nconsole.log('legacy-looking harness');\n", "utf8");
+
+      const result = await runSkill("com.test.malformed-agent-manifest", [], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /trusted skill result source metadata/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("rejects malformed agent blocks when parsing skill manifest metadata", () => {
+    const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
+      agent: {
+        cli: "",
+      },
+    });
+
+    assert.ok(!result.ok);
+    assert.match(result.message, /agent\.cli must be a non-empty string/i);
   });
 
   it("rejects unsupported SkillResult contract major versions", async () => {
@@ -2176,6 +3228,15 @@ describe("runSkill", () => {
     assert.ok(result.stdout?.includes('"stage":"before-timeout"'));
   });
 
+  it("returns timeout for orchestrated skills and preserves timeout precedence over any later frame", async () => {
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["timeout"], undefined, 150);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
+    assert.ok(result.stdout?.includes('"stage":"before-timeout"'));
+    assert.strictEqual(result.skillResult, null);
+  });
+
   it("reports timeout instead of parse failure when a framed result is cut off by timeout", async () => {
     const result = await runSkill(TEST_SKILL_RESULT, ["partial-frame-timeout"], undefined, 150);
 
@@ -2264,6 +3325,71 @@ describe("runSkill", () => {
     assert.ok(parsed.output?.includes("TEST_OUTPUT:--limit"));
     assert.ok(parsed.output?.includes("TEST_OUTPUT:40"));
     assert.strictEqual(parsed.timeoutMs, undefined);
+  });
+
+  it("CLI skills run forwards --device exactly once on the real CLI path", async () => {
+    const fakeAdbDir = await createFakeAdb({
+      installed: true,
+      operatorPackage: "com.clawperator.operator.dev",
+    });
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      "com.test.echo-all",
+      "--device",
+      "device-123",
+      "--operator-package",
+      "com.clawperator.operator.dev",
+      "--output",
+      "json",
+      "--",
+      "--limit",
+      "40",
+    ], {
+      env: {
+        ...process.env,
+        PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+      },
+    });
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { output?: string };
+    const outputLines = (parsed.output ?? "").trim().split(/\r?\n/);
+    assert.deepStrictEqual(outputLines, [
+      "TEST_OUTPUT:device-123",
+      "TEST_OUTPUT:--limit",
+      "TEST_OUTPUT:40",
+    ]);
+  });
+
+  it("CLI skills run keeps --device out of CLAWPERATOR_SKILL_INPUTS for agent-driven skills", async () => {
+    const fakeAdbDir = await createFakeAdb({
+      installed: true,
+      operatorPackage: "com.clawperator.operator.dev",
+    });
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      "com.test.agent-skill-result",
+      "--device",
+      "device-123",
+      "--operator-package",
+      "com.clawperator.operator.dev",
+      "--output",
+      "json",
+      "--",
+      "env-check",
+    ], {
+      env: {
+        ...process.env,
+        PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+        EXPECTED_DEVICE_ID: "device-123",
+      },
+    });
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as { skillResult?: { source?: { kind?: string } } | null };
+    assert.strictEqual(parsed.skillResult?.source?.kind, "agent");
   });
 
   it("CLI skills run rejects a typo in a known wrapper flag after the skill id", async () => {
@@ -2744,6 +3870,40 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.match(parsed.message ?? "", /Skill not found/);
   });
 
+  it("passes forwarded skill args through unchanged in cmdSkillsRun", async () => {
+    let observedArgs: string[] | null = null;
+    const fakeRunSkill = async (_skillId: string, args: string[]) => {
+      observedArgs = args;
+      return {
+        ok: true,
+        skillId: TEST_SKILL_VALID_ARTIFACT,
+        output: "RUN_OK",
+        exitCode: 0,
+        durationMs: 1,
+        skillResult: null,
+      } as const;
+    };
+
+    const stdout = await cmdSkillsRun(
+      TEST_SKILL_VALID_ARTIFACT,
+      ["--limit", "40"],
+      undefined,
+      undefined,
+      undefined,
+      {
+        format: "json",
+        skipValidate: true,
+        deviceId: "device-123",
+        runSkillImpl: fakeRunSkill as typeof runSkill,
+      }
+    );
+
+    const parsed = JSON.parse(stdout) as { skillId?: string; output?: string };
+    assert.strictEqual(parsed.skillId, TEST_SKILL_VALID_ARTIFACT);
+    assert.strictEqual(parsed.output, "RUN_OK");
+    assert.deepStrictEqual(observedArgs, ["--limit", "40"]);
+  });
+
   it("keeps cmdSkillsRun silent in JSON mode without a logger", async () => {
     const cmdModulePath = join(packageRoot, "dist", "cli", "commands", "skills.js");
     const script = `
@@ -3023,6 +4183,23 @@ describe("runSkill env vars", () => {
     assert.ok(result.output.includes("CLAWPERATOR_BIN:undefined"), `Expected CLAWPERATOR_BIN to be undefined when not passed, got: ${result.output}`);
     assert.ok(result.output.includes("CLAWPERATOR_OPERATOR_PACKAGE:undefined"), `Expected CLAWPERATOR_OPERATOR_PACKAGE to be undefined when not passed, got: ${result.output}`);
   });
+
+  it("keeps device selection in env for agent-driven skills instead of polluting forwarded inputs", async () => {
+    const result = await runSkill(
+      TEST_AGENT_SKILL_RESULT,
+      ["env-check", "40"],
+      undefined,
+      undefined,
+      {
+        CLAWPERATOR_DEVICE_ID: "device-123",
+        EXPECTED_DEVICE_ID: "device-123",
+      }
+    );
+
+    assert.ok(result.ok, `Expected device env split to succeed: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.source.kind, "agent");
+  });
 });
 
 describe("CLI skills run env vars", () => {
@@ -3185,12 +4362,14 @@ describe("CLI skills run streaming", () => {
 
 describe("runSkill logging", () => {
   let tempRoot: string;
+  const originalProcessKill = process.kill;
 
   beforeEach(async () => {
     tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-log-"));
   });
 
   afterEach(async () => {
+    process.kill = originalProcessKill;
     await rm(tempRoot, { recursive: true, force: true });
   });
 
@@ -3289,5 +4468,29 @@ describe("runSkill logging", () => {
     assert.ok(lines.some((line) => line.event === "skills.run.start"));
     assert.ok(lines.some((line) => line.event === "skills.run.failed"));
     assert.ok(lines.some((line) => line.event === "skills.run.complete"));
+  });
+
+  it("logs when detached process-group signaling falls back to direct child termination", async () => {
+    const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });
+    process.kill = ((pid: number | bigint, signal?: number | NodeJS.Signals) => {
+      if (typeof pid === "number" && pid < 0) {
+        throw new Error("process-group kill unavailable");
+      }
+      return typeof pid === "bigint"
+        ? originalProcessKill(Number(pid), signal)
+        : originalProcessKill(pid, signal);
+    }) as typeof process.kill;
+
+    const result = await runSkill("com.test.partial-timeout", [], undefined, 150, undefined, {
+      logger,
+    });
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
+    const contents = await readFile(logger.logPath()!, "utf8");
+    const lines = parseLogEvents(contents);
+    const fallbackLine = lines.find((line) => line.event === "skills.run.signal_fallback");
+    assert.strictEqual(fallbackLine?.skillId, "com.test.partial-timeout");
+    assert.match(fallbackLine?.message ?? "", /falling back to direct child termination/i);
   });
 });

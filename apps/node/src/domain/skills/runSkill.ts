@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
-import { access, readFile } from "node:fs/promises";
-import { join, extname } from "node:path";
+import { access } from "node:fs/promises";
+import { extname } from "node:path";
 import { loadRegistry, findSkillById, getRepoRoot } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import type { Logger } from "../../adapters/logger.js";
 import {
@@ -11,6 +11,9 @@ import {
   SKILL_EXECUTION_TIMEOUT,
   SKILL_OUTPUT_ASSERTION_FAILED,
   SKILL_RESULT_PARSE_FAILED,
+  SKILL_AGENT_CLI_UNAVAILABLE,
+  SKILL_VALIDATION_FAILED,
+  type SkillAgentConfig,
 } from "../../contracts/skills.js";
 import {
   emittedSkillResultSchema,
@@ -20,8 +23,25 @@ import {
   type SkillResult,
   type SkillResultSource,
 } from "../../contracts/skillResult.js";
+import {
+  readSkillManifestMetadata,
+  type SkillManifestReadResult,
+} from "./skillManifest.js";
+import {
+  resolveConfiguredAgentCli,
+  resolveAgentCliExecutable,
+  SKILL_AGENT_CLI_ENV_VAR,
+} from "./agentCli.js";
+import { CLAWPERATOR_DEVICE_ID_ENV_VAR } from "./skillsConfig.js";
+import { isOrchestratedHarnessScriptPath, resolveRepoRelativeSkillPath } from "./pathUtils.js";
 
 const DEFAULT_TIMEOUT_MS = 120_000;
+const SKILL_AGENT_CLI_PATH_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_CLI_PATH";
+const SKILL_AGENT_TIMEOUT_MS_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS";
+const SKILL_INPUTS_ENV_VAR = "CLAWPERATOR_SKILL_INPUTS";
+const SKILL_PROGRAM_ENV_VAR = "CLAWPERATOR_SKILL_PROGRAM";
+const SKILL_ID_ENV_VAR = "CLAWPERATOR_SKILL_ID";
+const SKILLS_REGISTRY_ENV_VAR = "CLAWPERATOR_SKILLS_REGISTRY";
 
 export interface SkillRunResult {
   ok: true;
@@ -51,18 +71,14 @@ export interface SkillRunEnv {
   CLAWPERATOR_BIN?: string;
   /** Operator package passed as --operator-package on every CLI call within a skill */
   CLAWPERATOR_OPERATOR_PACKAGE?: string;
+  /** Selected device id propagated by the CLI wrapper */
+  CLAWPERATOR_DEVICE_ID?: string;
   [key: string]: string | undefined;
 }
 
 export interface SkillRunCallbacks {
   onOutput?: (chunk: string, stream: "stdout" | "stderr") => void;
   logger?: Logger;
-}
-
-interface SkillManifestLike {
-  agent?: {
-    cli?: string;
-  };
 }
 
 interface SkillSourceResolutionSuccess {
@@ -87,6 +103,29 @@ interface SkillFrameParseFailure {
   message: string;
 }
 
+function signalSkillChildWithLogging(
+  child: ReturnType<typeof spawn>,
+  signal: NodeJS.Signals,
+  logger: Logger | undefined,
+  skillId: string
+): void {
+  if (process.platform !== "win32" && child.pid !== undefined) {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch {
+      logger?.emit({
+        ts: new Date().toISOString(),
+        level: "warn",
+        event: "skills.run.signal_fallback",
+        skillId,
+        message: `Skill ${skillId} could not signal its detached process group with ${signal}; falling back to direct child termination`,
+      });
+    }
+  }
+  child.kill(signal);
+}
+
 function parseSemver(version: string): { major: number; minor: number; patch: number } | null {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version.trim());
   if (!match) {
@@ -100,54 +139,27 @@ function parseSemver(version: string): { major: number; minor: number; patch: nu
 }
 
 async function resolveSkillResultSource(
-  repoRoot: string,
-  skillPath: string
+  manifestResult: SkillManifestReadResult
 ): Promise<SkillSourceResolution> {
-  const skillJsonPath = join(repoRoot, skillPath, "skill.json");
-  try {
-    const raw = await readFile(skillJsonPath, "utf-8");
-    const parsedUnknown = JSON.parse(raw) as unknown;
-    if (typeof parsedUnknown !== "object" || parsedUnknown === null || Array.isArray(parsedUnknown)) {
-      return {
-        ok: false,
-        message: `Unable to read trusted skill result source metadata from ${skillJsonPath}: skill.json must contain a JSON object`,
-      };
-    }
-
-    const parsedRecord = parsedUnknown as Record<string, unknown>;
-    if (!Object.prototype.hasOwnProperty.call(parsedRecord, "agent")) {
-      return { ok: true, source: { kind: "script" } };
-    }
-
-    const agent = parsedRecord.agent;
-    if (typeof agent !== "object" || agent === null || Array.isArray(agent)) {
-      return {
-        ok: false,
-        message: `Unable to read trusted skill result source metadata from ${skillJsonPath}: skill.json agent must be an object when present`,
-      };
-    }
-
-    const parsed = parsedUnknown as SkillManifestLike;
-    if (typeof parsed.agent?.cli !== "string" || parsed.agent.cli.trim().length === 0) {
-      return {
-        ok: false,
-        message: `Unable to read trusted skill result source metadata from ${skillJsonPath}: skill.json agent.cli must be a non-empty string when agent is present`,
-      };
-    }
-
-    return { ok: true, source: { kind: "agent", agentCli: parsed.agent.cli.trim() } };
-  } catch (error) {
+  if (!manifestResult.ok) {
     return {
       ok: false,
-      message: `Unable to read trusted skill result source metadata from ${skillJsonPath}: ${error instanceof Error ? error.message : String(error)}`,
+      message: manifestResult.message,
     };
   }
+
+  if (!manifestResult.metadata.agent) {
+    return { ok: true, source: { kind: "script" } };
+  }
+
+  return { ok: true, source: { kind: "agent", agentCli: manifestResult.metadata.agent.cli } };
 }
 
 function parseSkillResultFrame(
   stdout: string,
   expectedSkillId: string,
   sourceResolution: SkillSourceResolution,
+  requireTerminalFrame: boolean,
   logger?: Logger
 ): SkillFrameParseSuccess | SkillFrameParseFailure {
   const lines = stdout.split(/\r?\n/);
@@ -157,13 +169,16 @@ function parseSkillResultFrame(
   const markerIndexes = nonEmptyLines
     .map((line, index) => (line.raw === SKILL_RESULT_FRAME_PREFIX ? index : -1))
     .filter((index) => index >= 0);
-
   if (nonEmptyLines.length === 0) {
-    return { ok: true, skillResult: null };
+    return requireTerminalFrame
+      ? { ok: false, message: "Agent-driven skills must emit a terminal SkillResult frame" }
+      : { ok: true, skillResult: null };
   }
 
   if (markerIndexes.length === 0) {
-    return { ok: true, skillResult: null };
+    return requireTerminalFrame
+      ? { ok: false, message: "Agent-driven skills must emit a terminal SkillResult frame" }
+      : { ok: true, skillResult: null };
   }
 
   if (nonEmptyLines.length === 1) {
@@ -266,8 +281,18 @@ export async function runSkill(
 ): Promise<SkillRunResult | SkillRunError> {
   let resolvedPath: string;
   let sourceResolution: SkillSourceResolution = { ok: true, source: { kind: "script" } };
+  let resolvedAgentConfig: SkillAgentConfig | null = null;
+  let resolvedAgentExecutablePath: string | null = null;
+  let skillProgramPath: string | null = null;
+  let resolvedRegistryPath: string | null = null;
+  let effectiveTimeoutMs = timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const childEnv: NodeJS.ProcessEnv = {
+    ...process.env,
+    ...env,
+  };
   try {
     const loaded = await loadRegistry(registryPath);
+    resolvedRegistryPath = loaded.resolvedPath;
     const skill = findSkillById(loaded.registry, skillId);
     if (!skill) {
       return { ok: false, code: SKILL_NOT_FOUND, message: `Skill not found: ${skillId}`, skillId, skillResult: null };
@@ -284,14 +309,98 @@ export async function runSkill(
     }
 
     const repoRoot = getRepoRoot(loaded.resolvedPath);
-    // Prefer .js script over .sh for direct node invocation
-    const scriptRelative =
-      skill.scripts.find((s) => extname(s) === ".js") ??
+    const scriptRelative = skill.scripts.find((s) => extname(s) === ".js") ??
       skill.scripts.find((s) => extname(s) === ".sh") ??
       skill.scripts[0];
+    if (!scriptRelative) {
+      return {
+        ok: false,
+        code: SKILL_SCRIPT_NOT_FOUND,
+        message: `Skill ${skillId} has no runnable script defined`,
+        skillId,
+        skillResult: null,
+      };
+    }
 
-    resolvedPath = join(repoRoot, scriptRelative);
-    sourceResolution = await resolveSkillResultSource(repoRoot, skill.path);
+    const harnessScriptRelative = skill.scripts.find((scriptPath) => isOrchestratedHarnessScriptPath(scriptPath));
+    const manifestResult = await readSkillManifestMetadata(repoRoot, skill.path);
+    if (!manifestResult.ok) {
+      if (harnessScriptRelative) {
+        return {
+          ok: false,
+          code: SKILL_VALIDATION_FAILED,
+          message: manifestResult.message,
+          skillId,
+          skillResult: null,
+        };
+      }
+    }
+    if (manifestResult.ok) {
+      sourceResolution = await resolveSkillResultSource(manifestResult);
+    } else {
+      sourceResolution = harnessScriptRelative
+        ? {
+            ok: false,
+            message: manifestResult.message,
+          }
+        : {
+            ok: true,
+            source: {
+              kind: "script",
+            },
+          };
+    }
+    skillProgramPath = resolveRepoRelativeSkillPath(repoRoot, skill.skillFile);
+
+    const manifestAgent = manifestResult.ok ? manifestResult.metadata.agent : undefined;
+    const isAgentDriven = manifestAgent !== null && manifestAgent !== undefined;
+    const runnableScriptRelative = isAgentDriven
+      ? harnessScriptRelative
+      : scriptRelative;
+
+    if (!runnableScriptRelative) {
+      return {
+        ok: false,
+        code: SKILL_SCRIPT_NOT_FOUND,
+        message: isAgentDriven
+          ? `Agent-driven skill ${skillId} requires scripts/run.js`
+          : `Skill ${skillId} has no runnable script defined`,
+        skillId,
+        skillResult: null,
+      };
+    }
+
+    resolvedPath = resolveRepoRelativeSkillPath(repoRoot, runnableScriptRelative);
+
+    if (isAgentDriven) {
+      const effectiveAgentConfig = resolveConfiguredAgentCli(manifestAgent, childEnv);
+      if (!effectiveAgentConfig.ok) {
+        return {
+          ok: false,
+          code: SKILL_AGENT_CLI_UNAVAILABLE,
+          message: `Skill ${skillId} requires agent CLI '${manifestAgent.cli}', but it is unavailable. ${effectiveAgentConfig.message}`,
+          skillId,
+          skillResult: null,
+        };
+      }
+      resolvedAgentConfig = effectiveAgentConfig.agent;
+      effectiveTimeoutMs = timeoutMs ?? resolvedAgentConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+      const agentResolution = await resolveAgentCliExecutable(
+        resolvedAgentConfig,
+        resolveRepoRelativeSkillPath(repoRoot, skill.path),
+        childEnv
+      );
+      if (!agentResolution.ok) {
+        return {
+          ok: false,
+          code: SKILL_AGENT_CLI_UNAVAILABLE,
+          message: `Skill ${skillId} requires agent CLI '${resolvedAgentConfig.cli}', but it is unavailable. ${agentResolution.message}`,
+          skillId,
+          skillResult: null,
+        };
+      }
+      resolvedAgentExecutablePath = agentResolution.executablePath;
+    }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return { ok: false, code: REGISTRY_READ_FAILED, message, skillResult: null };
@@ -309,17 +418,43 @@ export async function runSkill(
     };
   }
 
+  if (resolvedAgentConfig && skillProgramPath !== null) {
+    try {
+      await access(skillProgramPath);
+    } catch {
+      return {
+        ok: false,
+        code: SKILL_SCRIPT_NOT_FOUND,
+        message: `Skill program not found: ${skillProgramPath}`,
+        skillId,
+        skillResult: null,
+      };
+    }
+  }
+
   const ext = extname(resolvedPath);
   const cmd = ext === ".js" ? process.execPath : resolvedPath;
-  const cmdArgs = ext === ".js" ? [resolvedPath, ...args] : args;
-  const timeout = timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const forwardedArgs = resolvedAgentConfig
+    ? args
+    : childEnv[CLAWPERATOR_DEVICE_ID_ENV_VAR]
+      ? [childEnv[CLAWPERATOR_DEVICE_ID_ENV_VAR], ...args]
+      : args;
+  const cmdArgs = ext === ".js" ? [resolvedPath, ...forwardedArgs] : forwardedArgs;
+  const timeout = effectiveTimeoutMs;
   const skillLogger = callbacks?.logger?.child({ skillId });
 
   // Merge provided env with process.env, with provided env taking precedence
-  const childEnv: NodeJS.ProcessEnv = {
-    ...process.env,
-    ...env,
-  };
+  if (resolvedAgentConfig && resolvedAgentExecutablePath && skillProgramPath) {
+    childEnv[SKILL_AGENT_CLI_ENV_VAR] = resolvedAgentConfig.cli;
+    childEnv[SKILL_AGENT_CLI_PATH_ENV_VAR] = resolvedAgentExecutablePath;
+    childEnv[SKILL_AGENT_TIMEOUT_MS_ENV_VAR] = String(effectiveTimeoutMs);
+    childEnv[SKILL_INPUTS_ENV_VAR] = JSON.stringify(args);
+    childEnv[SKILL_PROGRAM_ENV_VAR] = skillProgramPath;
+    childEnv[SKILL_ID_ENV_VAR] = skillId;
+    if (resolvedRegistryPath !== null) {
+      childEnv[SKILLS_REGISTRY_ENV_VAR] = resolvedRegistryPath;
+    }
+  }
 
   const start = Date.now();
   return new Promise((resolve) => {
@@ -332,6 +467,7 @@ export async function runSkill(
     });
 
     const child = spawn(cmd, cmdArgs, {
+      detached: process.platform !== "win32",
       stdio: ["ignore", "pipe", "pipe"],
       env: childEnv,
     });
@@ -341,6 +477,25 @@ export async function runSkill(
     let settled = false;
     let timedOut = false;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let forwardedSignal: NodeJS.Signals | undefined;
+
+    const handleTerminationSignal = (signal: NodeJS.Signals) => {
+      if (settled || forwardedSignal !== undefined) {
+        return;
+      }
+      forwardedSignal = signal;
+      signalSkillChildWithLogging(child, signal, skillLogger, skillId);
+    };
+
+    const sigintListener = () => {
+      handleTerminationSignal("SIGINT");
+    };
+    const sigtermListener = () => {
+      handleTerminationSignal("SIGTERM");
+    };
+
+    process.once("SIGINT", sigintListener);
+    process.once("SIGTERM", sigtermListener);
 
     const finish = (result: SkillRunResult | SkillRunError) => {
       if (settled) return;
@@ -348,6 +503,8 @@ export async function runSkill(
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId);
       }
+      process.removeListener("SIGINT", sigintListener);
+      process.removeListener("SIGTERM", sigtermListener);
       resolve(result);
     };
 
@@ -395,8 +552,14 @@ export async function runSkill(
       });
     });
 
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       const durationMs = Date.now() - start;
+      if (forwardedSignal !== undefined) {
+        process.removeListener("SIGINT", sigintListener);
+        process.removeListener("SIGTERM", sigtermListener);
+        process.kill(process.pid, forwardedSignal);
+        return;
+      }
       if (timedOut) {
         finish({
           ok: false,
@@ -410,7 +573,15 @@ export async function runSkill(
         return;
       }
 
-      const parsedSkillResult = parseSkillResultFrame(stdout, skillId, sourceResolution, skillLogger);
+      const requireTerminalFrame =
+        code === 0 && signal === null && sourceResolution.ok && sourceResolution.source.kind === "agent";
+      const parsedSkillResult = parseSkillResultFrame(
+        stdout,
+        skillId,
+        sourceResolution,
+        requireTerminalFrame,
+        skillLogger
+      );
       if (!parsedSkillResult.ok) {
         finish({
           ok: false,
@@ -494,7 +665,7 @@ export async function runSkill(
         skillId,
         message: `Skill ${skillId} timed out after ${timeout}ms`,
       });
-      child.kill("SIGTERM");
+      signalSkillChildWithLogging(child, "SIGTERM", skillLogger, skillId);
     }, timeout);
   });
 }

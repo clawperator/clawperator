@@ -12,6 +12,12 @@ import {
   SKILL_VALIDATION_FAILED,
 } from "../../contracts/skills.js";
 import { validateExecution, type ValidationFailure } from "../executions/validateExecution.js";
+import { parseSkillManifestMetadata } from "./skillManifest.js";
+import {
+  isOrchestratedHarnessScriptPath,
+  normalizeSkillPathSeparators,
+  resolveRepoRelativeSkillPath,
+} from "./pathUtils.js";
 
 const SKILL_DRY_RUN_SKIP_REASON =
   "skill has no pre-compiled artifacts; payload is generated at runtime by the skill script";
@@ -85,16 +91,20 @@ function getSkillJsonRelativePath(skill: SkillEntry): string {
   return join(skill.path, "skill.json");
 }
 
+function normalizeSkillPathArray(paths: string[] | undefined): string[] {
+  return (paths ?? []).map((path) => normalizeSkillPathSeparators(path));
+}
+
 function findMismatchFields(skill: SkillEntry, parsed: Partial<SkillEntry>): string[] {
   const mismatches: string[] = [];
   if (parsed.id !== skill.id) mismatches.push("id");
   if (parsed.applicationId !== skill.applicationId) mismatches.push("applicationId");
   if (parsed.intent !== skill.intent) mismatches.push("intent");
   if (parsed.summary !== skill.summary) mismatches.push("summary");
-  if (parsed.path !== skill.path) mismatches.push("path");
-  if (parsed.skillFile !== skill.skillFile) mismatches.push("skillFile");
-  if (JSON.stringify(parsed.scripts ?? []) !== JSON.stringify(skill.scripts)) mismatches.push("scripts");
-  if (JSON.stringify(parsed.artifacts ?? []) !== JSON.stringify(skill.artifacts)) mismatches.push("artifacts");
+  if (normalizeSkillPathSeparators(parsed.path ?? "") !== normalizeSkillPathSeparators(skill.path)) mismatches.push("path");
+  if (normalizeSkillPathSeparators(parsed.skillFile ?? "") !== normalizeSkillPathSeparators(skill.skillFile)) mismatches.push("skillFile");
+  if (JSON.stringify(normalizeSkillPathArray(parsed.scripts)) !== JSON.stringify(normalizeSkillPathArray(skill.scripts))) mismatches.push("scripts");
+  if (JSON.stringify(normalizeSkillPathArray(parsed.artifacts)) !== JSON.stringify(normalizeSkillPathArray(skill.artifacts))) mismatches.push("artifacts");
   return mismatches;
 }
 
@@ -104,8 +114,8 @@ async function validateLoadedSkill(
   options?: { dryRun?: boolean }
 ): Promise<ValidateSkillResult | ValidateSkillError> {
   const repoRoot = getRepoRoot(resolvedRegistryPath);
-  const skillJsonPath = join(repoRoot, getSkillJsonRelativePath(skill));
-  const skillFilePath = join(repoRoot, skill.skillFile);
+  const skillJsonPath = resolveRepoRelativeSkillPath(repoRoot, getSkillJsonRelativePath(skill));
+  const skillFilePath = resolveRepoRelativeSkillPath(repoRoot, skill.skillFile);
 
   if (!Array.isArray(skill.scripts)) {
     return {
@@ -132,9 +142,9 @@ async function validateLoadedSkill(
     };
   }
 
-  const scriptPaths = skill.scripts.map((file) => join(repoRoot, file));
+  const scriptPaths = skill.scripts.map((file) => resolveRepoRelativeSkillPath(repoRoot, file));
   // Artifacts are optional for script-only skills, but when present they must be explicit arrays.
-  const artifactPaths = skill.artifacts === undefined ? [] : skill.artifacts.map((file) => join(repoRoot, file));
+  const artifactPaths = skill.artifacts === undefined ? [] : skill.artifacts.map((file) => resolveRepoRelativeSkillPath(repoRoot, file));
   const missingFiles: string[] = [];
 
   for (const file of [skillJsonPath, skillFilePath, ...scriptPaths, ...artifactPaths]) {
@@ -158,7 +168,21 @@ async function validateLoadedSkill(
   }
 
   const raw = await readFile(skillJsonPath, "utf8");
-  const parsed = JSON.parse(raw) as Partial<SkillEntry>;
+  let parsed: Partial<SkillEntry>;
+  try {
+    parsed = JSON.parse(raw) as Partial<SkillEntry>;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} has an invalid skill.json payload`,
+      details: {
+        skillJsonPath,
+        reason,
+      },
+    };
+  }
   const mismatchFields = findMismatchFields(skill, parsed);
   if (mismatchFields.length > 0) {
     return {
@@ -168,6 +192,31 @@ async function validateLoadedSkill(
       details: {
         skillJsonPath,
         mismatchFields,
+      },
+    };
+  }
+
+  const manifestResult = parseSkillManifestMetadata(skillJsonPath, parsed);
+  if (!manifestResult.ok) {
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} has an invalid agent manifest`,
+      details: {
+        skillJsonPath,
+        reason: manifestResult.message,
+      },
+    };
+  }
+
+  if (manifestResult.metadata.agent && !skill.scripts.some((scriptPath) => isOrchestratedHarnessScriptPath(scriptPath))) {
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} is missing the required orchestrated harness`,
+      details: {
+        skillJsonPath,
+        reason: "Agent-driven skills must declare scripts/run.js in the registry scripts list.",
       },
     };
   }

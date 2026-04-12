@@ -1,7 +1,7 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { delimiter, join } from "node:path";
 import { tmpdir } from "node:os";
 import { DoctorService } from "../../../domain/doctor/DoctorService.js";
 import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
@@ -15,6 +15,27 @@ import {
 } from "../../../domain/version/compatibility.js";
 
 describe("DoctorService", () => {
+  let fakeAgentCliDir: string;
+  let originalPath: string | undefined;
+
+  beforeEach(async () => {
+    originalPath = process.env.PATH;
+    fakeAgentCliDir = await mkdtemp(join(tmpdir(), "clawperator-doctor-agent-cli-"));
+    const fakeAgentPath = join(fakeAgentCliDir, "codex");
+    await writeFile(fakeAgentPath, "#!/bin/sh\nexit 0\n", "utf8");
+    await chmod(fakeAgentPath, 0o755);
+    process.env.PATH = `${fakeAgentCliDir}${delimiter}${originalPath ?? ""}`;
+  });
+
+  afterEach(async () => {
+    await rm(fakeAgentCliDir, { recursive: true, force: true });
+    if (originalPath === undefined) {
+      delete process.env.PATH;
+    } else {
+      process.env.PATH = originalPath;
+    }
+  });
+
   it("treats missing APK as a critical failure and skips the handshake", async () => {
     const runner = new FakeProcessRunner();
     const config = getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" });
@@ -82,6 +103,30 @@ describe("DoctorService", () => {
     assert.strictEqual(versionCheck.status, "fail");
     assert.strictEqual(versionCheck.code, ERROR_CODES.VERSION_INCOMPATIBLE);
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
+  });
+
+  it("still reports the orchestrated agent CLI advisory when adb server startup fails", async () => {
+    const runner = new FakeProcessRunner();
+    const config = getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" });
+
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    runner.queueResult({ code: 1, stdout: "", stderr: "cannot start adb server" });
+
+    const report = await new DoctorService().run({ config });
+
+    const defaultAgentCliCheck = report.checks.find(check => check.id === "host.skill-agent-cli.default");
+    assert.ok(defaultAgentCliCheck);
+    assert.strictEqual(defaultAgentCliCheck.status, "pass");
+
+    const installedAgentCliCheck = report.checks.find(check => check.id === "host.skill-agent-cli.skills");
+    assert.ok(installedAgentCliCheck);
+    assert.strictEqual(installedAgentCliCheck.status, "pass");
+
+    const adbServer = report.checks.find(check => check.id === "host.adb.server");
+    assert.ok(adbServer);
+    assert.strictEqual(adbServer.status, "fail");
+    assert.strictEqual(adbServer.code, ERROR_CODES.ADB_SERVER_FAILED);
   });
 
   it("fails clearly when the installed APK version cannot be read", async () => {
@@ -241,13 +286,27 @@ describe("DoctorService", () => {
 
 describe("DoctorService logging", () => {
   let tempRoot: string;
+  let fakeAgentCliDir: string;
+  let originalPath: string | undefined;
 
   beforeEach(async () => {
     tempRoot = await mkdtemp(join(tmpdir(), "clawperator-doctor-log-"));
+    originalPath = process.env.PATH;
+    fakeAgentCliDir = await mkdtemp(join(tmpdir(), "clawperator-doctor-log-agent-cli-"));
+    const fakeAgentPath = join(fakeAgentCliDir, "codex");
+    await writeFile(fakeAgentPath, "#!/bin/sh\nexit 0\n", "utf8");
+    await chmod(fakeAgentPath, 0o755);
+    process.env.PATH = `${fakeAgentCliDir}${delimiter}${originalPath ?? ""}`;
   });
 
   afterEach(async () => {
     await rm(tempRoot, { recursive: true, force: true });
+    await rm(fakeAgentCliDir, { recursive: true, force: true });
+    if (originalPath === undefined) {
+      delete process.env.PATH;
+    } else {
+      process.env.PATH = originalPath;
+    }
   });
 
   it("logs one doctor.check entry per check", async () => {

@@ -22,13 +22,28 @@ runtime shape of orchestrated skills.
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | completed |
 | Total PRs | 2 |
 | Total phases | 5 |
-| Completed | none |
-| Remaining | P1, P2, P3, P4, P5 |
-| Current / Next | P1 after W2 lands |
-| Blockers | `skill-result-contract/` must land first (W2 contract + parser) |
+| Completed | P1, P2, P3, P4, P5 |
+| Remaining | none |
+| Current / Next | done |
+| Blockers | none |
+
+## Current Reality
+
+The W2b runtime shape now exists in code and in the Solax proving skill:
+
+- Clawperator `runSkill` detects agent-driven skills via `skill.json.agent`
+- orchestrated skills execute through `scripts/run.js` rather than direct agent
+  spawn in `runSkill`
+- missing agent CLI returns `SKILL_AGENT_CLI_UNAVAILABLE`
+- the Solax orchestrated proving skill exists in `../clawperator-skills`
+- one branch-local live proving run has succeeded on the physical Samsung target
+
+The repeated-run reliability validation and the durable handoff/docs phase are
+now complete. W2b should no longer be described as active work on these
+branches.
 
 ## Goal
 
@@ -114,7 +129,10 @@ the gap between that promise and the current plans.
   fallback. No graceful degradation. If the agent CLI is missing,
   `runSkill` refuses with `SKILL_AGENT_CLI_UNAVAILABLE`.
 - The default agent CLI is `codex`. Other CLIs must be nameable in
-  `skill.json` but `codex` is the v1 baseline.
+  `skill.json` but `codex` is the W2b v1 baseline. This pack may ship as
+  codex-only in practice if that limitation is documented honestly in code,
+  docs, and the proving skill. W2b does not need to prove runtime portability
+  across multiple agent CLIs.
 - The thin-harness pattern is boilerplate by design. It does not
   contain skill logic. If a harness starts growing skill-specific
   code, that code belongs in SKILL.md as an instruction for the
@@ -162,12 +180,17 @@ the gap between that promise and the current plans.
 - The authoring-time agent (W6) and the runtime agent (this pack)
   are the same binary (`codex`) with different prompts. Plans that
   split them across different CLIs need owner approval.
+- Hidden runtime switches are out of bounds. Any security-relevant or execution-
+  mode-affecting behavior, including approval or sandbox posture, must either
+  be declared in committed skill/runtime metadata and documented, or not ship
+  as part of W2b.
 - Reliability is measured, not assumed. The reliability validation
   phase (P4) must run at least 10 invocations against a live Samsung
   target with a cleaned starting state and record success rate,
   failure modes, and time-to-terminal-state. At least 8 of 10 runs
   must reach terminal verification with `status: success`, with no
-  `runtime_poisoned` states, or the pack does not ship.
+  `runtime_poisoned` states, or the pack does not ship. One successful
+  proving run exists already; it is not sufficient to close P4.
 - Replay remains first-class. This pack defines the orchestrated runtime shape,
   but it must not weaken the preserved replay baseline or imply replay is now a
   deprecated category.

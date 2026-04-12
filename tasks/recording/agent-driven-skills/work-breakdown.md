@@ -13,10 +13,10 @@ architectural framing.
 | --- | --- |
 | Total PRs | 2 |
 | Total phases | 5 |
-| Completed | none |
-| Remaining | P1, P2, P3, P4, P5 |
-| Current / Next | P1 after W2 lands |
-| Blockers | W2 (`skill-result-contract/`) must define `SkillResult` and `runSkill` parsing first |
+| Completed | P1, P2, P3, P4, P5 |
+| Remaining | none |
+| Current / Next | done |
+| Blockers | none |
 
 ## Hard Rules
 
@@ -66,6 +66,21 @@ Before starting P1, read:
 P5 is a documentation-only handoff phase and can be folded into
 PR-W2b-2 or shipped as a small follow-up PR depending on how large
 the docs changes end up.
+
+## Current Progress
+
+- P1 is complete: the runtime contract decisions are now reflected in code and
+  in this task pack.
+- P2 is complete: Clawperator runtime support for agent-driven orchestrated
+  skills landed, including `SKILL_AGENT_CLI_UNAVAILABLE` and regression tests.
+- P3 is complete for the first proving case: the Solax orchestrated skill now
+  exists and has produced one successful branch-local live run on the physical
+  Samsung target.
+- P4 is complete: the repeated-run reliability measurement completed with
+  10 of 10 runs reaching terminal verification with `status: success`.
+- P5 is complete: durable docs and handoff cleanup have been migrated into
+  `docs/skills/authoring.md`, `docs/skills/overview.md`, and
+  `docs/internal/design/skill-design.md`.
 
 ## Phase P1: Commit The Agent-Driven Runtime Contract
 
