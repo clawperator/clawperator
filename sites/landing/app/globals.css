@@ -696,6 +696,11 @@ body {
   font-size: 0.88rem;
 }
 
+.agent-entry-sep {
+  opacity: 0.4;
+  user-select: none;
+}
+
 .quickstart-top {
   padding: 1rem 1.1rem;
   display: flex;
@@ -1676,6 +1681,10 @@ body {
   .agent-entry-links {
     flex-direction: column;
     gap: 0.5rem;
+  }
+
+  .agent-entry-sep {
+    display: none;
   }
 
   .loop-step {
