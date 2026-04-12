@@ -50,6 +50,34 @@ only in `tasks/`.
   dialog returns to the `Peak Export` editor. Waiting for `Discharge to` to
   reappear before handling the save actions is therefore the wrong assumption
   for this branch state.
+- The successful orchestrated repair path on this branch used a decomposed
+  sequence of small `exec` payloads rather than one large improvised execution:
+  bootstrap, focus `Intelligence`, enter `Peak Export`, open `Device
+  Discharging`, set value, save, then reopen-and-verify.
+- The runtime agent benefited from being shown that exact decomposition in the
+  harness prompt. After adding the concrete successful command shapes, the
+  orchestrated skill completed two consecutive live value changes (`44 -> 46`
+  and `46 -> 48`) with truthful terminal verification.
+- One recurring runtime mistake was emitting raw `x`/`y` fields for click
+  actions instead of `params.coordinate`. The agent sometimes self-corrected
+  after validation feedback, but reliability guidance should prevent this shape
+  error up front rather than relying on recovery.
+- A failed reliability-loop run showed that even after self-correcting the
+  coordinate schema, the agent could still lose the next surface transition and
+  fall into a `RESULT_ENVELOPE_TIMEOUT`. That made the exact successful
+  decomposition materially more reliable than looser route prose alone.
+- The C3 wrapper itself needs to parse the `skills run --json` envelope
+  correctly. The top-level JSON object wraps the real `SkillResult` under
+  `skillResult`, so reading `.status` from the top level falsely classifies a
+  successful run as empty/failed and can stop the loop prematurely.
+- A concrete C3 failure root cause was concurrent live route commands from the
+  runtime agent. In one failed run, the agent started `focus-intelligence` and
+  `enter-peak-export` in parallel within the same turn instead of waiting for
+  the first command result. That overlap made the route nondeterministic and
+  plausibly explains the missing `Device Discharging` / `Discharge to` state.
+- Orchestrated harness guidance should explicitly forbid overlapping live device
+  commands and require strict step-by-step sequencing: one `exec`, wait for its
+  result, then choose the next `exec`.
 
 ## Gaps Exposed
 
@@ -68,6 +96,10 @@ only in `tasks/`.
 - Orchestrated authoring guidance should explicitly tell authors to document
   stateful entry surfaces and post-confirm screen transitions, not just the
   happy-path route from a cold app open.
+- Orchestrated authoring guidance should include validated execution payload
+  shapes for common action patterns such as coordinate clicks, small phased
+  executions, and reopen-and-verify loops, because the runtime agent does
+  better when it is not asked to infer those payload details from prose alone.
 
 ## Follow-Up To Graduate
 
