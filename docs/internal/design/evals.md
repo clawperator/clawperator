@@ -204,3 +204,41 @@ artifacts are skipped and do not block stdout or stderr answer extraction.
 - Pass `--device <serial>` explicitly whenever more than one device is
   connected.
 - Keep `skill_score` separate from `outcome` when you analyze runs.
+
+## Live Skill Eval Boundary
+
+The Solax orchestrated cold-start proving flow lives in `/evals` as a dedicated
+live-device batch eval, not as an extension of the repo-local `evals-run`
+skill.
+
+Reason:
+
+- `evals-run` is scoped to the `android-version` benchmark, runtime-target
+  choice (`local-dev` versus `published`), replay, and rescore
+- the Solax cold-start flow is a different abstraction: repeated skill proving
+  with per-run normalization, current-state probing, target selection, and
+  aggregate pass-fail classification
+- encoding that logic in `/evals` keeps the proving policy inspectable,
+  reviewable, and reusable by future eval authors without teaching a repo-local
+  skill to become the proving harness itself
+
+Current command surface:
+
+```bash
+uv run --project evals --extra dev python evals/run_eval.py solax-orchestrated-cold-start \
+  --device <serial> \
+  --operator-package com.clawperator.operator.dev \
+  --runs 4
+```
+
+Artifact boundary:
+
+- agent benchmark evals write single-run artifacts under `evals/runs/<run_id>/`
+- live orchestrated-skill proving writes batch artifacts under
+  `evals/artifacts/<batch_id>/`
+- retained live batches are copied into the private `clawperator-artifacts`
+  repo rather than committed in the main product repo
+
+That split is intentional. The benchmark harness measures an agent solving a
+task. The cold-start skill eval measures whether a pre-authored skill proves
+its claimed behavior repeatedly from a normalized device state.

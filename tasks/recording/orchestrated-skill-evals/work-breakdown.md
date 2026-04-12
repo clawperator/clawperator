@@ -10,6 +10,14 @@ Total PRs: 1. Total phases: 3.
 - P2: implement the Solax cold-start eval in `/evals`
 - P3: validate it on-device and document the workflow
 
+## Status
+
+| Phase | State |
+| --- | --- |
+| P1 | completed |
+| P2 | completed |
+| P3 | completed |
+
 ## Hard Rules
 
 - Do not rely on ad hoc shell loops as the proving mechanism.

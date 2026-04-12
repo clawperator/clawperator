@@ -24,6 +24,80 @@ skill wraps the common emulator workflow, including both runtime targets.
 Its helper script lives at
 [`run_android_version_eval.sh`](../.agents/skills/evals-run/scripts/run_android_version_eval.sh).
 
+## Solax Orchestrated Cold-Start Eval
+
+Use the Solax cold-start eval when you need repeatable live-device proof that
+the orchestrated skill can start from outside the app, choose a target value
+that differs from the currently persisted value, and verify the final
+persisted `Discharge to <n>%` row.
+
+Command:
+
+```bash
+uv run --project evals --extra dev python evals/run_eval.py solax-orchestrated-cold-start \
+  --device <serial> \
+  --operator-package com.clawperator.operator.dev \
+  --runs 4
+```
+
+Optional flags:
+
+- `--skills-registry <path>` overrides the default sibling-repo registry path
+  `../clawperator-skills/skills/skills-registry.json`
+- `--artifacts-dir <path>` overrides the default batch root
+  `evals/artifacts/`
+- `--label <text>` adds a readable suffix to the batch id
+
+Retention boundary:
+
+- `evals/artifacts/` is local working output in this repo and is ignored by
+  git
+- if a live batch is worth preserving, copy the sanitized batch into the
+  private `clawperator-artifacts` repo instead of committing it here
+
+This eval encodes the cold-start proving policy in code. For every run it:
+
+1. closes `com.solaxcloud.starter`
+2. presses Home
+3. proves the app is not foregrounded
+4. opens SolaX and probes the current persisted discharge row
+5. closes SolaX again and re-proves outside-app state before the skill run
+6. chooses a configured target percent that differs from the observed value
+7. runs `clawperator skills run ... --output json`
+8. classifies the run as cold-start proof, continuation-only success, or a
+   specific failure mode
+
+Artifacts land under `evals/artifacts/<batch_id>/`:
+
+- `config.json` - batch configuration
+- `run-01/metadata.json` - per-run normalization, probe, target selection, and
+  classification
+- `run-01/result.json` - parsed raw `skills run` JSON when the command emitted
+  valid JSON
+- `run-01/commands/` - stdout, stderr, and parsed command payloads for every
+  normalization and probe step
+- `summary.json` - machine-readable aggregate result
+- `summary.md` - readable batch digest
+
+Those files are local by default. Retained batches belong in the private
+artifacts repo, not in the main product repo history.
+
+Truth boundary:
+
+- `cold_start_verified` means the run proved outside-app start state, selected
+  a different target than the observed persisted value, and ended with
+  `skillResult.terminalVerification.status = "verified"` for the requested
+  percent
+- `continuation_success_only` means the skill reached the requested final
+  value, but the eval did not prove the run started from normalized outside-app
+  state
+- any other classification is a failed cold-start proof batch member, even if
+  the skill emitted a structured `SkillResult`
+
+This eval lives directly in `/evals`. It does not extend the repo-local
+`evals-run` skill because that skill remains scoped to the `android-version`
+benchmark, runtime-target setup, replay, and rescore workflow.
+
 Every run writes its artifacts under `evals/runs/<run_id>/`:
 
 - `config.json`

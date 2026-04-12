@@ -193,7 +193,11 @@ def _resolve_device_timezone(adb: str, device_serial: str) -> str | None:
     return value or None
 
 
-def resolve_inputs(device: str | None, runtime: str = "local-dev") -> RuntimeInputs:
+def resolve_inputs(
+    device: str | None,
+    runtime: str = "local-dev",
+    operator_package: str | None = None,
+) -> RuntimeInputs:
     adb = shutil.which("adb")
     if adb is None:
         raise EnvironmentError("adb_not_found")
@@ -222,13 +226,18 @@ def resolve_inputs(device: str | None, runtime: str = "local-dev") -> RuntimeInp
     if shutil.which(clawperator_cmd[0]) is None and not (clawperator_bin.is_file() and os.access(clawperator_bin, os.X_OK)):
         raise EnvironmentError("clawperator_binary_not_found")
 
-    requested_operator_package = os.environ.get("CLAWPERATOR_OPERATOR_PACKAGE")
+    env_operator_package = os.environ.get("CLAWPERATOR_OPERATOR_PACKAGE")
+    requested_operator_package = (
+        operator_package.strip()
+        if operator_package is not None and operator_package.strip()
+        else (env_operator_package.strip() if env_operator_package is not None and env_operator_package.strip() else None)
+    )
     if runtime == "published":
         operator_package = RELEASE_OPERATOR_PACKAGE
-    elif requested_operator_package is None or not requested_operator_package.strip():
+    elif requested_operator_package is None:
         operator_package = LOCAL_DEV_OPERATOR_PACKAGE
     else:
-        operator_package = requested_operator_package.strip()
+        operator_package = requested_operator_package
 
     doctor_env = _minimal_env(device_serial=device_serial, operator_package=operator_package)
     cli_version = _probe_clawperator_version(clawperator_cmd, doctor_env)
@@ -239,7 +248,7 @@ def resolve_inputs(device: str | None, runtime: str = "local-dev") -> RuntimeInp
         device_timezone=device_timezone,
         clawperator_cmd=clawperator_cmd,
         operator_package=operator_package,
-        requested_operator_package=requested_operator_package.strip() if requested_operator_package and requested_operator_package.strip() else None,
+        requested_operator_package=requested_operator_package,
         clawperator_version=cli_version,
         clawperator_npm_version=npm_version,
     )
@@ -249,8 +258,9 @@ def preflight(
     device: str | None,
     runtime: str = "local-dev",
     resolved_inputs: RuntimeInputs | None = None,
+    operator_package: str | None = None,
 ) -> Environment:
-    inputs = resolved_inputs if resolved_inputs is not None else resolve_inputs(device, runtime)
+    inputs = resolved_inputs if resolved_inputs is not None else resolve_inputs(device, runtime, operator_package)
     adb = shutil.which("adb")
     if adb is None:
         raise EnvironmentError("adb_not_found")
