@@ -231,7 +231,7 @@ async function validateLoadedSkill(
       details: {
         skillJsonPath,
         invalidKeys: unsupportedContractInputSchemas,
-        reason: "contract.inputs supports only 'string' and 'integer[<min>,<max>]' schemas in v1.",
+        reason: "contract.inputs supports only 'string', 'integer', and 'integer[<min>,<max>]' schemas in v1.",
       },
     };
   }

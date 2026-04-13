@@ -28,24 +28,44 @@ export interface SkillContract {
   verification: SkillContractVerification | null;
 }
 
+const reservedSkillContractInputNames = new Set(["__proto__", "constructor", "prototype"]);
+
 const skillContractInputNameSchema = z.string()
   .min(1)
-  .regex(/^[A-Za-z0-9_]+$/, "contract input names must contain only letters, numbers, and underscores");
+  .regex(/^[A-Za-z0-9_]+$/, "contract input names must contain only letters, numbers, and underscores")
+  .refine(
+    (name) => !reservedSkillContractInputNames.has(name),
+    "contract input names must not use reserved object property names"
+  );
 
-export function isSupportedSkillContractInputSchema(schema: string): boolean {
+export type ParsedSkillContractInputSchema =
+  | { kind: "string"; schema: "string" }
+  | { kind: "integer"; schema: string; min: number; max: number };
+
+export function parseSkillContractInputSchema(schema: string): ParsedSkillContractInputSchema | null {
   const trimmedSchema = schema.trim();
   if (trimmedSchema === "string") {
-    return true;
+    return { kind: "string", schema: "string" };
   }
   const integerRangeMatch = /^integer(?:\[(?<min>-?\d+),(?<max>-?\d+)])?$/.exec(trimmedSchema);
   if (!integerRangeMatch) {
-    return false;
+    return null;
   }
-  const { min, max } = integerRangeMatch.groups ?? {};
-  if (min === undefined || max === undefined) {
-    return true;
+  const min = Number.parseInt(integerRangeMatch.groups?.min ?? `${Number.MIN_SAFE_INTEGER}`, 10);
+  const max = Number.parseInt(integerRangeMatch.groups?.max ?? `${Number.MAX_SAFE_INTEGER}`, 10);
+  if (min > max) {
+    return null;
   }
-  return Number.parseInt(min, 10) <= Number.parseInt(max, 10);
+  return {
+    kind: "integer",
+    schema: trimmedSchema,
+    min,
+    max,
+  };
+}
+
+export function isSupportedSkillContractInputSchema(schema: string): boolean {
+  return parseSkillContractInputSchema(schema) !== null;
 }
 
 const skillContractInputSchemaStringSchema = z.string()

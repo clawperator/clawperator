@@ -5,6 +5,7 @@ import { loadRegistry, findSkillById, getRepoRoot } from "../../adapters/skills-
 import type { Logger } from "../../adapters/logger.js";
 import {
   hasMeaningfulSkillContract,
+  parseSkillContractInputSchema,
   REGISTRY_READ_FAILED,
   SKILL_NOT_FOUND,
   SKILL_SCRIPT_NOT_FOUND,
@@ -355,32 +356,28 @@ function terminalVerificationTextMatches(expectedText: string, observedText: str
 }
 
 function parseDeclaredContractInputValue(schema: string, rawValue: string): { ok: true; value: unknown } | { ok: false; message: string } {
-  const trimmedSchema = schema.trim();
-  if (trimmedSchema === "string") {
+  const parsedSchema = parseSkillContractInputSchema(schema);
+  if (parsedSchema === null) {
+    return {
+      ok: false,
+      message: `unsupported declared input schema '${schema.trim()}'`,
+    };
+  }
+
+  if (parsedSchema.kind === "string") {
     return { ok: true, value: rawValue };
   }
-
-  const integerRangeMatch = /^integer(?:\[(?<min>-?\d+),(?<max>-?\d+)])?$/.exec(trimmedSchema);
-  if (integerRangeMatch) {
-    if (!/^-?\d+$/.test(rawValue)) {
-      return { ok: false, message: `expected integer input for schema '${trimmedSchema}'` };
-    }
-    const parsedValue = Number.parseInt(rawValue, 10);
-    const min = Number.parseInt(integerRangeMatch.groups?.min ?? `${Number.MIN_SAFE_INTEGER}`, 10);
-    const max = Number.parseInt(integerRangeMatch.groups?.max ?? `${Number.MAX_SAFE_INTEGER}`, 10);
-    if (parsedValue < min || parsedValue > max) {
-      return {
-        ok: false,
-        message: `expected integer input in range [${min},${max}] for schema '${trimmedSchema}'`,
-      };
-    }
-    return { ok: true, value: parsedValue };
+  if (!/^-?\d+$/.test(rawValue)) {
+    return { ok: false, message: `expected integer input for schema '${parsedSchema.schema}'` };
   }
-
-  return {
-    ok: false,
-    message: `unsupported declared input schema '${trimmedSchema}'`,
-  };
+  const parsedValue = Number.parseInt(rawValue, 10);
+  if (parsedValue < parsedSchema.min || parsedValue > parsedSchema.max) {
+    return {
+      ok: false,
+      message: `expected integer input in range [${parsedSchema.min},${parsedSchema.max}] for schema '${parsedSchema.schema}'`,
+    };
+  }
+  return { ok: true, value: parsedValue };
 }
 
 function getOrderedDeclaredContractInputs(contract: SkillContract): Array<[string, string]> {
@@ -408,7 +405,7 @@ function resolveTrustedContractInputs(
   }
 
   const trustedRawInputs = args.slice(-declaredInputs.length);
-  const trustedInputs: Record<string, unknown> = {};
+  const trustedInputs = Object.create(null) as Record<string, unknown>;
   for (const [index, [inputName, schema]] of declaredInputs.entries()) {
     const parseResult = parseDeclaredContractInputValue(schema, trustedRawInputs[index] ?? "");
     if (!parseResult.ok) {
@@ -429,7 +426,7 @@ function declaredInputsMatchTrustedInputs(
 ): boolean {
   const normalizedReportedInputs = normalizeStableJsonValue(reportedInputs ?? {}) as Record<string, unknown>;
   for (const [key, trustedValue] of Object.entries(trustedInputs)) {
-    if (!(key in normalizedReportedInputs)) {
+    if (!Object.hasOwn(normalizedReportedInputs, key)) {
       return false;
     }
     if (JSON.stringify(normalizeStableJsonValue(trustedValue)) !== JSON.stringify(normalizedReportedInputs[key])) {

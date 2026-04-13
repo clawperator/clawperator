@@ -3531,6 +3531,26 @@ describe("runSkill", () => {
     assert.match(result.message, /contract input names must contain only letters, numbers, and underscores/i);
   });
 
+  it("rejects reserved contract input names", () => {
+    const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
+      contract: {
+        inputs: {
+          constructor: "string",
+        },
+        goal: {
+          kind: "set_discharge_limit",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Value {constructor}",
+        },
+      },
+    });
+
+    assert.ok(!result.ok);
+    assert.match(result.message, /reserved object property names/i);
+  });
+
   it("validateSkill rejects unsupported declared contract input schemas before execution", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-unsupported-contract-schema-"));
     const skillsDir = join(tempRoot, "skills");
