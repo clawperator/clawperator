@@ -317,6 +317,9 @@ Notes:
   - Auto mode selects semantic compare for agent-driven skill results and literal compare for scripted results.
   - Exit code is 0 for no meaningful divergence and non-zero for divergence or input errors.
   - Compare reads the wrapper's top-level skillResult field. It does not accept a bare SkillResult document in v1.
+  - v1 compare currently uses the Solax heuristic normalization path.
+  - Compare fails closed when the retained baseline does not satisfy that heuristic checkpoint set.
+  - Generic per-skill compare is follow-on work, not part of the shipped W4 closeout.
 `;
 
 const HELP_SKILLS_VALIDATE = `clawperator skills validate

@@ -392,6 +392,14 @@ What compare treats as authoritative:
 - `skillResult.terminalVerification` is the final-state proof channel
 - compare ignores the duplicated `terminal_state_verified` checkpoint id during path matching and uses `terminalVerification` instead
 
+Normalization scope:
+
+- v1 baseline normalization uses Solax-specific heuristics to extract four structural checkpoints from the recording export: `app_opened` (first in-app `window_change`), `discharge_to_row_focused` (first click matching `discharge`), `target_text_entered` (last `text_change` with non-empty text), and `save_completed` (last click matching `save` or `confirm`)
+- compare requires all four checkpoints to be extractable from the baseline export; if normalization produces fewer, compare returns `normalization_insufficient` instead of proceeding with a partial baseline
+- recording exports from other app flows will produce `normalization_insufficient` until per-skill declared checkpoint baselines are supported in a future release
+- every compare report includes `normalizationStrategy: "solax_heuristic"` so consumers know which normalization path was used
+- this closeout makes the Solax heuristic path honest and fail-closed; it does not make compare generic
+
 Mode selection:
 
 - `auto` is the default
@@ -410,6 +418,9 @@ Current v1 compare outcomes:
 - `upstream_failure`
 - `runtime_poisoned`
 - `runtime_unavailable`
+- `normalization_insufficient`
+- `baseline_uncovered`
+- `baseline_weakly_covered`
 
 Current interpretation rules:
 
@@ -420,12 +431,18 @@ Current interpretation rules:
 - `verification_failed` means the path matched but the proved final state did not
 - `verification_indeterminate` means the run did not prove the declared final state at all
 - `upstream_failure`, `runtime_poisoned`, and `runtime_unavailable` report the skill's own failure state instead of inventing later divergence
+- `normalization_insufficient` means the baseline export did not produce the required checkpoint set through heuristic normalization; compare cannot proceed and does not attempt path or terminal comparison
+- `baseline_uncovered` means terminal verification passed for an agent-driven run, but no baseline checkpoint IDs appeared in the actual run at all; this is suspicious because the baseline is effectively irrelevant to the path the skill took
+- `baseline_weakly_covered` means terminal verification passed for an agent-driven run, but the overlap with the baseline was below the minimum trusted threshold for the Solax heuristic path
 
 Exit-code contract:
 
 - exit `0` for `literal_match`
 - exit `0` for `semantic_match`
 - exit `0` for `outcome_matches_path_differs`
+- exit non-zero for `normalization_insufficient`
+- exit non-zero for `baseline_uncovered`
+- exit non-zero for `baseline_weakly_covered`
 - exit non-zero for every other compare outcome
 - exit non-zero for input or parse errors
 
@@ -478,6 +495,14 @@ Successful semantic compare example:
 }
 ```
 
+Every compare report includes `baselineCoverage` and `normalizationStrategy`:
+
+- `baselineCoverage.declared` is the number of baseline checkpoint IDs
+- `baselineCoverage.covered` is how many of those IDs appeared in the actual run
+- `normalizationStrategy` is `"solax_heuristic"` in v1
+- `minimumSemanticCoverage` is `2` in v1 for the Solax heuristic path
+- the current trust bar is enforced by fixture-backed regression tests for the Solax proving flow, not by a generic per-skill compare contract
+
 Divergence example:
 
 ```json
@@ -494,7 +519,7 @@ Verification:
 
 ```bash
 clawperator recording compare \
-  --baseline ./skills/com.example.demo.capture-state/references/compare-baseline.export.json \
+  --baseline ./skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/references/compare-baseline.export.json \
   --result ./runs/demo.skills-run.json \
   --json
 ```

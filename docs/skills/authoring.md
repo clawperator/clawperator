@@ -115,6 +115,13 @@ Durable compare-baseline rule:
 - do not treat `recording-context.json` as the long-term canonical compare path for a maintained skill
 - for replay and orchestrated sibling skills, both may compare against the same retained export baseline when that baseline captures the intended contract-level route and terminal outcome
 
+Cross-repo baseline sync:
+
+- the Clawperator test fixtures under `apps/node/src/test/fixtures/recording-compare/` must stay in sync with the canonical retained baseline in the skills repo
+- when the canonical baseline changes, update the corresponding Clawperator test fixture in the same PR or the next available PR
+- to verify sync: `CLAWPERATOR_SKILLS_ROOT=../clawperator-skills npm --prefix apps/node run test`
+- this is a developer-side guard for the closeout branch, not the final durability mechanism; the generic compare follow-on should wire canonical-baseline provenance into CI or another required validation path
+
 The scaffolded `SKILL.md` includes this section before the `Usage:` block:
 
 ```markdown
@@ -684,6 +691,7 @@ Current compare contract for authored skills:
 - compare accepts the full `skills run --json` wrapper as the durable `--result` input, not a hand-edited bare `SkillResult`
 - replay-style runs can succeed as `literal_match`
 - agent-driven runs can succeed as either `semantic_match` or `outcome_matches_path_differs`
+- v1 compare trust is enforced by fixture-backed Solax regression coverage, not by a generic per-skill compare contract
 
 Version handling:
 

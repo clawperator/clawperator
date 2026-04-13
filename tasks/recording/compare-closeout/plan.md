@@ -50,9 +50,9 @@ Execution guardrails:
 | State | in progress |
 | Total PRs | 1 |
 | Total phases | 4 |
-| Completed | P1, P2 |
-| Remaining | P3, P4 |
-| Current / Next | P3 |
+| Completed | P1, P2, P3 |
+| Remaining | P4 |
+| Current / Next | P4 |
 | Blockers | none |
 
 ## Goal

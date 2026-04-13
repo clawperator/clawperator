@@ -15,3 +15,12 @@
 - Discovered: The task-pack example `CLAWPERATOR_SKILLS_ROOT=../clawperator-skills npm --prefix apps/node run test` only works if the sync test resolves relative skills-root input against the Clawperator repo root rather than `apps/node`.
 - Decision: Do now, because the opt-in sync guard needed to match the documented validation path to be supportable.
 - Follow-up: P3 will update CLI/help/docs wording so the shipped Solax-specific path and the new fail-closed outcomes are documented honestly.
+
+## 2026-04-13 P3
+
+- Phase: P3
+- Changed: Updated `docs/api/recording.md` to document the Solax-only normalization scope, new outcomes, semantic coverage policy, report fields, and the real Solax proving-skill example; updated `docs/skills/authoring.md` with the cross-repo sync note and fixture-backed trust-bar wording; updated `apps/node/src/cli/registry.ts` help text so `recording compare` states the shipped Solax heuristic scope honestly.
+- Validation: `./scripts/docs_build.sh` passed; `grep -n "Solax" apps/node/src/cli/registry.ts` returned the new help note; `grep -c "normalization_insufficient" docs/api/recording.md` returned `5`; `grep -c "baseline_uncovered" docs/api/recording.md` returned `3`; `grep -c "baseline_weakly_covered" docs/api/recording.md` returned `3`; `grep -c "com.example.demo.capture-state" docs/api/recording.md` returned `0`; `grep -c "CLAWPERATOR_SKILLS_ROOT" docs/skills/authoring.md` returned `1`.
+- Discovered: The docs build regenerated `sites/docs/static/llms-full.txt` and `sites/landing/public/llms-full.txt`; no manual edits were needed in generated staging pages.
+- Decision: Commit the authored doc updates together with the regenerated `llms-full.txt` artifacts so the docs projection stays aligned with the new wording.
+- Follow-up: P4 is verification only.
