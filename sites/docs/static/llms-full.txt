@@ -7746,6 +7746,12 @@ Successful semantic compare example:
       "save_completed"
     ]
   },
+  "baselineCoverage": {
+    "declared": 4,
+    "covered": 4
+  },
+  "normalizationStrategy": "solax_heuristic",
+  "minimumSemanticCoverage": 2,
   "firstDivergence": {
     "index": 1,
     "baselineCheckpoint": "discharge_to_row_focused",
