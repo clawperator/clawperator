@@ -34,8 +34,8 @@ consume `SkillResult`, not invent an overlapping trace mechanism first.
 | Total phases | 4 |
 | Completed | P1, P2 |
 | Remaining | P3, P4 |
-| Current / Next | P3 live Solax proving |
-| Blockers | Live Solax proving still required for P3; P4 cleanup should finalize after that proving run lands |
+| Current / Next | P3 live forced-divergence capture |
+| Blockers | P3 replay and semantic happy-path proofs landed on April 13, 2026; path-different, baseline-drift, and verification-failed live captures plus fixture refresh are still pending |
 
 ## Goal
 

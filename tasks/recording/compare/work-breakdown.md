@@ -22,8 +22,8 @@ captured artifacts.
 | Total phases | 4 |
 | Completed | P1, P2 |
 | Remaining | P3, P4 |
-| Current / Next | P3 live Solax proof capture |
-| Blockers | P3 still requires live Solax runs and fixture refresh from those captures |
+| Current / Next | P3 forced-divergence capture and fixture refresh |
+| Blockers | Replay literal proof and orchestrated semantic proof landed on April 13, 2026; path-different, baseline-drift, verification-failed, and captured-fixture refresh are still pending |
 
 ## Hard Rules
 
@@ -292,11 +292,19 @@ Show the compare output is useful on the real Solax orchestrated proving skill.
 
 ### Steps
 
-1. Run the preserved replay Solax skill on-device, capture both the retained
+1. [DONE 2026-04-13] Run the preserved replay Solax skill on-device, capture both the retained
    baseline export and the emitted `SkillResult`, and compare them; expect
    literal success.
-2. Run a happy-path orchestrated Solax invocation against that same retained
+   Result: replay compare against the retained Solax baseline returned
+   `compareMode: "literal"` and `outcome: "literal_match"` using the saved
+   wrapper artifact at
+   `/tmp/clawperator-recording-compare-p3/replay-40-timeout300000.skills-run.json`.
+2. [DONE 2026-04-13] Run a happy-path orchestrated Solax invocation against that same retained
    baseline. Compare it; expect semantic success, not literal mode.
+   Result: orchestrated compare against the retained Solax baseline returned
+   `compareMode: "semantic"` and `outcome: "semantic_match"` using the saved
+   wrapper artifact at
+   `/tmp/clawperator-recording-compare-p3/orchestrated-40.skills-run.json`.
 3. Capture an agent-driven orchestrated run that takes a different valid path
    than the recording baseline but still reaches terminal verification.
    Compare it; expect `outcome_matches_path_differs`, not failure.
