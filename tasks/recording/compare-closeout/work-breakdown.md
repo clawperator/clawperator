@@ -331,11 +331,11 @@ semantic-coverage policy to the report. Rename the Solax-specific constant.
    `apps/node/src/test/fixtures/recording-compare/non-solax-generic-events.export.json`.
    This is a valid `RecordingExportArtifact` with events from
    `com.example.notes` that include a `window_change`, a `click` with text
-   "New Note", and a `text_change`. Normalization will extract `app_opened`
-   (from window_change) and `target_text_entered` (from text_change) but
-   NOT `discharge_to_row_focused` (no "discharge" text) and NOT
-   `save_completed` (no "save" or "confirm" text). That produces 2 of 4
-   required checkpoints, which is below the threshold.
+   "New Note", and a `text_change`. Under the shipped Solax-only
+   normalization guard, any baseline whose primary package is not
+   `com.solaxcloud.starter` immediately fails closed and returns
+   `checkpoints: []`. This fixture therefore normalizes to 0 of 4 required
+   checkpoints.
 
    Use this exact content:
    ```json
@@ -406,11 +406,10 @@ semantic-coverage policy to the report. Rename the Solax-specific constant.
       assert.strictEqual(normalized.appPackage, "com.example.notes");
     });
 
-    it("produces fewer than the required checkpoint count for a non-Solax recording with generic events", async () => {
+    it("fails closed for a non-Solax recording with generic events under the Solax-only normalization guard", async () => {
       const baseline = await readJsonFixture<RecordingExportArtifact>("non-solax-generic-events.export.json");
       const normalized = normalizeRecordingExportForCompare(baseline);
-      assert.ok(normalized.checkpoints.length > 0, "should extract some checkpoints");
-      assert.ok(normalized.checkpoints.length < 4, "should not extract all 4 Solax checkpoints");
+      assert.strictEqual(normalized.checkpoints.length, 0);
       assert.strictEqual(normalized.appPackage, "com.example.notes");
     });
     ```
@@ -428,12 +427,12 @@ semantic-coverage policy to the report. Rename the Solax-specific constant.
       assert.strictEqual(isMeaningfulCompareDivergence(report.outcome), true);
     });
 
-    it("reports normalization_insufficient for a non-Solax baseline with partial generic checkpoints", async () => {
+    it("reports normalization_insufficient for a non-Solax baseline blocked by the Solax-only normalization guard", async () => {
       const baseline = await readJsonFixture<RecordingExportArtifact>("non-solax-generic-events.export.json");
       const skillResult = await readJsonFixture<SkillResult>("solax-result-success.skillresult.json");
       const report = compareRecordingBaselineWithSkillResult(baseline, skillResult);
       assert.strictEqual(report.outcome, "normalization_insufficient");
-      assert.ok(report.baselineCoverage.declared < 4, "declared count should be less than 4");
+      assert.strictEqual(report.baselineCoverage.declared, 0);
       assert.strictEqual(isMeaningfulCompareDivergence(report.outcome), true);
     });
     ```
