@@ -14,12 +14,12 @@ verification). One commit per phase except P4 (verification only).
 
 | Item | Value |
 | --- | --- |
-| State | in progress |
+| State | completed |
 | Total PRs | 1 |
 | Total phases | 4 |
-| Completed | P1, P2, P3 |
-| Remaining | P4 |
-| Current / Next | P4 |
+| Completed | P1, P2, P3, P4 |
+| Remaining | none |
+| Current / Next | none |
 | Blockers | none |
 
 ## Hard Rules

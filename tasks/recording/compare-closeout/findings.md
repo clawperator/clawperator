@@ -24,3 +24,12 @@
 - Discovered: The docs build regenerated `sites/docs/static/llms-full.txt` and `sites/landing/public/llms-full.txt`; no manual edits were needed in generated staging pages.
 - Decision: Commit the authored doc updates together with the regenerated `llms-full.txt` artifacts so the docs projection stays aligned with the new wording.
 - Follow-up: P4 is verification only.
+
+## 2026-04-13 P4
+
+- Phase: P4
+- Changed: Verification only. No product code or docs changes beyond final task-pack status tracking.
+- Validation: `npm --prefix apps/node run build && npm --prefix apps/node run test && ./scripts/docs_build.sh` passed on the current worktree; `grep -r "DEFAULT_BASELINE_CHECKPOINT_ORDER" apps/node/src/` returned 0 results; `grep -c "com.example.demo.capture-state" docs/api/recording.md` returned `0`; `grep -c "normalization_insufficient" apps/node/src/domain/recording/compareRecording.ts` returned `4`; `grep -c "baseline_uncovered" apps/node/src/domain/recording/compareRecording.ts` returned `3`; `grep -c "baseline_weakly_covered" apps/node/src/domain/recording/compareRecording.ts` returned `3`.
+- Discovered: None.
+- Decision: Mark the pack complete without an extra commit, because P4 is explicitly verification-only.
+- Follow-up: Accepted limitations remain unchanged: the cross-repo sync guard is opt-in and developer-side for this branch, and `minimumSemanticCoverage = 2` is a temporary Solax-specific trust policy rather than a generic semantic-compare contract.
