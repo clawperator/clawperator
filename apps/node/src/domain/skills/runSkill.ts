@@ -20,9 +20,9 @@ import {
 } from "../../contracts/skills.js";
 import {
   emittedSkillResultSchema,
-  SKILL_RESULT_CONTRACT_MAJOR_VERSION,
   SKILL_RESULT_CONTRACT_MINOR_VERSION,
   SKILL_RESULT_FRAME_PREFIX,
+  validateSupportedSkillResultContractVersion,
   type SkillResult,
   type SkillResultSource,
 } from "../../contracts/skillResult.js";
@@ -163,18 +163,6 @@ function signalSkillChildWithLogging(
   child.kill(signal);
 }
 
-function parseSemver(version: string): { major: number; minor: number; patch: number } | null {
-  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version.trim());
-  if (!match) {
-    return null;
-  }
-  return {
-    major: Number.parseInt(match[1], 10),
-    minor: Number.parseInt(match[2], 10),
-    patch: Number.parseInt(match[3], 10),
-  };
-}
-
 async function resolveSkillResultSource(
   manifestResult: SkillManifestReadResult
 ): Promise<SkillSourceResolution> {
@@ -270,19 +258,12 @@ function parseSkillResultFrame(
     };
   }
 
-  const semver = parseSemver(schemaResult.data.contractVersion);
-  if (semver === null) {
-    return { ok: false, message: `SkillResult contractVersion must be semver-shaped, got ${schemaResult.data.contractVersion}` };
+  const contractVersionValidation = validateSupportedSkillResultContractVersion(schemaResult.data.contractVersion);
+  if (!contractVersionValidation.ok) {
+    return { ok: false, message: contractVersionValidation.message };
   }
 
-  if (semver.major !== SKILL_RESULT_CONTRACT_MAJOR_VERSION) {
-    return {
-      ok: false,
-      message: `Unsupported SkillResult contract major version ${semver.major}; expected ${SKILL_RESULT_CONTRACT_MAJOR_VERSION}`,
-    };
-  }
-
-  if (semver.minor > SKILL_RESULT_CONTRACT_MINOR_VERSION) {
+  if (contractVersionValidation.minorAhead) {
     logger?.emit({
       ts: new Date().toISOString(),
       level: "warn",

@@ -104,6 +104,23 @@ Recommended source:
 - use `--snapshots include` only when the author genuinely needs the raw XML snapshots for manual inspection
 - the parsed `recording parse` output is not a substitute for `recording-context.json`
 - `recording parse` is a lossy step log, while `recording export` preserves the raw event timeline and package-transition evidence
+- the saved `clawperator skills run --json` wrapper is the v1 compare input for `clawperator recording compare --result <file>`
+- the recording export baseline is reference evidence for compare and authoring, not a runtime input passed to the skill
+
+Durable compare-baseline rule:
+
+- `recording-context.json` is the scaffold-time handoff for an external author or agent
+- once a skill has a retained baseline that should be used for ongoing compare, keep that baseline under `skills/<skill_id>/references/compare-baseline.export.json`
+- keep the compare baseline outside `skill.json.artifacts`
+- do not treat `recording-context.json` as the long-term canonical compare path for a maintained skill
+- for replay and orchestrated sibling skills, both may compare against the same retained export baseline when that baseline captures the intended contract-level route and terminal outcome
+
+Cross-repo baseline sync:
+
+- the Clawperator test fixtures under `apps/node/src/test/fixtures/recording-compare/` must stay in sync with the canonical retained baseline in the skills repo
+- when the canonical baseline changes, update the corresponding Clawperator test fixture in the same PR or the next available PR
+- to verify sync: `CLAWPERATOR_SKILLS_ROOT=../clawperator-skills npm --prefix apps/node run test`
+- this is a developer-side guard for the closeout branch, not the final durability mechanism; the generic compare follow-on should wire canonical-baseline provenance into CI or another required validation path
 
 The scaffolded `SKILL.md` includes this section before the `Usage:` block:
 
@@ -656,6 +673,25 @@ Current authoring rule for new non-trivial skills:
   change
 - use `skillResult: null` only for legacy skills that have not yet been
   upgraded
+- if the skill is authored from a retained recording baseline, save a
+  `skills run --json` wrapper for the run you want to compare and feed that
+  wrapper directly to `clawperator recording compare`
+
+Current compare contract for authored skills:
+
+- compare reads the saved wrapper's top-level `skillResult`
+- compare auto-selects `semantic` mode for `skillResult.source.kind == "agent"`
+- compare auto-selects `literal` mode for `skillResult.source.kind == "script"`
+- compare uses `terminalVerification` as the final-state proof channel
+- compare classifies `diagnostics.runtimeState == "poisoned"` as
+  `runtime_poisoned`
+- compare classifies `diagnostics.runtimeState == "unavailable"` as
+  `runtime_unavailable`
+- compare expects the baseline input to be a recording export artifact such as `references/compare-baseline.export.json`, not a parsed `recording parse` step log
+- compare accepts the full `skills run --json` wrapper as the durable `--result` input, not a hand-edited bare `SkillResult`
+- replay-style runs can succeed as `literal_match`
+- agent-driven runs can succeed as either `semantic_match` or `outcome_matches_path_differs`
+- v1 compare trust is enforced by fixture-backed Solax regression coverage, not by a generic per-skill compare contract
 
 Version handling:
 

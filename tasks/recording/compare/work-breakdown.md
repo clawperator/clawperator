@@ -9,21 +9,21 @@ Total PRs: 2. Total phases: 4.
 - PR-1: compare model, fixtures, implementation, tests
 - PR-2: Solax proving integration and docs cleanup
 
-Current state: blocked until `tasks/recording/skill-result-contract/` lands.
-Live proving also depends on W2b because the semantic compare cases need the
-agent-driven orchestrated Solax skill.
+Current state: P1 and P2 are implemented in Clawperator. The remaining work is
+the live Solax proving pass plus the final cleanup/doc closeout tied to those
+captured artifacts.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | blocked |
+| State | complete |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | P1, P2, P3, P4 |
-| Current / Next | P1 after W2 |
-| Blockers | `tasks/recording/skill-result-contract/` must land first; P3 also waits on `tasks/recording/agent-driven-skills/` |
+| Completed | P1, P2, P3, P4 |
+| Remaining | none |
+| Current / Next | complete |
+| Blockers | none |
 
 ## Hard Rules
 
@@ -292,30 +292,50 @@ Show the compare output is useful on the real Solax orchestrated proving skill.
 
 ### Steps
 
-1. Run the preserved replay Solax skill on-device, capture both the retained
+1. [DONE 2026-04-13] Run the preserved replay Solax skill on-device, capture both the retained
    baseline export and the emitted `SkillResult`, and compare them; expect
    literal success.
-2. Run a happy-path orchestrated Solax invocation against that same retained
+   Result: replay compare against the retained Solax baseline returned
+   `compareMode: "literal"` and `outcome: "literal_match"` using the saved
+   wrapper artifact at
+   `/tmp/clawperator-recording-compare-p3/replay-40-timeout300000.skills-run.json`.
+2. [DONE 2026-04-13] Run a happy-path orchestrated Solax invocation against that same retained
    baseline. Compare it; expect semantic success, not literal mode.
-3. Capture an agent-driven orchestrated run that takes a different valid path
+   Result: orchestrated compare against the retained Solax baseline returned
+   `compareMode: "semantic"` and `outcome: "semantic_match"` using the saved
+   wrapper artifact at
+   `/tmp/clawperator-recording-compare-p3/orchestrated-40.skills-run.json`.
+3. [DONE 2026-04-13] Capture an agent-driven orchestrated run that takes a different valid path
    than the recording baseline but still reaches terminal verification.
    Compare it; expect `outcome_matches_path_differs`, not failure.
-4. Force a `baseline_drift` divergence on-device (e.g. by changing the
+   Result: a live orchestrated wrapper captured under a throwaway local proof
+   hook returned `compareMode: "semantic"` and
+   `outcome: "outcome_matches_path_differs"` with first divergence
+   `device_discharging_card_opened`.
+4. [DONE 2026-04-13] Force a `baseline_drift` divergence on-device (e.g. by changing the
    skill's checkpoint sequence in a sanitized branch) and compare; expect
    the first divergent checkpoint to be reported by identity.
-5. Force a `verification_failed` divergence on-device (e.g. by requesting a
+   Result: a live replay-backed wrapper captured under a throwaway local proof
+   hook returned `compareMode: "literal"` and `outcome: "baseline_drift"`
+   with first divergence `device_discharging_card_opened`.
+5. [DONE 2026-04-13] Force a `verification_failed` divergence on-device (e.g. by requesting a
    value the skill records as set but the persisted row does not actually
    show) and compare; expect the verification class.
-6. Sanitize and copy the captured artifacts into
+   Result: a live replay-backed wrapper captured under a throwaway local proof
+   hook returned `compareMode: "literal"` and
+   `outcome: "verification_failed"`.
+6. [DONE 2026-04-13] Sanitize and copy the captured artifacts into
    `apps/node/src/test/fixtures/recording-compare/` so the P2 tests are
    anchored to evidence from real runs, not hand-written shapes.
-7. From that same captured baseline, create a placeholder-templated retained
+7. [DONE 2026-04-13] From that same captured baseline, create a placeholder-templated retained
    baseline fixture and confirm compare normalization produces the same
    checkpoint baseline as the non-sanitized version wherever only sensitive
    leaf values changed.
-8. Capture forced-divergence artifacts from a throwaway local branch or local
+8. [DONE 2026-04-13] Capture forced-divergence artifacts from a throwaway local branch or local
    uncommitted patch in `../clawperator-skills` that is discarded after
    evidence capture. Do not merge the forced-divergence implementation.
+   Result: the temporary proof hooks were used only for evidence capture and
+   were removed before final repo state.
 
 ### Acceptance Criteria
 

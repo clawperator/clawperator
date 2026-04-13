@@ -29,13 +29,13 @@ consume `SkillResult`, not invent an overlapping trace mechanism first.
 
 | Item | Value |
 | --- | --- |
-| State | blocked |
+| State | complete |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | P1, P2, P3, P4 |
-| Current / Next | P1 after W2 |
-| Blockers | `tasks/recording/skill-result-contract/` must define `SkillResult` first; live proving also waits on `tasks/recording/agent-driven-skills/` |
+| Completed | P1, P2, P3, P4 |
+| Remaining | none |
+| Current / Next | complete |
+| Blockers | none |
 
 ## Goal
 
@@ -196,6 +196,17 @@ Judgment:
   if W2 emits an explicit runtime-state signal. If W2 does not ship that
   signal, compare must classify those cases as `upstream_failure` in v1 and
   document the limitation.
+- Shipped v1 compare uses `skillResult.terminalVerification` as the
+  authoritative final-state proof channel and ignores the duplicated
+  `terminal_state_verified` checkpoint id during path comparison.
+- Shipped v1 baseline normalization derives the Solax proving checkpoint
+  subset from recording export evidence using the primary app package plus
+  these structural facts:
+  - first in-app `window_change` -> `app_opened`
+  - first in-app click mentioning `Discharge to` -> `discharge_to_row_focused`
+  - last in-app `text_change` with non-empty text -> `target_text_entered`
+  - last in-app click mentioning `Save` (or `Confirm` as fallback) ->
+    `save_completed`
 
 ## Failure Modes To Prevent
 

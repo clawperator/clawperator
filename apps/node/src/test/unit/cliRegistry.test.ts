@@ -276,6 +276,13 @@ describe("record synonym dispatches to recording handler", () => {
       ["--input", "--out", "--snapshots"],
     );
   });
+
+  it("recording compare exposes the expected supported flags", () => {
+    assert.deepStrictEqual(
+      resolveSupportedFlagsFromRegistry(COMMANDS.recording, ["compare"]),
+      ["--baseline", "--result", "--mode"],
+    );
+  });
 });
 
 describe("agent-oriented command aliases", () => {
