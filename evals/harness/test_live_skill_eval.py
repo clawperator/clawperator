@@ -46,6 +46,31 @@ def test_classify_run_accepts_only_cold_start_verified_success():
     assert classified["passed"] is True
 
 
+def test_classify_run_requires_restart_proof_for_cold_start_pass():
+    result_payload = {
+        "skillResult": {
+            "status": "success",
+            "terminalVerification": {
+                "status": "verified",
+                "observed": {"text": "Discharge to 45% \ue660"},
+            },
+        }
+    }
+
+    classified = live_skill_eval._classify_run(
+        normalization_before_probe={"app_restart_proven": False},
+        normalization_before_skill={"outside_app_proven": True},
+        observed_percent=40,
+        target_percent=45,
+        result_payload=result_payload,
+        skill_capture=None,
+    )
+
+    assert classified["classification"] == "run_start_not_proven"
+    assert classified["proof_mode"] == "unproven"
+    assert classified["passed"] is False
+
+
 def test_classify_run_marks_outside_app_proof_failure():
     result_payload = {
         "skillResult": {
@@ -107,6 +132,7 @@ def test_render_summary_markdown_lists_runs():
         "aggregate_status": "failed",
         "counts": {
             "cold_start_verified": 1,
+            "run_start_not_proven": 0,
             "outside_app_not_proven": 1,
             "target_selection_failed": 0,
             "skill_timed_out": 0,
@@ -246,6 +272,8 @@ def test_run_eval_dispatches_solax_eval(monkeypatch, tmp_path):
     assert exit_code == 0
     assert calls["device_serial"] == "device-123"
     assert calls["runs"] == 2
+    assert calls["runtime"] == "local-dev"
+    assert calls["operator_package"] == "com.clawperator.operator.dev"
 
 
 def test_run_eval_rejects_operator_package_for_android_version():

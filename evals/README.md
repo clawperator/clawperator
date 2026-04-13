@@ -40,6 +40,15 @@ uv run --project evals --extra dev python evals/run_eval.py solax-orchestrated-c
   --runs 4
 ```
 
+The Solax live eval follows the normal eval runtime resolution rules:
+
+- `--runtime local-dev` uses the branch-local Node CLI build and defaults to
+  `com.clawperator.operator.dev`
+- `--runtime published` uses the published `clawperator` binary and the release
+  operator package
+- `--operator-package` overrides the local-dev default, and published runtime
+  still resolves to the release package
+
 Optional flags:
 
 - `--skills-registry <path>` overrides the default sibling-repo registry path
@@ -102,10 +111,14 @@ artifacts repo, not in the main product repo history.
 
 Truth boundary:
 
-- `cold_start_verified` means the run proved outside-app start state, selected
-  a different target than the observed persisted value, and ended with
+- `cold_start_verified` means the run proved restart-before-probe, proved
+  outside-app start state before the skill run, selected a different target
+  than the observed persisted value, and ended with
   `skillResult.terminalVerification.status = "verified"` for the requested
   percent
+- `run_start_not_proven` means the eval did not prove the initial restart
+  happened before the probe path, so the batch member cannot count as cold-start
+  proof even if the later skill run succeeded
 - `outside_app_not_proven` means the eval did not prove the run started from
   normalized outside-app state before the skill run, so the batch member cannot
   count as cold-start proof even if later in-app behavior looked promising

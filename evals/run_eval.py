@@ -447,7 +447,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.eval_id == SOLAX_COLD_START_EVAL_ID:
         batch_dir = run_solax_orchestrated_cold_start_eval(
             device_serial=args.device,
-            operator_package=args.operator_package or LOCAL_DEV_OPERATOR_PACKAGE,
+            operator_package=args.operator_package,
+            runtime=args.runtime,
             runs=args.runs,
             artifacts_dir=Path(args.artifacts_dir),
             skills_registry=Path(args.skills_registry),

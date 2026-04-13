@@ -442,7 +442,10 @@ def _classify_run(
     run_start_restarted = bool(normalization_before_probe.get("app_restart_proven"))
     outside_app_proven = bool(normalization_before_skill.get("outside_app_proven"))
     target_difference_proven = observed_percent is not None and target_percent is not None and observed_percent != target_percent
-    if not outside_app_proven:
+    if not run_start_restarted:
+        classification = "run_start_not_proven"
+        proof_mode = "unproven"
+    elif not outside_app_proven:
         classification = "outside_app_not_proven"
         proof_mode = "unproven"
     elif observed_percent is None:
@@ -506,6 +509,7 @@ def _render_summary_markdown(summary: dict[str, Any]) -> str:
         "## What Was Proven",
         "",
         f"- Cold-start verified runs: `{summary['counts']['cold_start_verified']}`",
+        f"- Restart-proof failures: `{summary['counts']['run_start_not_proven']}`",
         f"- Outside-app proof failures: `{summary['counts']['outside_app_not_proven']}`",
         f"- Target-selection failures: `{summary['counts']['target_selection_failed']}`",
         f"- Skill timeouts: `{summary['counts']['skill_timed_out']}`",
@@ -550,6 +554,7 @@ def _initial_summary(*, batch_id: str, device_serial: str, operator_package: str
         "aggregate_rule": "every run must prove outside-app cold start, target-difference selection, and verified terminal persistence",
         "counts": {
             "cold_start_verified": 0,
+            "run_start_not_proven": 0,
             "outside_app_not_proven": 0,
             "observed_value_unavailable": 0,
             "target_selection_failed": 0,
@@ -577,7 +582,8 @@ def _artifact_replacements(device_serial: str, skills_registry: Path) -> list[tu
 def run_solax_orchestrated_cold_start_eval(
     *,
     device_serial: str | None,
-    operator_package: str,
+    operator_package: str | None,
+    runtime: str = "local-dev",
     runs: int,
     artifacts_dir: Path,
     skills_registry: Path,
@@ -592,10 +598,10 @@ def run_solax_orchestrated_cold_start_eval(
 
     inputs: RuntimeInputs = resolve_inputs(
         device_serial,
-        runtime="local-dev",
+        runtime=runtime,
         operator_package=operator_package,
     )
-    preflight(device_serial, runtime="local-dev", resolved_inputs=inputs, operator_package=operator_package)
+    preflight(device_serial, runtime=runtime, resolved_inputs=inputs, operator_package=operator_package)
 
     batch_id = make_run_id(SOLAX_COLD_START_EVAL_ID, "live-skill", "solax", label)
     batch_dir = artifacts_dir / batch_id
@@ -605,8 +611,10 @@ def run_solax_orchestrated_cold_start_eval(
     config = {
         "eval_id": SOLAX_COLD_START_EVAL_ID,
         "batch_id": batch_id,
+        "runtime_target": runtime,
         "device_serial": inputs.device_serial,
-        "operator_package": operator_package,
+        "operator_package": inputs.operator_package,
+        "requested_operator_package": inputs.requested_operator_package,
         "skills_registry": str(skills_registry),
         "clawperator_cmd": inputs.clawperator_cmd,
         "target_values": list(DEFAULT_TARGET_VALUES),
@@ -620,7 +628,7 @@ def run_solax_orchestrated_cold_start_eval(
     summary = _initial_summary(
         batch_id=batch_id,
         device_serial=inputs.device_serial,
-        operator_package=operator_package,
+        operator_package=inputs.operator_package,
         skills_registry=skills_registry,
         runs_requested=runs,
     )
@@ -639,7 +647,7 @@ def run_solax_orchestrated_cold_start_eval(
             run_dir=run_dir,
             clawperator_cmd=inputs.clawperator_cmd,
             device_serial=inputs.device_serial,
-            operator_package=operator_package,
+            operator_package=inputs.operator_package,
             stage_prefix="before-probe",
             replacements=replacements,
         )
@@ -647,7 +655,7 @@ def run_solax_orchestrated_cold_start_eval(
             run_dir=run_dir,
             clawperator_cmd=inputs.clawperator_cmd,
             device_serial=inputs.device_serial,
-            operator_package=operator_package,
+            operator_package=inputs.operator_package,
             stage_prefix="probe",
             replacements=replacements,
         )
@@ -655,7 +663,7 @@ def run_solax_orchestrated_cold_start_eval(
             run_dir=run_dir,
             clawperator_cmd=inputs.clawperator_cmd,
             device_serial=inputs.device_serial,
-            operator_package=operator_package,
+            operator_package=inputs.operator_package,
             stage_prefix="before-skill",
             replacements=replacements,
         )
@@ -673,7 +681,7 @@ def run_solax_orchestrated_cold_start_eval(
                     "--device",
                     inputs.device_serial,
                     "--operator-package",
-                    operator_package,
+                    inputs.operator_package,
                     "--output",
                     "json",
                     "--",
@@ -701,8 +709,10 @@ def run_solax_orchestrated_cold_start_eval(
             "run_name": run_name,
             "skill_id": SOLAX_SKILL_ID,
             "application_id": SOLAX_APP_ID,
+            "runtime_target": runtime,
             "device_serial": inputs.device_serial,
-            "operator_package": operator_package,
+            "operator_package": inputs.operator_package,
+            "requested_operator_package": inputs.requested_operator_package,
             "target_values": list(DEFAULT_TARGET_VALUES),
             "normalization_before_probe": normalization_before_probe,
             "probe": probe,

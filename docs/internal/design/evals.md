@@ -231,6 +231,16 @@ uv run --project evals --extra dev python evals/run_eval.py solax-orchestrated-c
   --runs 4
 ```
 
+This command now uses the same runtime-resolution rules as the rest of the eval
+entrypoint:
+
+- `--runtime local-dev` uses the branch-local CLI and the local-dev operator
+  package resolution path
+- `--runtime published` uses the published CLI and release operator package
+  resolution path
+- `--operator-package` is honored through that same resolution path instead of
+  being handled as a Solax-only shortcut
+
 Artifact boundary:
 
 - agent benchmark evals write single-run artifacts under `evals/runs/<run_id>/`
@@ -246,6 +256,8 @@ Run-start normalization:
   from a previous attempt
 - the harness force-stops the target app again before `skills run` so the skill
   itself starts from a fresh outer-app state as well
+- missing restart-before-probe proof is a distinct failed classification and
+  does not count as `cold_start_verified`
 
 Visible run shape:
 
