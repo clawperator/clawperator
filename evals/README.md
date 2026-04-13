@@ -64,7 +64,7 @@ This eval encodes the cold-start proving policy in code. For every run it:
 5. force-stops SolaX again and re-proves outside-app state before the skill run
 6. chooses a configured target percent that differs from the observed value
 7. runs `clawperator skills run ... --output json`
-8. classifies the run as cold-start proof, continuation-only success, skill timeout, or a
+8. classifies the run as cold-start proof, outside-app proof failure, skill timeout, or a
    specific failure mode
 
 What you will see on-device during one eval run:
@@ -106,9 +106,9 @@ Truth boundary:
   a different target than the observed persisted value, and ended with
   `skillResult.terminalVerification.status = "verified"` for the requested
   percent
-- `continuation_success_only` means the skill reached the requested final
-  value, but the eval did not prove the run started from normalized outside-app
-  state
+- `outside_app_not_proven` means the eval did not prove the run started from
+  normalized outside-app state before the skill run, so the batch member cannot
+  count as cold-start proof even if later in-app behavior looked promising
 - `skill_timed_out` means the orchestrated `skills run` process did not finish
   within the eval timeout window, so the batch records the partial evidence and
   fails the run truthfully

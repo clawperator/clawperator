@@ -442,10 +442,7 @@ def _classify_run(
     run_start_restarted = bool(normalization_before_probe.get("app_restart_proven"))
     outside_app_proven = bool(normalization_before_skill.get("outside_app_proven"))
     target_difference_proven = observed_percent is not None and target_percent is not None and observed_percent != target_percent
-    if not outside_app_proven and skill_status == "success" and terminal_verified:
-        classification = "continuation_success_only"
-        proof_mode = "continuation-only"
-    elif not outside_app_proven:
+    if not outside_app_proven:
         classification = "outside_app_not_proven"
         proof_mode = "unproven"
     elif observed_percent is None:
@@ -509,7 +506,6 @@ def _render_summary_markdown(summary: dict[str, Any]) -> str:
         "## What Was Proven",
         "",
         f"- Cold-start verified runs: `{summary['counts']['cold_start_verified']}`",
-        f"- Continuation-only successes: `{summary['counts']['continuation_success_only']}`",
         f"- Outside-app proof failures: `{summary['counts']['outside_app_not_proven']}`",
         f"- Target-selection failures: `{summary['counts']['target_selection_failed']}`",
         f"- Skill timeouts: `{summary['counts']['skill_timed_out']}`",
@@ -554,7 +550,6 @@ def _initial_summary(*, batch_id: str, device_serial: str, operator_package: str
         "aggregate_rule": "every run must prove outside-app cold start, target-difference selection, and verified terminal persistence",
         "counts": {
             "cold_start_verified": 0,
-            "continuation_success_only": 0,
             "outside_app_not_proven": 0,
             "observed_value_unavailable": 0,
             "target_selection_failed": 0,

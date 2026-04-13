@@ -46,7 +46,7 @@ def test_classify_run_accepts_only_cold_start_verified_success():
     assert classified["passed"] is True
 
 
-def test_classify_run_distinguishes_continuation_only_success():
+def test_classify_run_marks_outside_app_proof_failure():
     result_payload = {
         "skillResult": {
             "status": "success",
@@ -66,8 +66,8 @@ def test_classify_run_distinguishes_continuation_only_success():
         skill_capture=None,
     )
 
-    assert classified["classification"] == "continuation_success_only"
-    assert classified["proof_mode"] == "continuation-only"
+    assert classified["classification"] == "outside_app_not_proven"
+    assert classified["proof_mode"] == "unproven"
     assert classified["passed"] is False
 
 
@@ -107,8 +107,7 @@ def test_render_summary_markdown_lists_runs():
         "aggregate_status": "failed",
         "counts": {
             "cold_start_verified": 1,
-            "continuation_success_only": 1,
-            "outside_app_not_proven": 0,
+            "outside_app_not_proven": 1,
             "target_selection_failed": 0,
             "skill_timed_out": 0,
             "verification_mismatch": 0,
@@ -126,8 +125,8 @@ def test_render_summary_markdown_lists_runs():
                 "run_name": "run-02",
                 "observed_percent": 45,
                 "target_percent": 35,
-                "classification": "continuation_success_only",
-                "proof_mode": "continuation-only",
+                "classification": "outside_app_not_proven",
+                "proof_mode": "unproven",
                 "passed": False,
             },
         ],
@@ -136,7 +135,7 @@ def test_render_summary_markdown_lists_runs():
     rendered = live_skill_eval._render_summary_markdown(summary)
 
     assert "run-01" in rendered
-    assert "continuation-only" in rendered
+    assert "outside_app_not_proven" in rendered
     assert "cold_start_verified" in rendered
 
 
@@ -247,3 +246,20 @@ def test_run_eval_dispatches_solax_eval(monkeypatch, tmp_path):
     assert exit_code == 0
     assert calls["device_serial"] == "device-123"
     assert calls["runs"] == 2
+
+
+def test_run_eval_rejects_operator_package_for_android_version():
+    from evals import run_eval
+
+    try:
+        run_eval.main(
+            [
+                "android-version",
+                "--operator-package",
+                "com.clawperator.operator.dev",
+            ]
+        )
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError("expected parser failure")

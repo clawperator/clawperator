@@ -465,6 +465,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.eval_id != "android-version":
         raise SystemExit(f"unsupported eval: {args.eval_id}")
+    if args.operator_package is not None:
+        parser.error("--operator-package is only supported for solax-orchestrated-cold-start")
 
     spec = _load_spec(args.eval_id)
     spec["runtime_target"] = args.runtime
