@@ -3438,6 +3438,26 @@ describe("runSkill", () => {
     assert.match(result.message, /unsupported contract input schema/i);
   });
 
+  it("rejects reversed integer contract ranges when parsing skill manifest metadata", () => {
+    const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
+      contract: {
+        inputs: {
+          percent: "integer[100,0]",
+        },
+        goal: {
+          kind: "set_discharge_limit",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Discharge to {percent}%",
+        },
+      },
+    });
+
+    assert.ok(!result.ok);
+    assert.match(result.message, /unsupported contract input schema/i);
+  });
+
   it("rejects contract input names that cannot be rendered in matcher placeholders", () => {
     const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
       contract: {
@@ -3552,6 +3572,71 @@ describe("runSkill", () => {
     } finally {
       await temp.cleanup();
     }
+  });
+
+  it("keeps the legacy path for malformed scripted manifests when only an empty scaffold contract is present", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.empty-contract-legacy",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.echo",
+        "scripts",
+        "echo.js"
+      ),
+      skillJsonContents: "{\"id\":\"com.test.empty-contract-legacy\",\"contract\":{\"inputs\":{},\"goal\":null,\"verification\":null},\"summary\":",
+      scriptRelativePath: "scripts/echo.js",
+    });
+
+    try {
+      await writeFile(
+        temp.registryPath,
+        JSON.stringify({
+          schemaVersion: "1.0",
+          generatedAt: "2026-04-11T00:00:00Z",
+          skills: [
+            {
+              id: "com.test.empty-contract-legacy",
+              applicationId: "com.test",
+              intent: "temp",
+              summary: "Temporary test skill",
+              path: "skills/com.test.empty-contract-legacy",
+              skillFile: "skills/com.test.empty-contract-legacy/SKILL.md",
+              scripts: [
+                "skills/com.test.empty-contract-legacy/scripts/echo.js",
+              ],
+              artifacts: [],
+              contract: {
+                inputs: {},
+                goal: null,
+                verification: null,
+              },
+            },
+          ],
+        }),
+        "utf8"
+      );
+
+      const result = await runSkill("com.test.empty-contract-legacy", ["hello"], temp.registryPath);
+      assert.ok(result.ok, `Expected empty scaffold contract to preserve legacy execution: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.match(result.output, /TEST_OUTPUT:hello/);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("redacts raw argv values from declared contract parse failures", async () => {
+    const secretValue = "super-secret-argv-value";
+    const result = await runSkill(TEST_SKILL_RESULT, ["valid", secretValue]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.status, "indeterminate");
+    assert.match(result.message, /Could not trust declared input 'targetPercent'/);
+    assert.doesNotMatch(result.message, new RegExp(secretValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   });
 
   it("rejects unsupported SkillResult contract major versions", async () => {

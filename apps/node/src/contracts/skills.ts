@@ -37,7 +37,15 @@ export function isSupportedSkillContractInputSchema(schema: string): boolean {
   if (trimmedSchema === "string") {
     return true;
   }
-  return /^integer(?:\[-?\d+,-?\d+])?$/.test(trimmedSchema);
+  const integerRangeMatch = /^integer(?:\[(?<min>-?\d+),(?<max>-?\d+)])?$/.exec(trimmedSchema);
+  if (!integerRangeMatch) {
+    return false;
+  }
+  const { min, max } = integerRangeMatch.groups ?? {};
+  if (min === undefined || max === undefined) {
+    return true;
+  }
+  return Number.parseInt(min, 10) <= Number.parseInt(max, 10);
 }
 
 const skillContractInputSchemaStringSchema = z.string()

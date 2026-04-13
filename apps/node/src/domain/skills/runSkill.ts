@@ -363,7 +363,7 @@ function parseDeclaredContractInputValue(schema: string, rawValue: string): { ok
   const integerRangeMatch = /^integer(?:\[(?<min>-?\d+),(?<max>-?\d+)])?$/.exec(trimmedSchema);
   if (integerRangeMatch?.groups) {
     if (!/^-?\d+$/.test(rawValue)) {
-      return { ok: false, message: `expected integer input for schema '${trimmedSchema}', got '${rawValue}'` };
+      return { ok: false, message: `expected integer input for schema '${trimmedSchema}'` };
     }
     const parsedValue = Number.parseInt(rawValue, 10);
     const min = Number.parseInt(integerRangeMatch.groups.min ?? `${Number.MIN_SAFE_INTEGER}`, 10);
@@ -371,7 +371,7 @@ function parseDeclaredContractInputValue(schema: string, rawValue: string): { ok
     if (parsedValue < min || parsedValue > max) {
       return {
         ok: false,
-        message: `expected integer input in range [${min},${max}] for schema '${trimmedSchema}', got '${rawValue}'`,
+        message: `expected integer input in range [${min},${max}] for schema '${trimmedSchema}'`,
       };
     }
     return { ok: true, value: parsedValue };
@@ -502,7 +502,16 @@ async function skillJsonRawMayDeclareContract(repoRoot: string, skillPath: strin
   const skillJsonPath = resolveRepoRelativeSkillPath(repoRoot, join(skillPath, "skill.json"));
   try {
     const raw = await readFile(skillJsonPath, "utf-8");
-    return /"contract"\s*:/.test(raw);
+    const contractPropertyMatch = /^\s*"contract"\s*:\s*\{/m.exec(raw);
+    if (!contractPropertyMatch) {
+      return false;
+    }
+
+    const trailingRaw = raw.slice(contractPropertyMatch.index);
+    const hasNonEmptyInputs = /"inputs"\s*:\s*\{\s*"/.test(trailingRaw);
+    const hasGoalObject = /"goal"\s*:\s*\{/.test(trailingRaw);
+    const hasVerificationObject = /"verification"\s*:\s*\{/.test(trailingRaw);
+    return hasNonEmptyInputs || hasGoalObject || hasVerificationObject;
   } catch {
     return false;
   }
@@ -567,7 +576,7 @@ export async function runSkill(
     const manifestResult = await readSkillManifestMetadata(repoRoot, skill.path);
     if (!manifestResult.ok) {
       const rawSkillJsonDeclaresContract = await skillJsonRawMayDeclareContract(repoRoot, skill.path);
-      if (harnessScriptRelative || skill.contract !== undefined || rawSkillJsonDeclaresContract) {
+      if (harnessScriptRelative || hasMeaningfulSkillContract(skill.contract) || rawSkillJsonDeclaresContract) {
         return {
           ok: false,
           status: "failed",
