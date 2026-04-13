@@ -9,6 +9,18 @@
     "skills/com.test.agent-skill-result/scripts/run.js"
   ],
   "artifacts": [],
+  "contract": {
+    "inputs": {
+      "percent": "integer[0,100]"
+    },
+    "goal": {
+      "kind": "set_discharge_limit"
+    },
+    "verification": {
+      "kind": "node_text_matches",
+      "matcher": "Discharge to {percent}%"
+    }
+  },
   "agent": {
     "cli": "codex",
     "cliPath": "scripts/fake_codex.js",

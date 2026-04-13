@@ -4,6 +4,7 @@ import { extname } from "node:path";
 import { loadRegistry, findSkillById, getRepoRoot } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import type { Logger } from "../../adapters/logger.js";
 import {
+  hasMeaningfulSkillContract,
   REGISTRY_READ_FAILED,
   SKILL_NOT_FOUND,
   SKILL_SCRIPT_NOT_FOUND,
@@ -13,6 +14,7 @@ import {
   SKILL_RESULT_PARSE_FAILED,
   SKILL_AGENT_CLI_UNAVAILABLE,
   SKILL_VALIDATION_FAILED,
+  type SkillContract,
   type SkillAgentConfig,
 } from "../../contracts/skills.js";
 import {
@@ -43,8 +45,21 @@ const SKILL_PROGRAM_ENV_VAR = "CLAWPERATOR_SKILL_PROGRAM";
 const SKILL_ID_ENV_VAR = "CLAWPERATOR_SKILL_ID";
 const SKILLS_REGISTRY_ENV_VAR = "CLAWPERATOR_SKILLS_REGISTRY";
 
-export interface SkillRunResult {
+export interface SkillRunSuccess {
   ok: true;
+  status: "success";
+  skillId: string;
+  output: string;
+  exitCode: number;
+  durationMs: number;
+  skillResult: SkillResult | null;
+}
+
+export interface SkillRunIndeterminate {
+  ok: null;
+  status: "indeterminate";
+  code: "SKILL_VERIFICATION_INDETERMINATE";
+  message: string;
   skillId: string;
   output: string;
   exitCode: number;
@@ -54,6 +69,7 @@ export interface SkillRunResult {
 
 export interface SkillRunError {
   ok: false;
+  status: "failed";
   code: string;
   message: string;
   skillId?: string;
@@ -65,6 +81,8 @@ export interface SkillRunError {
   expectedSubstring?: string;
   skillResult: SkillResult | null;
 }
+
+export type SkillRunResult = SkillRunSuccess | SkillRunIndeterminate;
 
 export interface SkillRunEnv {
   /** Path to CLI binary used by skill scripts */
@@ -101,6 +119,11 @@ interface SkillFrameParseSuccess {
 interface SkillFrameParseFailure {
   ok: false;
   message: string;
+}
+
+interface SkillContractVerificationOutcome {
+  ok: boolean;
+  message?: string;
 }
 
 function signalSkillChildWithLogging(
@@ -270,6 +293,90 @@ function parseSkillResultFrame(
   };
 }
 
+function renderVerificationMatcher(
+  matcher: string,
+  inputs: Record<string, unknown> | undefined
+): string | null {
+  let missingPlaceholder = false;
+  const rendered = matcher.replaceAll(/\{([a-zA-Z0-9_]+)\}/g, (_full, key: string) => {
+    const value = inputs?.[key];
+    if (value === undefined || value === null) {
+      missingPlaceholder = true;
+      return "";
+    }
+    return String(value);
+  });
+  return missingPlaceholder ? null : rendered;
+}
+
+function extractTextEvidence(evidence: unknown): string | null {
+  if (typeof evidence !== "object" || evidence === null || !("kind" in evidence)) {
+    return null;
+  }
+  const typedEvidence = evidence as { kind?: unknown; text?: unknown };
+  return typedEvidence.kind === "text" && typeof typedEvidence.text === "string"
+    ? typedEvidence.text
+    : null;
+}
+
+function verifyDeclaredSkillContract(
+  contract: SkillContract | null,
+  skillResult: SkillResult | null
+): SkillContractVerificationOutcome {
+  if (contract === null || !hasMeaningfulSkillContract(contract) || contract.verification === null) {
+    return { ok: true };
+  }
+
+  if (skillResult === null) {
+    return {
+      ok: false,
+      message: "Skill declared verification but did not emit a SkillResult to prove it.",
+    };
+  }
+
+  if (skillResult.status === "failed") {
+    return {
+      ok: false,
+      message: "SkillResult reported failed status for a declared verification run.",
+    };
+  }
+
+  const renderedMatcher = renderVerificationMatcher(contract.verification.matcher, skillResult.inputs);
+  if (renderedMatcher === null) {
+    return {
+      ok: false,
+      message: `SkillResult inputs did not provide the values required to render declared matcher '${contract.verification.matcher}'.`,
+    };
+  }
+
+  if (skillResult.terminalVerification?.status !== "verified") {
+    return {
+      ok: false,
+      message: "Skill declared verification but terminalVerification was not proved.",
+    };
+  }
+
+  const expectedText = extractTextEvidence(skillResult.terminalVerification.expected);
+  const observedText = extractTextEvidence(skillResult.terminalVerification.observed);
+  if (observedText !== renderedMatcher) {
+    return {
+      ok: false,
+      message: expectedText === renderedMatcher
+        ? `Skill terminal verification expected '${renderedMatcher}' but observed '${observedText ?? "<missing>"}'.`
+        : `Skill terminal verification did not match declared matcher '${renderedMatcher}'.`,
+    };
+  }
+
+  if (skillResult.status !== "success") {
+    return {
+      ok: false,
+      message: "Skill emitted terminal proof but did not report success.",
+    };
+  }
+
+  return { ok: true };
+}
+
 export async function runSkill(
   skillId: string,
   args: string[],
@@ -282,6 +389,7 @@ export async function runSkill(
   let resolvedPath: string;
   let sourceResolution: SkillSourceResolution = { ok: true, source: { kind: "script" } };
   let resolvedAgentConfig: SkillAgentConfig | null = null;
+  let resolvedContract: SkillContract | null = null;
   let resolvedAgentExecutablePath: string | null = null;
   let skillProgramPath: string | null = null;
   let resolvedRegistryPath: string | null = null;
@@ -295,12 +403,13 @@ export async function runSkill(
     resolvedRegistryPath = loaded.resolvedPath;
     const skill = findSkillById(loaded.registry, skillId);
     if (!skill) {
-      return { ok: false, code: SKILL_NOT_FOUND, message: `Skill not found: ${skillId}`, skillId, skillResult: null };
+      return { ok: false, status: "failed", code: SKILL_NOT_FOUND, message: `Skill not found: ${skillId}`, skillId, skillResult: null };
     }
 
     if (!skill.scripts || skill.scripts.length === 0) {
       return {
         ok: false,
+        status: "failed",
         code: SKILL_SCRIPT_NOT_FOUND,
         message: `Skill ${skillId} has no scripts defined`,
         skillId,
@@ -315,6 +424,7 @@ export async function runSkill(
     if (!scriptRelative) {
       return {
         ok: false,
+        status: "failed",
         code: SKILL_SCRIPT_NOT_FOUND,
         message: `Skill ${skillId} has no runnable script defined`,
         skillId,
@@ -328,6 +438,7 @@ export async function runSkill(
       if (harnessScriptRelative) {
         return {
           ok: false,
+          status: "failed",
           code: SKILL_VALIDATION_FAILED,
           message: manifestResult.message,
           skillId,
@@ -337,6 +448,7 @@ export async function runSkill(
     }
     if (manifestResult.ok) {
       sourceResolution = await resolveSkillResultSource(manifestResult);
+      resolvedContract = manifestResult.metadata.contract;
     } else {
       sourceResolution = harnessScriptRelative
         ? {
@@ -361,6 +473,7 @@ export async function runSkill(
     if (!runnableScriptRelative) {
       return {
         ok: false,
+        status: "failed",
         code: SKILL_SCRIPT_NOT_FOUND,
         message: isAgentDriven
           ? `Agent-driven skill ${skillId} requires scripts/run.js`
@@ -377,6 +490,7 @@ export async function runSkill(
       if (!effectiveAgentConfig.ok) {
         return {
           ok: false,
+          status: "failed",
           code: SKILL_AGENT_CLI_UNAVAILABLE,
           message: `Skill ${skillId} requires agent CLI '${manifestAgent.cli}', but it is unavailable. ${effectiveAgentConfig.message}`,
           skillId,
@@ -393,6 +507,7 @@ export async function runSkill(
       if (!agentResolution.ok) {
         return {
           ok: false,
+          status: "failed",
           code: SKILL_AGENT_CLI_UNAVAILABLE,
           message: `Skill ${skillId} requires agent CLI '${resolvedAgentConfig.cli}', but it is unavailable. ${agentResolution.message}`,
           skillId,
@@ -403,7 +518,7 @@ export async function runSkill(
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return { ok: false, code: REGISTRY_READ_FAILED, message, skillResult: null };
+    return { ok: false, status: "failed", code: REGISTRY_READ_FAILED, message, skillResult: null };
   }
 
   try {
@@ -411,6 +526,7 @@ export async function runSkill(
   } catch {
     return {
       ok: false,
+      status: "failed",
       code: SKILL_SCRIPT_NOT_FOUND,
       message: `Script not found: ${resolvedPath}`,
       skillId,
@@ -424,6 +540,7 @@ export async function runSkill(
     } catch {
       return {
         ok: false,
+        status: "failed",
         code: SKILL_SCRIPT_NOT_FOUND,
         message: `Skill program not found: ${skillProgramPath}`,
         skillId,
@@ -543,6 +660,7 @@ export async function runSkill(
           : "SPAWN_FAILED";
       finish({
         ok: false,
+        status: "failed",
         code: SKILL_EXECUTION_FAILED,
         message: `Skill ${skillId} ${errCode}: ${err.message}`,
         skillId,
@@ -563,6 +681,7 @@ export async function runSkill(
       if (timedOut) {
         finish({
           ok: false,
+          status: "failed",
           code: SKILL_EXECUTION_TIMEOUT,
           message: `Skill ${skillId} timed out after ${timeout}ms`,
           skillId,
@@ -585,6 +704,7 @@ export async function runSkill(
       if (!parsedSkillResult.ok) {
         finish({
           ok: false,
+          status: "failed",
           code: SKILL_RESULT_PARSE_FAILED,
           message: parsedSkillResult.message,
           skillId,
@@ -615,6 +735,7 @@ export async function runSkill(
         });
         finish({
           ok: false,
+          status: "failed",
           code: SKILL_EXECUTION_FAILED,
           message: `Skill ${skillId} exited with code ${exitCode}`,
           skillId,
@@ -637,6 +758,7 @@ export async function runSkill(
       if (expectContains !== undefined && !stdout.includes(expectContains)) {
         finish({
           ok: false,
+          status: "failed",
           code: SKILL_OUTPUT_ASSERTION_FAILED,
           message: `Skill ${skillId} output did not include expected text`,
           skillId,
@@ -646,8 +768,57 @@ export async function runSkill(
         });
         return;
       }
+      const contractVerification = verifyDeclaredSkillContract(resolvedContract, parsedSkillResult.skillResult);
+      const hasDeclaredVerification = resolvedContract !== null
+        && hasMeaningfulSkillContract(resolvedContract)
+        && resolvedContract.verification !== null;
+      if (hasDeclaredVerification && parsedSkillResult.skillResult?.status === "failed") {
+        finish({
+          ok: false,
+          status: "failed",
+          code: SKILL_EXECUTION_FAILED,
+          message: `Skill ${skillId} reported failed status while executing a declared verification contract`,
+          skillId,
+          exitCode: 0,
+          stdout: stdout || undefined,
+          stderr: stderr || undefined,
+          skillResult: parsedSkillResult.skillResult,
+        });
+        return;
+      }
+      if (hasDeclaredVerification && !contractVerification.ok) {
+        finish({
+          ok: null,
+          status: "indeterminate",
+          code: "SKILL_VERIFICATION_INDETERMINATE",
+          message: contractVerification.message ?? "Declared verification was not proved.",
+          skillId,
+          output: stdout,
+          exitCode: 0,
+          durationMs,
+          skillResult: parsedSkillResult.skillResult === null
+            ? null
+            : {
+                ...parsedSkillResult.skillResult,
+                status: "indeterminate",
+                terminalVerification: parsedSkillResult.skillResult.terminalVerification ?? {
+                  status: "not_run",
+                  note: contractVerification.message ?? "Declared verification was not proved.",
+                },
+                diagnostics: {
+                  ...(parsedSkillResult.skillResult.diagnostics ?? {}),
+                  warnings: [
+                    ...(parsedSkillResult.skillResult.diagnostics?.warnings ?? []),
+                    contractVerification.message ?? "Declared verification was not proved.",
+                  ],
+                },
+              },
+        });
+        return;
+      }
       finish({
         ok: true,
+        status: "success",
         skillId,
         output: stdout,
         exitCode: 0,

@@ -8782,7 +8782,12 @@ It also appends this exact registry shape:
     "skills/com.example.demo.capture-state/scripts/run.js",
     "skills/com.example.demo.capture-state/scripts/run.sh"
   ],
-  "artifacts": []
+  "artifacts": [],
+  "contract": {
+    "inputs": {},
+    "goal": null,
+    "verification": null
+  }
 }
 ```
 
@@ -8974,6 +8979,31 @@ Current orchestrated-skill extension:
 - if the CLI is unavailable, `runSkill()` returns `SKILL_AGENT_CLI_UNAVAILABLE`
 - the harness still owns the direct agent spawn; `runSkill()` executes `scripts/run.js`
 
+Current contract declaration extension:
+
+- `skill.json.contract` is optional
+- when present, the v1 shape is:
+  - `inputs`: object map of input names to simple schema strings
+  - `goal`: object with required `kind` plus any extra JSON fields, or `null`
+  - `verification`: currently `null` or:
+    ```json
+    {
+      "kind": "node_text_matches",
+      "matcher": "Discharge to {percent}%"
+    }
+    ```
+- the scaffold writes a present-but-empty block by default:
+  ```json
+  "contract": {
+    "inputs": {},
+    "goal": null,
+    "verification": null
+  }
+  ```
+- a missing `contract` block means legacy skill, with no declaration enforcement
+- a present-but-empty `contract` block is allowed and validates, but is treated the same as missing until an author fills a meaningful field
+- `skill.json.contract` participates in registry parity checks, unlike `agent`
+
 If any of those differ, validation fails with `SKILL_VALIDATION_FAILED`.
 
 Literal authored `skill.json` example:
@@ -8990,9 +9020,33 @@ Literal authored `skill.json` example:
     "skills/com.example.demo.capture-state/scripts/run.js",
     "skills/com.example.demo.capture-state/scripts/run.sh"
   ],
-  "artifacts": []
+  "artifacts": [],
+  "contract": {
+    "inputs": {},
+    "goal": null,
+    "verification": null
+  }
 }
 ```
+
+## Declared Verification And `indeterminate`
+
+When a skill declares `contract.verification`, `runSkill()` cross-checks that
+declaration against the parsed `skillResult`.
+
+Current v1 rule:
+
+- if the declared verification is proved, the run returns `status: "success"`
+- if the skill exits without upstream runtime failure but does not prove the declared verification, the run returns `status: "indeterminate"`
+- if the skill emits `skillResult.status: "failed"` for a declared-verification run, the run returns a normal failure result
+
+For `node_text_matches`, the runtime currently requires:
+
+- `skillResult.terminalVerification.status === "verified"`
+- the observed terminal verification text matches the declared `matcher` after replacing placeholders like `{percent}` from `skillResult.inputs`
+
+This keeps `skill.json` claims tied to the shipped `SkillResult` contract instead
+of inventing a second result channel.
 
 Use `clawperator skills validate <skill_id> --json` to verify the file paths and metadata match:
 

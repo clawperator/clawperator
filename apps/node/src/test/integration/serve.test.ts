@@ -259,6 +259,28 @@ describe("serve API integration", () => {
     assert.strictEqual(body.skillResult?.source?.kind, "script");
   });
 
+  test("POST /skills/:skillId/run returns indeterminate for declared-but-unproved verification", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.skill-result/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ args: ["legacy"] }),
+    });
+
+    assert.strictEqual(res.status, 200);
+    const body = await res.json() as {
+      status?: string;
+      code?: string;
+      ok?: null;
+      skillId?: string;
+      skillResult?: unknown;
+    };
+    assert.strictEqual(body.status, "indeterminate");
+    assert.strictEqual(body.code, "SKILL_VERIFICATION_INDETERMINATE");
+    assert.strictEqual(body.ok, null);
+    assert.strictEqual(body.skillId, "com.test.skill-result");
+    assert.strictEqual(body.skillResult, null);
+  });
+
   test("POST /skills/:skillId/run passes device selection via env for agent-driven skills", async () => {
     const res = await fetch(`http://localhost:${port}/skills/com.test.agent-skill-result/run`, {
       method: "POST",

@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Skills registry contract (aligns with skills-registry.json schema).
  */
@@ -5,6 +7,48 @@ export interface SkillAgentConfig {
   cli: string;
   cliPath?: string | null;
   timeoutMs?: number;
+}
+
+export interface SkillContractGoal {
+  kind: string;
+  [key: string]: unknown;
+}
+
+export interface SkillContractNodeTextMatchesVerification {
+  kind: "node_text_matches";
+  matcher: string;
+}
+
+export type SkillContractVerification =
+  | SkillContractNodeTextMatchesVerification;
+
+export interface SkillContract {
+  inputs: Record<string, string>;
+  goal: SkillContractGoal | null;
+  verification: SkillContractVerification | null;
+}
+
+export const skillContractVerificationSchema: z.ZodType<SkillContractVerification> = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("node_text_matches"),
+    matcher: z.string().min(1),
+  }),
+]);
+
+export const skillContractSchema: z.ZodType<SkillContract> = z.object({
+  inputs: z.record(z.string()),
+  goal: z.object({
+    kind: z.string().min(1),
+  }).catchall(z.unknown()).nullable(),
+  verification: skillContractVerificationSchema.nullable(),
+});
+
+export function hasMeaningfulSkillContract(contract: SkillContract | null | undefined): boolean {
+  return contract !== undefined && contract !== null && (
+    Object.keys(contract.inputs).length > 0
+    || contract.goal !== null
+    || contract.verification !== null
+  );
 }
 
 export interface SkillEntry {
@@ -17,6 +61,7 @@ export interface SkillEntry {
   scripts: string[];
   artifacts: string[];
   agent?: SkillAgentConfig;
+  contract?: SkillContract;
 }
 
 export interface SkillsRegistry {

@@ -8,5 +8,17 @@
   "scripts": [
     "skills/com.test.skill-result/scripts/emit_skill_result.js"
   ],
-  "artifacts": []
+  "artifacts": [],
+  "contract": {
+    "inputs": {
+      "targetPercent": "integer[0,100]"
+    },
+    "goal": {
+      "kind": "set"
+    },
+    "verification": {
+      "kind": "node_text_matches",
+      "matcher": "Discharge to {targetPercent}%"
+    }
+  }
 }

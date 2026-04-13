@@ -234,6 +234,22 @@ switch (mode) {
     console.error("FAIL_OUTPUT:skill-result");
     process.exit(9);
     break;
+  case "mismatched-success":
+    emitFrame({
+      ...basePayload,
+      terminalVerification: {
+        status: "verified",
+        expected: {
+          kind: "text",
+          text: "Discharge to 40%",
+        },
+        observed: {
+          kind: "text",
+          text: "Discharge to 35%",
+        },
+      },
+    });
+    break;
   default:
     console.error(`Unknown mode: ${mode}`);
     process.exit(1);

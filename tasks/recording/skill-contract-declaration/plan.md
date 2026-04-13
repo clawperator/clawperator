@@ -22,13 +22,13 @@ follow the shipped code.
 
 | Item | Value |
 | --- | --- |
-| State | blocked |
+| State | complete |
 | Total PRs | 2 |
 | Total phases | 3 |
-| Completed | none |
-| Remaining | P1, P2, P3 |
-| Current / Next | blocked on W2 and W2b |
-| Blockers | `tasks/recording/skill-result-contract/` must land first; `tasks/recording/agent-driven-skills/` must land before the Solax proving phase |
+| Completed | P1, P2, P3 |
+| Remaining | none |
+| Current / Next | complete; hand off to W4 |
+| Blockers | none |
 
 ## Goal
 

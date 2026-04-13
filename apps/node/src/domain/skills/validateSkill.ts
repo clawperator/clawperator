@@ -105,6 +105,7 @@ function findMismatchFields(skill: SkillEntry, parsed: Partial<SkillEntry>): str
   if (normalizeSkillPathSeparators(parsed.skillFile ?? "") !== normalizeSkillPathSeparators(skill.skillFile)) mismatches.push("skillFile");
   if (JSON.stringify(normalizeSkillPathArray(parsed.scripts)) !== JSON.stringify(normalizeSkillPathArray(skill.scripts))) mismatches.push("scripts");
   if (JSON.stringify(normalizeSkillPathArray(parsed.artifacts)) !== JSON.stringify(normalizeSkillPathArray(skill.artifacts))) mismatches.push("artifacts");
+  if (JSON.stringify(parsed.contract ?? null) !== JSON.stringify(skill.contract ?? null)) mismatches.push("contract");
   return mismatches;
 }
 

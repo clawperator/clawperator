@@ -177,6 +177,15 @@ async function createTempRegistryWithSkill(options: {
     await writeFile(skillProgramPath, `# ${options.skillId}\n`);
   }
   await writeFile(join(skillDir, "skill.json"), options.skillJsonContents);
+  let parsedSkillJson: Record<string, unknown> | null = null;
+  try {
+    const candidate = JSON.parse(options.skillJsonContents) as unknown;
+    if (typeof candidate === "object" && candidate !== null && !Array.isArray(candidate)) {
+      parsedSkillJson = candidate as Record<string, unknown>;
+    }
+  } catch {
+    parsedSkillJson = null;
+  }
 
   const registryPath = join(root, "skills", "skills-registry.json");
   await writeFile(
@@ -194,6 +203,9 @@ async function createTempRegistryWithSkill(options: {
           skillFile: options.skillFileRelativePath ?? `skills/${options.skillId}/SKILL.md`,
           scripts: [`skills/${options.skillId}/${scriptRelativePath}`],
           artifacts: [],
+          ...(parsedSkillJson !== null && Object.prototype.hasOwnProperty.call(parsedSkillJson, "contract")
+            ? { contract: parsedSkillJson.contract }
+            : {}),
         },
       ],
     }),
@@ -1199,12 +1211,24 @@ describe("scaffoldSkill", () => {
         `skills/${skillId}/scripts/run.sh`,
       ]);
       assert.deepStrictEqual(entry.artifacts, []);
+      assert.deepStrictEqual(entry.contract, {
+        inputs: {},
+        goal: null,
+        verification: null,
+      });
 
       const runShPath = join(tempRoot, "skills", skillId, "scripts", "run.sh");
       const runShContent = await readFile(runShPath, "utf8");
       const runShStats = await stat(runShPath);
       assert.match(runShContent, /node "\$DIR\/run\.js" "\$@"/);
       assert.ok((runShStats.mode & 0o111) !== 0, `Expected run.sh to be executable, mode=${runShStats.mode.toString(8)}`);
+
+      const skillJson = JSON.parse(await readFile(join(tempRoot, "skills", skillId, "skill.json"), "utf8"));
+      assert.deepStrictEqual(skillJson.contract, {
+        inputs: {},
+        goal: null,
+        verification: null,
+      });
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
@@ -2201,7 +2225,9 @@ describe("runSkill", () => {
   it("preserves indeterminate SkillResult status for orchestrated skills", async () => {
     const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["indeterminate"]);
 
-    assert.ok(result.ok, `Expected orchestrated indeterminate result to parse: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.status, "indeterminate");
+    assert.strictEqual(result.ok, null);
+    assert.strictEqual(result.code, "SKILL_VERIFICATION_INDETERMINATE");
     assert.ok(result.skillResult);
     assert.strictEqual(result.skillResult.source.kind, "agent");
     assert.strictEqual(result.skillResult.status, "indeterminate");
@@ -2844,9 +2870,22 @@ describe("runSkill", () => {
   it("keeps legacy stdout behavior when no SkillResult frame is present", async () => {
     const result = await runSkill(TEST_SKILL_RESULT, ["legacy"]);
 
-    assert.ok(result.ok, `Expected legacy mode to succeed: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.status, "indeterminate");
+    assert.strictEqual(result.ok, null);
     assert.strictEqual(result.output, "legacy-output-only\n");
     assert.strictEqual(result.skillResult, null);
+    assert.strictEqual(result.code, "SKILL_VERIFICATION_INDETERMINATE");
+  });
+
+  it("returns indeterminate when declared verification disagrees with a framed success result", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["mismatched-success"]);
+
+    assert.strictEqual(result.status, "indeterminate");
+    assert.strictEqual(result.ok, null);
+    assert.strictEqual(result.code, "SKILL_VERIFICATION_INDETERMINATE");
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.status, "indeterminate");
+    assert.strictEqual(result.skillResult.terminalVerification?.status, "verified");
   });
 
   it("rejects earlier marker mentions when they are not part of the trailing frame suffix", async () => {
@@ -2897,9 +2936,11 @@ describe("runSkill", () => {
   it("treats whitespace-padded marker lines as legacy stdout instead of a framed SkillResult", async () => {
     const result = await runSkill(TEST_SKILL_RESULT, ["whitespace-padded-frame-marker"]);
 
-    assert.ok(result.ok, `Expected whitespace-padded marker output to stay legacy: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.status, "indeterminate");
+    assert.strictEqual(result.ok, null);
     assert.ok(result.output.includes(` ${"[Clawperator-Skill-Result]"} `));
     assert.strictEqual(result.skillResult, null);
+    assert.strictEqual(result.code, "SKILL_VERIFICATION_INDETERMINATE");
   });
 
   it("rejects framed SkillResults that try to self-report source", async () => {
@@ -3129,6 +3170,19 @@ describe("runSkill", () => {
     assert.match(result.message, /agent\.cli must be a non-empty string/i);
   });
 
+  it("rejects malformed contract blocks when parsing skill manifest metadata", () => {
+    const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
+      contract: {
+        inputs: [],
+        goal: null,
+        verification: null,
+      },
+    });
+
+    assert.ok(!result.ok);
+    assert.match(result.message, /skill\.json contract is invalid/i);
+  });
+
   it("rejects unsupported SkillResult contract major versions", async () => {
     const result = await runSkill(TEST_SKILL_RESULT, ["unsupported-major"]);
 
@@ -3219,6 +3273,26 @@ describe("runSkill", () => {
 
     assert.strictEqual(parsed.skillResult?.skillId, TEST_SKILL_RESULT);
     assert.strictEqual(parsed.skillResult?.source?.kind, "script");
+  });
+
+  it("CLI skills run surfaces indeterminate for declared-but-unproved verification", async () => {
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      TEST_SKILL_RESULT,
+      "--output",
+      "json",
+      "--",
+      "legacy",
+    ]);
+
+    assert.strictEqual(code, 0, stdout);
+    const parsed = JSON.parse(stdout) as {
+      status?: string;
+      skillResult?: unknown;
+    };
+    assert.strictEqual(parsed.status, "indeterminate");
+    assert.strictEqual(parsed.skillResult, null);
   });
 
   it("returns partial stdout when a skill times out", async () => {
@@ -3784,6 +3858,7 @@ describe("cmdSkillsRun preflight gate", () => {
       runCalls += 1;
       return {
         ok: true,
+        status: "success",
         skillId: TEST_SKILL_INVALID_ARTIFACT,
         output: "should-not-run",
         exitCode: 0,
@@ -3812,6 +3887,7 @@ describe("cmdSkillsRun preflight gate", () => {
       runCalls += 1;
       return {
         ok: true,
+        status: "success",
         skillId: TEST_SKILL_VALID_ARTIFACT,
         output: "RUN_OK",
         exitCode: 0,
@@ -3840,6 +3916,7 @@ describe("cmdSkillsRun preflight gate", () => {
       runCalls += 1;
       return {
         ok: true,
+        status: "success",
         skillId: TEST_SKILL_VALID_ARTIFACT,
         output: "RUN_OK",
         exitCode: 0,
@@ -3876,6 +3953,7 @@ describe("cmdSkillsRun preflight gate", () => {
       observedArgs = args;
       return {
         ok: true,
+        status: "success",
         skillId: TEST_SKILL_VALID_ARTIFACT,
         output: "RUN_OK",
         exitCode: 0,
@@ -3924,6 +4002,7 @@ describe("cmdSkillsRun preflight gate", () => {
           skipValidate: true,
           runSkillImpl: async () => ({
             ok: true,
+            status: "success",
             skillId: ${JSON.stringify(TEST_SKILL_VALID_ARTIFACT)},
             output: "RUN_OK",
             exitCode: 0,
@@ -3984,6 +4063,7 @@ describe("cmdSkillsRun preflight gate", () => {
             callbacks?.onOutput?.("chunk2\\n", "stdout");
             return {
               ok: true,
+              status: "success",
               skillId: ${JSON.stringify(TEST_FIXTURE_CHUNKED_OUTPUT)},
               output: "chunk1\\nchunk2\\n",
               exitCode: 0,
@@ -4018,6 +4098,7 @@ describe("cmdSkillsRun preflight gate", () => {
       runCalls += 1;
       return {
         ok: true,
+        status: "success",
         skillId: TEST_SKILL_INVALID_ARTIFACT,
         output: "RUN_OK",
         exitCode: 0,

@@ -266,6 +266,11 @@ export async function scaffoldSkill(
     skillFile: skillFileRelative,
     scripts: [scriptPathRelative, shellScriptPathRelative],
     artifacts: [],
+    contract: {
+      inputs: {},
+      goal: null,
+      verification: null,
+    },
   };
 
   const stagingRoot = await mkdtemp(join(dirname(skillRoot), ".scaffold-"));
