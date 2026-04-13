@@ -68,6 +68,10 @@ export function isSupportedSkillContractInputSchema(schema: string): boolean {
   return parseSkillContractInputSchema(schema) !== null;
 }
 
+function extractMatcherPlaceholders(matcher: string): string[] {
+  return Array.from(matcher.matchAll(/\{([A-Za-z0-9_]+)\}/g), (match) => match[1] ?? "");
+}
+
 const skillContractInputSchemaStringSchema = z.string()
   .min(1)
   .refine(
@@ -90,6 +94,23 @@ export const skillContractSchema: z.ZodType<SkillContract> = z.object({
     kind: z.string().min(1),
   }).catchall(z.unknown()).nullable(),
   verification: skillContractVerificationSchema.nullable(),
+}).superRefine((contract, context) => {
+  if (contract.verification?.kind !== "node_text_matches") {
+    return;
+  }
+
+  const declaredInputs = new Set(Object.keys(contract.inputs));
+  const undeclaredPlaceholders = extractMatcherPlaceholders(contract.verification.matcher)
+    .filter((placeholder) => !declaredInputs.has(placeholder));
+  if (undeclaredPlaceholders.length === 0) {
+    return;
+  }
+
+  context.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ["verification", "matcher"],
+    message: `contract matcher references undeclared inputs: ${undeclaredPlaceholders.join(", ")}`,
+  });
 });
 
 export function hasMeaningfulSkillContract(contract: SkillContract | null | undefined): boolean {

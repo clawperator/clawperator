@@ -2986,6 +2986,7 @@ describe("runSkill", () => {
     assert.strictEqual(result.status, "indeterminate");
     assert.strictEqual(result.ok, null);
     assert.strictEqual(result.code, "SKILL_VERIFICATION_INDETERMINATE");
+    assert.match(result.message ?? "", /did not match declared matcher|expected 'Discharge to 40%'/i);
     assert.ok(result.skillResult);
     assert.strictEqual(result.skillResult.status, "success");
     assert.strictEqual(result.skillResult.terminalVerification?.status, "verified");
@@ -3549,6 +3550,26 @@ describe("runSkill", () => {
 
     assert.ok(!result.ok);
     assert.match(result.message, /reserved object property names/i);
+  });
+
+  it("rejects matcher placeholders that do not correspond to declared inputs", () => {
+    const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
+      contract: {
+        inputs: {
+          percent: "integer[0,100]",
+        },
+        goal: {
+          kind: "set_discharge_limit",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Discharge to {percnt}%",
+        },
+      },
+    });
+
+    assert.ok(!result.ok);
+    assert.match(result.message, /undeclared inputs: percnt/i);
   });
 
   it("validateSkill rejects unsupported declared contract input schemas before execution", async () => {
