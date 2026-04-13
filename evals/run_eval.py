@@ -445,6 +445,22 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.eval_id == SOLAX_COLD_START_EVAL_ID:
+        if args.agent is not None:
+            parser.error("--agent is not supported for solax-orchestrated-cold-start")
+        if args.model is not None:
+            parser.error("--model is not supported for solax-orchestrated-cold-start")
+        if args.skill_prompt is not None:
+            parser.error("--skill-prompt is not supported for solax-orchestrated-cold-start")
+        if args.replay is not None:
+            parser.error("--replay is not supported for solax-orchestrated-cold-start")
+        if args.rescore is not None:
+            parser.error("--rescore is not supported for solax-orchestrated-cold-start")
+        if args.timeout_s != 300:
+            parser.error("--timeout-s is not supported for solax-orchestrated-cold-start")
+        if args.max_turns != 40:
+            parser.error("--max-turns is not supported for solax-orchestrated-cold-start")
+        if args.runs_dir != str(ROOT / "evals" / "runs"):
+            parser.error("--runs-dir is not supported for solax-orchestrated-cold-start")
         batch_dir = run_solax_orchestrated_cold_start_eval(
             device_serial=args.device,
             operator_package=args.operator_package,

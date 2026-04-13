@@ -56,6 +56,13 @@ Optional flags:
 - `--artifacts-dir <path>` overrides the default batch root
   `evals/artifacts/`
 - `--label <text>` adds a readable suffix to the batch id
+- `--dry-run` writes the batch directory and `config.json` but skips live
+  device execution
+
+Unsupported on this eval:
+
+- `--agent`, `--model`, `--skill-prompt`, `--replay`, `--rescore`,
+  `--timeout-s`, `--max-turns`, and `--runs-dir`
 
 Retention boundary:
 

@@ -412,3 +412,26 @@ def test_run_eval_rejects_solax_only_flags_for_android_version():
             assert exc.code == 2
         else:
             raise AssertionError(f"expected parser failure for {flag}")
+
+
+def test_run_eval_rejects_android_version_flags_for_solax_eval():
+    from evals import run_eval
+
+    invalid_argvs = [
+        [live_skill_eval.SOLAX_COLD_START_EVAL_ID, "--agent", "claude"],
+        [live_skill_eval.SOLAX_COLD_START_EVAL_ID, "--model", "claude-haiku-4-5"],
+        [live_skill_eval.SOLAX_COLD_START_EVAL_ID, "--skill-prompt", "prompt-skill.md"],
+        [live_skill_eval.SOLAX_COLD_START_EVAL_ID, "--replay", "run-123"],
+        [live_skill_eval.SOLAX_COLD_START_EVAL_ID, "--rescore", "run-123"],
+        [live_skill_eval.SOLAX_COLD_START_EVAL_ID, "--timeout-s", "120"],
+        [live_skill_eval.SOLAX_COLD_START_EVAL_ID, "--max-turns", "12"],
+        [live_skill_eval.SOLAX_COLD_START_EVAL_ID, "--runs-dir", "/tmp/runs"],
+    ]
+
+    for argv in invalid_argvs:
+        try:
+            run_eval.main(argv)
+        except SystemExit as exc:
+            assert exc.code == 2
+        else:
+            raise AssertionError(f"expected parser failure for argv={argv!r}")
