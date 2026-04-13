@@ -3458,6 +3458,59 @@ describe("runSkill", () => {
     assert.match(result.message, /unsupported contract input schema/i);
   });
 
+  it("accepts bare integer contract schemas at runtime", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.bare-integer-contract",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        TEST_SKILL_RESULT,
+        "scripts",
+        "emit_skill_result.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.bare-integer-contract",
+        applicationId: "com.test",
+        intent: "temp",
+        summary: "Temporary test skill",
+        path: "skills/com.test.bare-integer-contract",
+        skillFile: "skills/com.test.bare-integer-contract/SKILL.md",
+        scripts: [
+          "skills/com.test.bare-integer-contract/scripts/run.js",
+        ],
+        artifacts: [],
+        contract: {
+          inputs: {
+            targetPercent: "integer",
+          },
+          goal: {
+            kind: "set",
+          },
+          verification: {
+            kind: "node_text_matches",
+            matcher: "Discharge to {targetPercent}%",
+          },
+        },
+      }),
+    });
+
+    try {
+      const result = await runSkill(
+        "com.test.bare-integer-contract",
+        ["--skill-id", "com.test.bare-integer-contract", "valid", "40"],
+        temp.registryPath
+      );
+      assert.ok(result.ok, `Expected bare integer schema to run successfully: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.strictEqual(result.skillResult?.inputs?.targetPercent, 40);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
   it("rejects contract input names that cannot be rendered in matcher placeholders", () => {
     const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
       contract: {
@@ -3637,6 +3690,77 @@ describe("runSkill", () => {
     assert.strictEqual(result.status, "indeterminate");
     assert.match(result.message, /Could not trust declared input 'targetPercent'/);
     assert.doesNotMatch(result.message, new RegExp(secretValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  });
+
+  it("binds trusted contract inputs in deterministic key order instead of object insertion order", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-contract-order-runtime-"));
+    const skillsDir = join(tempRoot, "skills");
+    const skillId = "com.test.runtime-contract-order";
+    const skillDir = join(skillsDir, skillId);
+    const registryPath = join(skillsDir, "skills-registry.json");
+    await mkdir(join(skillDir, "scripts"), { recursive: true });
+
+    const scriptContents = `#!/usr/bin/env node
+const [alpha = "", beta = ""] = process.argv.slice(2);
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: { alpha, beta },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: \`Alpha \${alpha} Beta \${beta}\` },
+    observed: { kind: "text", text: \`Alpha \${alpha} Beta \${beta}\` }
+  },
+  execEnvelopes: [],
+  diagnostics: { runtimeState: "healthy" }
+}));
+`;
+
+    const entry = {
+      id: skillId,
+      applicationId: "com.test",
+      intent: "temp",
+      summary: "Temporary test skill",
+      path: `skills/${skillId}`,
+      skillFile: `skills/${skillId}/SKILL.md`,
+      scripts: [`skills/${skillId}/scripts/run.js`],
+      artifacts: [],
+      contract: {
+        inputs: {
+          beta: "string",
+          alpha: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Alpha {alpha} Beta {beta}",
+        },
+      },
+    };
+
+    try {
+      await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+      await writeFile(join(skillDir, "scripts", "run.js"), scriptContents, "utf8");
+      await writeFile(join(skillDir, "skill.json"), `${JSON.stringify(entry, null, 2)}\n`, "utf8");
+      await writeFile(
+        registryPath,
+        `${JSON.stringify({ schemaVersion: "1.0", generatedAt: "2026-04-13T00:00:00Z", skills: [entry] }, null, 2)}\n`,
+        "utf8"
+      );
+
+      const result = await runSkill(skillId, ["first", "second"], registryPath);
+      assert.ok(result.ok, `Expected deterministic key-order binding to prove the contract: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.deepStrictEqual(result.skillResult?.inputs, { alpha: "first", beta: "second" });
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it("rejects unsupported SkillResult contract major versions", async () => {

@@ -361,13 +361,13 @@ function parseDeclaredContractInputValue(schema: string, rawValue: string): { ok
   }
 
   const integerRangeMatch = /^integer(?:\[(?<min>-?\d+),(?<max>-?\d+)])?$/.exec(trimmedSchema);
-  if (integerRangeMatch?.groups) {
+  if (integerRangeMatch) {
     if (!/^-?\d+$/.test(rawValue)) {
       return { ok: false, message: `expected integer input for schema '${trimmedSchema}'` };
     }
     const parsedValue = Number.parseInt(rawValue, 10);
-    const min = Number.parseInt(integerRangeMatch.groups.min ?? `${Number.MIN_SAFE_INTEGER}`, 10);
-    const max = Number.parseInt(integerRangeMatch.groups.max ?? `${Number.MAX_SAFE_INTEGER}`, 10);
+    const min = Number.parseInt(integerRangeMatch.groups?.min ?? `${Number.MIN_SAFE_INTEGER}`, 10);
+    const max = Number.parseInt(integerRangeMatch.groups?.max ?? `${Number.MAX_SAFE_INTEGER}`, 10);
     if (parsedValue < min || parsedValue > max) {
       return {
         ok: false,
@@ -383,11 +383,19 @@ function parseDeclaredContractInputValue(schema: string, rawValue: string): { ok
   };
 }
 
+function getOrderedDeclaredContractInputs(contract: SkillContract): Array<[string, string]> {
+  return Object.entries(contract.inputs).sort(([leftKey], [rightKey]) => {
+    if (leftKey < rightKey) return -1;
+    if (leftKey > rightKey) return 1;
+    return 0;
+  });
+}
+
 function resolveTrustedContractInputs(
   contract: SkillContract,
   args: string[]
 ): TrustedContractInputsResolution {
-  const declaredInputs = Object.entries(contract.inputs);
+  const declaredInputs = getOrderedDeclaredContractInputs(contract);
   if (declaredInputs.length === 0) {
     return { ok: true, inputs: {} };
   }
@@ -502,7 +510,7 @@ async function skillJsonRawMayDeclareContract(repoRoot: string, skillPath: strin
   const skillJsonPath = resolveRepoRelativeSkillPath(repoRoot, join(skillPath, "skill.json"));
   try {
     const raw = await readFile(skillJsonPath, "utf-8");
-    const contractPropertyMatch = /^\s*"contract"\s*:\s*\{/m.exec(raw);
+    const contractPropertyMatch = /(?:^|[{,]\s*)"contract"\s*:\s*\{/.exec(raw);
     if (!contractPropertyMatch) {
       return false;
     }
