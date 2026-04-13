@@ -177,6 +177,15 @@ async function createTempRegistryWithSkill(options: {
     await writeFile(skillProgramPath, `# ${options.skillId}\n`);
   }
   await writeFile(join(skillDir, "skill.json"), options.skillJsonContents);
+  let parsedSkillJson: Record<string, unknown> | null = null;
+  try {
+    const candidate = JSON.parse(options.skillJsonContents) as unknown;
+    if (typeof candidate === "object" && candidate !== null && !Array.isArray(candidate)) {
+      parsedSkillJson = candidate as Record<string, unknown>;
+    }
+  } catch {
+    parsedSkillJson = null;
+  }
 
   const registryPath = join(root, "skills", "skills-registry.json");
   await writeFile(
@@ -194,6 +203,9 @@ async function createTempRegistryWithSkill(options: {
           skillFile: options.skillFileRelativePath ?? `skills/${options.skillId}/SKILL.md`,
           scripts: [`skills/${options.skillId}/${scriptRelativePath}`],
           artifacts: [],
+          ...(parsedSkillJson !== null && Object.prototype.hasOwnProperty.call(parsedSkillJson, "contract")
+            ? { contract: parsedSkillJson.contract }
+            : {}),
         },
       ],
     }),
@@ -1199,12 +1211,24 @@ describe("scaffoldSkill", () => {
         `skills/${skillId}/scripts/run.sh`,
       ]);
       assert.deepStrictEqual(entry.artifacts, []);
+      assert.deepStrictEqual(entry.contract, {
+        inputs: {},
+        goal: null,
+        verification: null,
+      });
 
       const runShPath = join(tempRoot, "skills", skillId, "scripts", "run.sh");
       const runShContent = await readFile(runShPath, "utf8");
       const runShStats = await stat(runShPath);
       assert.match(runShContent, /node "\$DIR\/run\.js" "\$@"/);
       assert.ok((runShStats.mode & 0o111) !== 0, `Expected run.sh to be executable, mode=${runShStats.mode.toString(8)}`);
+
+      const skillJson = JSON.parse(await readFile(join(tempRoot, "skills", skillId, "skill.json"), "utf8"));
+      assert.deepStrictEqual(skillJson.contract, {
+        inputs: {},
+        goal: null,
+        verification: null,
+      });
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
@@ -1904,7 +1928,7 @@ describe("runSkill", () => {
   });
 
   it("parses a valid framed SkillResult for scripted skills", async () => {
-    const result = await runSkill(TEST_SKILL_RESULT, ["valid"]);
+    const result = await runSkill(TEST_SKILL_RESULT, ["valid", "40"]);
     assert.ok(result.ok, `Expected framed SkillResult to succeed: ${"message" in result ? result.message : ""}`);
     assert.ok(result.output.includes("progress:before-frame"));
     assert.ok(result.skillResult);
@@ -1938,7 +1962,7 @@ describe("runSkill", () => {
     });
 
     try {
-      const result = await runSkill(TEST_SKILL_RESULT, ["valid"], temp.registryPath);
+      const result = await runSkill(TEST_SKILL_RESULT, ["valid", "40"], temp.registryPath);
       assert.ok(result.ok, `Expected framed scripted run to stay permissive: ${"message" in result ? result.message : ""}`);
       assert.ok(result.skillResult);
       assert.strictEqual(result.skillResult.source.kind, "script");
@@ -1949,7 +1973,7 @@ describe("runSkill", () => {
   });
 
   it("parses a valid framed SkillResult for agent-driven skills and injects agent source metadata", async () => {
-    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["valid"]);
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["valid", "40"]);
 
     assert.ok(result.ok, `Expected agent SkillResult to succeed: ${"message" in result ? result.message : ""}`);
     assert.ok(result.skillResult);
@@ -2201,15 +2225,27 @@ describe("runSkill", () => {
   it("preserves indeterminate SkillResult status for orchestrated skills", async () => {
     const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["indeterminate"]);
 
-    assert.ok(result.ok, `Expected orchestrated indeterminate result to parse: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.status, "indeterminate");
+    assert.strictEqual(result.ok, null);
+    assert.strictEqual(result.code, "SKILL_VERIFICATION_INDETERMINATE");
     assert.ok(result.skillResult);
     assert.strictEqual(result.skillResult.source.kind, "agent");
     assert.strictEqual(result.skillResult.status, "indeterminate");
     assert.strictEqual(result.skillResult.terminalVerification?.status, "not_run");
   });
 
+  it("treats declared verification as proved even when the emitted SkillResult status is indeterminate", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["proved-indeterminate-status", "40"]);
+
+    assert.ok(result.ok, `Expected proved declared verification to return wrapper success: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.status, "success");
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.status, "indeterminate");
+    assert.strictEqual(result.skillResult.terminalVerification?.status, "verified");
+  });
+
   it("reports success for orchestrated skills that take a recovery path but still reach terminal verification", async () => {
-    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["recovery-success"]);
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["recovery-success", "40"]);
 
     assert.ok(result.ok, `Expected orchestrated recovery-path success to parse: ${"message" in result ? result.message : ""}`);
     assert.ok(result.skillResult);
@@ -2267,7 +2303,7 @@ describe("runSkill", () => {
     try {
       const result = await runSkill(
         "com.test.agent-env-check",
-        ["env-check"],
+        ["env-check", "40"],
         temp.registryPath,
         undefined,
         {
@@ -2331,7 +2367,7 @@ describe("runSkill", () => {
       const expectedSkillProgramPath = join(getRepoRoot(temp.registryPath), skillFileRelativePath);
       const result = await runSkill(
         "com.test.custom-skill-file",
-        ["env-check"],
+        ["env-check", "40"],
         temp.registryPath,
         undefined,
         {
@@ -2521,6 +2557,99 @@ describe("runSkill", () => {
       assert.ok(result.ok, `Expected validation to ignore registry parity for agent metadata: ${!result.ok ? result.message : ""}`);
     } finally {
       await temp.cleanup();
+    }
+  });
+
+  it("treats semantically identical contract objects as matching even when key order differs", async () => {
+    const root = await mkdtemp(join(tmpdir(), "clawperator-contract-order-"));
+    const skillId = "com.test.contract-order";
+    const skillDir = join(root, "skills", skillId);
+    const scriptsDir = join(skillDir, "scripts");
+    const registryPath = join(root, "skills", "skills-registry.json");
+
+    try {
+      await mkdir(scriptsDir, { recursive: true });
+      await copyFile(
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.echo",
+          "scripts",
+          "echo.js"
+        ),
+        join(scriptsDir, "run.js")
+      );
+      await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+      await writeFile(
+        join(skillDir, "skill.json"),
+        JSON.stringify({
+          id: skillId,
+          applicationId: "com.test",
+          intent: "contract-order",
+          summary: "Temporary test skill",
+          path: `skills/${skillId}`,
+          skillFile: `skills/${skillId}/SKILL.md`,
+          scripts: [`skills/${skillId}/scripts/run.js`],
+          artifacts: [],
+          contract: {
+            inputs: {
+              percent: "integer[0,100]",
+            },
+            goal: {
+              kind: "set_discharge_limit",
+              zeta: "last",
+              alpha: "first",
+            },
+            verification: {
+              kind: "node_text_matches",
+              matcher: "Discharge to {percent}%",
+            },
+          },
+        }),
+        "utf8"
+      );
+      await writeFile(
+        registryPath,
+        JSON.stringify({
+          schemaVersion: "1.0",
+          generatedAt: "2026-04-13T00:00:00Z",
+          skills: [
+            {
+              id: skillId,
+              applicationId: "com.test",
+              intent: "contract-order",
+              summary: "Temporary test skill",
+              path: `skills/${skillId}`,
+              skillFile: `skills/${skillId}/SKILL.md`,
+              scripts: [`skills/${skillId}/scripts/run.js`],
+              artifacts: [],
+              contract: {
+                inputs: {
+                  percent: "integer[0,100]",
+                },
+                goal: {
+                  alpha: "first",
+                  kind: "set_discharge_limit",
+                  zeta: "last",
+                },
+                verification: {
+                  matcher: "Discharge to {percent}%",
+                  kind: "node_text_matches",
+                },
+              },
+            },
+          ],
+        }),
+        "utf8"
+      );
+
+      const result = await validateSkill(skillId, registryPath);
+      assert.ok(result.ok, `Expected contract parity to ignore JSON key order: ${!result.ok ? result.message : ""}`);
+    } finally {
+      await rm(root, { recursive: true, force: true });
     }
   });
 
@@ -2748,7 +2877,7 @@ describe("runSkill", () => {
       try {
         const result = await runSkill(
           "com.test.agent-path-override",
-          ["env-check"],
+          ["env-check", "40"],
           temp.registryPath,
           undefined,
           {
@@ -2844,9 +2973,78 @@ describe("runSkill", () => {
   it("keeps legacy stdout behavior when no SkillResult frame is present", async () => {
     const result = await runSkill(TEST_SKILL_RESULT, ["legacy"]);
 
-    assert.ok(result.ok, `Expected legacy mode to succeed: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.status, "indeterminate");
+    assert.strictEqual(result.ok, null);
     assert.strictEqual(result.output, "legacy-output-only\n");
     assert.strictEqual(result.skillResult, null);
+    assert.strictEqual(result.code, "SKILL_VERIFICATION_INDETERMINATE");
+  });
+
+  it("returns indeterminate when declared verification disagrees with a framed success result", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["mismatched-success", "40"]);
+
+    assert.strictEqual(result.status, "indeterminate");
+    assert.strictEqual(result.ok, null);
+    assert.strictEqual(result.code, "SKILL_VERIFICATION_INDETERMINATE");
+    assert.match(result.message ?? "", /did not match declared matcher|expected 'Discharge to 40%'/i);
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.status, "success");
+    assert.strictEqual(result.skillResult.terminalVerification?.status, "verified");
+  });
+
+  it("accepts decorative terminal-verification suffixes for declared text matches", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["decorated-success", "40"]);
+
+    assert.ok(result.ok, `Expected decorated terminal verification to count as a match: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.status, "success");
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.status, "success");
+    assert.strictEqual(result.skillResult.terminalVerification?.status, "verified");
+  });
+
+  it("returns indeterminate when SkillResult inputs do not match trusted invocation inputs", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["40"], undefined, undefined, {
+      TEST_SKILL_MODE: "valid",
+    });
+
+    assert.ok(result.ok, `Expected trusted invocation inputs to match declared inputs: ${"message" in result ? result.message : ""}`);
+
+    const spoofed = await runSkill(TEST_SKILL_RESULT, ["40"], undefined, undefined, {
+      TEST_SKILL_MODE: "spoofed-inputs",
+    });
+
+    assert.strictEqual(spoofed.status, "indeterminate");
+    assert.strictEqual(spoofed.ok, null);
+    assert.strictEqual(spoofed.code, "SKILL_VERIFICATION_INDETERMINATE");
+    assert.match(spoofed.message, /trusted invocation inputs/i);
+    assert.ok(spoofed.skillResult);
+    assert.strictEqual(spoofed.skillResult.status, "success");
+  });
+
+  it("accepts extra undeclared SkillResult inputs when declared inputs still match trusted invocation inputs", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["40"], undefined, undefined, {
+      TEST_SKILL_MODE: "extra-inputs",
+    });
+
+    assert.ok(result.ok, `Expected extra undeclared inputs to be allowed: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.status, "success");
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.status, "success");
+    assert.strictEqual(result.skillResult.inputs?.targetPercent, 40);
+    assert.strictEqual(result.skillResult.inputs?.diagnosticNote, "kept-for-debugging");
+  });
+
+  it("fails a declared-verification run when a zero-exit SkillResult reports failed status", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["failed-zero-exit", "40"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.status, "failed");
+    assert.strictEqual(result.code, SKILL_EXECUTION_FAILED);
+    assert.match(result.message, /reported failed status while executing a declared verification contract/i);
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.status, "failed");
+    assert.strictEqual(result.skillResult.terminalVerification?.status, "failed");
   });
 
   it("rejects earlier marker mentions when they are not part of the trailing frame suffix", async () => {
@@ -2897,9 +3095,11 @@ describe("runSkill", () => {
   it("treats whitespace-padded marker lines as legacy stdout instead of a framed SkillResult", async () => {
     const result = await runSkill(TEST_SKILL_RESULT, ["whitespace-padded-frame-marker"]);
 
-    assert.ok(result.ok, `Expected whitespace-padded marker output to stay legacy: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.status, "indeterminate");
+    assert.strictEqual(result.ok, null);
     assert.ok(result.output.includes(` ${"[Clawperator-Skill-Result]"} `));
     assert.strictEqual(result.skillResult, null);
+    assert.strictEqual(result.code, "SKILL_VERIFICATION_INDETERMINATE");
   });
 
   it("rejects framed SkillResults that try to self-report source", async () => {
@@ -3118,6 +3318,83 @@ describe("runSkill", () => {
     }
   });
 
+  it("fails closed for scripted skills when a declared contract is present but the manifest contract is malformed", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.malformed-script-contract",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        TEST_SKILL_SCRIPT_ONLY,
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.malformed-script-contract",
+        applicationId: "com.test",
+        intent: "temp",
+        summary: "Temporary test skill",
+        path: "skills/com.test.malformed-script-contract",
+        skillFile: "skills/com.test.malformed-script-contract/SKILL.md",
+        scripts: [
+          "skills/com.test.malformed-script-contract/scripts/run.js",
+        ],
+        artifacts: [],
+        contract: {
+          inputs: [],
+          goal: null,
+          verification: null,
+        },
+      }),
+    });
+
+    try {
+      await writeFile(
+        temp.registryPath,
+        JSON.stringify({
+          schemaVersion: "1.0",
+          generatedAt: "2026-04-11T00:00:00Z",
+          skills: [
+            {
+              id: "com.test.malformed-script-contract",
+              applicationId: "com.test",
+              intent: "temp",
+              summary: "Temporary test skill",
+              path: "skills/com.test.malformed-script-contract",
+              skillFile: "skills/com.test.malformed-script-contract/SKILL.md",
+              scripts: [
+                "skills/com.test.malformed-script-contract/scripts/run.js",
+              ],
+              artifacts: [],
+              contract: {
+                inputs: {
+                  targetPercent: "integer[0,100]",
+                },
+                goal: {
+                  kind: "set",
+                },
+                verification: {
+                  kind: "node_text_matches",
+                  matcher: "Discharge to {targetPercent}%",
+                },
+              },
+            },
+          ],
+        }),
+        "utf8"
+      );
+
+      const result = await runSkill("com.test.malformed-script-contract", [], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /skill\.json contract is invalid|trusted skill result source metadata/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
   it("rejects malformed agent blocks when parsing skill manifest metadata", () => {
     const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
       agent: {
@@ -3127,6 +3404,404 @@ describe("runSkill", () => {
 
     assert.ok(!result.ok);
     assert.match(result.message, /agent\.cli must be a non-empty string/i);
+  });
+
+  it("rejects malformed contract blocks when parsing skill manifest metadata", () => {
+    const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
+      contract: {
+        inputs: [],
+        goal: null,
+        verification: null,
+      },
+    });
+
+    assert.ok(!result.ok);
+    assert.match(result.message, /skill\.json contract is invalid/i);
+  });
+
+  it("rejects unsupported contract input schemas when parsing skill manifest metadata", () => {
+    const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
+      contract: {
+        inputs: {
+          percent: "float",
+        },
+        goal: {
+          kind: "set_discharge_limit",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Discharge to {percent}%",
+        },
+      },
+    });
+
+    assert.ok(!result.ok);
+    assert.match(result.message, /unsupported contract input schema/i);
+  });
+
+  it("rejects reversed integer contract ranges when parsing skill manifest metadata", () => {
+    const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
+      contract: {
+        inputs: {
+          percent: "integer[100,0]",
+        },
+        goal: {
+          kind: "set_discharge_limit",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Discharge to {percent}%",
+        },
+      },
+    });
+
+    assert.ok(!result.ok);
+    assert.match(result.message, /unsupported contract input schema/i);
+  });
+
+  it("accepts bare integer contract schemas at runtime", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.bare-integer-contract",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        TEST_SKILL_RESULT,
+        "scripts",
+        "emit_skill_result.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.bare-integer-contract",
+        applicationId: "com.test",
+        intent: "temp",
+        summary: "Temporary test skill",
+        path: "skills/com.test.bare-integer-contract",
+        skillFile: "skills/com.test.bare-integer-contract/SKILL.md",
+        scripts: [
+          "skills/com.test.bare-integer-contract/scripts/run.js",
+        ],
+        artifacts: [],
+        contract: {
+          inputs: {
+            targetPercent: "integer",
+          },
+          goal: {
+            kind: "set",
+          },
+          verification: {
+            kind: "node_text_matches",
+            matcher: "Discharge to {targetPercent}%",
+          },
+        },
+      }),
+    });
+
+    try {
+      const result = await runSkill(
+        "com.test.bare-integer-contract",
+        ["--skill-id", "com.test.bare-integer-contract", "valid", "40"],
+        temp.registryPath
+      );
+      assert.ok(result.ok, `Expected bare integer schema to run successfully: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.strictEqual(result.skillResult?.inputs?.targetPercent, 40);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("rejects contract input names that cannot be rendered in matcher placeholders", () => {
+    const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
+      contract: {
+        inputs: {
+          "target-percent": "integer[0,100]",
+        },
+        goal: {
+          kind: "set_discharge_limit",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Discharge to {target-percent}%",
+        },
+      },
+    });
+
+    assert.ok(!result.ok);
+    assert.match(result.message, /contract input names must contain only letters, numbers, and underscores/i);
+  });
+
+  it("rejects reserved contract input names", () => {
+    const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
+      contract: {
+        inputs: {
+          constructor: "string",
+        },
+        goal: {
+          kind: "set_discharge_limit",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Value {constructor}",
+        },
+      },
+    });
+
+    assert.ok(!result.ok);
+    assert.match(result.message, /reserved object property names/i);
+  });
+
+  it("rejects matcher placeholders that do not correspond to declared inputs", () => {
+    const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
+      contract: {
+        inputs: {
+          percent: "integer[0,100]",
+        },
+        goal: {
+          kind: "set_discharge_limit",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Discharge to {percnt}%",
+        },
+      },
+    });
+
+    assert.ok(!result.ok);
+    assert.match(result.message, /undeclared inputs: percnt/i);
+  });
+
+  it("validateSkill rejects unsupported declared contract input schemas before execution", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-unsupported-contract-schema-"));
+    const skillsDir = join(tempRoot, "skills");
+    const skillId = "com.test.unsupported-contract-schema";
+    const skillDir = join(skillsDir, skillId);
+    const registryPath = join(skillsDir, "skills-registry.json");
+    await mkdir(join(skillDir, "scripts"), { recursive: true });
+
+    const entry = {
+      id: skillId,
+      applicationId: "com.test",
+      intent: "temp",
+      summary: "Skill with unsupported declared contract schema",
+      path: `skills/${skillId}`,
+      skillFile: `skills/${skillId}/SKILL.md`,
+      scripts: [`skills/${skillId}/scripts/run.js`],
+      artifacts: [],
+      contract: {
+        inputs: {
+          percent: "float",
+        },
+        goal: {
+          kind: "set_discharge_limit",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Discharge to {percent}%",
+        },
+      },
+    };
+
+    try {
+      await writeFile(join(skillDir, "SKILL.md"), "# Unsupported Schema\n", "utf8");
+      await writeFile(join(skillDir, "scripts", "run.js"), "#!/usr/bin/env node\nconsole.log('fixture run');\n", "utf8");
+      await writeFile(join(skillDir, "skill.json"), `${JSON.stringify(entry, null, 2)}\n`, "utf8");
+      await writeFile(registryPath, `${JSON.stringify({ schemaVersion: "1.0", generatedAt: "2026-04-11T00:00:00Z", skills: [entry] }, null, 2)}\n`, "utf8");
+
+      const result = await validateSkill(skillId, registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /invalid agent manifest|unsupported contract input schemas/i);
+      assert.match(result.details?.reason ?? "", /unsupported contract input schema|supports only 'string' and 'integer/i);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed for scripted skills when skill.json appears to declare a malformed contract but the registry is stale", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.stale-registry-contract",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        TEST_SKILL_SCRIPT_ONLY,
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: "{\"id\":\"com.test.stale-registry-contract\",\"contract\": {",
+    });
+
+    try {
+      await writeFile(
+        temp.registryPath,
+        JSON.stringify({
+          schemaVersion: "1.0",
+          generatedAt: "2026-04-11T00:00:00Z",
+          skills: [
+            {
+              id: "com.test.stale-registry-contract",
+              applicationId: "com.test",
+              intent: "temp",
+              summary: "Temporary test skill",
+              path: "skills/com.test.stale-registry-contract",
+              skillFile: "skills/com.test.stale-registry-contract/SKILL.md",
+              scripts: [
+                "skills/com.test.stale-registry-contract/scripts/run.js",
+              ],
+              artifacts: [],
+            },
+          ],
+        }),
+        "utf8"
+      );
+
+      const result = await runSkill("com.test.stale-registry-contract", [], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /trusted skill result source metadata/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("keeps the legacy path for malformed scripted manifests when only an empty scaffold contract is present", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.empty-contract-legacy",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.echo",
+        "scripts",
+        "echo.js"
+      ),
+      skillJsonContents: "{\"id\":\"com.test.empty-contract-legacy\",\"contract\":{\"inputs\":{},\"goal\":null,\"verification\":null},\"summary\":",
+      scriptRelativePath: "scripts/echo.js",
+    });
+
+    try {
+      await writeFile(
+        temp.registryPath,
+        JSON.stringify({
+          schemaVersion: "1.0",
+          generatedAt: "2026-04-11T00:00:00Z",
+          skills: [
+            {
+              id: "com.test.empty-contract-legacy",
+              applicationId: "com.test",
+              intent: "temp",
+              summary: "Temporary test skill",
+              path: "skills/com.test.empty-contract-legacy",
+              skillFile: "skills/com.test.empty-contract-legacy/SKILL.md",
+              scripts: [
+                "skills/com.test.empty-contract-legacy/scripts/echo.js",
+              ],
+              artifacts: [],
+              contract: {
+                inputs: {},
+                goal: null,
+                verification: null,
+              },
+            },
+          ],
+        }),
+        "utf8"
+      );
+
+      const result = await runSkill("com.test.empty-contract-legacy", ["hello"], temp.registryPath);
+      assert.ok(result.ok, `Expected empty scaffold contract to preserve legacy execution: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.match(result.output, /TEST_OUTPUT:hello/);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("redacts raw argv values from declared contract parse failures", async () => {
+    const secretValue = "super-secret-argv-value";
+    const result = await runSkill(TEST_SKILL_RESULT, ["valid", secretValue]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.status, "indeterminate");
+    assert.match(result.message, /Could not trust declared input 'targetPercent'/);
+    assert.doesNotMatch(result.message, new RegExp(secretValue.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  });
+
+  it("binds trusted contract inputs in deterministic key order instead of object insertion order", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-contract-order-runtime-"));
+    const skillsDir = join(tempRoot, "skills");
+    const skillId = "com.test.runtime-contract-order";
+    const skillDir = join(skillsDir, skillId);
+    const registryPath = join(skillsDir, "skills-registry.json");
+    await mkdir(join(skillDir, "scripts"), { recursive: true });
+
+    const scriptContents = `#!/usr/bin/env node
+const [alpha = "", beta = ""] = process.argv.slice(2);
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: { alpha, beta },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: \`Alpha \${alpha} Beta \${beta}\` },
+    observed: { kind: "text", text: \`Alpha \${alpha} Beta \${beta}\` }
+  },
+  execEnvelopes: [],
+  diagnostics: { runtimeState: "healthy" }
+}));
+`;
+
+    const entry = {
+      id: skillId,
+      applicationId: "com.test",
+      intent: "temp",
+      summary: "Temporary test skill",
+      path: `skills/${skillId}`,
+      skillFile: `skills/${skillId}/SKILL.md`,
+      scripts: [`skills/${skillId}/scripts/run.js`],
+      artifacts: [],
+      contract: {
+        inputs: {
+          beta: "string",
+          alpha: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Alpha {alpha} Beta {beta}",
+        },
+      },
+    };
+
+    try {
+      await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+      await writeFile(join(skillDir, "scripts", "run.js"), scriptContents, "utf8");
+      await writeFile(join(skillDir, "skill.json"), `${JSON.stringify(entry, null, 2)}\n`, "utf8");
+      await writeFile(
+        registryPath,
+        `${JSON.stringify({ schemaVersion: "1.0", generatedAt: "2026-04-13T00:00:00Z", skills: [entry] }, null, 2)}\n`,
+        "utf8"
+      );
+
+      const result = await runSkill(skillId, ["first", "second"], registryPath);
+      assert.ok(result.ok, `Expected deterministic key-order binding to prove the contract: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.deepStrictEqual(result.skillResult?.inputs, { alpha: "first", beta: "second" });
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it("rejects unsupported SkillResult contract major versions", async () => {
@@ -3139,7 +3814,7 @@ describe("runSkill", () => {
   });
 
   it("accepts newer SkillResult minor versions on the same major", async () => {
-    const result = await runSkill(TEST_SKILL_RESULT, ["newer-minor"]);
+    const result = await runSkill(TEST_SKILL_RESULT, ["newer-minor", "40"]);
 
     assert.ok(result.ok, `Expected newer minor version to succeed: ${"message" in result ? result.message : ""}`);
     assert.ok(result.skillResult);
@@ -3148,7 +3823,7 @@ describe("runSkill", () => {
   });
 
   it("accepts raw ResultEnvelope data values in execEnvelopes and normalizes them to strings", async () => {
-    const result = await runSkill(TEST_SKILL_RESULT, ["raw-envelope-data"]);
+    const result = await runSkill(TEST_SKILL_RESULT, ["raw-envelope-data", "40"]);
 
     assert.ok(result.ok, `Expected raw execEnvelopes to parse successfully: ${"message" in result ? result.message : ""}`);
     assert.ok(result.skillResult);
@@ -3206,8 +3881,14 @@ describe("runSkill", () => {
       "--output",
       "json",
       "--",
-      "valid",
-    ]);
+      "40",
+    ], {
+      env: {
+        ...process.env,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+        TEST_SKILL_MODE: "valid",
+      },
+    });
 
     assert.strictEqual(code, 0, stdout);
     const parsed = JSON.parse(stdout) as {
@@ -3221,6 +3902,36 @@ describe("runSkill", () => {
     assert.strictEqual(parsed.skillResult?.source?.kind, "script");
   });
 
+  it("CLI skills run surfaces indeterminate for declared-but-unproved verification", async () => {
+    const { stdout, code } = await runCli([
+      "skills",
+      "run",
+      TEST_SKILL_RESULT,
+      "--output",
+      "json",
+      "--",
+      "40",
+    ], {
+      env: {
+        ...process.env,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+        TEST_SKILL_MODE: "legacy",
+      },
+    });
+
+    assert.strictEqual(code, 1, stdout);
+    const parsed = JSON.parse(stdout) as {
+      status?: string;
+      code?: string;
+      message?: string;
+      skillResult?: unknown;
+    };
+    assert.strictEqual(parsed.status, "indeterminate");
+    assert.strictEqual(parsed.code, "SKILL_VERIFICATION_INDETERMINATE");
+    assert.match(parsed.message ?? "", /did not emit a SkillResult|did not prove/i);
+    assert.strictEqual(parsed.skillResult, null);
+  });
+
   it("returns partial stdout when a skill times out", async () => {
     const result = await runSkill("com.test.partial-timeout", [], undefined, 150);
     assert.ok(!result.ok);
@@ -3229,7 +3940,7 @@ describe("runSkill", () => {
   });
 
   it("returns timeout for orchestrated skills and preserves timeout precedence over any later frame", async () => {
-    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["timeout"], undefined, 150);
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["timeout", "40"], undefined, 150);
 
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
@@ -3379,6 +4090,7 @@ describe("runSkill", () => {
       "json",
       "--",
       "env-check",
+      "40",
     ], {
       env: {
         ...process.env,
@@ -3784,6 +4496,7 @@ describe("cmdSkillsRun preflight gate", () => {
       runCalls += 1;
       return {
         ok: true,
+        status: "success",
         skillId: TEST_SKILL_INVALID_ARTIFACT,
         output: "should-not-run",
         exitCode: 0,
@@ -3812,6 +4525,7 @@ describe("cmdSkillsRun preflight gate", () => {
       runCalls += 1;
       return {
         ok: true,
+        status: "success",
         skillId: TEST_SKILL_VALID_ARTIFACT,
         output: "RUN_OK",
         exitCode: 0,
@@ -3840,6 +4554,7 @@ describe("cmdSkillsRun preflight gate", () => {
       runCalls += 1;
       return {
         ok: true,
+        status: "success",
         skillId: TEST_SKILL_VALID_ARTIFACT,
         output: "RUN_OK",
         exitCode: 0,
@@ -3876,6 +4591,7 @@ describe("cmdSkillsRun preflight gate", () => {
       observedArgs = args;
       return {
         ok: true,
+        status: "success",
         skillId: TEST_SKILL_VALID_ARTIFACT,
         output: "RUN_OK",
         exitCode: 0,
@@ -3924,6 +4640,7 @@ describe("cmdSkillsRun preflight gate", () => {
           skipValidate: true,
           runSkillImpl: async () => ({
             ok: true,
+            status: "success",
             skillId: ${JSON.stringify(TEST_SKILL_VALID_ARTIFACT)},
             output: "RUN_OK",
             exitCode: 0,
@@ -3984,6 +4701,7 @@ describe("cmdSkillsRun preflight gate", () => {
             callbacks?.onOutput?.("chunk2\\n", "stdout");
             return {
               ok: true,
+              status: "success",
               skillId: ${JSON.stringify(TEST_FIXTURE_CHUNKED_OUTPUT)},
               output: "chunk1\\nchunk2\\n",
               exitCode: 0,
@@ -4018,6 +4736,7 @@ describe("cmdSkillsRun preflight gate", () => {
       runCalls += 1;
       return {
         ok: true,
+        status: "success",
         skillId: TEST_SKILL_INVALID_ARTIFACT,
         output: "RUN_OK",
         exitCode: 0,
@@ -4330,12 +5049,15 @@ describe("CLI skills run streaming", () => {
       "com.clawperator.operator.dev",
       "--output",
       "pretty",
+      "--",
+      "40",
     ], {
       cwd: packageRoot,
       env: {
         ...process.env,
         PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
         CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+        TEST_SKILL_MODE: "valid",
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

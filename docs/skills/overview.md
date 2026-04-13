@@ -434,6 +434,7 @@ If the expected text is present, the success payload echoes the assertion:
 
 ```json
 {
+  "status": "success",
   "skillId": "com.android.settings.capture-overview",
   "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
   "skillResult": null,
@@ -446,16 +447,36 @@ Important:
 
 - `output` is raw stdout from the script
 - the wrapper parses a trailing framed `SkillResult` when present and returns it as `skillResult`
+- the top-level wrapper `status` is `success`, `failed`, or `indeterminate`
+- when a declared verification contract is not proved, the wrapper returns `status: "indeterminate"` without rewriting the emitted `skillResult`
 - progress lines written by the skill to stdout remain inside `output` in JSON mode
 - pretty mode writes a banner before streaming live skill output, so use `--json` when another agent needs machine-readable output
 - in JSON mode, the wrapper returns one JSON object and does not stream live child stdout separately
 - `timeoutMs` is present only when the caller passed `--timeout` or `--timeout-ms`
 - `expectedSubstring` is present only when the caller passed `--expect-contains`
 
+## `skills run` Indeterminate Shape
+
+```json
+{
+  "status": "indeterminate",
+  "code": "SKILL_VERIFICATION_INDETERMINATE",
+  "message": "Declared verification was not proved.",
+  "skillId": "com.android.settings.capture-overview",
+  "output": "[Clawperator-Skill-Result]\n{\"status\":\"success\"}\n",
+  "skillResult": {
+    "status": "success"
+  },
+  "exitCode": 0,
+  "durationMs": 15842
+}
+```
+
 ## `skills run` Failure Shape
 
 ```json
 {
+  "status": "failed",
   "code": "SKILL_EXECUTION_FAILED",
   "message": "Skill com.android.settings.capture-overview exited with code 2",
   "skillId": "com.android.settings.capture-overview",

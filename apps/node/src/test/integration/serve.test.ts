@@ -4,9 +4,42 @@ import { startServer } from "../../cli/commands/serve.js";
 import { Server } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { createClawperatorLogger } from "../../adapters/logger.js";
+
+async function createTempRegistryWithSkill(options: {
+  skillId: string;
+  scriptSourcePath: string;
+  skillJsonContents: string;
+  registrySkillEntry: Record<string, unknown>;
+}): Promise<{ registryPath: string; cleanup: () => Promise<void> }> {
+  const root = await mkdtemp(join(tmpdir(), "clawperator-serve-skill-registry-"));
+  const skillDir = join(root, "skills", options.skillId);
+  const scriptsDir = join(skillDir, "scripts");
+  await mkdir(scriptsDir, { recursive: true });
+  await copyFile(options.scriptSourcePath, join(scriptsDir, "run.js"));
+  await writeFile(join(skillDir, "SKILL.md"), `# ${options.skillId}\n`, "utf8");
+  await writeFile(join(skillDir, "skill.json"), options.skillJsonContents, "utf8");
+
+  const registryPath = join(root, "skills", "skills-registry.json");
+  await writeFile(
+    registryPath,
+    `${JSON.stringify({
+      schemaVersion: "1.0",
+      generatedAt: "2026-04-13T00:00:00Z",
+      skills: [options.registrySkillEntry],
+    }, null, 2)}\n`,
+    "utf8"
+  );
+
+  return {
+    registryPath,
+    cleanup: async () => {
+      await rm(root, { recursive: true, force: true });
+    },
+  };
+}
 
 describe("serve API integration", () => {
   let server: Server;
@@ -239,7 +272,7 @@ describe("serve API integration", () => {
     const res = await fetch(`http://localhost:${port}/skills/com.test.skill-result/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ args: ["valid"] }),
+      body: JSON.stringify({ args: ["valid", "40"] }),
     });
 
     assert.strictEqual(res.status, 200);
@@ -257,6 +290,104 @@ describe("serve API integration", () => {
     assert.strictEqual(body.skillResult?.skillId, "com.test.skill-result");
     assert.strictEqual(body.skillResult?.status, "success");
     assert.strictEqual(body.skillResult?.source?.kind, "script");
+  });
+
+  test("POST /skills/:skillId/run shares the CLI validation gate for stale registry contract mismatches", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.serve-stale-registry-contract",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        "com.test.skill-result",
+        "scripts",
+        "emit_skill_result.js"
+      ),
+      skillJsonContents: `${JSON.stringify({
+        id: "com.test.serve-stale-registry-contract",
+        applicationId: "com.test",
+        intent: "temp",
+        summary: "Temporary serve stale-registry contract mismatch test skill",
+        path: "skills/com.test.serve-stale-registry-contract",
+        skillFile: "skills/com.test.serve-stale-registry-contract/SKILL.md",
+        scripts: ["skills/com.test.serve-stale-registry-contract/scripts/run.js"],
+        artifacts: [],
+        contract: {
+          inputs: {
+            percent: "integer[0,100]",
+          },
+          goal: {
+            kind: "set_discharge_limit",
+          },
+          verification: {
+            kind: "node_text_matches",
+            matcher: "Discharge to {percent}%",
+          },
+        },
+      }, null, 2)}\n`,
+      registrySkillEntry: {
+        id: "com.test.serve-stale-registry-contract",
+        applicationId: "com.test",
+        intent: "temp",
+        summary: "Temporary serve stale-registry contract mismatch test skill",
+        path: "skills/com.test.serve-stale-registry-contract",
+        skillFile: "skills/com.test.serve-stale-registry-contract/SKILL.md",
+        scripts: ["skills/com.test.serve-stale-registry-contract/scripts/run.js"],
+        artifacts: [],
+      },
+    });
+
+    const previousRegistryPathForTest = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+    process.env.CLAWPERATOR_SKILLS_REGISTRY = temp.registryPath;
+    try {
+      const res = await fetch(`http://localhost:${port}/skills/com.test.serve-stale-registry-contract/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ args: ["valid", "40"] }),
+      });
+
+      assert.strictEqual(res.status, 400);
+      const body = await res.json() as {
+        ok?: boolean;
+        status?: string;
+        error?: { code?: string; message?: string };
+      };
+      assert.strictEqual(body.ok, false);
+      assert.strictEqual(body.status, "failed");
+      assert.strictEqual(body.error?.code, "SKILL_VALIDATION_FAILED");
+      assert.match(body.error?.message ?? "", /metadata does not match the registry entry/i);
+    } finally {
+      if (previousRegistryPathForTest === undefined) {
+        delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+      } else {
+        process.env.CLAWPERATOR_SKILLS_REGISTRY = previousRegistryPathForTest;
+      }
+      await temp.cleanup();
+    }
+  });
+
+  test("POST /skills/:skillId/run returns indeterminate for declared-but-unproved verification", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.skill-result/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ args: ["legacy"] }),
+    });
+
+    assert.strictEqual(res.status, 200);
+    const body = await res.json() as {
+      status?: string;
+      code?: string;
+      ok?: null;
+      skillId?: string;
+      skillResult?: unknown;
+    };
+    assert.strictEqual(body.status, "indeterminate");
+    assert.strictEqual(body.code, "SKILL_VERIFICATION_INDETERMINATE");
+    assert.strictEqual(body.ok, null);
+    assert.strictEqual(body.skillId, "com.test.skill-result");
+    assert.strictEqual(body.skillResult, null);
   });
 
   test("POST /skills/:skillId/run passes device selection via env for agent-driven skills", async () => {

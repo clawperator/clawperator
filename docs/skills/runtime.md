@@ -244,6 +244,7 @@ The unified logger captures skill output as `skills.run.output` events, enabling
 
 ```json
 {
+  "status": "success",
   "skillId": "com.android.settings.capture-overview",
   "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
   "skillResult": null,
@@ -252,10 +253,33 @@ The unified logger captures skill output as `skills.run.output` events, enabling
 }
 ```
 
+## Runtime Indeterminate Example
+
+```json
+{
+  "status": "indeterminate",
+  "code": "SKILL_VERIFICATION_INDETERMINATE",
+  "message": "Declared verification was not proved.",
+  "skillId": "com.android.settings.capture-overview",
+  "output": "[Clawperator-Skill-Result]\n{\"status\":\"success\"}\n",
+  "skillResult": {
+    "status": "success"
+  },
+  "exitCode": 0,
+  "durationMs": 15321
+}
+```
+
+This wrapper-level `indeterminate` state means the skill process ran without an
+upstream runtime failure, but the declared `skill.json` verification contract
+was not proved. The parsed `skillResult` is returned verbatim; the wrapper does
+not rewrite it.
+
 ## Runtime Failure Example
 
 ```json
 {
+  "status": "failed",
   "code": "SKILL_EXECUTION_TIMEOUT",
   "message": "Skill com.android.settings.capture-overview timed out after 120000ms",
   "skillId": "com.android.settings.capture-overview",

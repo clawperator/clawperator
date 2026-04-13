@@ -6,9 +6,10 @@ import { listSkills } from "../../domain/skills/listSkills.js";
 import { getSkill } from "../../domain/skills/getSkill.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill, type SkillRunEnv } from "../../domain/skills/runSkill.js";
+import { validateSkill } from "../../domain/skills/validateSkill.js";
 import { clawperatorEvents, CLAWPERATOR_EVENT_TYPES } from "../../domain/observe/events.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
-import { SKILL_NOT_FOUND, SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
+import { REGISTRY_READ_FAILED, SKILL_NOT_FOUND, SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { listConfiguredAvds, inspectConfiguredAvd } from "../../domain/android-emulators/configuredAvds.js";
 import { listRunningEmulators } from "../../domain/android-emulators/runningEmulators.js";
@@ -490,6 +491,26 @@ export async function startServer(options: ServeOptions): Promise<Server> {
 
       const expectContainsArg =
         typeof expectContains === "string" ? expectContains : undefined;
+      const validation = await validateSkill(req.params.skillId, undefined, { dryRun: true });
+      if (!validation.ok) {
+        const status = validation.code === SKILL_NOT_FOUND ? 404
+          : validation.code === REGISTRY_READ_FAILED ? 500
+          : 400;
+        res.status(status).json({
+          status: "failed",
+          ok: false,
+          error: {
+            code: validation.code,
+            message: validation.message,
+            details: validation.details,
+            skillId: req.params.skillId,
+            timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
+            expectedSubstring: expectContainsArg,
+          },
+        });
+        return;
+      }
+
       const result = await runSkill(
         req.params.skillId,
         scriptArgs,
@@ -499,9 +520,24 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         { logger: options.logger },
         expectContainsArg
       );
-      if (result.ok) {
+      if (result.status === "success") {
         res.json({
+          status: result.status,
           ok: true,
+          skillId: result.skillId,
+          output: result.output,
+          exitCode: result.exitCode,
+          durationMs: result.durationMs,
+          skillResult: result.skillResult,
+          timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
+          expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
+        });
+      } else if (result.status === "indeterminate") {
+        res.json({
+          ok: result.ok,
+          status: result.status,
+          code: result.code,
+          message: result.message,
           skillId: result.skillId,
           output: result.output,
           exitCode: result.exitCode,
@@ -512,6 +548,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         });
       } else if (result.code === SKILL_OUTPUT_ASSERTION_FAILED) {
         res.status(400).json({
+          status: result.status,
           ok: false,
           error: {
             code: SKILL_OUTPUT_ASSERTION_FAILED,
@@ -528,6 +565,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
           : result.code === "REGISTRY_READ_FAILED" ? 500
           : 400;
         res.status(status).json({
+          status: result.status,
           ok: false,
           error: {
             code: result.code,

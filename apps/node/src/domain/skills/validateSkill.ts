@@ -10,9 +10,11 @@ import {
   REGISTRY_READ_FAILED,
   SKILL_NOT_FOUND,
   SKILL_VALIDATION_FAILED,
+  isSupportedSkillContractInputSchema,
 } from "../../contracts/skills.js";
 import { validateExecution, type ValidationFailure } from "../executions/validateExecution.js";
 import { parseSkillManifestMetadata } from "./skillManifest.js";
+import { normalizeStableJsonValue } from "./stableJson.js";
 import {
   isOrchestratedHarnessScriptPath,
   normalizeSkillPathSeparators,
@@ -105,7 +107,18 @@ function findMismatchFields(skill: SkillEntry, parsed: Partial<SkillEntry>): str
   if (normalizeSkillPathSeparators(parsed.skillFile ?? "") !== normalizeSkillPathSeparators(skill.skillFile)) mismatches.push("skillFile");
   if (JSON.stringify(normalizeSkillPathArray(parsed.scripts)) !== JSON.stringify(normalizeSkillPathArray(skill.scripts))) mismatches.push("scripts");
   if (JSON.stringify(normalizeSkillPathArray(parsed.artifacts)) !== JSON.stringify(normalizeSkillPathArray(skill.artifacts))) mismatches.push("artifacts");
+  if (JSON.stringify(normalizeStableJsonValue(parsed.contract ?? null)) !== JSON.stringify(normalizeStableJsonValue(skill.contract ?? null))) mismatches.push("contract");
   return mismatches;
+}
+
+function findUnsupportedContractInputSchemas(skill: SkillEntry): string[] {
+  if (!skill.contract) {
+    return [];
+  }
+
+  return Object.entries(skill.contract.inputs)
+    .filter(([, schema]) => !isSupportedSkillContractInputSchema(schema))
+    .map(([inputName]) => inputName);
 }
 
 async function validateLoadedSkill(
@@ -205,6 +218,20 @@ async function validateLoadedSkill(
       details: {
         skillJsonPath,
         reason: manifestResult.message,
+      },
+    };
+  }
+
+  const unsupportedContractInputSchemas = findUnsupportedContractInputSchemas(skill);
+  if (unsupportedContractInputSchemas.length > 0) {
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} declares unsupported contract input schemas`,
+      details: {
+        skillJsonPath,
+        invalidKeys: unsupportedContractInputSchemas,
+        reason: "contract.inputs supports only 'string', 'integer', and 'integer[<min>,<max>]' schemas in v1.",
       },
     };
   }

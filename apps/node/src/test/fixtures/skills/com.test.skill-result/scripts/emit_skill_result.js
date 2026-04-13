@@ -3,9 +3,23 @@
 const args = process.argv.slice(2);
 let mode = "valid";
 let cliSkillId;
+let modeSetFromArgs = false;
 
 for (let index = 0; index < args.length; index += 1) {
   const arg = args[index];
+
+  if (arg === "--mode") {
+    mode = args[index + 1] || mode;
+    modeSetFromArgs = true;
+    index += 1;
+    continue;
+  }
+
+  if (arg.startsWith("--mode=")) {
+    mode = arg.slice("--mode=".length) || mode;
+    modeSetFromArgs = true;
+    continue;
+  }
 
   if (arg === "--skill-id") {
     cliSkillId = args[index + 1];
@@ -18,12 +32,14 @@ for (let index = 0; index < args.length; index += 1) {
     continue;
   }
 
-  if (!arg.startsWith("--") && mode === "valid") {
+  if (!arg.startsWith("--") && !modeSetFromArgs) {
     mode = arg || "valid";
+    modeSetFromArgs = true;
   }
 }
 
 const skillId = cliSkillId || process.env.TEST_SKILL_ID || "com.test.skill-result";
+mode = process.env.TEST_SKILL_MODE || mode;
 const prefix = "[Clawperator-Skill-Result]";
 
 const basePayload = {
@@ -233,6 +249,104 @@ switch (mode) {
     });
     console.error("FAIL_OUTPUT:skill-result");
     process.exit(9);
+    break;
+  case "mismatched-success":
+    emitFrame({
+      ...basePayload,
+      terminalVerification: {
+        status: "verified",
+        expected: {
+          kind: "text",
+          text: "Discharge to 40%",
+        },
+        observed: {
+          kind: "text",
+          text: "Charge to 40%",
+        },
+      },
+    });
+    break;
+  case "extra-inputs":
+    emitFrame({
+      ...basePayload,
+      inputs: {
+        ...basePayload.inputs,
+        diagnosticNote: "kept-for-debugging",
+      },
+    });
+    break;
+  case "proved-indeterminate-status":
+    emitFrame({
+      ...basePayload,
+      status: "indeterminate",
+      terminalVerification: {
+        status: "verified",
+        expected: {
+          kind: "text",
+          text: "Discharge to 40%",
+        },
+        observed: {
+          kind: "text",
+          text: "Discharge to 40%",
+        },
+      },
+    });
+    break;
+  case "decorated-success":
+    emitFrame({
+      ...basePayload,
+      terminalVerification: {
+        status: "verified",
+        expected: {
+          kind: "text",
+          text: "Discharge to 40%",
+        },
+        observed: {
+          kind: "text",
+          text: "Discharge to 40% \ue660",
+        },
+      },
+    });
+    break;
+  case "spoofed-inputs":
+    emitFrame({
+      ...basePayload,
+      inputs: {
+        targetPercent: 35,
+      },
+      terminalVerification: {
+        status: "verified",
+        expected: {
+          kind: "text",
+          text: "Discharge to 35%",
+        },
+        observed: {
+          kind: "text",
+          text: "Discharge to 35%",
+        },
+      },
+    });
+    break;
+  case "failed-zero-exit":
+    emitFrame({
+      ...basePayload,
+      status: "failed",
+      terminalVerification: {
+        status: "failed",
+        expected: {
+          kind: "text",
+          text: "Discharge to 40%",
+        },
+        observed: {
+          kind: "text",
+          text: "Discharge to 35%",
+        },
+      },
+      diagnostics: {
+        runtimeState: "poisoned",
+        warnings: ["terminal verification failed"],
+      },
+    });
     break;
   default:
     console.error(`Unknown mode: ${mode}`);

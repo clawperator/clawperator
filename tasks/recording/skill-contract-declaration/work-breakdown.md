@@ -9,20 +9,19 @@ Total PRs: 2. Total phases: 3.
 - PR-1: declaration shape plus scaffold/runtime support
 - PR-2: Solax proving declaration
 
-Current state: blocked until `tasks/recording/skill-result-contract/` lands,
-with the Solax proving phase additionally blocked on W2b.
+Current state: complete from merged `main`.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | blocked |
+| State | complete |
 | Total PRs | 2 |
 | Total phases | 3 |
-| Completed | none |
-| Remaining | P1, P2, P3 |
-| Current / Next | P1 after W2 |
-| Blockers | `tasks/recording/skill-result-contract/` must land first; P3 also waits on `tasks/recording/agent-driven-skills/` |
+| Completed | P1, P2, P3 |
+| Remaining | none |
+| Current / Next | complete; W4 compare is next |
+| Blockers | none |
 
 ## Hard Rules
 

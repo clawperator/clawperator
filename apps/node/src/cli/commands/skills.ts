@@ -415,8 +415,25 @@ export async function cmdSkillsRun(
         }
       })()
     : await runSkillImpl(skillId, args, undefined, timeoutMs, env, { logger: cliLogger }, expectContains);
-  if (result.ok) {
+  if (result.status === "success") {
     return formatSuccess({
+      status: result.status,
+      skillId: result.skillId,
+      output: options.format === "pretty"
+        ? sanitizePrettySkillStdout(result.output, result.skillResult !== null)
+        : result.output,
+      exitCode: result.exitCode,
+      durationMs: result.durationMs,
+      skillResult: result.skillResult,
+      timeoutMs: timeoutMs ?? undefined,
+      expectedSubstring: expectContains ?? undefined,
+    }, options);
+  }
+  if (result.status === "indeterminate") {
+    return formatSuccess({
+      status: result.status,
+      code: result.code,
+      message: result.message,
       skillId: result.skillId,
       output: options.format === "pretty"
         ? sanitizePrettySkillStdout(result.output, result.skillResult !== null)
@@ -430,6 +447,7 @@ export async function cmdSkillsRun(
   }
   if (result.code === SKILL_OUTPUT_ASSERTION_FAILED) {
     return formatError({
+      status: result.status,
       code: SKILL_OUTPUT_ASSERTION_FAILED,
       message: result.message,
       skillId: result.skillId,
@@ -442,6 +460,7 @@ export async function cmdSkillsRun(
     }, options);
   }
   return formatError({
+    status: result.status,
     code: result.code,
     message: result.message,
     skillId: result.skillId,

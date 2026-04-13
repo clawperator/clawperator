@@ -1,11 +1,16 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { SkillAgentConfig } from "../../contracts/skills.js";
+import {
+  skillContractSchema,
+  type SkillAgentConfig,
+  type SkillContract,
+} from "../../contracts/skills.js";
 import { resolveRepoRelativeSkillPath } from "./pathUtils.js";
 
 export interface SkillManifestMetadata {
   skillJsonPath: string;
   agent: SkillAgentConfig | null;
+  contract: SkillContract | null;
 }
 
 export interface SkillManifestReadSuccess {
@@ -41,15 +46,9 @@ function formatSkillJsonError(skillJsonPath: string, detail: string): string {
 function parseAgentConfig(
   skillJsonPath: string,
   parsedUnknown: Record<string, unknown>
-): SkillManifestReadResult {
+): { ok: true; agent: SkillAgentConfig | null } | SkillManifestReadFailure {
   if (!Object.prototype.hasOwnProperty.call(parsedUnknown, "agent")) {
-    return {
-      ok: true,
-      metadata: {
-        skillJsonPath,
-        agent: null,
-      },
-    };
+    return { ok: true, agent: null };
   }
 
   const rawAgent = parsedUnknown.agent;
@@ -100,14 +99,36 @@ function parseAgentConfig(
 
   return {
     ok: true,
-    metadata: {
-      skillJsonPath,
-      agent: {
-        cli,
-        cliPath,
-        timeoutMs,
-      },
+    agent: {
+      cli,
+      cliPath,
+      timeoutMs,
     },
+  };
+}
+
+function parseContractConfig(
+  skillJsonPath: string,
+  parsedUnknown: Record<string, unknown>
+): { ok: true; contract: SkillContract | null } | SkillManifestReadFailure {
+  if (!Object.prototype.hasOwnProperty.call(parsedUnknown, "contract")) {
+    return { ok: true, contract: null };
+  }
+
+  const parsed = skillContractSchema.safeParse(parsedUnknown.contract);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: formatSkillJsonError(
+        skillJsonPath,
+        `skill.json contract is invalid: ${parsed.error.issues.map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.message}`).join("; ")}`
+      ),
+    };
+  }
+
+  return {
+    ok: true,
+    contract: parsed.data,
   };
 }
 
@@ -122,7 +143,25 @@ export function parseSkillManifestMetadata(
     };
   }
 
-  return parseAgentConfig(skillJsonPath, parsedUnknown as Record<string, unknown>);
+  const parsedRecord = parsedUnknown as Record<string, unknown>;
+  const agentResult = parseAgentConfig(skillJsonPath, parsedRecord);
+  if (!agentResult.ok) {
+    return agentResult;
+  }
+
+  const contractResult = parseContractConfig(skillJsonPath, parsedRecord);
+  if (!contractResult.ok) {
+    return contractResult;
+  }
+
+  return {
+    ok: true,
+    metadata: {
+      skillJsonPath,
+      agent: agentResult.agent,
+      contract: contractResult.contract,
+    },
+  };
 }
 
 export async function readSkillManifestMetadata(

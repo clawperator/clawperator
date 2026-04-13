@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Skills registry contract (aligns with skills-registry.json schema).
  */
@@ -5,6 +7,118 @@ export interface SkillAgentConfig {
   cli: string;
   cliPath?: string | null;
   timeoutMs?: number;
+}
+
+export interface SkillContractGoal {
+  kind: string;
+  [key: string]: unknown;
+}
+
+export interface SkillContractNodeTextMatchesVerification {
+  kind: "node_text_matches";
+  matcher: string;
+}
+
+export type SkillContractVerification =
+  | SkillContractNodeTextMatchesVerification;
+
+export interface SkillContract {
+  inputs: Record<string, string>;
+  goal: SkillContractGoal | null;
+  verification: SkillContractVerification | null;
+}
+
+const reservedSkillContractInputNames = new Set(["__proto__", "constructor", "prototype"]);
+
+const skillContractInputNameSchema = z.string()
+  .min(1)
+  .regex(/^[A-Za-z0-9_]+$/, "contract input names must contain only letters, numbers, and underscores")
+  .refine(
+    (name) => !reservedSkillContractInputNames.has(name),
+    "contract input names must not use reserved object property names"
+  );
+
+export type ParsedSkillContractInputSchema =
+  | { kind: "string"; schema: "string" }
+  | { kind: "integer"; schema: string; min: number; max: number };
+
+export function parseSkillContractInputSchema(schema: string): ParsedSkillContractInputSchema | null {
+  const trimmedSchema = schema.trim();
+  if (trimmedSchema === "string") {
+    return { kind: "string", schema: "string" };
+  }
+  const integerRangeMatch = /^integer(?:\[(?<min>-?\d+),(?<max>-?\d+)])?$/.exec(trimmedSchema);
+  if (!integerRangeMatch) {
+    return null;
+  }
+  const min = Number.parseInt(integerRangeMatch.groups?.min ?? `${Number.MIN_SAFE_INTEGER}`, 10);
+  const max = Number.parseInt(integerRangeMatch.groups?.max ?? `${Number.MAX_SAFE_INTEGER}`, 10);
+  if (min > max) {
+    return null;
+  }
+  return {
+    kind: "integer",
+    schema: trimmedSchema,
+    min,
+    max,
+  };
+}
+
+export function isSupportedSkillContractInputSchema(schema: string): boolean {
+  return parseSkillContractInputSchema(schema) !== null;
+}
+
+function extractMatcherPlaceholders(matcher: string): string[] {
+  return Array.from(matcher.matchAll(/\{([A-Za-z0-9_]+)\}/g), (match) => match[1] ?? "");
+}
+
+const skillContractInputSchemaStringSchema = z.string()
+  .min(1)
+  .refine(
+    (schema) => isSupportedSkillContractInputSchema(schema),
+    (schema) => ({
+      message: `unsupported contract input schema '${schema}'`,
+    })
+  );
+
+export const skillContractVerificationSchema: z.ZodType<SkillContractVerification> = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("node_text_matches"),
+    matcher: z.string().min(1),
+  }),
+]);
+
+export const skillContractSchema: z.ZodType<SkillContract> = z.object({
+  inputs: z.record(skillContractInputNameSchema, skillContractInputSchemaStringSchema),
+  goal: z.object({
+    kind: z.string().min(1),
+  }).catchall(z.unknown()).nullable(),
+  verification: skillContractVerificationSchema.nullable(),
+}).superRefine((contract, context) => {
+  if (contract.verification?.kind !== "node_text_matches") {
+    return;
+  }
+
+  const declaredInputs = new Set(Object.keys(contract.inputs));
+  const undeclaredPlaceholders = extractMatcherPlaceholders(contract.verification.matcher)
+    .filter((placeholder) => !declaredInputs.has(placeholder));
+  if (undeclaredPlaceholders.length === 0) {
+    return;
+  }
+
+  context.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ["verification", "matcher"],
+    message: `contract matcher references undeclared inputs: ${undeclaredPlaceholders.join(", ")}`,
+  });
+});
+
+export function hasMeaningfulSkillContract(contract: SkillContract | null | undefined): boolean {
+  return contract !== undefined && contract !== null && (
+    Object.keys(contract.inputs).length > 0
+    || contract.goal !== null
+    || contract.verification !== null
+  );
 }
 
 export interface SkillEntry {
@@ -17,6 +131,7 @@ export interface SkillEntry {
   scripts: string[];
   artifacts: string[];
   agent?: SkillAgentConfig;
+  contract?: SkillContract;
 }
 
 export interface SkillsRegistry {

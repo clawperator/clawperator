@@ -404,6 +404,7 @@ Verification pattern:
 
 ```json
 {
+  "status": "success",
   "ok": true,
   "skillId": "com.example.app.do-thing",
   "output": "RESULT|status=success\n",
@@ -415,10 +416,31 @@ Verification pattern:
 }
 ```
 
+- declared-but-unproved verification response shape is:
+
+```json
+{
+  "status": "indeterminate",
+  "ok": null,
+  "code": "SKILL_VERIFICATION_INDETERMINATE",
+  "message": "Declared verification was not proved.",
+  "skillId": "com.example.app.do-thing",
+  "output": "[Clawperator-Skill-Result]\n{\"status\":\"success\"}\n",
+  "skillResult": {
+    "status": "success"
+  },
+  "exitCode": 0,
+  "durationMs": 8421,
+  "timeoutMs": 90000,
+  "expectedSubstring": "RESULT"
+}
+```
+
 - failure response shape is:
 
 ```json
 {
+  "status": "failed",
   "ok": false,
   "error": {
     "code": "SKILL_EXECUTION_FAILED",
