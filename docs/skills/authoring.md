@@ -312,7 +312,9 @@ Current v1 rule:
 For `node_text_matches`, the runtime currently requires:
 
 - `skillResult.terminalVerification.status === "verified"`
-- the observed terminal verification text matches the declared `matcher` after replacing placeholders like `{percent}` from `skillResult.inputs`
+- the declared `matcher` is rendered from trusted invocation inputs parsed from the trailing raw `skills run ... -- <args>` arguments, in `contract.inputs` declaration order, not from self-reported `skillResult.inputs`
+- `skillResult.inputs` must agree with those trusted invocation inputs for the declared fields
+- the observed terminal verification text matches the declared matcher after placeholder replacement; decorative trailing glyphs or punctuation in the observed text are allowed, but a different value or different leading text is not
 
 This keeps `skill.json` claims tied to the shipped `SkillResult` contract instead
 of inventing a second result channel.

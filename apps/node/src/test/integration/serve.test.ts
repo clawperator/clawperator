@@ -239,7 +239,7 @@ describe("serve API integration", () => {
     const res = await fetch(`http://localhost:${port}/skills/com.test.skill-result/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ args: ["valid"] }),
+      body: JSON.stringify({ args: ["valid", "40"] }),
     });
 
     assert.strictEqual(res.status, 200);

@@ -8538,6 +8538,7 @@ If the expected text is present, the success payload echoes the assertion:
 
 ```json
 {
+  "status": "success",
   "skillId": "com.android.settings.capture-overview",
   "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
   "skillResult": null,
@@ -8550,16 +8551,36 @@ Important:
 
 - `output` is raw stdout from the script
 - the wrapper parses a trailing framed `SkillResult` when present and returns it as `skillResult`
+- the top-level wrapper `status` is `success`, `failed`, or `indeterminate`
+- when a declared verification contract is not proved, the wrapper returns `status: "indeterminate"` without rewriting the emitted `skillResult`
 - progress lines written by the skill to stdout remain inside `output` in JSON mode
 - pretty mode writes a banner before streaming live skill output, so use `--json` when another agent needs machine-readable output
 - in JSON mode, the wrapper returns one JSON object and does not stream live child stdout separately
 - `timeoutMs` is present only when the caller passed `--timeout` or `--timeout-ms`
 - `expectedSubstring` is present only when the caller passed `--expect-contains`
 
+## `skills run` Indeterminate Shape
+
+```json
+{
+  "status": "indeterminate",
+  "code": "SKILL_VERIFICATION_INDETERMINATE",
+  "message": "Declared verification was not proved.",
+  "skillId": "com.android.settings.capture-overview",
+  "output": "[Clawperator-Skill-Result]\n{\"status\":\"success\"}\n",
+  "skillResult": {
+    "status": "success"
+  },
+  "exitCode": 0,
+  "durationMs": 15842
+}
+```
+
 ## `skills run` Failure Shape
 
 ```json
 {
+  "status": "failed",
   "code": "SKILL_EXECUTION_FAILED",
   "message": "Skill com.android.settings.capture-overview exited with code 2",
   "skillId": "com.android.settings.capture-overview",
@@ -9043,7 +9064,9 @@ Current v1 rule:
 For `node_text_matches`, the runtime currently requires:
 
 - `skillResult.terminalVerification.status === "verified"`
-- the observed terminal verification text matches the declared `matcher` after replacing placeholders like `{percent}` from `skillResult.inputs`
+- the declared `matcher` is rendered from trusted invocation inputs parsed from the trailing raw `skills run ... -- <args>` arguments, in `contract.inputs` declaration order, not from self-reported `skillResult.inputs`
+- `skillResult.inputs` must agree with those trusted invocation inputs for the declared fields
+- the observed terminal verification text matches the declared matcher after placeholder replacement; decorative trailing glyphs or punctuation in the observed text are allowed, but a different value or different leading text is not
 
 This keeps `skill.json` claims tied to the shipped `SkillResult` contract instead
 of inventing a second result channel.
@@ -10194,6 +10217,7 @@ Verification pattern:
 
 ```json
 {
+  "status": "success",
   "ok": true,
   "skillId": "com.example.app.do-thing",
   "output": "RESULT|status=success\n",
@@ -10205,10 +10229,31 @@ Verification pattern:
 }
 ```
 
+- declared-but-unproved verification response shape is:
+
+```json
+{
+  "status": "indeterminate",
+  "ok": null,
+  "code": "SKILL_VERIFICATION_INDETERMINATE",
+  "message": "Declared verification was not proved.",
+  "skillId": "com.example.app.do-thing",
+  "output": "[Clawperator-Skill-Result]\n{\"status\":\"success\"}\n",
+  "skillResult": {
+    "status": "success"
+  },
+  "exitCode": 0,
+  "durationMs": 8421,
+  "timeoutMs": 90000,
+  "expectedSubstring": "RESULT"
+}
+```
+
 - failure response shape is:
 
 ```json
 {
+  "status": "failed",
   "ok": false,
   "error": {
     "code": "SKILL_EXECUTION_FAILED",
@@ -10652,6 +10697,7 @@ The unified logger captures skill output as `skills.run.output` events, enabling
 
 ```json
 {
+  "status": "success",
   "skillId": "com.android.settings.capture-overview",
   "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
   "skillResult": null,
@@ -10660,10 +10706,33 @@ The unified logger captures skill output as `skills.run.output` events, enabling
 }
 ```
 
+## Runtime Indeterminate Example
+
+```json
+{
+  "status": "indeterminate",
+  "code": "SKILL_VERIFICATION_INDETERMINATE",
+  "message": "Declared verification was not proved.",
+  "skillId": "com.android.settings.capture-overview",
+  "output": "[Clawperator-Skill-Result]\n{\"status\":\"success\"}\n",
+  "skillResult": {
+    "status": "success"
+  },
+  "exitCode": 0,
+  "durationMs": 15321
+}
+```
+
+This wrapper-level `indeterminate` state means the skill process ran without an
+upstream runtime failure, but the declared `skill.json` verification contract
+was not proved. The parsed `skillResult` is returned verbatim; the wrapper does
+not rewrite it.
+
 ## Runtime Failure Example
 
 ```json
 {
+  "status": "failed",
   "code": "SKILL_EXECUTION_TIMEOUT",
   "message": "Skill com.android.settings.capture-overview timed out after 120000ms",
   "skillId": "com.android.settings.capture-overview",

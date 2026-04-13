@@ -1928,7 +1928,7 @@ describe("runSkill", () => {
   });
 
   it("parses a valid framed SkillResult for scripted skills", async () => {
-    const result = await runSkill(TEST_SKILL_RESULT, ["valid"]);
+    const result = await runSkill(TEST_SKILL_RESULT, ["valid", "40"]);
     assert.ok(result.ok, `Expected framed SkillResult to succeed: ${"message" in result ? result.message : ""}`);
     assert.ok(result.output.includes("progress:before-frame"));
     assert.ok(result.skillResult);
@@ -1962,7 +1962,7 @@ describe("runSkill", () => {
     });
 
     try {
-      const result = await runSkill(TEST_SKILL_RESULT, ["valid"], temp.registryPath);
+      const result = await runSkill(TEST_SKILL_RESULT, ["valid", "40"], temp.registryPath);
       assert.ok(result.ok, `Expected framed scripted run to stay permissive: ${"message" in result ? result.message : ""}`);
       assert.ok(result.skillResult);
       assert.strictEqual(result.skillResult.source.kind, "script");
@@ -1973,7 +1973,7 @@ describe("runSkill", () => {
   });
 
   it("parses a valid framed SkillResult for agent-driven skills and injects agent source metadata", async () => {
-    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["valid"]);
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["valid", "40"]);
 
     assert.ok(result.ok, `Expected agent SkillResult to succeed: ${"message" in result ? result.message : ""}`);
     assert.ok(result.skillResult);
@@ -2235,7 +2235,7 @@ describe("runSkill", () => {
   });
 
   it("reports success for orchestrated skills that take a recovery path but still reach terminal verification", async () => {
-    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["recovery-success"]);
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["recovery-success", "40"]);
 
     assert.ok(result.ok, `Expected orchestrated recovery-path success to parse: ${"message" in result ? result.message : ""}`);
     assert.ok(result.skillResult);
@@ -2293,7 +2293,7 @@ describe("runSkill", () => {
     try {
       const result = await runSkill(
         "com.test.agent-env-check",
-        ["env-check"],
+        ["env-check", "40"],
         temp.registryPath,
         undefined,
         {
@@ -2357,7 +2357,7 @@ describe("runSkill", () => {
       const expectedSkillProgramPath = join(getRepoRoot(temp.registryPath), skillFileRelativePath);
       const result = await runSkill(
         "com.test.custom-skill-file",
-        ["env-check"],
+        ["env-check", "40"],
         temp.registryPath,
         undefined,
         {
@@ -2547,6 +2547,99 @@ describe("runSkill", () => {
       assert.ok(result.ok, `Expected validation to ignore registry parity for agent metadata: ${!result.ok ? result.message : ""}`);
     } finally {
       await temp.cleanup();
+    }
+  });
+
+  it("treats semantically identical contract objects as matching even when key order differs", async () => {
+    const root = await mkdtemp(join(tmpdir(), "clawperator-contract-order-"));
+    const skillId = "com.test.contract-order";
+    const skillDir = join(root, "skills", skillId);
+    const scriptsDir = join(skillDir, "scripts");
+    const registryPath = join(root, "skills", "skills-registry.json");
+
+    try {
+      await mkdir(scriptsDir, { recursive: true });
+      await copyFile(
+        join(
+          packageRoot,
+          "src",
+          "test",
+          "fixtures",
+          "skills",
+          "com.test.echo",
+          "scripts",
+          "echo.js"
+        ),
+        join(scriptsDir, "run.js")
+      );
+      await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+      await writeFile(
+        join(skillDir, "skill.json"),
+        JSON.stringify({
+          id: skillId,
+          applicationId: "com.test",
+          intent: "contract-order",
+          summary: "Temporary test skill",
+          path: `skills/${skillId}`,
+          skillFile: `skills/${skillId}/SKILL.md`,
+          scripts: [`skills/${skillId}/scripts/run.js`],
+          artifacts: [],
+          contract: {
+            inputs: {
+              percent: "integer[0,100]",
+            },
+            goal: {
+              kind: "set_discharge_limit",
+              zeta: "last",
+              alpha: "first",
+            },
+            verification: {
+              kind: "node_text_matches",
+              matcher: "Discharge to {percent}%",
+            },
+          },
+        }),
+        "utf8"
+      );
+      await writeFile(
+        registryPath,
+        JSON.stringify({
+          schemaVersion: "1.0",
+          generatedAt: "2026-04-13T00:00:00Z",
+          skills: [
+            {
+              id: skillId,
+              applicationId: "com.test",
+              intent: "contract-order",
+              summary: "Temporary test skill",
+              path: `skills/${skillId}`,
+              skillFile: `skills/${skillId}/SKILL.md`,
+              scripts: [`skills/${skillId}/scripts/run.js`],
+              artifacts: [],
+              contract: {
+                inputs: {
+                  percent: "integer[0,100]",
+                },
+                goal: {
+                  alpha: "first",
+                  kind: "set_discharge_limit",
+                  zeta: "last",
+                },
+                verification: {
+                  matcher: "Discharge to {percent}%",
+                  kind: "node_text_matches",
+                },
+              },
+            },
+          ],
+        }),
+        "utf8"
+      );
+
+      const result = await validateSkill(skillId, registryPath);
+      assert.ok(result.ok, `Expected contract parity to ignore JSON key order: ${!result.ok ? result.message : ""}`);
+    } finally {
+      await rm(root, { recursive: true, force: true });
     }
   });
 
@@ -2774,7 +2867,7 @@ describe("runSkill", () => {
       try {
         const result = await runSkill(
           "com.test.agent-path-override",
-          ["env-check"],
+          ["env-check", "40"],
           temp.registryPath,
           undefined,
           {
@@ -2878,24 +2971,56 @@ describe("runSkill", () => {
   });
 
   it("returns indeterminate when declared verification disagrees with a framed success result", async () => {
-    const result = await runSkill(TEST_SKILL_RESULT, ["mismatched-success"]);
+    const result = await runSkill(TEST_SKILL_RESULT, ["mismatched-success", "40"]);
 
     assert.strictEqual(result.status, "indeterminate");
     assert.strictEqual(result.ok, null);
     assert.strictEqual(result.code, "SKILL_VERIFICATION_INDETERMINATE");
     assert.ok(result.skillResult);
-    assert.strictEqual(result.skillResult.status, "indeterminate");
+    assert.strictEqual(result.skillResult.status, "success");
     assert.strictEqual(result.skillResult.terminalVerification?.status, "verified");
   });
 
   it("accepts decorative terminal-verification suffixes for declared text matches", async () => {
-    const result = await runSkill(TEST_SKILL_RESULT, ["decorated-success"]);
+    const result = await runSkill(TEST_SKILL_RESULT, ["decorated-success", "40"]);
 
     assert.ok(result.ok, `Expected decorated terminal verification to count as a match: ${"message" in result ? result.message : ""}`);
     assert.strictEqual(result.status, "success");
     assert.ok(result.skillResult);
     assert.strictEqual(result.skillResult.status, "success");
     assert.strictEqual(result.skillResult.terminalVerification?.status, "verified");
+  });
+
+  it("returns indeterminate when SkillResult inputs do not match trusted invocation inputs", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["40"], undefined, undefined, {
+      TEST_SKILL_MODE: "valid",
+    });
+
+    assert.ok(result.ok, `Expected trusted invocation inputs to match declared inputs: ${"message" in result ? result.message : ""}`);
+
+    const spoofed = await runSkill(TEST_SKILL_RESULT, ["40"], undefined, undefined, {
+      TEST_SKILL_MODE: "spoofed-inputs",
+    });
+
+    assert.strictEqual(spoofed.status, "indeterminate");
+    assert.strictEqual(spoofed.ok, null);
+    assert.strictEqual(spoofed.code, "SKILL_VERIFICATION_INDETERMINATE");
+    assert.match(spoofed.message, /trusted invocation inputs/i);
+    assert.ok(spoofed.skillResult);
+    assert.strictEqual(spoofed.skillResult.status, "success");
+  });
+
+  it("fails a declared-verification run when a zero-exit SkillResult reports failed status", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["failed-zero-exit", "40"]);
+
+    assert.ok(!result.ok);
+    assert.strictEqual(result.status, "failed");
+    assert.strictEqual(result.code, SKILL_EXECUTION_FAILED);
+    assert.match(result.message, /reported failed status while executing a declared verification contract/i);
+    assert.strictEqual(result.exitCode, 0);
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.status, "failed");
+    assert.strictEqual(result.skillResult.terminalVerification?.status, "failed");
   });
 
   it("rejects earlier marker mentions when they are not part of the trailing frame suffix", async () => {
@@ -3203,7 +3328,7 @@ describe("runSkill", () => {
   });
 
   it("accepts newer SkillResult minor versions on the same major", async () => {
-    const result = await runSkill(TEST_SKILL_RESULT, ["newer-minor"]);
+    const result = await runSkill(TEST_SKILL_RESULT, ["newer-minor", "40"]);
 
     assert.ok(result.ok, `Expected newer minor version to succeed: ${"message" in result ? result.message : ""}`);
     assert.ok(result.skillResult);
@@ -3212,7 +3337,7 @@ describe("runSkill", () => {
   });
 
   it("accepts raw ResultEnvelope data values in execEnvelopes and normalizes them to strings", async () => {
-    const result = await runSkill(TEST_SKILL_RESULT, ["raw-envelope-data"]);
+    const result = await runSkill(TEST_SKILL_RESULT, ["raw-envelope-data", "40"]);
 
     assert.ok(result.ok, `Expected raw execEnvelopes to parse successfully: ${"message" in result ? result.message : ""}`);
     assert.ok(result.skillResult);
@@ -3313,7 +3438,7 @@ describe("runSkill", () => {
   });
 
   it("returns timeout for orchestrated skills and preserves timeout precedence over any later frame", async () => {
-    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["timeout"], undefined, 150);
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["timeout", "40"], undefined, 150);
 
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
@@ -3463,6 +3588,7 @@ describe("runSkill", () => {
       "json",
       "--",
       "env-check",
+      "40",
     ], {
       env: {
         ...process.env,

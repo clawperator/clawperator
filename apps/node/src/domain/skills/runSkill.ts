@@ -126,6 +126,18 @@ interface SkillContractVerificationOutcome {
   message?: string;
 }
 
+interface TrustedContractInputsResult {
+  ok: true;
+  inputs: Record<string, unknown>;
+}
+
+interface TrustedContractInputsError {
+  ok: false;
+  message: string;
+}
+
+type TrustedContractInputsResolution = TrustedContractInputsResult | TrustedContractInputsError;
+
 function signalSkillChildWithLogging(
   child: ReturnType<typeof spawn>,
   signal: NodeJS.Signals,
@@ -341,9 +353,92 @@ function terminalVerificationTextMatches(expectedText: string, observedText: str
   return decorativeSuffixPattern.test(normalizedObserved);
 }
 
+function parseDeclaredContractInputValue(schema: string, rawValue: string): { ok: true; value: unknown } | { ok: false; message: string } {
+  const trimmedSchema = schema.trim();
+  if (trimmedSchema === "string") {
+    return { ok: true, value: rawValue };
+  }
+
+  const integerRangeMatch = /^integer(?:\[(?<min>-?\d+),(?<max>-?\d+)])?$/.exec(trimmedSchema);
+  if (integerRangeMatch?.groups) {
+    if (!/^-?\d+$/.test(rawValue)) {
+      return { ok: false, message: `expected integer input for schema '${trimmedSchema}', got '${rawValue}'` };
+    }
+    const parsedValue = Number.parseInt(rawValue, 10);
+    const min = Number.parseInt(integerRangeMatch.groups.min ?? `${Number.MIN_SAFE_INTEGER}`, 10);
+    const max = Number.parseInt(integerRangeMatch.groups.max ?? `${Number.MAX_SAFE_INTEGER}`, 10);
+    if (parsedValue < min || parsedValue > max) {
+      return {
+        ok: false,
+        message: `expected integer input in range [${min},${max}] for schema '${trimmedSchema}', got '${rawValue}'`,
+      };
+    }
+    return { ok: true, value: parsedValue };
+  }
+
+  return {
+    ok: false,
+    message: `unsupported declared input schema '${trimmedSchema}'`,
+  };
+}
+
+function resolveTrustedContractInputs(
+  contract: SkillContract,
+  args: string[]
+): TrustedContractInputsResolution {
+  const declaredInputs = Object.entries(contract.inputs);
+  if (declaredInputs.length === 0) {
+    return { ok: true, inputs: {} };
+  }
+
+  if (args.length < declaredInputs.length) {
+    return {
+      ok: false,
+      message: `Skill declared ${declaredInputs.length} contract inputs but was invoked with only ${args.length} raw args.`,
+    };
+  }
+
+  const trustedRawInputs = args.slice(-declaredInputs.length);
+  const trustedInputs: Record<string, unknown> = {};
+  for (const [index, [inputName, schema]] of declaredInputs.entries()) {
+    const parseResult = parseDeclaredContractInputValue(schema, trustedRawInputs[index] ?? "");
+    if (!parseResult.ok) {
+      return {
+        ok: false,
+        message: `Could not trust declared input '${inputName}': ${parseResult.message}.`,
+      };
+    }
+    trustedInputs[inputName] = parseResult.value;
+  }
+
+  return { ok: true, inputs: trustedInputs };
+}
+
+function normalizeJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeJsonValue(entry));
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+        .map(([key, entryValue]) => [key, normalizeJsonValue(entryValue)])
+    );
+  }
+  return value;
+}
+
+function declaredInputsMatchTrustedInputs(
+  trustedInputs: Record<string, unknown>,
+  reportedInputs: Record<string, unknown> | undefined
+): boolean {
+  return JSON.stringify(normalizeJsonValue(trustedInputs)) === JSON.stringify(normalizeJsonValue(reportedInputs ?? {}));
+}
+
 function verifyDeclaredSkillContract(
   contract: SkillContract | null,
-  skillResult: SkillResult | null
+  skillResult: SkillResult | null,
+  trustedInvocationArgs: string[]
 ): SkillContractVerificationOutcome {
   if (contract === null || !hasMeaningfulSkillContract(contract) || contract.verification === null) {
     return { ok: true };
@@ -363,11 +458,26 @@ function verifyDeclaredSkillContract(
     };
   }
 
-  const renderedMatcher = renderVerificationMatcher(contract.verification.matcher, skillResult.inputs);
+  const trustedInputsResolution = resolveTrustedContractInputs(contract, trustedInvocationArgs);
+  if (!trustedInputsResolution.ok) {
+    return {
+      ok: false,
+      message: trustedInputsResolution.message,
+    };
+  }
+
+  if (!declaredInputsMatchTrustedInputs(trustedInputsResolution.inputs, skillResult.inputs)) {
+    return {
+      ok: false,
+      message: "SkillResult inputs did not match the trusted invocation inputs for the declared contract.",
+    };
+  }
+
+  const renderedMatcher = renderVerificationMatcher(contract.verification.matcher, trustedInputsResolution.inputs);
   if (renderedMatcher === null) {
     return {
       ok: false,
-      message: `SkillResult inputs did not provide the values required to render declared matcher '${contract.verification.matcher}'.`,
+      message: `Trusted invocation inputs did not provide the values required to render declared matcher '${contract.verification.matcher}'.`,
     };
   }
 
@@ -790,7 +900,7 @@ export async function runSkill(
         });
         return;
       }
-      const contractVerification = verifyDeclaredSkillContract(resolvedContract, parsedSkillResult.skillResult);
+      const contractVerification = verifyDeclaredSkillContract(resolvedContract, parsedSkillResult.skillResult, args);
       const hasDeclaredVerification = resolvedContract !== null
         && hasMeaningfulSkillContract(resolvedContract)
         && resolvedContract.verification !== null;
@@ -818,23 +928,7 @@ export async function runSkill(
           output: stdout,
           exitCode: 0,
           durationMs,
-          skillResult: parsedSkillResult.skillResult === null
-            ? null
-            : {
-                ...parsedSkillResult.skillResult,
-                status: "indeterminate",
-                terminalVerification: parsedSkillResult.skillResult.terminalVerification ?? {
-                  status: "not_run",
-                  note: contractVerification.message ?? "Declared verification was not proved.",
-                },
-                diagnostics: {
-                  ...(parsedSkillResult.skillResult.diagnostics ?? {}),
-                  warnings: [
-                    ...(parsedSkillResult.skillResult.diagnostics?.warnings ?? []),
-                    contractVerification.message ?? "Declared verification was not proved.",
-                  ],
-                },
-              },
+          skillResult: parsedSkillResult.skillResult,
         });
         return;
       }
