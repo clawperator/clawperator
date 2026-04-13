@@ -39,6 +39,9 @@ Execution guardrails:
     follow-up
 - prefer recording a short rationale in `findings.md` over silently growing
   scope
+- `findings.md` is an execution artifact for this task pack only. It is not
+  part of the shipped compare contract and must not be treated as durable
+  documentation.
 
 ## Status
 
@@ -284,6 +287,8 @@ Enforcement posture:
   authoritative test input for routine Node test runs; the canonical
   skills-repo retained baseline is the authoritative source for refresh and
   sync verification
+- this means cross-repo durability remains an accepted limitation of the
+  closeout branch, not a fully solved property
 
 Test discipline:
 
@@ -339,6 +344,8 @@ After this task, the `skills/compare` branch must:
   Solax-specific and fail-closed
 - have an opt-in developer-side cross-repo sync guard that compares
   structure and compare behavior, not raw bytes
+- record the result of that opt-in sync guard in `findings.md` whenever the
+  sibling skills repo is available during execution
 - allow fixture refresh in the same task when that is required to restore
   truthful alignment with the canonical retained baseline
 - ship with an explicit compare regression matrix that covers the known and

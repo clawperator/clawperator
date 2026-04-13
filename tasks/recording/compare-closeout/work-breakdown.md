@@ -50,6 +50,8 @@ verification). One commit per phase except P4 (verification only).
 - Work on the existing `skills/compare` branch. Do not create a new branch.
 - Keep a running execution log in
   `tasks/recording/compare-closeout/findings.md`.
+- `findings.md` is for execution control only. Do not treat it as durable
+  shipped documentation or part of the compare contract.
 - When you complete a phase, add a short entry to `findings.md` covering:
   what changed, what validation ran, what remains, and any newly discovered
   risks or follow-ups.
@@ -798,6 +800,10 @@ compare behavior, not raw file bytes.
    JSON equality. The test should fail only when compare-relevant structure
    drifts.
 
+   Whether this sync guard passes, fails, or is skipped because
+   `CLAWPERATOR_SKILLS_ROOT` is not set, record that result in
+   `tasks/recording/compare-closeout/findings.md`.
+
 9. Build and test:
    ```bash
    npm --prefix apps/node run build && npm --prefix apps/node run test
@@ -843,6 +849,9 @@ compare behavior, not raw file bytes.
 - If the canonical retained baseline is already out of sync, the task may
   refresh the checked-in fixture and should do so rather than leaving the
   pack in a detect-but-don't-fix state.
+- The closeout summary and `findings.md` both describe the sync guard as a
+  developer-side validation aid for this branch, not as CI-enforced
+  durability or a fully solved retained-baseline ownership story.
 - All existing tests still pass with no modifications.
 - Build succeeds.
 - The compare Test Matrix is satisfied either by new tests in this phase or
@@ -1128,6 +1137,13 @@ None. This is a verification-only phase.
    validation honestly, separate compare-specific results from unrelated
    failures, and stop short of a PR-ready conclusion.
 
+8. In the closeout summary and final `findings.md` entry, state the accepted
+   limitations explicitly:
+   - the cross-repo sync guard is opt-in and developer-side for this branch,
+     not CI-enforced durability
+   - `minimumSemanticCoverage = 2` is a temporary Solax-specific trust policy,
+     not a generic semantic-compare contract
+
 ### Acceptance Criteria
 
 - Build succeeds.
@@ -1138,6 +1154,8 @@ None. This is a verification-only phase.
 - No placeholder skill ids in docs.
 - All three new outcomes appear in the implementation at least 3 times each.
 - If the full Node suite is not green, the task does not claim PR readiness.
+- The final closeout summary explicitly calls out the accepted limitations of
+  the opt-in sync guard and the temporary Solax-specific semantic threshold.
 
 ### Validation
 
