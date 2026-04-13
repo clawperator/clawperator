@@ -32,6 +32,11 @@ from evals.harness.environment import (
     resolve_inputs,
     _resolve_clawperator_cmd,
 )
+from evals.harness.live_skill_eval import (
+    DEFAULT_SKILLS_REGISTRY,
+    SOLAX_COLD_START_EVAL_ID,
+    run_solax_orchestrated_cold_start_eval,
+)
 from evals.harness.runner import build_prompt, run_eval, _prepare_clawperator_launcher
 from evals.harness.replay import run_replay, DEFAULT_REPLAY_TIMEOUT_S
 from evals.harness.scorer import score
@@ -417,6 +422,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--agent", choices=sorted(SUPPORTED_AGENTS))
     parser.add_argument("--model")
     parser.add_argument("--device")
+    parser.add_argument("--operator-package")
     parser.add_argument("--mode", default="public-surface", choices=sorted(SUPPORTED_MODES))
     parser.add_argument("--runtime", default="local-dev", choices=sorted(SUPPORTED_RUNTIMES))
     parser.add_argument("--timeout-s", type=int, default=300)
@@ -426,6 +432,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--replay-timeout-s", type=int, default=DEFAULT_REPLAY_TIMEOUT_S)
     parser.add_argument("--label")
     parser.add_argument("--runs-dir", default=str(ROOT / "evals" / "runs"))
+    parser.add_argument("--artifacts-dir", default=argparse.SUPPRESS)
+    parser.add_argument("--skills-registry", default=argparse.SUPPRESS)
+    parser.add_argument("--runs", type=int, default=argparse.SUPPRESS)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--rescore", nargs="?", const="")
     return parser
@@ -435,8 +444,52 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    if args.eval_id == SOLAX_COLD_START_EVAL_ID:
+        if args.agent is not None:
+            parser.error("--agent is not supported for solax-orchestrated-cold-start")
+        if args.model is not None:
+            parser.error("--model is not supported for solax-orchestrated-cold-start")
+        if args.skill_prompt is not None:
+            parser.error("--skill-prompt is not supported for solax-orchestrated-cold-start")
+        if args.replay is not None:
+            parser.error("--replay is not supported for solax-orchestrated-cold-start")
+        if args.rescore is not None:
+            parser.error("--rescore is not supported for solax-orchestrated-cold-start")
+        if args.timeout_s != 300:
+            parser.error("--timeout-s is not supported for solax-orchestrated-cold-start")
+        if args.max_turns != 40:
+            parser.error("--max-turns is not supported for solax-orchestrated-cold-start")
+        if args.runs_dir != str(ROOT / "evals" / "runs"):
+            parser.error("--runs-dir is not supported for solax-orchestrated-cold-start")
+        batch_dir = run_solax_orchestrated_cold_start_eval(
+            device_serial=args.device,
+            operator_package=args.operator_package,
+            runtime=args.runtime,
+            runs=getattr(args, "runs", 1),
+            artifacts_dir=Path(getattr(args, "artifacts_dir", str(ROOT / "evals" / "artifacts"))),
+            skills_registry=Path(getattr(args, "skills_registry", str(DEFAULT_SKILLS_REGISTRY))),
+            label=args.label,
+            dry_run=args.dry_run,
+        )
+        print(batch_dir)
+        if not args.dry_run:
+            summary = json.loads((batch_dir / "summary.json").read_text(encoding="utf-8"))
+            print(
+                f"{summary['aggregate_status'].upper()} | cold-start | "
+                f"{summary['counts']['cold_start_verified']}/{summary['runs_requested']} verified"
+            )
+        return 0
+
     if args.eval_id != "android-version":
         raise SystemExit(f"unsupported eval: {args.eval_id}")
+    if args.operator_package is not None:
+        parser.error("--operator-package is only supported for solax-orchestrated-cold-start")
+    if hasattr(args, "artifacts_dir"):
+        parser.error("--artifacts-dir is only supported for solax-orchestrated-cold-start")
+    if hasattr(args, "skills_registry"):
+        parser.error("--skills-registry is only supported for solax-orchestrated-cold-start")
+    if hasattr(args, "runs"):
+        parser.error("--runs is only supported for solax-orchestrated-cold-start")
 
     spec = _load_spec(args.eval_id)
     spec["runtime_target"] = args.runtime

@@ -13,7 +13,7 @@ from evals.harness.runner import build_prompt
 def _fake_run_factory(version: str):
     def _fake_run(cmd: list[str], env: dict[str, str], cwd: Path | None = None):
         if cmd[-1] == "devices":
-            return subprocess.CompletedProcess(cmd, 0, stdout="List of devices attached\nR5CT22AGEEF\tdevice\n", stderr="")
+            return subprocess.CompletedProcess(cmd, 0, stdout="List of devices attached\ndevice-123\tdevice\n", stderr="")
         if cmd[-3:] == ["shell", "getprop", "persist.sys.timezone"]:
             return subprocess.CompletedProcess(cmd, 0, stdout="Australia/Brisbane\n", stderr="")
         if cmd[-3:] == ["shell", "getprop", "ro.build.version.release"]:
@@ -51,7 +51,7 @@ def test_preflight_published_binary_missing(monkeypatch):
 def test_published_runtime_forces_release_operator_package(monkeypatch):
     def fake_run(cmd: list[str], env: dict[str, str], cwd: Path | None = None):
         if cmd[-1] == "devices":
-            return subprocess.CompletedProcess(cmd, 0, stdout="List of devices attached\nR5CT22AGEEF\tdevice\n", stderr="")
+            return subprocess.CompletedProcess(cmd, 0, stdout="List of devices attached\ndevice-123\tdevice\n", stderr="")
         if cmd[-3:] == ["shell", "getprop", "persist.sys.timezone"]:
             return subprocess.CompletedProcess(cmd, 0, stdout="Australia/Brisbane\n", stderr="")
         if cmd[-3:] == ["shell", "getprop", "ro.build.version.release"]:
@@ -81,7 +81,7 @@ def test_published_runtime_forces_release_operator_package(monkeypatch):
 def test_published_preflight_preserves_requested_operator_package(monkeypatch):
     def fake_run(cmd: list[str], env: dict[str, str], cwd: Path | None = None):
         if cmd[-1] == "devices":
-            return subprocess.CompletedProcess(cmd, 0, stdout="List of devices attached\nR5CT22AGEEF\tdevice\n", stderr="")
+            return subprocess.CompletedProcess(cmd, 0, stdout="List of devices attached\ndevice-123\tdevice\n", stderr="")
         if cmd[-3:] == ["shell", "getprop", "persist.sys.timezone"]:
             return subprocess.CompletedProcess(cmd, 0, stdout="Australia/Brisbane\n", stderr="")
         if cmd[-3:] == ["shell", "getprop", "ro.build.version.release"]:
@@ -105,6 +105,25 @@ def test_published_preflight_preserves_requested_operator_package(monkeypatch):
 
     assert env.operator_package == environment.RELEASE_OPERATOR_PACKAGE
     assert env.requested_operator_package == "com.clawperator.operator.dev"
+
+
+def test_local_dev_explicit_operator_package_overrides_env(monkeypatch):
+    monkeypatch.setattr(
+        environment.shutil,
+        "which",
+        _fake_which_factory({"adb": "/usr/bin/adb", "node": "/usr/bin/node"}),
+    )
+    monkeypatch.setattr(environment, "_run", _fake_run_factory("0.5.3"))
+    monkeypatch.setenv("CLAWPERATOR_OPERATOR_PACKAGE", "com.example.from-env")
+
+    inputs = environment.resolve_inputs(
+        None,
+        runtime="local-dev",
+        operator_package="com.clawperator.operator.dev",
+    )
+
+    assert inputs.operator_package == "com.clawperator.operator.dev"
+    assert inputs.requested_operator_package == "com.clawperator.operator.dev"
 
 
 @pytest.mark.parametrize(

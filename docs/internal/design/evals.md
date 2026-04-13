@@ -204,3 +204,91 @@ artifacts are skipped and do not block stdout or stderr answer extraction.
 - Pass `--device <serial>` explicitly whenever more than one device is
   connected.
 - Keep `skill_score` separate from `outcome` when you analyze runs.
+
+## Live Skill Eval Boundary
+
+The Solax orchestrated cold-start proving flow lives in `/evals` as a dedicated
+live-device batch eval, not as an extension of the repo-local `evals-run`
+skill.
+
+Reason:
+
+- `evals-run` is scoped to the `android-version` benchmark, runtime-target
+  choice (`local-dev` versus `published`), replay, and rescore
+- the Solax cold-start flow is a different abstraction: repeated skill proving
+  with per-run normalization, current-state probing, target selection, and
+  aggregate pass-fail classification
+- encoding that logic in `/evals` keeps the proving policy inspectable,
+  reviewable, and reusable by future eval authors without teaching a repo-local
+  skill to become the proving harness itself
+
+Current command surface:
+
+```bash
+uv run --project evals --extra dev python evals/run_eval.py solax-orchestrated-cold-start \
+  --device <serial> \
+  --operator-package com.clawperator.operator.dev \
+  --runs 4
+```
+
+This command now uses the same runtime-resolution rules as the rest of the eval
+entrypoint:
+
+- `--runtime local-dev` uses the branch-local CLI and the local-dev operator
+  package resolution path
+- `--runtime published` uses the published CLI and release operator package
+  resolution path
+- `--operator-package` is honored through that same resolution path instead of
+  being handled as a Solax-only shortcut
+
+Artifact boundary:
+
+- agent benchmark evals write single-run artifacts under `evals/runs/<run_id>/`
+- live orchestrated-skill proving writes batch artifacts under
+  `evals/artifacts/<batch_id>/`
+- retained live batches are copied into the private `clawperator-artifacts`
+  repo rather than committed in the main product repo
+
+Run-start normalization:
+
+- each live proving run force-stops the target app before probe so the observed
+  persisted value comes from a restarted app process, not leftover in-app state
+  from a previous attempt
+- the harness force-stops the target app again before `skills run` so the skill
+  itself starts from a fresh outer-app state as well
+- missing restart-before-probe proof is a distinct failed classification and
+  does not count as `cold_start_verified`
+
+Visible run shape:
+
+- one eval run is intentionally two-phase on the device:
+  1. the harness probe reopens the app, traverses to the relevant persisted row,
+     reads the current value, and stops without editing
+  2. the harness re-normalizes outside-app state, then launches the real
+     `skills run` attempt
+- the probe phase can look like a "first failed run" to a human watcher if they
+  do not know that the first traversal is target-selection setup rather than
+  the edit attempt itself
+- this is current intentional behavior in the eval harness, not an accidental
+  duplicate run
+
+Skill continuation policy:
+
+- once `skills run` starts, the Solax orchestrated skill is allowed to continue
+  from the current visible in-app SolaX state when it already shows `Peak
+  Export`, `Device Discharging`, or the `Discharge to` dialog
+- that continuation behavior is part of the skill contract, not the probe
+- as a result, a clean cold-start proof batch member can still look visually
+  non-linear inside the app even though the harness proved outside-app restart
+  before the skill run
+
+Hang handling:
+
+- the live orchestrated-skill harness must bound `skills run` with an explicit
+  timeout and classify a hung skill as `skill_timed_out`
+- a hung skill is evidence of an unproven run, not a reason to leave the batch
+  without summary output
+
+That split is intentional. The benchmark harness measures an agent solving a
+task. The cold-start skill eval measures whether a pre-authored skill proves
+its claimed behavior repeatedly from a normalized device state.

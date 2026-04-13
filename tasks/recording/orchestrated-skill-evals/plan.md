@@ -28,12 +28,12 @@ harness each time.
 
 | Item | Value |
 | --- | --- |
-| State | planned |
+| State | completed |
 | Total PRs | 1 |
 | Total phases | 3 |
-| Completed | none |
-| Remaining | P1, P2, P3 |
-| Current / Next | P1 |
+| Completed | P1, P2, P3 |
+| Remaining | none |
+| Current / Next | done |
 | Blockers | none |
 
 ## Goal
