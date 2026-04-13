@@ -11,7 +11,8 @@ Total PRs: 1. Total phases: 3.
 - P3: validate the workflow on the Solax proving case and graduate any durable
   guidance
 
-Current state: blocked until the earlier recording workstreams have landed.
+Current state: ready. The earlier recording workstreams have landed, so W6 can
+now start from the durable docs and code-adjacent contracts.
 
 ## Hard Rules
 
@@ -40,13 +41,12 @@ Current state: blocked until the earlier recording workstreams have landed.
 | --- | --- |
 | `tasks/recording/skill-author-by-recording/plan.md` | Stable scope and end-state |
 | `tasks/recording/plan.md` | Overall recording program sequencing |
-| `tasks/recording/agent-driven-skills/` | Runtime-agent shape the authored skill must target |
 | `docs/api/recording.md` | Recording lifecycle commands and artifacts |
 | `docs/skills/authoring.md` | Scaffold and authoring contract |
+| `docs/skills/overview.md` | Named orchestrated runtime contract |
 | `docs/internal/design/skill-design.md` | Durable orchestrated skill design lessons and failure modes |
-| `tasks/recording/skill-result-contract/` | Universal `SkillResult` return shape |
-| `tasks/recording/skill-contract-declaration/` | Declared contract expectations |
-| `tasks/recording/compare/` | How replay and orchestrated output are later compared |
+| `apps/node/src/contracts/skillResult.ts` | Universal `SkillResult` return shape |
+| `apps/node/src/domain/skills/runSkill.ts` | Runtime parsing and injected source behavior |
 
 ## Phase P1: Define The Workflow Contract
 
@@ -119,10 +119,12 @@ defined workflow consistently.
   restating a drift-prone parallel version.
 - It uses the recording export (required) and an optional plain-language
   description from the user explaining intent or device-specific nuance that
-  the recording alone may not capture, along with the W2b/W3 contract shape,
-  to author `SKILL.md`, `skill.json`, and the thin `run.js`. The authoring-time
-  agent should ask for the user description if the recording export is not
-  sufficient to infer the intent unambiguously.
+  the recording alone may not capture, along with the durable orchestrated
+  skill contract documented in `docs/skills/authoring.md` and implemented in
+  `apps/node/src/contracts/skillResult.ts`, to author `SKILL.md`,
+  `skill.json`, and the thin `run.js`. The authoring-time agent should ask for
+  the user description if the recording export is not sufficient to infer the
+  intent unambiguously.
 - It retains one canonical sanitized baseline export under the authored skill,
   at a stable reference path such as
   `references/compare-baseline.export.json`, for future compare and maintenance

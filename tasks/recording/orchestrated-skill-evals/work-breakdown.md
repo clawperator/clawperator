@@ -41,7 +41,7 @@ Total PRs: 1. Total phases: 3.
 | `evals/harness/runner.py` | Execution model |
 | `docs/skills/authoring.md` | Durable orchestrated authoring contract |
 | `docs/internal/design/skill-design.md` | Failure modes and proving lessons |
-| `tasks/recording/agent-driven-skills-closeout/plan.md` | Why ad hoc loops were insufficient |
+| `docs/skills/overview.md` | Named orchestrated runtime contract |
 
 ## Phase P1: Define The Eval Contract
 

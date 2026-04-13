@@ -162,8 +162,9 @@ Verify implementation and docs against:
 - `evals/harness/`
 - `docs/skills/authoring.md`
 - `docs/internal/design/skill-design.md`
-- `tasks/recording/agent-driven-skills/plan.md`
-- `tasks/recording/agent-driven-skills-closeout/plan.md`
+- `docs/skills/overview.md`
+- `apps/node/src/contracts/skillResult.ts`
+- `apps/node/src/domain/skills/runSkill.ts`
 
 ## Success Criteria
 
