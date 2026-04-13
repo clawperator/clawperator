@@ -245,7 +245,23 @@ switch (mode) {
         },
         observed: {
           kind: "text",
-          text: "Discharge to 35%",
+          text: "Charge to 40%",
+        },
+      },
+    });
+    break;
+  case "decorated-success":
+    emitFrame({
+      ...basePayload,
+      terminalVerification: {
+        status: "verified",
+        expected: {
+          kind: "text",
+          text: "Discharge to 40%",
+        },
+        observed: {
+          kind: "text",
+          text: "Discharge to 40% \ue660",
         },
       },
     });

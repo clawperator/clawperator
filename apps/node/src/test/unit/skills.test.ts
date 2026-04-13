@@ -2888,6 +2888,16 @@ describe("runSkill", () => {
     assert.strictEqual(result.skillResult.terminalVerification?.status, "verified");
   });
 
+  it("accepts decorative terminal-verification suffixes for declared text matches", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["decorated-success"]);
+
+    assert.ok(result.ok, `Expected decorated terminal verification to count as a match: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.status, "success");
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.status, "success");
+    assert.strictEqual(result.skillResult.terminalVerification?.status, "verified");
+  });
+
   it("rejects earlier marker mentions when they are not part of the trailing frame suffix", async () => {
     const result = await runSkill(TEST_SKILL_RESULT, ["marker-progress-only"]);
 

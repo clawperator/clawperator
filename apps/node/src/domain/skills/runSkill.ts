@@ -319,6 +319,28 @@ function extractTextEvidence(evidence: unknown): string | null {
     : null;
 }
 
+function normalizeTerminalVerificationText(text: string): string {
+  return text.trim().replaceAll(/\s+/g, " ");
+}
+
+function escapeRegexLiteral(text: string): string {
+  return text.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function terminalVerificationTextMatches(expectedText: string, observedText: string): boolean {
+  const normalizedExpected = normalizeTerminalVerificationText(expectedText);
+  const normalizedObserved = normalizeTerminalVerificationText(observedText);
+  if (normalizedObserved === normalizedExpected) {
+    return true;
+  }
+
+  const decorativeSuffixPattern = new RegExp(
+    `^${escapeRegexLiteral(normalizedExpected)}(?:[^\\p{L}\\p{N}]+)?$`,
+    "u"
+  );
+  return decorativeSuffixPattern.test(normalizedObserved);
+}
+
 function verifyDeclaredSkillContract(
   contract: SkillContract | null,
   skillResult: SkillResult | null
@@ -358,7 +380,7 @@ function verifyDeclaredSkillContract(
 
   const expectedText = extractTextEvidence(skillResult.terminalVerification.expected);
   const observedText = extractTextEvidence(skillResult.terminalVerification.observed);
-  if (observedText !== renderedMatcher) {
+  if (observedText === null || !terminalVerificationTextMatches(renderedMatcher, observedText)) {
     return {
       ok: false,
       message: expectedText === renderedMatcher
