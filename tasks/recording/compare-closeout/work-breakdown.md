@@ -24,6 +24,10 @@ verification). One commit per phase except P4 (verification only).
 
 ## Hard Rules
 
+- Follow this task pack closely. Do not treat it as optional guidance.
+- Use TDD for each closeout behavior change whenever practical:
+  add the failing test first, confirm it fails for the expected reason, then
+  implement the code change.
 - Do not modify any existing test case. Only add new ones.
 - Do not modify existing fixture files unless that refresh is required to
   restore truthful alignment with the canonical retained baseline. When a
@@ -35,15 +39,25 @@ verification). One commit per phase except P4 (verification only).
 - Do not build the cross-repo sync test around raw-file equality. It must
   compare structural normalization output and compare behavior so harmless
   metadata differences do not cause false failures.
-- Do not modify the CLI registration in `registry.ts` or the handler in
-  `record.ts`. The new outcomes flow through the existing
-  `isMeaningfulCompareDivergence` check, which already controls exit codes.
+- Do not modify the CLI handler in `record.ts`.
+- Do not modify the behavioral dispatch for `recording compare` in
+  `registry.ts`; help text updates are allowed and required in P3.
 - Run `npm --prefix apps/node run build && npm --prefix apps/node run test`
   after P1 and P2 to confirm all existing tests still pass alongside new
   ones.
 - Run `./scripts/docs_build.sh` after P3.
 - Use conventional commit messages exactly as specified in each phase.
 - Work on the existing `skills/compare` branch. Do not create a new branch.
+- Keep a running execution log in
+  `tasks/recording/compare-closeout/findings.md`.
+- When you complete a phase, add a short entry to `findings.md` covering:
+  what changed, what validation ran, what remains, and any newly discovered
+  risks or follow-ups.
+- If you encounter an undocumented requirement or issue:
+  - do it now if it is necessary to keep compare truthful, fail-closed, or
+    at the validation bar required by this pack
+  - otherwise record it in `findings.md` and defer it
+- Do not silently expand scope. If scope grows, `findings.md` should say why.
 
 ## Required Reading
 
@@ -58,6 +72,53 @@ Read these files IN THIS ORDER before writing anything.
 | `apps/node/src/domain/recording/recordingEventTypes.ts` | The `RecordingExportArtifact` interface. You need this to create valid non-Solax export fixtures |
 | `docs/api/recording.md` | Find the `### Compare` section. You will add normalization scope and new outcome documentation here |
 | `docs/skills/authoring.md` | Find the existing compare-related content. You will add a cross-repo sync note near it |
+| `apps/node/src/cli/registry.ts` | Update `recording compare` help text so it describes the shipped Solax heuristic path honestly |
+
+Before changing code, create or update:
+
+- `tasks/recording/compare-closeout/findings.md`
+
+Use it as the execution log for this task pack. Keep entries short and
+decision-oriented.
+
+Recommended entry shape:
+
+```markdown
+## <date or phase label>
+
+- Phase: P1 / P2 / P3 / P4
+- Changed: short summary of what was implemented
+- Validation: exact commands run and whether they passed
+- Discovered: new requirement, issue, or ambiguity found during execution
+- Decision: did now / deferred
+- Follow-up: only if something was deferred
+```
+
+## Test Matrix
+
+The closeout must leave behind an explicit regression matrix for the Solax
+heuristic path. At minimum, the implementation should be covered by tests
+for all of these classes:
+
+| Class | Expected outcome |
+| --- | --- |
+| canonical replay baseline success | `literal_match` |
+| canonical orchestrated success with full overlap | `semantic_match` or `outcome_matches_path_differs`, depending on fixture path |
+| semantic success with healthy alternate path and sufficient overlap | `outcome_matches_path_differs` |
+| semantic success with zero overlap | `baseline_uncovered` |
+| semantic success with trivial overlap below threshold | `baseline_weakly_covered` |
+| non-Solax or weak baseline with zero extracted checkpoints | `normalization_insufficient` |
+| non-Solax or weak baseline with partial extracted checkpoints | `normalization_insufficient` |
+| verification failure with matching baseline path | `verification_failed` |
+| indeterminate verification with matching baseline path | `verification_indeterminate` |
+| upstream failed skill result | `upstream_failure` |
+| poisoned runtime signal | `runtime_poisoned` |
+| unavailable runtime signal | `runtime_unavailable` |
+| CLI path for fail-closed outcomes | non-zero exit, typed JSON outcome |
+| cross-repo canonical baseline sync when enabled | structural parity with fixture |
+
+If a listed class is already covered by an existing test, do not duplicate it.
+Instead, cite the existing test while adding only the missing coverage.
 
 ## PR / Phase Plan
 
@@ -396,6 +457,11 @@ semantic-coverage policy to the report. Rename the Solax-specific constant.
     npm --prefix apps/node run build && npm --prefix apps/node run test
     ```
     All tests must pass (existing 961 + new ones).
+
+13. Before committing, review the Test Matrix above and confirm P1 now
+    covers the two normalization-insufficient classes plus one success-path
+    report-shape assertion. Do not assume later phases will backfill missing
+    normalization coverage.
 
 ### Acceptance Criteria
 
@@ -747,6 +813,12 @@ compare behavior, not raw file bytes.
    this task. That refresh is allowed even though the default rule is to
    avoid modifying existing fixtures.
 
+10. Before committing, review the Test Matrix above and confirm P2 now
+    covers both semantic fail-closed classes (`baseline_uncovered`,
+    `baseline_weakly_covered`), preserves the healthy alternate-path success
+    case, and exercises the CLI path for at least one fail-closed semantic
+    outcome.
+
 ### Acceptance Criteria
 
 - `determineOutcome` accepts a `baselineCoverage` parameter.
@@ -773,6 +845,8 @@ compare behavior, not raw file bytes.
   pack in a detect-but-don't-fix state.
 - All existing tests still pass with no modifications.
 - Build succeeds.
+- The compare Test Matrix is satisfied either by new tests in this phase or
+  by explicitly cited existing tests.
 
 ### Validation
 
@@ -802,6 +876,7 @@ guidance.
 
 - `docs/api/recording.md`
 - `docs/skills/authoring.md`
+- `apps/node/src/cli/registry.ts`
 
 ### Steps
 
@@ -902,11 +977,27 @@ guidance.
      canonical-baseline provenance into CI or another required validation path
    ```
 
-8. Rebuild docs:
+8. In `apps/node/src/cli/registry.ts`, update the `HELP_RECORDING_COMPARE`
+   text so it matches the shipped closeout scope. The help must say, in one
+   short note block, that:
+
+   - v1 compare currently uses the Solax heuristic normalization path
+   - compare fails closed when the retained baseline does not satisfy that
+     heuristic checkpoint set
+   - generic per-skill compare is follow-on work, not part of the shipped
+     W4 closeout
+
+   Keep the surface concise. Do not add a long essay to CLI help.
+
+9. Rebuild docs:
    ```bash
    ./scripts/docs_build.sh
    ```
    Must succeed end to end.
+
+10. Add or update one short documentation line that points future readers to
+    the fact that the current trust bar is enforced by fixture-backed tests,
+    not by a generic per-skill compare contract.
 
 ### Acceptance Criteria
 
@@ -915,6 +1006,8 @@ guidance.
   `normalization_insufficient`.
 - `docs/api/recording.md` explicitly says this closeout is Solax-specific
   and fail-closed, not generic compare completion.
+- `apps/node/src/cli/registry.ts` help text for `recording compare`
+  explicitly describes the shipped Solax heuristic path honestly.
 - The three new outcomes appear in the outcomes list and interpretation
   rules.
 - The exit-code contract includes the three new outcomes.
@@ -925,11 +1018,18 @@ guidance.
 - `docs/skills/authoring.md` has a cross-repo baseline sync note with
   the exact validation command.
 - `./scripts/docs_build.sh` succeeds.
+- The docs make clear that this closeout is backed by fixture-driven
+  regression coverage for the current Solax heuristic path.
 
 ### Validation
 
 ```bash
 ./scripts/docs_build.sh
+```
+
+```bash
+grep -n "Solax" apps/node/src/cli/registry.ts
+# Must show the new compare help note
 ```
 
 ```bash
@@ -1023,14 +1123,21 @@ None. This is a verification-only phase.
 
 6. If all pass, no commit is needed for this phase.
 
+7. If `npm --prefix apps/node run test` is still red, do not call the
+   branch PR-ready in the closeout summary. Report the current failing
+   validation honestly, separate compare-specific results from unrelated
+   failures, and stop short of a PR-ready conclusion.
+
 ### Acceptance Criteria
 
 - Build succeeds.
-- All tests pass (existing 961 + new ones, 0 failures).
+- All tests pass on the current branch state, including the full
+  `npm --prefix apps/node run test` suite.
 - Docs build succeeds.
 - No stale constant references.
 - No placeholder skill ids in docs.
 - All three new outcomes appear in the implementation at least 3 times each.
+- If the full Node suite is not green, the task does not claim PR readiness.
 
 ### Validation
 

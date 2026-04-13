@@ -24,6 +24,22 @@ Total PRs: 1. Total phases: 4. All work is on the existing
 is required for closeout; the canonical retained baseline is read as
 validation input only.
 
+Execution guardrails:
+
+- the implementing agent should follow this task pack closely and not treat
+  it as a loose brainstorming note
+- progress, decisions, and newly discovered risks should be recorded in
+  `tasks/recording/compare-closeout/findings.md` as work proceeds
+- if implementation uncovers an undocumented requirement or issue, use
+  judgment:
+  - if it is required to keep the branch truthful, fail-closed, or passing
+    the stated validation bar, do it in this task
+  - if it is useful but can be deferred without making this branch
+    misleading or unstable, record it in `findings.md` and leave it for
+    follow-up
+- prefer recording a short rationale in `findings.md` over silently growing
+  scope
+
 ## Status
 
 | Item | Value |
@@ -63,8 +79,14 @@ genuinely generic.
 ## Why Now
 
 The compare branch has 5 commits of working implementation, live-proved
-against Solax replay and orchestrated runs. Tests pass. Docs build succeeds.
-But EM review found four design-level gaps that make the tool misleading
+against Solax replay and orchestrated runs. The targeted compare suite and
+docs build have passed on recent branches, but PR readiness must be judged
+against the current branch state, not historical green runs. This closeout
+pack must therefore end with a fresh validation pass and must not claim
+branch readiness if `npm --prefix apps/node run test` is still red for any
+reason.
+
+EM review found four design-level gaps that make the tool misleading
 for non-Solax baselines and overly permissive for agent-driven runs. These
 gaps must be closed at the engine level before the branch can be reviewed
 as a PR.
@@ -91,9 +113,13 @@ as a PR.
 - opt-in cross-repo baseline sync guard
 - refresh of existing Clawperator compare fixtures when required to restore
   truthful alignment with the canonical retained baseline
+- explicit ownership wording for compare-baseline artifacts on this branch
 - honest normalization scope qualification in `docs/api/recording.md`
+- honest Solax-specific wording in compare CLI/help text
 - cross-repo sync note in `docs/skills/authoring.md`
 - new outcomes documented in `docs/api/recording.md`
+- stronger TDD requirements and an explicit compare test matrix for known
+  and likely failure modes
 - docs-site rebuild
 
 ## Out of Scope
@@ -114,10 +140,7 @@ This task edits artifacts that already exist on the `skills/compare` branch.
 
 Existing content preserved as-is:
 
-- all existing fixture files under
-  `apps/node/src/test/fixtures/recording-compare/`
 - all existing test cases in `recordingCompare.test.ts`
-- the CLI registration in `registry.ts`
 - the `cmdRecordCompare` handler in `record.ts`
 - `loadRecordingExportBaselineFile` and `loadSkillResultFromSkillsRunFile`
 - `findFirstDivergence` and `comparableActualCheckpoints`
@@ -125,6 +148,8 @@ Existing content preserved as-is:
 
 Existing content modified:
 
+- existing Clawperator fixture files may be refreshed if that is required to
+  restore truthful alignment with the canonical retained baseline
 - `RecordingCompareOutcome` type union: three new members added
 - `RecordingCompareReport` interface: three new fields added
 - `compareRecordingBaselineWithSkillResult`: normalization guard and
@@ -133,6 +158,8 @@ Existing content modified:
 - `isMeaningfulCompareDivergence`: three new outcomes handled
 - `summarizeOutcome`: three new cases added
 - `normalizeRecordingExportForCompare`: constant renamed, no logic change
+- `apps/node/src/cli/registry.ts`: help text updated to describe the shipped
+  Solax heuristic path honestly
 - `docs/api/recording.md`: normalization scope, new outcomes, example fix
 - `docs/skills/authoring.md`: cross-repo sync note
 
@@ -145,6 +172,7 @@ Existing content modified:
 | `apps/node/src/test/fixtures/recording-compare/` | Clawperator repo | new fixtures |
 | `docs/api/recording.md` | Clawperator repo | normalization scope, new outcomes |
 | `docs/skills/authoring.md` | Clawperator repo | cross-repo sync note |
+| `apps/node/src/cli/registry.ts` | Clawperator repo | help text must describe the shipped Solax heuristic path honestly |
 | `../clawperator-skills/.../references/` | Skills repo | canonical retained baseline read by the opt-in structural sync test |
 
 ## Source Of Truth
@@ -252,6 +280,20 @@ Enforcement posture:
   `../clawperator-skills` repo is present
 - wiring a mandatory CI or branch validation hook is explicitly deferred to
   the generic compare successor program
+- for this closeout branch, the checked-in Clawperator fixture is the
+  authoritative test input for routine Node test runs; the canonical
+  skills-repo retained baseline is the authoritative source for refresh and
+  sync verification
+
+Test discipline:
+
+- every behavior change in this closeout pack should land test-first where
+  practical: add or update the failing test, then implement the code change
+- because the branch has only one real proving skill, confidence must come
+  disproportionately from fixture quality and regression coverage
+- the closeout should therefore add tests not only for the exact bugs found,
+  but also for the most likely nearby failure modes that would silently
+  weaken compare trust
 
 ## Failure Modes To Prevent
 
@@ -289,6 +331,8 @@ After this task, the `skills/compare` branch must:
 - report `baselineCoverage`, `normalizationStrategy`, and
   `minimumSemanticCoverage` in every compare report
 - have honest normalization scope in public docs
+- have compare CLI/help text that explicitly describes the shipped
+  Solax-specific heuristic path rather than implying a generic compare engine
 - prove the new fail-closed outcomes on the CLI path, not only through
   direct compare helper tests
 - have public docs that clearly state the normalization strategy is
@@ -297,6 +341,11 @@ After this task, the `skills/compare` branch must:
   structure and compare behavior, not raw bytes
 - allow fixture refresh in the same task when that is required to restore
   truthful alignment with the canonical retained baseline
+- ship with an explicit compare regression matrix that covers the known and
+  likely failure modes for the Solax heuristic path
+- finish with a fresh branch-local validation pass and only call the branch
+  PR-ready if `npm --prefix apps/node run test` is green on the current
+  worktree
 
 ## Idempotency
 
