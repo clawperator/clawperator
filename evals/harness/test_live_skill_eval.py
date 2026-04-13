@@ -134,9 +134,14 @@ def test_render_summary_markdown_lists_runs():
             "cold_start_verified": 1,
             "run_start_not_proven": 0,
             "outside_app_not_proven": 1,
+            "observed_value_unavailable": 0,
             "target_selection_failed": 0,
             "skill_timed_out": 0,
             "verification_mismatch": 0,
+            "skill_failed": 0,
+            "skill_indeterminate": 0,
+            "skill_result_missing": 0,
+            "result_parse_failed": 1,
         },
         "runs": [
             {
@@ -163,6 +168,7 @@ def test_render_summary_markdown_lists_runs():
     assert "run-01" in rendered
     assert "outside_app_not_proven" in rendered
     assert "cold_start_verified" in rendered
+    assert "Result-parse failures: `1`" in rendered
 
 
 def test_sanitize_json_value_redacts_device_and_repo_paths(tmp_path):
@@ -396,8 +402,8 @@ def test_run_eval_rejects_solax_only_flags_for_android_version():
     from evals import run_eval
 
     for flag, value in [
-        ("--artifacts-dir", "/tmp/artifacts"),
-        ("--skills-registry", "/tmp/skills-registry.json"),
+        ("--artifacts-dir", str(Path(run_eval.ROOT / "evals" / "artifacts"))),
+        ("--skills-registry", str(run_eval.DEFAULT_SKILLS_REGISTRY)),
         ("--runs", "2"),
     ]:
         try:

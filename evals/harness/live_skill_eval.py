@@ -494,6 +494,19 @@ def _classify_run(
 
 
 def _render_summary_markdown(summary: dict[str, Any]) -> str:
+    count_labels = {
+        "cold_start_verified": "Cold-start verified runs",
+        "run_start_not_proven": "Restart-proof failures",
+        "outside_app_not_proven": "Outside-app proof failures",
+        "observed_value_unavailable": "Observed-value unavailable failures",
+        "target_selection_failed": "Target-selection failures",
+        "skill_timed_out": "Skill timeouts",
+        "verification_mismatch": "Verification mismatches",
+        "skill_failed": "Skill failures",
+        "skill_indeterminate": "Skill indeterminate runs",
+        "skill_result_missing": "Skill-result missing failures",
+        "result_parse_failed": "Result-parse failures",
+    }
     lines = [
         f"# {summary['eval_id']}",
         "",
@@ -512,18 +525,19 @@ def _render_summary_markdown(summary: dict[str, Any]) -> str:
         "",
         "## What Was Proven",
         "",
-        f"- Cold-start verified runs: `{summary['counts']['cold_start_verified']}`",
-        f"- Restart-proof failures: `{summary['counts']['run_start_not_proven']}`",
-        f"- Outside-app proof failures: `{summary['counts']['outside_app_not_proven']}`",
-        f"- Target-selection failures: `{summary['counts']['target_selection_failed']}`",
-        f"- Skill timeouts: `{summary['counts']['skill_timed_out']}`",
-        f"- Verification mismatches: `{summary['counts']['verification_mismatch']}`",
-        "",
+    ]
+    for key, value in summary["counts"].items():
+        label = count_labels.get(key, key.replace("_", "-"))
+        lines.append(f"- {label}: `{value}`")
+    lines.extend(
+        [
+            "",
         "## Runs",
         "",
         "| Run | Observed | Target | Classification | Proof mode | Result |",
         "| --- | --- | --- | --- | --- | --- |",
-    ]
+        ]
+    )
     for run in summary["runs"]:
         observed = run["observed_percent"] if run["observed_percent"] is not None else "n/a"
         target = run["target_percent"] if run["target_percent"] is not None else "n/a"

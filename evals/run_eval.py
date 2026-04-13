@@ -432,9 +432,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--replay-timeout-s", type=int, default=DEFAULT_REPLAY_TIMEOUT_S)
     parser.add_argument("--label")
     parser.add_argument("--runs-dir", default=str(ROOT / "evals" / "runs"))
-    parser.add_argument("--artifacts-dir", default=str(ROOT / "evals" / "artifacts"))
-    parser.add_argument("--skills-registry", default=str(DEFAULT_SKILLS_REGISTRY))
-    parser.add_argument("--runs", type=int, default=1)
+    parser.add_argument("--artifacts-dir", default=argparse.SUPPRESS)
+    parser.add_argument("--skills-registry", default=argparse.SUPPRESS)
+    parser.add_argument("--runs", type=int, default=argparse.SUPPRESS)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--rescore", nargs="?", const="")
     return parser
@@ -449,9 +449,9 @@ def main(argv: list[str] | None = None) -> int:
             device_serial=args.device,
             operator_package=args.operator_package,
             runtime=args.runtime,
-            runs=args.runs,
-            artifacts_dir=Path(args.artifacts_dir),
-            skills_registry=Path(args.skills_registry),
+            runs=getattr(args, "runs", 1),
+            artifacts_dir=Path(getattr(args, "artifacts_dir", str(ROOT / "evals" / "artifacts"))),
+            skills_registry=Path(getattr(args, "skills_registry", str(DEFAULT_SKILLS_REGISTRY))),
             label=args.label,
             dry_run=args.dry_run,
         )
@@ -468,11 +468,11 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"unsupported eval: {args.eval_id}")
     if args.operator_package is not None:
         parser.error("--operator-package is only supported for solax-orchestrated-cold-start")
-    if args.artifacts_dir != str(ROOT / "evals" / "artifacts"):
+    if hasattr(args, "artifacts_dir"):
         parser.error("--artifacts-dir is only supported for solax-orchestrated-cold-start")
-    if args.skills_registry != str(DEFAULT_SKILLS_REGISTRY):
+    if hasattr(args, "skills_registry"):
         parser.error("--skills-registry is only supported for solax-orchestrated-cold-start")
-    if args.runs != 1:
+    if hasattr(args, "runs"):
         parser.error("--runs is only supported for solax-orchestrated-cold-start")
 
     spec = _load_spec(args.eval_id)
