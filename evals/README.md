@@ -67,6 +67,24 @@ This eval encodes the cold-start proving policy in code. For every run it:
 8. classifies the run as cold-start proof, continuation-only success, skill timeout, or a
    specific failure mode
 
+What you will see on-device during one eval run:
+
+- the first visible traversal into SolaX is usually the harness probe, not the
+  actual edit attempt
+- that probe is expected to reach the `Discharge to ...` row, read the current
+  persisted value, and stop without opening the edit dialog
+- after the probe, the harness force-stops SolaX again and only then launches
+  the real `skills run` edit attempt
+- during the real skill run, the Solax orchestrated skill may continue from the
+  current visible SolaX surface if it is already on `Peak Export`, `Device
+  Discharging`, or the `Discharge to` dialog, instead of always rebuilding the
+  route from the home tab
+
+That means a visually "two-phase" run on the device is expected today:
+
+1. probe pass to observe the current value
+2. restarted skill pass to change and verify the value
+
 Artifacts land under `evals/artifacts/<batch_id>/`:
 
 - `config.json` - batch configuration

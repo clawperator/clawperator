@@ -247,6 +247,29 @@ Run-start normalization:
 - the harness force-stops the target app again before `skills run` so the skill
   itself starts from a fresh outer-app state as well
 
+Visible run shape:
+
+- one eval run is intentionally two-phase on the device:
+  1. the harness probe reopens the app, traverses to the relevant persisted row,
+     reads the current value, and stops without editing
+  2. the harness re-normalizes outside-app state, then launches the real
+     `skills run` attempt
+- the probe phase can look like a "first failed run" to a human watcher if they
+  do not know that the first traversal is target-selection setup rather than
+  the edit attempt itself
+- this is current intentional behavior in the eval harness, not an accidental
+  duplicate run
+
+Skill continuation policy:
+
+- once `skills run` starts, the Solax orchestrated skill is allowed to continue
+  from the current visible in-app SolaX state when it already shows `Peak
+  Export`, `Device Discharging`, or the `Discharge to` dialog
+- that continuation behavior is part of the skill contract, not the probe
+- as a result, a clean cold-start proof batch member can still look visually
+  non-linear inside the app even though the harness proved outside-app restart
+  before the skill run
+
 Hang handling:
 
 - the live orchestrated-skill harness must bound `skills run` with an explicit

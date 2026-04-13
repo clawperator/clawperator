@@ -116,3 +116,20 @@ This prints the newest Solax batch directory and its `summary.json`.
   the harness failed the run truthfully.
 - `run_start_restarted: true` means the harness force-stopped SolaX before the
   probe and again before the skill run.
+
+What you will see on the device:
+
+- the first visible pass into SolaX is usually the eval probe, not the real
+  edit attempt
+- that probe is expected to reach `Discharge to ...`, read the current value,
+  and stop without opening the dialog
+- after that, the harness restarts SolaX again and launches the real
+  `skills run` pass
+- during the real skill pass, the skill may continue from the current visible
+  SolaX screen if it is already on `Peak Export`, `Device Discharging`, or the
+  `Discharge to` dialog
+
+So if you are watching the device live, a single eval run can look like:
+
+1. a probe pass that reads but does not edit
+2. a restarted skill pass that performs the edit and verification
