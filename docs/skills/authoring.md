@@ -107,6 +107,14 @@ Recommended source:
 - the saved `clawperator skills run --json` wrapper is the v1 compare input for `clawperator recording compare --result <file>`
 - the recording export baseline is reference evidence for compare and authoring, not a runtime input passed to the skill
 
+Durable compare-baseline rule:
+
+- `recording-context.json` is the scaffold-time handoff for an external author or agent
+- once a skill has a retained baseline that should be used for ongoing compare, keep that baseline under `skills/<skill_id>/references/compare-baseline.export.json`
+- keep the compare baseline outside `skill.json.artifacts`
+- do not treat `recording-context.json` as the long-term canonical compare path for a maintained skill
+- for replay and orchestrated sibling skills, both may compare against the same retained export baseline when that baseline captures the intended contract-level route and terminal outcome
+
 The scaffolded `SKILL.md` includes this section before the `Usage:` block:
 
 ```markdown
@@ -672,6 +680,10 @@ Current compare contract for authored skills:
   `runtime_poisoned`
 - compare classifies `diagnostics.runtimeState == "unavailable"` as
   `runtime_unavailable`
+- compare expects the baseline input to be a recording export artifact such as `references/compare-baseline.export.json`, not a parsed `recording parse` step log
+- compare accepts the full `skills run --json` wrapper as the durable `--result` input, not a hand-edited bare `SkillResult`
+- replay-style runs can succeed as `literal_match`
+- agent-driven runs can succeed as either `semantic_match` or `outcome_matches_path_differs`
 
 Version handling:
 

@@ -39,12 +39,15 @@ Notes:
 - if `recording export --input` points at a file and `--out` is omitted, the output path is `<input without .ndjson>.export.json` when the input ends with `.ndjson`, otherwise `<input>.export.json`
 - if `recording export --input` points at a directory, the command picks the newest `*.ndjson` file in that directory and derives the default export path from that resolved file
 - `recording compare` reads a saved `clawperator skills run --json` wrapper file and extracts its top-level `skillResult`
+- for authored skills, the durable retained baseline for compare should live under a reference-style path such as `skills/<skill_id>/references/compare-baseline.export.json`
+- that retained baseline is authoring and maintenance evidence, not a runtime artifact consumed by `skills run`
 - a common authoring workflow is:
   1. `recording stop`
   2. `recording pull --out <dir>`
   3. `recording export --input <same dir>`
   4. `skills run <skill_id> --json > <run>.skills-run.json`
-  5. `recording compare --baseline <export.json> --result <run>.skills-run.json`
+  5. copy the retained export to `skills/<skill_id>/references/compare-baseline.export.json`
+  6. `recording compare --baseline skills/<skill_id>/references/compare-baseline.export.json --result <run>.skills-run.json`
 
 ## CLI Commands
 
@@ -381,6 +384,14 @@ What the command does:
 - compares that baseline against `skillResult.checkpoints` plus `skillResult.terminalVerification`
 - returns a typed compare report
 
+What compare treats as authoritative:
+
+- the recording export is baseline evidence, not a ready-made checkpoint list
+- compare derives a smaller checkpoint baseline from the export's structural facts
+- `skillResult.checkpoints` provide the path evidence for the current run
+- `skillResult.terminalVerification` is the final-state proof channel
+- compare ignores the duplicated `terminal_state_verified` checkpoint id during path matching and uses `terminalVerification` instead
+
 Mode selection:
 
 - `auto` is the default
@@ -400,6 +411,16 @@ Current v1 compare outcomes:
 - `runtime_poisoned`
 - `runtime_unavailable`
 
+Current interpretation rules:
+
+- `literal_match` is the success case for replay-style or other script-driven runs whose checkpoint path matches the retained baseline
+- `semantic_match` is the success case for agent-driven runs whose checkpoint path still matches the retained baseline
+- `outcome_matches_path_differs` is also a success case, used when an agent-driven run proves the same terminal outcome through a different valid checkpoint path
+- `baseline_drift` is the path-divergence failure class for runs that should still be path-sensitive
+- `verification_failed` means the path matched but the proved final state did not
+- `verification_indeterminate` means the run did not prove the declared final state at all
+- `upstream_failure`, `runtime_poisoned`, and `runtime_unavailable` report the skill's own failure state instead of inventing later divergence
+
 Exit-code contract:
 
 - exit `0` for `literal_match`
@@ -413,6 +434,7 @@ Result-wrapper requirement:
 - `--result` must be a saved `skills run --json` wrapper object
 - v1 compare does not accept a bare `SkillResult` document
 - the wrapper must contain a top-level non-null `skillResult`
+- when you want durable compare evidence, save the full wrapper and keep it as the compare input rather than copying only the embedded `skillResult`
 
 Successful semantic compare example:
 
@@ -472,7 +494,7 @@ Verification:
 
 ```bash
 clawperator recording compare \
-  --baseline ./recordings/demo-session.export.json \
+  --baseline ./skills/com.example.demo.capture-state/references/compare-baseline.export.json \
   --result ./runs/demo.skills-run.json \
   --json
 ```
