@@ -104,6 +104,8 @@ Recommended source:
 - use `--snapshots include` only when the author genuinely needs the raw XML snapshots for manual inspection
 - the parsed `recording parse` output is not a substitute for `recording-context.json`
 - `recording parse` is a lossy step log, while `recording export` preserves the raw event timeline and package-transition evidence
+- the saved `clawperator skills run --json` wrapper is the v1 compare input for `clawperator recording compare --result <file>`
+- the recording export baseline is reference evidence for compare and authoring, not a runtime input passed to the skill
 
 The scaffolded `SKILL.md` includes this section before the `Usage:` block:
 
@@ -656,6 +658,20 @@ Current authoring rule for new non-trivial skills:
   change
 - use `skillResult: null` only for legacy skills that have not yet been
   upgraded
+- if the skill is authored from a retained recording baseline, save a
+  `skills run --json` wrapper for the run you want to compare and feed that
+  wrapper directly to `clawperator recording compare`
+
+Current compare contract for authored skills:
+
+- compare reads the saved wrapper's top-level `skillResult`
+- compare auto-selects `semantic` mode for `skillResult.source.kind == "agent"`
+- compare auto-selects `literal` mode for `skillResult.source.kind == "script"`
+- compare uses `terminalVerification` as the final-state proof channel
+- compare classifies `diagnostics.runtimeState == "poisoned"` as
+  `runtime_poisoned`
+- compare classifies `diagnostics.runtimeState == "unavailable"` as
+  `runtime_unavailable`
 
 Version handling:
 

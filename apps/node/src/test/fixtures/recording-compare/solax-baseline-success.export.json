@@ -1,0 +1,112 @@
+{
+  "exportVersion": 1,
+  "session": {
+    "sessionId": "solax-session-001",
+    "schemaVersion": 1,
+    "startedAt": 1710000000000,
+    "operatorPackage": "com.clawperator.operator.dev"
+  },
+  "snapshotMode": "omit",
+  "events": [
+    {
+      "seq": 1,
+      "ts": 1710000000100,
+      "deltaMsSincePrevious": null,
+      "type": "window_change",
+      "packageName": "com.solaxcloud.starter",
+      "className": "MainActivity",
+      "title": "SolaX Cloud - Jane's Home",
+      "snapshot": {
+        "present": false,
+        "xml": null
+      }
+    },
+    {
+      "seq": 2,
+      "ts": 1710000000200,
+      "deltaMsSincePrevious": 100,
+      "type": "click",
+      "packageName": "com.solaxcloud.starter",
+      "resourceId": "com.solaxcloud.starter:id/discharge_row",
+      "text": "Discharge to",
+      "contentDesc": null,
+      "bounds": {
+        "left": 10,
+        "top": 10,
+        "right": 20,
+        "bottom": 20
+      },
+      "snapshot": {
+        "present": false,
+        "xml": null
+      }
+    },
+    {
+      "seq": 3,
+      "ts": 1710000000300,
+      "deltaMsSincePrevious": 100,
+      "type": "text_change",
+      "packageName": "com.solaxcloud.starter",
+      "resourceId": "van-field-1-input",
+      "text": "40",
+      "snapshot": {
+        "present": false,
+        "xml": null
+      }
+    },
+    {
+      "seq": 4,
+      "ts": 1710000000400,
+      "deltaMsSincePrevious": 100,
+      "type": "click",
+      "packageName": "com.solaxcloud.starter",
+      "resourceId": "com.solaxcloud.starter:id/confirm",
+      "text": "Confirm",
+      "contentDesc": null,
+      "bounds": {
+        "left": 30,
+        "top": 30,
+        "right": 40,
+        "bottom": 40
+      },
+      "snapshot": {
+        "present": false,
+        "xml": null
+      }
+    },
+    {
+      "seq": 5,
+      "ts": 1710000000500,
+      "deltaMsSincePrevious": 100,
+      "type": "click",
+      "packageName": "com.solaxcloud.starter",
+      "resourceId": "com.solaxcloud.starter:id/save",
+      "text": "Save",
+      "contentDesc": null,
+      "bounds": {
+        "left": 50,
+        "top": 50,
+        "right": 60,
+        "bottom": 60
+      },
+      "snapshot": {
+        "present": false,
+        "xml": null
+      }
+    }
+  ],
+  "counts": {
+    "totalEvents": 5,
+    "byType": {
+      "window_change": 1,
+      "click": 3,
+      "text_change": 1
+    }
+  },
+  "packageTransitions": [],
+  "timeline": {
+    "firstEventTs": 1710000000100,
+    "lastEventTs": 1710000000500,
+    "durationMs": 400
+  }
+}

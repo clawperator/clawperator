@@ -9,21 +9,21 @@ Total PRs: 2. Total phases: 4.
 - PR-1: compare model, fixtures, implementation, tests
 - PR-2: Solax proving integration and docs cleanup
 
-Current state: blocked until `tasks/recording/skill-result-contract/` lands.
-Live proving also depends on W2b because the semantic compare cases need the
-agent-driven orchestrated Solax skill.
+Current state: P1 and P2 are implemented in Clawperator. The remaining work is
+the live Solax proving pass plus the final cleanup/doc closeout tied to those
+captured artifacts.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | blocked |
+| State | active |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | P1, P2, P3, P4 |
-| Current / Next | P1 after W2 |
-| Blockers | `tasks/recording/skill-result-contract/` must land first; P3 also waits on `tasks/recording/agent-driven-skills/` |
+| Completed | P1, P2 |
+| Remaining | P3, P4 |
+| Current / Next | P3 live Solax proof capture |
+| Blockers | P3 still requires live Solax runs and fixture refresh from those captures |
 
 ## Hard Rules
 

@@ -281,7 +281,7 @@ Notes:
 const HELP_RECORDING = `clawperator recording
 
 Usage:
-  clawperator recording start|stop|pull|parse|export ... ('record' is an alias)
+  clawperator recording start|stop|pull|parse|export|compare ... ('record' is an alias)
 `;
 
 const HELP_RECORDING_EXPORT = `clawperator recording export
@@ -300,6 +300,23 @@ Notes:
   - Otherwise appends .export.json to the input path when --out is omitted.
   - Preserves raw recording evidence for agent or human review.
   - Does not generate skill logic, selectors, or parameters.
+`;
+
+const HELP_RECORDING_COMPARE = `clawperator recording compare
+
+Usage:
+  clawperator recording compare --baseline <export.json> --result <skills-run.json> [--mode <auto|literal|semantic>] [--output <json|pretty>]
+  clawperator record compare --baseline <export.json> --result <skills-run.json> [--mode <auto|literal|semantic>] [--output <json|pretty>]
+
+Options:
+  --baseline <export.json>       Recording export JSON used as the compare baseline
+  --result <skills-run.json>     Saved clawperator skills run --json wrapper file
+  --mode <auto|literal|semantic> Compare mode override (default: auto)
+
+Notes:
+  - Auto mode selects semantic compare for agent-driven skill results and literal compare for scripted results.
+  - Exit code is 0 for no meaningful divergence and non-zero for divergence or input errors.
+  - Compare reads the wrapper's top-level skillResult field. It does not accept a bare SkillResult document in v1.
 `;
 
 const HELP_SKILLS_VALIDATE = `clawperator skills validate
@@ -2229,11 +2246,13 @@ COMMANDS["recording"] = {
     if (sub === "pull") return ["--session-id", "--out"];
     if (sub === "parse") return ["--input", "--out"];
     if (sub === "export") return ["--input", "--out", "--snapshots"];
+    if (sub === "compare") return ["--baseline", "--result", "--mode"];
     return [];
   },
   summary: "Manage recording sessions on the Operator app",
   help: HELP_RECORDING,
   subtopics: {
+    compare: HELP_RECORDING_COMPARE,
     export: HELP_RECORDING_EXPORT,
   },
   topLevelBlock: `  recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]
@@ -2245,7 +2264,9 @@ COMMANDS["recording"] = {
   recording parse --input <file> [--out <file>]
                                             Parse a raw NDJSON recording into a step log JSON ('record' is an alias)
   recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]
-                                            Export raw recording evidence into agent-context JSON ('record' is an alias)`,
+                                            Export raw recording evidence into agent-context JSON ('record' is an alias)
+  recording compare --baseline <export.json> --result <skills-run.json> [--mode <auto|literal|semantic>]
+                                            Compare a saved skill run against a recording baseline ('record' is an alias)`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
@@ -2302,8 +2323,30 @@ COMMANDS["recording"] = {
         outputFile: getStringOptStrict(rest, "--out", ["--input", "--out", "--snapshots"]),
         snapshotMode,
       });
+    } else if (sub === "compare") {
+      const knownFlags = ["--baseline", "--result", "--mode"];
+      const baselineFile = getStringOptStrict(rest, "--baseline", knownFlags);
+      const resultFile = getStringOptStrict(rest, "--result", knownFlags);
+      if (!baselineFile || !resultFile) {
+        return JSON.stringify({
+          code: "USAGE",
+          message: "recording compare --baseline <export.json> --result <skills-run.json> [--mode <auto|literal|semantic>] ('record' is an alias)",
+        });
+      }
+
+      const mode = getStringOptStrict(rest, "--mode", knownFlags);
+      if (mode !== undefined && mode !== "auto" && mode !== "literal" && mode !== "semantic") {
+        throw new UsageError("recording compare --mode must be one of: auto, literal, semantic");
+      }
+
+      return (await import("./commands/record.js")).cmdRecordCompare({
+        ...out,
+        baselineFile,
+        resultFile,
+        mode,
+      });
     } else {
-      return JSON.stringify({ code: "USAGE", message: "recording start|stop|pull|parse|export ... ('record' is an alias)" });
+      return JSON.stringify({ code: "USAGE", message: "recording start|stop|pull|parse|export|compare ... ('record' is an alias)" });
     }
   },
 };

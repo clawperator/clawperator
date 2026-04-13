@@ -60,6 +60,16 @@ export interface SkillResult {
   diagnostics?: SkillDiagnostics;
 }
 
+export const skillResultSourceSchema: z.ZodType<SkillResultSource> = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("script"),
+  }),
+  z.object({
+    kind: z.literal("agent"),
+    agentCli: z.string().min(1),
+  }),
+]);
+
 const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(jsonValueSchema)])
 );
@@ -143,3 +153,7 @@ export const emittedSkillResultSchema = z.object({
 });
 
 export type EmittedSkillResult = z.infer<typeof emittedSkillResultSchema>;
+
+export const skillResultSchema = emittedSkillResultSchema.extend({
+  source: skillResultSourceSchema,
+});

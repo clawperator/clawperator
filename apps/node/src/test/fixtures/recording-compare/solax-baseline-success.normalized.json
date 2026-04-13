@@ -1,0 +1,33 @@
+{
+  "appPackage": "com.solaxcloud.starter",
+  "checkpoints": [
+    {
+      "id": "app_opened",
+      "expectedStatus": "ok",
+      "sourceEventSeq": 1,
+      "eventType": "window_change",
+      "summary": "window_change:com.solaxcloud.starter"
+    },
+    {
+      "id": "discharge_to_row_focused",
+      "expectedStatus": "ok",
+      "sourceEventSeq": 2,
+      "eventType": "click",
+      "summary": "click:com.solaxcloud.starter:discharge to"
+    },
+    {
+      "id": "target_text_entered",
+      "expectedStatus": "ok",
+      "sourceEventSeq": 3,
+      "eventType": "text_change",
+      "summary": "text_change:com.solaxcloud.starter:van-field-1-input"
+    },
+    {
+      "id": "save_completed",
+      "expectedStatus": "ok",
+      "sourceEventSeq": 5,
+      "eventType": "click",
+      "summary": "click:com.solaxcloud.starter:save"
+    }
+  ]
+}

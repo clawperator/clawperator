@@ -275,6 +275,7 @@ describe("CLI help", () => {
     assert.match(stdout, /recording pull/);
     assert.match(stdout, /recording parse/);
     assert.match(stdout, /recording export/);
+    assert.match(stdout, /recording compare/);
     assert.match(stdout, /'record' is an alias/);
   });
 
@@ -283,7 +284,7 @@ describe("CLI help", () => {
     assert.strictEqual(code, 0);
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message, /recording start\|stop\|pull\|parse\|export/);
+    assert.match(obj.message, /recording start\|stop\|pull\|parse\|export\|compare/);
     assert.match(obj.message, /'record' is an alias/);
   });
 
@@ -292,7 +293,7 @@ describe("CLI help", () => {
     assert.strictEqual(code, 0);
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message, /recording start\|stop\|pull\|parse\|export/);
+    assert.match(obj.message, /recording start\|stop\|pull\|parse\|export\|compare/);
     assert.match(obj.message, /'record' is an alias/);
   });
 
@@ -346,6 +347,14 @@ describe("CLI help", () => {
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "USAGE");
     assert.match(obj.message, /omit, include/);
+  });
+
+  it("returns USAGE for recording compare without required flags", async () => {
+    const { stdout, code } = await runCli(["recording", "compare"]);
+    assert.strictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /recording compare --baseline <export\.json> --result <skills-run\.json>/);
   });
 
   it("returns USAGE for record parse without --input", async () => {
