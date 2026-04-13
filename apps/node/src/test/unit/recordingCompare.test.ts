@@ -88,9 +88,15 @@ describe("recording compare normalization", () => {
   it("produces fewer than the required checkpoint count for a non-Solax recording with generic events", async () => {
     const baseline = await readJsonFixture<RecordingExportArtifact>("non-solax-generic-events.export.json");
     const normalized = normalizeRecordingExportForCompare(baseline);
-    assert.ok(normalized.checkpoints.length > 0, "should extract some checkpoints");
-    assert.ok(normalized.checkpoints.length < 4, "should not extract all 4 Solax checkpoints");
+    assert.strictEqual(normalized.checkpoints.length, 0);
     assert.strictEqual(normalized.appPackage, "com.example.notes");
+  });
+
+  it("fails closed for a non-Solax recording whose generic labels would otherwise synthesize a full checkpoint set", async () => {
+    const baseline = await readJsonFixture<RecordingExportArtifact>("non-solax-false-positive.export.json");
+    const normalized = normalizeRecordingExportForCompare(baseline);
+    assert.strictEqual(normalized.checkpoints.length, 0);
+    assert.strictEqual(normalized.appPackage, "com.example.energy");
   });
 });
 
@@ -203,7 +209,16 @@ describe("recording compare outcomes", () => {
     const skillResult = await readJsonFixture<SkillResult>("solax-result-success.skillresult.json");
     const report = compareRecordingBaselineWithSkillResult(baseline, skillResult);
     assert.strictEqual(report.outcome, "normalization_insufficient");
-    assert.ok(report.baselineCoverage.declared < 4, "declared count should be less than 4");
+    assert.strictEqual(report.baselineCoverage.declared, 0);
+    assert.strictEqual(isMeaningfulCompareDivergence(report.outcome), true);
+  });
+
+  it("reports normalization_insufficient for a false-positive non-Solax baseline that matches generic discharge/save strings", async () => {
+    const baseline = await readJsonFixture<RecordingExportArtifact>("non-solax-false-positive.export.json");
+    const skillResult = await readJsonFixture<SkillResult>("solax-result-success.skillresult.json");
+    const report = compareRecordingBaselineWithSkillResult(baseline, skillResult);
+    assert.strictEqual(report.outcome, "normalization_insufficient");
+    assert.strictEqual(report.baselineCoverage.declared, 0);
     assert.strictEqual(isMeaningfulCompareDivergence(report.outcome), true);
   });
 
@@ -291,6 +306,31 @@ describe("recording compare file loading", () => {
 
     assert.strictEqual(baseline.session.sessionId, "solax-set-discharge-to-limit-20260410-135211");
     assert.strictEqual(skillResult.source.kind, "agent");
+  });
+
+  it("rejects a saved skills run wrapper whose SkillResult contract major version is unsupported", async () => {
+    const dir = await makeTempDir("clawperator-recording-compare-contract-version-");
+    const resultPath = join(dir, "unsupported-contract-version.json");
+    const wrapper = await readJsonFixture<{ skillResult: SkillResult }>("solax-skills-run-success.json");
+    const unsupportedWrapper = {
+      ...wrapper,
+      skillResult: {
+        ...wrapper.skillResult,
+        contractVersion: "2.0.0",
+      },
+    };
+    await writeFile(resultPath, `${JSON.stringify(unsupportedWrapper, null, 2)}\n`, "utf-8");
+
+    await assert.rejects(
+      loadSkillResultFromSkillsRunFile(resultPath),
+      (error: unknown) => {
+        assert.deepStrictEqual(error, {
+          code: "RECORDING_COMPARE_FAILED",
+          message: `Compare result file ${resultPath} contained an unsupported skillResult contractVersion: Unsupported SkillResult contract major version 2; expected 1`,
+        });
+        return true;
+      }
+    );
   });
 });
 

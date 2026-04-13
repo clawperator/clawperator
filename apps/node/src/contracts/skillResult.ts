@@ -6,6 +6,53 @@ export const SKILL_RESULT_CONTRACT_VERSION = "1.0.0";
 export const SKILL_RESULT_CONTRACT_MAJOR_VERSION = 1;
 export const SKILL_RESULT_CONTRACT_MINOR_VERSION = 0;
 
+interface ParsedSemver {
+  major: number;
+  minor: number;
+  patch: number;
+}
+
+function parseSemver(version: string): ParsedSemver | null {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version.trim());
+  if (!match) {
+    return null;
+  }
+
+  return {
+    major: Number.parseInt(match[1]!, 10),
+    minor: Number.parseInt(match[2]!, 10),
+    patch: Number.parseInt(match[3]!, 10),
+  };
+}
+
+export type SkillResultContractVersionValidation =
+  | { ok: true; minorAhead: boolean }
+  | { ok: false; message: string };
+
+export function validateSupportedSkillResultContractVersion(
+  contractVersion: string
+): SkillResultContractVersionValidation {
+  const semver = parseSemver(contractVersion);
+  if (semver === null) {
+    return {
+      ok: false,
+      message: `SkillResult contractVersion must be semver-shaped, got ${contractVersion}`,
+    };
+  }
+
+  if (semver.major !== SKILL_RESULT_CONTRACT_MAJOR_VERSION) {
+    return {
+      ok: false,
+      message: `Unsupported SkillResult contract major version ${semver.major}; expected ${SKILL_RESULT_CONTRACT_MAJOR_VERSION}`,
+    };
+  }
+
+  return {
+    ok: true,
+    minorAhead: semver.minor > SKILL_RESULT_CONTRACT_MINOR_VERSION,
+  };
+}
+
 export type SkillResultSource =
   | { kind: "script" }
   | { kind: "agent"; agentCli: string };

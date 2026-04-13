@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import {
   skillResultSchema,
+  validateSupportedSkillResultContractVersion,
   type SkillCheckpointStatus,
   type SkillResult,
   type SkillTerminalVerification,
@@ -90,6 +91,7 @@ interface ComparableActualCheckpoint {
 }
 
 const TERMINAL_CHECKPOINT_IDS = new Set(["terminal_state_verified"]);
+const SOLAX_PRIMARY_PACKAGE = "com.solaxcloud.starter";
 const SOLAX_BASELINE_CHECKPOINT_ORDER = [
   "app_opened",
   "discharge_to_row_focused",
@@ -222,6 +224,12 @@ export function normalizeRecordingExportForCompare(
   artifact: RecordingExportArtifact
 ): NormalizedRecordingBaseline {
   const appPackage = determinePrimaryPackage(artifact);
+  if (appPackage !== SOLAX_PRIMARY_PACKAGE) {
+    return {
+      appPackage,
+      checkpoints: [],
+    };
+  }
   const inPrimaryPackage = (event: RecordingExportEvent): boolean =>
     appPackage === null || !("packageName" in event) || event.packageName === appPackage;
 
@@ -595,6 +603,14 @@ export async function loadSkillResultFromSkillsRunFile(path: string): Promise<Sk
     throw {
       code: ERROR_CODES.RECORDING_COMPARE_FAILED,
       message: `Compare result file ${path} contained an invalid skillResult: ${result.error.issues.map((issue) => `${issue.path.join(".") || "<root>"}: ${issue.message}`).join("; ")}`,
+    };
+  }
+
+  const contractVersionValidation = validateSupportedSkillResultContractVersion(result.data.contractVersion);
+  if (!contractVersionValidation.ok) {
+    throw {
+      code: ERROR_CODES.RECORDING_COMPARE_FAILED,
+      message: `Compare result file ${path} contained an unsupported skillResult contractVersion: ${contractVersionValidation.message}`,
     };
   }
 
