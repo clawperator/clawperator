@@ -33,10 +33,6 @@ Still active:
 
 - W6 `skill-author-by-recording`
 
-Supporting completed task packs still retained:
-
-- `tasks/recording/orchestrated-skill-evals/`
-
 ## Durable Sources Of Truth
 
 The completed recording workstreams no longer own the durable contract. Future
@@ -50,7 +46,7 @@ agents should rely on these surfaces instead of the retired task packs.
 | Orchestrated skill design lessons | `docs/internal/design/skill-design.md` |
 | Runtime env vars for agent-driven skills | `docs/api/environment.md` |
 | Compare outcome and normalization semantics | `docs/api/recording.md` |
-| Eval workflow for repeated orchestrated proving | `evals/README.md` and `tasks/recording/orchestrated-skill-evals/` |
+| Eval workflow for repeated orchestrated proving | `evals/README.md`, `docs/internal/design/evals.md`, and `evals/` |
 | Runtime and contract implementation | `apps/node/src/contracts/` and `apps/node/src/domain/skills/` |
 
 ## Remaining Sequence
