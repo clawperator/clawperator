@@ -28,6 +28,10 @@ export interface SkillContract {
   verification: SkillContractVerification | null;
 }
 
+const skillContractInputNameSchema = z.string()
+  .min(1)
+  .regex(/^[A-Za-z0-9_]+$/, "contract input names must contain only letters, numbers, and underscores");
+
 export function isSupportedSkillContractInputSchema(schema: string): boolean {
   const trimmedSchema = schema.trim();
   if (trimmedSchema === "string") {
@@ -53,7 +57,7 @@ export const skillContractVerificationSchema: z.ZodType<SkillContractVerificatio
 ]);
 
 export const skillContractSchema: z.ZodType<SkillContract> = z.object({
-  inputs: z.record(skillContractInputSchemaStringSchema),
+  inputs: z.record(skillContractInputNameSchema, skillContractInputSchemaStringSchema),
   goal: z.object({
     kind: z.string().min(1),
   }).catchall(z.unknown()).nullable(),

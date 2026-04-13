@@ -2234,6 +2234,16 @@ describe("runSkill", () => {
     assert.strictEqual(result.skillResult.terminalVerification?.status, "not_run");
   });
 
+  it("treats declared verification as proved even when the emitted SkillResult status is indeterminate", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["proved-indeterminate-status", "40"]);
+
+    assert.ok(result.ok, `Expected proved declared verification to return wrapper success: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.status, "success");
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.status, "indeterminate");
+    assert.strictEqual(result.skillResult.terminalVerification?.status, "verified");
+  });
+
   it("reports success for orchestrated skills that take a recovery path but still reach terminal verification", async () => {
     const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["recovery-success", "40"]);
 
@@ -3428,6 +3438,26 @@ describe("runSkill", () => {
     assert.match(result.message, /unsupported contract input schema/i);
   });
 
+  it("rejects contract input names that cannot be rendered in matcher placeholders", () => {
+    const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
+      contract: {
+        inputs: {
+          "target-percent": "integer[0,100]",
+        },
+        goal: {
+          kind: "set_discharge_limit",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Discharge to {target-percent}%",
+        },
+      },
+    });
+
+    assert.ok(!result.ok);
+    assert.match(result.message, /contract input names must contain only letters, numbers, and underscores/i);
+  });
+
   it("validateSkill rejects unsupported declared contract input schemas before execution", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-unsupported-contract-schema-"));
     const skillsDir = join(tempRoot, "skills");
@@ -3472,6 +3502,55 @@ describe("runSkill", () => {
       assert.match(result.details?.reason ?? "", /unsupported contract input schema|supports only 'string' and 'integer/i);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed for scripted skills when skill.json appears to declare a malformed contract but the registry is stale", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.stale-registry-contract",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        TEST_SKILL_SCRIPT_ONLY,
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: "{\"id\":\"com.test.stale-registry-contract\",\"contract\": {",
+    });
+
+    try {
+      await writeFile(
+        temp.registryPath,
+        JSON.stringify({
+          schemaVersion: "1.0",
+          generatedAt: "2026-04-11T00:00:00Z",
+          skills: [
+            {
+              id: "com.test.stale-registry-contract",
+              applicationId: "com.test",
+              intent: "temp",
+              summary: "Temporary test skill",
+              path: "skills/com.test.stale-registry-contract",
+              skillFile: "skills/com.test.stale-registry-contract/SKILL.md",
+              scripts: [
+                "skills/com.test.stale-registry-contract/scripts/run.js",
+              ],
+              artifacts: [],
+            },
+          ],
+        }),
+        "utf8"
+      );
+
+      const result = await runSkill("com.test.stale-registry-contract", [], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /trusted skill result source metadata/i);
+    } finally {
+      await temp.cleanup();
     }
   });
 
@@ -3552,8 +3631,14 @@ describe("runSkill", () => {
       "--output",
       "json",
       "--",
-      "valid",
-    ]);
+      "40",
+    ], {
+      env: {
+        ...process.env,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+        TEST_SKILL_MODE: "valid",
+      },
+    });
 
     assert.strictEqual(code, 0, stdout);
     const parsed = JSON.parse(stdout) as {
@@ -3575,15 +3660,25 @@ describe("runSkill", () => {
       "--output",
       "json",
       "--",
-      "legacy",
-    ]);
+      "40",
+    ], {
+      env: {
+        ...process.env,
+        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+        TEST_SKILL_MODE: "legacy",
+      },
+    });
 
-    assert.strictEqual(code, 0, stdout);
+    assert.strictEqual(code, 1, stdout);
     const parsed = JSON.parse(stdout) as {
       status?: string;
+      code?: string;
+      message?: string;
       skillResult?: unknown;
     };
     assert.strictEqual(parsed.status, "indeterminate");
+    assert.strictEqual(parsed.code, "SKILL_VERIFICATION_INDETERMINATE");
+    assert.match(parsed.message ?? "", /did not emit a SkillResult|did not prove/i);
     assert.strictEqual(parsed.skillResult, null);
   });
 
@@ -4704,12 +4799,15 @@ describe("CLI skills run streaming", () => {
       "com.clawperator.operator.dev",
       "--output",
       "pretty",
+      "--",
+      "40",
     ], {
       cwd: packageRoot,
       env: {
         ...process.env,
         PATH: `${fakeAdbDir}${process.env.PATH ? `:${process.env.PATH}` : ""}`,
         CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+        TEST_SKILL_MODE: "valid",
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

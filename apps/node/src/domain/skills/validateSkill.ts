@@ -14,6 +14,7 @@ import {
 } from "../../contracts/skills.js";
 import { validateExecution, type ValidationFailure } from "../executions/validateExecution.js";
 import { parseSkillManifestMetadata } from "./skillManifest.js";
+import { normalizeStableJsonValue } from "./stableJson.js";
 import {
   isOrchestratedHarnessScriptPath,
   normalizeSkillPathSeparators,
@@ -96,20 +97,6 @@ function normalizeSkillPathArray(paths: string[] | undefined): string[] {
   return (paths ?? []).map((path) => normalizeSkillPathSeparators(path));
 }
 
-function normalizeComparableJsonValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((entry) => normalizeComparableJsonValue(entry));
-  }
-  if (typeof value === "object" && value !== null) {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
-        .map(([key, entryValue]) => [key, normalizeComparableJsonValue(entryValue)])
-    );
-  }
-  return value;
-}
-
 function findMismatchFields(skill: SkillEntry, parsed: Partial<SkillEntry>): string[] {
   const mismatches: string[] = [];
   if (parsed.id !== skill.id) mismatches.push("id");
@@ -120,7 +107,7 @@ function findMismatchFields(skill: SkillEntry, parsed: Partial<SkillEntry>): str
   if (normalizeSkillPathSeparators(parsed.skillFile ?? "") !== normalizeSkillPathSeparators(skill.skillFile)) mismatches.push("skillFile");
   if (JSON.stringify(normalizeSkillPathArray(parsed.scripts)) !== JSON.stringify(normalizeSkillPathArray(skill.scripts))) mismatches.push("scripts");
   if (JSON.stringify(normalizeSkillPathArray(parsed.artifacts)) !== JSON.stringify(normalizeSkillPathArray(skill.artifacts))) mismatches.push("artifacts");
-  if (JSON.stringify(normalizeComparableJsonValue(parsed.contract ?? null)) !== JSON.stringify(normalizeComparableJsonValue(skill.contract ?? null))) mismatches.push("contract");
+  if (JSON.stringify(normalizeStableJsonValue(parsed.contract ?? null)) !== JSON.stringify(normalizeStableJsonValue(skill.contract ?? null))) mismatches.push("contract");
   return mismatches;
 }
 
@@ -244,7 +231,7 @@ async function validateLoadedSkill(
       details: {
         skillJsonPath,
         invalidKeys: unsupportedContractInputSchemas,
-        reason: "contract.inputs supports only 'string' and 'integer[min,max]' schemas in v1.",
+        reason: "contract.inputs supports only 'string' and 'integer[<min>,<max>]' schemas in v1.",
       },
     };
   }

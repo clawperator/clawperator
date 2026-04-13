@@ -275,6 +275,23 @@ switch (mode) {
       },
     });
     break;
+  case "proved-indeterminate-status":
+    emitFrame({
+      ...basePayload,
+      status: "indeterminate",
+      terminalVerification: {
+        status: "verified",
+        expected: {
+          kind: "text",
+          text: "Discharge to 40%",
+        },
+        observed: {
+          kind: "text",
+          text: "Discharge to 40%",
+        },
+      },
+    });
+    break;
   case "decorated-success":
     emitFrame({
       ...basePayload,

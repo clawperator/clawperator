@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
-import { access } from "node:fs/promises";
-import { extname } from "node:path";
+import { access, readFile } from "node:fs/promises";
+import { extname, join } from "node:path";
 import { loadRegistry, findSkillById, getRepoRoot } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import type { Logger } from "../../adapters/logger.js";
 import {
@@ -29,6 +29,7 @@ import {
   readSkillManifestMetadata,
   type SkillManifestReadResult,
 } from "./skillManifest.js";
+import { normalizeStableJsonValue } from "./stableJson.js";
 import {
   resolveConfiguredAgentCli,
   resolveAgentCliExecutable,
@@ -414,30 +415,16 @@ function resolveTrustedContractInputs(
   return { ok: true, inputs: trustedInputs };
 }
 
-function normalizeJsonValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((entry) => normalizeJsonValue(entry));
-  }
-  if (typeof value === "object" && value !== null) {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
-        .map(([key, entryValue]) => [key, normalizeJsonValue(entryValue)])
-    );
-  }
-  return value;
-}
-
 function declaredInputsMatchTrustedInputs(
   trustedInputs: Record<string, unknown>,
   reportedInputs: Record<string, unknown> | undefined
 ): boolean {
-  const normalizedReportedInputs = normalizeJsonValue(reportedInputs ?? {}) as Record<string, unknown>;
+  const normalizedReportedInputs = normalizeStableJsonValue(reportedInputs ?? {}) as Record<string, unknown>;
   for (const [key, trustedValue] of Object.entries(trustedInputs)) {
     if (!(key in normalizedReportedInputs)) {
       return false;
     }
-    if (JSON.stringify(normalizeJsonValue(trustedValue)) !== JSON.stringify(normalizedReportedInputs[key])) {
+    if (JSON.stringify(normalizeStableJsonValue(trustedValue)) !== JSON.stringify(normalizedReportedInputs[key])) {
       return false;
     }
   }
@@ -508,14 +495,17 @@ function verifyDeclaredSkillContract(
     };
   }
 
-  if (skillResult.status !== "success") {
-    return {
-      ok: false,
-      message: "Skill emitted terminal proof but did not report success.",
-    };
-  }
-
   return { ok: true };
+}
+
+async function skillJsonRawMayDeclareContract(repoRoot: string, skillPath: string): Promise<boolean> {
+  const skillJsonPath = resolveRepoRelativeSkillPath(repoRoot, join(skillPath, "skill.json"));
+  try {
+    const raw = await readFile(skillJsonPath, "utf-8");
+    return /"contract"\s*:/.test(raw);
+  } catch {
+    return false;
+  }
 }
 
 export async function runSkill(
@@ -576,7 +566,8 @@ export async function runSkill(
     const harnessScriptRelative = skill.scripts.find((scriptPath) => isOrchestratedHarnessScriptPath(scriptPath));
     const manifestResult = await readSkillManifestMetadata(repoRoot, skill.path);
     if (!manifestResult.ok) {
-      if (harnessScriptRelative || skill.contract !== undefined) {
+      const rawSkillJsonDeclaresContract = await skillJsonRawMayDeclareContract(repoRoot, skill.path);
+      if (harnessScriptRelative || skill.contract !== undefined || rawSkillJsonDeclaresContract) {
         return {
           ok: false,
           status: "failed",

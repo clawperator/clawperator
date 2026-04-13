@@ -432,6 +432,8 @@ export async function cmdSkillsRun(
   if (result.status === "indeterminate") {
     return formatSuccess({
       status: result.status,
+      code: result.code,
+      message: result.message,
       skillId: result.skillId,
       output: options.format === "pretty"
         ? sanitizePrettySkillStdout(result.output, result.skillResult !== null)
