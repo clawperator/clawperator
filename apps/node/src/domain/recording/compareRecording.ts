@@ -220,6 +220,17 @@ function asNormalizedCheckpoint(id: string, event: RecordingExportEvent): Normal
   };
 }
 
+function isMonotonicCheckpointSequence(checkpoints: NormalizedRecordingCheckpoint[]): boolean {
+  let lastSeq = -1;
+  for (const checkpoint of checkpoints) {
+    if (checkpoint.sourceEventSeq <= lastSeq) {
+      return false;
+    }
+    lastSeq = checkpoint.sourceEventSeq;
+  }
+  return true;
+}
+
 export function normalizeRecordingExportForCompare(
   artifact: RecordingExportArtifact
 ): NormalizedRecordingBaseline {
@@ -280,14 +291,16 @@ export function normalizeRecordingExportForCompare(
     eventMap.set("save_completed", saveEvent);
   }
 
+  const checkpoints = SOLAX_BASELINE_CHECKPOINT_ORDER
+    .map((id) => {
+      const event = eventMap.get(id);
+      return event ? asNormalizedCheckpoint(id, event) : null;
+    })
+    .filter((checkpoint): checkpoint is NormalizedRecordingCheckpoint => checkpoint !== null);
+
   return {
     appPackage,
-    checkpoints: SOLAX_BASELINE_CHECKPOINT_ORDER
-      .map((id) => {
-        const event = eventMap.get(id);
-        return event ? asNormalizedCheckpoint(id, event) : null;
-      })
-      .filter((checkpoint): checkpoint is NormalizedRecordingCheckpoint => checkpoint !== null),
+    checkpoints: isMonotonicCheckpointSequence(checkpoints) ? checkpoints : [],
   };
 }
 
@@ -590,7 +603,23 @@ export async function loadSkillResultFromSkillsRunFile(path: string): Promise<Sk
     };
   }
 
-  const candidate = (parsed as { skillResult?: unknown }).skillResult;
+  const parsedWrapper = parsed as {
+    status?: unknown;
+    code?: unknown;
+    message?: unknown;
+    skillResult?: unknown;
+  };
+  if (parsedWrapper.status !== "success") {
+    const codeSuffix = typeof parsedWrapper.code === "string" && parsedWrapper.code.length > 0
+      ? ` (${parsedWrapper.code}${typeof parsedWrapper.message === "string" && parsedWrapper.message.length > 0 ? `: ${parsedWrapper.message}` : ""})`
+      : "";
+    throw {
+      code: ERROR_CODES.RECORDING_COMPARE_FAILED,
+      message: `Compare result file ${path} must come from a successful skills run wrapper; got status ${typeof parsedWrapper.status === "string" ? parsedWrapper.status : "<missing>"}${codeSuffix}`,
+    };
+  }
+
+  const candidate = parsedWrapper.skillResult;
   if (candidate === null || candidate === undefined) {
     throw {
       code: ERROR_CODES.RECORDING_COMPARE_FAILED,

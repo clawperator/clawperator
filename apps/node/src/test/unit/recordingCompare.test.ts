@@ -98,6 +98,13 @@ describe("recording compare normalization", () => {
     assert.strictEqual(normalized.checkpoints.length, 0);
     assert.strictEqual(normalized.appPackage, "com.example.energy");
   });
+
+  it("fails closed when Solax checkpoint candidates are not monotonic in event order", async () => {
+    const baseline = await readJsonFixture<RecordingExportArtifact>("solax-baseline-non-monotonic.export.json");
+    const normalized = normalizeRecordingExportForCompare(baseline);
+    assert.strictEqual(normalized.checkpoints.length, 0);
+    assert.strictEqual(normalized.appPackage, "com.solaxcloud.starter");
+  });
 });
 
 describe("recording compare outcomes", () => {
@@ -222,6 +229,15 @@ describe("recording compare outcomes", () => {
     assert.strictEqual(isMeaningfulCompareDivergence(report.outcome), true);
   });
 
+  it("reports normalization_insufficient when Solax checkpoints can only be stitched together out of order", async () => {
+    const baseline = await readJsonFixture<RecordingExportArtifact>("solax-baseline-non-monotonic.export.json");
+    const skillResult = await readJsonFixture<SkillResult>("solax-result-success.skillresult.json");
+    const report = compareRecordingBaselineWithSkillResult(baseline, skillResult);
+    assert.strictEqual(report.outcome, "normalization_insufficient");
+    assert.strictEqual(report.baselineCoverage.declared, 0);
+    assert.strictEqual(isMeaningfulCompareDivergence(report.outcome), true);
+  });
+
   it("includes baselineCoverage and normalizationStrategy in a successful compare report", async () => {
     const baseline = await readJsonFixture<RecordingExportArtifact>("solax-baseline-success.export.json");
     const skillResult = await readJsonFixture<SkillResult>("solax-result-replay-success.skillresult.json");
@@ -332,6 +348,30 @@ describe("recording compare file loading", () => {
       }
     );
   });
+
+  it("rejects a saved skills run wrapper whose top-level status is indeterminate even when nested skillResult is successful", async () => {
+    const dir = await makeTempDir("clawperator-recording-compare-wrapper-status-");
+    const resultPath = join(dir, "wrapper-indeterminate.json");
+    const wrapper = await readJsonFixture<Record<string, unknown> & { skillResult: SkillResult }>("solax-skills-run-success.json");
+    const indeterminateWrapper = {
+      ...wrapper,
+      status: "indeterminate",
+      code: "SKILL_VERIFICATION_INDETERMINATE",
+      message: "Declared verification was not proved.",
+    };
+    await writeFile(resultPath, `${JSON.stringify(indeterminateWrapper, null, 2)}\n`, "utf-8");
+
+    await assert.rejects(
+      loadSkillResultFromSkillsRunFile(resultPath),
+      (error: unknown) => {
+        assert.deepStrictEqual(error, {
+          code: "RECORDING_COMPARE_FAILED",
+          message: `Compare result file ${resultPath} must come from a successful skills run wrapper; got status indeterminate (SKILL_VERIFICATION_INDETERMINATE: Declared verification was not proved.)`,
+        });
+        return true;
+      }
+    );
+  });
 });
 
 describe("recording compare CLI", () => {
@@ -371,7 +411,7 @@ describe("recording compare CLI", () => {
     assert.strictEqual(parsed.outcome, "outcome_matches_path_differs");
   });
 
-  it("returns exit code 1 for a meaningful divergence report", async () => {
+  it("returns a typed compare error for an indeterminate saved wrapper that was not trusted by skills run", async () => {
     const { stdout, code } = await runCli([
       "recording",
       "compare",
@@ -384,8 +424,9 @@ describe("recording compare CLI", () => {
     ]);
 
     assert.strictEqual(code, 1, stdout);
-    const parsed = JSON.parse(stdout) as { outcome?: string };
-    assert.strictEqual(parsed.outcome, "verification_failed");
+    const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.strictEqual(parsed.code, "RECORDING_COMPARE_FAILED");
+    assert.match(parsed.message ?? "", /must come from a successful skills run wrapper; got status indeterminate/i);
   });
 
   it("returns exit code 1 for a live-backed baseline drift wrapper", async () => {
@@ -460,7 +501,7 @@ describe("recording compare CLI", () => {
       "bogus",
     ]);
 
-    assert.notStrictEqual(code, 0);
+    assert.strictEqual(code, 0);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(parsed.code, "USAGE");
     assert.match(parsed.message ?? "", /auto, literal, semantic/);

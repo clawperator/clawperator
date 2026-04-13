@@ -2340,7 +2340,10 @@ COMMANDS["recording"] = {
 
       const mode = getStringOptStrict(rest, "--mode", knownFlags);
       if (mode !== undefined && mode !== "auto" && mode !== "literal" && mode !== "semantic") {
-        throw new UsageError("recording compare --mode must be one of: auto, literal, semantic");
+        return JSON.stringify({
+          code: "USAGE",
+          message: "recording compare --mode must be one of: auto, literal, semantic",
+        });
       }
 
       return (await import("./commands/record.js")).cmdRecordCompare({
