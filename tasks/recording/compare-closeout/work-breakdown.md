@@ -25,7 +25,10 @@ verification). One commit per phase except P4 (verification only).
 ## Hard Rules
 
 - Do not modify any existing test case. Only add new ones.
-- Do not modify any existing fixture file. Only add new ones.
+- Do not modify existing fixture files unless that refresh is required to
+  restore truthful alignment with the canonical retained baseline. When a
+  fixture refresh is required, keep the change narrowly scoped and document
+  why the previous fixture was stale.
 - Do not modify `findFirstDivergence`, `comparableActualCheckpoints`,
   `inferredCompareMode`, or `terminalVerificationStatus`. Those functions
   are correct and out of scope.
@@ -452,8 +455,8 @@ fix(recording): add normalization guard and baseline coverage to compare
 
 Make semantic compare require more than trivial baseline coverage before it
 is allowed to classify a verified agent-driven run as success. Add an
-opt-in cross-repo sync test that compares structure and compare behavior,
-not raw file bytes.
+opt-in developer-side cross-repo sync guard that compares structure and
+compare behavior, not raw file bytes.
 
 ### Files or Surfaces To Change
 
@@ -739,6 +742,11 @@ not raw file bytes.
    CLAWPERATOR_SKILLS_ROOT=../clawperator-skills npm --prefix apps/node run test
    ```
 
+   If the sync guard fails because the checked-in Clawperator fixture is
+   stale relative to the canonical retained baseline, refresh the fixture in
+   this task. That refresh is allowed even though the default rule is to
+   avoid modifying existing fixtures.
+
 ### Acceptance Criteria
 
 - `determineOutcome` accepts a `baselineCoverage` parameter.
@@ -760,6 +768,9 @@ not raw file bytes.
 - When `CLAWPERATOR_SKILLS_ROOT=../clawperator-skills` is set, the sync
   test runs and passes when the canonical baseline remains structurally
   aligned with the fixture.
+- If the canonical retained baseline is already out of sync, the task may
+  refresh the checked-in fixture and should do so rather than leaving the
+  pack in a detect-but-don't-fix state.
 - All existing tests still pass with no modifications.
 - Build succeeds.
 
@@ -818,6 +829,8 @@ guidance.
      baselines are supported in a future release
    - every compare report includes `normalizationStrategy: "solax_heuristic"`
      so consumers know which normalization path was used
+   - this closeout makes the Solax heuristic path honest and fail-closed;
+     it does not make compare generic
    ```
 
 2. In the same file, find the "Current v1 compare outcomes:" list (around
@@ -884,6 +897,9 @@ guidance.
      Clawperator test fixture in the same PR or the next available PR
    - to verify sync:
      `CLAWPERATOR_SKILLS_ROOT=../clawperator-skills npm --prefix apps/node run test`
+   - this is a developer-side guard for the closeout branch, not the final
+     durability mechanism; the generic compare follow-on should wire
+     canonical-baseline provenance into CI or another required validation path
    ```
 
 8. Rebuild docs:
@@ -897,6 +913,8 @@ guidance.
 - `docs/api/recording.md` has a normalization scope paragraph that
   explicitly names the Solax heuristics and says non-Solax exports produce
   `normalization_insufficient`.
+- `docs/api/recording.md` explicitly says this closeout is Solax-specific
+  and fail-closed, not generic compare completion.
 - The three new outcomes appear in the outcomes list and interpretation
   rules.
 - The exit-code contract includes the three new outcomes.

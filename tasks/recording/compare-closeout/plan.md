@@ -55,6 +55,11 @@ engine-level problems found during EM-level review:
 
 Plus honest docs framing and test coverage for the new behavior.
 
+This is a stabilization and closeout pack for the current Solax-specific
+compare path. It makes compare honest, fail-closed, and supportable for the
+shipped `solax_heuristic` implementation. It does not make compare
+genuinely generic.
+
 ## Why Now
 
 The compare branch has 5 commits of working implementation, live-proved
@@ -83,7 +88,9 @@ as a PR.
 - rename of `DEFAULT_BASELINE_CHECKPOINT_ORDER` to
   `SOLAX_BASELINE_CHECKPOINT_ORDER`
 - CLI-path tests for the new fail-closed outcomes and exit-code behavior
-- opt-in cross-repo baseline sync test
+- opt-in cross-repo baseline sync guard
+- refresh of existing Clawperator compare fixtures when required to restore
+  truthful alignment with the canonical retained baseline
 - honest normalization scope qualification in `docs/api/recording.md`
 - cross-repo sync note in `docs/skills/authoring.md`
 - new outcomes documented in `docs/api/recording.md`
@@ -237,6 +244,15 @@ Cross-repo sync behavior:
 | canonical baseline parses but normalizes differently from the Clawperator fixture | fail test |
 | canonical baseline normalizes identically and produces the same compare outcome for the canonical success fixture | pass |
 
+Enforcement posture:
+
+- in this closeout pack, the cross-repo sync check is a developer-side guard,
+  not the full durability solution
+- implementers should run it in local validation when the sibling
+  `../clawperator-skills` repo is present
+- wiring a mandatory CI or branch validation hook is explicitly deferred to
+  the generic compare successor program
+
 ## Failure Modes To Prevent
 
 - changing the compare engine behavior for any existing test case
@@ -247,6 +263,8 @@ Cross-repo sync behavior:
   coverage to be classified as success
 - building a cross-repo sync check that fails on harmless session-level
   metadata drift instead of meaningful compare drift
+- describing the opt-in sync guard as if it were already a mandatory CI
+  enforcement mechanism
 - only testing helper-level compare reports and forgetting to pin the CLI
   exit-code behavior for the new fail-closed outcomes
 - documenting normalization scope as an apology instead of an honest scope
@@ -273,8 +291,12 @@ After this task, the `skills/compare` branch must:
 - have honest normalization scope in public docs
 - prove the new fail-closed outcomes on the CLI path, not only through
   direct compare helper tests
-- have an opt-in cross-repo baseline sync test that compares structure and
-  compare behavior, not raw bytes
+- have public docs that clearly state the normalization strategy is
+  Solax-specific and fail-closed
+- have an opt-in developer-side cross-repo sync guard that compares
+  structure and compare behavior, not raw bytes
+- allow fixture refresh in the same task when that is required to restore
+  truthful alignment with the canonical retained baseline
 
 ## Idempotency
 
@@ -310,7 +332,8 @@ pack with at least these milestones:
 3. **Cross-repo fixture provenance.** Generate the Clawperator test
    fixture from the canonical skills-repo baseline so drift is
    mechanically impossible. Replace the current manual-copy workflow with
-   a script or build step.
+   a script or build step, and wire that check into CI or another required
+   branch validation path.
 
 4. **Semantic compare coverage threshold.** Decide whether semantic success
    should continue to use the closeout threshold (`minimumSemanticCoverage`
