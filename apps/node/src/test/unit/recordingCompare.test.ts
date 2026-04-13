@@ -85,7 +85,7 @@ describe("recording compare normalization", () => {
     assert.strictEqual(normalized.appPackage, "com.example.notes");
   });
 
-  it("produces fewer than the required checkpoint count for a non-Solax recording with generic events", async () => {
+  it("fails closed for a non-Solax recording with generic events under the Solax-only normalization guard", async () => {
     const baseline = await readJsonFixture<RecordingExportArtifact>("non-solax-generic-events.export.json");
     const normalized = normalizeRecordingExportForCompare(baseline);
     assert.strictEqual(normalized.checkpoints.length, 0);
@@ -204,7 +204,7 @@ describe("recording compare outcomes", () => {
     assert.strictEqual(isMeaningfulCompareDivergence(report.outcome), true);
   });
 
-  it("reports normalization_insufficient for a non-Solax baseline with partial generic checkpoints", async () => {
+  it("reports normalization_insufficient for a non-Solax baseline blocked by the Solax-only normalization guard", async () => {
     const baseline = await readJsonFixture<RecordingExportArtifact>("non-solax-generic-events.export.json");
     const skillResult = await readJsonFixture<SkillResult>("solax-result-success.skillresult.json");
     const report = compareRecordingBaselineWithSkillResult(baseline, skillResult);
