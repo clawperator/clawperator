@@ -22,22 +22,23 @@ story. Until this workflow is explicitly owned, the developer-facing "how"
 remains too implicit and too dependent on an expert holding the process in
 their head.
 
-This workflow is intentionally downstream of the current recording program. It
-should only be implemented once the replay baseline, `SkillResult`, the
+This workflow is intentionally downstream of the earlier recording workstreams.
+It should only be implemented once the replay baseline, `SkillResult`, the
 agent-driven orchestrated runtime, declarative skill contracts, compare, and
-durable docs are all in place.
+durable docs are all in place. That prerequisite is now satisfied on this
+branch.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | blocked |
+| State | ready |
 | Total PRs | 1 |
 | Total phases | 3 |
 | Completed | none |
 | Remaining | P1, P2, P3 |
-| Current / Next | P1 after W2b, W3, W4, and W5 |
-| Blockers | `skill-checkpoints/`, `skill-result-contract/`, `agent-driven-skills/`, `skill-contract-declaration/`, `compare/`, and `graduate-demo-findings/` must land first |
+| Current / Next | P1 |
+| Blockers | none |
 
 ## Goal
 
@@ -160,22 +161,20 @@ be explicit, justified, and easy to act on.
 
 ## Source Of Truth
 
-W6 executes after W2b, W3, W4, and W5 have all landed. By that point the
-durable knowledge from each workstream will have graduated to docs. Prefer
-the docs paths below as the stable read; fall back to the task files only if
-the docs have not yet been updated.
+W6 executes after the earlier recording workstreams have landed. Their durable
+knowledge should now be read from docs and code, not from retired task packs.
 
-| Area | Stable source (post-graduation) | Task file (while active) |
-| --- | --- | --- |
-| Recording lifecycle | `docs/api/recording.md` | `tasks/recording/demo/` |
-| Skill scaffolding and authoring | `docs/skills/authoring.md` | `tasks/recording/graduate-demo-findings/` |
-| Replay/orchestrated proving pattern | `docs/skills/authoring.md` | `tasks/recording/plan.md` |
-| Runtime-agent shape for orchestrated skills | `docs/skills/overview.md`, `docs/skills/authoring.md` | `tasks/recording/agent-driven-skills/` |
-| Orchestrated skill design lessons and failure modes | `docs/internal/design/skill-design.md`, `docs/skills/authoring.md` | `tasks/recording/agent-driven-skills-closeout/` |
-| Structured skill results | `docs/skills/authoring.md`, `apps/node/src/contracts/` | `tasks/recording/skill-result-contract/` |
-| Contract declaration | `docs/skills/authoring.md` | `tasks/recording/skill-contract-declaration/` |
-| Compare workflow | `docs/api/recording.md` | `tasks/recording/compare/` |
-| Reliability report | `docs/internal/design/reliability/` | n/a (never in tasks/) |
+| Area | Stable source |
+| --- | --- |
+| Recording lifecycle | `docs/api/recording.md` |
+| Skill scaffolding and authoring | `docs/skills/authoring.md` |
+| Replay/orchestrated proving pattern | `docs/skills/authoring.md` |
+| Runtime-agent shape for orchestrated skills | `docs/skills/overview.md`, `docs/skills/authoring.md` |
+| Orchestrated skill design lessons and failure modes | `docs/internal/design/skill-design.md`, `docs/skills/authoring.md` |
+| Structured skill results | `docs/skills/authoring.md`, `apps/node/src/contracts/`, `apps/node/src/domain/skills/` |
+| Contract declaration | `docs/skills/authoring.md` |
+| Compare workflow | `docs/api/recording.md` |
+| Reliability report | `docs/internal/design/reliability/` |
 
 ## Output Contract
 

@@ -116,6 +116,10 @@ clawperator grant-device-permissions --device <device_serial>
 
 Use this only after the Operator APK crashes or Android revokes accessibility / notification permissions. For the first install, use `clawperator operator setup`.
 
+If you force-stop the Operator package during debugging and the next handshake
+or snapshot stops working, use this same recovery step before trusting the
+runtime again, then re-run `clawperator doctor --json`.
+
 ## 5. Verify readiness with doctor
 
 ```bash

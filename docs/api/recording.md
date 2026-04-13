@@ -15,6 +15,34 @@ Document the current recording workflow, the raw NDJSON schema written by the Op
 - Shared validation: `apps/node/src/domain/recording/recordingValidation.ts`
 - Public error codes: `apps/node/src/contracts/errors.ts`
 
+## Recording As Evidence
+
+Recordings are evidence for later authoring, debugging, and compare work. They
+are not executable skills.
+
+Current durable rules:
+
+- retain the pulled NDJSON as the raw capture
+- retain `clawperator recording export` output as the canonical structured
+  artifact for authoring and compare
+- use `clawperator record parse` as lossy human inspection only
+- do not treat a recording export or parsed step log as a reusable skill with
+  only light cleanup
+
+What the retained export gives you:
+
+- the raw event timeline
+- package-transition evidence
+- candidate selectors, text, and timing
+- optional preserved XML snapshots when `--snapshots include` is used
+
+What it does not give you:
+
+- the final reusable control flow for a skill
+- the final selector strategy for every tap
+- terminal verification policy
+- a guarantee that the recorded visible label was the real clickable node
+
 ## Recording Lifecycle
 
 The current flow is:
@@ -23,14 +51,20 @@ The current flow is:
 2. interact with the device
 3. `clawperator record stop [--session-id <id>]`
 4. `clawperator record pull [--session-id <id>] [--out <dir>]`
-5. `clawperator record parse --input <file> [--out <file>]`
-6. `clawperator recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]`
+5. `clawperator recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]`
+6. `clawperator record parse --input <file> [--out <file>]`
 7. `clawperator recording compare --baseline <export.json> --result <skills-run.json> [--mode <auto|literal|semantic>]`
 
 Notes:
 
 - `record` is a top-level alias for `recording`
 - `pull` defaults to `./recordings/` when `--out` is omitted
+- the practical authoring order is `pull`, then `export`, then optional `parse`
+  or other human inspection
+- do not treat `parse` as the only retained baseline artifact; it intentionally
+  drops event detail that `export` preserves
+- do not run `export` or `parse` against a recording directory until `pull`
+  has finished writing the local NDJSON file you plan to keep
 - `parse` writes `<input without .ndjson>.steps.json` when the input ends with `.ndjson`, otherwise `<input>.steps.json`
 - `record start` builder timeout is `10000`
 - `record stop` builder timeout is `15000`

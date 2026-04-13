@@ -38,6 +38,32 @@ Practical note:
 The first stabilized orchestrated skills surfaced several durable design
 lessons for future authors.
 
+### Keep Per-Exec And Per-Skill Results Separate
+
+`ResultEnvelope` and `SkillResult` solve different contract problems.
+
+- `ResultEnvelope` is the per-`clawperator exec` terminal envelope. It reports
+  one execution's transport status, step results, and top-level error fields.
+- `SkillResult` is the per-skill terminal frame. It reports the skill-level
+  goal, checkpoints, terminal verification, diagnostics, and any embedded exec
+  envelopes needed as evidence.
+
+Multi-step skills need both layers.
+
+If the runtime only exposed the last `ResultEnvelope`, the caller could see
+that one execution succeeded but still could not tell:
+
+- which checkpoint failed first
+- whether the skill proved its declared final state
+- whether the overall run was `success`, `failed`, or `indeterminate`
+- which sequence of exec runs produced the final outcome
+
+Keep the boundary explicit:
+
+- `ResultEnvelope` remains the deterministic per-command contract
+- `SkillResult` remains the deterministic per-skill contract built on top of
+  those command results
+
 ### Keep Skill Authority In `SKILL.md`
 
 The durable contract is:
