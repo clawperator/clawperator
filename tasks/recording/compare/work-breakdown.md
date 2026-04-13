@@ -17,13 +17,13 @@ captured artifacts.
 
 | Item | Value |
 | --- | --- |
-| State | active |
+| State | complete |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | P1, P2 |
-| Remaining | P3, P4 |
-| Current / Next | P3 forced-divergence capture and fixture refresh |
-| Blockers | Replay literal proof and orchestrated semantic proof landed on April 13, 2026; path-different, baseline-drift, verification-failed, and captured-fixture refresh are still pending |
+| Completed | P1, P2, P3, P4 |
+| Remaining | none |
+| Current / Next | complete |
+| Blockers | none |
 
 ## Hard Rules
 
@@ -305,25 +305,37 @@ Show the compare output is useful on the real Solax orchestrated proving skill.
    `compareMode: "semantic"` and `outcome: "semantic_match"` using the saved
    wrapper artifact at
    `/tmp/clawperator-recording-compare-p3/orchestrated-40.skills-run.json`.
-3. Capture an agent-driven orchestrated run that takes a different valid path
+3. [DONE 2026-04-13] Capture an agent-driven orchestrated run that takes a different valid path
    than the recording baseline but still reaches terminal verification.
    Compare it; expect `outcome_matches_path_differs`, not failure.
-4. Force a `baseline_drift` divergence on-device (e.g. by changing the
+   Result: a live orchestrated wrapper captured under a throwaway local proof
+   hook returned `compareMode: "semantic"` and
+   `outcome: "outcome_matches_path_differs"` with first divergence
+   `device_discharging_card_opened`.
+4. [DONE 2026-04-13] Force a `baseline_drift` divergence on-device (e.g. by changing the
    skill's checkpoint sequence in a sanitized branch) and compare; expect
    the first divergent checkpoint to be reported by identity.
-5. Force a `verification_failed` divergence on-device (e.g. by requesting a
+   Result: a live replay-backed wrapper captured under a throwaway local proof
+   hook returned `compareMode: "literal"` and `outcome: "baseline_drift"`
+   with first divergence `device_discharging_card_opened`.
+5. [DONE 2026-04-13] Force a `verification_failed` divergence on-device (e.g. by requesting a
    value the skill records as set but the persisted row does not actually
    show) and compare; expect the verification class.
-6. Sanitize and copy the captured artifacts into
+   Result: a live replay-backed wrapper captured under a throwaway local proof
+   hook returned `compareMode: "literal"` and
+   `outcome: "verification_failed"`.
+6. [DONE 2026-04-13] Sanitize and copy the captured artifacts into
    `apps/node/src/test/fixtures/recording-compare/` so the P2 tests are
    anchored to evidence from real runs, not hand-written shapes.
-7. From that same captured baseline, create a placeholder-templated retained
+7. [DONE 2026-04-13] From that same captured baseline, create a placeholder-templated retained
    baseline fixture and confirm compare normalization produces the same
    checkpoint baseline as the non-sanitized version wherever only sensitive
    leaf values changed.
-8. Capture forced-divergence artifacts from a throwaway local branch or local
+8. [DONE 2026-04-13] Capture forced-divergence artifacts from a throwaway local branch or local
    uncommitted patch in `../clawperator-skills` that is discarded after
    evidence capture. Do not merge the forced-divergence implementation.
+   Result: the temporary proof hooks were used only for evidence capture and
+   were removed before final repo state.
 
 ### Acceptance Criteria
 

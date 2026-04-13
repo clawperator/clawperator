@@ -29,13 +29,13 @@ consume `SkillResult`, not invent an overlapping trace mechanism first.
 
 | Item | Value |
 | --- | --- |
-| State | active |
+| State | complete |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | P1, P2 |
-| Remaining | P3, P4 |
-| Current / Next | P3 live forced-divergence capture |
-| Blockers | P3 replay and semantic happy-path proofs landed on April 13, 2026; path-different, baseline-drift, and verification-failed live captures plus fixture refresh are still pending |
+| Completed | P1, P2, P3, P4 |
+| Remaining | none |
+| Current / Next | complete |
+| Blockers | none |
 
 ## Goal
 

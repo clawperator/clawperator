@@ -179,7 +179,7 @@ describe("recording compare file loading", () => {
     const baseline = await loadRecordingExportBaselineFile(join(fixturesRoot, "solax-baseline-success.export.json"));
     const skillResult = await loadSkillResultFromSkillsRunFile(join(fixturesRoot, "solax-skills-run-success.json"));
 
-    assert.strictEqual(baseline.session.sessionId, "solax-session-001");
+    assert.strictEqual(baseline.session.sessionId, "solax-set-discharge-to-limit-20260410-135211");
     assert.strictEqual(skillResult.source.kind, "agent");
   });
 });
@@ -204,25 +204,13 @@ describe("recording compare CLI", () => {
   });
 
   it("returns exit code 0 for semantic path-diff success when mode is auto-detected from the saved wrapper", async () => {
-    const dir = await makeTempDir("clawperator-recording-compare-");
-    const wrapperPath = join(dir, "solax-path-diff.skills-run.json");
-    const skillResult = await readJsonFixture<SkillResult>("solax-result-success-path-differs.skillresult.json");
-    await writeFile(wrapperPath, JSON.stringify({
-      status: "success",
-      skillId: skillResult.skillId,
-      output: "agent success with alternate path",
-      exitCode: 0,
-      durationMs: 1500,
-      skillResult,
-    }), "utf-8");
-
     const { stdout, code } = await runCli([
       "recording",
       "compare",
       "--baseline",
       join(fixturesRoot, "solax-baseline-success.export.json"),
       "--result",
-      wrapperPath,
+      join(fixturesRoot, "solax-skills-run-path-diff.json"),
       "--output",
       "json",
     ]);
@@ -234,25 +222,13 @@ describe("recording compare CLI", () => {
   });
 
   it("returns exit code 1 for a meaningful divergence report", async () => {
-    const dir = await makeTempDir("clawperator-recording-compare-");
-    const wrapperPath = join(dir, "solax-verification-failed.skills-run.json");
-    const skillResult = await readJsonFixture<SkillResult>("solax-result-verification-failed.skillresult.json");
-    await writeFile(wrapperPath, JSON.stringify({
-      status: "success",
-      skillId: skillResult.skillId,
-      output: "verification failed",
-      exitCode: 0,
-      durationMs: 1500,
-      skillResult,
-    }), "utf-8");
-
     const { stdout, code } = await runCli([
       "recording",
       "compare",
       "--baseline",
       join(fixturesRoot, "solax-baseline-success.export.json"),
       "--result",
-      wrapperPath,
+      join(fixturesRoot, "solax-skills-run-verification-failed.json"),
       "--output",
       "json",
     ]);
@@ -260,6 +236,24 @@ describe("recording compare CLI", () => {
     assert.strictEqual(code, 1, stdout);
     const parsed = JSON.parse(stdout) as { outcome?: string };
     assert.strictEqual(parsed.outcome, "verification_failed");
+  });
+
+  it("returns exit code 1 for a live-backed baseline drift wrapper", async () => {
+    const { stdout, code } = await runCli([
+      "recording",
+      "compare",
+      "--baseline",
+      join(fixturesRoot, "solax-baseline-success.export.json"),
+      "--result",
+      join(fixturesRoot, "solax-skills-run-baseline-drift.json"),
+      "--output",
+      "json",
+    ]);
+
+    assert.strictEqual(code, 1, stdout);
+    const parsed = JSON.parse(stdout) as { outcome?: string; firstDivergence?: { actualCheckpoint?: string } };
+    assert.strictEqual(parsed.outcome, "baseline_drift");
+    assert.strictEqual(parsed.firstDivergence?.actualCheckpoint, "device_discharging_card_opened");
   });
 
   it("returns USAGE when --baseline is omitted", async () => {
