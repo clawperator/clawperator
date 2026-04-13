@@ -432,7 +432,16 @@ function declaredInputsMatchTrustedInputs(
   trustedInputs: Record<string, unknown>,
   reportedInputs: Record<string, unknown> | undefined
 ): boolean {
-  return JSON.stringify(normalizeJsonValue(trustedInputs)) === JSON.stringify(normalizeJsonValue(reportedInputs ?? {}));
+  const normalizedReportedInputs = normalizeJsonValue(reportedInputs ?? {}) as Record<string, unknown>;
+  for (const [key, trustedValue] of Object.entries(trustedInputs)) {
+    if (!(key in normalizedReportedInputs)) {
+      return false;
+    }
+    if (JSON.stringify(normalizeJsonValue(trustedValue)) !== JSON.stringify(normalizedReportedInputs[key])) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function verifyDeclaredSkillContract(
@@ -567,7 +576,7 @@ export async function runSkill(
     const harnessScriptRelative = skill.scripts.find((scriptPath) => isOrchestratedHarnessScriptPath(scriptPath));
     const manifestResult = await readSkillManifestMetadata(repoRoot, skill.path);
     if (!manifestResult.ok) {
-      if (harnessScriptRelative) {
+      if (harnessScriptRelative || skill.contract !== undefined) {
         return {
           ok: false,
           status: "failed",

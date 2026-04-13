@@ -28,6 +28,23 @@ export interface SkillContract {
   verification: SkillContractVerification | null;
 }
 
+export function isSupportedSkillContractInputSchema(schema: string): boolean {
+  const trimmedSchema = schema.trim();
+  if (trimmedSchema === "string") {
+    return true;
+  }
+  return /^integer(?:\[-?\d+,-?\d+])?$/.test(trimmedSchema);
+}
+
+const skillContractInputSchemaStringSchema = z.string()
+  .min(1)
+  .refine(
+    (schema) => isSupportedSkillContractInputSchema(schema),
+    (schema) => ({
+      message: `unsupported contract input schema '${schema}'`,
+    })
+  );
+
 export const skillContractVerificationSchema: z.ZodType<SkillContractVerification> = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("node_text_matches"),
@@ -36,7 +53,7 @@ export const skillContractVerificationSchema: z.ZodType<SkillContractVerificatio
 ]);
 
 export const skillContractSchema: z.ZodType<SkillContract> = z.object({
-  inputs: z.record(z.string()),
+  inputs: z.record(skillContractInputSchemaStringSchema),
   goal: z.object({
     kind: z.string().min(1),
   }).catchall(z.unknown()).nullable(),

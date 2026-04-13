@@ -10,6 +10,7 @@ import {
   REGISTRY_READ_FAILED,
   SKILL_NOT_FOUND,
   SKILL_VALIDATION_FAILED,
+  isSupportedSkillContractInputSchema,
 } from "../../contracts/skills.js";
 import { validateExecution, type ValidationFailure } from "../executions/validateExecution.js";
 import { parseSkillManifestMetadata } from "./skillManifest.js";
@@ -123,6 +124,16 @@ function findMismatchFields(skill: SkillEntry, parsed: Partial<SkillEntry>): str
   return mismatches;
 }
 
+function findUnsupportedContractInputSchemas(skill: SkillEntry): string[] {
+  if (!skill.contract) {
+    return [];
+  }
+
+  return Object.entries(skill.contract.inputs)
+    .filter(([, schema]) => !isSupportedSkillContractInputSchema(schema))
+    .map(([inputName]) => inputName);
+}
+
 async function validateLoadedSkill(
   skill: SkillEntry,
   resolvedRegistryPath: string,
@@ -220,6 +231,20 @@ async function validateLoadedSkill(
       details: {
         skillJsonPath,
         reason: manifestResult.message,
+      },
+    };
+  }
+
+  const unsupportedContractInputSchemas = findUnsupportedContractInputSchemas(skill);
+  if (unsupportedContractInputSchemas.length > 0) {
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} declares unsupported contract input schemas`,
+      details: {
+        skillJsonPath,
+        invalidKeys: unsupportedContractInputSchemas,
+        reason: "contract.inputs supports only 'string' and 'integer[min,max]' schemas in v1.",
       },
     };
   }

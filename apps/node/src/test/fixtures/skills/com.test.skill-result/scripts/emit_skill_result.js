@@ -265,6 +265,15 @@ switch (mode) {
       },
     });
     break;
+  case "extra-inputs":
+    emitFrame({
+      ...basePayload,
+      inputs: {
+        ...basePayload.inputs,
+        diagnosticNote: "kept-for-debugging",
+      },
+    });
+    break;
   case "decorated-success":
     emitFrame({
       ...basePayload,

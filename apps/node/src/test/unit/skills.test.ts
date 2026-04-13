@@ -3010,6 +3010,19 @@ describe("runSkill", () => {
     assert.strictEqual(spoofed.skillResult.status, "success");
   });
 
+  it("accepts extra undeclared SkillResult inputs when declared inputs still match trusted invocation inputs", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["40"], undefined, undefined, {
+      TEST_SKILL_MODE: "extra-inputs",
+    });
+
+    assert.ok(result.ok, `Expected extra undeclared inputs to be allowed: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.status, "success");
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.status, "success");
+    assert.strictEqual(result.skillResult.inputs?.targetPercent, 40);
+    assert.strictEqual(result.skillResult.inputs?.diagnosticNote, "kept-for-debugging");
+  });
+
   it("fails a declared-verification run when a zero-exit SkillResult reports failed status", async () => {
     const result = await runSkill(TEST_SKILL_RESULT, ["failed-zero-exit", "40"]);
 
@@ -3294,6 +3307,83 @@ describe("runSkill", () => {
     }
   });
 
+  it("fails closed for scripted skills when a declared contract is present but the manifest contract is malformed", async () => {
+    const temp = await createTempRegistryWithSkill({
+      skillId: "com.test.malformed-script-contract",
+      scriptSourcePath: join(
+        packageRoot,
+        "src",
+        "test",
+        "fixtures",
+        "skills",
+        TEST_SKILL_SCRIPT_ONLY,
+        "scripts",
+        "run.js"
+      ),
+      skillJsonContents: JSON.stringify({
+        id: "com.test.malformed-script-contract",
+        applicationId: "com.test",
+        intent: "temp",
+        summary: "Temporary test skill",
+        path: "skills/com.test.malformed-script-contract",
+        skillFile: "skills/com.test.malformed-script-contract/SKILL.md",
+        scripts: [
+          "skills/com.test.malformed-script-contract/scripts/run.js",
+        ],
+        artifacts: [],
+        contract: {
+          inputs: [],
+          goal: null,
+          verification: null,
+        },
+      }),
+    });
+
+    try {
+      await writeFile(
+        temp.registryPath,
+        JSON.stringify({
+          schemaVersion: "1.0",
+          generatedAt: "2026-04-11T00:00:00Z",
+          skills: [
+            {
+              id: "com.test.malformed-script-contract",
+              applicationId: "com.test",
+              intent: "temp",
+              summary: "Temporary test skill",
+              path: "skills/com.test.malformed-script-contract",
+              skillFile: "skills/com.test.malformed-script-contract/SKILL.md",
+              scripts: [
+                "skills/com.test.malformed-script-contract/scripts/run.js",
+              ],
+              artifacts: [],
+              contract: {
+                inputs: {
+                  targetPercent: "integer[0,100]",
+                },
+                goal: {
+                  kind: "set",
+                },
+                verification: {
+                  kind: "node_text_matches",
+                  matcher: "Discharge to {targetPercent}%",
+                },
+              },
+            },
+          ],
+        }),
+        "utf8"
+      );
+
+      const result = await runSkill("com.test.malformed-script-contract", [], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /skill\.json contract is invalid|trusted skill result source metadata/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
   it("rejects malformed agent blocks when parsing skill manifest metadata", () => {
     const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
       agent: {
@@ -3316,6 +3406,73 @@ describe("runSkill", () => {
 
     assert.ok(!result.ok);
     assert.match(result.message, /skill\.json contract is invalid/i);
+  });
+
+  it("rejects unsupported contract input schemas when parsing skill manifest metadata", () => {
+    const result = parseSkillManifestMetadata("/tmp/test-skill.json", {
+      contract: {
+        inputs: {
+          percent: "float",
+        },
+        goal: {
+          kind: "set_discharge_limit",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Discharge to {percent}%",
+        },
+      },
+    });
+
+    assert.ok(!result.ok);
+    assert.match(result.message, /unsupported contract input schema/i);
+  });
+
+  it("validateSkill rejects unsupported declared contract input schemas before execution", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-unsupported-contract-schema-"));
+    const skillsDir = join(tempRoot, "skills");
+    const skillId = "com.test.unsupported-contract-schema";
+    const skillDir = join(skillsDir, skillId);
+    const registryPath = join(skillsDir, "skills-registry.json");
+    await mkdir(join(skillDir, "scripts"), { recursive: true });
+
+    const entry = {
+      id: skillId,
+      applicationId: "com.test",
+      intent: "temp",
+      summary: "Skill with unsupported declared contract schema",
+      path: `skills/${skillId}`,
+      skillFile: `skills/${skillId}/SKILL.md`,
+      scripts: [`skills/${skillId}/scripts/run.js`],
+      artifacts: [],
+      contract: {
+        inputs: {
+          percent: "float",
+        },
+        goal: {
+          kind: "set_discharge_limit",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Discharge to {percent}%",
+        },
+      },
+    };
+
+    try {
+      await writeFile(join(skillDir, "SKILL.md"), "# Unsupported Schema\n", "utf8");
+      await writeFile(join(skillDir, "scripts", "run.js"), "#!/usr/bin/env node\nconsole.log('fixture run');\n", "utf8");
+      await writeFile(join(skillDir, "skill.json"), `${JSON.stringify(entry, null, 2)}\n`, "utf8");
+      await writeFile(registryPath, `${JSON.stringify({ schemaVersion: "1.0", generatedAt: "2026-04-11T00:00:00Z", skills: [entry] }, null, 2)}\n`, "utf8");
+
+      const result = await validateSkill(skillId, registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /invalid agent manifest|unsupported contract input schemas/i);
+      assert.match(result.details?.reason ?? "", /unsupported contract input schema|supports only 'string' and 'integer/i);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 
   it("rejects unsupported SkillResult contract major versions", async () => {
