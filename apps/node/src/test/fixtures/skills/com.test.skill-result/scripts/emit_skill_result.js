@@ -10,6 +10,7 @@ for (let index = 0; index < args.length; index += 1) {
 
   if (arg === "--mode") {
     mode = args[index + 1] || mode;
+    modeSetFromArgs = true;
     index += 1;
     continue;
   }
