@@ -6,8 +6,8 @@ Parent plan: `tasks/recording/compare-closeout/plan.md`
 
 Total PRs: 1. Total phases: 4. All phases are in one PR on the existing
 `skills/compare` branch. Phase order: P1 (normalization guard, coverage
-computation, constant rename, new outcomes), P2 (semantic baseline-coverage
-check and cross-repo sync test), P3 (docs and framing), P4 (final
+computation, constant rename, new outcomes), P2 (semantic coverage policy
+and structural cross-repo sync test), P3 (docs and framing), P4 (final
 verification). One commit per phase except P4 (verification only).
 
 ## Status
@@ -29,6 +29,9 @@ verification). One commit per phase except P4 (verification only).
 - Do not modify `findFirstDivergence`, `comparableActualCheckpoints`,
   `inferredCompareMode`, or `terminalVerificationStatus`. Those functions
   are correct and out of scope.
+- Do not build the cross-repo sync test around raw-file equality. It must
+  compare structural normalization output and compare behavior so harmless
+  metadata differences do not cause false failures.
 - Do not modify the CLI registration in `registry.ts` or the handler in
   `record.ts`. The new outcomes flow through the existing
   `isMeaningfulCompareDivergence` check, which already controls exit codes.
@@ -68,14 +71,14 @@ Read these files IN THIS ORDER before writing anything.
 ### Goal
 
 Make compare fail-closed when heuristic normalization cannot extract the
-full Solax checkpoint set. Add baseline-coverage metrics to the report.
-Rename the Solax-specific constant.
+full Solax checkpoint set. Add baseline-coverage metrics plus the minimum
+semantic-coverage policy to the report. Rename the Solax-specific constant.
 
 ### Files or Surfaces To Change
 
 - `apps/node/src/domain/recording/compareRecording.ts`
 - `apps/node/src/test/unit/recordingCompare.test.ts`
-- `apps/node/src/test/fixtures/recording-compare/` (2 new fixtures)
+- `apps/node/src/test/fixtures/recording-compare/` (3 new fixtures)
 
 ### Steps
 
@@ -84,11 +87,12 @@ Rename the Solax-specific constant.
    to it at line 267. Search the file for any other references and update
    them. There should be exactly 2 occurrences total (declaration and usage).
 
-2. Add two new members to the `RecordingCompareOutcome` type union.
+2. Add three new members to the `RecordingCompareOutcome` type union.
    Place them after `"runtime_unavailable"`:
    ```typescript
    | "normalization_insufficient"
-   | "baseline_uncovered";
+   | "baseline_uncovered"
+   | "baseline_weakly_covered";
    ```
 
 3. Add three new fields to the `RecordingCompareReport` interface.
@@ -99,6 +103,7 @@ Rename the Solax-specific constant.
      covered: number;
    };
    normalizationStrategy: "solax_heuristic";
+   minimumSemanticCoverage: number;
    ```
 
 4. Add a helper function to compute baseline coverage. Place it after
@@ -115,22 +120,31 @@ Rename the Solax-specific constant.
    }
    ```
 
-5. In `summarizeOutcome`, add cases for the two new outcomes:
+5. Add a new constant near `SOLAX_BASELINE_CHECKPOINT_ORDER`:
+   ```typescript
+   const SOLAX_MINIMUM_SEMANTIC_COVERAGE = 2;
+   ```
+   Rationale: a single overlapping checkpoint such as `app_opened` is too
+   weak to make semantic compare helpful or trustworthy.
+
+6. In `summarizeOutcome`, add cases for the three new outcomes:
    ```typescript
    case "normalization_insufficient":
      return "baseline normalization could not extract the required checkpoint set from this recording export";
    case "baseline_uncovered":
      return "terminal verification passed but no baseline checkpoints appeared in the actual run";
+   case "baseline_weakly_covered":
+     return "terminal verification passed but baseline coverage was too weak to treat compare as trustworthy";
    ```
 
-6. In `isMeaningfulCompareDivergence`, confirm the function already returns
+7. In `isMeaningfulCompareDivergence`, confirm the function already returns
    `true` for the new outcomes. It uses an inclusion list of the three
    success outcomes (`literal_match`, `semantic_match`,
    `outcome_matches_path_differs`), so any outcome not in that list
    automatically returns `true`. No code change needed here, but verify
    by reading the function.
 
-7. Modify `compareRecordingBaselineWithSkillResult`. The current function
+8. Modify `compareRecordingBaselineWithSkillResult`. The current function
    body is approximately:
    ```typescript
    const baseline = normalizeRecordingExportForCompare(artifact);
@@ -168,6 +182,7 @@ Rename the Solax-specific constant.
        },
        baselineCoverage: coverage,
        normalizationStrategy: "solax_heuristic",
+       minimumSemanticCoverage: SOLAX_MINIMUM_SEMANTIC_COVERAGE,
      };
    }
    ```
@@ -184,9 +199,10 @@ Rename the Solax-specific constant.
    ```typescript
    baselineCoverage,
    normalizationStrategy: "solax_heuristic",
+   minimumSemanticCoverage: SOLAX_MINIMUM_SEMANTIC_COVERAGE,
    ```
 
-8. Create fixture
+9. Create fixture
    `apps/node/src/test/fixtures/recording-compare/non-solax-scroll-only.export.json`.
    This is a valid `RecordingExportArtifact` with events from
    `com.example.notes` that are all `scroll` type. Scroll events match
@@ -245,7 +261,7 @@ Rename the Solax-specific constant.
    }
    ```
 
-9. Create fixture
+10. Create fixture
    `apps/node/src/test/fixtures/recording-compare/non-solax-generic-events.export.json`.
    This is a valid `RecordingExportArtifact` with events from
    `com.example.notes` that include a `window_change`, a `click` with text
@@ -313,7 +329,7 @@ Rename the Solax-specific constant.
    }
    ```
 
-10. Add tests in `recordingCompare.test.ts`. In the
+11. Add tests in `recordingCompare.test.ts`. In the
     `"recording compare normalization"` describe block, add:
 
     ```typescript
@@ -356,13 +372,8 @@ Rename the Solax-specific constant.
     });
     ```
 
-    Also verify existing tests now include the new report fields. Add one
-    assertion to the FIRST existing test in the `"recording compare outcomes"`
-    block (the `"reports literal match"` test). After the existing
-    assertions, add:
-
-    Wait - the hard rule says "do not modify any existing test case." So
-    do NOT add assertions to existing tests. Instead, add a dedicated test:
+    Add a dedicated test for the new report fields (do not modify existing
+    tests):
 
     ```typescript
     it("includes baselineCoverage and normalizationStrategy in a successful compare report", async () => {
@@ -371,12 +382,13 @@ Rename the Solax-specific constant.
       const report = compareRecordingBaselineWithSkillResult(baseline, skillResult);
       assert.strictEqual(report.outcome, "literal_match");
       assert.strictEqual(report.normalizationStrategy, "solax_heuristic");
+      assert.strictEqual(report.minimumSemanticCoverage, 2);
       assert.strictEqual(report.baselineCoverage.declared, 4);
       assert.strictEqual(report.baselineCoverage.covered, 4);
     });
     ```
 
-11. Build and test:
+12. Build and test:
     ```bash
     npm --prefix apps/node run build && npm --prefix apps/node run test
     ```
@@ -386,12 +398,15 @@ Rename the Solax-specific constant.
 
 - `DEFAULT_BASELINE_CHECKPOINT_ORDER` no longer exists anywhere in the
   codebase. `SOLAX_BASELINE_CHECKPOINT_ORDER` exists in its place.
-- `"normalization_insufficient"` and `"baseline_uncovered"` are in the
+- `"normalization_insufficient"`, `"baseline_uncovered"`, and
+  `"baseline_weakly_covered"` are in the
   `RecordingCompareOutcome` type union.
-- `isMeaningfulCompareDivergence` returns `true` for both new outcomes.
-- `summarizeOutcome` handles both new outcomes without throwing.
+- `isMeaningfulCompareDivergence` returns `true` for all three new outcomes.
+- `summarizeOutcome` handles all three new outcomes without throwing.
 - Every `RecordingCompareReport` includes `baselineCoverage` and
   `normalizationStrategy`.
+- Every `RecordingCompareReport` includes
+  `minimumSemanticCoverage === 2`.
 - A non-Solax export with scroll-only events produces
   `normalization_insufficient`.
 - A non-Solax export with generic events (window_change + click + text_change
@@ -427,7 +442,7 @@ grep -r "SOLAX_BASELINE_CHECKPOINT_ORDER" apps/node/src/
 fix(recording): add normalization guard and baseline coverage to compare
 ```
 
-## Phase P2: Semantic Baseline-Coverage Check and Cross-Repo Sync Test
+## Phase P2: Semantic Coverage Policy and Structural Cross-Repo Sync Test
 
 ### Agent Tier
 
@@ -435,15 +450,16 @@ fix(recording): add normalization guard and baseline coverage to compare
 
 ### Goal
 
-Make semantic compare require at least one baseline checkpoint to appear in
-the actual run before classifying the result as success. Add an opt-in
-cross-repo baseline sync test.
+Make semantic compare require more than trivial baseline coverage before it
+is allowed to classify a verified agent-driven run as success. Add an
+opt-in cross-repo sync test that compares structure and compare behavior,
+not raw file bytes.
 
 ### Files or Surfaces To Change
 
 - `apps/node/src/domain/recording/compareRecording.ts`
 - `apps/node/src/test/unit/recordingCompare.test.ts`
-- `apps/node/src/test/fixtures/recording-compare/` (1 new fixture)
+- `apps/node/src/test/fixtures/recording-compare/` (3 new fixtures)
 
 ### Steps
 
@@ -468,6 +484,9 @@ cross-repo baseline sync test.
    }
    if (baselineCoverage.declared > 0 && baselineCoverage.covered === 0) {
      return "baseline_uncovered";
+   }
+   if (baselineCoverage.covered < SOLAX_MINIMUM_SEMANTIC_COVERAGE) {
+     return "baseline_weakly_covered";
    }
    return "outcome_matches_path_differs";
    ```
@@ -542,7 +561,58 @@ cross-repo baseline sync test.
    }
    ```
 
-4. Add tests. In the `"recording compare outcomes"` describe block, add:
+4. Create fixture
+   `apps/node/src/test/fixtures/recording-compare/solax-result-single-coverage.skillresult.json`.
+   This is a bare `SkillResult` with:
+   - `source.kind: "agent"`
+   - `status: "success"`
+   - `terminalVerification.status: "verified"`
+   - exactly one overlapping baseline checkpoint ID, and that overlap is
+     only `app_opened`
+   - all other checkpoint IDs are non-overlapping
+
+   Use this exact content:
+   ```json
+   {
+     "contractVersion": "1.0.0",
+     "skillId": "com.solaxcloud.starter.set-discharge-to-limit-orchestrated",
+     "source": {
+       "kind": "agent",
+       "agentCli": "codex"
+     },
+     "goal": {
+       "kind": "set_discharge_limit",
+       "percent": 40
+     },
+     "inputs": {
+       "percent": 40
+     },
+     "status": "success",
+     "checkpoints": [
+       { "id": "app_opened", "status": "ok" },
+       { "id": "login_completed", "status": "ok" },
+       { "id": "settings_opened", "status": "ok" },
+       { "id": "value_changed", "status": "ok" }
+     ],
+     "terminalVerification": {
+       "status": "verified",
+       "expected": { "kind": "text", "text": "Discharge to 40%" },
+       "observed": { "kind": "text", "text": "Discharge to 40%" }
+     },
+     "diagnostics": {
+       "runtimeState": "healthy"
+     }
+   }
+   ```
+
+5. Create fixture
+   `apps/node/src/test/fixtures/recording-compare/solax-skills-run-single-coverage.json`.
+   Create it by copying `solax-skills-run-success.json` and replacing its
+   top-level `skillResult` object with the exact contents of
+   `solax-result-single-coverage.skillresult.json`. Leave the rest of the
+   wrapper shape intact so the CLI test still exercises wrapper parsing.
+
+6. Add tests. In the `"recording compare outcomes"` describe block, add:
 
    ```typescript
    it("reports baseline_uncovered when an agent-driven run has verified terminal state but zero baseline checkpoint coverage", async () => {
@@ -557,22 +627,77 @@ cross-repo baseline sync test.
      assert.strictEqual(isMeaningfulCompareDivergence(report.outcome), true);
    });
 
+   it("reports baseline_weakly_covered when an agent-driven run covers only one baseline checkpoint", async () => {
+     const baseline = await readJsonFixture<RecordingExportArtifact>("solax-baseline-success.export.json");
+     const skillResult = await readJsonFixture<SkillResult>("solax-result-single-coverage.skillresult.json");
+     const report = compareRecordingBaselineWithSkillResult(baseline, skillResult);
+     assert.strictEqual(report.compareMode, "semantic");
+     assert.strictEqual(report.outcome, "baseline_weakly_covered");
+     assert.strictEqual(report.baselineCoverage.declared, 4);
+     assert.strictEqual(report.baselineCoverage.covered, 1);
+     assert.strictEqual(report.minimumSemanticCoverage, 2);
+     assert.strictEqual(isMeaningfulCompareDivergence(report.outcome), true);
+   });
+
    it("still reports outcome_matches_path_differs when an agent-driven run has baseline coverage and verified terminal state", async () => {
+     // This fixture has 4/4 baseline checkpoint overlap (app_opened,
+     // discharge_to_row_focused, target_text_entered, save_completed),
+     // so it satisfies the minimum semantic coverage threshold of 2.
      const baseline = await readJsonFixture<RecordingExportArtifact>("solax-baseline-success.export.json");
      const skillResult = await readJsonFixture<SkillResult>("solax-result-success-path-differs.skillresult.json");
      const report = compareRecordingBaselineWithSkillResult(baseline, skillResult);
      assert.strictEqual(report.compareMode, "semantic");
      assert.strictEqual(report.outcome, "outcome_matches_path_differs");
-     assert.ok(report.baselineCoverage.covered > 0, "should have nonzero baseline coverage");
+     assert.ok(report.baselineCoverage.covered >= 2, "should satisfy minimum semantic coverage");
    });
    ```
 
-5. Add the opt-in cross-repo baseline sync test. Create a new describe
+7. In the `"recording compare CLI"` describe block, add:
+
+   ```typescript
+   it("returns exit code 1 with normalization_insufficient for a baseline that does not satisfy the Solax heuristic set", async () => {
+     const { stdout, code } = await runCli([
+       "recording",
+       "compare",
+       "--baseline",
+       join(fixturesRoot, "non-solax-generic-events.export.json"),
+       "--result",
+       join(fixturesRoot, "solax-skills-run-success.json"),
+       "--output",
+       "json",
+     ]);
+
+     assert.strictEqual(code, 1, stdout);
+     const parsed = JSON.parse(stdout) as { outcome?: string; normalizationStrategy?: string };
+     assert.strictEqual(parsed.outcome, "normalization_insufficient");
+     assert.strictEqual(parsed.normalizationStrategy, "solax_heuristic");
+   });
+
+   it("returns exit code 1 with baseline_weakly_covered for a semantic run below the minimum coverage threshold", async () => {
+     const { stdout, code } = await runCli([
+       "recording",
+       "compare",
+       "--baseline",
+       join(fixturesRoot, "solax-baseline-success.export.json"),
+       "--result",
+       join(fixturesRoot, "solax-skills-run-single-coverage.json"),
+       "--output",
+       "json",
+     ]);
+
+     assert.strictEqual(code, 1, stdout);
+     const parsed = JSON.parse(stdout) as { outcome?: string; minimumSemanticCoverage?: number };
+     assert.strictEqual(parsed.outcome, "baseline_weakly_covered");
+     assert.strictEqual(parsed.minimumSemanticCoverage, 2);
+   });
+   ```
+
+8. Add the opt-in cross-repo baseline sync test. Create a new describe
    block in `recordingCompare.test.ts`:
 
    ```typescript
    describe("recording compare cross-repo baseline sync", () => {
-     it("skills-repo retained baseline matches the Clawperator test fixture", async () => {
+     it("skills-repo retained baseline matches the Clawperator fixture structurally", async () => {
        const skillsRoot = process.env.CLAWPERATOR_SKILLS_ROOT;
        if (!skillsRoot) {
          return; // skip when skills repo is not configured
@@ -584,17 +709,27 @@ cross-repo baseline sync test.
          "references",
          "compare-baseline.export.json"
        );
-       const canonical = JSON.parse(await readFile(canonicalPath, "utf-8"));
-       const fixture = await readJsonFixture("solax-baseline-success.export.json");
-       assert.deepStrictEqual(fixture, canonical);
+       const canonical = await loadRecordingExportBaselineFile(canonicalPath);
+       const fixture = await readJsonFixture<RecordingExportArtifact>("solax-baseline-success.export.json");
+       assert.deepStrictEqual(
+         normalizeRecordingExportForCompare(canonical),
+         normalizeRecordingExportForCompare(fixture)
+       );
+
+       const successFixture = await readJsonFixture<SkillResult>("solax-result-success.skillresult.json");
+       const canonicalReport = compareRecordingBaselineWithSkillResult(canonical, successFixture);
+       const fixtureReport = compareRecordingBaselineWithSkillResult(fixture, successFixture);
+       assert.strictEqual(canonicalReport.outcome, fixtureReport.outcome);
+       assert.deepStrictEqual(canonicalReport.baseline.checkpointIds, fixtureReport.baseline.checkpointIds);
      });
    });
    ```
 
-   Note: `readFile` is already imported at the top of the test file. The
-   `join` function is also already imported.
+   Add any required imports from `compareRecording.ts` rather than using raw
+   JSON equality. The test should fail only when compare-relevant structure
+   drifts.
 
-6. Build and test:
+9. Build and test:
    ```bash
    npm --prefix apps/node run build && npm --prefix apps/node run test
    ```
@@ -609,16 +744,22 @@ cross-repo baseline sync test.
 - `determineOutcome` accepts a `baselineCoverage` parameter.
 - In semantic mode with verified terminal state, a run with zero baseline
   coverage returns `baseline_uncovered` (exit 1).
-- In semantic mode with verified terminal state, a run with nonzero
-  baseline coverage returns `outcome_matches_path_differs` (exit 0,
-  existing behavior preserved).
+- In semantic mode with verified terminal state, a run with baseline
+  coverage of `1` returns `baseline_weakly_covered` (exit 1).
+- In semantic mode with verified terminal state, a run with baseline
+  coverage that meets the minimum threshold returns
+  `outcome_matches_path_differs` (exit 0, existing behavior preserved).
 - The zero-coverage fixture exists with completely non-overlapping
   checkpoint IDs.
-- Two new outcome tests pass.
+- The single-coverage fixture exists and overlaps only on `app_opened`.
+- The wrapper fixture `solax-skills-run-single-coverage.json` exists and
+  preserves the normal `skills run --json` top-level shape.
+- Three new outcome tests pass.
+- Two new CLI tests pass for the fail-closed outcomes.
 - The cross-repo sync test exists and is skipped by default (no env var).
 - When `CLAWPERATOR_SKILLS_ROOT=../clawperator-skills` is set, the sync
-  test runs and passes (assuming the skills repo baseline matches the
-  fixture).
+  test runs and passes when the canonical baseline remains structurally
+  aligned with the fixture.
 - All existing tests still pass with no modifications.
 - Build succeeds.
 
@@ -643,7 +784,8 @@ fix(recording): require baseline coverage for semantic compare success
 ### Goal
 
 Update docs to reflect the corrected compare behavior: normalization scope,
-new outcomes, and cross-repo sync guidance.
+new outcomes, semantic-coverage policy, report fields, and cross-repo sync
+guidance.
 
 ### Files or Surfaces To Change
 
@@ -679,10 +821,11 @@ new outcomes, and cross-repo sync guidance.
    ```
 
 2. In the same file, find the "Current v1 compare outcomes:" list (around
-   line 403). Add the two new outcomes at the end:
+   line 403). Add the three new outcomes at the end:
    ```
    - `normalization_insufficient`
    - `baseline_uncovered`
+   - `baseline_weakly_covered`
    ```
 
 3. In the same file, find the "Current interpretation rules:" list (around
@@ -695,12 +838,16 @@ new outcomes, and cross-repo sync guidance.
      agent-driven run, but no baseline checkpoint IDs appeared in the
      actual run at all; this is suspicious because the baseline is
      effectively irrelevant to the path the skill took
+   - `baseline_weakly_covered` means terminal verification passed for an
+     agent-driven run, but the overlap with the baseline was below the
+     minimum trusted threshold for the Solax heuristic path
    ```
 
 4. In the same file, find the "Exit-code contract:" list. Add:
    ```
    - exit non-zero for `normalization_insufficient`
    - exit non-zero for `baseline_uncovered`
+   - exit non-zero for `baseline_weakly_covered`
    ```
 
 5. In the same file, find the "Successful semantic compare example:" JSON
@@ -713,6 +860,7 @@ new outcomes, and cross-repo sync guidance.
    - `baselineCoverage.covered` is how many of those IDs appeared in the
      actual run
    - `normalizationStrategy` is `"solax_heuristic"` in v1
+   - `minimumSemanticCoverage` is `2` in v1 for the Solax heuristic path
    ```
 
 6. In the same file, find the verification example that uses
@@ -749,9 +897,11 @@ new outcomes, and cross-repo sync guidance.
 - `docs/api/recording.md` has a normalization scope paragraph that
   explicitly names the Solax heuristics and says non-Solax exports produce
   `normalization_insufficient`.
-- The two new outcomes appear in the outcomes list and interpretation rules.
-- The exit-code contract includes the two new outcomes.
+- The three new outcomes appear in the outcomes list and interpretation
+  rules.
+- The exit-code contract includes the three new outcomes.
 - The `baselineCoverage` and `normalizationStrategy` fields are documented.
+- The `minimumSemanticCoverage` field and Solax v1 threshold are documented.
 - The example skill id is the actual Solax proving skill, not a generic
   placeholder.
 - `docs/skills/authoring.md` has a cross-repo baseline sync note with
@@ -771,6 +921,11 @@ grep -c "normalization_insufficient" docs/api/recording.md
 
 ```bash
 grep -c "baseline_uncovered" docs/api/recording.md
+# Must return at least 2
+```
+
+```bash
+grep -c "baseline_weakly_covered" docs/api/recording.md
 # Must return at least 2
 ```
 
@@ -843,6 +998,11 @@ None. This is a verification-only phase.
    # Must return at least 3 (type union, summarizeOutcome, determineOutcome)
    ```
 
+   ```bash
+   grep -c "baseline_weakly_covered" apps/node/src/domain/recording/compareRecording.ts
+   # Must return at least 3 (type union, summarizeOutcome, determineOutcome)
+   ```
+
 6. If all pass, no commit is needed for this phase.
 
 ### Acceptance Criteria
@@ -852,7 +1012,7 @@ None. This is a verification-only phase.
 - Docs build succeeds.
 - No stale constant references.
 - No placeholder skill ids in docs.
-- Both new outcomes appear in the implementation at least 3 times each.
+- All three new outcomes appear in the implementation at least 3 times each.
 
 ### Validation
 

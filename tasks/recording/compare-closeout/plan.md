@@ -4,23 +4,25 @@
 
 Close the remaining gaps in the W4 `recording compare` implementation before
 the branch is PR-ready. The core compare engine (file loading, CLI surface,
-divergence finding, exit codes) is sound. Three design-level gaps remain:
+divergence finding, exit codes) is sound. Four design-level gaps remain:
 
 1. Heuristic normalization is Solax-specific but not fail-closed for
    non-Solax baselines.
 2. Semantic compare is too permissive: any agent-driven run with verified
-   terminal state is compare-success even if zero baseline checkpoints
-   appeared in the actual run.
+   terminal state is compare-success even when baseline coverage is too weak
+   to be a trustworthy signal.
 3. Cross-repo baseline drift between the canonical skills-repo retained
    baseline and the Clawperator test fixture has no mechanical check.
+4. The current sync-check idea is too brittle if it compares raw JSON
+   artifacts instead of structural compare behavior.
 
-This task fixes all three at the engine level, not just in docs. Docs are
+This task fixes all four at the engine level, not just in docs. Docs are
 updated to match the corrected behavior.
 
 Total PRs: 1. Total phases: 4. All work is on the existing
-`skills/compare` branch in the Clawperator repo. One small skills-repo
-change (adding declared checkpoints to the retained baseline) is in scope
-for P3.
+`skills/compare` branch in the Clawperator repo. No skills-repo source edit
+is required for closeout; the canonical retained baseline is read as
+validation input only.
 
 ## Status
 
@@ -36,19 +38,20 @@ for P3.
 
 ## Goal
 
-Make the `skills/compare` branch honestly PR-ready by fixing three concrete
+Make the `skills/compare` branch honestly PR-ready by fixing four concrete
 engine-level problems found during EM-level review:
 
 1. Heuristic normalization must be fail-closed: if the Solax-specific
    heuristics do not extract all 4 expected checkpoints, compare refuses
    with a typed outcome instead of proceeding with a partial or misleading
    baseline.
-2. Semantic compare must require minimal baseline-checkpoint coverage:
-   an agent-driven run that claims terminal verification but contains
-   zero baseline checkpoint IDs is suspicious and must not be classified
-   as success.
+2. Semantic compare must require meaningful baseline-checkpoint coverage:
+   an agent-driven run that claims terminal verification but covers only a
+   trivial slice of the baseline must not be classified as success.
 3. Cross-repo baseline drift must have a mechanical check, not just a
    documentation note.
+4. The mechanical sync check must compare durable structure, not raw file
+   bytes or session-level incidental metadata.
 
 Plus honest docs framing and test coverage for the new behavior.
 
@@ -56,7 +59,7 @@ Plus honest docs framing and test coverage for the new behavior.
 
 The compare branch has 5 commits of working implementation, live-proved
 against Solax replay and orchestrated runs. Tests pass. Docs build succeeds.
-But EM review found three design-level gaps that make the tool misleading
+But EM review found four design-level gaps that make the tool misleading
 for non-Solax baselines and overly permissive for agent-driven runs. These
 gaps must be closed at the engine level before the branch can be reviewed
 as a PR.
@@ -70,10 +73,16 @@ as a PR.
 - new `baseline_uncovered` outcome for semantic mode where terminal
   verification passed but zero baseline checkpoints appeared in the actual
   run
+- new `baseline_weakly_covered` outcome for semantic mode where terminal
+  verification passed but baseline coverage is nonzero yet below the
+  minimum trusted threshold
 - `normalizationStrategy` field in the report so consumers know which
   normalization path was used
+- `minimumSemanticCoverage` field in the report so consumers can see the
+  policy the engine applied
 - rename of `DEFAULT_BASELINE_CHECKPOINT_ORDER` to
   `SOLAX_BASELINE_CHECKPOINT_ORDER`
+- CLI-path tests for the new fail-closed outcomes and exit-code behavior
 - opt-in cross-repo baseline sync test
 - honest normalization scope qualification in `docs/api/recording.md`
 - cross-repo sync note in `docs/skills/authoring.md`
@@ -90,8 +99,7 @@ as a PR.
   correctly (literal_match, semantic_match, baseline_drift,
   verification_failed, verification_indeterminate, upstream_failure,
   runtime_poisoned, runtime_unavailable)
-- skills-repo changes beyond adding declared checkpoints to the retained
-  baseline
+- skills-repo source edits
 
 ## Existing Artifact Scope
 
@@ -110,13 +118,13 @@ Existing content preserved as-is:
 
 Existing content modified:
 
-- `RecordingCompareOutcome` type union: two new members added
+- `RecordingCompareOutcome` type union: three new members added
 - `RecordingCompareReport` interface: three new fields added
 - `compareRecordingBaselineWithSkillResult`: normalization guard and
   baseline-coverage computation added
-- `determineOutcome`: baseline-coverage check added for semantic mode
-- `isMeaningfulCompareDivergence`: two new outcomes handled
-- `summarizeOutcome`: two new cases added
+- `determineOutcome`: baseline-coverage thresholds added for semantic mode
+- `isMeaningfulCompareDivergence`: three new outcomes handled
+- `summarizeOutcome`: three new cases added
 - `normalizeRecordingExportForCompare`: constant renamed, no logic change
 - `docs/api/recording.md`: normalization scope, new outcomes, example fix
 - `docs/skills/authoring.md`: cross-repo sync note
@@ -130,7 +138,7 @@ Existing content modified:
 | `apps/node/src/test/fixtures/recording-compare/` | Clawperator repo | new fixtures |
 | `docs/api/recording.md` | Clawperator repo | normalization scope, new outcomes |
 | `docs/skills/authoring.md` | Clawperator repo | cross-repo sync note |
-| `../clawperator-skills/.../references/` | Skills repo | not changed in this task |
+| `../clawperator-skills/.../references/` | Skills repo | canonical retained baseline read by the opt-in structural sync test |
 
 ## Source Of Truth
 
@@ -155,8 +163,14 @@ Deterministic:
   (`SOLAX_BASELINE_CHECKPOINT_ORDER.length`)
 - baseline-coverage computation: set intersection of baseline checkpoint
   IDs and actual checkpoint IDs
-- `baseline_uncovered` trigger: `baselineCoverage.covered === 0` and
+- `baselineUncovered` trigger: `baselineCoverage.covered === 0` and
   `baselineCoverage.declared > 0` in semantic mode with verified terminal
+- `baselineWeaklyCovered` trigger:
+  `baselineCoverage.covered > 0 && baselineCoverage.covered < minimumSemanticCoverage`
+  in semantic mode with verified terminal
+- `minimumSemanticCoverage`: `2` for the shipped Solax heuristic path.
+  Rationale: `1` can be satisfied by a trivial anchor such as
+  `app_opened`, which is too weak to make semantic compare helpful.
 - new outcome membership in `isMeaningfulCompareDivergence`
 - fixture structure and test assertions
 - docs-site rebuild
@@ -180,8 +194,9 @@ Semantic compare baseline-coverage behavior:
 
 | Condition | Result |
 | --- | --- |
-| semantic mode, terminal verification verified, baseline coverage > 0 | `outcome_matches_path_differs` (existing behavior, exit 0) |
 | semantic mode, terminal verification verified, baseline coverage === 0 AND baseline declared > 0 | `baseline_uncovered` (new, exit 1) |
+| semantic mode, terminal verification verified, baseline coverage > 0 but `< minimumSemanticCoverage` | `baseline_weakly_covered` (new, exit 1) |
+| semantic mode, terminal verification verified, baseline coverage >= `minimumSemanticCoverage` | `outcome_matches_path_differs` (existing behavior, exit 0) |
 | semantic mode, terminal verification verified, baseline declared === 0 | cannot happen after normalization guard |
 
 New outcomes:
@@ -190,6 +205,7 @@ New outcomes:
 | --- | --- | --- | --- |
 | `normalization_insufficient` | yes | 1 | baseline normalization could not extract the required checkpoint set from this recording export |
 | `baseline_uncovered` | yes | 1 | terminal verification passed but no baseline checkpoints appeared in the actual run |
+| `baseline_weakly_covered` | yes | 1 | terminal verification passed but baseline coverage was too weak to treat compare as trustworthy |
 
 Report shape additions (all three are new required fields on
 `RecordingCompareReport`):
@@ -200,12 +216,26 @@ baselineCoverage: {
   covered: number;   // count of baseline IDs found in actual run
 };
 normalizationStrategy: "solax_heuristic";
+minimumSemanticCoverage: number;
 ```
 
 `baselineCoverage` is always populated, including in the
 `normalization_insufficient` early return (where `declared` is the count
 that normalization did extract, even if insufficient, and `covered` is
-computed against the actual checkpoints).
+computed against the actual checkpoints). Note: in the
+`normalization_insufficient` case, `declared` may be 0, 1, 2, or 3 -
+it reflects the partial extraction count, not the full Solax-expected 4.
+Consumers should not interpret `declared` as the policy-required count;
+that role belongs to `SOLAX_BASELINE_CHECKPOINT_ORDER.length`.
+
+Cross-repo sync behavior:
+
+| Condition | Result |
+| --- | --- |
+| `CLAWPERATOR_SKILLS_ROOT` unset | skip structural sync test |
+| canonical baseline file missing under `CLAWPERATOR_SKILLS_ROOT` | fail test with a clear path error |
+| canonical baseline parses but normalizes differently from the Clawperator fixture | fail test |
+| canonical baseline normalizes identically and produces the same compare outcome for the canonical success fixture | pass |
 
 ## Failure Modes To Prevent
 
@@ -213,8 +243,12 @@ computed against the actual checkpoints).
 - introducing a new fixture that does not match an explicit test
 - allowing a non-Solax baseline to silently produce a misleading compare
   report
-- allowing an agent-driven run with zero baseline-checkpoint coverage to
-  be classified as success
+- allowing an agent-driven run with zero or trivial baseline-checkpoint
+  coverage to be classified as success
+- building a cross-repo sync check that fails on harmless session-level
+  metadata drift instead of meaningful compare drift
+- only testing helper-level compare reports and forgetting to pin the CLI
+  exit-code behavior for the new fail-closed outcomes
 - documenting normalization scope as an apology instead of an honest scope
   statement
 - forgetting to handle new outcomes in `summarizeOutcome` or
@@ -231,10 +265,16 @@ After this task, the `skills/compare` branch must:
   does not produce all 4 expected checkpoints
 - fail with `baseline_uncovered` for semantic runs where terminal
   verification passed but zero baseline checkpoints appeared
-- report `baselineCoverage` and `normalizationStrategy` in every compare
-  report
+- fail with `baseline_weakly_covered` for semantic runs where terminal
+  verification passed but baseline coverage is below the minimum trusted
+  threshold
+- report `baselineCoverage`, `normalizationStrategy`, and
+  `minimumSemanticCoverage` in every compare report
 - have honest normalization scope in public docs
-- have an opt-in cross-repo baseline sync test
+- prove the new fail-closed outcomes on the CLI path, not only through
+  direct compare helper tests
+- have an opt-in cross-repo baseline sync test that compares structure and
+  compare behavior, not raw bytes
 
 ## Idempotency
 
@@ -273,9 +313,10 @@ pack with at least these milestones:
    a script or build step.
 
 4. **Semantic compare coverage threshold.** Decide whether semantic success
-   should require a minimum fraction of baseline-checkpoint coverage (e.g.,
-   50%) rather than just `> 0`. This determines whether
-   `outcome_matches_path_differs` becomes a more meaningful signal.
+   should continue to use the closeout threshold (`minimumSemanticCoverage`
+   count) or move to a per-baseline fraction or declared required subset.
+   The closeout ships a Solax-specific threshold of `2`; generic compare
+   must make that policy explicit and data-driven.
 
 5. **Non-Solax proving case.** Prove compare against a second app flow
    (not Solax) to validate that the declared-checkpoint path works for
