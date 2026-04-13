@@ -468,6 +468,12 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"unsupported eval: {args.eval_id}")
     if args.operator_package is not None:
         parser.error("--operator-package is only supported for solax-orchestrated-cold-start")
+    if args.artifacts_dir != str(ROOT / "evals" / "artifacts"):
+        parser.error("--artifacts-dir is only supported for solax-orchestrated-cold-start")
+    if args.skills_registry != str(DEFAULT_SKILLS_REGISTRY):
+        parser.error("--skills-registry is only supported for solax-orchestrated-cold-start")
+    if args.runs != 1:
+        parser.error("--runs is only supported for solax-orchestrated-cold-start")
 
     spec = _load_spec(args.eval_id)
     spec["runtime_target"] = args.runtime

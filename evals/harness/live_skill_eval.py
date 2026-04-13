@@ -28,6 +28,8 @@ SOLAX_SKILL_ID = "com.solaxcloud.starter.set-discharge-to-limit-orchestrated"
 DEFAULT_TARGET_VALUES = (35, 40, 45)
 DEFAULT_SKILLS_REGISTRY = REPO_ROOT.parent / "clawperator-skills" / "skills" / "skills-registry.json"
 SKILL_RUN_TIMEOUT_S = 180
+NORMALIZATION_TIMEOUT_S = 45
+PROBE_STEP_TIMEOUT_S = 60
 
 
 @dataclass
@@ -284,6 +286,7 @@ def _normalization_sequence(
             parse_json=True,
             replacements=replacements,
             cwd=REPO_ROOT,
+            timeout_s=NORMALIZATION_TIMEOUT_S,
         )
         records.append({**asdict(capture), "ok": capture.returncode == 0})
         return payload or {}
@@ -356,6 +359,7 @@ def _probe_observed_value(
             parse_json=True,
             replacements=replacements,
             cwd=REPO_ROOT,
+            timeout_s=PROBE_STEP_TIMEOUT_S,
         )
         records.append({**asdict(capture), "ok": capture.returncode == 0})
         return payload
@@ -570,13 +574,17 @@ def _initial_summary(*, batch_id: str, device_serial: str, operator_package: str
 
 
 def _artifact_replacements(device_serial: str, skills_registry: Path) -> list[tuple[str, str]]:
-    skills_repo_root = str(skills_registry.parent.parent)
-    return [
+    replacements: list[tuple[str, str]] = [
         (device_serial, "<device_serial>"),
-        (str(REPO_ROOT), "/<local_user>/src/clawperator"),
-        (skills_repo_root, "/<local_user>/src/clawperator-skills"),
         (str(skills_registry), "/<local_user>/src/clawperator-skills/skills/skills-registry.json"),
+        (str(REPO_ROOT), "/<local_user>/src/clawperator"),
     ]
+    skills_repo_root = skills_registry.parent.parent
+    skills_repo_root_str = str(skills_repo_root)
+    non_anchor_parts = [part for part in skills_repo_root.parts if part not in (skills_repo_root.anchor, "")]
+    if skills_repo_root.is_absolute() and skills_repo_root_str != skills_repo_root.anchor and len(non_anchor_parts) > 2:
+        replacements.append((skills_repo_root_str, "/<local_user>/src/clawperator-skills"))
+    return replacements
 
 
 def run_solax_orchestrated_cold_start_eval(

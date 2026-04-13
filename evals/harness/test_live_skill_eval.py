@@ -182,6 +182,22 @@ def test_sanitize_json_value_redacts_device_and_repo_paths(tmp_path):
     assert sanitized["repo"] == "/<local_user>/src/clawperator"
 
 
+def test_artifact_replacements_skip_root_like_skills_repo_prefix(tmp_path):
+    skills_registry = tmp_path / "skills-registry.json"
+    skills_registry.write_text("{}\n", encoding="utf-8")
+
+    replacements = live_skill_eval._artifact_replacements("device-123", skills_registry)
+    payload = {
+        "registry": str(skills_registry),
+        "other_path": "/tmp/example/path.json",
+    }
+
+    sanitized = live_skill_eval._sanitize_json_value(payload, replacements)
+
+    assert sanitized["registry"] == "/<local_user>/src/clawperator-skills/skills/skills-registry.json"
+    assert sanitized["other_path"] == "/tmp/example/path.json"
+
+
 def test_clawperator_env_forwards_skill_debugging_overrides(monkeypatch):
     monkeypatch.setenv("PATH", "/usr/bin")
     monkeypatch.setenv("HOME", "/tmp/home")
@@ -225,6 +241,89 @@ def test_run_and_capture_records_timeout(tmp_path, monkeypatch):
     assert payload == {"partial": True}
     assert stdout == '{"partial":true}\n'
     assert "timed out after 180s" in stderr
+
+
+def test_normalization_sequence_uses_bounded_timeout(tmp_path, monkeypatch):
+    calls: list[int | None] = []
+    (tmp_path / "commands").mkdir()
+
+    def fake_run_and_capture(**kwargs):
+        calls.append(kwargs.get("timeout_s"))
+        return (
+            live_skill_eval.CommandCapture(
+                name=kwargs["name"],
+                command=kwargs["command"],
+                returncode=0,
+                timed_out=False,
+                stdout_path="stdout.txt",
+                stderr_path="stderr.txt",
+                parsed_json_path="parsed.json",
+                started_at="2026-04-13T09:23:08+10:00",
+                finished_at="2026-04-13T09:23:09+10:00",
+            ),
+            {},
+            "{}",
+            "",
+        )
+
+    monkeypatch.setattr(live_skill_eval, "_run_and_capture", fake_run_and_capture)
+    monkeypatch.setattr(live_skill_eval, "_foreground_package", lambda device_serial: ("com.android.launcher", "line", "raw"))
+
+    result = live_skill_eval._normalization_sequence(
+        run_dir=tmp_path,
+        clawperator_cmd=["clawperator"],
+        device_serial="device-123",
+        operator_package="com.clawperator.operator.dev",
+        stage_prefix="before-probe",
+        replacements=[],
+    )
+
+    assert result["app_restart_proven"] is True
+    assert calls == [live_skill_eval.NORMALIZATION_TIMEOUT_S, live_skill_eval.NORMALIZATION_TIMEOUT_S]
+
+
+def test_probe_observed_value_uses_bounded_timeout(tmp_path, monkeypatch):
+    calls: list[int | None] = []
+
+    def fake_run_and_capture(**kwargs):
+        calls.append(kwargs.get("timeout_s"))
+        payload = {
+            "envelope": {
+                "stepResults": [
+                    {"data": {"text": "Discharge to 40% \ue660"}},
+                ]
+            }
+        }
+        return (
+            live_skill_eval.CommandCapture(
+                name=kwargs["name"],
+                command=kwargs["command"],
+                returncode=0,
+                timed_out=False,
+                stdout_path="stdout.txt",
+                stderr_path="stderr.txt",
+                parsed_json_path="parsed.json",
+                started_at="2026-04-13T09:23:08+10:00",
+                finished_at="2026-04-13T09:23:09+10:00",
+            ),
+            payload,
+            "{}",
+            "",
+        )
+
+    monkeypatch.setattr(live_skill_eval, "_run_and_capture", fake_run_and_capture)
+
+    result = live_skill_eval._probe_observed_value(
+        run_dir=tmp_path,
+        clawperator_cmd=["clawperator"],
+        device_serial="device-123",
+        operator_package="com.clawperator.operator.dev",
+        stage_prefix="probe",
+        replacements=[],
+    )
+
+    assert result["observed_percent"] == 40
+    assert calls == [live_skill_eval.PROBE_STEP_TIMEOUT_S, live_skill_eval.PROBE_STEP_TIMEOUT_S, live_skill_eval.PROBE_STEP_TIMEOUT_S]
 
 
 def test_run_eval_dispatches_solax_eval(monkeypatch, tmp_path):
@@ -291,3 +390,19 @@ def test_run_eval_rejects_operator_package_for_android_version():
         assert exc.code == 2
     else:
         raise AssertionError("expected parser failure")
+
+
+def test_run_eval_rejects_solax_only_flags_for_android_version():
+    from evals import run_eval
+
+    for flag, value in [
+        ("--artifacts-dir", "/tmp/artifacts"),
+        ("--skills-registry", "/tmp/skills-registry.json"),
+        ("--runs", "2"),
+    ]:
+        try:
+            run_eval.main(["android-version", flag, value])
+        except SystemExit as exc:
+            assert exc.code == 2
+        else:
+            raise AssertionError(f"expected parser failure for {flag}")
