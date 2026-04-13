@@ -98,12 +98,25 @@ What that file is for:
 - the source file must already match the recording export artifact schema
 - `skills validate` does not inspect `recording-context.json`; it still validates only the registry-linked skill files
 
+Practical authoring workflow:
+
+- after `record stop`, run `record pull` first and retain the local NDJSON file
+- generate `recording export` from that pulled file or directory before any
+  optional `record parse` inspection
+- scaffold with `--recording-context` from the retained export, not from the
+  parsed step log
+- treat `recording-context.json` as authoring evidence that helps you design
+  the skill, not as a skill that only needs light cleanup
+
 Recommended source:
 
 - use `clawperator recording export --snapshots omit` by default when the goal is agent or human authoring context
 - use `--snapshots include` only when the author genuinely needs the raw XML snapshots for manual inspection
 - the parsed `recording parse` output is not a substitute for `recording-context.json`
 - `recording parse` is a lossy step log, while `recording export` preserves the raw event timeline and package-transition evidence
+- recording-derived selectors and path hints are starting evidence only; the
+  authored skill still needs explicit control flow and truthful terminal
+  verification
 - the saved `clawperator skills run --json` wrapper is the v1 compare input for `clawperator recording compare --result <file>`
 - the recording export baseline is reference evidence for compare and authoring, not a runtime input passed to the skill
 
@@ -400,10 +413,13 @@ has left the orchestrated runtime contract described in
 These rules are the durable lessons from building and stabilizing the first
 real orchestrated skills.
 
+- Treat recordings as evidence, not route authority.
 - Keep the harness thin.
 - Put app-specific route authority in `SKILL.md`, not in `scripts/run.js`.
 - Make `SKILL.md` name the exact checkpoints and the terminal verification rule
   the runtime agent must satisfy.
+- Use retained recording export plus live device observation to define the
+  checkpoints and terminal verification that matter.
 - Require one live Clawperator device command at a time.
 - Do not pipeline multiple live device commands for the same run.
 - Make success depend on post-save or post-action verification, not on the

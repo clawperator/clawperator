@@ -12,13 +12,13 @@ relevant guidance has a stable long-term home in `docs/`.
 
 | Item | Value |
 | --- | --- |
-| State | active (wave A) / blocked (wave B) |
+| State | complete |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | P1A, P2A, P1B, P2B |
-| Current / Next | P1A — recording-as-evidence facts can graduate now |
-| Blockers | wave B blocked on W2 (`skill-result-contract`) and W2b (`agent-driven-skills`) wording stabilizing |
+| Completed | P1A, P2A, P1B, P2B |
+| Remaining | none |
+| Current / Next | none |
+| Blockers | none |
 
 ## Two-Wave Structure
 
@@ -68,8 +68,8 @@ the authored docs, then retire the temporary demo task files.
 
 ## Output Contract
 
-This task should produce:
+This task produced:
 
 - updated durable docs
 - validated docs build
-- a reduced or deleted `tasks/recording/demo/` footprint
+- a deleted `tasks/recording/demo/` footprint

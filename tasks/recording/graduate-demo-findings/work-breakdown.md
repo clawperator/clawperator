@@ -6,25 +6,24 @@ Parent plan: `tasks/recording/graduate-demo-findings/plan.md`
 
 Total PRs: 2. Total phases: 4.
 
-- PR-1 (wave A): graduate recording-as-evidence and operations facts that do
-  not depend on the `SkillResult` shape. Can ship as soon as W1 is in flight.
-- PR-2 (wave B): graduate skill-contract and authoring facts that depend on
-  W2 (`skill-result-contract`) and W2b (`agent-driven-skills`) wording being
-  stable.
+- PR-1 (wave A): graduated recording-as-evidence and operations facts that do
+  not depend on the `SkillResult` shape.
+- PR-2 (wave B): graduated skill-contract and authoring facts after the shipped
+  W2 and W2b wording stabilized.
 
-Current state: wave A is active. Wave B is blocked on W2.
+Current state: complete.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | active (wave A) / blocked (wave B) |
+| State | complete |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | P1A, P2A, P1B, P2B |
-| Current / Next | P1A |
-| Blockers | wave B waits for W2 contract wording and W2b runtime-agent wording to stabilize |
+| Completed | P1A, P2A, P1B, P2B |
+| Remaining | none |
+| Current / Next | none |
+| Blockers | none |
 
 ## Hard Rules
 
