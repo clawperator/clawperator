@@ -357,6 +357,13 @@ describe("CLI help", () => {
     assert.match(obj.message, /recording compare --baseline <export\.json> --result <skills-run\.json>/);
   });
 
+  it("shows accurate exit-code notes for recording compare help", async () => {
+    const { stdout, code } = await runCli(["recording", "compare", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /Exit code is 0 for no meaningful divergence and for USAGE responses/);
+    assert.match(stdout, /Exit code is non-zero for meaningful divergence and non-USAGE compare errors/);
+  });
+
   it("returns USAGE for record parse without --input", async () => {
     const { stdout, code } = await runCli(["record", "parse"]);
     assert.strictEqual(code, 0);
