@@ -2,7 +2,7 @@ import { afterEach, describe, it } from "node:test";
 import assert from "node:assert";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import {
@@ -216,6 +216,71 @@ describe("recording compare outcomes", () => {
     assert.strictEqual(report.minimumSemanticCoverage, 2);
     assert.strictEqual(report.baselineCoverage.declared, 4);
     assert.strictEqual(report.baselineCoverage.covered, 4);
+  });
+
+  it("reports baseline_uncovered when an agent-driven run has verified terminal state but zero baseline checkpoint coverage", async () => {
+    const baseline = await readJsonFixture<RecordingExportArtifact>("solax-baseline-success.export.json");
+    const skillResult = await readJsonFixture<SkillResult>("solax-result-zero-coverage.skillresult.json");
+    const report = compareRecordingBaselineWithSkillResult(baseline, skillResult);
+    assert.strictEqual(report.compareMode, "semantic");
+    assert.strictEqual(report.outcome, "baseline_uncovered");
+    assert.strictEqual(report.terminalVerificationStatus, "verified");
+    assert.strictEqual(report.baselineCoverage.declared, 4);
+    assert.strictEqual(report.baselineCoverage.covered, 0);
+    assert.strictEqual(isMeaningfulCompareDivergence(report.outcome), true);
+  });
+
+  it("reports baseline_weakly_covered when an agent-driven run covers only one baseline checkpoint", async () => {
+    const baseline = await readJsonFixture<RecordingExportArtifact>("solax-baseline-success.export.json");
+    const skillResult = await readJsonFixture<SkillResult>("solax-result-single-coverage.skillresult.json");
+    const report = compareRecordingBaselineWithSkillResult(baseline, skillResult);
+    assert.strictEqual(report.compareMode, "semantic");
+    assert.strictEqual(report.outcome, "baseline_weakly_covered");
+    assert.strictEqual(report.baselineCoverage.declared, 4);
+    assert.strictEqual(report.baselineCoverage.covered, 1);
+    assert.strictEqual(report.minimumSemanticCoverage, 2);
+    assert.strictEqual(isMeaningfulCompareDivergence(report.outcome), true);
+  });
+
+  it("still reports outcome_matches_path_differs when an agent-driven run has baseline coverage and verified terminal state", async () => {
+    const baseline = await readJsonFixture<RecordingExportArtifact>("solax-baseline-success.export.json");
+    const skillResult = await readJsonFixture<SkillResult>("solax-result-success-path-differs.skillresult.json");
+    const report = compareRecordingBaselineWithSkillResult(baseline, skillResult);
+    assert.strictEqual(report.compareMode, "semantic");
+    assert.strictEqual(report.outcome, "outcome_matches_path_differs");
+    assert.ok(report.baselineCoverage.covered >= 2, "should satisfy minimum semantic coverage");
+  });
+});
+
+describe("recording compare cross-repo baseline sync", () => {
+  it("skills-repo retained baseline matches the Clawperator fixture structurally", async () => {
+    const skillsRootInput = process.env.CLAWPERATOR_SKILLS_ROOT;
+    if (!skillsRootInput) {
+      return;
+    }
+    const repoRoot = resolve(packageRoot, "..", "..");
+    const skillsRoot = isAbsolute(skillsRootInput)
+      ? skillsRootInput
+      : resolve(repoRoot, skillsRootInput);
+    const canonicalPath = join(
+      skillsRoot,
+      "skills",
+      "com.solaxcloud.starter.set-discharge-to-limit-orchestrated",
+      "references",
+      "compare-baseline.export.json"
+    );
+    const canonical = await loadRecordingExportBaselineFile(canonicalPath);
+    const fixture = await readJsonFixture<RecordingExportArtifact>("solax-baseline-success.export.json");
+    assert.deepStrictEqual(
+      normalizeRecordingExportForCompare(canonical),
+      normalizeRecordingExportForCompare(fixture)
+    );
+
+    const successFixture = await readJsonFixture<SkillResult>("solax-result-success.skillresult.json");
+    const canonicalReport = compareRecordingBaselineWithSkillResult(canonical, successFixture);
+    const fixtureReport = compareRecordingBaselineWithSkillResult(fixture, successFixture);
+    assert.strictEqual(canonicalReport.outcome, fixtureReport.outcome);
+    assert.deepStrictEqual(canonicalReport.baseline.checkpointIds, fixtureReport.baseline.checkpointIds);
   });
 });
 
@@ -439,5 +504,41 @@ describe("recording compare CLI", () => {
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
     assert.strictEqual(parsed.code, "RECORDING_COMPARE_FAILED");
     assert.match(parsed.message ?? "", /missing the top-level skillResult field/);
+  });
+
+  it("returns exit code 1 with normalization_insufficient for a baseline that does not satisfy the Solax heuristic set", async () => {
+    const { stdout, code } = await runCli([
+      "recording",
+      "compare",
+      "--baseline",
+      join(fixturesRoot, "non-solax-generic-events.export.json"),
+      "--result",
+      join(fixturesRoot, "solax-skills-run-success.json"),
+      "--output",
+      "json",
+    ]);
+
+    assert.strictEqual(code, 1, stdout);
+    const parsed = JSON.parse(stdout) as { outcome?: string; normalizationStrategy?: string };
+    assert.strictEqual(parsed.outcome, "normalization_insufficient");
+    assert.strictEqual(parsed.normalizationStrategy, "solax_heuristic");
+  });
+
+  it("returns exit code 1 with baseline_weakly_covered for a semantic run below the minimum coverage threshold", async () => {
+    const { stdout, code } = await runCli([
+      "recording",
+      "compare",
+      "--baseline",
+      join(fixturesRoot, "solax-baseline-success.export.json"),
+      "--result",
+      join(fixturesRoot, "solax-skills-run-single-coverage.json"),
+      "--output",
+      "json",
+    ]);
+
+    assert.strictEqual(code, 1, stdout);
+    const parsed = JSON.parse(stdout) as { outcome?: string; minimumSemanticCoverage?: number };
+    assert.strictEqual(parsed.outcome, "baseline_weakly_covered");
+    assert.strictEqual(parsed.minimumSemanticCoverage, 2);
   });
 });

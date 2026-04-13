@@ -407,8 +407,17 @@ function determineOutcome(options: {
   compareMode: RecordingCompareMode;
   pathMatches: boolean;
   skillResult: SkillResult;
+  baselineCoverage: {
+    declared: number;
+    covered: number;
+  };
 }): RecordingCompareOutcome {
-  const { compareMode, pathMatches, skillResult } = options;
+  const {
+    compareMode,
+    pathMatches,
+    skillResult,
+    baselineCoverage,
+  } = options;
   const runtimeState = skillResult.diagnostics?.runtimeState;
   const verificationStatus = terminalVerificationStatus(skillResult);
 
@@ -426,7 +435,16 @@ function determineOutcome(options: {
     if (compareMode === "literal") {
       return pathMatches ? "literal_match" : "baseline_drift";
     }
-    return pathMatches ? "semantic_match" : "outcome_matches_path_differs";
+    if (pathMatches) {
+      return "semantic_match";
+    }
+    if (baselineCoverage.declared > 0 && baselineCoverage.covered === 0) {
+      return "baseline_uncovered";
+    }
+    if (baselineCoverage.covered < SOLAX_MINIMUM_SEMANTIC_COVERAGE) {
+      return "baseline_weakly_covered";
+    }
+    return "outcome_matches_path_differs";
   }
 
   if (verificationStatus === "failed") {
@@ -481,6 +499,7 @@ export function compareRecordingBaselineWithSkillResult(
     compareMode,
     pathMatches,
     skillResult,
+    baselineCoverage,
   });
 
   return {
