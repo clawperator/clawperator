@@ -47,12 +47,12 @@ Execution guardrails:
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | in progress |
 | Total PRs | 1 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | P1, P2, P3, P4 |
-| Current / Next | P1 |
+| Completed | P1 |
+| Remaining | P2, P3, P4 |
+| Current / Next | P2 |
 | Blockers | none |
 
 ## Goal

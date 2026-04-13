@@ -77,6 +77,21 @@ describe("recording compare normalization", () => {
     assert.deepStrictEqual(normalizeRecordingExportForCompare(sanitized), sanitizedExpected);
     assert.deepStrictEqual(sanitizedExpected, canonicalExpected);
   });
+
+  it("produces zero checkpoints for a non-Solax recording with only scroll events", async () => {
+    const baseline = await readJsonFixture<RecordingExportArtifact>("non-solax-scroll-only.export.json");
+    const normalized = normalizeRecordingExportForCompare(baseline);
+    assert.strictEqual(normalized.checkpoints.length, 0);
+    assert.strictEqual(normalized.appPackage, "com.example.notes");
+  });
+
+  it("produces fewer than the required checkpoint count for a non-Solax recording with generic events", async () => {
+    const baseline = await readJsonFixture<RecordingExportArtifact>("non-solax-generic-events.export.json");
+    const normalized = normalizeRecordingExportForCompare(baseline);
+    assert.ok(normalized.checkpoints.length > 0, "should extract some checkpoints");
+    assert.ok(normalized.checkpoints.length < 4, "should not extract all 4 Solax checkpoints");
+    assert.strictEqual(normalized.appPackage, "com.example.notes");
+  });
 });
 
 describe("recording compare outcomes", () => {
@@ -171,6 +186,36 @@ describe("recording compare outcomes", () => {
 
     const report = compareRecordingBaselineWithSkillResult(baseline, skillResult);
     assert.strictEqual(report.outcome, "runtime_unavailable");
+  });
+
+  it("reports normalization_insufficient for a non-Solax baseline with zero extractable checkpoints", async () => {
+    const baseline = await readJsonFixture<RecordingExportArtifact>("non-solax-scroll-only.export.json");
+    const skillResult = await readJsonFixture<SkillResult>("solax-result-success.skillresult.json");
+    const report = compareRecordingBaselineWithSkillResult(baseline, skillResult);
+    assert.strictEqual(report.outcome, "normalization_insufficient");
+    assert.strictEqual(report.normalizationStrategy, "solax_heuristic");
+    assert.strictEqual(report.baselineCoverage.declared, 0);
+    assert.strictEqual(isMeaningfulCompareDivergence(report.outcome), true);
+  });
+
+  it("reports normalization_insufficient for a non-Solax baseline with partial generic checkpoints", async () => {
+    const baseline = await readJsonFixture<RecordingExportArtifact>("non-solax-generic-events.export.json");
+    const skillResult = await readJsonFixture<SkillResult>("solax-result-success.skillresult.json");
+    const report = compareRecordingBaselineWithSkillResult(baseline, skillResult);
+    assert.strictEqual(report.outcome, "normalization_insufficient");
+    assert.ok(report.baselineCoverage.declared < 4, "declared count should be less than 4");
+    assert.strictEqual(isMeaningfulCompareDivergence(report.outcome), true);
+  });
+
+  it("includes baselineCoverage and normalizationStrategy in a successful compare report", async () => {
+    const baseline = await readJsonFixture<RecordingExportArtifact>("solax-baseline-success.export.json");
+    const skillResult = await readJsonFixture<SkillResult>("solax-result-replay-success.skillresult.json");
+    const report = compareRecordingBaselineWithSkillResult(baseline, skillResult);
+    assert.strictEqual(report.outcome, "literal_match");
+    assert.strictEqual(report.normalizationStrategy, "solax_heuristic");
+    assert.strictEqual(report.minimumSemanticCoverage, 2);
+    assert.strictEqual(report.baselineCoverage.declared, 4);
+    assert.strictEqual(report.baselineCoverage.covered, 4);
   });
 });
 

@@ -29,7 +29,10 @@ export type RecordingCompareOutcome =
   | "verification_indeterminate"
   | "upstream_failure"
   | "runtime_poisoned"
-  | "runtime_unavailable";
+  | "runtime_unavailable"
+  | "normalization_insufficient"
+  | "baseline_uncovered"
+  | "baseline_weakly_covered";
 
 export interface NormalizedRecordingCheckpoint {
   id: string;
@@ -71,6 +74,12 @@ export interface RecordingCompareReport {
     runtimeState: SkillResult["diagnostics"] extends { runtimeState?: infer T } ? T : string | undefined;
     checkpointIds: string[];
   };
+  baselineCoverage: {
+    declared: number;
+    covered: number;
+  };
+  normalizationStrategy: "solax_heuristic";
+  minimumSemanticCoverage: number;
   firstDivergence?: RecordingCompareFirstDivergence;
 }
 
@@ -81,12 +90,13 @@ interface ComparableActualCheckpoint {
 }
 
 const TERMINAL_CHECKPOINT_IDS = new Set(["terminal_state_verified"]);
-const DEFAULT_BASELINE_CHECKPOINT_ORDER = [
+const SOLAX_BASELINE_CHECKPOINT_ORDER = [
   "app_opened",
   "discharge_to_row_focused",
   "target_text_entered",
   "save_completed",
 ] as const;
+const SOLAX_MINIMUM_SEMANTIC_COVERAGE = 2;
 
 function lowerCaseStrings(values: Array<string | null | undefined>): string[] {
   return values
@@ -264,7 +274,7 @@ export function normalizeRecordingExportForCompare(
 
   return {
     appPackage,
-    checkpoints: DEFAULT_BASELINE_CHECKPOINT_ORDER
+    checkpoints: SOLAX_BASELINE_CHECKPOINT_ORDER
       .map((id) => {
         const event = eventMap.get(id);
         return event ? asNormalizedCheckpoint(id, event) : null;
@@ -281,6 +291,16 @@ function comparableActualCheckpoints(skillResult: SkillResult): ComparableActual
       status: checkpoint.status,
       note: checkpoint.note,
     }));
+}
+
+function computeBaselineCoverage(
+  baseline: NormalizedRecordingBaseline,
+  actualCheckpoints: ComparableActualCheckpoint[]
+): { declared: number; covered: number } {
+  const actualIds = new Set(actualCheckpoints.map((checkpoint) => checkpoint.id));
+  const declared = baseline.checkpoints.length;
+  const covered = baseline.checkpoints.filter((checkpoint) => actualIds.has(checkpoint.id)).length;
+  return { declared, covered };
 }
 
 function findFirstDivergence(
@@ -369,6 +389,12 @@ function summarizeOutcome(
       return "the skill reported an unavailable runtime state before compare could confirm baseline equivalence";
     case "upstream_failure":
       return "the skill failed before compare could confirm baseline equivalence";
+    case "normalization_insufficient":
+      return "baseline normalization could not extract the required checkpoint set from this recording export";
+    case "baseline_uncovered":
+      return "terminal verification passed but no baseline checkpoints appeared in the actual run";
+    case "baseline_weakly_covered":
+      return "terminal verification passed but baseline coverage was too weak to treat compare as trustworthy";
     case "baseline_drift":
       if (firstDivergence) {
         return `first meaningful divergence at baseline checkpoint ${firstDivergence.baselineCheckpoint ?? "<none>"}`;
@@ -420,7 +446,34 @@ export function compareRecordingBaselineWithSkillResult(
   options: { mode?: RecordingCompareModeInput } = {}
 ): RecordingCompareReport {
   const baseline = normalizeRecordingExportForCompare(artifact);
+  if (baseline.checkpoints.length < SOLAX_BASELINE_CHECKPOINT_ORDER.length) {
+    const actualCps = comparableActualCheckpoints(skillResult);
+    const coverage = computeBaselineCoverage(baseline, actualCps);
+    const mode = inferredCompareMode(skillResult, options.mode ?? "auto");
+    return {
+      compareMode: mode,
+      outcome: "normalization_insufficient",
+      summary: summarizeOutcome("normalization_insufficient", undefined),
+      pathMatches: false,
+      terminalVerificationStatus: terminalVerificationStatus(skillResult),
+      baseline: {
+        appPackage: baseline.appPackage,
+        checkpointIds: baseline.checkpoints.map((checkpoint) => checkpoint.id),
+      },
+      actual: {
+        skillId: skillResult.skillId,
+        sourceKind: skillResult.source.kind,
+        status: skillResult.status,
+        runtimeState: skillResult.diagnostics?.runtimeState,
+        checkpointIds: actualCps.map((checkpoint) => checkpoint.id),
+      },
+      baselineCoverage: coverage,
+      normalizationStrategy: "solax_heuristic",
+      minimumSemanticCoverage: SOLAX_MINIMUM_SEMANTIC_COVERAGE,
+    };
+  }
   const actualCheckpoints = comparableActualCheckpoints(skillResult);
+  const baselineCoverage = computeBaselineCoverage(baseline, actualCheckpoints);
   const compareMode = inferredCompareMode(skillResult, options.mode ?? "auto");
   const firstDivergence = findFirstDivergence(baseline, actualCheckpoints, skillResult.status);
   const pathMatches = firstDivergence === undefined;
@@ -447,6 +500,9 @@ export function compareRecordingBaselineWithSkillResult(
       runtimeState: skillResult.diagnostics?.runtimeState,
       checkpointIds: actualCheckpoints.map((checkpoint) => checkpoint.id),
     },
+    baselineCoverage,
+    normalizationStrategy: "solax_heuristic",
+    minimumSemanticCoverage: SOLAX_MINIMUM_SEMANTIC_COVERAGE,
     ...(firstDivergence ? { firstDivergence } : {}),
   };
 }
