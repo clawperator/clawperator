@@ -30,15 +30,15 @@ demo-grade closeout rather than new deep runtime invention.
 | State | active, plan tightened after implementation drift |
 | Total PRs | 3 |
 | Total phases | 3 |
-| Completed | problem framing and plan tightening |
-| Remaining | P1 (create skill), P2 (orchestrated path), P3 (demo validation) |
-| Current / Next | P1 replay-first workflow creation |
+| Completed | problem framing, plan tightening, and P1 |
+| Remaining | P2 (orchestrated path), P3 (demo validation) |
+| Current / Next | P2 orchestrated-path closeout |
 | Blockers | none |
 
 ## Current Baseline
 
-The `.agents/skills/skill-author-by-recording/` directory does not yet exist.
-P1 must create it from scratch.
+The `.agents/skills/skill-author-by-recording/` directory now exists from P1.
+P2 should extend that front-door skill rather than replace it.
 
 The product decisions and constraints are settled in this task pack and in
 `problem-definition.md`. The implementing agent should read those files and
@@ -55,9 +55,38 @@ Decisions already made that the implementation must honor:
 - keep the orchestrated boundary honest: `SKILL.md` is the program and
   `scripts/run.js` remains a thin harness
 
-The first implementation task is to create the skill directory with a
-`SKILL.md` that embodies the replay-first default workflow described in this
-plan.
+The next implementation task is to extend the created skill so the
+orchestrated branch is just as truthful and inspectable as the replay-first
+path established in P1.
+
+## Testing Strategy
+
+This task should be tested primarily as a workflow product, not as a library.
+
+Current expectation:
+
+- use lightweight automated checks for file presence, wording drift, and
+  anti-pattern phrasing
+- use human-guided acceptance walkthroughs to prove the workflow is truthful,
+  understandable, and inspectable end to end
+- add unit tests only if a later phase introduces executable decision logic,
+  validation helpers, or scripts whose behavior is no longer captured well by
+  human walkthroughs alone
+
+Phase-specific testing:
+
+- P1: one human-guided replay-safe walkthrough that confirms the recording
+  lifecycle, evidence retention, explicit replay recommendation, single-shape
+  authoring, one self-test run, and surfaced `SkillResult`
+- P2: one human-guided orchestrated-shaped walkthrough that confirms the
+  workflow honestly chooses orchestrated when replay would not be truthful or
+  sufficient
+- P3: demo-path validation against the Solax proving case so the full story is
+  understandable from recording through authored skill and self-test result
+
+If later work moves the replay-versus-orchestrated recommendation into code,
+the first unit-test target should be the first-match-wins decision table in
+this plan.
 
 ## Goal
 

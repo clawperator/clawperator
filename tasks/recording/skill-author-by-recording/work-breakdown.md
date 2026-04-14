@@ -79,6 +79,41 @@ Read these files in the listed order before writing anything.
 | PR-2 | Orchestrated-path closeout | P2 | `default` | Do not start PR-3 until PR-2 wording and workflow shape are accepted |
 | PR-3 | Demo validation and graduation | P3 | `default` | Final closeout after earlier phases are landed |
 
+## Testing Strategy
+
+Treat this task primarily as workflow validation.
+
+Human-guided acceptance is the main proof here because the core risks are
+wording drift, hidden evidence, unclear operator handoff, and untruthful claims
+about what recording-derived authoring does. Traditional unit tests are
+secondary until this workflow gains executable helper logic.
+
+Automated checks expected in every phase:
+
+- file existence and structure checks
+- spot-check reads of the authored workflow text and metadata
+- targeted grep checks for stale anti-pattern phrasing
+
+Human-guided checks expected by phase:
+
+- P1: run one replay-safe walkthrough and confirm the workflow:
+  - handles start, stop, pull, and export clearly
+  - treats the export as authoring evidence
+  - recommends replay explicitly when truthful
+  - authors one shape per pass
+  - runs one self-test and surfaces the resulting `SkillResult`
+- P2: run one orchestrated-shaped walkthrough and confirm the workflow:
+  - explains why replay would not be truthful or sufficient
+  - moves to orchestrated honestly instead of forcing replay first
+  - keeps `SKILL.md` as the runtime program and `run.js` as the thin harness
+- P3: run the Solax demo-path validation and confirm the full recording-to-skill
+  story remains understandable and truthful on camera
+
+Unit tests are optional for now. Add them when this task grows executable
+decision logic, validation helpers, or scripts whose behavior should be locked
+with deterministic inputs. The first unit-test target should be the
+first-match-wins replay-versus-orchestrated decision table.
+
 ## Phase P1: Replay-First Workflow Creation
 
 Status: complete
@@ -232,6 +267,11 @@ sed -n '1,260p' docs/skills/authoring.md
 rg -n "bundled runtime-family|mandatory dual-authoring|replay-first detour" tasks/recording/skill-author-by-recording
 ```
 
+Human check:
+
+- run one guided walkthrough on a flow that is clearly orchestrated-shaped and
+  confirm the workflow chooses orchestrated for truthful reasons
+
 ### Expected Commit
 
 ```text
@@ -300,6 +340,11 @@ sed -n '1,260p' tasks/recording/video-draft.md
 sed -n '1,260p' .agents/skills/skill-author-by-recording/SKILL.md
 sed -n '1,260p' docs/skills/authoring.md
 ```
+
+Human check:
+
+- run the Solax demo path end to end and confirm the on-camera story still
+  matches the actual workflow and artifacts
 
 ### Expected Commit
 
