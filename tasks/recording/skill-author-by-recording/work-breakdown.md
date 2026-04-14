@@ -24,9 +24,15 @@ stance.
 | Total PRs | 3 |
 | Total phases | 3 |
 | Completed | problem-definition pass and plan-tightening pass |
-| Remaining | P1, P2, P3 |
+| Remaining | P1 (create skill), P2 (orchestrated path), P3 (demo validation) |
 | Current / Next | P1 |
 | Blockers | none |
+
+## Starting Point
+
+`.agents/skills/skill-author-by-recording/` does not exist. P1 creates it.
+Do not look for existing files to edit. Read the plan and required reading
+list first, then create the skill directory and `SKILL.md` from scratch.
 
 ## Hard Rules
 
@@ -107,15 +113,17 @@ is sufficient.
 - The workflow still honors an explicit user request for `-orchestrated` or
   `-replay`.
 - The workflow explicitly includes:
-  - capture or confirm the target skill id and plain-language goal
-  - prompt agent to start recording
-  - tell human when to perform the phone flow
-  - stop and pull recording
+  - capture or confirm the target skill id, plain-language goal, and device
+    context
+  - run recording start, tell the human when to perform the flow, then stop
+    and pull
   - export the recording artifact
-  - pass the recording evidence to an authoring-time agent
+  - sanitize and retain the baseline under
+    `skills/<skill_id>/references/compare-baseline.export.json`
+  - analyze the export and recommend or apply the right skill shape
   - author the chosen skill shape
   - run one self-test invocation of the authored skill
-  - show the key generated files
+  - show the key generated files and surface the `SkillResult`
 - The workflow makes the "how" visible to a developer by surfacing the concrete
   recording/export commands and resulting files.
 - The workflow distinguishes clearly between:
@@ -126,23 +134,38 @@ is sufficient.
 
 ### Steps
 
-1. Review the current repo-local skill text against the refined planning files.
-2. Rewrite any stale orchestrated-first wording so the workflow authors one
-   requested or recommended shape per pass.
-3. Make the replay-first default explicit without claiming replay is mandatory
+1. Read the required reading list in full before writing anything.
+2. Create `.agents/skills/skill-author-by-recording/` and write `SKILL.md`
+   from scratch. The skill does not exist yet.
+3. Write `SKILL.md` as an agent-program that embodies the replay-first default:
+   - gather skill id, goal, and device context up front
+   - start recording, prompt human to perform the flow, stop and pull
+   - export and sanitize the recording artifact
+   - analyze the export and recommend replay or orchestrated with explicit
+     reasoning
+   - author the chosen shape
+   - run one self-test invocation and surface the `SkillResult`
+4. Make the replay-first default explicit without claiming replay is mandatory
    for every flow.
-4. Keep explicit support for a direct orchestrated request.
-5. Align `agents/openai.yaml` with the refined meaning if the wording changed
-   materially.
-6. Re-read the edited skill and confirm it still points to the durable docs and
-   does not invent a parallel contract.
+5. Keep explicit support for a direct orchestrated or replay request.
+6. Create `agents/openai.yaml` aligned with the skill program.
+   Use `.agents/skills/task-author/agents/openai.yaml` as the exemplar for
+   structure and field shape.
+7. Confirm the written skill points to durable docs and does not invent a
+   parallel contract.
 
 ### Validation
 
 ```bash
+# Confirm the skill was created
+ls .agents/skills/skill-author-by-recording/
+
+# Spot-check content
 sed -n '1,260p' .agents/skills/skill-author-by-recording/SKILL.md
 sed -n '1,120p' .agents/skills/skill-author-by-recording/agents/openai.yaml
-rg -n "orchestrated path first|only continue with orchestrated|less real|W6" .agents/skills/skill-author-by-recording tasks/recording/skill-author-by-recording
+
+# Check for stale anti-patterns
+rg -n "orchestrated path first|only continue with orchestrated|less real" .agents/skills/skill-author-by-recording tasks/recording/skill-author-by-recording
 ```
 
 ### Expected Commit
@@ -164,6 +187,11 @@ Status: pending
 Close out the orchestrated authoring path so the same front-door workflow can
 truthfully produce an orchestrated skill when replay would not be sufficient or
 when the user explicitly asks for orchestrated.
+
+This phase is the second authoring pass after P1. P1 creates the skill from
+scratch and establishes the replay-first front-door workflow. P2 extends that
+newly created workflow so it also handles the orchestrated branch cleanly and
+truthfully.
 
 ### Files or Surfaces To Change
 
@@ -187,14 +215,17 @@ when the user explicitly asks for orchestrated.
 
 ### Steps
 
-1. Tighten the orchestrated branch of the repo-local workflow so it clearly
-   describes when replay is not sufficient.
-2. Confirm the workflow still reuses the durable orchestrated runtime contract
+1. Start from the skill created in P1. Do not re-plan the front-door workflow
+   from scratch.
+2. Add or tighten the orchestrated branch of the repo-local workflow so it
+   clearly describes when replay is not sufficient and what the second authoring
+   pass must produce.
+3. Confirm the workflow still reuses the durable orchestrated runtime contract
    rather than redefining it.
-3. Update durable docs only if the current public guidance is missing a rule
+4. Update durable docs only if the current public guidance is missing a rule
    this workflow genuinely depends on.
-4. Recheck the task-pack wording so P2 still reads as a bounded follow-on, not
-   a runtime-family expansion.
+5. Recheck the task-pack wording so P2 still reads as a bounded second pass,
+   not a runtime-family expansion.
 
 ### Validation
 
