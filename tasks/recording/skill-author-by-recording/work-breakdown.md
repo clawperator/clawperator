@@ -6,15 +6,12 @@ Parent plan: `tasks/recording/skill-author-by-recording/plan.md`
 
 Total PRs: 3. Total phases: 3.
 
-- P1: close out the replay-first front-door workflow
-- P2: close out the orchestrated authoring path without expanding runtime scope
+- P1: create the replay-first front-door workflow from scratch
+- P2: extend the created workflow to handle the orchestrated authoring path
 - P3: validate the full story against the Solax demo path and graduate durable
   guidance
 
-Current state: a first repo-local workflow draft already exists at
-`.agents/skills/skill-author-by-recording/`, but the task pack now needs to
-reflect the actual implementation order and the replay-first default product
-stance.
+Current state: the skill directory does not exist yet. P1 creates it.
 
 ## Status
 
@@ -82,7 +79,7 @@ Read these files in the listed order before writing anything.
 | PR-2 | Orchestrated-path closeout | P2 | `default` | Do not start PR-3 until PR-2 wording and workflow shape are accepted |
 | PR-3 | Demo validation and graduation | P3 | `default` | Final closeout after earlier phases are landed |
 
-## Phase P1: Replay-First Workflow Closeout
+## Phase P1: Replay-First Workflow Creation
 
 Status: next
 
