@@ -20,9 +20,9 @@ Current state: the skill directory does not exist yet. P1 creates it.
 | State | active |
 | Total PRs | 3 |
 | Total phases | 3 |
-| Completed | problem-definition pass and plan-tightening pass |
-| Remaining | P1 (create skill), P2 (orchestrated path), P3 (demo validation) |
-| Current / Next | P1 |
+| Completed | problem-definition pass, plan-tightening pass, and P1 |
+| Remaining | P2 (orchestrated path), P3 (demo validation) |
+| Current / Next | P2 |
 | Blockers | none |
 
 ## Starting Point
@@ -81,7 +81,7 @@ Read these files in the listed order before writing anything.
 
 ## Phase P1: Replay-First Workflow Creation
 
-Status: next
+Status: complete
 
 ### Agent Tier
 
