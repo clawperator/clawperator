@@ -16,6 +16,18 @@ Current state: a first repo-local workflow draft already exists at
 reflect the actual implementation order and the replay-first default product
 stance.
 
+## Status
+
+| Item | Value |
+| --- | --- |
+| State | active |
+| Total PRs | 3 |
+| Total phases | 3 |
+| Completed | problem-definition pass and plan-tightening pass |
+| Remaining | P1, P2, P3 |
+| Current / Next | P1 |
+| Blockers | none |
+
 ## Hard Rules
 
 - Do not claim that the recording alone generates a reliable skill.
@@ -54,15 +66,38 @@ stance.
 | `apps/node/src/contracts/skillResult.ts` | Universal `SkillResult` return shape |
 | `apps/node/src/domain/skills/runSkill.ts` | Runtime parsing and injected source behavior |
 
+Read these files in the listed order before writing anything.
+
+## PR / Phase Plan
+
+| PR | Purpose | Included phases | Agent tier | Merge gate |
+| --- | --- | --- | --- | --- |
+| PR-1 | Replay-first workflow closeout | P1 | `thinking` | Do not start PR-2 until PR-1 intent and wording are accepted |
+| PR-2 | Orchestrated-path closeout | P2 | `default` | Do not start PR-3 until PR-2 wording and workflow shape are accepted |
+| PR-3 | Demo validation and graduation | P3 | `default` | Final closeout after earlier phases are landed |
+
 ## Phase P1: Replay-First Workflow Closeout
 
 Status: next
+
+### Agent Tier
+
+`thinking`
 
 ### Goal
 
 Tighten the front-door workflow so it truthfully supports "record once, author
 the right skill shape" while defaulting to replay-first authoring when replay
 is sufficient.
+
+### Files or Surfaces To Change
+
+- `.agents/skills/skill-author-by-recording/SKILL.md`
+- `.agents/skills/skill-author-by-recording/agents/openai.yaml`
+- `tasks/recording/skill-author-by-recording/plan.md` if wording drift is
+  discovered during implementation
+- `tasks/recording/skill-author-by-recording/work-breakdown.md` only if the
+  execution steps need to be tightened further
 
 ### Acceptance Criteria
 
@@ -89,15 +124,54 @@ is sufficient.
   - orchestrated runtime program plus thin harness
 - The workflow keeps the Solax proving case separate from the generic path.
 
+### Steps
+
+1. Review the current repo-local skill text against the refined planning files.
+2. Rewrite any stale orchestrated-first wording so the workflow authors one
+   requested or recommended shape per pass.
+3. Make the replay-first default explicit without claiming replay is mandatory
+   for every flow.
+4. Keep explicit support for a direct orchestrated request.
+5. Align `agents/openai.yaml` with the refined meaning if the wording changed
+   materially.
+6. Re-read the edited skill and confirm it still points to the durable docs and
+   does not invent a parallel contract.
+
+### Validation
+
+```bash
+sed -n '1,260p' .agents/skills/skill-author-by-recording/SKILL.md
+sed -n '1,120p' .agents/skills/skill-author-by-recording/agents/openai.yaml
+rg -n "orchestrated path first|only continue with orchestrated|less real|W6" .agents/skills/skill-author-by-recording tasks/recording/skill-author-by-recording
+```
+
+### Expected Commit
+
+```text
+docs(recording): align skill-author-by-recording workflow
+```
+
 ## Phase P2: Orchestrated Path Closeout
 
 Status: pending
+
+### Agent Tier
+
+`default`
 
 ### Goal
 
 Close out the orchestrated authoring path so the same front-door workflow can
 truthfully produce an orchestrated skill when replay would not be sufficient or
 when the user explicitly asks for orchestrated.
+
+### Files or Surfaces To Change
+
+- `.agents/skills/skill-author-by-recording/SKILL.md`
+- `docs/skills/authoring.md` if durable public authoring guidance needs to be
+  tightened
+- `tasks/recording/skill-author-by-recording/plan.md`
+- `tasks/recording/skill-author-by-recording/work-breakdown.md`
 
 ### Acceptance Criteria
 
@@ -111,15 +185,52 @@ when the user explicitly asks for orchestrated.
 - A developer can still use the workflow for a non-Solax skill without editing
   the skill first.
 
+### Steps
+
+1. Tighten the orchestrated branch of the repo-local workflow so it clearly
+   describes when replay is not sufficient.
+2. Confirm the workflow still reuses the durable orchestrated runtime contract
+   rather than redefining it.
+3. Update durable docs only if the current public guidance is missing a rule
+   this workflow genuinely depends on.
+4. Recheck the task-pack wording so P2 still reads as a bounded follow-on, not
+   a runtime-family expansion.
+
+### Validation
+
+```bash
+sed -n '1,260p' .agents/skills/skill-author-by-recording/SKILL.md
+sed -n '1,260p' docs/skills/authoring.md
+rg -n "bundled runtime-family|mandatory dual-authoring|replay-first detour" tasks/recording/skill-author-by-recording
+```
+
+### Expected Commit
+
+```text
+docs(recording): tighten orchestrated skill-authoring path
+```
+
 ## Phase P3: Demo Validation And Graduation
 
 Status: pending
+
+### Agent Tier
+
+`default`
 
 ### Goal
 
 Run the workflow against the Solax proving case and make sure the resulting
 experience is understandable from start to finish, while keeping the generic
 workflow framing truthful.
+
+### Files or Surfaces To Change
+
+- `.agents/skills/skill-author-by-recording/SKILL.md`
+- `docs/skills/authoring.md`
+- `tasks/recording/video-draft.md` only if a real scope mismatch is discovered
+- `tasks/recording/skill-author-by-recording/plan.md`
+- `tasks/recording/skill-author-by-recording/work-breakdown.md`
 
 ### Acceptance Criteria
 
@@ -142,6 +253,31 @@ workflow framing truthful.
   baseline exists.
 - Any other durable guidance discovered here is migrated into
   `docs/skills/authoring.md`.
+
+### Steps
+
+1. Run a reality check against the Solax demo path using the repo-local
+   workflow as the entrypoint.
+2. Record any discovered mismatches between the demo script and the actual
+   workflow behavior.
+3. Fix the workflow or docs when the mismatch is a real product gap.
+4. Only adjust the video draft if the gap is genuinely not in scope and needs
+   explicit renegotiation.
+5. Update the task pack status and closeout notes to reflect the final state.
+
+### Validation
+
+```bash
+sed -n '1,260p' tasks/recording/video-draft.md
+sed -n '1,260p' .agents/skills/skill-author-by-recording/SKILL.md
+sed -n '1,260p' docs/skills/authoring.md
+```
+
+### Expected Commit
+
+```text
+docs(recording): validate skill-authoring demo closeout
+```
 
 ## Closeout Notes
 

@@ -72,7 +72,7 @@ The default authoring strategy should be:
 - avoid requiring both variants in the first pass unless the task explicitly
   calls for both
 
-## Why This Is A Separate Task
+## Why Now
 
 The recording program now has a clear architectural shape:
 
@@ -161,6 +161,41 @@ move to orchestrated honestly instead of forcing a fake replay-first detour.
 - adding a second developer-facing top-level skill such as
   `skill-author-orchestrator`
 
+## Existing Artifact Scope
+
+This task edits an existing task pack and an existing repo-local workflow
+concept.
+
+In scope to change:
+
+- `tasks/recording/skill-author-by-recording/plan.md`
+- `tasks/recording/skill-author-by-recording/work-breakdown.md`
+- `tasks/recording/skill-author-by-recording/problem-definition.md`
+- `.agents/skills/skill-author-by-recording/` when aligning the implementation
+  skill to the refined plan
+
+Preserve as-is unless a later phase explicitly changes them:
+
+- the underlying replay runtime contract
+- the underlying orchestrated runtime contract
+- `tasks/recording/video-draft.md` as the current demo north star
+
+Out of scope for this planning task:
+
+- redesigning the already-landed runtime contracts
+- broad changes to recording, compare, or skills CLI behavior
+
+## Surfaces and Ownership
+
+| Surface | Ownership | Role in this task |
+| --- | --- | --- |
+| `tasks/recording/skill-author-by-recording/` | planning | Stable task-pack contract and execution spec |
+| `.agents/skills/skill-author-by-recording/` | repo-local skill | Front-door developer workflow implementation |
+| `docs/skills/authoring.md` | authored docs | Durable public authoring guidance |
+| `docs/skills/overview.md` | authored docs | Durable orchestrated runtime contract |
+| `docs/api/recording.md` | authored docs | Durable recording/export/compare contract |
+| `tasks/recording/video-draft.md` | demo reference | Demo north star and forcing function |
+
 ## Source Of Truth
 
 This work executes after the earlier recording implementation phases have
@@ -178,6 +213,60 @@ retired task packs.
 | Contract declaration | `docs/skills/authoring.md` |
 | Compare workflow | `docs/api/recording.md` |
 | Reliability report | `docs/internal/design/reliability/` |
+
+## Deterministic Versus Judgment
+
+Deterministic:
+
+- one front-door workflow remains the product shape
+- replay and orchestrated are both first-class
+- replay-first is the default recommendation when replay is sufficient
+- mandatory dual-authoring is out of scope
+- bundled runtime-family work is out of scope
+- the promo video remains the north star but does not redefine the generic
+  workflow as orchestrated-only
+
+Judgment:
+
+- whether a captured flow is replay-safe or requires orchestrated authoring
+- whether the user intent is ambiguous enough to require one clarifying
+  question
+- whether a later follow-on should author the sibling variant
+
+## Decision Rules
+
+Use this first-match-wins lookup table when deciding the authored shape for a
+single recording-driven pass:
+
+| Condition | Action |
+| --- | --- |
+| User explicitly requests `-replay` | Author replay and do not up-sell orchestrated in the same pass |
+| User explicitly requests `-orchestrated` | Author orchestrated and do not force a replay-first detour |
+| No explicit shape and flow is replay-safe | Recommend and author replay |
+| No explicit shape and replay would not be truthful or sufficient | Explain why and author orchestrated |
+| User wants both variants explicitly | Treat sibling authoring as intentional scope, not a default |
+
+Use this PR structure table:
+
+| PR | Purpose | Included phases |
+| --- | --- | --- |
+| PR-1 | Replay-first workflow closeout | P1 |
+| PR-2 | Orchestrated-path closeout | P2 |
+| PR-3 | Demo validation and graduation | P3 |
+
+## Failure Modes To Prevent
+
+- turning the generic workflow into orchestrated-only product framing because
+  the demo path is orchestrated
+- forcing first-time users to learn replay versus orchestrated before they can
+  create a skill
+- accidentally requiring both variants in the first implementation pass
+- letting the repo-local workflow drift away from the durable docs and runtime
+  contracts
+- leaving the PR order implicit and allowing later-phase work to start before
+  earlier framing is settled
+- treating the recording export as the runtime program instead of authoring
+  evidence
 
 ## Output Contract
 
@@ -205,6 +294,22 @@ the following in a way a developer can follow:
 The retained reference export is for authoring evidence, compare baselines, and
 future maintenance. It is not a runtime artifact and must not be listed under
 `skill.json.artifacts`.
+
+## Idempotency
+
+Stable across reruns:
+
+- the one-front-door workflow shape
+- the replay-first default recommendation
+- the phase order and PR boundaries unless explicitly re-planned
+- the canonical retained baseline location
+
+May vary across reruns:
+
+- whether a particular captured flow is judged replay-safe or orchestrated-only
+- the exact authored skill id chosen by the user for a new workflow
+- the detailed implementation text inside the repo-local skill as the workflow
+  is refined
 
 ## Relationship To The Recording Promo Video
 
@@ -236,3 +341,13 @@ Current recommended PR order:
 Each PR should leave the repo in a coherent reviewable state and update this
 task pack as the source of sequencing truth until the final recording-program
 PR ships.
+
+## Durable Follow-Up
+
+Once implementation closes out, durable knowledge should live in:
+
+- `.agents/skills/skill-author-by-recording/` for the repo-local workflow
+- `docs/skills/authoring.md` for durable public authoring guidance
+- `docs/skills/overview.md` only if the orchestrated runtime contract itself
+  changes
+- `docs/api/recording.md` only if recording/export/compare behavior changes
