@@ -1,4 +1,4 @@
 interface:
   display_name: "Skill Author By Recording"
   short_description: "Author a skill from one recorded phone flow"
-  default_prompt: "Use $skill-author-by-recording to turn a fresh phone recording into one truthful Clawperator skill shape. Start and stop the recording, retain the export as evidence, recommend replay or orchestrated explicitly, author the chosen shape, and run one self-test that surfaces the SkillResult."
+  default_prompt: "Use $skill-author-by-recording to turn a fresh phone recording into one truthful Clawperator skill. I will give you the plain-language goal, you should derive the skill id after the recording, default to replay unless I explicitly ask for orchestrated, and run one self-test that surfaces the SkillResult."

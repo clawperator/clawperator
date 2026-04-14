@@ -11,7 +11,9 @@ Total PRs: 3. Total phases: 3.
 - P3: validate the full story against the Solax demo path and graduate durable
   guidance
 
-Current state: the skill directory does not exist yet. P1 creates it.
+Current state: the repo-local skill exists from P1. P2 is now tightening the
+front door so it asks for a plain-language goal up front, derives the skill id
+after recording, and keeps replay as the default first pass.
 
 ## Status
 
@@ -27,9 +29,9 @@ Current state: the skill directory does not exist yet. P1 creates it.
 
 ## Starting Point
 
-`.agents/skills/skill-author-by-recording/` does not exist. P1 creates it.
-Do not look for existing files to edit. Read the plan and required reading
-list first, then create the skill directory and `SKILL.md` from scratch.
+`.agents/skills/skill-author-by-recording/` now exists from P1.
+Start from the created skill and tighten its workflow rather than replacing it
+from scratch.
 
 ## Hard Rules
 
@@ -38,9 +40,13 @@ list first, then create the skill directory and `SKILL.md` from scratch.
 - Do not imply the recording export becomes the runtime program. The export is
   authoring evidence.
 - Do not hardcode the Solax proving case into the front-door workflow. The
-  workflow must be able to help author a developer's own skill id and goal.
+  workflow must be able to help author a developer's own skill from a
+  plain-language goal.
 - Do not make first-time users learn replay versus orchestrated before they can
   create a skill.
+- Do not require the user to invent the final `skill_id` before recording.
+- Do derive the `skill_id` after export analysis from the observed app and the
+  user's goal.
 - Do not skip showing the orchestrated code and verification logic when the
   orchestrated path is chosen.
 - Do not declare authoring done until the newly written skill has been invoked
@@ -99,7 +105,9 @@ Human-guided checks expected by phase:
 - P1: run one replay-safe walkthrough and confirm the workflow:
   - handles start, stop, pull, and export clearly
   - treats the export as authoring evidence
-  - recommends replay explicitly when truthful
+  - derives the skill id after the recording instead of asking the user to
+    invent it up front
+  - defaults to replay on the first pass
   - authors one shape per pass
   - runs one self-test, saves wrapper plus stderr, and surfaces the resulting
     `SkillResult`
@@ -144,18 +152,23 @@ is sufficient.
 
 - The task pack and repo-local skill explicitly say that the workflow authors
   one requested or recommended skill shape per pass.
-- The default recommendation is replay when the captured flow is replay-safe.
+- The workflow requires the user's plain-language goal before recording starts.
+- The workflow derives the first-pass `skill_id` after export analysis instead
+  of asking the user to provide one up front.
+- The default first pass is replay unless the user explicitly requests
+  orchestrated.
 - The workflow still honors an explicit user request for `-orchestrated` or
   `-replay`.
 - The workflow explicitly includes:
-  - capture or confirm the target skill id, plain-language goal, and device
-    context
+  - capture or confirm the plain-language goal and device context
   - run recording start, tell the human when to perform the flow, then stop
     and pull
   - export the recording artifact
+  - derive a truthful first-pass `skill_id` from the observed app and the
+    user's goal
   - sanitize and retain the baseline under
     `skills/<skill_id>/references/compare-baseline.export.json`
-  - analyze the export and recommend or apply the right skill shape
+  - explain the replay-first default or an explicit orchestrated request
   - author the chosen skill shape
   - run one self-test invocation of the authored skill
   - show the key generated files and surface the `SkillResult`
@@ -170,14 +183,14 @@ is sufficient.
 ### Steps
 
 1. Read the required reading list in full before writing anything.
-2. Create `.agents/skills/skill-author-by-recording/` and write `SKILL.md`
-   from scratch. The skill does not exist yet.
+2. Start from the created `.agents/skills/skill-author-by-recording/` skill and
+   tighten `SKILL.md` to match the updated front-door product stance.
 3. Write `SKILL.md` as an agent-program that embodies the replay-first default:
-   - gather skill id, goal, and device context up front
+   - gather the plain-language goal and device context up front
    - start recording, prompt human to perform the flow, stop and pull
    - export and sanitize the recording artifact
-   - analyze the export and recommend replay or orchestrated with explicit
-     reasoning
+   - derive the first-pass `skill_id` from the app evidence and goal
+   - default to replay unless orchestrated was explicitly requested
    - author the chosen shape
    - run one self-test invocation and surface the `SkillResult`
 4. Make the replay-first default explicit without claiming replay is mandatory

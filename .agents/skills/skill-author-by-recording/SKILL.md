@@ -1,6 +1,6 @@
 ---
 name: skill-author-by-recording
-description: Create or update a Clawperator skill from a fresh phone recording. Use when a developer wants one front-door workflow that records a real device flow, retains the export as authoring evidence, explicitly recommends replay or orchestrated, authors one requested or recommended skill shape per pass, and runs one self-test that surfaces the emitted SkillResult.
+description: Create or update a Clawperator skill from a fresh phone recording. Use when a developer wants one front-door workflow that records a real device flow, requires a plain-language goal up front, derives the skill id from the recording and goal, defaults to replay on the first pass unless orchestrated is explicitly requested, and runs one self-test that surfaces the emitted SkillResult.
 ---
 
 # Skill Author By Recording
@@ -48,13 +48,17 @@ Reuse those contracts. Do not invent a parallel recording, skill, or
 - Treat the recording export as evidence, not as a finished skill or runtime
   recipe.
 - Surface the concrete commands you run and the files they produce.
-- Make the replay versus orchestrated recommendation explicit before authoring
-  begins.
+- Default to replay on the first pass unless the user explicitly asks for
+  orchestrated.
 - Honor an explicit user request for `-replay` or `-orchestrated`.
 - Author one requested or recommended skill shape per pass unless the user
   explicitly asks for both.
-- Default to replay when the captured flow is replay-safe.
-- Move to orchestrated when replay would not be truthful or sufficient.
+- Derive the initial `skill_id` after export analysis from the observed app and
+  the user's plain-language goal. Do not require the user to invent a package
+  name or reverse-domain id up front.
+- If replay proves untruthful, too brittle, or fails its first self-test,
+  explain why and strongly recommend orchestrated as the next pass with clear
+  pros and cons.
 - Keep the retained sanitized baseline at
   `skills/<skill_id>/references/compare-baseline.export.json`.
 - Do not list that retained baseline under `skill.json.artifacts`.
@@ -67,18 +71,23 @@ Reuse those contracts. Do not invent a parallel recording, skill, or
 
 Collect or confirm these inputs before recording:
 
-- target `skill_id`
 - plain-language goal
 - whether the user explicitly wants `-replay`, `-orchestrated`, or wants the
-  workflow to recommend the shape
+  default replay-first path
 - target device id when more than one device is connected
 - operator package
   `com.clawperator.operator.dev` unless the user explicitly needs the release
   package
 
-If the requested `skill_id` does not already encode `-replay` or
-`-orchestrated`, keep that in mind while recommending the shape and naming the
-authored artifact truthfully.
+Do not require the user to supply a final `skill_id` before recording. Derive
+it after export analysis from:
+
+- the app package observed in the recording
+- the user's plain-language goal
+- the chosen shape suffix such as `-replay` or `-orchestrated`
+
+Offer the derived id for confirmation or override after you have evidence, not
+before.
 
 ## Decision Table
 
@@ -86,20 +95,23 @@ Use this first-match-wins table exactly:
 
 | Condition | Action |
 | --- | --- |
-| User explicitly requests `-replay` | Author replay and do not up-sell orchestrated in the same pass |
+| User explicitly requests `-replay` | Author replay first and do not up-sell orchestrated in the same pass unless replay proves untruthful or fails self-test |
 | User explicitly requests `-orchestrated` | Author orchestrated and do not force a replay-first detour |
-| No explicit shape and flow is replay-safe | Recommend and author replay |
-| No explicit shape and replay would not be truthful or sufficient | Explain why and author orchestrated |
+| No explicit shape | Author replay first |
+| Replay authoring or self-test shows replay is not truthful or sufficient | Explain why, show replay versus orchestrated tradeoffs, and strongly recommend orchestrated as the next pass |
 | User explicitly wants both variants | Treat sibling authoring as intentional extra scope, not the default |
 
 ## Replay-Safe Versus Orchestrated
 
-Recommend replay when the captured flow is short, deterministic, and truthful
-to express as fixed script logic on a known UI path.
+Replay is the default first pass.
 
-Recommend orchestrated when the next action depends on current UI state,
-mid-flow recovery matters, the app may resume in different states, or the skill
-must prove a persisted terminal condition rather than merely replaying taps.
+Use replay for simple, repeatable flows where fixed script logic is likely to
+stay truthful.
+
+Use orchestrated for complex workflows where you want the run driven by an AI
+agent against the current UI, especially when the next step depends on current
+state, mid-flow recovery matters, or terminal proof must reflect a persisted
+outcome rather than a fixed tap sequence.
 
 Do not describe replay as a lower-grade artifact. Replay and orchestrated are
 both first-class maintained skill shapes.
@@ -114,13 +126,16 @@ Tell the user what you are about to do:
 - ask them to perform the flow once
 - stop recording and pull the raw capture
 - export the recording artifact
+- derive the skill id from the observed app and the user's goal
 - retain a sanitized compare baseline
-- recommend replay or orchestrated explicitly
-- author one skill shape
+- author replay first by default unless orchestrated was explicitly requested
 - run one self-test and inspect the `SkillResult`
 
 Keep the Solax proving case separate from the generic workflow. If the user is
 not authoring Solax, do not drag Solax-specific assumptions into the session.
+
+Require the plain-language goal before recording starts. Do not block on a
+final `skill_id`.
 
 ### 2. Start Recording
 
@@ -155,7 +170,25 @@ Treat the export JSON as the canonical structured authoring artifact. Optional
 `record parse` output is for human inspection only and does not replace the
 export.
 
-### 5. Retain The Sanitized Baseline
+### 5. Derive The App Identity And `skill_id`
+
+Inspect the export and derive a truthful first-pass `skill_id`.
+
+Base it on:
+
+- the app package observed in the recording export
+- the user's plain-language goal
+- the shape suffix that matches the current pass
+
+For the default first pass, derive a `-replay` id unless the user explicitly
+requested orchestrated.
+
+Show the proposed `skill_id` before scaffolding. Only ask for an override if
+the derived id is clearly misleading or the user wants a different naming
+choice. Do not make users invent reverse-domain naming from scratch before the
+recording exists.
+
+### 6. Retain The Sanitized Baseline
 
 Copy or write the sanitized retained export baseline to:
 
@@ -171,27 +204,25 @@ Rules:
 - do not treat `recording-context.json` as the long-term maintained compare
   path once this retained baseline exists
 
-### 6. Analyze The Export And Recommend The Shape
+### 7. Explain The Chosen Shape
 
-Inspect the recording export and explain the recommendation explicitly.
+Make the current pass explicit.
 
-Your explanation should name the deciding facts, for example:
+If the user explicitly requested orchestrated, say so and explain why that
+shape fits.
 
-- whether the recorded route is deterministic
-- whether selectors look stable enough for replay
-- whether runtime branching or continuation from current state is likely
-- whether terminal verification requires reopened persisted-state proof
+Otherwise, say that replay is the default first pass for simple flows and that
+you will test it before escalating to orchestrated.
 
-Then state one of:
+When discussing tradeoffs, use plain language like:
 
-- `Recommended shape: replay`
-- `Recommended shape: orchestrated`
+- replay is a good fit for simple repeatable flows
+- orchestrated is a better fit for complex workflows driven by an AI agent
 
-If the user explicitly requested a shape, still say whether the recording looks
-replay-safe or orchestrated-shaped, but honor the request unless it would make
-the artifact untruthful.
+Do not force the user to learn the taxonomy first, but do explain the tradeoff
+clearly when it matters.
 
-### 7. Scaffold The Runtime Skill
+### 8. Scaffold The Runtime Skill
 
 Create the runtime skill in the skills repo with recording context copied from
 the export artifact:
@@ -209,7 +240,7 @@ Remember:
 - `skills validate` still validates the registry-linked skill files, not the
   recording context
 
-### 8. Author The Chosen Shape
+### 9. Author The Chosen Shape
 
 Author exactly one requested or recommended shape in this pass.
 
@@ -218,6 +249,8 @@ For replay:
 - keep the logic truthful to a deterministic path
 - use the recording evidence to derive selectors, waits, and verification
 - keep the retained compare baseline separate from runtime artifacts
+- treat replay as the default first authored shape unless orchestrated was
+  explicitly requested
 
 For orchestrated:
 
@@ -235,7 +268,7 @@ For orchestrated:
 In both cases, make the terminal verification policy explicit and ensure the
 artifact reflects what the runtime can actually prove.
 
-### 9. Show The Authored Files
+### 10. Show The Authored Files
 
 Surface the key authored files so the developer can inspect the result:
 
@@ -252,7 +285,7 @@ If the chosen shape is orchestrated, make clear that:
 - `SKILL.md` is the runtime agent program
 - `scripts/run.js` is only the thin harness
 
-### 10. Run One Self-Test
+### 11. Run One Self-Test
 
 Run exactly one first self-test invocation of the authored skill and save the
 full JSON wrapper plus stderr:
@@ -281,7 +314,7 @@ device snapshot for post-mortem inspection and surface its path:
 clawperator snapshot --device <device_serial> --operator-package <operator_package> --json
 ```
 
-### 11. Surface The `SkillResult`
+### 12. Surface The `SkillResult`
 
 Inspect the saved `skills run --json` wrapper and surface the top-level
 `skillResult`.
@@ -313,6 +346,18 @@ tell the developer to read them in this order when debugging a bad run:
 4. `agent-stdout.log`
 5. captured snapshot path, if one was taken
 6. compare output, when a retained baseline exists
+
+If the self-test was replay and it failed, looked brittle, or could not
+truthfully prove the requested outcome, say that explicitly and strongly
+recommend an orchestrated follow-on pass. When you do that, show the tradeoff
+plainly:
+
+- replay is better for simple repeatable flows
+- orchestrated is better for complex workflows driven by an AI agent against
+  live UI state
+
+Do not silently switch shapes mid-pass. Finish the pass truthfully and make the
+next-step recommendation explicit.
 
 ## Truthfulness Checks
 

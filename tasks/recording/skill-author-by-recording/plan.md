@@ -100,8 +100,12 @@ human to choose among multiple top-level authoring skills.
 
 The default authoring strategy should be:
 
-- author replay first when the captured flow is replay-safe
-- author orchestrated when replay would not be truthful or sufficient
+- require a plain-language goal up front
+- derive the first-pass `skill_id` from the recording evidence plus the goal
+- author replay first by default unless the user explicitly asks for
+  orchestrated
+- strongly recommend orchestrated as a follow-on when replay proves untruthful,
+  too brittle, or insufficient
 - avoid requiring both variants in the first pass unless the task explicitly
   calls for both
 
@@ -137,19 +141,22 @@ generalizes without unnecessary scope expansion?"
   - surfacing the key files and generated code for inspection
 - explicit visual and file-level outputs that a human can inspect during the
   flow
-- a generic developer-facing path that accepts a new app-specific skill id and
-  plain-language goal instead of assuming the Solax proving case
+- a generic developer-facing path that accepts a plain-language goal and
+  derives a truthful app-specific skill id from the recording instead of
+  assuming the Solax proving case
 
 ## Replay vs Orchestrated: Product Stance
 
 This workflow should not make first-time users learn the replay/orchestrated
 taxonomy before they can create a skill. The authoring-time agent should use
-the recording evidence and user intent to recommend or apply the right shape.
+the recording evidence and the user's goal to derive the skill id and choose a
+truthful first-pass shape.
 
-The default product stance is replay-first authoring when replay is sufficient,
-because replay is simpler to author, easier to explain, and more deterministic.
-That does not make orchestrated secondary. It means the workflow should prefer
-the simplest truthful output first.
+The default product stance is replay-first authoring, because replay is
+simpler to author, easier to explain, and more deterministic. That does not
+make orchestrated secondary. It means the workflow should prefer the simplest
+truthful output first, test it, and escalate to orchestrated explicitly when
+the replay path is not good enough.
 
 ### Use a replay skill when
 
@@ -273,10 +280,10 @@ single recording-driven pass:
 
 | Condition | Action |
 | --- | --- |
-| User explicitly requests `-replay` | Author replay and do not up-sell orchestrated in the same pass |
+| User explicitly requests `-replay` | Author replay first and do not up-sell orchestrated in the same pass unless replay proves untruthful or fails self-test |
 | User explicitly requests `-orchestrated` | Author orchestrated and do not force a replay-first detour |
-| No explicit shape and flow is replay-safe | Recommend and author replay |
-| No explicit shape and replay would not be truthful or sufficient | Explain why and author orchestrated |
+| No explicit shape | Author replay first |
+| Replay authoring or self-test shows replay is not truthful or sufficient | Explain why, show replay versus orchestrated tradeoffs, and strongly recommend orchestrated as the next pass |
 | User wants both variants explicitly | Treat sibling authoring as intentional scope, not a default |
 
 Use this PR structure table:
@@ -307,8 +314,8 @@ This task should produce a workflow that, when invoked by an agent, does all of
 the following in a way a developer can follow:
 
 - explains when the human should touch the phone
-- asks for or derives the target skill id, app/package context, and
-  plain-language goal in a way that works for a developer's own workflow
+- asks for the plain-language goal and derives the target skill id plus
+  app/package context in a way that works for a developer's own workflow
 - shows the exact recording/export commands it is running under the hood
 - shows which recording artifacts were captured and where they live
 - retains one canonical sanitized recording-export baseline adjacent to the
