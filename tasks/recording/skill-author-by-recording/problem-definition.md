@@ -172,6 +172,13 @@ whole product problem as "author orchestrated skills only."
 For generic users, the front-door workflow should still support the simpler
 replay-first path when the captured flow is deterministic.
 
+## Current Implementation State
+
+The `.agents/skills/skill-author-by-recording/` directory does not yet exist.
+
+The product problem is defined. The constraints are settled. The next step is
+to create the skill from scratch in P1.
+
 ## Decision To Carry Into Planning
 
 The planning baseline after this problem-definition pass should be:

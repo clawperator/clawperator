@@ -30,19 +30,21 @@ demo-grade closeout rather than new deep runtime invention.
 | State | active, plan tightened after implementation drift |
 | Total PRs | 3 |
 | Total phases | 3 |
-| Completed | problem framing and first repo-local workflow draft |
-| Remaining | replay-first workflow closeout, orchestrated path closeout, demo validation |
-| Current / Next | P1 replay-first workflow closeout |
+| Completed | problem framing and plan tightening |
+| Remaining | P1 (create skill), P2 (orchestrated path), P3 (demo validation) |
+| Current / Next | P1 replay-first workflow creation |
 | Blockers | none |
 
 ## Current Baseline
 
-The workflow already exists on the current branch as the single repo-local
-entrypoint:
+The `.agents/skills/skill-author-by-recording/` directory does not yet exist.
+P1 must create it from scratch.
 
-- `.agents/skills/skill-author-by-recording/`
+The product decisions and constraints are settled in this task pack and in
+`problem-definition.md`. The implementing agent should read those files and
+the required reading list before writing anything.
 
-Important choices already made on this branch:
+Decisions already made that the implementation must honor:
 
 - keep one human-facing entrypoint
 - add no helper skills because the workflow fits in one durable skill for now
@@ -53,10 +55,9 @@ Important choices already made on this branch:
 - keep the orchestrated boundary honest: `SKILL.md` is the program and
   `scripts/run.js` remains a thin harness
 
-What now needs tightening is the product framing and implementation order. The
-original wording predates several rounds of replay, compare, contract, and
-orchestrated-runtime implementation, so this plan now treats this work as one
-linked initiative delivered across multiple ordered PRs.
+The first implementation task is to create the skill directory with a
+`SKILL.md` that embodies the replay-first default workflow described in this
+plan.
 
 ## Goal
 
@@ -250,7 +251,7 @@ Use this PR structure table:
 
 | PR | Purpose | Included phases |
 | --- | --- | --- |
-| PR-1 | Replay-first workflow closeout | P1 |
+| PR-1 | Replay-first workflow creation | P1 |
 | PR-2 | Orchestrated-path closeout | P2 |
 | PR-3 | Demo validation and graduation | P3 |
 

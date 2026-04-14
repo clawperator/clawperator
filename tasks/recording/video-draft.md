@@ -91,6 +91,15 @@ At runtime:
 - the skill must prove the final app state before it can say "success"
 ```
 
+- Small clarifying annotation beneath:
+
+```text
+Note: Clawperator also has deterministic replay skills for stable, predictable
+UI flows. Replay is a first-class production shape. This scene contrasts
+orchestrated skills with third-party macro recording tools, not with
+Clawperator's own replay skill type.
+```
+
 **Spoken**
 
 The first thing I want to make crystal clear is that this is not a macro
@@ -102,10 +111,17 @@ skill is the contract between them. At runtime, the thing driving the phone is
 not a tape being replayed. It is an agent reasoning against the current UI and
 then using Clawperator to do the actual work.
 
-That distinction is the whole value prop. Macro replay says, "do these exact
-steps and hope the app still looks the same." This says, "achieve this
-outcome, prove the app really ended up there, and return a typed result the
-brain can reason about."
+That distinction is the whole value prop. Third-party macro recorders say, "do
+these exact steps and hope the app still looks the same." An orchestrated skill
+says, "achieve this outcome, prove the app really ended up there, and return a
+typed result the brain can reason about."
+
+To be clear: Clawperator also has deterministic replay skills for stable,
+predictable flows. Replay is fully production-ready for apps where the UI does
+not change on you. What I am building here is an orchestrated skill, because
+the Solax UI has enough branching and enough post-save state that proving the
+outcome matters more than replaying a fixed path. The workflow will help you
+decide which shape fits your own flow when it is your turn.
 
 And the nice part is that this is not a Solax-only party trick. Solax is just
 the proving case I am using on camera. The same recording-driven workflow is

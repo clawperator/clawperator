@@ -78,7 +78,7 @@ Read these files in the listed order before writing anything.
 
 | PR | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
-| PR-1 | Replay-first workflow closeout | P1 | `thinking` | Do not start PR-2 until PR-1 intent and wording are accepted |
+| PR-1 | Replay-first workflow creation | P1 | `thinking` | Do not start PR-2 until PR-1 intent and wording are accepted |
 | PR-2 | Orchestrated-path closeout | P2 | `default` | Do not start PR-3 until PR-2 wording and workflow shape are accepted |
 | PR-3 | Demo validation and graduation | P3 | `default` | Final closeout after earlier phases are landed |
 
