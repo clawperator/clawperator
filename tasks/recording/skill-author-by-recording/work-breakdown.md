@@ -101,11 +101,14 @@ Human-guided checks expected by phase:
   - treats the export as authoring evidence
   - recommends replay explicitly when truthful
   - authors one shape per pass
-  - runs one self-test and surfaces the resulting `SkillResult`
+  - runs one self-test, saves wrapper plus stderr, and surfaces the resulting
+    `SkillResult`
 - P2: run one orchestrated-shaped walkthrough and confirm the workflow:
   - explains why replay would not be truthful or sufficient
   - moves to orchestrated honestly instead of forcing replay first
   - keeps `SKILL.md` as the runtime program and `run.js` as the thin harness
+  - retains `prompt.txt`, agent stdout, agent stderr, and run metadata for the
+    self-test run
 - P3: run the Solax demo-path validation and confirm the full recording-to-skill
   story remains understandable and truthful on camera
 

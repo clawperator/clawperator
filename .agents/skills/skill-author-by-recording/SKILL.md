@@ -224,6 +224,12 @@ For orchestrated:
 - keep `skill.json.agent` as trusted runtime metadata
 - write the app-specific runtime program in `SKILL.md`
 - keep `scripts/run.js` as a thin launcher that forwards stdout and stderr
+- keep per-run local debug artifacts when the harness runs:
+  - `prompt.txt`
+  - `agent-stdout.log`
+  - `agent-stderr.log`
+  - `run-metadata.json` with device id, operator package, forwarded args, and
+    output paths
 - do not bury app-specific navigation or verification policy in the harness
 
 In both cases, make the terminal verification policy explicit and ensure the
@@ -249,14 +255,31 @@ If the chosen shape is orchestrated, make clear that:
 ### 10. Run One Self-Test
 
 Run exactly one first self-test invocation of the authored skill and save the
-full JSON wrapper:
+full JSON wrapper plus stderr:
 
 ```bash
-clawperator skills run <skill_id> --device <device_serial> --operator-package <operator_package> --json > ./recordings/<session_id>/<skill_id>.skills-run.json
+clawperator skills run <skill_id> --device <device_serial> --operator-package <operator_package> --json > ./recordings/<session_id>/<skill_id>.skills-run.json 2> ./recordings/<session_id>/<skill_id>.skills-run.stderr.log
 ```
 
 If the skill takes inputs, pass the minimum truthful input set required for one
 real run.
+
+If the authored shape is orchestrated, require the self-test run to preserve
+the per-run debug bundle from the harness. At minimum retain:
+
+- the saved `skills run --json` wrapper
+- the saved `skills run` stderr log
+- `prompt.txt`
+- `agent-stdout.log`
+- `agent-stderr.log`
+- `run-metadata.json`
+
+If the run fails or ends in an unexpected UI state, capture one immediate
+device snapshot for post-mortem inspection and surface its path:
+
+```bash
+clawperator snapshot --device <device_serial> --operator-package <operator_package> --json
+```
 
 ### 11. Surface The `SkillResult`
 
@@ -281,6 +304,16 @@ clawperator recording compare --baseline skills/<skill_id>/references/compare-ba
 Do not hand-edit a bare `SkillResult` and do not claim compare accepts only a
 stripped result object.
 
+If the self-test was orchestrated, also surface the debug-artifact paths and
+tell the developer to read them in this order when debugging a bad run:
+
+1. `skills run` stderr log
+2. `SkillResult.checkpoints` and `terminalVerification`
+3. `agent-stderr.log`
+4. `agent-stdout.log`
+5. captured snapshot path, if one was taken
+6. compare output, when a retained baseline exists
+
 ## Truthfulness Checks
 
 Stop and correct the workflow if you find yourself implying any of these:
@@ -299,6 +332,9 @@ A complete pass should leave the developer with:
 - one authored runtime skill shape
 - one retained compare baseline
 - one saved `skills run --json` wrapper from the self-test
+- one saved `skills run` stderr log from the self-test
+- for orchestrated runs, one local debug bundle with prompt, agent stdout,
+  agent stderr, and metadata
 - a clear statement of why replay or orchestrated was chosen
 - visible file paths and commands that make the workflow inspectable
 

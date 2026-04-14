@@ -69,6 +69,8 @@ Current expectation:
   anti-pattern phrasing
 - use human-guided acceptance walkthroughs to prove the workflow is truthful,
   understandable, and inspectable end to end
+- require first-run debug evidence to be retained, especially for orchestrated
+  self-tests
 - add unit tests only if a later phase introduces executable decision logic,
   validation helpers, or scripts whose behavior is no longer captured well by
   human walkthroughs alone
@@ -80,7 +82,8 @@ Phase-specific testing:
   authoring, one self-test run, and surfaced `SkillResult`
 - P2: one human-guided orchestrated-shaped walkthrough that confirms the
   workflow honestly chooses orchestrated when replay would not be truthful or
-  sufficient
+  sufficient, and retains the self-test debug bundle needed for post-mortem
+  inspection
 - P3: demo-path validation against the Solax proving case so the full story is
   understandable from recording through authored skill and self-test result
 
