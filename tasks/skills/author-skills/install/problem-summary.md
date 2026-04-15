@@ -257,9 +257,10 @@ directory scanning for subdirectories containing SKILL.md; no manifest file
 is needed.
 
 **`apps/node/src/cli/commands/authoringSkills.ts` (new)**
-Commands: `install`, `update`, `list`. `install` clones and wires. `update`
-fast-forwards and re-wires. `list` scans the installed dir and prints the
-available authoring skill names and SKILL.md paths.
+Commands: `install`, `update`, `list`. `install` copies from the npm package
+and wires. `update` re-copies from the npm package and re-wires. `list` scans
+the installed dir and prints the available authoring skill names and SKILL.md
+paths.
 
 These commands are useful as internal plumbing and for repair/update flows, but
 they should not become a required extra step for the normal first-time install
@@ -270,9 +271,10 @@ Register the new `authoring-skills` command group.
 
 **`sites/landing/public/install.sh`**
 Add `setup_authoring_skills_via_cli()` after the existing
-`setup_skills_via_cli()` step. Include agent-specific wiring (symlinks to
-`~/.claude/skills/` when Claude Code is detected, Codex path when Codex is
-detected). Print installed paths in the final summary.
+`setup_skills_via_cli()` step. Unconditionally create agent discovery
+directories (`~/.claude/skills/`, Codex equivalent) and place symlinks
+regardless of whether the agent is currently installed. Print installed paths
+in the final summary.
 
 This is the key product behavior change:
 
