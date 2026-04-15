@@ -11,22 +11,22 @@ Total PRs: 3. Total phases: 3.
 - P3: validate the full story against the Solax demo path and graduate durable
   guidance
 
-Current state: P2 is complete and the repo-local workflow branch is ready for a
-P2 PR. The front door now makes the replay-versus-orchestrated recommendation
-explicit, supports direct orchestrated authoring without a fake replay detour,
-and requires an active repair loop during self-test verification. The remaining
-phase is P3 demo validation.
+Current state: P2 is complete. The front door now makes the
+replay-versus-orchestrated recommendation explicit, supports direct
+orchestrated authoring without a fake replay detour, and requires an active
+repair loop during self-test verification. P3 is now focused on demo-path
+truthfulness and durable guidance graduation.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | active |
+| State | active, P3 reality-check in progress |
 | Total PRs | 3 |
 | Total phases | 3 |
 | Completed | problem-definition pass, plan-tightening pass, P1, and P2 |
-| Remaining | P3 (demo validation) |
-| Current / Next | P3 |
+| Remaining | P3 (demo validation and closeout) |
+| Current / Next | P3 reality-check and doc graduation |
 | Blockers | none |
 
 ## Starting Point

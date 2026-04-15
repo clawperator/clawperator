@@ -135,9 +135,10 @@ meant to help you author your own weird, personal, app-specific skill too.
 - Show the exact prompt being sent to Codex:
 
 ```text
-Use $skill-author-by-recording to create
-com.solaxcloud.starter.set-discharge-to-limit-orchestrated
-from a fresh recording. Guide me when I need to touch the phone.
+Use $skill-author-by-recording to create a Solax discharge-limit skill from a
+fresh recording. My goal is to set the battery discharge limit to 40% tonight.
+If replay would be untruthful, author orchestrated. Guide me when I need to
+touch the phone.
 ```
 
 **Spoken**
@@ -147,9 +148,10 @@ stitch this together file by file. I am going to ask Codex to use a repo-local
 workflow called `skill-author-by-recording`.
 
 That workflow is the authoring-time guide. It starts the recording for me, tells
-me when to touch the phone, pulls the artifacts back into the repo when I am
-done, and then hands those artifacts to an authoring-time agent that reads the
-recording evidence and writes the actual skill.
+me when to touch the phone, pulls the artifacts into a retained user-scoped
+recording folder when I am done, derives the final skill id after it has seen
+the evidence, and then hands those artifacts to an authoring-time agent that
+reads the recording evidence and writes the actual skill.
 
 In the happy path I am showing here, my job as the developer is very small: I
 type that one prompt, I pick up the phone when the workflow asks me to, I do
@@ -173,8 +175,8 @@ that evidence into a runnable, inspectable skill.
 ```bash
 clawperator recording start --session-id <session_id> --device <device_serial> --operator-package com.clawperator.operator.dev --json
 clawperator recording stop --device <device_serial> --operator-package com.clawperator.operator.dev --json
-clawperator recording pull --device <device_serial> --session-id <session_id> --out ./recordings/<session_id> --json
-clawperator recording export --input ./recordings/<session_id> --snapshots omit --json
+clawperator recording pull --device <device_serial> --session-id <session_id> --out ~/.clawperator/recordings/<session_id> --json
+clawperator recording export --input ~/.clawperator/recordings/<session_id> --out ~/.clawperator/recordings/<session_id>/<session_id>.export.json --snapshots omit --json
 ```
 
 **Spoken**
@@ -195,7 +197,7 @@ right moment so I do not have to keep the lifecycle in my head.
   save, and save again.
 - Cut back to the terminal. Codex prints `Recording stopped. Pulling
   artifacts.` and then `Export written to
-  ./recordings/<session_id>/<session_id>.export.json`
+  ~/.clawperator/recordings/<session_id>/<session_id>.export.json`
   followed by `Sanitized baseline retained at
   ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/references/compare-baseline.export.json`.
 - Add a small note card beside the retained baseline path:
@@ -217,7 +219,7 @@ device, and writes an export artifact into the repo.
 
 **On screen**
 
-- Open `./recordings/<session_id>/<session_id>.export.json`.
+- Open `~/.clawperator/recordings/<session_id>/<session_id>.export.json`.
 - Highlight these top-level fields visually:
   - `events`
   - `packageTransitions`
@@ -540,8 +542,9 @@ back to the outer brain.
 **On screen**
 
 - Split view. Left: the recording export from Scene 6. Right: a saved
-  `clawperator skills run --json` result file from a later run, with the
-  wrapper's `skillResult` field highlighted before compare reads it.
+  `clawperator skills run --json` result file from a later run under the same
+  retained recording session folder, with the wrapper's `skillResult` field
+  highlighted before compare reads it.
 - Terminal shows two compare invocations: one for a successful run where the
   agent took a different path, and one for a forced-failure run where the app
   was put in a bad starting state.
@@ -549,12 +552,12 @@ back to the outer brain.
 ```bash
 # Successful run saved earlier:
 clawperator skills run com.solaxcloud.starter.set-discharge-to-limit-orchestrated \
-  --json -- 40 > ./runs/solax-run-01.skills-run.json
+  --json -- 40 > ~/.clawperator/recordings/<session_id>/solax-run-01.skills-run.json
 
 # Compare it against the retained sanitized recording baseline:
 clawperator recording compare \
   --baseline ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/references/compare-baseline.export.json \
-  --result ./runs/solax-run-01.skills-run.json \
+  --result ~/.clawperator/recordings/<session_id>/solax-run-01.skills-run.json \
   --json
 ```
 
@@ -575,7 +578,7 @@ clawperator recording compare \
 ```bash
 clawperator recording compare \
   --baseline ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/references/compare-baseline.export.json \
-  --result ./runs/solax-forced-failure.skills-run.json \
+  --result ~/.clawperator/recordings/<session_id>/solax-forced-failure.skills-run.json \
   --json
 ```
 
@@ -604,7 +607,7 @@ proved the final state, compare reports that as "outcome matches, path
 differs" - not a failure.
 
 And to make that workflow concrete: compare is reading the saved
-`skills run --json` file from the earlier invocation, extracting the
+`skills run --json` file from the retained session folder, extracting the
 `skillResult`, and using that as the runtime artifact. There is no manual
 copy-paste or hand-built JSON in the loop.
 
@@ -625,7 +628,7 @@ and terminal noise. I get a typed diagnosis I can act on.
 ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/SKILL.md
 ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/scripts/run.js
 ../clawperator-skills/skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/skill.json
-./runs/<run>.skills-run.json
+~/.clawperator/recordings/<session_id>/<run>.skills-run.json
 ```
 
 - Draw boxes:

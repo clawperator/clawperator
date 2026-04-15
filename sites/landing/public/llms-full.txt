@@ -9505,22 +9505,41 @@ agent is reading one definition while the wrapper is enforcing another.
 
 ### Debugging A Failed Orchestrated Run
 
-When an orchestrated skill misbehaves, read these in order:
+When an orchestrated skill misbehaves, start with the minimum durable evidence
+set before you rewrite the skill:
 
-1. The forwarded agent stderr stream.
-2. The emitted `SkillResult.checkpoints`.
-3. The retained agent stdout and stderr logs, if the harness kept them.
-4. A direct `clawperator snapshot` from the current screen, when the run ended
+1. The saved `clawperator skills run --json` wrapper result for that exact run.
+2. The forwarded agent stderr stream from that run.
+3. The emitted `SkillResult.checkpoints`.
+4. Compare output against the retained baseline, if the skill keeps
+   `references/compare-baseline.export.json`.
+
+That order matters:
+
+- the wrapper result tells you whether the failure was wrapper-level,
+  runtime-level, or a post-run verification mismatch
+- stderr usually explains what the runtime agent believed it was doing
+- `SkillResult.checkpoints` show how far the skill really progressed on device
+- compare output tells you whether the run still reached the right terminal
+  outcome, diverged mid-route, or failed before the expected checkpoint
+
+If those do not explain the failure, read these next:
+
+1. The retained per-run `prompt.txt`.
+2. The retained agent stdout and stderr logs, if the harness kept them.
+3. The retained run metadata file, if the harness kept it.
+4. A direct `clawperator snapshot` from the current screen when the run ended
    in an unexpected UI state.
-5. Compare or replay artifacts, if a baseline exists for the same flow.
 
 Recommended current debugging support for orchestrated harnesses:
 
 - keep a per-run `prompt.txt`
 - keep the runtime agent stdout log
 - keep the runtime agent stderr log
-- keep a small metadata file describing device id, operator package, forwarded
-  args, and output paths
+- keep a small `run-metadata.json` file describing device id, operator
+  package, forwarded args, and output paths
+- keep the saved wrapper JSON or an equivalent stderr/stdout capture for the
+  exact `clawperator skills run --json` invocation you are debugging
 
 This matters because many orchestrated failures are not pure route failures.
 Common failure shapes include:

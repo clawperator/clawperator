@@ -27,12 +27,12 @@ demo-grade closeout rather than new deep runtime invention.
 
 | Item | Value |
 | --- | --- |
-| State | active, plan tightened after implementation drift |
+| State | active, P3 reality-check in progress |
 | Total PRs | 3 |
 | Total phases | 3 |
 | Completed | problem framing, plan tightening, P1, and P2 |
-| Remaining | P3 (demo validation) |
-| Current / Next | P3 demo validation |
+| Remaining | P3 (demo validation and closeout) |
+| Current / Next | P3 demo validation and durable guidance graduation |
 | Blockers | none |
 
 P2 implementation status:
@@ -42,6 +42,15 @@ P2 implementation status:
   is the truthful first shape
 - the repair loop is now explicit and state-aware during self-test verification
 - the current implementation is ready to be turned into the P2 PR
+
+P3 implementation status:
+
+- reality-checking the Solax demo path against the shipped workflow surfaced
+  script drift around pre-supplying the final `skill_id` and using repo-local
+  `./recordings/` paths
+- the durable authoring docs now need to carry the minimum failed
+  orchestrated-run debugging order explicitly, rather than leaving that lesson
+  implicit in task-pack history
 
 ## Current Baseline
 
