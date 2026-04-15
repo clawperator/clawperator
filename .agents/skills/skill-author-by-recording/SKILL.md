@@ -327,7 +327,7 @@ author code:
 
 - if the flow still looks replay-safe, say that replay is the default first
   pass for this recording and that you will test it before escalating
-- if the flow already looks orchestration-shaped, say why replay would be
+- if the flow already looks orchestrated-shaped, say why replay would be
   untruthful or insufficient and move directly to orchestrated in this pass
 
 Do not hide that decision. The user should be able to tell whether the front
@@ -480,7 +480,7 @@ If the first self-test fails:
   5. terminal verification or normalization issue
 - patch the just-authored `SKILL.md`, `skill.json`, or `scripts/run.js`
   directly when the failure points to a skill bug
-- rerun `skills validate` after each substantive patch
+- rerun `skills validate <skill_id>` after each substantive patch
 - before each rerun, restore the target app or apps to the same truthful
   starting precondition the skill expects so you are not validating against a
   mutated mid-flow screen from the failed attempt
