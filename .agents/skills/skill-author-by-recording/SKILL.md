@@ -401,6 +401,9 @@ For orchestrated:
 - keep `scripts/run.js` as a thin launcher that forwards stdout and stderr
 - keep `skill.json.contract.inputs`, `SKILL.md` examples, forwarded wrapper
   args, and emitted `SkillResult.inputs` aligned around stable named inputs
+- anticipate user-facing versus UI-facing value mismatches such as
+  `medium` versus `med`; normalize them truthfully in the created skill instead
+  of assuming the public contract text and the app label are identical
 - keep per-run local debug artifacts when the harness runs:
   - `prompt.txt`
   - `agent-stdout.log`
@@ -410,6 +413,13 @@ For orchestrated:
 - save the outer `clawperator skills run --json` wrapper and stderr capture
   alongside that harness bundle under `~/.clawperator/recordings/<session_id>/`
 - do not bury app-specific navigation or verification policy in the harness
+- on the first repair pass, harden the runtime prompt against the failure class
+  you just observed, especially around:
+  - exact command templates
+  - exact final frame shape
+  - explicit bans on recursive skill calls or unrelated repo introspection
+  - single-line shell command requirements when multiline commands already
+    caused wrapper or transport drift
 
 In both cases, make the terminal verification policy explicit and ensure the
 artifact reflects what the runtime can actually prove.
@@ -461,14 +471,26 @@ If the first self-test fails:
 
 - inspect the saved wrapper JSON, stderr, and any orchestrated debug bundle
   from that exact run before changing strategy
+- classify the failure before patching anything:
+  1. environment or runtime mismatch
+  2. wrapper, contract, or frame issue
+  3. agent-prompt drift
+  4. app navigation or selector issue
+  5. terminal verification or normalization issue
 - patch the just-authored `SKILL.md`, `skill.json`, or `scripts/run.js`
   directly when the failure points to a skill bug
 - rerun `skills validate` after each substantive patch
+- before each rerun, restore the target app or apps to the same truthful
+  starting precondition the skill expects so you are not validating against a
+  mutated mid-flow screen from the failed attempt
 - rerun the same skill with the same truthful input set until the pass either
   succeeds or you hit a concrete blocker such as missing evidence, ambiguous UI
   state, or a user decision that cannot be inferred safely
 
 Stay focused on the created skill during this loop.
+
+Run only one active self-test per device at a time during authoring and repair.
+Do not overlap live retries on the same phone or emulator.
 
 Do not:
 
@@ -498,6 +520,13 @@ drive the next patch. Read it in this order before editing:
 4. `agent-stdout.log`
 5. `prompt.txt`
 6. `run-metadata.json`
+
+During that orchestrated repair pass, distinguish clearly between:
+
+- device work succeeded but the wrapper, frame, or contract handling failed
+- the automation itself failed on device
+
+Patch the failing layer first instead of mixing those cases together.
 
 If the run fails or ends in an unexpected UI state, capture one immediate
 device snapshot for post-mortem inspection and surface its path:
