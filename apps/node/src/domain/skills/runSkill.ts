@@ -398,7 +398,6 @@ function resolvePositionalFallbackArgs(
   declaredInputNames: string[]
 ): string[] {
   const declaredFlags = new Set(declaredInputNames.map(inputName => `--${toCliFlagName(inputName)}`));
-  const declaredFlagsArray = [...declaredFlags];
   const positionalArgs: string[] = [];
 
   for (let index = 0; index < args.length; index += 1) {
@@ -410,11 +409,10 @@ function resolvePositionalFallbackArgs(
       }
       continue;
     }
-    if (declaredFlagsArray.some(flagName => arg.startsWith(`${flagName}=`))) {
-      continue;
-    }
     if (arg.startsWith("--")) {
       if (arg.includes("=")) {
+        // self-contained --flag=value: skip regardless of whether the flag is declared or unknown
+        // (declared flags are identified via O(1) Set lookup on the prefix before "=")
         continue;
       }
       const next = args[index + 1];
