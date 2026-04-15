@@ -29,6 +29,8 @@ describe("DoctorService", () => {
     const registryPath = join(fakeRegistryDir, "skills", "skills-registry.json");
     await mkdir(join(fakeRegistryDir, "skills"), { recursive: true });
     await writeFile(fakeAgentPath, "#!/bin/sh\nexit 0\n", "utf8");
+    // Keep DoctorService tests isolated from any developer-local skills registry so
+    // host.skill-agent-cli.skills assertions stay deterministic across machines.
     await writeFile(registryPath, `${JSON.stringify({ schemaVersion: "1.0", generatedAt: "2026-04-16T00:00:00Z", skills: [] }, null, 2)}\n`, "utf8");
     await chmod(fakeAgentPath, 0o755);
     process.env.PATH = `${fakeAgentCliDir}${delimiter}${originalPath ?? ""}`;

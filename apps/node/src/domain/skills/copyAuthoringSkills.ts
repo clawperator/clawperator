@@ -161,6 +161,9 @@ async function removeStaleAgentSymlinks(agentDir: string, activeSkills: Set<stri
     try {
       entryStat = await lstat(entryPath);
     } catch {
+      // Agent discovery directories are shared user space. If an entry disappears
+      // mid-scan or is unreadable, skip it rather than failing the whole install.
+      // We only clean up links we can positively identify as Clawperator-owned.
       continue;
     }
     if (!entryStat.isSymbolicLink()) {
