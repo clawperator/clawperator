@@ -411,8 +411,9 @@ function resolvePositionalFallbackArgs(
     }
     if (arg.startsWith("--")) {
       if (arg.includes("=")) {
-        // self-contained --flag=value: skip regardless of whether the flag is declared or unknown
-        // (declared flags are identified via O(1) Set lookup on the prefix before "=")
+        // self-contained --flag=value: skip unconditionally; declared forms were already
+        // consumed by resolveNamedContractInputRawValue and unknown forms must not leak
+        // into the positional fallback
         continue;
       }
       const next = args[index + 1];
