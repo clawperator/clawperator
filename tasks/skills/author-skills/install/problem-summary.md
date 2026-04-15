@@ -157,15 +157,9 @@ Use a two-layer model:
      `~/.clawperator/authoring-skills/<skill>/` into agent-native discovery
      locations
    - for Claude Code: symlink into `~/.claude/skills/`
-   - for Codex: symlink into `~/.codex/skills/`
+   - for Codex: symlink into `$CODEX_HOME/skills` (default `~/.codex/skills/`)
    - if another agent later has a supported skill-discovery location, wire that
      too using the same canonical source
-
-Codex path verification for this task:
-
-- local Codex CLI is installed and available as `codex`
-- local Codex skill installation uses `$CODEX_HOME/skills`, defaulting to
-  `~/.codex/skills/`
 
 Symlinks are used at the agent-wiring layer so that `clawperator
 authoring-skills update` only needs to refresh the files in
@@ -261,10 +255,15 @@ directory scanning for subdirectories containing SKILL.md; no manifest file
 is needed.
 
 **`apps/node/src/cli/commands/authoringSkills.ts` (new)**
-Commands: `install`, `update`, `list`. `install` copies from the npm package
-and wires. `update` re-copies from the npm package and re-wires. `list` scans
-the installed dir and prints the available authoring skill names and SKILL.md
-paths.
+Commands: `install`, `update`, `list`. This command owns both the copy and
+wiring logic - matching the existing pattern where `clawperator skills install`
+owns runtime skill sync and `install.sh` calls it.
+
+- `install`: copies from the npm package to `~/.clawperator/authoring-skills/`,
+  writes `version.txt`, creates agent discovery directories, and places symlinks
+- `update`: re-copies from the npm package, re-wires; safe to run multiple times
+- `list`: scans the installed dir and prints available authoring skill names and
+  SKILL.md paths
 
 These commands are useful as internal plumbing and for repair/update flows, but
 they should not become a required extra step for the normal first-time install
@@ -275,10 +274,9 @@ Register the new `authoring-skills` command group.
 
 **`sites/landing/public/install.sh`**
 Add `setup_authoring_skills_via_cli()` after the existing
-`setup_skills_via_cli()` step. Unconditionally create agent discovery
-directories (`~/.claude/skills/`, `~/.codex/skills/`) and place symlinks
-regardless of whether the agent is currently installed. Print installed paths
-in the final summary.
+`setup_skills_via_cli()` step, calling `clawperator authoring-skills install`.
+That command owns directory creation and wiring; `install.sh` does not
+duplicate that logic. Print installed paths in the final summary.
 
 This is the key product behavior change:
 
