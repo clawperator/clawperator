@@ -278,10 +278,77 @@ references that currently assume a local repo checkout must be made portable.
 Published docs URLs are the correct answer. The SKILL.md portability fix must
 ship before or in the same change as any install plumbing, not as a follow-on.
 
-## Open Question
+## Versioning
 
-Confirm the exact Codex skill discovery path before implementing that wiring.
-The `agents/openai.yaml` format in `skill-author-by-recording` confirms Codex
-is a first-class target, but the Codex-side directory path for auto-loading
-skills needs to be verified against current Codex documentation or behavior
-before the wiring step is written.
+### Stance
+
+Authoring skills do not need their own version scheme. Their version is the
+Clawperator CLI version. When the CLI is at v1.2.0, the authoring skills are
+the ones that shipped with v1.2.0. No separate authoring-skill version number
+is needed.
+
+### The npm update gap
+
+This stance has a practical gap: `npm install -g clawperator@latest` updates
+the CLI binary but does not update the authoring skills that were installed to
+`~/.clawperator/authoring-skills/` during a prior `install.sh` run.
+
+A git-clone approach makes this worse. If authoring skills are cloned from
+GitHub into `~/.clawperator/authoring-skills/`, updating the CLI via npm leaves
+the clone at whatever commit it was at. The user then has a CLI at v1.2.0 and
+authoring skills that might be at v1.0.0.
+
+### Recommended approach: bundle in the npm package, copy out on install
+
+Authoring skill files (SKILL.md, `agents/openai.yaml`, etc.) are just text and
+belong inside the npm package itself under `authoring-skills/`. This is the
+right model because:
+
+- authoring skills are first-party and tightly coupled to the CLI codebase
+- the npm package already owns the CLI version
+- bundling means no separate git clone is needed during install
+
+During install, `clawperator authoring-skills install` copies the files out of
+the installed npm package to `~/.clawperator/authoring-skills/` and writes a
+`version.txt` alongside them recording the CLI version they came from. The
+agent symlinks point at `~/.clawperator/authoring-skills/`, not into the npm
+package internals. This avoids fragility from nvm version switches (which
+change the npm global prefix path and would break symlinks into
+`node_modules/`).
+
+### Staleness detection
+
+`clawperator doctor` should include a check that compares the CLI version
+against the version recorded in `~/.clawperator/authoring-skills/version.txt`.
+If they differ, the check warns and surfaces the fix:
+
+```
+clawperator authoring-skills update
+```
+
+`authoring-skills update` re-copies from the current npm package and re-runs
+agent wiring. It is a fast local operation because no network request or git
+clone is needed: the source is already on disk in the installed npm package.
+
+### Deferral scope
+
+The auto-update gap is a known limitation for now. The priority is:
+
+1. ship the install story (bundle in npm, copy on install, agent wiring)
+2. add the doctor staleness check
+
+Automatic triggering of `authoring-skills update` on CLI upgrade (e.g., via
+npm post-install hook) can be added later once the basic flow is stable.
+
+## Open Questions
+
+**Codex skill discovery path:** Confirm the exact Codex-side directory path for
+auto-loading skills before implementing that wiring. The `agents/openai.yaml`
+format in `skill-author-by-recording` confirms Codex is a first-class target,
+but the directory path needs to be verified against current Codex documentation
+or behavior.
+
+**npm package `files` field:** Confirm that `apps/node/package.json` includes
+an `authoring-skills/` entry in the `files` array so the text files are
+included in the published npm package and not gitignored or filtered out by the
+default npm publish rules.
