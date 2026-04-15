@@ -221,16 +221,27 @@ it was at. The npm bundle approach eliminates this gap entirely.
 
 Changes needed if this direction is adopted:
 
-**`apps/node/authoring-skills/` (new directory)**
-Add the authoring skill files (SKILL.md, `agents/openai.yaml`, etc.) here as
-static text assets - they are not TypeScript and do not go through the compiler,
-so they live alongside `dist/` rather than inside it.
+**`apps/node/authoring-skills/` (new directory, symlinks only)**
+This directory exists solely to make authoring skills visible to npm. Each
+entry is a symlink back to the canonical source in `.agents/skills/`:
+
+```
+apps/node/authoring-skills/
+  skill-author-by-recording -> ../../.agents/skills/skill-author-by-recording/
+```
+
+npm follows symlinks when packing, so the actual files are included in the
+published tarball. Developers edit only in `.agents/skills/`; no copy or sync
+step is needed when a skill changes.
+
+When a new authoring skill is added to `.agents/skills/`, a corresponding
+symlink is added here. That is the entire maintenance burden for keeping the
+npm package up to date.
 
 **`apps/node/package.json`**
 Add `"authoring-skills/"` to the `files` array. The current array is
-`["dist/", "!dist/test/**", "!dist/**/*.map", "README.md", "LICENSE"]`. Authoring
-skills are not in `dist/` so they need explicit inclusion; one line added is the
-complete change.
+`["dist/", "!dist/test/**", "!dist/**/*.map", "README.md", "LICENSE"]`. One
+line added is the complete change.
 
 **`apps/node/src/domain/skills/skillsConfig.ts`**
 Add `DEFAULT_AUTHORING_SKILLS_DIR` (`~/.clawperator/authoring-skills`). No
@@ -352,9 +363,3 @@ auto-loading skills before implementing that wiring. The `agents/openai.yaml`
 format in `skill-author-by-recording` confirms Codex is a first-class target,
 but the directory path needs to be verified against current Codex documentation
 or behavior.
-
-**npm package `files` field:** Resolved - see Implementation Surfaces. Add
-`"authoring-skills/"` to the `files` array in `apps/node/package.json`. The
-authoring skill files are static text assets that live at
-`apps/node/authoring-skills/` and are not compiled, so they need explicit
-inclusion. One line added to `files` is the complete change.
