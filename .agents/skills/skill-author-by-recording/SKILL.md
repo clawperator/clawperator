@@ -77,6 +77,9 @@ Reuse those contracts. Do not invent a parallel recording, skill, or
   keep `scripts/run.js` as a thin harness only.
 - Do not declare success until you have run one self-test invocation and shown
   the resulting `SkillResult`.
+- During creation and verification, own the fix loop for the just-authored
+  skill. If the first self-test fails, patch the created skill, validate it
+  again, and rerun it instead of stopping at the first broken draft.
 - Choose stable named user-facing inputs before finalizing the authored skill.
   Keep `skill.json.contract.inputs`, `SKILL.md` examples, script arg parsing,
   and emitted `SkillResult.inputs` aligned.
@@ -169,7 +172,8 @@ Tell the user what you are about to do:
   evidence and the user's goal
 - author replay first only when it still looks truthful; otherwise author
   orchestrated directly
-- run one self-test and inspect the `SkillResult`
+- run one self-test, inspect the `SkillResult`, and if it fails stay inside the
+  created skill's repair loop until it passes or you hit a real blocker
 
 Keep the Solax proving case separate from the generic workflow. If the user is
 not authoring Solax, do not drag Solax-specific assumptions into the session.
@@ -410,6 +414,17 @@ For orchestrated:
 In both cases, make the terminal verification policy explicit and ensure the
 artifact reflects what the runtime can actually prove.
 
+Before the first self-test, tell the user that scaffold plus first draft is not
+the finish line. This pass includes:
+
+1. author the skill
+2. validate the created files
+3. run the created skill
+4. if it fails, inspect the failure artifacts and patch that same skill
+5. rerun validation and the skill until it works or a real blocker remains
+
+Do not treat the first failed self-test as a satisfactory endpoint.
+
 ### 12. Show The Authored Files
 
 Surface the key authored files so the developer can inspect the result:
@@ -440,6 +455,30 @@ clawperator skills run <skill_id> --device <device_serial> --operator-package <o
 If the skill takes inputs, pass the minimum truthful input set required for one
 real run.
 
+The self-test phase is an active repair loop, not a one-shot ceremony.
+
+If the first self-test fails:
+
+- inspect the saved wrapper JSON, stderr, and any orchestrated debug bundle
+  from that exact run before changing strategy
+- patch the just-authored `SKILL.md`, `skill.json`, or `scripts/run.js`
+  directly when the failure points to a skill bug
+- rerun `skills validate` after each substantive patch
+- rerun the same skill with the same truthful input set until the pass either
+  succeeds or you hit a concrete blocker such as missing evidence, ambiguous UI
+  state, or a user decision that cannot be inferred safely
+
+Stay focused on the created skill during this loop.
+
+Do not:
+
+- wander into unrelated skills in the repo
+- treat auxiliary repo skills as the next step unless the user explicitly asked
+  for them
+- leave the authored skill broken while exploring other workflows
+- stop after surfacing a failed `SkillResult` if the failure is fixable from
+  the current artifacts and code
+
 If the authored shape is orchestrated, require the self-test run to preserve
 the per-run debug bundle from the harness. At minimum retain:
 
@@ -449,6 +488,16 @@ the per-run debug bundle from the harness. At minimum retain:
 - `agent-stdout.log`
 - `agent-stderr.log`
 - `run-metadata.json`
+
+If the self-test was orchestrated and failed, use that exact debug bundle to
+drive the next patch. Read it in this order before editing:
+
+1. saved `skills run` stderr log
+2. saved wrapper JSON `skillResult`
+3. `agent-stderr.log`
+4. `agent-stdout.log`
+5. `prompt.txt`
+6. `run-metadata.json`
 
 If the run fails or ends in an unexpected UI state, capture one immediate
 device snapshot for post-mortem inspection and surface its path:
@@ -504,6 +553,13 @@ plainly:
 - orchestrated is better for complex workflows driven by an AI agent against
   live UI state
 
+If the self-test failed first but the current pass repaired the created skill
+successfully, surface that repair loop briefly:
+
+- what broke on the first run
+- which created file or files you patched
+- which rerun finally passed
+
 Do not silently switch shapes mid-pass. Finish the pass truthfully and make the
 next-step recommendation explicit.
 
@@ -517,6 +573,8 @@ Stop and correct the workflow if you find yourself implying any of these:
 - the retained compare baseline is a runtime artifact
 - the harness owns the orchestrated skill logic
 - authoring is done before a self-test run emits an inspectable `SkillResult`
+- the first failed self-test is an acceptable stopping point when the created
+  skill could still be repaired from the current code and artifacts
 
 ## Output Standard
 
