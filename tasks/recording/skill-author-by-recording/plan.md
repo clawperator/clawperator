@@ -27,7 +27,7 @@ demo-grade closeout rather than new deep runtime invention.
 
 | Item | Value |
 | --- | --- |
-| State | active, P3 reality-check in progress |
+| State | active, P3 demo-path validation in progress |
 | Total PRs | 3 |
 | Total phases | 3 |
 | Completed | problem framing, plan tightening, P1, and P2 |
@@ -45,7 +45,7 @@ P2 implementation status:
 
 P3 implementation status:
 
-- reality-checking the Solax demo path against the shipped workflow surfaced
+- validating the Solax demo path against the shipped workflow surfaced
   script drift around pre-supplying the final `skill_id` and using repo-local
   `./recordings/` paths
 - the durable authoring docs now need to carry the minimum failed

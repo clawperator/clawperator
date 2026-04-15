@@ -510,6 +510,8 @@ set before you rewrite the skill:
 3. The emitted `SkillResult.checkpoints`.
 4. Compare output against the retained baseline, if the skill keeps
    `references/compare-baseline.export.json`.
+5. Replay artifacts too, if the same flow has a replay sibling or other
+   retained replay evidence.
 
 That order matters:
 
@@ -519,6 +521,8 @@ That order matters:
 - `SkillResult.checkpoints` show how far the skill really progressed on device
 - compare output tells you whether the run still reached the right terminal
   outcome, diverged mid-route, or failed before the expected checkpoint
+- replay artifacts can help you separate an orchestrated runtime problem from a
+  selector, route, or terminal-proof assumption shared across both shapes
 
 If those do not explain the failure, read these next:
 

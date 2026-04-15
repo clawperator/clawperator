@@ -21,12 +21,12 @@ truthfulness and durable guidance graduation.
 
 | Item | Value |
 | --- | --- |
-| State | active, P3 reality-check in progress |
+| State | active, P3 demo-path validation in progress |
 | Total PRs | 3 |
 | Total phases | 3 |
 | Completed | problem-definition pass, plan-tightening pass, P1, and P2 |
 | Remaining | P3 (demo validation and closeout) |
-| Current / Next | P3 reality-check and doc graduation |
+| Current / Next | P3 demo-path validation and doc graduation |
 | Blockers | none |
 
 ## Starting Point
@@ -382,7 +382,7 @@ workflow framing truthful.
 
 ### Steps
 
-1. Run a reality check against the Solax demo path using the repo-local
+1. Run demo-path validation against the Solax demo path using the repo-local
    workflow as the entrypoint.
 2. Record any discovered mismatches between the demo script and the actual
    workflow behavior.
