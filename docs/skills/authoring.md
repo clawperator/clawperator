@@ -342,7 +342,7 @@ Current v1 rule:
 For `node_text_matches`, the runtime currently requires:
 
 - `skillResult.terminalVerification.status === "verified"`
-- the declared `matcher` is rendered from trusted invocation inputs parsed from the trailing raw `skills run ... -- <args>` arguments, using a deterministic lexicographic sort of `contract.inputs` keys, not from self-reported `skillResult.inputs`
+- the declared `matcher` is rendered from trusted invocation inputs, preferring named flags that match declared input names in kebab-case form such as `unit_name -> --unit-name`, then falling back to trailing positional `skills run ... -- <args>` arguments in deterministic lexicographic order of `contract.inputs`
 - `skillResult.inputs` must agree with those trusted invocation inputs for the declared fields
 - the observed terminal verification text matches the declared matcher after placeholder replacement; decorative trailing glyphs or punctuation in the observed text are allowed, but a different value or different leading text is not
 
