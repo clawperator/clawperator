@@ -11,12 +11,11 @@ Total PRs: 3. Total phases: 3.
 - P3: validate the full story against the Solax demo path and graduate durable
   guidance
 
-Current state: P2 is complete. The repo-local front door now makes the
-replay-versus-orchestrated recommendation explicit, supports direct
-orchestrated authoring without a fake replay detour, and was validated by
-authoring `com.google.android.apps.chromecast.app.get-climate-orchestrated`
-from fresh Google Home recording evidence. The remaining phase is P3 demo
-validation.
+Current state: P2 is complete and the repo-local workflow branch is ready for a
+P2 PR. The front door now makes the replay-versus-orchestrated recommendation
+explicit, supports direct orchestrated authoring without a fake replay detour,
+and requires an active repair loop during self-test verification. The remaining
+phase is P3 demo validation.
 
 ## Status
 
@@ -320,10 +319,16 @@ Human check:
 
 Completed validation:
 
-- 2026-04-15: authored and self-tested
-  `com.google.android.apps.chromecast.app.get-climate-orchestrated` from a
-  fresh Google Home recording session
-  `p2-get-climate-orchestrated-20260415-151731`
+- 2026-04-15: completed a real orchestrated-path authoring walkthrough from
+  fresh Google Home recording evidence to confirm the workflow could take the
+  orchestrated branch truthfully
+- 2026-04-15: tightened the repo-local repair loop so failed self-tests now
+  stay inside the created skill until the skill is repaired or a concrete
+  blocker remains
+- PR readiness: the `clawperator` branch now contains the P2 workflow and
+  task-pack updates needed for the reviewable P2 PR; real runtime skill PRs
+  should come from running the front-door workflow on the intended recording,
+  not from the temporary validation artifact used during implementation
 
 ### Expected Commit
 
