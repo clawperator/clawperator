@@ -23,7 +23,6 @@ Retired completed workstreams:
 - W4 `compare`
 - W4c `compare-closeout`
 - W5 `graduate-demo-findings`
-- `skill-author-by-recording`
 
 Retired temporary task folders:
 
@@ -32,7 +31,7 @@ Retired temporary task folders:
 
 Still active:
 
-- none
+- `skill-author-by-recording`
 
 ## Durable Sources Of Truth
 
@@ -52,13 +51,16 @@ agents should rely on these surfaces instead of the retired task packs.
 
 ## Remaining Sequence
 
-No recording workstreams remain open on the current branch.
+One recording workstream remains open on the current branch:
 
-Next step:
+1. `skill-author-by-recording`
+   P1 is complete. P2 and P3 remain the active follow-on phases.
 
-1. Keep the `skill-author-by-recording` task pack until this final
-   recording-program PR ships, then retire it because the durable guidance now
-   lives in docs, code, and the repo-local skill.
+Retirement step:
+
+1. Keep the `skill-author-by-recording` task pack until the remaining phases
+   ship, then retire it because the durable guidance now lives in docs, code,
+   and the repo-local skill.
 
 ## Retirement Rule
 

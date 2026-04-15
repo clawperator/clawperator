@@ -279,6 +279,9 @@ Copy or write the sanitized retained export baseline to:
 skills/<skill_id>/references/compare-baseline.export.json
 ```
 
+If the skill folder does not exist yet, scaffold first or create the
+`skills/<skill_id>/references/` directory before you write this file.
+
 Rules:
 
 - keep this file as authoring and compare evidence

@@ -27,9 +27,11 @@ That workflow is represented by the repo-local skill:
 
 - `.agents/skills/skill-author-by-recording/`
 
+That repo-local skill now exists as the P1 implementation baseline.
+
 This file exists to pin down the actual product problem now that the supporting
-implementation has moved forward and some of the original task-pack framing has
-started to drift.
+implementation has moved forward, P1 has landed, and some of the original
+task-pack framing has started to drift.
 
 ## Refined North Star
 
