@@ -217,14 +217,15 @@ Run the full recording lifecycle in order and surface the resulting paths:
 clawperator recording stop --session-id <session_id> --device <device_serial> --operator-package <operator_package> --json
 mkdir -p ~/.clawperator/recordings/<session_id>
 clawperator recording pull --session-id <session_id> --device <device_serial> --operator-package <operator_package> --out ~/.clawperator/recordings/<session_id> --json
-clawperator recording export --input ~/.clawperator/recordings/<session_id> --snapshots omit --json
+clawperator recording export --input ~/.clawperator/recordings/<session_id> --out ~/.clawperator/recordings/<session_id>/<session_id>.export.json --snapshots omit --json
 ```
 
 Retain the pulled NDJSON as the raw capture.
 
 Treat the export JSON as the canonical structured authoring artifact. Optional
 `record parse` output is for human inspection only and does not replace the
-export.
+export. Reuse the explicit export path above as `<export_json>` in the
+subsequent scaffold and authoring steps.
 
 Do not rely on the CLI default `./recordings/` output location for this
 workflow. Use the explicit user-scoped path above so authoring artifacts do not

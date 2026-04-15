@@ -411,15 +411,17 @@ function resolvePositionalFallbackArgs(
     }
     if (arg.startsWith("--")) {
       if (arg.includes("=")) {
-        // self-contained --flag=value: skip unconditionally; declared forms were already
-        // consumed by resolveNamedContractInputRawValue and unknown forms must not leak
-        // into the positional fallback
+        positionalArgs.push(arg);
         continue;
       }
       const next = args[index + 1];
       if (typeof next === "string" && !next.startsWith("--")) {
+        // Treat bare --flag value pairs as option-shaped input, not positional fallback,
+        // so unknown named flags cannot leak their value into declared contract inputs.
         index += 1;
+        continue;
       }
+      positionalArgs.push(arg);
       continue;
     }
     positionalArgs.push(arg);

@@ -4237,6 +4237,98 @@ console.log(JSON.stringify({
     }
   });
 
+  it("preserves standalone flag-shaped positional literals for declared string inputs", async () => {
+    const skillId = "com.test.positional-flag-shaped-literal";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "echo" },
+  inputs: {
+    phrase: "--help",
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: "Phrase --help" },
+    observed: { kind: "text", text: "Phrase --help" },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          phrase: "string",
+        },
+        goal: {
+          kind: "echo",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Phrase {phrase}",
+        },
+      },
+    });
+
+    try {
+      const result = await runSkill(skillId, ["--help"], temp.registryPath);
+      assert.ok(result.ok);
+      assert.strictEqual(result.status, "success");
+      assert.deepStrictEqual(result.skillResult?.inputs, { phrase: "--help" });
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("preserves equals-style positional literals for declared string inputs", async () => {
+    const skillId = "com.test.positional-equals-shaped-literal";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "echo" },
+  inputs: {
+    phrase: "--foo=bar",
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: "Phrase --foo=bar" },
+    observed: { kind: "text", text: "Phrase --foo=bar" },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          phrase: "string",
+        },
+        goal: {
+          kind: "echo",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Phrase {phrase}",
+        },
+      },
+    });
+
+    try {
+      const result = await runSkill(skillId, ["--foo=bar"], temp.registryPath);
+      assert.ok(result.ok);
+      assert.strictEqual(result.status, "success");
+      assert.deepStrictEqual(result.skillResult?.inputs, { phrase: "--foo=bar" });
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
   it("uses the last duplicate named flag value when trusting declared contract inputs", async () => {
     const skillId = "com.test.duplicate-named-contract-inputs";
     const temp = await createTempRegistryWithInlineScript({
