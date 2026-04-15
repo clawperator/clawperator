@@ -1,6 +1,6 @@
 ---
 name: skill-author-by-recording
-description: Create or update a Clawperator skill from a fresh phone recording. Use when a developer wants one front-door workflow that records a real device flow, requires a plain-language goal up front, derives the skill id from the recording and goal, defaults to replay on the first pass unless orchestrated is explicitly requested, and runs one self-test that surfaces the emitted SkillResult.
+description: Create or update a Clawperator skill from a fresh phone recording. Use when a developer wants one front-door workflow that records a real device flow, requires a plain-language goal up front, derives the skill id from the recording and goal, defaults to replay on the first pass unless orchestrated is explicitly requested or clearly more truthful, and runs one self-test that surfaces the emitted SkillResult.
 ---
 
 # Skill Author By Recording
@@ -58,6 +58,10 @@ Reuse those contracts. Do not invent a parallel recording, skill, or
 - Derive the initial `skill_id` after export analysis from the observed app and
   the user's plain-language goal. Do not require the user to invent a package
   name or reverse-domain id up front.
+- Make the replay-versus-orchestrated recommendation explicit before you author
+  code. If the recording evidence already shows replay would be untruthful or
+  insufficient, say so plainly and author orchestrated in the same front-door
+  workflow instead of forcing a fake replay-first detour.
 - If replay proves untruthful, too brittle, or fails its first self-test,
   explain why and strongly recommend orchestrated as the next pass with clear
   pros and cons.
@@ -116,7 +120,8 @@ Use this first-match-wins table exactly:
 | --- | --- |
 | User explicitly requests `-replay` | Author replay first and do not up-sell orchestrated in the same pass unless replay proves untruthful or fails self-test |
 | User explicitly requests `-orchestrated` | Author orchestrated and do not force a replay-first detour |
-| No explicit shape | Author replay first |
+| No explicit shape and the recording evidence already shows replay would be untruthful or insufficient | Explain why and author orchestrated now |
+| No explicit shape and the flow still looks replay-safe | Author replay first |
 | Replay authoring or self-test shows replay is not truthful or sufficient | Explain why, show replay versus orchestrated tradeoffs, and strongly recommend orchestrated as the next pass |
 | User explicitly wants both variants | Treat sibling authoring as intentional extra scope, not the default |
 
@@ -135,6 +140,17 @@ outcome rather than a fixed tap sequence.
 Do not describe replay as a lower-grade artifact. Replay and orchestrated are
 both first-class maintained skill shapes.
 
+When deciding whether orchestrated is already the truthful first pass, look for
+signs like these in the recording export plus the user's stated goal:
+
+- the next action depends on reading current UI state before acting
+- the flow needs recovery from a mid-route or resumed app state
+- the terminal proof depends on a persisted value that cannot be trusted from
+  one fixed tap sequence alone
+- the recording only captures one branch of a state-driven route
+- a personalized first pass is still valid, but it needs an agentic runtime
+  program rather than a deterministic macro
+
 ## Workflow
 
 ### 1. Confirm Scope And Show The Plan
@@ -149,7 +165,10 @@ Tell the user what you are about to do:
 - export the recording artifact
 - derive the skill id from the observed app and the user's goal
 - retain a sanitized compare baseline
-- author replay first by default unless orchestrated was explicitly requested
+- make an explicit replay-versus-orchestrated recommendation from the recording
+  evidence and the user's goal
+- author replay first only when it still looks truthful; otherwise author
+  orchestrated directly
 - run one self-test and inspect the `SkillResult`
 
 Keep the Solax proving case separate from the generic workflow. If the user is
@@ -298,8 +317,16 @@ Make the current pass explicit.
 If the user explicitly requested orchestrated, say so and explain why that
 shape fits.
 
-Otherwise, say that replay is the default first pass for simple flows and that
-you will test it before escalating to orchestrated.
+Otherwise, make a truthful recommendation from the export evidence before you
+author code:
+
+- if the flow still looks replay-safe, say that replay is the default first
+  pass for this recording and that you will test it before escalating
+- if the flow already looks orchestration-shaped, say why replay would be
+  untruthful or insufficient and move directly to orchestrated in this pass
+
+Do not hide that decision. The user should be able to tell whether the front
+door stayed replay-first or took the orchestrated branch and why.
 
 Also make the personalization boundary explicit:
 
@@ -361,15 +388,23 @@ For replay:
 
 For orchestrated:
 
+- reuse the durable orchestrated runtime contract from
+  `docs/skills/overview.md#orchestrated-runtime-contract`
 - keep `skill.json.agent` as trusted runtime metadata
 - write the app-specific runtime program in `SKILL.md`
+- make `SKILL.md` own the route, checkpoints, verification policy, and emitted
+  `SkillResult` shape
 - keep `scripts/run.js` as a thin launcher that forwards stdout and stderr
+- keep `skill.json.contract.inputs`, `SKILL.md` examples, forwarded wrapper
+  args, and emitted `SkillResult.inputs` aligned around stable named inputs
 - keep per-run local debug artifacts when the harness runs:
   - `prompt.txt`
   - `agent-stdout.log`
   - `agent-stderr.log`
   - `run-metadata.json` with device id, operator package, forwarded args, and
     output paths
+- save the outer `clawperator skills run --json` wrapper and stderr capture
+  alongside that harness bundle under `~/.clawperator/recordings/<session_id>/`
 - do not bury app-specific navigation or verification policy in the harness
 
 In both cases, make the terminal verification policy explicit and ensure the
@@ -390,6 +425,7 @@ If the chosen shape is replay, make clear which file contains the replay logic.
 If the chosen shape is orchestrated, make clear that:
 
 - `SKILL.md` is the runtime agent program
+- `skill.json.agent` is the trusted runtime metadata
 - `scripts/run.js` is only the thin harness
 
 ### 13. Run One Self-Test
