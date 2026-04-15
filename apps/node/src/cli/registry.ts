@@ -2271,7 +2271,7 @@ Usage:
   },
 };
 
-// recording
+// authoring-skills
 COMMANDS["authoring-skills"] = {
   name: "authoring-skills",
   group: "Execution",
