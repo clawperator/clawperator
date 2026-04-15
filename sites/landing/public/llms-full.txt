@@ -9007,6 +9007,26 @@ Common ones:
 
 Document the current authoring contract for local skills: scaffolded files, `SKILL.md`, run scripts, artifact compilation, and validation.
 
+## Preferred Creation Path
+
+The preferred current way to create a new recording-derived skill is the
+repo-local workflow at
+`.agents/skills/skill-author-by-recording/SKILL.md`.
+
+That workflow is the current canonical front door for creating skills from a
+fresh recording because it:
+
+- gathers the plain-language goal first
+- resets the target app before recording
+- keeps recording artifacts under `~/.clawperator/recordings/<session_id>/`
+- recommends replay versus orchestrated truthfully from the evidence
+- retains the compare baseline in the expected place
+- runs one self-test and surfaces the resulting `SkillResult`
+
+Use raw `clawperator skills new <skill_id>` scaffolding directly when you are
+doing manual skill construction or editing an existing skill shape, not when
+you want the preferred end-to-end recording-to-skill workflow.
+
 ## Sources
 
 - Scaffold implementation: `apps/node/src/domain/skills/scaffoldSkill.ts`
@@ -9157,6 +9177,19 @@ Authoring mode terminology:
   what came from nearby references
 - if you used nearby exemplars, say so in the authoring notes or `SKILL.md`
   rather than presenting the result as recording-only synthesis
+
+Recommended exemplar inspection:
+
+- when you want a concrete structure reference, inspect maintained skills in
+  the sibling skills repo at `../clawperator-skills/skills/`
+- the current best exemplar family to inspect is the Google Home package
+  `com.google.android.apps.chromecast.app`, because it contains both replay and
+  orchestrated authoring lessons from recent real recording-driven work
+- especially useful current examples are
+- `../clawperator-skills/skills/com.google.android.apps.chromecast.app.get-climate-replay/`
+- `../clawperator-skills/skills/com.google.android.apps.chromecast.app.set-power-replay/`
+- `../clawperator-skills/skills/com.google.android.apps.chromecast.app.set-temperature-replay/`
+- `../clawperator-skills/skills/com.google.android.apps.chromecast.app.control-hvac-orchestrated/`
 
 Recording-count guidance:
 
