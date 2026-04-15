@@ -176,10 +176,12 @@ replay-first path when the captured flow is deterministic.
 
 ## Current Implementation State
 
-The `.agents/skills/skill-author-by-recording/` directory does not yet exist.
+The `.agents/skills/skill-author-by-recording/` directory already exists from
+P1.
 
-The product problem is defined. The constraints are settled. The next step is
-to create the skill from scratch in P1.
+The product problem is defined, the constraints are settled, and the P1
+baseline is complete. The next work is to carry this forward through P2 and P3
+rather than recreate the skill from scratch.
 
 ## Decision To Carry Into Planning
 
