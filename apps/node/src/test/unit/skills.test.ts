@@ -220,6 +220,52 @@ async function createTempRegistryWithSkill(options: {
   };
 }
 
+async function createTempRegistryWithInlineScript(options: {
+  skillId: string;
+  scriptContents: string;
+  contract: {
+    inputs: Record<string, string>;
+    goal: { kind: string };
+    verification: { kind: "node_text_matches"; matcher: string } | null;
+  };
+}): Promise<{ registryPath: string; cleanup: () => Promise<void> }> {
+  const root = await mkdtemp(join(tmpdir(), "clawperator-inline-skill-"));
+  const skillDir = join(root, "skills", options.skillId);
+  const scriptsDir = join(skillDir, "scripts");
+  await mkdir(scriptsDir, { recursive: true });
+
+  const entry = {
+    id: options.skillId,
+    applicationId: "com.test",
+    intent: "temp",
+    summary: "Temporary test skill",
+    path: `skills/${options.skillId}`,
+    skillFile: `skills/${options.skillId}/SKILL.md`,
+    scripts: [`skills/${options.skillId}/scripts/run.js`],
+    artifacts: [],
+    contract: options.contract,
+  };
+
+  await writeFile(join(skillDir, "SKILL.md"), `# ${options.skillId}\n`, "utf8");
+  await writeFile(join(scriptsDir, "run.js"), options.scriptContents, "utf8");
+  await chmod(join(scriptsDir, "run.js"), 0o755);
+  await writeFile(join(skillDir, "skill.json"), `${JSON.stringify(entry, null, 2)}\n`, "utf8");
+
+  const registryPath = join(root, "skills", "skills-registry.json");
+  await writeFile(
+    registryPath,
+    `${JSON.stringify({ schemaVersion: "1.0", generatedAt: "2026-04-15T00:00:00Z", skills: [entry] }, null, 2)}\n`,
+    "utf8"
+  );
+
+  return {
+    registryPath,
+    cleanup: async () => {
+      await rm(root, { recursive: true, force: true });
+    },
+  };
+}
+
 function getLogPathForDir(logDir: string): string {
   const now = new Date();
   const yyyy = String(now.getFullYear());
@@ -3801,6 +3847,620 @@ console.log(JSON.stringify({
       assert.deepStrictEqual(result.skillResult?.inputs, { alpha: "first", beta: "second" });
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("trusts declared contract inputs passed entirely through named flags", async () => {
+    const skillId = "com.test.named-contract-inputs";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+const args = process.argv.slice(2);
+let temperature = "";
+let unitName = "";
+for (let index = 0; index < args.length; index += 1) {
+  const arg = args[index] ?? "";
+  if (arg === "--temperature") {
+    temperature = args[index + 1] ?? "";
+    index += 1;
+    continue;
+  }
+  if (arg.startsWith("--temperature=")) {
+    temperature = arg.slice("--temperature=".length);
+    continue;
+  }
+  if (arg === "--unit-name") {
+    unitName = args[index + 1] ?? "";
+    index += 1;
+    continue;
+  }
+  if (arg.startsWith("--unit-name=")) {
+    unitName = arg.slice("--unit-name=".length);
+  }
+}
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: {
+    temperature: Number.parseInt(temperature, 10),
+    unit_name: unitName,
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+    observed: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          temperature: "integer",
+          unit_name: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Unit {unit_name} Temp {temperature}",
+        },
+      },
+    });
+
+    try {
+      const result = await runSkill(skillId, ["--temperature", "23", "--unit-name", "Panasonic"], temp.registryPath);
+      assert.ok(result.ok, `Expected named declared inputs to verify successfully: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.deepStrictEqual(result.skillResult?.inputs, { temperature: 23, unit_name: "Panasonic" });
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("mixes named and positional declared contract inputs without treating named values as fallback positional args", async () => {
+    const skillId = "com.test.mixed-contract-inputs";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+const args = process.argv.slice(2);
+let temperature = "";
+let unitName = "";
+for (let index = 0; index < args.length; index += 1) {
+  const arg = args[index] ?? "";
+  if (arg === "--unit-name") {
+    unitName = args[index + 1] ?? "";
+    index += 1;
+    continue;
+  }
+  if (arg.startsWith("--unit-name=")) {
+    unitName = arg.slice("--unit-name=".length);
+    continue;
+  }
+  if (!arg.startsWith("--") && !temperature) {
+    temperature = arg;
+  }
+}
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: {
+    temperature: Number.parseInt(temperature, 10),
+    unit_name: unitName,
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+    observed: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          temperature: "integer",
+          unit_name: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Unit {unit_name} Temp {temperature}",
+        },
+      },
+    });
+
+    try {
+      const result = await runSkill(skillId, ["23", "--unit-name", "Panasonic"], temp.registryPath);
+      assert.ok(result.ok, `Expected mixed named and positional declared inputs to verify successfully: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.deepStrictEqual(result.skillResult?.inputs, { temperature: 23, unit_name: "Panasonic" });
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("supports equals-style named flags for declared contract inputs", async () => {
+    const skillId = "com.test.equals-style-contract-inputs";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+const args = process.argv.slice(2);
+let temperature = "";
+let unitName = "";
+for (const arg of args) {
+  if (arg.startsWith("--temperature=")) {
+    temperature = arg.slice("--temperature=".length);
+    continue;
+  }
+  if (arg.startsWith("--unit-name=")) {
+    unitName = arg.slice("--unit-name=".length);
+  }
+}
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: {
+    temperature: Number.parseInt(temperature, 10),
+    unit_name: unitName,
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+    observed: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          temperature: "integer",
+          unit_name: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Unit {unit_name} Temp {temperature}",
+        },
+      },
+    });
+
+    try {
+      const result = await runSkill(skillId, ["--temperature=23", "--unit-name=Panasonic"], temp.registryPath);
+      assert.ok(result.ok, `Expected equals-style named declared inputs to verify successfully: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.deepStrictEqual(result.skillResult?.inputs, { temperature: 23, unit_name: "Panasonic" });
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("fails closed when a declared named input is missing instead of stealing another flag's value as positional fallback", async () => {
+    const skillId = "com.test.missing-named-contract-input";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: {
+    temperature: 23,
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: "Unit missing Temp 23" },
+    observed: { kind: "text", text: "Unit missing Temp 23" },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          temperature: "integer",
+          unit_name: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Unit {unit_name} Temp {temperature}",
+        },
+      },
+    });
+
+    try {
+      const result = await runSkill(skillId, ["--temperature", "23"], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.status, "indeterminate");
+      assert.match(result.message, /only 1 named input and 0 positional args were available/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("fails closed when a declared named flag is followed by another flag token instead of a real value", async () => {
+    const skillId = "com.test.named-flag-followed-by-flag-token";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: {
+    temperature: 23,
+    unit_name: "--temperature",
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: "Unit --temperature Temp 23" },
+    observed: { kind: "text", text: "Unit --temperature Temp 23" },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          temperature: "integer",
+          unit_name: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Unit {unit_name} Temp {temperature}",
+        },
+      },
+    });
+
+    try {
+      const result = await runSkill(skillId, ["--unit-name", "--temperature", "23"], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.status, "indeterminate");
+      assert.match(result.message, /only 1 named input and 0 positional args were available/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("fails closed when an unknown flag value would otherwise leak into positional fallback", async () => {
+    const skillId = "com.test.unknown-flag-positional-leak";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: {
+    temperature: 23,
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: "Unit kitchen Temp 23" },
+    observed: { kind: "text", text: "Unit kitchen Temp 23" },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          temperature: "integer",
+          unit_name: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Unit {unit_name} Temp {temperature}",
+        },
+      },
+    });
+
+    try {
+      const result = await runSkill(skillId, ["--temperature", "23", "--foo", "kitchen"], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.status, "indeterminate");
+      assert.match(result.message, /only 1 named input and 0 positional args were available/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("keeps legitimate positional fallback args after unknown equals-style flags", async () => {
+    const skillId = "com.test.unknown-equals-flag-preserves-positional";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: {
+    temperature: 23,
+    unit_name: "kitchen",
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: "Unit kitchen Temp 23" },
+    observed: { kind: "text", text: "Unit kitchen Temp 23" },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          temperature: "integer",
+          unit_name: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Unit {unit_name} Temp {temperature}",
+        },
+      },
+    });
+
+    try {
+      const result = await runSkill(skillId, ["--temperature", "23", "--foo=bar", "kitchen"], temp.registryPath);
+      assert.ok(result.ok, `Expected unknown equals-style flags to preserve positional fallback args: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.deepStrictEqual(result.skillResult?.inputs, { temperature: 23, unit_name: "kitchen" });
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("uses the last duplicate named flag value when trusting declared contract inputs", async () => {
+    const skillId = "com.test.duplicate-named-contract-inputs";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+const args = process.argv.slice(2);
+let temperature = "";
+let unitName = "";
+for (let index = 0; index < args.length; index += 1) {
+  const arg = args[index] ?? "";
+  if (arg === "--temperature") {
+    temperature = args[index + 1] ?? "";
+    index += 1;
+    continue;
+  }
+  if (arg.startsWith("--temperature=")) {
+    temperature = arg.slice("--temperature=".length);
+    continue;
+  }
+  if (arg === "--unit-name") {
+    unitName = args[index + 1] ?? "";
+    index += 1;
+    continue;
+  }
+  if (arg.startsWith("--unit-name=")) {
+    unitName = arg.slice("--unit-name=".length);
+  }
+}
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: {
+    temperature: Number.parseInt(temperature, 10),
+    unit_name: unitName,
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+    observed: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          temperature: "integer",
+          unit_name: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Unit {unit_name} Temp {temperature}",
+        },
+      },
+    });
+
+    try {
+      const result = await runSkill(
+        skillId,
+        ["--temperature", "22", "--unit-name", "Bedroom", "--temperature", "23", "--unit-name", "Panasonic"],
+        temp.registryPath
+      );
+      assert.ok(result.ok, `Expected duplicate named declared inputs to verify successfully: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.deepStrictEqual(result.skillResult?.inputs, { temperature: 23, unit_name: "Panasonic" });
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("resolves a consecutive duplicate named flag when the first occurrence lacks a value", async () => {
+    const skillId = "com.test.consecutive-duplicate-no-value-first";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+const args = process.argv.slice(2);
+let temperature = "";
+let unitName = "";
+for (let index = 0; index < args.length; index += 1) {
+  const arg = args[index] ?? "";
+  if (arg === "--temperature") {
+    const next = args[index + 1];
+    if (typeof next === "string" && !next.startsWith("--")) {
+      temperature = next;
+      index += 1;
+    }
+    continue;
+  }
+  if (arg === "--unit-name") {
+    const next = args[index + 1];
+    if (typeof next === "string" && !next.startsWith("--")) {
+      unitName = next;
+      index += 1;
+    }
+    continue;
+  }
+}
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: {
+    temperature: Number.parseInt(temperature, 10),
+    unit_name: unitName,
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+    observed: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          temperature: "integer",
+          unit_name: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Unit {unit_name} Temp {temperature}",
+        },
+      },
+    });
+
+    try {
+      // --unit-name appears twice; the first occurrence is immediately followed by another flag
+      // (no value consumed), so the second occurrence must be the one that resolves the input.
+      const result = await runSkill(
+        skillId,
+        ["--unit-name", "--unit-name", "Panasonic", "--temperature", "23"],
+        temp.registryPath
+      );
+      assert.ok(result.ok, `Expected consecutive duplicate named flag to resolve via second occurrence: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.deepStrictEqual(result.skillResult?.inputs, { temperature: 23, unit_name: "Panasonic" });
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("keeps the previously resolved value when the last duplicate named flag occurrence lacks a value", async () => {
+    const skillId = "com.test.duplicate-last-occurrence-no-value";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+const args = process.argv.slice(2);
+let temperature = "";
+let unitName = "";
+for (let index = 0; index < args.length; index += 1) {
+  const arg = args[index] ?? "";
+  if (arg === "--temperature") {
+    const next = args[index + 1];
+    if (typeof next === "string" && !next.startsWith("--")) {
+      temperature = next;
+      index += 1;
+    }
+    continue;
+  }
+  if (arg === "--unit-name") {
+    const next = args[index + 1];
+    if (typeof next === "string" && !next.startsWith("--")) {
+      unitName = next;
+      index += 1;
+    }
+    continue;
+  }
+}
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: {
+    temperature: Number.parseInt(temperature, 10),
+    unit_name: unitName,
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+    observed: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          temperature: "integer",
+          unit_name: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Unit {unit_name} Temp {temperature}",
+        },
+      },
+    });
+
+    try {
+      // The trailing --temperature has no following value; the resolver treats it as a no-op
+      // and keeps the previously resolved value of 22.
+      const result = await runSkill(
+        skillId,
+        ["--temperature", "22", "--unit-name", "Panasonic", "--temperature"],
+        temp.registryPath
+      );
+      assert.ok(result.ok, `Expected valueless trailing duplicate flag to be a no-op: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.deepStrictEqual(result.skillResult?.inputs, { temperature: 22, unit_name: "Panasonic" });
+    } finally {
+      await temp.cleanup();
     }
   });
 

@@ -369,6 +369,65 @@ function getOrderedDeclaredContractInputs(contract: SkillContract): Array<[strin
   });
 }
 
+function toCliFlagName(inputName: string): string {
+  return inputName.replace(/_/g, "-");
+}
+
+function resolveNamedContractInputRawValue(args: string[], inputName: string): string | null {
+  const flagName = `--${toCliFlagName(inputName)}`;
+  let resolvedValue: string | null = null;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index] ?? "";
+    if (arg === flagName) {
+      const next = args[index + 1];
+      if (typeof next === "string" && !next.startsWith("--")) {
+        resolvedValue = next;
+        index += 1;
+      }
+      continue;
+    }
+    if (arg.startsWith(`${flagName}=`)) {
+      resolvedValue = arg.slice(flagName.length + 1);
+    }
+  }
+  return resolvedValue;
+}
+
+function resolvePositionalFallbackArgs(
+  args: string[],
+  declaredInputNames: string[]
+): string[] {
+  const declaredFlags = new Set(declaredInputNames.map(inputName => `--${toCliFlagName(inputName)}`));
+  const positionalArgs: string[] = [];
+
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index] ?? "";
+    if (declaredFlags.has(arg)) {
+      const next = args[index + 1];
+      if (typeof next === "string" && !next.startsWith("--")) {
+        index += 1;
+      }
+      continue;
+    }
+    if (arg.startsWith("--")) {
+      if (arg.includes("=")) {
+        // self-contained --flag=value: skip unconditionally; declared forms were already
+        // consumed by resolveNamedContractInputRawValue and unknown forms must not leak
+        // into the positional fallback
+        continue;
+      }
+      const next = args[index + 1];
+      if (typeof next === "string" && !next.startsWith("--")) {
+        index += 1;
+      }
+      continue;
+    }
+    positionalArgs.push(arg);
+  }
+
+  return positionalArgs;
+}
+
 function resolveTrustedContractInputs(
   contract: SkillContract,
   args: string[]
@@ -378,17 +437,36 @@ function resolveTrustedContractInputs(
     return { ok: true, inputs: {} };
   }
 
-  if (args.length < declaredInputs.length) {
+  const resolvedRawInputs = new Map<string, string>();
+  const unresolvedDeclaredInputs: Array<[string, string]> = [];
+
+  for (const [inputName, schema] of declaredInputs) {
+    const namedRawValue = resolveNamedContractInputRawValue(args, inputName);
+    if (namedRawValue === null) {
+      unresolvedDeclaredInputs.push([inputName, schema]);
+      continue;
+    }
+    resolvedRawInputs.set(inputName, namedRawValue);
+  }
+
+  const positionalArgs = resolvePositionalFallbackArgs(args, declaredInputs.map(([inputName]) => inputName));
+  if (positionalArgs.length < unresolvedDeclaredInputs.length) {
+    const namedCount = resolvedRawInputs.size;
+    const positionalCount = positionalArgs.length;
     return {
       ok: false,
-      message: `Skill declared ${declaredInputs.length} contract inputs but was invoked with only ${args.length} raw args.`,
+      message: `Skill declared ${declaredInputs.length} contract inputs but only ${namedCount} named ${namedCount === 1 ? "input" : "inputs"} and ${positionalCount} positional ${positionalCount === 1 ? "arg" : "args"} were available.`,
     };
   }
 
-  const trustedRawInputs = args.slice(-declaredInputs.length);
+  const positionalRawInputs = positionalArgs.slice(-unresolvedDeclaredInputs.length);
   const trustedInputs = Object.create(null) as Record<string, unknown>;
-  for (const [index, [inputName, schema]] of declaredInputs.entries()) {
-    const parseResult = parseDeclaredContractInputValue(schema, trustedRawInputs[index] ?? "");
+  let positionalIndex = 0;
+  for (const [inputName, schema] of declaredInputs) {
+    const rawValue = resolvedRawInputs.has(inputName)
+      ? resolvedRawInputs.get(inputName) ?? ""
+      : positionalRawInputs[positionalIndex++] ?? "";
+    const parseResult = parseDeclaredContractInputValue(schema, rawValue);
     if (!parseResult.ok) {
       return {
         ok: false,
