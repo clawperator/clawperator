@@ -4094,6 +4094,128 @@ console.log(JSON.stringify({
     }
   });
 
+  it("fails closed when an unknown flag value would otherwise leak into positional fallback", async () => {
+    const skillId = "com.test.unknown-flag-positional-leak";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: {
+    temperature: 23,
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: "Unit kitchen Temp 23" },
+    observed: { kind: "text", text: "Unit kitchen Temp 23" },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          temperature: "integer",
+          unit_name: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Unit {unit_name} Temp {temperature}",
+        },
+      },
+    });
+
+    try {
+      const result = await runSkill(skillId, ["--temperature", "23", "--foo", "kitchen"], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.status, "indeterminate");
+      assert.match(result.message, /only 1 named inputs and 0 positional args were available/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("uses the last duplicate named flag value when trusting declared contract inputs", async () => {
+    const skillId = "com.test.duplicate-named-contract-inputs";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+const args = process.argv.slice(2);
+let temperature = "";
+let unitName = "";
+for (let index = 0; index < args.length; index += 1) {
+  const arg = args[index] ?? "";
+  if (arg === "--temperature") {
+    temperature = args[index + 1] ?? "";
+    index += 1;
+    continue;
+  }
+  if (arg.startsWith("--temperature=")) {
+    temperature = arg.slice("--temperature=".length);
+    continue;
+  }
+  if (arg === "--unit-name") {
+    unitName = args[index + 1] ?? "";
+    index += 1;
+    continue;
+  }
+  if (arg.startsWith("--unit-name=")) {
+    unitName = arg.slice("--unit-name=".length);
+  }
+}
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: {
+    temperature: Number.parseInt(temperature, 10),
+    unit_name: unitName,
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+    observed: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          temperature: "integer",
+          unit_name: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Unit {unit_name} Temp {temperature}",
+        },
+      },
+    });
+
+    try {
+      const result = await runSkill(
+        skillId,
+        ["--temperature", "22", "--unit-name", "Bedroom", "--temperature", "23", "--unit-name", "Panasonic"],
+        temp.registryPath
+      );
+      assert.ok(result.ok, `Expected duplicate named declared inputs to verify successfully: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.deepStrictEqual(result.skillResult?.inputs, { temperature: 23, unit_name: "Panasonic" });
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
   it("rejects unsupported SkillResult contract major versions", async () => {
     const result = await runSkill(TEST_SKILL_RESULT, ["unsupported-major"]);
 

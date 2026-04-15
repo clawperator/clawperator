@@ -375,20 +375,23 @@ function toCliFlagName(inputName: string): string {
 
 function resolveNamedContractInputRawValue(args: string[], inputName: string): string | null {
   const flagName = `--${toCliFlagName(inputName)}`;
+  let resolvedValue: string | null = null;
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index] ?? "";
     if (arg === flagName) {
       const next = args[index + 1];
       if (typeof next === "string") {
-        return next;
+        resolvedValue = next;
+      } else {
+        resolvedValue = "";
       }
-      return "";
+      continue;
     }
     if (arg.startsWith(`${flagName}=`)) {
-      return arg.slice(flagName.length + 1);
+      resolvedValue = arg.slice(flagName.length + 1);
     }
   }
-  return null;
+  return resolvedValue;
 }
 
 function resolvePositionalFallbackArgs(
@@ -408,6 +411,10 @@ function resolvePositionalFallbackArgs(
       continue;
     }
     if (arg.startsWith("--")) {
+      const next = args[index + 1] ?? "";
+      if (next && !next.startsWith("--")) {
+        index += 1;
+      }
       continue;
     }
     positionalArgs.push(arg);
