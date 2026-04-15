@@ -9,20 +9,21 @@ portability fix, npm package scaffolding, Node CLI implementation, and unit
 tests. PR-2 (Phases 3-5) delivers install.sh wiring, doctor staleness check,
 and docs updates. PR-2 has a hard merge gate on PR-1 being merged AND the
 updated npm package published, because install.sh calls `clawperator
-authoring-skills install` which must exist in the installed CLI. Currently in
-planning; Phase 1 is next.
+authoring-skills install` which must exist in the installed CLI. Phases 1 and 2
+are complete on `skills/author-skills-install-pr1`. Phase 3 is next once PR-1
+is merged and the updated npm package is published.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | PR-1 complete locally; PR-2 blocked pending merge + npm publish |
 | Total PRs | 2 |
 | Total phases | 5 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4, 5 |
-| Current / Next | Phase 1 |
-| Blockers | none |
+| Completed | 1, 2 |
+| Remaining | 3, 4, 5 |
+| Current / Next | Phase 3 |
+| Blockers | PR-1 merge and updated npm package publish |
 
 ## Hard Rules
 
@@ -64,7 +65,8 @@ Read these files IN THIS ORDER before writing anything.
 | 10 | `apps/node/package.json` | Current `files` array - confirm before adding `"authoring-skills/"` |
 | 11 | `sites/landing/public/install.sh` | Function structure and where to add `setup_authoring_skills_via_cli()` |
 | 12 | `sites/docs/mkdocs.yml` | Verify published URL paths for `docs/api/recording.md`, `docs/skills/authoring.md`, `docs/skills/overview.md`, `docs/internal/design/skill-design.md` before writing URLs into SKILL.md |
-| 13 | `.agents/skills/docs-author/SKILL.md` | Use for Phase 5 docs work |
+| 13 | `apps/node/src/domain/skills/copyAuthoringSkills.ts` | Read before Phase 4: `readAgentSymlinkTarget` returns an absolute resolved path (not the raw `readlink` value); the doctor check must not call `readlink` directly expecting a relative result |
+| 14 | `.agents/skills/docs-author/SKILL.md` | Use for Phase 5 docs work |
 
 ## PR / Phase Plan
 
@@ -397,6 +399,11 @@ Human review:
   and does not duplicate any copy or symlink logic
 - Failure of this step does not abort the overall install
 - AGENTS.md template section names the skill and its location
+- When `clawperator authoring-skills install` exits with an error (e.g.
+  `AUTHORING_SKILLS_INSTALL_FAILED` from a symlink conflict), the function prints
+  the full error output so the user sees what happened and what to do next. The
+  canonical store may have been partially written before the error; the printed
+  output must make clear that re-running after resolving the conflict is safe.
 
 ### Validation
 
@@ -456,6 +463,9 @@ stale relative to the current CLI version and surfaces the fix command.
    Use `getCliVersion()` from `../../domain/version/compatibility.js` (already
    imported in the existing checks - verify exact import path).
    Include the installed and CLI version in `evidence`.
+   If the check needs to inspect agent symlinks, use `readAgentSymlinkTarget` from
+   `copyAuthoringSkills.ts`. It returns an absolute resolved path, not a raw
+   `readlink` value. Do not call `readlink` directly expecting a relative result.
 
 3. Register the new check in `DoctorService.ts`. Add it to the host checks block,
    after the existing `checkInstalledOrchestratedSkillAgentCliAvailability` call.

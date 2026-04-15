@@ -7,19 +7,21 @@ Clawperator authoring skills. Two PRs, five phases. PR-1 delivers the Node
 foundation: SKILL.md portability fix plus npm package scaffolding (Phase 1) and
 the Node CLI implementation with unit tests (Phase 2). PR-2 delivers the product
 wiring: install.sh integration (Phase 3), doctor staleness check (Phase 4), and
-public docs updates (Phase 5). PR-2 has a hard merge gate on PR-1.
+public docs updates (Phase 5). PR-1 is complete on
+`skills/author-skills-install-pr1`. PR-2 remains blocked until PR-1 is merged
+and the updated npm package is published.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | PR-1 complete locally; PR-2 blocked pending merge + npm publish |
 | Total PRs | 2 |
 | Total phases | 5 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4, 5 |
-| Current / Next | Phase 1 |
-| Blockers | none |
+| Completed | 1, 2 |
+| Remaining | 3, 4, 5 |
+| Current / Next | Phase 3 |
+| Blockers | PR-1 merge and updated npm package publish |
 
 ## Goal
 

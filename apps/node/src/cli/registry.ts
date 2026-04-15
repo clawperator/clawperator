@@ -264,6 +264,38 @@ Notes:
       $HOME/.clawperator/skills/skills/skills-registry.json
 `;
 
+const HELP_AUTHORING_SKILLS_INSTALL = `clawperator authoring-skills install
+
+Usage:
+  clawperator authoring-skills install [--output <json|pretty>]
+
+Notes:
+  - Copies packaged first-party authoring skills to ~/.clawperator/authoring-skills/
+  - Creates Claude Code and Codex discovery directories unconditionally
+  - Symlinks each installed skill into ~/.claude/skills/ and the Codex skills dir
+`;
+
+const HELP_AUTHORING_SKILLS_UPDATE = `clawperator authoring-skills update
+
+Usage:
+  clawperator authoring-skills update [--output <json|pretty>]
+
+Notes:
+  - Re-copies packaged first-party authoring skills into ~/.clawperator/authoring-skills/
+  - Recreates Claude Code and Codex discovery symlinks
+  - Safe to run multiple times
+`;
+
+const HELP_AUTHORING_SKILLS_LIST = `clawperator authoring-skills list
+
+Usage:
+  clawperator authoring-skills list [--output <json|pretty>]
+
+Notes:
+  - Lists installed first-party authoring skills from ~/.clawperator/authoring-skills/
+  - Shows the absolute SKILL.md path for each installed authoring skill
+`;
+
 const HELP_SKILLS_NEW = `clawperator skills new
 
 Usage:
@@ -2235,6 +2267,44 @@ Usage:
         : JSON.stringify({ code: "USAGE", message: "skills sync --ref <git-ref>" });
     } else {
       return JSON.stringify({ code: "USAGE", message: "skills list|get|search|compile-artifact|new|validate|run|install|update|sync ..." });
+    }
+  },
+};
+
+// authoring-skills
+COMMANDS["authoring-skills"] = {
+  name: "authoring-skills",
+  group: "Execution",
+  summary: "Manage first-party authoring skills for Claude Code and Codex",
+  help: `clawperator authoring-skills
+
+Usage:
+  clawperator authoring-skills list
+  clawperator authoring-skills install
+  clawperator authoring-skills update
+`,
+  subtopics: {
+    install: HELP_AUTHORING_SKILLS_INSTALL,
+    update: HELP_AUTHORING_SKILLS_UPDATE,
+    list: HELP_AUTHORING_SKILLS_LIST,
+  },
+  topLevelBlock: `  authoring-skills list
+                                            List installed first-party authoring skills
+  authoring-skills install
+                                            Copy and wire packaged authoring skills for Claude Code and Codex
+  authoring-skills update
+                                            Refresh installed authoring skills and recreate discovery symlinks`,
+  handler: async (ctx) => {
+    const { rest, format } = ctx;
+    const out = { format, env: process.env };
+    if (rest[0] === "list") {
+      return (await import("./commands/authoringSkills.js")).cmdAuthoringSkillsList(out);
+    } else if (rest[0] === "install") {
+      return (await import("./commands/authoringSkills.js")).cmdAuthoringSkillsInstall(out);
+    } else if (rest[0] === "update") {
+      return (await import("./commands/authoringSkills.js")).cmdAuthoringSkillsUpdate(out);
+    } else {
+      return JSON.stringify({ code: "USAGE", message: "authoring-skills list|install|update" });
     }
   },
 };
