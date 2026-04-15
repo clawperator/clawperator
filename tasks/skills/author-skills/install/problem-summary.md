@@ -161,6 +161,12 @@ Use a two-layer model:
    - if another agent later has a supported skill-discovery location, wire that
      too using the same canonical source
 
+Codex path verification for this task:
+
+- local Codex CLI is installed and available as `codex`
+- local Codex skill installation uses `$CODEX_HOME/skills`, defaulting to
+  `~/.codex/skills/`
+
 Symlinks are used at the agent-wiring layer so that `clawperator
 authoring-skills update` only needs to refresh the files in
 `~/.clawperator/authoring-skills/`; the agent-side symlinks stay valid without
@@ -355,20 +361,3 @@ The auto-update gap is a known limitation for now. The priority is:
 
 Automatic triggering of `authoring-skills update` on CLI upgrade (e.g., via
 npm post-install hook) can be added later once the basic flow is stable.
-
-## Open Questions
-
-No remaining open question blocks the core install/discovery design in this
-task note.
-
-Codex skill discovery path verification:
-
-- local Codex CLI is installed and available as `codex`
-- local Codex state uses `/<local_user>/.codex/`
-- local Codex skill installation uses `/<local_user>/.codex/skills/`
-- local Codex skill documentation states that installed skills live under
-  `$CODEX_HOME/skills`, defaulting to `~/.codex/skills`
-
-For this task, treat the Codex discovery location as:
-
-- `~/.codex/skills/`
