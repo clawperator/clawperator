@@ -63,16 +63,16 @@ export async function cmdAuthoringSkillsList(
   options: { format: OutputOptions["format"]; installDir?: string }
 ): Promise<string> {
   const installDir = options.installDir ?? DEFAULT_AUTHORING_SKILLS_DIR;
-  if (await isMissingDir(installDir)) {
-    return formatSuccess({
-      skills: [],
-      count: 0,
-      installedDir: installDir,
-      message: "No installed authoring skills found. Run clawperator authoring-skills install.",
-    }, options);
-  }
-
   try {
+    if (await isMissingDir(installDir)) {
+      return formatSuccess({
+        skills: [],
+        count: 0,
+        installedDir: installDir,
+        message: "No installed authoring skills found. Run clawperator authoring-skills install.",
+      }, options);
+    }
+
     const skills = await listInstalledAuthoringSkills(installDir);
     return formatSuccess({
       skills,

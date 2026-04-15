@@ -19,8 +19,9 @@ async function createSourceSkill(root: string, skillName: string): Promise<strin
   const sourceDir = join(root, "source");
   const skillDir = join(sourceDir, skillName);
   await mkdir(skillDir, { recursive: true });
+  await mkdir(join(skillDir, "agents"), { recursive: true });
   await writeFile(join(skillDir, "SKILL.md"), `# ${skillName}\n`, "utf8");
-  await writeFile(join(skillDir, "agents.openai.yaml"), "name: demo\n", "utf8");
+  await writeFile(join(skillDir, "agents", "openai.yaml"), "name: demo\n", "utf8");
   return sourceDir;
 }
 
@@ -48,6 +49,7 @@ describe("copyAuthoringSkills", () => {
     }
     assert.deepEqual(result.skills, ["skill-author-by-recording"]);
     assert.equal(await readFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "utf8"), "# skill-author-by-recording\n");
+    assert.equal(await readFile(join(installedDir, "skill-author-by-recording", "agents", "openai.yaml"), "utf8"), "name: demo\n");
   });
 
   it("ignores subdirectories without SKILL.md", async () => {
@@ -238,6 +240,26 @@ describe("copyAuthoringSkills", () => {
       code: "AUTHORING_SKILLS_SOURCE_EMPTY",
       message: `No packaged authoring skills with SKILL.md were found in ${sourceDir}`,
     });
+  });
+
+  it("removes stale installed skills that are no longer present in the packaged source", async () => {
+    const root = await makeTempRoot();
+    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const installedDir = join(root, "home", ".clawperator", "authoring-skills");
+    const staleSkillDir = join(installedDir, "old-skill");
+    await mkdir(staleSkillDir, { recursive: true });
+    await writeFile(join(staleSkillDir, "SKILL.md"), "# old-skill\n", "utf8");
+
+    const result = await copyAuthoringSkills({
+      sourceDir,
+      installedDir,
+      claudeSkillsDir: join(root, "home", ".claude", "skills"),
+      codexSkillsDir: join(root, "home", ".codex", "skills"),
+      cliVersion: "1.2.3",
+    });
+
+    assert.equal(result.ok, true);
+    await assert.rejects(() => stat(staleSkillDir));
   });
 
   it("does not delete unrelated user-managed symlinks from shared agent skill directories", async () => {

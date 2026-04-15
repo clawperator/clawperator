@@ -201,6 +201,35 @@ async function removeStaleAgentSymlinks(agentDir: string, activeSkills: Set<stri
   }
 }
 
+async function removeStaleInstalledSkills(installedDir: string, activeSkills: Set<string>): Promise<void> {
+  const entries = await readdir(installedDir);
+
+  for (const entry of entries) {
+    if (entry === VERSION_FILENAME || activeSkills.has(entry)) {
+      continue;
+    }
+
+    const entryPath = join(installedDir, entry);
+
+    let entryStat;
+    try {
+      entryStat = await stat(entryPath);
+    } catch {
+      continue;
+    }
+
+    if (!entryStat.isDirectory()) {
+      continue;
+    }
+
+    if (!(await pathExists(join(entryPath, "SKILL.md")))) {
+      continue;
+    }
+
+    await rm(entryPath, { recursive: true, force: true });
+  }
+}
+
 export async function copyAuthoringSkills(
   options: CopyAuthoringSkillsOptions = {}
 ): Promise<CopyAuthoringSkillsSuccess | CopyAuthoringSkillsError> {
@@ -260,6 +289,7 @@ export async function copyAuthoringSkills(
     }
 
     const activeSkills = new Set(skills);
+    await removeStaleInstalledSkills(installedDir, activeSkills);
     await removeStaleAgentSymlinks(claudeSkillsDir, activeSkills, installedDir);
     await removeStaleAgentSymlinks(codexSkillsDir, activeSkills, installedDir);
     await writeFile(join(installedDir, VERSION_FILENAME), `${options.cliVersion ?? getCliVersion()}\n`, "utf8");
