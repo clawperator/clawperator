@@ -126,8 +126,9 @@ See `tasks/skills/author-skills/install/problem-summary.md` for full background.
 - Agent discovery paths: `~/.claude/skills/` for Claude Code, `$CODEX_HOME/skills`
   (default `~/.codex/skills/`) for Codex.
 - Unconditional directory creation: create `~/.claude/skills/` and
-  `~/.codex/skills/` even if the agent is not installed. Reason: agent-install
-  ordering edge case - user installs Clawperator before the agent.
+  `$CODEX_HOME/skills` (if `CODEX_HOME` is set) else `~/.codex/skills/`, even if
+  the agent is not installed. Reason: agent-install ordering edge case - user
+  installs Clawperator before the agent.
 - Skill discovery from npm package: scan for subdirectories containing `SKILL.md`.
   No manifest file is needed.
 - `version.txt` written alongside installed skills; content is the CLI version

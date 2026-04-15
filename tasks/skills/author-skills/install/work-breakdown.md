@@ -227,8 +227,8 @@ without requiring a live filesystem outside of tmpdir isolation.
      - `~/.claude/skills/`
      - `$CODEX_HOME/skills` if `CODEX_HOME` is set, else `~/.codex/skills/`
    - Symlinks `~/.claude/skills/<skill-name>` -> `~/.clawperator/authoring-skills/<skill-name>/`
-   - Symlinks `~/.codex/skills/<skill-name>` (or `$CODEX_HOME/skills/<skill-name>`)
-     -> `~/.clawperator/authoring-skills/<skill-name>/`
+   - Symlinks `$CODEX_HOME/skills/<skill-name>` (if `CODEX_HOME` is set) else
+     `~/.codex/skills/<skill-name>` -> `~/.clawperator/authoring-skills/<skill-name>/`
    - Removes stale symlinks in agent dirs that no longer have a corresponding
      installed skill (handles skill removal).
    - Returns a result object: `{ ok: true, skills: string[], installedDir: string,
