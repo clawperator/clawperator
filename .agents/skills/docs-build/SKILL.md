@@ -14,12 +14,15 @@ content, use the `docs-author` skill.
 ## Source of Truth Contract
 
 `docs/` is the authored public docs tree. `apps/node/src/` is the source of
-truth for CLI/API behavior. `source-map.yaml` only describes code-derived page
-generation and marker expansion.
+truth for CLI/API behavior. Repo-local agent workflow instructions live in
+`.agents/skills/**/SKILL.md`. `source-map.yaml` only describes code-derived
+page generation and marker expansion.
 
 When you find an error in a generated page:
 1. Identify whether it comes from authored docs or code-derived output.
-2. Fix the authored source in `docs/` or the code source in `apps/node/src/`.
+2. Fix the authored source in `docs/`, the code source in `apps/node/src/`, or
+   the relevant repo-local skill doc in `.agents/skills/` if the issue is
+   actually agent-workflow guidance rather than public-site content.
 3. Re-run the docs build workflow.
 4. Commit the source fix and the regenerated output together.
 

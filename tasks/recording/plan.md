@@ -2,8 +2,8 @@
 
 ## Purpose
 
-This file is the top-level status index for `tasks/recording/` while the final
-authoring workflow workstream remains open.
+This file is the top-level status index for `tasks/recording/` after the
+recording-program implementation workstreams landed on the current branch.
 
 Use it to answer:
 
@@ -31,7 +31,7 @@ Retired temporary task folders:
 
 Still active:
 
-- W6 `skill-author-by-recording`
+- `skill-author-by-recording`
 
 ## Durable Sources Of Truth
 
@@ -51,11 +51,16 @@ agents should rely on these surfaces instead of the retired task packs.
 
 ## Remaining Sequence
 
-Only W6 remains in the recording program.
+One recording workstream remains open on the current branch:
 
-Next step:
+1. `skill-author-by-recording`
+   P1 is complete. P2 and P3 remain the active follow-on phases.
 
-1. Execute `tasks/recording/skill-author-by-recording/`
+Retirement step:
+
+1. Keep the `skill-author-by-recording` task pack until the remaining phases
+   ship, then retire it because the durable guidance now lives in docs, code,
+   and the repo-local skill.
 
 ## Retirement Rule
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skill Author By Recording"
+  short_description: "Author a skill from one recorded phone flow"
+  default_prompt: "Use $skill-author-by-recording to turn a fresh phone recording into one truthful Clawperator skill. I will give you the plain-language goal and the target app or apps, you should close those apps before recording starts, derive the skill id after the recording, default to replay unless I explicitly ask for orchestrated, treat the first useful outcome as a personalized local skill unless it is clearly generic, disclose whether you stayed from scratch or used nearby exemplar patterns, suggest an extra recording pass when the first one looks weak, and run one self-test that surfaces the SkillResult."

@@ -4,43 +4,92 @@ Parent plan: `tasks/recording/skill-author-by-recording/plan.md`
 
 ## Executive Summary
 
-Total PRs: 1. Total phases: 3.
+Total PRs: 3. Total phases: 3.
 
-- P1: define the guided workflow and artifact contract
-- P2: implement the repo-local skill
-- P3: validate the workflow on the Solax proving case and graduate any durable
+- P1: create the replay-first front-door workflow from scratch
+- P2: extend the created workflow to handle the orchestrated authoring path
+- P3: validate the full story against the Solax demo path and graduate durable
   guidance
 
-Current state: ready. The earlier recording workstreams have landed, so W6 can
-now start from the durable docs and code-adjacent contracts.
+Current state: the repo-local skill exists from P1. P2 is now tightening the
+front door so it asks for a plain-language goal up front, derives the skill id
+after recording, and keeps replay as the default first pass. The next
+tightening pass should also make the workflow honest about personalized local
+outcomes, assisted versus from-scratch authoring, and named user-facing
+inputs.
+
+## Status
+
+| Item | Value |
+| --- | --- |
+| State | active |
+| Total PRs | 3 |
+| Total phases | 3 |
+| Completed | problem-definition pass, plan-tightening pass, and P1 |
+| Remaining | P2 (orchestrated path), P3 (demo validation) |
+| Current / Next | P2 |
+| Blockers | none |
+
+## Starting Point
+
+`.agents/skills/skill-author-by-recording/` now exists from P1.
+Start from the created skill and tighten its workflow rather than replacing it
+from scratch.
 
 ## Hard Rules
 
 - Do not claim that the recording alone generates a reliable skill.
 - Do not hide the intermediate artifacts. The workflow must surface them.
 - Do not imply the recording export becomes the runtime program. The export is
-  authoring evidence; `SKILL.md` is the runtime program.
+  authoring evidence.
 - Do not hardcode the Solax proving case into the front-door workflow. The
-  workflow must be able to help author a developer's own skill id and goal.
-- Do not skip showing the orchestrated code and verification logic. This
-  workflow exists to make the "how" understandable.
+  workflow must be able to help author a developer's own skill from a
+  plain-language goal.
+- Do not make first-time users learn replay versus orchestrated before they can
+  create a skill.
+- Do not require the user to invent the final `skill_id` before recording.
+- Do derive the `skill_id` after export analysis from the observed app and the
+  user's goal.
+- Do treat a personalized local skill as a valid first outcome.
+- Do not present a personalized skill as shared-ready unless the assumptions
+  were actually generalized.
+- Do make it explicit whether the authoring pass stayed `from scratch` or used
+  nearby exemplar patterns.
+- Do prefer stable named inputs over positional-only public interfaces for
+  non-trivial skills.
+- Do ask which target app or apps should be reset before recording, and close
+  them before `recording start`.
+- Do treat one recording as the minimum baseline, not an always-sufficient
+  baseline.
+- Do recommend another recording pass when the first recording looks
+  exploratory, sparse, or state-dependent.
+- Do not let authoring-time recording artifacts default into `./recordings/`
+  under the current repo.
+- Do direct intermediate recordings, exports, and self-test wrappers into
+  `~/.clawperator/recordings/<session_id>/`.
+- Do not author runtime skill code that imports contracts from machine-local
+  absolute filesystem paths.
+- Do not skip showing the orchestrated code and verification logic when the
+  orchestrated path is chosen.
 - Do not declare authoring done until the newly written skill has been invoked
   once and its emitted `SkillResult` is inspectable.
 - Keep one human-facing entrypoint: `skill-author-by-recording`.
-- If helper skills are introduced, they sit behind that entrypoint. Do not
-  make the user choose among multiple top-level authoring skills for this flow.
+- If helper skills are introduced, they sit behind that entrypoint.
 - Reuse the named orchestrated runtime contract from
-  `docs/skills/overview.md#orchestrated-runtime-contract`. Do not create a
-  second competing definition inside the authoring skill.
+  `docs/skills/overview.md#orchestrated-runtime-contract`.
 - Do not introduce a top-level skill named `skill-author-orchestrator`.
-  That name is too easy to confuse with `skill-author-orchestrated`.
+- Do not require both replay and orchestrated output variants in the first pass
+  unless the task explicitly calls for both.
+- Do not expand this task into bundled runtime-family work such as a single
+  registry skill with internal replay and orchestrated subfolders.
 
 ## Required Reading
 
 | File | Why it matters |
 | --- | --- |
-| `tasks/recording/skill-author-by-recording/plan.md` | Stable scope and end-state |
-| `tasks/recording/plan.md` | Overall recording program sequencing |
+| `tasks/recording/skill-author-by-recording/problem-definition.md` | Refined product framing and north star |
+| `tasks/recording/skill-author-by-recording/plan.md` | Stable scope and ordered delivery shape |
+| `tasks/recording/video-draft.md` | Demo north star |
 | `docs/api/recording.md` | Recording lifecycle commands and artifacts |
 | `docs/skills/authoring.md` | Scaffold and authoring contract |
 | `docs/skills/overview.md` | Named orchestrated runtime contract |
@@ -48,127 +97,313 @@ now start from the durable docs and code-adjacent contracts.
 | `apps/node/src/contracts/skillResult.ts` | Universal `SkillResult` return shape |
 | `apps/node/src/domain/skills/runSkill.ts` | Runtime parsing and injected source behavior |
 
-## Phase P1: Define The Workflow Contract
+Read these files in the listed order before writing anything.
+
+## PR / Phase Plan
+
+| PR | Purpose | Included phases | Agent tier | Merge gate |
+| --- | --- | --- | --- | --- |
+| PR-1 | Replay-first workflow creation | P1 | `thinking` | Do not start PR-2 until PR-1 intent and wording are accepted |
+| PR-2 | Orchestrated-path closeout | P2 | `default` | Do not start PR-3 until PR-2 wording and workflow shape are accepted |
+| PR-3 | Demo validation and graduation | P3 | `default` | Final closeout after earlier phases are landed |
+
+## Testing Strategy
+
+Treat this task primarily as workflow validation.
+
+Human-guided acceptance is the main proof here because the core risks are
+wording drift, hidden evidence, unclear operator handoff, and untruthful claims
+about what recording-derived authoring does. Traditional unit tests are
+secondary until this workflow gains executable helper logic.
+
+Automated checks expected in every phase:
+
+- file existence and structure checks
+- spot-check reads of the authored workflow text and metadata
+- targeted grep checks for stale anti-pattern phrasing
+- spot-check commands and examples for the intended
+  `~/.clawperator/recordings/<session_id>/` artifact path
+
+Human-guided checks expected by phase:
+
+- P1: run one replay-safe walkthrough and confirm the workflow:
+  - handles start, stop, pull, and export clearly
+  - writes authoring-time recordings and self-test outputs under
+    `~/.clawperator/recordings/<session_id>/`
+  - treats the export as authoring evidence
+  - derives the skill id after the recording instead of asking the user to
+    invent it up front
+  - defaults to replay on the first pass
+  - authors one shape per pass
+  - runs one self-test, saves wrapper plus stderr, and surfaces the resulting
+    `SkillResult`
+- P2: run one orchestrated-shaped walkthrough and confirm the workflow:
+  - explains why replay would not be truthful or sufficient
+  - moves to orchestrated honestly instead of forcing replay first
+  - keeps `SKILL.md` as the runtime program and `run.js` as the thin harness
+  - retains `prompt.txt`, agent stdout, agent stderr, and run metadata for the
+    self-test run
+- P3: run the Solax demo-path validation and confirm the full recording-to-skill
+  story remains understandable and truthful on camera
+
+Unit tests are optional for now. Add them when this task grows executable
+decision logic, validation helpers, or scripts whose behavior should be locked
+with deterministic inputs. The first unit-test target should be the
+first-match-wins replay-versus-orchestrated decision table.
+
+## Phase P1: Replay-First Workflow Creation
+
+Status: complete
+
+### Agent Tier
+
+`thinking`
 
 ### Goal
 
-Specify exactly what the skill-authoring workflow must do and show.
+Tighten the front-door workflow so it truthfully supports "record once, author
+the right skill shape" while defaulting to replay-first authoring when replay
+is sufficient.
+
+### Files or Surfaces To Change
+
+- `.agents/skills/skill-author-by-recording/SKILL.md`
+- `.agents/skills/skill-author-by-recording/agents/openai.yaml`
+- `tasks/recording/skill-author-by-recording/plan.md` if wording drift is
+  discovered during implementation
+- `tasks/recording/skill-author-by-recording/work-breakdown.md` only if the
+  execution steps need to be tightened further
 
 ### Acceptance Criteria
 
+- The task pack and repo-local skill explicitly say that the workflow authors
+  one requested or recommended skill shape per pass.
+- The workflow requires the user's plain-language goal before recording starts.
+- The workflow derives the first-pass `skill_id` after export analysis instead
+  of asking the user to provide one up front.
+- The default first pass is replay unless the user explicitly requests
+  orchestrated.
+- The workflow still honors an explicit user request for `-orchestrated` or
+  `-replay`.
 - The workflow explicitly includes:
-  - capture or confirm the target skill id and plain-language goal
-  - prompt agent to start recording
-  - tell human when to perform the phone flow
-  - stop and pull recording
+  - capture or confirm the plain-language goal and device context
+  - run recording start, tell the human when to perform the flow, then stop
+    and pull
+  - retain authoring-time artifacts under
+    `~/.clawperator/recordings/<session_id>/`
   - export the recording artifact
-  - pass the recording evidence to an authoring-time agent
-  - author the orchestrated skill
+  - derive a truthful first-pass `skill_id` from the observed app and the
+    user's goal
+  - sanitize and retain the baseline under
+    `skills/<skill_id>/references/compare-baseline.export.json`
+  - explain the replay-first default or an explicit orchestrated request
+  - author the chosen skill shape
   - run one self-test invocation of the authored skill
-  - show the key generated files
-  - highlight the instructions and code that perform checkpoints and verification
-- The workflow makes the "how" visible to a developer by surfacing:
-  - the concrete recording/export commands it ran
-  - the exact files produced by those commands
-  - the exact orchestrated code surfaces that should be opened next
-- The workflow keeps the Solax proving case separate from the generic path:
-  - Solax may be the validation example
-  - the actual workflow wording must support arbitrary app/package/intent input
+  - show the key generated files and surface the `SkillResult`
+- The workflow makes the "how" visible to a developer by surfacing the concrete
+  recording/export commands and resulting files.
 - The workflow distinguishes clearly between:
-  - what is authoring-time evidence
-  - what is the runtime program the embedded agent will later read
-- The workflow names the specific artifacts it must surface, at minimum:
-  - recording export
-  - retained sanitized compare baseline under the authored skill, e.g.
-    `references/compare-baseline.export.json`
-  - orchestrated `SKILL.md`
-  - orchestrated `skill.json`
-  - orchestrated runtime script
-  - first-run `SkillResult`
-  - any compare or verification artifact added by the earlier workstreams
-- The workflow explicitly defines whether implementation is:
-  - monolithic inside `skill-author-by-recording`, or
-  - decomposed behind it into helper skills
-- The workflow explicitly points at the durable contract source for authored
-  orchestrated skills:
-  - `docs/skills/overview.md#orchestrated-runtime-contract`
-  - `docs/skills/authoring.md#authoring-agent-driven-orchestrated-skills`
-- If helper skills are used, the default recommended decomposition is:
-  - `recording-capture-export`
-  - `skill-author-orchestrated-from-recording`
-  - `skill-validate-authored-skill`
-- Replay-skill authoring is not required as part of the first front-door flow.
-  But replay recommendation is required as part of the first front-door flow.
-  If the recording evidence points to replay as the better fit, the workflow
-  must say so clearly and let the developer choose it without stigma.
+  - authoring evidence
+  - replay script logic
+  - orchestrated runtime program plus thin harness
+- The workflow keeps the Solax proving case separate from the generic path.
 
-## Phase P2: Implement The Repo-Local Skill
+### Steps
+
+1. Read the required reading list in full before writing anything.
+2. Start from the created `.agents/skills/skill-author-by-recording/` skill and
+   tighten `SKILL.md` to match the updated front-door product stance.
+3. Write `SKILL.md` as an agent-program that embodies the replay-first default:
+   - gather the plain-language goal and device context up front
+   - start recording, prompt human to perform the flow, stop and pull
+   - keep intermediate recording and self-test artifacts under
+     `~/.clawperator/recordings/<session_id>/`
+   - export and sanitize the recording artifact
+   - derive the first-pass `skill_id` from the app evidence and goal
+   - default to replay unless orchestrated was explicitly requested
+   - author the chosen shape
+   - run one self-test invocation and surface the `SkillResult`
+4. Make the replay-first default explicit without claiming replay is mandatory
+   for every flow.
+5. Keep explicit support for a direct orchestrated or replay request.
+6. Create `agents/openai.yaml` aligned with the skill program.
+   Use `.agents/skills/task-author/agents/openai.yaml` as the exemplar for
+   structure and field shape.
+7. Confirm the written skill points to durable docs and does not invent a
+   parallel contract.
+
+### Validation
+
+```bash
+# Confirm the skill was created
+ls .agents/skills/skill-author-by-recording/
+
+# Spot-check content
+sed -n '1,260p' .agents/skills/skill-author-by-recording/SKILL.md
+sed -n '1,120p' .agents/skills/skill-author-by-recording/agents/openai.yaml
+
+# Check for stale anti-patterns
+rg -n "orchestrated path first|only continue with orchestrated|less real" .agents/skills/skill-author-by-recording tasks/recording/skill-author-by-recording
+```
+
+### Expected Commit
+
+```text
+docs(recording): align skill-author-by-recording workflow
+```
+
+## Phase P2: Orchestrated Path Closeout
+
+Status: pending
+
+### Agent Tier
+
+`default`
 
 ### Goal
 
-Create `.agents/skills/skill-author-by-recording/` so an agent can execute the
-defined workflow consistently.
+Close out the orchestrated authoring path so the same front-door workflow can
+truthfully produce an orchestrated skill when replay would not be sufficient or
+when the user explicitly asks for orchestrated.
+
+This phase is the second authoring pass after P1. P1 creates the skill from
+scratch and establishes the replay-first front-door workflow. P2 extends that
+newly created workflow so it also handles the orchestrated branch cleanly and
+truthfully.
+
+### Files or Surfaces To Change
+
+- `.agents/skills/skill-author-by-recording/SKILL.md`
+- `docs/skills/authoring.md` if durable public authoring guidance needs to be
+  tightened
+- `tasks/recording/skill-author-by-recording/plan.md`
+- `tasks/recording/skill-author-by-recording/work-breakdown.md`
 
 ### Acceptance Criteria
 
-- The skill exists in `.agents/skills/`.
-- It guides the operator rather than assuming silent background work.
-- It points developers at the exact files that explain what was generated.
-- It reuses the durable orchestrated runtime contract wording from
-  `docs/skills/overview.md#orchestrated-runtime-contract` rather than
-  restating a drift-prone parallel version.
-- It uses the recording export (required) and an optional plain-language
-  description from the user explaining intent or device-specific nuance that
-  the recording alone may not capture, along with the durable orchestrated
-  skill contract documented in `docs/skills/authoring.md` and implemented in
-  `apps/node/src/contracts/skillResult.ts`, to author `SKILL.md`,
-  `skill.json`, and the thin `run.js`. The authoring-time agent should ask for
-  the user description if the recording export is not sufficient to infer the
-  intent unambiguously.
-- It retains one canonical sanitized baseline export under the authored skill,
-  at a stable reference path such as
-  `references/compare-baseline.export.json`, for future compare and maintenance
-  work.
-- It sanitizes the retained baseline before commit by templating
-  environment-specific or personal values with angle-bracket placeholders such
-  as `<device_serial>`, `<person_name>`, `<place_name>`, and
-  `<account_email>`.
-- It does not list that retained baseline under `skill.json.artifacts`, and it
-  does not pass the retained baseline into the runtime agent prompt.
-- If helper skills are introduced, the top-level skill clearly delegates to
-  them and preserves resumability across phase boundaries.
-- A developer following the workflow can understand the end-to-end path without
-  extra narration from the original author.
-- A developer can use the workflow to author a non-Solax skill without editing
-  the skill itself first. The workflow gathers the needed id/goal/context up
-  front and does not assume Solax-specific naming or checkpoint text.
+- The repo-local skill reuses the durable orchestrated runtime contract wording
+  from `docs/skills/overview.md#orchestrated-runtime-contract`.
+- The workflow uses the recording export and optional user clarification to
+  author orchestrated `SKILL.md`, `skill.json`, and thin `run.js`.
+- The retained compare baseline rules remain explicit and truthful.
+- The workflow makes clear that replay and orchestrated are peers, but the
+  workflow is now intentionally taking the more advanced orchestrated branch.
+- A developer can still use the workflow for a non-Solax skill without editing
+  the skill first.
 
-## Phase P3: Validate And Tighten
+### Steps
+
+1. Start from the skill created in P1. Do not re-plan the front-door workflow
+   from scratch.
+2. Add or tighten the orchestrated branch of the repo-local workflow so it
+   clearly describes when replay is not sufficient and what the second authoring
+   pass must produce.
+3. Confirm the workflow still reuses the durable orchestrated runtime contract
+   rather than redefining it.
+4. Update durable docs only if the current public guidance is missing a rule
+   this workflow genuinely depends on.
+5. Recheck the task-pack wording so P2 still reads as a bounded second pass,
+   not a runtime-family expansion.
+
+### Validation
+
+```bash
+sed -n '1,260p' .agents/skills/skill-author-by-recording/SKILL.md
+sed -n '1,260p' docs/skills/authoring.md
+rg -n "bundled runtime-family|mandatory dual-authoring|replay-first detour" tasks/recording/skill-author-by-recording
+```
+
+Human check:
+
+- run one guided walkthrough on a flow that is clearly orchestrated-shaped and
+  confirm the workflow chooses orchestrated for truthful reasons
+
+### Expected Commit
+
+```text
+docs(recording): tighten orchestrated skill-authoring path
+```
+
+## Phase P3: Demo Validation And Graduation
+
+Status: pending
+
+### Agent Tier
+
+`default`
 
 ### Goal
 
 Run the workflow against the Solax proving case and make sure the resulting
-experience is understandable from start to finish.
+experience is understandable from start to finish, while keeping the generic
+workflow framing truthful.
+
+### Files or Surfaces To Change
+
+- `.agents/skills/skill-author-by-recording/SKILL.md`
+- `docs/skills/authoring.md`
+- `tasks/recording/video-draft.md` only if a real scope mismatch is discovered
+- `tasks/recording/skill-author-by-recording/plan.md`
+- `tasks/recording/skill-author-by-recording/work-breakdown.md`
 
 ### Acceptance Criteria
 
 - A developer can follow the workflow and understand:
   - what was recorded
-  - how the recording evidence informed the authored `SKILL.md`
+  - how the recording evidence informed the authored skill
+  - how replay and orchestrated differ when each is chosen
   - how the orchestrated skill is split across `SKILL.md`, `skill.json`, and
-    the thin `run.js`
+    the thin `run.js` when the orchestrated path is demonstrated
   - how the brain/hand model is embodied in code and in the first-run
     `SkillResult`
 - The chosen decomposition still feels like one workflow to the user rather
   than a menu of competing authoring skills.
-- The workflow's default narrative still preserves replay as a first-class
-  category: if replay was recommended for the captured flow, that fact is
-  visible and justified rather than hidden.
+- The workflow's default narrative preserves replay as a first-class category
+  and does not redefine the whole product story as orchestrated-only just
+  because the demo path is orchestrated.
 - `docs/skills/authoring.md` includes a concrete "debugging a failed
   orchestrated run" section covering the minimum set a developer reads: agent
-  stderr stream (forwarded by `runSkill`), `SkillResult.checkpoints` (first
-  failed or skipped checkpoint), and compare output when a recording baseline
-  exists. This must be authored in this phase or explicitly scheduled as the
-  immediate follow-on before declaring W6 done.
+  stderr stream, `SkillResult.checkpoints`, and compare output when a recording
+  baseline exists.
 - Any other durable guidance discovered here is migrated into
   `docs/skills/authoring.md`.
+
+### Steps
+
+1. Run a reality check against the Solax demo path using the repo-local
+   workflow as the entrypoint.
+2. Record any discovered mismatches between the demo script and the actual
+   workflow behavior.
+3. Fix the workflow or docs when the mismatch is a real product gap.
+4. Only adjust the video draft if the gap is genuinely not in scope and needs
+   explicit renegotiation.
+5. Update the task pack status and closeout notes to reflect the final state.
+
+### Validation
+
+```bash
+sed -n '1,260p' tasks/recording/video-draft.md
+sed -n '1,260p' .agents/skills/skill-author-by-recording/SKILL.md
+sed -n '1,260p' docs/skills/authoring.md
+```
+
+Human check:
+
+- run the Solax demo path end to end and confirm the on-camera story still
+  matches the actual workflow and artifacts
+
+### Expected Commit
+
+```text
+docs(recording): validate skill-authoring demo closeout
+```
+
+## Closeout Notes
+
+Expected closeout shape:
+
+- keep one parent task pack until the final PR ships
+- land the work in ordered reviewable PRs
+- update this pack after each phase so sequencing stays explicit
+- retire the pack only after the durable guidance is fully reflected in docs,
+  code, and the repo-local skill

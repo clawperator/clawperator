@@ -100,6 +100,9 @@ What that file is for:
 
 Practical authoring workflow:
 
+- before recording, identify the target app or apps and close them so the
+  capture starts from a fresh app state rather than a half-explored mid-flow
+  screen
 - after `record stop`, run `record pull` first and retain the local NDJSON file
 - generate `recording export` from that pulled file or directory before any
   optional `record parse` inspection
@@ -119,6 +122,48 @@ Recommended source:
   verification
 - the saved `clawperator skills run --json` wrapper is the v1 compare input for `clawperator recording compare --result <file>`
 - the recording export baseline is reference evidence for compare and authoring, not a runtime input passed to the skill
+
+Recording-derived authoring truthfulness:
+
+- the export is evidence, not a complete recipe
+- authors may need live snapshots, fresh UI reads, or one-off inspection to
+  refine selectors and verification
+- if live inspection materially informed the authored route, say so in
+  `SKILL.md` instead of implying the recording alone was sufficient
+- do not over-claim `from scratch` if the author reused nearby same-app skills,
+  fixtures, or shared helpers while drafting the result
+- if the first recording looked exploratory, stateful, or obviously
+  suboptimal, capture an additional pass instead of pretending one recording
+  is a reliable baseline
+
+Personalized versus shared skills:
+
+- a recording-derived skill is often valuable even when it is personalized to
+  one user's setup, labels, account state, or device graph
+- personalized local skills are a valid first outcome
+- do not pretend a personalized skill is generic if it hardcodes local labels
+  such as room names, device names, or one user's climate tile
+- a shared skill should replace those personal assumptions with generalized
+  inputs or broader selector strategy before it is presented as reusable
+
+Authoring mode terminology:
+
+- `from scratch` means do not consult same-app exemplar skills while authoring
+- `assisted from nearby patterns` means exemplar reuse is allowed, but the
+  authored skill must still be truthful about what came from the recording and
+  what came from nearby references
+- if you used nearby exemplars, say so in the authoring notes or `SKILL.md`
+  rather than presenting the result as recording-only synthesis
+
+Recording-count guidance:
+
+- one recording is the minimum viable authoring handoff
+- two recordings are often better when the first pass looked messy or
+  branch-dependent
+- three recordings are reserved for flows that are especially flaky or whose
+  path differs materially by state
+- do not merge multiple recordings by hand-waving; explain which pass became
+  the retained baseline and why
 
 Durable compare-baseline rule:
 
@@ -342,7 +387,7 @@ Current v1 rule:
 For `node_text_matches`, the runtime currently requires:
 
 - `skillResult.terminalVerification.status === "verified"`
-- the declared `matcher` is rendered from trusted invocation inputs, preferring named flags that match declared input names in kebab-case form such as `unit_name -> --unit-name`, then falling back to trailing positional invocation args in deterministic lexicographic order of `contract.inputs` (use `--` to separate skill args from wrapper-known flags when needed)
+- the declared `matcher` is rendered from trusted invocation inputs, preferring named flags that match declared input names in kebab-case form such as `unit_name -> --unit-name`, then falling back to trailing positional arguments forwarded by `clawperator skills run` in deterministic lexicographic order of `contract.inputs`; `--` is not required for ordinary positional args, but can be used to keep wrapper-known flags such as `--timeout` or `--expect-contains` from being consumed by the wrapper, and to force tokens that would otherwise be intercepted by the top-level CLI or wrapper to be forwarded positionally; for example, `--help` is intercepted unless it appears after the forwarding `--`, while standalone literals such as `--foo=bar` can still be forwarded for positional binding
 - `skillResult.inputs` must agree with those trusted invocation inputs for the declared fields
 - the observed terminal verification text matches the declared matcher after placeholder replacement; decorative trailing glyphs or punctuation in the observed text are allowed, but a different value or different leading text is not
 
@@ -687,6 +732,12 @@ Current authoring rule for new non-trivial skills:
 - keep process exit truthful
 - use `terminalVerification` when the skill claims a persisted app-state
   change
+- choose stable named user-facing inputs early and keep them aligned across:
+  - `skill.json.contract.inputs`
+  - `SKILL.md` usage examples
+  - script argument parsing and emitted `skillResult.inputs`
+- avoid positional-only public interfaces for non-trivial skills unless the
+  contract is genuinely single-purpose and obvious
 - use `skillResult: null` only for legacy skills that have not yet been
   upgraded
 - if the skill is authored from a retained recording baseline, save a
@@ -756,6 +807,11 @@ Current authoring expectation:
   exit non-zero rather than translating the failure into a "successful" skill run
 - if the skill's purpose is to change app state, the skill should verify the
   intended terminal state before reporting success
+- if the immediate post-action UI is known to be stale or delayed, re-open or
+  re-read the relevant controller before claiming terminal verification
+- if replay cannot truthfully prove the persisted state after a reasonable
+  re-read strategy, prefer an orchestrated or otherwise richer verification
+  path instead of claiming replay success
 
 Examples of terminal-state verification:
 

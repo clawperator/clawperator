@@ -43,6 +43,16 @@ What it does not give you:
 - terminal verification policy
 - a guarantee that the recorded visible label was the real clickable node
 
+Practical evidence quality rules:
+
+- start the recording from a fresh app state whenever possible
+- if the author already explored the target app manually, close the target app
+  or apps before recording so the capture reflects a reusable path rather than
+  a half-completed mid-flow state
+- a single recording is the minimum evidence, not always the ideal evidence
+- when the first recording looks exploratory, sparse, or branch-dependent,
+  capture another pass rather than pretending one shaky run is authoritative
+
 ## Recording Lifecycle
 
 The current flow is:
@@ -82,6 +92,29 @@ Notes:
   4. `skills run <skill_id> --json > <run>.skills-run.json`
   5. copy the retained export to `skills/<skill_id>/references/compare-baseline.export.json`
   6. `recording compare --baseline skills/<skill_id>/references/compare-baseline.export.json --result <run>.skills-run.json`
+
+Recommended pre-recording reset:
+
+- ask which target app or apps the user intends to record
+- close those apps through Clawperator before `recording start`
+- do not rely on the user manually swiping apps away unless the workflow makes
+  that explicit
+- for a single app reset, prefer the flat CLI:
+  `clawperator close --app <application_id> --device <device_id> --operator-package <operator_package> --json`
+- for multiple app resets, use a small `clawperator exec` with one or more
+  `close_app` actions before you start recording
+- the underlying API action is `close_app`, which Node executes as an adb
+  `am force-stop` pre-flight and normalizes to a successful close only when
+  that force-stop actually succeeded
+
+Recommended recording-count stance:
+
+- default to one recording for a first pass
+- recommend a second recording when the first pass looks exploratory,
+  state-dependent, or unusually sparse
+- use a third recording only when the flow is especially flaky or divergent
+- do not silently average multiple recordings; explain what the extra pass is
+  meant to confirm
 
 ## CLI Commands
 
