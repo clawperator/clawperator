@@ -96,11 +96,16 @@ Notes:
 Recommended pre-recording reset:
 
 - ask which target app or apps the user intends to record
-- close those apps before `recording start`
+- close those apps through Clawperator before `recording start`
 - do not rely on the user manually swiping apps away unless the workflow makes
   that explicit
-- when a clean-start path matters, use a small `clawperator exec` with one or
-  more `close_app` actions before you start recording
+- for a single app reset, prefer the flat CLI:
+  `clawperator close --app <application_id> --device <device_id> --operator-package <operator_package> --json`
+- for multiple app resets, use a small `clawperator exec` with one or more
+  `close_app` actions before you start recording
+- the underlying API action is `close_app`, which Node executes as an adb
+  `am force-stop` pre-flight and normalizes to a successful close only when
+  that force-stop actually succeeded
 
 Recommended recording-count stance:
 

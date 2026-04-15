@@ -163,7 +163,16 @@ final `skill_id`.
 Before `recording start`, reset the user-confirmed target app or apps so the
 recorded route starts from a fresh app state instead of a half-explored screen.
 
-Use Clawperator to close each target app explicitly. A typical shape is:
+Use Clawperator to close each target app explicitly.
+
+For one target app, prefer the flat CLI:
+
+```bash
+clawperator close --app <target_application_id> --device <device_serial> --operator-package <operator_package> --json
+```
+
+For multiple target apps, use one `clawperator exec` with `close_app` actions.
+A typical shape is:
 
 ```bash
 clawperator exec --device <device_serial> --operator-package <operator_package> --execution '{"commandId":"skill-author-reset-<timestamp>","taskId":"skill-author-by-recording","source":"skill-author-by-recording","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"close_target","type":"close_app","params":{"applicationId":"<target_application_id>"}}]}' --json
@@ -171,6 +180,10 @@ clawperator exec --device <device_serial> --operator-package <operator_package> 
 
 If more than one target app matters to the flow, close each of them before you
 start recording.
+
+Call out that `close_app` is the underlying Clawperator action and that Node
+runs it as an adb force-stop pre-flight. Do not tell the user to swipe apps
+away manually unless the workflow explicitly depends on that human action.
 
 Call out why this matters:
 

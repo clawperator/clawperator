@@ -7309,6 +7309,16 @@ What it does not give you:
 - terminal verification policy
 - a guarantee that the recorded visible label was the real clickable node
 
+Practical evidence quality rules:
+
+- start the recording from a fresh app state whenever possible
+- if the author already explored the target app manually, close the target app
+  or apps before recording so the capture reflects a reusable path rather than
+  a half-completed mid-flow state
+- a single recording is the minimum evidence, not always the ideal evidence
+- when the first recording looks exploratory, sparse, or branch-dependent,
+  capture another pass rather than pretending one shaky run is authoritative
+
 ## Recording Lifecycle
 
 The current flow is:
@@ -7348,6 +7358,29 @@ Notes:
   4. `skills run <skill_id> --json > <run>.skills-run.json`
   5. copy the retained export to `skills/<skill_id>/references/compare-baseline.export.json`
   6. `recording compare --baseline skills/<skill_id>/references/compare-baseline.export.json --result <run>.skills-run.json`
+
+Recommended pre-recording reset:
+
+- ask which target app or apps the user intends to record
+- close those apps through Clawperator before `recording start`
+- do not rely on the user manually swiping apps away unless the workflow makes
+  that explicit
+- for a single app reset, prefer the flat CLI:
+  `clawperator close --app <application_id> --device <device_id> --operator-package <operator_package> --json`
+- for multiple app resets, use a small `clawperator exec` with one or more
+  `close_app` actions before you start recording
+- the underlying API action is `close_app`, which Node executes as an adb
+  `am force-stop` pre-flight and normalizes to a successful close only when
+  that force-stop actually succeeded
+
+Recommended recording-count stance:
+
+- default to one recording for a first pass
+- recommend a second recording when the first pass looks exploratory,
+  state-dependent, or unusually sparse
+- use a third recording only when the flow is especially flaky or divergent
+- do not silently average multiple recordings; explain what the extra pass is
+  meant to confirm
 
 ## CLI Commands
 
@@ -9070,6 +9103,9 @@ What that file is for:
 
 Practical authoring workflow:
 
+- before recording, identify the target app or apps and close them so the
+  capture starts from a fresh app state rather than a half-explored mid-flow
+  screen
 - after `record stop`, run `record pull` first and retain the local NDJSON file
 - generate `recording export` from that pulled file or directory before any
   optional `record parse` inspection
@@ -9089,6 +9125,48 @@ Recommended source:
   verification
 - the saved `clawperator skills run --json` wrapper is the v1 compare input for `clawperator recording compare --result <file>`
 - the recording export baseline is reference evidence for compare and authoring, not a runtime input passed to the skill
+
+Recording-derived authoring truthfulness:
+
+- the export is evidence, not a complete recipe
+- authors may need live snapshots, fresh UI reads, or one-off inspection to
+  refine selectors and verification
+- if live inspection materially informed the authored route, say so in
+  `SKILL.md` instead of implying the recording alone was sufficient
+- do not over-claim `from scratch` if the author reused nearby same-app skills,
+  fixtures, or shared helpers while drafting the result
+- if the first recording looked exploratory, stateful, or obviously
+  suboptimal, capture an additional pass instead of pretending one recording
+  is a reliable baseline
+
+Personalized versus shared skills:
+
+- a recording-derived skill is often valuable even when it is personalized to
+  one user's setup, labels, account state, or device graph
+- personalized local skills are a valid first outcome
+- do not pretend a personalized skill is generic if it hardcodes local labels
+  such as room names, device names, or one user's climate tile
+- a shared skill should replace those personal assumptions with generalized
+  inputs or broader selector strategy before it is presented as reusable
+
+Authoring mode terminology:
+
+- `from scratch` means do not consult same-app exemplar skills while authoring
+- `assisted from nearby patterns` means exemplar reuse is allowed, but the
+  authored skill must still be truthful about what came from the recording and
+  what came from nearby references
+- if you used nearby exemplars, say so in the authoring notes or `SKILL.md`
+  rather than presenting the result as recording-only synthesis
+
+Recording-count guidance:
+
+- one recording is the minimum viable authoring handoff
+- two recordings are often better when the first pass looked messy or
+  branch-dependent
+- three recordings are reserved for flows that are especially flaky or whose
+  path differs materially by state
+- do not merge multiple recordings by hand-waving; explain which pass became
+  the retained baseline and why
 
 Durable compare-baseline rule:
 
@@ -9312,7 +9390,7 @@ Current v1 rule:
 For `node_text_matches`, the runtime currently requires:
 
 - `skillResult.terminalVerification.status === "verified"`
-- the declared `matcher` is rendered from trusted invocation inputs parsed from the trailing raw `skills run ... -- <args>` arguments, using a deterministic lexicographic sort of `contract.inputs` keys, not from self-reported `skillResult.inputs`
+- the declared `matcher` is rendered from trusted invocation inputs, preferring named flags that match declared input names in kebab-case form such as `unit_name -> --unit-name`, then falling back to trailing positional `skills run ... -- <args>` arguments in deterministic lexicographic order of `contract.inputs`
 - `skillResult.inputs` must agree with those trusted invocation inputs for the declared fields
 - the observed terminal verification text matches the declared matcher after placeholder replacement; decorative trailing glyphs or punctuation in the observed text are allowed, but a different value or different leading text is not
 
@@ -9657,6 +9735,12 @@ Current authoring rule for new non-trivial skills:
 - keep process exit truthful
 - use `terminalVerification` when the skill claims a persisted app-state
   change
+- choose stable named user-facing inputs early and keep them aligned across:
+  - `skill.json.contract.inputs`
+  - `SKILL.md` usage examples
+  - script argument parsing and emitted `skillResult.inputs`
+- avoid positional-only public interfaces for non-trivial skills unless the
+  contract is genuinely single-purpose and obvious
 - use `skillResult: null` only for legacy skills that have not yet been
   upgraded
 - if the skill is authored from a retained recording baseline, save a
@@ -9726,6 +9810,11 @@ Current authoring expectation:
   exit non-zero rather than translating the failure into a "successful" skill run
 - if the skill's purpose is to change app state, the skill should verify the
   intended terminal state before reporting success
+- if the immediate post-action UI is known to be stale or delayed, re-open or
+  re-read the relevant controller before claiming terminal verification
+- if replay cannot truthfully prove the persisted state after a reasonable
+  re-read strategy, prefer an orchestrated or otherwise richer verification
+  path instead of claiming replay success
 
 Examples of terminal-state verification:
 
