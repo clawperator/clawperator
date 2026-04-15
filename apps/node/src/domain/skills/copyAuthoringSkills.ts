@@ -76,6 +76,15 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
+async function pathExistsNoFollow(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function discoverAuthoringSkills(sourceDir: string): Promise<string[]> {
   const entries = await readdir(sourceDir);
   const skills: string[] = [];
@@ -137,7 +146,7 @@ async function isManagedAgentSymlink(linkPath: string, installedDir: string, ski
 }
 
 async function ensureManagedSymlink(targetPath: string, linkPath: string, installedDir: string, skillName: string): Promise<void> {
-  const exists = await pathExists(linkPath);
+  const exists = await pathExistsNoFollow(linkPath);
   if (exists) {
     const managed = await isManagedAgentSymlink(linkPath, installedDir, skillName);
     if (!managed) {
@@ -148,6 +157,18 @@ async function ensureManagedSymlink(targetPath: string, linkPath: string, instal
 
   await mkdir(dirname(linkPath), { recursive: true });
   await symlink(targetPath, linkPath);
+}
+
+async function assertManagedSymlinkWritable(linkPath: string, installedDir: string, skillName: string): Promise<void> {
+  const exists = await pathExistsNoFollow(linkPath);
+  if (!exists) {
+    return;
+  }
+
+  const managed = await isManagedAgentSymlink(linkPath, installedDir, skillName);
+  if (!managed) {
+    throw new Error(`Refusing to overwrite non-Clawperator skill entry: ${linkPath}`);
+  }
 }
 
 async function removeStaleAgentSymlinks(agentDir: string, activeSkills: Set<string>, installedDir: string): Promise<void> {
@@ -220,6 +241,11 @@ export async function copyAuthoringSkills(
     await ensureDirectory(installedDir);
     await ensureDirectory(claudeSkillsDir);
     await ensureDirectory(codexSkillsDir);
+
+    for (const skillName of skills) {
+      await assertManagedSymlinkWritable(join(claudeSkillsDir, skillName), installedDir, skillName);
+      await assertManagedSymlinkWritable(join(codexSkillsDir, skillName), installedDir, skillName);
+    }
 
     for (const skillName of skills) {
       const sourceSkillDir = join(sourceDir, skillName);

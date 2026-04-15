@@ -267,6 +267,63 @@ describe("copyAuthoringSkills", () => {
     });
     assert.equal((await stat(join(claudeSkillsDir, "skill-author-by-recording"))).isDirectory(), true);
   });
+
+  it("replaces a broken managed symlink instead of failing with EEXIST", async () => {
+    const root = await makeTempRoot();
+    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const installedDir = join(root, "home", ".clawperator", "authoring-skills");
+    const claudeSkillsDir = join(root, "home", ".claude", "skills");
+    const codexSkillsDir = join(root, "home", ".codex", "skills");
+    const targetSkillDir = join(installedDir, "skill-author-by-recording");
+
+    await mkdir(claudeSkillsDir, { recursive: true });
+    await mkdir(codexSkillsDir, { recursive: true });
+    await symlink(targetSkillDir, join(claudeSkillsDir, "skill-author-by-recording"));
+    await symlink(targetSkillDir, join(codexSkillsDir, "skill-author-by-recording"));
+
+    const result = await copyAuthoringSkills({
+      sourceDir,
+      installedDir,
+      claudeSkillsDir,
+      codexSkillsDir,
+      cliVersion: "1.2.3",
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(await readlink(join(claudeSkillsDir, "skill-author-by-recording")), targetSkillDir);
+    assert.equal(await readlink(join(codexSkillsDir, "skill-author-by-recording")), targetSkillDir);
+    assert.equal(await readFile(join(targetSkillDir, "SKILL.md"), "utf8"), "# skill-author-by-recording\n");
+  });
+
+  it("preflights discovery conflicts before replacing an already installed skill", async () => {
+    const root = await makeTempRoot();
+    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const installedDir = join(root, "home", ".clawperator", "authoring-skills");
+    const targetSkillDir = join(installedDir, "skill-author-by-recording");
+    const claudeSkillsDir = join(root, "home", ".claude", "skills");
+    const codexSkillsDir = join(root, "home", ".codex", "skills");
+
+    await mkdir(targetSkillDir, { recursive: true });
+    await writeFile(join(targetSkillDir, "SKILL.md"), "# existing-installed-version\n", "utf8");
+    await mkdir(claudeSkillsDir, { recursive: true });
+    await mkdir(codexSkillsDir, { recursive: true });
+    await mkdir(join(codexSkillsDir, "skill-author-by-recording"), { recursive: true });
+
+    const result = await copyAuthoringSkills({
+      sourceDir,
+      installedDir,
+      claudeSkillsDir,
+      codexSkillsDir,
+      cliVersion: "1.2.3",
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      code: "AUTHORING_SKILLS_INSTALL_FAILED",
+      message: `Refusing to overwrite non-Clawperator skill entry: ${join(codexSkillsDir, "skill-author-by-recording")}`,
+    });
+    assert.equal(await readFile(join(targetSkillDir, "SKILL.md"), "utf8"), "# existing-installed-version\n");
+  });
 });
 
 describe("cmdAuthoringSkillsList", () => {
