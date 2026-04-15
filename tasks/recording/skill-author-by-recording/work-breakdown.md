@@ -13,7 +13,10 @@ Total PRs: 3. Total phases: 3.
 
 Current state: the repo-local skill exists from P1. P2 is now tightening the
 front door so it asks for a plain-language goal up front, derives the skill id
-after recording, and keeps replay as the default first pass.
+after recording, and keeps replay as the default first pass. The next
+tightening pass should also make the workflow honest about personalized local
+outcomes, assisted versus from-scratch authoring, and named user-facing
+inputs.
 
 ## Status
 
@@ -47,6 +50,13 @@ from scratch.
 - Do not require the user to invent the final `skill_id` before recording.
 - Do derive the `skill_id` after export analysis from the observed app and the
   user's goal.
+- Do treat a personalized local skill as a valid first outcome.
+- Do not present a personalized skill as shared-ready unless the assumptions
+  were actually generalized.
+- Do make it explicit whether the authoring pass stayed `from scratch` or used
+  nearby exemplar patterns.
+- Do prefer stable named inputs over positional-only public interfaces for
+  non-trivial skills.
 - Do not let authoring-time recording artifacts default into `./recordings/`
   under the current repo.
 - Do direct intermediate recordings, exports, and self-test wrappers into

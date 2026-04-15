@@ -48,6 +48,8 @@ Reuse those contracts. Do not invent a parallel recording, skill, or
 - Treat the recording export as evidence, not as a finished skill or runtime
   recipe.
 - Surface the concrete commands you run and the files they produce.
+- Frame the first useful outcome as a personalized local skill unless you have
+  evidence that the result is generic enough to share.
 - Default to replay on the first pass unless the user explicitly asks for
   orchestrated.
 - Honor an explicit user request for `-replay` or `-orchestrated`.
@@ -71,6 +73,14 @@ Reuse those contracts. Do not invent a parallel recording, skill, or
   keep `scripts/run.js` as a thin harness only.
 - Do not declare success until you have run one self-test invocation and shown
   the resulting `SkillResult`.
+- Choose stable named user-facing inputs before finalizing the authored skill.
+  Keep `skill.json.contract.inputs`, `SKILL.md` examples, script arg parsing,
+  and emitted `SkillResult.inputs` aligned.
+- Do not ship positional-only public interfaces for non-trivial skills when a
+  named flag would be clearer.
+- Be explicit about authoring mode. `From scratch` means no same-app exemplar
+  reuse. `Assisted from nearby patterns` means exemplar reuse is allowed, but
+  you must disclose it.
 
 ## Inputs To Gather Up Front
 
@@ -79,6 +89,9 @@ Collect or confirm these inputs before recording:
 - plain-language goal
 - whether the user explicitly wants `-replay`, `-orchestrated`, or wants the
   default replay-first path
+- whether the user wants a strict `from scratch` pass with no same-app exemplar
+  reuse, or the default assisted pass where nearby patterns may be consulted
+  and disclosed
 - target device id when more than one device is connected
 - operator package
   `com.clawperator.operator.dev` unless the user explicitly needs the release
@@ -224,6 +237,13 @@ shape fits.
 Otherwise, say that replay is the default first pass for simple flows and that
 you will test it before escalating to orchestrated.
 
+Also make the personalization boundary explicit:
+
+- if the authored path hardcodes personal labels, rooms, or one user's device
+  graph, describe it as a personalized local skill
+- do not describe that result as a shared generic skill unless you actually
+  generalized those assumptions
+
 When discussing tradeoffs, use plain language like:
 
 - replay is a good fit for simple repeatable flows
@@ -263,9 +283,17 @@ For replay:
 
 - keep the logic truthful to a deterministic path
 - use the recording evidence to derive selectors, waits, and verification
+- use live snapshots or fresh UI reads when the recording export is not enough,
+  but say so plainly in the authored notes instead of implying the export
+  alone determined the route
 - keep the retained compare baseline separate from runtime artifacts
 - treat replay as the default first authored shape unless orchestrated was
   explicitly requested
+- if the UI is known to reflect state late or unreliably, re-enter or re-read
+  the relevant controller before claiming terminal verification
+- if replay still cannot truthfully prove the persisted outcome after that
+  re-read strategy, stop calling it replay-safe and recommend orchestrated as
+  the next pass
 
 For orchestrated:
 
@@ -361,6 +389,11 @@ tell the developer to read them in this order when debugging a bad run:
 4. `agent-stdout.log`
 5. captured snapshot path, if one was taken
 6. compare output, when a retained baseline exists
+
+Also surface:
+
+1. whether the result is personalized local scope or genuinely shared-ready
+2. whether the pass stayed `from scratch` or used assisted nearby patterns
 
 If the self-test was replay and it failed, looked brittle, or could not
 truthfully prove the requested outcome, say that explicitly and strongly

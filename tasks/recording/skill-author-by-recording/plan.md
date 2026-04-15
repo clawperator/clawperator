@@ -69,6 +69,12 @@ Additional lessons from the first real replay-success run:
 - generated runtime skills must stay portable across machines and worktrees;
   do not author imports from machine-local absolute filesystem paths such as
   `/Users/<local_user>/src/...`
+- the first useful product outcome is often a personalized local skill rather
+  than a shared generic one
+- `from scratch` should mean no same-app exemplar reuse; the default assisted
+  mode may consult nearby patterns, but it should disclose that choice
+- non-trivial public skill interfaces should use stable named inputs rather
+  than positional leftovers
 
 ## Testing Strategy
 
@@ -170,6 +176,10 @@ simpler to author, easier to explain, and more deterministic. That does not
 make orchestrated secondary. It means the workflow should prefer the simplest
 truthful output first, test it, and escalate to orchestrated explicitly when
 the replay path is not good enough.
+
+The default product stance is also personalized-first. A skill can be a real
+success even when it is tied to one user's labels, rooms, or account state, as
+long as the authored artifact is honest about that boundary.
 
 ### Use a replay skill when
 
