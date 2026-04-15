@@ -9009,9 +9009,8 @@ Document the current authoring contract for local skills: scaffolded files, `SKI
 
 ## Preferred Creation Path
 
-The preferred current way to create a new recording-derived skill is the
-repo-local workflow at
-`.agents/skills/skill-author-by-recording/SKILL.md`.
+The preferred current way to create a new recording-derived skill is to use
+`skill-author-by-recording`.
 
 That workflow is the current canonical front door for creating skills from a
 fresh recording because it:
@@ -9045,7 +9044,7 @@ When you create a skill from a recording, use these current authoring rules:
   depends on one user's labels, rooms, or device graph
 
 These are the current documented rules for recording-derived authoring. They
-should stay aligned with the repo-local `skill-author-by-recording` workflow.
+should stay aligned with `skill-author-by-recording`.
 
 ## Sources
 
