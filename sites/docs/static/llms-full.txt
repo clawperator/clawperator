@@ -9204,7 +9204,7 @@ Recommended exemplar inspection:
 - the current best exemplar family to inspect is the Google Home package
   `com.google.android.apps.chromecast.app`, because it contains both replay and
   orchestrated authoring lessons from recent real recording-driven work
-- especially useful current examples are
+- especially useful current examples are:
 - `../clawperator-skills/skills/com.google.android.apps.chromecast.app.get-climate-replay/`
 - `../clawperator-skills/skills/com.google.android.apps.chromecast.app.set-power-replay/`
 - `../clawperator-skills/skills/com.google.android.apps.chromecast.app.set-temperature-replay/`
