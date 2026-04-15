@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
-import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { tmpdir } from "node:os";
 import { DoctorService } from "../../../domain/doctor/DoctorService.js";
@@ -16,23 +16,37 @@ import {
 
 describe("DoctorService", () => {
   let fakeAgentCliDir: string;
+  let fakeRegistryDir: string;
   let originalPath: string | undefined;
+  let originalRegistryPath: string | undefined;
 
   beforeEach(async () => {
     originalPath = process.env.PATH;
+    originalRegistryPath = process.env.CLAWPERATOR_SKILLS_REGISTRY;
     fakeAgentCliDir = await mkdtemp(join(tmpdir(), "clawperator-doctor-agent-cli-"));
+    fakeRegistryDir = await mkdtemp(join(tmpdir(), "clawperator-doctor-registry-"));
     const fakeAgentPath = join(fakeAgentCliDir, "codex");
+    const registryPath = join(fakeRegistryDir, "skills", "skills-registry.json");
+    await mkdir(join(fakeRegistryDir, "skills"), { recursive: true });
     await writeFile(fakeAgentPath, "#!/bin/sh\nexit 0\n", "utf8");
+    await writeFile(registryPath, `${JSON.stringify({ schemaVersion: "1.0", generatedAt: "2026-04-16T00:00:00Z", skills: [] }, null, 2)}\n`, "utf8");
     await chmod(fakeAgentPath, 0o755);
     process.env.PATH = `${fakeAgentCliDir}${delimiter}${originalPath ?? ""}`;
+    process.env.CLAWPERATOR_SKILLS_REGISTRY = registryPath;
   });
 
   afterEach(async () => {
     await rm(fakeAgentCliDir, { recursive: true, force: true });
+    await rm(fakeRegistryDir, { recursive: true, force: true });
     if (originalPath === undefined) {
       delete process.env.PATH;
     } else {
       process.env.PATH = originalPath;
+    }
+    if (originalRegistryPath === undefined) {
+      delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+    } else {
+      process.env.CLAWPERATOR_SKILLS_REGISTRY = originalRegistryPath;
     }
   });
 
