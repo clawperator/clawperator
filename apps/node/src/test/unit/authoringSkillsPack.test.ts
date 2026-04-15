@@ -2,12 +2,13 @@ import { afterEach, describe, it } from "node:test";
 import assert from "node:assert";
 import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, lstat, readFile, readlink, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 
-const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const sourceScriptPath = join(packageRoot, "scripts", "authoringSkillsPack.mjs");
+const directorySymlinkType = process.platform === "win32" ? "junction" : "dir";
 
 const tempRoots: string[] = [];
 
@@ -57,7 +58,7 @@ describe("authoringSkillsPack.mjs", () => {
     await writeFile(join(sourceSkillDir, "agents", "openai.yaml"), "name: demo\n", "utf8");
 
     const symlinkPath = join(authoringSkillsDir, "skill-author-by-recording");
-    await import("node:fs/promises").then(({ symlink }) => symlink("../sources/skill-author-by-recording", symlinkPath));
+    await import("node:fs/promises").then(({ symlink }) => symlink("../sources/skill-author-by-recording", symlinkPath, directorySymlinkType));
 
     await runNodeScript(scriptPath, "prepack", root);
 

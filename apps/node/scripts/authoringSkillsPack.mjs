@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const authoringSkillsDir = resolve(packageDir, "authoring-skills");
 const statePath = resolve(packageDir, ".authoring-skills-pack-state.json");
+const directorySymlinkType = process.platform === "win32" ? "junction" : "dir";
 
 async function prepack() {
   const entries = await readdir(authoringSkillsDir);
@@ -44,7 +45,7 @@ async function postpack() {
   for (const { entry, target } of symlinks) {
     const entryPath = resolve(authoringSkillsDir, entry);
     await rm(entryPath, { recursive: true, force: true });
-    await symlink(target, entryPath);
+    await symlink(target, entryPath, directorySymlinkType);
   }
 
   await rm(statePath, { force: true });
