@@ -92,6 +92,27 @@ Not:
 The product should make authoring skills available as part of "install
 Clawperator", not as a separate mental model the user has to discover later.
 
+## Explicit Success Criteria
+
+The intended end state for this work is:
+
+- a user runs `curl -fsSL https://clawperator.com/install.sh | bash`
+- the install flow sets up runtime skills as it does today
+- the install flow also installs first-party authoring skills from the main
+  Clawperator repo
+- the install flow wires those authoring skills into supported agent discovery
+  locations
+- when the user next opens Claude Code or Codex, supported first-party
+  Clawperator authoring skills are already available without any separate manual
+  install step
+
+In other words:
+
+- "install Clawperator" must be sufficient
+- there should be no separate "install authoring skills" step for the user
+- there should be no requirement to manually paste authoring-skill filesystem
+  paths into prompts
+
 ## Constraints
 
 - Authoring skills must remain separate from runtime skills.
@@ -116,8 +137,8 @@ Use a two-layer model:
      not the full Android source tree
 
 2. Agent discovery wiring:
-   - during Clawperator install, automatically wire supported authoring skills
-     into agent-native discovery locations via symlinks (not copies)
+   - during `install.sh`, automatically wire supported authoring skills into
+     agent-native discovery locations via symlinks (not copies)
    - for Claude Code: symlink each skill from
      `~/.clawperator/authoring-skills/<skill>/` into `~/.claude/skills/`
    - for Codex: symlink into the correct Codex skill discovery path; verify
@@ -149,6 +170,8 @@ experience:
 
 - "install Clawperator" should handle runtime skills and authoring skills
 - supported agents should discover the authoring skills without path-copying
+- after `install.sh`, the user should not need any additional authoring-skill
+  install command
 
 ## Why Not The Alternatives
 
@@ -189,6 +212,10 @@ Commands: `install`, `update`, `list`. `install` clones and wires. `update`
 fast-forwards and re-wires. `list` scans the installed dir and prints the
 available authoring skill names and SKILL.md paths.
 
+These commands are useful as internal plumbing and for repair/update flows, but
+they should not become a required extra step for the normal first-time install
+experience. The primary path should still be `install.sh`.
+
 **`apps/node/src/cli/registry.ts`**
 Register the new `authoring-skills` command group.
 
@@ -197,6 +224,12 @@ Add `setup_authoring_skills_via_cli()` after the existing
 `setup_skills_via_cli()` step. Include agent-specific wiring (symlinks to
 `~/.claude/skills/` when Claude Code is detected, Codex path when Codex is
 detected). Print installed paths in the final summary.
+
+This is the key product behavior change:
+
+- `install.sh` itself should leave the user with supported authoring skills
+  ready in supported agents
+- no follow-up manual install step should be required
 
 **`~/.clawperator/AGENTS.md` template in `install.sh`**
 Add a section pointing agents to the installed authoring skills location and
@@ -211,7 +244,10 @@ paths that do not exist outside the repo.
 
 **`docs/skills/authoring.md`**
 Add an "Authoring Skills Install" section explaining the product distinction,
-install path, and how to run `clawperator authoring-skills install`.
+install path, and that a normal Clawperator install should already make the
+supported authoring skills available. Any `clawperator authoring-skills ...`
+commands should be documented as maintenance or repair flows, not as the
+expected first-run path.
 
 **`docs/skills/overview.md`**
 Clarify that `clawperator skills` and `skills-registry.json` cover runtime
