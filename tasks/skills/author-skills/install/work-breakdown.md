@@ -9,20 +9,21 @@ portability fix, npm package scaffolding, Node CLI implementation, and unit
 tests. PR-2 (Phases 3-5) delivers install.sh wiring, doctor staleness check,
 and docs updates. PR-2 has a hard merge gate on PR-1 being merged AND the
 updated npm package published, because install.sh calls `clawperator
-authoring-skills install` which must exist in the installed CLI. Currently in
-planning; Phase 1 is next.
+authoring-skills install` which must exist in the installed CLI. Phases 1 and 2
+are complete on `skills/author-skills-install-pr1`. Phase 3 is next once PR-1
+is merged and the updated npm package is published.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | PR-1 complete locally; PR-2 blocked pending merge + npm publish |
 | Total PRs | 2 |
 | Total phases | 5 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4, 5 |
-| Current / Next | Phase 1 |
-| Blockers | none |
+| Completed | 1, 2 |
+| Remaining | 3, 4, 5 |
+| Current / Next | Phase 3 |
+| Blockers | PR-1 merge and updated npm package publish |
 
 ## Hard Rules
 
