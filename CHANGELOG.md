@@ -4,6 +4,46 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.6.0] - 2026-04-16
+
+This release adds the new authoring-skills install workflow, expands the Node skills runtime with framed SkillResult parsing and orchestrated execution support, and refreshes public docs and Android build tooling alongside the release follow-up for the previous version.
+
+### 🤖 Node API & CLI
+- **Added:** Added framed SkillResult parsing, trusted skill-result provenance handling, and orchestrated runtime support so `skills run` and `serve` can surface structured skill execution results.
+- **Added:** Added the `authoring-skills` CLI workflow for packaged skill installs, updates, and listings, including filesystem wiring for the canonical authoring-skill store.
+- **Changed:** Improved `skills run` argument forwarding and skill contract input handling so trailing arguments and named inputs are treated consistently.
+
+### 📚 Documentation & Website
+- **Added:** Documented the skill-result contract, orchestrated runtime behavior, authoring-skills install flow, and MCP references across the public docs and site surfaces.
+- **Changed:** Refreshed the landing page theme and updated release-facing docs and website artifacts for the previously published `0.5.5` release.
+
+### 📱 Android Operator APK
+- **Changed:** Upgraded the Android build stack to AGP 9.1.0 and Gradle 9, plus the corresponding module and wrapper configuration.
+- **Fixed:** Stabilized Android JSON extension unit tests by removing the Robolectric dependency from the pure JSON helper coverage.
+
+Pull requests:
+- [chore(android): upgrade AGP to 9.1.0](https://github.com/clawperator/clawperator/pull/166)
+- [feat(site): lighter landing theme](https://github.com/clawperator/clawperator/pull/165)
+- [fix(android): stabilize json extension unit tests](https://github.com/clawperator/clawperator/pull/168)
+- [chore: fix banned claw shorthand usage](https://github.com/clawperator/clawperator/pull/167)
+- [feat(skills): improve skills run argument handling](https://github.com/clawperator/clawperator/pull/171)
+- [tasks(recording): create task packs](https://github.com/clawperator/clawperator/pull/170)
+- [feat(recording): complete skill-checkpoints workstream](https://github.com/clawperator/clawperator/pull/172)
+- [feat(skills): add SkillResult contract parsing for skills](https://github.com/clawperator/clawperator/pull/173)
+- [feat(landing): mention MCP + improve demo code](https://github.com/clawperator/clawperator/pull/175)
+- [docs: add MCP references and refresh indexes](https://github.com/clawperator/clawperator/pull/176)
+- [skills: add agent-driven orchestrated runtime support](https://github.com/clawperator/clawperator/pull/177)
+- [feat(evals): add durable Solax cold-start live proving](https://github.com/clawperator/clawperator/pull/178)
+- [feat(skills): add skill contract declarations](https://github.com/clawperator/clawperator/pull/179)
+- [feat(recording): harden compare closeout and fail-closed behavior](https://github.com/clawperator/clawperator/pull/180)
+- [docs(recording): retire completed recording task packs after graduation](https://github.com/clawperator/clawperator/pull/181)
+- [fix(node): trust named skill contract inputs](https://github.com/clawperator/clawperator/pull/182)
+- [feat(skills): add skill-author-by-recording workflow](https://github.com/clawperator/clawperator/pull/183)
+- [docs(recording): harden P2 skill-author-by-recording workflow](https://github.com/clawperator/clawperator/pull/184)
+- [docs(skills): graduate recording authoring guidance](https://github.com/clawperator/clawperator/pull/185)
+- [tasks: authoring skills install and discovery task pack](https://github.com/clawperator/clawperator/pull/186)
+- [feat(node): add authoring-skills CLI support for packaged skill installs](https://github.com/clawperator/clawperator/pull/187)
+
 ## [0.5.5] - 2026-04-10
 This release expands the MCP surface with a first-party server, session defaults, and snapshot truncation ergonomics, while also adding recording export and agent-friendly CLI aliases. Documentation was refreshed alongside the new runtime behavior and the already-published 0.5.4 release.
 
