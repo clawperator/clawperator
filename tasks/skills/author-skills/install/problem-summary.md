@@ -113,6 +113,23 @@ In other words:
 - there should be no requirement to manually paste authoring-skill filesystem
   paths into prompts
 
+### Agent-install ordering edge case
+
+A user may install Clawperator before they have installed Claude Code or Codex.
+In that case `~/.claude/skills/` and the equivalent Codex path may not exist
+yet, so the symlinks cannot be created during the initial `install.sh` run.
+
+The implementation must handle this:
+
+- `install.sh` should create the target agent directories if they are missing
+  before attempting to symlink, or
+- skip wiring for absent agents gracefully and note what was skipped in the
+  install summary
+
+Either way, `clawperator authoring-skills update` must also re-run wiring so a
+user who installs an agent after Clawperator can recover with one command
+instead of re-running the full install script.
+
 ## Constraints
 
 - Authoring skills must remain separate from runtime skills.
