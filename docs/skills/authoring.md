@@ -7,7 +7,7 @@ Document the current authoring contract for local skills: scaffolded files, `SKI
 ## Preferred Creation Path
 
 The preferred current way to create a new recording-derived skill is to use
-`skill-author-by-recording`.
+the `skill-author-by-recording` skill.
 
 That workflow is the current canonical front door for creating skills from a
 fresh recording because it:
@@ -27,7 +27,7 @@ you want the preferred end-to-end recording-to-skill workflow.
 
 When you create a skill from a recording, use these current authoring rules:
 
-- use `skill-author-by-recording` as the normal way to create a new
+- use the `skill-author-by-recording` skill as the normal way to create a new
   recording-derived skill
 - start from the user's plain-language goal, not from a final prechosen
   `skill_id`
@@ -41,7 +41,7 @@ When you create a skill from a recording, use these current authoring rules:
   depends on one user's labels, rooms, or device graph
 
 These are the current documented rules for recording-derived authoring. They
-should stay aligned with `skill-author-by-recording`.
+should stay aligned with the `skill-author-by-recording` skill.
 
 ## Sources
 
