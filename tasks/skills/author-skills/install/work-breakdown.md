@@ -35,8 +35,9 @@ planning; Phase 1 is next.
   package. Use copies. Symlinks into a globally installed npm package break when
   nvm switches Node versions.
 - Do use symlinks from agent discovery dirs to `~/.clawperator/authoring-skills/`.
-- Create `~/.claude/skills/` and `~/.codex/skills/` unconditionally in the
-  `install` command. Do not gate on whether the agent is installed.
+- Create `~/.claude/skills/` and `$CODEX_HOME/skills` (if `CODEX_HOME` is set)
+  else `~/.codex/skills/` unconditionally in the `install` command. Do not gate
+  on whether the agent is installed.
 - Phase 2 must include unit tests for `copyAuthoringSkills.ts` and
   `authoringSkills.ts`. Do not defer tests.
 - Phase 4 must include unit tests for the new doctor check. Do not defer tests.

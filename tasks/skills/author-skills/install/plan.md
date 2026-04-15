@@ -186,8 +186,9 @@ See `tasks/skills/author-skills/install/problem-summary.md` for full background.
 - **install.sh duplicating wiring logic.** All logic lives in
   `clawperator authoring-skills install`. install.sh calls that command. Nothing
   else.
-- **Conditional directory creation.** `~/.claude/skills/` and `~/.codex/skills/`
-  must be created unconditionally. Do not gate on agent presence.
+- **Conditional directory creation.** `~/.claude/skills/` and `$CODEX_HOME/skills`
+  (if `CODEX_HOME` is set, else `~/.codex/skills/`) must be created
+  unconditionally. Do not gate on agent presence.
 - **Tests deferred past the phase that introduces behavior.** Phase 2 ships
   `copyAuthoringSkills.ts` and `authoringSkills.ts`; their tests ship in Phase 2.
   Phase 4 ships the doctor check; its tests ship in Phase 4.
