@@ -30,9 +30,9 @@ demo-grade closeout rather than new deep runtime invention.
 | State | active, plan tightened after implementation drift |
 | Total PRs | 3 |
 | Total phases | 3 |
-| Completed | problem framing, plan tightening, and P1 |
-| Remaining | P2 (orchestrated path), P3 (demo validation) |
-| Current / Next | P2 orchestrated-path closeout |
+| Completed | problem framing, plan tightening, P1, and P2 |
+| Remaining | P3 (demo validation) |
+| Current / Next | P3 demo validation |
 | Blockers | none |
 
 ## Current Baseline

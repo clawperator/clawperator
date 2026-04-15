@@ -11,12 +11,12 @@ Total PRs: 3. Total phases: 3.
 - P3: validate the full story against the Solax demo path and graduate durable
   guidance
 
-Current state: the repo-local skill exists from P1. P2 is now tightening the
-front door so it asks for a plain-language goal up front, derives the skill id
-after recording, and keeps replay as the default first pass. The next
-tightening pass should also make the workflow honest about personalized local
-outcomes, assisted versus from-scratch authoring, and named user-facing
-inputs.
+Current state: P2 is complete. The repo-local front door now makes the
+replay-versus-orchestrated recommendation explicit, supports direct
+orchestrated authoring without a fake replay detour, and was validated by
+authoring `com.google.android.apps.chromecast.app.get-climate-orchestrated`
+from fresh Google Home recording evidence. The remaining phase is P3 demo
+validation.
 
 ## Status
 
@@ -25,9 +25,9 @@ inputs.
 | State | active |
 | Total PRs | 3 |
 | Total phases | 3 |
-| Completed | problem-definition pass, plan-tightening pass, and P1 |
-| Remaining | P2 (orchestrated path), P3 (demo validation) |
-| Current / Next | P2 |
+| Completed | problem-definition pass, plan-tightening pass, P1, and P2 |
+| Remaining | P3 (demo validation) |
+| Current / Next | P3 |
 | Blockers | none |
 
 ## Starting Point
@@ -254,7 +254,7 @@ docs(recording): align skill-author-by-recording workflow
 
 ## Phase P2: Orchestrated Path Closeout
 
-Status: pending
+Status: complete
 
 ### Agent Tier
 
@@ -317,6 +317,13 @@ Human check:
 
 - run one guided walkthrough on a flow that is clearly orchestrated-shaped and
   confirm the workflow chooses orchestrated for truthful reasons
+
+Completed validation:
+
+- 2026-04-15: authored and self-tested
+  `com.google.android.apps.chromecast.app.get-climate-orchestrated` from a
+  fresh Google Home recording session
+  `p2-get-climate-orchestrated-20260415-151731`
 
 ### Expected Commit
 
