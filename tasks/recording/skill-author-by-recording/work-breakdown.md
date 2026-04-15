@@ -57,6 +57,12 @@ from scratch.
   nearby exemplar patterns.
 - Do prefer stable named inputs over positional-only public interfaces for
   non-trivial skills.
+- Do ask which target app or apps should be reset before recording, and close
+  them before `recording start`.
+- Do treat one recording as the minimum baseline, not an always-sufficient
+  baseline.
+- Do recommend another recording pass when the first recording looks
+  exploratory, sparse, or state-dependent.
 - Do not let authoring-time recording artifacts default into `./recordings/`
   under the current repo.
 - Do direct intermediate recordings, exports, and self-test wrappers into

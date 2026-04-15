@@ -87,6 +87,7 @@ Reuse those contracts. Do not invent a parallel recording, skill, or
 Collect or confirm these inputs before recording:
 
 - plain-language goal
+- target app or apps to reset before recording starts
 - whether the user explicitly wants `-replay`, `-orchestrated`, or wants the
   default replay-first path
 - whether the user wants a strict `from scratch` pass with no same-app exemplar
@@ -140,6 +141,8 @@ both first-class maintained skill shapes.
 
 Tell the user what you are about to do:
 
+- confirm the target app or apps and close them first so recording starts from
+  a fresh state
 - start recording
 - ask them to perform the flow once
 - stop recording and pull the raw capture
@@ -155,7 +158,28 @@ not authoring Solax, do not drag Solax-specific assumptions into the session.
 Require the plain-language goal before recording starts. Do not block on a
 final `skill_id`.
 
-### 2. Start Recording
+### 2. Reset Target Apps Before Recording
+
+Before `recording start`, reset the user-confirmed target app or apps so the
+recorded route starts from a fresh app state instead of a half-explored screen.
+
+Use Clawperator to close each target app explicitly. A typical shape is:
+
+```bash
+clawperator exec --device <device_serial> --operator-package <operator_package> --execution '{"commandId":"skill-author-reset-<timestamp>","taskId":"skill-author-by-recording","source":"skill-author-by-recording","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"close_target","type":"close_app","params":{"applicationId":"<target_application_id>"}}]}' --json
+```
+
+If more than one target app matters to the flow, close each of them before you
+start recording.
+
+Call out why this matters:
+
+- many users will explore the UI first, then decide to record
+- leaving the app mid-flow can produce a misleadingly short recording
+- a truthful baseline should start from the app state the skill is expected to
+  reproduce
+
+### 3. Start Recording
 
 Use the selected device and operator package explicitly. Show the concrete
 command before or while running it.
@@ -167,12 +191,12 @@ clawperator recording start --session-id <session_id> --device <device_serial> -
 Then tell the human clearly that recording is active and it is their turn to
 perform the target phone flow.
 
-### 3. Human Performs The Flow
+### 4. Human Performs The Flow
 
 Pause for the human to do the workflow on the device. Do not guess what
 happened. When they say the flow is complete, continue.
 
-### 4. Stop, Pull, And Export
+### 5. Stop, Pull, And Export
 
 Run the full recording lifecycle in order and surface the resulting paths:
 
@@ -193,7 +217,30 @@ Do not rely on the CLI default `./recordings/` output location for this
 workflow. Use the explicit user-scoped path above so authoring artifacts do not
 accumulate in whichever repo the skill happened to run from.
 
-### 5. Derive The App Identity And `skill_id`
+### 6. Confidence Check And Optional Extra Recording
+
+Before you commit to authoring from a single pass, inspect whether the first
+recording looked clean enough to trust.
+
+Recommend another recording when any of these are true:
+
+- the user explored or corrected themselves mid-flow
+- the recording appears unusually sparse for the claimed route
+- the path differs based on starting UI state
+- replay would require guesswork rather than evidence-backed selectors
+- the final state changed what the next run would look like
+
+When confidence is low, ask plainly whether the user wants to run another
+recording pass before you author the skill. Explain why:
+
+- a second pass can confirm the intended route
+- a second or third pass can expose state-driven branching
+- extra passes help distinguish stable selectors from one-off noise
+
+Do not silently merge multiple recordings into fake certainty. If there are
+multiple passes, say which recording became the retained baseline and why.
+
+### 7. Derive The App Identity And `skill_id`
 
 Inspect the export and derive a truthful first-pass `skill_id`.
 
@@ -211,7 +258,7 @@ the derived id is clearly misleading or the user wants a different naming
 choice. Do not make users invent reverse-domain naming from scratch before the
 recording exists.
 
-### 6. Retain The Sanitized Baseline
+### 8. Retain The Sanitized Baseline
 
 Copy or write the sanitized retained export baseline to:
 
@@ -227,7 +274,7 @@ Rules:
 - do not treat `recording-context.json` as the long-term maintained compare
   path once this retained baseline exists
 
-### 7. Explain The Chosen Shape
+### 9. Explain The Chosen Shape
 
 Make the current pass explicit.
 
@@ -252,7 +299,7 @@ When discussing tradeoffs, use plain language like:
 Do not force the user to learn the taxonomy first, but do explain the tradeoff
 clearly when it matters.
 
-### 8. Scaffold The Runtime Skill
+### 10. Scaffold The Runtime Skill
 
 Create the runtime skill in the skills repo with recording context copied from
 the export artifact:
@@ -275,7 +322,7 @@ Remember:
 - if you need stable `SkillResult` frame constants in a generated script,
   prefer portable local constants or a repo-relative/runtime-safe import path
 
-### 9. Author The Chosen Shape
+### 11. Author The Chosen Shape
 
 Author exactly one requested or recommended shape in this pass.
 
@@ -311,7 +358,7 @@ For orchestrated:
 In both cases, make the terminal verification policy explicit and ensure the
 artifact reflects what the runtime can actually prove.
 
-### 10. Show The Authored Files
+### 12. Show The Authored Files
 
 Surface the key authored files so the developer can inspect the result:
 
@@ -328,7 +375,7 @@ If the chosen shape is orchestrated, make clear that:
 - `SKILL.md` is the runtime agent program
 - `scripts/run.js` is only the thin harness
 
-### 11. Run One Self-Test
+### 13. Run One Self-Test
 
 Run exactly one first self-test invocation of the authored skill and save the
 full JSON wrapper plus stderr:
@@ -357,7 +404,7 @@ device snapshot for post-mortem inspection and surface its path:
 clawperator snapshot --device <device_serial> --operator-package <operator_package> --json
 ```
 
-### 12. Surface The `SkillResult`
+### 14. Surface The `SkillResult`
 
 Inspect the saved `skills run --json` wrapper and surface the top-level
 `skillResult`.

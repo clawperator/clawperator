@@ -100,6 +100,9 @@ What that file is for:
 
 Practical authoring workflow:
 
+- before recording, identify the target app or apps and close them so the
+  capture starts from a fresh app state rather than a half-explored mid-flow
+  screen
 - after `record stop`, run `record pull` first and retain the local NDJSON file
 - generate `recording export` from that pulled file or directory before any
   optional `record parse` inspection
@@ -129,6 +132,9 @@ Recording-derived authoring truthfulness:
   `SKILL.md` instead of implying the recording alone was sufficient
 - do not over-claim `from scratch` if the author reused nearby same-app skills,
   fixtures, or shared helpers while drafting the result
+- if the first recording looked exploratory, stateful, or obviously
+  suboptimal, capture an additional pass instead of pretending one recording
+  is a reliable baseline
 
 Personalized versus shared skills:
 
@@ -148,6 +154,16 @@ Authoring mode terminology:
   what came from nearby references
 - if you used nearby exemplars, say so in the authoring notes or `SKILL.md`
   rather than presenting the result as recording-only synthesis
+
+Recording-count guidance:
+
+- one recording is the minimum viable authoring handoff
+- two recordings are often better when the first pass looked messy or
+  branch-dependent
+- three recordings are reserved for flows that are especially flaky or whose
+  path differs materially by state
+- do not merge multiple recordings by hand-waving; explain which pass became
+  the retained baseline and why
 
 Durable compare-baseline rule:
 

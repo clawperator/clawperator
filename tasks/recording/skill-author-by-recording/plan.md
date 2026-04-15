@@ -75,6 +75,11 @@ Additional lessons from the first real replay-success run:
   mode may consult nearby patterns, but it should disclose that choice
 - non-trivial public skill interfaces should use stable named inputs rather
   than positional leftovers
+- recordings should begin from a fresh app state, which means the workflow
+  should reset the target app or apps before `recording start`
+- one recording is the minimum evidence, but the workflow should recommend
+  another pass when the first capture looks exploratory, sparse, or
+  state-dependent
 
 ## Testing Strategy
 
@@ -180,6 +185,10 @@ the replay path is not good enough.
 The default product stance is also personalized-first. A skill can be a real
 success even when it is tied to one user's labels, rooms, or account state, as
 long as the authored artifact is honest about that boundary.
+
+The workflow should also assume that many users will explore the app before
+they record. A truthful recording baseline therefore usually requires an
+explicit app reset step before recording starts.
 
 ### Use a replay skill when
 
