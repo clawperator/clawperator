@@ -1,6 +1,6 @@
 ---
 name: skill-author-by-recording
-description: Create or update a Clawperator skill from a fresh phone recording. Use when a developer wants one front-door workflow that records a real device flow, requires a plain-language goal up front, derives the skill id from the recording and goal, defaults to replay on the first pass unless orchestrated is explicitly requested, and runs one self-test that surfaces the emitted SkillResult.
+description: Create or update a Clawperator skill from a fresh phone recording. Use when a developer wants one front-door workflow that records a real device flow, requires a plain-language goal up front, derives the skill id from the recording and goal, defaults to replay on the first pass unless orchestrated is explicitly requested or clearly more truthful, and runs one self-test that surfaces the emitted SkillResult.
 ---
 
 # Skill Author By Recording
@@ -51,13 +51,18 @@ Reuse those contracts. Do not invent a parallel recording, skill, or
 - Frame the first useful outcome as a personalized local skill unless you have
   evidence that the result is generic enough to share.
 - Default to replay on the first pass unless the user explicitly asks for
-  orchestrated.
+  orchestrated or the recording evidence already shows orchestrated is the more
+  truthful shape.
 - Honor an explicit user request for `-replay` or `-orchestrated`.
 - Author one requested or recommended skill shape per pass unless the user
   explicitly asks for both.
 - Derive the initial `skill_id` after export analysis from the observed app and
   the user's plain-language goal. Do not require the user to invent a package
   name or reverse-domain id up front.
+- Make the replay-versus-orchestrated recommendation explicit before you author
+  code. If the recording evidence already shows replay would be untruthful or
+  insufficient, say so plainly and author orchestrated in the same front-door
+  workflow instead of forcing a fake replay-first detour.
 - If replay proves untruthful, too brittle, or fails its first self-test,
   explain why and strongly recommend orchestrated as the next pass with clear
   pros and cons.
@@ -73,6 +78,9 @@ Reuse those contracts. Do not invent a parallel recording, skill, or
   keep `scripts/run.js` as a thin harness only.
 - Do not declare success until you have run one self-test invocation and shown
   the resulting `SkillResult`.
+- During creation and verification, own the fix loop for the just-authored
+  skill. If the first self-test fails, patch the created skill, validate it
+  again, and rerun it instead of stopping at the first broken draft.
 - Choose stable named user-facing inputs before finalizing the authored skill.
   Keep `skill.json.contract.inputs`, `SKILL.md` examples, script arg parsing,
   and emitted `SkillResult.inputs` aligned.
@@ -116,7 +124,8 @@ Use this first-match-wins table exactly:
 | --- | --- |
 | User explicitly requests `-replay` | Author replay first and do not up-sell orchestrated in the same pass unless replay proves untruthful or fails self-test |
 | User explicitly requests `-orchestrated` | Author orchestrated and do not force a replay-first detour |
-| No explicit shape | Author replay first |
+| No explicit shape and the recording evidence already shows replay would be untruthful or insufficient | Explain why and author orchestrated now |
+| No explicit shape and the flow still looks replay-safe | Author replay first |
 | Replay authoring or self-test shows replay is not truthful or sufficient | Explain why, show replay versus orchestrated tradeoffs, and strongly recommend orchestrated as the next pass |
 | User explicitly wants both variants | Treat sibling authoring as intentional extra scope, not the default |
 
@@ -135,6 +144,17 @@ outcome rather than a fixed tap sequence.
 Do not describe replay as a lower-grade artifact. Replay and orchestrated are
 both first-class maintained skill shapes.
 
+When deciding whether orchestrated is already the truthful first pass, look for
+signs like these in the recording export plus the user's stated goal:
+
+- the next action depends on reading current UI state before acting
+- the flow needs recovery from a mid-route or resumed app state
+- the terminal proof depends on a persisted value that cannot be trusted from
+  one fixed tap sequence alone
+- the recording only captures one branch of a state-driven route
+- a personalized first pass is still valid, but it needs an agentic runtime
+  program rather than a deterministic macro
+
 ## Workflow
 
 ### 1. Confirm Scope And Show The Plan
@@ -149,8 +169,12 @@ Tell the user what you are about to do:
 - export the recording artifact
 - derive the skill id from the observed app and the user's goal
 - retain a sanitized compare baseline
-- author replay first by default unless orchestrated was explicitly requested
-- run one self-test and inspect the `SkillResult`
+- make an explicit replay-versus-orchestrated recommendation from the recording
+  evidence and the user's goal
+- author replay first only when it still looks truthful; otherwise author
+  orchestrated directly
+- run one self-test, inspect the `SkillResult`, and if it fails stay inside the
+  created skill's repair loop until it passes or you hit a real blocker
 
 Keep the Solax proving case separate from the generic workflow. If the user is
 not authoring Solax, do not drag Solax-specific assumptions into the session.
@@ -298,8 +322,16 @@ Make the current pass explicit.
 If the user explicitly requested orchestrated, say so and explain why that
 shape fits.
 
-Otherwise, say that replay is the default first pass for simple flows and that
-you will test it before escalating to orchestrated.
+Otherwise, make a truthful recommendation from the export evidence before you
+author code:
+
+- if the flow still looks replay-safe, say that replay is the default first
+  pass for this recording and that you will test it before escalating
+- if the flow already looks orchestrated-shaped, say why replay would be
+  untruthful or insufficient and move directly to orchestrated in this pass
+
+Do not hide that decision. The user should be able to tell whether the front
+door stayed replay-first or took the orchestrated branch and why.
 
 Also make the personalization boundary explicit:
 
@@ -361,19 +393,48 @@ For replay:
 
 For orchestrated:
 
+- reuse the durable orchestrated runtime contract from
+  `docs/skills/overview.md#orchestrated-runtime-contract`
 - keep `skill.json.agent` as trusted runtime metadata
 - write the app-specific runtime program in `SKILL.md`
+- make `SKILL.md` own the route, checkpoints, verification policy, and emitted
+  `SkillResult` shape
 - keep `scripts/run.js` as a thin launcher that forwards stdout and stderr
+- keep `skill.json.contract.inputs`, `SKILL.md` examples, forwarded wrapper
+  args, and emitted `SkillResult.inputs` aligned around stable named inputs
+- anticipate user-facing versus UI-facing value mismatches such as
+  `medium` versus `med`; normalize them truthfully in the created skill instead
+  of assuming the public contract text and the app label are identical
 - keep per-run local debug artifacts when the harness runs:
   - `prompt.txt`
   - `agent-stdout.log`
   - `agent-stderr.log`
   - `run-metadata.json` with device id, operator package, forwarded args, and
     output paths
+- save the outer `clawperator skills run --json` wrapper and stderr capture
+  alongside that harness bundle under `~/.clawperator/recordings/<session_id>/`
 - do not bury app-specific navigation or verification policy in the harness
+- on the first repair pass, harden the runtime prompt against the failure class
+  you just observed, especially around:
+  - exact command templates
+  - exact final frame shape
+  - explicit bans on recursive skill calls or unrelated repo introspection
+  - single-line shell command requirements when multiline commands already
+    caused wrapper or transport drift
 
 In both cases, make the terminal verification policy explicit and ensure the
 artifact reflects what the runtime can actually prove.
+
+Before the first self-test, tell the user that scaffold plus first draft is not
+the finish line. This pass includes:
+
+1. author the skill
+2. validate the created files
+3. run the created skill
+4. if it fails, inspect the failure artifacts and patch that same skill
+5. rerun validation and the skill until it works or a real blocker remains
+
+Do not treat the first failed self-test as a satisfactory endpoint.
 
 ### 12. Show The Authored Files
 
@@ -390,6 +451,7 @@ If the chosen shape is replay, make clear which file contains the replay logic.
 If the chosen shape is orchestrated, make clear that:
 
 - `SKILL.md` is the runtime agent program
+- `skill.json.agent` is the trusted runtime metadata
 - `scripts/run.js` is only the thin harness
 
 ### 13. Run One Self-Test
@@ -404,6 +466,42 @@ clawperator skills run <skill_id> --device <device_serial> --operator-package <o
 If the skill takes inputs, pass the minimum truthful input set required for one
 real run.
 
+The self-test phase is an active repair loop, not a one-shot ceremony.
+
+If the first self-test fails:
+
+- inspect the saved wrapper JSON, stderr, and any orchestrated debug bundle
+  from that exact run before changing strategy
+- classify the failure before patching anything:
+  1. environment or runtime mismatch
+  2. wrapper, contract, or frame issue
+  3. agent-prompt drift
+  4. app navigation or selector issue
+  5. terminal verification or normalization issue
+- patch the just-authored `SKILL.md`, `skill.json`, or `scripts/run.js`
+  directly when the failure points to a skill bug
+- rerun `skills validate <skill_id>` after each substantive patch
+- before each rerun, restore the target app or apps to the same truthful
+  starting precondition the skill expects so you are not validating against a
+  mutated mid-flow screen from the failed attempt
+- rerun the same skill with the same truthful input set until the pass either
+  succeeds or you hit a concrete blocker such as missing evidence, ambiguous UI
+  state, or a user decision that cannot be inferred safely
+
+Stay focused on the created skill during this loop.
+
+Run only one active self-test per device at a time during authoring and repair.
+Do not overlap live retries on the same phone or emulator.
+
+Do not:
+
+- wander into unrelated skills in the repo
+- treat auxiliary repo skills as the next step unless the user explicitly asked
+  for them
+- leave the authored skill broken while exploring other workflows
+- stop after surfacing a failed `SkillResult` if the failure is fixable from
+  the current artifacts and code
+
 If the authored shape is orchestrated, require the self-test run to preserve
 the per-run debug bundle from the harness. At minimum retain:
 
@@ -413,6 +511,23 @@ the per-run debug bundle from the harness. At minimum retain:
 - `agent-stdout.log`
 - `agent-stderr.log`
 - `run-metadata.json`
+
+If the self-test was orchestrated and failed, use that exact debug bundle to
+drive the next patch. Read it in this order before editing:
+
+1. saved `skills run` stderr log
+2. saved wrapper JSON `skillResult`
+3. `agent-stderr.log`
+4. `agent-stdout.log`
+5. `prompt.txt`
+6. `run-metadata.json`
+
+During that orchestrated repair pass, distinguish clearly between:
+
+- device work succeeded but the wrapper, frame, or contract handling failed
+- the automation itself failed on device
+
+Patch the failing layer first instead of mixing those cases together.
 
 If the run fails or ends in an unexpected UI state, capture one immediate
 device snapshot for post-mortem inspection and surface its path:
@@ -468,6 +583,13 @@ plainly:
 - orchestrated is better for complex workflows driven by an AI agent against
   live UI state
 
+If the self-test failed first but the current pass repaired the created skill
+successfully, surface that repair loop briefly:
+
+- what broke on the first run
+- which created file or files you patched
+- which rerun finally passed
+
 Do not silently switch shapes mid-pass. Finish the pass truthfully and make the
 next-step recommendation explicit.
 
@@ -481,6 +603,8 @@ Stop and correct the workflow if you find yourself implying any of these:
 - the retained compare baseline is a runtime artifact
 - the harness owns the orchestrated skill logic
 - authoring is done before a self-test run emits an inspectable `SkillResult`
+- the first failed self-test is an acceptable stopping point when the created
+  skill could still be repaired from the current code and artifacts
 
 ## Output Standard
 

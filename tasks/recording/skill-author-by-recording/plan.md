@@ -30,10 +30,18 @@ demo-grade closeout rather than new deep runtime invention.
 | State | active, plan tightened after implementation drift |
 | Total PRs | 3 |
 | Total phases | 3 |
-| Completed | problem framing, plan tightening, and P1 |
-| Remaining | P2 (orchestrated path), P3 (demo validation) |
-| Current / Next | P2 orchestrated-path closeout |
+| Completed | problem framing, plan tightening, P1, and P2 |
+| Remaining | P3 (demo validation) |
+| Current / Next | P3 demo validation |
 | Blockers | none |
+
+P2 implementation status:
+
+- the repo-local `skill-author-by-recording` workflow is implemented
+- the orchestrated branch now supports direct orchestrated authoring when that
+  is the truthful first shape
+- the repair loop is now explicit and state-aware during self-test verification
+- the current implementation is ready to be turned into the P2 PR
 
 ## Current Baseline
 
