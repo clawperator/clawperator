@@ -113,22 +113,18 @@ In other words:
 - there should be no requirement to manually paste authoring-skill filesystem
   paths into prompts
 
-### Agent-install ordering edge case
+### Agent-install ordering
 
 A user may install Clawperator before they have installed Claude Code or Codex.
-In that case `~/.claude/skills/` and the equivalent Codex path may not exist
-yet, so the symlinks cannot be created during the initial `install.sh` run.
+`install.sh` must handle this by unconditionally creating the agent discovery
+directories (`~/.claude/skills/`, and the Codex equivalent) and placing the
+symlinks regardless of whether the agent is currently installed. When the user
+later installs Claude Code or Codex, those agents find the directories already
+populated and the skills are immediately available.
 
-The implementation must handle this:
-
-- `install.sh` should create the target agent directories if they are missing
-  before attempting to symlink, or
-- skip wiring for absent agents gracefully and note what was skipped in the
-  install summary
-
-Either way, `clawperator authoring-skills update` must also re-run wiring so a
-user who installs an agent after Clawperator can recover with one command
-instead of re-running the full install script.
+`clawperator authoring-skills update` must also re-run wiring for the same
+reason: a user who installs an agent after Clawperator can rerun it once to
+confirm everything is in place without re-running the full install script.
 
 ## Constraints
 
@@ -148,25 +144,29 @@ instead of re-running the full install script.
 Use a two-layer model:
 
 1. Canonical install location:
-   - install first-party authoring skills to `~/.clawperator/authoring-skills/`
-   - clone the `.agents/skills/` subtree from the main clawperator GitHub repo
-     using git sparse checkout so only the authoring skill files are pulled,
-     not the full Android source tree
+   - bundle authoring skill files (SKILL.md, `agents/openai.yaml`, etc.) inside
+     the npm package under `authoring-skills/`
+   - during install, copy those files out of the installed npm package to
+     `~/.clawperator/authoring-skills/` and write a `version.txt` recording the
+     CLI version they came from
+   - copies, not symlinks, are used at this layer to avoid fragility from nvm
+     version switches (which change the npm global prefix path)
 
 2. Agent discovery wiring:
-   - during `install.sh`, automatically wire supported authoring skills into
-     agent-native discovery locations via symlinks (not copies)
-   - for Claude Code: symlink each skill from
-     `~/.clawperator/authoring-skills/<skill>/` into `~/.claude/skills/`
+   - during `install.sh`, symlink each skill from
+     `~/.clawperator/authoring-skills/<skill>/` into agent-native discovery
+     locations
+   - for Claude Code: symlink into `~/.claude/skills/`
    - for Codex: symlink into the correct Codex skill discovery path; verify
      the actual path before implementing (the `agents/openai.yaml` convention
-     is known, but the Codex skill directory path needs confirmation)
+     is known, but the Codex-side directory path needs confirmation)
    - if another agent later has a supported skill-discovery location, wire that
      too using the same canonical source
 
-Symlinks are preferred over copies so that `clawperator authoring-skills
-update` automatically propagates to all wired agent locations without needing
-to re-run each agent's wiring step.
+Symlinks are used at the agent-wiring layer so that `clawperator
+authoring-skills update` only needs to refresh the files in
+`~/.clawperator/authoring-skills/`; the agent-side symlinks stay valid without
+needing to be recreated.
 
 ## Why This Direction
 
@@ -210,19 +210,34 @@ Do not move first-party authoring skills into `clawperator-skills`: wrong
 boundary. The skills repo is for content Clawperator can execute, not for
 programs that author that content.
 
+Do not use git sparse checkout from the main clawperator repo as the primary
+distribution mechanism: authoring skills are first-party and tightly coupled to
+the CLI, so the npm package is already the correct versioned artifact. A
+separate git clone introduces a version skew problem - `npm install -g
+clawperator@latest` updates the CLI but leaves the git clone at whatever commit
+it was at. The npm bundle approach eliminates this gap entirely.
+
 ## Implementation Surfaces
 
 Changes needed if this direction is adopted:
 
-**`apps/node/src/domain/skills/skillsConfig.ts`**
-Add `AUTHORING_SKILLS_REPO_URL` (main clawperator GitHub repo),
-`DEFAULT_AUTHORING_SKILLS_DIR` (`~/.clawperator/authoring-skills`).
+**`apps/node/package.json` and `apps/node/authoring-skills/` (new)**
+Add the authoring skill files (SKILL.md, `agents/openai.yaml`, etc.) under
+`apps/node/authoring-skills/` in the main repo and ensure `authoring-skills/`
+is included in the `files` array so it is published with the npm package.
 
-**`apps/node/src/domain/skills/syncAuthoringSkills.ts` (new)**
-Clone or sparse-checkout `.agents/skills/` from the main clawperator repo,
-similar in shape to `syncSkills.ts`. Verify the registry file exists after sync
-(the authoring skills dir should contain a `skills-index.json` or equivalent
-manifest rather than reusing the runtime registry schema).
+**`apps/node/src/domain/skills/skillsConfig.ts`**
+Add `DEFAULT_AUTHORING_SKILLS_DIR` (`~/.clawperator/authoring-skills`). No
+remote URL constant is needed: the source is the installed npm package, not a
+remote repository.
+
+**`apps/node/src/domain/skills/copyAuthoringSkills.ts` (new)**
+Locate the authoring skills source inside the installed npm package (relative
+to `import.meta.url`), copy each skill directory to
+`~/.clawperator/authoring-skills/`, and write `version.txt` with the current
+CLI version. No git operations required. Discovery of available skills uses
+directory scanning for subdirectories containing SKILL.md; no manifest file
+is needed.
 
 **`apps/node/src/cli/commands/authoringSkills.ts` (new)**
 Commands: `install`, `update`, `list`. `install` clones and wires. `update`
@@ -289,32 +304,16 @@ is needed.
 
 ### The npm update gap
 
-This stance has a practical gap: `npm install -g clawperator@latest` updates
-the CLI binary but does not update the authoring skills that were installed to
-`~/.clawperator/authoring-skills/` during a prior `install.sh` run.
+`npm install -g clawperator@latest` updates the CLI binary but does not
+automatically refresh the authoring skills that were copied to
+`~/.clawperator/authoring-skills/` during a prior install. The user then has a
+CLI at v1.2.0 with authoring skills copied from v1.0.0.
 
-A git-clone approach makes this worse. If authoring skills are cloned from
-GitHub into `~/.clawperator/authoring-skills/`, updating the CLI via npm leaves
-the clone at whatever commit it was at. The user then has a CLI at v1.2.0 and
-authoring skills that might be at v1.0.0.
-
-### Recommended approach: bundle in the npm package, copy out on install
-
-Authoring skill files (SKILL.md, `agents/openai.yaml`, etc.) are just text and
-belong inside the npm package itself under `authoring-skills/`. This is the
-right model because:
-
-- authoring skills are first-party and tightly coupled to the CLI codebase
-- the npm package already owns the CLI version
-- bundling means no separate git clone is needed during install
-
-During install, `clawperator authoring-skills install` copies the files out of
-the installed npm package to `~/.clawperator/authoring-skills/` and writes a
-`version.txt` alongside them recording the CLI version they came from. The
-agent symlinks point at `~/.clawperator/authoring-skills/`, not into the npm
-package internals. This avoids fragility from nvm version switches (which
-change the npm global prefix path and would break symlinks into
-`node_modules/`).
+The bundle-and-copy model described in the Recommendation section is the
+correct response to this: because the source is always the installed npm
+package, `clawperator authoring-skills update` is a fast local copy with no
+network request needed. The staleness is visible via `clawperator doctor`, and
+the fix is one command.
 
 ### Staleness detection
 
