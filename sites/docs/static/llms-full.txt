@@ -9027,6 +9027,26 @@ Use raw `clawperator skills new <skill_id>` scaffolding directly when you are
 doing manual skill construction or editing an existing skill shape, not when
 you want the preferred end-to-end recording-to-skill workflow.
 
+## Recording-Driven Workflow Stance
+
+The durable product stance for recording-driven skill creation is:
+
+- keep one front door: `skill-author-by-recording`
+- start from a plain-language goal, not a precommitted final `skill_id`
+- derive the first-pass `skill_id` after inspecting the recording evidence
+- author one requested or recommended skill shape per pass unless the caller
+  explicitly wants both
+- treat replay and orchestrated as first-class maintained shapes
+- default to replay for the first pass when replay still looks truthful
+- move directly to orchestrated when replay would already be untruthful or
+  insufficient
+- treat a personalized local skill as a valid first outcome when the recording
+  reflects one user's labels, rooms, or device graph
+
+Those rules are product behavior, not temporary task-pack guidance. The
+repo-local workflow enforces them at authoring time, and the authored skill
+docs should stay aligned with that same front-door stance.
+
 ## Sources
 
 - Scaffold implementation: `apps/node/src/domain/skills/scaffoldSkill.ts`
