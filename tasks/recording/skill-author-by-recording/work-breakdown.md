@@ -11,22 +11,22 @@ Total PRs: 3. Total phases: 3.
 - P3: validate the full story against the Solax demo path and graduate durable
   guidance
 
-Current state: P2 is complete. The front door now makes the
+Current state: complete. The front door now makes the
 replay-versus-orchestrated recommendation explicit, supports direct
-orchestrated authoring without a fake replay detour, and requires an active
-repair loop during self-test verification. P3 is now focused on demo-path
-truthfulness and durable guidance graduation.
+orchestrated authoring without a fake replay detour, requires an active repair
+loop during self-test verification, and has completed the P3 demo-path
+documentation closeout.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | active, P3 demo-path validation in progress |
+| State | complete |
 | Total PRs | 3 |
 | Total phases | 3 |
-| Completed | problem-definition pass, plan-tightening pass, P1, and P2 |
-| Remaining | P3 (demo validation and closeout) |
-| Current / Next | P3 demo-path validation and doc graduation |
+| Completed | problem-definition pass, plan-tightening pass, P1, P2, and P3 |
+| Remaining | none |
+| Current / Next | retire pack when task-folder cleanup runs |
 | Blockers | none |
 
 ## Starting Point
@@ -338,7 +338,7 @@ docs(recording): tighten orchestrated skill-authoring path
 
 ## Phase P3: Demo Validation And Graduation
 
-Status: pending
+Status: complete
 
 ### Agent Tier
 
@@ -404,6 +404,18 @@ Human check:
 - run the Solax demo path end to end and confirm the on-camera story still
   matches the actual workflow and artifacts
 
+Completed validation:
+
+- 2026-04-16: updated the Solax demo draft so it now matches the shipped
+  `skill-author-by-recording` workflow instead of the older pre-P1/P2 story
+- 2026-04-16: graduated the minimum failed orchestrated-run debugging sequence
+  into `docs/skills/authoring.md`, including wrapper JSON, stderr,
+  `SkillResult.checkpoints`, compare output, and replay artifacts when present
+- 2026-04-16: updated the public authoring docs to name
+  `.agents/skills/skill-author-by-recording/` as the preferred canonical
+  creation path and to point authors at the Google Home / Chromecast skill
+  family as the best current exemplar set in `../clawperator-skills`
+
 ### Expected Commit
 
 ```text
@@ -419,3 +431,10 @@ Expected closeout shape:
 - update this pack after each phase so sequencing stays explicit
 - retire the pack only after the durable guidance is fully reflected in docs,
   code, and the repo-local skill
+
+Current closeout state:
+
+- the durable guidance has now been reflected in docs, code, and the repo-local
+  skill
+- this task pack is complete and ready for retirement when task-folder cleanup
+  runs

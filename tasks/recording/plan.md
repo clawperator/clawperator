@@ -8,7 +8,7 @@ recording-program implementation workstreams landed on the current branch.
 Use it to answer:
 
 - which recording workstreams are finished and retired
-- which task pack is still active
+- whether any recording task pack is still active
 - where the durable source of truth now lives after task-pack graduation
 
 ## Current Status
@@ -23,6 +23,7 @@ Retired completed workstreams:
 - W4 `compare`
 - W4c `compare-closeout`
 - W5 `graduate-demo-findings`
+- `skill-author-by-recording`
 
 Retired temporary task folders:
 
@@ -31,7 +32,7 @@ Retired temporary task folders:
 
 Still active:
 
-- `skill-author-by-recording`
+- none
 
 ## Durable Sources Of Truth
 
@@ -51,16 +52,14 @@ agents should rely on these surfaces instead of the retired task packs.
 
 ## Remaining Sequence
 
-One recording workstream remains open on the current branch:
-
-1. `skill-author-by-recording`
-   P1 is complete. P2 and P3 remain the active follow-on phases.
+No recording workstreams remain open on the current branch.
 
 Retirement step:
 
-1. Keep the `skill-author-by-recording` task pack until the remaining phases
-   ship, then retire it because the durable guidance now lives in docs, code,
-   and the repo-local skill.
+1. The recording program task packs can now be retired because the durable
+   guidance lives in docs, code, the repo-local
+   `.agents/skills/skill-author-by-recording/` workflow, and the maintained
+   skills repo exemplars.
 
 ## Retirement Rule
 

@@ -27,12 +27,12 @@ demo-grade closeout rather than new deep runtime invention.
 
 | Item | Value |
 | --- | --- |
-| State | active, P3 demo-path validation in progress |
+| State | complete |
 | Total PRs | 3 |
 | Total phases | 3 |
-| Completed | problem framing, plan tightening, P1, and P2 |
-| Remaining | P3 (demo validation and closeout) |
-| Current / Next | P3 demo validation and durable guidance graduation |
+| Completed | problem framing, plan tightening, P1, P2, and P3 |
+| Remaining | none |
+| Current / Next | retired after durable guidance graduation |
 | Blockers | none |
 
 P2 implementation status:
@@ -51,6 +51,13 @@ P3 implementation status:
 - the durable authoring docs now need to carry the minimum failed
   orchestrated-run debugging order explicitly, rather than leaving that lesson
   implicit in task-pack history
+- the public authoring docs now explicitly point developers at the repo-local
+  `skill-author-by-recording` workflow as the preferred canonical creation path
+- the public authoring docs now explicitly point developers at the Google Home
+  / Chromecast skill family in `../clawperator-skills` as the best current
+  exemplar set for structure and recent recording-driven lessons
+- the remaining P3 documentation closeout has shipped, so this task pack is now
+  complete
 
 ## Current Baseline
 
