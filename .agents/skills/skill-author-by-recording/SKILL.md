@@ -32,12 +32,12 @@ The runtime skill you author lives in the skills repo, typically
 
 Read these durable sources before making authoring decisions:
 
-- `docs/api/recording.md`
-- `docs/skills/authoring.md`
-- `docs/skills/overview.md`
-- `docs/internal/design/skill-design.md`
-- `apps/node/src/contracts/skillResult.ts`
-- `apps/node/src/domain/skills/runSkill.ts`
+- `https://docs.clawperator.com/api/recording/`
+- `https://docs.clawperator.com/skills/authoring/`
+- `https://docs.clawperator.com/skills/overview/`
+- `https://github.com/clawperator/clawperator/blob/main/docs/internal/design/skill-design.md`
+- `https://github.com/clawperator/clawperator/blob/main/apps/node/src/contracts/skillResult.ts`
+- `https://github.com/clawperator/clawperator/blob/main/apps/node/src/domain/skills/runSkill.ts`
 
 Reuse those contracts. Do not invent a parallel recording, skill, or
 `SkillResult` model inside this workflow.
