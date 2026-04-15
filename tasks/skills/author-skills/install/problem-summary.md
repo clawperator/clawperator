@@ -157,9 +157,7 @@ Use a two-layer model:
      `~/.clawperator/authoring-skills/<skill>/` into agent-native discovery
      locations
    - for Claude Code: symlink into `~/.claude/skills/`
-   - for Codex: symlink into the correct Codex skill discovery path; verify
-     the actual path before implementing (the `agents/openai.yaml` convention
-     is known, but the Codex-side directory path needs confirmation)
+   - for Codex: symlink into `~/.codex/skills/`
    - if another agent later has a supported skill-discovery location, wire that
      too using the same canonical source
 
@@ -272,7 +270,7 @@ Register the new `authoring-skills` command group.
 **`sites/landing/public/install.sh`**
 Add `setup_authoring_skills_via_cli()` after the existing
 `setup_skills_via_cli()` step. Unconditionally create agent discovery
-directories (`~/.claude/skills/`, Codex equivalent) and place symlinks
+directories (`~/.claude/skills/`, `~/.codex/skills/`) and place symlinks
 regardless of whether the agent is currently installed. Print installed paths
 in the final summary.
 
@@ -360,8 +358,17 @@ npm post-install hook) can be added later once the basic flow is stable.
 
 ## Open Questions
 
-**Codex skill discovery path:** Confirm the exact Codex-side directory path for
-auto-loading skills before implementing that wiring. The `agents/openai.yaml`
-format in `skill-author-by-recording` confirms Codex is a first-class target,
-but the directory path needs to be verified against current Codex documentation
-or behavior.
+No remaining open question blocks the core install/discovery design in this
+task note.
+
+Codex skill discovery path verification:
+
+- local Codex CLI is installed and available as `codex`
+- local Codex state uses `/<local_user>/.codex/`
+- local Codex skill installation uses `/<local_user>/.codex/skills/`
+- local Codex skill documentation states that installed skills live under
+  `$CODEX_HOME/skills`, defaulting to `~/.codex/skills`
+
+For this task, treat the Codex discovery location as:
+
+- `~/.codex/skills/`
