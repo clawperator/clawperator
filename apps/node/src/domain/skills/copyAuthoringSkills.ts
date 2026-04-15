@@ -38,31 +38,34 @@ function resolveAuthoringSkillsSourceDir(): string {
 }
 
 function resolveHomeDir(options: CopyAuthoringSkillsOptions): string {
-  return options.homeDir ?? homedir();
+  return resolve(options.homeDir ?? homedir());
 }
 
 function resolveInstalledDir(options: CopyAuthoringSkillsOptions): string {
   if (options.installedDir) {
-    return options.installedDir;
+    return resolve(options.installedDir);
   }
   if (options.homeDir) {
-    return join(options.homeDir, ".clawperator", "authoring-skills");
+    return join(resolveHomeDir(options), ".clawperator", "authoring-skills");
   }
   return DEFAULT_AUTHORING_SKILLS_DIR;
 }
 
 function resolveClaudeSkillsDir(options: CopyAuthoringSkillsOptions): string {
-  return options.claudeSkillsDir ?? join(resolveHomeDir(options), ".claude", "skills");
+  if (options.claudeSkillsDir) {
+    return resolve(options.claudeSkillsDir);
+  }
+  return join(resolveHomeDir(options), ".claude", "skills");
 }
 
 function resolveCodexSkillsDir(options: CopyAuthoringSkillsOptions): string {
   if (options.codexSkillsDir) {
-    return options.codexSkillsDir;
+    return resolve(options.codexSkillsDir);
   }
   const env = options.env ?? process.env;
   const codexHome = options.codexHome ?? env.CODEX_HOME;
   if (codexHome !== undefined && codexHome !== "") {
-    return join(codexHome, "skills");
+    return join(resolve(codexHome), "skills");
   }
   return join(resolveHomeDir(options), ".codex", "skills");
 }
@@ -156,7 +159,7 @@ async function ensureManagedSymlink(targetPath: string, linkPath: string, instal
   }
 
   await mkdir(dirname(linkPath), { recursive: true });
-  await symlink(targetPath, linkPath);
+  await symlink(targetPath, linkPath, process.platform === "win32" ? "junction" : "dir");
 }
 
 async function assertManagedSymlinkWritable(linkPath: string, installedDir: string, skillName: string): Promise<void> {

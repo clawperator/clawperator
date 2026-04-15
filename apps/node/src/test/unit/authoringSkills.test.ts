@@ -1,7 +1,7 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert";
 import { chmod, mkdtemp, mkdir, readFile, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { getCliVersion } from "../../domain/version/compatibility.js";
 import { cmdAuthoringSkillsList } from "../../cli/commands/authoringSkills.js";
@@ -178,6 +178,28 @@ describe("copyAuthoringSkills", () => {
 
     assert.deepEqual(second, first);
     assert.equal(await readFile(join(options.installedDir, "skill-author-by-recording", "SKILL.md"), "utf8"), "# skill-author-by-recording\n");
+  });
+
+  it("normalizes relative directory overrides so managed symlinks remain idempotent", async () => {
+    const root = await makeTempRoot();
+    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const installedDir = join(root, "home", ".clawperator", "authoring-skills");
+    const claudeSkillsDir = join(root, "home", ".claude", "skills");
+    const codexSkillsDir = join(root, "home", ".codex", "skills");
+    const options = {
+      sourceDir: relative(process.cwd(), sourceDir),
+      installedDir: relative(process.cwd(), installedDir),
+      claudeSkillsDir: relative(process.cwd(), claudeSkillsDir),
+      codexSkillsDir: relative(process.cwd(), codexSkillsDir),
+      cliVersion: "1.2.3",
+    };
+
+    const first = await copyAuthoringSkills(options);
+    const second = await copyAuthoringSkills(options);
+
+    assert.equal(first.ok, true);
+    assert.deepEqual(second, first);
+    assert.equal(await readlink(join(claudeSkillsDir, "skill-author-by-recording")), resolve(installedDir, "skill-author-by-recording"));
   });
 
   it("returns an error result when the npm package source dir does not exist", async () => {
