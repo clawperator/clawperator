@@ -325,10 +325,10 @@ Completed validation:
 - 2026-04-15: tightened the repo-local repair loop so failed self-tests now
   stay inside the created skill until the skill is repaired or a concrete
   blocker remains
-- PR readiness: the `clawperator` branch now contains the P2 workflow and
-  task-pack updates needed for the reviewable P2 PR; real runtime skill PRs
-  should come from running the front-door workflow on the intended recording,
-  not from the temporary validation artifact used during implementation
+- PR readiness: the P2 workflow and task-pack updates are ready for the
+  reviewable P2 PR; real runtime skill PRs should come from running the
+  front-door workflow on the intended recording, not from the temporary
+  validation artifact used during implementation
 
 ### Expected Commit
 

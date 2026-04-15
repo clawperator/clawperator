@@ -41,7 +41,7 @@ P2 implementation status:
 - the orchestrated branch now supports direct orchestrated authoring when that
   is the truthful first shape
 - the repair loop is now explicit and state-aware during self-test verification
-- the current `clawperator` branch is ready to be turned into the P2 PR
+- the current implementation is ready to be turned into the P2 PR
 
 ## Current Baseline
 

@@ -51,7 +51,8 @@ Reuse those contracts. Do not invent a parallel recording, skill, or
 - Frame the first useful outcome as a personalized local skill unless you have
   evidence that the result is generic enough to share.
 - Default to replay on the first pass unless the user explicitly asks for
-  orchestrated.
+  orchestrated or the recording evidence already shows orchestrated is the more
+  truthful shape.
 - Honor an explicit user request for `-replay` or `-orchestrated`.
 - Author one requested or recommended skill shape per pass unless the user
   explicitly asks for both.
