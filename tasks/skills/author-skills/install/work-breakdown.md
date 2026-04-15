@@ -209,9 +209,14 @@ without requiring a live filesystem outside of tmpdir isolation.
 
 2. Create `apps/node/src/domain/skills/copyAuthoringSkills.ts`. This module:
    - Locates the authoring-skills source directory relative to `import.meta.url`.
-     The compiled output is at `dist/domain/skills/copyAuthoringSkills.js`; the
-     source directory is at `../../authoring-skills/` relative to the module file.
-     Verify the resolved path exists before proceeding.
+     The compiled output is at `dist/domain/skills/copyAuthoringSkills.js`.
+     From that location, `../../../authoring-skills/` traverses up through
+     `dist/domain/skills/` -> `dist/domain/` -> `dist/` -> package root, landing
+     at the `authoring-skills/` directory at the package root. Use
+     `resolve(dirname(fileURLToPath(import.meta.url)), "../../../authoring-skills")`
+     and verify the resolved path exists before proceeding. Model the resolution
+     pattern on `getSiblingBuildPath()` in `skillsConfig.ts`, which resolves a
+     sibling path relative to the compiled module.
    - Scans the source directory for subdirectories containing `SKILL.md` using
      directory scanning (no manifest file).
    - Copies each discovered skill directory to `~/.clawperator/authoring-skills/<skill-name>/`
@@ -529,9 +534,11 @@ Use `.agents/skills/docs-author/SKILL.md` for this phase. Do not hand-edit
    - What authoring skills are (AI agent programs, not runtime skills)
    - That `curl install.sh | bash` installs them automatically
    - Where they are installed: `~/.clawperator/authoring-skills/`
-   - Where they are wired: `~/.claude/skills/` and `~/.codex/skills/`
-   - `clawperator authoring-skills install` - what it does, when to use it
-     (first install, or post-`npm install -g` refresh)
+   - Where they are wired: `~/.claude/skills/` and `$CODEX_HOME/skills`
+     (default `~/.codex/skills/`; the effective path when `CODEX_HOME` is set)
+   - `clawperator authoring-skills install` - a repair and manual bootstrap
+     command; normal first-time users do not need to run it because `install.sh`
+     handles it automatically
    - `clawperator authoring-skills update` - re-copies and re-wires; use after
      `npm install -g clawperator@latest`
    - `clawperator authoring-skills list` - list installed skills and paths

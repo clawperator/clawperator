@@ -202,7 +202,7 @@ After `install.sh` completes:
   copied from npm package
 - `~/.clawperator/authoring-skills/version.txt` - contains CLI version string
 - `~/.claude/skills/skill-author-by-recording` - symlink to the canonical store
-- `~/.codex/skills/skill-author-by-recording` - symlink to the canonical store
+- `$CODEX_HOME/skills/skill-author-by-recording` (default `~/.codex/skills/skill-author-by-recording`) - symlink to the canonical store
 - `~/.clawperator/AGENTS.md` - includes a section naming installed authoring
   skills and their paths
 
