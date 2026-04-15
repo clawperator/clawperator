@@ -1,4 +1,4 @@
-import { access, cp, lstat, mkdir, readdir, readlink, rm, stat, writeFile } from "node:fs/promises";
+import { access, cp, lstat, mkdir, readdir, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -104,13 +104,53 @@ async function ensureDirectory(path: string): Promise<void> {
   await mkdir(path, { recursive: true });
 }
 
-async function replaceWithSymlink(targetPath: string, linkPath: string): Promise<void> {
-  await rm(linkPath, { recursive: true, force: true });
-  await mkdir(dirname(linkPath), { recursive: true });
-  await import("node:fs/promises").then(({ symlink }) => symlink(targetPath, linkPath));
+function normalizeOwnedSkillTarget(installedDir: string, skillName: string): string {
+  return resolve(installedDir, skillName);
 }
 
-async function removeStaleAgentSymlinks(agentDir: string, activeSkills: Set<string>): Promise<void> {
+async function resolveSymlinkTarget(path: string): Promise<string | undefined> {
+  try {
+    const target = await readlink(path);
+    return resolve(dirname(path), target);
+  } catch {
+    return undefined;
+  }
+}
+
+async function isManagedAgentSymlink(linkPath: string, installedDir: string, skillName: string): Promise<boolean> {
+  let entryStat;
+  try {
+    entryStat = await lstat(linkPath);
+  } catch {
+    return false;
+  }
+  if (!entryStat.isSymbolicLink()) {
+    return false;
+  }
+
+  const resolvedTarget = await resolveSymlinkTarget(linkPath);
+  if (resolvedTarget === undefined) {
+    return false;
+  }
+
+  return resolvedTarget === normalizeOwnedSkillTarget(installedDir, skillName);
+}
+
+async function ensureManagedSymlink(targetPath: string, linkPath: string, installedDir: string, skillName: string): Promise<void> {
+  const exists = await pathExists(linkPath);
+  if (exists) {
+    const managed = await isManagedAgentSymlink(linkPath, installedDir, skillName);
+    if (!managed) {
+      throw new Error(`Refusing to overwrite non-Clawperator skill entry: ${linkPath}`);
+    }
+    await rm(linkPath, { recursive: true, force: true });
+  }
+
+  await mkdir(dirname(linkPath), { recursive: true });
+  await symlink(targetPath, linkPath);
+}
+
+async function removeStaleAgentSymlinks(agentDir: string, activeSkills: Set<string>, installedDir: string): Promise<void> {
   const entries = await readdir(agentDir);
   for (const entry of entries) {
     if (activeSkills.has(entry)) {
@@ -123,7 +163,12 @@ async function removeStaleAgentSymlinks(agentDir: string, activeSkills: Set<stri
     } catch {
       continue;
     }
-    if (entryStat.isSymbolicLink()) {
+    if (!entryStat.isSymbolicLink()) {
+      continue;
+    }
+
+    const resolvedTarget = await resolveSymlinkTarget(entryPath);
+    if (resolvedTarget === normalizeOwnedSkillTarget(installedDir, entry)) {
       await rm(entryPath, { recursive: true, force: true });
     }
   }
@@ -162,6 +207,13 @@ export async function copyAuthoringSkills(
 
   try {
     const skills = await discoverAuthoringSkills(sourceDir);
+    if (skills.length === 0) {
+      return {
+        ok: false,
+        code: "AUTHORING_SKILLS_SOURCE_EMPTY",
+        message: `No packaged authoring skills with SKILL.md were found in ${sourceDir}`,
+      };
+    }
     await ensureDirectory(installedDir);
     await ensureDirectory(claudeSkillsDir);
     await ensureDirectory(codexSkillsDir);
@@ -171,13 +223,13 @@ export async function copyAuthoringSkills(
       const targetSkillDir = join(installedDir, skillName);
       await rm(targetSkillDir, { recursive: true, force: true });
       await cp(sourceSkillDir, targetSkillDir, { recursive: true, force: true, dereference: true });
-      await replaceWithSymlink(targetSkillDir, join(claudeSkillsDir, skillName));
-      await replaceWithSymlink(targetSkillDir, join(codexSkillsDir, skillName));
+      await ensureManagedSymlink(targetSkillDir, join(claudeSkillsDir, skillName), installedDir, skillName);
+      await ensureManagedSymlink(targetSkillDir, join(codexSkillsDir, skillName), installedDir, skillName);
     }
 
     const activeSkills = new Set(skills);
-    await removeStaleAgentSymlinks(claudeSkillsDir, activeSkills);
-    await removeStaleAgentSymlinks(codexSkillsDir, activeSkills);
+    await removeStaleAgentSymlinks(claudeSkillsDir, activeSkills, installedDir);
+    await removeStaleAgentSymlinks(codexSkillsDir, activeSkills, installedDir);
     await writeFile(join(installedDir, VERSION_FILENAME), `${options.cliVersion ?? getCliVersion()}\n`, "utf8");
 
     return {
@@ -212,9 +264,5 @@ export async function listInstalledAuthoringSkills(installDir = DEFAULT_AUTHORIN
 }
 
 export async function readAgentSymlinkTarget(path: string): Promise<string | undefined> {
-  try {
-    return await readlink(path);
-  } catch {
-    return undefined;
-  }
+  return resolveSymlinkTarget(path);
 }

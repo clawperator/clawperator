@@ -1,6 +1,6 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert";
-import { mkdtemp, mkdir, readFile, readlink, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readFile, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { getCliVersion } from "../../domain/version/compatibility.js";
@@ -197,6 +197,76 @@ describe("copyAuthoringSkills", () => {
       message: `Authoring skills source directory not found: ${join(root, "missing-source")}`,
     });
   });
+
+  it("returns an error when the packaged authoring skills tree is empty", async () => {
+    const root = await makeTempRoot();
+    const sourceDir = join(root, "source");
+    await mkdir(sourceDir, { recursive: true });
+
+    const result = await copyAuthoringSkills({
+      sourceDir,
+      installedDir: join(root, "home", ".clawperator", "authoring-skills"),
+      claudeSkillsDir: join(root, "home", ".claude", "skills"),
+      codexSkillsDir: join(root, "home", ".codex", "skills"),
+      cliVersion: "1.2.3",
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      code: "AUTHORING_SKILLS_SOURCE_EMPTY",
+      message: `No packaged authoring skills with SKILL.md were found in ${sourceDir}`,
+    });
+  });
+
+  it("does not delete unrelated user-managed symlinks from shared agent skill directories", async () => {
+    const root = await makeTempRoot();
+    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const claudeSkillsDir = join(root, "home", ".claude", "skills");
+    const codexSkillsDir = join(root, "home", ".codex", "skills");
+    const unrelatedTarget = join(root, "user-skills", "other-skill");
+    await mkdir(unrelatedTarget, { recursive: true });
+    await mkdir(claudeSkillsDir, { recursive: true });
+    await mkdir(codexSkillsDir, { recursive: true });
+    await symlink(unrelatedTarget, join(claudeSkillsDir, "other-skill"));
+    await symlink(unrelatedTarget, join(codexSkillsDir, "other-skill"));
+
+    const result = await copyAuthoringSkills({
+      sourceDir,
+      installedDir: join(root, "home", ".clawperator", "authoring-skills"),
+      claudeSkillsDir,
+      codexSkillsDir,
+      cliVersion: "1.2.3",
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(await readlink(join(claudeSkillsDir, "other-skill")), unrelatedTarget);
+    assert.equal(await readlink(join(codexSkillsDir, "other-skill")), unrelatedTarget);
+  });
+
+  it("refuses to overwrite an existing non-Clawperator skill entry with the same basename", async () => {
+    const root = await makeTempRoot();
+    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const claudeSkillsDir = join(root, "home", ".claude", "skills");
+    const codexSkillsDir = join(root, "home", ".codex", "skills");
+    await mkdir(join(claudeSkillsDir, "skill-author-by-recording"), { recursive: true });
+    await mkdir(codexSkillsDir, { recursive: true });
+
+    const result = await copyAuthoringSkills({
+      sourceDir,
+      installedDir: join(root, "home", ".clawperator", "authoring-skills"),
+      claudeSkillsDir,
+      codexSkillsDir,
+      cliVersion: "1.2.3",
+    });
+
+    assert.equal(result.ok, false);
+    assert.deepEqual(result, {
+      ok: false,
+      code: "AUTHORING_SKILLS_INSTALL_FAILED",
+      message: `Refusing to overwrite non-Clawperator skill entry: ${join(claudeSkillsDir, "skill-author-by-recording")}`,
+    });
+    assert.equal((await stat(join(claudeSkillsDir, "skill-author-by-recording"))).isDirectory(), true);
+  });
 });
 
 describe("cmdAuthoringSkillsList", () => {
@@ -213,5 +283,23 @@ describe("cmdAuthoringSkillsList", () => {
       installedDir: join(root, "missing-install-dir"),
       message: "No installed authoring skills found. Run clawperator authoring-skills install.",
     });
+  });
+
+  it("surfaces filesystem errors instead of reporting an empty install", async () => {
+    const root = await makeTempRoot();
+    const installDir = join(root, "unreadable-install-dir");
+    await mkdir(installDir, { recursive: true });
+    await chmod(installDir, 0o000);
+
+    try {
+      const output = await cmdAuthoringSkillsList({
+        format: "json",
+        installDir,
+      });
+      const parsed = JSON.parse(output);
+      assert.equal(parsed.code, "AUTHORING_SKILLS_LIST_FAILED");
+    } finally {
+      await chmod(installDir, 0o755);
+    }
   });
 });

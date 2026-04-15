@@ -1,5 +1,4 @@
-import { access } from "node:fs/promises";
-import { constants } from "node:fs";
+import { stat } from "node:fs/promises";
 import { DEFAULT_AUTHORING_SKILLS_DIR } from "../../domain/skills/skillsConfig.js";
 import {
   copyAuthoringSkills,
@@ -13,12 +12,15 @@ export interface AuthoringSkillCommandOptions extends CopyAuthoringSkillsOptions
   format: OutputOptions["format"];
 }
 
-async function installDirExists(path: string): Promise<boolean> {
+async function isMissingDir(path: string): Promise<boolean> {
   try {
-    await access(path, constants.F_OK);
-    return true;
-  } catch {
+    await stat(path);
     return false;
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return true;
+    }
+    throw error;
   }
 }
 
@@ -61,7 +63,7 @@ export async function cmdAuthoringSkillsList(
   options: { format: OutputOptions["format"]; installDir?: string }
 ): Promise<string> {
   const installDir = options.installDir ?? DEFAULT_AUTHORING_SKILLS_DIR;
-  if (!(await installDirExists(installDir))) {
+  if (await isMissingDir(installDir)) {
     return formatSuccess({
       skills: [],
       count: 0,
