@@ -8,6 +8,7 @@ import { cmdAuthoringSkillsList } from "../../cli/commands/authoringSkills.js";
 import { copyAuthoringSkills } from "../../domain/skills/copyAuthoringSkills.js";
 
 const tempRoots: string[] = [];
+const directorySymlinkType = process.platform === "win32" ? "junction" : "dir";
 
 async function makeTempRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "clawperator-authoring-skills-"));
@@ -271,8 +272,8 @@ describe("copyAuthoringSkills", () => {
     await mkdir(unrelatedTarget, { recursive: true });
     await mkdir(claudeSkillsDir, { recursive: true });
     await mkdir(codexSkillsDir, { recursive: true });
-    await symlink(unrelatedTarget, join(claudeSkillsDir, "other-skill"));
-    await symlink(unrelatedTarget, join(codexSkillsDir, "other-skill"));
+    await symlink(unrelatedTarget, join(claudeSkillsDir, "other-skill"), directorySymlinkType);
+    await symlink(unrelatedTarget, join(codexSkillsDir, "other-skill"), directorySymlinkType);
 
     const result = await copyAuthoringSkills({
       sourceDir,
@@ -322,8 +323,8 @@ describe("copyAuthoringSkills", () => {
 
     await mkdir(claudeSkillsDir, { recursive: true });
     await mkdir(codexSkillsDir, { recursive: true });
-    await symlink(targetSkillDir, join(claudeSkillsDir, "skill-author-by-recording"));
-    await symlink(targetSkillDir, join(codexSkillsDir, "skill-author-by-recording"));
+    await symlink(targetSkillDir, join(claudeSkillsDir, "skill-author-by-recording"), directorySymlinkType);
+    await symlink(targetSkillDir, join(codexSkillsDir, "skill-author-by-recording"), directorySymlinkType);
 
     const result = await copyAuthoringSkills({
       sourceDir,

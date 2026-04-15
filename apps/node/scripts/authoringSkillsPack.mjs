@@ -7,6 +7,10 @@ const authoringSkillsDir = resolve(packageDir, "authoring-skills");
 const statePath = resolve(packageDir, ".authoring-skills-pack-state.json");
 const directorySymlinkType = process.platform === "win32" ? "junction" : "dir";
 
+function normalizeDirectorySymlinkTarget(target) {
+  return process.platform === "win32" ? resolve(authoringSkillsDir, target) : target;
+}
+
 async function prepack() {
   const entries = await readdir(authoringSkillsDir);
   const symlinks = [];
@@ -45,7 +49,7 @@ async function postpack() {
   for (const { entry, target } of symlinks) {
     const entryPath = resolve(authoringSkillsDir, entry);
     await rm(entryPath, { recursive: true, force: true });
-    await symlink(target, entryPath, directorySymlinkType);
+    await symlink(normalizeDirectorySymlinkTarget(target), entryPath, directorySymlinkType);
   }
 
   await rm(statePath, { force: true });
