@@ -65,7 +65,8 @@ Read these files IN THIS ORDER before writing anything.
 | 10 | `apps/node/package.json` | Current `files` array - confirm before adding `"authoring-skills/"` |
 | 11 | `sites/landing/public/install.sh` | Function structure and where to add `setup_authoring_skills_via_cli()` |
 | 12 | `sites/docs/mkdocs.yml` | Verify published URL paths for `docs/api/recording.md`, `docs/skills/authoring.md`, `docs/skills/overview.md`, `docs/internal/design/skill-design.md` before writing URLs into SKILL.md |
-| 13 | `.agents/skills/docs-author/SKILL.md` | Use for Phase 5 docs work |
+| 13 | `apps/node/src/domain/skills/copyAuthoringSkills.ts` | Read before Phase 4: `readAgentSymlinkTarget` returns an absolute resolved path (not the raw `readlink` value); the doctor check must not call `readlink` directly expecting a relative result |
+| 14 | `.agents/skills/docs-author/SKILL.md` | Use for Phase 5 docs work |
 
 ## PR / Phase Plan
 
@@ -398,6 +399,11 @@ Human review:
   and does not duplicate any copy or symlink logic
 - Failure of this step does not abort the overall install
 - AGENTS.md template section names the skill and its location
+- When `clawperator authoring-skills install` exits with an error (e.g.
+  `AUTHORING_SKILLS_INSTALL_FAILED` from a symlink conflict), the function prints
+  the full error output so the user sees what happened and what to do next. The
+  canonical store may have been partially written before the error; the printed
+  output must make clear that re-running after resolving the conflict is safe.
 
 ### Validation
 
@@ -457,6 +463,9 @@ stale relative to the current CLI version and surfaces the fix command.
    Use `getCliVersion()` from `../../domain/version/compatibility.js` (already
    imported in the existing checks - verify exact import path).
    Include the installed and CLI version in `evidence`.
+   If the check needs to inspect agent symlinks, use `readAgentSymlinkTarget` from
+   `copyAuthoringSkills.ts`. It returns an absolute resolved path, not a raw
+   `readlink` value. Do not call `readlink` directly expecting a relative result.
 
 3. Register the new check in `DoctorService.ts`. Add it to the host checks block,
    after the existing `checkInstalledOrchestratedSkillAgentCliAvailability` call.
