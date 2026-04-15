@@ -4,6 +4,45 @@
 
 Document the current authoring contract for local skills: scaffolded files, `SKILL.md`, run scripts, artifact compilation, and validation.
 
+## Preferred Creation Path
+
+The preferred current way to create a new recording-derived skill is to use
+the `skill-author-by-recording` skill.
+
+That workflow is the current canonical front door for creating skills from a
+fresh recording because it:
+
+- gathers the plain-language goal first
+- resets the target app before recording
+- keeps recording artifacts under `~/.clawperator/recordings/<session_id>/`
+- recommends replay versus orchestrated truthfully from the evidence
+- retains the compare baseline in the expected place
+- runs one self-test and surfaces the resulting `SkillResult`
+
+Use raw `clawperator skills new <skill_id>` scaffolding directly when you are
+doing manual skill construction or editing an existing skill shape, not when
+you want the preferred end-to-end recording-to-skill workflow.
+
+## Recording-Driven Workflow Stance
+
+When you create a skill from a recording, use these current authoring rules:
+
+- use the `skill-author-by-recording` skill as the normal way to create a new
+  recording-derived skill
+- start from the user's plain-language goal, not from a final prechosen
+  `skill_id`
+- derive the first-pass `skill_id` after inspecting the recording evidence
+- author one skill shape per pass unless the caller explicitly asks for both
+- treat replay and orchestrated as equally valid maintained skill shapes
+- choose replay first when replay still looks truthful for the captured flow
+- choose orchestrated immediately when replay would already be misleading,
+  brittle, or insufficient
+- treat a personalized local skill as a valid first result when the flow
+  depends on one user's labels, rooms, or device graph
+
+These are the current documented rules for recording-derived authoring. They
+should stay aligned with the `skill-author-by-recording` skill.
+
 ## Sources
 
 - Scaffold implementation: `apps/node/src/domain/skills/scaffoldSkill.ts`
@@ -154,6 +193,19 @@ Authoring mode terminology:
   what came from nearby references
 - if you used nearby exemplars, say so in the authoring notes or `SKILL.md`
   rather than presenting the result as recording-only synthesis
+
+Recommended exemplar inspection:
+
+- when you want a concrete structure reference, inspect maintained skills in
+  the sibling skills repo at `../clawperator-skills/skills/`
+- the current best exemplar family to inspect is the Google Home package
+  `com.google.android.apps.chromecast.app`, because it contains both replay and
+  orchestrated authoring lessons from recent real recording-driven work
+- especially useful current examples are:
+- `../clawperator-skills/skills/com.google.android.apps.chromecast.app.get-climate-replay/`
+- `../clawperator-skills/skills/com.google.android.apps.chromecast.app.set-power-replay/`
+- `../clawperator-skills/skills/com.google.android.apps.chromecast.app.set-temperature-replay/`
+- `../clawperator-skills/skills/com.google.android.apps.chromecast.app.control-hvac-orchestrated/`
 
 Recording-count guidance:
 
@@ -502,22 +554,45 @@ agent is reading one definition while the wrapper is enforcing another.
 
 ### Debugging A Failed Orchestrated Run
 
-When an orchestrated skill misbehaves, read these in order:
+When an orchestrated skill misbehaves, start with the minimum durable evidence
+set before you rewrite the skill:
 
-1. The forwarded agent stderr stream.
-2. The emitted `SkillResult.checkpoints`.
-3. The retained agent stdout and stderr logs, if the harness kept them.
-4. A direct `clawperator snapshot` from the current screen, when the run ended
+1. The saved `clawperator skills run --json` wrapper result for that exact run.
+2. The forwarded agent stderr stream from that run.
+3. The emitted `SkillResult.checkpoints`.
+4. Compare output against the retained baseline, if the skill keeps
+   `references/compare-baseline.export.json`.
+5. Replay artifacts too, if the same flow has a replay sibling or other
+   retained replay evidence.
+
+That order matters:
+
+- the wrapper result tells you whether the failure was wrapper-level,
+  runtime-level, or a post-run verification mismatch
+- stderr usually explains what the runtime agent believed it was doing
+- `SkillResult.checkpoints` show how far the skill really progressed on device
+- compare output tells you whether the run still reached the right terminal
+  outcome, diverged mid-route, or failed before the expected checkpoint
+- replay artifacts can help you separate an orchestrated runtime problem from a
+  selector, route, or terminal-proof assumption shared across both shapes
+
+If those do not explain the failure, read these next:
+
+1. The retained per-run `prompt.txt`.
+2. The retained agent stdout and stderr logs, if the harness kept them.
+3. The retained run metadata file, if the harness kept it.
+4. A direct `clawperator snapshot` from the current screen when the run ended
    in an unexpected UI state.
-5. Compare or replay artifacts, if a baseline exists for the same flow.
 
 Recommended current debugging support for orchestrated harnesses:
 
 - keep a per-run `prompt.txt`
 - keep the runtime agent stdout log
 - keep the runtime agent stderr log
-- keep a small metadata file describing device id, operator package, forwarded
-  args, and output paths
+- keep a small `run-metadata.json` file describing device id, operator
+  package, forwarded args, and output paths
+- keep the saved wrapper JSON or an equivalent stderr/stdout capture for the
+  exact `clawperator skills run --json` invocation you are debugging
 
 This matters because many orchestrated failures are not pure route failures.
 Common failure shapes include:
