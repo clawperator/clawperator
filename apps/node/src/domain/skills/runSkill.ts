@@ -382,8 +382,8 @@ function resolveNamedContractInputRawValue(args: string[], inputName: string): s
       const next = args[index + 1];
       if (typeof next === "string" && !next.startsWith("--")) {
         resolvedValue = next;
+        index += 1;
       }
-      index += 1;
       continue;
     }
     if (arg.startsWith(`${flagName}=`)) {
@@ -452,9 +452,11 @@ function resolveTrustedContractInputs(
 
   const positionalArgs = resolvePositionalFallbackArgs(args, declaredInputs.map(([inputName]) => inputName));
   if (positionalArgs.length < unresolvedDeclaredInputs.length) {
+    const namedCount = resolvedRawInputs.size;
+    const positionalCount = positionalArgs.length;
     return {
       ok: false,
-      message: `Skill declared ${declaredInputs.length} contract inputs but only ${resolvedRawInputs.size} named inputs and ${positionalArgs.length} positional args were available.`,
+      message: `Skill declared ${declaredInputs.length} contract inputs but only ${namedCount} named ${namedCount === 1 ? "input" : "inputs"} and ${positionalCount} positional ${positionalCount === 1 ? "arg" : "args"} were available.`,
     };
   }
 

@@ -4088,7 +4088,7 @@ console.log(JSON.stringify({
       const result = await runSkill(skillId, ["--temperature", "23"], temp.registryPath);
       assert.ok(!result.ok);
       assert.strictEqual(result.status, "indeterminate");
-      assert.match(result.message, /only 1 named inputs and 0 positional args were available/i);
+      assert.match(result.message, /only 1 named input and 0 positional args were available/i);
     } finally {
       await temp.cleanup();
     }
@@ -4136,7 +4136,7 @@ console.log(JSON.stringify({
       const result = await runSkill(skillId, ["--unit-name", "--temperature", "23"], temp.registryPath);
       assert.ok(!result.ok);
       assert.strictEqual(result.status, "indeterminate");
-      assert.match(result.message, /only 1 named inputs and 0 positional args were available/i);
+      assert.match(result.message, /only 1 named input and 0 positional args were available/i);
     } finally {
       await temp.cleanup();
     }
@@ -4183,7 +4183,7 @@ console.log(JSON.stringify({
       const result = await runSkill(skillId, ["--temperature", "23", "--foo", "kitchen"], temp.registryPath);
       assert.ok(!result.ok);
       assert.strictEqual(result.status, "indeterminate");
-      assert.match(result.message, /only 1 named inputs and 0 positional args were available/i);
+      assert.match(result.message, /only 1 named input and 0 positional args were available/i);
     } finally {
       await temp.cleanup();
     }
@@ -4307,6 +4307,158 @@ console.log(JSON.stringify({
       assert.ok(result.ok, `Expected duplicate named declared inputs to verify successfully: ${"message" in result ? result.message : ""}`);
       assert.strictEqual(result.status, "success");
       assert.deepStrictEqual(result.skillResult?.inputs, { temperature: 23, unit_name: "Panasonic" });
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("resolves a consecutive duplicate named flag when the first occurrence lacks a value", async () => {
+    const skillId = "com.test.consecutive-duplicate-no-value-first";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+const args = process.argv.slice(2);
+let temperature = "";
+let unitName = "";
+for (let index = 0; index < args.length; index += 1) {
+  const arg = args[index] ?? "";
+  if (arg === "--temperature") {
+    const next = args[index + 1];
+    if (typeof next === "string" && !next.startsWith("--")) {
+      temperature = next;
+      index += 1;
+    }
+    continue;
+  }
+  if (arg === "--unit-name") {
+    const next = args[index + 1];
+    if (typeof next === "string" && !next.startsWith("--")) {
+      unitName = next;
+      index += 1;
+    }
+    continue;
+  }
+}
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: {
+    temperature: Number.parseInt(temperature, 10),
+    unit_name: unitName,
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+    observed: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          temperature: "integer",
+          unit_name: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Unit {unit_name} Temp {temperature}",
+        },
+      },
+    });
+
+    try {
+      // --unit-name appears twice; the first occurrence is immediately followed by another flag
+      // (no value consumed), so the second occurrence must be the one that resolves the input.
+      const result = await runSkill(
+        skillId,
+        ["--unit-name", "--unit-name", "Panasonic", "--temperature", "23"],
+        temp.registryPath
+      );
+      assert.ok(result.ok, `Expected consecutive duplicate named flag to resolve via second occurrence: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.deepStrictEqual(result.skillResult?.inputs, { temperature: 23, unit_name: "Panasonic" });
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("keeps the previously resolved value when the last duplicate named flag occurrence lacks a value", async () => {
+    const skillId = "com.test.duplicate-last-occurrence-no-value";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+const args = process.argv.slice(2);
+let temperature = "";
+let unitName = "";
+for (let index = 0; index < args.length; index += 1) {
+  const arg = args[index] ?? "";
+  if (arg === "--temperature") {
+    const next = args[index + 1];
+    if (typeof next === "string" && !next.startsWith("--")) {
+      temperature = next;
+      index += 1;
+    }
+    continue;
+  }
+  if (arg === "--unit-name") {
+    const next = args[index + 1];
+    if (typeof next === "string" && !next.startsWith("--")) {
+      unitName = next;
+      index += 1;
+    }
+    continue;
+  }
+}
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: {
+    temperature: Number.parseInt(temperature, 10),
+    unit_name: unitName,
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+    observed: { kind: "text", text: \`Unit \${unitName} Temp \${temperature}\` },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          temperature: "integer",
+          unit_name: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Unit {unit_name} Temp {temperature}",
+        },
+      },
+    });
+
+    try {
+      // The trailing --temperature has no following value; the resolver treats it as a no-op
+      // and keeps the previously resolved value of 22.
+      const result = await runSkill(
+        skillId,
+        ["--temperature", "22", "--unit-name", "Panasonic", "--temperature"],
+        temp.registryPath
+      );
+      assert.ok(result.ok, `Expected valueless trailing duplicate flag to be a no-op: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.deepStrictEqual(result.skillResult?.inputs, { temperature: 22, unit_name: "Panasonic" });
     } finally {
       await temp.cleanup();
     }
