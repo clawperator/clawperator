@@ -59,6 +59,17 @@ The next implementation task is to extend the created skill so the
 orchestrated branch is just as truthful and inspectable as the replay-first
 path established in P1.
 
+Additional lessons from the first real replay-success run:
+
+- the workflow should not rely on the CLI default `./recordings/` output path,
+  because that causes authoring-time captures to land in whichever repo the
+  session happened to run from
+- the workflow should explicitly direct intermediate recording artifacts and
+  self-test wrappers into `~/.clawperator/recordings/<session_id>/`
+- generated runtime skills must stay portable across machines and worktrees;
+  do not author imports from machine-local absolute filesystem paths such as
+  `/Users/<local_user>/src/...`
+
 ## Testing Strategy
 
 This task should be tested primarily as a workflow product, not as a library.
@@ -106,6 +117,8 @@ The default authoring strategy should be:
   orchestrated
 - strongly recommend orchestrated as a follow-on when replay proves untruthful,
   too brittle, or insufficient
+- keep authoring-time recordings, exports, and self-test wrappers under
+  `~/.clawperator/recordings/<session_id>/`
 - avoid requiring both variants in the first pass unless the task explicitly
   calls for both
 

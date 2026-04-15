@@ -47,6 +47,12 @@ from scratch.
 - Do not require the user to invent the final `skill_id` before recording.
 - Do derive the `skill_id` after export analysis from the observed app and the
   user's goal.
+- Do not let authoring-time recording artifacts default into `./recordings/`
+  under the current repo.
+- Do direct intermediate recordings, exports, and self-test wrappers into
+  `~/.clawperator/recordings/<session_id>/`.
+- Do not author runtime skill code that imports contracts from machine-local
+  absolute filesystem paths.
 - Do not skip showing the orchestrated code and verification logic when the
   orchestrated path is chosen.
 - Do not declare authoring done until the newly written skill has been invoked
@@ -99,11 +105,15 @@ Automated checks expected in every phase:
 - file existence and structure checks
 - spot-check reads of the authored workflow text and metadata
 - targeted grep checks for stale anti-pattern phrasing
+- spot-check commands and examples for the intended
+  `~/.clawperator/recordings/<session_id>/` artifact path
 
 Human-guided checks expected by phase:
 
 - P1: run one replay-safe walkthrough and confirm the workflow:
   - handles start, stop, pull, and export clearly
+  - writes authoring-time recordings and self-test outputs under
+    `~/.clawperator/recordings/<session_id>/`
   - treats the export as authoring evidence
   - derives the skill id after the recording instead of asking the user to
     invent it up front
@@ -163,6 +173,8 @@ is sufficient.
   - capture or confirm the plain-language goal and device context
   - run recording start, tell the human when to perform the flow, then stop
     and pull
+  - retain authoring-time artifacts under
+    `~/.clawperator/recordings/<session_id>/`
   - export the recording artifact
   - derive a truthful first-pass `skill_id` from the observed app and the
     user's goal
@@ -188,6 +200,8 @@ is sufficient.
 3. Write `SKILL.md` as an agent-program that embodies the replay-first default:
    - gather the plain-language goal and device context up front
    - start recording, prompt human to perform the flow, stop and pull
+   - keep intermediate recording and self-test artifacts under
+     `~/.clawperator/recordings/<session_id>/`
    - export and sanitize the recording artifact
    - derive the first-pass `skill_id` from the app evidence and goal
    - default to replay unless orchestrated was explicitly requested

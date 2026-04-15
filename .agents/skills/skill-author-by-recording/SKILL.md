@@ -59,6 +59,11 @@ Reuse those contracts. Do not invent a parallel recording, skill, or
 - If replay proves untruthful, too brittle, or fails its first self-test,
   explain why and strongly recommend orchestrated as the next pass with clear
   pros and cons.
+- Keep authoring-time recordings, exports, and self-test wrappers under
+  `~/.clawperator/recordings/<session_id>/` rather than `./recordings/` in the
+  current repo.
+- Do not author runtime skills that import contracts or helpers through
+  machine-local absolute filesystem paths.
 - Keep the retained sanitized baseline at
   `skills/<skill_id>/references/compare-baseline.export.json`.
 - Do not list that retained baseline under `skill.json.artifacts`.
@@ -160,8 +165,9 @@ Run the full recording lifecycle in order and surface the resulting paths:
 
 ```bash
 clawperator recording stop --session-id <session_id> --device <device_serial> --operator-package <operator_package> --json
-clawperator recording pull --session-id <session_id> --device <device_serial> --operator-package <operator_package> --out ./recordings/<session_id> --json
-clawperator recording export --input ./recordings/<session_id> --snapshots omit --json
+mkdir -p ~/.clawperator/recordings/<session_id>
+clawperator recording pull --session-id <session_id> --device <device_serial> --operator-package <operator_package> --out ~/.clawperator/recordings/<session_id> --json
+clawperator recording export --input ~/.clawperator/recordings/<session_id> --snapshots omit --json
 ```
 
 Retain the pulled NDJSON as the raw capture.
@@ -169,6 +175,10 @@ Retain the pulled NDJSON as the raw capture.
 Treat the export JSON as the canonical structured authoring artifact. Optional
 `record parse` output is for human inspection only and does not replace the
 export.
+
+Do not rely on the CLI default `./recordings/` output location for this
+workflow. Use the explicit user-scoped path above so authoring artifacts do not
+accumulate in whichever repo the skill happened to run from.
 
 ### 5. Derive The App Identity And `skill_id`
 
@@ -239,6 +249,11 @@ Remember:
 - it is not the executable program
 - `skills validate` still validates the registry-linked skill files, not the
   recording context
+- generated runtime skills must stay portable across machines and worktrees
+- do not import runtime contracts from absolute local filesystem paths such as
+  `/Users/<local_user>/src/...`
+- if you need stable `SkillResult` frame constants in a generated script,
+  prefer portable local constants or a repo-relative/runtime-safe import path
 
 ### 9. Author The Chosen Shape
 
@@ -291,7 +306,7 @@ Run exactly one first self-test invocation of the authored skill and save the
 full JSON wrapper plus stderr:
 
 ```bash
-clawperator skills run <skill_id> --device <device_serial> --operator-package <operator_package> --json > ./recordings/<session_id>/<skill_id>.skills-run.json 2> ./recordings/<session_id>/<skill_id>.skills-run.stderr.log
+clawperator skills run <skill_id> --device <device_serial> --operator-package <operator_package> --json > ~/.clawperator/recordings/<session_id>/<skill_id>.skills-run.json 2> ~/.clawperator/recordings/<session_id>/<skill_id>.skills-run.stderr.log
 ```
 
 If the skill takes inputs, pass the minimum truthful input set required for one
@@ -331,7 +346,7 @@ When compare is relevant, note that the saved wrapper file is the durable v1
 `--result` input for:
 
 ```bash
-clawperator recording compare --baseline skills/<skill_id>/references/compare-baseline.export.json --result ./recordings/<session_id>/<skill_id>.skills-run.json
+clawperator recording compare --baseline skills/<skill_id>/references/compare-baseline.export.json --result ~/.clawperator/recordings/<session_id>/<skill_id>.skills-run.json
 ```
 
 Do not hand-edit a bare `SkillResult` and do not claim compare accepts only a
