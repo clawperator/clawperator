@@ -4094,6 +4094,54 @@ console.log(JSON.stringify({
     }
   });
 
+  it("fails closed when a declared named flag is followed by another flag token instead of a real value", async () => {
+    const skillId = "com.test.named-flag-followed-by-flag-token";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: {
+    temperature: 23,
+    unit_name: "--temperature",
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: "Unit --temperature Temp 23" },
+    observed: { kind: "text", text: "Unit --temperature Temp 23" },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          temperature: "integer",
+          unit_name: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Unit {unit_name} Temp {temperature}",
+        },
+      },
+    });
+
+    try {
+      const result = await runSkill(skillId, ["--unit-name", "--temperature", "23"], temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.status, "indeterminate");
+      assert.match(result.message, /only 1 named inputs and 0 positional args were available/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
   it("fails closed when an unknown flag value would otherwise leak into positional fallback", async () => {
     const skillId = "com.test.unknown-flag-positional-leak";
     const temp = await createTempRegistryWithInlineScript({
@@ -4136,6 +4184,54 @@ console.log(JSON.stringify({
       assert.ok(!result.ok);
       assert.strictEqual(result.status, "indeterminate");
       assert.match(result.message, /only 1 named inputs and 0 positional args were available/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("keeps legitimate positional fallback args after unknown equals-style flags", async () => {
+    const skillId = "com.test.unknown-equals-flag-preserves-positional";
+    const temp = await createTempRegistryWithInlineScript({
+      skillId,
+      scriptContents: `#!/usr/bin/env node
+console.log("[Clawperator-Skill-Result]");
+console.log(JSON.stringify({
+  contractVersion: "1.0.0",
+  skillId: "${skillId}",
+  goal: { kind: "set" },
+  inputs: {
+    temperature: 23,
+    unit_name: "kitchen",
+  },
+  status: "success",
+  checkpoints: [],
+  terminalVerification: {
+    status: "verified",
+    expected: { kind: "text", text: "Unit kitchen Temp 23" },
+    observed: { kind: "text", text: "Unit kitchen Temp 23" },
+  },
+  diagnostics: { runtimeState: "healthy" },
+}));`,
+      contract: {
+        inputs: {
+          temperature: "integer",
+          unit_name: "string",
+        },
+        goal: {
+          kind: "set",
+        },
+        verification: {
+          kind: "node_text_matches",
+          matcher: "Unit {unit_name} Temp {temperature}",
+        },
+      },
+    });
+
+    try {
+      const result = await runSkill(skillId, ["--temperature", "23", "--foo=bar", "kitchen"], temp.registryPath);
+      assert.ok(result.ok, `Expected unknown equals-style flags to preserve positional fallback args: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.status, "success");
+      assert.deepStrictEqual(result.skillResult?.inputs, { temperature: 23, unit_name: "kitchen" });
     } finally {
       await temp.cleanup();
     }

@@ -380,11 +380,10 @@ function resolveNamedContractInputRawValue(args: string[], inputName: string): s
     const arg = args[index] ?? "";
     if (arg === flagName) {
       const next = args[index + 1];
-      if (typeof next === "string") {
+      if (typeof next === "string" && !next.startsWith("--")) {
         resolvedValue = next;
-      } else {
-        resolvedValue = "";
       }
+      index += 1;
       continue;
     }
     if (arg.startsWith(`${flagName}=`)) {
@@ -399,20 +398,27 @@ function resolvePositionalFallbackArgs(
   declaredInputNames: string[]
 ): string[] {
   const declaredFlags = new Set(declaredInputNames.map(inputName => `--${toCliFlagName(inputName)}`));
+  const declaredFlagsArray = [...declaredFlags];
   const positionalArgs: string[] = [];
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index] ?? "";
     if (declaredFlags.has(arg)) {
-      index += 1;
+      const next = args[index + 1];
+      if (typeof next === "string" && !next.startsWith("--")) {
+        index += 1;
+      }
       continue;
     }
-    if (Array.from(declaredFlags).some(flagName => arg.startsWith(`${flagName}=`))) {
+    if (declaredFlagsArray.some(flagName => arg.startsWith(`${flagName}=`))) {
       continue;
     }
     if (arg.startsWith("--")) {
-      const next = args[index + 1] ?? "";
-      if (next && !next.startsWith("--")) {
+      if (arg.includes("=")) {
+        continue;
+      }
+      const next = args[index + 1];
+      if (typeof next === "string" && !next.startsWith("--")) {
         index += 1;
       }
       continue;
