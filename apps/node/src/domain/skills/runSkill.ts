@@ -380,10 +380,9 @@ function resolveNamedContractInputRawValue(args: string[], inputName: string): s
     const arg = args[index] ?? "";
     if (arg === flagName) {
       const next = args[index + 1];
-      if (typeof next === "string") {
+      if (typeof next === "string" && !next.startsWith("--")) {
         resolvedValue = next;
-      } else {
-        resolvedValue = "";
+        index += 1;
       }
       continue;
     }
@@ -404,15 +403,21 @@ function resolvePositionalFallbackArgs(
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index] ?? "";
     if (declaredFlags.has(arg)) {
-      index += 1;
-      continue;
-    }
-    if (Array.from(declaredFlags).some(flagName => arg.startsWith(`${flagName}=`))) {
+      const next = args[index + 1];
+      if (typeof next === "string" && !next.startsWith("--")) {
+        index += 1;
+      }
       continue;
     }
     if (arg.startsWith("--")) {
-      const next = args[index + 1] ?? "";
-      if (next && !next.startsWith("--")) {
+      if (arg.includes("=")) {
+        // self-contained --flag=value: skip unconditionally; declared forms were already
+        // consumed by resolveNamedContractInputRawValue and unknown forms must not leak
+        // into the positional fallback
+        continue;
+      }
+      const next = args[index + 1];
+      if (typeof next === "string" && !next.startsWith("--")) {
         index += 1;
       }
       continue;
@@ -446,9 +451,11 @@ function resolveTrustedContractInputs(
 
   const positionalArgs = resolvePositionalFallbackArgs(args, declaredInputs.map(([inputName]) => inputName));
   if (positionalArgs.length < unresolvedDeclaredInputs.length) {
+    const namedCount = resolvedRawInputs.size;
+    const positionalCount = positionalArgs.length;
     return {
       ok: false,
-      message: `Skill declared ${declaredInputs.length} contract inputs but only ${resolvedRawInputs.size} named inputs and ${positionalArgs.length} positional args were available.`,
+      message: `Skill declared ${declaredInputs.length} contract inputs but only ${namedCount} named ${namedCount === 1 ? "input" : "inputs"} and ${positionalCount} positional ${positionalCount === 1 ? "arg" : "args"} were available.`,
     };
   }
 
