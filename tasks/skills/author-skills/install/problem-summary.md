@@ -221,10 +221,16 @@ it was at. The npm bundle approach eliminates this gap entirely.
 
 Changes needed if this direction is adopted:
 
-**`apps/node/package.json` and `apps/node/authoring-skills/` (new)**
-Add the authoring skill files (SKILL.md, `agents/openai.yaml`, etc.) under
-`apps/node/authoring-skills/` in the main repo and ensure `authoring-skills/`
-is included in the `files` array so it is published with the npm package.
+**`apps/node/authoring-skills/` (new directory)**
+Add the authoring skill files (SKILL.md, `agents/openai.yaml`, etc.) here as
+static text assets - they are not TypeScript and do not go through the compiler,
+so they live alongside `dist/` rather than inside it.
+
+**`apps/node/package.json`**
+Add `"authoring-skills/"` to the `files` array. The current array is
+`["dist/", "!dist/test/**", "!dist/**/*.map", "README.md", "LICENSE"]`. Authoring
+skills are not in `dist/` so they need explicit inclusion; one line added is the
+complete change.
 
 **`apps/node/src/domain/skills/skillsConfig.ts`**
 Add `DEFAULT_AUTHORING_SKILLS_DIR` (`~/.clawperator/authoring-skills`). No
@@ -347,7 +353,8 @@ format in `skill-author-by-recording` confirms Codex is a first-class target,
 but the directory path needs to be verified against current Codex documentation
 or behavior.
 
-**npm package `files` field:** Confirm that `apps/node/package.json` includes
-an `authoring-skills/` entry in the `files` array so the text files are
-included in the published npm package and not gitignored or filtered out by the
-default npm publish rules.
+**npm package `files` field:** Resolved - see Implementation Surfaces. Add
+`"authoring-skills/"` to the `files` array in `apps/node/package.json`. The
+authoring skill files are static text assets that live at
+`apps/node/authoring-skills/` and are not compiled, so they need explicit
+inclusion. One line added to `files` is the complete change.
