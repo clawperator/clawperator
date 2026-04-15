@@ -9029,23 +9029,23 @@ you want the preferred end-to-end recording-to-skill workflow.
 
 ## Recording-Driven Workflow Stance
 
-The durable product stance for recording-driven skill creation is:
+When you create a skill from a recording, use these current authoring rules:
 
-- keep one front door: `skill-author-by-recording`
-- start from a plain-language goal, not a precommitted final `skill_id`
+- use `skill-author-by-recording` as the normal way to create a new
+  recording-derived skill
+- start from the user's plain-language goal, not from a final prechosen
+  `skill_id`
 - derive the first-pass `skill_id` after inspecting the recording evidence
-- author one requested or recommended skill shape per pass unless the caller
-  explicitly wants both
-- treat replay and orchestrated as first-class maintained shapes
-- default to replay for the first pass when replay still looks truthful
-- move directly to orchestrated when replay would already be untruthful or
-  insufficient
-- treat a personalized local skill as a valid first outcome when the recording
-  reflects one user's labels, rooms, or device graph
+- author one skill shape per pass unless the caller explicitly asks for both
+- treat replay and orchestrated as equally valid maintained skill shapes
+- choose replay first when replay still looks truthful for the captured flow
+- choose orchestrated immediately when replay would already be misleading,
+  brittle, or insufficient
+- treat a personalized local skill as a valid first result when the flow
+  depends on one user's labels, rooms, or device graph
 
-Those rules are product behavior, not temporary task-pack guidance. The
-repo-local workflow enforces them at authoring time, and the authored skill
-docs should stay aligned with that same front-door stance.
+These are the current documented rules for recording-derived authoring. They
+should stay aligned with the repo-local `skill-author-by-recording` workflow.
 
 ## Sources
 
