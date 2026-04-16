@@ -537,7 +537,6 @@ setup_skills_via_cli() {
 }
 
 setup_authoring_skills_via_cli() {
-    local AUTHORING_SETUP_STATUS="not-configured"
     local DEFAULT_AUTHORING_SKILLS_INSTALL_DIR="$HOME/.clawperator/authoring-skills/"
     local DEFAULT_AUTHORING_SKILLS_CLAUDE_DIR="$HOME/.claude/skills/"
     local DEFAULT_AUTHORING_SKILLS_CODEX_DIR="${CODEX_HOME:-$HOME/.codex}/skills/"
@@ -548,8 +547,7 @@ setup_authoring_skills_via_cli() {
     AUTHORING_SKILLS_CODEX_DIR="$DEFAULT_AUTHORING_SKILLS_CODEX_DIR"
 
     if [ "${CLAWPERATOR_INSTALL_SKIP_SKILLS:-0}" = "1" ]; then
-        AUTHORING_SETUP_STATUS="skipped"
-        AUTHORING_SKILLS_SETUP_STATUS="$AUTHORING_SETUP_STATUS"
+        AUTHORING_SKILLS_SETUP_STATUS="skipped"
         echo -e "${YELLOW}⚠️  Skipping authoring skills setup because CLAWPERATOR_INSTALL_SKIP_SKILLS=1.${NC}"
         return 0
     fi
@@ -574,8 +572,7 @@ setup_authoring_skills_via_cli() {
             esac
         done < <(printf '%s' "$AUTHORING_SKILLS_OUTPUT" | parse_authoring_skills_install_result)
 
-        AUTHORING_SETUP_STATUS="configured"
-        AUTHORING_SKILLS_SETUP_STATUS="$AUTHORING_SETUP_STATUS"
+        AUTHORING_SKILLS_SETUP_STATUS="configured"
         echo -e "${GREEN}✅ Authoring skills setup complete.${NC}"
         echo -e "${GREEN}   Installed at: ${AUTHORING_SKILLS_INSTALL_DIR}${NC}"
         echo -e "${GREEN}   Claude skills dir: ${AUTHORING_SKILLS_CLAUDE_DIR}${NC}"
@@ -583,8 +580,7 @@ setup_authoring_skills_via_cli() {
         return 0
     fi
 
-    AUTHORING_SETUP_STATUS="failed"
-    AUTHORING_SKILLS_SETUP_STATUS="$AUTHORING_SETUP_STATUS"
+    AUTHORING_SKILLS_SETUP_STATUS="failed"
     echo -e "${YELLOW}⚠️  Authoring skills setup failed via CLI. Resolve the issue below, then re-run 'clawperator authoring-skills install'.${NC}"
     echo -e "${YELLOW}   Re-running after resolving the conflict is safe.${NC}"
     if [ -n "$AUTHORING_SKILLS_OUTPUT" ]; then
