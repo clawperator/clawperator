@@ -1,445 +1,228 @@
-# Findings: OpenClaw Onboarding Gaps for Clawperator
+# Findings: OpenClaw onboarding gaps for Clawperator
 
 ## Scope
 
-This document combines the Codex and Opus findings into one gap-focused research note.
+Anchor user request (Telegram):
 
-Anchor user request:
+> "I saw this app called clawperator. Check it out and see if I can use it to control my air conditioner via the Google Home app. I've plugged in an Android device."
 
-> "I saw this app called clawperator. Check it out and see if I can use it to control my air conditioner via the Google Home app. I've plugged in an Android device"
+Evaluation target — the real first-run path for an OpenClaw-class personal assistant:
 
-The evaluation target is the real first-run path for an OpenClaw-class personal assistant agent:
-
-1. receive the Telegram-style user message
+1. receive the Telegram message
 2. discover Clawperator on the web
 3. run `curl -fsSL https://clawperator.com/install.sh | bash`
 4. discover installed Google Home runtime skills
 5. run the right skill
 6. report current HVAC state back to the user
 
-This note focuses on what currently blocks or weakens that flow.
+Notes on levels. OpenClaw is the chat-to-agent gateway; it routes a message to an underlying coding agent (Claude Code, Codex, etc.) that in turn shells out to `clawperator`. The "discovery conventions" called out below are the ones OpenClaw documents as its tool surface (`AGENTS.md`, `TOOLS.md`, plugin entry points) plus the `~/.agents/skills` and per-agent-CLI skill directories the underlying agents already read. This note focuses on what blocks or weakens the flow above.
 
-## Executive Summary
+## Executive summary
 
-Clawperator already has most of the underlying capability needed for this scenario:
+Clawperator already has the runtime capability for this scenario:
 
-1. `install.sh` installs the CLI, operator APK, and a public skills repo.
-2. The public skills repo already contains Google Home HVAC skills.
-3. The CLI already supports `skills list`, `skills search`, `skills get`, and `skills run`.
+- `install.sh` installs the CLI, operator APK, and the public skills repo.
+- The public skills repo already contains four Google Home HVAC skills.
+- The CLI already supports `skills list`, `skills search`, `skills get`, `skills run`.
 
-The main issue is not missing runtime capability. The issue is missing agent handoff after install.
+The problem is not missing runtime capability. The problem is missing agent handoff after install. Today an OpenClaw-style agent can successfully install Clawperator and still fail to realize:
 
-Today, an OpenClaw-style agent can successfully install Clawperator and still fail to realize:
-
-1. that runtime skills were installed
-2. where those skills live
-3. how the Clawperator registry model differs from OpenClaw's own skill discovery model
-4. which Google Home skills are relevant
+1. that runtime skills were installed at all
+2. where they live
+3. how to reach them from the CLI it just acquired
+4. which skills match the user's natural-language request
 5. what prerequisites those skills require
 
-So the core problem is discoverability and integration, not the absence of Google Home support.
+Everything below is a discoverability / onboarding gap, not a runtime gap.
 
-## What Exists Today
+## What exists today
 
-### Installer behavior
-
-`sites/landing/public/install.sh` currently:
+**Installer behavior** — `sites/landing/public/install.sh`:
 
 1. installs `clawperator`
 2. runs `clawperator doctor`
-3. runs `clawperator skills install`
-4. appends `CLAWPERATOR_SKILLS_REGISTRY` to shell rc files
-5. installs authoring skills
+3. runs `clawperator skills install` (clones the public skills repo to `~/.clawperator/skills`)
+4. appends `CLAWPERATOR_SKILLS_REGISTRY` to `~/.zshrc` / `~/.bashrc`
+5. runs `clawperator authoring-skills install` (fan-outs into `~/.claude/skills`, `~/.codex/skills`, `~/.agents/skills`)
 6. writes `~/.clawperator/AGENTS.md`
 
-Evidence:
+Key code refs: [install.sh:490](sites/landing/public/install.sh:490), [install.sh:540](sites/landing/public/install.sh:540), [install.sh:598](sites/landing/public/install.sh:598), [install.sh:1068](sites/landing/public/install.sh:1068).
 
-- installer skill setup: `sites/landing/public/install.sh:490`
-- authoring-skill setup: `sites/landing/public/install.sh:540`
-- agent-guide write: `sites/landing/public/install.sh:598`
-- final install summary: `sites/landing/public/install.sh:1068`
-
-### Runtime skills already exist for Google Home HVAC
-
-The public skills repo already contains the relevant Google Home skills:
+**Google Home runtime skills already on disk after install**:
 
 | Skill ID | Intent | Role |
 | --- | --- | --- |
 | `com.google.android.apps.chromecast.app.get-climate-replay` | `get-climate` | Read current climate state |
-| `com.google.android.apps.chromecast.app.set-power-replay` | `set-power` | Turn climate power on/off |
+| `com.google.android.apps.chromecast.app.set-power-replay` | `set-power` | Turn climate power on / off |
 | `com.google.android.apps.chromecast.app.set-temperature-replay` | `set-temperature` | Set target temperature |
-| `com.google.android.apps.chromecast.app.control-hvac-orchestrated` | `control-hvac` | Agent-driven controller |
+| `com.google.android.apps.chromecast.app.control-hvac-orchestrated` | `control-hvac` | Agent-driven controller (requires `codex` on host) |
 
-Evidence:
+Refs: `../clawperator-skills/skills/skills-registry.json`, per-skill `skill.json` and `SKILL.md`.
 
-- registry entries: `../clawperator-skills/skills/skills-registry.json:89`
-- orchestrated skill manifest: `../clawperator-skills/skills/com.google.android.apps.chromecast.app.control-hvac-orchestrated/skill.json:1`
-- replay skill manifest: `../clawperator-skills/skills/com.google.android.apps.chromecast.app.get-climate-replay/skill.json:1`
-
-### Clawperator runtime skills are registry-driven
-
-Clawperator runtime skills are not discovered by folder scanning alone. They are loaded through the configured registry path.
-
-Evidence:
-
-- registry loader: `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts:6`
-- skills overview docs: `docs/skills/overview.md:17`
-- environment docs: `docs/api/environment.md:145`
+**Registry model** — runtime skills are registry-driven, not folder-scanned. Loaded via `CLAWPERATOR_SKILLS_REGISTRY`, with a CWD-relative fallback. Refs: [apps/node/src/adapters/skills-repo/localSkillsRegistry.ts:8](apps/node/src/adapters/skills-repo/localSkillsRegistry.ts:8), [docs/skills/overview.md:17](docs/skills/overview.md:17), [docs/api/environment.md:145](docs/api/environment.md:145).
 
 ## Findings
 
-### F1. `clawperator skills list` can fail in a fresh shell even after a successful install
+### F1. `clawperator skills list` fails in a fresh shell after a successful install — highest-friction gap
 
-This is the highest-friction implementation gap.
+Default path when `CLAWPERATOR_SKILLS_REGISTRY` is unset: `<cwd>/skills/skills-registry.json`. Installed path: `~/.clawperator/skills/skills/skills-registry.json`. The installer only propagates the env var via shell rc append, so a non-interactive or subprocess-spawned shell fails with:
 
-After install, the long-lived runtime registry lives at:
-
-`~/.clawperator/skills/skills/skills-registry.json`
-
-But the CLI default when `CLAWPERATOR_SKILLS_REGISTRY` is unset is:
-
-`<cwd>/skills/skills-registry.json`
-
-That means any non-interactive or fresh shell that does not source `~/.zshrc` or `~/.bashrc` can fail to discover installed skills even though the installer already cloned them successfully.
-
-Why this matters:
-
-`clawperator skills list` is the canonical command an agent should use to answer "what can this host do?" If that command fails by default, the agent is pushed toward the false conclusion that no skills are installed.
-
-Evidence:
-
-- default path behavior: `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts:8`
-- installer shell export behavior: `sites/landing/public/install.sh:505`
-- environment docs: `docs/api/environment.md:145`
-
-### F2. OpenClaw and Clawperator use different skill discovery models, and there is no bridge between them
-
-Clawperator installs runtime skills into `~/.clawperator/skills` and expects them to be discovered through `CLAWPERATOR_SKILLS_REGISTRY`.
-
-OpenClaw's published skill model is different. It discovers skills from workspace and shared agent directories such as:
-
-1. `<workspace>/skills`
-2. `<workspace>/.agents/skills`
-3. `~/.agents/skills`
-4. `~/.openclaw/skills`
-
-That means a successful Clawperator install does not automatically make Clawperator runtime skills visible to OpenClaw's own prompt-building or skill-selection system.
-
-Evidence:
-
-- Clawperator install location: `apps/node/src/domain/skills/skillsConfig.ts:6`
-- Clawperator sync target: `apps/node/src/domain/skills/syncSkills.ts:41`
-- OpenClaw skill docs: [OpenClaw Skills docs](https://docs.openclaw.ai/tools/skills)
-
-### F3. The installer wires authoring skills into agent discovery directories, but not runtime skills
-
-This is one of the clearest mismatches in the current onboarding story.
-
-`install.sh` explicitly wires authoring skills into:
-
-1. `~/.claude/skills`
-2. `${CODEX_HOME:-~/.codex}/skills`
-3. `~/.agents/skills`
-
-But it does not do the equivalent for runtime skills.
-
-So after install, generic agents are more likely to discover Clawperator maintenance helpers than the runtime Google Home HVAC skills the user actually cares about.
-
-Evidence:
-
-- authoring skill install summary: `sites/landing/public/install.sh:540`
-- authoring skill discovery docs: `docs/skills/authoring.md:45`
-
-### F4. `~/.clawperator/AGENTS.md` omits runtime skills entirely
-
-The installer does write an agent-facing guide, but it currently focuses on:
-
-1. `doctor`
-2. `snapshot`
-3. a simple click example
-4. installed authoring skills
-
-It does not tell an agent:
-
-1. where runtime skills were installed
-2. that public runtime skills came from `clawperator-skills`
-3. how to use `clawperator skills list/search/get`
-4. which Google Home skills already exist
-5. what arguments those skills require
-
-This means even an agent that finds `~/.clawperator/AGENTS.md` still does not learn the key fact for the Telegram HVAC scenario.
-
-Evidence:
-
-- guide write: `sites/landing/public/install.sh:598`
-- guide template: `sites/landing/public/install.sh:605`
-
-### F5. The guide is written to a Clawperator-specific path, not an OpenClaw-conventional discovery path
-
-The installer writes its guide to:
-
-`~/.clawperator/AGENTS.md`
-
-But OpenClaw-class agents are much more likely to look at:
-
-1. `./AGENTS.md`
-2. `~/AGENTS.md`
-3. `~/.agents/AGENTS.md`
-4. `~/.agents/skills/*/SKILL.md`
-
-So the system does generate agent-facing context, but not in the place OpenClaw naturally reads.
-
-This is made worse by the fact that `~/.agents/AGENTS.md` may already exist for unrelated host workflows and currently has no Clawperator bridge section.
-
-Evidence:
-
-- installer guide write: `sites/landing/public/install.sh:598`
-- OpenClaw personal assistant docs: [Personal Assistant Setup](https://docs.openclaw.ai/start/openclaw)
-- OpenClaw AGENTS template docs: [AGENTS.md Template](https://docs.openclaw.ai/reference/templates/AGENTS.md)
-
-### F6. Runtime skills are not surfaced through doctor or host-oriented help output
-
-`clawperator doctor` is the obvious first diagnostic command after install, but it only reports host/device readiness. It does not tell the agent whether the skills registry resolved, how many skills are installed, or whether the target app already has skills.
-
-Similarly, `clawperator skills` help lists the subcommands, but it does not answer the more important agent question:
-
-> "What capabilities are already installed on this host for the app the user mentioned?"
-
-This forces the agent to do extra discovery work after the first successful install instead of getting immediate confirmation that Google Home HVAC skills are ready.
-
-Evidence:
-
-- CLI registry/help surface: `apps/node/src/cli/registry.ts:2064`
-- install doctor flow: `sites/landing/public/install.sh:988`
-
-### F7. Skill search vocabulary does not match ordinary user vocabulary
-
-The user says "air conditioner" and "Google Home". The current skills use vocabulary like:
-
-1. `climate`
-2. `hvac`
-3. `set-power`
-4. `set-temperature`
-5. `com.google.android.apps.chromecast.app`
-
-`skills search --keyword` uses substring matching. So an agent that searches with user-language terms such as `"air conditioner"`, `"aircon"`, `"ac"`, or `"google home"` may miss the correct skills entirely.
-
-This means an agent can reach the registry and still fail to find the right capability because the vocabulary is tuned for author/developer terms rather than user phrasing.
-
-Evidence:
-
-- search behavior: `apps/node/src/domain/skills/searchSkills.ts:14`
-- Google Home skill IDs and contracts: `../clawperator-skills/skills/com.google.android.apps.chromecast.app.get-climate-replay/skill.json:1`
-
-### F8. `skills get` does not surface enough preconditions for first-run agent use
-
-The orchestrated Google Home HVAC skill currently requires more than just "run this command". Its real-world preconditions include:
-
-1. Google Home installed on the burner device
-2. Google Home already signed in
-3. the climate unit exposed under the expected `Climate` / `Home` route
-4. the exact `unit_name` label
-5. for the orchestrated path, `codex` available on the host
-
-None of that currently appears as first-class preflight metadata in `SkillEntry` or `clawperator skills get`.
-
-So an agent may correctly find a skill, but still not know whether:
-
-1. the replay path is safer for "check current status"
-2. the orchestrated path depends on Codex specifically
-3. the user must provide or confirm the exact climate-tile label
-
-Evidence:
-
-- orchestrated runtime path: `apps/node/src/domain/skills/runSkill.ts:1`
-- skill contract shape: `apps/node/src/contracts/skills.ts:1`
-- orchestrated skill manifest: `../clawperator-skills/skills/com.google.android.apps.chromecast.app.control-hvac-orchestrated/skill.json:1`
-
-### F9. The best existing control skill is hard-wired to `codex`, not OpenClaw
-
-The Google Home control skill declares:
-
-```json
-"agent": {
-  "cli": "codex",
-  "timeoutMs": 300000
-}
+```
+Warning: CLAWPERATOR_SKILLS_REGISTRY is not set. Run 'clawperator skills install' to configure the registry path.
+{"code":"REGISTRY_READ_FAILED","message":"Registry not found at default path:
+  <repo_root>/skills/skills-registry.json. Set CLAWPERATOR_SKILLS_REGISTRY or run clawperator skills install."}
 ```
 
-For the exact "check current HVAC status" scenario this is not fatal, because the replay read-only skill already exists.
+Reproduced live on this machine after a completed install.
 
-But for the broader intended story, "OpenClaw uses Clawperator to control Google Home", this is a real cross-product mismatch. The current flagship orchestrated HVAC runtime is not natively OpenClaw-oriented today.
+Why this matters: `skills list` is the canonical answer to "what can this host do?" If that command fails by default, the agent concludes "no skills installed" — the opposite of the truth.
 
-Evidence:
+Why it breaks for agents specifically:
 
-- orchestrated skill manifest: `../clawperator-skills/skills/com.google.android.apps.chromecast.app.control-hvac-orchestrated/skill.json:1`
+- agents spawn `clawperator` via `execFile` / `spawn` / non-login shells; `.zshrc` / `.bashrc` are not sourced
+- `clawperator doctor` itself emits the same warning, so the very first diagnostic command looks broken
 
-### F10. Important orientation currently lives only in install stdout
+Refs: [apps/node/src/adapters/skills-repo/localSkillsRegistry.ts:8](apps/node/src/adapters/skills-repo/localSkillsRegistry.ts:8), [install.sh:505](sites/landing/public/install.sh:505).
 
-The final installer output includes useful orientation such as:
+**Fix direction:** fall back to `${HOME}/.clawperator/skills/skills/skills-registry.json` before failing. Keep the env var as override, drop it as requirement.
 
-1. the skills registry path
-2. the authoring-skills location
-3. the agent-guide pointer
-4. the suggestion that AI agents read the guide before running commands
+### F2. `~/.clawperator/AGENTS.md` omits runtime skills, and lives in a non-conventional path
 
-That is useful for a human at install time, but not durable enough for OpenClaw-style agent workflows that continue later in fresh shells or future turns.
+Single finding, two halves.
 
-If information matters after install, it should exist in a persistent on-disk form the agent can re-read.
+**Content half.** [install.sh:598](sites/landing/public/install.sh:598) `write_agent_guide()` produces a file that lists `doctor`, `snapshot`, `click`, authoring-skills. It does not list:
 
-Evidence:
+1. where runtime skills were installed
+2. that they came from `clawperator-skills`
+3. how to call `clawperator skills list / search / get / run`
+4. that four Google Home HVAC skills already exist
+5. what arguments those skills accept
 
-- final install summary block: `sites/landing/public/install.sh:1081`
+On this machine the file names exactly one authoring skill (`skill-author-by-recording`) and zero runtime skills, despite the registry containing 17. An agent that finds this file still does not learn the single fact the Telegram scenario needs.
 
-### F11. The MCP surface exists but is not materialized as the default bridge
+**Location half.** The file lives at `~/.clawperator/AGENTS.md`. OpenClaw-class agents read, in rough order:
 
-Clawperator already has an MCP server. In principle, this could become the cleanest bridge between OpenClaw and Clawperator because MCP gives the agent a first-class tool surface instead of forcing shell-oriented skill discovery.
+1. `./AGENTS.md`
+2. `$HOME/AGENTS.md`
+3. `$HOME/.agents/AGENTS.md`
+4. per-agent skill dirs (`~/.agents/skills/*/SKILL.md`, `~/.claude/skills/*/SKILL.md`, `~/.codex/skills/*/SKILL.md`)
 
-But today:
+Clawperator writes to none of those. Worse, on this machine `~/.agents/AGENTS.md` already exists — owned by an unrelated PR/git-workflow skills repo — and contains zero mention of clawperator. A default traversal would conclude "this host is for git automation" and never find clawperator.
 
-1. the installer does not register the MCP server with OpenClaw or related agents
-2. it does not write a ready-to-paste MCP config snippet to disk
-3. the agent still has to discover MCP support from docs or source code
+Refs: [install.sh:598](sites/landing/public/install.sh:598), [install.sh:605](sites/landing/public/install.sh:605), OpenClaw [AGENTS template](https://docs.openclaw.ai/reference/templates/AGENTS.md), [personal-assistant setup](https://docs.openclaw.ai/start/openclaw).
 
-So the strongest existing integration surface is not yet helping the first-run onboarding flow.
+**Fix direction:**
 
-Evidence:
+- `write_agent_guide()` should render the runtime registry into the file (grouped by `applicationId`, with `intent`, `summary`, exact `clawperator skills run ...` invocation).
+- Append (not overwrite) a bounded, guard-comment-delimited `## Clawperator` section to `~/.agents/AGENTS.md` that points at `~/.clawperator/AGENTS.md` and teaches `clawperator skills list`. Same idempotency discipline as the existing shell-rc append.
+- Optional: write `~/.clawperator/TOOLS.md` in OpenClaw's `TOOLS.md` schema describing `clawperator` as a CLI tool.
 
-- MCP CLI surface: `apps/node/src/cli/registry.ts:2463`
+### F3. Runtime skills are not wired into agent-discovery directories, only authoring skills are
 
-### F12. There is no opinionated first-success recipe for "evaluate Google Home HVAC status"
+`install.sh` explicitly fans authoring skills into `~/.claude/skills`, `~/.codex/skills`, `~/.agents/skills`. Runtime skills (including the Google Home HVAC ones) get none of that treatment.
 
-The shortest likely-success path for the Telegram request is roughly:
+Note: runtime skills are CLI-invoked (`clawperator skills run <id>`), not standalone `SKILL.md` executables, so symlinking them into `~/.agents/skills` as-is would not work. What is missing is a **single bridge skill / pointer** under each agent-discovery directory that teaches the agent to delegate to `clawperator skills`. Today, generic agents are more likely to discover Clawperator's self-maintenance helpers than the runtime skills the user actually cares about.
 
-1. install Clawperator
-2. verify readiness with `clawperator doctor`
-3. confirm Google Home is installed and signed in on the burner
-4. discover Google Home runtime skills
-5. run `get-climate-replay` with the correct `--unit-name`
-6. return power, mode, and temperature to the user
+Refs: [install.sh:540](sites/landing/public/install.sh:540), [docs/skills/authoring.md:45](docs/skills/authoring.md:45).
 
-The system can do this today, but that path is not surfaced as a first-class onboarding recipe anywhere obvious in the install flow or agent landing surfaces.
+**Fix direction:** install one small bridge skill into the agent-discovery directories whose SKILL.md is essentially "to drive an Android app, call `clawperator skills list` first; then `clawperator skills run ...`". This is also where F2's `~/.agents/AGENTS.md` append should cross-link.
 
-Right now the product behaves more like an SDK install followed by open-ended exploration than a guided "yes, I can check your HVAC state through Google Home" evaluation path.
+### F4. `clawperator doctor` does not report skills readiness
 
-Evidence:
+`doctor` answers host/device questions only. After a clean install, the agent's obvious next question is not "is adb working?" but:
 
-- setup docs: `docs/setup.md:1`
-- agents page: `sites/landing/app/agents/page.js:1`
+> "What app-level capabilities are already installed on this host?"
 
-## Practical Consequence For The Telegram Scenario
+A skills-aware doctor check — "registry resolves; 17 skills available; 4 cover `com.google.android.apps.chromecast.app`" — would compress the agent's decision path from "install succeeded, now I must go explore" to "skills ready for the user's stated app".
 
-If an OpenClaw agent receives:
+Refs: [apps/node/src/cli/registry.ts:2064](apps/node/src/cli/registry.ts:2064), [install.sh:988](sites/landing/public/install.sh:988).
 
-> "I saw this app called clawperator. Check it out and see if I can use it to control my air conditioner via the Google Home app. I've plugged in an Android device"
+**Fix direction:** add a `skills.registry.presence` check to doctor that uses the F1 fallback path, reports count and per-`applicationId` counts, and is included in both pretty and JSON output. Add a `clawperator skills for-app <pkg>` shortcut so an agent can get the right answer in one command.
 
-then the likely failure points today are:
+### F5. Skill search vocabulary does not match user vocabulary, and user-language terms mis-rank
 
-1. the agent installs Clawperator successfully
-2. the agent runs `clawperator skills list` or `skills search` in a fresh shell
-3. the registry is not resolved because the shell did not source the exported env var
-4. even if the registry resolves, the agent may search for `"air conditioner"` or `"google home"` and miss the right skills
-5. even if the agent finds the right skill, it may not realize the safer first move is the replay read-only skill rather than the orchestrated control skill
-6. even if it chooses a skill correctly, it may not realize Google Home sign-in and exact tile label are prerequisites
+`skills search --keyword` does a case-insensitive substring match across `id`, `summary`, and `applicationId` ([apps/node/src/domain/skills/searchSkills.ts:30](apps/node/src/domain/skills/searchSkills.ts:30)).
 
-This is a discoverability and onboarding problem, not a runtime-capability problem.
+Behavior on the real registry, verified live:
 
-## Priority Fixes
+| Query | Result |
+| --- | --- |
+| `"air conditioner"` | 0 hits |
+| `"aircon"` | 0 hits |
+| `"ac"` | 4 hits, but **all four are wrong** — `com.coles.search-products`, `com.globird.energy.get-yesterday-usage-cost-replay`, `com.woolworths.search-products`, plus `control-hvac-orchestrated` (matches because "hvac" contains "ac") |
+| `"google home"` | 4 hits (matches `summary` text) — works today |
+| `"climate"` | 4 hits — works today |
+| `"hvac"` | 1 hit |
 
-### P0. Make installed runtime skills self-discovering for headless shells
+So the failure mode is worse than "user words miss the right skills": user words also *return confidently wrong skills*. An agent that searches "ac" gets supermarket skills and would have no a priori reason to reject them.
 
-The CLI should fall back to the installed home-directory registry path before failing:
+Refs: [apps/node/src/domain/skills/searchSkills.ts:30](apps/node/src/domain/skills/searchSkills.ts:30), [../clawperator-skills/skills/com.google.android.apps.chromecast.app.get-climate-replay/skill.json:1](../clawperator-skills/skills/com.google.android.apps.chromecast.app.get-climate-replay/skill.json:1).
 
-`~/.clawperator/skills/skills/skills-registry.json`
+**Fix direction:**
 
-Without this, the first canonical discovery command can still fail after a successful install.
+- add `keywords: string[]` (or `aliases`) to `SkillEntry` in [apps/node/src/contracts/skills.ts](apps/node/src/contracts/skills.ts) and match on it.
+- seed Google Home HVAC skills with `["air conditioner", "aircon", "ac", "heater", "hvac", "climate", "google home"]`.
+- require minimum token length and/or whole-token boundaries to stop "ac" matching "hvac" — or, better, give exact-token matches on `keywords` higher rank than substring matches on summary.
 
-### P0. Surface runtime skills in the generated agent guide
+### F6. `skills get` does not surface the preconditions needed for first-run use
 
-`~/.clawperator/AGENTS.md` should enumerate runtime skills, especially grouped by app, with:
+The Google Home skills silently assume:
 
-1. `applicationId`
-2. `intent`
-3. `summary`
-4. exact `clawperator skills run ...` examples
-5. a note that Google Home HVAC skills already exist
+1. `com.google.android.apps.chromecast.app` is installed on the burner
+2. Google Home is signed in and has at least one climate unit linked
+3. the climate unit is reachable via the `Home` → `Climate` route
+4. the caller passes the exact `unit_name` that matches the controller toolbar title
+5. for `control-hvac-orchestrated`, the `codex` CLI is installed on the host (declared by `agent.cli: codex`); without it the skill will fail mid-run
 
-### P0. Add an explicit OpenClaw bridge
+None of that surfaces in `clawperator skills get <id>` today. A correctly-discovered skill can still fail deep in the UI flow, which reads to the agent as "Clawperator is broken" rather than "the user needs to sign in to Google Home".
 
-Best candidate options:
+Note on `agent.cli: codex`: this is the CLI the orchestrated skill spawns *internally* — it is not about which agent calls `clawperator` from the outside. OpenClaw → clawperator → internal codex works fine as long as codex is on PATH. The gap is that this precondition is invisible at discovery time, not that the skill is OpenClaw-hostile.
 
-1. append a bounded Clawperator section to `~/.agents/AGENTS.md`
-2. write `~/.clawperator/TOOLS.md` or equivalent OpenClaw-oriented tool description
-3. install an OpenClaw-readable bridge skill under `~/.agents/skills` or `~/.openclaw/skills`
+Refs: [apps/node/src/domain/skills/runSkill.ts:1](apps/node/src/domain/skills/runSkill.ts:1), [apps/node/src/contracts/skills.ts:1](apps/node/src/contracts/skills.ts:1), [../clawperator-skills/skills/com.google.android.apps.chromecast.app.control-hvac-orchestrated/skill.json:1](../clawperator-skills/skills/com.google.android.apps.chromecast.app.control-hvac-orchestrated/skill.json:1).
 
-The bridge should teach the agent to:
+**Fix direction:** add first-class `preflight` / `requires` metadata to `SkillEntry`: required Android packages, required sign-in state, required host CLIs, required user-provided inputs, and an explicit `safer_first_run` / replay pointer for read-only alternatives. Have `skills get` render it; have orchestrated harnesses reject early with structured `PRECONDITION_*` errors.
 
-1. verify Clawperator readiness
-2. discover runtime skills via the CLI
-3. prefer existing public skills before inventing new ones
-4. ask for or infer required values such as `unit_name`
+### F7. Install-time orientation lives only in stdout
 
-### P0. Add vocabulary aliases so user-language searches find the right skills
+The final `echo` block at [install.sh:1081](sites/landing/public/install.sh:1081) prints the skills registry path, APK path, agent-guide URL, and the "AI agents should read the guide" nudge. None of this is durable across turns. An OpenClaw session 24 hours later sees none of it.
 
-Google Home HVAC skills should be discoverable through terms like:
+**Fix direction:** mirror the block into `~/.clawperator/AGENTS.md` (F2) and additionally write `~/.clawperator/install-state.json` with schema version, install timestamp, CLI version, APK version, resolved registry path, last device serial. One `cat` replaces N `doctor --format json` re-runs.
 
-1. `air conditioner`
-2. `aircon`
-3. `ac`
-4. `google home`
-5. `heater`
+### F8. The MCP surface exists but is not materialized as the default bridge
 
-This is likely the smallest schema-level change that materially improves first-run agent success.
+Clawperator already implements an MCP server ([apps/node/src/cli/registry.ts:2463](apps/node/src/cli/registry.ts:2463)). MCP would sidestep F1–F5 entirely because tool discovery is solved at the protocol layer. But the installer does not register the MCP server with any agent host and does not write a ready-to-paste config snippet.
 
-### P1. Surface skill readiness through doctor or a host-summary command
+**Fix direction:** write `~/.clawperator/mcp-config-snippet.json` with variants for Claude Desktop, Codex, and generic stdio MCP consumers. Print the paste location in the final install message. Automatic registration is too invasive — the paste-ready file is the right compromise.
 
-After install, the obvious next question is not just "is adb working?" but:
+## Practical consequence for the Telegram scenario
 
-> "What app-level capabilities are already installed here?"
+Given the message above, the most likely failure today is:
 
-A skills-aware doctor check or summary command would answer that directly.
+1. install succeeds
+2. agent runs `clawperator skills list` in a spawned shell → fails (F1)
+3. agent reads `~/.clawperator/AGENTS.md` (if it finds it) → sees only authoring skills (F2)
+4. agent web-searches the docs → finds `skills search` and tries "air conditioner" → 0 hits (F5), or tries "ac" → 4 wrong hits (F5)
+5. if the agent does reach `control-hvac-orchestrated` it doesn't learn that `codex` must be on PATH or that Google Home sign-in is required (F6)
+6. agent reports "I can't control this" even though the capability is already on disk
 
-### P1. Add first-class skill preflight metadata
+Every step here is fixable independently.
 
-`SkillEntry` or adjacent metadata should advertise:
+## Priority fixes
 
-1. required Android package(s)
-2. required host CLIs
-3. user-provided inputs like `unit_name`
-4. sign-in expectations
-5. whether a replay path is the safer first-run option
+### P0 — the three that convert the Telegram flow from "probably fails" to "probably works"
 
-### P1. Materialize MCP config as an install artifact
+1. **F1** — fall back to `~/.clawperator/skills/skills/skills-registry.json` in the registry loader. Single-file change. Without this, every other fix is gated behind a command that fails by default.
+2. **F2 content** — render the runtime skills registry into `~/.clawperator/AGENTS.md`, grouped by `applicationId`, with `intent`, `summary`, and exact `clawperator skills run ...` examples.
+3. **F5** — add `keywords` to `SkillEntry` and seed the Google Home HVAC skills with `["air conditioner", "aircon", "ac", "heater", "hvac", "climate", "google home"]`. Rank exact-token matches on `keywords` ahead of substring summary matches so `"ac"` stops returning Coles.
 
-The installer should write a ready-to-paste MCP config snippet under `~/.clawperator/` for Codex, Claude Desktop, and generic stdio MCP consumers.
+### P1 — meaningfully strengthens subsequent turns and cross-agent discovery
 
-### P1. Add a first-class Google Home HVAC evaluation recipe
+4. **F2 location** — idempotent `## Clawperator` append to `~/.agents/AGENTS.md`; same guard-comment discipline as the shell-rc append.
+5. **F4** — `skills.registry.presence` check in `doctor`, plus per-`applicationId` counts.
+6. **F6** — first-class `preflight` metadata in `SkillEntry`; rendered in `skills get`; enforced in orchestrated harnesses.
+7. **F7** — `install-state.json`.
+8. **F8** — ship `mcp-config-snippet.json`.
 
-The current system needs a short, scenario-oriented doc or install follow-up that says:
+### P2
 
-1. verify device and operator readiness
-2. confirm Google Home is installed and signed in
-3. discover Google Home runtime skills
-4. start with `get-climate-replay`
-5. return current HVAC status to the user
-
-## Smallest Viable Unblocker
-
-If only a few changes ship, the most leverage appears to be:
-
-1. fix registry fallback so `clawperator skills list` works after install without shell-session luck
-2. render runtime skills into `~/.clawperator/AGENTS.md`
-3. add search aliases so `"air conditioner"` and `"google home"` find the existing Google Home HVAC skills
-
-Those three changes would move the Telegram scenario much closer to "just works" without requiring a larger architecture rewrite.
-
-## Useful Evidence
-
-- install script: `sites/landing/public/install.sh:1`
-- runtime skills overview: `docs/skills/overview.md:1`
-- environment docs: `docs/api/environment.md:1`
-- setup docs: `docs/setup.md:1`
-- agents page: `sites/landing/app/agents/page.js:1`
-- OpenClaw skills docs: [https://docs.openclaw.ai/tools/skills](https://docs.openclaw.ai/tools/skills)
-- OpenClaw AGENTS docs: [https://docs.openclaw.ai/reference/templates/AGENTS.md](https://docs.openclaw.ai/reference/templates/AGENTS.md)
-- OpenClaw personal assistant docs: [https://docs.openclaw.ai/start/openclaw](https://docs.openclaw.ai/start/openclaw)
+9. **F3** — single bridge skill under `~/.claude/skills`, `~/.codex/skills`, `~/.agents/skills` that delegates to `clawperator skills`.
