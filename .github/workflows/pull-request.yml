@@ -151,7 +151,7 @@ jobs:
         run: npm --prefix apps/node ci
 
       - name: Make validation scripts executable
-        run: chmod +x scripts/test_install validation/test_doctor.sh validation/test_install_multidevice.sh validation/test_install_java.sh validation/test_install_authoring_skills.sh
+        run: chmod +x scripts/test_install validation/test_doctor.sh validation/test_install_multidevice.sh validation/test_install_java.sh validation/test_install_authoring_skills.sh validation/test_install_main.sh
 
       - name: Run install validation suite
         run: bash scripts/test_install

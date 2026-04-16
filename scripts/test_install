@@ -19,5 +19,6 @@ bash validation/test_doctor.sh
 bash validation/test_install_multidevice.sh
 bash validation/test_install_java.sh
 bash validation/test_install_authoring_skills.sh
+bash validation/test_install_main.sh
 
 echo "=== install-related test suite passed ==="
