@@ -559,14 +559,14 @@ setup_authoring_skills_via_cli() {
         while IFS= read -r PARSED_AUTHORING_LINE; do
             case "$PARSED_AUTHORING_LINE" in
                 installedDir=*)
-                    AUTHORING_SKILLS_INSTALL_DIR="${PARSED_AUTHORING_LINE#installedDir=}/"
+                    AUTHORING_SKILLS_INSTALL_DIR="${PARSED_AUTHORING_LINE#installedDir=}"
                     ;;
                 agentDir=*)
                     AUTHORING_AGENT_DIR_INDEX=$((AUTHORING_AGENT_DIR_INDEX + 1))
                     if [ "$AUTHORING_AGENT_DIR_INDEX" -eq 1 ]; then
-                        AUTHORING_SKILLS_CLAUDE_DIR="${PARSED_AUTHORING_LINE#agentDir=}/"
+                        AUTHORING_SKILLS_CLAUDE_DIR="${PARSED_AUTHORING_LINE#agentDir=}"
                     elif [ "$AUTHORING_AGENT_DIR_INDEX" -eq 2 ]; then
-                        AUTHORING_SKILLS_CODEX_DIR="${PARSED_AUTHORING_LINE#agentDir=}/"
+                        AUTHORING_SKILLS_CODEX_DIR="${PARSED_AUTHORING_LINE#agentDir=}"
                     fi
                     ;;
             esac
