@@ -451,12 +451,11 @@ process.stdin.on("end", () => {
     if (parsed && typeof parsed.installedDir === "string") {
       process.stdout.write(`installedDir=${parsed.installedDir}\n`);
     }
-    if (parsed && Array.isArray(parsed.agentDirs)) {
-      for (const agentDir of parsed.agentDirs) {
-        if (typeof agentDir === "string") {
-          process.stdout.write(`agentDir=${agentDir}\n`);
-        }
-      }
+    if (parsed && typeof parsed.claudeSkillsDir === "string") {
+      process.stdout.write(`claudeSkillsDir=${parsed.claudeSkillsDir}\n`);
+    }
+    if (parsed && typeof parsed.codexSkillsDir === "string") {
+      process.stdout.write(`codexSkillsDir=${parsed.codexSkillsDir}\n`);
     }
   } catch {}
 });
@@ -553,23 +552,18 @@ setup_authoring_skills_via_cli() {
     fi
 
     echo -e "${BLUE}Setting up authoring skills...${NC}"
-    if AUTHORING_SKILLS_OUTPUT="$("$CLAWPERATOR_BIN_PATH" authoring-skills install --output json 2>&1)"; then
+    if AUTHORING_SKILLS_OUTPUT="$("$CLAWPERATOR_BIN_PATH" authoring-skills install --output json)"; then
         local PARSED_AUTHORING_LINE=""
-        local AUTHORING_AGENT_DIR_INDEX=0
         while IFS= read -r PARSED_AUTHORING_LINE; do
             case "$PARSED_AUTHORING_LINE" in
                 installedDir=*)
                     AUTHORING_SKILLS_INSTALL_DIR="${PARSED_AUTHORING_LINE#installedDir=}"
                     ;;
-                agentDir=*)
-                    AUTHORING_AGENT_DIR_INDEX=$((AUTHORING_AGENT_DIR_INDEX + 1))
-                    # agentDirs order from the CLI: index 1 = Claude Code, index 2 = Codex.
-                    # This mirrors the order in copyAuthoringSkills.ts resolveAgentDirs().
-                    if [ "$AUTHORING_AGENT_DIR_INDEX" -eq 1 ]; then
-                        AUTHORING_SKILLS_CLAUDE_DIR="${PARSED_AUTHORING_LINE#agentDir=}"
-                    elif [ "$AUTHORING_AGENT_DIR_INDEX" -eq 2 ]; then
-                        AUTHORING_SKILLS_CODEX_DIR="${PARSED_AUTHORING_LINE#agentDir=}"
-                    fi
+                claudeSkillsDir=*)
+                    AUTHORING_SKILLS_CLAUDE_DIR="${PARSED_AUTHORING_LINE#claudeSkillsDir=}"
+                    ;;
+                codexSkillsDir=*)
+                    AUTHORING_SKILLS_CODEX_DIR="${PARSED_AUTHORING_LINE#codexSkillsDir=}"
                     ;;
             esac
         done < <(printf '%s' "$AUTHORING_SKILLS_OUTPUT" | parse_authoring_skills_install_result)
@@ -594,6 +588,8 @@ setup_authoring_skills_via_cli() {
 write_agent_guide() {
     local AGENT_GUIDE_PATH="$HOME/.clawperator/AGENTS.md"
     local AUTHORING_SKILLS_GUIDE_DIR="${AUTHORING_SKILLS_INSTALL_DIR:-$HOME/.clawperator/authoring-skills}"
+    local SKILL_DIR=""
+    local HAS_SKILLS=0
 
     mkdir -p "$HOME/.clawperator"
 
@@ -615,19 +611,31 @@ clawperator click --text "Settings" --json  # tap an element
 - Setup guide: https://docs.clawperator.com/setup/
 EOF
 
-    if [ -d "$AUTHORING_SKILLS_GUIDE_DIR" ] \
-        && [ -f "$AUTHORING_SKILLS_GUIDE_DIR/version.txt" ] \
-        && [ -f "$AUTHORING_SKILLS_GUIDE_DIR/skill-author-by-recording/SKILL.md" ]; then
-        cat >> "$AGENT_GUIDE_PATH" <<'EOF'
+    # Check whether any skill dirs with SKILL.md exist in the install dir.
+    if [ -d "$AUTHORING_SKILLS_GUIDE_DIR" ] && [ -f "$AUTHORING_SKILLS_GUIDE_DIR/version.txt" ]; then
+        for SKILL_DIR in "$AUTHORING_SKILLS_GUIDE_DIR"/*/; do
+            if [ -f "${SKILL_DIR}SKILL.md" ]; then
+                HAS_SKILLS=1
+                break
+            fi
+        done
+    fi
+
+    if [ "$HAS_SKILLS" -eq 1 ]; then
+        cat >> "$AGENT_GUIDE_PATH" <<EOF
 
 ## Authoring Skills
 
 First-party Clawperator authoring skills are installed at:
-~/.clawperator/authoring-skills/
+${AUTHORING_SKILLS_GUIDE_DIR}
 
 Available skills:
-- skill-author-by-recording: use this to author a new Clawperator runtime skill from a fresh phone recording
 EOF
+        for SKILL_DIR in "$AUTHORING_SKILLS_GUIDE_DIR"/*/; do
+            if [ -f "${SKILL_DIR}SKILL.md" ]; then
+                printf -- '- %s\n' "$(basename "$SKILL_DIR")" >> "$AGENT_GUIDE_PATH"
+            fi
+        done
     else
         cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 

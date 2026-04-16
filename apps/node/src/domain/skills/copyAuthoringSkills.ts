@@ -13,7 +13,8 @@ export interface CopyAuthoringSkillsSuccess {
   ok: true;
   skills: string[];
   installedDir: string;
-  agentDirs: string[];
+  claudeSkillsDir: string;
+  codexSkillsDir: string;
 }
 
 export interface CopyAuthoringSkillsError {
@@ -370,7 +371,8 @@ export async function copyAuthoringSkills(
       ok: true,
       skills,
       installedDir,
-      agentDirs: [claudeSkillsDir, codexSkillsDir],
+      claudeSkillsDir,
+      codexSkillsDir,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

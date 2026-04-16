@@ -45,7 +45,8 @@ async function runAuthoringSkillsInstall(
     skills: result.skills,
     count: result.skills.length,
     installedDir: result.installedDir,
-    agentDirs: result.agentDirs,
+    claudeSkillsDir: result.claudeSkillsDir,
+    codexSkillsDir: result.codexSkillsDir,
     message: `Authoring skills ${action === "install" ? "installed" : "updated"}.`,
     envHint: getAuthoringSkillsEnvHint(options.env),
   }, options);
