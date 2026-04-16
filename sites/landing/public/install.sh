@@ -289,6 +289,8 @@ check_node() {
         return $?
     fi
 
+    local NODE_VERSION
+    local MAJOR_VERSION
     NODE_VERSION=$(node -v | cut -d'v' -f2)
     MAJOR_VERSION=$(echo "$NODE_VERSION" | cut -d'.' -f1)
 
@@ -915,13 +917,13 @@ doctor_check_status() {
     local json="$1"
     local check_id="$2"
     local expected_status="$3"
-    printf '%s' "$json" | node -e "
+    printf '%s' "$json" | CHECK_ID="$check_id" EXPECTED_STATUS="$expected_status" node -e "
 let d='';
 process.stdin.on('data', c => d += c).on('end', () => {
   try {
     const r = JSON.parse(d);
-    const c = (r.checks || []).find(x => x.id === '$check_id');
-    process.exitCode = (c && c.status === '$expected_status') ? 0 : 1;
+    const c = (r.checks || []).find(x => x.id === process.env.CHECK_ID);
+    process.exitCode = (c && c.status === process.env.EXPECTED_STATUS) ? 0 : 1;
   } catch { process.exitCode = 1; }
 });
 " 2>/dev/null
@@ -944,13 +946,13 @@ doctor_check_code() {
     local json="$1"
     local check_id="$2"
     local expected_code="$3"
-    printf '%s' "$json" | node -e "
+    printf '%s' "$json" | CHECK_ID="$check_id" EXPECTED_CODE="$expected_code" node -e "
 let d='';
 process.stdin.on('data', c => d += c).on('end', () => {
   try {
     const r = JSON.parse(d);
-    const c = (r.checks || []).find(x => x.id === '$check_id');
-    process.exitCode = (c && c.code === '$expected_code') ? 0 : 1;
+    const c = (r.checks || []).find(x => x.id === process.env.CHECK_ID);
+    process.exitCode = (c && c.code === process.env.EXPECTED_CODE) ? 0 : 1;
   } catch { process.exitCode = 1; }
 });
 " 2>/dev/null
@@ -1125,4 +1127,4 @@ main() {
     show_star_hint
 }
 
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi
+if [[ "${BASH_SOURCE[0]-}" == "$0" || -z "${BASH_SOURCE[0]-}" ]]; then main "$@"; fi
