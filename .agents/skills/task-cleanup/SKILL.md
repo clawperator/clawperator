@@ -261,7 +261,7 @@ Do not delete the task folder until the user has resolved or accepted all flagge
 After all three gates pass and any flagged gaps are resolved or accepted:
 
 ```bash
-rm -rf <task-path>
+git rm -r -- <task-path>
 ```
 
 Commit:
