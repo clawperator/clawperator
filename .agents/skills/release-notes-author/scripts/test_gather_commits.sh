@@ -294,6 +294,42 @@ fi
 rm -rf "$fixture_repo"
 rm -f "$fixture_out" "$fixture_err"
 
+release_fixture_repo="$(mktemp -d)"
+release_fixture_out="$(mktemp)"
+release_fixture_err="$(mktemp)"
+(
+  cd "$release_fixture_repo" || exit 1
+  git init -q
+  git config user.name "Release Notes Test"
+  git config user.email "release-notes-test@example.com"
+  mkdir -p docs/troubleshooting sites/landing/public
+  printf 'Compatibility guide.\n' > docs/troubleshooting/compatibility.md
+  printf '#!/usr/bin/env bash\n' > sites/landing/public/install.sh
+  git add docs/troubleshooting/compatibility.md sites/landing/public/install.sh
+  git commit -q -m "docs: add public install docs"
+  git tag v1.0.0
+  printf 'Compatibility guide for 1.0.0.\n' > docs/troubleshooting/compatibility.md
+  printf '#!/usr/bin/env bash\n# install 1.0.0\n' > sites/landing/public/install.sh
+  git add docs/troubleshooting/compatibility.md sites/landing/public/install.sh
+  git commit -q -m "docs(release): update published version to 1.0.0"
+  git tag v1.0.1
+)
+
+if run_script_in_repo "$release_fixture_repo" "$release_fixture_out" "$release_fixture_err" v1.0.0 v1.0.1; then
+  if grep -q '^SUBJECT: docs(release): update published version to 1.0.0$' "$release_fixture_out" && \
+    grep -q '^CLASSIFICATION: drop:infra$' "$release_fixture_out"; then
+    printf 'PASS: published-version release ceremony commit is classified as drop:infra\n'
+  else
+    printf 'FAIL: published-version release ceremony commit was not classified as drop:infra\n'
+    failures=$((failures + 1))
+  fi
+else
+  printf 'FAIL: published-version release ceremony fixture invocation failed\n'
+  failures=$((failures + 1))
+fi
+rm -rf "$release_fixture_repo"
+rm -f "$release_fixture_out" "$release_fixture_err"
+
 if [[ "$failures" -ne 0 ]]; then
   printf 'FAIL: %s test case(s) failed\n' "$failures" >&2
   exit 1

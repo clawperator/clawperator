@@ -123,6 +123,19 @@ path_type() {
   esac
 }
 
+is_release_ceremony_subject() {
+  local subject="$1"
+
+  case "$subject" in
+    "docs(release): update published version to "*)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 collect_commit_files() {
   local sha="$1"
 
@@ -204,6 +217,12 @@ while IFS= read -r sha; do
     classification="keep"
   elif [[ "$has_named_surface" -eq 1 ]]; then
     classification="drop:no-src"
+  fi
+
+  # Dedicated published-version follow-up commits are release ceremony, not
+  # changelog-worthy product or docs changes, even when they touch authored docs.
+  if is_release_ceremony_subject "$local_subject"; then
+    classification="drop:infra"
   fi
 
   printf '=== COMMIT %s ===\n' "$sha"

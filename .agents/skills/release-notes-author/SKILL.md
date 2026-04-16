@@ -33,6 +33,11 @@ bash .agents/skills/release-notes-author/scripts/gather_prs.sh <start-tag> <end-
 
 `drop:no-src` and `drop:infra` mean skip the commit. Never skip silently.
 
+The gather script may classify dedicated release-ceremony commits such as
+`docs(release): update published version to ...` as `drop:infra` even when they
+touch authored docs. Treat that classifier output as authoritative so published
+version bumps do not show up as changelog-worthy documentation work.
+
 `keep` means include the commit. Group it by surface using the `SURFACES:` line.
 
 | Path example | Type | Classification result |

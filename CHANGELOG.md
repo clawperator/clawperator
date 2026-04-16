@@ -6,10 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [0.6.2] - 2026-04-17
 
-This release tightens the install flow for stdin-based usage and refreshes the public release-facing docs for the published `0.6.1` artifacts.
+This release fixes the `install.sh` stdin execution path so streamed installs complete cleanly.
 
 ### 📚 Documentation & Website
-- **Changed:** Refreshed the public release-facing docs and install entrypoints to point at the published `0.6.1` release artifacts.
 - **Fixed:** Corrected the `install.sh` stdin execution path so `curl -fsSL https://clawperator.com/install.sh | bash` completes without tripping the entrypoint guard.
 
 Pull requests:
