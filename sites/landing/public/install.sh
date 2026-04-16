@@ -1057,19 +1057,19 @@ main() {
     echo -e "${BLUE}Final Doctor Check...${NC}"
     local FINAL_DOCTOR_JSON
     FINAL_DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json || true)"
+    if doctor_check_code "$FINAL_DOCTOR_JSON" "device.discovery" "MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"; then
+        echo -e "${YELLOW}⚠️  Host install completed, but Android setup is still pending because more than one device is connected.${NC}"
+        print_manual_operator_setup_commands
+        echo ""
+        echo -e "${YELLOW}After setup, verify one device explicitly with:${NC}"
+        echo -e "${YELLOW}  clawperator doctor --device <device_id> --output pretty${NC}"
+        echo ""
+        echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+        echo -e "${GREEN}  Installation Complete (Device Selection Required)${NC}"
+        echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+        return 0
+    fi
     if ! doctor_report_ok "$FINAL_DOCTOR_JSON"; then
-        if doctor_check_code "$FINAL_DOCTOR_JSON" "device.discovery" "MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"; then
-            echo -e "${YELLOW}⚠️  Host install completed, but Android setup is still pending because more than one device is connected.${NC}"
-            print_manual_operator_setup_commands
-            echo ""
-            echo -e "${YELLOW}After setup, verify one device explicitly with:${NC}"
-            echo -e "${YELLOW}  clawperator doctor --device <device_id> --output pretty${NC}"
-            echo ""
-            echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
-            echo -e "${GREEN}  Installation Complete (Device Selection Required)${NC}"
-            echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
-            return 0
-        fi
         echo -e "${RED}❌ Final doctor check failed.${NC}"
         "$CLAWPERATOR_BIN_PATH" doctor --output pretty || true
         return 1

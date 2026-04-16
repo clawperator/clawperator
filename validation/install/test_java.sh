@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
 REPO_ROOT="$(pwd)"
 INSTALL_SCRIPT="$REPO_ROOT/sites/landing/public/install.sh"
@@ -350,4 +350,4 @@ run_linux_apt_install_case "$TMP_DIR/linux-apt-install"
 run_linux_pacman_install_case "$TMP_DIR/linux-pacman-install"
 run_linux_conflict_case "$TMP_DIR/linux-conflict"
 
-echo "validation/test_install_java.sh: pass"
+echo "validation/install/test_java.sh: pass"
