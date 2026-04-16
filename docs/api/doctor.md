@@ -399,7 +399,7 @@ For a failing check, pretty output includes:
 | `host.adb.server` | `pass`, `fail` | `ADB_SERVER_FAILED` | adb server can start |
 | `host.skill-agent-cli.default` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | default orchestrated-skill agent CLI is a valid executable name and exists on PATH |
 | `host.skill-agent-cli.skills` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | all installed orchestrated skills can resolve their configured agent CLI executable |
-| `host.authoring-skills.staleness` | `pass`, `warn` | `AUTHORING_SKILLS_STALE` | installed authoring skills version matches the current CLI version, or authoring skills are not yet installed |
+| `host.authoring-skills.staleness` | `pass`, `warn` | `AUTHORING_SKILLS_STALE` | when authoring skills are present, the canonical install store is readable, packaged skills are present, and managed Claude/Codex discovery links point at the canonical store |
 | `host.java.version` | `pass`, `fail` | `HOST_DEPENDENCY_MISSING` or no explicit code | Java 17 or 21 is available for full Android build checks |
 | `build.android.assemble` | `pass`, `fail` | `ANDROID_BUILD_FAILED` | `./gradlew :app:assembleDebug` succeeds |
 | `device.discovery` | `pass`, `warn`, `fail` | `NO_DEVICES`, `DEVICE_UNAUTHORIZED`, `DEVICE_OFFLINE`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`, `DEVICE_NOT_FOUND` | device discovery succeeded and the environment is targetable, or explains why explicit `--device` selection is still required |

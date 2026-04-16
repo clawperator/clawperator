@@ -985,6 +985,37 @@ describe("Doctor: hostChecks", () => {
             });
         });
 
+        it("warns when an expected skill path cannot be inspected for a non-ENOENT reason", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-uninspectable-skill-");
+            const installedDir = join(root, "authoring-skills");
+            const claudeSkillsDir = join(root, "claude-skills");
+            const codexSkillsDir = join(root, "codex-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            await mkdir(installedDir, { recursive: true });
+            await mkdir(claudeSkillsDir, { recursive: true });
+            await mkdir(codexSkillsDir, { recursive: true });
+            await writeFile(join(installedDir, "skill-author-by-recording"), "not a directory\n", "utf8");
+            await symlink(join(installedDir, "skill-author-by-recording"), join(claudeSkillsDir, "skill-author-by-recording"));
+            await symlink(join(installedDir, "skill-author-by-recording"), join(codexSkillsDir, "skill-author-by-recording"));
+            await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
+
+            const result = await checkAuthoringSkillsStaleness(config, {
+                installedDir,
+                claudeSkillsDir,
+                codexSkillsDir,
+            });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
+            assert.strictEqual(result.summary, "Authoring skills install could not be fully inspected.");
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                installedVersion: getCliVersion(),
+                cliVersion: getCliVersion(),
+                expectedSkills: ["skill-author-by-recording"],
+            });
+        });
+
         it("warns when version.txt cannot be read for a non-ENOENT reason", async () => {
             const root = await makeTempRoot("clawperator-doctor-authoring-skills-unreadable-version-");
             const installedDir = join(root, "authoring-skills");

@@ -92,8 +92,12 @@ async function findMissingInstalledAuthoringSkills(
       if (!skillFileStat.isFile()) {
         missingSkills.push(skillName);
       }
-    } catch {
-      missingSkills.push(skillName);
+    } catch (error) {
+      if (isMissingPathError(error)) {
+        missingSkills.push(skillName);
+        continue;
+      }
+      throw error;
     }
   }
 
@@ -581,7 +585,22 @@ export async function checkAuthoringSkillsStaleness(
     );
   }
 
-  const missingSkills = await findMissingInstalledAuthoringSkills(installedDir, expectedSkills);
+  let missingSkills: string[];
+  try {
+    missingSkills = await findMissingInstalledAuthoringSkills(installedDir, expectedSkills);
+  } catch (error) {
+    return buildAuthoringSkillsWarn(
+      "Authoring skills install could not be fully inspected.",
+      error instanceof Error ? error.message : String(error),
+      {
+        installedDir,
+        installedVersion,
+        cliVersion,
+        expectedSkills,
+      }
+    );
+  }
+
   if (missingSkills.length > 0) {
     return buildAuthoringSkillsWarn(
       "Authoring skills install is missing expected packaged skills.",

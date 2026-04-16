@@ -70,8 +70,22 @@ Current doctor behavior:
 - `clawperator doctor` includes `host.authoring-skills.staleness`
 - if `~/.clawperator/authoring-skills/` does not exist, doctor reports
   `pass` with `Authoring skills not yet installed.`
-- if `version.txt` is missing or does not match the current CLI version,
-  doctor reports `warn` and recommends `clawperator authoring-skills update`
+- if the installed authoring-skills state exists but is stale, incomplete, or
+  malformed, doctor reports `warn`
+- current warning conditions include:
+  - `version.txt` is missing, empty, unreadable, or does not match the current
+    CLI version
+  - `~/.clawperator/authoring-skills/` exists but is not a directory, or is a
+    dangling symlink
+  - one or more packaged first-party authoring skill directories are missing
+    from the canonical install store
+  - Claude Code or Codex discovery entries are missing, broken, conflicting, or
+    no longer point at `~/.clawperator/authoring-skills/<skill_name>`
+- recommended remediation for those `warn` states is
+  `clawperator authoring-skills update`
+- if the install path itself is malformed and cannot be repaired in place,
+  remove or rename the conflicting path and then run
+  `clawperator authoring-skills install`
 
 Verification pattern:
 
