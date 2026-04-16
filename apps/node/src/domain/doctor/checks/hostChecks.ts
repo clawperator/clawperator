@@ -1,3 +1,5 @@
+import { readFile, stat } from "node:fs/promises";
+import { join } from "node:path";
 import { isAdbAvailable, runAdb } from "../../../adapters/android-bridge/adbClient.js";
 import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { type DoctorCheckResult } from "../../../contracts/doctor.js";
@@ -12,9 +14,20 @@ import {
 } from "../../skills/agentCli.js";
 import { isOrchestratedHarnessScriptPath, resolveRepoRelativeSkillPath } from "../../skills/pathUtils.js";
 import { readSkillManifestMetadata } from "../../skills/skillManifest.js";
+import { DEFAULT_AUTHORING_SKILLS_DIR } from "../../skills/skillsConfig.js";
+import { getCliVersion } from "../../version/compatibility.js";
 
 const DEFAULT_ORCHESTRATED_SKILL_AGENT_CLI = "codex";
 const ORCHESTRATED_SKILL_AGENT_CLI_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_CLI";
+const AUTHORING_SKILLS_VERSION_FILENAME = "version.txt";
+
+export interface CheckAuthoringSkillsStalenessOptions {
+  installedDir?: string;
+}
+
+function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+}
 
 export async function checkNodeVersion(): Promise<DoctorCheckResult> {
   const version = process.version;
@@ -290,6 +303,111 @@ export async function checkInstalledOrchestratedSkillAgentCliAvailability(_confi
     summary: `All ${orchestratedSkills} orchestrated skills in the local registry resolved their configured agent CLI.`,
     evidence: {
       checkedSkills: orchestratedSkills,
+    },
+  };
+}
+
+export async function checkAuthoringSkillsStaleness(
+  _config: RuntimeConfig,
+  options: CheckAuthoringSkillsStalenessOptions = {}
+): Promise<DoctorCheckResult> {
+  const installedDir = options.installedDir ?? DEFAULT_AUTHORING_SKILLS_DIR;
+  const versionPath = join(installedDir, AUTHORING_SKILLS_VERSION_FILENAME);
+  const cliVersion = getCliVersion();
+
+  try {
+    const installedDirStat = await stat(installedDir);
+    if (!installedDirStat.isDirectory()) {
+      return {
+        id: "host.authoring-skills.staleness",
+        status: "warn",
+        code: ERROR_CODES.AUTHORING_SKILLS_STALE,
+        summary: "Authoring skills version file is missing.",
+        detail: `Expected an authoring skills directory at ${installedDir}.`,
+        fix: {
+          title: "Update authoring skills",
+          platform: "any",
+          steps: [
+            { kind: "shell", value: "clawperator authoring-skills update" },
+          ],
+        },
+        evidence: {
+          installedDir,
+          cliVersion,
+        },
+      };
+    }
+  } catch (error) {
+    if (isMissingPathError(error)) {
+      return {
+        id: "host.authoring-skills.staleness",
+        status: "pass",
+        summary: "Authoring skills not yet installed.",
+        evidence: {
+          installedDir,
+        },
+      };
+    }
+    throw error;
+  }
+
+  let installedVersion: string;
+  try {
+    installedVersion = (await readFile(versionPath, "utf8")).trim();
+  } catch (error) {
+    if (!isMissingPathError(error)) {
+      throw error;
+    }
+    return {
+      id: "host.authoring-skills.staleness",
+      status: "warn",
+      code: ERROR_CODES.AUTHORING_SKILLS_STALE,
+      summary: "Authoring skills version file is missing.",
+      detail: `Expected ${versionPath} to contain the installed authoring skills version.`,
+      fix: {
+        title: "Update authoring skills",
+        platform: "any",
+        steps: [
+          { kind: "shell", value: "clawperator authoring-skills update" },
+        ],
+      },
+      evidence: {
+        installedDir,
+        cliVersion,
+      },
+    };
+  }
+
+  if (installedVersion === cliVersion) {
+    return {
+      id: "host.authoring-skills.staleness",
+      status: "pass",
+      summary: "Authoring skills are up to date.",
+      evidence: {
+        installedDir,
+        installedVersion,
+        cliVersion,
+      },
+    };
+  }
+
+  return {
+    id: "host.authoring-skills.staleness",
+    status: "warn",
+    code: ERROR_CODES.AUTHORING_SKILLS_STALE,
+    summary: `Authoring skills (v${installedVersion}) are outdated (CLI is v${cliVersion}).`,
+    detail: "Installed authoring skills should be refreshed to match the current CLI version.",
+    fix: {
+      title: "Update authoring skills",
+      platform: "any",
+      steps: [
+        { kind: "shell", value: "clawperator authoring-skills update" },
+      ],
+    },
+    evidence: {
+      installedDir,
+      installedVersion,
+      cliVersion,
     },
   };
 }

@@ -7,6 +7,7 @@ import {
   checkAdbServer,
   checkDefaultOrchestratedSkillAgentCli,
   checkInstalledOrchestratedSkillAgentCliAvailability,
+  checkAuthoringSkillsStaleness,
 } from "./checks/hostChecks.js";
 import {
   checkDeviceDiscovery,
@@ -35,6 +36,10 @@ export interface RunDoctorOptions {
   logger?: Logger;
 }
 
+type RuntimeConfigWithDoctorOverrides = RuntimeConfig & {
+  authoringSkillsDir?: string;
+};
+
 export class DoctorService {
   async run(options: RunDoctorOptions): Promise<DoctorReport> {
     const config = options.logger === undefined ? options.config : { ...options.config, logger: options.logger };
@@ -55,6 +60,11 @@ export class DoctorService {
 
     const installedOrchestratedSkillAgentCli = await checkInstalledOrchestratedSkillAgentCliAvailability(config);
     checks.push(installedOrchestratedSkillAgentCli);
+
+    const authoringSkillsStaleness = await checkAuthoringSkillsStaleness(config, {
+      installedDir: (config as RuntimeConfigWithDoctorOverrides).authoringSkillsDir,
+    });
+    checks.push(authoringSkillsStaleness);
 
     const adbServer = await checkAdbServer(config);
     checks.push(adbServer);
