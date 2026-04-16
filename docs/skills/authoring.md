@@ -46,6 +46,7 @@ Current install model:
 | Claude Code discovery dir | `~/.claude/skills/` | symlinks into the canonical store |
 | Codex discovery dir | `$CODEX_HOME/skills/` | symlinks into the canonical store when `CODEX_HOME` is set |
 | Codex default discovery dir | `~/.codex/skills/` | used when `CODEX_HOME` is unset |
+| Generic agents discovery dir | `~/.agents/skills/` | symlinks into the canonical store for generic agent runtimes |
 
 Maintenance and repair commands:
 
@@ -59,7 +60,7 @@ Current command behavior:
 
 - `clawperator authoring-skills install` copies packaged first-party authoring
   skills into `~/.clawperator/authoring-skills/` and recreates discovery
-  symlinks for Claude Code and Codex
+  symlinks for Claude Code, Codex, and the generic agents runtime
 - `clawperator authoring-skills update` runs the same copy-and-wire flow but
   reports the result as an update rather than a first install
 - `clawperator authoring-skills list` reports installed skill names and the
@@ -79,8 +80,8 @@ Current doctor behavior:
     dangling symlink
   - one or more packaged first-party authoring skill directories are missing
     from the canonical install store
-  - Claude Code or Codex discovery entries are missing, broken, conflicting, or
-    no longer point at `~/.clawperator/authoring-skills/<skill_name>`
+  - Claude Code, Codex, or generic agents discovery entries are missing, broken,
+    conflicting, or no longer point at `~/.clawperator/authoring-skills/<skill_name>`
 - recommended remediation for those `warn` states is
   `clawperator authoring-skills update`
 - if the install path itself is malformed and cannot be repaired in place,
