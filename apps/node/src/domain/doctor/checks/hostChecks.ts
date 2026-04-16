@@ -1,3 +1,5 @@
+import { lstat, readFile, stat } from "node:fs/promises";
+import { join } from "node:path";
 import { isAdbAvailable, runAdb } from "../../../adapters/android-bridge/adbClient.js";
 import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { type DoctorCheckResult } from "../../../contracts/doctor.js";
@@ -12,9 +14,165 @@ import {
 } from "../../skills/agentCli.js";
 import { isOrchestratedHarnessScriptPath, resolveRepoRelativeSkillPath } from "../../skills/pathUtils.js";
 import { readSkillManifestMetadata } from "../../skills/skillManifest.js";
+import {
+  inspectManagedAuthoringSkillLink,
+  listPackagedAuthoringSkills,
+  resolveAuthoringSkillsInstalledDir,
+  resolvePackagedAuthoringSkillsSourceDir,
+  resolveClaudeSkillsDir,
+  resolveCodexSkillsDir,
+  resolveAgentsSkillsDir,
+} from "../../skills/copyAuthoringSkills.js";
+import { getCliVersion } from "../../version/compatibility.js";
 
 const DEFAULT_ORCHESTRATED_SKILL_AGENT_CLI = "codex";
 const ORCHESTRATED_SKILL_AGENT_CLI_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_CLI";
+const AUTHORING_SKILLS_VERSION_FILENAME = "version.txt";
+const AUTHORING_SKILLS_UPDATE_COMMAND = "clawperator authoring-skills update";
+
+export interface CheckAuthoringSkillsStalenessOptions {
+  installedDir?: string;
+  sourceDir?: string;
+  cliVersion?: string;
+  getCliVersionFn?: () => string;
+  claudeSkillsDir?: string;
+  codexSkillsDir?: string;
+  agentsSkillsDir?: string;
+  codexHome?: string;
+  homeDir?: string;
+  env?: NodeJS.ProcessEnv;
+}
+
+function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+}
+
+function buildAuthoringSkillsWarn(
+  summary: string,
+  detail: string,
+  evidence: Record<string, unknown>,
+  fixOverride?: DoctorCheckResult["fix"]
+): DoctorCheckResult {
+  return {
+    id: "host.authoring-skills.staleness",
+    status: "warn",
+    code: ERROR_CODES.AUTHORING_SKILLS_STALE,
+    summary,
+    detail,
+    fix: fixOverride ?? {
+      title: "Update authoring skills",
+      platform: "any",
+      steps: [
+        { kind: "shell", value: AUTHORING_SKILLS_UPDATE_COMMAND },
+      ],
+    },
+    evidence,
+  };
+}
+
+function buildAuthoringSkillsPathRepairFix(installedDir: string): DoctorCheckResult["fix"] {
+  return {
+    title: "Repair authoring skills install path",
+    platform: "any",
+    steps: [
+      {
+        kind: "manual",
+        value: `Remove or rename the conflicting path at ${installedDir}.`,
+      },
+      { kind: "shell", value: "clawperator authoring-skills install" },
+    ],
+  };
+}
+
+async function findMissingInstalledAuthoringSkills(
+  installedDir: string,
+  expectedSkills: string[]
+): Promise<string[]> {
+  const missingSkills: string[] = [];
+
+  for (const skillName of expectedSkills) {
+    try {
+      const skillFileStat = await stat(join(installedDir, skillName, "SKILL.md"));
+      if (!skillFileStat.isFile()) {
+        missingSkills.push(skillName);
+      }
+    } catch (error) {
+      if (isMissingPathError(error)) {
+        missingSkills.push(skillName);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  return missingSkills;
+}
+
+interface BrokenAuthoringDiscoveryEntry {
+  dirLabel: string;
+  discoveryDir: string;
+  skillName: string;
+  issue: "missing" | "conflict" | "broken" | "wrong-target";
+  expectedTarget: string;
+  actualTarget?: string;
+}
+
+async function findBrokenAuthoringDiscoveryEntries(
+  installedDir: string,
+  expectedSkills: string[],
+  options: CheckAuthoringSkillsStalenessOptions
+): Promise<BrokenAuthoringDiscoveryEntry[]> {
+  const discoveryDirs = [
+    {
+      dirLabel: "claude",
+      discoveryDir: resolveClaudeSkillsDir({
+        claudeSkillsDir: options.claudeSkillsDir,
+        homeDir: options.homeDir,
+      }),
+    },
+    {
+      dirLabel: "codex",
+      discoveryDir: resolveCodexSkillsDir({
+        codexSkillsDir: options.codexSkillsDir,
+        codexHome: options.codexHome,
+        homeDir: options.homeDir,
+        env: options.env,
+      }),
+    },
+    {
+      dirLabel: "agents",
+      discoveryDir: resolveAgentsSkillsDir({
+        agentsSkillsDir: options.agentsSkillsDir,
+        homeDir: options.homeDir,
+      }),
+    },
+  ];
+
+  const brokenEntries: BrokenAuthoringDiscoveryEntry[] = [];
+
+  for (const { dirLabel, discoveryDir } of discoveryDirs) {
+    for (const skillName of expectedSkills) {
+      const inspection = await inspectManagedAuthoringSkillLink(
+        join(discoveryDir, skillName),
+        installedDir,
+        skillName
+      );
+      if (inspection.status === "ok") {
+        continue;
+      }
+      brokenEntries.push({
+        dirLabel,
+        discoveryDir,
+        skillName,
+        issue: inspection.status,
+        expectedTarget: inspection.expectedTarget,
+        actualTarget: inspection.actualTarget,
+      });
+    }
+  }
+
+  return brokenEntries;
+}
 
 export async function checkNodeVersion(): Promise<DoctorCheckResult> {
   const version = process.version;
@@ -290,6 +448,258 @@ export async function checkInstalledOrchestratedSkillAgentCliAvailability(_confi
     summary: `All ${orchestratedSkills} orchestrated skills in the local registry resolved their configured agent CLI.`,
     evidence: {
       checkedSkills: orchestratedSkills,
+    },
+  };
+}
+
+export async function checkAuthoringSkillsStaleness(
+  _config: RuntimeConfig,
+  options: CheckAuthoringSkillsStalenessOptions = {}
+): Promise<DoctorCheckResult> {
+  const installedDir = resolveAuthoringSkillsInstalledDir({
+    installedDir: options.installedDir,
+    homeDir: options.homeDir,
+  });
+  const versionPath = join(installedDir, AUTHORING_SKILLS_VERSION_FILENAME);
+  let cliVersion: string;
+  try {
+    cliVersion = options.cliVersion ?? (options.getCliVersionFn ?? getCliVersion)();
+  } catch (error) {
+    return buildAuthoringSkillsWarn(
+      "CLI version metadata could not be read.",
+      error instanceof Error ? error.message : String(error),
+      {
+        installedDir,
+      }
+    );
+  }
+
+  try {
+    const installedDirStat = await stat(installedDir);
+    if (!installedDirStat.isDirectory()) {
+      return buildAuthoringSkillsWarn(
+        `Authoring skills install path exists but is not a directory: ${installedDir}.`,
+        "Remove or rename the conflicting path first, then re-run the authoring skills installer.",
+        {
+          installedDir,
+          cliVersion,
+        },
+        buildAuthoringSkillsPathRepairFix(installedDir)
+      );
+    }
+  } catch (error) {
+    if (isMissingPathError(error)) {
+      try {
+        const danglingEntryStat = await lstat(installedDir);
+        return buildAuthoringSkillsWarn(
+          danglingEntryStat.isSymbolicLink()
+            ? `Authoring skills install path is a dangling symlink: ${installedDir}.`
+            : `Authoring skills install path could not be resolved cleanly: ${installedDir}.`,
+          "Remove or rename the broken path first, then re-run the authoring skills installer.",
+          {
+            installedDir,
+            cliVersion,
+            pathType: danglingEntryStat.isSymbolicLink() ? "dangling-symlink" : "unresolved-entry",
+          },
+          buildAuthoringSkillsPathRepairFix(installedDir)
+        );
+      } catch (lstatError) {
+        if (!isMissingPathError(lstatError)) {
+          return buildAuthoringSkillsWarn(
+            "Authoring skills install state could not be inspected.",
+            lstatError instanceof Error ? lstatError.message : String(lstatError),
+            {
+              installedDir,
+              cliVersion,
+            }
+          );
+        }
+        return {
+          id: "host.authoring-skills.staleness",
+          status: "pass",
+          summary: "Authoring skills not yet installed.",
+          evidence: {
+            installedDir,
+          },
+        };
+      }
+    }
+    return buildAuthoringSkillsWarn(
+      "Authoring skills install state could not be inspected.",
+      error instanceof Error ? error.message : String(error),
+      {
+        installedDir,
+        cliVersion,
+      }
+    );
+  }
+
+  let installedVersion: string;
+  try {
+    installedVersion = (await readFile(versionPath, "utf8")).trim();
+  } catch (error) {
+    if (!isMissingPathError(error)) {
+      return buildAuthoringSkillsWarn(
+        "Authoring skills version file could not be read.",
+        error instanceof Error ? error.message : String(error),
+        {
+          installedDir,
+          versionPath,
+          cliVersion,
+        }
+      );
+    }
+    return buildAuthoringSkillsWarn(
+      "Authoring skills version file is missing.",
+      `Expected ${versionPath} to contain the installed authoring skills version.`,
+      {
+        installedDir,
+        versionPath,
+        cliVersion,
+      }
+    );
+  }
+
+  if (installedVersion === "") {
+    return buildAuthoringSkillsWarn(
+      "Authoring skills version file is empty.",
+      `Expected ${versionPath} to contain the installed authoring skills version.`,
+      {
+        installedDir,
+        versionPath,
+        cliVersion,
+      }
+    );
+  }
+
+  const sourceDir = resolvePackagedAuthoringSkillsSourceDir({
+    sourceDir: options.sourceDir,
+    env: options.env,
+  });
+
+  let expectedSkills: string[];
+  try {
+    expectedSkills = await listPackagedAuthoringSkills(sourceDir);
+  } catch (error) {
+    return buildAuthoringSkillsWarn(
+      "Packaged authoring skills could not be inspected.",
+      error instanceof Error ? error.message : String(error),
+      {
+        installedDir,
+        installedVersion,
+        cliVersion,
+      }
+    );
+  }
+
+  if (expectedSkills.length === 0) {
+    return buildAuthoringSkillsWarn(
+      "Packaged authoring skills list is empty.",
+      "Expected at least one packaged authoring skill containing SKILL.md.",
+      {
+        installedDir,
+        installedVersion,
+        cliVersion,
+      }
+    );
+  }
+
+  let missingSkills: string[];
+  try {
+    missingSkills = await findMissingInstalledAuthoringSkills(installedDir, expectedSkills);
+  } catch (error) {
+    return buildAuthoringSkillsWarn(
+      "Authoring skills install could not be fully inspected.",
+      error instanceof Error ? error.message : String(error),
+      {
+        installedDir,
+        installedVersion,
+        cliVersion,
+        expectedSkills,
+      }
+    );
+  }
+
+  if (missingSkills.length > 0) {
+    return buildAuthoringSkillsWarn(
+      "Authoring skills install is missing expected packaged skills.",
+      "Re-run the authoring skills installer to restore the packaged first-party skill set.",
+      {
+        installedDir,
+        installedVersion,
+        cliVersion,
+        expectedSkills,
+        missingSkills,
+      }
+    );
+  }
+
+  let brokenDiscoveryEntries: BrokenAuthoringDiscoveryEntry[];
+  try {
+    brokenDiscoveryEntries = await findBrokenAuthoringDiscoveryEntries(installedDir, expectedSkills, options);
+  } catch (error) {
+    return buildAuthoringSkillsWarn(
+      "Authoring skills discovery links could not be inspected.",
+      error instanceof Error ? error.message : String(error),
+      {
+        installedDir,
+        installedVersion,
+        cliVersion,
+      }
+    );
+  }
+
+  if (brokenDiscoveryEntries.length > 0) {
+    const brokenDiscoveryByDir: Record<string, BrokenAuthoringDiscoveryEntry[]> = {};
+    for (const entry of brokenDiscoveryEntries) {
+      (brokenDiscoveryByDir[entry.dirLabel] ??= []).push(entry);
+    }
+    const affectedDirs = Object.keys(brokenDiscoveryByDir);
+    const detailParts = Object.entries(brokenDiscoveryByDir)
+      .map(([dirLabel, entries]) => `${dirLabel}: ${entries.map((entry) => `${entry.skillName} (${entry.issue})`).join(", ")}`);
+
+    return buildAuthoringSkillsWarn(
+      "Authoring skills discovery links are incomplete or invalid.",
+      `Managed discovery entries are broken in ${affectedDirs.join(" and ")} skill directories. ${detailParts.join("; ")}`,
+      {
+        installedDir,
+        installedVersion,
+        cliVersion,
+        brokenDiscoveryByDir,
+      }
+    );
+  }
+
+  if (installedVersion === cliVersion) {
+    return {
+      id: "host.authoring-skills.staleness",
+      status: "pass",
+      summary: "Authoring skills are up to date.",
+      evidence: {
+        installedDir,
+        installedVersion,
+        cliVersion,
+      },
+    };
+  }
+
+  return {
+    id: "host.authoring-skills.staleness",
+    status: "warn",
+    code: ERROR_CODES.AUTHORING_SKILLS_STALE,
+    summary: `Authoring skills (v${installedVersion}) are outdated (CLI is v${cliVersion}).`,
+    detail: "Installed authoring skills should be refreshed to match the current CLI version.",
+    fix: {
+      title: "Update authoring skills",
+      platform: "any",
+      steps: [
+        { kind: "shell", value: AUTHORING_SKILLS_UPDATE_COMMAND },
+      ],
+    },
+    evidence: {
+      installedDir,
+      installedVersion,
+      cliVersion,
     },
   };
 }

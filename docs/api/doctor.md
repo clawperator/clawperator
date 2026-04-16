@@ -287,7 +287,9 @@ Doctor runs checks in this order:
 
 | Order | Check IDs | When they run |
 | --- | --- | --- |
-| 1 | `host.node.version`, `host.adb.presence`, `host.adb.server` | always |
+| 1 | `host.node.version`, `host.adb.presence` | always |
+| 1 (advisory) | `host.skill-agent-cli.default`, `host.skill-agent-cli.skills`, `host.authoring-skills.staleness` | after `host.adb.presence` passes; advisory only, never halt on failure |
+| 1 | `host.adb.server` | after `host.adb.presence` passes |
 | 2 | `host.java.version`, `build.android.assemble` | only with `--full` |
 | 3 | `device.discovery` | always |
 | 4 | device resolution via `resolveDevice.ts` | after discovery when doctor still needs a target device |
@@ -395,6 +397,9 @@ For a failing check, pretty output includes:
 | `host.node.version` | `pass`, `fail` | `NODE_TOO_OLD` | Node.js major version is at least 24 |
 | `host.adb.presence` | `pass`, `fail` | `ADB_NOT_FOUND` | adb exists and can report a version |
 | `host.adb.server` | `pass`, `fail` | `ADB_SERVER_FAILED` | adb server can start |
+| `host.skill-agent-cli.default` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | default orchestrated-skill agent CLI is a valid executable name and exists on PATH |
+| `host.skill-agent-cli.skills` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | all installed orchestrated skills can resolve their configured agent CLI executable |
+| `host.authoring-skills.staleness` | `pass`, `warn` | `AUTHORING_SKILLS_STALE` | when authoring skills are present, the canonical install store is readable, packaged skills are present, and managed Claude/Codex discovery links point at the canonical store |
 | `host.java.version` | `pass`, `fail` | `HOST_DEPENDENCY_MISSING` or no explicit code | Java 17 or 21 is available for full Android build checks |
 | `build.android.assemble` | `pass`, `fail` | `ANDROID_BUILD_FAILED` | `./gradlew :app:assembleDebug` succeeds |
 | `device.discovery` | `pass`, `warn`, `fail` | `NO_DEVICES`, `DEVICE_UNAUTHORIZED`, `DEVICE_OFFLINE`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`, `DEVICE_NOT_FOUND` | device discovery succeeded and the environment is targetable, or explains why explicit `--device` selection is still required |

@@ -9,11 +9,16 @@ import { DEFAULT_AUTHORING_SKILLS_DIR } from "./skillsConfig.js";
 const AUTHORING_SKILLS_SOURCE_ENV_VAR = "CLAWPERATOR_AUTHORING_SKILLS";
 const VERSION_FILENAME = "version.txt";
 
+export interface AgentDiscoveryDirEntry {
+  label: string;
+  dir: string;
+}
+
 export interface CopyAuthoringSkillsSuccess {
   ok: true;
   skills: string[];
   installedDir: string;
-  agentDirs: string[];
+  agentDiscoveryDirs: AgentDiscoveryDirEntry[];
 }
 
 export interface CopyAuthoringSkillsError {
@@ -27,6 +32,7 @@ export interface CopyAuthoringSkillsOptions {
   installedDir?: string;
   claudeSkillsDir?: string;
   codexSkillsDir?: string;
+  agentsSkillsDir?: string;
   codexHome?: string;
   homeDir?: string;
   env?: NodeJS.ProcessEnv;
@@ -37,11 +43,21 @@ function resolveAuthoringSkillsSourceDir(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), "../../../authoring-skills");
 }
 
+export function resolvePackagedAuthoringSkillsSourceDir(
+  options: Pick<CopyAuthoringSkillsOptions, "sourceDir" | "env"> = {}
+): string {
+  const env = options.env ?? process.env;
+  return options.sourceDir
+    ?? (env[AUTHORING_SKILLS_SOURCE_ENV_VAR] !== undefined && env[AUTHORING_SKILLS_SOURCE_ENV_VAR] !== ""
+      ? env[AUTHORING_SKILLS_SOURCE_ENV_VAR]
+      : resolveAuthoringSkillsSourceDir());
+}
+
 function resolveHomeDir(options: CopyAuthoringSkillsOptions): string {
   return resolve(options.homeDir ?? homedir());
 }
 
-function resolveInstalledDir(options: CopyAuthoringSkillsOptions): string {
+export function resolveAuthoringSkillsInstalledDir(options: Pick<CopyAuthoringSkillsOptions, "installedDir" | "homeDir"> = {}): string {
   if (options.installedDir) {
     return resolve(options.installedDir);
   }
@@ -51,14 +67,14 @@ function resolveInstalledDir(options: CopyAuthoringSkillsOptions): string {
   return DEFAULT_AUTHORING_SKILLS_DIR;
 }
 
-function resolveClaudeSkillsDir(options: CopyAuthoringSkillsOptions): string {
+export function resolveClaudeSkillsDir(options: CopyAuthoringSkillsOptions): string {
   if (options.claudeSkillsDir) {
     return resolve(options.claudeSkillsDir);
   }
   return join(resolveHomeDir(options), ".claude", "skills");
 }
 
-function resolveCodexSkillsDir(options: CopyAuthoringSkillsOptions): string {
+export function resolveCodexSkillsDir(options: CopyAuthoringSkillsOptions): string {
   if (options.codexSkillsDir) {
     return resolve(options.codexSkillsDir);
   }
@@ -68,6 +84,21 @@ function resolveCodexSkillsDir(options: CopyAuthoringSkillsOptions): string {
     return join(resolve(codexHome), "skills");
   }
   return join(resolveHomeDir(options), ".codex", "skills");
+}
+
+export function resolveAgentsSkillsDir(options: CopyAuthoringSkillsOptions): string {
+  if (options.agentsSkillsDir) {
+    return resolve(options.agentsSkillsDir);
+  }
+  return join(resolveHomeDir(options), ".agents", "skills");
+}
+
+function resolveAgentDiscoveryDirs(options: CopyAuthoringSkillsOptions): AgentDiscoveryDirEntry[] {
+  return [
+    { label: "claude", dir: resolveClaudeSkillsDir(options) },
+    { label: "codex", dir: resolveCodexSkillsDir(options) },
+    { label: "agents", dir: resolveAgentsSkillsDir(options) },
+  ];
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -112,11 +143,15 @@ async function discoverAuthoringSkills(sourceDir: string): Promise<string[]> {
   return skills;
 }
 
+export async function listPackagedAuthoringSkills(sourceDir = resolveAuthoringSkillsSourceDir()): Promise<string[]> {
+  return discoverAuthoringSkills(sourceDir);
+}
+
 async function ensureDirectory(path: string): Promise<void> {
   await mkdir(path, { recursive: true });
 }
 
-function normalizeOwnedSkillTarget(installedDir: string, skillName: string): string {
+export function normalizeOwnedSkillTarget(installedDir: string, skillName: string): string {
   return resolve(installedDir, skillName);
 }
 
@@ -129,23 +164,91 @@ async function resolveSymlinkTarget(path: string): Promise<string | undefined> {
   }
 }
 
-async function isManagedAgentSymlink(linkPath: string, installedDir: string, skillName: string): Promise<boolean> {
+export interface ManagedAuthoringSkillLinkInspection {
+  ok: boolean;
+  status: "missing" | "conflict" | "broken" | "wrong-target" | "ok";
+  actualTarget?: string;
+  expectedTarget: string;
+}
+
+export async function inspectManagedAuthoringSkillLink(
+  linkPath: string,
+  installedDir: string,
+  skillName: string
+): Promise<ManagedAuthoringSkillLinkInspection> {
+  const expectedTarget = normalizeOwnedSkillTarget(installedDir, skillName);
+
   let entryStat;
   try {
     entryStat = await lstat(linkPath);
-  } catch {
-    return false;
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return {
+        ok: false,
+        status: "missing",
+        expectedTarget,
+      };
+    }
+    throw error;
   }
+
   if (!entryStat.isSymbolicLink()) {
-    return false;
+    return {
+      ok: false,
+      status: "conflict",
+      expectedTarget,
+    };
   }
 
   const resolvedTarget = await resolveSymlinkTarget(linkPath);
   if (resolvedTarget === undefined) {
-    return false;
+    return {
+      ok: false,
+      status: "broken",
+      expectedTarget,
+    };
   }
 
-  return resolvedTarget === normalizeOwnedSkillTarget(installedDir, skillName);
+  try {
+    await stat(resolvedTarget);
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return {
+        ok: false,
+        status: "broken",
+        actualTarget: resolvedTarget,
+        expectedTarget,
+      };
+    }
+    throw error;
+  }
+
+  if (resolvedTarget !== expectedTarget) {
+    return {
+      ok: false,
+      status: "wrong-target",
+      actualTarget: resolvedTarget,
+      expectedTarget,
+    };
+  }
+
+  return {
+    ok: true,
+    status: "ok",
+    actualTarget: resolvedTarget,
+    expectedTarget,
+  };
+}
+
+async function isManagedAgentSymlink(linkPath: string, installedDir: string, skillName: string): Promise<boolean> {
+  const inspection = await inspectManagedAuthoringSkillLink(linkPath, installedDir, skillName);
+  // A dangling symlink that points at the correct expected target is still considered managed:
+  // it means Clawperator previously installed the link but the install dir was subsequently
+  // removed. The install/update flow is allowed to recreate it.
+  if (!inspection.ok && inspection.status === "broken" && inspection.actualTarget === inspection.expectedTarget) {
+    return true;
+  }
+  return inspection.ok;
 }
 
 async function ensureManagedSymlink(targetPath: string, linkPath: string, installedDir: string, skillName: string): Promise<void> {
@@ -233,14 +336,9 @@ async function removeStaleInstalledSkills(installedDir: string, activeSkills: Se
 export async function copyAuthoringSkills(
   options: CopyAuthoringSkillsOptions = {}
 ): Promise<CopyAuthoringSkillsSuccess | CopyAuthoringSkillsError> {
-  const env = options.env ?? process.env;
-  const sourceDir = options.sourceDir
-    ?? (env[AUTHORING_SKILLS_SOURCE_ENV_VAR] !== undefined && env[AUTHORING_SKILLS_SOURCE_ENV_VAR] !== ""
-      ? env[AUTHORING_SKILLS_SOURCE_ENV_VAR]
-      : resolveAuthoringSkillsSourceDir());
-  const installedDir = resolveInstalledDir(options);
-  const claudeSkillsDir = resolveClaudeSkillsDir(options);
-  const codexSkillsDir = resolveCodexSkillsDir(options);
+  const sourceDir = resolvePackagedAuthoringSkillsSourceDir(options);
+  const installedDir = resolveAuthoringSkillsInstalledDir(options);
+  const agentDiscoveryDirs = resolveAgentDiscoveryDirs(options);
 
   let sourceStat;
   try {
@@ -271,12 +369,14 @@ export async function copyAuthoringSkills(
       };
     }
     await ensureDirectory(installedDir);
-    await ensureDirectory(claudeSkillsDir);
-    await ensureDirectory(codexSkillsDir);
+    for (const { dir } of agentDiscoveryDirs) {
+      await ensureDirectory(dir);
+    }
 
     for (const skillName of skills) {
-      await assertManagedSymlinkWritable(join(claudeSkillsDir, skillName), installedDir, skillName);
-      await assertManagedSymlinkWritable(join(codexSkillsDir, skillName), installedDir, skillName);
+      for (const { dir } of agentDiscoveryDirs) {
+        await assertManagedSymlinkWritable(join(dir, skillName), installedDir, skillName);
+      }
     }
 
     for (const skillName of skills) {
@@ -284,21 +384,23 @@ export async function copyAuthoringSkills(
       const targetSkillDir = join(installedDir, skillName);
       await rm(targetSkillDir, { recursive: true, force: true });
       await cp(sourceSkillDir, targetSkillDir, { recursive: true, force: true, dereference: true });
-      await ensureManagedSymlink(targetSkillDir, join(claudeSkillsDir, skillName), installedDir, skillName);
-      await ensureManagedSymlink(targetSkillDir, join(codexSkillsDir, skillName), installedDir, skillName);
+      for (const { dir } of agentDiscoveryDirs) {
+        await ensureManagedSymlink(targetSkillDir, join(dir, skillName), installedDir, skillName);
+      }
     }
 
     const activeSkills = new Set(skills);
     await removeStaleInstalledSkills(installedDir, activeSkills);
-    await removeStaleAgentSymlinks(claudeSkillsDir, activeSkills, installedDir);
-    await removeStaleAgentSymlinks(codexSkillsDir, activeSkills, installedDir);
+    for (const { dir } of agentDiscoveryDirs) {
+      await removeStaleAgentSymlinks(dir, activeSkills, installedDir);
+    }
     await writeFile(join(installedDir, VERSION_FILENAME), `${options.cliVersion ?? getCliVersion()}\n`, "utf8");
 
     return {
       ok: true,
       skills,
       installedDir,
-      agentDirs: [claudeSkillsDir, codexSkillsDir],
+      agentDiscoveryDirs,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

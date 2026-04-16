@@ -25,6 +25,12 @@ Current role split:
 
 Skills are registry-driven. They are not discovered by folder scanning alone. `clawperator skills list`, `clawperator skills search`, `clawperator skills get`, `clawperator skills validate`, and `clawperator skills run` all read the registry through `loadRegistry()` in `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`.
 
+`clawperator skills` and `skills-registry.json` cover runtime skills only.
+Authoring skills are a separate category of AI agent programs that live in
+`.agents/skills/` in source form and install separately into
+`~/.clawperator/authoring-skills/` plus the Claude Code, Codex, and generic
+agents (`~/.agents/skills/`) discovery directories.
+
 ## Skill Categories
 
 Current authoring practice recognizes two categories of skills:
