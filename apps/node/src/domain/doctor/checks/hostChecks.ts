@@ -18,6 +18,7 @@ import { DEFAULT_AUTHORING_SKILLS_DIR } from "../../skills/skillsConfig.js";
 import {
   inspectManagedAuthoringSkillLink,
   listPackagedAuthoringSkills,
+  resolvePackagedAuthoringSkillsSourceDir,
   resolveClaudeSkillsDir,
   resolveCodexSkillsDir,
   resolveAgentsSkillsDir,
@@ -31,6 +32,7 @@ const AUTHORING_SKILLS_UPDATE_COMMAND = "clawperator authoring-skills update";
 
 export interface CheckAuthoringSkillsStalenessOptions {
   installedDir?: string;
+  sourceDir?: string;
   cliVersion?: string;
   getCliVersionFn?: () => string;
   claudeSkillsDir?: string;
@@ -567,9 +569,14 @@ export async function checkAuthoringSkillsStaleness(
     );
   }
 
+  const sourceDir = resolvePackagedAuthoringSkillsSourceDir({
+    sourceDir: options.sourceDir,
+    env: options.env,
+  });
+
   let expectedSkills: string[];
   try {
-    expectedSkills = await listPackagedAuthoringSkills();
+    expectedSkills = await listPackagedAuthoringSkills(sourceDir);
   } catch (error) {
     return buildAuthoringSkillsWarn(
       "Packaged authoring skills could not be inspected.",

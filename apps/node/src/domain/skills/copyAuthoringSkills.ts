@@ -43,6 +43,16 @@ function resolveAuthoringSkillsSourceDir(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), "../../../authoring-skills");
 }
 
+export function resolvePackagedAuthoringSkillsSourceDir(
+  options: Pick<CopyAuthoringSkillsOptions, "sourceDir" | "env"> = {}
+): string {
+  const env = options.env ?? process.env;
+  return options.sourceDir
+    ?? (env[AUTHORING_SKILLS_SOURCE_ENV_VAR] !== undefined && env[AUTHORING_SKILLS_SOURCE_ENV_VAR] !== ""
+      ? env[AUTHORING_SKILLS_SOURCE_ENV_VAR]
+      : resolveAuthoringSkillsSourceDir());
+}
+
 function resolveHomeDir(options: CopyAuthoringSkillsOptions): string {
   return resolve(options.homeDir ?? homedir());
 }
@@ -326,11 +336,7 @@ async function removeStaleInstalledSkills(installedDir: string, activeSkills: Se
 export async function copyAuthoringSkills(
   options: CopyAuthoringSkillsOptions = {}
 ): Promise<CopyAuthoringSkillsSuccess | CopyAuthoringSkillsError> {
-  const env = options.env ?? process.env;
-  const sourceDir = options.sourceDir
-    ?? (env[AUTHORING_SKILLS_SOURCE_ENV_VAR] !== undefined && env[AUTHORING_SKILLS_SOURCE_ENV_VAR] !== ""
-      ? env[AUTHORING_SKILLS_SOURCE_ENV_VAR]
-      : resolveAuthoringSkillsSourceDir());
+  const sourceDir = resolvePackagedAuthoringSkillsSourceDir(options);
   const installedDir = resolveInstalledDir(options);
   const agentDiscoveryDirs = resolveAgentDiscoveryDirs(options);
 

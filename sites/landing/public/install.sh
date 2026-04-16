@@ -621,8 +621,9 @@ clawperator click --text "Settings" --json  # tap an element
 - Setup guide: https://docs.clawperator.com/setup/
 EOF
 
-    # Check whether any skill dirs with SKILL.md exist in the install dir.
-    if [ -d "$AUTHORING_SKILLS_GUIDE_DIR" ] && [ -f "$AUTHORING_SKILLS_GUIDE_DIR/version.txt" ]; then
+    # Treat any install tree with at least one SKILL.md as configured, even if
+    # version metadata is missing and the install should be refreshed.
+    if [ -d "$AUTHORING_SKILLS_GUIDE_DIR" ]; then
         for SKILL_DIR in "$AUTHORING_SKILLS_GUIDE_DIR"/*/; do
             if [ -f "${SKILL_DIR}SKILL.md" ]; then
                 HAS_SKILLS=1
@@ -646,6 +647,14 @@ EOF
                 printf -- '- %s\n' "$(basename "$SKILL_DIR")" >> "$AGENT_GUIDE_PATH"
             fi
         done
+        if [ ! -f "$AUTHORING_SKILLS_GUIDE_DIR/version.txt" ]; then
+            cat >> "$AGENT_GUIDE_PATH" <<'EOF'
+
+Version metadata is missing for this install.
+Refresh it with:
+- run `clawperator authoring-skills update`
+EOF
+        fi
     else
         cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 

@@ -15,6 +15,7 @@ import { ERROR_CODES } from "../../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
 import { getCliVersion } from "../../../domain/version/compatibility.js";
+import { listPackagedAuthoringSkills } from "../../../domain/skills/copyAuthoringSkills.js";
 
 describe("Doctor: hostChecks", () => {
     const tempRoots: string[] = [];
@@ -27,6 +28,32 @@ describe("Doctor: hostChecks", () => {
         const root = await mkdtemp(join(tmpdir(), prefix));
         tempRoots.push(root);
         return root;
+    }
+
+    async function getExpectedAuthoringSkills(): Promise<string[]> {
+        return listPackagedAuthoringSkills();
+    }
+
+    async function seedHealthyAuthoringSkillsInstall(
+        installedDir: string,
+        discoveryDirs: string[],
+        version = getCliVersion()
+    ): Promise<string[]> {
+        const skillNames = await getExpectedAuthoringSkills();
+        await mkdir(installedDir, { recursive: true });
+        for (const discoveryDir of discoveryDirs) {
+            await mkdir(discoveryDir, { recursive: true });
+        }
+        for (const skillName of skillNames) {
+            const skillDir = join(installedDir, skillName);
+            await mkdir(skillDir, { recursive: true });
+            await writeFile(join(skillDir, "SKILL.md"), `# ${skillName}\n`, "utf8");
+            for (const discoveryDir of discoveryDirs) {
+                await symlink(skillDir, join(discoveryDir, skillName));
+            }
+        }
+        await writeFile(join(installedDir, "version.txt"), `${version}\n`, "utf8");
+        return skillNames;
     }
 
     function withNodeVersion(version: string, fn: () => Promise<void> | void): Promise<void> | void {
@@ -710,15 +737,7 @@ describe("Doctor: hostChecks", () => {
             const codexSkillsDir = join(root, "codex-skills");
             const agentsSkillsDir = join(root, "agents-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
-            await mkdir(claudeSkillsDir, { recursive: true });
-            await mkdir(codexSkillsDir, { recursive: true });
-            await mkdir(agentsSkillsDir, { recursive: true });
-            await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
-            await symlink(join(installedDir, "skill-author-by-recording"), join(claudeSkillsDir, "skill-author-by-recording"));
-            await symlink(join(installedDir, "skill-author-by-recording"), join(codexSkillsDir, "skill-author-by-recording"));
-            await symlink(join(installedDir, "skill-author-by-recording"), join(agentsSkillsDir, "skill-author-by-recording"));
-            await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
+            await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
 
             const result = await checkAuthoringSkillsStaleness(config, {
                 installedDir,
@@ -743,14 +762,8 @@ describe("Doctor: hostChecks", () => {
             const codexSkillsDir = join(root, "codex-skills");
             const agentsSkillsDir = join(root, "agents-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
-            await mkdir(claudeSkillsDir, { recursive: true });
-            await mkdir(codexSkillsDir, { recursive: true });
-            await mkdir(agentsSkillsDir, { recursive: true });
-            await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
-            await symlink(join(installedDir, "skill-author-by-recording"), join(codexSkillsDir, "skill-author-by-recording"));
-            await symlink(join(installedDir, "skill-author-by-recording"), join(agentsSkillsDir, "skill-author-by-recording"));
-            await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
+            const [targetSkill] = await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            await rm(join(claudeSkillsDir, targetSkill), { force: true });
 
             const result = await checkAuthoringSkillsStaleness(config, {
                 installedDir,
@@ -771,9 +784,9 @@ describe("Doctor: hostChecks", () => {
                         actualTarget: undefined,
                         dirLabel: "claude",
                         discoveryDir: claudeSkillsDir,
-                        skillName: "skill-author-by-recording",
+                        skillName: targetSkill,
                         issue: "missing",
-                        expectedTarget: join(installedDir, "skill-author-by-recording"),
+                        expectedTarget: join(installedDir, targetSkill),
                     }],
                 },
             });
@@ -786,14 +799,8 @@ describe("Doctor: hostChecks", () => {
             const codexSkillsDir = join(root, "codex-skills");
             const agentsSkillsDir = join(root, "agents-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
-            await mkdir(claudeSkillsDir, { recursive: true });
-            await mkdir(codexSkillsDir, { recursive: true });
-            await mkdir(agentsSkillsDir, { recursive: true });
-            await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
-            await symlink(join(installedDir, "skill-author-by-recording"), join(claudeSkillsDir, "skill-author-by-recording"));
-            await symlink(join(installedDir, "skill-author-by-recording"), join(agentsSkillsDir, "skill-author-by-recording"));
-            await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
+            const [targetSkill] = await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            await rm(join(codexSkillsDir, targetSkill), { force: true });
 
             const result = await checkAuthoringSkillsStaleness(config, {
                 installedDir,
@@ -813,9 +820,9 @@ describe("Doctor: hostChecks", () => {
                         actualTarget: undefined,
                         dirLabel: "codex",
                         discoveryDir: codexSkillsDir,
-                        skillName: "skill-author-by-recording",
+                        skillName: targetSkill,
                         issue: "missing",
-                        expectedTarget: join(installedDir, "skill-author-by-recording"),
+                        expectedTarget: join(installedDir, targetSkill),
                     }],
                 },
             });
@@ -827,18 +834,12 @@ describe("Doctor: hostChecks", () => {
             const claudeSkillsDir = join(root, "claude-skills");
             const codexSkillsDir = join(root, "codex-skills");
             const agentsSkillsDir = join(root, "agents-skills");
-            const wrongTargetRoot = join(root, "wrong-target", "skill-author-by-recording");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
+            const [targetSkill] = await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            const wrongTargetRoot = join(root, "wrong-target", targetSkill);
             await mkdir(wrongTargetRoot, { recursive: true });
-            await mkdir(claudeSkillsDir, { recursive: true });
-            await mkdir(codexSkillsDir, { recursive: true });
-            await mkdir(agentsSkillsDir, { recursive: true });
-            await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
-            await symlink(wrongTargetRoot, join(claudeSkillsDir, "skill-author-by-recording"));
-            await symlink(join(installedDir, "skill-author-by-recording"), join(codexSkillsDir, "skill-author-by-recording"));
-            await symlink(join(installedDir, "skill-author-by-recording"), join(agentsSkillsDir, "skill-author-by-recording"));
-            await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
+            await rm(join(claudeSkillsDir, targetSkill), { force: true });
+            await symlink(wrongTargetRoot, join(claudeSkillsDir, targetSkill));
 
             const result = await checkAuthoringSkillsStaleness(config, {
                 installedDir,
@@ -857,9 +858,9 @@ describe("Doctor: hostChecks", () => {
                     claude: [{
                         dirLabel: "claude",
                         discoveryDir: claudeSkillsDir,
-                        skillName: "skill-author-by-recording",
+                        skillName: targetSkill,
                         issue: "wrong-target",
-                        expectedTarget: join(installedDir, "skill-author-by-recording"),
+                        expectedTarget: join(installedDir, targetSkill),
                         actualTarget: wrongTargetRoot,
                     }],
                 },
@@ -873,15 +874,9 @@ describe("Doctor: hostChecks", () => {
             const codexSkillsDir = join(root, "codex-skills");
             const agentsSkillsDir = join(root, "agents-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
-            await mkdir(claudeSkillsDir, { recursive: true });
-            await mkdir(codexSkillsDir, { recursive: true });
-            await mkdir(agentsSkillsDir, { recursive: true });
-            await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
-            await writeFile(join(claudeSkillsDir, "skill-author-by-recording"), "not a symlink\n", "utf8");
-            await symlink(join(installedDir, "skill-author-by-recording"), join(codexSkillsDir, "skill-author-by-recording"));
-            await symlink(join(installedDir, "skill-author-by-recording"), join(agentsSkillsDir, "skill-author-by-recording"));
-            await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
+            const [targetSkill] = await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            await rm(join(claudeSkillsDir, targetSkill), { force: true });
+            await writeFile(join(claudeSkillsDir, targetSkill), "not a symlink\n", "utf8");
 
             const result = await checkAuthoringSkillsStaleness(config, {
                 installedDir,
@@ -901,9 +896,9 @@ describe("Doctor: hostChecks", () => {
                         actualTarget: undefined,
                         dirLabel: "claude",
                         discoveryDir: claudeSkillsDir,
-                        skillName: "skill-author-by-recording",
+                        skillName: targetSkill,
                         issue: "conflict",
-                        expectedTarget: join(installedDir, "skill-author-by-recording"),
+                        expectedTarget: join(installedDir, targetSkill),
                     }],
                 },
             });
@@ -917,15 +912,9 @@ describe("Doctor: hostChecks", () => {
             const agentsSkillsDir = join(root, "agents-skills");
             const missingTarget = join(root, "missing-target");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
-            await mkdir(claudeSkillsDir, { recursive: true });
-            await mkdir(codexSkillsDir, { recursive: true });
-            await mkdir(agentsSkillsDir, { recursive: true });
-            await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
-            await symlink(missingTarget, join(claudeSkillsDir, "skill-author-by-recording"));
-            await symlink(join(installedDir, "skill-author-by-recording"), join(codexSkillsDir, "skill-author-by-recording"));
-            await symlink(join(installedDir, "skill-author-by-recording"), join(agentsSkillsDir, "skill-author-by-recording"));
-            await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
+            const [targetSkill] = await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            await rm(join(claudeSkillsDir, targetSkill), { force: true });
+            await symlink(missingTarget, join(claudeSkillsDir, targetSkill));
 
             const result = await checkAuthoringSkillsStaleness(config, {
                 installedDir,
@@ -944,9 +933,9 @@ describe("Doctor: hostChecks", () => {
                     claude: [{
                         dirLabel: "claude",
                         discoveryDir: claudeSkillsDir,
-                        skillName: "skill-author-by-recording",
+                        skillName: targetSkill,
                         issue: "broken",
-                        expectedTarget: join(installedDir, "skill-author-by-recording"),
+                        expectedTarget: join(installedDir, targetSkill),
                         actualTarget: missingTarget,
                     }],
                 },
@@ -960,15 +949,7 @@ describe("Doctor: hostChecks", () => {
             const codexSkillsDir = join(root, "codex-skills");
             const agentsSkillsDir = join(root, "agents-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
-            await mkdir(claudeSkillsDir, { recursive: true });
-            await mkdir(codexSkillsDir, { recursive: true });
-            await mkdir(agentsSkillsDir, { recursive: true });
-            await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
-            await symlink(join(installedDir, "skill-author-by-recording"), join(claudeSkillsDir, "skill-author-by-recording"));
-            await symlink(join(installedDir, "skill-author-by-recording"), join(codexSkillsDir, "skill-author-by-recording"));
-            await symlink(join(installedDir, "skill-author-by-recording"), join(agentsSkillsDir, "skill-author-by-recording"));
-            await writeFile(join(installedDir, "version.txt"), "0.0.1\n", "utf8");
+            await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir], "0.0.1");
 
             const result = await checkAuthoringSkillsStaleness(config, {
                 installedDir,
@@ -991,6 +972,7 @@ describe("Doctor: hostChecks", () => {
             const root = await makeTempRoot("clawperator-doctor-authoring-skills-empty-tree-");
             const installedDir = join(root, "authoring-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const expectedSkills = await getExpectedAuthoringSkills();
             await mkdir(join(installedDir, "broken-skill"), { recursive: true });
             await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
 
@@ -1003,8 +985,8 @@ describe("Doctor: hostChecks", () => {
                 installedDir,
                 installedVersion: getCliVersion(),
                 cliVersion: getCliVersion(),
-                expectedSkills: ["skill-author-by-recording"],
-                missingSkills: ["skill-author-by-recording"],
+                expectedSkills,
+                missingSkills: expectedSkills,
             });
         });
 
@@ -1015,14 +997,15 @@ describe("Doctor: hostChecks", () => {
             const codexSkillsDir = join(root, "codex-skills");
             const agentsSkillsDir = join(root, "agents-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const [targetSkill] = await getExpectedAuthoringSkills();
             await mkdir(installedDir, { recursive: true });
             await mkdir(claudeSkillsDir, { recursive: true });
             await mkdir(codexSkillsDir, { recursive: true });
             await mkdir(agentsSkillsDir, { recursive: true });
-            await writeFile(join(installedDir, "skill-author-by-recording"), "not a directory\n", "utf8");
-            await symlink(join(installedDir, "skill-author-by-recording"), join(claudeSkillsDir, "skill-author-by-recording"));
-            await symlink(join(installedDir, "skill-author-by-recording"), join(codexSkillsDir, "skill-author-by-recording"));
-            await symlink(join(installedDir, "skill-author-by-recording"), join(agentsSkillsDir, "skill-author-by-recording"));
+            await writeFile(join(installedDir, targetSkill), "not a directory\n", "utf8");
+            await symlink(join(installedDir, targetSkill), join(claudeSkillsDir, targetSkill));
+            await symlink(join(installedDir, targetSkill), join(codexSkillsDir, targetSkill));
+            await symlink(join(installedDir, targetSkill), join(agentsSkillsDir, targetSkill));
             await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
 
             const result = await checkAuthoringSkillsStaleness(config, {
@@ -1035,11 +1018,48 @@ describe("Doctor: hostChecks", () => {
             assert.strictEqual(result.status, "warn");
             assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
             assert.strictEqual(result.summary, "Authoring skills install could not be fully inspected.");
+            const expectedSkills = await getExpectedAuthoringSkills();
             assert.deepStrictEqual(result.evidence, {
                 installedDir,
                 installedVersion: getCliVersion(),
                 cliVersion: getCliVersion(),
-                expectedSkills: ["skill-author-by-recording"],
+                expectedSkills,
+            });
+        });
+
+        it("respects CLAWPERATOR_AUTHORING_SKILLS when deriving the expected packaged skill set", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-override-source-");
+            const sourceDir = join(root, "custom-authoring-skills");
+            const installedDir = join(root, "authoring-skills");
+            const claudeSkillsDir = join(root, "claude-skills");
+            const codexSkillsDir = join(root, "codex-skills");
+            const agentsSkillsDir = join(root, "agents-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const customSkill = "custom-authoring-skill";
+
+            await mkdir(join(sourceDir, customSkill), { recursive: true });
+            await writeFile(join(sourceDir, customSkill, "SKILL.md"), `# ${customSkill}\n`, "utf8");
+            await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+
+            const result = await checkAuthoringSkillsStaleness(config, {
+                installedDir,
+                claudeSkillsDir,
+                codexSkillsDir,
+                agentsSkillsDir,
+                env: {
+                    ...process.env,
+                    CLAWPERATOR_AUTHORING_SKILLS: sourceDir,
+                },
+            });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.summary, "Authoring skills install is missing expected packaged skills.");
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                installedVersion: getCliVersion(),
+                cliVersion: getCliVersion(),
+                expectedSkills: [customSkill],
+                missingSkills: [customSkill],
             });
         });
 
