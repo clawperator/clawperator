@@ -268,10 +268,9 @@ run_main_case() {
 }
 
 run_stdin_entrypoint_case() {
-    local label="$1"
-    local stdout_file="$2"
-    local stderr_file="$3"
-    local status_file="$4"
+    local stdout_file="$1"
+    local stderr_file="$2"
+    local status_file="$3"
 
     set +e
     cat "$INSTALL_SCRIPT" | OS=Plan9 bash >"$stdout_file" 2>"$stderr_file"
@@ -401,7 +400,6 @@ STDIN_STDOUT="$TMP_DIR/stdin.stdout"
 STDIN_STDERR="$TMP_DIR/stdin.stderr"
 STDIN_STATUS="$TMP_DIR/stdin.status"
 run_stdin_entrypoint_case \
-    stdin-entrypoint \
     "$STDIN_STDOUT" \
     "$STDIN_STDERR" \
     "$STDIN_STATUS"
