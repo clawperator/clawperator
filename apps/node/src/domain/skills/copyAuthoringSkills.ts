@@ -211,6 +211,9 @@ export async function inspectManagedAuthoringSkillLink(
 
 async function isManagedAgentSymlink(linkPath: string, installedDir: string, skillName: string): Promise<boolean> {
   const inspection = await inspectManagedAuthoringSkillLink(linkPath, installedDir, skillName);
+  // A dangling symlink that points at the correct expected target is still considered managed:
+  // it means Clawperator previously installed the link but the install dir was subsequently
+  // removed. The install/update flow is allowed to recreate it.
   if (!inspection.ok && inspection.status === "broken" && inspection.actualTarget === inspection.expectedTarget) {
     return true;
   }

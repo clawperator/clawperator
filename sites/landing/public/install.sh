@@ -563,6 +563,8 @@ setup_authoring_skills_via_cli() {
                     ;;
                 agentDir=*)
                     AUTHORING_AGENT_DIR_INDEX=$((AUTHORING_AGENT_DIR_INDEX + 1))
+                    # agentDirs order from the CLI: index 1 = Claude Code, index 2 = Codex.
+                    # This mirrors the order in copyAuthoringSkills.ts resolveAgentDirs().
                     if [ "$AUTHORING_AGENT_DIR_INDEX" -eq 1 ]; then
                         AUTHORING_SKILLS_CLAUDE_DIR="${PARSED_AUTHORING_LINE#agentDir=}"
                     elif [ "$AUTHORING_AGENT_DIR_INDEX" -eq 2 ]; then
