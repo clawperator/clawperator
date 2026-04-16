@@ -5,6 +5,8 @@ cd "$(dirname "$0")/../.."
 
 REPO_ROOT="$(pwd)"
 INSTALL_SCRIPT="$REPO_ROOT/sites/landing/public/install.sh"
+SYSTEM_NODE_BIN_DIR="$(dirname "$(command -v node)")"
+SYSTEM_PATH_BASE="$SYSTEM_NODE_BIN_DIR:/usr/bin:/bin:/usr/sbin:/sbin"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
@@ -205,7 +207,7 @@ run_main_case() {
 
     HOME="$TMP_DIR/home-$label" \
     OS=Linux \
-    PATH="$mock_dir:$PATH" \
+    PATH="$mock_dir:$SYSTEM_PATH_BASE" \
     MOCK_MAIN_STATE_FILE="$state_file" \
     MOCK_MAIN_SCENARIO="$scenario" \
     bash -c '
@@ -263,6 +265,20 @@ run_main_case() {
     local actual_exit
     actual_exit="$(cat "$TMP_DIR/$label.status")"
     assert_exit_code "$actual_exit" "$expected_exit" "$label"
+}
+
+run_stdin_entrypoint_case() {
+    local label="$1"
+    local stdout_file="$2"
+    local stderr_file="$3"
+    local status_file="$4"
+
+    set +e
+    cat "$INSTALL_SCRIPT" | OS=Plan9 bash >"$stdout_file" 2>"$stderr_file"
+    local actual_exit=$?
+    set -e
+
+    printf '%s\n' "$actual_exit" > "$status_file"
 }
 
 echo "=== Scenario 1: main success path completes and writes summary ==="
@@ -379,5 +395,19 @@ assert_contains "$REMEDIATE_TRACE" "verify_operator_apk" "main-remediation trace
 assert_contains "$REMEDIATE_TRACE" "maybe_install_operator_apk" "main-remediation trace"
 assert_contains "$REMEDIATE_CLI_LOG" "doctor --format json" "main-remediation cli log"
 assert_contains "$REMEDIATE_CLI_LOG" "doctor --output pretty" "main-remediation cli log"
+
+echo "=== Scenario 5: stdin entrypoint runs without BASH_SOURCE errors ==="
+STDIN_STDOUT="$TMP_DIR/stdin.stdout"
+STDIN_STDERR="$TMP_DIR/stdin.stderr"
+STDIN_STATUS="$TMP_DIR/stdin.status"
+run_stdin_entrypoint_case \
+    stdin-entrypoint \
+    "$STDIN_STDOUT" \
+    "$STDIN_STDERR" \
+    "$STDIN_STATUS"
+
+assert_exit_code "$(cat "$STDIN_STATUS")" 1 "stdin-entrypoint"
+assert_contains "$STDIN_STDOUT" "Unsupported OS: Plan9" "stdin-entrypoint stdout"
+assert_not_contains "$STDIN_STDERR" "BASH_SOURCE[0]: unbound variable" "stdin-entrypoint stderr"
 
 echo "=== install.sh main smoke harness passed ==="
