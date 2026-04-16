@@ -37,6 +37,24 @@ The three cleanup gates are:
 
 All three gates must pass before the task folder is deleted.
 
+## Gap Triage
+
+Any gap surfaced by any gate - whether a missing code deliverable, an unresolved migration target, or a prompt gap in the task pack itself - must be classified before the task folder can be deleted.
+
+- **Fix now** - The gap is small, local, and can be resolved without reopening the task pack or changing the intended scope.
+- **Defer** - The gap is real work that should survive cleanup. Move it into durable follow-up, a new task pack, or another durable home with enough detail for the next agent to act on it without reconstructing context.
+- **Accept** - The gap is deliberate variance, already risk-assessed, and does not block shipping.
+
+For each unresolved gap, record:
+
+- what was planned or expected
+- what exists now
+- why the gap matters
+- the recommended disposition
+- whether the disposition needs user confirmation
+
+Do not treat a gap as resolved until it has one of those three dispositions. Present gaps that require user confirmation before deleting anything.
+
 ## Workflow
 
 1. Read the task pack.
@@ -113,7 +131,7 @@ For each piece of durable information:
 
 If the task pack explicitly named durable destinations in its `Durable Follow-Up` or `finalization-items.md` sections, treat those as the authoritative migration list and verify each one.
 
-If the task pack leaves a durable destination implicit, use the routing table and repo context to choose the correct home. If the right home cannot be established confidently, report that as a task-pack gap and do not silently drop the knowledge.
+If the task pack leaves a durable destination implicit, use the routing table and repo context to choose the correct home. If the right home cannot be established confidently, report that as a task-pack gap and do not silently drop the knowledge. Apply Gap Triage to any gap that cannot be resolved inline.
 
 If docs were updated, run `./scripts/docs_build.sh` and confirm it succeeds before treating the docs gate as closed.
 
@@ -209,25 +227,11 @@ Flag these as standout gaps:
 
 ### Gap Triage
 
-When Gate 3 surfaces a gap, or when the task pack itself is under-specified, classify the issue before deciding whether the task pack can be deleted:
-
-- **Fix now** - The gap is small, local, and can be resolved without reopening the task pack or changing the intended scope.
-- **Defer** - The gap is real work that should survive cleanup. Move it into durable follow-up, a new task pack, or another durable home with enough detail for the next agent to act on it.
-- **Accept** - The gap is deliberate variance, already risk-assessed, and does not block shipping.
-
-For each unresolved gap, write down:
-
-- what was planned
-- what exists now
-- why the gap matters
-- the recommended disposition
-- whether the disposition needs user confirmation
-
-Do not treat a gap as resolved until it has one of those three dispositions.
+Apply the Gap Triage model defined above to every gap surfaced here.
 
 ### Prompt Gaps
 
-Some cleanup findings are gaps in the task pack, not in the delivered code. Treat these as first-class cleanup work.
+Some cleanup findings are gaps in the task pack itself, not in the delivered code. These can surface during any gate. Treat them as first-class cleanup work.
 
 Examples:
 
@@ -292,3 +296,6 @@ Prevent these explicitly:
 - Running Gate 3 validation only against the task pack text and not against the actual code
 - Accepting a flagged gap without presenting it to the user for an explicit decision
 - Leaving `finalization-items.md` deferred items unresolved and untracked after deletion
+- Treating prompt gaps (missing durable destinations, contradictory instructions, implied-but-unwritten follow-up) as invisible background noise rather than cleanup findings
+- Conflating prompt gaps with code gaps in the gap report - they are distinct categories with different fix paths
+- Applying Gap Triage only to Gate 3 findings and silently dropping Gate 1 gaps that could not be routed
