@@ -292,5 +292,6 @@ assert_contains "$MULTI_STDOUT" "clawperator doctor --device <device_id> --outpu
 assert_not_contains "$MULTI_STDOUT" "Final doctor check failed." "main-multi stdout"
 MULTI_DOCTOR_CALLS="$(grep -c '^doctor --format json$' "$MULTI_CLI_LOG")"
 assert_equals "3" "$MULTI_DOCTOR_CALLS" "main-multi doctor call count"
+assert_equals "0" "$(grep -c '^doctor --output pretty$' "$MULTI_CLI_LOG" || true)" "main-multi no pretty doctor call"
 
 echo "=== install.sh main smoke harness passed ==="
