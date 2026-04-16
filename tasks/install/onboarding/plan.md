@@ -1,0 +1,197 @@
+# Install Onboarding Agent Discovery Cleanup
+
+## Executive Summary
+
+Tighten the post-install path so an OpenClaw-style host agent can actually
+discover and use the runtime skills that Clawperator already installs. This is
+a small cross-surface task pack: 2 PRs, 4 phases. PR-1 ships Node-side runtime
+discovery ergonomics. PR-2 ships install/on-disk host-agent guidance and bridge
+artifacts. The deferred preflight metadata idea from `findings.md` F6 is
+explicitly out of scope for this pack.
+
+## Status
+
+| Item | Value |
+| --- | --- |
+| State | not started |
+| Total PRs | 2 |
+| Total phases | 4 |
+| Completed | none |
+| Remaining | 1, 2, 3, 4 |
+| Current / Next | Phase 1 |
+| Blockers | none |
+
+## Goal
+
+After this task ships, a host agent that runs `curl -fsSL https://clawperator.com/install.sh | bash`
+can discover installed runtime skills without shell-session luck, identify the
+Google Home HVAC skills using user-language terms, and find durable on-disk
+guidance about how to call Clawperator from an OpenClaw-style environment.
+
+## Why Now
+
+`tasks/install/onboarding/findings.md` shows the capability gap is not runtime
+execution. The Google Home HVAC skills already exist. The failure is the
+handoff after install: registry resolution, search quality, app-oriented
+discovery, and host-agent-facing artifacts. These are all part of the same
+onboarding problem and should land as one small multi-phase project.
+
+## In Scope
+
+- Make runtime-skill registry resolution work after install without requiring a
+  shell rc reload
+- Add an app-oriented runtime-skill discovery surface
+- Improve `skills search` so user-language queries can find the Google Home HVAC
+  skills and do not confidently mis-rank irrelevant skills for short queries
+- Render installed runtime skills into `~/.clawperator/AGENTS.md`
+- Add durable install artifacts for host-agent use
+- Add a bounded host-agent bridge at the `AGENTS.md` / `TOOLS.md` layer
+- Materialize an MCP config snippet under `~/.clawperator/`
+- Update authored docs that describe these host-facing behaviors
+
+## Out of Scope
+
+- New `SkillEntry` preflight or `requires` metadata
+- Harness-enforced precondition failures
+- Changes to orchestrated-skill runtime semantics beyond describing existing
+  host requirements
+- Treating Clawperator runtime skills as native prompt-skills in shared agent
+  skill directories
+- Any Android runtime behavior change
+
+## Existing Artifact Scope
+
+- `tasks/install/onboarding/findings.md`: preserved as the research source of
+  truth for this task pack; do not rewrite it as part of implementation
+- `tasks/install/onboarding/findings-codex.md`: preserved as-is
+- `tasks/install/onboarding/findings-opus.md`: preserved as-is
+- `sites/landing/public/install.sh`: in scope for additive onboarding and
+  artifact-generation changes; existing install steps stay intact
+- `~/.clawperator/AGENTS.md` template in `install.sh`: in scope to expand with
+  runtime-skill guidance
+- Shared agent discovery surfaces: in scope for bounded, idempotent append-only
+  bridge guidance, not ownership takeover
+
+## Surfaces and Ownership
+
+| Surface | What changes | Owner |
+| --- | --- | --- |
+| `apps/node/src/adapters/skills-repo/` | Registry fallback behavior | PR-1 / Phase 1 |
+| `apps/node/src/domain/skills/` | Search behavior, `for-app` discovery, possible contract support for `keywords` | PR-1 / Phases 1-2 |
+| `apps/node/src/cli/` | `skills for-app <pkg>` command surface and help text | PR-1 / Phase 2 |
+| `apps/node/src/test/unit/` | Unit tests for fallback, search, and app-oriented discovery | PR-1 / Phases 1-2 |
+| `sites/landing/public/install.sh` | Runtime-skill AGENTS content, install-state artifact, MCP snippet, bounded shared-agent bridge | PR-2 / Phases 3-4 |
+| `docs/` | Public docs for install/onboarding and runtime-skill discovery behavior | PR-2 / Phase 4 |
+| `docs/internal/` | No new internal docs required in this pack | n/a |
+
+## Source Of Truth
+
+| Topic | Verify against |
+| --- | --- |
+| Runtime-skills registry path resolution | `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts` |
+| Runtime skills config constants | `apps/node/src/domain/skills/skillsConfig.ts` |
+| Skills search behavior | `apps/node/src/domain/skills/searchSkills.ts` |
+| Skills registry contract | `apps/node/src/contracts/skills.ts` |
+| Skills CLI registration | `apps/node/src/cli/registry.ts` |
+| Skills CLI command implementation | `apps/node/src/cli/commands/skills.ts` |
+| Existing unit-test patterns | `apps/node/src/test/unit/skills.test.ts` |
+| install.sh structure and final summary | `sites/landing/public/install.sh` |
+| MCP public behavior | `docs/api/mcp.md`, `apps/node/src/cli/registry.ts` |
+| Docs authoring workflow | `.agents/skills/docs-author/SKILL.md` |
+| Build validation | `./scripts/docs_build.sh` |
+| Research source | `tasks/install/onboarding/findings.md` |
+
+## Deterministic Versus Judgment
+
+**Deterministic - do not re-derive:**
+
+- This pack excludes F6-style skill preflight metadata work. Do not add new
+  `requires`, `preflight`, or orchestrated-harness precondition logic here.
+- The preferred bridge order is:
+  1. `~/.clawperator/AGENTS.md`
+  2. bounded append to `~/.agents/AGENTS.md`
+  3. optional `~/.clawperator/TOOLS.md`
+  4. MCP config snippet
+  5. no shared-agent bridge skill in this pack
+- App-oriented discovery should ship as `clawperator skills for-app <pkg>` or an
+  equivalent single-command surface in the `skills` namespace. Do not move this
+  into `doctor`.
+- Search improvement should be implemented through explicit metadata and ranking
+  rules, not vague semantic heuristics.
+
+**Judgment required:**
+
+- Exact output shape of `skills for-app`
+- Exact wording of the new `AGENTS.md` sections
+- Whether `TOOLS.md` is justified in PR-2 or whether `AGENTS.md` plus MCP
+  snippet is sufficient
+- The smallest ranking rule that fixes `"ac"` mis-ranking without broad search
+  regressions
+
+## Decision Rules
+
+| Question | Rule |
+| --- | --- |
+| Should this pack address `findings.md` F6? | No. Record it in `finalization-items.md` only. |
+| Should shared agent skill dirs receive runtime-skill copies or symlinks? | No. Runtime skills remain CLI-invoked assets. |
+| Should `doctor` become the main app-capability discovery surface? | No. Ship `skills for-app` first; any doctor enhancement is secondary. |
+| How should host guidance be written into shared agent surfaces? | Append-only, bounded, idempotent, and clearly marked as Clawperator-owned text. |
+| How should `"ac"`-style short queries be handled? | Prefer exact-token or keyword matches ahead of substring summary matches; do not let substring matches dominate for short tokens. |
+| What if `TOOLS.md` adds more complexity than value? | Skip it in PR-2 and keep the bridge in `AGENTS.md` plus MCP snippet. |
+
+## Failure Modes To Prevent
+
+- **Shell-rc dependency remains the only way skills resolve.** Phase 1 must
+  make the installed home-directory registry discoverable by default.
+- **Search looks "improved" but still mis-ranks short user terms.** Phase 2 must
+  include explicit ranking tests using the real problem queries from
+  `findings.md`.
+- **Runtime skills are presented as if they were host-agent prompt-skills.** Do
+  not install runtime-skill mirrors into shared agent skill dirs.
+- **Shared agent discovery file is overwritten.** Any `~/.agents/AGENTS.md`
+  change must be append-only and guard-comment delimited.
+- **`doctor` becomes a second capability browser.** Keep app-capability
+  discovery in `skills`, not in `doctor`.
+- **F6 leaks into the pack.** If work starts touching skill preflight metadata,
+  stop and split it into follow-up instead of expanding this pack.
+- **Tests deferred to a later phase.** Phase 1 and Phase 2 each ship their own
+  unit coverage.
+
+## Output Contract
+
+After PR-1:
+
+- `clawperator skills list` succeeds after install in a fresh non-login shell
+  when the installed runtime registry exists under `~/.clawperator/skills/...`
+- `clawperator skills for-app com.google.android.apps.chromecast.app` returns
+  the Google Home HVAC skills in one command
+- `clawperator skills search` can find the Google Home HVAC skills using the
+  target user-language queries from `findings.md`
+
+After PR-2:
+
+- `~/.clawperator/AGENTS.md` includes installed runtime-skill guidance
+- a bounded Clawperator section can be added to `~/.agents/AGENTS.md`
+- `~/.clawperator/install-state.json` exists after install
+- `~/.clawperator/mcp-config-snippet.json` exists after install
+- public docs reflect the new onboarding and discovery behavior
+
+## Idempotency
+
+- Re-running `install.sh` must be safe: generated host-agent artifacts are
+  overwritten or updated in place without duplicate append blocks
+- The `~/.agents/AGENTS.md` contribution must be idempotent and guard-comment
+  delimited
+- `install-state.json` and `mcp-config-snippet.json` are rewrite-safe
+- Search and registry behavior must be stable across repeated CLI invocations
+
+## Durable Follow-Up
+
+| Knowledge | Permanent home |
+| --- | --- |
+| Host-agent onboarding behavior | `docs/setup.md` and skills/onboarding docs updated in PR-2 |
+| App-oriented discovery command | `docs/skills/overview.md` or adjacent public docs in PR-2 |
+| Deferred skill preflight metadata work (F6) | `tasks/install/onboarding/finalization-items.md` |
+
+Delete this task pack only after both PRs land and the F6 follow-up has been
+captured elsewhere.
