@@ -30,6 +30,13 @@ contract work.
   this pack. That is deferred follow-up.
 - Do not start PR-2 until PR-1 is merged. The install/onboarding artifacts must
   point at the real shipped discovery behavior, not a branch-local preview.
+- The `keywords` metadata in Phase 2 is a cross-repo contract change. Land a
+  paired PR in `../clawperator-skills` that bumps the registry schema and seeds
+  Google Home HVAC entries (`["air conditioner", "aircon", "ac", "heater",
+  "hvac", "climate", "google home"]`) in the same review window as the Node
+  change. Do not rely only on a local test fixture to prove the behavior.
+- `skills for-app <pkg>` must be implemented as a thin wrapper over the
+  existing `searchSkills({ app })` path. Do not introduce a new domain module.
 - Do not treat runtime Clawperator skills as native prompt-skills in shared
   agent skill directories.
 - Any `~/.agents/AGENTS.md` change must be append-only, idempotent, and bounded
@@ -91,17 +98,25 @@ install, even in a fresh non-login shell.
 ### Steps
 
 1. Read the current registry-loading path and confirm how the installed
-   home-directory registry path is assembled elsewhere in the codebase.
+   home-directory registry path is assembled elsewhere in the codebase. Note
+   that `loadRegistry` already has a CWD-relative `../../skills/...` fallback
+   (see `localSkillsRegistry.ts`). The new installed-home fallback must
+   compose cleanly with it, not replace it.
 2. Add a fallback so registry resolution checks the installed path under
    `~/.clawperator/skills/skills/skills-registry.json` before failing when no
-   explicit env var or explicit registry path is provided.
+   explicit env var or explicit registry path is provided. Suppress the
+   "CLAWPERATOR_SKILLS_REGISTRY is not set" warning when the home-directory
+   fallback resolves successfully - otherwise `doctor` still prints a
+   misleading warning on the happy path.
 3. Keep `CLAWPERATOR_SKILLS_REGISTRY` as an override. If it is set and points to
    a bad file, preserve the configured-path failure behavior.
 4. Add unit tests for:
-   - installed-path fallback succeeds when CWD-relative path is missing
-   - explicit env var still takes precedence
-   - broken explicit env var still fails closed
-   - CWD-relative path still works when present
+   - installed-home fallback succeeds when CWD-relative path is missing
+   - explicit env var still takes precedence over both fallbacks
+   - broken explicit env var still fails closed (path-not-found error)
+   - CWD-relative path still works when present and env var is unset
+   - warning about unset env var is suppressed when the home-directory
+     fallback resolved successfully
 5. Re-run the Node build and tests.
 
 ### Acceptance Criteria
@@ -151,14 +166,20 @@ make user-language skill search return the right Google Home HVAC skills.
 
 ### Steps
 
-1. Add the minimum metadata and ranking support needed to fix the real queries
-   from `tasks/install/onboarding/findings.md`. Prefer explicit `keywords` or
-   equivalent metadata over heuristic-only search changes.
-2. Add a `skills for-app <package_id>` discovery surface in the `skills`
-   namespace. Keep the output shape aligned with existing `formatSuccess` /
-   `formatError` patterns.
-3. Seed or adapt the relevant registry fixtures so the Google Home HVAC skills
-   can be discovered using:
+1. Add `keywords?: string[]` to `SkillEntry` in
+   `apps/node/src/contracts/skills.ts` and teach `searchSkills` to match
+   `--keyword` against it. Implement a ranking rule that places exact-token
+   matches on `id` / `applicationId` / `keywords` ahead of substring matches on
+   `summary`. Returned order must be deterministic. No fuzzy-match or semantic
+   redesign.
+2. Add `skills for-app <package_id>` as a thin wrapper over
+   `searchSkills({ app })`. Register the subcommand in
+   `apps/node/src/cli/registry.ts` and dispatch to a one-line handler in
+   `apps/node/src/cli/commands/skills.ts`. Keep the output shape aligned with
+   existing `formatSuccess` / `formatError` patterns. No new domain module.
+3. Land the paired PR in `../clawperator-skills` that updates the registry
+   JSON schema to include optional `keywords` and seeds Google Home HVAC
+   entries with:
    - `google home`
    - `climate`
    - `hvac`
@@ -168,20 +189,28 @@ make user-language skill search return the right Google Home HVAC skills.
 4. Preserve the live query table in `findings.md` as the authoritative set of
    regression cases. Use those exact problem queries in tests.
 5. Add unit tests for:
-   - `skills for-app com.google.android.apps.chromecast.app`
+   - `skills for-app com.google.android.apps.chromecast.app` returns the four
+     Google Home HVAC skills and nothing else
    - correct Google Home hits for `google home`
    - correct Google Home hits for `air conditioner`
    - correct Google Home hits for `aircon`
-   - short-query behavior so `"ac"` no longer confidently ranks irrelevant
-     skills ahead of the HVAC skills
+   - `"ac"` no longer ranks `com.coles.*` / `com.woolworths.*` /
+     `com.globird.energy.*` ahead of the HVAC skills (use the exact mis-ranked
+     list from `findings.md` F5 as the regression fixture)
+   - explicit-keyword hit beats substring-summary hit in ordering
 6. Update CLI help text only as needed to document the new discovery surface.
 7. Re-run the Node build and tests.
 
 ### Acceptance Criteria
 
-- `skills for-app` exists and returns the Google Home HVAC skills
-- search improvements are driven by explicit metadata and tested ranking rules
-- the exact user-problem queries from `findings.md` are covered by unit tests
+- `skills for-app` exists as a thin wrapper and returns the Google Home HVAC
+  skills
+- search improvements are driven by explicit `keywords` metadata and tested
+  ranking rules; result order is deterministic
+- the exact user-problem queries from `findings.md` are covered by unit tests,
+  including the "ac" mis-ranking regression
+- paired `../clawperator-skills` PR is open or merged and seeds the Google
+  Home HVAC keywords
 - no semantic-search or fuzzy-match redesign is introduced
 
 ### Validation
@@ -222,18 +251,30 @@ present, and persist the key install outputs for future agent turns.
 
 ### Steps
 
-1. Expand the `~/.clawperator/AGENTS.md` template so it includes runtime skills,
-   grouped or summarized in a way that makes the Google Home HVAC skills obvious
-   to a cold-start host agent.
-2. Add a durable `install-state.json` artifact under `~/.clawperator/` that
-   records the minimum stable install facts future agents need.
-3. Add `mcp-config-snippet.json` under `~/.clawperator/` with paste-ready MCP
-   config guidance for host agents.
+1. Expand the `~/.clawperator/AGENTS.md` template in
+   `sites/landing/public/install.sh` `write_agent_guide()` so it includes
+   runtime skills, grouped by `applicationId`, with `intent`, `summary`, and a
+   concrete `clawperator skills run <id>` invocation example. Source the data
+   by reading the installed registry at
+   `~/.clawperator/skills/skills/skills-registry.json`. If the registry is
+   absent or unreadable, fall back to today's authoring-skills-only content
+   and leave a clear "runtime skills not available" note - do not fail the
+   install.
+2. Add a durable `~/.clawperator/install-state.json` artifact with at minimum:
+   `schemaVersion`, `installedAt`, `cliVersion`, `apkVersion`, `registryPath`,
+   `lastDeviceSerial`. Rewrite-safe.
+3. Add `~/.clawperator/mcp-config-snippet.json` with paste-ready entries for
+   Claude Desktop, Codex, and a generic stdio MCP consumer. Do not attempt
+   automatic registration.
 4. Update the final installer summary to reference the durable artifact paths
    rather than leaving critical orientation only in stdout.
 5. Keep these changes additive. Do not rewrite unrelated install behavior.
-6. Add or extend install-script validation coverage if the repo already has a
-   suitable harness for this output generation path.
+6. Extend `validation/install/test_install.sh` (the existing harness) to
+   assert: `~/.clawperator/AGENTS.md` lists at least one runtime skill when
+   the registry is present; `install-state.json` exists and parses as JSON;
+   `mcp-config-snippet.json` exists and contains the Claude Desktop entry;
+   re-running the installer does not duplicate any of these artifacts or any
+   appended sections.
 
 ### Acceptance Criteria
 
@@ -279,9 +320,12 @@ discovery behavior is public, durable, and easy to follow.
 
 ### Steps
 
-1. Add a bounded, guard-comment-delimited Clawperator section to the shared
-   agent discovery surface used by the installer. This should point to
+1. If `~/.agents/AGENTS.md` already exists, append a bounded,
+   guard-comment-delimited `## Clawperator` section (same discipline as the
+   existing shell-rc append in `setup_skills_via_cli`). The section points to
    `~/.clawperator/AGENTS.md` and the `clawperator skills` discovery commands.
+   If the file does not exist, do not create it - Clawperator does not own
+   that path. Re-runs must not duplicate or drift the section.
 2. Keep the bridge clearly a pointer/delegator. Do not try to mirror runtime
    skills into shared agent skill directories.
 3. Use `.agents/skills/docs-author/SKILL.md` for the docs work.

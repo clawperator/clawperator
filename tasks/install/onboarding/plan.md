@@ -109,15 +109,24 @@ onboarding problem and should land as one small multi-phase project.
   `requires`, `preflight`, or orchestrated-harness precondition logic here.
 - The preferred bridge order is:
   1. `~/.clawperator/AGENTS.md`
-  2. bounded append to `~/.agents/AGENTS.md`
+  2. bounded append to `~/.agents/AGENTS.md` (append only; do not create the
+     file if it does not already exist - Clawperator does not own this path)
   3. optional `~/.clawperator/TOOLS.md`
   4. MCP config snippet
   5. no shared-agent bridge skill in this pack
-- App-oriented discovery should ship as `clawperator skills for-app <pkg>` or an
-  equivalent single-command surface in the `skills` namespace. Do not move this
-  into `doctor`.
+- App-oriented discovery should ship as `clawperator skills for-app <pkg>` in
+  the `skills` namespace. Implement it as a thin wrapper over the existing
+  `searchSkills({ app })` path - do not introduce a new domain module for this.
+  `skills search --app <pkg>` already filters correctly today; `for-app` is a
+  discoverability alias, not new capability. Do not move this into `doctor`.
 - Search improvement should be implemented through explicit metadata and ranking
-  rules, not vague semantic heuristics.
+  rules, not vague semantic heuristics. Adding `keywords?: string[]` to
+  `SkillEntry` is a registry-contract change and therefore a cross-repo change:
+  the Clawperator Node contract, the `clawperator-skills` registry JSON schema,
+  and the seeded Google Home HVAC entries must land in lockstep (see Hard Rules
+  in the work breakdown).
+- MCP config snippet must include at minimum: Claude Desktop, Codex, and a
+  generic stdio MCP consumer entry. Do not attempt automatic registration.
 
 **Judgment required:**
 
@@ -135,8 +144,9 @@ onboarding problem and should land as one small multi-phase project.
 | Should this pack address `findings.md` F6? | No. Record it in `finalization-items.md` only. |
 | Should shared agent skill dirs receive runtime-skill copies or symlinks? | No. Runtime skills remain CLI-invoked assets. |
 | Should `doctor` become the main app-capability discovery surface? | No. Ship `skills for-app` first; any doctor enhancement is secondary. |
-| How should host guidance be written into shared agent surfaces? | Append-only, bounded, idempotent, and clearly marked as Clawperator-owned text. |
-| How should `"ac"`-style short queries be handled? | Prefer exact-token or keyword matches ahead of substring summary matches; do not let substring matches dominate for short tokens. |
+| How should host guidance be written into shared agent surfaces? | Append-only, bounded, idempotent, and clearly marked as Clawperator-owned text. Do not create `~/.agents/AGENTS.md` if it does not exist. |
+| How should `"ac"`-style short queries be handled? | Prefer exact-token or keyword matches ahead of substring summary matches; do not let substring matches dominate for short tokens. Returned order must be stable and covered by tests against the findings.md query table. |
+| Where should `keywords` metadata be seeded? | In `../clawperator-skills` (the sibling skills repo). The Node contract change and the seeded entries ship as paired PRs; do not mock it by editing only a local test fixture. |
 | What if `TOOLS.md` adds more complexity than value? | Skip it in PR-2 and keep the bridge in `AGENTS.md` plus MCP snippet. |
 
 ## Failure Modes To Prevent
