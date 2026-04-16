@@ -1,6 +1,6 @@
 ---
 name: task-cleanup
-description: Close out a completed task pack under tasks/. Migrates durable knowledge to permanent homes, removes stale phase-reference comments from code, triages task-pack and plan-vs-code gaps, and deletes the task folder. Use when a task pack is done and ready to be retired.
+description: Close out a completed task pack under tasks/. Migrates durable knowledge to permanent homes, removes stale phase-reference comments from code, triages prompt and plan-vs-code gaps, and deletes the task folder. Use when a task pack is done and ready to be retired.
 ---
 
 # Task Cleanup
@@ -59,7 +59,7 @@ Do not treat a gap as resolved until it has one of those three dispositions. Pre
 
 1. Read the task pack.
    - Read every file in the task folder: `plan.md`, `work-breakdown.md`, `findings.md`, `finalization-items.md`, and any phase-specific files.
-   - Build a complete picture of: what was planned, what decisions were made, what was deferred, what the task itself said should be migrated to durable docs, and what it failed to say explicitly.
+   - Build a complete picture of: what was planned, what decisions were made, what was deferred, what the task itself said should be migrated to durable docs, and what it left implicit.
    - Treat missing durable destinations, missing acceptance criteria, missing validation steps, or contradictory instructions in the task pack as cleanup findings, not as invisible background noise.
 2. Run Gate 1: Knowledge migration.
    - See the Knowledge Migration section below.
@@ -131,7 +131,7 @@ For each piece of durable information:
 
 If the task pack explicitly named durable destinations in its `Durable Follow-Up` or `finalization-items.md` sections, treat those as the authoritative migration list and verify each one.
 
-If the task pack leaves a durable destination implicit, use the routing table and repo context to choose the correct home. If the right home cannot be established confidently, report that as a task-pack gap and do not silently drop the knowledge. Apply Gap Triage to any gap that cannot be resolved inline.
+If the task pack leaves a durable destination implicit, use the routing table and repo context to choose the correct home. If the right home cannot be established confidently, report that as a prompt gap and do not silently drop the knowledge.
 
 If docs were updated, run `./scripts/docs_build.sh` and confirm it succeeds before treating the docs gate as closed.
 
@@ -225,10 +225,6 @@ Flag these as standout gaps:
 - A durable follow-up item in `plan.md` or `finalization-items.md` has no corresponding docs or code change
 - A test was explicitly required but is absent
 
-### Gap Triage
-
-Apply the Gap Triage model defined above to every gap surfaced here.
-
 ### Prompt Gaps
 
 Some cleanup findings are gaps in the task pack itself, not in the delivered code. These can surface during any gate. Treat them as first-class cleanup work.
@@ -254,8 +250,8 @@ Produce a short gap report with two sections:
 - List deliverables and acceptance criteria that passed.
 
 **Flagged gaps:**
-- List each gap with: what was planned, what exists, and a suggested resolution.
-- For each gap, state the recommended disposition and ask the user to confirm if it is not already fixed.
+- List each gap with: what was planned or expected, what exists now, why it matters, and the suggested resolution.
+- For each gap, state whether it is fixed, deferred durably, or accepted, and ask the user to confirm anything that is not already fixed.
 
 Do not delete the task folder until the user has resolved or accepted all flagged gaps.
 
