@@ -6,13 +6,8 @@ cd "$(dirname "$0")/../.."
 echo "=== Building Node package for install-related tests ==="
 npm --prefix apps/node run build
 
-echo "=== Running install-related Node tests ==="
-node --test \
-    apps/node/dist/test/integration/installScript.test.js \
-    apps/node/dist/test/unit/authoringSkills.test.js \
-    apps/node/dist/test/unit/authoringSkillsPack.test.js \
-    apps/node/dist/test/unit/doctor/DoctorService.test.js \
-    apps/node/dist/test/unit/doctor/hostChecks.test.js
+echo "=== Running Node test suite for installer-facing CLI contracts ==="
+npm --prefix apps/node run test
 
 echo "=== Running install-related validation harnesses ==="
 bash validation/test_doctor.sh

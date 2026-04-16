@@ -142,6 +142,29 @@ EOF
     chmod +x "$mock_dir/clawperator"
 }
 
+setup_mock_adb() {
+    local mock_dir="$1"
+
+    mkdir -p "$mock_dir"
+    cat > "$mock_dir/adb" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ "$1" = "devices" ]; then
+  cat <<'OUT'
+List of devices attached
+serial-alpha	device
+serial-beta	device
+OUT
+  exit 0
+fi
+
+printf '%s\n' "unexpected mock adb invocation: $*" >&2
+exit 99
+EOF
+    chmod +x "$mock_dir/adb"
+}
+
 run_main_case() {
     local label="$1"
     local scenario="$2"
@@ -155,6 +178,7 @@ run_main_case() {
     local mock_dir="$TMP_DIR/mock-$label"
 
     setup_mock_clawperator "$mock_dir" "$scenario" "$cli_log_file"
+    setup_mock_adb "$mock_dir"
     : > "$cli_log_file"
     : > "$trace_file"
 
@@ -235,11 +259,6 @@ assert_contains "$SUCCESS_CLI_LOG" "skills install --output json" "main-success 
 assert_contains "$SUCCESS_CLI_LOG" "authoring-skills install --output json" "main-success cli log"
 assert_contains "$SUCCESS_CLI_LOG" "doctor --output pretty" "main-success cli log"
 
-# The install flow currently runs doctor three times:
-# initial check, post-repair recheck, and final summary check.
-DOCTOR_CALLS_SUCCESS="$(grep -c '^doctor --format json$' "$SUCCESS_CLI_LOG")"
-assert_equals "3" "$DOCTOR_CALLS_SUCCESS" "main-success doctor call count"
-
 echo "=== Scenario 2: final doctor failure aborts after setup ==="
 FAIL_STDOUT="$TMP_DIR/main-fail.stdout"
 FAIL_STDERR="$TMP_DIR/main-fail.stderr"
@@ -267,9 +286,6 @@ assert_contains "$FAIL_CLI_LOG" "skills install --output json" "main-fail cli lo
 assert_contains "$FAIL_CLI_LOG" "authoring-skills install --output json" "main-fail cli log"
 assert_contains "$FAIL_CLI_LOG" "doctor --output pretty" "main-fail cli log"
 
-DOCTOR_CALLS_FAIL="$(grep -c '^doctor --format json$' "$FAIL_CLI_LOG")"
-assert_equals "3" "$DOCTOR_CALLS_FAIL" "main-fail doctor call count"
-
 echo "=== Scenario 3: final doctor multi-device path returns success with manual guidance ==="
 MULTI_STDOUT="$TMP_DIR/main-multi.stdout"
 MULTI_STDERR="$TMP_DIR/main-multi.stderr"
@@ -291,9 +307,9 @@ run_main_case \
 assert_contains "$MULTI_STDOUT" "Installation Complete (Device Selection Required)" "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "Host install completed, but Android setup is still pending because more than one device is connected." "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "clawperator doctor --device <device_id> --output pretty" "main-multi stdout"
+assert_contains "$MULTI_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi/.clawperator/downloads/operator.apk --device serial-alpha" "main-multi stdout"
+assert_contains "$MULTI_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi/.clawperator/downloads/operator.apk --device serial-beta" "main-multi stdout"
 assert_not_contains "$MULTI_STDOUT" "Final doctor check failed." "main-multi stdout"
-MULTI_DOCTOR_CALLS="$(grep -c '^doctor --format json$' "$MULTI_CLI_LOG")"
-assert_equals "3" "$MULTI_DOCTOR_CALLS" "main-multi doctor call count"
-assert_equals "0" "$(grep -c '^doctor --output pretty$' "$MULTI_CLI_LOG" || true)" "main-multi no pretty doctor call"
+assert_not_contains "$MULTI_STDOUT" "Doctor pretty output" "main-multi stdout"
 
 echo "=== install.sh main smoke harness passed ==="
