@@ -117,11 +117,11 @@ Refs: [install.sh:598](sites/landing/public/install.sh:598), [install.sh:605](si
 - Append (not overwrite) a bounded, guard-comment-delimited `## Clawperator` section to `~/.agents/AGENTS.md` that points at `~/.clawperator/AGENTS.md` and teaches `clawperator skills list`. Same idempotency discipline as the existing shell-rc append.
 - Optional: write `~/.clawperator/TOOLS.md` in OpenClaw's `TOOLS.md` schema describing `clawperator` as a CLI tool.
 
-### F3. Runtime skills are not wired into agent-discovery directories, only authoring skills are
+### F3. Runtime skills are not wired into agent-discovery conventions, only authoring skills are
 
 `install.sh` explicitly fans authoring skills into `~/.claude/skills`, `~/.codex/skills`, `~/.agents/skills`. Runtime skills (including the Google Home HVAC ones) get none of that treatment.
 
-Note: runtime skills are CLI-invoked (`clawperator skills run <id>`), not standalone `SKILL.md` executables, so symlinking them into `~/.agents/skills` as-is would not work. What is missing is a **single bridge skill / pointer** under each agent-discovery directory that teaches the agent to delegate to `clawperator skills`. Today, generic agents are more likely to discover Clawperator's self-maintenance helpers than the runtime skills the user actually cares about.
+Note: runtime skills are CLI-invoked (`clawperator skills run <id>`), not standalone `SKILL.md` executables, so symlinking them into `~/.agents/skills` as-is would not work. The primary missing piece is a bridge at the documented agent-discovery layer: `AGENTS.md` / `TOOLS.md` should teach the agent to delegate to `clawperator skills`. A small bridge skill under `~/.agents/skills` can still help, but it should be clearly a pointer/delegator rather than something that makes Clawperator runtime skills look like native prompt-skills.
 
 Refs: [install.sh:540](sites/landing/public/install.sh:540), [docs/skills/authoring.md:45](docs/skills/authoring.md:45).
 
@@ -137,7 +137,7 @@ A skills-aware doctor check — "registry resolves; 17 skills available; 4 cover
 
 Refs: [apps/node/src/cli/registry.ts:2064](apps/node/src/cli/registry.ts:2064), [install.sh:988](sites/landing/public/install.sh:988).
 
-**Fix direction:** add a `skills.registry.presence` check to doctor that uses the F1 fallback path, reports count and per-`applicationId` counts, and is included in both pretty and JSON output. Add a `clawperator skills for-app <pkg>` shortcut so an agent can get the right answer in one command.
+**Fix direction:** the cleaner near-term move is probably a `clawperator skills for-app <pkg>` shortcut so an agent can answer "what can I do for this app?" in one command. A `skills.registry.presence` doctor check can still help, but the app-oriented shortcut is likely the better primary surface because it answers the actual user-on-behalf question more directly and avoids making doctor carry too much app-capability logic.
 
 ### F5. Skill search vocabulary does not match user vocabulary, and user-language terms mis-rank
 
@@ -218,11 +218,11 @@ Every step here is fixable independently.
 ### P1 — meaningfully strengthens subsequent turns and cross-agent discovery
 
 4. **F2 location** — idempotent `## Clawperator` append to `~/.agents/AGENTS.md`; same guard-comment discipline as the shell-rc append.
-5. **F4** — `skills.registry.presence` check in `doctor`, plus per-`applicationId` counts.
+5. **F4** — add `clawperator skills for-app <pkg>` as the primary app-capability discovery surface; optionally follow with a lighter `skills.registry.presence` doctor check.
 6. **F6** — first-class `preflight` metadata in `SkillEntry`; rendered in `skills get`; enforced in orchestrated harnesses.
 7. **F7** — `install-state.json`.
 8. **F8** — ship `mcp-config-snippet.json`.
 
 ### P2
 
-9. **F3** — single bridge skill under `~/.claude/skills`, `~/.codex/skills`, `~/.agents/skills` that delegates to `clawperator skills`.
+9. **F3** — single bridge skill under `~/.claude/skills`, `~/.codex/skills`, `~/.agents/skills` that visibly delegates to `clawperator skills` rather than trying to masquerade as a native runtime-skill model.
