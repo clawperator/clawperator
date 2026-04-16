@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.6.2] - 2026-04-17
+
+This release tightens the install flow for stdin-based usage and refreshes the public release-facing docs for the published `0.6.1` artifacts.
+
+### 📚 Documentation & Website
+- **Changed:** Refreshed the public release-facing docs and install entrypoints to point at the published `0.6.1` release artifacts.
+- **Fixed:** Corrected the `install.sh` stdin execution path so `curl -fsSL https://clawperator.com/install.sh | bash` completes without tripping the entrypoint guard.
+
+Pull requests:
+- [feat(skills): add task-cleanup skill](https://github.com/clawperator/clawperator/pull/191)
+- [fix(install): fix stdin execution for install.sh](https://github.com/clawperator/clawperator/pull/192)
+
 ## [0.6.1] - 2026-04-16
 
 This release centers on packaged authoring-skills support and the matching public guidance refresh, with installer validation tightened along the way.
