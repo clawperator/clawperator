@@ -19,6 +19,7 @@ import { listPackagedAuthoringSkills } from "../../../domain/skills/copyAuthorin
 
 describe("Doctor: hostChecks", () => {
     const tempRoots: string[] = [];
+    const directorySymlinkType = process.platform === "win32" ? "junction" : "dir";
 
     afterEach(async () => {
         await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
@@ -32,6 +33,10 @@ describe("Doctor: hostChecks", () => {
 
     async function getExpectedAuthoringSkills(): Promise<string[]> {
         return listPackagedAuthoringSkills();
+    }
+
+    async function createDirectorySymlink(targetPath: string, linkPath: string): Promise<void> {
+        await symlink(targetPath, linkPath, directorySymlinkType);
     }
 
     async function seedHealthyAuthoringSkillsInstall(
@@ -49,7 +54,7 @@ describe("Doctor: hostChecks", () => {
             await mkdir(skillDir, { recursive: true });
             await writeFile(join(skillDir, "SKILL.md"), `# ${skillName}\n`, "utf8");
             for (const discoveryDir of discoveryDirs) {
-                await symlink(skillDir, join(discoveryDir, skillName));
+                await createDirectorySymlink(skillDir, join(discoveryDir, skillName));
             }
         }
         await writeFile(join(installedDir, "version.txt"), `${version}\n`, "utf8");
@@ -696,7 +701,7 @@ describe("Doctor: hostChecks", () => {
             const installedDir = join(root, "authoring-skills");
             const missingTarget = join(root, "missing-target");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            await symlink(missingTarget, installedDir);
+            await createDirectorySymlink(missingTarget, installedDir);
 
             const result = await checkAuthoringSkillsStaleness(config, { installedDir });
 
@@ -854,7 +859,7 @@ describe("Doctor: hostChecks", () => {
             const wrongTargetRoot = join(root, "wrong-target", targetSkill);
             await mkdir(wrongTargetRoot, { recursive: true });
             await rm(join(claudeSkillsDir, targetSkill), { force: true });
-            await symlink(wrongTargetRoot, join(claudeSkillsDir, targetSkill));
+            await createDirectorySymlink(wrongTargetRoot, join(claudeSkillsDir, targetSkill));
 
             const result = await checkAuthoringSkillsStaleness(config, {
                 installedDir,
@@ -929,7 +934,7 @@ describe("Doctor: hostChecks", () => {
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
             const [targetSkill] = await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
             await rm(join(claudeSkillsDir, targetSkill), { force: true });
-            await symlink(missingTarget, join(claudeSkillsDir, targetSkill));
+            await createDirectorySymlink(missingTarget, join(claudeSkillsDir, targetSkill));
 
             const result = await checkAuthoringSkillsStaleness(config, {
                 installedDir,
@@ -1018,9 +1023,9 @@ describe("Doctor: hostChecks", () => {
             await mkdir(codexSkillsDir, { recursive: true });
             await mkdir(agentsSkillsDir, { recursive: true });
             await writeFile(join(installedDir, targetSkill), "not a directory\n", "utf8");
-            await symlink(join(installedDir, targetSkill), join(claudeSkillsDir, targetSkill));
-            await symlink(join(installedDir, targetSkill), join(codexSkillsDir, targetSkill));
-            await symlink(join(installedDir, targetSkill), join(agentsSkillsDir, targetSkill));
+            await createDirectorySymlink(join(installedDir, targetSkill), join(claudeSkillsDir, targetSkill));
+            await createDirectorySymlink(join(installedDir, targetSkill), join(codexSkillsDir, targetSkill));
+            await createDirectorySymlink(join(installedDir, targetSkill), join(agentsSkillsDir, targetSkill));
             await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
 
             const result = await checkAuthoringSkillsStaleness(config, {
