@@ -10967,7 +10967,11 @@ The exact `CLAWPERATOR_OPERATOR_PACKAGE` resolution order from `cmdSkillsRun()` 
 Verification pattern:
 
 ```bash
+CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
 clawperator skills run com.android.settings.capture-overview --json
+
+CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
+clawperator skills run com.android.settings.capture-overview --operator-package com.clawperator.operator --json
 ```
 
 Then verify the skill's internal `clawperator` calls behave against the intended package. When you need stronger confirmation, add a deliberate internal probe inside the skill script and inspect the raw `output`.
