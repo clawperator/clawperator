@@ -64,7 +64,7 @@ Claude Desktop example:
       ],
       "env": {
         "ADB_PATH": "<adb_path>",
-        "CLAWPERATOR_OPERATOR_PACKAGE": "com.clawperator.operator.dev",
+        "CLAWPERATOR_OPERATOR_PACKAGE": "com.clawperator.operator",
         "CLAWPERATOR_LOG_DIR": "<log_dir>",
         "CLAWPERATOR_LOG_LEVEL": "info"
       }

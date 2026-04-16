@@ -129,7 +129,7 @@ clawperator doctor --json
 With explicit targeting:
 
 ```bash
-clawperator doctor --json --device <device_serial> --operator-package com.clawperator.operator.dev
+clawperator doctor --json --device <device_serial>
 ```
 
 ### Doctor checks
@@ -210,7 +210,7 @@ clawperator snapshot --json
 With explicit targeting:
 
 ```bash
-clawperator snapshot --json --device <device_serial> --operator-package com.clawperator.operator.dev
+clawperator snapshot --json --device <device_serial>
 ```
 
 Success conditions:

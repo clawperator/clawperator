@@ -23,7 +23,7 @@ Before `clawperator skills run`, the target should already satisfy the normal Cl
 Recommended verification:
 
 ```bash
-clawperator doctor --json --device <device_serial> --operator-package com.clawperator.operator.dev
+clawperator doctor --json --device <device_serial>
 ```
 
 Treat the device as ready only when:
@@ -70,7 +70,7 @@ The exact `CLAWPERATOR_OPERATOR_PACKAGE` resolution order from `cmdSkillsRun()` 
 Verification pattern:
 
 ```bash
-CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev clawperator skills run com.android.settings.capture-overview --json
+clawperator skills run com.android.settings.capture-overview --json
 ```
 
 Then verify the skill's internal `clawperator` calls behave against the intended package. When you need stronger confirmation, add a deliberate internal probe inside the skill script and inspect the raw `output`.
@@ -160,7 +160,7 @@ When more than one device is connected:
 Example:
 
 ```bash
-clawperator skills run com.android.settings.capture-overview --device <device_serial> --operator-package com.clawperator.operator.dev
+clawperator skills run com.android.settings.capture-overview --device <device_serial>
 ```
 
 Why:
