@@ -51,14 +51,14 @@ function resolveInstalledDir(options: CopyAuthoringSkillsOptions): string {
   return DEFAULT_AUTHORING_SKILLS_DIR;
 }
 
-function resolveClaudeSkillsDir(options: CopyAuthoringSkillsOptions): string {
+export function resolveClaudeSkillsDir(options: CopyAuthoringSkillsOptions): string {
   if (options.claudeSkillsDir) {
     return resolve(options.claudeSkillsDir);
   }
   return join(resolveHomeDir(options), ".claude", "skills");
 }
 
-function resolveCodexSkillsDir(options: CopyAuthoringSkillsOptions): string {
+export function resolveCodexSkillsDir(options: CopyAuthoringSkillsOptions): string {
   if (options.codexSkillsDir) {
     return resolve(options.codexSkillsDir);
   }
@@ -120,7 +120,7 @@ async function ensureDirectory(path: string): Promise<void> {
   await mkdir(path, { recursive: true });
 }
 
-function normalizeOwnedSkillTarget(installedDir: string, skillName: string): string {
+export function normalizeOwnedSkillTarget(installedDir: string, skillName: string): string {
   return resolve(installedDir, skillName);
 }
 
@@ -133,23 +133,88 @@ async function resolveSymlinkTarget(path: string): Promise<string | undefined> {
   }
 }
 
-async function isManagedAgentSymlink(linkPath: string, installedDir: string, skillName: string): Promise<boolean> {
+export interface ManagedAuthoringSkillLinkInspection {
+  ok: boolean;
+  status: "missing" | "conflict" | "broken" | "wrong-target" | "ok";
+  actualTarget?: string;
+  expectedTarget: string;
+}
+
+export async function inspectManagedAuthoringSkillLink(
+  linkPath: string,
+  installedDir: string,
+  skillName: string
+): Promise<ManagedAuthoringSkillLinkInspection> {
+  const expectedTarget = normalizeOwnedSkillTarget(installedDir, skillName);
+
   let entryStat;
   try {
     entryStat = await lstat(linkPath);
-  } catch {
-    return false;
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return {
+        ok: false,
+        status: "missing",
+        expectedTarget,
+      };
+    }
+    throw error;
   }
+
   if (!entryStat.isSymbolicLink()) {
-    return false;
+    return {
+      ok: false,
+      status: "conflict",
+      expectedTarget,
+    };
   }
 
   const resolvedTarget = await resolveSymlinkTarget(linkPath);
   if (resolvedTarget === undefined) {
-    return false;
+    return {
+      ok: false,
+      status: "broken",
+      expectedTarget,
+    };
   }
 
-  return resolvedTarget === normalizeOwnedSkillTarget(installedDir, skillName);
+  try {
+    await stat(resolvedTarget);
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return {
+        ok: false,
+        status: "broken",
+        actualTarget: resolvedTarget,
+        expectedTarget,
+      };
+    }
+    throw error;
+  }
+
+  if (resolvedTarget !== expectedTarget) {
+    return {
+      ok: false,
+      status: "wrong-target",
+      actualTarget: resolvedTarget,
+      expectedTarget,
+    };
+  }
+
+  return {
+    ok: true,
+    status: "ok",
+    actualTarget: resolvedTarget,
+    expectedTarget,
+  };
+}
+
+async function isManagedAgentSymlink(linkPath: string, installedDir: string, skillName: string): Promise<boolean> {
+  const inspection = await inspectManagedAuthoringSkillLink(linkPath, installedDir, skillName);
+  if (!inspection.ok && inspection.status === "broken" && inspection.actualTarget === inspection.expectedTarget) {
+    return true;
+  }
+  return inspection.ok;
 }
 
 async function ensureManagedSymlink(targetPath: string, linkPath: string, installedDir: string, skillName: string): Promise<void> {

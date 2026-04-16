@@ -706,12 +706,22 @@ describe("Doctor: hostChecks", () => {
         it("passes when version.txt matches the current CLI version", async () => {
             const root = await makeTempRoot("clawperator-doctor-authoring-skills-current-");
             const installedDir = join(root, "authoring-skills");
+            const claudeSkillsDir = join(root, "claude-skills");
+            const codexSkillsDir = join(root, "codex-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
             await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
+            await mkdir(claudeSkillsDir, { recursive: true });
+            await mkdir(codexSkillsDir, { recursive: true });
             await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
+            await symlink(join(installedDir, "skill-author-by-recording"), join(claudeSkillsDir, "skill-author-by-recording"));
+            await symlink(join(installedDir, "skill-author-by-recording"), join(codexSkillsDir, "skill-author-by-recording"));
             await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
 
-            const result = await checkAuthoringSkillsStaleness(config, { installedDir });
+            const result = await checkAuthoringSkillsStaleness(config, {
+                installedDir,
+                claudeSkillsDir,
+                codexSkillsDir,
+            });
 
             assert.strictEqual(result.status, "pass");
             assert.strictEqual(result.summary, "Authoring skills are up to date.");
@@ -722,15 +732,227 @@ describe("Doctor: hostChecks", () => {
             });
         });
 
+        it("warns when the Claude discovery link is missing", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-missing-claude-link-");
+            const installedDir = join(root, "authoring-skills");
+            const claudeSkillsDir = join(root, "claude-skills");
+            const codexSkillsDir = join(root, "codex-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
+            await mkdir(claudeSkillsDir, { recursive: true });
+            await mkdir(codexSkillsDir, { recursive: true });
+            await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
+            await symlink(join(installedDir, "skill-author-by-recording"), join(codexSkillsDir, "skill-author-by-recording"));
+            await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
+
+            const result = await checkAuthoringSkillsStaleness(config, {
+                installedDir,
+                claudeSkillsDir,
+                codexSkillsDir,
+            });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.summary, "Authoring skills discovery links are incomplete or invalid.");
+            assert.deepStrictEqual(result.fix?.steps, [{ kind: "shell", value: "clawperator authoring-skills update" }]);
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                installedVersion: getCliVersion(),
+                cliVersion: getCliVersion(),
+                brokenDiscoveryByDir: {
+                    claude: [{
+                        actualTarget: undefined,
+                        dirLabel: "claude",
+                        discoveryDir: claudeSkillsDir,
+                        skillName: "skill-author-by-recording",
+                        issue: "missing",
+                        expectedTarget: join(installedDir, "skill-author-by-recording"),
+                    }],
+                    codex: [],
+                },
+            });
+        });
+
+        it("warns when the Codex discovery link is missing", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-missing-codex-link-");
+            const installedDir = join(root, "authoring-skills");
+            const claudeSkillsDir = join(root, "claude-skills");
+            const codexSkillsDir = join(root, "codex-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
+            await mkdir(claudeSkillsDir, { recursive: true });
+            await mkdir(codexSkillsDir, { recursive: true });
+            await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
+            await symlink(join(installedDir, "skill-author-by-recording"), join(claudeSkillsDir, "skill-author-by-recording"));
+            await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
+
+            const result = await checkAuthoringSkillsStaleness(config, {
+                installedDir,
+                claudeSkillsDir,
+                codexSkillsDir,
+            });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.summary, "Authoring skills discovery links are incomplete or invalid.");
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                installedVersion: getCliVersion(),
+                cliVersion: getCliVersion(),
+                brokenDiscoveryByDir: {
+                    claude: [],
+                    codex: [{
+                        actualTarget: undefined,
+                        dirLabel: "codex",
+                        discoveryDir: codexSkillsDir,
+                        skillName: "skill-author-by-recording",
+                        issue: "missing",
+                        expectedTarget: join(installedDir, "skill-author-by-recording"),
+                    }],
+                },
+            });
+        });
+
+        it("warns when a managed discovery link points to the wrong target", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-wrong-link-target-");
+            const installedDir = join(root, "authoring-skills");
+            const claudeSkillsDir = join(root, "claude-skills");
+            const codexSkillsDir = join(root, "codex-skills");
+            const wrongTargetRoot = join(root, "wrong-target", "skill-author-by-recording");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
+            await mkdir(wrongTargetRoot, { recursive: true });
+            await mkdir(claudeSkillsDir, { recursive: true });
+            await mkdir(codexSkillsDir, { recursive: true });
+            await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
+            await symlink(wrongTargetRoot, join(claudeSkillsDir, "skill-author-by-recording"));
+            await symlink(join(installedDir, "skill-author-by-recording"), join(codexSkillsDir, "skill-author-by-recording"));
+            await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
+
+            const result = await checkAuthoringSkillsStaleness(config, {
+                installedDir,
+                claudeSkillsDir,
+                codexSkillsDir,
+            });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.summary, "Authoring skills discovery links are incomplete or invalid.");
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                installedVersion: getCliVersion(),
+                cliVersion: getCliVersion(),
+                brokenDiscoveryByDir: {
+                    claude: [{
+                        dirLabel: "claude",
+                        discoveryDir: claudeSkillsDir,
+                        skillName: "skill-author-by-recording",
+                        issue: "wrong-target",
+                        expectedTarget: join(installedDir, "skill-author-by-recording"),
+                        actualTarget: wrongTargetRoot,
+                    }],
+                    codex: [],
+                },
+            });
+        });
+
+        it("warns when a discovery entry is a conflicting non-symlink", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-conflicting-entry-");
+            const installedDir = join(root, "authoring-skills");
+            const claudeSkillsDir = join(root, "claude-skills");
+            const codexSkillsDir = join(root, "codex-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
+            await mkdir(claudeSkillsDir, { recursive: true });
+            await mkdir(codexSkillsDir, { recursive: true });
+            await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
+            await writeFile(join(claudeSkillsDir, "skill-author-by-recording"), "not a symlink\n", "utf8");
+            await symlink(join(installedDir, "skill-author-by-recording"), join(codexSkillsDir, "skill-author-by-recording"));
+            await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
+
+            const result = await checkAuthoringSkillsStaleness(config, {
+                installedDir,
+                claudeSkillsDir,
+                codexSkillsDir,
+            });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.summary, "Authoring skills discovery links are incomplete or invalid.");
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                installedVersion: getCliVersion(),
+                cliVersion: getCliVersion(),
+                brokenDiscoveryByDir: {
+                    claude: [{
+                        actualTarget: undefined,
+                        dirLabel: "claude",
+                        discoveryDir: claudeSkillsDir,
+                        skillName: "skill-author-by-recording",
+                        issue: "conflict",
+                        expectedTarget: join(installedDir, "skill-author-by-recording"),
+                    }],
+                    codex: [],
+                },
+            });
+        });
+
+        it("warns when a managed discovery link is dangling", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-broken-link-");
+            const installedDir = join(root, "authoring-skills");
+            const claudeSkillsDir = join(root, "claude-skills");
+            const codexSkillsDir = join(root, "codex-skills");
+            const missingTarget = join(root, "missing-target");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
+            await mkdir(claudeSkillsDir, { recursive: true });
+            await mkdir(codexSkillsDir, { recursive: true });
+            await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
+            await symlink(missingTarget, join(claudeSkillsDir, "skill-author-by-recording"));
+            await symlink(join(installedDir, "skill-author-by-recording"), join(codexSkillsDir, "skill-author-by-recording"));
+            await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
+
+            const result = await checkAuthoringSkillsStaleness(config, {
+                installedDir,
+                claudeSkillsDir,
+                codexSkillsDir,
+            });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.summary, "Authoring skills discovery links are incomplete or invalid.");
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                installedVersion: getCliVersion(),
+                cliVersion: getCliVersion(),
+                brokenDiscoveryByDir: {
+                    claude: [{
+                        dirLabel: "claude",
+                        discoveryDir: claudeSkillsDir,
+                        skillName: "skill-author-by-recording",
+                        issue: "broken",
+                        expectedTarget: join(installedDir, "skill-author-by-recording"),
+                        actualTarget: missingTarget,
+                    }],
+                    codex: [],
+                },
+            });
+        });
+
         it("warns when version.txt differs from the current CLI version", async () => {
             const root = await makeTempRoot("clawperator-doctor-authoring-skills-stale-");
             const installedDir = join(root, "authoring-skills");
+            const claudeSkillsDir = join(root, "claude-skills");
+            const codexSkillsDir = join(root, "codex-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
             await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
+            await mkdir(claudeSkillsDir, { recursive: true });
+            await mkdir(codexSkillsDir, { recursive: true });
             await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
+            await symlink(join(installedDir, "skill-author-by-recording"), join(claudeSkillsDir, "skill-author-by-recording"));
+            await symlink(join(installedDir, "skill-author-by-recording"), join(codexSkillsDir, "skill-author-by-recording"));
             await writeFile(join(installedDir, "version.txt"), "0.0.1\n", "utf8");
 
-            const result = await checkAuthoringSkillsStaleness(config, { installedDir });
+            const result = await checkAuthoringSkillsStaleness(config, {
+                installedDir,
+                claudeSkillsDir,
+                codexSkillsDir,
+            });
 
             assert.strictEqual(result.status, "warn");
             assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);

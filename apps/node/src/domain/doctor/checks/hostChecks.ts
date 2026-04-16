@@ -15,7 +15,12 @@ import {
 import { isOrchestratedHarnessScriptPath, resolveRepoRelativeSkillPath } from "../../skills/pathUtils.js";
 import { readSkillManifestMetadata } from "../../skills/skillManifest.js";
 import { DEFAULT_AUTHORING_SKILLS_DIR } from "../../skills/skillsConfig.js";
-import { listPackagedAuthoringSkills } from "../../skills/copyAuthoringSkills.js";
+import {
+  inspectManagedAuthoringSkillLink,
+  listPackagedAuthoringSkills,
+  resolveClaudeSkillsDir,
+  resolveCodexSkillsDir,
+} from "../../skills/copyAuthoringSkills.js";
 import { getCliVersion } from "../../version/compatibility.js";
 
 const DEFAULT_ORCHESTRATED_SKILL_AGENT_CLI = "codex";
@@ -27,6 +32,11 @@ export interface CheckAuthoringSkillsStalenessOptions {
   installedDir?: string;
   cliVersion?: string;
   getCliVersionFn?: () => string;
+  claudeSkillsDir?: string;
+  codexSkillsDir?: string;
+  codexHome?: string;
+  homeDir?: string;
+  env?: NodeJS.ProcessEnv;
 }
 
 function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
@@ -88,6 +98,65 @@ async function findMissingInstalledAuthoringSkills(
   }
 
   return missingSkills;
+}
+
+interface BrokenAuthoringDiscoveryEntry {
+  dirLabel: "claude" | "codex";
+  discoveryDir: string;
+  skillName: string;
+  issue: "missing" | "conflict" | "broken" | "wrong-target";
+  expectedTarget: string;
+  actualTarget?: string;
+}
+
+async function findBrokenAuthoringDiscoveryEntries(
+  installedDir: string,
+  expectedSkills: string[],
+  options: CheckAuthoringSkillsStalenessOptions
+): Promise<BrokenAuthoringDiscoveryEntry[]> {
+  const discoveryDirs = [
+    {
+      dirLabel: "claude" as const,
+      discoveryDir: resolveClaudeSkillsDir({
+        claudeSkillsDir: options.claudeSkillsDir,
+        homeDir: options.homeDir,
+      }),
+    },
+    {
+      dirLabel: "codex" as const,
+      discoveryDir: resolveCodexSkillsDir({
+        codexSkillsDir: options.codexSkillsDir,
+        codexHome: options.codexHome,
+        homeDir: options.homeDir,
+        env: options.env,
+      }),
+    },
+  ];
+
+  const brokenEntries: BrokenAuthoringDiscoveryEntry[] = [];
+
+  for (const { dirLabel, discoveryDir } of discoveryDirs) {
+    for (const skillName of expectedSkills) {
+      const inspection = await inspectManagedAuthoringSkillLink(
+        join(discoveryDir, skillName),
+        installedDir,
+        skillName
+      );
+      if (inspection.ok || inspection.status === "ok") {
+        continue;
+      }
+      brokenEntries.push({
+        dirLabel,
+        discoveryDir,
+        skillName,
+        issue: inspection.status,
+        expectedTarget: inspection.expectedTarget,
+        actualTarget: inspection.actualTarget,
+      });
+    }
+  }
+
+  return brokenEntries;
 }
 
 export async function checkNodeVersion(): Promise<DoctorCheckResult> {
@@ -523,6 +592,45 @@ export async function checkAuthoringSkillsStaleness(
         cliVersion,
         expectedSkills,
         missingSkills,
+      }
+    );
+  }
+
+  let brokenDiscoveryEntries: BrokenAuthoringDiscoveryEntry[];
+  try {
+    brokenDiscoveryEntries = await findBrokenAuthoringDiscoveryEntries(installedDir, expectedSkills, options);
+  } catch (error) {
+    return buildAuthoringSkillsWarn(
+      "Authoring skills discovery links could not be inspected.",
+      error instanceof Error ? error.message : String(error),
+      {
+        installedDir,
+        installedVersion,
+        cliVersion,
+      }
+    );
+  }
+
+  if (brokenDiscoveryEntries.length > 0) {
+    const brokenDiscoveryByDir = {
+      claude: brokenDiscoveryEntries.filter((entry) => entry.dirLabel === "claude"),
+      codex: brokenDiscoveryEntries.filter((entry) => entry.dirLabel === "codex"),
+    };
+    const affectedDirs = Object.entries(brokenDiscoveryByDir)
+      .filter(([, entries]) => entries.length > 0)
+      .map(([dirLabel]) => dirLabel);
+    const detailParts = Object.entries(brokenDiscoveryByDir)
+      .filter(([, entries]) => entries.length > 0)
+      .map(([dirLabel, entries]) => `${dirLabel}: ${entries.map((entry) => `${entry.skillName} (${entry.issue})`).join(", ")}`);
+
+    return buildAuthoringSkillsWarn(
+      "Authoring skills discovery links are incomplete or invalid.",
+      `Managed discovery entries are broken in ${affectedDirs.join(" and ")} skill directories. ${detailParts.join("; ")}`,
+      {
+        installedDir,
+        installedVersion,
+        cliVersion,
+        brokenDiscoveryByDir,
       }
     );
   }
