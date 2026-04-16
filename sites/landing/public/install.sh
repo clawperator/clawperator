@@ -25,6 +25,7 @@ AUTHORING_SKILLS_SETUP_STATUS="not-run"
 AUTHORING_SKILLS_INSTALL_DIR=""
 AUTHORING_SKILLS_CLAUDE_DIR=""
 AUTHORING_SKILLS_CODEX_DIR=""
+AUTHORING_SKILLS_AGENTS_DIR=""
 CLAWPERATOR_BIN_PATH=""
 
 TEMP_FILES=()
@@ -451,11 +452,12 @@ process.stdin.on("end", () => {
     if (parsed && typeof parsed.installedDir === "string") {
       process.stdout.write(`installedDir=${parsed.installedDir}\n`);
     }
-    if (parsed && typeof parsed.claudeSkillsDir === "string") {
-      process.stdout.write(`claudeSkillsDir=${parsed.claudeSkillsDir}\n`);
-    }
-    if (parsed && typeof parsed.codexSkillsDir === "string") {
-      process.stdout.write(`codexSkillsDir=${parsed.codexSkillsDir}\n`);
+    if (parsed && Array.isArray(parsed.agentDiscoveryDirs)) {
+      for (const entry of parsed.agentDiscoveryDirs) {
+        if (typeof entry.label === "string" && typeof entry.dir === "string") {
+          process.stdout.write(`agentDiscoveryDir:${entry.label}=${entry.dir}\n`);
+        }
+      }
     }
   } catch {}
 });
@@ -539,11 +541,13 @@ setup_authoring_skills_via_cli() {
     local DEFAULT_AUTHORING_SKILLS_INSTALL_DIR="$HOME/.clawperator/authoring-skills/"
     local DEFAULT_AUTHORING_SKILLS_CLAUDE_DIR="$HOME/.claude/skills/"
     local DEFAULT_AUTHORING_SKILLS_CODEX_DIR="${CODEX_HOME:-$HOME/.codex}/skills/"
+    local DEFAULT_AUTHORING_SKILLS_AGENTS_DIR="$HOME/.agents/skills/"
     local AUTHORING_SKILLS_OUTPUT=""
 
     AUTHORING_SKILLS_INSTALL_DIR="$DEFAULT_AUTHORING_SKILLS_INSTALL_DIR"
     AUTHORING_SKILLS_CLAUDE_DIR="$DEFAULT_AUTHORING_SKILLS_CLAUDE_DIR"
     AUTHORING_SKILLS_CODEX_DIR="$DEFAULT_AUTHORING_SKILLS_CODEX_DIR"
+    AUTHORING_SKILLS_AGENTS_DIR="$DEFAULT_AUTHORING_SKILLS_AGENTS_DIR"
 
     if [ "${CLAWPERATOR_INSTALL_SKIP_SKILLS:-0}" = "1" ]; then
         AUTHORING_SKILLS_SETUP_STATUS="skipped"
@@ -559,11 +563,16 @@ setup_authoring_skills_via_cli() {
                 installedDir=*)
                     AUTHORING_SKILLS_INSTALL_DIR="${PARSED_AUTHORING_LINE#installedDir=}"
                     ;;
-                claudeSkillsDir=*)
-                    AUTHORING_SKILLS_CLAUDE_DIR="${PARSED_AUTHORING_LINE#claudeSkillsDir=}"
+                # agentDiscoveryDir:<label>=<path> entries - matched by label so new agents
+                # (e.g. gemini) can be added to the CLI without breaking this script.
+                agentDiscoveryDir:claude=*)
+                    AUTHORING_SKILLS_CLAUDE_DIR="${PARSED_AUTHORING_LINE#agentDiscoveryDir:claude=}"
                     ;;
-                codexSkillsDir=*)
-                    AUTHORING_SKILLS_CODEX_DIR="${PARSED_AUTHORING_LINE#codexSkillsDir=}"
+                agentDiscoveryDir:codex=*)
+                    AUTHORING_SKILLS_CODEX_DIR="${PARSED_AUTHORING_LINE#agentDiscoveryDir:codex=}"
+                    ;;
+                agentDiscoveryDir:agents=*)
+                    AUTHORING_SKILLS_AGENTS_DIR="${PARSED_AUTHORING_LINE#agentDiscoveryDir:agents=}"
                     ;;
             esac
         done < <(printf '%s' "$AUTHORING_SKILLS_OUTPUT" | parse_authoring_skills_install_result)
@@ -573,6 +582,7 @@ setup_authoring_skills_via_cli() {
         echo -e "${GREEN}   Installed at: ${AUTHORING_SKILLS_INSTALL_DIR}${NC}"
         echo -e "${GREEN}   Claude skills dir: ${AUTHORING_SKILLS_CLAUDE_DIR}${NC}"
         echo -e "${GREEN}   Codex skills dir: ${AUTHORING_SKILLS_CODEX_DIR}${NC}"
+        echo -e "${GREEN}   Agents skills dir: ${AUTHORING_SKILLS_AGENTS_DIR}${NC}"
         return 0
     fi
 

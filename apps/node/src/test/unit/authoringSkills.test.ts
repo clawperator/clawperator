@@ -41,6 +41,7 @@ describe("copyAuthoringSkills", () => {
       installedDir,
       claudeSkillsDir: join(root, "home", ".claude", "skills"),
       codexSkillsDir: join(root, "home", ".codex", "skills"),
+      agentsSkillsDir: join(root, "home", ".agents", "skills"),
       cliVersion: "1.2.3",
     });
 
@@ -66,6 +67,7 @@ describe("copyAuthoringSkills", () => {
       installedDir,
       claudeSkillsDir: join(root, "home", ".claude", "skills"),
       codexSkillsDir: join(root, "home", ".codex", "skills"),
+      agentsSkillsDir: join(root, "home", ".agents", "skills"),
       cliVersion: "1.2.3",
     });
 
@@ -87,6 +89,7 @@ describe("copyAuthoringSkills", () => {
       installedDir,
       claudeSkillsDir: join(root, "home", ".claude", "skills"),
       codexSkillsDir: join(root, "home", ".codex", "skills"),
+      agentsSkillsDir: join(root, "home", ".agents", "skills"),
     });
 
     assert.equal(result.ok, true);
@@ -103,6 +106,7 @@ describe("copyAuthoringSkills", () => {
       installedDir: join(root, "home", ".clawperator", "authoring-skills"),
       claudeSkillsDir,
       codexSkillsDir: join(root, "home", ".codex", "skills"),
+      agentsSkillsDir: join(root, "home", ".agents", "skills"),
       cliVersion: "1.2.3",
     });
 
@@ -136,6 +140,7 @@ describe("copyAuthoringSkills", () => {
       sourceDir,
       installedDir: join(root, "home", ".clawperator", "authoring-skills"),
       claudeSkillsDir: join(root, "home", ".claude", "skills"),
+      agentsSkillsDir: join(root, "home", ".agents", "skills"),
       env: { ...process.env, CODEX_HOME: codexHome },
       cliVersion: "1.2.3",
     });
@@ -155,6 +160,7 @@ describe("copyAuthoringSkills", () => {
       installedDir,
       claudeSkillsDir,
       codexSkillsDir: join(root, "home", ".codex", "skills"),
+      agentsSkillsDir: join(root, "home", ".agents", "skills"),
       cliVersion: "1.2.3",
     });
 
@@ -173,6 +179,7 @@ describe("copyAuthoringSkills", () => {
       installedDir: join(root, "home", ".clawperator", "authoring-skills"),
       claudeSkillsDir: join(root, "home", ".claude", "skills"),
       codexSkillsDir: join(root, "home", ".codex", "skills"),
+      agentsSkillsDir: join(root, "home", ".agents", "skills"),
       cliVersion: "1.2.3",
     };
 
@@ -189,11 +196,13 @@ describe("copyAuthoringSkills", () => {
     const installedDir = join(root, "home", ".clawperator", "authoring-skills");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
     const codexSkillsDir = join(root, "home", ".codex", "skills");
+    const agentsSkillsDir = join(root, "home", ".agents", "skills");
     const options = {
       sourceDir: relative(process.cwd(), sourceDir),
       installedDir: relative(process.cwd(), installedDir),
       claudeSkillsDir: relative(process.cwd(), claudeSkillsDir),
       codexSkillsDir: relative(process.cwd(), codexSkillsDir),
+      agentsSkillsDir: relative(process.cwd(), agentsSkillsDir),
       cliVersion: "1.2.3",
     };
 
@@ -213,6 +222,7 @@ describe("copyAuthoringSkills", () => {
       installedDir: join(root, "home", ".clawperator", "authoring-skills"),
       claudeSkillsDir: join(root, "home", ".claude", "skills"),
       codexSkillsDir: join(root, "home", ".codex", "skills"),
+      agentsSkillsDir: join(root, "home", ".agents", "skills"),
       cliVersion: "1.2.3",
     });
 
@@ -233,6 +243,7 @@ describe("copyAuthoringSkills", () => {
       installedDir: join(root, "home", ".clawperator", "authoring-skills"),
       claudeSkillsDir: join(root, "home", ".claude", "skills"),
       codexSkillsDir: join(root, "home", ".codex", "skills"),
+      agentsSkillsDir: join(root, "home", ".agents", "skills"),
       cliVersion: "1.2.3",
     });
 
@@ -256,6 +267,7 @@ describe("copyAuthoringSkills", () => {
       installedDir,
       claudeSkillsDir: join(root, "home", ".claude", "skills"),
       codexSkillsDir: join(root, "home", ".codex", "skills"),
+      agentsSkillsDir: join(root, "home", ".agents", "skills"),
       cliVersion: "1.2.3",
     });
 
@@ -268,24 +280,29 @@ describe("copyAuthoringSkills", () => {
     const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
     const codexSkillsDir = join(root, "home", ".codex", "skills");
+    const agentsSkillsDir = join(root, "home", ".agents", "skills");
     const unrelatedTarget = join(root, "user-skills", "other-skill");
     await mkdir(unrelatedTarget, { recursive: true });
     await mkdir(claudeSkillsDir, { recursive: true });
     await mkdir(codexSkillsDir, { recursive: true });
+    await mkdir(agentsSkillsDir, { recursive: true });
     await symlink(unrelatedTarget, join(claudeSkillsDir, "other-skill"), directorySymlinkType);
     await symlink(unrelatedTarget, join(codexSkillsDir, "other-skill"), directorySymlinkType);
+    await symlink(unrelatedTarget, join(agentsSkillsDir, "other-skill"), directorySymlinkType);
 
     const result = await copyAuthoringSkills({
       sourceDir,
       installedDir: join(root, "home", ".clawperator", "authoring-skills"),
       claudeSkillsDir,
       codexSkillsDir,
+      agentsSkillsDir,
       cliVersion: "1.2.3",
     });
 
     assert.equal(result.ok, true);
     assert.equal(await readlink(join(claudeSkillsDir, "other-skill")), unrelatedTarget);
     assert.equal(await readlink(join(codexSkillsDir, "other-skill")), unrelatedTarget);
+    assert.equal(await readlink(join(agentsSkillsDir, "other-skill")), unrelatedTarget);
   });
 
   it("refuses to overwrite an existing non-Clawperator skill entry with the same basename", async () => {
@@ -293,14 +310,17 @@ describe("copyAuthoringSkills", () => {
     const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
     const codexSkillsDir = join(root, "home", ".codex", "skills");
+    const agentsSkillsDir = join(root, "home", ".agents", "skills");
     await mkdir(join(claudeSkillsDir, "skill-author-by-recording"), { recursive: true });
     await mkdir(codexSkillsDir, { recursive: true });
+    await mkdir(agentsSkillsDir, { recursive: true });
 
     const result = await copyAuthoringSkills({
       sourceDir,
       installedDir: join(root, "home", ".clawperator", "authoring-skills"),
       claudeSkillsDir,
       codexSkillsDir,
+      agentsSkillsDir,
       cliVersion: "1.2.3",
     });
 
@@ -319,24 +339,29 @@ describe("copyAuthoringSkills", () => {
     const installedDir = join(root, "home", ".clawperator", "authoring-skills");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
     const codexSkillsDir = join(root, "home", ".codex", "skills");
+    const agentsSkillsDir = join(root, "home", ".agents", "skills");
     const targetSkillDir = join(installedDir, "skill-author-by-recording");
 
     await mkdir(claudeSkillsDir, { recursive: true });
     await mkdir(codexSkillsDir, { recursive: true });
+    await mkdir(agentsSkillsDir, { recursive: true });
     await symlink(targetSkillDir, join(claudeSkillsDir, "skill-author-by-recording"), directorySymlinkType);
     await symlink(targetSkillDir, join(codexSkillsDir, "skill-author-by-recording"), directorySymlinkType);
+    await symlink(targetSkillDir, join(agentsSkillsDir, "skill-author-by-recording"), directorySymlinkType);
 
     const result = await copyAuthoringSkills({
       sourceDir,
       installedDir,
       claudeSkillsDir,
       codexSkillsDir,
+      agentsSkillsDir,
       cliVersion: "1.2.3",
     });
 
     assert.equal(result.ok, true);
     assert.equal(await readlink(join(claudeSkillsDir, "skill-author-by-recording")), targetSkillDir);
     assert.equal(await readlink(join(codexSkillsDir, "skill-author-by-recording")), targetSkillDir);
+    assert.equal(await readlink(join(agentsSkillsDir, "skill-author-by-recording")), targetSkillDir);
     assert.equal(await readFile(join(targetSkillDir, "SKILL.md"), "utf8"), "# skill-author-by-recording\n");
   });
 
@@ -347,11 +372,13 @@ describe("copyAuthoringSkills", () => {
     const targetSkillDir = join(installedDir, "skill-author-by-recording");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
     const codexSkillsDir = join(root, "home", ".codex", "skills");
+    const agentsSkillsDir = join(root, "home", ".agents", "skills");
 
     await mkdir(targetSkillDir, { recursive: true });
     await writeFile(join(targetSkillDir, "SKILL.md"), "# existing-installed-version\n", "utf8");
     await mkdir(claudeSkillsDir, { recursive: true });
     await mkdir(codexSkillsDir, { recursive: true });
+    await mkdir(agentsSkillsDir, { recursive: true });
     await mkdir(join(codexSkillsDir, "skill-author-by-recording"), { recursive: true });
 
     const result = await copyAuthoringSkills({
@@ -359,6 +386,7 @@ describe("copyAuthoringSkills", () => {
       installedDir,
       claudeSkillsDir,
       codexSkillsDir,
+      agentsSkillsDir,
       cliVersion: "1.2.3",
     });
 

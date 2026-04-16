@@ -9,12 +9,16 @@ import { DEFAULT_AUTHORING_SKILLS_DIR } from "./skillsConfig.js";
 const AUTHORING_SKILLS_SOURCE_ENV_VAR = "CLAWPERATOR_AUTHORING_SKILLS";
 const VERSION_FILENAME = "version.txt";
 
+export interface AgentDiscoveryDirEntry {
+  label: string;
+  dir: string;
+}
+
 export interface CopyAuthoringSkillsSuccess {
   ok: true;
   skills: string[];
   installedDir: string;
-  claudeSkillsDir: string;
-  codexSkillsDir: string;
+  agentDiscoveryDirs: AgentDiscoveryDirEntry[];
 }
 
 export interface CopyAuthoringSkillsError {
@@ -28,6 +32,7 @@ export interface CopyAuthoringSkillsOptions {
   installedDir?: string;
   claudeSkillsDir?: string;
   codexSkillsDir?: string;
+  agentsSkillsDir?: string;
   codexHome?: string;
   homeDir?: string;
   env?: NodeJS.ProcessEnv;
@@ -69,6 +74,21 @@ export function resolveCodexSkillsDir(options: CopyAuthoringSkillsOptions): stri
     return join(resolve(codexHome), "skills");
   }
   return join(resolveHomeDir(options), ".codex", "skills");
+}
+
+export function resolveAgentsSkillsDir(options: CopyAuthoringSkillsOptions): string {
+  if (options.agentsSkillsDir) {
+    return resolve(options.agentsSkillsDir);
+  }
+  return join(resolveHomeDir(options), ".agents", "skills");
+}
+
+function resolveAgentDiscoveryDirs(options: CopyAuthoringSkillsOptions): AgentDiscoveryDirEntry[] {
+  return [
+    { label: "claude", dir: resolveClaudeSkillsDir(options) },
+    { label: "codex", dir: resolveCodexSkillsDir(options) },
+    { label: "agents", dir: resolveAgentsSkillsDir(options) },
+  ];
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -312,8 +332,7 @@ export async function copyAuthoringSkills(
       ? env[AUTHORING_SKILLS_SOURCE_ENV_VAR]
       : resolveAuthoringSkillsSourceDir());
   const installedDir = resolveInstalledDir(options);
-  const claudeSkillsDir = resolveClaudeSkillsDir(options);
-  const codexSkillsDir = resolveCodexSkillsDir(options);
+  const agentDiscoveryDirs = resolveAgentDiscoveryDirs(options);
 
   let sourceStat;
   try {
@@ -344,12 +363,14 @@ export async function copyAuthoringSkills(
       };
     }
     await ensureDirectory(installedDir);
-    await ensureDirectory(claudeSkillsDir);
-    await ensureDirectory(codexSkillsDir);
+    for (const { dir } of agentDiscoveryDirs) {
+      await ensureDirectory(dir);
+    }
 
     for (const skillName of skills) {
-      await assertManagedSymlinkWritable(join(claudeSkillsDir, skillName), installedDir, skillName);
-      await assertManagedSymlinkWritable(join(codexSkillsDir, skillName), installedDir, skillName);
+      for (const { dir } of agentDiscoveryDirs) {
+        await assertManagedSymlinkWritable(join(dir, skillName), installedDir, skillName);
+      }
     }
 
     for (const skillName of skills) {
@@ -357,22 +378,23 @@ export async function copyAuthoringSkills(
       const targetSkillDir = join(installedDir, skillName);
       await rm(targetSkillDir, { recursive: true, force: true });
       await cp(sourceSkillDir, targetSkillDir, { recursive: true, force: true, dereference: true });
-      await ensureManagedSymlink(targetSkillDir, join(claudeSkillsDir, skillName), installedDir, skillName);
-      await ensureManagedSymlink(targetSkillDir, join(codexSkillsDir, skillName), installedDir, skillName);
+      for (const { dir } of agentDiscoveryDirs) {
+        await ensureManagedSymlink(targetSkillDir, join(dir, skillName), installedDir, skillName);
+      }
     }
 
     const activeSkills = new Set(skills);
     await removeStaleInstalledSkills(installedDir, activeSkills);
-    await removeStaleAgentSymlinks(claudeSkillsDir, activeSkills, installedDir);
-    await removeStaleAgentSymlinks(codexSkillsDir, activeSkills, installedDir);
+    for (const { dir } of agentDiscoveryDirs) {
+      await removeStaleAgentSymlinks(dir, activeSkills, installedDir);
+    }
     await writeFile(join(installedDir, VERSION_FILENAME), `${options.cliVersion ?? getCliVersion()}\n`, "utf8");
 
     return {
       ok: true,
       skills,
       installedDir,
-      claudeSkillsDir,
-      codexSkillsDir,
+      agentDiscoveryDirs,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

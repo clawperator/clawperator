@@ -20,6 +20,7 @@ import {
   listPackagedAuthoringSkills,
   resolveClaudeSkillsDir,
   resolveCodexSkillsDir,
+  resolveAgentsSkillsDir,
 } from "../../skills/copyAuthoringSkills.js";
 import { getCliVersion } from "../../version/compatibility.js";
 
@@ -34,6 +35,7 @@ export interface CheckAuthoringSkillsStalenessOptions {
   getCliVersionFn?: () => string;
   claudeSkillsDir?: string;
   codexSkillsDir?: string;
+  agentsSkillsDir?: string;
   codexHome?: string;
   homeDir?: string;
   env?: NodeJS.ProcessEnv;
@@ -105,7 +107,7 @@ async function findMissingInstalledAuthoringSkills(
 }
 
 interface BrokenAuthoringDiscoveryEntry {
-  dirLabel: "claude" | "codex";
+  dirLabel: string;
   discoveryDir: string;
   skillName: string;
   issue: "missing" | "conflict" | "broken" | "wrong-target";
@@ -120,19 +122,26 @@ async function findBrokenAuthoringDiscoveryEntries(
 ): Promise<BrokenAuthoringDiscoveryEntry[]> {
   const discoveryDirs = [
     {
-      dirLabel: "claude" as const,
+      dirLabel: "claude",
       discoveryDir: resolveClaudeSkillsDir({
         claudeSkillsDir: options.claudeSkillsDir,
         homeDir: options.homeDir,
       }),
     },
     {
-      dirLabel: "codex" as const,
+      dirLabel: "codex",
       discoveryDir: resolveCodexSkillsDir({
         codexSkillsDir: options.codexSkillsDir,
         codexHome: options.codexHome,
         homeDir: options.homeDir,
         env: options.env,
+      }),
+    },
+    {
+      dirLabel: "agents",
+      discoveryDir: resolveAgentsSkillsDir({
+        agentsSkillsDir: options.agentsSkillsDir,
+        homeDir: options.homeDir,
       }),
     },
   ];
@@ -631,15 +640,12 @@ export async function checkAuthoringSkillsStaleness(
   }
 
   if (brokenDiscoveryEntries.length > 0) {
-    const brokenDiscoveryByDir = {
-      claude: brokenDiscoveryEntries.filter((entry) => entry.dirLabel === "claude"),
-      codex: brokenDiscoveryEntries.filter((entry) => entry.dirLabel === "codex"),
-    };
-    const affectedDirs = Object.entries(brokenDiscoveryByDir)
-      .filter(([, entries]) => entries.length > 0)
-      .map(([dirLabel]) => dirLabel);
+    const brokenDiscoveryByDir: Record<string, BrokenAuthoringDiscoveryEntry[]> = {};
+    for (const entry of brokenDiscoveryEntries) {
+      (brokenDiscoveryByDir[entry.dirLabel] ??= []).push(entry);
+    }
+    const affectedDirs = Object.keys(brokenDiscoveryByDir);
     const detailParts = Object.entries(brokenDiscoveryByDir)
-      .filter(([, entries]) => entries.length > 0)
       .map(([dirLabel, entries]) => `${dirLabel}: ${entries.map((entry) => `${entry.skillName} (${entry.issue})`).join(", ")}`);
 
     return buildAuthoringSkillsWarn(
