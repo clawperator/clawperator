@@ -21,6 +21,10 @@ DEFAULT_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operat
 INSTALL_COMMAND="curl -fsSL https://clawperator.com/install.sh | bash"
 SKILLS_SETUP_STATUS="not-run"
 SKILLS_REGISTRY_PATH=""
+AUTHORING_SKILLS_SETUP_STATUS="not-run"
+AUTHORING_SKILLS_INSTALL_DIR=""
+AUTHORING_SKILLS_CLAUDE_DIR=""
+AUTHORING_SKILLS_CODEX_DIR=""
 CLAWPERATOR_BIN_PATH=""
 
 TEMP_FILES=()
@@ -434,6 +438,31 @@ process.stdin.on("end", () => {
 ' 2>/dev/null || true
 }
 
+parse_authoring_skills_install_result() {
+    node -e '
+let raw = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  raw += chunk;
+});
+process.stdin.on("end", () => {
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.installedDir === "string") {
+      process.stdout.write(`installedDir=${parsed.installedDir}\n`);
+    }
+    if (parsed && Array.isArray(parsed.agentDirs)) {
+      for (const agentDir of parsed.agentDirs) {
+        if (typeof agentDir === "string") {
+          process.stdout.write(`agentDir=${agentDir}\n`);
+        }
+      }
+    }
+  } catch {}
+});
+' 2>/dev/null || true
+}
+
 copy_file_mode() {
     local SOURCE_PATH=$1
     local TARGET_PATH=$2
@@ -507,6 +536,63 @@ setup_skills_via_cli() {
     fi
 }
 
+setup_authoring_skills_via_cli() {
+    local AUTHORING_SETUP_STATUS="not-configured"
+    local DEFAULT_AUTHORING_SKILLS_INSTALL_DIR="$HOME/.clawperator/authoring-skills/"
+    local DEFAULT_AUTHORING_SKILLS_CLAUDE_DIR="$HOME/.claude/skills/"
+    local DEFAULT_AUTHORING_SKILLS_CODEX_DIR="${CODEX_HOME:-$HOME/.codex}/skills/"
+    local AUTHORING_SKILLS_OUTPUT=""
+
+    AUTHORING_SKILLS_INSTALL_DIR="$DEFAULT_AUTHORING_SKILLS_INSTALL_DIR"
+    AUTHORING_SKILLS_CLAUDE_DIR="$DEFAULT_AUTHORING_SKILLS_CLAUDE_DIR"
+    AUTHORING_SKILLS_CODEX_DIR="$DEFAULT_AUTHORING_SKILLS_CODEX_DIR"
+
+    if [ "${CLAWPERATOR_INSTALL_SKIP_SKILLS:-0}" = "1" ]; then
+        AUTHORING_SETUP_STATUS="skipped"
+        AUTHORING_SKILLS_SETUP_STATUS="$AUTHORING_SETUP_STATUS"
+        echo -e "${YELLOW}⚠️  Skipping authoring skills setup because CLAWPERATOR_INSTALL_SKIP_SKILLS=1.${NC}"
+        return 0
+    fi
+
+    echo -e "${BLUE}Setting up authoring skills...${NC}"
+    if AUTHORING_SKILLS_OUTPUT="$("$CLAWPERATOR_BIN_PATH" authoring-skills install --output json 2>&1)"; then
+        local PARSED_AUTHORING_LINE=""
+        local AUTHORING_AGENT_DIR_INDEX=0
+        while IFS= read -r PARSED_AUTHORING_LINE; do
+            case "$PARSED_AUTHORING_LINE" in
+                installedDir=*)
+                    AUTHORING_SKILLS_INSTALL_DIR="${PARSED_AUTHORING_LINE#installedDir=}/"
+                    ;;
+                agentDir=*)
+                    AUTHORING_AGENT_DIR_INDEX=$((AUTHORING_AGENT_DIR_INDEX + 1))
+                    if [ "$AUTHORING_AGENT_DIR_INDEX" -eq 1 ]; then
+                        AUTHORING_SKILLS_CLAUDE_DIR="${PARSED_AUTHORING_LINE#agentDir=}/"
+                    elif [ "$AUTHORING_AGENT_DIR_INDEX" -eq 2 ]; then
+                        AUTHORING_SKILLS_CODEX_DIR="${PARSED_AUTHORING_LINE#agentDir=}/"
+                    fi
+                    ;;
+            esac
+        done < <(printf '%s' "$AUTHORING_SKILLS_OUTPUT" | parse_authoring_skills_install_result)
+
+        AUTHORING_SETUP_STATUS="configured"
+        AUTHORING_SKILLS_SETUP_STATUS="$AUTHORING_SETUP_STATUS"
+        echo -e "${GREEN}✅ Authoring skills setup complete.${NC}"
+        echo -e "${GREEN}   Installed at: ${AUTHORING_SKILLS_INSTALL_DIR}${NC}"
+        echo -e "${GREEN}   Claude skills dir: ${AUTHORING_SKILLS_CLAUDE_DIR}${NC}"
+        echo -e "${GREEN}   Codex skills dir: ${AUTHORING_SKILLS_CODEX_DIR}${NC}"
+        return 0
+    fi
+
+    AUTHORING_SETUP_STATUS="failed"
+    AUTHORING_SKILLS_SETUP_STATUS="$AUTHORING_SETUP_STATUS"
+    echo -e "${YELLOW}⚠️  Authoring skills setup failed via CLI. Resolve the issue below, then re-run 'clawperator authoring-skills install'.${NC}"
+    echo -e "${YELLOW}   Re-running after resolving the conflict is safe.${NC}"
+    if [ -n "$AUTHORING_SKILLS_OUTPUT" ]; then
+        echo "$AUTHORING_SKILLS_OUTPUT"
+    fi
+    return 0
+}
+
 write_agent_guide() {
     local AGENT_GUIDE_PATH="$HOME/.clawperator/AGENTS.md"
 
@@ -528,6 +614,14 @@ clawperator click --text "Settings" --json  # tap an element
 - Docs index: https://docs.clawperator.com/llms.txt
 - Full docs: https://docs.clawperator.com/llms-full.txt
 - Setup guide: https://docs.clawperator.com/setup/
+
+## Authoring Skills
+
+First-party Clawperator authoring skills are installed at:
+~/.clawperator/authoring-skills/
+
+Available skills:
+- skill-author-by-recording: use this to author a new Clawperator runtime skill from a fresh phone recording
 EOF
 
     echo -e "${GREEN}✅ Wrote agent guide to ${AGENT_GUIDE_PATH}.${NC}"
@@ -904,6 +998,7 @@ main() {
     
     # Setup skills via CLI (best-effort)
     setup_skills_via_cli
+    setup_authoring_skills_via_cli
 
     local ACTIVE_SHELL="${SHELL:-/bin/bash}"
     local DETECTED_SHELL
@@ -968,6 +1063,15 @@ main() {
         echo -e "   ${YELLOW}clawperator skills install${NC}"
         echo -e "   Then add to your shell profile (~/.zshrc or ~/.bashrc):"
         echo -e "   ${YELLOW}export CLAWPERATOR_SKILLS_REGISTRY=\"\$HOME/.clawperator/skills/skills/skills-registry.json\"${NC}"
+    fi
+    echo ""
+    if [ "$AUTHORING_SKILLS_SETUP_STATUS" = "configured" ]; then
+        echo -e "6. Authoring skills installed at:"
+        echo -e "   ${BLUE}${AUTHORING_SKILLS_INSTALL_DIR}${NC}"
+    else
+        echo -e "6. ${YELLOW}Authoring skills were not configured during install.${NC}"
+        echo -e "   To repair this later, run:"
+        echo -e "   ${YELLOW}clawperator authoring-skills install${NC}"
     fi
     echo ""
     echo -e "For more info, visit: ${BLUE}https://docs.clawperator.com${NC}"
