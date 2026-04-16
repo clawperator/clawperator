@@ -44,6 +44,16 @@ assert_exit_code() {
     fi
 }
 
+assert_equals() {
+    local expected="$1"
+    local actual="$2"
+    local label="$3"
+    if [ "$expected" != "$actual" ]; then
+        echo "ERROR: $label expected '$expected' but got '$actual'" >&2
+        return 1
+    fi
+}
+
 setup_mock_clawperator() {
     local mock_dir="$1"
     local scenario="$2"
@@ -76,6 +86,18 @@ JSON
     final-fail:3)
       cat <<'JSON'
 {"ok":false,"criticalOk":false,"checks":[{"id":"readiness.handshake","status":"fail","code":"HANDSHAKE_FAILED"}]}
+JSON
+      exit 0
+      ;;
+    multi-device:1|multi-device:2)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+      exit 0
+      ;;
+    multi-device:3)
+      cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"device.discovery","status":"fail","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
 JSON
       exit 0
       ;;
@@ -214,15 +236,6 @@ assert_contains "$SUCCESS_CLI_LOG" "authoring-skills install --output json" "mai
 assert_contains "$SUCCESS_CLI_LOG" "doctor --output pretty" "main-success cli log"
 
 DOCTOR_CALLS_SUCCESS="$(grep -c '^doctor --format json$' "$SUCCESS_CLI_LOG")"
-assert_equals() {
-    local expected="$1"
-    local actual="$2"
-    local label="$3"
-    if [ "$expected" != "$actual" ]; then
-        echo "ERROR: $label expected '$expected' but got '$actual'" >&2
-        return 1
-    fi
-}
 assert_equals "3" "$DOCTOR_CALLS_SUCCESS" "main-success doctor call count"
 
 echo "=== Scenario 2: final doctor failure aborts after setup ==="
@@ -254,5 +267,30 @@ assert_contains "$FAIL_CLI_LOG" "doctor --output pretty" "main-fail cli log"
 
 DOCTOR_CALLS_FAIL="$(grep -c '^doctor --format json$' "$FAIL_CLI_LOG")"
 assert_equals "3" "$DOCTOR_CALLS_FAIL" "main-fail doctor call count"
+
+echo "=== Scenario 3: final doctor multi-device path returns success with manual guidance ==="
+MULTI_STDOUT="$TMP_DIR/main-multi.stdout"
+MULTI_STDERR="$TMP_DIR/main-multi.stderr"
+MULTI_TRACE="$TMP_DIR/main-multi.trace"
+MULTI_CLI_LOG="$TMP_DIR/main-multi.cli.log"
+MULTI_GUIDE_PATH_FILE="$TMP_DIR/main-multi.guide.path"
+MULTI_STATE="$TMP_DIR/main-multi.state"
+run_main_case \
+    main-multi \
+    multi-device \
+    0 \
+    "$MULTI_STDOUT" \
+    "$MULTI_STDERR" \
+    "$MULTI_TRACE" \
+    "$MULTI_CLI_LOG" \
+    "$MULTI_GUIDE_PATH_FILE" \
+    "$MULTI_STATE"
+
+assert_contains "$MULTI_STDOUT" "Installation Complete (Device Selection Required)" "main-multi stdout"
+assert_contains "$MULTI_STDOUT" "Host install completed, but Android setup is still pending because more than one device is connected." "main-multi stdout"
+assert_contains "$MULTI_STDOUT" "clawperator doctor --device <device_id> --output pretty" "main-multi stdout"
+assert_not_contains "$MULTI_STDOUT" "Final doctor check failed." "main-multi stdout"
+MULTI_DOCTOR_CALLS="$(grep -c '^doctor --format json$' "$MULTI_CLI_LOG")"
+assert_equals "3" "$MULTI_DOCTOR_CALLS" "main-multi doctor call count"
 
 echo "=== install.sh main smoke harness passed ==="
