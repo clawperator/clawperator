@@ -4,7 +4,7 @@ import { chmod, mkdtemp, mkdir, readFile, readlink, rm, stat, symlink, writeFile
 import { join, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { getCliVersion } from "../../domain/version/compatibility.js";
-import { cmdAuthoringSkillsList } from "../../cli/commands/authoringSkills.js";
+import { cmdAuthoringSkillsInstall, cmdAuthoringSkillsList } from "../../cli/commands/authoringSkills.js";
 import { copyAuthoringSkills } from "../../domain/skills/copyAuthoringSkills.js";
 
 const tempRoots: string[] = [];
@@ -396,6 +396,43 @@ describe("copyAuthoringSkills", () => {
       message: `Refusing to overwrite non-Clawperator skill entry: ${join(codexSkillsDir, "skill-author-by-recording")}`,
     });
     assert.equal(await readFile(join(targetSkillDir, "SKILL.md"), "utf8"), "# existing-installed-version\n");
+  });
+});
+
+describe("cmdAuthoringSkillsInstall", () => {
+  it("preserves legacy top-level discovery dirs alongside agentDiscoveryDirs in json output", async () => {
+    const root = await makeTempRoot();
+    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const installedDir = join(root, "home", ".clawperator", "authoring-skills");
+    const claudeSkillsDir = join(root, "home", ".claude", "skills");
+    const codexSkillsDir = join(root, "home", ".codex", "skills");
+    const agentsSkillsDir = join(root, "home", ".agents", "skills");
+
+    const rendered = await cmdAuthoringSkillsInstall({
+      format: "json",
+      sourceDir,
+      installedDir,
+      claudeSkillsDir,
+      codexSkillsDir,
+      agentsSkillsDir,
+      cliVersion: "1.2.3",
+    });
+
+    const parsed = JSON.parse(rendered) as {
+      installedDir: string;
+      claudeSkillsDir: string;
+      codexSkillsDir: string;
+      agentDiscoveryDirs: Array<{ label: string; dir: string }>;
+    };
+
+    assert.equal(parsed.installedDir, installedDir);
+    assert.equal(parsed.claudeSkillsDir, claudeSkillsDir);
+    assert.equal(parsed.codexSkillsDir, codexSkillsDir);
+    assert.deepEqual(parsed.agentDiscoveryDirs, [
+      { label: "claude", dir: claudeSkillsDir },
+      { label: "codex", dir: codexSkillsDir },
+      { label: "agents", dir: agentsSkillsDir },
+    ]);
   });
 });
 

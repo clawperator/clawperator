@@ -3,6 +3,8 @@ import { DEFAULT_AUTHORING_SKILLS_DIR } from "../../domain/skills/skillsConfig.j
 import {
   copyAuthoringSkills,
   listInstalledAuthoringSkills,
+  resolveClaudeSkillsDir,
+  resolveCodexSkillsDir,
   type CopyAuthoringSkillsOptions,
 } from "../../domain/skills/copyAuthoringSkills.js";
 import type { OutputOptions } from "../output.js";
@@ -45,6 +47,8 @@ async function runAuthoringSkillsInstall(
     skills: result.skills,
     count: result.skills.length,
     installedDir: result.installedDir,
+    claudeSkillsDir: resolveClaudeSkillsDir(options),
+    codexSkillsDir: resolveCodexSkillsDir(options),
     agentDiscoveryDirs: result.agentDiscoveryDirs,
     message: `Authoring skills ${action === "install" ? "installed" : "updated"}.`,
     envHint: getAuthoringSkillsEnvHint(options.env),
