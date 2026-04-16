@@ -322,8 +322,8 @@ export async function checkAuthoringSkillsStaleness(
         id: "host.authoring-skills.staleness",
         status: "warn",
         code: ERROR_CODES.AUTHORING_SKILLS_STALE,
-        summary: "Authoring skills version file is missing.",
-        detail: `Expected an authoring skills directory at ${installedDir}.`,
+        summary: `Authoring skills install path exists but is not a directory: ${installedDir}.`,
+        detail: "Re-installing authoring skills will replace this path with the correct directory.",
         fix: {
           title: "Update authoring skills",
           platform: "any",

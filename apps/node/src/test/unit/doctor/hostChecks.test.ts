@@ -682,5 +682,19 @@ describe("Doctor: hostChecks", () => {
                 cliVersion: getCliVersion(),
             });
         });
+
+        it("warns when the install path exists but is a file rather than a directory", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-file-");
+            const installedDir = join(root, "authoring-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            await writeFile(installedDir, "not-a-directory\n", "utf8");
+
+            const result = await checkAuthoringSkillsStaleness(config, { installedDir });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
+            assert.match(result.summary, /not a directory/);
+            assert.deepStrictEqual(result.fix?.steps, [{ kind: "shell", value: "clawperator authoring-skills update" }]);
+        });
     });
 });
