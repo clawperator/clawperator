@@ -591,6 +591,7 @@ setup_authoring_skills_via_cli() {
 
 write_agent_guide() {
     local AGENT_GUIDE_PATH="$HOME/.clawperator/AGENTS.md"
+    local AUTHORING_SKILLS_GUIDE_DIR="${AUTHORING_SKILLS_INSTALL_DIR:-$HOME/.clawperator/authoring-skills}"
 
     mkdir -p "$HOME/.clawperator"
 
@@ -612,7 +613,9 @@ clawperator click --text "Settings" --json  # tap an element
 - Setup guide: https://docs.clawperator.com/setup/
 EOF
 
-    if [ "$AUTHORING_SKILLS_SETUP_STATUS" = "configured" ]; then
+    if [ -d "$AUTHORING_SKILLS_GUIDE_DIR" ] \
+        && [ -f "$AUTHORING_SKILLS_GUIDE_DIR/version.txt" ] \
+        && [ -f "$AUTHORING_SKILLS_GUIDE_DIR/skill-author-by-recording/SKILL.md" ]; then
         cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
 ## Authoring Skills

@@ -1,6 +1,6 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert";
-import { chmod, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -632,6 +632,46 @@ describe("Doctor: hostChecks", () => {
             assert.strictEqual(result.summary, "Authoring skills not yet installed.");
         });
 
+        it("warns when the authoring skills install path is a regular file", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-file-conflict-");
+            const installedDir = join(root, "authoring-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            await writeFile(installedDir, "not a directory\n", "utf8");
+
+            const result = await checkAuthoringSkillsStaleness(config, { installedDir });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
+            assert.strictEqual(result.summary, `Authoring skills install path exists but is not a directory: ${installedDir}.`);
+            assert.deepStrictEqual(result.fix?.steps, [
+                { kind: "manual", value: `Remove or rename the conflicting path at ${installedDir}.` },
+                { kind: "shell", value: "clawperator authoring-skills install" },
+            ]);
+        });
+
+        it("warns when the authoring skills install path is a dangling symlink", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-dangling-link-");
+            const installedDir = join(root, "authoring-skills");
+            const missingTarget = join(root, "missing-target");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            await symlink(missingTarget, installedDir);
+
+            const result = await checkAuthoringSkillsStaleness(config, { installedDir });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
+            assert.strictEqual(result.summary, `Authoring skills install path is a dangling symlink: ${installedDir}.`);
+            assert.deepStrictEqual(result.fix?.steps, [
+                { kind: "manual", value: `Remove or rename the conflicting path at ${installedDir}.` },
+                { kind: "shell", value: "clawperator authoring-skills install" },
+            ]);
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                cliVersion: getCliVersion(),
+                pathType: "dangling-symlink",
+            });
+        });
+
         it("warns when the CLI version metadata cannot be read", async () => {
             const root = await makeTempRoot("clawperator-doctor-authoring-skills-cli-version-fail-");
             const installedDir = join(root, "authoring-skills");
@@ -700,20 +740,6 @@ describe("Doctor: hostChecks", () => {
                 installedVersion: "0.0.1",
                 cliVersion: getCliVersion(),
             });
-        });
-
-        it("warns when the install path exists but is a file rather than a directory", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-file-");
-            const installedDir = join(root, "authoring-skills");
-            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            await writeFile(installedDir, "not-a-directory\n", "utf8");
-
-            const result = await checkAuthoringSkillsStaleness(config, { installedDir });
-
-            assert.strictEqual(result.status, "warn");
-            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
-            assert.match(result.summary, /not a directory/);
-            assert.deepStrictEqual(result.fix?.steps, [{ kind: "shell", value: "clawperator authoring-skills update" }]);
         });
 
         it("warns when version.txt matches but no installed skill directory contains SKILL.md", async () => {

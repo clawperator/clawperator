@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { lstat, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { isAdbAvailable, runAdb } from "../../../adapters/android-bridge/adbClient.js";
 import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
@@ -36,7 +36,8 @@ function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
 function buildAuthoringSkillsWarn(
   summary: string,
   detail: string,
-  evidence: Record<string, unknown>
+  evidence: Record<string, unknown>,
+  fixOverride?: DoctorCheckResult["fix"]
 ): DoctorCheckResult {
   return {
     id: "host.authoring-skills.staleness",
@@ -44,7 +45,7 @@ function buildAuthoringSkillsWarn(
     code: ERROR_CODES.AUTHORING_SKILLS_STALE,
     summary,
     detail,
-    fix: {
+    fix: fixOverride ?? {
       title: "Update authoring skills",
       platform: "any",
       steps: [
@@ -52,6 +53,20 @@ function buildAuthoringSkillsWarn(
       ],
     },
     evidence,
+  };
+}
+
+function buildAuthoringSkillsPathRepairFix(installedDir: string): DoctorCheckResult["fix"] {
+  return {
+    title: "Repair authoring skills install path",
+    platform: "any",
+    steps: [
+      {
+        kind: "manual",
+        value: `Remove or rename the conflicting path at ${installedDir}.`,
+      },
+      { kind: "shell", value: "clawperator authoring-skills install" },
+    ],
   };
 }
 
@@ -377,23 +392,50 @@ export async function checkAuthoringSkillsStaleness(
     if (!installedDirStat.isDirectory()) {
       return buildAuthoringSkillsWarn(
         `Authoring skills install path exists but is not a directory: ${installedDir}.`,
-        "Re-installing authoring skills will replace this path with the correct directory.",
+        "Remove or rename the conflicting path first, then re-run the authoring skills installer.",
         {
           installedDir,
           cliVersion,
-        }
+        },
+        buildAuthoringSkillsPathRepairFix(installedDir)
       );
     }
   } catch (error) {
     if (isMissingPathError(error)) {
-      return {
-        id: "host.authoring-skills.staleness",
-        status: "pass",
-        summary: "Authoring skills not yet installed.",
-        evidence: {
-          installedDir,
-        },
-      };
+      try {
+        const danglingEntryStat = await lstat(installedDir);
+        return buildAuthoringSkillsWarn(
+          danglingEntryStat.isSymbolicLink()
+            ? `Authoring skills install path is a dangling symlink: ${installedDir}.`
+            : `Authoring skills install path could not be resolved cleanly: ${installedDir}.`,
+          "Remove or rename the broken path first, then re-run the authoring skills installer.",
+          {
+            installedDir,
+            cliVersion,
+            pathType: danglingEntryStat.isSymbolicLink() ? "dangling-symlink" : "unresolved-entry",
+          },
+          buildAuthoringSkillsPathRepairFix(installedDir)
+        );
+      } catch (lstatError) {
+        if (!isMissingPathError(lstatError)) {
+          return buildAuthoringSkillsWarn(
+            "Authoring skills install state could not be inspected.",
+            lstatError instanceof Error ? lstatError.message : String(lstatError),
+            {
+              installedDir,
+              cliVersion,
+            }
+          );
+        }
+        return {
+          id: "host.authoring-skills.staleness",
+          status: "pass",
+          summary: "Authoring skills not yet installed.",
+          evidence: {
+            installedDir,
+          },
+        };
+      }
     }
     return buildAuthoringSkillsWarn(
       "Authoring skills install state could not be inspected.",
