@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { afterEach, describe, it } from "node:test";
 import assert from "node:assert";
 import { chmod, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
@@ -9,12 +9,26 @@ import {
   checkNodeVersion,
   checkDefaultOrchestratedSkillAgentCli,
   checkInstalledOrchestratedSkillAgentCliAvailability,
+  checkAuthoringSkillsStaleness,
 } from "../../../domain/doctor/checks/hostChecks.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
+import { getCliVersion } from "../../../domain/version/compatibility.js";
 
 describe("Doctor: hostChecks", () => {
+    const tempRoots: string[] = [];
+
+    afterEach(async () => {
+        await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+    });
+
+    async function makeTempRoot(prefix: string): Promise<string> {
+        const root = await mkdtemp(join(tmpdir(), prefix));
+        tempRoots.push(root);
+        return root;
+    }
+
     function withNodeVersion(version: string, fn: () => Promise<void> | void): Promise<void> | void {
         const originalVersionDescriptor = Object.getOwnPropertyDescriptor(process, "version");
         Object.defineProperty(process, "version", {
@@ -602,6 +616,71 @@ describe("Doctor: hostChecks", () => {
                     process.env.CLAWPERATOR_SKILLS_REGISTRY = originalRegistry;
                 }
             }
+        });
+    });
+
+    describe("checkAuthoringSkillsStaleness", () => {
+        it("passes when the authoring skills install dir does not exist", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-missing-");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+
+            const result = await checkAuthoringSkillsStaleness(config, {
+                installedDir: join(root, "missing-authoring-skills"),
+            });
+
+            assert.strictEqual(result.status, "pass");
+            assert.strictEqual(result.summary, "Authoring skills not yet installed.");
+        });
+
+        it("warns when the authoring skills install dir exists but version.txt is missing", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-no-version-");
+            const installedDir = join(root, "authoring-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            await mkdir(installedDir, { recursive: true });
+
+            const result = await checkAuthoringSkillsStaleness(config, { installedDir });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
+            assert.strictEqual(result.summary, "Authoring skills version file is missing.");
+            assert.deepStrictEqual(result.fix?.steps, [{ kind: "shell", value: "clawperator authoring-skills update" }]);
+        });
+
+        it("passes when version.txt matches the current CLI version", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-current-");
+            const installedDir = join(root, "authoring-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            await mkdir(installedDir, { recursive: true });
+            await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
+
+            const result = await checkAuthoringSkillsStaleness(config, { installedDir });
+
+            assert.strictEqual(result.status, "pass");
+            assert.strictEqual(result.summary, "Authoring skills are up to date.");
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                installedVersion: getCliVersion(),
+                cliVersion: getCliVersion(),
+            });
+        });
+
+        it("warns when version.txt differs from the current CLI version", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-stale-");
+            const installedDir = join(root, "authoring-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            await mkdir(installedDir, { recursive: true });
+            await writeFile(join(installedDir, "version.txt"), "0.0.1\n", "utf8");
+
+            const result = await checkAuthoringSkillsStaleness(config, { installedDir });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
+            assert.strictEqual(result.summary, `Authoring skills (v0.0.1) are outdated (CLI is v${getCliVersion()}).`);
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                installedVersion: "0.0.1",
+                cliVersion: getCliVersion(),
+            });
         });
     });
 });
