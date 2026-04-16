@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
 REPO_ROOT="$(pwd)"
 TMP_DIR="$(mktemp -d)"

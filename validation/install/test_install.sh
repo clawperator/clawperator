@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
 echo "=== Building Node package for install-related tests ==="
 npm --prefix apps/node run build
@@ -16,9 +16,9 @@ node --test \
 
 echo "=== Running install-related validation harnesses ==="
 bash validation/test_doctor.sh
-bash validation/test_install_multidevice.sh
-bash validation/test_install_java.sh
-bash validation/test_install_authoring_skills.sh
-bash validation/test_install_main.sh
+bash validation/install/test_multidevice.sh
+bash validation/install/test_java.sh
+bash validation/install/test_authoring_skills.sh
+bash validation/install/test_main.sh
 
 echo "=== install-related test suite passed ==="

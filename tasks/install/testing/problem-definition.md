@@ -88,10 +88,10 @@ The repo already has meaningful coverage in a few places:
 - `apps/node/src/test/integration/installScript.test.ts`
   covers `check_node()` upgrade behavior via sourced-shell execution and fake
   `nvm` state
-- `validation/test_install_java.sh`
+- `validation/install/test_java.sh`
   covers several `check_java()` branches with mocked `brew`, `apt-get`, and
   `pacman`
-- `validation/test_install_multidevice.sh`
+- `validation/install/test_multidevice.sh`
   covers a `maybe_install_operator_apk()` multi-device path with mocked `adb`
   and `clawperator`
 - `apps/node/src/test/unit/authoringSkills.test.ts`
@@ -110,8 +110,8 @@ existing install-related tests:
   `npm --prefix apps/node run test`
 - `validation-tests` runs:
   - `bash validation/test_doctor.sh`
-  - `bash validation/test_install_multidevice.sh`
-  - `bash validation/test_install_java.sh`
+  - `bash validation/install/test_multidevice.sh`
+  - `bash validation/install/test_java.sh`
 
 So the problem is not that `install.sh` has zero coverage. The problem is that
 the coverage is fragmented and narrower than the behavior surface that now
@@ -239,10 +239,10 @@ just isolated helpers.
 
 ## Recommended Work Items
 
-### 1. Add `validation/test_install_authoring_skills.sh`
+### 1. Add `validation/install/test_authoring_skills.sh`
 
-Model it after `validation/test_install_java.sh` and
-`validation/test_install_multidevice.sh`.
+Model it after `validation/install/test_java.sh` and
+`validation/install/test_multidevice.sh`.
 
 It should:
 
@@ -323,15 +323,16 @@ Each `main()` scenario should assert:
 ### 6. Add one obvious top-level entrypoint
 
 The existing tests are spread across Node tests and validation scripts. Add a
-single obvious developer command, for example `scripts/test_install`, that runs
+single obvious developer command, for example
+`validation/install/test_install.sh`, that runs
 the install-related regression suite.
 
 At minimum it should orchestrate:
 
 - `npm --prefix apps/node run build`
 - targeted Node install-related tests
-- `validation/test_install_java.sh`
-- `validation/test_install_multidevice.sh`
+- `validation/install/test_java.sh`
+- `validation/install/test_multidevice.sh`
 - new authoring-skills validation scripts
 
 This is partly a testing improvement and partly a usability improvement.
@@ -350,9 +351,9 @@ Once the new tests exist:
 
 | Priority | Work item |
 | --- | --- |
-| High | `validation/test_install_authoring_skills.sh` |
+| High | `validation/install/test_authoring_skills.sh` |
 | High | parser coverage for `parse_authoring_skills_install_result()` |
-| High | one obvious `scripts/test_install` entrypoint |
+| High | one obvious `validation/install/test_install.sh` entrypoint |
 | High | one success-path and one failure-path `main()` smoke test |
 | Medium | `write_agent_guide()` assertions |
 | Medium | combined `CLAWPERATOR_INSTALL_SKIP_SKILLS` regression |
@@ -376,11 +377,11 @@ should be treated as unprotected until a harness covers it directly.
 
 The best immediate hardening PR is:
 
-1. add `validation/test_install_authoring_skills.sh`
+1. add `validation/install/test_authoring_skills.sh`
 2. add parser coverage for `parse_authoring_skills_install_result()`
 3. add `write_agent_guide()` assertions
 4. add one success-path and one failure-path hermetic `main()` test
-5. add `scripts/test_install`
+5. add `validation/install/test_install.sh`
 6. wire the new command into CI and validation guidance
 
 That would move the project from "some install.sh testing exists" to
