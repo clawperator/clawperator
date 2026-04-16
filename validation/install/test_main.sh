@@ -96,7 +96,19 @@ JSON
       ;;
     multi-device:3)
       cat <<'JSON'
-{"ok":false,"criticalOk":false,"checks":[{"id":"device.discovery","status":"fail","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
+{"ok":true,"criticalOk":true,"checks":[{"id":"device.discovery","status":"warn","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
+JSON
+      exit 0
+      ;;
+    apk-remediation:1)
+      cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.apk.presence","status":"fail","code":"OPERATOR_NOT_INSTALLED"}]}
+JSON
+      exit 0
+      ;;
+    apk-remediation:2|apk-remediation:3)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
 JSON
       exit 0
       ;;
@@ -150,11 +162,21 @@ setup_mock_adb() {
 set -euo pipefail
 
 if [ "$1" = "devices" ]; then
-  cat <<'OUT'
+  case "${MOCK_MAIN_SCENARIO:-}" in
+    multi-device)
+      cat <<'OUT'
 List of devices attached
 serial-alpha	device
 serial-beta	device
 OUT
+      ;;
+    *)
+      cat <<'OUT'
+List of devices attached
+serial-solo	device
+OUT
+      ;;
+  esac
   exit 0
 fi
 
@@ -203,6 +225,25 @@ run_main_case() {
         install_cli() {
             trace install_cli "$TRACE_FILE"
             export CLAWPERATOR_BIN_PATH="$MOCK_CLAWPERATOR_BIN"
+            return 0
+        }
+        download_operator_apk() {
+            trace download_operator_apk "$TRACE_FILE"
+            mkdir -p "$(dirname "$APK_LOCAL_PATH")"
+            printf "mock apk\n" > "$APK_LOCAL_PATH"
+            printf "mock sha\n" > "$APK_SHA_PATH"
+            OPERATOR_VERSION="9.9.9"
+            echo "Mock download_operator_apk"
+            return 0
+        }
+        verify_operator_apk() {
+            trace verify_operator_apk "$TRACE_FILE"
+            echo "Mock verify_operator_apk"
+            return 0
+        }
+        maybe_install_operator_apk() {
+            trace maybe_install_operator_apk "$TRACE_FILE"
+            echo "Mock maybe_install_operator_apk"
             return 0
         }
         show_star_hint() { trace show_star_hint "$TRACE_FILE"; return 0; }
@@ -310,5 +351,33 @@ assert_contains "$MULTI_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-
 assert_contains "$MULTI_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi/.clawperator/downloads/operator.apk --device serial-beta" "main-multi stdout"
 assert_not_contains "$MULTI_STDOUT" "Final doctor check failed." "main-multi stdout"
 assert_not_contains "$MULTI_STDOUT" "Doctor pretty output" "main-multi stdout"
+
+echo "=== Scenario 4: APK remediation path runs before final success ==="
+REMEDIATE_STDOUT="$TMP_DIR/main-remediation.stdout"
+REMEDIATE_STDERR="$TMP_DIR/main-remediation.stderr"
+REMEDIATE_TRACE="$TMP_DIR/main-remediation.trace"
+REMEDIATE_CLI_LOG="$TMP_DIR/main-remediation.cli.log"
+REMEDIATE_GUIDE_PATH_FILE="$TMP_DIR/main-remediation.guide.path"
+REMEDIATE_STATE="$TMP_DIR/main-remediation.state"
+run_main_case \
+    main-remediation \
+    apk-remediation \
+    0 \
+    "$REMEDIATE_STDOUT" \
+    "$REMEDIATE_STDERR" \
+    "$REMEDIATE_TRACE" \
+    "$REMEDIATE_CLI_LOG" \
+    "$REMEDIATE_GUIDE_PATH_FILE" \
+    "$REMEDIATE_STATE"
+
+assert_contains "$REMEDIATE_STDOUT" "Mock download_operator_apk" "main-remediation stdout"
+assert_contains "$REMEDIATE_STDOUT" "Mock verify_operator_apk" "main-remediation stdout"
+assert_contains "$REMEDIATE_STDOUT" "Mock maybe_install_operator_apk" "main-remediation stdout"
+assert_contains "$REMEDIATE_STDOUT" "Installation Successful!" "main-remediation stdout"
+assert_contains "$REMEDIATE_TRACE" "download_operator_apk" "main-remediation trace"
+assert_contains "$REMEDIATE_TRACE" "verify_operator_apk" "main-remediation trace"
+assert_contains "$REMEDIATE_TRACE" "maybe_install_operator_apk" "main-remediation trace"
+assert_contains "$REMEDIATE_CLI_LOG" "doctor --format json" "main-remediation cli log"
+assert_contains "$REMEDIATE_CLI_LOG" "doctor --output pretty" "main-remediation cli log"
 
 echo "=== install.sh main smoke harness passed ==="

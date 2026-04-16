@@ -3,6 +3,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
+ensure_node_build() {
+    if [ ! -f "apps/node/dist/cli/index.js" ]; then
+        echo "=== Building Node package for validation harnesses ==="
+        npm --prefix apps/node run build
+    fi
+}
+
 if [ "${CLAWPERATOR_INSTALL_SKIP_NODE_TESTS:-0}" != "1" ]; then
     if [ ! -d "apps/node/node_modules" ]; then
         echo "ERROR: apps/node dependencies are not installed." >&2
@@ -17,6 +24,7 @@ if [ "${CLAWPERATOR_INSTALL_SKIP_NODE_TESTS:-0}" != "1" ]; then
     npm --prefix apps/node run test
 else
     echo "=== Skipping Node build/tests (CLAWPERATOR_INSTALL_SKIP_NODE_TESTS=1) ==="
+    ensure_node_build
 fi
 
 echo "=== Running install-related validation harnesses ==="
