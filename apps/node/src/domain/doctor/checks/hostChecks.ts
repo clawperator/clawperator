@@ -1,4 +1,4 @@
-import { readFile, stat } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { isAdbAvailable, runAdb } from "../../../adapters/android-bridge/adbClient.js";
 import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
@@ -20,6 +20,7 @@ import { getCliVersion } from "../../version/compatibility.js";
 const DEFAULT_ORCHESTRATED_SKILL_AGENT_CLI = "codex";
 const ORCHESTRATED_SKILL_AGENT_CLI_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_CLI";
 const AUTHORING_SKILLS_VERSION_FILENAME = "version.txt";
+const AUTHORING_SKILLS_UPDATE_COMMAND = "clawperator authoring-skills update";
 
 export interface CheckAuthoringSkillsStalenessOptions {
   installedDir?: string;
@@ -27,6 +28,60 @@ export interface CheckAuthoringSkillsStalenessOptions {
 
 function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
   return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+}
+
+function buildAuthoringSkillsWarn(
+  summary: string,
+  detail: string,
+  evidence: Record<string, unknown>
+): DoctorCheckResult {
+  return {
+    id: "host.authoring-skills.staleness",
+    status: "warn",
+    code: ERROR_CODES.AUTHORING_SKILLS_STALE,
+    summary,
+    detail,
+    fix: {
+      title: "Update authoring skills",
+      platform: "any",
+      steps: [
+        { kind: "shell", value: AUTHORING_SKILLS_UPDATE_COMMAND },
+      ],
+    },
+    evidence,
+  };
+}
+
+async function hasInstalledAuthoringSkillDir(installedDir: string): Promise<boolean> {
+  const entries = await readdir(installedDir);
+  for (const entry of entries) {
+    if (entry === AUTHORING_SKILLS_VERSION_FILENAME) {
+      continue;
+    }
+
+    const entryPath = join(installedDir, entry);
+    let entryStat;
+    try {
+      entryStat = await stat(entryPath);
+    } catch {
+      continue;
+    }
+
+    if (!entryStat.isDirectory()) {
+      continue;
+    }
+
+    try {
+      const skillFileStat = await stat(join(entryPath, "SKILL.md"));
+      if (skillFileStat.isFile()) {
+        return true;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return false;
 }
 
 export async function checkNodeVersion(): Promise<DoctorCheckResult> {
@@ -318,24 +373,14 @@ export async function checkAuthoringSkillsStaleness(
   try {
     const installedDirStat = await stat(installedDir);
     if (!installedDirStat.isDirectory()) {
-      return {
-        id: "host.authoring-skills.staleness",
-        status: "warn",
-        code: ERROR_CODES.AUTHORING_SKILLS_STALE,
-        summary: `Authoring skills install path exists but is not a directory: ${installedDir}.`,
-        detail: "Re-installing authoring skills will replace this path with the correct directory.",
-        fix: {
-          title: "Update authoring skills",
-          platform: "any",
-          steps: [
-            { kind: "shell", value: "clawperator authoring-skills update" },
-          ],
-        },
-        evidence: {
+      return buildAuthoringSkillsWarn(
+        `Authoring skills install path exists but is not a directory: ${installedDir}.`,
+        "Re-installing authoring skills will replace this path with the correct directory.",
+        {
           installedDir,
           cliVersion,
-        },
-      };
+        }
+      );
     }
   } catch (error) {
     if (isMissingPathError(error)) {
@@ -348,7 +393,14 @@ export async function checkAuthoringSkillsStaleness(
         },
       };
     }
-    throw error;
+    return buildAuthoringSkillsWarn(
+      "Authoring skills install state could not be inspected.",
+      error instanceof Error ? error.message : String(error),
+      {
+        installedDir,
+        cliVersion,
+      }
+    );
   }
 
   let installedVersion: string;
@@ -356,26 +408,64 @@ export async function checkAuthoringSkillsStaleness(
     installedVersion = (await readFile(versionPath, "utf8")).trim();
   } catch (error) {
     if (!isMissingPathError(error)) {
-      throw error;
+      return buildAuthoringSkillsWarn(
+        "Authoring skills version file could not be read.",
+        error instanceof Error ? error.message : String(error),
+        {
+          installedDir,
+          versionPath,
+          cliVersion,
+        }
+      );
     }
-    return {
-      id: "host.authoring-skills.staleness",
-      status: "warn",
-      code: ERROR_CODES.AUTHORING_SKILLS_STALE,
-      summary: "Authoring skills version file is missing.",
-      detail: `Expected ${versionPath} to contain the installed authoring skills version.`,
-      fix: {
-        title: "Update authoring skills",
-        platform: "any",
-        steps: [
-          { kind: "shell", value: "clawperator authoring-skills update" },
-        ],
-      },
-      evidence: {
+    return buildAuthoringSkillsWarn(
+      "Authoring skills version file is missing.",
+      `Expected ${versionPath} to contain the installed authoring skills version.`,
+      {
         installedDir,
+        versionPath,
         cliVersion,
-      },
-    };
+      }
+    );
+  }
+
+  if (installedVersion === "") {
+    return buildAuthoringSkillsWarn(
+      "Authoring skills version file is empty.",
+      `Expected ${versionPath} to contain the installed authoring skills version.`,
+      {
+        installedDir,
+        versionPath,
+        cliVersion,
+      }
+    );
+  }
+
+  let hasInstalledSkillDir: boolean;
+  try {
+    hasInstalledSkillDir = await hasInstalledAuthoringSkillDir(installedDir);
+  } catch (error) {
+    return buildAuthoringSkillsWarn(
+      "Authoring skills install state could not be inspected.",
+      error instanceof Error ? error.message : String(error),
+      {
+        installedDir,
+        installedVersion,
+        cliVersion,
+      }
+    );
+  }
+
+  if (!hasInstalledSkillDir) {
+    return buildAuthoringSkillsWarn(
+      "Authoring skills install is missing skill directories.",
+      "Expected at least one installed authoring skill directory containing SKILL.md.",
+      {
+        installedDir,
+        installedVersion,
+        cliVersion,
+      }
+    );
   }
 
   if (installedVersion === cliVersion) {
@@ -401,7 +491,7 @@ export async function checkAuthoringSkillsStaleness(
       title: "Update authoring skills",
       platform: "any",
       steps: [
-        { kind: "shell", value: "clawperator authoring-skills update" },
+        { kind: "shell", value: AUTHORING_SKILLS_UPDATE_COMMAND },
       ],
     },
     evidence: {

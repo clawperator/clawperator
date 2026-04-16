@@ -287,8 +287,9 @@ Doctor runs checks in this order:
 
 | Order | Check IDs | When they run |
 | --- | --- | --- |
-| 1 | `host.node.version`, `host.adb.presence`, `host.adb.server` | always |
-| 1 (advisory) | `host.skill-agent-cli.default`, `host.skill-agent-cli.skills`, `host.authoring-skills.staleness` | always; advisory only, never halt on failure |
+| 1 | `host.node.version`, `host.adb.presence` | always |
+| 1 (advisory) | `host.skill-agent-cli.default`, `host.skill-agent-cli.skills`, `host.authoring-skills.staleness` | after `host.adb.presence` passes; advisory only, never halt on failure |
+| 1 | `host.adb.server` | after `host.adb.presence` passes |
 | 2 | `host.java.version`, `build.android.assemble` | only with `--full` |
 | 3 | `device.discovery` | always |
 | 4 | device resolution via `resolveDevice.ts` | after discovery when doctor still needs a target device |

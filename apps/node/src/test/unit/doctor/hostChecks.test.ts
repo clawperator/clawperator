@@ -696,5 +696,44 @@ describe("Doctor: hostChecks", () => {
             assert.match(result.summary, /not a directory/);
             assert.deepStrictEqual(result.fix?.steps, [{ kind: "shell", value: "clawperator authoring-skills update" }]);
         });
+
+        it("warns when version.txt matches but no installed skill directory contains SKILL.md", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-empty-tree-");
+            const installedDir = join(root, "authoring-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            await mkdir(join(installedDir, "broken-skill"), { recursive: true });
+            await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
+
+            const result = await checkAuthoringSkillsStaleness(config, { installedDir });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
+            assert.strictEqual(result.summary, "Authoring skills install is missing skill directories.");
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                installedVersion: getCliVersion(),
+                cliVersion: getCliVersion(),
+            });
+        });
+
+        it("warns when version.txt cannot be read for a non-ENOENT reason", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-unreadable-version-");
+            const installedDir = join(root, "authoring-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
+            await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
+            await mkdir(join(installedDir, "version.txt"), { recursive: true });
+
+            const result = await checkAuthoringSkillsStaleness(config, { installedDir });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
+            assert.strictEqual(result.summary, "Authoring skills version file could not be read.");
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                versionPath: join(installedDir, "version.txt"),
+                cliVersion: getCliVersion(),
+            });
+        });
     });
 });
