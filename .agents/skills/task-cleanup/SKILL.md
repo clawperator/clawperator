@@ -73,7 +73,8 @@ Do not treat a gap as resolved until it has one of those three dispositions. Pre
    - If any gate has an unresolved blocker, stop here and present it for user decision.
 6. Delete the task folder.
    - Only after all gates pass and any blockers are resolved or explicitly accepted by the user.
-   - Delete the entire task folder: `rm -rf <task-path>`.
+   - Before any deletion, verify `<task-path>` resolves under `tasks/`; reject absolute paths, `..`, or any path that escapes `tasks/`.
+   - Delete the entire task folder with a repo-scoped command: `git rm -r -- <task-path>`.
    - Commit the deletion with a `chore:` commit.
 
 ## Gate 1: Knowledge Migration
@@ -155,16 +156,16 @@ Search the entire codebase (source files, comments, strings, tests, docs under `
 Use grep to find candidates:
 
 ```bash
-grep -rn --include="*.ts" --include="*.kt" --include="*.md" --include="*.sh" \
-  -E "(Phase [0-9]|PR-[0-9]|implemented in Phase|added in PR|see task|per task|TODO:.*[Pp]hase|FIXME:.*[Pp]hase)" \
-  . --exclude-dir=tasks --exclude-dir=.git --exclude-dir=node_modules
+grep -rn --exclude-dir=tasks --exclude-dir=.git --exclude-dir=node_modules \
+  -E "(Phase [0-9]+|PR-[0-9]+|implemented in Phase|added in PR|see task|per task|TODO:.*[Pp]hase|FIXME:.*[Pp]hase)" \
+  .
 ```
 
 Also search specifically for the task folder name:
 
 ```bash
-grep -rn --include="*.ts" --include="*.kt" --include="*.md" --include="*.sh" \
-  "<task-folder-name>" . --exclude-dir=tasks --exclude-dir=.git --exclude-dir=node_modules
+grep -rn --exclude-dir=tasks --exclude-dir=.git --exclude-dir=node_modules \
+  "<task-folder-name>" .
 ```
 
 ### What to do with findings
