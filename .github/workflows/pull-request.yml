@@ -150,17 +150,8 @@ jobs:
       - name: Install Node dependencies
         run: npm --prefix apps/node ci
 
-      - name: Build Node package
-        run: npm --prefix apps/node run build
-
       - name: Make validation scripts executable
-        run: chmod +x validation/test_doctor.sh validation/test_install_multidevice.sh validation/test_install_java.sh
+        run: chmod +x scripts/test_install validation/test_doctor.sh validation/test_install_multidevice.sh validation/test_install_java.sh validation/test_install_authoring_skills.sh
 
-      - name: Run doctor validation
-        run: bash validation/test_doctor.sh
-
-      - name: Run multi-device install validation
-        run: bash validation/test_install_multidevice.sh
-
-      - name: Run Java install validation
-        run: bash validation/test_install_java.sh
+      - name: Run install validation suite
+        run: bash scripts/test_install
