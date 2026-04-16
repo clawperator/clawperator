@@ -13,6 +13,15 @@ Run the full installer regression suite from the repo root with:
 
 This is the expected validation command for changes to `install.sh`.
 
+Prerequisite for local runs:
+
+```bash
+npm --prefix apps/node ci
+```
+
+The suite builds and tests `apps/node`, but it does not install Node
+dependencies for you.
+
 ## Harnesses
 
 - `test_install.sh`
