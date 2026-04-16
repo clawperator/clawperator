@@ -186,6 +186,16 @@ After PR-2:
 - `~/.clawperator/mcp-config-snippet.json` exists after install
 - public docs reflect the new onboarding and discovery behavior
 
+`install-state.json` field rules:
+
+- `schemaVersion`, `installedAt`, and `cliVersion` are always required
+- `registryPath` is required when runtime skills were installed successfully,
+  otherwise `null`
+- `apkVersion` should use the installer's known operator version when available,
+  otherwise `null`
+- `lastDeviceSerial` is nullable when no unambiguous device was selected during
+  install
+
 ## Idempotency
 
 - Re-running `install.sh` must be safe: generated host-agent artifacts are

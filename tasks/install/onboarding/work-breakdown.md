@@ -72,10 +72,10 @@ Read these files IN THIS ORDER before writing anything.
 
 ## PR / Phase Plan
 
-| PR | Purpose | Included phases | Agent tier | Merge gate |
-| --- | --- | --- | --- | --- |
-| PR-1 | Runtime discovery ergonomics | 1, 2 | default, thinking | none |
-| PR-2 | Install and host-agent artifacts | 3, 4 | default, default | PR-1 merged |
+| PR | Purpose | Included phases | Agent tier | Merge gate | Cross-repo dependency |
+| --- | --- | --- | --- | --- | --- |
+| PR-1 | Runtime discovery ergonomics | 1, 2 | default, thinking | none | Phase 2 requires a paired PR in `../clawperator-skills` before the phase is complete |
+| PR-2 | Install and host-agent artifacts | 3, 4 | default, default | PR-1 merged | none |
 
 ## Phase 1: Registry Fallback and Runtime Discovery Foundation
 
@@ -209,8 +209,9 @@ make user-language skill search return the right Google Home HVAC skills.
   ranking rules; result order is deterministic
 - the exact user-problem queries from `findings.md` are covered by unit tests,
   including the "ac" mis-ranking regression
-- paired `../clawperator-skills` PR is open or merged and seeds the Google
-  Home HVAC keywords
+- paired `../clawperator-skills` PR exists and carries the schema plus seeded
+  Google Home HVAC keywords; Phase 2 is not complete until that sibling-repo PR
+  is open and linked from the Clawperator PR
 - no semantic-search or fuzzy-match redesign is introduced
 
 ### Validation
@@ -262,7 +263,12 @@ present, and persist the key install outputs for future agent turns.
    install.
 2. Add a durable `~/.clawperator/install-state.json` artifact with at minimum:
    `schemaVersion`, `installedAt`, `cliVersion`, `apkVersion`, `registryPath`,
-   `lastDeviceSerial`. Rewrite-safe.
+   `lastDeviceSerial`. Rewrite-safe. Field rules:
+   - `schemaVersion`, `installedAt`, `cliVersion`: always required
+   - `registryPath`: required when runtime skills install/configure succeeded,
+     otherwise `null`
+   - `apkVersion`: the known installer version when available, otherwise `null`
+   - `lastDeviceSerial`: nullable when the install did not select one
 3. Add `~/.clawperator/mcp-config-snippet.json` with paste-ready entries for
    Claude Desktop, Codex, and a generic stdio MCP consumer. Do not attempt
    automatic registration.
