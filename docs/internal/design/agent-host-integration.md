@@ -9,6 +9,24 @@ This is an internal design note. It is not public product documentation. Use it
 when changing install, onboarding, agent guides, runtime-skill discovery, or
 MCP setup.
 
+Read [OpenClaw Reference](../openclaw-reference.md) first if you need the basic
+answer to "what is OpenClaw?" This file assumes that baseline context and
+focuses on the Clawperator-side design implications.
+
+## Scope Of This Note
+
+This file is about agent-host integration decisions for Clawperator.
+
+It is not meant to re-explain OpenClaw itself in full. Instead, it answers:
+
+1. what host-agent layer Clawperator is integrating with
+2. which host-agent discovery conventions matter
+3. how Clawperator's current install model lines up with those conventions
+4. what durable design rules should guide future onboarding work
+
+For the OpenClaw system overview, workspace model, and official docs links, use
+[OpenClaw Reference](../openclaw-reference.md).
+
 ## Example Host Model
 
 The motivating example is OpenClaw, but the model here is broader:
@@ -44,7 +62,9 @@ What was missing during the onboarding findings pass was the host-agent layer:
    to use the runtime skills that are already present
 
 That context shapes product decisions. It should not need to be rediscovered by
-future agents.
+future agents. The OpenClaw-specific background is captured separately in
+[OpenClaw Reference](../openclaw-reference.md) so this file can stay focused on
+integration behavior rather than system introduction.
 
 ## Host-Agent Discovery Conventions
 
@@ -199,6 +219,7 @@ Update this file when changing any of the following:
 
 ## Related Docs
 
+- `docs/internal/openclaw-reference.md`
 - `docs/internal/design/mcp-server.md`
 - `docs/internal/design/operator-llm-playbook.md`
 - `docs/internal/design/node-api-design-guiding-principles.md`
