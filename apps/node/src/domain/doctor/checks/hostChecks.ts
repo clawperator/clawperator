@@ -1,4 +1,4 @@
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { isAdbAvailable, runAdb } from "../../../adapters/android-bridge/adbClient.js";
 import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
@@ -15,6 +15,7 @@ import {
 import { isOrchestratedHarnessScriptPath, resolveRepoRelativeSkillPath } from "../../skills/pathUtils.js";
 import { readSkillManifestMetadata } from "../../skills/skillManifest.js";
 import { DEFAULT_AUTHORING_SKILLS_DIR } from "../../skills/skillsConfig.js";
+import { listPackagedAuthoringSkills } from "../../skills/copyAuthoringSkills.js";
 import { getCliVersion } from "../../version/compatibility.js";
 
 const DEFAULT_ORCHESTRATED_SKILL_AGENT_CLI = "codex";
@@ -24,6 +25,8 @@ const AUTHORING_SKILLS_UPDATE_COMMAND = "clawperator authoring-skills update";
 
 export interface CheckAuthoringSkillsStalenessOptions {
   installedDir?: string;
+  cliVersion?: string;
+  getCliVersionFn?: () => string;
 }
 
 function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
@@ -52,36 +55,24 @@ function buildAuthoringSkillsWarn(
   };
 }
 
-async function hasInstalledAuthoringSkillDir(installedDir: string): Promise<boolean> {
-  const entries = await readdir(installedDir);
-  for (const entry of entries) {
-    if (entry === AUTHORING_SKILLS_VERSION_FILENAME) {
-      continue;
-    }
+async function findMissingInstalledAuthoringSkills(
+  installedDir: string,
+  expectedSkills: string[]
+): Promise<string[]> {
+  const missingSkills: string[] = [];
 
-    const entryPath = join(installedDir, entry);
-    let entryStat;
+  for (const skillName of expectedSkills) {
     try {
-      entryStat = await stat(entryPath);
-    } catch {
-      continue;
-    }
-
-    if (!entryStat.isDirectory()) {
-      continue;
-    }
-
-    try {
-      const skillFileStat = await stat(join(entryPath, "SKILL.md"));
-      if (skillFileStat.isFile()) {
-        return true;
+      const skillFileStat = await stat(join(installedDir, skillName, "SKILL.md"));
+      if (!skillFileStat.isFile()) {
+        missingSkills.push(skillName);
       }
     } catch {
-      continue;
+      missingSkills.push(skillName);
     }
   }
 
-  return false;
+  return missingSkills;
 }
 
 export async function checkNodeVersion(): Promise<DoctorCheckResult> {
@@ -368,7 +359,18 @@ export async function checkAuthoringSkillsStaleness(
 ): Promise<DoctorCheckResult> {
   const installedDir = options.installedDir ?? DEFAULT_AUTHORING_SKILLS_DIR;
   const versionPath = join(installedDir, AUTHORING_SKILLS_VERSION_FILENAME);
-  const cliVersion = getCliVersion();
+  let cliVersion: string;
+  try {
+    cliVersion = options.cliVersion ?? (options.getCliVersionFn ?? getCliVersion)();
+  } catch (error) {
+    return buildAuthoringSkillsWarn(
+      "CLI version metadata could not be read.",
+      error instanceof Error ? error.message : String(error),
+      {
+        installedDir,
+      }
+    );
+  }
 
   try {
     const installedDirStat = await stat(installedDir);
@@ -441,12 +443,12 @@ export async function checkAuthoringSkillsStaleness(
     );
   }
 
-  let hasInstalledSkillDir: boolean;
+  let expectedSkills: string[];
   try {
-    hasInstalledSkillDir = await hasInstalledAuthoringSkillDir(installedDir);
+    expectedSkills = await listPackagedAuthoringSkills();
   } catch (error) {
     return buildAuthoringSkillsWarn(
-      "Authoring skills install state could not be inspected.",
+      "Packaged authoring skills could not be inspected.",
       error instanceof Error ? error.message : String(error),
       {
         installedDir,
@@ -456,14 +458,29 @@ export async function checkAuthoringSkillsStaleness(
     );
   }
 
-  if (!hasInstalledSkillDir) {
+  if (expectedSkills.length === 0) {
     return buildAuthoringSkillsWarn(
-      "Authoring skills install is missing skill directories.",
-      "Expected at least one installed authoring skill directory containing SKILL.md.",
+      "Packaged authoring skills list is empty.",
+      "Expected at least one packaged authoring skill containing SKILL.md.",
       {
         installedDir,
         installedVersion,
         cliVersion,
+      }
+    );
+  }
+
+  const missingSkills = await findMissingInstalledAuthoringSkills(installedDir, expectedSkills);
+  if (missingSkills.length > 0) {
+    return buildAuthoringSkillsWarn(
+      "Authoring skills install is missing expected packaged skills.",
+      "Re-run the authoring skills installer to restore the packaged first-party skill set.",
+      {
+        installedDir,
+        installedVersion,
+        cliVersion,
+        expectedSkills,
+        missingSkills,
       }
     );
   }

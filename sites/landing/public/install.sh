@@ -610,6 +610,10 @@ clawperator click --text "Settings" --json  # tap an element
 - Docs index: https://docs.clawperator.com/llms.txt
 - Full docs: https://docs.clawperator.com/llms-full.txt
 - Setup guide: https://docs.clawperator.com/setup/
+EOF
+
+    if [ "$AUTHORING_SKILLS_SETUP_STATUS" = "configured" ]; then
+        cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
 ## Authoring Skills
 
@@ -619,6 +623,17 @@ First-party Clawperator authoring skills are installed at:
 Available skills:
 - skill-author-by-recording: use this to author a new Clawperator runtime skill from a fresh phone recording
 EOF
+    else
+        cat >> "$AGENT_GUIDE_PATH" <<'EOF'
+
+## Authoring Skills
+
+First-party Clawperator authoring skills are not currently configured on this host.
+
+Repair or manual bootstrap:
+- run `clawperator authoring-skills install`
+EOF
+    fi
 
     echo -e "${GREEN}✅ Wrote agent guide to ${AGENT_GUIDE_PATH}.${NC}"
 }
@@ -987,7 +1002,6 @@ main() {
     check_git || exit 1
     
     install_cli || exit 1
-    write_agent_guide
     
     # Use doctor to drive the rest of the installation
     run_doctor_and_fix || exit 1
@@ -995,6 +1009,7 @@ main() {
     # Setup skills via CLI (best-effort)
     setup_skills_via_cli
     setup_authoring_skills_via_cli
+    write_agent_guide
 
     local ACTIVE_SHELL="${SHELL:-/bin/bash}"
     local DETECTED_SHELL

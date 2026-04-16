@@ -112,6 +112,10 @@ async function discoverAuthoringSkills(sourceDir: string): Promise<string[]> {
   return skills;
 }
 
+export async function listPackagedAuthoringSkills(sourceDir = resolveAuthoringSkillsSourceDir()): Promise<string[]> {
+  return discoverAuthoringSkills(sourceDir);
+}
+
 async function ensureDirectory(path: string): Promise<void> {
   await mkdir(path, { recursive: true });
 }

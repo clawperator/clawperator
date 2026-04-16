@@ -632,6 +632,23 @@ describe("Doctor: hostChecks", () => {
             assert.strictEqual(result.summary, "Authoring skills not yet installed.");
         });
 
+        it("warns when the CLI version metadata cannot be read", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-cli-version-fail-");
+            const installedDir = join(root, "authoring-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+
+            const result = await checkAuthoringSkillsStaleness(config, {
+                installedDir,
+                getCliVersionFn: () => {
+                    throw new Error("package.json version is missing");
+                },
+            });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
+            assert.strictEqual(result.summary, "CLI version metadata could not be read.");
+        });
+
         it("warns when the authoring skills install dir exists but version.txt is missing", async () => {
             const root = await makeTempRoot("clawperator-doctor-authoring-skills-no-version-");
             const installedDir = join(root, "authoring-skills");
@@ -650,7 +667,8 @@ describe("Doctor: hostChecks", () => {
             const root = await makeTempRoot("clawperator-doctor-authoring-skills-current-");
             const installedDir = join(root, "authoring-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            await mkdir(installedDir, { recursive: true });
+            await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
+            await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
             await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
 
             const result = await checkAuthoringSkillsStaleness(config, { installedDir });
@@ -668,7 +686,8 @@ describe("Doctor: hostChecks", () => {
             const root = await makeTempRoot("clawperator-doctor-authoring-skills-stale-");
             const installedDir = join(root, "authoring-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            await mkdir(installedDir, { recursive: true });
+            await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
+            await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
             await writeFile(join(installedDir, "version.txt"), "0.0.1\n", "utf8");
 
             const result = await checkAuthoringSkillsStaleness(config, { installedDir });
@@ -708,11 +727,13 @@ describe("Doctor: hostChecks", () => {
 
             assert.strictEqual(result.status, "warn");
             assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
-            assert.strictEqual(result.summary, "Authoring skills install is missing skill directories.");
+            assert.strictEqual(result.summary, "Authoring skills install is missing expected packaged skills.");
             assert.deepStrictEqual(result.evidence, {
                 installedDir,
                 installedVersion: getCliVersion(),
                 cliVersion: getCliVersion(),
+                expectedSkills: ["skill-author-by-recording"],
+                missingSkills: ["skill-author-by-recording"],
             });
         });
 
