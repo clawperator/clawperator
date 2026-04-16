@@ -235,6 +235,8 @@ assert_contains "$SUCCESS_CLI_LOG" "skills install --output json" "main-success 
 assert_contains "$SUCCESS_CLI_LOG" "authoring-skills install --output json" "main-success cli log"
 assert_contains "$SUCCESS_CLI_LOG" "doctor --output pretty" "main-success cli log"
 
+# The install flow currently runs doctor three times:
+# initial check, post-repair recheck, and final summary check.
 DOCTOR_CALLS_SUCCESS="$(grep -c '^doctor --format json$' "$SUCCESS_CLI_LOG")"
 assert_equals "3" "$DOCTOR_CALLS_SUCCESS" "main-success doctor call count"
 

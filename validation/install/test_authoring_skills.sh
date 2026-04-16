@@ -296,6 +296,7 @@ echo "=== Scenario 5: CODEX_HOME fallback is used when codex dir is omitted ==="
 AUTHORING_CODEX_HOME_OUT="$TMP_DIR/authoring-codex-home.out"
 AUTHORING_CODEX_HOME_STATUS="$TMP_DIR/authoring-codex-home.status"
 AUTHORING_CODEX_HOME_VALUES="$TMP_DIR/authoring-codex-home.values"
+EXPECTED_CODEX_HOME_DIR="$TMP_DIR/home-authoring-codex-home/custom-codex-home/skills/"
 run_setup_authoring_case \
     authoring-codex-home \
     success \
@@ -305,7 +306,7 @@ run_setup_authoring_case \
     "$AUTHORING_CODEX_HOME_VALUES" \
     'export CODEX_HOME="$HOME/custom-codex-home"'
 assert_equals "configured" "$(cat "$AUTHORING_CODEX_HOME_STATUS")" "authoring-codex-home status"
-assert_contains "$AUTHORING_CODEX_HOME_VALUES" "codex=$TMP_DIR/home-authoring-codex-home/custom-codex-home/skills/" "authoring-codex-home values"
+assert_contains "$AUTHORING_CODEX_HOME_VALUES" "codex=$EXPECTED_CODEX_HOME_DIR" "authoring-codex-home values"
 assert_contains "$AUTHORING_CODEX_HOME_VALUES" "agents=$TMP_DIR/home-authoring-codex-home/.agents/skills/" "authoring-codex-home values"
 
 echo "=== Scenario 6: authoring skills setup failure is non-fatal ==="
