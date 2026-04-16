@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.6.1] - 2026-04-16
+
+This release centers on packaged authoring-skills support and the matching public guidance refresh, with installer validation tightened along the way.
+
+### 🤖 Node API & CLI
+- **Added:** Added packaged authoring-skills installation support, kept agent discovery path compatibility in CLI output, and expanded doctor coverage for stale, malformed, and partially broken authoring-skills installs.
+
+### 📚 Documentation & Website
+- **Changed:** Updated public examples to use the release operator package by default, while keeping debug-package guidance for local debug workflows.
+- **Changed:** Refreshed release-facing docs and installer validation coverage for the published `0.6.0` release, including the consolidated `validation/install` smoke paths.
+
+Pull requests:
+- [feat(install,node): add authoring skills](https://github.com/clawperator/clawperator/pull/188)
+- [docs: use release operator package in public examples](https://github.com/clawperator/clawperator/pull/189)
+- [test(install): harden install.sh validation coverage](https://github.com/clawperator/clawperator/pull/190)
+
 ## [0.6.0] - 2026-04-16
 
 This release adds the new authoring-skills install workflow, expands the Node skills runtime with framed SkillResult parsing and orchestrated execution support, and refreshes public docs and Android build tooling alongside the release follow-up for the previous version.
