@@ -3,11 +3,21 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
-echo "=== Building Node package for install-related tests ==="
-npm --prefix apps/node run build
+if [ "${CLAWPERATOR_INSTALL_SKIP_NODE_TESTS:-0}" != "1" ]; then
+    if [ ! -d "apps/node/node_modules" ]; then
+        echo "ERROR: apps/node dependencies are not installed." >&2
+        echo "Run: npm --prefix apps/node ci" >&2
+        exit 1
+    fi
 
-echo "=== Running Node test suite for installer-facing CLI contracts ==="
-npm --prefix apps/node run test
+    echo "=== Building Node package for install-related tests ==="
+    npm --prefix apps/node run build
+
+    echo "=== Running Node test suite for installer-facing CLI contracts ==="
+    npm --prefix apps/node run test
+else
+    echo "=== Skipping Node build/tests (CLAWPERATOR_INSTALL_SKIP_NODE_TESTS=1) ==="
+fi
 
 echo "=== Running install-related validation harnesses ==="
 bash validation/test_doctor.sh

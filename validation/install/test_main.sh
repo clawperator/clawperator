@@ -56,8 +56,7 @@ assert_equals() {
 
 setup_mock_clawperator() {
     local mock_dir="$1"
-    local scenario="$2"
-    local log_file="$3"
+    local log_file="$2"
 
     mkdir -p "$mock_dir"
     cat > "$mock_dir/clawperator" <<EOF
@@ -177,7 +176,7 @@ run_main_case() {
     local state_file="$9"
     local mock_dir="$TMP_DIR/mock-$label"
 
-    setup_mock_clawperator "$mock_dir" "$scenario" "$cli_log_file"
+    setup_mock_clawperator "$mock_dir" "$cli_log_file"
     setup_mock_adb "$mock_dir"
     : > "$cli_log_file"
     : > "$trace_file"
