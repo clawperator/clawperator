@@ -659,6 +659,21 @@ describe("Doctor: hostChecks", () => {
             assert.strictEqual(result.summary, "Authoring skills not yet installed.");
         });
 
+        it("derives the default installed dir from homeDir when installedDir is unset", async () => {
+            const root = await makeTempRoot("clawperator-doctor-authoring-skills-alt-home-");
+            const homeDir = join(root, "alt-home");
+            const installedDir = join(homeDir, ".clawperator", "authoring-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+
+            const result = await checkAuthoringSkillsStaleness(config, { homeDir });
+
+            assert.strictEqual(result.status, "pass");
+            assert.strictEqual(result.summary, "Authoring skills not yet installed.");
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+            });
+        });
+
         it("warns when the authoring skills install path is a regular file", async () => {
             const root = await makeTempRoot("clawperator-doctor-authoring-skills-file-conflict-");
             const installedDir = join(root, "authoring-skills");

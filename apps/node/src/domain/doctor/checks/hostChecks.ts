@@ -14,10 +14,10 @@ import {
 } from "../../skills/agentCli.js";
 import { isOrchestratedHarnessScriptPath, resolveRepoRelativeSkillPath } from "../../skills/pathUtils.js";
 import { readSkillManifestMetadata } from "../../skills/skillManifest.js";
-import { DEFAULT_AUTHORING_SKILLS_DIR } from "../../skills/skillsConfig.js";
 import {
   inspectManagedAuthoringSkillLink,
   listPackagedAuthoringSkills,
+  resolveAuthoringSkillsInstalledDir,
   resolvePackagedAuthoringSkillsSourceDir,
   resolveClaudeSkillsDir,
   resolveCodexSkillsDir,
@@ -157,7 +157,7 @@ async function findBrokenAuthoringDiscoveryEntries(
         installedDir,
         skillName
       );
-      if (inspection.ok || inspection.status === "ok") {
+      if (inspection.status === "ok") {
         continue;
       }
       brokenEntries.push({
@@ -456,7 +456,10 @@ export async function checkAuthoringSkillsStaleness(
   _config: RuntimeConfig,
   options: CheckAuthoringSkillsStalenessOptions = {}
 ): Promise<DoctorCheckResult> {
-  const installedDir = options.installedDir ?? DEFAULT_AUTHORING_SKILLS_DIR;
+  const installedDir = resolveAuthoringSkillsInstalledDir({
+    installedDir: options.installedDir,
+    homeDir: options.homeDir,
+  });
   const versionPath = join(installedDir, AUTHORING_SKILLS_VERSION_FILENAME);
   let cliVersion: string;
   try {

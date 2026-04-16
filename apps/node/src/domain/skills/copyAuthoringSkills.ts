@@ -57,7 +57,7 @@ function resolveHomeDir(options: CopyAuthoringSkillsOptions): string {
   return resolve(options.homeDir ?? homedir());
 }
 
-function resolveInstalledDir(options: CopyAuthoringSkillsOptions): string {
+export function resolveAuthoringSkillsInstalledDir(options: Pick<CopyAuthoringSkillsOptions, "installedDir" | "homeDir"> = {}): string {
   if (options.installedDir) {
     return resolve(options.installedDir);
   }
@@ -337,7 +337,7 @@ export async function copyAuthoringSkills(
   options: CopyAuthoringSkillsOptions = {}
 ): Promise<CopyAuthoringSkillsSuccess | CopyAuthoringSkillsError> {
   const sourceDir = resolvePackagedAuthoringSkillsSourceDir(options);
-  const installedDir = resolveInstalledDir(options);
+  const installedDir = resolveAuthoringSkillsInstalledDir(options);
   const agentDiscoveryDirs = resolveAgentDiscoveryDirs(options);
 
   let sourceStat;
