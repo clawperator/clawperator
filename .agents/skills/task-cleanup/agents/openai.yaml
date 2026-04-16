@@ -1,4 +1,4 @@
 interface:
   display_name: "Task Cleanup"
-  short_description: "Retire completed task packs safely"
-  default_prompt: "Use $task-cleanup to close out a completed task pack. Read SKILL.md first, then run all three gates in order: migrate durable knowledge, remove stale phase references from code, verify plan fidelity. Only delete the task folder after all gates pass."
+  short_description: "Retire completed task packs safely and triage leftover gaps"
+  default_prompt: "Use $task-cleanup to close out a completed task pack. Read SKILL.md first, then run all three gates in order: migrate durable knowledge, remove stale phase references from code, and verify plan fidelity with explicit gap triage. Only delete the task folder after all gates pass and any remaining gaps are fixed, deferred durably, or accepted."

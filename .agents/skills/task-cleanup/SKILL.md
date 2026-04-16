@@ -1,6 +1,6 @@
 ---
 name: task-cleanup
-description: Close out a completed task pack under tasks/. Migrates durable knowledge to permanent homes, removes stale phase-reference comments from code, compares final code state against the task plan, and deletes the task folder. Use when a task pack is done and ready to be retired.
+description: Close out a completed task pack under tasks/. Migrates durable knowledge to permanent homes, removes stale phase-reference comments from code, triages plan-vs-code gaps, and deletes the task folder. Use when a task pack is done and ready to be retired.
 ---
 
 # Task Cleanup
@@ -50,6 +50,7 @@ All three gates must pass before the task folder is deleted.
    - See the Plan Fidelity section below.
 5. Report results.
    - Summarize what was migrated, what was cleaned, and any flagged gaps.
+   - For each gap, state whether it is fixed, deferred into durable follow-up, or accepted as intentional variance.
    - If any gate has an unresolved blocker, stop here and present it for user decision.
 6. Delete the task folder.
    - Only after all gates pass and any blockers are resolved or explicitly accepted by the user.
@@ -200,6 +201,24 @@ Flag these as standout gaps:
 - A durable follow-up item in `plan.md` or `finalization-items.md` has no corresponding docs or code change
 - A test was explicitly required but is absent
 
+### Gap Triage
+
+When Gate 3 surfaces a gap, classify it before deciding whether the task pack can be deleted:
+
+- **Fix now** - The gap is small, local, and can be resolved without reopening the task pack or changing the intended scope.
+- **Defer** - The gap is real work that should survive cleanup. Move it into durable follow-up, a new task pack, or another durable home with enough detail for the next agent to act on it.
+- **Accept** - The gap is deliberate variance, already risk-assessed, and does not block shipping.
+
+For each unresolved gap, write down:
+
+- what was planned
+- what exists now
+- why the gap matters
+- the recommended disposition
+- whether the disposition needs user confirmation
+
+Do not treat a gap as resolved until it has one of those three dispositions.
+
 ### How to report
 
 Produce a short gap report with two sections:
@@ -209,7 +228,7 @@ Produce a short gap report with two sections:
 
 **Flagged gaps:**
 - List each gap with: what was planned, what exists, and a suggested resolution.
-- For each gap, ask the user whether to fix it now, defer it in a new task, or accept it as intentional variance.
+- For each gap, state the recommended disposition and ask the user to confirm if it is not already fixed.
 
 Do not delete the task folder until the user has resolved or accepted all flagged gaps.
 
