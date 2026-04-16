@@ -23,6 +23,71 @@ Use raw `clawperator skills new <skill_id>` scaffolding directly when you are
 doing manual skill construction or editing an existing skill shape, not when
 you want the preferred end-to-end recording-to-skill workflow.
 
+## Authoring Skills Install
+
+Authoring skills are AI agent programs that help create or maintain skills.
+They are not runtime skills, and they are not loaded from
+`skills-registry.json`.
+
+Normal first-time users do not need to install them manually. The recommended
+installer:
+
+```bash
+curl -fsSL https://clawperator.com/install.sh | bash
+```
+
+already installs first-party authoring skills automatically.
+
+Current install model:
+
+| Surface | Path | Role |
+| --- | --- | --- |
+| Canonical authoring-skills store | `~/.clawperator/authoring-skills/` | copied first-party authoring skills |
+| Claude Code discovery dir | `~/.claude/skills/` | symlinks into the canonical store |
+| Codex discovery dir | `$CODEX_HOME/skills/` | symlinks into the canonical store when `CODEX_HOME` is set |
+| Codex default discovery dir | `~/.codex/skills/` | used when `CODEX_HOME` is unset |
+
+Maintenance and repair commands:
+
+| Command | Use it when | First-run requirement |
+| --- | --- | --- |
+| `clawperator authoring-skills install` | repair a missing install, or manually bootstrap authoring skills without `install.sh` | no |
+| `clawperator authoring-skills update` | re-copy and re-wire authoring skills after `npm install -g clawperator@latest` or after local conflicts are resolved | no |
+| `clawperator authoring-skills list` | inspect which authoring skills are installed and where their `SKILL.md` files live | no |
+
+Current command behavior:
+
+- `clawperator authoring-skills install` copies packaged first-party authoring
+  skills into `~/.clawperator/authoring-skills/` and recreates discovery
+  symlinks for Claude Code and Codex
+- `clawperator authoring-skills update` runs the same copy-and-wire flow but
+  reports the result as an update rather than a first install
+- `clawperator authoring-skills list` reports installed skill names and the
+  absolute `SKILL.md` path for each installed authoring skill
+
+Current doctor behavior:
+
+- `clawperator doctor` includes `host.authoring-skills.staleness`
+- if `~/.clawperator/authoring-skills/` does not exist, doctor reports
+  `pass` with `Authoring skills not yet installed.`
+- if `version.txt` is missing or does not match the current CLI version,
+  doctor reports `warn` and recommends `clawperator authoring-skills update`
+
+Verification pattern:
+
+```bash
+clawperator authoring-skills list --json
+clawperator doctor --json
+```
+
+Expected signals:
+
+- `authoring-skills list --json` returns `installedDir` as
+  `~/.clawperator/authoring-skills/` or the resolved absolute equivalent on the
+  current host
+- `doctor --json` includes a check with
+  `"id": "host.authoring-skills.staleness"`
+
 ## Recording-Driven Workflow Stance
 
 When you create a skill from a recording, use these current authoring rules:
