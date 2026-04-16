@@ -7,23 +7,19 @@ Parent plan: `tasks/skills/author-skills/install/plan.md`
 2 PRs, 5 phases. PR-1 (Phases 1-2) delivers the Node foundation: SKILL.md
 portability fix, npm package scaffolding, Node CLI implementation, and unit
 tests. PR-2 (Phases 3-5) delivers install.sh wiring, doctor staleness check,
-and docs updates. PR-2 has a hard merge gate on PR-1 being merged AND the
-updated npm package published, because install.sh calls `clawperator
-authoring-skills install` which must exist in the installed CLI. Phases 1 and 2
-are complete on `skills/author-skills-install-pr1`. Phase 3 is next once PR-1
-is merged and the updated npm package is published.
+and docs updates. All five phases are complete.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | PR-1 complete locally; PR-2 blocked pending merge + npm publish |
+| State | Complete |
 | Total PRs | 2 |
 | Total phases | 5 |
-| Completed | 1, 2 |
-| Remaining | 3, 4, 5 |
-| Current / Next | Phase 3 |
-| Blockers | PR-1 merge and updated npm package publish |
+| Completed | 1, 2, 3, 4, 5 |
+| Remaining | none |
+| Current / Next | complete |
+| Blockers | none |
 
 ## Hard Rules
 
