@@ -929,18 +929,17 @@ resolve_cli_entrypoint_js() {
     fi
 
     local NPM_GLOBAL_ROOT=""
+    local RESOLVED=""
     if command -v npm > /dev/null 2>&1; then
         NPM_GLOBAL_ROOT="$(npm root -g 2>/dev/null || true)"
     fi
 
-    local RESOLVED=""
-    RESOLVED="$(NODE_PATH="$NPM_GLOBAL_ROOT" node -e '
-try {
-  console.log(require.resolve("clawperator/dist/cli/index.js"));
-} catch (error) {
-  process.exit(1);
-}
-' 2>/dev/null || true)"
+    if [ -n "$NPM_GLOBAL_ROOT" ]; then
+        RESOLVED="$NPM_GLOBAL_ROOT/clawperator/dist/cli/index.js"
+        if [ ! -f "$RESOLVED" ]; then
+            RESOLVED=""
+        fi
+    fi
 
     printf '%s\n' "$RESOLVED"
 }
@@ -1075,7 +1074,7 @@ clawperator click --text "Settings" --json  # tap an element
 
 ## Documentation
 
-- Docs index: https://docs.clawperator.com/llms.txt
+- LLM guide: https://docs.clawperator.com/llms.txt
 - Full docs: https://docs.clawperator.com/llms-full.txt
 - Setup guide: https://docs.clawperator.com/setup/
 EOF
@@ -1694,7 +1693,7 @@ main() {
     print_durable_artifact_summary
     echo ""
     echo -e "For more info, visit: ${BLUE}https://docs.clawperator.com${NC}"
-    echo -e "Docs index: ${BLUE}https://docs.clawperator.com/llms.txt${NC}"
+    echo -e "LLM guide: ${BLUE}https://docs.clawperator.com/llms.txt${NC}"
     echo ""
 
     show_star_hint

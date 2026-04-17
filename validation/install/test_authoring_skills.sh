@@ -430,6 +430,49 @@ EOF
     ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$cli_js_value" "$output_file" "$snippet_file"
 }
 
+run_resolve_cli_entrypoint_case() {
+    local label="$1"
+    local output_file="$2"
+    local mock_dir="$TMP_DIR/mock-resolve-cli-$label"
+    local cwd_dir="$TMP_DIR/cwd-resolve-cli-$label"
+    local global_root="$TMP_DIR/global-root-resolve-cli-$label"
+    local local_package_json="$cwd_dir/node_modules/clawperator/package.json"
+    local global_package_json="$global_root/clawperator/package.json"
+    local local_cli_js="$cwd_dir/node_modules/clawperator/dist/cli/index.js"
+    local global_cli_js="$global_root/clawperator/dist/cli/index.js"
+    local node_bin_dir
+
+    node_bin_dir="$(dirname "$(command -v node)")"
+
+    mkdir -p "$mock_dir" "${local_cli_js%/*}" "${global_cli_js%/*}"
+    printf '%s\n' '{"name":"clawperator","version":"0.0.0-test"}' > "$local_package_json"
+    printf '%s\n' '{"name":"clawperator","version":"0.0.0-test"}' > "$global_package_json"
+    printf '%s\n' '// local cwd clawperator' > "$local_cli_js"
+    printf '%s\n' '// global root clawperator' > "$global_cli_js"
+
+    cat > "$mock_dir/npm" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+if [ "\${1:-}" = "root" ] && [ "\${2:-}" = "-g" ]; then
+  printf '%s\n' "$global_root"
+  exit 0
+fi
+exit 99
+EOF
+    chmod +x "$mock_dir/npm"
+
+    HOME="$TMP_DIR/home-resolve-cli-$label" \
+    OS=Linux \
+    PATH="$mock_dir:$node_bin_dir:/usr/bin:/bin" \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        unset CLAWPERATOR_CLI_JS_PATH
+        cd "$2"
+        printf "%s\n" "$(resolve_cli_entrypoint_js)" > "$3"
+    ' _ "$INSTALL_SCRIPT" "$cwd_dir" "$output_file"
+}
+
 run_durable_summary_case() {
     local label="$1"
     local output_file="$2"
@@ -583,6 +626,7 @@ run_guide_case guide-missing-version without-version with-runtime-registry "$GUI
 GUIDE_PATH="$(cat "$GUIDE_PATH_FILE")"
 assert_contains "$GUIDE_OUT" "Wrote agent guide" "guide-missing-version"
 assert_contains "$GUIDE_PATH" "## Runtime Skills" "guide-missing-version file"
+assert_contains "$GUIDE_PATH" "LLM guide: https://docs.clawperator.com/llms.txt" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" 'Inspect required inputs before running with `clawperator skills get <id>`.' "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "### Application" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "App ID:" "guide-missing-version file"
@@ -775,6 +819,14 @@ assert_json_field_equals "$MCP_CONFIG_PATH" "genericStdioConsumer.server.command
 assert_not_contains "$MCP_CONFIG_PATH" "npm shell wrapper" "mcp-config no wrapper note when node-form resolved"
 assert_not_contains "$MCP_CONFIG_PATH" "<set ADB_PATH" "mcp-config no adb placeholder when adb resolved"
 assert_mode "$MCP_CONFIG_PATH" "600" "mcp-config mode"
+
+echo "=== Scenario 17d: CLI entrypoint resolver prefers npm global root over cwd node_modules ==="
+RESOLVE_CLI_ENTRYPOINT_OUT="$TMP_DIR/resolve-cli-entrypoint.out"
+run_resolve_cli_entrypoint_case global-root "$RESOLVE_CLI_ENTRYPOINT_OUT"
+assert_equals \
+    "$TMP_DIR/global-root-resolve-cli-global-root/clawperator/dist/cli/index.js" \
+    "$(cat "$RESOLVE_CLI_ENTRYPOINT_OUT")" \
+    "resolve-cli-entrypoint global-root"
 
 echo "=== Scenario 17b: MCP config writer falls back to npm wrapper when CLI JS unresolvable ==="
 MCP_FALLBACK_OUT="$TMP_DIR/mcp-fallback.out"
