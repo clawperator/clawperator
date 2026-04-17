@@ -124,6 +124,55 @@ Success conditions:
 - `clawperator version` exits `0` and prints a version string.
 - If you used `install.sh`, the installer also downloads the current release APK to `~/.clawperator/downloads/operator.apk`.
 
+### Durable host-agent artifacts from `install.sh`
+
+If you used `install.sh`, it also writes these durable onboarding files under `~/.clawperator/`:
+
+| Path | Meaning | When to read it |
+| --- | --- | --- |
+| `~/.clawperator/AGENTS.md` | Local Clawperator guide with runtime-skill discovery commands and current authoring-skills status | First stop for a host agent that needs to discover what Clawperator can do on this machine |
+| `~/.clawperator/install-state.json` | Durable install metadata written by the installer | Use when you need the last known install facts without rerunning `doctor` |
+| `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config for Claude Desktop, Codex, and a generic stdio MCP consumer | Use when the host should connect through `clawperator mcp serve` instead of shelling out to the CLI |
+
+`install-state.json` currently has this shape:
+
+```json
+{
+  "schemaVersion": 1,
+  "installedAt": "2026-04-17T08:12:34Z",
+  "cliVersion": "1.2.3",
+  "registryPath": "/Users/<local_user>/.clawperator/skills/skills/skills-registry.json",
+  "apkVersion": "1.2.3",
+  "lastDeviceSerial": null
+}
+```
+
+Field rules:
+
+- `schemaVersion`, `installedAt`, and `cliVersion` are always present
+- `registryPath` is `null` when runtime skills were not installed successfully
+- `apkVersion` is `null` when the installer does not have a known operator version
+- `lastDeviceSerial` is `null` when install did not pick one unambiguous device
+
+Shared-agent bridge behavior is intentionally bounded:
+
+- if `~/.agents/AGENTS.md` already exists, the installer appends one Clawperator-owned bridge block there
+- that bridge points back to `~/.clawperator/AGENTS.md` plus the `clawperator skills` discovery commands
+- if `~/.agents/AGENTS.md` does not exist, the installer does not create it
+- the installer does not copy runtime skills into shared agent skill directories
+
+Verification:
+
+```bash
+ls ~/.clawperator/AGENTS.md ~/.clawperator/install-state.json ~/.clawperator/mcp-config-snippet.json
+test ! -f ~/.agents/AGENTS.md || grep -F "CLAWPERATOR_SHARED_AGENT_BRIDGE:START" ~/.agents/AGENTS.md
+```
+
+When choosing the host-facing surface:
+
+- use `clawperator skills` when you want to discover or run installed runtime skills by app, keyword, or id
+- use MCP when your host already supports stdio MCP and wants registered tools such as `devices`, `snapshot`, and `execute`
+
 ## 2. Prepare the Android target
 
 Required device state:
@@ -6167,6 +6216,7 @@ Describe the first-party stdio MCP server exposed by `clawperator mcp serve`: ho
 - Core tools: `apps/node/src/mcp/tools/core.ts`
 - Named tools: `apps/node/src/mcp/tools/named.ts`
 - MCP session defaults: `apps/node/src/mcp/session.ts`
+- Installer-generated MCP snippet: `sites/landing/public/install.sh`
 - Execution contract: `apps/node/src/contracts/execution.ts`
 - Error codes: `apps/node/src/contracts/errors.ts`
 - Selector contract: `apps/node/src/contracts/selectors.ts`
@@ -6206,6 +6256,23 @@ Notes:
 - Global CLI flags such as `--device`, `--device-id`, and `--operator-package` are not accepted on the `mcp serve` argv line. Pass `deviceId` and `operatorPackage` per MCP tool call instead, or store them for the current MCP session with `configure`.
 - Node.js `24+` is required.
 
+## Installer-Generated Snippet
+
+`install.sh` writes a host-specific MCP snippet to:
+
+- `~/.clawperator/mcp-config-snippet.json`
+
+That file is generated from the installer's current binary path, detected `adb`
+path, `DEFAULT_OPERATOR_PACKAGE` (`com.clawperator.operator`), and
+`~/.clawperator/logs`. It includes:
+
+- `claudeDesktop.entry.clawperator`
+- `codex.entryToml`
+- `genericStdioConsumer.server`
+
+The installer does not auto-register the MCP server with any client. The file
+is a paste-ready bridge, not an automatic configuration mutation.
+
 ## Claude Desktop Example
 
 Example `mcpServers` entry:
@@ -6236,6 +6303,25 @@ Why `node` is the command:
 - the npm package ships `dist/cli/index.js`
 - MCP desktop clients usually want an explicit executable plus argument list
 - using `node` plus the installed CLI entrypoint avoids relying on shell wrappers
+
+## When To Use MCP Versus `clawperator skills`
+
+Use `clawperator skills` when:
+
+- your host can shell out to the CLI directly
+- you want to discover installed runtime skills by app, keyword, or id
+- you want the runtime-skill wrapper semantics from `skills get` and `skills run`
+
+Use MCP when:
+
+- your host already supports stdio MCP
+- you want a long-running registered tool surface instead of repeated CLI process launches
+- you need general device tools such as `devices`, `snapshot`, `execute`, and `configure`, not only runtime-skill discovery
+
+These surfaces are complementary:
+
+- `clawperator skills` is the primary runtime-skill discovery and wrapper surface
+- `clawperator mcp serve` is the primary tool-registration surface for MCP-capable hosts
 
 ## Environment For Long-Running MCP Clients
 
@@ -8386,6 +8472,7 @@ Explain what Clawperator skills are, how the registry model works, how skills ar
 - Runtime wrapper: `apps/node/src/domain/skills/runSkill.ts`
 - Listing and search: `apps/node/src/domain/skills/listSkills.ts`, `apps/node/src/domain/skills/searchSkills.ts`
 - CLI surface: `apps/node/src/cli/commands/skills.ts`, `apps/node/src/cli/registry.ts`
+- Installer outputs: `sites/landing/public/install.sh`
 - Serve API wrapper: `apps/node/src/cli/commands/serve.ts`
 
 ## What Skills Are
@@ -8405,6 +8492,12 @@ Authoring skills are a separate category of AI agent programs that live in
 `.agents/skills/` in source form and install separately into
 `~/.clawperator/authoring-skills/` plus the Claude Code, Codex, and generic
 agents (`~/.agents/skills/`) discovery directories.
+
+Installer-facing discovery is deliberately split:
+
+- `~/.clawperator/AGENTS.md` is the installer-written local guide for runtime skills
+- if `~/.agents/AGENTS.md` already exists, the installer appends one bounded Clawperator bridge there that points back to `~/.clawperator/AGENTS.md` and the `clawperator skills` discovery commands
+- the installer does not mirror runtime skills into shared agent skill directories such as `~/.agents/skills/`, `~/.claude/skills/`, or `~/.codex/skills/`
 
 ## Skill Categories
 
@@ -8559,6 +8652,8 @@ That path is assembled from these literals in `apps/node/src/domain/skills/skill
 
 Use `skills list --json` to confirm that the registry path in your current shell is readable:
 
+- after `install.sh`, this works in a fresh non-login shell because `loadRegistry()` falls back to `~/.clawperator/skills/skills/skills-registry.json` when no explicit registry path or env var is active
+
 ```bash
 clawperator skills list --json
 ```
@@ -8597,7 +8692,7 @@ If the registry cannot be read, every discovery command fails with `REGISTRY_REA
 Recovery depends on how the path was chosen:
 
 - when `CLAWPERATOR_SKILLS_REGISTRY` points at a missing file, update the env var or run `clawperator skills install`
-- when no env var is set and the current working directory does not contain `skills/skills-registry.json`, run from the expected repo root or set `CLAWPERATOR_SKILLS_REGISTRY`
+- when no env var is set and neither the current working directory nor `~/.clawperator/skills/skills/skills-registry.json` contains the registry, run from the expected repo root, run `clawperator skills install`, or set `CLAWPERATOR_SKILLS_REGISTRY`
 - when the registry file exists but does not contain a `skills` array, fix the JSON because `loadRegistry()` rejects that shape with `Invalid registry: skills array required`
 
 Wrapper failure fields like `stdout` and `stderr` are optional. `runSkill.ts` includes them only when the child process actually emitted non-empty data on those streams.
@@ -8680,6 +8775,8 @@ Equal-ranked results keep their original registry order.
 ### `skills for-app`
 
 `cmdSkillsForApp()` is a thin discovery alias over `skills search --app <package_id>`.
+
+Use `skills for-app` when you already know the Android package id and want the shortest answer to "what can this host do for this app?" Use `skills search --keyword` when you only have user-language terms such as app names or intents.
 
 Example:
 

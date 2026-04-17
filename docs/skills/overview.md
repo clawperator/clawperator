@@ -11,6 +11,7 @@ Explain what Clawperator skills are, how the registry model works, how skills ar
 - Runtime wrapper: `apps/node/src/domain/skills/runSkill.ts`
 - Listing and search: `apps/node/src/domain/skills/listSkills.ts`, `apps/node/src/domain/skills/searchSkills.ts`
 - CLI surface: `apps/node/src/cli/commands/skills.ts`, `apps/node/src/cli/registry.ts`
+- Installer outputs: `sites/landing/public/install.sh`
 - Serve API wrapper: `apps/node/src/cli/commands/serve.ts`
 
 ## What Skills Are
@@ -30,6 +31,12 @@ Authoring skills are a separate category of AI agent programs that live in
 `.agents/skills/` in source form and install separately into
 `~/.clawperator/authoring-skills/` plus the Claude Code, Codex, and generic
 agents (`~/.agents/skills/`) discovery directories.
+
+Installer-facing discovery is deliberately split:
+
+- `~/.clawperator/AGENTS.md` is the installer-written local guide for runtime skills
+- if `~/.agents/AGENTS.md` already exists, the installer appends one bounded Clawperator bridge there that points back to `~/.clawperator/AGENTS.md` and the `clawperator skills` discovery commands
+- the installer does not mirror runtime skills into shared agent skill directories such as `~/.agents/skills/`, `~/.claude/skills/`, or `~/.codex/skills/`
 
 ## Skill Categories
 
@@ -184,6 +191,8 @@ That path is assembled from these literals in `apps/node/src/domain/skills/skill
 
 Use `skills list --json` to confirm that the registry path in your current shell is readable:
 
+- after `install.sh`, this works in a fresh non-login shell because `loadRegistry()` falls back to `~/.clawperator/skills/skills/skills-registry.json` when no explicit registry path or env var is active
+
 ```bash
 clawperator skills list --json
 ```
@@ -222,7 +231,7 @@ If the registry cannot be read, every discovery command fails with `REGISTRY_REA
 Recovery depends on how the path was chosen:
 
 - when `CLAWPERATOR_SKILLS_REGISTRY` points at a missing file, update the env var or run `clawperator skills install`
-- when no env var is set and the current working directory does not contain `skills/skills-registry.json`, run from the expected repo root or set `CLAWPERATOR_SKILLS_REGISTRY`
+- when no env var is set and neither the current working directory nor `~/.clawperator/skills/skills/skills-registry.json` contains the registry, run from the expected repo root, run `clawperator skills install`, or set `CLAWPERATOR_SKILLS_REGISTRY`
 - when the registry file exists but does not contain a `skills` array, fix the JSON because `loadRegistry()` rejects that shape with `Invalid registry: skills array required`
 
 Wrapper failure fields like `stdout` and `stderr` are optional. `runSkill.ts` includes them only when the child process actually emitted non-empty data on those streams.
@@ -305,6 +314,8 @@ Equal-ranked results keep their original registry order.
 ### `skills for-app`
 
 `cmdSkillsForApp()` is a thin discovery alias over `skills search --app <package_id>`.
+
+Use `skills for-app` when you already know the Android package id and want the shortest answer to "what can this host do for this app?" Use `skills search --keyword` when you only have user-language terms such as app names or intents.
 
 Example:
 
