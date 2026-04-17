@@ -64,74 +64,8 @@ assert_file_empty() {
     fi
 }
 
-json_field_value() {
-    local file="$1"
-    local field_path="$2"
-
-    node -e '
-const fs = require("fs");
-const filePath = process.argv[1];
-const fieldPath = process.argv[2];
-const json = JSON.parse(fs.readFileSync(filePath, "utf8"));
-const segments = fieldPath.split(".").filter(Boolean);
-let value = json;
-for (const segment of segments) {
-  if (value === undefined || value === null) {
-    value = undefined;
-    break;
-  }
-  if (/^\d+$/.test(segment)) {
-    value = value[Number(segment)];
-  } else {
-    value = value[segment];
-  }
-}
-if (value === undefined) {
-  process.stdout.write("__undefined__");
-} else if (value === null) {
-  process.stdout.write("null");
-} else {
-  process.stdout.write(String(value));
-}
-' "$file" "$field_path"
-}
-
-assert_json_field_equals() {
-    local file="$1"
-    local field="$2"
-    local expected="$3"
-    local label="$4"
-    local actual
-    actual="$(json_field_value "$file" "$field")"
-    assert_equals "$expected" "$actual" "$label"
-}
-
-assert_json_field_null() {
-    local file="$1"
-    local field="$2"
-    local label="$3"
-    assert_json_field_equals "$file" "$field" "null" "$label"
-}
-
-assert_json_field_is_iso_timestamp() {
-    local file="$1"
-    local field="$2"
-    local label="$3"
-    if ! node -e '
-const fs = require("fs");
-const filePath = process.argv[1];
-const field = process.argv[2];
-const json = JSON.parse(fs.readFileSync(filePath, "utf8"));
-const value = json[field];
-if (typeof value !== "string" || Number.isNaN(Date.parse(value))) {
-  process.exit(1);
-}
-' "$file" "$field"; then
-        echo "ERROR: $label expected parseable ISO timestamp in $field" >&2
-        cat "$file" >&2
-        return 1
-    fi
-}
+# shellcheck source=lib/json_assert.sh
+source "$REPO_ROOT/validation/install/lib/json_assert.sh"
 
 run_parser_case() {
     local label="$1"
@@ -380,28 +314,56 @@ run_skip_case() {
 
 run_mcp_config_case() {
     local label="$1"
-    local output_file="$2"
-    local snippet_file="$3"
+    local adb_mode="$2"
+    local cli_js_mode="$3"
+    local output_file="$4"
+    local snippet_file="$5"
     local mock_dir="$TMP_DIR/mock-mcp-$label"
+    local mock_cli_js="$mock_dir/clawperator-cli.js"
 
     setup_mock_clawperator "$mock_dir" "success" '{}'
-    cat > "$mock_dir/adb" <<'EOF'
+    if [ "$adb_mode" = "with-adb" ]; then
+        cat > "$mock_dir/adb" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 exit 0
 EOF
-    chmod +x "$mock_dir/adb"
+        chmod +x "$mock_dir/adb"
+    fi
+
+    # A non-empty placeholder JS file is enough: resolve_cli_entrypoint_js
+    # only needs a path, it does not execute this file.
+    printf '// mock cli entrypoint for tests\n' > "$mock_cli_js"
+
+    local cli_js_value=""
+    if [ "$cli_js_mode" = "with-cli-js" ]; then
+        cli_js_value="$mock_cli_js"
+    fi
+
+    # For the without-adb case, use a narrow PATH that excludes the user's
+    # shell PATH so adb lookup fails deterministically even on a developer
+    # machine with adb installed elsewhere. node and mkdir come from the
+    # mock_dir plus /usr/bin:/bin.
+    local node_bin_dir
+    node_bin_dir="$(dirname "$(command -v node)")"
+    local mcp_path
+    if [ "$adb_mode" = "with-adb" ]; then
+        mcp_path="$mock_dir:$PATH"
+    else
+        mcp_path="$mock_dir:$node_bin_dir:/usr/bin:/bin"
+    fi
 
     HOME="$TMP_DIR/home-mcp-$label" \
     OS=Linux \
-    PATH="$mock_dir:$PATH" \
+    PATH="$mcp_path" \
     bash -c '
         source "$1" >/dev/null 2>&1
         trap - ERR
         export CLAWPERATOR_BIN_PATH="$2"
-        write_mcp_config_snippet > "$3"
-        printf "%s\n" "$HOME/.clawperator/mcp-config-snippet.json" > "$4"
-    ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$output_file" "$snippet_file"
+        export CLAWPERATOR_CLI_JS_PATH="$3"
+        write_mcp_config_snippet > "$4"
+        printf "%s\n" "$HOME/.clawperator/mcp-config-snippet.json" > "$5"
+    ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$cli_js_value" "$output_file" "$snippet_file"
 }
 
 run_durable_summary_case() {
@@ -641,6 +603,22 @@ assert_json_field_null "$INSTALL_STATE_NULL_PATH" "registryPath" "install-state-
 assert_json_field_null "$INSTALL_STATE_NULL_PATH" "apkVersion" "install-state-null apkVersion"
 assert_json_field_null "$INSTALL_STATE_NULL_PATH" "lastDeviceSerial" "install-state-null lastDeviceSerial"
 
+echo "=== Scenario 13b: install-state writer emits null cliVersion when CLI is unresolvable ==="
+INSTALL_STATE_NO_CLI_OUT="$TMP_DIR/install-state-no-cli.out"
+INSTALL_STATE_NO_CLI_PATH="$TMP_DIR/home-state-no-cli/.clawperator/install-state.json"
+HOME="$TMP_DIR/home-state-no-cli" \
+OS=Linux \
+bash -c '
+    source "$1" >/dev/null 2>&1
+    trap - ERR
+    unset CLAWPERATOR_BIN_PATH
+    write_install_state > "$2"
+' _ "$INSTALL_SCRIPT" "$INSTALL_STATE_NO_CLI_OUT"
+assert_contains "$INSTALL_STATE_NO_CLI_OUT" "Wrote install state" "install-state-no-cli output"
+assert_json_field_equals "$INSTALL_STATE_NO_CLI_PATH" "schemaVersion" "1" "install-state-no-cli schemaVersion"
+assert_json_field_is_iso_timestamp "$INSTALL_STATE_NO_CLI_PATH" "installedAt" "install-state-no-cli installedAt"
+assert_json_field_null "$INSTALL_STATE_NO_CLI_PATH" "cliVersion" "install-state-no-cli cliVersion"
+
 echo "=== Scenario 14: skip flag suppresses both runtime and authoring skills setup ==="
 SKIP_SKILLS_OUT="$TMP_DIR/skip-skills.out"
 SKIP_AUTHORING_OUT="$TMP_DIR/skip-authoring.out"
@@ -654,24 +632,48 @@ assert_contains "$SKIP_STATUS" "skills=skipped" "skip-status"
 assert_contains "$SKIP_STATUS" "authoring=skipped" "skip-status"
 assert_equals "" "$(cat "$SKIP_LOG")" "skip command log"
 
-echo "=== Scenario 15: MCP config writer emits paste-ready snippets ==="
+echo "=== Scenario 15: MCP config writer emits paste-ready node-form snippet ==="
 MCP_CONFIG_OUT="$TMP_DIR/mcp-config.out"
 MCP_CONFIG_PATH_FILE="$TMP_DIR/mcp-config.path"
-run_mcp_config_case authoring "$MCP_CONFIG_OUT" "$MCP_CONFIG_PATH_FILE"
+run_mcp_config_case authoring with-adb with-cli-js "$MCP_CONFIG_OUT" "$MCP_CONFIG_PATH_FILE"
 MCP_CONFIG_PATH="$(cat "$MCP_CONFIG_PATH_FILE")"
+MCP_CLI_JS_PATH="$TMP_DIR/mock-mcp-authoring/clawperator-cli.js"
 assert_contains "$MCP_CONFIG_OUT" "Wrote MCP config snippet" "mcp-config"
 assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.mergeKey" "mcpServers" "mcp-config claude mergeKey"
-assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.command" "$TMP_DIR/mock-mcp-authoring/clawperator" "mcp-config claude command"
-assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.0" "mcp" "mcp-config claude args.0"
-assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.1" "serve" "mcp-config claude args.1"
+assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.command" "node" "mcp-config claude command"
+assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.0" "$MCP_CLI_JS_PATH" "mcp-config claude args.0"
+assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.1" "mcp" "mcp-config claude args.1"
+assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.2" "serve" "mcp-config claude args.2"
 assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.env.ADB_PATH" "$TMP_DIR/mock-mcp-authoring/adb" "mcp-config claude env.ADB_PATH"
 assert_json_field_equals "$MCP_CONFIG_PATH" "codex.configPath" "$TMP_DIR/home-mcp-authoring/.codex/config.toml" "mcp-config codex configPath"
 assert_json_field_equals "$MCP_CONFIG_PATH" "notes.0" "This snippet is generated for the current host." "mcp-config notes.0"
-assert_equals "serve" "$(json_field_value "$MCP_CONFIG_PATH" "genericStdioConsumer.server.args.1")" "mcp-config helper direct call"
+assert_equals "mcp" "$(json_field_value "$MCP_CONFIG_PATH" "genericStdioConsumer.server.args.1")" "mcp-config helper direct call"
+assert_json_field_equals "$MCP_CONFIG_PATH" "genericStdioConsumer.server.args.2" "serve" "mcp-config generic args.2"
 assert_contains "$MCP_CONFIG_PATH" '[mcp_servers.clawperator]' "mcp-config codex entryToml"
-assert_contains "$MCP_CONFIG_PATH" 'args = [\"mcp\", \"serve\"]' "mcp-config codex entryToml"
+assert_contains "$MCP_CONFIG_PATH" "args = [\\\"$MCP_CLI_JS_PATH\\\", \\\"mcp\\\", \\\"serve\\\"]" "mcp-config codex entryToml"
 assert_json_field_equals "$MCP_CONFIG_PATH" "genericStdioConsumer.serverName" "clawperator" "mcp-config generic serverName"
-assert_json_field_equals "$MCP_CONFIG_PATH" "genericStdioConsumer.server.command" "$TMP_DIR/mock-mcp-authoring/clawperator" "mcp-config generic command"
+assert_json_field_equals "$MCP_CONFIG_PATH" "genericStdioConsumer.server.command" "node" "mcp-config generic command"
+assert_not_contains "$MCP_CONFIG_PATH" "npm shell wrapper" "mcp-config no wrapper note when node-form resolved"
+assert_not_contains "$MCP_CONFIG_PATH" "<set ADB_PATH" "mcp-config no adb placeholder when adb resolved"
+
+echo "=== Scenario 15b: MCP config writer falls back to npm wrapper when CLI JS unresolvable ==="
+MCP_FALLBACK_OUT="$TMP_DIR/mcp-fallback.out"
+MCP_FALLBACK_PATH_FILE="$TMP_DIR/mcp-fallback.path"
+run_mcp_config_case fallback with-adb without-cli-js "$MCP_FALLBACK_OUT" "$MCP_FALLBACK_PATH_FILE"
+MCP_FALLBACK_PATH="$(cat "$MCP_FALLBACK_PATH_FILE")"
+assert_json_field_equals "$MCP_FALLBACK_PATH" "claudeDesktop.entry.clawperator.command" "$TMP_DIR/mock-mcp-fallback/clawperator" "mcp-fallback claude command"
+assert_json_field_equals "$MCP_FALLBACK_PATH" "claudeDesktop.entry.clawperator.args.0" "mcp" "mcp-fallback claude args.0"
+assert_json_field_equals "$MCP_FALLBACK_PATH" "claudeDesktop.entry.clawperator.args.1" "serve" "mcp-fallback claude args.1"
+assert_contains "$MCP_FALLBACK_PATH" "npm shell wrapper" "mcp-fallback includes wrapper fallback note"
+assert_contains "$MCP_FALLBACK_PATH" 'args = [\"mcp\", \"serve\"]' "mcp-fallback codex entryToml wrapper args"
+
+echo "=== Scenario 15c: MCP config writer emits placeholder when adb is missing ==="
+MCP_NOADB_OUT="$TMP_DIR/mcp-noadb.out"
+MCP_NOADB_PATH_FILE="$TMP_DIR/mcp-noadb.path"
+run_mcp_config_case noadb without-adb with-cli-js "$MCP_NOADB_OUT" "$MCP_NOADB_PATH_FILE"
+MCP_NOADB_PATH="$(cat "$MCP_NOADB_PATH_FILE")"
+assert_json_field_equals "$MCP_NOADB_PATH" "claudeDesktop.entry.clawperator.env.ADB_PATH" "<set ADB_PATH to your adb binary>" "mcp-noadb claude env.ADB_PATH placeholder"
+assert_contains "$MCP_NOADB_PATH" "adb was not found on PATH" "mcp-noadb includes adb note"
 
 echo "=== Scenario 16: durable summary points at local artifacts ==="
 DURABLE_SUMMARY_OUT="$TMP_DIR/durable-summary.out"

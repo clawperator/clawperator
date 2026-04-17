@@ -764,7 +764,7 @@ resolve_cli_version() {
         fi
     fi
 
-    printf '%s\n' "unknown"
+    printf '%s\n' ""
 }
 
 write_install_state() {
@@ -810,7 +810,7 @@ function nullableEnv(name) {
 const installState = {
   schemaVersion: 1,
   installedAt: requiredEnv("INSTALL_STATE_INSTALLED_AT"),
-  cliVersion: requiredEnv("INSTALL_STATE_CLI_VERSION"),
+  cliVersion: nullableEnv("INSTALL_STATE_CLI_VERSION"),
   registryPath: nullableEnv("INSTALL_STATE_REGISTRY_PATH"),
   apkVersion: nullableEnv("INSTALL_STATE_APK_VERSION"),
   lastDeviceSerial: nullableEnv("INSTALL_STATE_LAST_DEVICE_SERIAL"),
@@ -828,12 +828,44 @@ resolve_adb_path_for_mcp() {
         return 0
     fi
 
-    printf '%s\n' "adb"
+    printf '%s\n' ""
+}
+
+# Resolves the absolute path of the installed Clawperator CLI JS entrypoint
+# (e.g. <npm_global_root>/clawperator/dist/cli/index.js). MCP clients like
+# Claude Desktop work best with "node <js>" rather than the npm shell wrapper,
+# per docs/api/mcp.md. Prints an empty string when resolution is not possible.
+# Tests may override by exporting CLAWPERATOR_CLI_JS_PATH before the call.
+resolve_cli_entrypoint_js() {
+    # When CLAWPERATOR_CLI_JS_PATH is explicitly set (even to empty), treat it
+    # as authoritative. Validation harnesses use this to force either the node
+    # form (non-empty path) or the wrapper-fallback path (empty string).
+    if [ -n "${CLAWPERATOR_CLI_JS_PATH+x}" ]; then
+        printf '%s\n' "${CLAWPERATOR_CLI_JS_PATH}"
+        return 0
+    fi
+
+    local NPM_GLOBAL_ROOT=""
+    if command -v npm > /dev/null 2>&1; then
+        NPM_GLOBAL_ROOT="$(npm root -g 2>/dev/null || true)"
+    fi
+
+    local RESOLVED=""
+    RESOLVED="$(NODE_PATH="$NPM_GLOBAL_ROOT" node -e '
+try {
+  console.log(require.resolve("clawperator/dist/cli/index.js"));
+} catch (error) {
+  process.exit(1);
+}
+' 2>/dev/null || true)"
+
+    printf '%s\n' "$RESOLVED"
 }
 
 write_mcp_config_snippet() {
     local MCP_CONFIG_SNIPPET_PATH="$HOME/.clawperator/mcp-config-snippet.json"
-    local MCP_COMMAND="${CLAWPERATOR_BIN_PATH:-clawperator}"
+    local CLI_WRAPPER_PATH="${CLAWPERATOR_BIN_PATH:-clawperator}"
+    local CLI_JS_PATH
     local ADB_PATH_VALUE
     local LOG_DIR="$HOME/.clawperator/logs"
     local CODEX_CONFIG_PATH="${CODEX_HOME:-$HOME/.codex}/config.toml"
@@ -842,14 +874,16 @@ write_mcp_config_snippet() {
 
     mkdir -p "$HOME/.clawperator"
 
+    CLI_JS_PATH="$(resolve_cli_entrypoint_js)"
     ADB_PATH_VALUE="$(resolve_adb_path_for_mcp)"
 
-    node - "$MCP_CONFIG_SNIPPET_PATH" "$MCP_COMMAND" "$ADB_PATH_VALUE" "$DEFAULT_OPERATOR_PACKAGE" "$LOG_DIR" "$CODEX_CONFIG_PATH" "$CLAUDE_CONFIG_PATH_MAC" "$CLAUDE_CONFIG_PATH_LINUX" <<'EOF'
+    node - "$MCP_CONFIG_SNIPPET_PATH" "$CLI_WRAPPER_PATH" "$CLI_JS_PATH" "$ADB_PATH_VALUE" "$DEFAULT_OPERATOR_PACKAGE" "$LOG_DIR" "$CODEX_CONFIG_PATH" "$CLAUDE_CONFIG_PATH_MAC" "$CLAUDE_CONFIG_PATH_LINUX" <<'EOF'
 const fs = require("fs");
 
 const [
   snippetPath,
-  command,
+  cliWrapperPath,
+  cliJsPath,
   adbPath,
   operatorPackage,
   logDir,
@@ -858,22 +892,49 @@ const [
   claudeLinuxPath,
 ] = process.argv.slice(2);
 
+const ADB_PLACEHOLDER = "<set ADB_PATH to your adb binary>";
+const adbResolved = adbPath.length > 0;
+const adbValue = adbResolved ? adbPath : ADB_PLACEHOLDER;
+
+// Prefer "node <js>" per docs/api/mcp.md: MCP desktop clients usually do not
+// inherit the interactive shell PATH and "node <js>" avoids relying on the npm
+// shell wrapper. Fall back to the wrapper only when the JS entrypoint could not
+// be resolved.
+const useNodeForm = cliJsPath.length > 0;
+const command = useNodeForm ? "node" : cliWrapperPath;
+const args = useNodeForm
+  ? [cliJsPath, "mcp", "serve"]
+  : ["mcp", "serve"];
+
 const serverConfig = {
   command,
-  args: ["mcp", "serve"],
+  args,
   env: {
-    ADB_PATH: adbPath,
+    ADB_PATH: adbValue,
     CLAWPERATOR_OPERATOR_PACKAGE: operatorPackage,
     CLAWPERATOR_LOG_DIR: logDir,
     CLAWPERATOR_LOG_LEVEL: "info",
   },
 };
 
+const notes = [
+  "This snippet is generated for the current host.",
+  "Regenerate it with install.sh if the clawperator binary path or adb path changes.",
+];
+if (!useNodeForm) {
+  notes.push(
+    "Could not resolve the Clawperator CLI JS entrypoint, so this snippet uses the npm shell wrapper. Claude Desktop and other GUI MCP clients usually do not inherit your shell PATH; if launch fails, replace \"command\" with \"node\" and \"args\" with [\"<installed_clawperator_path>/dist/cli/index.js\", \"mcp\", \"serve\"]."
+  );
+}
+if (!adbResolved) {
+  notes.push(
+    `adb was not found on PATH at install time. Replace ADB_PATH (${ADB_PLACEHOLDER}) with the absolute path to your adb binary before using this snippet.`
+  );
+}
+
+const tomlArgs = args.map((value) => JSON.stringify(value)).join(", ");
 const snippet = {
-  notes: [
-    "This snippet is generated for the current host.",
-    "Regenerate it with install.sh if the clawperator binary path or adb path changes.",
-  ],
+  notes,
   claudeDesktop: {
     configPathHints: [claudeMacPath, claudeLinuxPath],
     mergeKey: "mcpServers",
@@ -886,9 +947,9 @@ const snippet = {
     entryToml: [
       "[mcp_servers.clawperator]",
       `command = ${JSON.stringify(command)}`,
-      "args = [\"mcp\", \"serve\"]",
+      `args = [${tomlArgs}]`,
       "[mcp_servers.clawperator.env]",
-      `ADB_PATH = ${JSON.stringify(adbPath)}`,
+      `ADB_PATH = ${JSON.stringify(adbValue)}`,
       `CLAWPERATOR_OPERATOR_PACKAGE = ${JSON.stringify(operatorPackage)}`,
       `CLAWPERATOR_LOG_DIR = ${JSON.stringify(logDir)}`,
       "CLAWPERATOR_LOG_LEVEL = \"info\"",
@@ -993,9 +1054,14 @@ write_shared_agent_bridge() {
         return 0
     fi
 
+    # Content between the START/END markers is installer-owned. Any hand edits
+    # inside that block will be overwritten on the next install.sh run. Edits
+    # elsewhere in ~/.agents/AGENTS.md are preserved.
     node - "$SHARED_AGENTS_PATH" "$LOCAL_AGENT_GUIDE_PATH" <<'EOF'
 const fs = require("fs");
 
+// Content between startMarker and endMarker is installer-owned and is
+// overwritten in place on every rerun. See the shell caller's comment.
 const [sharedAgentsPath, localAgentGuidePath] = process.argv.slice(2);
 const startMarker = "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:START -->";
 const endMarker = "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:END -->";
