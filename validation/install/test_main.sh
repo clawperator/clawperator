@@ -131,8 +131,17 @@ if [ "\$1" = "doctor" ] && [ "\$2" = "--output" ] && [ "\$3" = "pretty" ]; then
 fi
 
 if [ "\$1" = "skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
-  cat <<'JSON'
-{"registryPath":"/tmp/mock-skills-registry.json"}
+  HOME_DIR="\${HOME:?}"
+  REGISTRY_PATH="\$HOME_DIR/.clawperator/skills/skills/skills-registry.json"
+  mkdir -p "\${REGISTRY_PATH%/*}"
+  cat > "\$REGISTRY_PATH" <<'JSON'
+{"skills":[
+  {"id":"com.google.android.apps.chromecast.app.get-climate-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"get-climate","summary":"Read the current Google Home climate state.","path":"skills/com.google.android.apps.chromecast.app.get-climate-replay","skillFile":"skills/com.google.android.apps.chromecast.app.get-climate-replay/SKILL.md","scripts":[],"artifacts":[]},
+  {"id":"com.spotify.music.play-playlist","applicationId":"com.spotify.music","intent":"play-playlist","summary":"Start a named playlist in Spotify.","path":"skills/com.spotify.music.play-playlist","skillFile":"skills/com.spotify.music.play-playlist/SKILL.md","scripts":[],"artifacts":[]}
+]}
+JSON
+  cat <<JSON
+{"registryPath":"\$REGISTRY_PATH"}
 JSON
   exit 0
 fi
@@ -302,10 +311,14 @@ SUCCESS_GUIDE_PATH="$(cat "$SUCCESS_GUIDE_PATH_FILE")"
 assert_contains "$SUCCESS_STDOUT" "Installation Successful!" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Skills registry configured at:" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Authoring skills installed at:" "main-success stdout"
-assert_contains "$SUCCESS_STDOUT" "/tmp/mock-skills-registry.json" "main-success stdout"
+assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/skills/skills/skills-registry.json" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Doctor pretty output (success)" "main-success stdout"
+assert_contains "$SUCCESS_GUIDE_PATH" "## Runtime Skills" "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" "### com.google.android.apps.chromecast.app" "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" "clawperator skills run com.google.android.apps.chromecast.app.get-climate-replay" "main-success guide"
 assert_contains "$SUCCESS_GUIDE_PATH" "skill-author-by-recording" "main-success guide"
 assert_not_contains "$SUCCESS_GUIDE_PATH" "not currently configured on this host" "main-success guide"
+assert_not_contains "$SUCCESS_GUIDE_PATH" "Runtime skills not available on this host right now." "main-success guide"
 assert_contains "$SUCCESS_TRACE" "validate_os" "main-success trace"
 assert_contains "$SUCCESS_TRACE" "install_cli" "main-success trace"
 assert_contains "$SUCCESS_TRACE" "show_star_hint" "main-success trace"
@@ -336,6 +349,7 @@ FAIL_GUIDE_PATH="$(cat "$FAIL_GUIDE_PATH_FILE")"
 assert_contains "$FAIL_STDOUT" "Final doctor check failed." "main-fail stdout"
 assert_contains "$FAIL_STDOUT" "Doctor pretty output (failure)" "main-fail stdout"
 assert_not_contains "$FAIL_STDOUT" "Installation Successful!" "main-fail stdout"
+assert_contains "$FAIL_GUIDE_PATH" "### com.google.android.apps.chromecast.app" "main-fail guide"
 assert_contains "$FAIL_GUIDE_PATH" "skill-author-by-recording" "main-fail guide"
 assert_contains "$FAIL_CLI_LOG" "skills install --output json" "main-fail cli log"
 assert_contains "$FAIL_CLI_LOG" "authoring-skills install --output json" "main-fail cli log"

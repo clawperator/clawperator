@@ -173,8 +173,9 @@ run_setup_authoring_case() {
 run_guide_case() {
     local label="$1"
     local version_mode="$2"
-    local output_file="$3"
-    local guide_file="$4"
+    local runtime_mode="$3"
+    local output_file="$4"
+    local guide_file="$5"
 
     HOME="$TMP_DIR/home-$label" \
     OS=Linux \
@@ -189,9 +190,21 @@ run_guide_case() {
         if [ "$2" = "with-version" ]; then
           printf "1.2.3\n" > "$AUTHORING_SKILLS_INSTALL_DIR/version.txt"
         fi
-        write_agent_guide > "$3"
-        printf "%s\n" "$HOME/.clawperator/AGENTS.md" > "$4"
-    ' _ "$INSTALL_SCRIPT" "$version_mode" "$output_file" "$guide_file"
+        if [ "$3" = "with-runtime-registry" ]; then
+          mkdir -p "$HOME/.clawperator/skills/skills"
+          cat > "$HOME/.clawperator/skills/skills/skills-registry.json" <<'\''JSON'\''
+{"skills":[
+  {"id":"com.google.android.apps.chromecast.app.get-climate-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"get-climate","summary":"Read the current Google Home climate state.","path":"skills/com.google.android.apps.chromecast.app.get-climate-replay","skillFile":"skills/com.google.android.apps.chromecast.app.get-climate-replay/SKILL.md","scripts":[],"artifacts":[]},
+  {"id":"com.spotify.music.play-playlist","applicationId":"com.spotify.music","intent":"play-playlist","summary":"Start a named playlist in Spotify.","path":"skills/com.spotify.music.play-playlist","skillFile":"skills/com.spotify.music.play-playlist/SKILL.md","scripts":[],"artifacts":[]}
+]}
+JSON
+        elif [ "$3" = "with-invalid-runtime-registry" ]; then
+          mkdir -p "$HOME/.clawperator/skills/skills"
+          printf "{\\"skills\\":" > "$HOME/.clawperator/skills/skills/skills-registry.json"
+        fi
+        write_agent_guide > "$4"
+        printf "%s\n" "$HOME/.clawperator/AGENTS.md" > "$5"
+    ' _ "$INSTALL_SCRIPT" "$version_mode" "$runtime_mode" "$output_file" "$guide_file"
 }
 
 run_missing_guide_case() {
@@ -328,9 +341,15 @@ assert_contains "$AUTHORING_FAILURE_VALUES" "install=$TMP_DIR/home-authoring-fai
 echo "=== Scenario 7: guide writer lists installed skills and refresh guidance ==="
 GUIDE_OUT="$TMP_DIR/guide.out"
 GUIDE_PATH_FILE="$TMP_DIR/guide.path"
-run_guide_case guide-missing-version without-version "$GUIDE_OUT" "$GUIDE_PATH_FILE"
+run_guide_case guide-missing-version without-version with-runtime-registry "$GUIDE_OUT" "$GUIDE_PATH_FILE"
 GUIDE_PATH="$(cat "$GUIDE_PATH_FILE")"
 assert_contains "$GUIDE_OUT" "Wrote agent guide" "guide-missing-version"
+assert_contains "$GUIDE_PATH" "## Runtime Skills" "guide-missing-version file"
+assert_contains "$GUIDE_PATH" "### com.google.android.apps.chromecast.app" "guide-missing-version file"
+assert_contains "$GUIDE_PATH" 'intent `get-climate`' "guide-missing-version file"
+assert_contains "$GUIDE_PATH" "Read the current Google Home climate state." "guide-missing-version file"
+assert_contains "$GUIDE_PATH" "clawperator skills run com.google.android.apps.chromecast.app.get-climate-replay" "guide-missing-version file"
+assert_contains "$GUIDE_PATH" "### com.spotify.music" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "skill-author-by-recording" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "skill-audit" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "Version metadata is missing for this install." "guide-missing-version file"
@@ -339,9 +358,10 @@ assert_contains "$GUIDE_PATH" "clawperator authoring-skills update" "guide-missi
 echo "=== Scenario 8: guide writer with version omits refresh guidance ==="
 GUIDE_WITH_VERSION_OUT="$TMP_DIR/guide-with-version.out"
 GUIDE_WITH_VERSION_PATH_FILE="$TMP_DIR/guide-with-version.path"
-run_guide_case guide-with-version with-version "$GUIDE_WITH_VERSION_OUT" "$GUIDE_WITH_VERSION_PATH_FILE"
+run_guide_case guide-with-version with-version with-runtime-registry "$GUIDE_WITH_VERSION_OUT" "$GUIDE_WITH_VERSION_PATH_FILE"
 GUIDE_WITH_VERSION_PATH="$(cat "$GUIDE_WITH_VERSION_PATH_FILE")"
 assert_contains "$GUIDE_WITH_VERSION_OUT" "Wrote agent guide" "guide-with-version"
+assert_not_contains "$GUIDE_WITH_VERSION_PATH" "Runtime skills not available on this host right now." "guide-with-version file"
 assert_contains "$GUIDE_WITH_VERSION_PATH" "skill-author-by-recording" "guide-with-version file"
 assert_not_contains "$GUIDE_WITH_VERSION_PATH" "Version metadata is missing for this install." "guide-with-version file"
 assert_not_contains "$GUIDE_WITH_VERSION_PATH" "clawperator authoring-skills update" "guide-with-version file"
@@ -351,10 +371,20 @@ GUIDE_MISSING_OUT="$TMP_DIR/guide-missing.out"
 GUIDE_MISSING_PATH_FILE="$TMP_DIR/guide-missing.path"
 run_missing_guide_case guide-absent "$GUIDE_MISSING_OUT" "$GUIDE_MISSING_PATH_FILE"
 GUIDE_MISSING_PATH="$(cat "$GUIDE_MISSING_PATH_FILE")"
+assert_contains "$GUIDE_MISSING_PATH" "Runtime skills not available on this host right now." "guide-absent file"
 assert_contains "$GUIDE_MISSING_PATH" "First-party Clawperator authoring skills are not currently configured on this host." "guide-absent file"
 assert_contains "$GUIDE_MISSING_PATH" "clawperator authoring-skills install" "guide-absent file"
 
-echo "=== Scenario 10: skip flag suppresses both runtime and authoring skills setup ==="
+echo "=== Scenario 10: guide writer degrades cleanly when runtime registry is unreadable ==="
+GUIDE_INVALID_OUT="$TMP_DIR/guide-invalid.out"
+GUIDE_INVALID_PATH_FILE="$TMP_DIR/guide-invalid.path"
+run_guide_case guide-invalid-runtime without-version with-invalid-runtime-registry "$GUIDE_INVALID_OUT" "$GUIDE_INVALID_PATH_FILE"
+GUIDE_INVALID_PATH="$(cat "$GUIDE_INVALID_PATH_FILE")"
+assert_contains "$GUIDE_INVALID_OUT" "Wrote agent guide" "guide-invalid-runtime"
+assert_contains "$GUIDE_INVALID_PATH" "Runtime skills not available on this host right now." "guide-invalid-runtime file"
+assert_contains "$GUIDE_INVALID_PATH" "The registry exists but could not be read." "guide-invalid-runtime file"
+
+echo "=== Scenario 11: skip flag suppresses both runtime and authoring skills setup ==="
 SKIP_SKILLS_OUT="$TMP_DIR/skip-skills.out"
 SKIP_AUTHORING_OUT="$TMP_DIR/skip-authoring.out"
 SKIP_STATUS="$TMP_DIR/skip.status"
@@ -367,7 +397,7 @@ assert_contains "$SKIP_STATUS" "skills=skipped" "skip-status"
 assert_contains "$SKIP_STATUS" "authoring=skipped" "skip-status"
 assert_equals "" "$(cat "$SKIP_LOG")" "skip command log"
 
-echo "=== Scenario 11: operator metadata parser extracts all expected fields ==="
+echo "=== Scenario 12: operator metadata parser extracts all expected fields ==="
 METADATA_SUCCESS_OUT="$TMP_DIR/metadata-success.out"
 METADATA_SUCCESS_STATUS="$TMP_DIR/metadata-success.status"
 METADATA_SUCCESS_VALUES="$TMP_DIR/metadata-success.values"
@@ -384,7 +414,7 @@ assert_contains "$METADATA_SUCCESS_VALUES" "sha_url=https://example.com/operator
 assert_contains "$METADATA_SUCCESS_VALUES" "sha256=deadbeef" "metadata-success values"
 assert_file_empty "$METADATA_SUCCESS_OUT" "metadata-success output"
 
-echo "=== Scenario 12: operator metadata parser allows missing inline checksum ==="
+echo "=== Scenario 13: operator metadata parser allows missing inline checksum ==="
 METADATA_NO_SHA_OUT="$TMP_DIR/metadata-no-sha.out"
 METADATA_NO_SHA_STATUS="$TMP_DIR/metadata-no-sha.status"
 METADATA_NO_SHA_VALUES="$TMP_DIR/metadata-no-sha.values"
@@ -398,7 +428,7 @@ assert_equals "0" "$(cat "$METADATA_NO_SHA_STATUS")" "metadata-no-sha status"
 assert_contains "$METADATA_NO_SHA_VALUES" "sha256=" "metadata-no-sha values"
 assert_file_empty "$METADATA_NO_SHA_OUT" "metadata-no-sha output"
 
-echo "=== Scenario 13: operator metadata parser rejects missing required fields ==="
+echo "=== Scenario 14: operator metadata parser rejects missing required fields ==="
 METADATA_MISSING_OUT="$TMP_DIR/metadata-missing.out"
 METADATA_MISSING_STATUS="$TMP_DIR/metadata-missing.status"
 METADATA_MISSING_VALUES="$TMP_DIR/metadata-missing.values"
@@ -411,7 +441,7 @@ run_operator_metadata_case \
 assert_equals "1" "$(cat "$METADATA_MISSING_STATUS")" "metadata-missing status"
 assert_contains "$METADATA_MISSING_OUT" "Failed to parse APK metadata" "metadata-missing output"
 
-echo "=== Scenario 14: operator metadata parser rejects malformed JSON ==="
+echo "=== Scenario 15: operator metadata parser rejects malformed JSON ==="
 METADATA_BAD_OUT="$TMP_DIR/metadata-bad.out"
 METADATA_BAD_STATUS="$TMP_DIR/metadata-bad.status"
 METADATA_BAD_VALUES="$TMP_DIR/metadata-bad.values"

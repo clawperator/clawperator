@@ -597,6 +597,111 @@ setup_authoring_skills_via_cli() {
     return 0
 }
 
+append_runtime_skills_guide() {
+    local AGENT_GUIDE_PATH="$1"
+    local RUNTIME_SKILLS_REGISTRY_PATH="$HOME/.clawperator/skills/skills/skills-registry.json"
+
+    cat >> "$AGENT_GUIDE_PATH" <<'EOF'
+
+## Runtime Skills
+
+Use the installed runtime-skill registry to discover and run app workflows:
+- `clawperator skills list`
+- `clawperator skills search --keyword "<term>"`
+- `clawperator skills get <id>`
+- `clawperator skills run <id>`
+EOF
+
+    if [ ! -r "$RUNTIME_SKILLS_REGISTRY_PATH" ]; then
+        cat >> "$AGENT_GUIDE_PATH" <<EOF
+
+Runtime skills not available on this host right now.
+Expected registry path:
+\`${RUNTIME_SKILLS_REGISTRY_PATH}\`
+
+Repair or manual bootstrap:
+- run \`clawperator skills install\`
+EOF
+        return 0
+    fi
+
+    if node - "$RUNTIME_SKILLS_REGISTRY_PATH" >> "$AGENT_GUIDE_PATH" 2>/dev/null <<'EOF'
+const fs = require("fs");
+
+const registryPath = process.argv[2];
+const registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
+if (!registry || !Array.isArray(registry.skills)) {
+  throw new Error("skills array required");
+}
+
+const byApplication = new Map();
+for (const skill of registry.skills) {
+  if (!skill || typeof skill !== "object") {
+    continue;
+  }
+
+  const applicationId = typeof skill.applicationId === "string" && skill.applicationId.length > 0
+    ? skill.applicationId
+    : "unknown.application";
+  const skillList = byApplication.get(applicationId) || [];
+  skillList.push(skill);
+  byApplication.set(applicationId, skillList);
+}
+
+const applicationIds = Array.from(byApplication.keys()).sort((a, b) => a.localeCompare(b));
+
+console.log("");
+console.log("Registry path:");
+console.log("`" + registryPath + "`");
+
+if (applicationIds.length === 0) {
+  console.log("");
+  console.log("Runtime skills registry is present, but it does not contain any installed skills.");
+  process.exit(0);
+}
+
+for (const applicationId of applicationIds) {
+  const skills = byApplication.get(applicationId).slice().sort((left, right) => {
+    const leftIntent = typeof left.intent === "string" ? left.intent : "";
+    const rightIntent = typeof right.intent === "string" ? right.intent : "";
+    if (leftIntent !== rightIntent) {
+      return leftIntent.localeCompare(rightIntent);
+    }
+    const leftId = typeof left.id === "string" ? left.id : "";
+    const rightId = typeof right.id === "string" ? right.id : "";
+    return leftId.localeCompare(rightId);
+  });
+
+  console.log("");
+  console.log("### " + applicationId);
+  console.log("");
+
+  for (const skill of skills) {
+    const id = typeof skill.id === "string" && skill.id.length > 0 ? skill.id : "unknown-skill";
+    const intent = typeof skill.intent === "string" && skill.intent.length > 0 ? skill.intent : "unknown";
+    const summary = typeof skill.summary === "string" && skill.summary.length > 0
+      ? skill.summary
+      : "No summary provided.";
+    console.log("- `" + id + "` - intent `" + intent + "` - " + summary + " Example: `clawperator skills run " + id + "`");
+  }
+}
+EOF
+    then
+        return 0
+    fi
+
+    cat >> "$AGENT_GUIDE_PATH" <<EOF
+
+Runtime skills not available on this host right now.
+Expected registry path:
+\`${RUNTIME_SKILLS_REGISTRY_PATH}\`
+
+The registry exists but could not be read.
+Repair or manual bootstrap:
+- run \`clawperator skills install\`
+EOF
+}
+
 write_agent_guide() {
     local AGENT_GUIDE_PATH="$HOME/.clawperator/AGENTS.md"
     local AUTHORING_SKILLS_GUIDE_DIR="${AUTHORING_SKILLS_INSTALL_DIR:-$HOME/.clawperator/authoring-skills}"
@@ -622,6 +727,8 @@ clawperator click --text "Settings" --json  # tap an element
 - Full docs: https://docs.clawperator.com/llms-full.txt
 - Setup guide: https://docs.clawperator.com/setup/
 EOF
+
+    append_runtime_skills_guide "$AGENT_GUIDE_PATH"
 
     # Treat any install tree with at least one SKILL.md as configured, even if
     # version metadata is missing and the install should be refreshed.
