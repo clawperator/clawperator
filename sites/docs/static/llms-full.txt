@@ -155,7 +155,7 @@ Field rules:
 
 - `schemaVersion` and `installedAt` are always present
 - `cliVersion` is `null` when the installer could not run `clawperator --version`
-- `registryPath` is `null` when the installer cannot resolve any readable runtime-skills registry path from the current install run, `CLAWPERATOR_SKILLS_REGISTRY`, prior install state, or the default installed home path; when present, the `skills/skills/` double segment is intentional and is assembled from `DEFAULT_SKILLS_DIR` plus `DEFAULT_SKILLS_REGISTRY_SUBPATH` in `apps/node/src/domain/skills/skillsConfig.ts` (the inner `skills/` comes from the registry layout inside the runtime-skills repo)
+- `registryPath` is `null` when the installer cannot resolve any readable runtime-skills registry path from the current install run, `CLAWPERATOR_SKILLS_REGISTRY`, prior install state, or the default installed home path
 - `apkVersion` is `null` when the installer does not have a known operator version
 - `lastDeviceSerial` is `null` when install did not pick one unambiguous device
 

@@ -28,6 +28,7 @@ AUTHORING_SKILLS_CODEX_DIR=""
 AUTHORING_SKILLS_AGENTS_DIR=""
 CLAWPERATOR_BIN_PATH=""
 LAST_DEVICE_SERIAL=""
+BLANK_RUNTIME_SKILLS_REGISTRY_WARNED=0
 
 TEMP_FILES=()
 
@@ -788,6 +789,14 @@ resolve_configured_runtime_skills_registry_path() {
     fi
 
     TRIMMED_PATH="$(trim_shell_value "$CONFIGURED_PATH")"
+    if [ -z "$TRIMMED_PATH" ]; then
+        if [ "${BLANK_RUNTIME_SKILLS_REGISTRY_WARNED:-0}" -eq 0 ]; then
+            echo -e "${YELLOW}Warning: CLAWPERATOR_SKILLS_REGISTRY is set but blank; ignoring it for onboarding artifacts.${NC}" >&2
+            BLANK_RUNTIME_SKILLS_REGISTRY_WARNED=1
+        fi
+        printf '%s\n' ""
+        return 0
+    fi
     printf '%s\n' "$TRIMMED_PATH"
 }
 
@@ -840,10 +849,12 @@ secure_host_artifact_path() {
 
 resolve_cli_version() {
     local CLI_VERSION_OUTPUT=""
+    local CLI_VERSION_LINE=""
 
-    if [ -n "${CLAWPERATOR_BIN_PATH:-}" ] && CLI_VERSION_OUTPUT="$("$CLAWPERATOR_BIN_PATH" --version 2>/dev/null | head -n 1 | tr -d '\r')"; then
-        if [ -n "$CLI_VERSION_OUTPUT" ]; then
-            printf '%s\n' "$CLI_VERSION_OUTPUT"
+    if [ -n "${CLAWPERATOR_BIN_PATH:-}" ] && CLI_VERSION_OUTPUT="$("$CLAWPERATOR_BIN_PATH" --version 2>/dev/null | tr -d '\r')"; then
+        CLI_VERSION_LINE="$(printf '%s\n' "$CLI_VERSION_OUTPUT" | awk 'NF { line = $0 } END { print line }')"
+        if [ -n "$CLI_VERSION_LINE" ]; then
+            printf '%s\n' "$CLI_VERSION_LINE"
             return 0
         fi
     fi
@@ -1364,6 +1375,21 @@ record_selected_device_serial() {
     LAST_DEVICE_SERIAL="$device_serial"
 }
 
+maybe_record_unambiguous_connected_device_serial() {
+    local device_count=""
+    local device_id=""
+
+    device_count="$(count_connected_devices)"
+    if [ "$device_count" -ne 1 ]; then
+        return 0
+    fi
+
+    device_id="$(list_connected_devices)"
+    if [ -n "$device_id" ]; then
+        record_selected_device_serial "$device_id"
+    fi
+}
+
 maybe_install_operator_apk() {
     local READY_DEVICE_COUNT
     local DETECTED_DEVICE_COUNT
@@ -1574,6 +1600,7 @@ run_doctor_and_fix() {
     # Check for Handshake (permissions)
     # Re-run doctor to see if APK install fixed handshake, or if we need to grant permissions
     DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json || true)"
+    maybe_record_unambiguous_connected_device_serial
     if doctor_check_status "$DOCTOR_JSON" "readiness.handshake" "fail"; then
         local DEVICE_COUNT
         DEVICE_COUNT="$(count_connected_devices)"

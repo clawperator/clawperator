@@ -175,6 +175,13 @@ JSON
       exit 0
     fi
     ;;
+  version-banner)
+    if [ "\$1" = "--version" ]; then
+      printf '%s\n' 'Clawperator CLI'
+      printf '%s\n' '1.2.3'
+      exit 0
+    fi
+    ;;
 esac
 
 exit 99
@@ -348,6 +355,29 @@ run_install_state_with_previous_registry_case() {
         write_install_state > "$4"
         printf "%s\n" "$HOME/.clawperator/install-state.json" > "$5"
     ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$previous_registry_path" "$output_file" "$state_file"
+}
+
+run_install_state_version_banner_case() {
+    local label="$1"
+    local output_file="$2"
+    local state_file="$3"
+    local mock_dir="$TMP_DIR/mock-state-version-banner-$label"
+
+    setup_mock_clawperator "$mock_dir" "version-banner" '{}'
+
+    HOME="$TMP_DIR/home-state-version-banner-$label" \
+    OS=Linux \
+    PATH="$mock_dir:$PATH" \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        unset CLAWPERATOR_SKILLS_REGISTRY
+        unset SKILLS_REGISTRY_PATH
+        unset SKILLS_SETUP_STATUS
+        export CLAWPERATOR_BIN_PATH="$2"
+        write_install_state > "$3"
+        printf "%s\n" "$HOME/.clawperator/install-state.json" > "$4"
+    ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$output_file" "$state_file"
 }
 
 run_skip_case() {
@@ -781,6 +811,17 @@ assert_contains "$INSTALL_STATE_NO_CLI_OUT" "Wrote install state" "install-state
 assert_json_field_equals "$INSTALL_STATE_NO_CLI_PATH" "schemaVersion" "1" "install-state-no-cli schemaVersion"
 assert_json_field_is_iso_timestamp "$INSTALL_STATE_NO_CLI_PATH" "installedAt" "install-state-no-cli installedAt"
 assert_json_field_null "$INSTALL_STATE_NO_CLI_PATH" "cliVersion" "install-state-no-cli cliVersion"
+
+echo "=== Scenario 15c: install-state writer uses the last non-empty version line ==="
+INSTALL_STATE_VERSION_BANNER_OUT="$TMP_DIR/install-state-version-banner.out"
+INSTALL_STATE_VERSION_BANNER_PATH_FILE="$TMP_DIR/install-state-version-banner.path"
+run_install_state_version_banner_case \
+    version-banner \
+    "$INSTALL_STATE_VERSION_BANNER_OUT" \
+    "$INSTALL_STATE_VERSION_BANNER_PATH_FILE"
+INSTALL_STATE_VERSION_BANNER_PATH="$(cat "$INSTALL_STATE_VERSION_BANNER_PATH_FILE")"
+assert_contains "$INSTALL_STATE_VERSION_BANNER_OUT" "Wrote install state" "install-state-version-banner output"
+assert_json_field_equals "$INSTALL_STATE_VERSION_BANNER_PATH" "cliVersion" "1.2.3" "install-state-version-banner cliVersion"
 
 echo "=== Scenario 16: skip flag suppresses both runtime and authoring skills setup ==="
 SKIP_SKILLS_OUT="$TMP_DIR/skip-skills.out"
