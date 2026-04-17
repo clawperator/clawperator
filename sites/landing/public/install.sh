@@ -658,6 +658,10 @@ function toCliFlagName(inputName) {
   return inputName.replace(/_/g, "-");
 }
 
+function quoteGuideValue(value) {
+  return JSON.stringify(typeof value === "string" ? value : String(value));
+}
+
 function buildSkillRunExample(skill) {
   const id = typeof skill.id === "string" && skill.id.length > 0 ? skill.id : "unknown-skill";
   const contract = skill && typeof skill.contract === "object" && skill.contract !== null ? skill.contract : null;
@@ -670,7 +674,7 @@ function buildSkillRunExample(skill) {
 
 console.log("");
 console.log("Registry path:");
-console.log("`" + registryPath + "`");
+console.log(quoteGuideValue(registryPath));
 console.log("");
 console.log("Inspect required inputs before running with `clawperator skills get <id>`.");
 
@@ -693,7 +697,9 @@ for (const applicationId of applicationIds) {
   });
 
   console.log("");
-  console.log("### " + applicationId);
+  console.log("### Application");
+  console.log("");
+  console.log("Application ID: " + quoteGuideValue(applicationId));
   console.log("");
 
   for (const skill of skills) {
@@ -702,7 +708,11 @@ for (const applicationId of applicationIds) {
     const summary = typeof skill.summary === "string" && skill.summary.length > 0
       ? skill.summary
       : "No summary provided.";
-    console.log("- `" + id + "` - intent `" + intent + "` - " + summary + " Example: `" + buildSkillRunExample(skill) + "`");
+    console.log("- Skill");
+    console.log("  id: " + quoteGuideValue(id));
+    console.log("  intent: " + quoteGuideValue(intent));
+    console.log("  summary: " + quoteGuideValue(summary));
+    console.log("  example: " + quoteGuideValue(buildSkillRunExample(skill)));
   }
 }
 EOF
@@ -1092,13 +1102,9 @@ list_detected_android_devices() {
     adb devices | awk 'NR > 1 && $2 != "" { print $1 "\t" $2 }'
 }
 
-record_single_connected_device_serial() {
-    local READY_DEVICE_COUNT
-    READY_DEVICE_COUNT="$(count_connected_devices)"
-
-    if [ "$READY_DEVICE_COUNT" -eq 1 ]; then
-        LAST_DEVICE_SERIAL="$(list_connected_devices)"
-    fi
+record_selected_device_serial() {
+    local device_serial="$1"
+    LAST_DEVICE_SERIAL="$device_serial"
 }
 
 maybe_install_operator_apk() {
@@ -1176,6 +1182,7 @@ maybe_install_operator_apk() {
         y|Y|yes|YES)
             local DEVICE_ID
             DEVICE_ID="$(list_connected_devices)"
+            record_selected_device_serial "$DEVICE_ID"
             echo -e "${BLUE}Installing operator APK on connected device...${NC}"
             if [ -n "$CLAWPERATOR_BIN_PATH" ]; then
                 # Use the canonical install command: installs APK and grants permissions in one step.
@@ -1312,10 +1319,13 @@ run_doctor_and_fix() {
     DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json || true)"
     if doctor_check_status "$DOCTOR_JSON" "readiness.handshake" "fail"; then
         local DEVICE_COUNT
+        local DETECTED_DEVICE_COUNT
         DEVICE_COUNT="$(count_connected_devices)"
-        if [ "$DEVICE_COUNT" -eq 1 ]; then
+        DETECTED_DEVICE_COUNT="$(count_detected_android_devices)"
+        if [ "$DEVICE_COUNT" -eq 1 ] && [ "$DETECTED_DEVICE_COUNT" -eq 1 ]; then
             local DEVICE_ID
             DEVICE_ID="$(list_connected_devices)"
+            record_selected_device_serial "$DEVICE_ID"
             # Handshake failed after install - re-grant permissions as remediation (not initial setup).
             echo -e "${BLUE}Handshake failed. Re-granting device permissions for $DEVICE_ID as recovery...${NC}"
             "$CLAWPERATOR_BIN_PATH" grant-device-permissions --device "$DEVICE_ID" --operator-package "$DEFAULT_OPERATOR_PACKAGE" > /dev/null 2>&1 || true
@@ -1345,7 +1355,6 @@ main() {
     setup_skills_via_cli
     setup_authoring_skills_via_cli
     write_agent_guide
-    record_single_connected_device_serial
     write_install_state
     write_mcp_config_snippet
 
@@ -1379,6 +1388,7 @@ main() {
     if ! doctor_report_ok "$FINAL_DOCTOR_JSON"; then
         echo -e "${RED}❌ Final doctor check failed.${NC}"
         "$CLAWPERATOR_BIN_PATH" doctor --output pretty || true
+        print_durable_artifact_summary
         return 1
     fi
     "$CLAWPERATOR_BIN_PATH" doctor --output pretty

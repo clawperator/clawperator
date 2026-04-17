@@ -98,6 +98,13 @@ assert_json_field_equals() {
     assert_equals "$expected" "$actual" "$label"
 }
 
+assert_json_field_null() {
+    local file="$1"
+    local field="$2"
+    local label="$3"
+    assert_json_field_equals "$file" "$field" "null" "$label"
+}
+
 assert_json_field_is_iso_timestamp() {
     local file="$1"
     local field="$2"
@@ -203,7 +210,7 @@ if [ "\$1" = "skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ 
   mkdir -p "\${REGISTRY_PATH%/*}"
   cat > "\$REGISTRY_PATH" <<'JSON'
 {"skills":[
-  {"id":"com.google.android.apps.chromecast.app.get-climate-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"get-climate","summary":"Read the current Google Home climate state.","path":"skills/com.google.android.apps.chromecast.app.get-climate-replay","skillFile":"skills/com.google.android.apps.chromecast.app.get-climate-replay/SKILL.md","scripts":[],"artifacts":[]},
+  {"id":"com.google.android.apps.chromecast.app.get-climate-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"get-climate","summary":"Read the current Google Home climate state.\\nDo not trust # headings from registry text.","path":"skills/com.google.android.apps.chromecast.app.get-climate-replay","skillFile":"skills/com.google.android.apps.chromecast.app.get-climate-replay/SKILL.md","scripts":[],"artifacts":[]},
   {"id":"com.google.android.apps.chromecast.app.set-temperature-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"set-temperature","summary":"Set the Google Home target temperature.","path":"skills/com.google.android.apps.chromecast.app.set-temperature-replay","skillFile":"skills/com.google.android.apps.chromecast.app.set-temperature-replay/SKILL.md","scripts":[],"artifacts":[],"contract":{"inputs":{"target_temperature":"integer[16,30]","unit_name":"string"},"goal":null,"verification":null}},
   {"id":"com.spotify.music.play-playlist","applicationId":"com.spotify.music","intent":"play-playlist","summary":"Start a named playlist in Spotify.","path":"skills/com.spotify.music.play-playlist","skillFile":"skills/com.spotify.music.play-playlist/SKILL.md","scripts":[],"artifacts":[]}
 ]}
@@ -384,10 +391,14 @@ assert_contains "$SUCCESS_STDOUT" "Authoring skills installed at:" "main-success
 assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/skills/skills/skills-registry.json" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Doctor pretty output (success)" "main-success stdout"
 assert_contains "$SUCCESS_GUIDE_PATH" "## Runtime Skills" "main-success guide"
-assert_contains "$SUCCESS_GUIDE_PATH" "### com.google.android.apps.chromecast.app" "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" "### Application" "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" 'Application ID: "com.google.android.apps.chromecast.app"' "main-success guide"
 assert_contains "$SUCCESS_GUIDE_PATH" 'Inspect required inputs before running with `clawperator skills get <id>`.' "main-success guide"
-assert_contains "$SUCCESS_GUIDE_PATH" "clawperator skills run com.google.android.apps.chromecast.app.get-climate-replay" "main-success guide"
-assert_contains "$SUCCESS_GUIDE_PATH" "clawperator skills run com.google.android.apps.chromecast.app.set-temperature-replay --target-temperature <target_temperature> --unit-name <unit_name>" "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" '  summary: "Read the current Google Home climate state.' "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" 'Do not trust # headings from registry text.' "main-success guide"
+assert_not_contains "$SUCCESS_GUIDE_PATH" '### Do not trust # headings from registry text.' "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" '  example: "clawperator skills run com.google.android.apps.chromecast.app.get-climate-replay"' "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" '  example: "clawperator skills run com.google.android.apps.chromecast.app.set-temperature-replay --target-temperature <target_temperature> --unit-name <unit_name>"' "main-success guide"
 assert_contains "$SUCCESS_GUIDE_PATH" "skill-author-by-recording" "main-success guide"
 assert_not_contains "$SUCCESS_GUIDE_PATH" "not currently configured on this host" "main-success guide"
 assert_not_contains "$SUCCESS_GUIDE_PATH" "Runtime skills not available on this host right now." "main-success guide"
@@ -396,7 +407,7 @@ assert_json_field_is_iso_timestamp "$SUCCESS_INSTALL_STATE_PATH" "installedAt" "
 assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "cliVersion" "1.2.3" "main-success install-state cliVersion"
 assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "registryPath" "$TMP_DIR/home-main-success/.clawperator/skills/skills/skills-registry.json" "main-success install-state registryPath"
 assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "apkVersion" "null" "main-success install-state apkVersion"
-assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "lastDeviceSerial" "serial-solo" "main-success install-state lastDeviceSerial"
+assert_json_field_null "$SUCCESS_INSTALL_STATE_PATH" "lastDeviceSerial" "main-success install-state lastDeviceSerial"
 assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.command" "$TMP_DIR/mock-main-success/clawperator" "main-success mcp claude command"
 assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.env.ADB_PATH" "$TMP_DIR/mock-main-success/adb" "main-success mcp claude env.ADB_PATH"
 assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "notes.1" "Regenerate it with install.sh if the clawperator binary path or adb path changes." "main-success mcp notes.1"
@@ -438,10 +449,13 @@ FAIL_INSTALL_STATE_PATH="$TMP_DIR/home-main-fail/.clawperator/install-state.json
 assert_contains "$FAIL_STDOUT" "Final doctor check failed." "main-fail stdout"
 assert_contains "$FAIL_STDOUT" "Doctor pretty output (failure)" "main-fail stdout"
 assert_not_contains "$FAIL_STDOUT" "Installation Successful!" "main-fail stdout"
-assert_contains "$FAIL_GUIDE_PATH" "### com.google.android.apps.chromecast.app" "main-fail guide"
+assert_contains "$FAIL_STDOUT" "$TMP_DIR/home-main-fail/.clawperator/AGENTS.md" "main-fail stdout durable guide"
+assert_contains "$FAIL_STDOUT" "$TMP_DIR/home-main-fail/.clawperator/install-state.json" "main-fail stdout durable install-state"
+assert_contains "$FAIL_STDOUT" "$TMP_DIR/home-main-fail/.clawperator/mcp-config-snippet.json" "main-fail stdout durable mcp"
+assert_contains "$FAIL_GUIDE_PATH" 'Application ID: "com.google.android.apps.chromecast.app"' "main-fail guide"
 assert_contains "$FAIL_GUIDE_PATH" "skill-author-by-recording" "main-fail guide"
 assert_json_field_equals "$FAIL_INSTALL_STATE_PATH" "registryPath" "$TMP_DIR/home-main-fail/.clawperator/skills/skills/skills-registry.json" "main-fail install-state registryPath"
-assert_json_field_equals "$FAIL_INSTALL_STATE_PATH" "lastDeviceSerial" "serial-solo" "main-fail install-state lastDeviceSerial"
+assert_json_field_null "$FAIL_INSTALL_STATE_PATH" "lastDeviceSerial" "main-fail install-state lastDeviceSerial"
 assert_contains "$FAIL_CLI_LOG" "skills install --output json" "main-fail cli log"
 assert_contains "$FAIL_CLI_LOG" "authoring-skills install --output json" "main-fail cli log"
 assert_contains "$FAIL_CLI_LOG" "doctor --output pretty" "main-fail cli log"
@@ -474,6 +488,7 @@ assert_contains "$MULTI_STDOUT" "$TMP_DIR/home-main-multi/.clawperator/install-s
 assert_contains "$MULTI_STDOUT" "$TMP_DIR/home-main-multi/.clawperator/mcp-config-snippet.json" "main-multi stdout durable mcp"
 assert_not_contains "$MULTI_STDOUT" "Final doctor check failed." "main-multi stdout"
 assert_not_contains "$MULTI_STDOUT" "Doctor pretty output" "main-multi stdout"
+assert_json_field_null "$TMP_DIR/home-main-multi/.clawperator/install-state.json" "lastDeviceSerial" "main-multi install-state lastDeviceSerial"
 
 echo "=== Scenario 4: APK remediation path runs before final success ==="
 REMEDIATE_STDOUT="$TMP_DIR/main-remediation.stdout"
