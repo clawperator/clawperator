@@ -320,7 +320,7 @@ Another common failure is a bad registry or missing script:
 
 Recovery patterns:
 
-- `REGISTRY_READ_FAILED`: repair `CLAWPERATOR_SKILLS_REGISTRY` or reinstall the skills repo
+- `REGISTRY_READ_FAILED`: run `clawperator skills install` to restore the registry at the installed home path (`~/.clawperator/skills/skills/skills-registry.json`); if `CLAWPERATOR_SKILLS_REGISTRY` is set to a custom path, fix or unset that variable
 - `SKILL_NOT_FOUND`: confirm the exact registry `id` with `clawperator skills list --json`
 - `SKILL_SCRIPT_NOT_FOUND`: repair the registry entry or restore the script file on disk
 - `SKILL_EXECUTION_FAILED`: inspect `exitCode`, `stdout`, and `stderr`
@@ -337,6 +337,7 @@ Recovery patterns:
 
 ## Related Pages
 
+- [Host Agent Orientation](../host-agents.md)
 - [Setup](../setup.md)
 - [Doctor](../api/doctor.md)
 - [Devices](../api/devices.md)

@@ -165,20 +165,21 @@ Fallback behavior after that initial choice:
    - `<cwd>/../../skills/skills-registry.json` when the current working directory is `apps/node`
    - `~/.clawperator/skills/skills/skills-registry.json`
 
-After `clawperator skills install` or `clawperator skills sync`, the registry lives at `~/.clawperator/skills/skills/skills-registry.json`. Set the env var to point there:
+After `clawperator skills install` or `clawperator skills sync`, the registry lives at `~/.clawperator/skills/skills/skills-registry.json`. That path is automatically discovered as a fallback when `CLAWPERATOR_SKILLS_REGISTRY` is not set, so no env var change is needed after a normal install:
 
 ```bash
-export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
 clawperator skills list --json
 ```
+
+Set `CLAWPERATOR_SKILLS_REGISTRY` only when pointing at a non-standard registry path, such as a development checkout outside the installed home. For the normal post-install flow, start with [Host Agent Orientation](../host-agents.md).
 
 Error case: if the path does not exist, skill commands fail with `REGISTRY_READ_FAILED`. The error message includes the path that was tried.
 
 Current recovery rules:
 
-- missing default path with no env var: run `clawperator skills install`
+- missing default path with no env var: run `clawperator skills install` to restore the registry at `~/.clawperator/skills/skills/skills-registry.json`
 - blank `CLAWPERATOR_SKILLS_REGISTRY`: unset it or point it at a valid registry path
-- wrong `CLAWPERATOR_SKILLS_REGISTRY` path: fix the env var or rerun `clawperator skills install`
+- wrong `CLAWPERATOR_SKILLS_REGISTRY` path: fix the env var, or unset it to fall back to the installed home path
 - explicit caller-supplied registry path: fix the explicit path because `loadRegistry()` does not fall back from it
 
 ## `CLAWPERATOR_BIN`
@@ -318,11 +319,10 @@ If the resolved path does not exist, the runtime falls back to the bare command 
 
 ## Agent Configuration Pattern
 
-For deterministic agent environments, set these three variables and forget about per-command flags:
+For deterministic agent environments, set these variables and forget about per-command flags:
 
 ```bash
 export CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev
-export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
 export ADB_PATH=/usr/local/bin/adb
 ```
 
@@ -336,8 +336,11 @@ clawperator skills run com.test.echo --device emulator-5554
 
 The only flag you still need per-command is `--device` when multiple targets are connected. There is no environment variable equivalent for `--device` - device selection must always be explicit.
 
+After `clawperator skills install`, the registry at `~/.clawperator/skills/skills/skills-registry.json` is discovered automatically. Setting `CLAWPERATOR_SKILLS_REGISTRY` is only needed when overriding to a non-standard path. For the post-install orientation flow, read [Host Agent Orientation](../host-agents.md).
+
 ## Related Pages
 
+- [Host Agent Orientation](../host-agents.md)
 - [Setup](../setup.md)
 - [Devices](devices.md)
 - [Doctor](doctor.md)
