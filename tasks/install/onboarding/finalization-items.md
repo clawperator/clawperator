@@ -15,3 +15,31 @@ These items are intentionally deferred from the install/onboarding cleanup pack.
 - **Needed later:** separate task pack under the skills or Node surface
 - **Dependencies:** none on this onboarding pack, other than preserving the F6
   rationale from `tasks/install/onboarding/findings.md`
+
+### D1: Agent-facing docs information architecture and discoverability pass
+
+- **Deferred item:** do a docs-focused pass that optimizes how quickly an
+  unfamiliar agent or human can understand what Clawperator is, how runtime
+  skills are discovered after install, and which surface to use first: CLI,
+  runtime skills, or MCP.
+- **Why deferred:** Phase 4 in this onboarding pack should document the shipped
+  behavior that lands in PR-2. A broader docs information-architecture pass is
+  still worthwhile, but it should happen after the new install artifacts and
+  discovery commands are real so the docs can simplify around shipped behavior
+  instead of branch-local intent.
+- **Recommended scope later:**
+  - tighten `docs/setup.md` so the post-install handoff is explicit:
+    `~/.clawperator/AGENTS.md`, `install-state.json`, `mcp-config-snippet.json`,
+    and the first discovery commands
+  - tighten `docs/skills/overview.md` so runtime skills versus authoring skills
+    is obvious and the first-success discovery flow is easy to follow
+  - tighten `docs/api/mcp.md` so agent-host readers understand when MCP is the
+    right front door versus `clawperator skills` or direct CLI commands
+  - consider one new canonical public page for agent-host usage, such as
+    "Use Clawperator From An Agent Host", instead of forcing readers to piece
+    together setup, skills, and MCP pages themselves
+  - cross-link the public pages in the order an unfamiliar host agent would need
+    them, not just by subsystem
+- **Needed later:** likely a small docs task pack under `tasks/docs/`
+- **Dependencies:** onboarding cleanup PR-2 shipped, so the docs pass can
+  describe stable behavior instead of speculative behavior
