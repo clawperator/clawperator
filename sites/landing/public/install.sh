@@ -658,8 +658,17 @@ function toCliFlagName(inputName) {
   return inputName.replace(/_/g, "-");
 }
 
-function quoteGuideValue(value) {
-  return JSON.stringify(typeof value === "string" ? value : String(value));
+function normalizeGuideValue(value) {
+  return String(value).replace(/\r\n?/g, "\n");
+}
+
+function printLiteralBlock(value, indent = "") {
+  const normalized = normalizeGuideValue(value);
+  console.log(indent + "```text");
+  for (const line of normalized.split("\n")) {
+    console.log(indent + line);
+  }
+  console.log(indent + "```");
 }
 
 function buildSkillRunExample(skill) {
@@ -674,7 +683,7 @@ function buildSkillRunExample(skill) {
 
 console.log("");
 console.log("Registry path:");
-console.log(quoteGuideValue(registryPath));
+printLiteralBlock(registryPath);
 console.log("");
 console.log("Inspect required inputs before running with `clawperator skills get <id>`.");
 
@@ -699,7 +708,8 @@ for (const applicationId of applicationIds) {
   console.log("");
   console.log("### Application");
   console.log("");
-  console.log("Application ID: " + quoteGuideValue(applicationId));
+  console.log("App ID:");
+  printLiteralBlock(applicationId);
   console.log("");
 
   for (const skill of skills) {
@@ -709,10 +719,14 @@ for (const applicationId of applicationIds) {
       ? skill.summary
       : "No summary provided.";
     console.log("- Skill");
-    console.log("  id: " + quoteGuideValue(id));
-    console.log("  intent: " + quoteGuideValue(intent));
-    console.log("  summary: " + quoteGuideValue(summary));
-    console.log("  example: " + quoteGuideValue(buildSkillRunExample(skill)));
+    console.log("  id:");
+    printLiteralBlock(id, "  ");
+    console.log("  intent:");
+    printLiteralBlock(intent, "  ");
+    console.log("  summary:");
+    printLiteralBlock(summary, "  ");
+    console.log("  example:");
+    printLiteralBlock(buildSkillRunExample(skill), "  ");
   }
 }
 EOF
