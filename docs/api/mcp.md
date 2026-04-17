@@ -4,6 +4,10 @@
 
 Describe the first-party stdio MCP server exposed by `clawperator mcp serve`: how to launch it, how to configure long-running MCP clients, which tools ship today, and what behavior to expect when device state changes under a running client.
 
+For the post-install decision of whether you should start with MCP or with
+`clawperator skills`, read [Host Agent Orientation](../host-agents.md) first.
+This page assumes you have already decided that MCP is the correct front door.
+
 ## Sources
 
 - CLI command registration: `apps/node/src/cli/registry.ts`
@@ -122,6 +126,7 @@ These surfaces are complementary:
 
 - `clawperator skills` is the primary runtime-skill discovery and wrapper surface
 - `clawperator mcp serve` is the primary tool-registration surface for MCP-capable hosts
+- [Host Agent Orientation](../host-agents.md) is the canonical post-install route for choosing between them
 
 ## Environment For Long-Running MCP Clients
 

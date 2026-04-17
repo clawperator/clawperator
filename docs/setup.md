@@ -50,6 +50,11 @@ durable onboarding files under `~/.clawperator/`:
 Early prerequisite failures and early doctor failures exit before these files
 are written.
 
+Canonical public next step after install:
+
+- read [Host Agent Orientation](host-agents.md) when you need to decide between
+  `clawperator skills`, `clawperator mcp serve`, and direct CLI automation
+
 `install-state.json` currently has this shape:
 
 ```json
@@ -89,6 +94,9 @@ When choosing the host-facing surface:
 
 - use `clawperator skills` when you want to discover or run installed runtime skills by app, keyword, or id
 - use MCP when your host already supports stdio MCP and wants registered tools such as `devices`, `snapshot`, and `execute`
+
+See [Host Agent Orientation](host-agents.md) for the post-install decision flow
+and the first discovery commands to try.
 
 ## 2. Prepare the Android target
 
@@ -344,6 +352,7 @@ See [Logging](api/logging.md) for complete documentation.
 
 ## Related pages
 
+- [Host Agent Orientation](host-agents.md)
 - [Quickstart](quickstart.md)
 - [API Overview](api/overview.md)
 - [Devices](api/devices.md)

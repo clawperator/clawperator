@@ -50,6 +50,7 @@ Use:
 ## Setup
 
 - [Setup](setup.md) - install the CLI, prepare a device, install the Operator APK, verify readiness, and run the first snapshot
+- [Host Agent Orientation](host-agents.md) - canonical post-install route for choosing between `clawperator skills`, `clawperator mcp serve`, and direct CLI automation
 - [Quickstart](quickstart.md) - the observe/decide/act loop: taking snapshots, reading the hierarchy, and sending actions
 
 ## API
@@ -138,6 +139,11 @@ durable onboarding files under `~/.clawperator/`:
 Early prerequisite failures and early doctor failures exit before these files
 are written.
 
+Canonical public next step after install:
+
+- read [Host Agent Orientation](host-agents.md) when you need to decide between
+  `clawperator skills`, `clawperator mcp serve`, and direct CLI automation
+
 `install-state.json` currently has this shape:
 
 ```json
@@ -177,6 +183,9 @@ When choosing the host-facing surface:
 
 - use `clawperator skills` when you want to discover or run installed runtime skills by app, keyword, or id
 - use MCP when your host already supports stdio MCP and wants registered tools such as `devices`, `snapshot`, and `execute`
+
+See [Host Agent Orientation](host-agents.md) for the post-install decision flow
+and the first discovery commands to try.
 
 ## 2. Prepare the Android target
 
@@ -432,6 +441,7 @@ See [Logging](api/logging.md) for complete documentation.
 
 ## Related pages
 
+- [Host Agent Orientation](host-agents.md)
 - [Quickstart](quickstart.md)
 - [API Overview](api/overview.md)
 - [Devices](api/devices.md)
@@ -440,6 +450,163 @@ See [Logging](api/logging.md) for complete documentation.
 - [Environment Variables](api/environment.md)
 - [Troubleshooting](troubleshooting/operator.md)
 - [Logging](api/logging.md)
+
+---
+
+# Host Agent Orientation
+
+## Purpose
+
+Choose the correct Clawperator front door after install: runtime-skill discovery
+through `clawperator skills`, long-running tool registration through
+`clawperator mcp serve`, or direct action work through the CLI and local API.
+
+## When To Read This Page
+
+Read this page after [Setup](setup.md) succeeds.
+
+Machine-checkable prerequisite:
+
+```bash
+clawperator doctor --json
+```
+
+Continue only when:
+
+- exit code is `0`
+- `criticalOk` is `true`
+
+If you have not reached that state yet, finish [Setup](setup.md) first.
+
+## First Route After Install
+
+Use this order:
+
+1. Read this page.
+2. If you need an app-specific capability, start with `clawperator skills`.
+3. If your host already speaks stdio MCP and wants registered tools, use `clawperator mcp serve`.
+4. If you already know you need raw actions and result envelopes, continue to [Quickstart](quickstart.md).
+
+## Choose The Front Door
+
+| Situation | Start here | Why |
+| --- | --- | --- |
+| You know the Android package id and want the fastest answer to "what can this host do for this app?" | `clawperator skills for-app <package_id> --json` | `skills for-app` is the primary app-oriented discovery surface. |
+| You only know user-language terms such as app name or intent | `clawperator skills search --keyword <text> --json` | Search is the fallback when you do not have the package id yet. |
+| You already have a skill id and want the exact metadata | `clawperator skills get <skill_id> --json` | Confirms the registry entry before a run. |
+| You want to execute a skill through the wrapper | `clawperator skills run <skill_id> ... --json` | Uses the runtime-skill wrapper and its validation gate. |
+| Your host already supports stdio MCP and wants registered tools such as `devices`, `snapshot`, `execute`, and `configure` | `clawperator mcp serve` | MCP is the transport surface for long-running tool registration. |
+| You already know the exact action payload you want to send | [Quickstart](quickstart.md) | Quickstart covers the observe / decide / act loop directly. |
+
+## Runtime-Skill Discovery Flow
+
+Use the shortest successful path first:
+
+```bash
+clawperator skills for-app <package_id> --json
+clawperator skills search --keyword <text> --json
+clawperator skills get <skill_id> --json
+clawperator skills run <skill_id> --json
+```
+
+Decision rules:
+
+- Start with `skills for-app` when you know the Android package id.
+- Use `skills search --keyword` when you only have a user-language term.
+- Use `skills get` before `skills run` when you need to confirm the exact id or summary.
+- Use `skills run` only after discovery, not as the first probe.
+
+## MCP Decision Rule
+
+Use `clawperator mcp serve` only when the host already wants MCP.
+
+Use [MCP Server](api/mcp.md) for:
+
+- stdio MCP client setup
+- long-running MCP sessions
+- tool registration for hosts such as Claude Desktop
+
+Do not use MCP as the first discovery surface when the real question is
+"what runtime skills are installed for this app?". Start with
+`clawperator skills` for that job.
+
+## When Discovery Stalls
+
+Use this sequence:
+
+1. Confirm the registry is readable:
+
+```bash
+clawperator skills list --json
+```
+
+2. If registry discovery still fails, check the installed home path written by
+   the install and sync flow:
+
+```bash
+ls ~/.clawperator/skills/skills/skills-registry.json
+```
+
+3. If that file is missing or stale, reinstall the runtime skills:
+
+```bash
+clawperator skills install
+```
+
+4. If the host should connect through MCP instead of shelling out to the CLI,
+   read the installed snippet and then use `clawperator mcp serve`:
+
+```bash
+cat ~/.clawperator/mcp-config-snippet.json
+clawperator mcp serve
+```
+
+## Durable Post-Install Files
+
+These files help a host orient after install:
+
+| Path | Meaning | Next step |
+| --- | --- | --- |
+| `~/.clawperator/AGENTS.md` | Local Clawperator guide written by `install.sh` | Use it as machine-local context after you read this public route. |
+| `~/.clawperator/install-state.json` | Durable install metadata | Check `registryPath`, `cliVersion`, and `lastDeviceSerial` without rerunning install. |
+| `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config | Use it when you choose the MCP route. |
+| `~/.clawperator/skills/skills/skills-registry.json` | Installed runtime-skills registry | Verify it exists when `skills list` or `skills for-app` cannot discover skills. |
+
+## Verification
+
+Use these commands to confirm the intended surface is working:
+
+```bash
+clawperator skills for-app com.android.settings --json
+clawperator skills search --keyword settings --json
+clawperator skills get com.android.settings.capture-overview --json
+clawperator skills list --json
+```
+
+Check:
+
+- `skills for-app`, `skills search`, and `skills list` return top-level `skills` and `count`
+- `skills get` returns a top-level `skill`
+
+For MCP:
+
+```bash
+clawperator mcp serve
+```
+
+Check:
+
+- the process starts without printing normal CLI help
+- the process remains attached to stdio for the MCP client
+
+## Read Next
+
+| Topic | Page |
+| --- | --- |
+| Install and device readiness | [Setup](setup.md) |
+| Raw observe / decide / act loop | [Quickstart](quickstart.md) |
+| Runtime-skill registry and wrapper behavior | [Skills Overview](skills/overview.md) |
+| MCP client setup and tool surface | [MCP Server](api/mcp.md) |
 
 ---
 
@@ -452,6 +619,11 @@ connected, Operator APK installed, and `clawperator doctor --json` returning
 `"criticalOk": true`.
 
 If you have not reached that state yet, complete [Setup](setup.md) first.
+
+If you are choosing between runtime-skill discovery, MCP, and direct CLI
+automation after install, read [Host Agent Orientation](host-agents.md) first.
+This page starts after that choice and focuses on direct observe / decide / act
+execution.
 
 ---
 
@@ -5231,20 +5403,21 @@ Fallback behavior after that initial choice:
    - `<cwd>/../../skills/skills-registry.json` when the current working directory is `apps/node`
    - `~/.clawperator/skills/skills/skills-registry.json`
 
-After `clawperator skills install` or `clawperator skills sync`, the registry lives at `~/.clawperator/skills/skills/skills-registry.json`. Set the env var to point there:
+After `clawperator skills install` or `clawperator skills sync`, the registry lives at `~/.clawperator/skills/skills/skills-registry.json`. That path is automatically discovered as a fallback when `CLAWPERATOR_SKILLS_REGISTRY` is not set, so no env var change is needed after a normal install:
 
 ```bash
-export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
 clawperator skills list --json
 ```
+
+Set `CLAWPERATOR_SKILLS_REGISTRY` only when pointing at a non-standard registry path, such as a development checkout outside the installed home. For the normal post-install flow, start with [Host Agent Orientation](../host-agents.md).
 
 Error case: if the path does not exist, skill commands fail with `REGISTRY_READ_FAILED`. The error message includes the path that was tried.
 
 Current recovery rules:
 
-- missing default path with no env var: run `clawperator skills install`
+- missing default path with no env var: run `clawperator skills install` to restore the registry at `~/.clawperator/skills/skills/skills-registry.json`
 - blank `CLAWPERATOR_SKILLS_REGISTRY`: unset it or point it at a valid registry path
-- wrong `CLAWPERATOR_SKILLS_REGISTRY` path: fix the env var or rerun `clawperator skills install`
+- wrong `CLAWPERATOR_SKILLS_REGISTRY` path: fix the env var, or unset it to fall back to the installed home path
 - explicit caller-supplied registry path: fix the explicit path because `loadRegistry()` does not fall back from it
 
 ## `CLAWPERATOR_BIN`
@@ -5384,11 +5557,10 @@ If the resolved path does not exist, the runtime falls back to the bare command 
 
 ## Agent Configuration Pattern
 
-For deterministic agent environments, set these three variables and forget about per-command flags:
+For deterministic agent environments, set these variables and forget about per-command flags:
 
 ```bash
 export CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev
-export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/skills/skills/skills-registry.json"
 export ADB_PATH=/usr/local/bin/adb
 ```
 
@@ -5402,8 +5574,11 @@ clawperator skills run com.test.echo --device emulator-5554
 
 The only flag you still need per-command is `--device` when multiple targets are connected. There is no environment variable equivalent for `--device` - device selection must always be explicit.
 
+After `clawperator skills install`, the registry at `~/.clawperator/skills/skills/skills-registry.json` is discovered automatically. Setting `CLAWPERATOR_SKILLS_REGISTRY` is only needed when overriding to a non-standard path. For the post-install orientation flow, read [Host Agent Orientation](../host-agents.md).
+
 ## Related Pages
 
+- [Host Agent Orientation](../host-agents.md)
 - [Setup](../setup.md)
 - [Devices](devices.md)
 - [Doctor](doctor.md)
@@ -6213,6 +6388,10 @@ Examples of route-local validation failures:
 
 Describe the first-party stdio MCP server exposed by `clawperator mcp serve`: how to launch it, how to configure long-running MCP clients, which tools ship today, and what behavior to expect when device state changes under a running client.
 
+For the post-install decision of whether you should start with MCP or with
+`clawperator skills`, read [Host Agent Orientation](../host-agents.md) first.
+This page assumes you have already decided that MCP is the correct front door.
+
 ## Sources
 
 - CLI command registration: `apps/node/src/cli/registry.ts`
@@ -6331,6 +6510,7 @@ These surfaces are complementary:
 
 - `clawperator skills` is the primary runtime-skill discovery and wrapper surface
 - `clawperator mcp serve` is the primary tool-registration surface for MCP-capable hosts
+- [Host Agent Orientation](../host-agents.md) is the canonical post-install route for choosing between them
 
 ## Environment For Long-Running MCP Clients
 
@@ -8474,6 +8654,11 @@ Typical failure shape:
 
 Explain what Clawperator skills are, how the registry model works, how skills are discovered, and what the `clawperator skills` wrapper actually does.
 
+For the post-install decision of when to start with `clawperator skills`
+instead of MCP or direct CLI automation, read
+[Host Agent Orientation](../host-agents.md) first. This page is the detailed
+runtime-skills contract.
+
 ## Sources
 
 - Registry contract: `apps/node/src/contracts/skills.ts`
@@ -8701,12 +8886,25 @@ If the registry cannot be read, every discovery command fails with `REGISTRY_REA
 Recovery depends on how the path was chosen:
 
 - when `CLAWPERATOR_SKILLS_REGISTRY` points at a missing file, update the env var or run `clawperator skills install`
-- when no env var is set and neither the current working directory nor `~/.clawperator/skills/skills/skills-registry.json` contains the registry, run from the expected repo root, run `clawperator skills install`, or set `CLAWPERATOR_SKILLS_REGISTRY`
+- when no env var is set and neither the current working directory nor `~/.clawperator/skills/skills/skills-registry.json` contains the registry, verify `~/.clawperator/skills/skills/skills-registry.json`, run `clawperator skills list --json`, then run `clawperator skills install` or set `CLAWPERATOR_SKILLS_REGISTRY`
 - when the registry file exists but does not contain a `skills` array, fix the JSON because `loadRegistry()` rejects that shape with `Invalid registry: skills array required`
 
 Wrapper failure fields like `stdout` and `stderr` are optional. `runSkill.ts` includes them only when the child process actually emitted non-empty data on those streams.
 
 ## Discovery
+
+If you are starting from a fresh install, the shortest discovery flow is:
+
+```bash
+clawperator skills for-app <package_id> --json
+clawperator skills search --keyword <text> --json
+clawperator skills get <skill_id> --json
+clawperator skills run <skill_id> --json
+```
+
+Start with `skills for-app` when you know the Android package id. Use
+`skills search --keyword` when you only have app names or user-language intent
+terms.
 
 Current discovery commands:
 
@@ -9156,6 +9354,7 @@ Common ones:
 
 ## Related Pages
 
+- [Host Agent Orientation](../host-agents.md)
 - [Authoring](authoring.md)
 - [Development Workflow](development.md)
 - [Device Prep and Runtime](runtime.md)
@@ -11428,7 +11627,7 @@ Another common failure is a bad registry or missing script:
 ```json
 {
   "code": "REGISTRY_READ_FAILED",
-  "message": "Registry not found at configured path: /tmp/missing-registry.json. Update CLAWPERATOR_SKILLS_REGISTRY or run clawperator skills install."
+  "message": "Registry not found at configured path: /tmp/missing-registry.json. The installed registry normally lives at ~/.clawperator/skills/skills/skills-registry.json. Fix CLAWPERATOR_SKILLS_REGISTRY, unset it to use the installed copy, then rerun clawperator skills list --json, or run clawperator skills install."
 }
 ```
 
@@ -11450,7 +11649,7 @@ Another common failure is a bad registry or missing script:
 
 Recovery patterns:
 
-- `REGISTRY_READ_FAILED`: repair `CLAWPERATOR_SKILLS_REGISTRY` or reinstall the skills repo
+- `REGISTRY_READ_FAILED`: run `clawperator skills install` to restore the registry at the installed home path (`~/.clawperator/skills/skills/skills-registry.json`); if `CLAWPERATOR_SKILLS_REGISTRY` is set to a custom path, fix or unset that variable
 - `SKILL_NOT_FOUND`: confirm the exact registry `id` with `clawperator skills list --json`
 - `SKILL_SCRIPT_NOT_FOUND`: repair the registry entry or restore the script file on disk
 - `SKILL_EXECUTION_FAILED`: inspect `exitCode`, `stdout`, and `stderr`
@@ -11467,6 +11666,7 @@ Recovery patterns:
 
 ## Related Pages
 
+- [Host Agent Orientation](../host-agents.md)
 - [Setup](../setup.md)
 - [Doctor](../api/doctor.md)
 - [Devices](../api/devices.md)

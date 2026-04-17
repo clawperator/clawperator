@@ -152,6 +152,11 @@ For host-agent onboarding, the preferred bridge order is:
 That order keeps the runtime model honest and avoids pretending that every
 host-agent convention is interchangeable with Clawperator's own registry model.
 
+Public docs should also expose one canonical post-install route. The current
+public first stop is `docs/host-agents.md`, which explains when to use
+`clawperator skills`, when to use `clawperator mcp serve`, and what to try next
+when discovery stalls.
+
 ### 4. Shell rc propagation is not enough for agent workflows
 
 Appending to `~/.zshrc` or `~/.bashrc` helps interactive humans, but it is not a

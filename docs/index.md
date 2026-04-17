@@ -46,6 +46,7 @@ Use:
 ## Setup
 
 - [Setup](setup.md) - install the CLI, prepare a device, install the Operator APK, verify readiness, and run the first snapshot
+- [Host Agent Orientation](host-agents.md) - canonical post-install route for choosing between `clawperator skills`, `clawperator mcp serve`, and direct CLI automation
 - [Quickstart](quickstart.md) - the observe/decide/act loop: taking snapshots, reading the hierarchy, and sending actions
 
 ## API
