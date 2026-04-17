@@ -23,7 +23,7 @@ Current role split:
 - a skill defines a reusable wrapper or artifact
 - the agent decides when to invoke the skill and how to interpret the result
 
-Skills are registry-driven. They are not discovered by folder scanning alone. `clawperator skills list`, `clawperator skills search`, `clawperator skills get`, `clawperator skills validate`, and `clawperator skills run` all read the registry through `loadRegistry()` in `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`.
+Skills are registry-driven. They are not discovered by folder scanning alone. `clawperator skills list`, `clawperator skills for-app`, `clawperator skills search`, `clawperator skills get`, `clawperator skills validate`, and `clawperator skills run` all read the registry through `loadRegistry()` in `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`.
 
 `clawperator skills` and `skills-registry.json` cover runtime skills only.
 Authoring skills are a separate category of AI agent programs that live in
@@ -155,11 +155,20 @@ The registry file is a JSON object with:
 }
 ```
 
-Registry resolution is exact:
+Registry resolution precedence is:
 
-- if `CLAWPERATOR_SKILLS_REGISTRY` is set and non-empty, Node uses that literal path
-- otherwise it first reads `skills/skills-registry.json` relative to the current working directory
-- if the caller passed an explicit `registryPath` and that file is missing, `loadRegistry()` also tries `../../skills/skills-registry.json` relative to the current working directory
+1. explicit `registryPath` argument, when a caller supplied one
+2. `CLAWPERATOR_SKILLS_REGISTRY`, when it is set and non-blank
+3. default path `skills/skills-registry.json` relative to the current working directory
+
+Current failure and fallback rules:
+
+- if an explicit `registryPath` argument is passed and that path cannot be read, `loadRegistry()` fails immediately and does not fall back
+- if `CLAWPERATOR_SKILLS_REGISTRY` is set but blank, `loadRegistry()` fails immediately and does not fall back
+- if `CLAWPERATOR_SKILLS_REGISTRY` is set to a non-blank path and that read fails, `loadRegistry()` fails immediately and does not fall back
+- if neither an explicit path nor env var is active and the default-path read fails, `loadRegistry()` next tries:
+  - `../../skills/skills-registry.json` relative to the current working directory when running from `apps/node`
+  - `~/.clawperator/skills/skills/skills-registry.json`
 
 The install and sync flow writes the canonical long-lived registry under:
 
@@ -224,6 +233,7 @@ Current discovery commands:
 
 ```bash
 clawperator skills list
+clawperator skills for-app <package_id>
 clawperator skills search --app <package_id>
 clawperator skills search --intent <intent>
 clawperator skills search --keyword <text>
@@ -256,11 +266,19 @@ clawperator skills get <skill_id>
 
 ### `skills search`
 
-Search filters are exact for `--app` and `--intent`, and case-insensitive substring matching for `--keyword` against:
+Search filters are exact for `--app` and `--intent`.
 
-- `id`
-- `summary`
-- `applicationId`
+`--keyword` matching is case-insensitive and deterministic. Current ranking order is:
+
+1. exact `keywords[]` entry match
+2. tokenized `keywords[]` match
+3. exact `id` or `applicationId` match
+4. tokenized `id` or `applicationId` match
+5. substring in `keywords[]`
+6. substring in `id` or `applicationId`
+7. substring in `summary`
+
+Equal-ranked results keep their original registry order.
 
 `skills search` success uses the same response shape as `skills list`:
 
@@ -283,6 +301,18 @@ Search filters are exact for `--app` and `--intent`, and case-insensitive substr
   "count": 1
 }
 ```
+
+### `skills for-app`
+
+`cmdSkillsForApp()` is a thin discovery alias over `skills search --app <package_id>`.
+
+Example:
+
+```bash
+clawperator skills for-app com.android.settings --json
+```
+
+It returns the same response shape as `skills search --app ... --json`.
 
 ### `skills get`
 
@@ -315,6 +345,7 @@ Use these commands to verify the three core discovery paths:
 
 ```bash
 clawperator skills list --json
+clawperator skills for-app com.android.settings --json
 clawperator skills search --app com.android.settings --json
 clawperator skills get com.android.settings.capture-overview --json
 ```

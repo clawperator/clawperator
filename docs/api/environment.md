@@ -153,14 +153,17 @@ Default when unset: `<cwd>/skills/skills-registry.json` where `<cwd>` is `proces
 Current `loadRegistry()` precedence is:
 
 1. explicit `registryPath` argument, when a caller supplied one
-2. `CLAWPERATOR_SKILLS_REGISTRY`
+2. `CLAWPERATOR_SKILLS_REGISTRY`, when it is set and non-blank
 3. default path `<cwd>/skills/skills-registry.json`
 
 Fallback behavior after that initial choice:
 
-1. If an explicit `registryPath` argument was passed and that read fails, also try `<cwd>/../../skills/skills-registry.json` (covers running from `apps/node/`)
-2. If `CLAWPERATOR_SKILLS_REGISTRY` is set and that read fails, `loadRegistry()` throws a configured-path error immediately
-3. If the default-path read fails with no env var and no explicit `registryPath`, `loadRegistry()` throws immediately and suggests `clawperator skills install`
+1. If an explicit `registryPath` argument was passed and that read fails, `loadRegistry()` throws immediately
+2. If `CLAWPERATOR_SKILLS_REGISTRY` is set but blank, `loadRegistry()` throws immediately
+3. If `CLAWPERATOR_SKILLS_REGISTRY` is set to a non-blank path and that read fails, `loadRegistry()` throws a configured-path error immediately
+4. If the default-path read fails with no env var and no explicit `registryPath`, `loadRegistry()` next tries:
+   - `<cwd>/../../skills/skills-registry.json` when the current working directory is `apps/node`
+   - `~/.clawperator/skills/skills/skills-registry.json`
 
 After `clawperator skills install` or `clawperator skills sync`, the registry lives at `~/.clawperator/skills/skills/skills-registry.json`. Set the env var to point there:
 
@@ -174,8 +177,9 @@ Error case: if the path does not exist, skill commands fail with `REGISTRY_READ_
 Current recovery rules:
 
 - missing default path with no env var: run `clawperator skills install`
+- blank `CLAWPERATOR_SKILLS_REGISTRY`: unset it or point it at a valid registry path
 - wrong `CLAWPERATOR_SKILLS_REGISTRY` path: fix the env var or rerun `clawperator skills install`
-- explicit caller-supplied registry path that only exists from `apps/node/`: the `../../skills/skills-registry.json` fallback may still succeed
+- explicit caller-supplied registry path: fix the explicit path because `loadRegistry()` does not fall back from it
 
 ## `CLAWPERATOR_BIN`
 

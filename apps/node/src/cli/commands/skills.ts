@@ -274,6 +274,13 @@ export async function cmdSkillsSearch(
   return formatError({ code: result.code, message: result.message }, options);
 }
 
+export async function cmdSkillsForApp(
+  packageId: string,
+  options: { format: OutputOptions["format"] }
+): Promise<string> {
+  return cmdSkillsSearch({ app: packageId }, options);
+}
+
 export async function cmdSkillsRun(
   skillId: string,
   args: string[],

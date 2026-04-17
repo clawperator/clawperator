@@ -97,12 +97,25 @@ function normalizeSkillPathArray(paths: string[] | undefined): string[] {
   return (paths ?? []).map((path) => normalizeSkillPathSeparators(path));
 }
 
+function normalizeKeywordArray(keywords: string[] | undefined): string[] {
+  return Array.from(new Set(
+    (keywords ?? [])
+      .map((keyword) => keyword.trim().toLowerCase())
+      .filter((keyword) => keyword.length > 0)
+  )).sort();
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
 function findMismatchFields(skill: SkillEntry, parsed: Partial<SkillEntry>): string[] {
   const mismatches: string[] = [];
   if (parsed.id !== skill.id) mismatches.push("id");
   if (parsed.applicationId !== skill.applicationId) mismatches.push("applicationId");
   if (parsed.intent !== skill.intent) mismatches.push("intent");
   if (parsed.summary !== skill.summary) mismatches.push("summary");
+  if (JSON.stringify(normalizeKeywordArray(parsed.keywords)) !== JSON.stringify(normalizeKeywordArray(skill.keywords))) mismatches.push("keywords");
   if (normalizeSkillPathSeparators(parsed.path ?? "") !== normalizeSkillPathSeparators(skill.path)) mismatches.push("path");
   if (normalizeSkillPathSeparators(parsed.skillFile ?? "") !== normalizeSkillPathSeparators(skill.skillFile)) mismatches.push("skillFile");
   if (JSON.stringify(normalizeSkillPathArray(parsed.scripts)) !== JSON.stringify(normalizeSkillPathArray(skill.scripts))) mismatches.push("scripts");
@@ -155,6 +168,18 @@ async function validateLoadedSkill(
     };
   }
 
+  if (skill.keywords !== undefined && !isStringArray(skill.keywords)) {
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} registry entry has an invalid keywords value`,
+      details: {
+        skillJsonPath,
+        reason: "keywords must be an array of strings when present",
+      },
+    };
+  }
+
   const scriptPaths = skill.scripts.map((file) => resolveRepoRelativeSkillPath(repoRoot, file));
   // Artifacts are optional for script-only skills, but when present they must be explicit arrays.
   const artifactPaths = skill.artifacts === undefined ? [] : skill.artifacts.map((file) => resolveRepoRelativeSkillPath(repoRoot, file));
@@ -196,6 +221,19 @@ async function validateLoadedSkill(
       },
     };
   }
+
+  if (parsed.keywords !== undefined && !isStringArray(parsed.keywords)) {
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} has an invalid skill.json keywords value`,
+      details: {
+        skillJsonPath,
+        reason: "keywords must be an array of strings when present",
+      },
+    };
+  }
+
   const mismatchFields = findMismatchFields(skill, parsed);
   if (mismatchFields.length > 0) {
     return {

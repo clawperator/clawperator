@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { join, dirname } from "node:path";
+import { homedir } from "node:os";
+import { join, dirname, basename } from "node:path";
 import type { SkillsRegistry, SkillEntry } from "../../contracts/skills.js";
 
 /**
@@ -11,8 +12,43 @@ function getDefaultRegistryPath(): string {
   return join(cwd, "skills", "skills-registry.json");
 }
 
+function getInstalledHomeRegistryPath(): string {
+  return join(homedir(), ".clawperator", "skills", "skills", "skills-registry.json");
+}
+
+function getRepoRelativeFallbackPath(): string | undefined {
+  const cwd = process.cwd();
+  if (basename(cwd) !== "node" || basename(dirname(cwd)) !== "apps") {
+    return undefined;
+  }
+  return join(cwd, "..", "..", "skills", "skills-registry.json");
+}
+
+function isMissingRegistryFileError(error: unknown): boolean {
+  const code = typeof error === "object" && error !== null && "code" in error
+    ? (error as NodeJS.ErrnoException).code
+    : undefined;
+  return code === "ENOENT" || code === "ENOTDIR";
+}
+
+function getConfiguredRegistryPathFromEnv(): string | undefined {
+  const configuredPath = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+  if (configuredPath === undefined) {
+    return undefined;
+  }
+
+  const trimmedPath = configuredPath.trim();
+  if (trimmedPath.length === 0) {
+    throw new Error(
+      "CLAWPERATOR_SKILLS_REGISTRY is set but blank. Unset it or set it to a valid skills-registry.json path."
+    );
+  }
+
+  return trimmedPath;
+}
+
 export function getRegistryPath(): string {
-  return process.env.CLAWPERATOR_SKILLS_REGISTRY ?? getDefaultRegistryPath();
+  return getConfiguredRegistryPathFromEnv() ?? getDefaultRegistryPath();
 }
 
 /**
@@ -27,25 +63,55 @@ export interface LoadRegistryResult {
   resolvedPath: string;
 }
 
+function normalizeExplicitRegistryPath(registryPath: string | undefined): string | undefined {
+  if (registryPath === undefined) {
+    return undefined;
+  }
+
+  const trimmedPath = registryPath.trim();
+  if (trimmedPath.length === 0) {
+    throw new Error("Registry path is blank. Pass a valid skills-registry.json path.");
+  }
+
+  return trimmedPath;
+}
+
 export async function loadRegistry(registryPath?: string): Promise<LoadRegistryResult> {
-  const configuredPath = process.env.CLAWPERATOR_SKILLS_REGISTRY;
-  let path = registryPath ?? configuredPath ?? getDefaultRegistryPath();
-  let raw: string;
+  const explicitRegistryPath = normalizeExplicitRegistryPath(registryPath);
+
+  let configuredPath: string | undefined;
+  if (explicitRegistryPath === undefined) {
+    try {
+      configuredPath = getConfiguredRegistryPathFromEnv();
+    } catch (error) {
+      process.stderr.write(
+        "Error: CLAWPERATOR_SKILLS_REGISTRY is set but blank. " +
+        "Unset it or set it to a valid skills-registry.json path.\n"
+      );
+      throw error;
+    }
+  }
+
+  const defaultPath = getDefaultRegistryPath();
+  let path = explicitRegistryPath ?? configuredPath ?? defaultPath;
+  let raw: string | undefined;
   try {
     raw = await readFile(path, "utf-8");
-  } catch {
-    if (!registryPath && !configuredPath) {
-      process.stderr.write(
-        "Warning: CLAWPERATOR_SKILLS_REGISTRY is not set. " +
-        "Run 'clawperator skills install' to configure the registry path.\n"
-      );
+  } catch (error) {
+    if (explicitRegistryPath) {
+      if (!isMissingRegistryFileError(error)) {
+        throw error;
+      }
       throw new Error(
-        `Registry not found at default path: ${path}. ` +
-        "Set CLAWPERATOR_SKILLS_REGISTRY or run clawperator skills install."
+        `Registry not found at explicit path: ${path}. ` +
+        "Fix the path or omit the explicit registry path."
       );
     }
 
-    if (!registryPath && configuredPath) {
+    if (!explicitRegistryPath && configuredPath) {
+      if (!isMissingRegistryFileError(error)) {
+        throw error;
+      }
       process.stderr.write(
         `Error: Registry file not found at ${path} (from CLAWPERATOR_SKILLS_REGISTRY). ` +
         "Check that the path is correct.\n"
@@ -56,18 +122,50 @@ export async function loadRegistry(registryPath?: string): Promise<LoadRegistryR
       );
     }
 
-    const fallback = join(process.cwd(), "..", "..", "skills", "skills-registry.json");
-    if (fallback !== path) {
+    if (!isMissingRegistryFileError(error)) {
+      throw error;
+    }
+
+    const candidates = [
+      getRepoRelativeFallbackPath(),
+      getInstalledHomeRegistryPath(),
+    ].filter((candidate, index, all): candidate is string => (
+      candidate !== undefined
+      && candidate !== path
+      && all.indexOf(candidate) === index
+    ));
+
+    for (const candidate of candidates) {
       try {
-        raw = await readFile(fallback, "utf-8");
-        path = fallback;
-      } catch {
+        raw = await readFile(candidate, "utf-8");
+        path = candidate;
+        break;
+      } catch (candidateError) {
+        if (!isMissingRegistryFileError(candidateError)) {
+          throw candidateError;
+        }
+      }
+    }
+
+    if (raw === undefined) {
+      if (!explicitRegistryPath && !configuredPath) {
+        process.stderr.write(
+          "Warning: CLAWPERATOR_SKILLS_REGISTRY is not set. " +
+          "Run 'clawperator skills install' to configure the registry path.\n"
+        );
         throw new Error(
-          `Registry not found. Checked: ${path}, ${fallback}. ` +
+          `Registry not found. Checked: ${[path, ...candidates].join(", ")}. ` +
+          "Set CLAWPERATOR_SKILLS_REGISTRY or run clawperator skills install."
+        );
+      }
+
+      if (candidates.length > 0) {
+        throw new Error(
+          `Registry not found. Checked: ${[path, ...candidates].join(", ")}. ` +
           "Run from repo root, set CLAWPERATOR_SKILLS_REGISTRY, or run clawperator skills install."
         );
       }
-    } else {
+
       throw new Error(`Registry not found: ${path}. Run from repo root or set CLAWPERATOR_SKILLS_REGISTRY.`);
     }
   }
