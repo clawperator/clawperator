@@ -27,6 +27,8 @@ AUTHORING_SKILLS_CLAUDE_DIR=""
 AUTHORING_SKILLS_CODEX_DIR=""
 AUTHORING_SKILLS_AGENTS_DIR=""
 CLAWPERATOR_BIN_PATH=""
+LAST_DEVICE_SERIAL=""
+BLANK_RUNTIME_SKILLS_REGISTRY_WARNED=0
 
 TEMP_FILES=()
 
@@ -597,13 +599,478 @@ setup_authoring_skills_via_cli() {
     return 0
 }
 
+append_runtime_skills_guide() {
+    local AGENT_GUIDE_PATH="$1"
+    local RUNTIME_SKILLS_REGISTRY_PATH=""
+    local RUNTIME_SKILLS_REGISTRY_HINT_PATH=""
+    local RUNTIME_GUIDE_TMP=""
+
+    cat >> "$AGENT_GUIDE_PATH" <<'EOF'
+
+## Runtime Skills
+
+Use the installed runtime-skill registry to discover and run app workflows:
+- `clawperator skills list`
+- `clawperator skills search --keyword "<term>"`
+- `clawperator skills get <id>`
+- `clawperator skills run <id>`
+EOF
+
+    RUNTIME_SKILLS_REGISTRY_PATH="$(resolve_runtime_skills_registry_path)"
+    RUNTIME_SKILLS_REGISTRY_HINT_PATH="$(resolve_runtime_skills_registry_hint_path)"
+
+    if [ ! -r "$RUNTIME_SKILLS_REGISTRY_PATH" ]; then
+        cat >> "$AGENT_GUIDE_PATH" <<EOF
+
+Runtime skills not available on this host right now.
+Expected registry path:
+\`${RUNTIME_SKILLS_REGISTRY_HINT_PATH}\`
+
+Repair or manual bootstrap:
+- run \`clawperator skills install\`
+EOF
+        return 0
+    fi
+
+    RUNTIME_GUIDE_TMP="$(mktemp "${TMPDIR:-/tmp}/clawperator-runtime-skills.XXXXXX")"
+    register_temp_file "$RUNTIME_GUIDE_TMP"
+
+    if node - "$RUNTIME_SKILLS_REGISTRY_PATH" > "$RUNTIME_GUIDE_TMP" 2>/dev/null <<'EOF'
+const fs = require("fs");
+
+const registryPath = process.argv[2];
+const registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
+if (!registry || !Array.isArray(registry.skills)) {
+  throw new Error("skills array required");
+}
+
+const byApplication = new Map();
+for (const skill of registry.skills) {
+  if (!skill || typeof skill !== "object") {
+    continue;
+  }
+
+  const applicationId = typeof skill.applicationId === "string" && skill.applicationId.length > 0
+    ? skill.applicationId
+    : "unknown.application";
+  const skillList = byApplication.get(applicationId) || [];
+  skillList.push(skill);
+  byApplication.set(applicationId, skillList);
+}
+
+const applicationIds = Array.from(byApplication.keys()).sort((a, b) => a.localeCompare(b));
+
+function toCliFlagName(inputName) {
+  return inputName.replace(/_/g, "-");
+}
+
+function normalizeGuideValue(value) {
+  return String(value).replace(/\r\n?/g, "\n");
+}
+
+function printLiteralBlock(value, indent = "") {
+  const normalized = normalizeGuideValue(value);
+  const literalIndent = `${indent}    `;
+  console.log(literalIndent);
+  for (const line of normalized.split("\n")) {
+    console.log(literalIndent + line);
+  }
+}
+
+function buildSkillRunExample(skill) {
+  const id = typeof skill.id === "string" && skill.id.length > 0 ? skill.id : "unknown-skill";
+  const contract = skill && typeof skill.contract === "object" && skill.contract !== null ? skill.contract : null;
+  const inputs = contract && typeof contract.inputs === "object" && contract.inputs !== null
+    ? Object.keys(contract.inputs).sort((left, right) => left.localeCompare(right))
+    : [];
+  const args = inputs.map((inputName) => `--${toCliFlagName(inputName)} <${inputName}>`);
+  return ["clawperator", "skills", "run", id, ...args].join(" ");
+}
+
+console.log("");
+console.log("Registry path:");
+printLiteralBlock(registryPath);
+console.log("");
+console.log("Inspect required inputs before running with `clawperator skills get <id>`.");
+
+if (applicationIds.length === 0) {
+  console.log("");
+  console.log("Runtime skills registry is present, but it does not contain any installed skills.");
+  process.exit(0);
+}
+
+for (const applicationId of applicationIds) {
+  const skills = byApplication.get(applicationId).slice().sort((left, right) => {
+    const leftIntent = typeof left.intent === "string" ? left.intent : "";
+    const rightIntent = typeof right.intent === "string" ? right.intent : "";
+    if (leftIntent !== rightIntent) {
+      return leftIntent.localeCompare(rightIntent);
+    }
+    const leftId = typeof left.id === "string" ? left.id : "";
+    const rightId = typeof right.id === "string" ? right.id : "";
+    return leftId.localeCompare(rightId);
+  });
+
+  console.log("");
+  console.log("### Application");
+  console.log("");
+  console.log("App ID:");
+  printLiteralBlock(applicationId);
+  console.log("");
+
+  for (const skill of skills) {
+    const id = typeof skill.id === "string" && skill.id.length > 0 ? skill.id : "unknown-skill";
+    const intent = typeof skill.intent === "string" && skill.intent.length > 0 ? skill.intent : "unknown";
+    const summary = typeof skill.summary === "string" && skill.summary.length > 0
+      ? skill.summary
+      : "No summary provided.";
+    console.log("- Skill");
+    console.log("  id:");
+    printLiteralBlock(id, "  ");
+    console.log("  intent:");
+    printLiteralBlock(intent, "  ");
+    console.log("  summary:");
+    printLiteralBlock(summary, "  ");
+    console.log("  example:");
+    printLiteralBlock(buildSkillRunExample(skill), "  ");
+  }
+}
+EOF
+    then
+        cat "$RUNTIME_GUIDE_TMP" >> "$AGENT_GUIDE_PATH"
+        rm -f "$RUNTIME_GUIDE_TMP"
+        return 0
+    fi
+
+    rm -f "$RUNTIME_GUIDE_TMP"
+
+    cat >> "$AGENT_GUIDE_PATH" <<EOF
+
+Runtime skills not available on this host right now.
+Expected registry path:
+\`${RUNTIME_SKILLS_REGISTRY_PATH}\`
+
+The registry exists but could not be read.
+Repair or manual bootstrap:
+- run \`clawperator skills install\`
+EOF
+}
+
+trim_shell_value() {
+    printf '%s' "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+resolve_previous_install_state_registry_path() {
+    local INSTALL_STATE_PATH="$HOME/.clawperator/install-state.json"
+
+    if [ ! -r "$INSTALL_STATE_PATH" ]; then
+        printf '%s\n' ""
+        return 0
+    fi
+
+    node - "$INSTALL_STATE_PATH" <<'EOF' 2>/dev/null || true
+const fs = require("fs");
+
+const [installStatePath] = process.argv.slice(2);
+const installState = JSON.parse(fs.readFileSync(installStatePath, "utf8"));
+if (installState && typeof installState.registryPath === "string" && installState.registryPath.length > 0) {
+  console.log(installState.registryPath);
+}
+EOF
+}
+
+resolve_configured_runtime_skills_registry_path() {
+    local CONFIGURED_PATH="${CLAWPERATOR_SKILLS_REGISTRY:-}"
+    local TRIMMED_PATH=""
+
+    if [ -z "${CLAWPERATOR_SKILLS_REGISTRY+x}" ]; then
+        printf '%s\n' ""
+        return 0
+    fi
+
+    TRIMMED_PATH="$(trim_shell_value "$CONFIGURED_PATH")"
+    if [ -z "$TRIMMED_PATH" ]; then
+        if [ "${BLANK_RUNTIME_SKILLS_REGISTRY_WARNED:-0}" -eq 0 ]; then
+            echo -e "${YELLOW}Warning: CLAWPERATOR_SKILLS_REGISTRY is set but blank; ignoring it for onboarding artifacts.${NC}" >&2
+            BLANK_RUNTIME_SKILLS_REGISTRY_WARNED=1
+        fi
+        printf '%s\n' ""
+        return 0
+    fi
+    printf '%s\n' "$TRIMMED_PATH"
+}
+
+resolve_runtime_skills_registry_hint_path() {
+    local DEFAULT_RUNTIME_SKILLS_REGISTRY_PATH="$HOME/.clawperator/skills/skills/skills-registry.json"
+    local CANDIDATE=""
+
+    for CANDIDATE in \
+        "${SKILLS_REGISTRY_PATH:-}" \
+        "$(resolve_configured_runtime_skills_registry_path)" \
+        "$(resolve_previous_install_state_registry_path)" \
+        "$DEFAULT_RUNTIME_SKILLS_REGISTRY_PATH"; do
+        if [ -n "$CANDIDATE" ]; then
+            printf '%s\n' "$CANDIDATE"
+            return 0
+        fi
+    done
+
+    printf '%s\n' "$DEFAULT_RUNTIME_SKILLS_REGISTRY_PATH"
+}
+
+resolve_runtime_skills_registry_path() {
+    local CANDIDATE=""
+
+    for CANDIDATE in \
+        "${SKILLS_REGISTRY_PATH:-}" \
+        "$(resolve_configured_runtime_skills_registry_path)" \
+        "$(resolve_previous_install_state_registry_path)" \
+        "$HOME/.clawperator/skills/skills/skills-registry.json"; do
+        if [ -n "$CANDIDATE" ] && [ -r "$CANDIDATE" ]; then
+            printf '%s\n' "$CANDIDATE"
+            return 0
+        fi
+    done
+
+    printf '%s\n' ""
+}
+
+ensure_private_clawperator_dir() {
+    mkdir -p "$HOME/.clawperator"
+    chmod 700 "$HOME/.clawperator" 2>/dev/null || true
+}
+
+secure_host_artifact_path() {
+    local ARTIFACT_PATH="$1"
+    if [ -f "$ARTIFACT_PATH" ]; then
+        chmod 600 "$ARTIFACT_PATH" 2>/dev/null || true
+    fi
+}
+
+resolve_cli_version() {
+    local CLI_VERSION_OUTPUT=""
+    local CLI_VERSION_LINE=""
+
+    if [ -n "${CLAWPERATOR_BIN_PATH:-}" ] && CLI_VERSION_OUTPUT="$("$CLAWPERATOR_BIN_PATH" --version 2>/dev/null | tr -d '\r')"; then
+        CLI_VERSION_LINE="$(printf '%s\n' "$CLI_VERSION_OUTPUT" | awk 'NF { line = $0 } END { print line }')"
+        if [ -n "$CLI_VERSION_LINE" ]; then
+            printf '%s\n' "$CLI_VERSION_LINE"
+            return 0
+        fi
+    fi
+
+    printf '%s\n' ""
+}
+
+write_install_state() {
+    local INSTALL_STATE_PATH="$HOME/.clawperator/install-state.json"
+    local INSTALLED_AT
+    local CLI_VERSION
+    local REGISTRY_PATH_VALUE=""
+    local APK_VERSION_VALUE="${OPERATOR_VERSION:-}"
+    local LAST_DEVICE_SERIAL_VALUE="${LAST_DEVICE_SERIAL:-}"
+
+    ensure_private_clawperator_dir
+
+    INSTALLED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    CLI_VERSION="$(resolve_cli_version)"
+    REGISTRY_PATH_VALUE="$(resolve_runtime_skills_registry_path)"
+
+    INSTALL_STATE_INSTALLED_AT="$INSTALLED_AT" \
+    INSTALL_STATE_CLI_VERSION="$CLI_VERSION" \
+    INSTALL_STATE_REGISTRY_PATH="$REGISTRY_PATH_VALUE" \
+    INSTALL_STATE_APK_VERSION="$APK_VERSION_VALUE" \
+    INSTALL_STATE_LAST_DEVICE_SERIAL="$LAST_DEVICE_SERIAL_VALUE" \
+    node - "$INSTALL_STATE_PATH" <<'EOF'
+const fs = require("fs");
+
+const [installStatePath] = process.argv.slice(2);
+
+function requiredEnv(name) {
+  const value = process.env[name];
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`Missing required install-state field: ${name}`);
+  }
+  return value;
+}
+
+function nullableEnv(name) {
+  const value = process.env[name];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+const installState = {
+  schemaVersion: 1,
+  installedAt: requiredEnv("INSTALL_STATE_INSTALLED_AT"),
+  cliVersion: nullableEnv("INSTALL_STATE_CLI_VERSION"),
+  registryPath: nullableEnv("INSTALL_STATE_REGISTRY_PATH"),
+  apkVersion: nullableEnv("INSTALL_STATE_APK_VERSION"),
+  lastDeviceSerial: nullableEnv("INSTALL_STATE_LAST_DEVICE_SERIAL"),
+};
+
+fs.writeFileSync(installStatePath, JSON.stringify(installState, null, 2) + "\n");
+EOF
+
+    secure_host_artifact_path "$INSTALL_STATE_PATH"
+
+    echo -e "${GREEN}✅ Wrote install state to ${INSTALL_STATE_PATH}.${NC}"
+}
+
+resolve_adb_path_for_mcp() {
+    if command -v adb > /dev/null 2>&1; then
+        command -v adb
+        return 0
+    fi
+
+    printf '%s\n' ""
+}
+
+# Resolves the absolute path of the installed Clawperator CLI JS entrypoint
+# (e.g. <npm_global_root>/clawperator/dist/cli/index.js). MCP clients like
+# Claude Desktop work best with "node <js>" rather than the npm shell wrapper,
+# per docs/api/mcp.md. Prints an empty string when resolution is not possible.
+# Tests may override by exporting CLAWPERATOR_CLI_JS_PATH before the call.
+resolve_cli_entrypoint_js() {
+    # When CLAWPERATOR_CLI_JS_PATH is explicitly set (even to empty), treat it
+    # as authoritative. Validation harnesses use this to force either the node
+    # form (non-empty path) or the wrapper-fallback path (empty string).
+    if [ -n "${CLAWPERATOR_CLI_JS_PATH+x}" ]; then
+        printf '%s\n' "${CLAWPERATOR_CLI_JS_PATH}"
+        return 0
+    fi
+
+    local NPM_GLOBAL_ROOT=""
+    local RESOLVED=""
+    if command -v npm > /dev/null 2>&1; then
+        NPM_GLOBAL_ROOT="$(npm root -g 2>/dev/null || true)"
+    fi
+
+    if [ -n "$NPM_GLOBAL_ROOT" ]; then
+        RESOLVED="$NPM_GLOBAL_ROOT/clawperator/dist/cli/index.js"
+        if [ ! -f "$RESOLVED" ]; then
+            RESOLVED=""
+        fi
+    fi
+
+    printf '%s\n' "$RESOLVED"
+}
+
+write_mcp_config_snippet() {
+    local MCP_CONFIG_SNIPPET_PATH="$HOME/.clawperator/mcp-config-snippet.json"
+    local CLI_WRAPPER_PATH="${CLAWPERATOR_BIN_PATH:-clawperator}"
+    local CLI_JS_PATH
+    local ADB_PATH_VALUE
+    local LOG_DIR="$HOME/.clawperator/logs"
+    local CODEX_CONFIG_PATH="${CODEX_HOME:-$HOME/.codex}/config.toml"
+    local CLAUDE_CONFIG_PATH_MAC="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+    local CLAUDE_CONFIG_PATH_LINUX="$HOME/.config/Claude/claude_desktop_config.json"
+
+    ensure_private_clawperator_dir
+
+    CLI_JS_PATH="$(resolve_cli_entrypoint_js)"
+    ADB_PATH_VALUE="$(resolve_adb_path_for_mcp)"
+
+    node - "$MCP_CONFIG_SNIPPET_PATH" "$CLI_WRAPPER_PATH" "$CLI_JS_PATH" "$ADB_PATH_VALUE" "$DEFAULT_OPERATOR_PACKAGE" "$LOG_DIR" "$CODEX_CONFIG_PATH" "$CLAUDE_CONFIG_PATH_MAC" "$CLAUDE_CONFIG_PATH_LINUX" <<'EOF'
+const fs = require("fs");
+
+const [
+  snippetPath,
+  cliWrapperPath,
+  cliJsPath,
+  adbPath,
+  operatorPackage,
+  logDir,
+  codexConfigPath,
+  claudeMacPath,
+  claudeLinuxPath,
+] = process.argv.slice(2);
+
+const ADB_PLACEHOLDER = "<set ADB_PATH to your adb binary>";
+const adbResolved = adbPath.length > 0;
+const adbValue = adbResolved ? adbPath : ADB_PLACEHOLDER;
+const nodeCommand = process.execPath;
+
+// Prefer "node <js>" per docs/api/mcp.md: MCP desktop clients usually do not
+// inherit the interactive shell PATH and "node <js>" avoids relying on the npm
+// shell wrapper. Fall back to the wrapper only when the JS entrypoint could not
+// be resolved.
+const useNodeForm = cliJsPath.length > 0;
+const command = useNodeForm ? nodeCommand : cliWrapperPath;
+const args = useNodeForm
+  ? [cliJsPath, "mcp", "serve"]
+  : ["mcp", "serve"];
+
+const serverConfig = {
+  command,
+  args,
+  env: {
+    ADB_PATH: adbValue,
+    CLAWPERATOR_OPERATOR_PACKAGE: operatorPackage,
+    CLAWPERATOR_LOG_DIR: logDir,
+    CLAWPERATOR_LOG_LEVEL: "info",
+  },
+};
+
+const notes = [
+  "This snippet is generated for the current host.",
+  "Regenerate it with install.sh if the clawperator binary path or adb path changes.",
+];
+if (!useNodeForm) {
+  notes.push(
+    "Could not resolve the Clawperator CLI JS entrypoint, so this snippet uses the npm shell wrapper. Claude Desktop and other GUI MCP clients usually do not inherit your shell PATH; if launch fails, replace \"command\" with \"node\" and \"args\" with [\"<installed_clawperator_path>/dist/cli/index.js\", \"mcp\", \"serve\"]."
+  );
+}
+if (!adbResolved) {
+  notes.push(
+    `adb was not found on PATH at install time. Replace ADB_PATH (${ADB_PLACEHOLDER}) with the absolute path to your adb binary before using this snippet.`
+  );
+}
+
+const tomlArgs = args.map((value) => JSON.stringify(value)).join(", ");
+const snippet = {
+  notes,
+  claudeDesktop: {
+    configPathHints: [claudeMacPath, claudeLinuxPath],
+    mergeKey: "mcpServers",
+    entry: {
+      clawperator: serverConfig,
+    },
+  },
+  codex: {
+    configPath: codexConfigPath,
+    entryToml: [
+      "[mcp_servers.clawperator]",
+      `command = ${JSON.stringify(command)}`,
+      `args = [${tomlArgs}]`,
+      "[mcp_servers.clawperator.env]",
+      `ADB_PATH = ${JSON.stringify(adbValue)}`,
+      `CLAWPERATOR_OPERATOR_PACKAGE = ${JSON.stringify(operatorPackage)}`,
+      `CLAWPERATOR_LOG_DIR = ${JSON.stringify(logDir)}`,
+      "CLAWPERATOR_LOG_LEVEL = \"info\"",
+      "",
+    ].join("\n"),
+  },
+  genericStdioConsumer: {
+    serverName: "clawperator",
+    server: serverConfig,
+  },
+};
+
+fs.writeFileSync(snippetPath, JSON.stringify(snippet, null, 2) + "\n");
+EOF
+
+    secure_host_artifact_path "$MCP_CONFIG_SNIPPET_PATH"
+
+    echo -e "${GREEN}✅ Wrote MCP config snippet to ${MCP_CONFIG_SNIPPET_PATH}.${NC}"
+}
+
 write_agent_guide() {
     local AGENT_GUIDE_PATH="$HOME/.clawperator/AGENTS.md"
     local AUTHORING_SKILLS_GUIDE_DIR="${AUTHORING_SKILLS_INSTALL_DIR:-$HOME/.clawperator/authoring-skills}"
     local SKILL_DIR=""
     local HAS_SKILLS=0
 
-    mkdir -p "$HOME/.clawperator"
+    ensure_private_clawperator_dir
 
     cat > "$AGENT_GUIDE_PATH" <<'EOF'
 # Clawperator
@@ -618,10 +1085,12 @@ clawperator click --text "Settings" --json  # tap an element
 
 ## Documentation
 
-- Docs index: https://docs.clawperator.com/llms.txt
+- LLM guide: https://docs.clawperator.com/llms.txt
 - Full docs: https://docs.clawperator.com/llms-full.txt
 - Setup guide: https://docs.clawperator.com/setup/
 EOF
+
+    append_runtime_skills_guide "$AGENT_GUIDE_PATH"
 
     # Treat any install tree with at least one SKILL.md as configured, even if
     # version metadata is missing and the install should be refreshed.
@@ -669,7 +1138,105 @@ Repair or manual bootstrap:
 EOF
     fi
 
+    secure_host_artifact_path "$AGENT_GUIDE_PATH"
+
     echo -e "${GREEN}✅ Wrote agent guide to ${AGENT_GUIDE_PATH}.${NC}"
+}
+
+write_shared_agent_bridge() {
+    local SHARED_AGENTS_PATH="$HOME/.agents/AGENTS.md"
+    local LOCAL_AGENT_GUIDE_PATH="$HOME/.clawperator/AGENTS.md"
+    local BRIDGE_ERROR_TMP=""
+
+    if [ ! -f "$SHARED_AGENTS_PATH" ]; then
+        echo -e "${BLUE}Shared agent guide not found at ${SHARED_AGENTS_PATH}; skipping Clawperator bridge.${NC}"
+        return 0
+    fi
+
+    BRIDGE_ERROR_TMP="$(mktemp "${TMPDIR:-/tmp}/clawperator-shared-bridge-error.XXXXXX")"
+    register_temp_file "$BRIDGE_ERROR_TMP"
+
+    # Content between the START/END markers is installer-owned. Any hand edits
+    # inside that block will be overwritten on the next install.sh run. Edits
+    # elsewhere in ~/.agents/AGENTS.md are preserved.
+    if node - "$SHARED_AGENTS_PATH" "$LOCAL_AGENT_GUIDE_PATH" 2>"$BRIDGE_ERROR_TMP" <<'EOF'
+const fs = require("fs");
+const path = require("path");
+
+// Content between startMarker and endMarker is installer-owned and is
+// overwritten in place on every rerun. See the shell caller's comment.
+const [sharedAgentsPath, localAgentGuidePath] = process.argv.slice(2);
+const startMarker = "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:START -->";
+const endMarker = "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:END -->";
+const sharedAgentsStat = fs.lstatSync(sharedAgentsPath);
+
+if (!sharedAgentsStat.isFile()) {
+  throw new Error(`${sharedAgentsPath} must be a regular file`);
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const bridgeBlock = [
+  startMarker,
+  "## Clawperator",
+  "",
+  "Clawperator runtime skills stay in the `clawperator` CLI surface.",
+  "Do not mirror them into shared agent skill directories.",
+  "",
+  "Start here:",
+  `- \`${localAgentGuidePath}\``,
+  "- `clawperator skills list`",
+  "- `clawperator skills for-app <package_id>`",
+  "- `clawperator skills search --keyword \"<term>\"`",
+  "- `clawperator skills get <skill_id>`",
+  "",
+  "Use `clawperator skills run <skill_id>` after you have identified the right runtime skill.",
+  endMarker,
+].join("\n");
+
+let content = fs.readFileSync(sharedAgentsPath, "utf8");
+const bridgePattern = new RegExp(
+  `${escapeRegExp(startMarker)}[\\s\\S]*?${escapeRegExp(endMarker)}`,
+  "g"
+);
+
+content = content.replace(bridgePattern, "");
+
+const separator = content.length === 0
+  ? ""
+  : (content.endsWith("\n\n") ? "" : (content.endsWith("\n") ? "\n" : "\n\n"));
+
+const nextContent = `${content}${separator}${bridgeBlock}`;
+
+const tempPath = path.join(
+  path.dirname(sharedAgentsPath),
+  `.clawperator-shared-agents.${process.pid}.${Date.now()}.tmp`
+);
+const sharedAgentsPermissions = sharedAgentsStat.mode & 0o777;
+
+try {
+  fs.writeFileSync(tempPath, nextContent, { mode: sharedAgentsPermissions });
+  fs.chmodSync(tempPath, sharedAgentsPermissions);
+  fs.renameSync(tempPath, sharedAgentsPath);
+  fs.chmodSync(sharedAgentsPath, sharedAgentsPermissions);
+} finally {
+  if (fs.existsSync(tempPath)) {
+    fs.unlinkSync(tempPath);
+  }
+}
+EOF
+    then
+        echo -e "${GREEN}✅ Updated shared agent guide bridge at ${SHARED_AGENTS_PATH}.${NC}"
+        return 0
+    fi
+
+    echo -e "${YELLOW}⚠️  Failed to update shared agent bridge at ${SHARED_AGENTS_PATH}; continuing without it.${NC}" >&2
+    if [ -s "$BRIDGE_ERROR_TMP" ]; then
+        cat "$BRIDGE_ERROR_TMP" >&2
+    fi
+    return 0
 }
 
 sha256_file() {
@@ -808,6 +1375,26 @@ list_detected_android_devices() {
     adb devices | awk 'NR > 1 && $2 != "" { print $1 "\t" $2 }'
 }
 
+record_selected_device_serial() {
+    local device_serial="$1"
+    LAST_DEVICE_SERIAL="$device_serial"
+}
+
+maybe_record_unambiguous_connected_device_serial() {
+    local device_count=""
+    local device_id=""
+
+    device_count="$(count_connected_devices)"
+    if [ "$device_count" -ne 1 ]; then
+        return 0
+    fi
+
+    device_id="$(list_connected_devices)"
+    if [ -n "$device_id" ]; then
+        record_selected_device_serial "$device_id"
+    fi
+}
+
 maybe_install_operator_apk() {
     local READY_DEVICE_COUNT
     local DETECTED_DEVICE_COUNT
@@ -883,6 +1470,7 @@ maybe_install_operator_apk() {
         y|Y|yes|YES)
             local DEVICE_ID
             DEVICE_ID="$(list_connected_devices)"
+            record_selected_device_serial "$DEVICE_ID"
             echo -e "${BLUE}Installing operator APK on connected device...${NC}"
             if [ -n "$CLAWPERATOR_BIN_PATH" ]; then
                 # Use the canonical install command: installs APK and grants permissions in one step.
@@ -966,6 +1554,14 @@ print_manual_operator_setup_commands() {
     done < <(list_connected_devices)
 }
 
+print_durable_artifact_summary() {
+    echo -e "Durable host-agent artifacts:"
+    echo -e "   ${BLUE}$HOME/.clawperator/AGENTS.md${NC}"
+    echo -e "   ${BLUE}$HOME/.clawperator/install-state.json${NC}"
+    echo -e "   ${BLUE}$HOME/.clawperator/mcp-config-snippet.json${NC}"
+    echo -e "   AI agents should start with the local guide, then use the install state and MCP snippet as needed."
+}
+
 show_star_hint() {
   # Skip if not a TTY
   [ -t 2 ] || return 0
@@ -1009,12 +1605,14 @@ run_doctor_and_fix() {
     # Check for Handshake (permissions)
     # Re-run doctor to see if APK install fixed handshake, or if we need to grant permissions
     DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json || true)"
+    maybe_record_unambiguous_connected_device_serial
     if doctor_check_status "$DOCTOR_JSON" "readiness.handshake" "fail"; then
         local DEVICE_COUNT
         DEVICE_COUNT="$(count_connected_devices)"
         if [ "$DEVICE_COUNT" -eq 1 ]; then
             local DEVICE_ID
             DEVICE_ID="$(list_connected_devices)"
+            record_selected_device_serial "$DEVICE_ID"
             # Handshake failed after install - re-grant permissions as remediation (not initial setup).
             echo -e "${BLUE}Handshake failed. Re-granting device permissions for $DEVICE_ID as recovery...${NC}"
             "$CLAWPERATOR_BIN_PATH" grant-device-permissions --device "$DEVICE_ID" --operator-package "$DEFAULT_OPERATOR_PACKAGE" > /dev/null 2>&1 || true
@@ -1044,6 +1642,9 @@ main() {
     setup_skills_via_cli
     setup_authoring_skills_via_cli
     write_agent_guide
+    write_shared_agent_bridge
+    write_install_state
+    write_mcp_config_snippet
 
     local ACTIVE_SHELL="${SHELL:-/bin/bash}"
     local DETECTED_SHELL
@@ -1069,11 +1670,13 @@ main() {
         echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
         echo -e "${GREEN}  Installation Complete (Device Selection Required)${NC}"
         echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+        print_durable_artifact_summary
         return 0
     fi
     if ! doctor_report_ok "$FINAL_DOCTOR_JSON"; then
         echo -e "${RED}❌ Final doctor check failed.${NC}"
         "$CLAWPERATOR_BIN_PATH" doctor --output pretty || true
+        print_durable_artifact_summary
         return 1
     fi
     "$CLAWPERATOR_BIN_PATH" doctor --output pretty
@@ -1119,9 +1722,10 @@ main() {
         echo -e "   ${YELLOW}clawperator authoring-skills install${NC}"
     fi
     echo ""
+    print_durable_artifact_summary
+    echo ""
     echo -e "For more info, visit: ${BLUE}https://docs.clawperator.com${NC}"
-    echo -e "Agent guide: ${BLUE}https://docs.clawperator.com/llms.txt${NC}"
-    echo -e "If you are an AI agent, read the agent guide before running any commands.${NC}"
+    echo -e "LLM guide: ${BLUE}https://docs.clawperator.com/llms.txt${NC}"
     echo ""
 
     show_star_hint

@@ -36,6 +36,60 @@ Success conditions:
 - `clawperator version` exits `0` and prints a version string.
 - If you used `install.sh`, the installer also downloads the current release APK to `~/.clawperator/downloads/operator.apk`.
 
+### Durable host-agent artifacts from `install.sh`
+
+If `install.sh` reaches its post-doctor onboarding phase, it also writes these
+durable onboarding files under `~/.clawperator/`:
+
+| Path | Meaning | When to read it |
+| --- | --- | --- |
+| `~/.clawperator/AGENTS.md` | Local Clawperator guide with runtime-skill discovery commands and current authoring-skills status | First stop for a host agent that needs to discover what Clawperator can do on this machine |
+| `~/.clawperator/install-state.json` | Durable install metadata written by the installer | Use when you need the last known install facts without rerunning `doctor` |
+| `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config for Claude Desktop, Codex, and a generic stdio MCP consumer | Use when the host should connect through `clawperator mcp serve` instead of shelling out to the CLI |
+
+Early prerequisite failures and early doctor failures exit before these files
+are written.
+
+`install-state.json` currently has this shape:
+
+```json
+{
+  "schemaVersion": 1,
+  "installedAt": "2026-04-17T08:12:34Z",
+  "cliVersion": "1.2.3",
+  "registryPath": "/Users/<local_user>/.clawperator/skills/skills/skills-registry.json",
+  "apkVersion": "1.2.3",
+  "lastDeviceSerial": null
+}
+```
+
+Field rules:
+
+- `schemaVersion` and `installedAt` are always present
+- `cliVersion` is `null` when the installer could not run `clawperator --version`
+- `registryPath` is `null` when the installer cannot resolve any readable runtime-skills registry path from the current install run, `CLAWPERATOR_SKILLS_REGISTRY`, prior install state, or the default installed home path
+- `apkVersion` is `null` when the installer does not have a known operator version
+- `lastDeviceSerial` is `null` when install did not pick one unambiguous device
+
+Shared-agent bridge behavior is intentionally bounded:
+
+- if `~/.agents/AGENTS.md` already exists, the installer appends one Clawperator-owned bridge block there
+- that bridge points back to `~/.clawperator/AGENTS.md` plus the `clawperator skills` discovery commands
+- if `~/.agents/AGENTS.md` does not exist, the installer does not create it
+- the installer does not copy runtime skills into shared agent skill directories
+
+Verification:
+
+```bash
+ls ~/.clawperator/AGENTS.md ~/.clawperator/install-state.json ~/.clawperator/mcp-config-snippet.json
+test ! -f ~/.agents/AGENTS.md || grep -F "CLAWPERATOR_SHARED_AGENT_BRIDGE:START" ~/.agents/AGENTS.md
+```
+
+When choosing the host-facing surface:
+
+- use `clawperator skills` when you want to discover or run installed runtime skills by app, keyword, or id
+- use MCP when your host already supports stdio MCP and wants registered tools such as `devices`, `snapshot`, and `execute`
+
 ## 2. Prepare the Android target
 
 Required device state:

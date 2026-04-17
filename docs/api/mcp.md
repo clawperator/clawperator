@@ -12,6 +12,7 @@ Describe the first-party stdio MCP server exposed by `clawperator mcp serve`: ho
 - Core tools: `apps/node/src/mcp/tools/core.ts`
 - Named tools: `apps/node/src/mcp/tools/named.ts`
 - MCP session defaults: `apps/node/src/mcp/session.ts`
+- Installer-generated MCP snippet: [`install.sh`](https://github.com/clawperator/clawperator/blob/main/sites/landing/public/install.sh)
 - Execution contract: `apps/node/src/contracts/execution.ts`
 - Error codes: `apps/node/src/contracts/errors.ts`
 - Selector contract: `apps/node/src/contracts/selectors.ts`
@@ -51,6 +52,27 @@ Notes:
 - Global CLI flags such as `--device`, `--device-id`, and `--operator-package` are not accepted on the `mcp serve` argv line. Pass `deviceId` and `operatorPackage` per MCP tool call instead, or store them for the current MCP session with `configure`.
 - Node.js `24+` is required.
 
+## Installer-Generated Snippet
+
+`install.sh` writes a host-specific MCP snippet to:
+
+- `~/.clawperator/mcp-config-snippet.json`
+
+That file is generated from the installer's current binary path, detected `adb`
+path, `DEFAULT_OPERATOR_PACKAGE` (`com.clawperator.operator`), and
+`~/.clawperator/logs`. It includes:
+
+- `claudeDesktop.entry.clawperator`
+- `codex.entryToml`
+- `genericStdioConsumer.server`
+
+When the installer can resolve the packaged CLI JS entrypoint, the generated
+snippet uses the installer's current absolute Node executable path instead of a
+bare `node` command so GUI MCP clients do not depend on shell `PATH`.
+
+The installer does not auto-register the MCP server with any client. The file
+is a paste-ready bridge, not an automatic configuration mutation.
+
 ## Claude Desktop Example
 
 Example `mcpServers` entry:
@@ -81,6 +103,25 @@ Why `node` is the command:
 - the npm package ships `dist/cli/index.js`
 - MCP desktop clients usually want an explicit executable plus argument list
 - using `node` plus the installed CLI entrypoint avoids relying on shell wrappers
+
+## When To Use MCP Versus `clawperator skills`
+
+Use `clawperator skills` when:
+
+- your host can shell out to the CLI directly
+- you want to discover installed runtime skills by app, keyword, or id
+- you want the runtime-skill wrapper semantics from `skills get` and `skills run`
+
+Use MCP when:
+
+- your host already supports stdio MCP
+- you want a long-running registered tool surface instead of repeated CLI process launches
+- you need general device tools such as `devices`, `snapshot`, `execute`, and `configure`, not only runtime-skill discovery
+
+These surfaces are complementary:
+
+- `clawperator skills` is the primary runtime-skill discovery and wrapper surface
+- `clawperator mcp serve` is the primary tool-registration surface for MCP-capable hosts
 
 ## Environment For Long-Running MCP Clients
 

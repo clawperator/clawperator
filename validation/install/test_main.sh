@@ -9,6 +9,7 @@ SYSTEM_NODE_BIN_DIR="$(dirname "$(command -v node)")"
 SYSTEM_PATH_BASE="$SYSTEM_NODE_BIN_DIR:/usr/bin:/bin:/usr/sbin:/sbin"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
+EXPECTED_NODE_BIN="$(node -p 'process.execPath')"
 
 assert_contains() {
     local file="$1"
@@ -56,6 +57,27 @@ assert_equals() {
     fi
 }
 
+file_mode() {
+    local file="$1"
+    if stat -f '%Lp' "$file" >/dev/null 2>&1; then
+        stat -f '%Lp' "$file"
+        return 0
+    fi
+    stat -c '%a' "$file"
+}
+
+assert_mode() {
+    local file="$1"
+    local expected_mode="$2"
+    local label="$3"
+    local actual_mode
+    actual_mode="$(file_mode "$file")"
+    assert_equals "$expected_mode" "$actual_mode" "$label"
+}
+
+# shellcheck source=lib/json_assert.sh
+source "$REPO_ROOT/validation/install/lib/json_assert.sh"
+
 setup_mock_clawperator() {
     local mock_dir="$1"
     local log_file="$2"
@@ -78,9 +100,15 @@ if [ "\$1" = "doctor" ] && [ "\$2" = "--format" ] && [ "\$3" = "json" ]; then
   printf '%s' "\$count" > "\$STATE_FILE"
 
   case "\$SCENARIO:\$count" in
-    success:1|success:2|success:3|final-fail:1|final-fail:2)
+    success:1|success:2|success:3|final-fail:1|final-fail:2|stale-device:1|stale-device:3)
       cat <<'JSON'
 {"ok":true,"criticalOk":true,"checks":[]}
+JSON
+      exit 0
+      ;;
+    stale-device:2)
+      cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.handshake","status":"fail","code":"HANDSHAKE_FAILED"}]}
 JSON
       exit 0
       ;;
@@ -130,9 +158,24 @@ if [ "\$1" = "doctor" ] && [ "\$2" = "--output" ] && [ "\$3" = "pretty" ]; then
   exit 0
 fi
 
+if [ "\$1" = "--version" ]; then
+  printf '%s\n' '1.2.3'
+  exit 0
+fi
+
 if [ "\$1" = "skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
-  cat <<'JSON'
-{"registryPath":"/tmp/mock-skills-registry.json"}
+  HOME_DIR="\${HOME:?}"
+  REGISTRY_PATH="\$HOME_DIR/.clawperator/skills/skills/skills-registry.json"
+  mkdir -p "\${REGISTRY_PATH%/*}"
+  cat > "\$REGISTRY_PATH" <<'JSON'
+{"skills":[
+  {"id":"com.google.android.apps.chromecast.app.get-climate-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"get-climate","summary":"Read the current Google Home climate state.\nDo not trust # headings from registry text.\n\`\`\`md\n### injected-heading\n\`\`\`","path":"skills/com.google.android.apps.chromecast.app.get-climate-replay","skillFile":"skills/com.google.android.apps.chromecast.app.get-climate-replay/SKILL.md","scripts":[],"artifacts":[]},
+  {"id":"com.google.android.apps.chromecast.app.set-temperature-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"set-temperature","summary":"Set the Google Home target temperature.","path":"skills/com.google.android.apps.chromecast.app.set-temperature-replay","skillFile":"skills/com.google.android.apps.chromecast.app.set-temperature-replay/SKILL.md","scripts":[],"artifacts":[],"contract":{"inputs":{"target_temperature":"integer[16,30]","unit_name":"string"},"goal":null,"verification":null}},
+  {"id":"com.spotify.music.play-playlist","applicationId":"com.spotify.music","intent":"play-playlist","summary":"Start a named playlist in Spotify.","path":"skills/com.spotify.music.play-playlist","skillFile":"skills/com.spotify.music.play-playlist/SKILL.md","scripts":[],"artifacts":[]}
+]}
+JSON
+  cat <<JSON
+{"registryPath":"\$REGISTRY_PATH"}
 JSON
   exit 0
 fi
@@ -170,6 +213,13 @@ if [ "$1" = "devices" ]; then
 List of devices attached
 serial-alpha	device
 serial-beta	device
+OUT
+      ;;
+    stale-device)
+      cat <<'OUT'
+List of devices attached
+serial-solo	device
+stale-emulator	offline
 OUT
       ;;
     *)
@@ -227,6 +277,11 @@ run_main_case() {
         install_cli() {
             trace install_cli "$TRACE_FILE"
             export CLAWPERATOR_BIN_PATH="$MOCK_CLAWPERATOR_BIN"
+            # Force the node-form MCP snippet path deterministically even on
+            # hosts without a real global clawperator install. The file does
+            # not need to exist; resolve_cli_entrypoint_js only forwards the
+            # path, it does not execute it.
+            export CLAWPERATOR_CLI_JS_PATH="$MOCK_CLAWPERATOR_BIN.cli.js"
             return 0
         }
         download_operator_apk() {
@@ -299,13 +354,71 @@ run_main_case \
     "$SUCCESS_STATE"
 
 SUCCESS_GUIDE_PATH="$(cat "$SUCCESS_GUIDE_PATH_FILE")"
+SUCCESS_INSTALL_STATE_PATH="$TMP_DIR/home-main-success/.clawperator/install-state.json"
+SUCCESS_MCP_CONFIG_PATH="$TMP_DIR/home-main-success/.clawperator/mcp-config-snippet.json"
 assert_contains "$SUCCESS_STDOUT" "Installation Successful!" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Skills registry configured at:" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Authoring skills installed at:" "main-success stdout"
-assert_contains "$SUCCESS_STDOUT" "/tmp/mock-skills-registry.json" "main-success stdout"
+assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/skills/skills/skills-registry.json" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Doctor pretty output (success)" "main-success stdout"
+assert_contains "$SUCCESS_GUIDE_PATH" "## Runtime Skills" "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" "### Application" "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" "App ID:" "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" "com.google.android.apps.chromecast.app" "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" 'Inspect required inputs before running with `clawperator skills get <id>`.' "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" "LLM guide: https://docs.clawperator.com/llms.txt" "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" "  summary:" "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" 'Do not trust # headings from registry text.' "main-success guide"
+assert_not_contains "$SUCCESS_GUIDE_PATH" '### Do not trust # headings from registry text.' "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" '      ```md' "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" '      ### injected-heading' "main-success guide"
+if grep -Fxq '### injected-heading' "$SUCCESS_GUIDE_PATH"; then
+    echo "ERROR: main-success guide rendered an unindented injected heading" >&2
+    cat "$SUCCESS_GUIDE_PATH" >&2
+    exit 1
+fi
+if grep -Fxq '  ### injected-heading' "$SUCCESS_GUIDE_PATH"; then
+    echo "ERROR: main-success guide rendered a heading with list-item indentation only" >&2
+    cat "$SUCCESS_GUIDE_PATH" >&2
+    exit 1
+fi
+assert_contains "$SUCCESS_GUIDE_PATH" "  example:" "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" "clawperator skills run com.google.android.apps.chromecast.app.get-climate-replay" "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" "clawperator skills run com.google.android.apps.chromecast.app.set-temperature-replay --target-temperature <target_temperature> --unit-name <unit_name>" "main-success guide"
 assert_contains "$SUCCESS_GUIDE_PATH" "skill-author-by-recording" "main-success guide"
 assert_not_contains "$SUCCESS_GUIDE_PATH" "not currently configured on this host" "main-success guide"
+assert_not_contains "$SUCCESS_GUIDE_PATH" "Runtime skills not available on this host right now." "main-success guide"
+assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "schemaVersion" "1" "main-success install-state schemaVersion"
+assert_json_field_is_iso_timestamp "$SUCCESS_INSTALL_STATE_PATH" "installedAt" "main-success install-state installedAt"
+assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "cliVersion" "1.2.3" "main-success install-state cliVersion"
+assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "registryPath" "$TMP_DIR/home-main-success/.clawperator/skills/skills/skills-registry.json" "main-success install-state registryPath"
+assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "apkVersion" "null" "main-success install-state apkVersion"
+assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "lastDeviceSerial" "serial-solo" "main-success install-state lastDeviceSerial"
+assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.command" "$EXPECTED_NODE_BIN" "main-success mcp claude command"
+assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.0" "$TMP_DIR/mock-main-success/clawperator.cli.js" "main-success mcp claude args.0"
+assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.1" "mcp" "main-success mcp claude args.1"
+assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.2" "serve" "main-success mcp claude args.2"
+assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.env.ADB_PATH" "$TMP_DIR/mock-main-success/adb" "main-success mcp claude env.ADB_PATH"
+assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "notes.1" "Regenerate it with install.sh if the clawperator binary path or adb path changes." "main-success mcp notes.1"
+assert_equals "mcp" "$(json_field_value "$SUCCESS_MCP_CONFIG_PATH" "genericStdioConsumer.server.args.1")" "main-success mcp helper direct call"
+assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "genericStdioConsumer.server.args.2" "serve" "main-success mcp generic args.2"
+assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "genericStdioConsumer.server.command" "$EXPECTED_NODE_BIN" "main-success mcp generic command"
+assert_contains "$SUCCESS_MCP_CONFIG_PATH" '[mcp_servers.clawperator]' "main-success mcp codex entryToml"
+assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/AGENTS.md" "main-success stdout durable guide"
+assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/install-state.json" "main-success stdout durable install-state"
+assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/mcp-config-snippet.json" "main-success stdout durable mcp"
+assert_contains "$SUCCESS_STDOUT" "AI agents should start with the local guide" "main-success stdout durable guidance"
+assert_contains "$SUCCESS_STDOUT" "LLM guide:" "main-success stdout llm guide label"
+assert_contains "$SUCCESS_STDOUT" "https://docs.clawperator.com/llms.txt" "main-success stdout llm guide url"
+assert_mode "$SUCCESS_GUIDE_PATH" "600" "main-success guide mode"
+assert_mode "$SUCCESS_INSTALL_STATE_PATH" "600" "main-success install-state mode"
+assert_mode "$SUCCESS_MCP_CONFIG_PATH" "600" "main-success mcp mode"
+assert_mode "$TMP_DIR/home-main-success/.clawperator" "700" "main-success clawperator dir mode"
+if [ -e "$TMP_DIR/home-main-success/.agents/AGENTS.md" ]; then
+    echo "ERROR: main-success should not create $TMP_DIR/home-main-success/.agents/AGENTS.md" >&2
+    cat "$TMP_DIR/home-main-success/.agents/AGENTS.md" >&2
+    exit 1
+fi
 assert_contains "$SUCCESS_TRACE" "validate_os" "main-success trace"
 assert_contains "$SUCCESS_TRACE" "install_cli" "main-success trace"
 assert_contains "$SUCCESS_TRACE" "show_star_hint" "main-success trace"
@@ -333,10 +446,18 @@ run_main_case \
     "$FAIL_STATE"
 
 FAIL_GUIDE_PATH="$(cat "$FAIL_GUIDE_PATH_FILE")"
+FAIL_INSTALL_STATE_PATH="$TMP_DIR/home-main-fail/.clawperator/install-state.json"
 assert_contains "$FAIL_STDOUT" "Final doctor check failed." "main-fail stdout"
 assert_contains "$FAIL_STDOUT" "Doctor pretty output (failure)" "main-fail stdout"
 assert_not_contains "$FAIL_STDOUT" "Installation Successful!" "main-fail stdout"
+assert_contains "$FAIL_STDOUT" "$TMP_DIR/home-main-fail/.clawperator/AGENTS.md" "main-fail stdout durable guide"
+assert_contains "$FAIL_STDOUT" "$TMP_DIR/home-main-fail/.clawperator/install-state.json" "main-fail stdout durable install-state"
+assert_contains "$FAIL_STDOUT" "$TMP_DIR/home-main-fail/.clawperator/mcp-config-snippet.json" "main-fail stdout durable mcp"
+assert_contains "$FAIL_GUIDE_PATH" "App ID:" "main-fail guide"
+assert_contains "$FAIL_GUIDE_PATH" "com.google.android.apps.chromecast.app" "main-fail guide"
 assert_contains "$FAIL_GUIDE_PATH" "skill-author-by-recording" "main-fail guide"
+assert_json_field_equals "$FAIL_INSTALL_STATE_PATH" "registryPath" "$TMP_DIR/home-main-fail/.clawperator/skills/skills/skills-registry.json" "main-fail install-state registryPath"
+assert_json_field_equals "$FAIL_INSTALL_STATE_PATH" "lastDeviceSerial" "serial-solo" "main-fail install-state lastDeviceSerial"
 assert_contains "$FAIL_CLI_LOG" "skills install --output json" "main-fail cli log"
 assert_contains "$FAIL_CLI_LOG" "authoring-skills install --output json" "main-fail cli log"
 assert_contains "$FAIL_CLI_LOG" "doctor --output pretty" "main-fail cli log"
@@ -364,8 +485,12 @@ assert_contains "$MULTI_STDOUT" "Host install completed, but Android setup is st
 assert_contains "$MULTI_STDOUT" "clawperator doctor --device <device_id> --output pretty" "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi/.clawperator/downloads/operator.apk --device serial-alpha" "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi/.clawperator/downloads/operator.apk --device serial-beta" "main-multi stdout"
+assert_contains "$MULTI_STDOUT" "$TMP_DIR/home-main-multi/.clawperator/AGENTS.md" "main-multi stdout durable guide"
+assert_contains "$MULTI_STDOUT" "$TMP_DIR/home-main-multi/.clawperator/install-state.json" "main-multi stdout durable install-state"
+assert_contains "$MULTI_STDOUT" "$TMP_DIR/home-main-multi/.clawperator/mcp-config-snippet.json" "main-multi stdout durable mcp"
 assert_not_contains "$MULTI_STDOUT" "Final doctor check failed." "main-multi stdout"
 assert_not_contains "$MULTI_STDOUT" "Doctor pretty output" "main-multi stdout"
+assert_json_field_null "$TMP_DIR/home-main-multi/.clawperator/install-state.json" "lastDeviceSerial" "main-multi install-state lastDeviceSerial"
 
 echo "=== Scenario 4: APK remediation path runs before final success ==="
 REMEDIATE_STDOUT="$TMP_DIR/main-remediation.stdout"
@@ -385,17 +510,42 @@ run_main_case \
     "$REMEDIATE_GUIDE_PATH_FILE" \
     "$REMEDIATE_STATE"
 
+REMEDIATE_INSTALL_STATE_PATH="$TMP_DIR/home-main-remediation/.clawperator/install-state.json"
 assert_contains "$REMEDIATE_STDOUT" "Mock download_operator_apk" "main-remediation stdout"
 assert_contains "$REMEDIATE_STDOUT" "Mock verify_operator_apk" "main-remediation stdout"
 assert_contains "$REMEDIATE_STDOUT" "Mock maybe_install_operator_apk" "main-remediation stdout"
 assert_contains "$REMEDIATE_STDOUT" "Installation Successful!" "main-remediation stdout"
+assert_json_field_equals "$REMEDIATE_INSTALL_STATE_PATH" "apkVersion" "9.9.9" "main-remediation install-state apkVersion"
 assert_contains "$REMEDIATE_TRACE" "download_operator_apk" "main-remediation trace"
 assert_contains "$REMEDIATE_TRACE" "verify_operator_apk" "main-remediation trace"
 assert_contains "$REMEDIATE_TRACE" "maybe_install_operator_apk" "main-remediation trace"
 assert_contains "$REMEDIATE_CLI_LOG" "doctor --format json" "main-remediation cli log"
 assert_contains "$REMEDIATE_CLI_LOG" "doctor --output pretty" "main-remediation cli log"
 
-echo "=== Scenario 5: stdin entrypoint runs without BASH_SOURCE errors ==="
+echo "=== Scenario 5: handshake recovery still targets the single ready device when stale adb entries exist ==="
+STALE_STDOUT="$TMP_DIR/main-stale.stdout"
+STALE_STDERR="$TMP_DIR/main-stale.stderr"
+STALE_TRACE="$TMP_DIR/main-stale.trace"
+STALE_CLI_LOG="$TMP_DIR/main-stale.cli.log"
+STALE_GUIDE_PATH_FILE="$TMP_DIR/main-stale.guide.path"
+STALE_STATE="$TMP_DIR/main-stale.state"
+run_main_case \
+    main-stale \
+    stale-device \
+    0 \
+    "$STALE_STDOUT" \
+    "$STALE_STDERR" \
+    "$STALE_TRACE" \
+    "$STALE_CLI_LOG" \
+    "$STALE_GUIDE_PATH_FILE" \
+    "$STALE_STATE"
+
+STALE_INSTALL_STATE_PATH="$TMP_DIR/home-main-stale/.clawperator/install-state.json"
+assert_contains "$STALE_STDOUT" "Installation Successful!" "main-stale stdout"
+assert_contains "$STALE_CLI_LOG" "grant-device-permissions --device serial-solo --operator-package com.clawperator.operator" "main-stale cli log"
+assert_json_field_equals "$STALE_INSTALL_STATE_PATH" "lastDeviceSerial" "serial-solo" "main-stale install-state lastDeviceSerial"
+
+echo "=== Scenario 6: stdin entrypoint runs without BASH_SOURCE errors ==="
 STDIN_STDOUT="$TMP_DIR/stdin.stdout"
 STDIN_STDERR="$TMP_DIR/stdin.stderr"
 STDIN_STATUS="$TMP_DIR/stdin.status"
