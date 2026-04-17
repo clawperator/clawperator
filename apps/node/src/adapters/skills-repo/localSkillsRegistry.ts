@@ -21,8 +21,19 @@ function getRepoRelativeFallbackPath(): string {
 }
 
 function getConfiguredRegistryPathFromEnv(): string | undefined {
-  const configuredPath = process.env.CLAWPERATOR_SKILLS_REGISTRY?.trim();
-  return configuredPath && configuredPath.length > 0 ? configuredPath : undefined;
+  const configuredPath = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+  if (configuredPath === undefined) {
+    return undefined;
+  }
+
+  const trimmedPath = configuredPath.trim();
+  if (trimmedPath.length === 0) {
+    throw new Error(
+      "CLAWPERATOR_SKILLS_REGISTRY is set but blank. Unset it or set it to a valid skills-registry.json path."
+    );
+  }
+
+  return trimmedPath;
 }
 
 export function getRegistryPath(): string {
@@ -42,13 +53,36 @@ export interface LoadRegistryResult {
 }
 
 export async function loadRegistry(registryPath?: string): Promise<LoadRegistryResult> {
-  const configuredPath = getConfiguredRegistryPathFromEnv();
+  if (registryPath !== undefined && registryPath.trim().length === 0) {
+    throw new Error("Registry path is blank. Pass a valid skills-registry.json path.");
+  }
+
+  let configuredPath: string | undefined;
+  try {
+    configuredPath = getConfiguredRegistryPathFromEnv();
+  } catch (error) {
+    if (registryPath === undefined) {
+      process.stderr.write(
+        "Error: CLAWPERATOR_SKILLS_REGISTRY is set but blank. " +
+        "Unset it or set it to a valid skills-registry.json path.\n"
+      );
+    }
+    throw error;
+  }
+
   const defaultPath = getDefaultRegistryPath();
   let path = registryPath ?? configuredPath ?? defaultPath;
   let raw: string | undefined;
   try {
     raw = await readFile(path, "utf-8");
   } catch {
+    if (registryPath) {
+      throw new Error(
+        `Registry not found at explicit path: ${path}. ` +
+        "Fix the path or omit the explicit registry path."
+      );
+    }
+
     if (!registryPath && configuredPath) {
       process.stderr.write(
         `Error: Registry file not found at ${path} (from CLAWPERATOR_SKILLS_REGISTRY). ` +

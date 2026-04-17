@@ -420,12 +420,14 @@ describe("listSkills", () => {
 });
 
 describe("loadRegistry", () => {
-  it("treats a blank CLAWPERATOR_SKILLS_REGISTRY as unset for getRegistryPath", () => {
+  it("rejects a blank CLAWPERATOR_SKILLS_REGISTRY in getRegistryPath", () => {
     const originalRegistry = process.env.CLAWPERATOR_SKILLS_REGISTRY;
     try {
       process.env.CLAWPERATOR_SKILLS_REGISTRY = "   ";
-      assert.notStrictEqual(getRegistryPath(), "");
-      assert.match(getRegistryPath(), /skills\/skills-registry\.json$/);
+      assert.throws(
+        () => getRegistryPath(),
+        /CLAWPERATOR_SKILLS_REGISTRY is set but blank/
+      );
     } finally {
       if (originalRegistry === undefined) {
         delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
@@ -518,7 +520,7 @@ describe("loadRegistry", () => {
     }
   });
 
-  it("treats a blank CLAWPERATOR_SKILLS_REGISTRY as unset and still falls back", async () => {
+  it("fails when CLAWPERATOR_SKILLS_REGISTRY is blank instead of falling back", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-blank-env-"));
     const tempHome = await mkdtemp(join(tmpdir(), "clawperator-home-blank-env-"));
     const appNodeDir = join(tempRoot, "apps", "node");
@@ -542,30 +544,28 @@ describe("loadRegistry", () => {
         import { loadRegistry } from ${JSON.stringify(moduleUrl)};
         process.chdir(${JSON.stringify(appNodeDir)});
         process.env.CLAWPERATOR_SKILLS_REGISTRY = "   ";
-        const result = await loadRegistry();
-        console.log(JSON.stringify({
-          resolvedPath: result.resolvedPath,
-          skillCount: result.registry.skills.length,
-        }));
+        try {
+          await loadRegistry();
+          console.log(JSON.stringify({ ok: true }));
+        } catch (error) {
+          console.log(JSON.stringify({ ok: false, message: error instanceof Error ? error.message : String(error) }));
+        }
       `;
       const child = await runNodeSnippet(script, {
         env: { ...process.env, HOME: tempHome },
       });
       assert.strictEqual(child.code, 0, child.stderr);
-      const parsed = JSON.parse(child.stdout) as { resolvedPath: string; skillCount: number };
-      assert.strictEqual(
-        normalizeMacTmpPath(parsed.resolvedPath),
-        normalizeMacTmpPath(installedHomeRegistryPath)
-      );
-      assert.ok(parsed.skillCount > 0);
-      assert.strictEqual(child.stderr, "");
+      const parsed = JSON.parse(child.stdout) as { ok: boolean; message?: string };
+      assert.strictEqual(parsed.ok, false);
+      assert.match(parsed.message ?? "", /CLAWPERATOR_SKILLS_REGISTRY is set but blank/);
+      assert.match(child.stderr, /CLAWPERATOR_SKILLS_REGISTRY is set but blank/);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
       await rm(tempHome, { recursive: true, force: true });
     }
   });
 
-  it("falls back when the caller passes the derived default path", async () => {
+  it("fails when the caller passes an explicit default registry path that does not exist", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-"));
     const appNodeDir = join(tempRoot, "apps", "node");
     const fallbackDir = join(tempRoot, "skills");
@@ -583,19 +583,20 @@ describe("loadRegistry", () => {
         import { loadRegistry, getRegistryPath } from ${JSON.stringify(moduleUrl)};
         process.chdir(${JSON.stringify(appNodeDir)});
         delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
-        const result = await loadRegistry(getRegistryPath());
-        console.log(JSON.stringify({
-          resolvedPath: result.resolvedPath,
-          skillCount: result.registry.skills.length,
-        }));
+        try {
+          await loadRegistry(getRegistryPath());
+          console.log(JSON.stringify({ ok: true }));
+        } catch (error) {
+          console.log(JSON.stringify({ ok: false, message: error instanceof Error ? error.message : String(error) }));
+        }
       `;
       const child = await runNodeSnippet(script, {
         env: { ...process.env },
       });
       assert.strictEqual(child.code, 0, child.stderr);
-      const parsed = JSON.parse(child.stdout);
-      assert.strictEqual(normalizeMacTmpPath(parsed.resolvedPath), normalizeMacTmpPath(fallbackPath));
-      assert.ok(parsed.skillCount > 0);
+      const parsed = JSON.parse(child.stdout) as { ok: boolean; message?: string };
+      assert.strictEqual(parsed.ok, false);
+      assert.match(parsed.message ?? "", /Registry not found at explicit path:/);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }
@@ -771,7 +772,7 @@ describe("loadRegistry", () => {
       assert.strictEqual(parsed.ok, false);
       assert.match(
         parsed.message ?? "",
-        new RegExp(`Registry not found\\. Checked: ${explicitMissingPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`)
+        new RegExp(`Registry not found at explicit path: ${explicitMissingPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`)
       );
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
@@ -953,6 +954,94 @@ describe("validateSkill", () => {
       assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
       assert.deepStrictEqual(result.details?.missingFields, ["scripts"]);
       assert.strictEqual(result.details?.mismatchFields, undefined);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects registry entries whose keywords are not a string array", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-bad-registry-keywords-"));
+    const skillsDir = join(tempRoot, "skills");
+    const skillDir = join(skillsDir, "com.test.bad-registry-keywords");
+    const registryPath = join(skillsDir, "skills-registry.json");
+    const entry = {
+      id: "com.test.bad-registry-keywords",
+      applicationId: "com.test",
+      intent: "bad-registry-keywords",
+      summary: "Broken skill",
+      keywords: ["ok", 123],
+      path: "skills/com.test.bad-registry-keywords",
+      skillFile: "skills/com.test.bad-registry-keywords/SKILL.md",
+      scripts: ["skills/com.test.bad-registry-keywords/scripts/run.js"],
+      artifacts: [],
+    };
+
+    await mkdir(join(skillDir, "scripts"), { recursive: true });
+    await copyFile(
+      join(packageRoot, "src", "test", "fixtures", "skills", "com.test.echo", "scripts", "echo.js"),
+      join(skillDir, "scripts", "run.js")
+    );
+    await writeFile(registryPath, `${JSON.stringify({ skills: [entry] }, null, 2)}\n`, "utf8");
+    await writeFile(
+      join(skillDir, "skill.json"),
+      `${JSON.stringify({
+        ...entry,
+        keywords: ["ok"],
+      }, null, 2)}\n`,
+      "utf8"
+    );
+    await writeFile(join(skillDir, "SKILL.md"), "# Broken Skill\n", "utf8");
+
+    try {
+      const result = await validateSkill("com.test.bad-registry-keywords", registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /invalid keywords value/);
+      assert.strictEqual(result.details?.reason, "keywords must be an array of strings when present");
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects skill.json keywords that are not a string array", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-bad-manifest-keywords-"));
+    const skillsDir = join(tempRoot, "skills");
+    const skillDir = join(skillsDir, "com.test.bad-manifest-keywords");
+    const registryPath = join(skillsDir, "skills-registry.json");
+    const entry = {
+      id: "com.test.bad-manifest-keywords",
+      applicationId: "com.test",
+      intent: "bad-manifest-keywords",
+      summary: "Broken skill",
+      keywords: ["ok"],
+      path: "skills/com.test.bad-manifest-keywords",
+      skillFile: "skills/com.test.bad-manifest-keywords/SKILL.md",
+      scripts: ["skills/com.test.bad-manifest-keywords/scripts/run.js"],
+      artifacts: [],
+    };
+
+    await mkdir(join(skillDir, "scripts"), { recursive: true });
+    await copyFile(
+      join(packageRoot, "src", "test", "fixtures", "skills", "com.test.echo", "scripts", "echo.js"),
+      join(skillDir, "scripts", "run.js")
+    );
+    await writeFile(registryPath, `${JSON.stringify({ skills: [entry] }, null, 2)}\n`, "utf8");
+    await writeFile(
+      join(skillDir, "skill.json"),
+      `${JSON.stringify({
+        ...entry,
+        keywords: ["ok", { bad: true }],
+      }, null, 2)}\n`,
+      "utf8"
+    );
+    await writeFile(join(skillDir, "SKILL.md"), "# Broken Skill\n", "utf8");
+
+    try {
+      const result = await validateSkill("com.test.bad-manifest-keywords", registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /invalid skill\.json keywords value/);
+      assert.strictEqual(result.details?.reason, "keywords must be an array of strings when present");
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }

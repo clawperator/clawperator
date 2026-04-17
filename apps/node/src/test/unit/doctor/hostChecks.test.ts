@@ -318,7 +318,7 @@ describe("Doctor: hostChecks", () => {
             }
         });
 
-        it("passes when no local skills registry is installed and CLAWPERATOR_SKILLS_REGISTRY is blank", async () => {
+        it("warns when no local skills registry is installed and CLAWPERATOR_SKILLS_REGISTRY is blank", async () => {
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
             const originalRegistry = process.env.CLAWPERATOR_SKILLS_REGISTRY;
             const originalHome = process.env.HOME;
@@ -335,9 +335,9 @@ describe("Doctor: hostChecks", () => {
                 process.chdir(appNodeDir);
 
                 const result = await checkInstalledOrchestratedSkillAgentCliAvailability(config);
-                assert.strictEqual(result.status, "pass");
-                assert.match(result.summary, /Skipping skill-aware orchestrated agent CLI check/i);
-                assert.match(result.detail ?? "", /Registry not found\. Checked:/);
+                assert.strictEqual(result.status, "warn");
+                assert.match(result.summary, /could not inspect the local skills registry/i);
+                assert.match(result.detail ?? "", /CLAWPERATOR_SKILLS_REGISTRY is set but blank/);
             } finally {
                 process.chdir(originalCwd);
                 if (originalRegistry === undefined) {

@@ -26,7 +26,11 @@ function computeKeywordMatchRank(skill: SkillEntry, keyword: string): number {
     return -1;
   }
 
-  const keywords = (skill.keywords ?? []).map((entry) => entry.toLowerCase());
+  const keywords = Array.isArray(skill.keywords)
+    ? skill.keywords
+        .filter((entry): entry is string => typeof entry === "string")
+        .map((entry) => entry.toLowerCase())
+    : [];
   const id = skill.id.toLowerCase();
   const applicationId = skill.applicationId.toLowerCase();
   const summary = skill.summary.toLowerCase();
