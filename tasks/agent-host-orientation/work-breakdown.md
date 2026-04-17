@@ -4,135 +4,83 @@ Parent plan: `tasks/agent-host-orientation/plan.md`
 
 ## Executive Summary
 
-2 PRs, 4 phases. PR-1 settles the canonical public host-agent orientation flow
-and updates the authored docs around it. PR-2 tightens CLI help plus
-registry/discovery remediation so shell surfaces point at the same stable docs.
-This pack assumes the shipped onboarding baseline from PR #196 already exists on
-the branch you implement from. It is a follow-up to that shipped baseline, not
-an invitation to reopen onboarding scope.
+This pack no longer represents greenfield work.
+
+The original 4-phase follow-up is now shipped on branches that already contain
+`docs/host-agents.md`, public cross-links around that route, top-level CLI help
+that points at it, and installed-home registry remediation text.
+
+Use this work breakdown to avoid redoing that shipped work. The only remaining
+implementation work, if this pack is reopened, is residual public docs cleanup
+for env-var-first discovery guidance that contradicts the shipped installed-home
+flow.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | planning |
-| Total PRs | 2 |
-| Total phases | 4 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4 |
-| Current / Next | Phase 1 |
-| Blockers | use a branch with the shipped onboarding baseline already present |
+| State | partially shipped |
+| Total historical phases | 4 |
+| Historical completed phases | 1, 2, 3, 4 |
+| Remaining active phases | 5 |
+| Current / Next | Phase 5 |
+| Blockers | none |
 
 ## Hard Rules
 
-- Do not reopen or expand PR #196. Use this pack only from a branch where the
-  shipped onboarding baseline is already present.
-- Use `.agents/skills/docs-author/SKILL.md` for authored docs changes. Do not
-  hand-edit generated docs outputs.
+- Do not reopen or expand PR #196.
+- Do not recreate the canonical public route. `docs/host-agents.md` is already
+  the shipped first stop.
+- Do not create a second competing "start here" page.
+- Do not redo top-level CLI and `skills` help alignment unless current code has
+  regressed.
+- Use `.agents/skills/docs-author/SKILL.md` for authored docs changes.
 - Do not hand-edit `sites/docs/.build/`, `sites/docs/site/`, or generated
   `api/cli.md` content. Regenerate them from source.
-- Do not add new commands or change runtime behavior in this pack. Only
-  orientation, help, and remediation guidance are in scope.
+- Do not add new commands or change runtime behavior in this pack.
 - Keep `skills for-app` as the primary app-oriented discovery surface.
-- If a new public page is needed, create exactly one. Do not create a mini-docs
-  cluster for the same concept.
-- Any CLI docs link must point at the chosen public docs route, not at a task
-  file, GitHub source file, or local install artifact.
-- If the plan and current code disagree, trust the code and update the task plan
-  decision rather than implementing the stale assumption.
+- If the plan and current code disagree, trust the code and update the task
+  pack rather than implementing the stale assumption.
 - Do not read retired onboarding task files as execution context. All baseline
   context this pack needs is already captured in
   `tasks/agent-host-orientation/plan.md`.
-- One commit per logical step. Do not batch docs IA, help text, and error-text
-  work into one catch-all commit.
 
 ## Required Reading
 
-Read these files IN THIS ORDER before writing anything.
+Read these files in this order before making residual cleanup changes.
 
 | File | Why it matters |
 | --- | --- |
-| `tasks/agent-host-orientation/plan.md` | Stable contract and scope boundaries |
-| `docs/setup.md` | Current public install and artifact guidance |
+| `tasks/agent-host-orientation/plan.md` | Stable contract and current status |
+| `docs/host-agents.md` | Current canonical public route |
+| `docs/index.md` | Current docs-home entry point and link to the canonical route |
+| `docs/setup.md` | Current install and artifact guidance |
 | `docs/skills/overview.md` | Current runtime-skills discovery flow |
 | `docs/api/mcp.md` | Current MCP front-door guidance |
-| `docs/index.md` | Current docs home entry point |
-| `docs/quickstart.md` | Current fast-start public page |
+| `docs/api/environment.md` | Residual env-var-first guidance that may still need cleanup |
+| `docs/skills/runtime.md` | Residual runtime docs guidance that may still need cleanup |
+| `docs/quickstart.md` | Current direct-automation public page |
 | `docs/internal/design/agent-host-integration.md` | Durable design rules for host-agent orientation |
 | `sites/docs/mkdocs.yml` | Public nav and published route ownership |
 | `sites/docs/source-map.yaml` | Generated-page ownership, especially `api/cli.md` |
-| `apps/node/src/cli/registry.ts` | Top-level CLI help and `skills` help surface |
-| `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts` | Registry-read and discovery remediation text |
-| `.agents/skills/docs-author/SKILL.md` | Required authoring workflow for PR-1 docs work |
+| `apps/node/src/cli/registry.ts` | Current top-level CLI help and `skills` help |
+| `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts` | Current registry-read remediation text |
+| `.agents/skills/docs-author/SKILL.md` | Required authoring workflow for docs work |
 
-## PR / Phase Plan
+## Historical Shipped Phases
 
-| PR | Branch | Purpose | Included phases | Agent tier | Merge gate |
-| --- | --- | --- | --- | --- | --- |
-| PR-1 | `docs/agent-host-orientation-p1` | Canonical docs flow | 1, 2 | thinking, default | shipped onboarding baseline already present |
-| PR-2 | `node/agent-host-orientation-p2` | CLI help and remediation alignment | 3, 4 | default, default | PR-1 merged |
+These phases are already shipped and should be treated as baseline, not as open
+implementation work:
 
-## Phase 1: Canonical Public Orientation Path
+1. canonical public host-agent route selection
+2. public docs cross-link alignment around that route
+3. top-level CLI and `skills` help orientation alignment
+4. registry-read remediation alignment around the installed home path
 
-### Agent Tier
+If any of those surfaces regress later, open a new task or add a narrow
+follow-up note instead of pretending this work is still not started.
 
-thinking
-
-### Goal
-
-Choose and implement one canonical public docs route that answers "how should a
-host agent use Clawperator after install?" without requiring subsystem
-archaeology.
-
-### Files or Surfaces To Change
-
-- `docs/index.md`
-- `docs/quickstart.md`
-- `docs/setup.md`
-- `docs/skills/overview.md`
-- `docs/api/mcp.md`
-- one new authored docs page under `docs/` only if reuse is not enough
-- `sites/docs/mkdocs.yml`
-- `docs/internal/design/agent-host-integration.md` if the durable preferred
-  orientation flow changes materially
-
-### Steps
-
-1. Audit the current public entry points (`index.md`, `quickstart.md`,
-   `setup.md`, `skills/overview.md`, `api/mcp.md`) and identify where a cold
-   reader currently has to hop across pages to understand the post-install flow.
-2. Decide whether an existing page can become the canonical host-agent front
-   door with targeted edits. If yes, reuse it. If not, create exactly one new
-   authored page under `docs/`.
-3. Update `sites/docs/mkdocs.yml` so the chosen route is visible in the public
-   nav instead of being an orphaned page.
-4. If the durable preferred flow changes meaningfully, update
-   `docs/internal/design/agent-host-integration.md` so future agents do not
-   rediscover the decision.
-5. Leave the detailed flow edits for Phase 2. Phase 1 is about locking the
-   canonical route and nav ownership, not polishing every page at once.
-
-### Acceptance Criteria
-
-- One canonical public docs route is chosen and implemented in source.
-- `sites/docs/mkdocs.yml` clearly exposes that route.
-- No second competing "start here for agents" page is introduced.
-- Any internal design note update reflects the same preferred flow.
-
-### Validation
-
-```bash
-./scripts/docs_build.sh
-rg -n "skills for-app|mcp serve" docs sites/docs/mkdocs.yml
-```
-
-### Expected Commit
-
-```text
-docs(agent-host): add canonical host orientation path
-```
-
-## Phase 2: Public Docs Cross-Links and First-Success Flow
+## Phase 5: Residual Public Docs Contradiction Cleanup
 
 ### Agent Tier
 
@@ -140,157 +88,64 @@ default
 
 ### Goal
 
-Make the authored public docs consistently explain the same post-install order:
-what to read first, when to use `clawperator skills`, when to use MCP, and what
-artifacts from install matter later.
+Remove or explicitly narrow the remaining public docs guidance that still
+pushes users toward env-var-first registry remediation instead of the shipped
+installed-home discovery flow and canonical host-agent route.
 
 ### Files or Surfaces To Change
 
-- Canonical public orientation page from Phase 1
-- `docs/setup.md`
-- `docs/skills/overview.md`
-- `docs/api/mcp.md`
-- `docs/index.md` and `docs/quickstart.md` if they still need pointer updates
+- `docs/api/environment.md`
+- `docs/skills/runtime.md`
+- `docs/host-agents.md` only if the canonical route needs a new cross-reference
+- `docs/skills/overview.md` or `docs/setup.md` only if a cross-reference must
+  stay in sync
+- generated docs outputs through the normal docs build workflow
 
 ### Steps
 
-1. Tighten `docs/setup.md` so the post-install handoff is explicit and points at
-   the canonical orientation route rather than forcing the user to infer the
-   next surface.
-2. Tighten `docs/skills/overview.md` so runtime-skills discovery starts with the
-   shortest successful commands and clearly says when `skills for-app` is the
-   fastest path.
-3. Tighten `docs/api/mcp.md` so it explains when MCP is the right front door
-   versus `clawperator skills` or direct CLI commands.
-4. Make `docs/index.md` and `docs/quickstart.md` either point cleanly at the
-   canonical route or intentionally remain standalone. Do not leave ambiguous
-   overlap.
-5. Regenerate the docs site and fix any broken links or nav mismatches before
-   moving to PR review.
+1. Compare the current guidance in `docs/api/environment.md` and
+   `docs/skills/runtime.md` against the shipped baseline in
+   `docs/host-agents.md`, `docs/skills/overview.md`, and
+   `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`.
+2. Rewrite residual env-var-first instructions so they do not imply that
+   setting `CLAWPERATOR_SKILLS_REGISTRY` is the only normal post-install fix.
+3. Point those pages at the installed home path
+   `~/.clawperator/skills/skills/skills-registry.json` plus a concrete next
+   command such as `clawperator skills list --json` or
+   `clawperator skills install`.
+4. Add or tighten cross-links back to `docs/host-agents.md` when a reader needs
+   the higher-level "skills versus MCP" decision flow.
+5. Regenerate the docs site and verify that the public route and link graph stay
+   consistent.
 
 ### Acceptance Criteria
 
-- A cold reader can identify one first page, one first discovery command family,
-  and one criterion for when MCP is the better front door.
-- The public pages no longer contradict one another about the first successful
-  post-install path.
-- Docs build succeeds with the updated nav and links.
+- `docs/host-agents.md` remains the only canonical post-install route.
+- `docs/api/environment.md` and `docs/skills/runtime.md` no longer contradict
+  the shipped installed-home discovery flow.
+- No page implies that `CLAWPERATOR_SKILLS_REGISTRY` is the only normal
+  remediation path after install.
+- Docs build succeeds with the updated authored pages and generated outputs in
+  sync.
 
 ### Validation
 
 ```bash
 ./scripts/docs_build.sh
-rg -n "skills for-app|mcp serve|install-state.json|mcp-config-snippet.json" docs
+rg -n "CLAWPERATOR_SKILLS_REGISTRY|skills list --json|host-agents" docs/api/environment.md docs/skills/runtime.md docs/host-agents.md docs/skills/overview.md
 ```
 
 ### Expected Commit
 
 ```text
-docs(agent-host): tighten public discovery guidance
+docs(agent-host): align residual discovery guidance
 ```
 
-## Phase 3: Top-Level CLI and Skills Help Orientation
+## Deferred Work
 
-### Agent Tier
+If future contradictions appear outside the files above, record them here
+explicitly instead of silently widening this pack again. Examples:
 
-default
-
-### Goal
-
-Make the CLI help answer the same orientation questions as the public docs:
-where to start, which discovery commands to use first, and when MCP is the
-alternative front door.
-
-### Files or Surfaces To Change
-
-- `apps/node/src/cli/registry.ts`
-- generated CLI reference output through the normal docs build workflow
-
-### Steps
-
-1. Read the current top-level help and `skills` help in `registry.ts` before
-   editing. Keep command inventory intact; this phase changes wording and
-   emphasis, not subcommand shape.
-2. Tighten the top-level `clawperator` help so it points at the canonical docs
-   route and the right first command families instead of assuming prior context.
-3. Tighten `clawperator skills` help so the fastest discovery commands are easy
-   to spot, especially `skills for-app`, `skills search`, and `skills get`.
-4. Only mention MCP at the help level where it helps a host choose between
-   fronts. Do not turn top-level help into protocol documentation.
-5. Regenerate docs so `api/cli.md` stays in sync with the edited help blocks.
-
-### Acceptance Criteria
-
-- Top-level help points at the canonical public orientation route.
-- `skills` help highlights the first successful discovery flow rather than only
-  listing subcommands mechanically.
-- `api/cli.md` is regenerated from source and matches the new help text.
-
-### Validation
-
-```bash
-npm --prefix apps/node run build
-npm --prefix apps/node run test
-./scripts/docs_build.sh
-```
-
-### Expected Commit
-
-```text
-feat(node): improve agent-host CLI orientation
-```
-
-## Phase 4: Registry and Discovery Remediation Guidance
-
-### Agent Tier
-
-default
-
-### Goal
-
-Make registry-read and related discovery failures point at the durable installed
-path and the correct next step instead of only env-var remediation.
-
-### Files or Surfaces To Change
-
-- `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`
-- `apps/node/src/test/unit/skills.test.ts`
-- `apps/node/src/cli/registry.ts` if a tightly related usage string must stay in sync
-- `sites/docs/source-map.yaml` only if generator ownership changes are required
-
-### Steps
-
-1. Review the current registry-read failure and warning text in
-   `localSkillsRegistry.ts`, then compare it with the shipped baseline captured
-   in `tasks/agent-host-orientation/plan.md`.
-2. Tighten failure messages so they mention the durable installed registry path
-   and the relevant next step. Preserve the existing path-selection behavior
-   unless a direct contradiction is found.
-3. Add focused regression coverage in `apps/node/src/test/unit/skills.test.ts`
-   for the changed guidance text where the message is part of the intended user
-   contract.
-4. If any help or generated CLI reference text changed as part of the same work,
-   regenerate docs before closing the phase.
-
-### Acceptance Criteria
-
-- Registry-read guidance no longer implies that setting
-  `CLAWPERATOR_SKILLS_REGISTRY` is the only normal fix after install.
-- The changed messages reference the installed home path and a concrete next
-  step.
-- Focused tests cover the intended guidance changes where practical.
-- Node build, tests, and docs build all pass together.
-
-### Validation
-
-```bash
-npm --prefix apps/node run build
-npm --prefix apps/node run test
-./scripts/docs_build.sh
-```
-
-### Expected Commit
-
-```text
-fix(node): clarify skills discovery remediation
-```
+- new public docs pages that bypass `docs/host-agents.md`
+- future CLI regressions that stop pointing at the canonical route
+- registry-resolution behavior changes in code that require new remediation text
