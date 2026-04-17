@@ -1225,6 +1225,14 @@ print_manual_operator_setup_commands() {
     done < <(list_connected_devices)
 }
 
+print_durable_artifact_summary() {
+    echo -e "Durable host-agent artifacts:"
+    echo -e "   ${BLUE}$HOME/.clawperator/AGENTS.md${NC}"
+    echo -e "   ${BLUE}$HOME/.clawperator/install-state.json${NC}"
+    echo -e "   ${BLUE}$HOME/.clawperator/mcp-config-snippet.json${NC}"
+    echo -e "   AI agents should start with the local guide, then use the install state and MCP snippet as needed."
+}
+
 show_star_hint() {
   # Skip if not a TTY
   [ -t 2 ] || return 0
@@ -1331,6 +1339,7 @@ main() {
         echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
         echo -e "${GREEN}  Installation Complete (Device Selection Required)${NC}"
         echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
+        print_durable_artifact_summary
         return 0
     fi
     if ! doctor_report_ok "$FINAL_DOCTOR_JSON"; then
@@ -1381,9 +1390,10 @@ main() {
         echo -e "   ${YELLOW}clawperator authoring-skills install${NC}"
     fi
     echo ""
+    print_durable_artifact_summary
+    echo ""
     echo -e "For more info, visit: ${BLUE}https://docs.clawperator.com${NC}"
-    echo -e "Agent guide: ${BLUE}https://docs.clawperator.com/llms.txt${NC}"
-    echo -e "If you are an AI agent, read the agent guide before running any commands.${NC}"
+    echo -e "Docs index: ${BLUE}https://docs.clawperator.com/llms.txt${NC}"
     echo ""
 
     show_star_hint

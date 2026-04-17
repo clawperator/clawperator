@@ -384,6 +384,19 @@ EOF
     ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$output_file" "$snippet_file"
 }
 
+run_durable_summary_case() {
+    local label="$1"
+    local output_file="$2"
+
+    HOME="$TMP_DIR/home-summary-$label" \
+    OS=Linux \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        print_durable_artifact_summary > "$2"
+    ' _ "$INSTALL_SCRIPT" "$output_file"
+}
+
 echo "=== Scenario 1: parser extracts installed and discovery dirs ==="
 PARSE_SUCCESS_OUT="$TMP_DIR/parse-success.out"
 run_parser_case \
@@ -589,7 +602,15 @@ assert_contains "$MCP_CONFIG_PATH" 'args = [\"mcp\", \"serve\"]' "mcp-config cod
 assert_json_field_equals "$MCP_CONFIG_PATH" "genericStdioConsumer.serverName" "clawperator" "mcp-config generic serverName"
 assert_json_field_equals "$MCP_CONFIG_PATH" "genericStdioConsumer.server.command" "$TMP_DIR/mock-mcp-authoring/clawperator" "mcp-config generic command"
 
-echo "=== Scenario 15: operator metadata parser extracts all expected fields ==="
+echo "=== Scenario 15: durable summary points at local artifacts ==="
+DURABLE_SUMMARY_OUT="$TMP_DIR/durable-summary.out"
+run_durable_summary_case authoring "$DURABLE_SUMMARY_OUT"
+assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawperator/AGENTS.md" "durable-summary"
+assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawperator/install-state.json" "durable-summary"
+assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawperator/mcp-config-snippet.json" "durable-summary"
+assert_contains "$DURABLE_SUMMARY_OUT" "AI agents should start with the local guide" "durable-summary"
+
+echo "=== Scenario 16: operator metadata parser extracts all expected fields ==="
 METADATA_SUCCESS_OUT="$TMP_DIR/metadata-success.out"
 METADATA_SUCCESS_STATUS="$TMP_DIR/metadata-success.status"
 METADATA_SUCCESS_VALUES="$TMP_DIR/metadata-success.values"
@@ -606,7 +627,7 @@ assert_contains "$METADATA_SUCCESS_VALUES" "sha_url=https://example.com/operator
 assert_contains "$METADATA_SUCCESS_VALUES" "sha256=deadbeef" "metadata-success values"
 assert_file_empty "$METADATA_SUCCESS_OUT" "metadata-success output"
 
-echo "=== Scenario 16: operator metadata parser allows missing inline checksum ==="
+echo "=== Scenario 17: operator metadata parser allows missing inline checksum ==="
 METADATA_NO_SHA_OUT="$TMP_DIR/metadata-no-sha.out"
 METADATA_NO_SHA_STATUS="$TMP_DIR/metadata-no-sha.status"
 METADATA_NO_SHA_VALUES="$TMP_DIR/metadata-no-sha.values"
@@ -620,7 +641,7 @@ assert_equals "0" "$(cat "$METADATA_NO_SHA_STATUS")" "metadata-no-sha status"
 assert_contains "$METADATA_NO_SHA_VALUES" "sha256=" "metadata-no-sha values"
 assert_file_empty "$METADATA_NO_SHA_OUT" "metadata-no-sha output"
 
-echo "=== Scenario 17: operator metadata parser rejects missing required fields ==="
+echo "=== Scenario 18: operator metadata parser rejects missing required fields ==="
 METADATA_MISSING_OUT="$TMP_DIR/metadata-missing.out"
 METADATA_MISSING_STATUS="$TMP_DIR/metadata-missing.status"
 METADATA_MISSING_VALUES="$TMP_DIR/metadata-missing.values"
@@ -633,7 +654,7 @@ run_operator_metadata_case \
 assert_equals "1" "$(cat "$METADATA_MISSING_STATUS")" "metadata-missing status"
 assert_contains "$METADATA_MISSING_OUT" "Failed to parse APK metadata" "metadata-missing output"
 
-echo "=== Scenario 18: operator metadata parser rejects malformed JSON ==="
+echo "=== Scenario 19: operator metadata parser rejects malformed JSON ==="
 METADATA_BAD_OUT="$TMP_DIR/metadata-bad.out"
 METADATA_BAD_STATUS="$TMP_DIR/metadata-bad.status"
 METADATA_BAD_VALUES="$TMP_DIR/metadata-bad.values"
