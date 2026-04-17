@@ -677,6 +677,45 @@ describe("loadRegistry", () => {
       await rm(tempHome, { recursive: true, force: true });
     }
   });
+
+  it("fails cleanly when the caller passes an explicit missing registry path and no fallbacks resolve", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-explicit-missing-"));
+    const tempHome = await mkdtemp(join(tmpdir(), "clawperator-home-explicit-missing-"));
+    const appNodeDir = join(tempRoot, "apps", "node");
+    const explicitMissingPath = join(tempRoot, "custom", "skills-registry.json");
+
+    await mkdir(appNodeDir, { recursive: true });
+
+    try {
+      const moduleUrl = pathToFileURL(
+        join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js")
+      ).href;
+      const script = `
+        import { loadRegistry } from ${JSON.stringify(moduleUrl)};
+        process.chdir(${JSON.stringify(appNodeDir)});
+        delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+        try {
+          await loadRegistry(${JSON.stringify(explicitMissingPath)});
+          console.log(JSON.stringify({ ok: true }));
+        } catch (error) {
+          console.log(JSON.stringify({ ok: false, message: error instanceof Error ? error.message : String(error) }));
+        }
+      `;
+      const child = await runNodeSnippet(script, {
+        env: { ...process.env, HOME: tempHome },
+      });
+      assert.strictEqual(child.code, 0, child.stderr);
+      const parsed = JSON.parse(child.stdout) as { ok: boolean; message?: string };
+      assert.strictEqual(parsed.ok, false);
+      assert.match(
+        parsed.message ?? "",
+        new RegExp(`Registry not found\\. Checked: ${explicitMissingPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`)
+      );
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("getSkill", () => {

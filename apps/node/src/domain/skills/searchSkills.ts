@@ -16,7 +16,7 @@ export interface SearchSkillsError {
 function tokenize(value: string): string[] {
   return value
     .toLowerCase()
-    .split(/[^a-z0-9]+/i)
+    .split(/[^a-z0-9]+/)
     .filter((token) => token.length > 0);
 }
 
@@ -68,7 +68,7 @@ export async function searchSkills(
 ): Promise<SearchSkillsResult | SearchSkillsError> {
   try {
     const { registry } = await loadRegistry(registryPath);
-    let skills = registry.skills.map((skill, index) => ({ skill, index }));
+    let skills = registry.skills.map((skill, index) => ({ skill, index, rank: 0 }));
 
     if (query.app) {
       skills = skills.filter(({ skill }) => skill.applicationId === query.app);
@@ -77,14 +77,18 @@ export async function searchSkills(
       skills = skills.filter(({ skill }) => skill.intent === query.intent);
     }
     if (query.keyword) {
+      const normalizedKeyword = query.keyword;
+      skills = skills.map(({ skill, index }) => ({
+        skill,
+        index,
+        rank: computeKeywordMatchRank(skill, normalizedKeyword),
+      }));
       skills = skills.filter(
-        ({ skill }) => computeKeywordMatchRank(skill, query.keyword ?? "") >= 0
+        ({ rank }) => rank >= 0
       );
       skills.sort((left, right) => {
-        const leftRank = computeKeywordMatchRank(left.skill, query.keyword ?? "");
-        const rightRank = computeKeywordMatchRank(right.skill, query.keyword ?? "");
-        if (rightRank !== leftRank) {
-          return rightRank - leftRank;
+        if (right.rank !== left.rank) {
+          return right.rank - left.rank;
         }
         return left.index - right.index;
       });
