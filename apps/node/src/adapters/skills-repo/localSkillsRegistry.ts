@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, dirname } from "node:path";
+import { join, dirname, basename } from "node:path";
 import type { SkillsRegistry, SkillEntry } from "../../contracts/skills.js";
 
 /**
@@ -16,8 +16,19 @@ function getInstalledHomeRegistryPath(): string {
   return join(homedir(), ".clawperator", "skills", "skills", "skills-registry.json");
 }
 
-function getRepoRelativeFallbackPath(): string {
-  return join(process.cwd(), "..", "..", "skills", "skills-registry.json");
+function getRepoRelativeFallbackPath(): string | undefined {
+  const cwd = process.cwd();
+  if (basename(cwd) !== "node" || basename(dirname(cwd)) !== "apps") {
+    return undefined;
+  }
+  return join(cwd, "..", "..", "skills", "skills-registry.json");
+}
+
+function isMissingRegistryFileError(error: unknown): boolean {
+  const code = typeof error === "object" && error !== null && "code" in error
+    ? (error as NodeJS.ErrnoException).code
+    : undefined;
+  return code === "ENOENT" || code === "ENOTDIR";
 }
 
 function getConfiguredRegistryPathFromEnv(): string | undefined {
@@ -58,16 +69,16 @@ export async function loadRegistry(registryPath?: string): Promise<LoadRegistryR
   }
 
   let configuredPath: string | undefined;
-  try {
-    configuredPath = getConfiguredRegistryPathFromEnv();
-  } catch (error) {
-    if (registryPath === undefined) {
+  if (registryPath === undefined) {
+    try {
+      configuredPath = getConfiguredRegistryPathFromEnv();
+    } catch (error) {
       process.stderr.write(
         "Error: CLAWPERATOR_SKILLS_REGISTRY is set but blank. " +
         "Unset it or set it to a valid skills-registry.json path.\n"
       );
+      throw error;
     }
-    throw error;
   }
 
   const defaultPath = getDefaultRegistryPath();
@@ -75,8 +86,11 @@ export async function loadRegistry(registryPath?: string): Promise<LoadRegistryR
   let raw: string | undefined;
   try {
     raw = await readFile(path, "utf-8");
-  } catch {
+  } catch (error) {
     if (registryPath) {
+      if (!isMissingRegistryFileError(error)) {
+        throw error;
+      }
       throw new Error(
         `Registry not found at explicit path: ${path}. ` +
         "Fix the path or omit the explicit registry path."
@@ -84,6 +98,9 @@ export async function loadRegistry(registryPath?: string): Promise<LoadRegistryR
     }
 
     if (!registryPath && configuredPath) {
+      if (!isMissingRegistryFileError(error)) {
+        throw error;
+      }
       process.stderr.write(
         `Error: Registry file not found at ${path} (from CLAWPERATOR_SKILLS_REGISTRY). ` +
         "Check that the path is correct.\n"
@@ -94,18 +111,28 @@ export async function loadRegistry(registryPath?: string): Promise<LoadRegistryR
       );
     }
 
+    if (!isMissingRegistryFileError(error)) {
+      throw error;
+    }
+
     const candidates = [
       getRepoRelativeFallbackPath(),
       getInstalledHomeRegistryPath(),
-    ].filter((candidate, index, all) => candidate !== path && all.indexOf(candidate) === index);
+    ].filter((candidate, index, all): candidate is string => (
+      candidate !== undefined
+      && candidate !== path
+      && all.indexOf(candidate) === index
+    ));
 
     for (const candidate of candidates) {
       try {
         raw = await readFile(candidate, "utf-8");
         path = candidate;
         break;
-      } catch {
-        continue;
+      } catch (candidateError) {
+        if (!isMissingRegistryFileError(candidateError)) {
+          throw candidateError;
+        }
       }
     }
 

@@ -162,7 +162,7 @@ Fallback behavior after that initial choice:
 2. If `CLAWPERATOR_SKILLS_REGISTRY` is set but blank, `loadRegistry()` throws immediately
 3. If `CLAWPERATOR_SKILLS_REGISTRY` is set to a non-blank path and that read fails, `loadRegistry()` throws a configured-path error immediately
 4. If the default-path read fails with no env var and no explicit `registryPath`, `loadRegistry()` next tries:
-   - `<cwd>/../../skills/skills-registry.json`
+   - `<cwd>/../../skills/skills-registry.json` when the current working directory is `apps/node`
    - `~/.clawperator/skills/skills/skills-registry.json`
 
 After `clawperator skills install` or `clawperator skills sync`, the registry lives at `~/.clawperator/skills/skills/skills-registry.json`. Set the env var to point there:

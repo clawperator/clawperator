@@ -73,6 +73,7 @@ export async function searchSkills(
   try {
     const { registry } = await loadRegistry(registryPath);
     let skills = registry.skills.map((skill, index) => ({ skill, index, rank: 0 }));
+    const keywordQuery = query.keyword?.trim();
 
     if (query.app) {
       skills = skills.filter(({ skill }) => skill.applicationId === query.app);
@@ -80,8 +81,7 @@ export async function searchSkills(
     if (query.intent) {
       skills = skills.filter(({ skill }) => skill.intent === query.intent);
     }
-    if (query.keyword) {
-      const keywordQuery = query.keyword;
+    if (keywordQuery) {
       skills = skills.map(({ skill, index }) => ({
         skill,
         index,

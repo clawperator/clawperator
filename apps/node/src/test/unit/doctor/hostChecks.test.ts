@@ -354,6 +354,43 @@ describe("Doctor: hostChecks", () => {
             }
         });
 
+        it("warns when the default registry path exists but is unreadable as a file", async () => {
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const originalRegistry = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+            const originalHome = process.env.HOME;
+            const originalCwd = process.cwd();
+            const root = await mkdtemp(join(tmpdir(), "clawperator-doctor-skills-broken-default-"));
+            const tempHome = join(root, "home");
+            const appNodeDir = join(root, "apps", "node");
+            const defaultRegistryPath = join(appNodeDir, "skills", "skills-registry.json");
+
+            try {
+                await mkdir(tempHome, { recursive: true });
+                await mkdir(defaultRegistryPath, { recursive: true });
+                delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+                process.env.HOME = tempHome;
+                process.chdir(appNodeDir);
+
+                const result = await checkInstalledOrchestratedSkillAgentCliAvailability(config);
+                assert.strictEqual(result.status, "warn");
+                assert.match(result.summary, /could not inspect the local skills registry/i);
+                assert.match(result.detail ?? "", /EISDIR|illegal operation on a directory/i);
+            } finally {
+                process.chdir(originalCwd);
+                if (originalRegistry === undefined) {
+                    delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+                } else {
+                    process.env.CLAWPERATOR_SKILLS_REGISTRY = originalRegistry;
+                }
+                if (originalHome === undefined) {
+                    delete process.env.HOME;
+                } else {
+                    process.env.HOME = originalHome;
+                }
+                await rm(root, { recursive: true, force: true });
+            }
+        });
+
         it("passes when the local registry has no orchestrated skills", async () => {
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
             const originalRegistry = process.env.CLAWPERATOR_SKILLS_REGISTRY;

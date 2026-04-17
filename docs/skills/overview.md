@@ -167,7 +167,7 @@ Current failure and fallback rules:
 - if `CLAWPERATOR_SKILLS_REGISTRY` is set but blank, `loadRegistry()` fails immediately and does not fall back
 - if `CLAWPERATOR_SKILLS_REGISTRY` is set to a non-blank path and that read fails, `loadRegistry()` fails immediately and does not fall back
 - if neither an explicit path nor env var is active and the default-path read fails, `loadRegistry()` next tries:
-  - `../../skills/skills-registry.json` relative to the current working directory
+  - `../../skills/skills-registry.json` relative to the current working directory when running from `apps/node`
   - `~/.clawperator/skills/skills/skills-registry.json`
 
 The install and sync flow writes the canonical long-lived registry under:
