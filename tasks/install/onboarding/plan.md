@@ -63,8 +63,6 @@ onboarding problem and should land as one small multi-phase project.
 
 - `tasks/install/onboarding/findings.md`: preserved as the research source of
   truth for this task pack; do not rewrite it as part of implementation
-- `tasks/install/onboarding/findings-codex.md`: preserved as-is
-- `tasks/install/onboarding/findings-opus.md`: preserved as-is
 - `sites/landing/public/install.sh`: in scope for additive onboarding and
   artifact-generation changes; existing install steps stay intact
 - `~/.clawperator/AGENTS.md` template in `install.sh`: in scope to expand with
