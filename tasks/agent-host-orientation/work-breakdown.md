@@ -10,6 +10,12 @@ The original 4-phase follow-up is now shipped on branches that already contain
 `docs/host-agents.md`, public cross-links around that route, top-level CLI help
 that points at it, and installed-home registry remediation text.
 
+For this pack, two decisions are settled baseline:
+
+- `docs/host-agents.md` is the chosen canonical post-install orientation route
+- installed-home-first registry remediation is a guidance change only, not a
+  `loadRegistry()` precedence change
+
 Use this work breakdown to avoid redoing that shipped work. The only remaining
 implementation work, if this pack is reopened, is residual public docs cleanup
 for env-var-first discovery guidance that contradicts the shipped installed-home
@@ -80,6 +86,17 @@ implementation work:
 If any of those surfaces regress later, open a new task or add a narrow
 follow-up note instead of pretending this work is still not started.
 
+Settled interpretation for future readers:
+
+- `docs/host-agents.md` is the canonical post-install route
+- `docs/setup.md` remains install and readiness only
+- `docs/quickstart.md` remains direct automation and observe / decide / act
+- registry remediation guidance should favor
+  `~/.clawperator/skills/skills/skills-registry.json` as the normal post-install
+  recovery path
+- explicit `CLAWPERATOR_SKILLS_REGISTRY` still wins when set, including the
+  current fail-fast behavior for blank or misconfigured values
+
 ## Phase 5: Residual Public Docs Contradiction Cleanup
 
 ### Agent Tier
@@ -100,6 +117,9 @@ installed-home discovery flow and canonical host-agent route.
 - `docs/skills/overview.md` or `docs/setup.md` only if a cross-reference must
   stay in sync
 - generated docs outputs through the normal docs build workflow
+
+These residual contradictions are explicit follow-up scope, not hidden debt.
+Do not claim repo-wide discovery-guidance consistency until they are cleaned up.
 
 ### Steps
 

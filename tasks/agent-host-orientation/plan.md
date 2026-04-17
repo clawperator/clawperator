@@ -8,6 +8,8 @@ host-agent orientation, CLI self-orientation, and registry remediation.
 That core work is now shipped on branches that already contain:
 
 - `docs/host-agents.md` as the canonical public post-install route
+- `docs/setup.md` still scoped to install and readiness
+- `docs/quickstart.md` still scoped to direct automation and the observe / decide / act loop
 - docs-home and public cross-links pointing at that route
 - top-level CLI and `skills` help that reference the same route and discovery
   flow
@@ -47,6 +49,9 @@ can answer three questions without task archaeology:
 Treat these as already-shipped baseline behavior and documentation:
 
 - `docs/host-agents.md` is the canonical public post-install route
+- this is no longer an open design decision in this pack
+- `docs/setup.md` remains the install and readiness page
+- `docs/quickstart.md` remains the direct automation and observe / decide / act page
 - `docs/index.md` links to `docs/host-agents.md`
 - `clawperator` top-level help points at the public host-agent route
 - `clawperator skills` help emphasizes the shortest discovery flow:
@@ -55,8 +60,11 @@ Treat these as already-shipped baseline behavior and documentation:
   back to the same public orientation route
 - runtime-skill registry resolution falls back to the installed home path under
   `~/.clawperator/skills/skills/skills-registry.json`
-- registry-read remediation text names that installed home path plus a concrete
-  next command
+- registry-read remediation text treats that installed-home path as the normal
+  post-install recovery path and names a concrete next command
+- this changes guidance only, not `loadRegistry()` precedence or fallback behavior
+- explicit `CLAWPERATOR_SKILLS_REGISTRY` still wins when set, including
+  fail-fast behavior when it is blank or points at a missing configured path
 
 ## Remaining Gap
 
