@@ -12,7 +12,7 @@ Describe the first-party stdio MCP server exposed by `clawperator mcp serve`: ho
 - Core tools: `apps/node/src/mcp/tools/core.ts`
 - Named tools: `apps/node/src/mcp/tools/named.ts`
 - MCP session defaults: `apps/node/src/mcp/session.ts`
-- Installer-generated MCP snippet: `sites/landing/public/install.sh`
+- Installer-generated MCP snippet: [`sites/landing/public/install.sh`](https://github.com/clawperator/clawperator/blob/main/sites/landing/public/install.sh)
 - Execution contract: `apps/node/src/contracts/execution.ts`
 - Error codes: `apps/node/src/contracts/errors.ts`
 - Selector contract: `apps/node/src/contracts/selectors.ts`
