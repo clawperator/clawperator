@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.6.3] - 2026-04-17
+
+This release expands skills discovery and ranking, while refreshing the install and onboarding guidance to match the current runtime-skill flow.
+
+### 🤖 Node API & CLI
+- **Added:** Added `clawperator skills for-app <package_id>` as app-oriented discovery sugar, along with optional `keywords` metadata and deterministic keyword ranking in `skills search`.
+- **Fixed:** Covered the Google Home HVAC discovery regressions, including the `ac` mis-ranking case.
+
+### 📚 Documentation & Website
+- **Changed:** Documented the app-oriented skills discovery and keyword-ranking behavior in the public skills and environment references.
+- **Changed:** Updated the install and onboarding guidance, plus the public installer script, to describe runtime-skill discovery, installed-registry fallback, and when to use `clawperator skills` versus MCP.
+
+Pull requests:
+- [feat(skills): add app discovery and keyword ranking](https://github.com/clawperator/clawperator/pull/195)
+- [feat(install): add host onboarding artifacts](https://github.com/clawperator/clawperator/pull/196)
+
 ## [0.6.2] - 2026-04-17
 
 This release fixes the `install.sh` stdin execution path so streamed installs complete cleanly.
