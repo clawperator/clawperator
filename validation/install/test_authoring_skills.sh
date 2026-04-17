@@ -82,6 +82,15 @@ assert_mode() {
     assert_equals "$expected_mode" "$actual_mode" "$label"
 }
 
+assert_command_fails() {
+    local label="$1"
+    shift
+    if "$@" >/dev/null 2>&1; then
+        echo "ERROR: $label expected command to fail" >&2
+        return 1
+    fi
+}
+
 # shellcheck source=lib/json_assert.sh
 source "$REPO_ROOT/validation/install/lib/json_assert.sh"
 
@@ -849,6 +858,15 @@ run_install_state_version_banner_case \
 INSTALL_STATE_VERSION_BANNER_PATH="$(cat "$INSTALL_STATE_VERSION_BANNER_PATH_FILE")"
 assert_contains "$INSTALL_STATE_VERSION_BANNER_OUT" "Wrote install state" "install-state-version-banner output"
 assert_json_field_equals "$INSTALL_STATE_VERSION_BANNER_PATH" "cliVersion" "1.2.3" "install-state-version-banner cliVersion"
+
+echo "=== Scenario 15d: ISO timestamp assertion rejects non-Z parseable timestamps ==="
+NON_ISO_TIMESTAMP_JSON="$TMP_DIR/non-iso-timestamp.json"
+cat > "$NON_ISO_TIMESTAMP_JSON" <<'EOF'
+{"installedAt":"2026-04-17T10:11:12+10:00"}
+EOF
+assert_command_fails \
+    "install-state timestamp format rejection" \
+    assert_json_field_is_iso_timestamp "$NON_ISO_TIMESTAMP_JSON" "installedAt" "non-iso-timestamp"
 
 echo "=== Scenario 16: skip flag suppresses both runtime and authoring skills setup ==="
 SKIP_SKILLS_OUT="$TMP_DIR/skip-skills.out"

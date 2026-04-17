@@ -63,11 +63,38 @@ const filePath = process.argv[1];
 const field = process.argv[2];
 const json = JSON.parse(fs.readFileSync(filePath, "utf8"));
 const value = json[field];
-if (typeof value !== "string" || Number.isNaN(Date.parse(value))) {
+const isoTimestampPattern = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$/;
+
+if (typeof value !== "string") {
+  process.exit(1);
+}
+
+const match = value.match(isoTimestampPattern);
+if (!match) {
+  process.exit(1);
+}
+
+const year = Number(match[1]);
+const month = Number(match[2]);
+const day = Number(match[3]);
+const hour = Number(match[4]);
+const minute = Number(match[5]);
+const second = Number(match[6]);
+const parsed = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+
+if (
+  Number.isNaN(parsed.getTime()) ||
+  parsed.getUTCFullYear() !== year ||
+  parsed.getUTCMonth() !== month - 1 ||
+  parsed.getUTCDate() !== day ||
+  parsed.getUTCHours() !== hour ||
+  parsed.getUTCMinutes() !== minute ||
+  parsed.getUTCSeconds() !== second
+) {
   process.exit(1);
 }
 ' "$file" "$field"; then
-        echo "ERROR: $label expected parseable ISO timestamp in $field" >&2
+        echo "ERROR: $label expected ISO timestamp in YYYY-MM-DDTHH:MM:SSZ format in $field" >&2
         cat "$file" >&2
         return 1
     fi
