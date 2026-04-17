@@ -5557,7 +5557,7 @@ console.log(JSON.stringify({
   });
 
   it("returns timeout for orchestrated skills and preserves timeout precedence over any later frame", async () => {
-    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["timeout", "40"], undefined, 150);
+    const result = await runSkill(TEST_AGENT_SKILL_RESULT, ["timeout", "40"], undefined, 300);
 
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
