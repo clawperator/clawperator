@@ -146,6 +146,18 @@ switch (mode) {
     break;
   case "timeout":
     process.stdout.write('{"stage":"before-timeout"}\n');
+    {
+      const heartbeat = setInterval(() => {
+        process.stdout.write('{"stage":"waiting-for-timeout"}\n');
+      }, 20);
+      heartbeat.unref?.();
+      process.on("SIGTERM", () => {
+        clearInterval(heartbeat);
+      });
+      process.on("SIGINT", () => {
+        clearInterval(heartbeat);
+      });
+    }
     setTimeout(() => {
       console.log(prefix);
       console.log(JSON.stringify(basePayload));
