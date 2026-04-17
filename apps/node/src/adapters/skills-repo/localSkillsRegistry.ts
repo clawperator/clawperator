@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import type { SkillsRegistry, SkillEntry } from "../../contracts/skills.js";
 
@@ -9,6 +10,14 @@ import type { SkillsRegistry, SkillEntry } from "../../contracts/skills.js";
 function getDefaultRegistryPath(): string {
   const cwd = process.cwd();
   return join(cwd, "skills", "skills-registry.json");
+}
+
+function getInstalledHomeRegistryPath(): string {
+  return join(homedir(), ".clawperator", "skills", "skills", "skills-registry.json");
+}
+
+function getRepoRelativeFallbackPath(): string {
+  return join(process.cwd(), "..", "..", "skills", "skills-registry.json");
 }
 
 export function getRegistryPath(): string {
@@ -29,22 +38,12 @@ export interface LoadRegistryResult {
 
 export async function loadRegistry(registryPath?: string): Promise<LoadRegistryResult> {
   const configuredPath = process.env.CLAWPERATOR_SKILLS_REGISTRY;
-  let path = registryPath ?? configuredPath ?? getDefaultRegistryPath();
-  let raw: string;
+  const defaultPath = getDefaultRegistryPath();
+  let path = registryPath ?? configuredPath ?? defaultPath;
+  let raw: string | undefined;
   try {
     raw = await readFile(path, "utf-8");
   } catch {
-    if (!registryPath && !configuredPath) {
-      process.stderr.write(
-        "Warning: CLAWPERATOR_SKILLS_REGISTRY is not set. " +
-        "Run 'clawperator skills install' to configure the registry path.\n"
-      );
-      throw new Error(
-        `Registry not found at default path: ${path}. ` +
-        "Set CLAWPERATOR_SKILLS_REGISTRY or run clawperator skills install."
-      );
-    }
-
     if (!registryPath && configuredPath) {
       process.stderr.write(
         `Error: Registry file not found at ${path} (from CLAWPERATOR_SKILLS_REGISTRY). ` +
@@ -56,18 +55,40 @@ export async function loadRegistry(registryPath?: string): Promise<LoadRegistryR
       );
     }
 
-    const fallback = join(process.cwd(), "..", "..", "skills", "skills-registry.json");
-    if (fallback !== path) {
+    const candidates = [
+      getRepoRelativeFallbackPath(),
+      getInstalledHomeRegistryPath(),
+    ].filter((candidate, index, all) => candidate !== path && all.indexOf(candidate) === index);
+
+    for (const candidate of candidates) {
       try {
-        raw = await readFile(fallback, "utf-8");
-        path = fallback;
+        raw = await readFile(candidate, "utf-8");
+        path = candidate;
+        break;
       } catch {
+        continue;
+      }
+    }
+
+    if (raw === undefined) {
+      if (!registryPath && !configuredPath) {
+        process.stderr.write(
+          "Warning: CLAWPERATOR_SKILLS_REGISTRY is not set. " +
+          "Run 'clawperator skills install' to configure the registry path.\n"
+        );
         throw new Error(
-          `Registry not found. Checked: ${path}, ${fallback}. ` +
+          `Registry not found. Checked: ${[path, ...candidates].join(", ")}. ` +
+          "Set CLAWPERATOR_SKILLS_REGISTRY or run clawperator skills install."
+        );
+      }
+
+      if (candidates.length > 0) {
+        throw new Error(
+          `Registry not found. Checked: ${[path, ...candidates].join(", ")}. ` +
           "Run from repo root, set CLAWPERATOR_SKILLS_REGISTRY, or run clawperator skills install."
         );
       }
-    } else {
+
       throw new Error(`Registry not found: ${path}. Run from repo root or set CLAWPERATOR_SKILLS_REGISTRY.`);
     }
   }

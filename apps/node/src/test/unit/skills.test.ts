@@ -337,6 +337,9 @@ describe("listSkills", () => {
 describe("loadRegistry", () => {
   it("warns to stderr when CLAWPERATOR_SKILLS_REGISTRY is unset and the default path is missing", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-unset-"));
+    const tempHome = await mkdtemp(join(tmpdir(), "clawperator-home-unset-"));
+    const appNodeDir = join(tempRoot, "apps", "node");
+    await mkdir(appNodeDir, { recursive: true });
 
     try {
       const moduleUrl = pathToFileURL(
@@ -344,7 +347,7 @@ describe("loadRegistry", () => {
       ).href;
       const script = `
         import { loadRegistry } from ${JSON.stringify(moduleUrl)};
-        process.chdir(${JSON.stringify(tempRoot)});
+        process.chdir(${JSON.stringify(appNodeDir)});
         delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
         try {
           await loadRegistry();
@@ -354,18 +357,19 @@ describe("loadRegistry", () => {
         }
       `;
       const child = await runNodeSnippet(script, {
-        env: { ...process.env },
+        env: { ...process.env, HOME: tempHome },
       });
       assert.strictEqual(child.code, 0, child.stderr);
       const parsed = JSON.parse(child.stdout) as { ok: boolean; message?: string };
       assert.strictEqual(parsed.ok, false);
-      assert.match(parsed.message ?? "", /Registry not found at default path:/);
+      assert.match(parsed.message ?? "", /Registry not found\. Checked:/);
       assert.ok(
         child.stderr.includes("CLAWPERATOR_SKILLS_REGISTRY"),
         `Expected stderr to mention CLAWPERATOR_SKILLS_REGISTRY, got: ${child.stderr}`
       );
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
+      await rm(tempHome, { recursive: true, force: true });
     }
   });
 
@@ -374,6 +378,16 @@ describe("loadRegistry", () => {
       join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js")
     ).href;
     const missingPath = "/tmp/does-not-exist/skills-registry.json";
+    const tempHome = await mkdtemp(join(tmpdir(), "clawperator-home-fallback-configured-"));
+    const installedHomeRegistryPath = join(
+      tempHome,
+      ".clawperator",
+      "skills",
+      "skills",
+      "skills-registry.json"
+    );
+    await mkdir(dirname(installedHomeRegistryPath), { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, installedHomeRegistryPath);
     const script = `
       import { loadRegistry } from ${JSON.stringify(moduleUrl)};
       process.env.CLAWPERATOR_SKILLS_REGISTRY = ${JSON.stringify(missingPath)};
@@ -384,20 +398,24 @@ describe("loadRegistry", () => {
         console.log(JSON.stringify({ ok: false, message: error instanceof Error ? error.message : String(error) }));
       }
     `;
-    const child = await runNodeSnippet(script, {
-      env: { ...process.env },
-    });
-    assert.strictEqual(child.code, 0, child.stderr);
-    const parsed = JSON.parse(child.stdout) as { ok: boolean; message?: string };
-    assert.strictEqual(parsed.ok, false);
-    assert.match(
-      parsed.message ?? "",
-      /Registry not found at configured path: \/tmp\/does-not-exist\/skills-registry\.json/
-    );
-    assert.ok(
-      child.stderr.includes(missingPath),
-      `Expected stderr to include the missing path, got: ${child.stderr}`
-    );
+    try {
+      const child = await runNodeSnippet(script, {
+        env: { ...process.env, HOME: tempHome },
+      });
+      assert.strictEqual(child.code, 0, child.stderr);
+      const parsed = JSON.parse(child.stdout) as { ok: boolean; message?: string };
+      assert.strictEqual(parsed.ok, false);
+      assert.match(
+        parsed.message ?? "",
+        /Registry not found at configured path: \/tmp\/does-not-exist\/skills-registry\.json/
+      );
+      assert.ok(
+        child.stderr.includes(missingPath),
+        `Expected stderr to include the missing path, got: ${child.stderr}`
+      );
+    } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
   });
 
   it("falls back when the caller passes the derived default path", async () => {
@@ -433,6 +451,145 @@ describe("loadRegistry", () => {
       assert.ok(parsed.skillCount > 0);
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back to the installed home registry without warning when repo-local paths are missing", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-home-"));
+    const tempHome = await mkdtemp(join(tmpdir(), "clawperator-home-"));
+    const appNodeDir = join(tempRoot, "apps", "node");
+    const installedHomeRegistryPath = join(
+      tempHome,
+      ".clawperator",
+      "skills",
+      "skills",
+      "skills-registry.json"
+    );
+
+    await mkdir(appNodeDir, { recursive: true });
+    await mkdir(dirname(installedHomeRegistryPath), { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, installedHomeRegistryPath);
+
+    try {
+      const moduleUrl = pathToFileURL(
+        join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js")
+      ).href;
+      const script = `
+        import { loadRegistry } from ${JSON.stringify(moduleUrl)};
+        process.chdir(${JSON.stringify(appNodeDir)});
+        delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+        const result = await loadRegistry();
+        console.log(JSON.stringify({
+          resolvedPath: result.resolvedPath,
+          skillCount: result.registry.skills.length,
+        }));
+      `;
+      const child = await runNodeSnippet(script, {
+        env: { ...process.env, HOME: tempHome },
+      });
+      assert.strictEqual(child.code, 0, child.stderr);
+      const parsed = JSON.parse(child.stdout) as { resolvedPath: string; skillCount: number };
+      assert.strictEqual(
+        normalizeMacTmpPath(parsed.resolvedPath),
+        normalizeMacTmpPath(installedHomeRegistryPath)
+      );
+      assert.ok(parsed.skillCount > 0);
+      assert.strictEqual(child.stderr, "");
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps the configured env registry ahead of repo and installed-home fallbacks", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-env-priority-"));
+    const tempHome = await mkdtemp(join(tmpdir(), "clawperator-home-priority-"));
+    const appNodeDir = join(tempRoot, "apps", "node");
+    const repoFallbackPath = join(tempRoot, "skills", "skills-registry.json");
+    const installedHomeRegistryPath = join(
+      tempHome,
+      ".clawperator",
+      "skills",
+      "skills",
+      "skills-registry.json"
+    );
+
+    await mkdir(appNodeDir, { recursive: true });
+    await mkdir(dirname(repoFallbackPath), { recursive: true });
+    await mkdir(dirname(installedHomeRegistryPath), { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, repoFallbackPath);
+    await copyFile(TEST_REGISTRY_PATH, installedHomeRegistryPath);
+
+    try {
+      const moduleUrl = pathToFileURL(
+        join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js")
+      ).href;
+      const script = `
+        import { loadRegistry } from ${JSON.stringify(moduleUrl)};
+        process.chdir(${JSON.stringify(appNodeDir)});
+        process.env.CLAWPERATOR_SKILLS_REGISTRY = ${JSON.stringify(TEST_REGISTRY_PATH)};
+        const result = await loadRegistry();
+        console.log(JSON.stringify({
+          resolvedPath: result.resolvedPath,
+          skillCount: result.registry.skills.length,
+        }));
+      `;
+      const child = await runNodeSnippet(script, {
+        env: { ...process.env, HOME: tempHome },
+      });
+      assert.strictEqual(child.code, 0, child.stderr);
+      const parsed = JSON.parse(child.stdout) as { resolvedPath: string; skillCount: number };
+      assert.strictEqual(normalizeMacTmpPath(parsed.resolvedPath), normalizeMacTmpPath(TEST_REGISTRY_PATH));
+      assert.ok(parsed.skillCount > 0);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it("prefers the repo-relative fallback over the installed home registry when both exist", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-repo-priority-"));
+    const tempHome = await mkdtemp(join(tmpdir(), "clawperator-home-repo-priority-"));
+    const appNodeDir = join(tempRoot, "apps", "node");
+    const repoFallbackPath = join(tempRoot, "skills", "skills-registry.json");
+    const installedHomeRegistryPath = join(
+      tempHome,
+      ".clawperator",
+      "skills",
+      "skills",
+      "skills-registry.json"
+    );
+
+    await mkdir(appNodeDir, { recursive: true });
+    await mkdir(dirname(repoFallbackPath), { recursive: true });
+    await mkdir(dirname(installedHomeRegistryPath), { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, repoFallbackPath);
+    await copyFile(TEST_REGISTRY_PATH, installedHomeRegistryPath);
+
+    try {
+      const moduleUrl = pathToFileURL(
+        join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js")
+      ).href;
+      const script = `
+        import { loadRegistry } from ${JSON.stringify(moduleUrl)};
+        process.chdir(${JSON.stringify(appNodeDir)});
+        delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+        const result = await loadRegistry();
+        console.log(JSON.stringify({
+          resolvedPath: result.resolvedPath,
+          skillCount: result.registry.skills.length,
+        }));
+      `;
+      const child = await runNodeSnippet(script, {
+        env: { ...process.env, HOME: tempHome },
+      });
+      assert.strictEqual(child.code, 0, child.stderr);
+      const parsed = JSON.parse(child.stdout) as { resolvedPath: string; skillCount: number };
+      assert.strictEqual(normalizeMacTmpPath(parsed.resolvedPath), normalizeMacTmpPath(repoFallbackPath));
+      assert.ok(parsed.skillCount > 0);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+      await rm(tempHome, { recursive: true, force: true });
     }
   });
 });
