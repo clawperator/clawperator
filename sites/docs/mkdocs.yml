@@ -52,6 +52,7 @@ plugins:
 nav:
   - Docs Home: index.md
   - Setup: setup.md
+  - Host Agent Orientation: host-agents.md
   - Quickstart: quickstart.md
   - API:
       - Overview: api/overview.md

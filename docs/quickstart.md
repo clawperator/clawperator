@@ -8,6 +8,11 @@ connected, Operator APK installed, and `clawperator doctor --json` returning
 
 If you have not reached that state yet, complete [Setup](setup.md) first.
 
+If you are choosing between runtime-skill discovery, MCP, and direct CLI
+automation after install, read [Host Agent Orientation](host-agents.md) first.
+This page starts after that choice and focuses on direct observe / decide / act
+execution.
+
 ---
 
 ## The Automation Loop

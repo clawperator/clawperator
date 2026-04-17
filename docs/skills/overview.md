@@ -4,6 +4,11 @@
 
 Explain what Clawperator skills are, how the registry model works, how skills are discovered, and what the `clawperator skills` wrapper actually does.
 
+For the post-install decision of when to start with `clawperator skills`
+instead of MCP or direct CLI automation, read
+[Host Agent Orientation](../host-agents.md) first. This page is the detailed
+runtime-skills contract.
+
 ## Sources
 
 - Registry contract: `apps/node/src/contracts/skills.ts`
@@ -231,12 +236,25 @@ If the registry cannot be read, every discovery command fails with `REGISTRY_REA
 Recovery depends on how the path was chosen:
 
 - when `CLAWPERATOR_SKILLS_REGISTRY` points at a missing file, update the env var or run `clawperator skills install`
-- when no env var is set and neither the current working directory nor `~/.clawperator/skills/skills/skills-registry.json` contains the registry, run from the expected repo root, run `clawperator skills install`, or set `CLAWPERATOR_SKILLS_REGISTRY`
+- when no env var is set and neither the current working directory nor `~/.clawperator/skills/skills/skills-registry.json` contains the registry, verify `~/.clawperator/skills/skills/skills-registry.json`, run `clawperator skills list --json`, then run `clawperator skills install` or set `CLAWPERATOR_SKILLS_REGISTRY`
 - when the registry file exists but does not contain a `skills` array, fix the JSON because `loadRegistry()` rejects that shape with `Invalid registry: skills array required`
 
 Wrapper failure fields like `stdout` and `stderr` are optional. `runSkill.ts` includes them only when the child process actually emitted non-empty data on those streams.
 
 ## Discovery
+
+If you are starting from a fresh install, the shortest discovery flow is:
+
+```bash
+clawperator skills for-app <package_id> --json
+clawperator skills search --keyword <text> --json
+clawperator skills get <skill_id> --json
+clawperator skills run <skill_id> --json
+```
+
+Start with `skills for-app` when you know the Android package id. Use
+`skills search --keyword` when you only have app names or user-language intent
+terms.
 
 Current discovery commands:
 
@@ -686,6 +704,7 @@ Common ones:
 
 ## Related Pages
 
+- [Host Agent Orientation](../host-agents.md)
 - [Authoring](authoring.md)
 - [Development Workflow](development.md)
 - [Device Prep and Runtime](runtime.md)
