@@ -3,13 +3,13 @@
 ## Executive Summary
 
 Follow-up to the install/onboarding cleanup pack after PR #196. This pack is
-the durable home for deferred items D1 and D2 from
-`tasks/install/onboarding/finalization-items.md`: public agent-facing docs
+the durable home for deferred items D1 and D2: public agent-facing docs
 information architecture plus CLI self-orientation and discovery guidance.
 This is a cross-surface task pack, so it lives unscoped under `tasks/`: 2 PRs,
 4 phases. PR-1 settles the public "start here" path for host-agent readers and
-updates the authored docs around it. PR-2 tightens CLI help and registry/discovery
-error guidance so the shell surface points at the same stable docs and flows.
+updates the authored docs around it. PR-2 tightens CLI help and
+registry/discovery error guidance so the shell surface points at the same
+stable docs and flows.
 
 ## Status
 
@@ -41,6 +41,25 @@ bridge. D1 and D2 are still worthwhile, but they should simplify around the
 shipped behavior that lands from that PR instead of reopening its scope with a
 broader docs and CLI pass.
 
+## Current Shipped Baseline
+
+Treat these as already-shipped baseline behavior for this pack. This pack is
+allowed to explain them better, but not redesign them:
+
+- `clawperator skills for-app <package_id>` exists as the primary app-oriented
+  discovery command
+- runtime-skill registry resolution now falls back to the installed home path
+  under `~/.clawperator/skills/skills/skills-registry.json`
+- `install.sh` writes durable host-agent artifacts under `~/.clawperator/`:
+  `AGENTS.md`, `install-state.json`, and `mcp-config-snippet.json`
+- if `~/.agents/AGENTS.md` already exists, the installer appends one bounded
+  Clawperator bridge block there; it does not create the file otherwise
+- runtime skills remain a `clawperator skills ...` model, not shared-agent
+  prompt-skills mirrored into `~/.agents/skills/`
+- public docs already describe the shipped behavior in `docs/setup.md`,
+  `docs/skills/overview.md`, and `docs/api/mcp.md`, but the current entry path
+  and cross-linking are still broader follow-up work
+
 ## In Scope
 
 - Define one canonical public doc path for agent-host orientation after install
@@ -64,9 +83,6 @@ broader docs and CLI pass.
 
 ## Existing Artifact Scope
 
-- `tasks/install/onboarding/`: preserved as the shipped onboarding cleanup pack;
-  do not reopen its plan or implementation scope beyond pointer updates that
-  redirect deferred work here
 - `docs/setup.md`, `docs/skills/overview.md`, `docs/api/mcp.md`, `docs/index.md`,
   and `docs/quickstart.md`: in scope to rewrite where needed so they align on
   one public first-success flow
@@ -94,14 +110,13 @@ broader docs and CLI pass.
 
 | Topic | Verify against |
 | --- | --- |
-| Deferred scope origin | `tasks/install/onboarding/finalization-items.md` |
-| Shipped onboarding behavior and exclusions | `tasks/install/onboarding/plan.md`, `tasks/install/onboarding/work-breakdown.md` |
 | Public install and artifact behavior | `docs/setup.md`, `sites/landing/public/install.sh` |
 | Runtime-skills discovery semantics | `docs/skills/overview.md`, `apps/node/src/cli/registry.ts`, `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts` |
 | MCP front-door guidance | `docs/api/mcp.md`, `apps/node/src/cli/registry.ts` |
 | Public docs nav | `sites/docs/mkdocs.yml` |
 | Generated CLI reference ownership | `sites/docs/source-map.yaml` |
 | Durable host-agent design rules | `docs/internal/design/agent-host-integration.md` |
+| Historical scope split for this pack | This `plan.md` under `Why Now` and `Current Shipped Baseline` |
 
 ## Deterministic Versus Judgment
 

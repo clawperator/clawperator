@@ -2,16 +2,15 @@
 
 ## Executive Summary
 
-Follow-up to deferred item F6 from
-`tasks/install/onboarding/finalization-items.md`. This pack is the durable home
-for first-run requirements metadata work that PR #196 intentionally left out of
-the onboarding cleanup scope. The job here is not install/onboarding cleanup.
-It is skills-surface maturity: add first-class requirements metadata to the
-runtime skills model, surface it through discovery, and enforce only the
-mechanically provable requirements before execution. This pack is Node-dominant
-even though it includes a paired change in `../clawperator-skills`: 2 PRs,
-4 phases. PR-1 ships the metadata contract plus discovery surfaces. PR-2 ships
-runtime preflight evaluation and structured failures.
+Follow-up to deferred item F6. This pack is the durable home for first-run
+requirements metadata work that PR #196 intentionally left out of the
+onboarding cleanup scope. The job here is not install/onboarding cleanup. It is
+skills-surface maturity: add first-class requirements metadata to the runtime
+skills model, surface it through discovery, and enforce only the mechanically
+provable requirements before execution. This pack is Node-dominant even though
+it includes a paired change in `../clawperator-skills`: 2 PRs, 4 phases. PR-1
+ships the metadata contract plus discovery surfaces. PR-2 ships runtime
+preflight evaluation and structured failures.
 
 ## Status
 
@@ -35,10 +34,39 @@ requirement can be checked mechanically and is not met.
 ## Why Now
 
 The onboarding cleanup pack fixed discovery of the Google Home HVAC skills, but
-`tasks/install/onboarding/findings.md` still shows a first-run trust gap: an
-agent can discover the right skill and still fail deep in execution because the
-preconditions are not visible up front. That is a skills contract and runtime
-problem, not an install/onboarding problem, so it deserves its own pack.
+there is still a first-run trust gap: an agent can discover the right skill and
+still fail deep in execution because the preconditions are not visible up
+front. That is a skills contract and runtime problem, not an install/onboarding
+problem, so it deserves its own pack.
+
+## Historical Context Captured Here
+
+This pack replaces the need to consult the deleted onboarding notes. Treat the
+following as the baseline problem statement:
+
+- The Google Home HVAC skills already exist and are now discoverable after
+  install. The gap is not discovery anymore.
+- The remaining problem is first-run requirements visibility and truthful early
+  failure handling.
+- At minimum, the Google Home exemplar skills still have important requirements
+  that a caller should learn before deep runtime execution:
+  - `com.google.android.apps.chromecast.app` must be installed on the target
+    device
+  - Google Home must already be signed in and have a linked climate unit
+  - the caller may need to supply the exact `unit_name` that matches the UI
+  - the orchestrated HVAC skill internally depends on the `codex` CLI being
+    available on the host
+- Not all of those requirements are equally provable ahead of time:
+  - missing host CLIs and missing installed Android packages can be checked
+    mechanically
+  - sign-in state, linked-device state, and exact unit-label correctness are
+    advisory first-run guidance unless the runtime gains a truthful proof path
+- The design intent for this pack is therefore:
+  - render all relevant requirements in discovery
+  - block execution only on hard requirements that can be checked
+    mechanically before spawn
+  - keep subjective requirements visible without pretending they are
+    authoritatively checked
 
 ## In Scope
 
@@ -92,8 +120,6 @@ problem, not an install/onboarding problem, so it deserves its own pack.
 
 | Topic | Verify against |
 | --- | --- |
-| Deferred scope origin | `tasks/install/onboarding/finalization-items.md` |
-| Original problem framing | `tasks/install/onboarding/findings.md` |
 | Current skill contract | `apps/node/src/contracts/skills.ts` |
 | Trusted skill manifest parsing | `apps/node/src/domain/skills/skillManifest.ts` |
 | Runtime skill execution boundary | `apps/node/src/domain/skills/runSkill.ts` |
@@ -102,6 +128,7 @@ problem, not an install/onboarding problem, so it deserves its own pack.
 | Public error-code contract | `docs/api/errors.md`, `apps/node/src/contracts/errors.ts` |
 | Runtime skills registry and schema | `../clawperator-skills/skills/skills-registry.json`, `../clawperator-skills/skills/skills-registry.schema.json` |
 | Canonical exemplar manifests | `../clawperator-skills/skills/com.google.android.apps.chromecast.app.*/skill.json` |
+| Historical problem framing for this pack | This `plan.md` under `Historical Context Captured Here` |
 
 ## Deterministic Versus Judgment
 

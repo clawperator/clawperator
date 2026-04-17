@@ -53,8 +53,6 @@ Read these files IN THIS ORDER before writing anything.
 | File | Why it matters |
 | --- | --- |
 | `tasks/node/skill-preflight-metadata/plan.md` | Stable contract and scope boundaries |
-| `tasks/install/onboarding/finalization-items.md` | Origin of F6 and the explicit split from onboarding cleanup |
-| `tasks/install/onboarding/findings.md` | Canonical problem statement and Google Home exemplar details |
 | `apps/node/src/contracts/skills.ts` | Current `SkillEntry` shape and skill-surface codes |
 | `apps/node/src/domain/skills/skillManifest.ts` | Trusted `skill.json` parsing path to extend |
 | `apps/node/src/domain/skills/runSkill.ts` | Runtime pre-spawn evaluation boundary |

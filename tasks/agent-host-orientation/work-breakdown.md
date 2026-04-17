@@ -48,8 +48,6 @@ Read these files IN THIS ORDER before writing anything.
 | File | Why it matters |
 | --- | --- |
 | `tasks/agent-host-orientation/plan.md` | Stable contract and scope boundaries |
-| `tasks/install/onboarding/finalization-items.md` | Origin of D1 and D2 and pointer relationship back to onboarding |
-| `tasks/install/onboarding/plan.md` | PR #196 scope boundary and already-shipped onboarding behavior |
 | `docs/setup.md` | Current public install and artifact guidance |
 | `docs/skills/overview.md` | Current runtime-skills discovery flow |
 | `docs/api/mcp.md` | Current MCP front-door guidance |
@@ -258,8 +256,8 @@ path and the correct next step instead of only env-var remediation.
 ### Steps
 
 1. Review the current registry-read failure and warning text in
-   `localSkillsRegistry.ts`, then compare it with the shipped onboarding model
-   from PR #196.
+   `localSkillsRegistry.ts`, then compare it with the shipped baseline captured
+   in `tasks/agent-host-orientation/plan.md`.
 2. Tighten failure messages so they mention the durable installed registry path
    and the relevant next step. Preserve the existing path-selection behavior
    unless a direct contradiction is found.
