@@ -71,6 +71,8 @@ following as the baseline problem statement:
     mechanically before spawn
   - keep subjective requirements visible without pretending they are
     authoritatively checked
+  - keep manifest-level `agent.cli` visible in discovery for orchestrated
+    skills even though its runtime guard already exists separately
 
 ## In Scope
 
@@ -104,7 +106,8 @@ following as the baseline problem statement:
 - `apps/node/src/cli/commands/skills.ts`: in scope for `skills get` rendering
   only; do not redesign list or search output into verbose metadata dumps
 - `../clawperator-skills`: in scope for paired schema and skill-metadata updates
-  that must land with the Node-side contract work
+  plus regeneration of the checked-in registry and generated indexes that must
+  land with the Node-side contract work
 
 ## Surfaces and Ownership
 
@@ -118,6 +121,8 @@ following as the baseline problem statement:
 | `docs/skills/overview.md` | Public discovery and requirements guidance | PR-1 / Phase 2, PR-2 / Phase 4 |
 | `docs/api/errors.md` | Public documentation for any new stable error codes that belong on that page | PR-2 / Phase 4 |
 | `../clawperator-skills/skills/skills-registry.schema.json` | Registry schema for requirements metadata | PR-1 / Phase 2 |
+| `../clawperator-skills/skills/skills-registry.json` | Regenerated canonical registry consumed by Clawperator | PR-1 / Phase 2 |
+| `../clawperator-skills/skills/generated/` | Regenerated committed indexes and manifest derived from exemplar metadata | PR-1 / Phase 2 |
 | `../clawperator-skills/skills/com.google.android.apps.chromecast.app.*/skill.json` | Seeded exemplar requirements metadata | PR-1 / Phase 2 |
 
 ## Source Of Truth
@@ -155,11 +160,19 @@ following as the baseline problem statement:
   unless the current code proves that decision wrong.
 - The Google Home HVAC skills are the required exemplar seed set for this pack.
   Do not prove the feature only with synthetic local fixtures.
+- The sibling skills repo treats `skills/skills-registry.json` and
+  `skills/generated/` as checked-in generated artifacts. Any Phase 2 schema or
+  exemplar-manifest edit must be followed by `../clawperator-skills/scripts/generate_skill_indexes.sh`
+  so the shipped registry and indexes actually carry the new metadata.
 - The manifest-level `agent.cli` field already exists and is already enforced
   at runtime by `SKILL_AGENT_CLI_UNAVAILABLE`. Do not restate `agent.cli` as a
   `requirements.hostCli` entry, and do not add a second preflight path for it.
   `requirements.hostCli` is reserved for additional host CLIs that a skill
   needs beyond its declared `agent.cli`.
+- Discovery still needs to surface manifest-level `agent.cli` for orchestrated
+  skills. The no-duplication rule applies to metadata shape and runtime
+  preflight, not to discovery output. A caller using `skills get` should still
+  learn that an orchestrated skill depends on `codex` before execution.
 
 **Judgment required:**
 
@@ -178,6 +191,8 @@ following as the baseline problem statement:
 | What metadata name should the registry use? | `requirements`. Runtime "preflight" is derived from it; do not add a second parallel field. |
 | What kinds of requirements should this pack support? | At minimum: host CLI requirements, Android package requirements, user-input guidance, advisory account or app-state notes, and an explicit safer-first-run pointer when a safer read-only alternative exists. |
 | Which requirements are hard blockers at runtime? | Only requirements that can be checked mechanically before spawn, such as missing host CLIs or missing Android packages when a target device is known. |
+| How should manifest `agent.cli` appear in discovery? | Surface it in `skills get` as existing orchestrated runtime metadata or an equivalent derived discovery field, but do not copy it into `requirements.hostCli` and do not add a second runtime preflight path for it. |
+| What must happen after editing sibling repo schema or exemplar manifests? | Regenerate the sibling repo registry and committed indexes with `../clawperator-skills/scripts/generate_skill_indexes.sh`, then validate the generated outputs that changed. Do not leave `skills/skills-registry.json` or `skills/generated/` stale. |
 | How should subjective requirements such as sign-in state be handled? | Render them as advisory requirements in discovery output. Do not invent UI probing in this pack. |
 | How should user inputs be represented? | As guidance metadata that complements, not replaces, the existing `contract.inputs` system. Do not duplicate contract parsing logic. |
 | Where should safer-first-run guidance live? | In `requirements`, as an explicit pointer to the safer skill or route. Surface it in `skills get`; do not bury it only in prose docs. |
@@ -206,6 +221,9 @@ After PR-1:
   safer-first-run pointer when present.
 - `../clawperator-skills` schema and the Google Home HVAC exemplar skills ship
   real `requirements` metadata in lockstep with the Node contract.
+- The checked-in sibling repo registry and generated indexes are regenerated, so
+  `skills/skills-registry.json` and `skills/generated/` actually carry the new
+  metadata consumed by Clawperator.
 
 After PR-2:
 

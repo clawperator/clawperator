@@ -21,7 +21,7 @@ stable docs and flows.
 | Completed | none |
 | Remaining | 1, 2, 3, 4 |
 | Current / Next | Phase 1 |
-| Blockers | wait for PR #196 to merge before implementation starts |
+| Blockers | start after the shipped onboarding baseline from PR #196 is available on the branch you implement from |
 
 ## Goal
 
@@ -122,7 +122,8 @@ allowed to explain them better, but not redesign them:
 
 **Deterministic - do not re-derive:**
 
-- This pack starts after PR #196 merges. Do not fold D1 or D2 back into that PR.
+- Use this pack against a branch where the shipped onboarding baseline from
+  PR #196 already exists. Do not fold D1 or D2 back into that PR.
 - `clawperator skills for-app <package_id>` remains the primary app-oriented
   discovery surface. This pack should explain and surface it better, not replace
   it.

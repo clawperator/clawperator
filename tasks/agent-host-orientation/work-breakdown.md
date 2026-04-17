@@ -7,8 +7,9 @@ Parent plan: `tasks/agent-host-orientation/plan.md`
 2 PRs, 4 phases. PR-1 settles the canonical public host-agent orientation flow
 and updates the authored docs around it. PR-2 tightens CLI help plus
 registry/discovery remediation so shell surfaces point at the same stable docs.
-This work begins only after PR #196 is merged; until then the pack stays in
-planning so it does not reopen onboarding scope.
+This pack assumes the shipped onboarding baseline from PR #196 already exists on
+the branch you implement from. It is a follow-up to that shipped baseline, not
+an invitation to reopen onboarding scope.
 
 ## Status
 
@@ -20,11 +21,12 @@ planning so it does not reopen onboarding scope.
 | Completed | none |
 | Remaining | 1, 2, 3, 4 |
 | Current / Next | Phase 1 |
-| Blockers | PR #196 merge gate |
+| Blockers | use a branch with the shipped onboarding baseline already present |
 
 ## Hard Rules
 
-- Do not reopen or expand PR #196. This pack starts after that PR merges.
+- Do not reopen or expand PR #196. Use this pack only from a branch where the
+  shipped onboarding baseline is already present.
 - Use `.agents/skills/docs-author/SKILL.md` for authored docs changes. Do not
   hand-edit generated docs outputs.
 - Do not hand-edit `sites/docs/.build/`, `sites/docs/site/`, or generated
@@ -67,7 +69,7 @@ Read these files IN THIS ORDER before writing anything.
 
 | PR | Branch | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- | --- |
-| PR-1 | `docs/agent-host-orientation-p1` | Canonical docs flow | 1, 2 | thinking, default | PR #196 merged |
+| PR-1 | `docs/agent-host-orientation-p1` | Canonical docs flow | 1, 2 | thinking, default | shipped onboarding baseline already present |
 | PR-2 | `node/agent-host-orientation-p2` | CLI help and remediation alignment | 3, 4 | default, default | PR-1 merged |
 
 ## Phase 1: Canonical Public Orientation Path

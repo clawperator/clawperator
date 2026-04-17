@@ -144,6 +144,8 @@ Home HVAC skills with that metadata in `../clawperator-skills`.
 - `apps/node/src/test/unit/skills.test.ts`
 - `docs/skills/overview.md`
 - `../clawperator-skills/skills/skills-registry.schema.json`
+- `../clawperator-skills/skills/skills-registry.json`
+- `../clawperator-skills/skills/generated/`
 - `../clawperator-skills/skills/com.google.android.apps.chromecast.app.*/skill.json`
 
 ### Steps
@@ -168,15 +170,40 @@ Home HVAC skills with that metadata in `../clawperator-skills`.
    Do not restate the orchestrated skill's existing `agent.cli = "codex"` as a
    `requirements.hostCli` entry; that is already covered by the manifest
    `agent` block.
-5. Update public docs in `docs/skills/overview.md` so they describe the new
+5. Regenerate the sibling repo registry and committed indexes after the schema
+   and exemplar-manifest edits:
+   ```bash
+   (cd ../clawperator-skills && ./scripts/generate_skill_indexes.sh)
+   ```
+   Treat `skills/skills-registry.json` and the changed files under
+   `skills/generated/` as required Phase 2 outputs, not optional rebuild noise.
+6. Ensure `skills get` discovery output still surfaces the orchestrated skill's
+   manifest-level `agent.cli` dependency (`codex`) alongside the new
+   `requirements` metadata. Do not leave that prerequisite discoverable only
+   through a later runtime failure.
+7. Validate the sibling repo generated outputs that changed. At minimum, confirm
+   the regenerated `skills/skills-registry.json` and the Google Home
+   `skills/generated/by-app/com.google.android.apps.chromecast.app.json` shard
+   include the new requirements metadata, and inspect `skills/generated/manifest.json`
+   if it changed.
+8. Update public docs in `docs/skills/overview.md` so they describe the new
    discovery surface accurately.
-6. Add regression coverage that proves `skills get` surfaces the seeded Google
+9. Add regression coverage that proves `skills get` surfaces the seeded Google
    Home requirements in a stable shape.
+   Include a regression that the orchestrated HVAC skill still exposes its
+   manifest-level `agent.cli` dependency in discovery output without encoding it
+   as `requirements.hostCli`.
 
 ### Acceptance Criteria
 
 - `skills get` returns and pretty-prints `requirements`.
+- `skills get` still makes the orchestrated HVAC skill's `codex` dependency
+  visible at discovery time via manifest-derived output, without duplicating it
+  in `requirements.hostCli`.
 - The sibling repo schema and exemplar Google Home skills ship real metadata.
+- The regenerated sibling repo `skills/skills-registry.json` and changed
+  `skills/generated/` artifacts carry the new metadata instead of remaining
+  stale.
 - Docs describe `requirements` as the first-run discovery surface.
 - Tests cover the seeded exemplar behavior rather than only synthetic fixtures.
 
@@ -185,6 +212,10 @@ Home HVAC skills with that metadata in `../clawperator-skills`.
 ```bash
 npm --prefix apps/node run build
 npm --prefix apps/node run test
+(cd ../clawperator-skills && ./scripts/generate_skill_indexes.sh)
+rg -n "\"requirements\"|\"saferFirstRun\"|\"codex\"" \
+  ../clawperator-skills/skills/skills-registry.json \
+  ../clawperator-skills/skills/generated/by-app/com.google.android.apps.chromecast.app.json
 ./scripts/docs_build.sh
 ```
 
