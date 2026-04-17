@@ -26,13 +26,13 @@ flow.
 
 | Item | Value |
 | --- | --- |
-| State | partially shipped |
-| Total shipped phases | 4 |
-| Remaining phases | 1 |
-| Completed | 1, 2, 3, 4 |
-| Remaining | 5 |
-| Current / Next | Phase 5 |
-| Blockers | none; use the current repo state, not the pre-ship baseline |
+| State | shipped |
+| Total shipped phases | 5 |
+| Remaining phases | 0 |
+| Completed | 1, 2, 3, 4, 5 |
+| Remaining | none |
+| Current / Next | done |
+| Blockers | none |
 
 ## Goal
 

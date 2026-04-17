@@ -25,11 +25,11 @@ flow.
 
 | Item | Value |
 | --- | --- |
-| State | partially shipped |
-| Total historical phases | 4 |
-| Historical completed phases | 1, 2, 3, 4 |
-| Remaining active phases | 5 |
-| Current / Next | Phase 5 |
+| State | shipped |
+| Total historical phases | 5 |
+| Historical completed phases | 1, 2, 3, 4, 5 |
+| Remaining active phases | 0 |
+| Current / Next | done |
 | Blockers | none |
 
 ## Hard Rules
