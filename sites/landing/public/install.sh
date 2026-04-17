@@ -601,6 +601,7 @@ setup_authoring_skills_via_cli() {
 append_runtime_skills_guide() {
     local AGENT_GUIDE_PATH="$1"
     local RUNTIME_SKILLS_REGISTRY_PATH="$HOME/.clawperator/skills/skills/skills-registry.json"
+    local RUNTIME_GUIDE_TMP=""
 
     cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
@@ -626,7 +627,9 @@ EOF
         return 0
     fi
 
-    if node - "$RUNTIME_SKILLS_REGISTRY_PATH" >> "$AGENT_GUIDE_PATH" 2>/dev/null <<'EOF'
+    RUNTIME_GUIDE_TMP="$(mktemp "${TMPDIR:-/tmp}/clawperator-runtime-skills.XXXXXX")"
+
+    if node - "$RUNTIME_SKILLS_REGISTRY_PATH" > "$RUNTIME_GUIDE_TMP" 2>/dev/null <<'EOF'
 const fs = require("fs");
 
 const registryPath = process.argv[2];
@@ -704,8 +707,12 @@ for (const applicationId of applicationIds) {
 }
 EOF
     then
+        cat "$RUNTIME_GUIDE_TMP" >> "$AGENT_GUIDE_PATH"
+        rm -f "$RUNTIME_GUIDE_TMP"
         return 0
     fi
+
+    rm -f "$RUNTIME_GUIDE_TMP"
 
     cat >> "$AGENT_GUIDE_PATH" <<EOF
 
@@ -749,29 +756,36 @@ write_install_state() {
         REGISTRY_PATH_VALUE="$SKILLS_REGISTRY_PATH"
     fi
 
-    node - "$INSTALL_STATE_PATH" "$INSTALLED_AT" "$CLI_VERSION" "${REGISTRY_PATH_VALUE:-__NULL__}" "${APK_VERSION_VALUE:-__NULL__}" "${LAST_DEVICE_SERIAL_VALUE:-__NULL__}" <<'EOF'
+    INSTALL_STATE_INSTALLED_AT="$INSTALLED_AT" \
+    INSTALL_STATE_CLI_VERSION="$CLI_VERSION" \
+    INSTALL_STATE_REGISTRY_PATH="$REGISTRY_PATH_VALUE" \
+    INSTALL_STATE_APK_VERSION="$APK_VERSION_VALUE" \
+    INSTALL_STATE_LAST_DEVICE_SERIAL="$LAST_DEVICE_SERIAL_VALUE" \
+    node - "$INSTALL_STATE_PATH" <<'EOF'
 const fs = require("fs");
 
-const [
-  installStatePath,
-  installedAt,
-  cliVersion,
-  registryPathArg,
-  apkVersionArg,
-  lastDeviceSerialArg,
-] = process.argv.slice(2);
+const [installStatePath] = process.argv.slice(2);
 
-function normalizeNullable(value) {
-  return value === "__NULL__" ? null : value;
+function requiredEnv(name) {
+  const value = process.env[name];
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`Missing required install-state field: ${name}`);
+  }
+  return value;
+}
+
+function nullableEnv(name) {
+  const value = process.env[name];
+  return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 const installState = {
   schemaVersion: 1,
-  installedAt,
-  cliVersion,
-  registryPath: normalizeNullable(registryPathArg),
-  apkVersion: normalizeNullable(apkVersionArg),
-  lastDeviceSerial: normalizeNullable(lastDeviceSerialArg),
+  installedAt: requiredEnv("INSTALL_STATE_INSTALLED_AT"),
+  cliVersion: requiredEnv("INSTALL_STATE_CLI_VERSION"),
+  registryPath: nullableEnv("INSTALL_STATE_REGISTRY_PATH"),
+  apkVersion: nullableEnv("INSTALL_STATE_APK_VERSION"),
+  lastDeviceSerial: nullableEnv("INSTALL_STATE_LAST_DEVICE_SERIAL"),
 };
 
 fs.writeFileSync(installStatePath, JSON.stringify(installState, null, 2) + "\n");
@@ -828,6 +842,10 @@ const serverConfig = {
 };
 
 const snippet = {
+  notes: [
+    "This snippet is generated for the current host.",
+    "Regenerate it with install.sh if the clawperator binary path or adb path changes.",
+  ],
   claudeDesktop: {
     configPathHints: [claudeMacPath, claudeLinuxPath],
     mergeKey: "mcpServers",

@@ -83,7 +83,7 @@ if (value === undefined) {
 } else {
   process.stdout.write(String(value));
 }
-' "$file" "$field"
+' "$file" "$field_path"
 }
 
 assert_json_field_equals() {
@@ -600,6 +600,8 @@ assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.arg
 assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.1" "serve" "mcp-config claude args.1"
 assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.env.ADB_PATH" "$TMP_DIR/mock-mcp-authoring/adb" "mcp-config claude env.ADB_PATH"
 assert_json_field_equals "$MCP_CONFIG_PATH" "codex.configPath" "$TMP_DIR/home-mcp-authoring/.codex/config.toml" "mcp-config codex configPath"
+assert_json_field_equals "$MCP_CONFIG_PATH" "notes.0" "This snippet is generated for the current host." "mcp-config notes.0"
+assert_equals "serve" "$(json_field_value "$MCP_CONFIG_PATH" "genericStdioConsumer.server.args.1")" "mcp-config helper direct call"
 assert_contains "$MCP_CONFIG_PATH" '[mcp_servers.clawperator]' "mcp-config codex entryToml"
 assert_contains "$MCP_CONFIG_PATH" 'args = [\"mcp\", \"serve\"]' "mcp-config codex entryToml"
 assert_json_field_equals "$MCP_CONFIG_PATH" "genericStdioConsumer.serverName" "clawperator" "mcp-config generic serverName"

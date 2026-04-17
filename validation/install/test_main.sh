@@ -85,7 +85,7 @@ if (value === undefined) {
 } else {
   process.stdout.write(String(value));
 }
-' "$file" "$field"
+' "$file" "$field_path"
 }
 
 assert_json_field_equals() {
@@ -399,6 +399,8 @@ assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "apkVersion" "null" "main
 assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "lastDeviceSerial" "serial-solo" "main-success install-state lastDeviceSerial"
 assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.command" "$TMP_DIR/mock-main-success/clawperator" "main-success mcp claude command"
 assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.env.ADB_PATH" "$TMP_DIR/mock-main-success/adb" "main-success mcp claude env.ADB_PATH"
+assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "notes.1" "Regenerate it with install.sh if the clawperator binary path or adb path changes." "main-success mcp notes.1"
+assert_equals "serve" "$(json_field_value "$SUCCESS_MCP_CONFIG_PATH" "genericStdioConsumer.server.args.1")" "main-success mcp helper direct call"
 assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "genericStdioConsumer.server.args.1" "serve" "main-success mcp generic args.1"
 assert_contains "$SUCCESS_MCP_CONFIG_PATH" '[mcp_servers.clawperator]' "main-success mcp codex entryToml"
 assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/AGENTS.md" "main-success stdout durable guide"
