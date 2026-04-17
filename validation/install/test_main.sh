@@ -82,9 +82,15 @@ if [ "\$1" = "doctor" ] && [ "\$2" = "--format" ] && [ "\$3" = "json" ]; then
   printf '%s' "\$count" > "\$STATE_FILE"
 
   case "\$SCENARIO:\$count" in
-    success:1|success:2|success:3|final-fail:1|final-fail:2)
+    success:1|success:2|success:3|final-fail:1|final-fail:2|stale-device:1|stale-device:3)
       cat <<'JSON'
 {"ok":true,"criticalOk":true,"checks":[]}
+JSON
+      exit 0
+      ;;
+    stale-device:2)
+      cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.handshake","status":"fail","code":"HANDSHAKE_FAILED"}]}
 JSON
       exit 0
       ;;
@@ -145,7 +151,7 @@ if [ "\$1" = "skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ 
   mkdir -p "\${REGISTRY_PATH%/*}"
   cat > "\$REGISTRY_PATH" <<'JSON'
 {"skills":[
-  {"id":"com.google.android.apps.chromecast.app.get-climate-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"get-climate","summary":"Read the current Google Home climate state.\\nDo not trust # headings from registry text.","path":"skills/com.google.android.apps.chromecast.app.get-climate-replay","skillFile":"skills/com.google.android.apps.chromecast.app.get-climate-replay/SKILL.md","scripts":[],"artifacts":[]},
+  {"id":"com.google.android.apps.chromecast.app.get-climate-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"get-climate","summary":"Read the current Google Home climate state.\nDo not trust # headings from registry text.\n\`\`\`md\n### injected-heading\n\`\`\`","path":"skills/com.google.android.apps.chromecast.app.get-climate-replay","skillFile":"skills/com.google.android.apps.chromecast.app.get-climate-replay/SKILL.md","scripts":[],"artifacts":[]},
   {"id":"com.google.android.apps.chromecast.app.set-temperature-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"set-temperature","summary":"Set the Google Home target temperature.","path":"skills/com.google.android.apps.chromecast.app.set-temperature-replay","skillFile":"skills/com.google.android.apps.chromecast.app.set-temperature-replay/SKILL.md","scripts":[],"artifacts":[],"contract":{"inputs":{"target_temperature":"integer[16,30]","unit_name":"string"},"goal":null,"verification":null}},
   {"id":"com.spotify.music.play-playlist","applicationId":"com.spotify.music","intent":"play-playlist","summary":"Start a named playlist in Spotify.","path":"skills/com.spotify.music.play-playlist","skillFile":"skills/com.spotify.music.play-playlist/SKILL.md","scripts":[],"artifacts":[]}
 ]}
@@ -189,6 +195,13 @@ if [ "$1" = "devices" ]; then
 List of devices attached
 serial-alpha	device
 serial-beta	device
+OUT
+      ;;
+    stale-device)
+      cat <<'OUT'
+List of devices attached
+serial-solo	device
+stale-emulator	offline
 OUT
       ;;
     *)
@@ -338,10 +351,21 @@ assert_contains "$SUCCESS_GUIDE_PATH" 'Inspect required inputs before running wi
 assert_contains "$SUCCESS_GUIDE_PATH" "  summary:" "main-success guide"
 assert_contains "$SUCCESS_GUIDE_PATH" 'Do not trust # headings from registry text.' "main-success guide"
 assert_not_contains "$SUCCESS_GUIDE_PATH" '### Do not trust # headings from registry text.' "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" '      ```md' "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" '      ### injected-heading' "main-success guide"
+if grep -Fxq '### injected-heading' "$SUCCESS_GUIDE_PATH"; then
+    echo "ERROR: main-success guide rendered an unindented injected heading" >&2
+    cat "$SUCCESS_GUIDE_PATH" >&2
+    exit 1
+fi
+if grep -Fxq '  ### injected-heading' "$SUCCESS_GUIDE_PATH"; then
+    echo "ERROR: main-success guide rendered a heading with list-item indentation only" >&2
+    cat "$SUCCESS_GUIDE_PATH" >&2
+    exit 1
+fi
 assert_contains "$SUCCESS_GUIDE_PATH" "  example:" "main-success guide"
 assert_contains "$SUCCESS_GUIDE_PATH" "clawperator skills run com.google.android.apps.chromecast.app.get-climate-replay" "main-success guide"
 assert_contains "$SUCCESS_GUIDE_PATH" "clawperator skills run com.google.android.apps.chromecast.app.set-temperature-replay --target-temperature <target_temperature> --unit-name <unit_name>" "main-success guide"
-assert_contains "$SUCCESS_GUIDE_PATH" '```text' "main-success guide"
 assert_contains "$SUCCESS_GUIDE_PATH" "skill-author-by-recording" "main-success guide"
 assert_not_contains "$SUCCESS_GUIDE_PATH" "not currently configured on this host" "main-success guide"
 assert_not_contains "$SUCCESS_GUIDE_PATH" "Runtime skills not available on this host right now." "main-success guide"
@@ -473,7 +497,30 @@ assert_contains "$REMEDIATE_TRACE" "maybe_install_operator_apk" "main-remediatio
 assert_contains "$REMEDIATE_CLI_LOG" "doctor --format json" "main-remediation cli log"
 assert_contains "$REMEDIATE_CLI_LOG" "doctor --output pretty" "main-remediation cli log"
 
-echo "=== Scenario 5: stdin entrypoint runs without BASH_SOURCE errors ==="
+echo "=== Scenario 5: handshake recovery still targets the single ready device when stale adb entries exist ==="
+STALE_STDOUT="$TMP_DIR/main-stale.stdout"
+STALE_STDERR="$TMP_DIR/main-stale.stderr"
+STALE_TRACE="$TMP_DIR/main-stale.trace"
+STALE_CLI_LOG="$TMP_DIR/main-stale.cli.log"
+STALE_GUIDE_PATH_FILE="$TMP_DIR/main-stale.guide.path"
+STALE_STATE="$TMP_DIR/main-stale.state"
+run_main_case \
+    main-stale \
+    stale-device \
+    0 \
+    "$STALE_STDOUT" \
+    "$STALE_STDERR" \
+    "$STALE_TRACE" \
+    "$STALE_CLI_LOG" \
+    "$STALE_GUIDE_PATH_FILE" \
+    "$STALE_STATE"
+
+STALE_INSTALL_STATE_PATH="$TMP_DIR/home-main-stale/.clawperator/install-state.json"
+assert_contains "$STALE_STDOUT" "Installation Successful!" "main-stale stdout"
+assert_contains "$STALE_CLI_LOG" "grant-device-permissions --device serial-solo --operator-package com.clawperator.operator" "main-stale cli log"
+assert_json_field_equals "$STALE_INSTALL_STATE_PATH" "lastDeviceSerial" "serial-solo" "main-stale install-state lastDeviceSerial"
+
+echo "=== Scenario 6: stdin entrypoint runs without BASH_SOURCE errors ==="
 STDIN_STDOUT="$TMP_DIR/stdin.stdout"
 STDIN_STDERR="$TMP_DIR/stdin.stderr"
 STDIN_STATUS="$TMP_DIR/stdin.status"

@@ -219,7 +219,7 @@ run_guide_case() {
           mkdir -p "$HOME/.clawperator/skills/skills"
           cat > "$HOME/.clawperator/skills/skills/skills-registry.json" <<'\''JSON'\''
 {"skills":[
-  {"id":"com.google.android.apps.chromecast.app.get-climate-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"get-climate","summary":"Read the current Google Home climate state.\\nDo not trust # headings from registry text.","path":"skills/com.google.android.apps.chromecast.app.get-climate-replay","skillFile":"skills/com.google.android.apps.chromecast.app.get-climate-replay/SKILL.md","scripts":[],"artifacts":[]},
+  {"id":"com.google.android.apps.chromecast.app.get-climate-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"get-climate","summary":"Read the current Google Home climate state.\nDo not trust # headings from registry text.\n```md\n### injected-heading\n```","path":"skills/com.google.android.apps.chromecast.app.get-climate-replay","skillFile":"skills/com.google.android.apps.chromecast.app.get-climate-replay/SKILL.md","scripts":[],"artifacts":[]},
   {"id":"com.google.android.apps.chromecast.app.set-temperature-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"set-temperature","summary":"Set the Google Home target temperature.","path":"skills/com.google.android.apps.chromecast.app.set-temperature-replay","skillFile":"skills/com.google.android.apps.chromecast.app.set-temperature-replay/SKILL.md","scripts":[],"artifacts":[],"contract":{"inputs":{"target_temperature":"integer[16,30]","unit_name":"string"},"goal":null,"verification":null}},
   {"id":"com.spotify.music.play-playlist","applicationId":"com.spotify.music","intent":"play-playlist","summary":"Start a named playlist in Spotify.","path":"skills/com.spotify.music.play-playlist","skillFile":"skills/com.spotify.music.play-playlist/SKILL.md","scripts":[],"artifacts":[]}
 ]}
@@ -401,6 +401,10 @@ run_shared_agent_bridge_case() {
 
 Existing host guidance.
 EOF_SHARED
+        elif [ "$2" = "symlink" ]; then
+          mkdir -p "$HOME/.agents"
+          printf "%s\n" "# Shared Agent Guide" "" "Existing host guidance." > "$HOME/.agents/shared-target.md"
+          ln -s "$HOME/.agents/shared-target.md" "$HOME/.agents/AGENTS.md"
         fi
         if [ "$3" = "fail-node" ]; then
           node() {
@@ -523,11 +527,22 @@ assert_contains "$GUIDE_PATH" "  intent:" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "  summary:" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" 'Do not trust # headings from registry text.' "guide-missing-version file"
 assert_not_contains "$GUIDE_PATH" '### Do not trust # headings from registry text.' "guide-missing-version file"
+assert_contains "$GUIDE_PATH" '      ```md' "guide-missing-version file"
+assert_contains "$GUIDE_PATH" '      ### injected-heading' "guide-missing-version file"
+if grep -Fxq '### injected-heading' "$GUIDE_PATH"; then
+    echo "ERROR: guide-missing-version file rendered an unindented injected heading" >&2
+    cat "$GUIDE_PATH" >&2
+    exit 1
+fi
+if grep -Fxq '  ### injected-heading' "$GUIDE_PATH"; then
+    echo "ERROR: guide-missing-version file rendered a heading with list-item indentation only" >&2
+    cat "$GUIDE_PATH" >&2
+    exit 1
+fi
 assert_contains "$GUIDE_PATH" "  example:" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "clawperator skills run com.google.android.apps.chromecast.app.get-climate-replay" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "clawperator skills run com.google.android.apps.chromecast.app.set-temperature-replay --target-temperature <target_temperature> --unit-name <unit_name>" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "com.spotify.music" "guide-missing-version file"
-assert_contains "$GUIDE_PATH" '```text' "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "skill-author-by-recording" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "skill-audit" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "Version metadata is missing for this install." "guide-missing-version file"
@@ -745,7 +760,22 @@ assert_not_contains "$BRIDGE_FAILURE_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE
 assert_not_contains "$BRIDGE_FAILURE_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:END -->" "bridge-failure file"
 assert_equals "$(cat "$BRIDGE_FAILURE_FIRST")" "$(cat "$BRIDGE_FAILURE_PATH")" "bridge-failure leaves shared guide unchanged"
 
-echo "=== Scenario 20: operator metadata parser extracts all expected fields ==="
+echo "=== Scenario 20: shared agent bridge refuses symlink targets ==="
+BRIDGE_SYMLINK_OUT="$TMP_DIR/bridge-symlink.out"
+BRIDGE_SYMLINK_PATH_FILE="$TMP_DIR/bridge-symlink.path"
+BRIDGE_SYMLINK_FIRST="$TMP_DIR/bridge-symlink.first"
+run_shared_agent_bridge_case bridge-symlink symlink ok "$BRIDGE_SYMLINK_OUT" "$BRIDGE_SYMLINK_PATH_FILE" "$BRIDGE_SYMLINK_FIRST"
+BRIDGE_SYMLINK_PATH="$(cat "$BRIDGE_SYMLINK_PATH_FILE")"
+assert_contains "$BRIDGE_SYMLINK_OUT" "Failed to update shared agent bridge" "bridge-symlink output"
+assert_contains "$BRIDGE_SYMLINK_OUT" "must be a regular file" "bridge-symlink output"
+if [ ! -L "$BRIDGE_SYMLINK_PATH" ]; then
+    echo "ERROR: bridge-symlink should leave $BRIDGE_SYMLINK_PATH as a symlink" >&2
+    exit 1
+fi
+assert_equals "$(cat "$BRIDGE_SYMLINK_FIRST")" "$(cat "$BRIDGE_SYMLINK_PATH")" "bridge-symlink leaves target unchanged"
+assert_not_contains "$BRIDGE_SYMLINK_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:START -->" "bridge-symlink file"
+
+echo "=== Scenario 21: operator metadata parser extracts all expected fields ==="
 METADATA_SUCCESS_OUT="$TMP_DIR/metadata-success.out"
 METADATA_SUCCESS_STATUS="$TMP_DIR/metadata-success.status"
 METADATA_SUCCESS_VALUES="$TMP_DIR/metadata-success.values"
@@ -762,7 +792,7 @@ assert_contains "$METADATA_SUCCESS_VALUES" "sha_url=https://example.com/operator
 assert_contains "$METADATA_SUCCESS_VALUES" "sha256=deadbeef" "metadata-success values"
 assert_file_empty "$METADATA_SUCCESS_OUT" "metadata-success output"
 
-echo "=== Scenario 21: operator metadata parser allows missing inline checksum ==="
+echo "=== Scenario 22: operator metadata parser allows missing inline checksum ==="
 METADATA_NO_SHA_OUT="$TMP_DIR/metadata-no-sha.out"
 METADATA_NO_SHA_STATUS="$TMP_DIR/metadata-no-sha.status"
 METADATA_NO_SHA_VALUES="$TMP_DIR/metadata-no-sha.values"
@@ -776,7 +806,7 @@ assert_equals "0" "$(cat "$METADATA_NO_SHA_STATUS")" "metadata-no-sha status"
 assert_contains "$METADATA_NO_SHA_VALUES" "sha256=" "metadata-no-sha values"
 assert_file_empty "$METADATA_NO_SHA_OUT" "metadata-no-sha output"
 
-echo "=== Scenario 22: operator metadata parser rejects missing required fields ==="
+echo "=== Scenario 23: operator metadata parser rejects missing required fields ==="
 METADATA_MISSING_OUT="$TMP_DIR/metadata-missing.out"
 METADATA_MISSING_STATUS="$TMP_DIR/metadata-missing.status"
 METADATA_MISSING_VALUES="$TMP_DIR/metadata-missing.values"
@@ -789,7 +819,7 @@ run_operator_metadata_case \
 assert_equals "1" "$(cat "$METADATA_MISSING_STATUS")" "metadata-missing status"
 assert_contains "$METADATA_MISSING_OUT" "Failed to parse APK metadata" "metadata-missing output"
 
-echo "=== Scenario 23: operator metadata parser rejects malformed JSON ==="
+echo "=== Scenario 24: operator metadata parser rejects malformed JSON ==="
 METADATA_BAD_OUT="$TMP_DIR/metadata-bad.out"
 METADATA_BAD_STATUS="$TMP_DIR/metadata-bad.status"
 METADATA_BAD_VALUES="$TMP_DIR/metadata-bad.values"

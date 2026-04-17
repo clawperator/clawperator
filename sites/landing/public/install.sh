@@ -669,11 +669,11 @@ function normalizeGuideValue(value) {
 
 function printLiteralBlock(value, indent = "") {
   const normalized = normalizeGuideValue(value);
-  console.log(indent + "```text");
+  const literalIndent = `${indent}    `;
+  console.log(literalIndent);
   for (const line of normalized.split("\n")) {
-    console.log(indent + line);
+    console.log(literalIndent + line);
   }
-  console.log(indent + "```");
 }
 
 function buildSkillRunExample(skill) {
@@ -1065,12 +1065,18 @@ write_shared_agent_bridge() {
     # elsewhere in ~/.agents/AGENTS.md are preserved.
     if node - "$SHARED_AGENTS_PATH" "$LOCAL_AGENT_GUIDE_PATH" 2>"$BRIDGE_ERROR_TMP" <<'EOF'
 const fs = require("fs");
+const path = require("path");
 
 // Content between startMarker and endMarker is installer-owned and is
 // overwritten in place on every rerun. See the shell caller's comment.
 const [sharedAgentsPath, localAgentGuidePath] = process.argv.slice(2);
 const startMarker = "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:START -->";
 const endMarker = "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:END -->";
+const sharedAgentsStat = fs.lstatSync(sharedAgentsPath);
+
+if (!sharedAgentsStat.isFile()) {
+  throw new Error(`${sharedAgentsPath} must be a regular file`);
+}
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -1106,7 +1112,19 @@ const nextContent = content.length === 0
   ? bridgeBlock
   : `${content}\n\n${bridgeBlock}`;
 
-fs.writeFileSync(sharedAgentsPath, `${nextContent}\n`);
+const tempPath = path.join(
+  path.dirname(sharedAgentsPath),
+  `.clawperator-shared-agents.${process.pid}.${Date.now()}.tmp`
+);
+
+try {
+  fs.writeFileSync(tempPath, `${nextContent}\n`, { mode: sharedAgentsStat.mode });
+  fs.renameSync(tempPath, sharedAgentsPath);
+} finally {
+  if (fs.existsSync(tempPath)) {
+    fs.unlinkSync(tempPath);
+  }
+}
 EOF
     then
         echo -e "${GREEN}✅ Updated shared agent guide bridge at ${SHARED_AGENTS_PATH}.${NC}"
@@ -1473,10 +1491,8 @@ run_doctor_and_fix() {
     DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json || true)"
     if doctor_check_status "$DOCTOR_JSON" "readiness.handshake" "fail"; then
         local DEVICE_COUNT
-        local DETECTED_DEVICE_COUNT
         DEVICE_COUNT="$(count_connected_devices)"
-        DETECTED_DEVICE_COUNT="$(count_detected_android_devices)"
-        if [ "$DEVICE_COUNT" -eq 1 ] && [ "$DETECTED_DEVICE_COUNT" -eq 1 ]; then
+        if [ "$DEVICE_COUNT" -eq 1 ]; then
             local DEVICE_ID
             DEVICE_ID="$(list_connected_devices)"
             record_selected_device_serial "$DEVICE_ID"
