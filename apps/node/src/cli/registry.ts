@@ -2086,6 +2086,7 @@ COMMANDS["skills"] = {
 Usage:
   clawperator skills list
   clawperator skills get <skill_id>
+  clawperator skills for-app <package_id>
   clawperator skills search --app <package_id> [--intent <intent>] [--keyword <text>]
   clawperator skills search <keyword>
   clawperator skills compile-artifact <skill_id> --artifact <name> [--vars <json>]
@@ -2109,6 +2110,8 @@ Usage:
                                             List available skills from local indexes/cache
   skills get <skill_id>
                                             Show skill metadata
+  skills for-app <package_id>
+                                            List skills for one app package (alias for skills search --app)
   skills search --app <package_id> [--intent <intent>] [--keyword <text>]
   skills search <keyword>                   Search skills by app package, intent, or keyword
                                             (bare keyword is shorthand for --keyword)
@@ -2137,6 +2140,10 @@ Usage:
       return rest[1]
         ? (await import("./commands/skills.js")).cmdSkillsGet(rest[1], out)
         : JSON.stringify({ code: "USAGE", message: "skills get <skill_id>" });
+    } else if (rest[0] === "for-app") {
+      return rest[1]
+        ? (await import("./commands/skills.js")).cmdSkillsForApp(rest[1], out)
+        : JSON.stringify({ code: "USAGE", message: "skills for-app <package_id>" });
     } else if (rest[0] === "search") {
       const app = getOpt(rest, "--app");
       const intent = getOpt(rest, "--intent");

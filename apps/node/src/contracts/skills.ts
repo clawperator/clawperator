@@ -126,6 +126,7 @@ export interface SkillEntry {
   applicationId: string;
   intent: string;
   summary: string;
+  keywords?: string[];
   path: string;
   skillFile: string;
   scripts: string[];

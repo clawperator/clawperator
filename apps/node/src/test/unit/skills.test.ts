@@ -266,6 +266,91 @@ async function createTempRegistryWithInlineScript(options: {
   };
 }
 
+interface TempSearchSkillEntry {
+  id: string;
+  applicationId: string;
+  intent: string;
+  summary: string;
+  keywords?: string[];
+}
+
+async function createTempRegistryWithEntries(
+  entries: TempSearchSkillEntry[]
+): Promise<{ registryPath: string; cleanup: () => Promise<void> }> {
+  const root = await mkdtemp(join(tmpdir(), "clawperator-search-registry-"));
+  const registryPath = join(root, "skills", "skills-registry.json");
+  await mkdir(dirname(registryPath), { recursive: true });
+  await writeFile(
+    registryPath,
+    `${JSON.stringify({
+      schemaVersion: "1.0",
+      generatedAt: "2026-04-17T00:00:00Z",
+      skills: entries.map((entry) => ({
+        ...entry,
+        path: `skills/${entry.id}`,
+        skillFile: `skills/${entry.id}/SKILL.md`,
+        scripts: [`skills/${entry.id}/scripts/run.js`],
+        artifacts: [],
+      })),
+    }, null, 2)}\n`,
+    "utf8"
+  );
+
+  return {
+    registryPath,
+    cleanup: async () => {
+      await rm(root, { recursive: true, force: true });
+    },
+  };
+}
+
+const GOOGLE_HOME_HVAC_KEYWORDS = [
+  "google home",
+  "climate",
+  "hvac",
+  "air conditioner",
+  "aircon",
+  "ac",
+  "heater",
+];
+
+function makeGoogleHomeHvacEntries(): TempSearchSkillEntry[] {
+  return [
+    {
+      id: "com.google.android.apps.chromecast.app.control-hvac-orchestrated",
+      applicationId: "com.google.android.apps.chromecast.app",
+      intent: "control-hvac",
+      summary: "Agent-driven Google Home HVAC controller for one named climate action per run.",
+      keywords: GOOGLE_HOME_HVAC_KEYWORDS,
+    },
+    {
+      id: "com.google.android.apps.chromecast.app.get-climate-replay",
+      applicationId: "com.google.android.apps.chromecast.app",
+      intent: "get-climate",
+      summary: "Replay baseline skill for reading a Google Home climate unit status.",
+      keywords: GOOGLE_HOME_HVAC_KEYWORDS,
+    },
+    {
+      id: "com.google.android.apps.chromecast.app.set-power-replay",
+      applicationId: "com.google.android.apps.chromecast.app",
+      intent: "set-power",
+      summary: "Replay baseline skill for setting a Google Home climate unit power on or off.",
+      keywords: GOOGLE_HOME_HVAC_KEYWORDS,
+    },
+    {
+      id: "com.google.android.apps.chromecast.app.set-temperature-replay",
+      applicationId: "com.google.android.apps.chromecast.app",
+      intent: "set-temperature",
+      summary: "Replay baseline skill for setting a Google Home climate unit temperature.",
+      keywords: GOOGLE_HOME_HVAC_KEYWORDS,
+    },
+  ];
+}
+
+function getGoogleHomeHvacSkillIds(): string[] {
+  return makeGoogleHomeHvacEntries().map((entry) => entry.id);
+}
+
 function getLogPathForDir(logDir: string): string {
   const now = new Date();
   const yyyy = String(now.getFullYear());
@@ -2042,6 +2127,156 @@ describe("searchSkills", () => {
     const result = await searchSkills({ app: "com.android.settings", intent: "get-climate" });
     assert.ok(result.ok);
     assert.strictEqual(result.skills.length, 0);
+  });
+
+  it("returns the four Google Home HVAC skills for the google home query", async () => {
+    const temp = await createTempRegistryWithEntries([
+      ...makeGoogleHomeHvacEntries(),
+      {
+        id: "com.example.notes.capture",
+        applicationId: "com.example.notes",
+        intent: "capture",
+        summary: "Capture the current notes screen.",
+      },
+    ]);
+
+    try {
+      const result = await searchSkills({ keyword: "google home" }, temp.registryPath);
+      assert.ok(result.ok);
+      assert.deepStrictEqual(result.skills.map((skill) => skill.id), getGoogleHomeHvacSkillIds());
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("returns the four Google Home HVAC skills for the air conditioner query", async () => {
+    const temp = await createTempRegistryWithEntries(makeGoogleHomeHvacEntries());
+
+    try {
+      const result = await searchSkills({ keyword: "air conditioner" }, temp.registryPath);
+      assert.ok(result.ok);
+      assert.deepStrictEqual(result.skills.map((skill) => skill.id), getGoogleHomeHvacSkillIds());
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("returns the four Google Home HVAC skills for the aircon query", async () => {
+    const temp = await createTempRegistryWithEntries(makeGoogleHomeHvacEntries());
+
+    try {
+      const result = await searchSkills({ keyword: "aircon" }, temp.registryPath);
+      assert.ok(result.ok);
+      assert.deepStrictEqual(result.skills.map((skill) => skill.id), getGoogleHomeHvacSkillIds());
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("ranks HVAC skills ahead of known ac false positives", async () => {
+    const temp = await createTempRegistryWithEntries([
+      {
+        id: "com.coles.search-products",
+        applicationId: "com.coles",
+        intent: "search-products",
+        summary: "Search Coles products and extract current price plus original price for sale items.",
+      },
+      {
+        id: "com.globird.energy.get-yesterday-usage-cost-replay",
+        applicationId: "com.globird.energy",
+        intent: "get-yesterday-usage-cost",
+        summary: "Open GloBird and extract the signed dollar amount for Yesterday usage cost.",
+      },
+      {
+        id: "com.woolworths.search-products",
+        applicationId: "com.woolworths",
+        intent: "search-products",
+        summary: "Search Woolworths products and extract current price plus original price for sale items.",
+      },
+      ...makeGoogleHomeHvacEntries(),
+    ]);
+
+    try {
+      const result = await searchSkills({ keyword: "ac" }, temp.registryPath);
+      assert.ok(result.ok);
+      assert.deepStrictEqual(
+        result.skills.slice(0, 4).map((skill) => skill.id),
+        getGoogleHomeHvacSkillIds()
+      );
+      const irrelevantSkillIds = [
+        "com.coles.search-products",
+        "com.globird.energy.get-yesterday-usage-cost-replay",
+        "com.woolworths.search-products",
+      ];
+      for (const irrelevantSkillId of irrelevantSkillIds) {
+        const irrelevantIndex = result.skills.findIndex((skill) => skill.id === irrelevantSkillId);
+        assert.ok(irrelevantIndex >= 4, `Expected ${irrelevantSkillId} to rank after the HVAC skills`);
+      }
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("ranks explicit keyword hits ahead of summary substring hits", async () => {
+    const temp = await createTempRegistryWithEntries([
+      {
+        id: "com.example.summary-match",
+        applicationId: "com.example.summary",
+        intent: "summary-match",
+        summary: "Inspect HVAC status for the current device.",
+      },
+      {
+        id: "com.example.keyword-match",
+        applicationId: "com.example.keyword",
+        intent: "keyword-match",
+        summary: "Inspect the current climate unit.",
+        keywords: ["hvac"],
+      },
+    ]);
+
+    try {
+      const result = await searchSkills({ keyword: "hvac" }, temp.registryPath);
+      assert.ok(result.ok);
+      assert.deepStrictEqual(
+        result.skills.map((skill) => skill.id),
+        ["com.example.keyword-match", "com.example.summary-match"]
+      );
+    } finally {
+      await temp.cleanup();
+    }
+  });
+});
+
+describe("skills for-app CLI", () => {
+  it("returns the four Google Home HVAC skills and nothing else", async () => {
+    const temp = await createTempRegistryWithEntries([
+      ...makeGoogleHomeHvacEntries(),
+      {
+        id: "com.example.other-app.capture",
+        applicationId: "com.example.other-app",
+        intent: "capture",
+        summary: "Capture another app state.",
+      },
+    ]);
+
+    try {
+      const { stdout, code } = await runCli(
+        ["skills", "for-app", "com.google.android.apps.chromecast.app", "--output", "json"],
+        {
+          env: {
+            ...process.env,
+            CLAWPERATOR_SKILLS_REGISTRY: temp.registryPath,
+          },
+        }
+      );
+
+      assert.strictEqual(code, 0, stdout);
+      const parsed = JSON.parse(stdout) as { count?: number; skills?: Array<{ id: string }> };
+      assert.strictEqual(parsed.count, 4);
+      assert.deepStrictEqual(parsed.skills?.map((skill) => skill.id), getGoogleHomeHvacSkillIds());
+    } finally {
+      await temp.cleanup();
+    }
   });
 });
 
