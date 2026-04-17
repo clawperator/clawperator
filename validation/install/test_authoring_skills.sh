@@ -64,6 +64,24 @@ assert_file_empty() {
     fi
 }
 
+file_mode() {
+    local file="$1"
+    if stat -f '%Lp' "$file" >/dev/null 2>&1; then
+        stat -f '%Lp' "$file"
+        return 0
+    fi
+    stat -c '%a' "$file"
+}
+
+assert_mode() {
+    local file="$1"
+    local expected_mode="$2"
+    local label="$3"
+    local actual_mode
+    actual_mode="$(file_mode "$file")"
+    assert_equals "$expected_mode" "$actual_mode" "$label"
+}
+
 # shellcheck source=lib/json_assert.sh
 source "$REPO_ROOT/validation/install/lib/json_assert.sh"
 
@@ -207,6 +225,9 @@ run_guide_case() {
     bash -c '
         source "$1" >/dev/null 2>&1
         trap - ERR
+        unset CLAWPERATOR_SKILLS_REGISTRY
+        unset SKILLS_REGISTRY_PATH
+        unset SKILLS_SETUP_STATUS
         export AUTHORING_SKILLS_INSTALL_DIR="$HOME/.clawperator/authoring-skills"
         mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-recording"
         mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-audit"
@@ -236,6 +257,14 @@ JSON
         elif [ "$3" = "with-invalid-runtime-registry" ]; then
           mkdir -p "$HOME/.clawperator/skills/skills"
           printf "{\\"skills\\":" > "$HOME/.clawperator/skills/skills/skills-registry.json"
+        elif [ "$3" = "with-env-runtime-registry" ]; then
+          export CLAWPERATOR_SKILLS_REGISTRY="$HOME/.clawperator/env-runtime/skills-registry.json"
+          mkdir -p "${CLAWPERATOR_SKILLS_REGISTRY%/*}"
+          cat > "$CLAWPERATOR_SKILLS_REGISTRY" <<'\''JSON'\''
+{"skills":[
+  {"id":"com.google.android.apps.chromecast.app.get-climate-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"get-climate","summary":"Read the current Google Home climate state from CLAWPERATOR_SKILLS_REGISTRY.","path":"skills/com.google.android.apps.chromecast.app.get-climate-replay","skillFile":"skills/com.google.android.apps.chromecast.app.get-climate-replay/SKILL.md","scripts":[],"artifacts":[]}
+]}
+JSON
         fi
         write_agent_guide > "$4"
         printf "%s\n" "$HOME/.clawperator/AGENTS.md" > "$5"
@@ -252,6 +281,9 @@ run_missing_guide_case() {
     bash -c '
         source "$1" >/dev/null 2>&1
         trap - ERR
+        unset CLAWPERATOR_SKILLS_REGISTRY
+        unset SKILLS_REGISTRY_PATH
+        unset SKILLS_SETUP_STATUS
         export AUTHORING_SKILLS_INSTALL_DIR="$HOME/.clawperator/nonexistent-authoring-skills"
         write_agent_guide > "$2"
         printf "%s\n" "$HOME/.clawperator/AGENTS.md" > "$3"
@@ -276,14 +308,46 @@ run_install_state_case() {
     bash -c '
         source "$1" >/dev/null 2>&1
         trap - ERR
+        unset CLAWPERATOR_SKILLS_REGISTRY
         export CLAWPERATOR_BIN_PATH="$2"
         export SKILLS_SETUP_STATUS="$3"
         export SKILLS_REGISTRY_PATH="$4"
         export OPERATOR_VERSION="$5"
         export LAST_DEVICE_SERIAL="$6"
+        if [ -n "$SKILLS_REGISTRY_PATH" ]; then
+          mkdir -p "${SKILLS_REGISTRY_PATH%/*}"
+          printf "%s\n" "{\"skills\":[]}" > "$SKILLS_REGISTRY_PATH"
+        fi
         write_install_state > "$7"
         printf "%s\n" "$HOME/.clawperator/install-state.json" > "$8"
     ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$skills_setup_status" "$registry_path" "$apk_version" "$last_device_serial" "$output_file" "$state_file"
+}
+
+run_install_state_with_previous_registry_case() {
+    local label="$1"
+    local previous_registry_path="$2"
+    local output_file="$3"
+    local state_file="$4"
+    local mock_dir="$TMP_DIR/mock-state-previous-$label"
+
+    setup_mock_clawperator "$mock_dir" "success" '{}'
+
+    HOME="$TMP_DIR/home-state-previous-$label" \
+    OS=Linux \
+    PATH="$mock_dir:$PATH" \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        unset CLAWPERATOR_SKILLS_REGISTRY
+        unset SKILLS_REGISTRY_PATH
+        unset SKILLS_SETUP_STATUS
+        export CLAWPERATOR_BIN_PATH="$2"
+        mkdir -p "${3%/*}"
+        mkdir -p "$HOME/.clawperator"
+        printf "%s\n" "{\"schemaVersion\":1,\"installedAt\":\"2026-04-17T00:00:00Z\",\"cliVersion\":\"1.2.3\",\"registryPath\":\"$3\",\"apkVersion\":null,\"lastDeviceSerial\":null}" > "$HOME/.clawperator/install-state.json"
+        write_install_state > "$4"
+        printf "%s\n" "$HOME/.clawperator/install-state.json" > "$5"
+    ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$previous_registry_path" "$output_file" "$state_file"
 }
 
 run_skip_case() {
@@ -558,6 +622,8 @@ assert_not_contains "$GUIDE_WITH_VERSION_PATH" "Runtime skills not available on 
 assert_contains "$GUIDE_WITH_VERSION_PATH" "skill-author-by-recording" "guide-with-version file"
 assert_not_contains "$GUIDE_WITH_VERSION_PATH" "Version metadata is missing for this install." "guide-with-version file"
 assert_not_contains "$GUIDE_WITH_VERSION_PATH" "clawperator authoring-skills update" "guide-with-version file"
+assert_mode "$GUIDE_WITH_VERSION_PATH" "600" "guide-with-version mode"
+assert_mode "$TMP_DIR/home-guide-with-version/.clawperator" "700" "guide-with-version dir mode"
 
 echo "=== Scenario 9: guide writer prefers configured runtime registry path ==="
 GUIDE_CONFIGURED_OUT="$TMP_DIR/guide-configured.out"
@@ -569,7 +635,17 @@ assert_contains "$GUIDE_CONFIGURED_PATH" "$TMP_DIR/home-guide-configured/.clawpe
 assert_contains "$GUIDE_CONFIGURED_PATH" "configured registry path." "guide-configured file"
 assert_not_contains "$GUIDE_CONFIGURED_PATH" "Runtime skills not available on this host right now." "guide-configured file"
 
-echo "=== Scenario 10: guide writer shows fallback when authoring skills are absent ==="
+echo "=== Scenario 10: guide writer uses readable CLAWPERATOR_SKILLS_REGISTRY on rerun paths ==="
+GUIDE_ENV_OUT="$TMP_DIR/guide-env.out"
+GUIDE_ENV_PATH_FILE="$TMP_DIR/guide-env.path"
+run_guide_case guide-env without-version with-env-runtime-registry "$GUIDE_ENV_OUT" "$GUIDE_ENV_PATH_FILE"
+GUIDE_ENV_PATH="$(cat "$GUIDE_ENV_PATH_FILE")"
+assert_contains "$GUIDE_ENV_OUT" "Wrote agent guide" "guide-env"
+assert_contains "$GUIDE_ENV_PATH" "$TMP_DIR/home-guide-env/.clawperator/env-runtime/skills-registry.json" "guide-env file"
+assert_contains "$GUIDE_ENV_PATH" "from CLAWPERATOR_SKILLS_REGISTRY." "guide-env file"
+assert_not_contains "$GUIDE_ENV_PATH" "Runtime skills not available on this host right now." "guide-env file"
+
+echo "=== Scenario 11: guide writer shows fallback when authoring skills are absent ==="
 GUIDE_MISSING_OUT="$TMP_DIR/guide-missing.out"
 GUIDE_MISSING_PATH_FILE="$TMP_DIR/guide-missing.path"
 run_missing_guide_case guide-absent "$GUIDE_MISSING_OUT" "$GUIDE_MISSING_PATH_FILE"
@@ -578,7 +654,7 @@ assert_contains "$GUIDE_MISSING_PATH" "Runtime skills not available on this host
 assert_contains "$GUIDE_MISSING_PATH" "First-party Clawperator authoring skills are not currently configured on this host." "guide-absent file"
 assert_contains "$GUIDE_MISSING_PATH" "clawperator authoring-skills install" "guide-absent file"
 
-echo "=== Scenario 11: guide writer degrades cleanly when runtime registry is unreadable ==="
+echo "=== Scenario 12: guide writer degrades cleanly when runtime registry is unreadable ==="
 GUIDE_INVALID_OUT="$TMP_DIR/guide-invalid.out"
 GUIDE_INVALID_PATH_FILE="$TMP_DIR/guide-invalid.path"
 run_guide_case guide-invalid-runtime without-version with-invalid-runtime-registry "$GUIDE_INVALID_OUT" "$GUIDE_INVALID_PATH_FILE"
@@ -587,7 +663,7 @@ assert_contains "$GUIDE_INVALID_OUT" "Wrote agent guide" "guide-invalid-runtime"
 assert_contains "$GUIDE_INVALID_PATH" "Runtime skills not available on this host right now." "guide-invalid-runtime file"
 assert_contains "$GUIDE_INVALID_PATH" "The registry exists but could not be read." "guide-invalid-runtime file"
 
-echo "=== Scenario 12: install-state writer persists configured outputs ==="
+echo "=== Scenario 13: install-state writer persists configured outputs ==="
 INSTALL_STATE_FULL_OUT="$TMP_DIR/install-state-full.out"
 INSTALL_STATE_FULL_PATH_FILE="$TMP_DIR/install-state-full.path"
 run_install_state_case \
@@ -606,8 +682,24 @@ assert_json_field_equals "$INSTALL_STATE_FULL_PATH" "cliVersion" "1.2.3" "instal
 assert_json_field_equals "$INSTALL_STATE_FULL_PATH" "registryPath" "$TMP_DIR/runtime-registry.json" "install-state-full registryPath"
 assert_json_field_equals "$INSTALL_STATE_FULL_PATH" "apkVersion" "9.9.9" "install-state-full apkVersion"
 assert_json_field_equals "$INSTALL_STATE_FULL_PATH" "lastDeviceSerial" "serial-123" "install-state-full lastDeviceSerial"
+assert_mode "$INSTALL_STATE_FULL_PATH" "600" "install-state-full mode"
 
-echo "=== Scenario 13: install-state writer preserves nullable fields ==="
+echo "=== Scenario 14: install-state writer preserves last known readable registry path on rerun ==="
+PREVIOUS_REGISTRY_PATH="$TMP_DIR/previous-runtime/skills-registry.json"
+mkdir -p "${PREVIOUS_REGISTRY_PATH%/*}"
+printf '%s\n' '{"skills":[]}' > "$PREVIOUS_REGISTRY_PATH"
+INSTALL_STATE_PREVIOUS_OUT="$TMP_DIR/install-state-previous.out"
+INSTALL_STATE_PREVIOUS_PATH_FILE="$TMP_DIR/install-state-previous.path"
+run_install_state_with_previous_registry_case \
+    previous \
+    "$PREVIOUS_REGISTRY_PATH" \
+    "$INSTALL_STATE_PREVIOUS_OUT" \
+    "$INSTALL_STATE_PREVIOUS_PATH_FILE"
+INSTALL_STATE_PREVIOUS_PATH="$(cat "$INSTALL_STATE_PREVIOUS_PATH_FILE")"
+assert_contains "$INSTALL_STATE_PREVIOUS_OUT" "Wrote install state" "install-state-previous"
+assert_json_field_equals "$INSTALL_STATE_PREVIOUS_PATH" "registryPath" "$PREVIOUS_REGISTRY_PATH" "install-state-previous registryPath"
+
+echo "=== Scenario 15: install-state writer preserves nullable fields ==="
 INSTALL_STATE_NULL_OUT="$TMP_DIR/install-state-null.out"
 INSTALL_STATE_NULL_PATH_FILE="$TMP_DIR/install-state-null.path"
 run_install_state_case \
@@ -627,7 +719,7 @@ assert_json_field_null "$INSTALL_STATE_NULL_PATH" "registryPath" "install-state-
 assert_json_field_null "$INSTALL_STATE_NULL_PATH" "apkVersion" "install-state-null apkVersion"
 assert_json_field_null "$INSTALL_STATE_NULL_PATH" "lastDeviceSerial" "install-state-null lastDeviceSerial"
 
-echo "=== Scenario 13b: install-state writer emits null cliVersion when CLI is unresolvable ==="
+echo "=== Scenario 15b: install-state writer emits null cliVersion when CLI is unresolvable ==="
 INSTALL_STATE_NO_CLI_OUT="$TMP_DIR/install-state-no-cli.out"
 INSTALL_STATE_NO_CLI_PATH="$TMP_DIR/home-state-no-cli/.clawperator/install-state.json"
 HOME="$TMP_DIR/home-state-no-cli" \
@@ -635,6 +727,9 @@ OS=Linux \
 bash -c '
     source "$1" >/dev/null 2>&1
     trap - ERR
+    unset CLAWPERATOR_SKILLS_REGISTRY
+    unset SKILLS_REGISTRY_PATH
+    unset SKILLS_SETUP_STATUS
     unset CLAWPERATOR_BIN_PATH
     write_install_state > "$2"
 ' _ "$INSTALL_SCRIPT" "$INSTALL_STATE_NO_CLI_OUT"
@@ -643,7 +738,7 @@ assert_json_field_equals "$INSTALL_STATE_NO_CLI_PATH" "schemaVersion" "1" "insta
 assert_json_field_is_iso_timestamp "$INSTALL_STATE_NO_CLI_PATH" "installedAt" "install-state-no-cli installedAt"
 assert_json_field_null "$INSTALL_STATE_NO_CLI_PATH" "cliVersion" "install-state-no-cli cliVersion"
 
-echo "=== Scenario 14: skip flag suppresses both runtime and authoring skills setup ==="
+echo "=== Scenario 16: skip flag suppresses both runtime and authoring skills setup ==="
 SKIP_SKILLS_OUT="$TMP_DIR/skip-skills.out"
 SKIP_AUTHORING_OUT="$TMP_DIR/skip-authoring.out"
 SKIP_STATUS="$TMP_DIR/skip.status"
@@ -656,7 +751,7 @@ assert_contains "$SKIP_STATUS" "skills=skipped" "skip-status"
 assert_contains "$SKIP_STATUS" "authoring=skipped" "skip-status"
 assert_equals "" "$(cat "$SKIP_LOG")" "skip command log"
 
-echo "=== Scenario 15: MCP config writer emits paste-ready node-form snippet ==="
+echo "=== Scenario 17: MCP config writer emits paste-ready node-form snippet ==="
 MCP_CONFIG_OUT="$TMP_DIR/mcp-config.out"
 MCP_CONFIG_PATH_FILE="$TMP_DIR/mcp-config.path"
 run_mcp_config_case authoring with-adb with-cli-js "$MCP_CONFIG_OUT" "$MCP_CONFIG_PATH_FILE"
@@ -679,8 +774,9 @@ assert_json_field_equals "$MCP_CONFIG_PATH" "genericStdioConsumer.serverName" "c
 assert_json_field_equals "$MCP_CONFIG_PATH" "genericStdioConsumer.server.command" "$EXPECTED_NODE_BIN" "mcp-config generic command"
 assert_not_contains "$MCP_CONFIG_PATH" "npm shell wrapper" "mcp-config no wrapper note when node-form resolved"
 assert_not_contains "$MCP_CONFIG_PATH" "<set ADB_PATH" "mcp-config no adb placeholder when adb resolved"
+assert_mode "$MCP_CONFIG_PATH" "600" "mcp-config mode"
 
-echo "=== Scenario 15b: MCP config writer falls back to npm wrapper when CLI JS unresolvable ==="
+echo "=== Scenario 17b: MCP config writer falls back to npm wrapper when CLI JS unresolvable ==="
 MCP_FALLBACK_OUT="$TMP_DIR/mcp-fallback.out"
 MCP_FALLBACK_PATH_FILE="$TMP_DIR/mcp-fallback.path"
 run_mcp_config_case fallback with-adb without-cli-js "$MCP_FALLBACK_OUT" "$MCP_FALLBACK_PATH_FILE"
@@ -691,7 +787,7 @@ assert_json_field_equals "$MCP_FALLBACK_PATH" "claudeDesktop.entry.clawperator.a
 assert_contains "$MCP_FALLBACK_PATH" "npm shell wrapper" "mcp-fallback includes wrapper fallback note"
 assert_contains "$MCP_FALLBACK_PATH" 'args = [\"mcp\", \"serve\"]' "mcp-fallback codex entryToml wrapper args"
 
-echo "=== Scenario 15c: MCP config writer emits placeholder when adb is missing ==="
+echo "=== Scenario 17c: MCP config writer emits placeholder when adb is missing ==="
 MCP_NOADB_OUT="$TMP_DIR/mcp-noadb.out"
 MCP_NOADB_PATH_FILE="$TMP_DIR/mcp-noadb.path"
 run_mcp_config_case noadb without-adb with-cli-js "$MCP_NOADB_OUT" "$MCP_NOADB_PATH_FILE"
@@ -699,7 +795,7 @@ MCP_NOADB_PATH="$(cat "$MCP_NOADB_PATH_FILE")"
 assert_json_field_equals "$MCP_NOADB_PATH" "claudeDesktop.entry.clawperator.env.ADB_PATH" "<set ADB_PATH to your adb binary>" "mcp-noadb claude env.ADB_PATH placeholder"
 assert_contains "$MCP_NOADB_PATH" "adb was not found on PATH" "mcp-noadb includes adb note"
 
-echo "=== Scenario 16: durable summary points at local artifacts ==="
+echo "=== Scenario 18: durable summary points at local artifacts ==="
 DURABLE_SUMMARY_OUT="$TMP_DIR/durable-summary.out"
 run_durable_summary_case authoring "$DURABLE_SUMMARY_OUT"
 assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawperator/AGENTS.md" "durable-summary"
@@ -707,7 +803,7 @@ assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawper
 assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawperator/mcp-config-snippet.json" "durable-summary"
 assert_contains "$DURABLE_SUMMARY_OUT" "AI agents should start with the local guide" "durable-summary"
 
-echo "=== Scenario 17: shared agent bridge appends once and stays bounded ==="
+echo "=== Scenario 19: shared agent bridge appends once and stays bounded ==="
 BRIDGE_EXISTING_OUT="$TMP_DIR/bridge-existing.out"
 BRIDGE_EXISTING_PATH_FILE="$TMP_DIR/bridge-existing.path"
 BRIDGE_EXISTING_FIRST="$TMP_DIR/bridge-existing.first"
@@ -729,7 +825,7 @@ assert_occurrence_count "$BRIDGE_EXISTING_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_B
 assert_occurrence_count "$BRIDGE_EXISTING_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:END -->" "1" "bridge-existing end marker count"
 assert_equals "$(cat "$BRIDGE_EXISTING_FIRST")" "$(cat "$BRIDGE_EXISTING_PATH")" "bridge-existing idempotent rerun"
 
-echo "=== Scenario 18: shared agent bridge skips missing shared guide ==="
+echo "=== Scenario 20: shared agent bridge skips missing shared guide ==="
 BRIDGE_MISSING_OUT="$TMP_DIR/bridge-missing.out"
 BRIDGE_MISSING_PATH_FILE="$TMP_DIR/bridge-missing.path"
 BRIDGE_MISSING_FIRST="$TMP_DIR/bridge-missing.first"
@@ -746,7 +842,7 @@ if [ -e "$BRIDGE_MISSING_FIRST" ]; then
     exit 1
 fi
 
-echo "=== Scenario 19: shared agent bridge failure is non-fatal ==="
+echo "=== Scenario 21: shared agent bridge failure is non-fatal ==="
 BRIDGE_FAILURE_OUT="$TMP_DIR/bridge-failure.out"
 BRIDGE_FAILURE_PATH_FILE="$TMP_DIR/bridge-failure.path"
 BRIDGE_FAILURE_FIRST="$TMP_DIR/bridge-failure.first"
@@ -760,7 +856,7 @@ assert_not_contains "$BRIDGE_FAILURE_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE
 assert_not_contains "$BRIDGE_FAILURE_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:END -->" "bridge-failure file"
 assert_equals "$(cat "$BRIDGE_FAILURE_FIRST")" "$(cat "$BRIDGE_FAILURE_PATH")" "bridge-failure leaves shared guide unchanged"
 
-echo "=== Scenario 20: shared agent bridge refuses symlink targets ==="
+echo "=== Scenario 22: shared agent bridge refuses symlink targets ==="
 BRIDGE_SYMLINK_OUT="$TMP_DIR/bridge-symlink.out"
 BRIDGE_SYMLINK_PATH_FILE="$TMP_DIR/bridge-symlink.path"
 BRIDGE_SYMLINK_FIRST="$TMP_DIR/bridge-symlink.first"
@@ -775,7 +871,7 @@ fi
 assert_equals "$(cat "$BRIDGE_SYMLINK_FIRST")" "$(cat "$BRIDGE_SYMLINK_PATH")" "bridge-symlink leaves target unchanged"
 assert_not_contains "$BRIDGE_SYMLINK_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:START -->" "bridge-symlink file"
 
-echo "=== Scenario 21: operator metadata parser extracts all expected fields ==="
+echo "=== Scenario 23: operator metadata parser extracts all expected fields ==="
 METADATA_SUCCESS_OUT="$TMP_DIR/metadata-success.out"
 METADATA_SUCCESS_STATUS="$TMP_DIR/metadata-success.status"
 METADATA_SUCCESS_VALUES="$TMP_DIR/metadata-success.values"
@@ -792,7 +888,7 @@ assert_contains "$METADATA_SUCCESS_VALUES" "sha_url=https://example.com/operator
 assert_contains "$METADATA_SUCCESS_VALUES" "sha256=deadbeef" "metadata-success values"
 assert_file_empty "$METADATA_SUCCESS_OUT" "metadata-success output"
 
-echo "=== Scenario 22: operator metadata parser allows missing inline checksum ==="
+echo "=== Scenario 24: operator metadata parser allows missing inline checksum ==="
 METADATA_NO_SHA_OUT="$TMP_DIR/metadata-no-sha.out"
 METADATA_NO_SHA_STATUS="$TMP_DIR/metadata-no-sha.status"
 METADATA_NO_SHA_VALUES="$TMP_DIR/metadata-no-sha.values"
@@ -806,7 +902,7 @@ assert_equals "0" "$(cat "$METADATA_NO_SHA_STATUS")" "metadata-no-sha status"
 assert_contains "$METADATA_NO_SHA_VALUES" "sha256=" "metadata-no-sha values"
 assert_file_empty "$METADATA_NO_SHA_OUT" "metadata-no-sha output"
 
-echo "=== Scenario 23: operator metadata parser rejects missing required fields ==="
+echo "=== Scenario 25: operator metadata parser rejects missing required fields ==="
 METADATA_MISSING_OUT="$TMP_DIR/metadata-missing.out"
 METADATA_MISSING_STATUS="$TMP_DIR/metadata-missing.status"
 METADATA_MISSING_VALUES="$TMP_DIR/metadata-missing.values"
@@ -819,7 +915,7 @@ run_operator_metadata_case \
 assert_equals "1" "$(cat "$METADATA_MISSING_STATUS")" "metadata-missing status"
 assert_contains "$METADATA_MISSING_OUT" "Failed to parse APK metadata" "metadata-missing output"
 
-echo "=== Scenario 24: operator metadata parser rejects malformed JSON ==="
+echo "=== Scenario 26: operator metadata parser rejects malformed JSON ==="
 METADATA_BAD_OUT="$TMP_DIR/metadata-bad.out"
 METADATA_BAD_STATUS="$TMP_DIR/metadata-bad.status"
 METADATA_BAD_VALUES="$TMP_DIR/metadata-bad.values"

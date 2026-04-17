@@ -57,6 +57,24 @@ assert_equals() {
     fi
 }
 
+file_mode() {
+    local file="$1"
+    if stat -f '%Lp' "$file" >/dev/null 2>&1; then
+        stat -f '%Lp' "$file"
+        return 0
+    fi
+    stat -c '%a' "$file"
+}
+
+assert_mode() {
+    local file="$1"
+    local expected_mode="$2"
+    local label="$3"
+    local actual_mode
+    actual_mode="$(file_mode "$file")"
+    assert_equals "$expected_mode" "$actual_mode" "$label"
+}
+
 # shellcheck source=lib/json_assert.sh
 source "$REPO_ROOT/validation/install/lib/json_assert.sh"
 
@@ -389,6 +407,10 @@ assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/AGENT
 assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/install-state.json" "main-success stdout durable install-state"
 assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/mcp-config-snippet.json" "main-success stdout durable mcp"
 assert_contains "$SUCCESS_STDOUT" "AI agents should start with the local guide" "main-success stdout durable guidance"
+assert_mode "$SUCCESS_GUIDE_PATH" "600" "main-success guide mode"
+assert_mode "$SUCCESS_INSTALL_STATE_PATH" "600" "main-success install-state mode"
+assert_mode "$SUCCESS_MCP_CONFIG_PATH" "600" "main-success mcp mode"
+assert_mode "$TMP_DIR/home-main-success/.clawperator" "700" "main-success clawperator dir mode"
 if [ -e "$TMP_DIR/home-main-success/.agents/AGENTS.md" ]; then
     echo "ERROR: main-success should not create $TMP_DIR/home-main-success/.agents/AGENTS.md" >&2
     cat "$TMP_DIR/home-main-success/.agents/AGENTS.md" >&2

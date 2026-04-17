@@ -38,13 +38,17 @@ Success conditions:
 
 ### Durable host-agent artifacts from `install.sh`
 
-If you used `install.sh`, it also writes these durable onboarding files under `~/.clawperator/`:
+If `install.sh` reaches its post-doctor onboarding phase, it also writes these
+durable onboarding files under `~/.clawperator/`:
 
 | Path | Meaning | When to read it |
 | --- | --- | --- |
 | `~/.clawperator/AGENTS.md` | Local Clawperator guide with runtime-skill discovery commands and current authoring-skills status | First stop for a host agent that needs to discover what Clawperator can do on this machine |
 | `~/.clawperator/install-state.json` | Durable install metadata written by the installer | Use when you need the last known install facts without rerunning `doctor` |
 | `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config for Claude Desktop, Codex, and a generic stdio MCP consumer | Use when the host should connect through `clawperator mcp serve` instead of shelling out to the CLI |
+
+Early prerequisite failures and early doctor failures exit before these files
+are written.
 
 `install-state.json` currently has this shape:
 
@@ -63,7 +67,7 @@ Field rules:
 
 - `schemaVersion` and `installedAt` are always present
 - `cliVersion` is `null` when the installer could not run `clawperator --version`
-- `registryPath` is `null` when runtime skills were not installed successfully; when present, the `skills/skills/` double segment is intentional and is assembled from `DEFAULT_SKILLS_DIR` plus `DEFAULT_SKILLS_REGISTRY_SUBPATH` in `apps/node/src/domain/skills/skillsConfig.ts` (the inner `skills/` comes from the registry layout inside the runtime-skills repo)
+- `registryPath` is `null` when the installer cannot resolve any readable runtime-skills registry path from the current install run, `CLAWPERATOR_SKILLS_REGISTRY`, prior install state, or the default installed home path; when present, the `skills/skills/` double segment is intentional and is assembled from `DEFAULT_SKILLS_DIR` plus `DEFAULT_SKILLS_REGISTRY_SUBPATH` in `apps/node/src/domain/skills/skillsConfig.ts` (the inner `skills/` comes from the registry layout inside the runtime-skills repo)
 - `apkVersion` is `null` when the installer does not have a known operator version
 - `lastDeviceSerial` is `null` when install did not pick one unambiguous device
 

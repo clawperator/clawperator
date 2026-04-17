@@ -600,12 +600,9 @@ setup_authoring_skills_via_cli() {
 
 append_runtime_skills_guide() {
     local AGENT_GUIDE_PATH="$1"
-    local RUNTIME_SKILLS_REGISTRY_PATH="$HOME/.clawperator/skills/skills/skills-registry.json"
+    local RUNTIME_SKILLS_REGISTRY_PATH=""
+    local RUNTIME_SKILLS_REGISTRY_HINT_PATH=""
     local RUNTIME_GUIDE_TMP=""
-
-    if [ "${SKILLS_SETUP_STATUS:-}" = "configured" ] && [ -n "${SKILLS_REGISTRY_PATH:-}" ]; then
-        RUNTIME_SKILLS_REGISTRY_PATH="$SKILLS_REGISTRY_PATH"
-    fi
 
     cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
@@ -618,12 +615,15 @@ Use the installed runtime-skill registry to discover and run app workflows:
 - `clawperator skills run <id>`
 EOF
 
+    RUNTIME_SKILLS_REGISTRY_PATH="$(resolve_runtime_skills_registry_path)"
+    RUNTIME_SKILLS_REGISTRY_HINT_PATH="$(resolve_runtime_skills_registry_hint_path)"
+
     if [ ! -r "$RUNTIME_SKILLS_REGISTRY_PATH" ]; then
         cat >> "$AGENT_GUIDE_PATH" <<EOF
 
 Runtime skills not available on this host right now.
 Expected registry path:
-\`${RUNTIME_SKILLS_REGISTRY_PATH}\`
+\`${RUNTIME_SKILLS_REGISTRY_HINT_PATH}\`
 
 Repair or manual bootstrap:
 - run \`clawperator skills install\`
@@ -755,6 +755,89 @@ Repair or manual bootstrap:
 EOF
 }
 
+trim_shell_value() {
+    printf '%s' "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+resolve_previous_install_state_registry_path() {
+    local INSTALL_STATE_PATH="$HOME/.clawperator/install-state.json"
+
+    if [ ! -r "$INSTALL_STATE_PATH" ]; then
+        printf '%s\n' ""
+        return 0
+    fi
+
+    node - "$INSTALL_STATE_PATH" <<'EOF' 2>/dev/null || true
+const fs = require("fs");
+
+const [installStatePath] = process.argv.slice(2);
+const installState = JSON.parse(fs.readFileSync(installStatePath, "utf8"));
+if (installState && typeof installState.registryPath === "string" && installState.registryPath.length > 0) {
+  console.log(installState.registryPath);
+}
+EOF
+}
+
+resolve_configured_runtime_skills_registry_path() {
+    local CONFIGURED_PATH="${CLAWPERATOR_SKILLS_REGISTRY:-}"
+    local TRIMMED_PATH=""
+
+    if [ -z "${CLAWPERATOR_SKILLS_REGISTRY+x}" ]; then
+        printf '%s\n' ""
+        return 0
+    fi
+
+    TRIMMED_PATH="$(trim_shell_value "$CONFIGURED_PATH")"
+    printf '%s\n' "$TRIMMED_PATH"
+}
+
+resolve_runtime_skills_registry_hint_path() {
+    local DEFAULT_RUNTIME_SKILLS_REGISTRY_PATH="$HOME/.clawperator/skills/skills/skills-registry.json"
+    local CANDIDATE=""
+
+    for CANDIDATE in \
+        "${SKILLS_REGISTRY_PATH:-}" \
+        "$(resolve_configured_runtime_skills_registry_path)" \
+        "$(resolve_previous_install_state_registry_path)" \
+        "$DEFAULT_RUNTIME_SKILLS_REGISTRY_PATH"; do
+        if [ -n "$CANDIDATE" ]; then
+            printf '%s\n' "$CANDIDATE"
+            return 0
+        fi
+    done
+
+    printf '%s\n' "$DEFAULT_RUNTIME_SKILLS_REGISTRY_PATH"
+}
+
+resolve_runtime_skills_registry_path() {
+    local CANDIDATE=""
+
+    for CANDIDATE in \
+        "${SKILLS_REGISTRY_PATH:-}" \
+        "$(resolve_configured_runtime_skills_registry_path)" \
+        "$(resolve_previous_install_state_registry_path)" \
+        "$HOME/.clawperator/skills/skills/skills-registry.json"; do
+        if [ -n "$CANDIDATE" ] && [ -r "$CANDIDATE" ]; then
+            printf '%s\n' "$CANDIDATE"
+            return 0
+        fi
+    done
+
+    printf '%s\n' ""
+}
+
+ensure_private_clawperator_dir() {
+    mkdir -p "$HOME/.clawperator"
+    chmod 700 "$HOME/.clawperator" 2>/dev/null || true
+}
+
+secure_host_artifact_path() {
+    local ARTIFACT_PATH="$1"
+    if [ -f "$ARTIFACT_PATH" ]; then
+        chmod 600 "$ARTIFACT_PATH" 2>/dev/null || true
+    fi
+}
+
 resolve_cli_version() {
     local CLI_VERSION_OUTPUT=""
 
@@ -776,14 +859,11 @@ write_install_state() {
     local APK_VERSION_VALUE="${OPERATOR_VERSION:-}"
     local LAST_DEVICE_SERIAL_VALUE="${LAST_DEVICE_SERIAL:-}"
 
-    mkdir -p "$HOME/.clawperator"
+    ensure_private_clawperator_dir
 
     INSTALLED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     CLI_VERSION="$(resolve_cli_version)"
-
-    if [ "${SKILLS_SETUP_STATUS:-}" = "configured" ] && [ -n "${SKILLS_REGISTRY_PATH:-}" ]; then
-        REGISTRY_PATH_VALUE="$SKILLS_REGISTRY_PATH"
-    fi
+    REGISTRY_PATH_VALUE="$(resolve_runtime_skills_registry_path)"
 
     INSTALL_STATE_INSTALLED_AT="$INSTALLED_AT" \
     INSTALL_STATE_CLI_VERSION="$CLI_VERSION" \
@@ -819,6 +899,8 @@ const installState = {
 
 fs.writeFileSync(installStatePath, JSON.stringify(installState, null, 2) + "\n");
 EOF
+
+    secure_host_artifact_path "$INSTALL_STATE_PATH"
 
     echo -e "${GREEN}✅ Wrote install state to ${INSTALL_STATE_PATH}.${NC}"
 }
@@ -873,7 +955,7 @@ write_mcp_config_snippet() {
     local CLAUDE_CONFIG_PATH_MAC="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
     local CLAUDE_CONFIG_PATH_LINUX="$HOME/.config/Claude/claude_desktop_config.json"
 
-    mkdir -p "$HOME/.clawperator"
+    ensure_private_clawperator_dir
 
     CLI_JS_PATH="$(resolve_cli_entrypoint_js)"
     ADB_PATH_VALUE="$(resolve_adb_path_for_mcp)"
@@ -967,6 +1049,8 @@ const snippet = {
 fs.writeFileSync(snippetPath, JSON.stringify(snippet, null, 2) + "\n");
 EOF
 
+    secure_host_artifact_path "$MCP_CONFIG_SNIPPET_PATH"
+
     echo -e "${GREEN}✅ Wrote MCP config snippet to ${MCP_CONFIG_SNIPPET_PATH}.${NC}"
 }
 
@@ -976,7 +1060,7 @@ write_agent_guide() {
     local SKILL_DIR=""
     local HAS_SKILLS=0
 
-    mkdir -p "$HOME/.clawperator"
+    ensure_private_clawperator_dir
 
     cat > "$AGENT_GUIDE_PATH" <<'EOF'
 # Clawperator
@@ -1043,6 +1127,8 @@ Repair or manual bootstrap:
 - run `clawperator authoring-skills install`
 EOF
     fi
+
+    secure_host_artifact_path "$AGENT_GUIDE_PATH"
 
     echo -e "${GREEN}✅ Wrote agent guide to ${AGENT_GUIDE_PATH}.${NC}"
 }
