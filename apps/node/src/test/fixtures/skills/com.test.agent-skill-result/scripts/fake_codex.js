@@ -151,12 +151,6 @@ switch (mode) {
         process.stdout.write('{"stage":"waiting-for-timeout"}\n');
       }, 20);
       heartbeat.unref?.();
-      process.on("SIGTERM", () => {
-        clearInterval(heartbeat);
-      });
-      process.on("SIGINT", () => {
-        clearInterval(heartbeat);
-      });
     }
     setTimeout(() => {
       console.log(prefix);
