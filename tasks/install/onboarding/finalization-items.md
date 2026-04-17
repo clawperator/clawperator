@@ -43,3 +43,28 @@ These items are intentionally deferred from the install/onboarding cleanup pack.
 - **Needed later:** likely a small docs task pack under `tasks/docs/`
 - **Dependencies:** onboarding cleanup PR-2 shipped, so the docs pass can
   describe stable behavior instead of speculative behavior
+
+### D2: CLI self-orientation and discoverability pass
+
+- **Deferred item:** review whether the CLI itself should do more to orient a
+  zero-context agent or user toward the right next step after install.
+- **Why deferred:** the current onboarding pack should first ship the runtime
+  discovery behavior and durable artifacts. After that lands, we can make the
+  CLI help and error surfaces point at the right stable docs and discovery
+  commands instead of guessing ahead of the final shape.
+- **Recommended scope later:**
+  - review top-level `clawperator --help` for whether it should point to one
+    canonical "start here" or "use from an agent host" doc
+  - review `clawperator skills --help` for whether it should explicitly mention
+    the public runtime skills registry / skills repo and the fastest discovery
+    commands
+  - tighten registry-read and skill-discovery errors so they reference the
+    long-lived installed registry path and the relevant docs, not only env-var
+    remediation
+  - evaluate whether `skills for-app` should be surfaced prominently in help as
+    the shortest path for questions like "what can this host do for Google Home?"
+  - prefer linking primary help text to canonical docs, with the public skills
+    repo as a secondary deep-link rather than the main orientation surface
+- **Needed later:** likely a small Node / CLI task pack under `tasks/node/`
+- **Dependencies:** onboarding cleanup PR-1 and PR-2 shipped, so help text can
+  reflect the final discovery commands and installed artifact paths
