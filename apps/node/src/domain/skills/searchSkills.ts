@@ -77,11 +77,11 @@ export async function searchSkills(
       skills = skills.filter(({ skill }) => skill.intent === query.intent);
     }
     if (query.keyword) {
-      const normalizedKeyword = query.keyword;
+      const keywordQuery = query.keyword;
       skills = skills.map(({ skill, index }) => ({
         skill,
         index,
-        rank: computeKeywordMatchRank(skill, normalizedKeyword),
+        rank: computeKeywordMatchRank(skill, keywordQuery),
       }));
       skills = skills.filter(
         ({ rank }) => rank >= 0
