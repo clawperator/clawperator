@@ -318,6 +318,42 @@ describe("Doctor: hostChecks", () => {
             }
         });
 
+        it("passes when no local skills registry is installed and CLAWPERATOR_SKILLS_REGISTRY is blank", async () => {
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const originalRegistry = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+            const originalHome = process.env.HOME;
+            const originalCwd = process.cwd();
+            const root = await mkdtemp(join(tmpdir(), "clawperator-doctor-skills-blank-"));
+            const tempHome = join(root, "home");
+            const appNodeDir = join(root, "apps", "node");
+
+            try {
+                await mkdir(tempHome, { recursive: true });
+                await mkdir(appNodeDir, { recursive: true });
+                process.env.CLAWPERATOR_SKILLS_REGISTRY = "   ";
+                process.env.HOME = tempHome;
+                process.chdir(appNodeDir);
+
+                const result = await checkInstalledOrchestratedSkillAgentCliAvailability(config);
+                assert.strictEqual(result.status, "pass");
+                assert.match(result.summary, /Skipping skill-aware orchestrated agent CLI check/i);
+                assert.match(result.detail ?? "", /Registry not found\. Checked:/);
+            } finally {
+                process.chdir(originalCwd);
+                if (originalRegistry === undefined) {
+                    delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+                } else {
+                    process.env.CLAWPERATOR_SKILLS_REGISTRY = originalRegistry;
+                }
+                if (originalHome === undefined) {
+                    delete process.env.HOME;
+                } else {
+                    process.env.HOME = originalHome;
+                }
+                await rm(root, { recursive: true, force: true });
+            }
+        });
+
         it("passes when the local registry has no orchestrated skills", async () => {
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
             const originalRegistry = process.env.CLAWPERATOR_SKILLS_REGISTRY;

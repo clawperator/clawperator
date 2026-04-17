@@ -14,7 +14,7 @@ import {
   resolveSkillBinCommand,
   resolveOperatorPackage,
 } from "../../domain/skills/skillsConfig.js";
-import { getRepoRoot } from "../../adapters/skills-repo/localSkillsRegistry.js";
+import { getRepoRoot, getRegistryPath } from "../../adapters/skills-repo/localSkillsRegistry.js";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 import { listSkills } from "../../domain/skills/listSkills.js";
@@ -420,6 +420,21 @@ describe("listSkills", () => {
 });
 
 describe("loadRegistry", () => {
+  it("treats a blank CLAWPERATOR_SKILLS_REGISTRY as unset for getRegistryPath", () => {
+    const originalRegistry = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+    try {
+      process.env.CLAWPERATOR_SKILLS_REGISTRY = "   ";
+      assert.notStrictEqual(getRegistryPath(), "");
+      assert.match(getRegistryPath(), /skills\/skills-registry\.json$/);
+    } finally {
+      if (originalRegistry === undefined) {
+        delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+      } else {
+        process.env.CLAWPERATOR_SKILLS_REGISTRY = originalRegistry;
+      }
+    }
+  });
+
   it("warns to stderr when CLAWPERATOR_SKILLS_REGISTRY is unset and the default path is missing", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-unset-"));
     const tempHome = await mkdtemp(join(tmpdir(), "clawperator-home-unset-"));
@@ -499,6 +514,53 @@ describe("loadRegistry", () => {
         `Expected stderr to include the missing path, got: ${child.stderr}`
       );
     } finally {
+      await rm(tempHome, { recursive: true, force: true });
+    }
+  });
+
+  it("treats a blank CLAWPERATOR_SKILLS_REGISTRY as unset and still falls back", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-blank-env-"));
+    const tempHome = await mkdtemp(join(tmpdir(), "clawperator-home-blank-env-"));
+    const appNodeDir = join(tempRoot, "apps", "node");
+    const installedHomeRegistryPath = join(
+      tempHome,
+      ".clawperator",
+      "skills",
+      "skills",
+      "skills-registry.json"
+    );
+
+    await mkdir(appNodeDir, { recursive: true });
+    await mkdir(dirname(installedHomeRegistryPath), { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, installedHomeRegistryPath);
+
+    try {
+      const moduleUrl = pathToFileURL(
+        join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js")
+      ).href;
+      const script = `
+        import { loadRegistry } from ${JSON.stringify(moduleUrl)};
+        process.chdir(${JSON.stringify(appNodeDir)});
+        process.env.CLAWPERATOR_SKILLS_REGISTRY = "   ";
+        const result = await loadRegistry();
+        console.log(JSON.stringify({
+          resolvedPath: result.resolvedPath,
+          skillCount: result.registry.skills.length,
+        }));
+      `;
+      const child = await runNodeSnippet(script, {
+        env: { ...process.env, HOME: tempHome },
+      });
+      assert.strictEqual(child.code, 0, child.stderr);
+      const parsed = JSON.parse(child.stdout) as { resolvedPath: string; skillCount: number };
+      assert.strictEqual(
+        normalizeMacTmpPath(parsed.resolvedPath),
+        normalizeMacTmpPath(installedHomeRegistryPath)
+      );
+      assert.ok(parsed.skillCount > 0);
+      assert.strictEqual(child.stderr, "");
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
       await rm(tempHome, { recursive: true, force: true });
     }
   });

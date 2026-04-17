@@ -20,8 +20,13 @@ function getRepoRelativeFallbackPath(): string {
   return join(process.cwd(), "..", "..", "skills", "skills-registry.json");
 }
 
+function getConfiguredRegistryPathFromEnv(): string | undefined {
+  const configuredPath = process.env.CLAWPERATOR_SKILLS_REGISTRY?.trim();
+  return configuredPath && configuredPath.length > 0 ? configuredPath : undefined;
+}
+
 export function getRegistryPath(): string {
-  return process.env.CLAWPERATOR_SKILLS_REGISTRY ?? getDefaultRegistryPath();
+  return getConfiguredRegistryPathFromEnv() ?? getDefaultRegistryPath();
 }
 
 /**
@@ -37,7 +42,7 @@ export interface LoadRegistryResult {
 }
 
 export async function loadRegistry(registryPath?: string): Promise<LoadRegistryResult> {
-  const configuredPath = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+  const configuredPath = getConfiguredRegistryPathFromEnv();
   const defaultPath = getDefaultRegistryPath();
   let path = registryPath ?? configuredPath ?? defaultPath;
   let raw: string | undefined;

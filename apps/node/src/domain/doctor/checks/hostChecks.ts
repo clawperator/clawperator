@@ -91,6 +91,11 @@ function isUnsetRegistryConfigurationError(detail: string): boolean {
   );
 }
 
+function isRegistryConfigurationUnset(): boolean {
+  const configuredPath = process.env.CLAWPERATOR_SKILLS_REGISTRY?.trim();
+  return configuredPath === undefined || configuredPath.length === 0;
+}
+
 async function findMissingInstalledAuthoringSkills(
   installedDir: string,
   expectedSkills: string[]
@@ -336,7 +341,7 @@ export async function checkInstalledOrchestratedSkillAgentCliAvailability(_confi
     registryResult = await loadRegistry();
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    const registryNotConfigured = process.env.CLAWPERATOR_SKILLS_REGISTRY === undefined
+    const registryNotConfigured = isRegistryConfigurationUnset()
       && isUnsetRegistryConfigurationError(detail);
     if (registryNotConfigured) {
       return {
