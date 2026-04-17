@@ -63,13 +63,24 @@ export interface LoadRegistryResult {
   resolvedPath: string;
 }
 
-export async function loadRegistry(registryPath?: string): Promise<LoadRegistryResult> {
-  if (registryPath !== undefined && registryPath.trim().length === 0) {
+function normalizeExplicitRegistryPath(registryPath: string | undefined): string | undefined {
+  if (registryPath === undefined) {
+    return undefined;
+  }
+
+  const trimmedPath = registryPath.trim();
+  if (trimmedPath.length === 0) {
     throw new Error("Registry path is blank. Pass a valid skills-registry.json path.");
   }
 
+  return trimmedPath;
+}
+
+export async function loadRegistry(registryPath?: string): Promise<LoadRegistryResult> {
+  const explicitRegistryPath = normalizeExplicitRegistryPath(registryPath);
+
   let configuredPath: string | undefined;
-  if (registryPath === undefined) {
+  if (explicitRegistryPath === undefined) {
     try {
       configuredPath = getConfiguredRegistryPathFromEnv();
     } catch (error) {
@@ -82,12 +93,12 @@ export async function loadRegistry(registryPath?: string): Promise<LoadRegistryR
   }
 
   const defaultPath = getDefaultRegistryPath();
-  let path = registryPath ?? configuredPath ?? defaultPath;
+  let path = explicitRegistryPath ?? configuredPath ?? defaultPath;
   let raw: string | undefined;
   try {
     raw = await readFile(path, "utf-8");
   } catch (error) {
-    if (registryPath) {
+    if (explicitRegistryPath) {
       if (!isMissingRegistryFileError(error)) {
         throw error;
       }
@@ -97,7 +108,7 @@ export async function loadRegistry(registryPath?: string): Promise<LoadRegistryR
       );
     }
 
-    if (!registryPath && configuredPath) {
+    if (!explicitRegistryPath && configuredPath) {
       if (!isMissingRegistryFileError(error)) {
         throw error;
       }
@@ -137,7 +148,7 @@ export async function loadRegistry(registryPath?: string): Promise<LoadRegistryR
     }
 
     if (raw === undefined) {
-      if (!registryPath && !configuredPath) {
+      if (!explicitRegistryPath && !configuredPath) {
         process.stderr.write(
           "Warning: CLAWPERATOR_SKILLS_REGISTRY is not set. " +
           "Run 'clawperator skills install' to configure the registry path.\n"

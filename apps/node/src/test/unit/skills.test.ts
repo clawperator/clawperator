@@ -601,6 +601,41 @@ describe("loadRegistry", () => {
     }
   });
 
+  it("trims explicit registry paths before reading them", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-explicit-trim-"));
+    const explicitRegistryPath = join(tempRoot, "skills", "skills-registry.json");
+
+    await mkdir(dirname(explicitRegistryPath), { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, explicitRegistryPath);
+
+    try {
+      const moduleUrl = pathToFileURL(
+        join(packageRoot, "dist", "adapters", "skills-repo", "localSkillsRegistry.js")
+      ).href;
+      const script = `
+        import { loadRegistry } from ${JSON.stringify(moduleUrl)};
+        const result = await loadRegistry(${JSON.stringify(`  ${explicitRegistryPath}  `)});
+        console.log(JSON.stringify({
+          resolvedPath: result.resolvedPath,
+          skillCount: result.registry.skills.length,
+        }));
+      `;
+      const child = await runNodeSnippet(script, {
+        env: { ...process.env },
+      });
+      assert.strictEqual(child.code, 0, child.stderr);
+      const parsed = JSON.parse(child.stdout) as { resolvedPath: string; skillCount: number };
+      assert.strictEqual(
+        normalizeMacTmpPath(parsed.resolvedPath),
+        normalizeMacTmpPath(explicitRegistryPath)
+      );
+      assert.ok(parsed.skillCount > 0);
+      assert.strictEqual(child.stderr, "");
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it("fails when the caller passes an explicit default registry path that does not exist", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-"));
     const appNodeDir = join(tempRoot, "apps", "node");
@@ -2505,6 +2540,18 @@ describe("searchSkills", () => {
 
     try {
       const result = await searchSkills({ keyword: "google home" }, temp.registryPath);
+      assert.ok(result.ok);
+      assert.deepStrictEqual(result.skills.map((skill) => skill.id), getGoogleHomeHvacSkillIds());
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("returns the four Google Home HVAC skills for a tokenized google-home query", async () => {
+    const temp = await createTempRegistryWithEntries(makeGoogleHomeHvacEntries());
+
+    try {
+      const result = await searchSkills({ keyword: "google-home" }, temp.registryPath);
       assert.ok(result.ok);
       assert.deepStrictEqual(result.skills.map((skill) => skill.id), getGoogleHomeHvacSkillIds());
     } finally {

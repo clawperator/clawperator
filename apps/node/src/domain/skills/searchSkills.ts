@@ -20,11 +20,17 @@ function tokenize(value: string): string[] {
     .filter((token) => token.length > 0);
 }
 
+function includesAllQueryTokens(fieldValue: string, queryTokens: string[]): boolean {
+  const fieldTokens = tokenize(fieldValue);
+  return queryTokens.every((token) => fieldTokens.includes(token));
+}
+
 function computeKeywordMatchRank(skill: SkillEntry, keyword: string): number {
   const normalizedKeyword = keyword.trim().toLowerCase();
   if (normalizedKeyword.length === 0) {
     return -1;
   }
+  const queryTokens = tokenize(normalizedKeyword);
 
   const keywords = Array.isArray(skill.keywords)
     ? skill.keywords
@@ -39,7 +45,7 @@ function computeKeywordMatchRank(skill: SkillEntry, keyword: string): number {
     return 600;
   }
 
-  if (keywords.some((entry) => tokenize(entry).includes(normalizedKeyword))) {
+  if (queryTokens.length > 0 && keywords.some((entry) => includesAllQueryTokens(entry, queryTokens))) {
     return 550;
   }
 
@@ -47,7 +53,10 @@ function computeKeywordMatchRank(skill: SkillEntry, keyword: string): number {
     return 500;
   }
 
-  if (tokenize(skill.id).includes(normalizedKeyword) || tokenize(skill.applicationId).includes(normalizedKeyword)) {
+  if (
+    queryTokens.length > 0
+    && (includesAllQueryTokens(skill.id, queryTokens) || includesAllQueryTokens(skill.applicationId, queryTokens))
+  ) {
     return 450;
   }
 
