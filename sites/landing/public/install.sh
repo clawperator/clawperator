@@ -603,6 +603,10 @@ append_runtime_skills_guide() {
     local RUNTIME_SKILLS_REGISTRY_PATH="$HOME/.clawperator/skills/skills/skills-registry.json"
     local RUNTIME_GUIDE_TMP=""
 
+    if [ "${SKILLS_SETUP_STATUS:-}" = "configured" ] && [ -n "${SKILLS_REGISTRY_PATH:-}" ]; then
+        RUNTIME_SKILLS_REGISTRY_PATH="$SKILLS_REGISTRY_PATH"
+    fi
+
     cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
 ## Runtime Skills
