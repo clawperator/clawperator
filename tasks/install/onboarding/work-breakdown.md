@@ -62,6 +62,13 @@ contract work.
   `main()` runs.
 - Phase 3 installer work must be done in small local patches. Avoid large
   rewrite-style edits to `install.sh`.
+- For Phase 3, "validate after each slice" is not satisfied by `bash -n`
+  alone. After each slice, rerun:
+  - `bash -n sites/landing/public/install.sh`
+  - `bash validation/install/test_authoring_skills.sh`
+  - `bash validation/install/test_main.sh`
+  Then run `./validation/install/test_install.sh` when a slice changes
+  end-to-end installer outputs or when declaring the phase complete.
 - One commit per logical step. Do not batch unrelated changes.
 
 ## Required Reading
@@ -295,7 +302,13 @@ present, and persist the key install outputs for future agent turns.
    - Slice B: `install-state.json`
    - Slice C: `mcp-config-snippet.json`
    - Slice D: final summary text
-   Run the validation stack after each slice before moving on.
+   After each slice, run at minimum:
+   - `bash -n sites/landing/public/install.sh`
+   - `bash validation/install/test_authoring_skills.sh`
+   - `bash validation/install/test_main.sh`
+   Run `./validation/install/test_install.sh` once the slice changes
+   top-level installer artifacts or summary behavior, and again before
+   declaring Phase 3 complete.
 3. Expand the `~/.clawperator/AGENTS.md` template in
    `sites/landing/public/install.sh` `write_agent_guide()` so it includes
    runtime skills, grouped by `applicationId`, with `intent`, `summary`, and a

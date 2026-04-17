@@ -237,6 +237,13 @@ After PR-2:
   - `main()`-driven harnesses such as `validation/install/test_main.sh`
 - For Phase 3 installer work, prefer tiny additive edits and rerun validation
   after each slice rather than attempting one large `install.sh` rewrite.
+- For Phase 3 installer slices, "rerun validation" means at minimum:
+  - `bash -n sites/landing/public/install.sh`
+  - `bash validation/install/test_authoring_skills.sh`
+  - `bash validation/install/test_main.sh`
+  Reserve `./validation/install/test_install.sh` as the top-level proof once a
+  slice is ready to be declared complete or when a slice changes the installer
+  end-to-end flow directly.
 
 ## Durable Follow-Up
 
