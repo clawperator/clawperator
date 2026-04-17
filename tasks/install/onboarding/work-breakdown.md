@@ -56,6 +56,12 @@ contract work.
   installer behavior change must also be proven through
   `validation/install/test_install.sh` or a clearly justified existing harness
   under `validation/install/`.
+- Do not split `sites/landing/public/install.sh` into sibling helper files as
+  part of Phase 3. The public installer must keep working as a single-file
+  stdin script, and the current harnesses also source functions directly before
+  `main()` runs.
+- Phase 3 installer work must be done in small local patches. Avoid large
+  rewrite-style edits to `install.sh`.
 - One commit per logical step. Do not batch unrelated changes.
 
 ## Required Reading
@@ -73,6 +79,9 @@ Read these files IN THIS ORDER before writing anything.
 | `apps/node/src/cli/registry.ts` | `skills` namespace registration and help blocks |
 | `apps/node/src/test/unit/skills.test.ts` | Unit test patterns and existing skills coverage |
 | `sites/landing/public/install.sh` | Installer sequencing, AGENTS template, final summary |
+| `validation/install/test_authoring_skills.sh` | Sourced-function harness shape for installer helpers |
+| `validation/install/test_main.sh` | `main()`-driven harness shape and rerun behavior |
+| `validation/install/test_install.sh` | Top-level installer validation suite |
 | `docs/internal/design/agent-host-integration.md` | Host-agent bridge order and design constraints |
 | `docs/internal/openclaw-reference.md` | OpenClaw context for future-facing guidance |
 | `.agents/skills/docs-author/SKILL.md` | Required workflow for Phase 4 docs work |
@@ -90,7 +99,7 @@ Read these files IN THIS ORDER before writing anything.
 | --- | --- | --- | --- |
 | 1 | `apps/node/src/test/unit/skills.test.ts` | installed-home registry fallback, env precedence, unchanged failure semantics, warning suppression | manual `skills list` spot-checks |
 | 2 | `apps/node/src/test/unit/skills.test.ts` plus paired `../clawperator-skills` change | `skills for-app`, deterministic ranking, exact findings-driven query regressions, shipped keyword data exists in the real skills repo | only editing local fixtures, only checking one query by hand |
-| 3 | `validation/install/test_install.sh` | durable artifact creation, runtime-skills rendering in `~/.clawperator/AGENTS.md`, JSON parseability, rerun idempotency | `bash -n`, stdout inspection, one-off local install run |
+| 3 | `validation/install/test_authoring_skills.sh`, `validation/install/test_main.sh`, then `validation/install/test_install.sh` | durable artifact creation, runtime-skills rendering in `~/.clawperator/AGENTS.md`, JSON parseability, rerun idempotency, and compatibility with both sourced-function and `main()` installer entrypoints | `bash -n`, stdout inspection, one-off local install run |
 | 4 | `validation/install/test_install.sh` plus `./scripts/docs_build.sh` | bounded `~/.agents/AGENTS.md` append behavior, docs accuracy, generated docs regeneration | docs edits without build, installer edits without harness coverage |
 
 OpenClaw itself is not the test harness for this pack. We are testing the
@@ -275,7 +284,19 @@ present, and persist the key install outputs for future agent turns.
 
 ### Steps
 
-1. Expand the `~/.clawperator/AGENTS.md` template in
+1. Keep all new Phase 3 logic in `sites/landing/public/install.sh` itself.
+   Do not create sibling helper files or lazy-fetch helpers for this phase.
+   The current installer contract must continue to work for both:
+   - stdin execution via `curl ... | bash`
+   - harnesses that source installer functions directly before `main()` runs
+2. Implement Phase 3 in narrow slices, validating after each slice instead of
+   landing one large edit:
+   - Slice A: runtime-skills rendering in `write_agent_guide()`
+   - Slice B: `install-state.json`
+   - Slice C: `mcp-config-snippet.json`
+   - Slice D: final summary text
+   Run the validation stack after each slice before moving on.
+3. Expand the `~/.clawperator/AGENTS.md` template in
    `sites/landing/public/install.sh` `write_agent_guide()` so it includes
    runtime skills, grouped by `applicationId`, with `intent`, `summary`, and a
    concrete `clawperator skills run <id>` invocation example. Source the data
@@ -284,7 +305,11 @@ present, and persist the key install outputs for future agent turns.
    absent or unreadable, fall back to today's authoring-skills-only content
    and leave a clear "runtime skills not available" note - do not fail the
    install.
-2. Add a durable `~/.clawperator/install-state.json` artifact with at minimum:
+4. For runtime-skill rendering, prefer a small embedded `node` block that reads
+   the installed registry JSON and prints grouped sections. Do not hand-roll
+   complex JSON parsing in shell if a tiny embedded Node helper keeps the edit
+   more local and deterministic.
+5. Add a durable `~/.clawperator/install-state.json` artifact with at minimum:
    `schemaVersion`, `installedAt`, `cliVersion`, `apkVersion`, `registryPath`,
    `lastDeviceSerial`. Rewrite-safe. Field rules:
    - `schemaVersion`, `installedAt`, `cliVersion`: always required
@@ -292,20 +317,32 @@ present, and persist the key install outputs for future agent turns.
      otherwise `null`
    - `apkVersion`: the known installer version when available, otherwise `null`
    - `lastDeviceSerial`: nullable when the install did not select one
-3. Add `~/.clawperator/mcp-config-snippet.json` with paste-ready entries for
+6. Add `~/.clawperator/mcp-config-snippet.json` with paste-ready entries for
    Claude Desktop, Codex, and a generic stdio MCP consumer. Do not attempt
    automatic registration.
-4. Update the final installer summary to reference the durable artifact paths
+7. Update the final installer summary to reference the durable artifact paths
    rather than leaving critical orientation only in stdout.
-5. Keep these changes additive. Do not rewrite unrelated install behavior.
-6. Extend `validation/install/test_install.sh` (the existing harness) to
+8. Keep these changes additive. Do not rewrite unrelated install behavior.
+9. Before broadening behavior, tighten the harnesses so they encode the Phase 3
+   nullability contract directly:
+   - `apkVersion` may be `null`
+   - `registryPath` may be `null`
+   - `lastDeviceSerial` may be `null`
+10. Extend `validation/install/test_install.sh` (the existing harness) to
    assert: `~/.clawperator/AGENTS.md` lists at least one runtime skill when
    the registry is present; `install-state.json` exists and parses as JSON;
    `mcp-config-snippet.json` exists and contains the Claude Desktop entry;
    re-running the installer does not duplicate any of these artifacts or any
    appended sections.
-7. Keep the harness additions phase-local. Do not defer installer-artifact
+11. Keep the harness additions phase-local. Do not defer installer-artifact
    assertions to Phase 4 just because both phases land in PR-2.
+12. Treat `validation/install/test_authoring_skills.sh` and
+    `validation/install/test_main.sh` as separate consumers with different
+    failure modes:
+    - `test_authoring_skills.sh` exercises sourced helper functions such as
+      `write_agent_guide()` directly
+    - `test_main.sh` exercises `main()` and rerun behavior
+    Phase 3 is not complete until both still pass.
 
 ### Acceptance Criteria
 
@@ -319,6 +356,8 @@ present, and persist the key install outputs for future agent turns.
 
 ```bash
 bash -n sites/landing/public/install.sh
+bash validation/install/test_authoring_skills.sh
+bash validation/install/test_main.sh
 ./validation/install/test_install.sh
 ```
 

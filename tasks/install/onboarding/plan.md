@@ -164,6 +164,14 @@ onboarding problem and should land as one small multi-phase project.
   stop and split it into follow-up instead of expanding this pack.
 - **Tests deferred to a later phase.** Phase 1 and Phase 2 each ship their own
   unit coverage.
+- **Phase 3 accidentally turns into an installer architecture refactor.**
+  `sites/landing/public/install.sh` must continue to work both when piped via
+  `curl ... | bash` and when sourced directly by the install harnesses. Do not
+  split Phase 3 logic into sibling helper files unless a separate task
+  explicitly changes the installer packaging model.
+- **Phase 3 validates only one installer execution mode.** The installer is
+  consumed both by `main()`-driven flows and by harnesses that source functions
+  such as `write_agent_guide()` directly before `main()` runs.
 
 ## Output Contract
 
@@ -224,6 +232,11 @@ After PR-2:
   idempotency.
 - The install harness is the authoritative place to test `install.sh`. Do not
   rely only on ad hoc shell runs or `bash -n` for installer behavior changes.
+- For PR-2 specifically, test both installer consumption shapes:
+  - sourced-function harnesses such as `validation/install/test_authoring_skills.sh`
+  - `main()`-driven harnesses such as `validation/install/test_main.sh`
+- For Phase 3 installer work, prefer tiny additive edits and rerun validation
+  after each slice rather than attempting one large `install.sh` rewrite.
 
 ## Durable Follow-Up
 
