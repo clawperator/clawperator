@@ -223,4 +223,3 @@ Update this file when changing any of the following:
 - `docs/internal/design/mcp-server.md`
 - `docs/internal/design/operator-llm-playbook.md`
 - `docs/internal/design/node-api-design-guiding-principles.md`
-- `tasks/install/onboarding/findings.md`

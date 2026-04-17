@@ -40,9 +40,9 @@ an invitation to reopen onboarding scope.
   file, GitHub source file, or local install artifact.
 - If the plan and current code disagree, trust the code and update the task plan
   decision rather than implementing the stale assumption.
-- Do not read `tasks/install/onboarding/` as execution context. That pack is
-  retired after PR #196 merges; all baseline context this pack needs is
-  already captured in `tasks/agent-host-orientation/plan.md`.
+- Do not read retired onboarding task files as execution context. All baseline
+  context this pack needs is already captured in
+  `tasks/agent-host-orientation/plan.md`.
 - One commit per logical step. Do not batch docs IA, help text, and error-text
   work into one catch-all commit.
 
