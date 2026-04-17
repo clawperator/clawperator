@@ -203,6 +203,28 @@ After PR-2:
 - `install-state.json` and `mcp-config-snippet.json` are rewrite-safe
 - Search and registry behavior must be stable across repeated CLI invocations
 
+## Testing Strategy
+
+- Treat testing as part of the pack contract, not phase-local cleanup. Every
+  phase must prove the behavior it introduces before the next phase starts.
+- Prefer the smallest realistic proof for each surface:
+  - Node discovery behavior: unit tests in `apps/node/src/test/unit/skills.test.ts`
+  - installer artifact and idempotency behavior: `validation/install/test_install.sh`
+  - docs behavior: authored-doc updates plus `./scripts/docs_build.sh`
+- Do not require live OpenClaw execution as a gate for this pack. The correct
+  proxy is to prove the on-disk agent-facing artifacts, CLI discovery paths,
+  and install rerun behavior that an OpenClaw-style host would consume.
+- When behavior spans code plus seeded skills metadata, the test plan must
+  cover both:
+  - repo-local unit tests for the Node ranking and command behavior
+  - paired `../clawperator-skills` change for the shipped registry/schema data
+- PR-1 must leave behind deterministic regression coverage for the exact
+  user-language queries in `findings.md`. PR-2 must leave behind deterministic
+  installer-harness coverage for artifact creation, pointer text, and rerun
+  idempotency.
+- The install harness is the authoritative place to test `install.sh`. Do not
+  rely only on ad hoc shell runs or `bash -n` for installer behavior changes.
+
 ## Durable Follow-Up
 
 | Knowledge | Permanent home |

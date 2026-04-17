@@ -49,6 +49,13 @@ contract work.
   generated docs surfaces.
 - Keep the live query table in `tasks/install/onboarding/findings.md` intact and
   use it as the authoritative search-regression input.
+- Treat testing as first-class work. Each phase must add or tighten the test
+  path that proves its shipped behavior; do not rely on manual confidence or
+  on later phases to backfill validation.
+- `bash -n sites/landing/public/install.sh` is syntax validation only. Any
+  installer behavior change must also be proven through
+  `validation/install/test_install.sh` or a clearly justified existing harness
+  under `validation/install/`.
 - One commit per logical step. Do not batch unrelated changes.
 
 ## Required Reading
@@ -76,6 +83,19 @@ Read these files IN THIS ORDER before writing anything.
 | --- | --- | --- | --- | --- | --- |
 | PR-1 | Runtime discovery ergonomics | 1, 2 | default, thinking | none | Phase 2 requires a paired PR in `../clawperator-skills` before the phase is complete |
 | PR-2 | Install and host-agent artifacts | 3, 4 | default, default | PR-1 merged | none |
+
+## Testing Model
+
+| Phase | Primary proof | What it must prove | Not sufficient by itself |
+| --- | --- | --- | --- |
+| 1 | `apps/node/src/test/unit/skills.test.ts` | installed-home registry fallback, env precedence, unchanged failure semantics, warning suppression | manual `skills list` spot-checks |
+| 2 | `apps/node/src/test/unit/skills.test.ts` plus paired `../clawperator-skills` change | `skills for-app`, deterministic ranking, exact findings-driven query regressions, shipped keyword data exists in the real skills repo | only editing local fixtures, only checking one query by hand |
+| 3 | `validation/install/test_install.sh` | durable artifact creation, runtime-skills rendering in `~/.clawperator/AGENTS.md`, JSON parseability, rerun idempotency | `bash -n`, stdout inspection, one-off local install run |
+| 4 | `validation/install/test_install.sh` plus `./scripts/docs_build.sh` | bounded `~/.agents/AGENTS.md` append behavior, docs accuracy, generated docs regeneration | docs edits without build, installer edits without harness coverage |
+
+OpenClaw itself is not the test harness for this pack. We are testing the
+surfaces an OpenClaw-style host actually consumes: CLI discovery behavior,
+durable install artifacts, shared-agent pointer text, and docs.
 
 ## Phase 1: Registry Fallback and Runtime Discovery Foundation
 
@@ -117,7 +137,9 @@ install, even in a fresh non-login shell.
    - CWD-relative path still works when present and env var is unset
    - warning about unset env var is suppressed when the home-directory
      fallback resolved successfully
-5. Re-run the Node build and tests.
+5. Re-run the Node build and tests. Treat the new unit coverage as the merge
+   gate for this phase; no later phase is allowed to "implicitly" cover
+   registry fallback.
 
 ### Acceptance Criteria
 
@@ -199,7 +221,8 @@ make user-language skill search return the right Google Home HVAC skills.
      list from `findings.md` F5 as the regression fixture)
    - explicit-keyword hit beats substring-summary hit in ordering
 6. Update CLI help text only as needed to document the new discovery surface.
-7. Re-run the Node build and tests.
+7. Re-run the Node build and tests. Confirm the regression set proves returned
+   order, not only result inclusion.
 
 ### Acceptance Criteria
 
@@ -281,6 +304,8 @@ present, and persist the key install outputs for future agent turns.
    `mcp-config-snippet.json` exists and contains the Claude Desktop entry;
    re-running the installer does not duplicate any of these artifacts or any
    appended sections.
+7. Keep the harness additions phase-local. Do not defer installer-artifact
+   assertions to Phase 4 just because both phases land in PR-2.
 
 ### Acceptance Criteria
 
@@ -340,7 +365,11 @@ discovery behavior is public, durable, and easy to follow.
    - the new app-oriented discovery surface
    - host-facing install artifacts
    - MCP snippet availability if Phase 3 shipped it
-5. Regenerate docs and run the full docs build.
+5. Extend `validation/install/test_install.sh` to cover the shared-agent
+   bridge behavior: when `~/.agents/AGENTS.md` exists, the Clawperator block is
+   appended exactly once; when the file is absent, the installer does not
+   create it.
+6. Regenerate docs and run the full docs build.
 
 ### Acceptance Criteria
 
@@ -352,6 +381,7 @@ discovery behavior is public, durable, and easy to follow.
 
 ```bash
 bash -n sites/landing/public/install.sh
+./validation/install/test_install.sh
 ./scripts/docs_build.sh
 ```
 
