@@ -44,6 +44,16 @@ assert_equals() {
     fi
 }
 
+assert_occurrence_count() {
+    local file="$1"
+    local needle="$2"
+    local expected_count="$3"
+    local label="$4"
+    local actual_count
+    actual_count="$(grep -Foc "$needle" "$file" || true)"
+    assert_equals "$expected_count" "$actual_count" "$label"
+}
+
 assert_file_empty() {
     local file="$1"
     local label="$2"
@@ -407,6 +417,37 @@ run_durable_summary_case() {
     ' _ "$INSTALL_SCRIPT" "$output_file"
 }
 
+run_shared_agent_bridge_case() {
+    local label="$1"
+    local shared_agents_mode="$2"
+    local output_file="$3"
+    local shared_agents_file="$4"
+    local first_snapshot_file="$5"
+
+    HOME="$TMP_DIR/home-bridge-$label" \
+    OS=Linux \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        mkdir -p "$HOME/.clawperator"
+        printf "# Clawperator local guide\n" > "$HOME/.clawperator/AGENTS.md"
+        if [ "$2" = "existing" ]; then
+          mkdir -p "$HOME/.agents"
+          cat > "$HOME/.agents/AGENTS.md" <<'\''EOF_SHARED'\''
+# Shared Agent Guide
+
+Existing host guidance.
+EOF_SHARED
+        fi
+        write_shared_agent_bridge > "$3"
+        if [ -f "$HOME/.agents/AGENTS.md" ]; then
+          cp "$HOME/.agents/AGENTS.md" "$5"
+        fi
+        write_shared_agent_bridge >> "$3"
+        printf "%s\n" "$HOME/.agents/AGENTS.md" > "$4"
+    ' _ "$INSTALL_SCRIPT" "$shared_agents_mode" "$output_file" "$shared_agents_file" "$first_snapshot_file"
+}
+
 echo "=== Scenario 1: parser extracts installed and discovery dirs ==="
 PARSE_SUCCESS_OUT="$TMP_DIR/parse-success.out"
 run_parser_case \
@@ -640,7 +681,46 @@ assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawper
 assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawperator/mcp-config-snippet.json" "durable-summary"
 assert_contains "$DURABLE_SUMMARY_OUT" "AI agents should start with the local guide" "durable-summary"
 
-echo "=== Scenario 17: operator metadata parser extracts all expected fields ==="
+echo "=== Scenario 17: shared agent bridge appends once and stays bounded ==="
+BRIDGE_EXISTING_OUT="$TMP_DIR/bridge-existing.out"
+BRIDGE_EXISTING_PATH_FILE="$TMP_DIR/bridge-existing.path"
+BRIDGE_EXISTING_FIRST="$TMP_DIR/bridge-existing.first"
+run_shared_agent_bridge_case existing existing "$BRIDGE_EXISTING_OUT" "$BRIDGE_EXISTING_PATH_FILE" "$BRIDGE_EXISTING_FIRST"
+BRIDGE_EXISTING_PATH="$(cat "$BRIDGE_EXISTING_PATH_FILE")"
+assert_contains "$BRIDGE_EXISTING_OUT" "Updated shared agent guide bridge" "bridge-existing output"
+assert_contains "$BRIDGE_EXISTING_PATH" "# Shared Agent Guide" "bridge-existing file"
+assert_contains "$BRIDGE_EXISTING_PATH" "Existing host guidance." "bridge-existing file"
+assert_contains "$BRIDGE_EXISTING_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:START -->" "bridge-existing file"
+assert_contains "$BRIDGE_EXISTING_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:END -->" "bridge-existing file"
+assert_contains "$BRIDGE_EXISTING_PATH" "$TMP_DIR/home-bridge-existing/.clawperator/AGENTS.md" "bridge-existing file"
+assert_contains "$BRIDGE_EXISTING_PATH" 'clawperator skills list' "bridge-existing file"
+assert_contains "$BRIDGE_EXISTING_PATH" 'clawperator skills for-app <package_id>' "bridge-existing file"
+assert_contains "$BRIDGE_EXISTING_PATH" 'clawperator skills search --keyword "<term>"' "bridge-existing file"
+assert_contains "$BRIDGE_EXISTING_PATH" 'clawperator skills get <skill_id>' "bridge-existing file"
+assert_contains "$BRIDGE_EXISTING_PATH" 'Do not mirror them into shared agent skill directories.' "bridge-existing file"
+assert_not_contains "$BRIDGE_EXISTING_PATH" "### Application" "bridge-existing file"
+assert_occurrence_count "$BRIDGE_EXISTING_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:START -->" "1" "bridge-existing start marker count"
+assert_occurrence_count "$BRIDGE_EXISTING_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:END -->" "1" "bridge-existing end marker count"
+assert_equals "$(cat "$BRIDGE_EXISTING_FIRST")" "$(cat "$BRIDGE_EXISTING_PATH")" "bridge-existing idempotent rerun"
+
+echo "=== Scenario 18: shared agent bridge skips missing shared guide ==="
+BRIDGE_MISSING_OUT="$TMP_DIR/bridge-missing.out"
+BRIDGE_MISSING_PATH_FILE="$TMP_DIR/bridge-missing.path"
+BRIDGE_MISSING_FIRST="$TMP_DIR/bridge-missing.first"
+run_shared_agent_bridge_case missing absent "$BRIDGE_MISSING_OUT" "$BRIDGE_MISSING_PATH_FILE" "$BRIDGE_MISSING_FIRST"
+BRIDGE_MISSING_PATH="$(cat "$BRIDGE_MISSING_PATH_FILE")"
+assert_contains "$BRIDGE_MISSING_OUT" "Shared agent guide not found" "bridge-missing output"
+if [ -e "$BRIDGE_MISSING_PATH" ]; then
+    echo "ERROR: bridge-missing should not create $BRIDGE_MISSING_PATH" >&2
+    cat "$BRIDGE_MISSING_PATH" >&2
+    exit 1
+fi
+if [ -e "$BRIDGE_MISSING_FIRST" ]; then
+    echo "ERROR: bridge-missing should not create first-run snapshot $BRIDGE_MISSING_FIRST" >&2
+    exit 1
+fi
+
+echo "=== Scenario 19: operator metadata parser extracts all expected fields ==="
 METADATA_SUCCESS_OUT="$TMP_DIR/metadata-success.out"
 METADATA_SUCCESS_STATUS="$TMP_DIR/metadata-success.status"
 METADATA_SUCCESS_VALUES="$TMP_DIR/metadata-success.values"
@@ -657,7 +737,7 @@ assert_contains "$METADATA_SUCCESS_VALUES" "sha_url=https://example.com/operator
 assert_contains "$METADATA_SUCCESS_VALUES" "sha256=deadbeef" "metadata-success values"
 assert_file_empty "$METADATA_SUCCESS_OUT" "metadata-success output"
 
-echo "=== Scenario 18: operator metadata parser allows missing inline checksum ==="
+echo "=== Scenario 20: operator metadata parser allows missing inline checksum ==="
 METADATA_NO_SHA_OUT="$TMP_DIR/metadata-no-sha.out"
 METADATA_NO_SHA_STATUS="$TMP_DIR/metadata-no-sha.status"
 METADATA_NO_SHA_VALUES="$TMP_DIR/metadata-no-sha.values"
@@ -671,7 +751,7 @@ assert_equals "0" "$(cat "$METADATA_NO_SHA_STATUS")" "metadata-no-sha status"
 assert_contains "$METADATA_NO_SHA_VALUES" "sha256=" "metadata-no-sha values"
 assert_file_empty "$METADATA_NO_SHA_OUT" "metadata-no-sha output"
 
-echo "=== Scenario 19: operator metadata parser rejects missing required fields ==="
+echo "=== Scenario 21: operator metadata parser rejects missing required fields ==="
 METADATA_MISSING_OUT="$TMP_DIR/metadata-missing.out"
 METADATA_MISSING_STATUS="$TMP_DIR/metadata-missing.status"
 METADATA_MISSING_VALUES="$TMP_DIR/metadata-missing.values"
@@ -684,7 +764,7 @@ run_operator_metadata_case \
 assert_equals "1" "$(cat "$METADATA_MISSING_STATUS")" "metadata-missing status"
 assert_contains "$METADATA_MISSING_OUT" "Failed to parse APK metadata" "metadata-missing output"
 
-echo "=== Scenario 20: operator metadata parser rejects malformed JSON ==="
+echo "=== Scenario 22: operator metadata parser rejects malformed JSON ==="
 METADATA_BAD_OUT="$TMP_DIR/metadata-bad.out"
 METADATA_BAD_STATUS="$TMP_DIR/metadata-bad.status"
 METADATA_BAD_VALUES="$TMP_DIR/metadata-bad.values"

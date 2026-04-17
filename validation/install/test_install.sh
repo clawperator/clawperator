@@ -27,7 +27,7 @@ else
     ensure_node_build
 fi
 
-echo "=== Running install-related validation harnesses ==="
+echo "=== Running install-related validation harnesses (including shared-agent bridge coverage) ==="
 bash validation/test_doctor.sh
 bash validation/install/test_multidevice.sh
 bash validation/install/test_java.sh

@@ -421,6 +421,11 @@ assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/AGENT
 assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/install-state.json" "main-success stdout durable install-state"
 assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/mcp-config-snippet.json" "main-success stdout durable mcp"
 assert_contains "$SUCCESS_STDOUT" "AI agents should start with the local guide" "main-success stdout durable guidance"
+if [ -e "$TMP_DIR/home-main-success/.agents/AGENTS.md" ]; then
+    echo "ERROR: main-success should not create $TMP_DIR/home-main-success/.agents/AGENTS.md" >&2
+    cat "$TMP_DIR/home-main-success/.agents/AGENTS.md" >&2
+    exit 1
+fi
 assert_contains "$SUCCESS_TRACE" "validate_os" "main-success trace"
 assert_contains "$SUCCESS_TRACE" "install_cli" "main-success trace"
 assert_contains "$SUCCESS_TRACE" "show_star_hint" "main-success trace"

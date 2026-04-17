@@ -984,6 +984,62 @@ EOF
     echo -e "${GREEN}✅ Wrote agent guide to ${AGENT_GUIDE_PATH}.${NC}"
 }
 
+write_shared_agent_bridge() {
+    local SHARED_AGENTS_PATH="$HOME/.agents/AGENTS.md"
+    local LOCAL_AGENT_GUIDE_PATH="$HOME/.clawperator/AGENTS.md"
+
+    if [ ! -f "$SHARED_AGENTS_PATH" ]; then
+        echo -e "${BLUE}Shared agent guide not found at ${SHARED_AGENTS_PATH}; skipping Clawperator bridge.${NC}"
+        return 0
+    fi
+
+    node - "$SHARED_AGENTS_PATH" "$LOCAL_AGENT_GUIDE_PATH" <<'EOF'
+const fs = require("fs");
+
+const [sharedAgentsPath, localAgentGuidePath] = process.argv.slice(2);
+const startMarker = "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:START -->";
+const endMarker = "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:END -->";
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const bridgeBlock = [
+  startMarker,
+  "## Clawperator",
+  "",
+  "Clawperator runtime skills stay in the `clawperator` CLI surface.",
+  "Do not mirror them into shared agent skill directories.",
+  "",
+  "Start here:",
+  `- \`${localAgentGuidePath}\``,
+  "- `clawperator skills list`",
+  "- `clawperator skills for-app <package_id>`",
+  "- `clawperator skills search --keyword \"<term>\"`",
+  "- `clawperator skills get <skill_id>`",
+  "",
+  "Use `clawperator skills run <skill_id>` after you have identified the right runtime skill.",
+  endMarker,
+].join("\n");
+
+let content = fs.readFileSync(sharedAgentsPath, "utf8");
+const bridgePattern = new RegExp(
+  `(?:\\r?\\n)?${escapeRegExp(startMarker)}[\\s\\S]*?${escapeRegExp(endMarker)}(?:\\r?\\n)?`,
+  "g"
+);
+
+content = content.replace(bridgePattern, "\n").replace(/\s*$/, "");
+
+const nextContent = content.length === 0
+  ? bridgeBlock
+  : `${content}\n\n${bridgeBlock}`;
+
+fs.writeFileSync(sharedAgentsPath, `${nextContent}\n`);
+EOF
+
+    echo -e "${GREEN}✅ Updated shared agent guide bridge at ${SHARED_AGENTS_PATH}.${NC}"
+}
+
 sha256_file() {
     local FILE_PATH=$1
 
@@ -1373,6 +1429,7 @@ main() {
     setup_skills_via_cli
     setup_authoring_skills_via_cli
     write_agent_guide
+    write_shared_agent_bridge
     write_install_state
     write_mcp_config_snippet
 
