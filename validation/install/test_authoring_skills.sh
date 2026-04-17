@@ -50,7 +50,7 @@ assert_occurrence_count() {
     local expected_count="$3"
     local label="$4"
     local actual_count
-    actual_count="$(grep -Foc "$needle" "$file" || true)"
+    actual_count="$(grep -Fc "$needle" "$file" || true)"
     assert_equals "$expected_count" "$actual_count" "$label"
 }
 
