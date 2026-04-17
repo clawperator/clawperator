@@ -632,6 +632,7 @@ EOF
     fi
 
     RUNTIME_GUIDE_TMP="$(mktemp "${TMPDIR:-/tmp}/clawperator-runtime-skills.XXXXXX")"
+    register_temp_file "$RUNTIME_GUIDE_TMP"
 
     if node - "$RUNTIME_SKILLS_REGISTRY_PATH" > "$RUNTIME_GUIDE_TMP" 2>/dev/null <<'EOF'
 const fs = require("fs");
@@ -1049,16 +1050,20 @@ EOF
 write_shared_agent_bridge() {
     local SHARED_AGENTS_PATH="$HOME/.agents/AGENTS.md"
     local LOCAL_AGENT_GUIDE_PATH="$HOME/.clawperator/AGENTS.md"
+    local BRIDGE_ERROR_TMP=""
 
     if [ ! -f "$SHARED_AGENTS_PATH" ]; then
         echo -e "${BLUE}Shared agent guide not found at ${SHARED_AGENTS_PATH}; skipping Clawperator bridge.${NC}"
         return 0
     fi
 
+    BRIDGE_ERROR_TMP="$(mktemp "${TMPDIR:-/tmp}/clawperator-shared-bridge-error.XXXXXX")"
+    register_temp_file "$BRIDGE_ERROR_TMP"
+
     # Content between the START/END markers is installer-owned. Any hand edits
     # inside that block will be overwritten on the next install.sh run. Edits
     # elsewhere in ~/.agents/AGENTS.md are preserved.
-    node - "$SHARED_AGENTS_PATH" "$LOCAL_AGENT_GUIDE_PATH" <<'EOF'
+    if node - "$SHARED_AGENTS_PATH" "$LOCAL_AGENT_GUIDE_PATH" 2>"$BRIDGE_ERROR_TMP" <<'EOF'
 const fs = require("fs");
 
 // Content between startMarker and endMarker is installer-owned and is
@@ -1103,8 +1108,16 @@ const nextContent = content.length === 0
 
 fs.writeFileSync(sharedAgentsPath, `${nextContent}\n`);
 EOF
+    then
+        echo -e "${GREEN}✅ Updated shared agent guide bridge at ${SHARED_AGENTS_PATH}.${NC}"
+        return 0
+    fi
 
-    echo -e "${GREEN}✅ Updated shared agent guide bridge at ${SHARED_AGENTS_PATH}.${NC}"
+    echo -e "${YELLOW}⚠️  Failed to update shared agent bridge at ${SHARED_AGENTS_PATH}; continuing without it.${NC}" >&2
+    if [ -s "$BRIDGE_ERROR_TMP" ]; then
+        cat "$BRIDGE_ERROR_TMP" >&2
+    fi
+    return 0
 }
 
 sha256_file() {

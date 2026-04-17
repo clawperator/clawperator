@@ -382,9 +382,10 @@ run_durable_summary_case() {
 run_shared_agent_bridge_case() {
     local label="$1"
     local shared_agents_mode="$2"
-    local output_file="$3"
-    local shared_agents_file="$4"
-    local first_snapshot_file="$5"
+    local node_mode="$3"
+    local output_file="$4"
+    local shared_agents_file="$5"
+    local first_snapshot_file="$6"
 
     HOME="$TMP_DIR/home-bridge-$label" \
     OS=Linux \
@@ -401,13 +402,19 @@ run_shared_agent_bridge_case() {
 Existing host guidance.
 EOF_SHARED
         fi
-        write_shared_agent_bridge > "$3"
-        if [ -f "$HOME/.agents/AGENTS.md" ]; then
-          cp "$HOME/.agents/AGENTS.md" "$5"
+        if [ "$3" = "fail-node" ]; then
+          node() {
+            printf "%s\n" "simulated shared bridge failure" >&2
+            return 1
+          }
         fi
-        write_shared_agent_bridge >> "$3"
-        printf "%s\n" "$HOME/.agents/AGENTS.md" > "$4"
-    ' _ "$INSTALL_SCRIPT" "$shared_agents_mode" "$output_file" "$shared_agents_file" "$first_snapshot_file"
+        write_shared_agent_bridge > "$4" 2>&1
+        if [ -f "$HOME/.agents/AGENTS.md" ]; then
+          cp "$HOME/.agents/AGENTS.md" "$6"
+        fi
+        write_shared_agent_bridge >> "$4" 2>&1
+        printf "%s\n" "$HOME/.agents/AGENTS.md" > "$5"
+    ' _ "$INSTALL_SCRIPT" "$shared_agents_mode" "$node_mode" "$output_file" "$shared_agents_file" "$first_snapshot_file"
 }
 
 EXPECTED_NODE_BIN="$(node -p 'process.execPath')"
@@ -689,7 +696,7 @@ echo "=== Scenario 17: shared agent bridge appends once and stays bounded ==="
 BRIDGE_EXISTING_OUT="$TMP_DIR/bridge-existing.out"
 BRIDGE_EXISTING_PATH_FILE="$TMP_DIR/bridge-existing.path"
 BRIDGE_EXISTING_FIRST="$TMP_DIR/bridge-existing.first"
-run_shared_agent_bridge_case existing existing "$BRIDGE_EXISTING_OUT" "$BRIDGE_EXISTING_PATH_FILE" "$BRIDGE_EXISTING_FIRST"
+run_shared_agent_bridge_case existing existing ok "$BRIDGE_EXISTING_OUT" "$BRIDGE_EXISTING_PATH_FILE" "$BRIDGE_EXISTING_FIRST"
 BRIDGE_EXISTING_PATH="$(cat "$BRIDGE_EXISTING_PATH_FILE")"
 assert_contains "$BRIDGE_EXISTING_OUT" "Updated shared agent guide bridge" "bridge-existing output"
 assert_contains "$BRIDGE_EXISTING_PATH" "# Shared Agent Guide" "bridge-existing file"
@@ -711,7 +718,7 @@ echo "=== Scenario 18: shared agent bridge skips missing shared guide ==="
 BRIDGE_MISSING_OUT="$TMP_DIR/bridge-missing.out"
 BRIDGE_MISSING_PATH_FILE="$TMP_DIR/bridge-missing.path"
 BRIDGE_MISSING_FIRST="$TMP_DIR/bridge-missing.first"
-run_shared_agent_bridge_case missing absent "$BRIDGE_MISSING_OUT" "$BRIDGE_MISSING_PATH_FILE" "$BRIDGE_MISSING_FIRST"
+run_shared_agent_bridge_case missing absent ok "$BRIDGE_MISSING_OUT" "$BRIDGE_MISSING_PATH_FILE" "$BRIDGE_MISSING_FIRST"
 BRIDGE_MISSING_PATH="$(cat "$BRIDGE_MISSING_PATH_FILE")"
 assert_contains "$BRIDGE_MISSING_OUT" "Shared agent guide not found" "bridge-missing output"
 if [ -e "$BRIDGE_MISSING_PATH" ]; then
@@ -724,7 +731,21 @@ if [ -e "$BRIDGE_MISSING_FIRST" ]; then
     exit 1
 fi
 
-echo "=== Scenario 19: operator metadata parser extracts all expected fields ==="
+echo "=== Scenario 19: shared agent bridge failure is non-fatal ==="
+BRIDGE_FAILURE_OUT="$TMP_DIR/bridge-failure.out"
+BRIDGE_FAILURE_PATH_FILE="$TMP_DIR/bridge-failure.path"
+BRIDGE_FAILURE_FIRST="$TMP_DIR/bridge-failure.first"
+run_shared_agent_bridge_case bridge-failure existing fail-node "$BRIDGE_FAILURE_OUT" "$BRIDGE_FAILURE_PATH_FILE" "$BRIDGE_FAILURE_FIRST"
+BRIDGE_FAILURE_PATH="$(cat "$BRIDGE_FAILURE_PATH_FILE")"
+assert_contains "$BRIDGE_FAILURE_OUT" "Failed to update shared agent bridge" "bridge-failure output"
+assert_contains "$BRIDGE_FAILURE_OUT" "simulated shared bridge failure" "bridge-failure output"
+assert_contains "$BRIDGE_FAILURE_PATH" "# Shared Agent Guide" "bridge-failure file"
+assert_contains "$BRIDGE_FAILURE_PATH" "Existing host guidance." "bridge-failure file"
+assert_not_contains "$BRIDGE_FAILURE_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:START -->" "bridge-failure file"
+assert_not_contains "$BRIDGE_FAILURE_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:END -->" "bridge-failure file"
+assert_equals "$(cat "$BRIDGE_FAILURE_FIRST")" "$(cat "$BRIDGE_FAILURE_PATH")" "bridge-failure leaves shared guide unchanged"
+
+echo "=== Scenario 20: operator metadata parser extracts all expected fields ==="
 METADATA_SUCCESS_OUT="$TMP_DIR/metadata-success.out"
 METADATA_SUCCESS_STATUS="$TMP_DIR/metadata-success.status"
 METADATA_SUCCESS_VALUES="$TMP_DIR/metadata-success.values"
@@ -741,7 +762,7 @@ assert_contains "$METADATA_SUCCESS_VALUES" "sha_url=https://example.com/operator
 assert_contains "$METADATA_SUCCESS_VALUES" "sha256=deadbeef" "metadata-success values"
 assert_file_empty "$METADATA_SUCCESS_OUT" "metadata-success output"
 
-echo "=== Scenario 20: operator metadata parser allows missing inline checksum ==="
+echo "=== Scenario 21: operator metadata parser allows missing inline checksum ==="
 METADATA_NO_SHA_OUT="$TMP_DIR/metadata-no-sha.out"
 METADATA_NO_SHA_STATUS="$TMP_DIR/metadata-no-sha.status"
 METADATA_NO_SHA_VALUES="$TMP_DIR/metadata-no-sha.values"
@@ -755,7 +776,7 @@ assert_equals "0" "$(cat "$METADATA_NO_SHA_STATUS")" "metadata-no-sha status"
 assert_contains "$METADATA_NO_SHA_VALUES" "sha256=" "metadata-no-sha values"
 assert_file_empty "$METADATA_NO_SHA_OUT" "metadata-no-sha output"
 
-echo "=== Scenario 21: operator metadata parser rejects missing required fields ==="
+echo "=== Scenario 22: operator metadata parser rejects missing required fields ==="
 METADATA_MISSING_OUT="$TMP_DIR/metadata-missing.out"
 METADATA_MISSING_STATUS="$TMP_DIR/metadata-missing.status"
 METADATA_MISSING_VALUES="$TMP_DIR/metadata-missing.values"
@@ -768,7 +789,7 @@ run_operator_metadata_case \
 assert_equals "1" "$(cat "$METADATA_MISSING_STATUS")" "metadata-missing status"
 assert_contains "$METADATA_MISSING_OUT" "Failed to parse APK metadata" "metadata-missing output"
 
-echo "=== Scenario 22: operator metadata parser rejects malformed JSON ==="
+echo "=== Scenario 23: operator metadata parser rejects malformed JSON ==="
 METADATA_BAD_OUT="$TMP_DIR/metadata-bad.out"
 METADATA_BAD_STATUS="$TMP_DIR/metadata-bad.status"
 METADATA_BAD_VALUES="$TMP_DIR/metadata-bad.values"
