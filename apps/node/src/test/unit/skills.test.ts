@@ -441,6 +441,13 @@ describe("loadRegistry", () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-registry-unset-"));
     const tempHome = await mkdtemp(join(tmpdir(), "clawperator-home-unset-"));
     const appNodeDir = join(tempRoot, "apps", "node");
+    const installedHomeRegistryPath = join(
+      tempHome,
+      ".clawperator",
+      "skills",
+      "skills",
+      "skills-registry.json"
+    );
     await mkdir(appNodeDir, { recursive: true });
 
     try {
@@ -466,8 +473,24 @@ describe("loadRegistry", () => {
       assert.strictEqual(parsed.ok, false);
       assert.match(parsed.message ?? "", /Registry not found\. Checked:/);
       assert.ok(
+        parsed.message?.includes(installedHomeRegistryPath),
+        `Expected message to include installed registry path, got: ${parsed.message}`
+      );
+      assert.ok(
+        parsed.message?.includes("clawperator skills list --json"),
+        `Expected message to include next-step command, got: ${parsed.message}`
+      );
+      assert.ok(
         child.stderr.includes("CLAWPERATOR_SKILLS_REGISTRY"),
         `Expected stderr to mention CLAWPERATOR_SKILLS_REGISTRY, got: ${child.stderr}`
+      );
+      assert.ok(
+        child.stderr.includes(installedHomeRegistryPath),
+        `Expected stderr to include installed registry path, got: ${child.stderr}`
+      );
+      assert.ok(
+        child.stderr.includes("clawperator skills list --json"),
+        `Expected stderr to include next-step command, got: ${child.stderr}`
       );
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
@@ -512,8 +535,20 @@ describe("loadRegistry", () => {
         /Registry not found at configured path: \/tmp\/does-not-exist\/skills-registry\.json/
       );
       assert.ok(
+        parsed.message?.includes(installedHomeRegistryPath),
+        `Expected message to include installed registry path, got: ${parsed.message}`
+      );
+      assert.ok(
+        parsed.message?.includes("clawperator skills list --json"),
+        `Expected message to include next-step command, got: ${parsed.message}`
+      );
+      assert.ok(
         child.stderr.includes(missingPath),
         `Expected stderr to include the missing path, got: ${child.stderr}`
+      );
+      assert.ok(
+        child.stderr.includes(installedHomeRegistryPath),
+        `Expected stderr to include installed registry path, got: ${child.stderr}`
       );
     } finally {
       await rm(tempHome, { recursive: true, force: true });

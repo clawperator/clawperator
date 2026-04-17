@@ -78,6 +78,7 @@ function normalizeExplicitRegistryPath(registryPath: string | undefined): string
 
 export async function loadRegistry(registryPath?: string): Promise<LoadRegistryResult> {
   const explicitRegistryPath = normalizeExplicitRegistryPath(registryPath);
+  const installedHomeRegistryPath = getInstalledHomeRegistryPath();
 
   let configuredPath: string | undefined;
   if (explicitRegistryPath === undefined) {
@@ -114,11 +115,13 @@ export async function loadRegistry(registryPath?: string): Promise<LoadRegistryR
       }
       process.stderr.write(
         `Error: Registry file not found at ${path} (from CLAWPERATOR_SKILLS_REGISTRY). ` +
+        `The installed registry normally lives at ${installedHomeRegistryPath}. ` +
         "Check that the path is correct.\n"
       );
       throw new Error(
         `Registry not found at configured path: ${path}. ` +
-        "Update CLAWPERATOR_SKILLS_REGISTRY or run clawperator skills install."
+        `The installed registry normally lives at ${installedHomeRegistryPath}. ` +
+        "Fix CLAWPERATOR_SKILLS_REGISTRY, unset it to use the installed copy, then rerun clawperator skills list --json, or run clawperator skills install."
       );
     }
 
@@ -151,22 +154,29 @@ export async function loadRegistry(registryPath?: string): Promise<LoadRegistryR
       if (!explicitRegistryPath && !configuredPath) {
         process.stderr.write(
           "Warning: CLAWPERATOR_SKILLS_REGISTRY is not set. " +
-          "Run 'clawperator skills install' to configure the registry path.\n"
+          `Clawperator also checked the installed registry at ${installedHomeRegistryPath}. ` +
+          "Verify that file, then rerun 'clawperator skills list --json', or run 'clawperator skills install'.\n"
         );
         throw new Error(
           `Registry not found. Checked: ${[path, ...candidates].join(", ")}. ` +
-          "Set CLAWPERATOR_SKILLS_REGISTRY or run clawperator skills install."
+          `The installed registry normally lives at ${installedHomeRegistryPath}. ` +
+          "Verify that path, then rerun clawperator skills list --json, or run clawperator skills install."
         );
       }
 
       if (candidates.length > 0) {
         throw new Error(
           `Registry not found. Checked: ${[path, ...candidates].join(", ")}. ` +
-          "Run from repo root, set CLAWPERATOR_SKILLS_REGISTRY, or run clawperator skills install."
+          `The installed registry normally lives at ${installedHomeRegistryPath}. ` +
+          "Verify that path, then rerun clawperator skills list --json, or run clawperator skills install."
         );
       }
 
-      throw new Error(`Registry not found: ${path}. Run from repo root or set CLAWPERATOR_SKILLS_REGISTRY.`);
+      throw new Error(
+        `Registry not found: ${path}. ` +
+        `The installed registry normally lives at ${installedHomeRegistryPath}. ` +
+        "Verify that path, then rerun clawperator skills list --json, or run clawperator skills install."
+      );
     }
   }
   const data = JSON.parse(raw) as SkillsRegistry;
