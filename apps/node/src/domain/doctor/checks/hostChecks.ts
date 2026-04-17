@@ -84,6 +84,13 @@ function buildAuthoringSkillsPathRepairFix(installedDir: string): DoctorCheckRes
   };
 }
 
+function isUnsetRegistryConfigurationError(detail: string): boolean {
+  return (
+    detail.startsWith("Registry not found at default path:")
+    || detail.startsWith("Registry not found. Checked:")
+  );
+}
+
 async function findMissingInstalledAuthoringSkills(
   installedDir: string,
   expectedSkills: string[]
@@ -330,7 +337,7 @@ export async function checkInstalledOrchestratedSkillAgentCliAvailability(_confi
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     const registryNotConfigured = process.env.CLAWPERATOR_SKILLS_REGISTRY === undefined
-      && detail.startsWith("Registry not found at default path:");
+      && isUnsetRegistryConfigurationError(detail);
     if (registryNotConfigured) {
       return {
         id: "host.skill-agent-cli.skills",
