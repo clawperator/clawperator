@@ -97,6 +97,14 @@ function normalizeSkillPathArray(paths: string[] | undefined): string[] {
   return (paths ?? []).map((path) => normalizeSkillPathSeparators(path));
 }
 
+function normalizeKeywordArray(keywords: string[] | undefined): string[] {
+  return Array.from(new Set(
+    (keywords ?? [])
+      .map((keyword) => keyword.trim().toLowerCase())
+      .filter((keyword) => keyword.length > 0)
+  )).sort();
+}
+
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((entry) => typeof entry === "string");
 }
@@ -107,7 +115,7 @@ function findMismatchFields(skill: SkillEntry, parsed: Partial<SkillEntry>): str
   if (parsed.applicationId !== skill.applicationId) mismatches.push("applicationId");
   if (parsed.intent !== skill.intent) mismatches.push("intent");
   if (parsed.summary !== skill.summary) mismatches.push("summary");
-  if (JSON.stringify(parsed.keywords ?? []) !== JSON.stringify(skill.keywords ?? [])) mismatches.push("keywords");
+  if (JSON.stringify(normalizeKeywordArray(parsed.keywords)) !== JSON.stringify(normalizeKeywordArray(skill.keywords))) mismatches.push("keywords");
   if (normalizeSkillPathSeparators(parsed.path ?? "") !== normalizeSkillPathSeparators(skill.path)) mismatches.push("path");
   if (normalizeSkillPathSeparators(parsed.skillFile ?? "") !== normalizeSkillPathSeparators(skill.skillFile)) mismatches.push("skillFile");
   if (JSON.stringify(normalizeSkillPathArray(parsed.scripts)) !== JSON.stringify(normalizeSkillPathArray(skill.scripts))) mismatches.push("scripts");

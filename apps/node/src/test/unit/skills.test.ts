@@ -833,6 +833,47 @@ describe("validateSkill", () => {
     }
   });
 
+  it("treats reordered equivalent keywords as matching metadata", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-keyword-parity-"));
+    const skillsDir = join(tempRoot, "skills");
+    const skillDir = join(skillsDir, "com.test.keyword-parity");
+    const registryPath = join(skillsDir, "skills-registry.json");
+    const entry = {
+      id: "com.test.keyword-parity",
+      applicationId: "com.test",
+      intent: "keyword-parity",
+      summary: "Keyword parity skill",
+      keywords: ["google home", "hvac", "aircon"],
+      path: "skills/com.test.keyword-parity",
+      skillFile: "skills/com.test.keyword-parity/SKILL.md",
+      scripts: ["skills/com.test.keyword-parity/scripts/run.js"],
+      artifacts: [],
+    };
+
+    await mkdir(join(skillDir, "scripts"), { recursive: true });
+    await copyFile(
+      join(packageRoot, "src", "test", "fixtures", "skills", "com.test.echo", "scripts", "echo.js"),
+      join(skillDir, "scripts", "run.js")
+    );
+    await writeFile(registryPath, `${JSON.stringify({ skills: [entry] }, null, 2)}\n`, "utf8");
+    await writeFile(
+      join(skillDir, "skill.json"),
+      `${JSON.stringify({
+        ...entry,
+        keywords: ["aircon", "Google Home", "hvac"],
+      }, null, 2)}\n`,
+      "utf8"
+    );
+    await writeFile(join(skillDir, "SKILL.md"), "# Keyword Parity Skill\n", "utf8");
+
+    try {
+      const result = await validateSkill("com.test.keyword-parity", registryPath);
+      if (!result.ok) assert.fail(result.message);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it("still passes invalid artifact payloads without dry-run", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-validate-artifact-"));
     const skillsDir = join(tempRoot, "skills");
