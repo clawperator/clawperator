@@ -392,6 +392,7 @@ Usage:
   clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]
 
 Notes:
+  - Prefer 'clawperator skills for-app', 'clawperator skills search', and 'clawperator skills get' before 'clawperator skills run' when you are still discovering the correct skill.
   - Runs the selected skill script through the local skill wrapper.
   - Use --device explicitly when more than one Android device is connected.
   - --operator-package sets the Operator package for this skill run (default: com.clawperator.operator).
@@ -2097,6 +2098,13 @@ Usage:
   clawperator skills install
   clawperator skills update [--ref <git-ref>]
   clawperator skills sync --ref <git-ref>
+
+Notes:
+  - Start with 'clawperator skills for-app <package_id>' when you know the Android package id.
+  - Use 'clawperator skills search --keyword <text>' when you only have app names or user-language intent terms.
+  - Use 'clawperator skills get <skill_id>' before 'clawperator skills run <skill_id>' when discovery already returned an id.
+  - If your host already supports stdio MCP and wants registered tools instead of runtime-skill discovery, use 'clawperator mcp serve'.
+  - Post-install orientation: https://docs.clawperator.com/host-agents/
 `,
   subtopics: {
     install: HELP_SKILLS_INSTALL,
@@ -2107,11 +2115,11 @@ Usage:
     run: HELP_SKILLS_RUN,
   },
   topLevelBlock: `  skills list
-                                            List available skills from local indexes/cache
+                                            List available runtime skills from the registry
   skills get <skill_id>
                                             Show skill metadata
   skills for-app <package_id>
-                                            List skills for one app package (alias for skills search --app)
+                                            Primary app-oriented discovery by package id
   skills search --app <package_id> [--intent <intent>] [--keyword <text>]
   skills search <keyword>                   Search skills by app package, intent, or keyword
                                             (bare keyword is shorthand for --keyword)
@@ -2124,7 +2132,7 @@ Usage:
   skills validate --all [--dry-run]
                                             Validate one local skill or the entire configured registry
   skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]
-                                            Invoke a skill script (convenience wrapper)
+                                            Run a discovered skill through the local wrapper
   skills install
                                             Clone skills repository to ~/.clawperator/skills/
   skills update [--ref <git-ref>]
@@ -2471,7 +2479,7 @@ COMMANDS["mcp"] = {
   group: "Execution",
   supportedFlags: [],
   summary: "Start the first-party MCP server",
-  help: "clawperator mcp\n\nUsage:\n  clawperator mcp serve\n\nNotes:\n  - Starts the stdio MCP server.\n  - Use 'node dist/cli/index.js mcp serve' for branch-local development.\n",
+  help: "clawperator mcp\n\nUsage:\n  clawperator mcp serve\n\nNotes:\n  - Starts the stdio MCP server.\n  - Use this when the host already supports stdio MCP and wants registered Clawperator tools.\n  - For app-oriented runtime-skill discovery, start with 'clawperator skills for-app <package_id>'.\n  - Post-install orientation: https://docs.clawperator.com/host-agents/\n  - Use 'node dist/cli/index.js mcp serve' for branch-local development.\n",
   topLevelBlock: `  mcp serve
                                             Start the first-party stdio MCP server`,
   handler: async (ctx) => {
@@ -2725,6 +2733,9 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "  --version                               Show version",
     "",
     "Notes:",
+    "  - Post-install host-agent orientation: https://docs.clawperator.com/host-agents/",
+    "  - Start runtime-skill discovery with 'clawperator skills for-app <package_id>' when you know the Android package, or 'clawperator skills search --keyword <text>' when you do not.",
+    "  - Use 'clawperator mcp serve' when the host already supports stdio MCP and wants registered Clawperator tools.",
     "  - operator setup is the canonical setup command. operator install remains an alias.",
     "  - recording is the canonical command family; 'record' is a supported short alias.",
     "  - exec is the canonical command for execution payloads; 'execute' is a supported synonym.",

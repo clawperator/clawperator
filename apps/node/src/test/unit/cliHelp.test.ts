@@ -134,6 +134,9 @@ describe("CLI help", () => {
     const { stdout, code } = await runCli(["--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /exec <json-or-file> \[--validate-only\]/);
+    assert.match(stdout, /https:\/\/docs\.clawperator\.com\/host-agents\//);
+    assert.match(stdout, /skills for-app <package_id>/);
+    assert.match(stdout, /mcp serve/);
   });
 
   it("shows top-level help for help mcp serve", async () => {
@@ -146,7 +149,9 @@ describe("CLI help", () => {
   it("shows mcp help for --help mcp serve", async () => {
     const { stdout, code } = await runCli(["--help", "mcp", "serve"]);
     assert.strictEqual(code, 0);
-    assert.ok(stdout.length > 0);
+    assert.match(stdout, /stdio MCP server/);
+    assert.match(stdout, /skills for-app <package_id>/);
+    assert.match(stdout, /https:\/\/docs\.clawperator\.com\/host-agents\//);
   });
 
   it("prints the version for --version before mcp serve", async () => {
@@ -208,10 +213,23 @@ describe("CLI help", () => {
     const { stdout, code } = await runCli(["skills", "run", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator skills run/);
+    assert.match(stdout, /skills for-app/);
+    assert.match(stdout, /skills search/);
+    assert.match(stdout, /skills get/);
     assert.match(stdout, /--timeout <ms>/);
     assert.match(stdout, /--expect-contains <text>/);
     assert.match(stdout, /SKILL_OUTPUT_ASSERTION_FAILED/);
     assert.doesNotMatch(stdout, /action open-app/);
+  });
+
+  it("shows post-install discovery guidance in skills help", async () => {
+    const { stdout, code } = await runCli(["skills", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /skills for-app <package_id>/);
+    assert.match(stdout, /skills search --keyword <text>/);
+    assert.match(stdout, /skills get <skill_id>/);
+    assert.match(stdout, /clawperator mcp serve/);
+    assert.match(stdout, /https:\/\/docs\.clawperator\.com\/host-agents\//);
   });
 
   it("inspect ui --help falls back to top-level help", async () => {
