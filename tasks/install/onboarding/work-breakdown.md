@@ -16,13 +16,29 @@ contract work.
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | implementation complete on branch; PR-2 in review |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4 |
-| Current / Next | Phase 1 |
+| Completed | 1, 2, 3, 4 |
+| Remaining | PR-2 review/merge, then task-pack cleanup |
+| Current / Next | Close review feedback on PR-2, merge, then retire task pack |
 | Blockers | none |
+
+Current pack checkpoint as of 2026-04-17:
+
+- Phase 1 completed: installed-home runtime registry fallback shipped with
+  Node unit coverage.
+- Phase 2 completed: `skills for-app` and findings-driven search/ranking
+  improvements shipped.
+- Phase 3 completed: `~/.clawperator/AGENTS.md`, `install-state.json`,
+  `mcp-config-snippet.json`, and installer summary updates shipped with
+  sourced-function and `main()` harness coverage.
+- Phase 4 completed on branch: bounded `~/.agents/AGENTS.md` bridge, public
+  docs updates, docs build regeneration, and follow-up installer hardening from
+  review shipped on `install/onboarding-impl2`.
+- Remaining work for this task pack is administrative, not implementation:
+  finish PR review, merge PR #196, then delete the task folder once durable
+  follow-up items remain captured elsewhere.
 
 ## Hard Rules
 
@@ -115,6 +131,8 @@ durable install artifacts, shared-agent pointer text, and docs.
 
 ## Phase 1: Registry Fallback and Runtime Discovery Foundation
 
+Status: done
+
 ### Agent Tier
 
 default
@@ -182,6 +200,8 @@ test(node): cover installed skills registry fallback
 ```
 
 ## Phase 2: App-Oriented Discovery and Search Quality
+
+Status: done
 
 ### Agent Tier
 
@@ -275,6 +295,8 @@ test(skills): add discovery and search regression coverage
 ```
 
 ## Phase 3: Install Artifacts and `~/.clawperator/AGENTS.md`
+
+Status: done
 
 ### Agent Tier
 
@@ -386,6 +408,8 @@ test(install): cover onboarding host artifacts
 
 ## Phase 4: Shared-Agent Bridge and Public Docs
 
+Status: done on branch (`install/onboarding-impl2` / PR #196)
+
 ### Agent Tier
 
 default
@@ -449,5 +473,7 @@ docs: update install and skills discovery guidance for host agents
 
 ## Finalization
 
-- After PR-2, update `tasks/install/onboarding/finalization-items.md` if any
-  part of F6 still needs sharper scoping for the follow-up task pack.
+- `tasks/install/onboarding/finalization-items.md` has already been refreshed
+  with the deferred follow-up scope that remains after this pack.
+- Delete the task folder after PR #196 merges and no additional onboarding-pack
+  review fixes remain outstanding.

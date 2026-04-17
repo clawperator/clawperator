@@ -2,6 +2,13 @@
 
 These items are intentionally deferred from the install/onboarding cleanup pack.
 
+## Current Pack Status
+
+As of 2026-04-17, the install/onboarding cleanup implementation is complete on
+`install/onboarding-impl2` and PR #196 carries the remaining review/merge work.
+The items below are still intentionally out of scope for that PR and should not
+be folded back into this task pack.
+
 ## Deferred Follow-Up
 
 ### F6: Skill preflight and first-run requirements metadata

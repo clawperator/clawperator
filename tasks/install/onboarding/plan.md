@@ -13,13 +13,22 @@ explicitly out of scope for this pack.
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | implementation complete on branch; PR-2 in review |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4 |
-| Current / Next | Phase 1 |
+| Completed | 1, 2, 3, 4 |
+| Remaining | PR-2 review/merge, then task-pack cleanup |
+| Current / Next | Final review on PR-2, then delete task pack after merge |
 | Blockers | none |
+
+Current branch status as of 2026-04-17:
+
+- PR-1 is already shipped and is treated as complete for this pack.
+- PR-2 work is implemented on `install/onboarding-impl2` and tracked in
+  PR #196.
+- Phase 4 follow-up fixes from review were also applied on this branch:
+  absolute Node path in the MCP snippet, best-effort shared-agent bridge
+  behavior, and matching installer-harness coverage.
 
 ## Goal
 
@@ -253,5 +262,5 @@ After PR-2:
 | App-oriented discovery command | `docs/skills/overview.md` or adjacent public docs in PR-2 |
 | Deferred skill preflight metadata work (F6) | `tasks/install/onboarding/finalization-items.md` |
 
-Delete this task pack only after both PRs land and the F6 follow-up has been
+Delete this task pack only after PR #196 merges and the F6 follow-up has been
 captured elsewhere.
