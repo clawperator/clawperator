@@ -54,6 +54,63 @@ assert_file_empty() {
     fi
 }
 
+json_field_value() {
+    local file="$1"
+    local field="$2"
+
+    node -e '
+const fs = require("fs");
+const filePath = process.argv[1];
+const field = process.argv[2];
+const json = JSON.parse(fs.readFileSync(filePath, "utf8"));
+const value = json[field];
+if (value === undefined) {
+  process.stdout.write("__undefined__");
+} else if (value === null) {
+  process.stdout.write("null");
+} else {
+  process.stdout.write(String(value));
+}
+' "$file" "$field"
+}
+
+assert_json_field_equals() {
+    local file="$1"
+    local field="$2"
+    local expected="$3"
+    local label="$4"
+    local actual
+    actual="$(json_field_value "$file" "$field")"
+    assert_equals "$expected" "$actual" "$label"
+}
+
+assert_json_field_null() {
+    local file="$1"
+    local field="$2"
+    local label="$3"
+    assert_json_field_equals "$file" "$field" "null" "$label"
+}
+
+assert_json_field_is_iso_timestamp() {
+    local file="$1"
+    local field="$2"
+    local label="$3"
+    if ! node -e '
+const fs = require("fs");
+const filePath = process.argv[1];
+const field = process.argv[2];
+const json = JSON.parse(fs.readFileSync(filePath, "utf8"));
+const value = json[field];
+if (typeof value !== "string" || Number.isNaN(Date.parse(value))) {
+  process.exit(1);
+}
+' "$file" "$field"; then
+        echo "ERROR: $label expected parseable ISO timestamp in $field" >&2
+        cat "$file" >&2
+        return 1
+    fi
+}
+
 run_parser_case() {
     local label="$1"
     local input_json="$2"
@@ -113,6 +170,10 @@ fi
 
 case "${mode}" in
   success)
+    if [ "\$1" = "--version" ]; then
+      printf '%s\n' '1.2.3'
+      exit 0
+    fi
     if [ "\$1" = "authoring-skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
       cat <<'JSON'
 ${payload}
@@ -121,12 +182,20 @@ JSON
     fi
     ;;
   failure)
+    if [ "\$1" = "--version" ]; then
+      printf '%s\n' '1.2.3'
+      exit 0
+    fi
     if [ "\$1" = "authoring-skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
       printf '%s\n' '${payload}'
       exit 1
     fi
     ;;
   skills-success)
+    if [ "\$1" = "--version" ]; then
+      printf '%s\n' '1.2.3'
+      exit 0
+    fi
     if [ "\$1" = "skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
       printf '%s\n' '{"registryPath":"/tmp/skills-registry.json"}'
       exit 0
@@ -221,6 +290,34 @@ run_missing_guide_case() {
         write_agent_guide > "$2"
         printf "%s\n" "$HOME/.clawperator/AGENTS.md" > "$3"
     ' _ "$INSTALL_SCRIPT" "$output_file" "$guide_file"
+}
+
+run_install_state_case() {
+    local label="$1"
+    local skills_setup_status="$2"
+    local registry_path="$3"
+    local apk_version="$4"
+    local last_device_serial="$5"
+    local output_file="$6"
+    local state_file="$7"
+    local mock_dir="$TMP_DIR/mock-state-$label"
+
+    setup_mock_clawperator "$mock_dir" "success" '{}'
+
+    HOME="$TMP_DIR/home-state-$label" \
+    OS=Linux \
+    PATH="$mock_dir:$PATH" \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        export CLAWPERATOR_BIN_PATH="$2"
+        export SKILLS_SETUP_STATUS="$3"
+        export SKILLS_REGISTRY_PATH="$4"
+        export OPERATOR_VERSION="$5"
+        export LAST_DEVICE_SERIAL="$6"
+        write_install_state > "$7"
+        printf "%s\n" "$HOME/.clawperator/install-state.json" > "$8"
+    ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$skills_setup_status" "$registry_path" "$apk_version" "$last_device_serial" "$output_file" "$state_file"
 }
 
 run_skip_case() {
@@ -384,7 +481,47 @@ assert_contains "$GUIDE_INVALID_OUT" "Wrote agent guide" "guide-invalid-runtime"
 assert_contains "$GUIDE_INVALID_PATH" "Runtime skills not available on this host right now." "guide-invalid-runtime file"
 assert_contains "$GUIDE_INVALID_PATH" "The registry exists but could not be read." "guide-invalid-runtime file"
 
-echo "=== Scenario 11: skip flag suppresses both runtime and authoring skills setup ==="
+echo "=== Scenario 11: install-state writer persists configured outputs ==="
+INSTALL_STATE_FULL_OUT="$TMP_DIR/install-state-full.out"
+INSTALL_STATE_FULL_PATH_FILE="$TMP_DIR/install-state-full.path"
+run_install_state_case \
+    configured \
+    configured \
+    "$TMP_DIR/runtime-registry.json" \
+    "9.9.9" \
+    "serial-123" \
+    "$INSTALL_STATE_FULL_OUT" \
+    "$INSTALL_STATE_FULL_PATH_FILE"
+INSTALL_STATE_FULL_PATH="$(cat "$INSTALL_STATE_FULL_PATH_FILE")"
+assert_contains "$INSTALL_STATE_FULL_OUT" "Wrote install state" "install-state-full"
+assert_json_field_equals "$INSTALL_STATE_FULL_PATH" "schemaVersion" "1" "install-state-full schemaVersion"
+assert_json_field_is_iso_timestamp "$INSTALL_STATE_FULL_PATH" "installedAt" "install-state-full installedAt"
+assert_json_field_equals "$INSTALL_STATE_FULL_PATH" "cliVersion" "1.2.3" "install-state-full cliVersion"
+assert_json_field_equals "$INSTALL_STATE_FULL_PATH" "registryPath" "$TMP_DIR/runtime-registry.json" "install-state-full registryPath"
+assert_json_field_equals "$INSTALL_STATE_FULL_PATH" "apkVersion" "9.9.9" "install-state-full apkVersion"
+assert_json_field_equals "$INSTALL_STATE_FULL_PATH" "lastDeviceSerial" "serial-123" "install-state-full lastDeviceSerial"
+
+echo "=== Scenario 12: install-state writer preserves nullable fields ==="
+INSTALL_STATE_NULL_OUT="$TMP_DIR/install-state-null.out"
+INSTALL_STATE_NULL_PATH_FILE="$TMP_DIR/install-state-null.path"
+run_install_state_case \
+    nullable \
+    failed \
+    "" \
+    "" \
+    "" \
+    "$INSTALL_STATE_NULL_OUT" \
+    "$INSTALL_STATE_NULL_PATH_FILE"
+INSTALL_STATE_NULL_PATH="$(cat "$INSTALL_STATE_NULL_PATH_FILE")"
+assert_contains "$INSTALL_STATE_NULL_OUT" "Wrote install state" "install-state-null"
+assert_json_field_equals "$INSTALL_STATE_NULL_PATH" "schemaVersion" "1" "install-state-null schemaVersion"
+assert_json_field_is_iso_timestamp "$INSTALL_STATE_NULL_PATH" "installedAt" "install-state-null installedAt"
+assert_json_field_equals "$INSTALL_STATE_NULL_PATH" "cliVersion" "1.2.3" "install-state-null cliVersion"
+assert_json_field_null "$INSTALL_STATE_NULL_PATH" "registryPath" "install-state-null registryPath"
+assert_json_field_null "$INSTALL_STATE_NULL_PATH" "apkVersion" "install-state-null apkVersion"
+assert_json_field_null "$INSTALL_STATE_NULL_PATH" "lastDeviceSerial" "install-state-null lastDeviceSerial"
+
+echo "=== Scenario 13: skip flag suppresses both runtime and authoring skills setup ==="
 SKIP_SKILLS_OUT="$TMP_DIR/skip-skills.out"
 SKIP_AUTHORING_OUT="$TMP_DIR/skip-authoring.out"
 SKIP_STATUS="$TMP_DIR/skip.status"
@@ -397,7 +534,7 @@ assert_contains "$SKIP_STATUS" "skills=skipped" "skip-status"
 assert_contains "$SKIP_STATUS" "authoring=skipped" "skip-status"
 assert_equals "" "$(cat "$SKIP_LOG")" "skip command log"
 
-echo "=== Scenario 12: operator metadata parser extracts all expected fields ==="
+echo "=== Scenario 14: operator metadata parser extracts all expected fields ==="
 METADATA_SUCCESS_OUT="$TMP_DIR/metadata-success.out"
 METADATA_SUCCESS_STATUS="$TMP_DIR/metadata-success.status"
 METADATA_SUCCESS_VALUES="$TMP_DIR/metadata-success.values"
@@ -414,7 +551,7 @@ assert_contains "$METADATA_SUCCESS_VALUES" "sha_url=https://example.com/operator
 assert_contains "$METADATA_SUCCESS_VALUES" "sha256=deadbeef" "metadata-success values"
 assert_file_empty "$METADATA_SUCCESS_OUT" "metadata-success output"
 
-echo "=== Scenario 13: operator metadata parser allows missing inline checksum ==="
+echo "=== Scenario 15: operator metadata parser allows missing inline checksum ==="
 METADATA_NO_SHA_OUT="$TMP_DIR/metadata-no-sha.out"
 METADATA_NO_SHA_STATUS="$TMP_DIR/metadata-no-sha.status"
 METADATA_NO_SHA_VALUES="$TMP_DIR/metadata-no-sha.values"
@@ -428,7 +565,7 @@ assert_equals "0" "$(cat "$METADATA_NO_SHA_STATUS")" "metadata-no-sha status"
 assert_contains "$METADATA_NO_SHA_VALUES" "sha256=" "metadata-no-sha values"
 assert_file_empty "$METADATA_NO_SHA_OUT" "metadata-no-sha output"
 
-echo "=== Scenario 14: operator metadata parser rejects missing required fields ==="
+echo "=== Scenario 16: operator metadata parser rejects missing required fields ==="
 METADATA_MISSING_OUT="$TMP_DIR/metadata-missing.out"
 METADATA_MISSING_STATUS="$TMP_DIR/metadata-missing.status"
 METADATA_MISSING_VALUES="$TMP_DIR/metadata-missing.values"
@@ -441,7 +578,7 @@ run_operator_metadata_case \
 assert_equals "1" "$(cat "$METADATA_MISSING_STATUS")" "metadata-missing status"
 assert_contains "$METADATA_MISSING_OUT" "Failed to parse APK metadata" "metadata-missing output"
 
-echo "=== Scenario 15: operator metadata parser rejects malformed JSON ==="
+echo "=== Scenario 17: operator metadata parser rejects malformed JSON ==="
 METADATA_BAD_OUT="$TMP_DIR/metadata-bad.out"
 METADATA_BAD_STATUS="$TMP_DIR/metadata-bad.status"
 METADATA_BAD_VALUES="$TMP_DIR/metadata-bad.values"

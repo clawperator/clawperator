@@ -56,6 +56,56 @@ assert_equals() {
     fi
 }
 
+json_field_value() {
+    local file="$1"
+    local field="$2"
+
+    node -e '
+const fs = require("fs");
+const filePath = process.argv[1];
+const field = process.argv[2];
+const json = JSON.parse(fs.readFileSync(filePath, "utf8"));
+const value = json[field];
+if (value === undefined) {
+  process.stdout.write("__undefined__");
+} else if (value === null) {
+  process.stdout.write("null");
+} else {
+  process.stdout.write(String(value));
+}
+' "$file" "$field"
+}
+
+assert_json_field_equals() {
+    local file="$1"
+    local field="$2"
+    local expected="$3"
+    local label="$4"
+    local actual
+    actual="$(json_field_value "$file" "$field")"
+    assert_equals "$expected" "$actual" "$label"
+}
+
+assert_json_field_is_iso_timestamp() {
+    local file="$1"
+    local field="$2"
+    local label="$3"
+    if ! node -e '
+const fs = require("fs");
+const filePath = process.argv[1];
+const field = process.argv[2];
+const json = JSON.parse(fs.readFileSync(filePath, "utf8"));
+const value = json[field];
+if (typeof value !== "string" || Number.isNaN(Date.parse(value))) {
+  process.exit(1);
+}
+' "$file" "$field"; then
+        echo "ERROR: $label expected parseable ISO timestamp in $field" >&2
+        cat "$file" >&2
+        return 1
+    fi
+}
+
 setup_mock_clawperator() {
     local mock_dir="$1"
     local log_file="$2"
@@ -127,6 +177,11 @@ if [ "\$1" = "doctor" ] && [ "\$2" = "--output" ] && [ "\$3" = "pretty" ]; then
   else
     printf '%s\n' 'Doctor pretty output (success)'
   fi
+  exit 0
+fi
+
+if [ "\$1" = "--version" ]; then
+  printf '%s\n' '1.2.3'
   exit 0
 fi
 
@@ -308,6 +363,7 @@ run_main_case \
     "$SUCCESS_STATE"
 
 SUCCESS_GUIDE_PATH="$(cat "$SUCCESS_GUIDE_PATH_FILE")"
+SUCCESS_INSTALL_STATE_PATH="$TMP_DIR/home-main-success/.clawperator/install-state.json"
 assert_contains "$SUCCESS_STDOUT" "Installation Successful!" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Skills registry configured at:" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Authoring skills installed at:" "main-success stdout"
@@ -319,6 +375,12 @@ assert_contains "$SUCCESS_GUIDE_PATH" "clawperator skills run com.google.android
 assert_contains "$SUCCESS_GUIDE_PATH" "skill-author-by-recording" "main-success guide"
 assert_not_contains "$SUCCESS_GUIDE_PATH" "not currently configured on this host" "main-success guide"
 assert_not_contains "$SUCCESS_GUIDE_PATH" "Runtime skills not available on this host right now." "main-success guide"
+assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "schemaVersion" "1" "main-success install-state schemaVersion"
+assert_json_field_is_iso_timestamp "$SUCCESS_INSTALL_STATE_PATH" "installedAt" "main-success install-state installedAt"
+assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "cliVersion" "1.2.3" "main-success install-state cliVersion"
+assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "registryPath" "$TMP_DIR/home-main-success/.clawperator/skills/skills/skills-registry.json" "main-success install-state registryPath"
+assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "apkVersion" "null" "main-success install-state apkVersion"
+assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "lastDeviceSerial" "serial-solo" "main-success install-state lastDeviceSerial"
 assert_contains "$SUCCESS_TRACE" "validate_os" "main-success trace"
 assert_contains "$SUCCESS_TRACE" "install_cli" "main-success trace"
 assert_contains "$SUCCESS_TRACE" "show_star_hint" "main-success trace"
@@ -346,11 +408,14 @@ run_main_case \
     "$FAIL_STATE"
 
 FAIL_GUIDE_PATH="$(cat "$FAIL_GUIDE_PATH_FILE")"
+FAIL_INSTALL_STATE_PATH="$TMP_DIR/home-main-fail/.clawperator/install-state.json"
 assert_contains "$FAIL_STDOUT" "Final doctor check failed." "main-fail stdout"
 assert_contains "$FAIL_STDOUT" "Doctor pretty output (failure)" "main-fail stdout"
 assert_not_contains "$FAIL_STDOUT" "Installation Successful!" "main-fail stdout"
 assert_contains "$FAIL_GUIDE_PATH" "### com.google.android.apps.chromecast.app" "main-fail guide"
 assert_contains "$FAIL_GUIDE_PATH" "skill-author-by-recording" "main-fail guide"
+assert_json_field_equals "$FAIL_INSTALL_STATE_PATH" "registryPath" "$TMP_DIR/home-main-fail/.clawperator/skills/skills/skills-registry.json" "main-fail install-state registryPath"
+assert_json_field_equals "$FAIL_INSTALL_STATE_PATH" "lastDeviceSerial" "serial-solo" "main-fail install-state lastDeviceSerial"
 assert_contains "$FAIL_CLI_LOG" "skills install --output json" "main-fail cli log"
 assert_contains "$FAIL_CLI_LOG" "authoring-skills install --output json" "main-fail cli log"
 assert_contains "$FAIL_CLI_LOG" "doctor --output pretty" "main-fail cli log"
@@ -399,10 +464,12 @@ run_main_case \
     "$REMEDIATE_GUIDE_PATH_FILE" \
     "$REMEDIATE_STATE"
 
+REMEDIATE_INSTALL_STATE_PATH="$TMP_DIR/home-main-remediation/.clawperator/install-state.json"
 assert_contains "$REMEDIATE_STDOUT" "Mock download_operator_apk" "main-remediation stdout"
 assert_contains "$REMEDIATE_STDOUT" "Mock verify_operator_apk" "main-remediation stdout"
 assert_contains "$REMEDIATE_STDOUT" "Mock maybe_install_operator_apk" "main-remediation stdout"
 assert_contains "$REMEDIATE_STDOUT" "Installation Successful!" "main-remediation stdout"
+assert_json_field_equals "$REMEDIATE_INSTALL_STATE_PATH" "apkVersion" "9.9.9" "main-remediation install-state apkVersion"
 assert_contains "$REMEDIATE_TRACE" "download_operator_apk" "main-remediation trace"
 assert_contains "$REMEDIATE_TRACE" "verify_operator_apk" "main-remediation trace"
 assert_contains "$REMEDIATE_TRACE" "maybe_install_operator_apk" "main-remediation trace"

@@ -27,6 +27,7 @@ AUTHORING_SKILLS_CLAUDE_DIR=""
 AUTHORING_SKILLS_CODEX_DIR=""
 AUTHORING_SKILLS_AGENTS_DIR=""
 CLAWPERATOR_BIN_PATH=""
+LAST_DEVICE_SERIAL=""
 
 TEMP_FILES=()
 
@@ -702,6 +703,67 @@ Repair or manual bootstrap:
 EOF
 }
 
+resolve_cli_version() {
+    local CLI_VERSION_OUTPUT=""
+
+    if [ -n "${CLAWPERATOR_BIN_PATH:-}" ] && CLI_VERSION_OUTPUT="$("$CLAWPERATOR_BIN_PATH" --version 2>/dev/null | head -n 1 | tr -d '\r')"; then
+        if [ -n "$CLI_VERSION_OUTPUT" ]; then
+            printf '%s\n' "$CLI_VERSION_OUTPUT"
+            return 0
+        fi
+    fi
+
+    printf '%s\n' "unknown"
+}
+
+write_install_state() {
+    local INSTALL_STATE_PATH="$HOME/.clawperator/install-state.json"
+    local INSTALLED_AT
+    local CLI_VERSION
+    local REGISTRY_PATH_VALUE=""
+    local APK_VERSION_VALUE="${OPERATOR_VERSION:-}"
+    local LAST_DEVICE_SERIAL_VALUE="${LAST_DEVICE_SERIAL:-}"
+
+    mkdir -p "$HOME/.clawperator"
+
+    INSTALLED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    CLI_VERSION="$(resolve_cli_version)"
+
+    if [ "${SKILLS_SETUP_STATUS:-}" = "configured" ] && [ -n "${SKILLS_REGISTRY_PATH:-}" ]; then
+        REGISTRY_PATH_VALUE="$SKILLS_REGISTRY_PATH"
+    fi
+
+    node - "$INSTALL_STATE_PATH" "$INSTALLED_AT" "$CLI_VERSION" "${REGISTRY_PATH_VALUE:-__NULL__}" "${APK_VERSION_VALUE:-__NULL__}" "${LAST_DEVICE_SERIAL_VALUE:-__NULL__}" <<'EOF'
+const fs = require("fs");
+
+const [
+  installStatePath,
+  installedAt,
+  cliVersion,
+  registryPathArg,
+  apkVersionArg,
+  lastDeviceSerialArg,
+] = process.argv.slice(2);
+
+function normalizeNullable(value) {
+  return value === "__NULL__" ? null : value;
+}
+
+const installState = {
+  schemaVersion: 1,
+  installedAt,
+  cliVersion,
+  registryPath: normalizeNullable(registryPathArg),
+  apkVersion: normalizeNullable(apkVersionArg),
+  lastDeviceSerial: normalizeNullable(lastDeviceSerialArg),
+};
+
+fs.writeFileSync(installStatePath, JSON.stringify(installState, null, 2) + "\n");
+EOF
+
+    echo -e "${GREEN}✅ Wrote install state to ${INSTALL_STATE_PATH}.${NC}"
+}
+
 write_agent_guide() {
     local AGENT_GUIDE_PATH="$HOME/.clawperator/AGENTS.md"
     local AUTHORING_SKILLS_GUIDE_DIR="${AUTHORING_SKILLS_INSTALL_DIR:-$HOME/.clawperator/authoring-skills}"
@@ -913,6 +975,15 @@ list_connected_devices() {
 
 list_detected_android_devices() {
     adb devices | awk 'NR > 1 && $2 != "" { print $1 "\t" $2 }'
+}
+
+record_single_connected_device_serial() {
+    local READY_DEVICE_COUNT
+    READY_DEVICE_COUNT="$(count_connected_devices)"
+
+    if [ "$READY_DEVICE_COUNT" -eq 1 ]; then
+        LAST_DEVICE_SERIAL="$(list_connected_devices)"
+    fi
 }
 
 maybe_install_operator_apk() {
@@ -1151,6 +1222,8 @@ main() {
     setup_skills_via_cli
     setup_authoring_skills_via_cli
     write_agent_guide
+    record_single_connected_device_serial
+    write_install_state
 
     local ACTIVE_SHELL="${SHELL:-/bin/bash}"
     local DETECTED_SHELL
