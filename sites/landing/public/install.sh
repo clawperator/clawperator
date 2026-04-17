@@ -1198,24 +1198,29 @@ const bridgeBlock = [
 
 let content = fs.readFileSync(sharedAgentsPath, "utf8");
 const bridgePattern = new RegExp(
-  `(?:\\r?\\n)?${escapeRegExp(startMarker)}[\\s\\S]*?${escapeRegExp(endMarker)}(?:\\r?\\n)?`,
+  `${escapeRegExp(startMarker)}[\\s\\S]*?${escapeRegExp(endMarker)}`,
   "g"
 );
 
-content = content.replace(bridgePattern, "\n").replace(/\s*$/, "");
+content = content.replace(bridgePattern, "");
 
-const nextContent = content.length === 0
-  ? bridgeBlock
-  : `${content}\n\n${bridgeBlock}`;
+const separator = content.length === 0
+  ? ""
+  : (content.endsWith("\n\n") ? "" : (content.endsWith("\n") ? "\n" : "\n\n"));
+
+const nextContent = `${content}${separator}${bridgeBlock}`;
 
 const tempPath = path.join(
   path.dirname(sharedAgentsPath),
   `.clawperator-shared-agents.${process.pid}.${Date.now()}.tmp`
 );
+const sharedAgentsPermissions = sharedAgentsStat.mode & 0o777;
 
 try {
-  fs.writeFileSync(tempPath, `${nextContent}\n`, { mode: sharedAgentsStat.mode });
+  fs.writeFileSync(tempPath, nextContent, { mode: sharedAgentsPermissions });
+  fs.chmodSync(tempPath, sharedAgentsPermissions);
   fs.renameSync(tempPath, sharedAgentsPath);
+  fs.chmodSync(sharedAgentsPath, sharedAgentsPermissions);
 } finally {
   if (fs.existsSync(tempPath)) {
     fs.unlinkSync(tempPath);

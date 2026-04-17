@@ -558,6 +558,33 @@ EOF_SHARED
     ' _ "$INSTALL_SCRIPT" "$shared_agents_mode" "$node_mode" "$output_file" "$shared_agents_file" "$first_snapshot_file"
 }
 
+run_shared_agent_bridge_preservation_case() {
+    local label="$1"
+    local output_file="$2"
+    local shared_agents_file="$3"
+    local before_mode_file="$4"
+    local expected_prefix_file="$5"
+
+    HOME="$TMP_DIR/home-bridge-$label" \
+    OS=Linux \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        mkdir -p "$HOME/.clawperator" "$HOME/.agents"
+        printf "# Clawperator local guide\n" > "$HOME/.clawperator/AGENTS.md"
+        printf "# Shared Agent Guide\n\nExisting host guidance.   \n\n" > "$HOME/.agents/AGENTS.md"
+        chmod 640 "$HOME/.agents/AGENTS.md"
+        if stat -f "%Lp" "$HOME/.agents/AGENTS.md" >/dev/null 2>&1; then
+          stat -f "%Lp" "$HOME/.agents/AGENTS.md" > "$4"
+        else
+          stat -c "%a" "$HOME/.agents/AGENTS.md" > "$4"
+        fi
+        printf "# Shared Agent Guide\n\nExisting host guidance.   \n\n" > "$5"
+        write_shared_agent_bridge > "$2" 2>&1
+        printf "%s\n" "$HOME/.agents/AGENTS.md" > "$3"
+    ' _ "$INSTALL_SCRIPT" "$output_file" "$shared_agents_file" "$before_mode_file" "$expected_prefix_file"
+}
+
 EXPECTED_NODE_BIN="$(node -p 'process.execPath')"
 
 echo "=== Scenario 1: parser extracts installed and discovery dirs ==="
@@ -917,6 +944,30 @@ assert_not_contains "$BRIDGE_EXISTING_PATH" "### Application" "bridge-existing f
 assert_occurrence_count "$BRIDGE_EXISTING_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:START -->" "1" "bridge-existing start marker count"
 assert_occurrence_count "$BRIDGE_EXISTING_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:END -->" "1" "bridge-existing end marker count"
 assert_equals "$(cat "$BRIDGE_EXISTING_FIRST")" "$(cat "$BRIDGE_EXISTING_PATH")" "bridge-existing idempotent rerun"
+
+echo "=== Scenario 19b: shared agent bridge preserves file mode and trailing whitespace ==="
+BRIDGE_PRESERVE_OUT="$TMP_DIR/bridge-preserve.out"
+BRIDGE_PRESERVE_PATH_FILE="$TMP_DIR/bridge-preserve.path"
+BRIDGE_PRESERVE_MODE_BEFORE="$TMP_DIR/bridge-preserve.mode-before"
+BRIDGE_PRESERVE_PREFIX="$TMP_DIR/bridge-preserve.prefix"
+run_shared_agent_bridge_preservation_case \
+    preserve \
+    "$BRIDGE_PRESERVE_OUT" \
+    "$BRIDGE_PRESERVE_PATH_FILE" \
+    "$BRIDGE_PRESERVE_MODE_BEFORE" \
+    "$BRIDGE_PRESERVE_PREFIX"
+BRIDGE_PRESERVE_PATH="$(cat "$BRIDGE_PRESERVE_PATH_FILE")"
+assert_contains "$BRIDGE_PRESERVE_OUT" "Updated shared agent guide bridge" "bridge-preserve output"
+assert_mode "$BRIDGE_PRESERVE_PATH" "$(cat "$BRIDGE_PRESERVE_MODE_BEFORE")" "bridge-preserve mode"
+python - "$BRIDGE_PRESERVE_PATH" "$BRIDGE_PRESERVE_PREFIX" <<'PY'
+from pathlib import Path
+import sys
+
+actual = Path(sys.argv[1]).read_text()
+expected_prefix = Path(sys.argv[2]).read_text()
+if not actual.startswith(expected_prefix):
+    raise SystemExit("bridge-preserve prefix changed unexpectedly")
+PY
 
 echo "=== Scenario 20: shared agent bridge skips missing shared guide ==="
 BRIDGE_MISSING_OUT="$TMP_DIR/bridge-missing.out"
