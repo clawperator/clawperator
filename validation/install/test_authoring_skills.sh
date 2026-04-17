@@ -56,14 +56,26 @@ assert_file_empty() {
 
 json_field_value() {
     local file="$1"
-    local field="$2"
+    local field_path="$2"
 
     node -e '
 const fs = require("fs");
 const filePath = process.argv[1];
-const field = process.argv[2];
+const fieldPath = process.argv[2];
 const json = JSON.parse(fs.readFileSync(filePath, "utf8"));
-const value = json[field];
+const segments = fieldPath.split(".").filter(Boolean);
+let value = json;
+for (const segment of segments) {
+  if (value === undefined || value === null) {
+    value = undefined;
+    break;
+  }
+  if (/^\d+$/.test(segment)) {
+    value = value[Number(segment)];
+  } else {
+    value = value[segment];
+  }
+}
 if (value === undefined) {
   process.stdout.write("__undefined__");
 } else if (value === null) {
@@ -346,6 +358,32 @@ run_skip_case() {
     ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$output_skills" "$output_authoring" "$status_file"
 }
 
+run_mcp_config_case() {
+    local label="$1"
+    local output_file="$2"
+    local snippet_file="$3"
+    local mock_dir="$TMP_DIR/mock-mcp-$label"
+
+    setup_mock_clawperator "$mock_dir" "success" '{}'
+    cat > "$mock_dir/adb" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+exit 0
+EOF
+    chmod +x "$mock_dir/adb"
+
+    HOME="$TMP_DIR/home-mcp-$label" \
+    OS=Linux \
+    PATH="$mock_dir:$PATH" \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        export CLAWPERATOR_BIN_PATH="$2"
+        write_mcp_config_snippet > "$3"
+        printf "%s\n" "$HOME/.clawperator/mcp-config-snippet.json" > "$4"
+    ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$output_file" "$snippet_file"
+}
+
 echo "=== Scenario 1: parser extracts installed and discovery dirs ==="
 PARSE_SUCCESS_OUT="$TMP_DIR/parse-success.out"
 run_parser_case \
@@ -534,7 +572,24 @@ assert_contains "$SKIP_STATUS" "skills=skipped" "skip-status"
 assert_contains "$SKIP_STATUS" "authoring=skipped" "skip-status"
 assert_equals "" "$(cat "$SKIP_LOG")" "skip command log"
 
-echo "=== Scenario 14: operator metadata parser extracts all expected fields ==="
+echo "=== Scenario 14: MCP config writer emits paste-ready snippets ==="
+MCP_CONFIG_OUT="$TMP_DIR/mcp-config.out"
+MCP_CONFIG_PATH_FILE="$TMP_DIR/mcp-config.path"
+run_mcp_config_case authoring "$MCP_CONFIG_OUT" "$MCP_CONFIG_PATH_FILE"
+MCP_CONFIG_PATH="$(cat "$MCP_CONFIG_PATH_FILE")"
+assert_contains "$MCP_CONFIG_OUT" "Wrote MCP config snippet" "mcp-config"
+assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.mergeKey" "mcpServers" "mcp-config claude mergeKey"
+assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.command" "$TMP_DIR/mock-mcp-authoring/clawperator" "mcp-config claude command"
+assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.0" "mcp" "mcp-config claude args.0"
+assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.1" "serve" "mcp-config claude args.1"
+assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.env.ADB_PATH" "$TMP_DIR/mock-mcp-authoring/adb" "mcp-config claude env.ADB_PATH"
+assert_json_field_equals "$MCP_CONFIG_PATH" "codex.configPath" "$TMP_DIR/home-mcp-authoring/.codex/config.toml" "mcp-config codex configPath"
+assert_contains "$MCP_CONFIG_PATH" '[mcp_servers.clawperator]' "mcp-config codex entryToml"
+assert_contains "$MCP_CONFIG_PATH" 'args = [\"mcp\", \"serve\"]' "mcp-config codex entryToml"
+assert_json_field_equals "$MCP_CONFIG_PATH" "genericStdioConsumer.serverName" "clawperator" "mcp-config generic serverName"
+assert_json_field_equals "$MCP_CONFIG_PATH" "genericStdioConsumer.server.command" "$TMP_DIR/mock-mcp-authoring/clawperator" "mcp-config generic command"
+
+echo "=== Scenario 15: operator metadata parser extracts all expected fields ==="
 METADATA_SUCCESS_OUT="$TMP_DIR/metadata-success.out"
 METADATA_SUCCESS_STATUS="$TMP_DIR/metadata-success.status"
 METADATA_SUCCESS_VALUES="$TMP_DIR/metadata-success.values"
@@ -551,7 +606,7 @@ assert_contains "$METADATA_SUCCESS_VALUES" "sha_url=https://example.com/operator
 assert_contains "$METADATA_SUCCESS_VALUES" "sha256=deadbeef" "metadata-success values"
 assert_file_empty "$METADATA_SUCCESS_OUT" "metadata-success output"
 
-echo "=== Scenario 15: operator metadata parser allows missing inline checksum ==="
+echo "=== Scenario 16: operator metadata parser allows missing inline checksum ==="
 METADATA_NO_SHA_OUT="$TMP_DIR/metadata-no-sha.out"
 METADATA_NO_SHA_STATUS="$TMP_DIR/metadata-no-sha.status"
 METADATA_NO_SHA_VALUES="$TMP_DIR/metadata-no-sha.values"
@@ -565,7 +620,7 @@ assert_equals "0" "$(cat "$METADATA_NO_SHA_STATUS")" "metadata-no-sha status"
 assert_contains "$METADATA_NO_SHA_VALUES" "sha256=" "metadata-no-sha values"
 assert_file_empty "$METADATA_NO_SHA_OUT" "metadata-no-sha output"
 
-echo "=== Scenario 16: operator metadata parser rejects missing required fields ==="
+echo "=== Scenario 17: operator metadata parser rejects missing required fields ==="
 METADATA_MISSING_OUT="$TMP_DIR/metadata-missing.out"
 METADATA_MISSING_STATUS="$TMP_DIR/metadata-missing.status"
 METADATA_MISSING_VALUES="$TMP_DIR/metadata-missing.values"
@@ -578,7 +633,7 @@ run_operator_metadata_case \
 assert_equals "1" "$(cat "$METADATA_MISSING_STATUS")" "metadata-missing status"
 assert_contains "$METADATA_MISSING_OUT" "Failed to parse APK metadata" "metadata-missing output"
 
-echo "=== Scenario 17: operator metadata parser rejects malformed JSON ==="
+echo "=== Scenario 18: operator metadata parser rejects malformed JSON ==="
 METADATA_BAD_OUT="$TMP_DIR/metadata-bad.out"
 METADATA_BAD_STATUS="$TMP_DIR/metadata-bad.status"
 METADATA_BAD_VALUES="$TMP_DIR/metadata-bad.values"

@@ -58,14 +58,26 @@ assert_equals() {
 
 json_field_value() {
     local file="$1"
-    local field="$2"
+    local field_path="$2"
 
     node -e '
 const fs = require("fs");
 const filePath = process.argv[1];
-const field = process.argv[2];
+const fieldPath = process.argv[2];
 const json = JSON.parse(fs.readFileSync(filePath, "utf8"));
-const value = json[field];
+const segments = fieldPath.split(".").filter(Boolean);
+let value = json;
+for (const segment of segments) {
+  if (value === undefined || value === null) {
+    value = undefined;
+    break;
+  }
+  if (/^\d+$/.test(segment)) {
+    value = value[Number(segment)];
+  } else {
+    value = value[segment];
+  }
+}
 if (value === undefined) {
   process.stdout.write("__undefined__");
 } else if (value === null) {
@@ -364,6 +376,7 @@ run_main_case \
 
 SUCCESS_GUIDE_PATH="$(cat "$SUCCESS_GUIDE_PATH_FILE")"
 SUCCESS_INSTALL_STATE_PATH="$TMP_DIR/home-main-success/.clawperator/install-state.json"
+SUCCESS_MCP_CONFIG_PATH="$TMP_DIR/home-main-success/.clawperator/mcp-config-snippet.json"
 assert_contains "$SUCCESS_STDOUT" "Installation Successful!" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Skills registry configured at:" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Authoring skills installed at:" "main-success stdout"
@@ -381,6 +394,10 @@ assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "cliVersion" "1.2.3" "mai
 assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "registryPath" "$TMP_DIR/home-main-success/.clawperator/skills/skills/skills-registry.json" "main-success install-state registryPath"
 assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "apkVersion" "null" "main-success install-state apkVersion"
 assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "lastDeviceSerial" "serial-solo" "main-success install-state lastDeviceSerial"
+assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.command" "$TMP_DIR/mock-main-success/clawperator" "main-success mcp claude command"
+assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.env.ADB_PATH" "$TMP_DIR/mock-main-success/adb" "main-success mcp claude env.ADB_PATH"
+assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "genericStdioConsumer.server.args.1" "serve" "main-success mcp generic args.1"
+assert_contains "$SUCCESS_MCP_CONFIG_PATH" '[mcp_servers.clawperator]' "main-success mcp codex entryToml"
 assert_contains "$SUCCESS_TRACE" "validate_os" "main-success trace"
 assert_contains "$SUCCESS_TRACE" "install_cli" "main-success trace"
 assert_contains "$SUCCESS_TRACE" "show_star_hint" "main-success trace"

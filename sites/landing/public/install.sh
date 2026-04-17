@@ -764,6 +764,87 @@ EOF
     echo -e "${GREEN}✅ Wrote install state to ${INSTALL_STATE_PATH}.${NC}"
 }
 
+resolve_adb_path_for_mcp() {
+    if command -v adb > /dev/null 2>&1; then
+        command -v adb
+        return 0
+    fi
+
+    printf '%s\n' "adb"
+}
+
+write_mcp_config_snippet() {
+    local MCP_CONFIG_SNIPPET_PATH="$HOME/.clawperator/mcp-config-snippet.json"
+    local MCP_COMMAND="${CLAWPERATOR_BIN_PATH:-clawperator}"
+    local ADB_PATH_VALUE
+    local LOG_DIR="$HOME/.clawperator/logs"
+    local CODEX_CONFIG_PATH="${CODEX_HOME:-$HOME/.codex}/config.toml"
+    local CLAUDE_CONFIG_PATH_MAC="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+    local CLAUDE_CONFIG_PATH_LINUX="$HOME/.config/Claude/claude_desktop_config.json"
+
+    mkdir -p "$HOME/.clawperator"
+
+    ADB_PATH_VALUE="$(resolve_adb_path_for_mcp)"
+
+    node - "$MCP_CONFIG_SNIPPET_PATH" "$MCP_COMMAND" "$ADB_PATH_VALUE" "$DEFAULT_OPERATOR_PACKAGE" "$LOG_DIR" "$CODEX_CONFIG_PATH" "$CLAUDE_CONFIG_PATH_MAC" "$CLAUDE_CONFIG_PATH_LINUX" <<'EOF'
+const fs = require("fs");
+
+const [
+  snippetPath,
+  command,
+  adbPath,
+  operatorPackage,
+  logDir,
+  codexConfigPath,
+  claudeMacPath,
+  claudeLinuxPath,
+] = process.argv.slice(2);
+
+const serverConfig = {
+  command,
+  args: ["mcp", "serve"],
+  env: {
+    ADB_PATH: adbPath,
+    CLAWPERATOR_OPERATOR_PACKAGE: operatorPackage,
+    CLAWPERATOR_LOG_DIR: logDir,
+    CLAWPERATOR_LOG_LEVEL: "info",
+  },
+};
+
+const snippet = {
+  claudeDesktop: {
+    configPathHints: [claudeMacPath, claudeLinuxPath],
+    mergeKey: "mcpServers",
+    entry: {
+      clawperator: serverConfig,
+    },
+  },
+  codex: {
+    configPath: codexConfigPath,
+    entryToml: [
+      "[mcp_servers.clawperator]",
+      `command = ${JSON.stringify(command)}`,
+      "args = [\"mcp\", \"serve\"]",
+      "[mcp_servers.clawperator.env]",
+      `ADB_PATH = ${JSON.stringify(adbPath)}`,
+      `CLAWPERATOR_OPERATOR_PACKAGE = ${JSON.stringify(operatorPackage)}`,
+      `CLAWPERATOR_LOG_DIR = ${JSON.stringify(logDir)}`,
+      "CLAWPERATOR_LOG_LEVEL = \"info\"",
+      "",
+    ].join("\n"),
+  },
+  genericStdioConsumer: {
+    serverName: "clawperator",
+    server: serverConfig,
+  },
+};
+
+fs.writeFileSync(snippetPath, JSON.stringify(snippet, null, 2) + "\n");
+EOF
+
+    echo -e "${GREEN}✅ Wrote MCP config snippet to ${MCP_CONFIG_SNIPPET_PATH}.${NC}"
+}
+
 write_agent_guide() {
     local AGENT_GUIDE_PATH="$HOME/.clawperator/AGENTS.md"
     local AUTHORING_SKILLS_GUIDE_DIR="${AUTHORING_SKILLS_INSTALL_DIR:-$HOME/.clawperator/authoring-skills}"
@@ -1224,6 +1305,7 @@ main() {
     write_agent_guide
     record_single_connected_device_serial
     write_install_state
+    write_mcp_config_snippet
 
     local ACTIVE_SHELL="${SHELL:-/bin/bash}"
     local DETECTED_SHELL
