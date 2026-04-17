@@ -410,6 +410,8 @@ EOF_SHARED
     ' _ "$INSTALL_SCRIPT" "$shared_agents_mode" "$output_file" "$shared_agents_file" "$first_snapshot_file"
 }
 
+EXPECTED_NODE_BIN="$(node -p 'process.execPath')"
+
 echo "=== Scenario 1: parser extracts installed and discovery dirs ==="
 PARSE_SUCCESS_OUT="$TMP_DIR/parse-success.out"
 run_parser_case \
@@ -640,7 +642,7 @@ MCP_CONFIG_PATH="$(cat "$MCP_CONFIG_PATH_FILE")"
 MCP_CLI_JS_PATH="$TMP_DIR/mock-mcp-authoring/clawperator-cli.js"
 assert_contains "$MCP_CONFIG_OUT" "Wrote MCP config snippet" "mcp-config"
 assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.mergeKey" "mcpServers" "mcp-config claude mergeKey"
-assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.command" "node" "mcp-config claude command"
+assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.command" "$EXPECTED_NODE_BIN" "mcp-config claude command"
 assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.0" "$MCP_CLI_JS_PATH" "mcp-config claude args.0"
 assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.1" "mcp" "mcp-config claude args.1"
 assert_json_field_equals "$MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.2" "serve" "mcp-config claude args.2"
@@ -652,7 +654,7 @@ assert_json_field_equals "$MCP_CONFIG_PATH" "genericStdioConsumer.server.args.2"
 assert_contains "$MCP_CONFIG_PATH" '[mcp_servers.clawperator]' "mcp-config codex entryToml"
 assert_contains "$MCP_CONFIG_PATH" "args = [\\\"$MCP_CLI_JS_PATH\\\", \\\"mcp\\\", \\\"serve\\\"]" "mcp-config codex entryToml"
 assert_json_field_equals "$MCP_CONFIG_PATH" "genericStdioConsumer.serverName" "clawperator" "mcp-config generic serverName"
-assert_json_field_equals "$MCP_CONFIG_PATH" "genericStdioConsumer.server.command" "node" "mcp-config generic command"
+assert_json_field_equals "$MCP_CONFIG_PATH" "genericStdioConsumer.server.command" "$EXPECTED_NODE_BIN" "mcp-config generic command"
 assert_not_contains "$MCP_CONFIG_PATH" "npm shell wrapper" "mcp-config no wrapper note when node-form resolved"
 assert_not_contains "$MCP_CONFIG_PATH" "<set ADB_PATH" "mcp-config no adb placeholder when adb resolved"
 

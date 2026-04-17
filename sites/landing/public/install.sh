@@ -895,13 +895,14 @@ const [
 const ADB_PLACEHOLDER = "<set ADB_PATH to your adb binary>";
 const adbResolved = adbPath.length > 0;
 const adbValue = adbResolved ? adbPath : ADB_PLACEHOLDER;
+const nodeCommand = process.execPath;
 
 // Prefer "node <js>" per docs/api/mcp.md: MCP desktop clients usually do not
 // inherit the interactive shell PATH and "node <js>" avoids relying on the npm
 // shell wrapper. Fall back to the wrapper only when the JS entrypoint could not
 // be resolved.
 const useNodeForm = cliJsPath.length > 0;
-const command = useNodeForm ? "node" : cliWrapperPath;
+const command = useNodeForm ? nodeCommand : cliWrapperPath;
 const args = useNodeForm
   ? [cliJsPath, "mcp", "serve"]
   : ["mcp", "serve"];

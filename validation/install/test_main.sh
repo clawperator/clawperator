@@ -9,6 +9,7 @@ SYSTEM_NODE_BIN_DIR="$(dirname "$(command -v node)")"
 SYSTEM_PATH_BASE="$SYSTEM_NODE_BIN_DIR:/usr/bin:/bin:/usr/sbin:/sbin"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
+EXPECTED_NODE_BIN="$(node -p 'process.execPath')"
 
 assert_contains() {
     local file="$1"
@@ -350,7 +351,7 @@ assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "cliVersion" "1.2.3" "mai
 assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "registryPath" "$TMP_DIR/home-main-success/.clawperator/skills/skills/skills-registry.json" "main-success install-state registryPath"
 assert_json_field_equals "$SUCCESS_INSTALL_STATE_PATH" "apkVersion" "null" "main-success install-state apkVersion"
 assert_json_field_null "$SUCCESS_INSTALL_STATE_PATH" "lastDeviceSerial" "main-success install-state lastDeviceSerial"
-assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.command" "node" "main-success mcp claude command"
+assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.command" "$EXPECTED_NODE_BIN" "main-success mcp claude command"
 assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.0" "$TMP_DIR/mock-main-success/clawperator.cli.js" "main-success mcp claude args.0"
 assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.1" "mcp" "main-success mcp claude args.1"
 assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.2" "serve" "main-success mcp claude args.2"
@@ -358,7 +359,7 @@ assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawper
 assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "notes.1" "Regenerate it with install.sh if the clawperator binary path or adb path changes." "main-success mcp notes.1"
 assert_equals "mcp" "$(json_field_value "$SUCCESS_MCP_CONFIG_PATH" "genericStdioConsumer.server.args.1")" "main-success mcp helper direct call"
 assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "genericStdioConsumer.server.args.2" "serve" "main-success mcp generic args.2"
-assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "genericStdioConsumer.server.command" "node" "main-success mcp generic command"
+assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "genericStdioConsumer.server.command" "$EXPECTED_NODE_BIN" "main-success mcp generic command"
 assert_contains "$SUCCESS_MCP_CONFIG_PATH" '[mcp_servers.clawperator]' "main-success mcp codex entryToml"
 assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/AGENTS.md" "main-success stdout durable guide"
 assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/install-state.json" "main-success stdout durable install-state"

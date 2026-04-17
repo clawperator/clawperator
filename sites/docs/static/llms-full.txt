@@ -6271,6 +6271,10 @@ path, `DEFAULT_OPERATOR_PACKAGE` (`com.clawperator.operator`), and
 - `codex.entryToml`
 - `genericStdioConsumer.server`
 
+When the installer can resolve the packaged CLI JS entrypoint, the generated
+snippet uses the installer's current absolute Node executable path instead of a
+bare `node` command so GUI MCP clients do not depend on shell `PATH`.
+
 The installer does not auto-register the MCP server with any client. The file
 is a paste-ready bridge, not an automatic configuration mutation.
 
