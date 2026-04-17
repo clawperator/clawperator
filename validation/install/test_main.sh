@@ -204,6 +204,7 @@ if [ "\$1" = "skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ 
   cat > "\$REGISTRY_PATH" <<'JSON'
 {"skills":[
   {"id":"com.google.android.apps.chromecast.app.get-climate-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"get-climate","summary":"Read the current Google Home climate state.","path":"skills/com.google.android.apps.chromecast.app.get-climate-replay","skillFile":"skills/com.google.android.apps.chromecast.app.get-climate-replay/SKILL.md","scripts":[],"artifacts":[]},
+  {"id":"com.google.android.apps.chromecast.app.set-temperature-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"set-temperature","summary":"Set the Google Home target temperature.","path":"skills/com.google.android.apps.chromecast.app.set-temperature-replay","skillFile":"skills/com.google.android.apps.chromecast.app.set-temperature-replay/SKILL.md","scripts":[],"artifacts":[],"contract":{"inputs":{"target_temperature":"integer[16,30]","unit_name":"string"},"goal":null,"verification":null}},
   {"id":"com.spotify.music.play-playlist","applicationId":"com.spotify.music","intent":"play-playlist","summary":"Start a named playlist in Spotify.","path":"skills/com.spotify.music.play-playlist","skillFile":"skills/com.spotify.music.play-playlist/SKILL.md","scripts":[],"artifacts":[]}
 ]}
 JSON
@@ -384,7 +385,9 @@ assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/skill
 assert_contains "$SUCCESS_STDOUT" "Doctor pretty output (success)" "main-success stdout"
 assert_contains "$SUCCESS_GUIDE_PATH" "## Runtime Skills" "main-success guide"
 assert_contains "$SUCCESS_GUIDE_PATH" "### com.google.android.apps.chromecast.app" "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" 'Inspect required inputs before running with `clawperator skills get <id>`.' "main-success guide"
 assert_contains "$SUCCESS_GUIDE_PATH" "clawperator skills run com.google.android.apps.chromecast.app.get-climate-replay" "main-success guide"
+assert_contains "$SUCCESS_GUIDE_PATH" "clawperator skills run com.google.android.apps.chromecast.app.set-temperature-replay --target-temperature <target_temperature> --unit-name <unit_name>" "main-success guide"
 assert_contains "$SUCCESS_GUIDE_PATH" "skill-author-by-recording" "main-success guide"
 assert_not_contains "$SUCCESS_GUIDE_PATH" "not currently configured on this host" "main-success guide"
 assert_not_contains "$SUCCESS_GUIDE_PATH" "Runtime skills not available on this host right now." "main-success guide"

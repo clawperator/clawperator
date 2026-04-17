@@ -651,9 +651,25 @@ for (const skill of registry.skills) {
 
 const applicationIds = Array.from(byApplication.keys()).sort((a, b) => a.localeCompare(b));
 
+function toCliFlagName(inputName) {
+  return inputName.replace(/_/g, "-");
+}
+
+function buildSkillRunExample(skill) {
+  const id = typeof skill.id === "string" && skill.id.length > 0 ? skill.id : "unknown-skill";
+  const contract = skill && typeof skill.contract === "object" && skill.contract !== null ? skill.contract : null;
+  const inputs = contract && typeof contract.inputs === "object" && contract.inputs !== null
+    ? Object.keys(contract.inputs).sort((left, right) => left.localeCompare(right))
+    : [];
+  const args = inputs.map((inputName) => `--${toCliFlagName(inputName)} <${inputName}>`);
+  return ["clawperator", "skills", "run", id, ...args].join(" ");
+}
+
 console.log("");
 console.log("Registry path:");
 console.log("`" + registryPath + "`");
+console.log("");
+console.log("Inspect required inputs before running with `clawperator skills get <id>`.");
 
 if (applicationIds.length === 0) {
   console.log("");
@@ -683,7 +699,7 @@ for (const applicationId of applicationIds) {
     const summary = typeof skill.summary === "string" && skill.summary.length > 0
       ? skill.summary
       : "No summary provided.";
-    console.log("- `" + id + "` - intent `" + intent + "` - " + summary + " Example: `clawperator skills run " + id + "`");
+    console.log("- `" + id + "` - intent `" + intent + "` - " + summary + " Example: `" + buildSkillRunExample(skill) + "`");
   }
 }
 EOF

@@ -276,6 +276,7 @@ run_guide_case() {
           cat > "$HOME/.clawperator/skills/skills/skills-registry.json" <<'\''JSON'\''
 {"skills":[
   {"id":"com.google.android.apps.chromecast.app.get-climate-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"get-climate","summary":"Read the current Google Home climate state.","path":"skills/com.google.android.apps.chromecast.app.get-climate-replay","skillFile":"skills/com.google.android.apps.chromecast.app.get-climate-replay/SKILL.md","scripts":[],"artifacts":[]},
+  {"id":"com.google.android.apps.chromecast.app.set-temperature-replay","applicationId":"com.google.android.apps.chromecast.app","intent":"set-temperature","summary":"Set the Google Home target temperature.","path":"skills/com.google.android.apps.chromecast.app.set-temperature-replay","skillFile":"skills/com.google.android.apps.chromecast.app.set-temperature-replay/SKILL.md","scripts":[],"artifacts":[],"contract":{"inputs":{"target_temperature":"integer[16,30]","unit_name":"string"},"goal":null,"verification":null}},
   {"id":"com.spotify.music.play-playlist","applicationId":"com.spotify.music","intent":"play-playlist","summary":"Start a named playlist in Spotify.","path":"skills/com.spotify.music.play-playlist","skillFile":"skills/com.spotify.music.play-playlist/SKILL.md","scripts":[],"artifacts":[]}
 ]}
 JSON
@@ -493,10 +494,12 @@ run_guide_case guide-missing-version without-version with-runtime-registry "$GUI
 GUIDE_PATH="$(cat "$GUIDE_PATH_FILE")"
 assert_contains "$GUIDE_OUT" "Wrote agent guide" "guide-missing-version"
 assert_contains "$GUIDE_PATH" "## Runtime Skills" "guide-missing-version file"
+assert_contains "$GUIDE_PATH" 'Inspect required inputs before running with `clawperator skills get <id>`.' "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "### com.google.android.apps.chromecast.app" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" 'intent `get-climate`' "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "Read the current Google Home climate state." "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "clawperator skills run com.google.android.apps.chromecast.app.get-climate-replay" "guide-missing-version file"
+assert_contains "$GUIDE_PATH" "clawperator skills run com.google.android.apps.chromecast.app.set-temperature-replay --target-temperature <target_temperature> --unit-name <unit_name>" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "### com.spotify.music" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "skill-author-by-recording" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "skill-audit" "guide-missing-version file"
