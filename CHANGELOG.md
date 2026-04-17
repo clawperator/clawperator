@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.6.4] - 2026-04-18
+
+This release sharpens the post-install host orientation flow and updates the surrounding CLI and docs guidance to point users at the right entry points.
+
+### 🤖 Node API & CLI
+- **Changed:** Reworked the post-install discovery flow so the CLI now steers hosts through `skills for-app` or `skills search` first, while keeping `mcp serve` as the stdio MCP transport entry point.
+
+### 📚 Documentation & Website
+- **Changed:** Added `docs/host-agents.md` as the canonical post-install route and repointed setup, quickstart, skills, MCP, index, and design guidance around that flow.
+- **Changed:** Clarified registry-read remediation to favor the installed home registry path and concrete next steps without changing `CLAWPERATOR_SKILLS_REGISTRY` precedence.
+
+Pull requests:
+- [docs: update docs and cli for agent host orientation](https://github.com/clawperator/clawperator/pull/197)
+
 ## [0.6.3] - 2026-04-17
 
 This release expands skills discovery and ranking, while refreshing the install and onboarding guidance to match the current runtime-skill flow.
