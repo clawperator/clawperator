@@ -116,7 +116,7 @@ allowed to explain them better, but not redesign them:
 | Public docs nav | `sites/docs/mkdocs.yml` |
 | Generated CLI reference ownership | `sites/docs/source-map.yaml` |
 | Durable host-agent design rules | `docs/internal/design/agent-host-integration.md` |
-| Historical scope split for this pack | This `plan.md` under `Why Now` and `Current Shipped Baseline` |
+| Historical scope split for this pack | This `plan.md` under `Why Now` and `Current Shipped Baseline`. Do not read `tasks/install/onboarding/`; that pack is retired after PR #196 merges. |
 
 ## Deterministic Versus Judgment
 

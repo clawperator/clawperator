@@ -54,11 +54,15 @@ following as the baseline problem statement:
     device
   - Google Home must already be signed in and have a linked climate unit
   - the caller may need to supply the exact `unit_name` that matches the UI
-  - the orchestrated HVAC skill internally depends on the `codex` CLI being
-    available on the host
+  - the orchestrated HVAC skill declares `agent.cli = "codex"` in its
+    `skill.json`, which the existing runtime already guards with
+    `SKILL_AGENT_CLI_UNAVAILABLE` before spawn (see
+    `apps/node/src/domain/skills/runSkill.ts`)
 - Not all of those requirements are equally provable ahead of time:
-  - missing host CLIs and missing installed Android packages can be checked
-    mechanically
+  - missing Android packages on a known target device can be checked
+    mechanically; additional host CLIs declared by `requirements` (beyond the
+    manifest-level `agent.cli`, which already has its own guard) can also be
+    checked mechanically
   - sign-in state, linked-device state, and exact unit-label correctness are
     advisory first-run guidance unless the runtime gains a truthful proof path
 - The design intent for this pack is therefore:
@@ -106,7 +110,7 @@ following as the baseline problem statement:
 
 | Surface | What changes | Owner |
 | --- | --- | --- |
-| `apps/node/src/contracts/skills.ts` | Requirements metadata shape and skill-surface precondition codes | PR-1 / Phase 1 |
+| `apps/node/src/contracts/skills.ts` | Requirements metadata shape in PR-1 / Phase 1; new skill-surface precondition codes (if any) in PR-2 / Phase 3 |
 | `apps/node/src/domain/skills/skillManifest.ts` | Trusted manifest parsing for new metadata | PR-1 / Phase 1 |
 | `apps/node/src/cli/commands/skills.ts` | `skills get` discovery output | PR-1 / Phase 2 |
 | `apps/node/src/test/unit/skills.test.ts` | Contract, discovery, and runtime preflight regression coverage | PR-1 / Phase 2, PR-2 / Phase 4 |
@@ -151,6 +155,11 @@ following as the baseline problem statement:
   unless the current code proves that decision wrong.
 - The Google Home HVAC skills are the required exemplar seed set for this pack.
   Do not prove the feature only with synthetic local fixtures.
+- The manifest-level `agent.cli` field already exists and is already enforced
+  at runtime by `SKILL_AGENT_CLI_UNAVAILABLE`. Do not restate `agent.cli` as a
+  `requirements.hostCli` entry, and do not add a second preflight path for it.
+  `requirements.hostCli` is reserved for additional host CLIs that a skill
+  needs beyond its declared `agent.cli`.
 
 **Judgment required:**
 

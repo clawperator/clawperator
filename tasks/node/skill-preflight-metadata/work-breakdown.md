@@ -156,14 +156,18 @@ Home HVAC skills with that metadata in `../clawperator-skills`.
 3. Update the sibling skills repo schema in
    `../clawperator-skills/skills/skills-registry.schema.json` so the published
    registry accepts the new metadata.
-4. Seed the four Google Home HVAC skills with real requirements metadata. At
-   minimum cover:
+4. Seed the four Google Home HVAC skills (`get-climate-replay`,
+   `set-power-replay`, `set-temperature-replay`, and
+   `control-hvac-orchestrated`) with real requirements metadata. At minimum
+   cover:
    - required Android package `com.google.android.apps.chromecast.app`
-   - required host CLI for orchestrated skill execution where applicable
    - user-input guidance for exact unit-name matching
    - advisory sign-in or linked-device notes
    - safer-first-run guidance from the orchestrated skill to the replay or
      read-only path
+   Do not restate the orchestrated skill's existing `agent.cli = "codex"` as a
+   `requirements.hostCli` entry; that is already covered by the manifest
+   `agent` block.
 5. Update public docs in `docs/skills/overview.md` so they describe the new
    discovery surface accurately.
 6. Add regression coverage that proves `skills get` surfaces the seeded Google
@@ -221,7 +225,10 @@ skill-surface failures when the requirement is known to be unmet.
 1. Add runtime preflight evaluation ahead of harness spawn in `runSkill.ts`.
 2. Implement checks only for hard requirements that can be proven before spawn,
    such as:
-   - required host CLI missing from PATH or configured location
+   - required host CLI declared via new `requirements.hostCli` missing from
+     PATH or configured location. Do not re-check the manifest-level
+     `agent.cli`; that path is already guarded by `SKILL_AGENT_CLI_UNAVAILABLE`
+     in `runSkill.ts` and must not be duplicated here.
    - required Android package missing on the selected target device when a
      device is known
 3. Decide what should happen when a device-side package requirement exists but
