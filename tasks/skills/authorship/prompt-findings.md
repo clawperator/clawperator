@@ -1,374 +1,230 @@
-# Findings: Skill Authorship Prompt Review
+# Agent Prompt: Skill Authorship Findings Pass
 
-Date: 2026-04-19
-Scope: review the drafted prompt, verify the referenced paths, point future agents at the real source surfaces, and tighten the prompt so it is easier to execute truthfully.
+Created: 2026-04-19
 
-## Executive Summary
+Audit the current Clawperator skill authorship story and document the findings in:
 
-The draft is directionally strong, but it currently underspecifies the actual source-of-truth surfaces an agent would need to inspect.
+- `tasks/skills/authorship/findings-codex-1.md`
 
-The biggest gaps are:
+This is a findings pass only.
 
-- it focuses mostly on this repo and misses the sibling runtime-skills repo `../clawperator-skills/`, where authored skills, generated indexes, and repo-local authoring rules actually live
-- it mentions discoverability, but it does not explicitly include the host-agent discovery docs and install surfaces that currently carry that responsibility
-- it talks about possible new authorship workflows, but it does not clearly separate current-state audit from future design recommendation
-- it asks for PR-history learning, but it does not tell the future agent which recurring failure classes to look for
-- it does not ask for a concrete output shape beyond “document your findings”, which risks an unfocused report
+- Do not implement product changes.
+- Do not create task packs yet.
+- Do not run `$task-author` yet.
+- Do not create `plan.md` or `work-breakdown.md` in this pass.
 
-There is also one real doc gap in the current repo:
+The goal is to gather enough grounded context that a later pass can use
+`$task-author` to create the right follow-up task packs.
 
-- [`docs/internal/design/skill-design.md`](../../../docs/internal/design/skill-design.md) points to `../skills/skill-from-recording.md` at lines 15-17, but that file does not exist
+## Goal
 
-## Verified Paths From The Draft
+Evaluate two related but distinct tracks:
 
-These references were checked locally.
+1. How an agent should draft a new Clawperator runtime skill from a natural-language request.
+2. How Clawperator should provide durable guidance, best practices, testing expectations, and structure for safe skill authoring.
 
-- [`../../../.agents/skills/skill-author-by-recording/SKILL.md`](../../../.agents/skills/skill-author-by-recording/SKILL.md) exists
-- [`../../../docs/skills/overview.md`](../../../docs/skills/overview.md) exists
-- [`../../../docs/skills/authoring.md`](../../../docs/skills/authoring.md) exists
-- [`../../../docs/skills/development.md`](../../../docs/skills/development.md) exists
-- [`../../../docs/skills/runtime.md`](../../../docs/skills/runtime.md) exists
-- [`../../../.agents/skills/evals-run/SKILL.md`](../../../.agents/skills/evals-run/SKILL.md) exists
-- [`../../../.agents/skills/evals-live-run/SKILL.md`](../../../.agents/skills/evals-live-run/SKILL.md) exists
-- [`../../../evals/`](../../../evals/) exists
-- [`../../../docs/internal/openclaw-reference.md`](../../../docs/internal/openclaw-reference.md) exists
-- [`../../../docs/internal/design/agent-host-integration.md`](../../../docs/internal/design/agent-host-integration.md) exists
-- [`../../../docs/internal/design/skill-design.md`](../../../docs/internal/design/skill-design.md) exists
+Analyze both tracks together in this findings pass, but keep them explicitly
+separated in the writeup.
 
-Additional related surfaces that are not in the draft but should be:
+## Concrete scenario
 
-- [`../../../docs/host-agents.md`](../../../docs/host-agents.md)
-- [`../../../docs/api/recording.md`](../../../docs/api/recording.md)
-- [`../../../docs/api/environment.md`](../../../docs/api/environment.md)
-- [`../../../sites/landing/public/install.sh`](../../../sites/landing/public/install.sh)
-- [`../../../apps/node/src/cli/commands/authoringSkills.ts`](../../../apps/node/src/cli/commands/authoringSkills.ts)
-- [`../../../apps/node/src/domain/skills/copyAuthoringSkills.ts`](../../../apps/node/src/domain/skills/copyAuthoringSkills.ts)
-- [`../../../apps/node/src/contracts/skills.ts`](../../../apps/node/src/contracts/skills.ts)
-- [`../../../apps/node/src/contracts/skillResult.ts`](../../../apps/node/src/contracts/skillResult.ts)
-- [`../../../apps/node/src/domain/skills/runSkill.ts`](../../../apps/node/src/domain/skills/runSkill.ts)
-- [`../../../apps/node/src/domain/skills/validateSkill.ts`](../../../apps/node/src/domain/skills/validateSkill.ts)
-- [`../../../apps/node/src/domain/skills/scaffoldSkill.ts`](../../../apps/node/src/domain/skills/scaffoldSkill.ts)
-- [`../../../apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`](../../../apps/node/src/adapters/skills-repo/localSkillsRegistry.ts)
-- [`../../../../clawperator-skills/AGENTS.md`](../../../../clawperator-skills/AGENTS.md)
-- [`../../../../clawperator-skills/README.md`](../../../../clawperator-skills/README.md)
-- [`../../../../clawperator-skills/scripts/generate_skill_indexes.sh`](../../../../clawperator-skills/scripts/generate_skill_indexes.sh)
-- [`../../../../clawperator-skills/docs/`](../../../../clawperator-skills/docs/)
-- `~/.clawperator/findings/skill-drafting/findings.md`
+Use this scenario as the anchor case:
 
-## Term And Contract Source Map
+> "Make a Clawperator skill that opens Netflix, searches for House of Cards, and adds it to My List."
 
-Use these files when the prompt talks about a concept and the future agent needs the actual definition.
+Assume a host agent such as OpenClaw receives that request through a surface
+like Telegram and wants to figure out:
 
-| Topic | Source | Why it matters |
-| --- | --- | --- |
-| runtime skills vs authoring skills | [`docs/skills/overview.md`](../../../docs/skills/overview.md) lines 32-45 | clarifies that runtime skills and authoring skills are separate models |
-| `replay` vs `orchestrated` | [`docs/skills/overview.md`](../../../docs/skills/overview.md) lines 46-67 | current public definition and caveats |
-| preferred recording-first authoring path | [`docs/skills/authoring.md`](../../../docs/skills/authoring.md) lines 7-24 | says `skill-author-by-recording` is the current front door |
-| authoring-skills install model | [`docs/skills/authoring.md`](../../../docs/skills/authoring.md) lines 26-104 | explains copied install store and discovery symlinks |
-| host-agent discovery route | [`docs/host-agents.md`](../../../docs/host-agents.md) lines 26-119 | covers discovery after install and durable host-facing files |
-| OpenClaw / Telegram host framing | [`docs/internal/openclaw-reference.md`](../../../docs/internal/openclaw-reference.md) lines 27-55 | validates the “OpenClaw receives a Telegram and delegates” framing |
-| host-agent integration implications | [`docs/internal/design/agent-host-integration.md`](../../../docs/internal/design/agent-host-integration.md) lines 69-195 | covers discovery conventions, install outputs, and preferred bridge order |
-| recording export and compare | [`docs/api/recording.md`](../../../docs/api/recording.md) lines 314-577 | defines `recording export`, `recording compare`, wrapper requirements, and compare semantics |
-| orchestrated harness env vars | [`docs/api/environment.md`](../../../docs/api/environment.md) lines 209-267 | defines env vars injected into `scripts/run.js` for orchestrated skills |
-| `SkillResult` contract | [`apps/node/src/contracts/skillResult.ts`](../../../apps/node/src/contracts/skillResult.ts) lines 4-205 | authoritative frame prefix, statuses, source kinds, checkpoints, diagnostics, schema |
-| `skill.json` contract and input schemas | [`apps/node/src/contracts/skills.ts`](../../../apps/node/src/contracts/skills.ts) lines 6-162 | authoritative `SkillEntry`, `agent`, `contract`, and supported input schemas |
-| how orchestrated results are parsed and trusted | [`apps/node/src/domain/skills/runSkill.ts`](../../../apps/node/src/domain/skills/runSkill.ts) lines 42-289 | shows terminal frame parsing and trusted source injection |
-| scaffolding behavior and `recording-context.json` | [`docs/skills/authoring.md`](../../../docs/skills/authoring.md) lines 137-243 and [`apps/node/src/domain/skills/scaffoldSkill.ts`](../../../apps/node/src/domain/skills/scaffoldSkill.ts) | explains what scaffold creates and what recording context is not |
-| current authoring workflow rules | [`../../../.agents/skills/skill-author-by-recording/SKILL.md`](../../../.agents/skills/skill-author-by-recording/SKILL.md) lines 31-177 and 351-620 | front-door rules, decision table, self-test loop, compare-baseline policy |
-| eval boundary | [`docs/internal/design/evals.md`](../../../docs/internal/design/evals.md) lines 1-280 and the two eval skills | useful context, but secondary to the main authoring surfaces |
-| skills repo validation and generated indexes | [`../../../../clawperator-skills/AGENTS.md`](../../../../clawperator-skills/AGENTS.md) lines 52-80 and [`../../../../clawperator-skills/scripts/generate_skill_indexes.sh`](../../../../clawperator-skills/scripts/generate_skill_indexes.sh) lines 50-173 | explains why authoring work must include index regeneration and referenced-path checks |
+- what Clawperator can already do
+- how a new skill would be authored today
+- what the agent would struggle with
+- what the best future design should be
 
-## What The Draft Prompt Gets Right
+## Working rules
 
-- It centers the actual user problem: “make me a new skill that does this”.
-- It correctly identifies two goals: lower the cost of creating new skills, and improve guidance and quality standards around skill authoring.
-- It correctly suspects that discoverability matters as much as raw capability.
-- It correctly calls out the main design fork: recording-first authoring versus a more agent-driven discovery flow.
-- It correctly notices that PR hardening churn in `clawperator-skills` contains reusable lessons.
+1. Verify behavioral claims against code and docs. Do not rely on memory.
+2. Assume `gh` is available and use it for the PR-history portion.
+3. Separate current-state facts from recommendations.
+4. Keep repo boundaries explicit:
+   - `clawperator` main repo
+   - sibling `../clawperator-skills` repo
+   - install-distributed authoring-skills surfaces
+5. Treat discoverability as a first-class part of the problem, not a side note.
+6. Call out broken or missing docs, missing links, or misleading source surfaces.
+7. Do not propose implementation details as if they already exist.
+8. If you recommend future task-pack splits, describe them, but do not author them yet.
 
-## Gaps In The Draft Prompt
+## Required reading
 
-### 1. It misses the runtime-skills repo
+Read these IN THIS ORDER before writing anything.
 
-The draft mostly names files in `clawperator`, but authored runtime skills live in `../clawperator-skills/skills/`, and that repo also owns:
+| File | Why it matters |
+| --- | --- |
+| `.agents/skills/skill-author-by-recording/SKILL.md` | Current front-door authoring workflow and decision rules |
+| `docs/skills/overview.md` | Runtime skills vs authoring skills, replay vs orchestrated |
+| `docs/skills/authoring.md` | Public authoring guidance and install model |
+| `docs/skills/development.md` | Local development and validation loop |
+| `docs/skills/runtime.md` | Runtime expectations, device handling, and env rules |
+| `docs/host-agents.md` | Current host-agent discovery route after install |
+| `docs/internal/openclaw-reference.md` | OpenClaw mental model and why Telegram-style host usage matters |
+| `docs/internal/design/agent-host-integration.md` | Durable host-agent integration rules and discovery assumptions |
+| `docs/internal/design/skill-design.md` | Durable skill design lessons and current doc gaps |
+| `docs/internal/design/evals.md` | Eval boundary and where skill-proving work currently lives |
+| `docs/api/recording.md` | Recording export and compare contracts |
+| `docs/api/environment.md` | Orchestrated runtime env-var contract |
+| `apps/node/src/contracts/skills.ts` | Skill registry, `agent`, and `contract` source of truth |
+| `apps/node/src/contracts/skillResult.ts` | `SkillResult` contract source of truth |
+| `apps/node/src/domain/skills/runSkill.ts` | Runtime parsing and trusted orchestrated behavior |
+| `apps/node/src/domain/skills/validateSkill.ts` | What validation does and does not guarantee |
+| `apps/node/src/domain/skills/scaffoldSkill.ts` | What `skills new` actually scaffolds |
+| `apps/node/src/domain/skills/copyAuthoringSkills.ts` | How packaged authoring skills are installed and wired |
+| `apps/node/src/cli/commands/authoringSkills.ts` | CLI surface for authoring-skills install/update/list |
+| `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts` | Runtime skill discovery and registry resolution |
+| `sites/landing/public/install.sh` | Installer behavior, AGENTS.md writing, and authoring-skills setup |
+| `../clawperator-skills/AGENTS.md` | Runtime-skills repo rules and validation expectations |
+| `../clawperator-skills/README.md` | Skills-repo layout and its own docs surfaces |
+| `../clawperator-skills/docs/skill-development-workflow.md` | Current shortest-path workflow from exploration to reusable skill |
+| `../clawperator-skills/docs/skill-authoring-guidelines.md` | Quality bar and authoring conventions in the skills repo |
+| `../clawperator-skills/docs/device-prep-and-runtime-tips.md` | Device and runtime-prep guidance that may affect authoring |
+| `../clawperator-skills/scripts/generate_skill_indexes.sh` | Generated-index and referenced-path contract |
+| `~/.clawperator/findings/skill-drafting/findings.md` | Existing lessons from real skill drafting and PR hardening |
 
-- repo-local authoring rules in `AGENTS.md`
-- authoring guidance in `docs/`
-- generated registry and search indexes
-- shared helpers under `skills/utils/`
+Also inspect at least:
 
-If the audit ignores that repo, it will miss where most authorship quality problems actually show up.
+- one replay example under `../clawperator-skills/skills/`
+- one orchestrated example under `../clawperator-skills/skills/`
 
-### 2. It does not point the future agent at the actual code contracts
+Prefer the Google Home examples because they currently capture both skill
+shapes and recent authorship lessons.
 
-If the goal is “agent-friendly and truthful”, the audit has to verify current behavior against code, not just docs.
+## Required PR-history review
 
-The draft should explicitly require reading:
+Use `gh` to inspect the discussion history of these PRs in
+`clawperator/clawperator-skills`:
 
-- `apps/node/src/contracts/skills.ts`
-- `apps/node/src/contracts/skillResult.ts`
-- `apps/node/src/domain/skills/runSkill.ts`
-- `apps/node/src/domain/skills/validateSkill.ts`
-- `apps/node/src/domain/skills/scaffoldSkill.ts`
+- PR 27
+- PR 29
 
-Without those files, an agent can easily overgeneralize what skill types exist, what `contract.verification` can express, or what the runtime really trusts.
-
-### 3. It says “discoverable” but does not name the discovery surfaces
-
-The discoverability question is not just “does the Node API point to docs”.
-
-The current host-facing surfaces are:
-
-- `docs/host-agents.md`
-- `~/.clawperator/AGENTS.md` as generated by `install.sh`
-- authoring-skill discovery links created by `clawperator authoring-skills install`
-- optional MCP material
-
-The draft should ask the future agent to evaluate those surfaces explicitly.
-
-### 4. It should verify the install and bundling story in code
-
-The draft correctly worries that a new authoring skill would need to be bundled, but it should point to the real mechanism:
-
-- `sites/landing/public/install.sh` lines 544-600 call `clawperator authoring-skills install`
-- `apps/node/src/cli/commands/authoringSkills.ts` lines 37-64 invoke the copy flow
-- `apps/node/src/domain/skills/copyAuthoringSkills.ts` lines 42-100 and 336 onward define the packaged source, install dir, and discovery-link wiring
-
-That should be part of the future audit, otherwise the prompt invites speculative answers.
-
-### 5. It mixes current-state audit with future design too early
-
-Right now the prompt slides between:
-
-- “what is the current skill creation process”
-- “what should improve”
-- “should we add a new authoring skill”
-- “should an agent first yolo a UI flow and then record it”
-
-Those are related, but they are not the same task. The future agent should be told to separate:
-
-- current system inventory
-- friction points and evidence
-- option set
-- recommendation
-
-### 6. It does not explicitly ask for repo-boundary recommendations
-
-Some likely improvements belong in `clawperator`, some in `clawperator-skills`, and some in install-distributed authoring skills.
-
-The prompt should require the future agent to label each recommendation as one of:
-
-- main repo docs or runtime
-- skills repo docs or runtime skill conventions
-- install / host-discovery behavior
-- authoring-skill workflow changes
-
-### 7. It under-specifies how to use the PR-history evidence
-
-The two referenced PRs are useful, but the prompt should tell the future agent what to extract from them:
+Read enough review discussion to extract recurring failure patterns around:
 
 - contract drift
 - generated index drift
-- shared helper bypass
+- helper reuse versus copy-paste logic
 - diagnostics truthfulness
-- parser edge cases
+- parser ambiguity
 - verification-state semantics
 - privacy hygiene
 
-Those are the repeated classes that appeared in the PR feedback and in the local findings note at `~/.clawperator/findings/skill-drafting/findings.md`.
+Do not just summarize the PRs. Extract the reusable authoring lessons.
 
-### 8. It should acknowledge tool availability for PR review
+## Core questions to answer
 
-The draft says “if you use `gh`”, but a future agent may not have GitHub auth or may have a connector instead.
-
-The prompt should say:
-
-- inspect PRs 27 and 29 if GitHub access is available
-- otherwise note the limitation and continue with repo-local evidence
-
-### 9. It does not give the future agent a concrete output shape
-
-The current “document your findings” ask is too open-ended.
-
-The prompt should require:
-
-1. current-state map
-2. friction / gaps
-3. design options
-4. recommendation
-5. open questions
-6. suggested follow-up work breakdown
-
-### 10. It misses one current doc bug
-
-`docs/internal/design/skill-design.md` points to `docs/skills/skill-from-recording.md`, but that page does not exist. The audit should capture this because it is exactly the kind of discoverability gap that hurts future agents.
-
-## Early Read On The Main Design Fork
-
-The future audit should not assume that one answer is already correct.
-
-The real design choices appear to be:
-
-1. keep `skill-author-by-recording` as the only front door and make it broader
-2. add a sibling authoring skill such as `skill-author-by-agent-discovery`
-3. keep recording-first authoring, but add a pre-recording discovery workflow or helper
-4. support a hybrid flow where the agent explores, proves a route, then records a cleaner baseline pass
-
-The prompt should ask the future agent to compare those options against:
-
-- truthfulness
-- ease of use from an OpenClaw / Telegram request
-- testability
-- install and bundling complexity
-- discoverability for host agents
-- maintenance burden across `clawperator` and `clawperator-skills`
-
-## Recurring Lessons Already Visible In The Evidence
-
-From the local findings note and the cited PRs, the future prompt should explicitly tell the agent to look for:
-
-- drift between declared contract and what the skill can actually prove
-- failure to regenerate `skills/generated/*` after metadata changes
-- duplicate helper logic instead of shared helper reuse
-- diagnostics that are verbose but misleading
-- positional or parser ambiguity in skill inputs
-- screenshot or parsing edge cases that create false confidence
-- confusion between runtime failure and verification failure
-- missing privacy hygiene in code, docs, and PR metadata
-
-## Recommended Tightened Prompt
-
-Use the following as the next-pass agent prompt.
-
-```markdown
-High-level goal: audit the Clawperator skill authorship flow and recommend improvements that make it easier for an agent to create new skills and easier for humans and agents to author them safely and truthfully.
-
-This is a findings pass only. Do not implement product changes yet. Gather current-state evidence, identify gaps, compare design options, and write the findings to `tasks/skills/authorship/findings-codex-1.md`.
-
-## Questions To Answer
-
-1. What is the current end-to-end authorship flow for creating a new skill today?
-2. What documentation, code contracts, install surfaces, and discovery surfaces already support that flow?
-3. Where are the biggest friction points for an agent that receives a natural-language request such as:
-   "Make a Clawperator skill that opens Netflix, searches for House of Cards, and adds it to My List."
-4. What guidance is currently missing or too hard to discover for safe skill authoring?
-5. Should we keep a single `skill-author-by-recording` front door, add a sibling discovery-oriented authoring skill, or use some hybrid?
-6. Which improvements belong in `clawperator`, which belong in `clawperator-skills`, and which belong in install-distributed authoring skills?
-
-## Required Reading
-
-### Current repo
-
-- `.agents/skills/skill-author-by-recording/SKILL.md`
-- `.agents/skills/evals-run/SKILL.md`
-- `.agents/skills/evals-live-run/SKILL.md`
-- `docs/skills/overview.md`
-- `docs/skills/authoring.md`
-- `docs/skills/development.md`
-- `docs/skills/runtime.md`
-- `docs/host-agents.md`
-- `docs/api/recording.md`
-- `docs/api/environment.md`
-- `docs/internal/openclaw-reference.md`
-- `docs/internal/design/agent-host-integration.md`
-- `docs/internal/design/skill-design.md`
-- `docs/internal/design/evals.md`
-
-### Current repo code contracts
-
-- `apps/node/src/contracts/skills.ts`
-- `apps/node/src/contracts/skillResult.ts`
-- `apps/node/src/domain/skills/runSkill.ts`
-- `apps/node/src/domain/skills/validateSkill.ts`
-- `apps/node/src/domain/skills/scaffoldSkill.ts`
-- `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`
-- `apps/node/src/domain/skills/copyAuthoringSkills.ts`
-- `apps/node/src/cli/commands/authoringSkills.ts`
-- `sites/landing/public/install.sh`
-
-### Sibling skills repo
-
-- `../clawperator-skills/AGENTS.md`
-- `../clawperator-skills/README.md`
-- `../clawperator-skills/docs/skill-development-workflow.md`
-- `../clawperator-skills/docs/skill-authoring-guidelines.md`
-- `../clawperator-skills/docs/device-prep-and-runtime-tips.md`
-- `../clawperator-skills/scripts/generate_skill_indexes.sh`
-- inspect at least one replay example and one orchestrated example under `../clawperator-skills/skills/`, especially the Google Home examples
-
-### Additional evidence
-
-- `~/.clawperator/findings/skill-drafting/findings.md`
-- if GitHub access is available, inspect the discussion history of `clawperator-skills` PRs 27 and 29 for recurring authoring hardening issues; if unavailable, note the limitation and continue
-
-## Working Rules
-
-- Verify every behavioral claim against code or docs. Do not rely on memory.
-- Separate current-state facts from proposed future design.
-- Be explicit about repo boundaries: `clawperator` vs `clawperator-skills` vs install-distributed authoring skills.
-- Treat discoverability as a first-class part of the problem, not just documentation volume.
-- Pay special attention to how an OpenClaw-style host agent would discover and use this workflow after install.
-- Call out any broken or missing doc links you find.
-
-## Specific Areas To Analyze
-
-1. The current recording-first workflow and where it is strong or weak.
-2. Whether agent-driven exploration before recording is desirable, risky, or both.
-3. Whether a new authorship skill should exist, and if so whether it should be:
-   - a split from `skill-author-by-recording`
-   - a sibling skill such as `skill-author-by-agent-discovery`
-   - a helper used by the existing front door
-   - or not a new skill at all
-4. What best-practice guidance should become mandatory for skill authors, especially around:
-   - truthful verification
+1. What is the current end-to-end skill authorship flow today?
+2. What parts of that flow already work well for agents?
+3. What parts are too hard to discover, too underspecified, or too brittle?
+4. What is the current role of `skill-author-by-recording`, and where does it stop being enough?
+5. What would an agent struggle with if asked to create a new skill directly from a user request?
+6. Is recording-first still the right front door, or should discovery-first or hybrid flows exist?
+7. If an agent explores first and records later, what are the truthfulness, testing, and UX risks?
+8. What guidance should become more explicit for skill authors, especially around:
+   - testing
+   - structure
    - helper reuse
-   - generated index regeneration
-   - testing and self-test expectations
-   - privacy hygiene
+   - truthful verification
    - personalized-local versus shared-general skills
-5. How new authoring skills would actually be packaged and installed today.
+   - generated index regeneration
+9. Which improvements belong in:
+   - `clawperator`
+   - `../clawperator-skills`
+   - install-distributed authoring skills
+10. Should the eventual follow-up work stay grouped, or should it split into separate task packs for:
+   - agent-assisted skill drafting
+   - skill authoring guidance
 
-## Deliverable Shape
+## Specific areas to analyze
+
+### Track A: Agent-drafted skill workflow
+
+Evaluate:
+
+- how an agent would go from user request to first working draft today
+- whether the current system expects recording before it has enough route knowledge
+- whether there should be a distinct agent-discovery phase before recording
+- whether a new authoring skill is warranted
+- whether the right shape is:
+  - extending `skill-author-by-recording`
+  - adding a sibling skill such as `skill-author-by-agent-discovery`
+  - adding helper tooling without a new top-level skill
+  - or a hybrid workflow
+
+### Track B: Skill creation guidance
+
+Evaluate:
+
+- whether the current docs and repo guidance are sufficient
+- what guidance is missing or not discoverable enough
+- what best practices should be mandatory for authors
+- what mistakes keep appearing in authored skills and PR review
+- where the durable guidance should live:
+  - public docs
+  - `clawperator-skills/AGENTS.md`
+  - repo-local authoring skills
+  - other canonical docs
+
+### Shared concerns across both tracks
+
+Evaluate:
+
+- install and bundling implications of new authoring skills
+- host-agent discovery after install
+- runtime skill discovery versus prompt-skill discovery
+- validation expectations and self-test expectations
+- repo-boundary ownership
+
+## Deliverable structure
 
 Write `tasks/skills/authorship/findings-codex-1.md` with these sections:
 
-1. Scope and method
-2. Verified current-state map
-3. Source map for key terms and contracts
-4. Friction points and discoverability gaps
-5. Design options with tradeoffs
-6. Recommended direction
-7. Open questions
-8. Candidate follow-up work breakdown for a later task pack
+1. Executive summary
+2. Scope and method
+3. Verified source map
+4. Current-state map
+5. Track A findings: agent-drafted skill workflow
+6. Track B findings: skill creation guidance
+7. Shared issues and dependencies
+8. Recurrent lessons from PR history and existing findings
+9. Design options and tradeoffs
+10. Recommended direction
+11. Recommended split for future task packs
+12. Open questions
 
-Where useful, link directly to the files that support a claim.
-```
+## Output expectations
 
-## Suggested Reading Order For The Future Agent
+The findings document should be useful to an EM or tech lead deciding what work
+to schedule next.
 
-This order will probably produce the cleanest result:
+That means:
 
-1. `skill-author-by-recording`
-2. `docs/skills/overview.md`
-3. `docs/skills/authoring.md`
-4. `docs/host-agents.md`
-5. `docs/internal/openclaw-reference.md`
-6. `docs/internal/design/agent-host-integration.md`
-7. `apps/node/src/contracts/skills.ts`
-8. `apps/node/src/contracts/skillResult.ts`
-9. `apps/node/src/domain/skills/runSkill.ts`
-10. `apps/node/src/domain/skills/scaffoldSkill.ts`
-11. `apps/node/src/domain/skills/copyAuthoringSkills.ts`
-12. `sites/landing/public/install.sh`
-13. `../clawperator-skills/AGENTS.md`
-14. `../clawperator-skills/docs/*`
-15. exemplar skills in `../clawperator-skills/skills/`
-16. local findings note and PR history
+- concise executive summary first
+- current-state facts clearly separated from proposals
+- recommendations labeled by owner surface
+- concrete references to code and docs where terms are defined
+- explicit note of broken or missing docs if found
+- explicit recommendation on whether follow-up work should split into separate task packs
 
-## Concrete Findings To Preserve For The Next Phase
+## Important constraints
 
-- The current canonical front door is still recording-first, not exploration-first.
-- The current public docs already distinguish runtime skills from authoring skills, but the draft prompt should force the next agent to inspect both models.
-- Discoverability is partly a docs problem and partly an install/on-disk artifact problem.
-- New authoring-skill proposals have to be evaluated against the real install flow, not just the idea of “bundling”.
-- The strongest reusable authoring lessons currently appear to be in the sibling `clawperator-skills` repo and the PR hardening history, not only in this repo’s public docs.
+- Do not create implementation diffs in this pass.
+- Do not author new skills in this pass.
+- Do not create task packs in this pass.
+- Do not drift into generic documentation advice. Keep it specific to the real Clawperator authoring workflow.
+- Do not treat PR review history as anecdotal noise. Use it as evidence for where authorship guidance and workflow design are currently failing.
+- Do not confuse runtime skills with authoring skills or host-agent prompt-skills.
+
+## Known issue to verify
+
+Check the link from `docs/internal/design/skill-design.md` to
+`../skills/skill-from-recording.md`.
+
+If it is still broken or the target still does not exist, include that in the
+findings as a concrete discoverability gap.
