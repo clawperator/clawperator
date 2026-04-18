@@ -209,21 +209,38 @@ the CLI. Exemplar skills in `../clawperator-skills` instead import
 
 Pack 0 should fix the scaffold to match exemplar practice.
 
-### Validator coverage gaps
+### Enforcement coverage gaps
 
-[apps/node/src/domain/skills/validateSkill.ts](../../../apps/node/src/domain/skills/validateSkill.ts)
-currently checks structural shape: registry entry, script presence, manifest
-fields. It does **not** check:
+Gaps are split by enforcement layer, because the layers have different
+owners and different implementation shapes. Downstream packs must not
+conflate them.
+
+**Static validator gaps** (things
+[validateSkill.ts](../../../apps/node/src/domain/skills/validateSkill.ts)
+could check before a skill ever runs):
 
 - `clawperator-skill-type` frontmatter on `SKILL.md` (grep returns no
   matches).
-- Declared `contract.verification` semantic alignment with the actual proof
-  path.
 - Generated index freshness against `skills-registry.json`.
-- `SkillResult.source` omission in author-emitted frames.
+- Declared `contract.verification` shape sanity (kind recognized; matcher
+  template references declared inputs).
 
-Every one of these gaps maps to a recurring PR review comment. Pack 0 should
-pick the low-risk subset to promote to mechanical checks.
+**Runtime parser and runner gaps** (things
+[runSkill.ts](../../../apps/node/src/domain/skills/runSkill.ts) could
+enforce during execution, not at static-validation time):
+
+- `SkillResult.source` omission in author-emitted frames. Any emitted
+  `source` is a bug; the wrapper injects it. This is a frame-parser
+  concern, not a static validator concern.
+- Declared-contract semantic alignment with the actual proof path. Only
+  the runtime sees the matcher inputs and the emitted result together.
+- Bounded stdout/stderr on error-path messages to prevent raw blobs from
+  flowing into `error.message`.
+
+Every gap maps to a recurring PR review comment. Pack 0 should pick the
+low-risk subset for mechanical enforcement; owner surface depends on which
+layer the check belongs to. **Do not scope a runtime parser concern as a
+static validator change.**
 
 ### Resolved source conflicts
 
@@ -416,6 +433,28 @@ Real device ids, labels, and local paths leak into examples, validation
 notes, and PR metadata. Code is eventually scrubbed; metadata often is not.
 Pack B rule, tied to privacy-hygiene checklist.
 
+## PR-hardening lessons (enumerated)
+
+Concrete rules extracted from PR 27 (AirTouch set-zone-state) and PR 29
+(Amazon search-products) review discussions. Each is a durable authoring
+rule downstream packs can cite by number.
+
+| # | Rule | Category | PR source |
+| --- | --- | --- | --- |
+| 1 | Declared `contract.verification` kind must match the actual proof path; use `null` when unsure. | Verification drift | 27 |
+| 2 | Regenerate `skills/generated/*` whenever `skills-registry.json` changes, in the same commit. | Generated index drift | 27, 29 |
+| 3 | Use shared helpers (`resolveOperatorPackage`, `resolveClawperatorBin`) instead of duplicating resolution logic. | Shared helper bypass | 27 |
+| 4 | Success diagnostics must not reference files, directories, or runtime states that are no longer true at emit time. | Diagnostics truthfulness | 27 |
+| 5 | Failure diagnostics must not inherit stale success state; distinguish runtime failure from post-action verification failure. | Diagnostics truthfulness | 27 |
+| 6 | Explicit named flags win over positional fallbacks; positional parsers skip tokens that belong to named flags. | Parser ambiguity | 27 |
+| 7 | Cleanup behavior must be best-effort across both success and failure paths, and must not corrupt the primary reported outcome. | Diagnostics truthfulness | 27 |
+| 8 | Image decoders must validate dimensions and pixel data before classification; reject zero width/height. | Parser robustness | 27 |
+| 9 | Crop and averaging math must guard against empty regions and division by zero. | Parser robustness | 27 |
+| 10 | Numeric and price parsers must cover the full digit range the domain requires; do not truncate. | Parser robustness | 29 |
+| 11 | HTML entity decoders must cover the common set (`&apos;`, `&#39;`, `&#x27;`, `&amp;`). | Parser robustness | 27, 29 |
+| 12 | Error messages must not unwrap raw `stdout`/`stderr` into `error.message`; bound the payload. | Diagnostics truthfulness | 29 |
+| 13 | Privacy scrubbing applies to code, examples, validation notes, PR bodies, and commit messages equally. | Privacy hygiene | 27 |
+
 ## Risk register
 
 Second-order risks the packs must address explicitly.
@@ -483,6 +522,37 @@ These are not resolved. Packs must call out which side of each they land on.
 - It allows cleaner ownership:
   - Pack A focuses on workflow routing and host-agent UX.
   - Pack B focuses on durable guidance and quality bar.
+
+## Working assumptions for Pack A and Pack B
+
+Pack A and Pack B are scoped under the following load-bearing assumptions.
+If execution reveals any assumption is wrong, the fix becomes a separate
+follow-on pack rather than expanding the scope of A or B.
+
+### Verification-surface assumption
+
+Pack A and Pack B assume the current declared verification surface
+(`node_text_matches` kind, plus `null` as the safe default) is sufficient
+for the skills they enable. Rationale: no cited PR failure in the sources
+reviewed here was caused by lacking a richer verification kind. The
+observed failures were caused by drift between declared and actual
+verification (PR-hardening lesson #1), not by insufficient verification
+primitives.
+
+If Pack A or Pack B discovers during execution that a richer declared
+verification kind is required (e.g., screenshot-region matcher, structured
+`SkillResult` comparison, image-classifier result), that work becomes a
+separate follow-on pack (candidate name: **Pack C, verification-surface
+expansion**) and is out of scope for both Pack A and Pack B. Neither pack
+may modify the runtime verification contract.
+
+### Runtime-contract stability assumption
+
+Pack A and Pack B assume `SkillResult` v1, the orchestrated env contract,
+registry resolution precedence, and the device-id passing convention
+remain unchanged. Any required change to these contracts is either a
+Pack 0 candidate (mechanical guardrail) or a separate runtime-contract
+pack. Pack A and Pack B do not modify runtime contracts.
 
 ## Pack 0: shared prerequisite
 
@@ -568,6 +638,25 @@ is a one-line change.
 - Resolve namespace and discovery-order issues with `$task-author` and
   `skill-author-by-recording`.
 
+### Discovery artifact minimum fields
+
+The discovery phase must produce a structured artifact that contains all of
+the following fields. Each field maps directly to a routing or safety
+decision that downstream authoring cannot make without it.
+
+| Field | Required value space | Decision it supports |
+| --- | --- | --- |
+| `existing_skill_verdict` | `match`, `partial_match`, or `none`, with the queried registry paths. | Whether authoring is warranted at all, or whether an existing skill should be reused or extended. |
+| `skill_classification` | `personalized-local` or `shared-general`, with supporting reasoning. | Target repo: `../clawperator-skills` public skills vs a local skill folder. |
+| `route_readiness` | `record_now`, `more_probing_needed`, or `block`, with the bounded evidence used. | Whether the handoff to recording can proceed now, the discovery phase must iterate, or the request must be declined. |
+| `recommended_proving_shape` | `replay` or `orchestrated`, with reasoning. | Which proving workflow to invoke. For cold-start requests with no existing recording, orchestrated is typically the more honest first shape (see Tradeoffs). |
+| `mutation_risk` | `read_only`, `reversible_mutation`, or `irreversible_mutation`, with account-side surface notes. | Whether self-tests can run safely, whether opt-in semantics are required, and whether explicit user confirmation must gate first runs. |
+| `discovery_budget_used` | Adb traffic count, screenshot count, elapsed wall time. | Prevents unbounded discovery; gates escalation to human when budget exceeded. |
+
+The artifact serialization format (JSON, markdown, YAML) is an
+execution-time decision for Pack A. The minimum field set above is not
+negotiable: any artifact missing a field must be rejected by the workflow.
+
 ### Non-goals
 
 - Not authoring the Netflix skill itself. Pack A produces the workflow that
@@ -581,15 +670,15 @@ is a one-line change.
 ### Acceptance criteria
 
 - An agent receiving the anchor scenario, starting from zero, can produce a
-  discovery artifact without exceeding the defined discovery budget.
-- The discovery artifact is well-defined enough to decide: author now,
-  decline with reason, or escalate to human.
+  discovery artifact that contains every field listed in "Discovery
+  artifact minimum fields" above, without exceeding the defined discovery
+  budget.
+- The artifact drives a clear next action: author now, decline with
+  reason, or escalate to human. A missing field blocks the handoff.
 - `docs/host-agents.md` documents the zero-results route explicitly.
-- If a new packaged authoring skill is added, it is discoverable in all three
-  symlinked agent directories and listed in `~/.clawperator/AGENTS.md`.
-- The first skill drafted end-to-end through Pack A's workflow passes
-  `validateSkill` and the Pack B checklist on first PR submission (signals
-  that A and B are coherent).
+- If a new packaged authoring skill is added, it is discoverable in all
+  three symlinked agent directories and listed in
+  `~/.clawperator/AGENTS.md`.
 
 ### File touchpoints
 
@@ -618,8 +707,8 @@ is a one-line change.
 
 - Blocks on Pack 0 (scaffold fix, namespace clarity).
 - Does not block Pack B (can run concurrently after Pack 0).
-- Concurrent with Pack B. Coordination point: Track A's first end-to-end
-  skill is the canonical test case for Track B's checklist.
+- Concurrent with Pack B; joint close-out is the Integration milestone
+  below, not a pack-level acceptance criterion.
 
 ## Pack B: skill creation guidance
 
@@ -629,7 +718,9 @@ is a one-line change.
   failure pattern above with a concrete negative example.
 - Restore or consolidate the README-promised `../clawperator-skills/docs/*`
   content, per the Pack 0 decision.
-- Codify the 13 PR-hardening lessons into repo-local rules.
+- Codify the 13 enumerated PR-hardening lessons (see "PR-hardening lessons
+  (enumerated)" above) into repo-local rules with concrete negative
+  examples.
 - Define the single-source pointer back to `clawperator` contract docs so
   the two surfaces do not drift.
 - Clarify ownership boundaries between main-repo docs and skills-repo
@@ -652,13 +743,11 @@ is a one-line change.
 - `../clawperator-skills/README.md` resolves every advertised doc link (Pack
   0 decision applied here).
 - `../clawperator-skills/AGENTS.md` contains the migrated rules from
-  `~/.clawperator/findings/skill-drafting/findings.md` and the 13 PR-hardening
-  lessons.
+  `~/.clawperator/findings/skill-drafting/findings.md` and each of the 13
+  enumerated PR-hardening lessons, with concrete negative examples.
 - Pack B defines how guidance syncs with `clawperator` contract evolution.
   Acceptable forms: single-source link, generated guidance, or PR-checklist
   cross-reference.
-- Pack A's first end-to-end-drafted skill passes the Pack B checklist on
-  first PR submission.
 
 ### File touchpoints
 
@@ -678,8 +767,36 @@ is a one-line change.
 
 - Blocks on Pack 0 (README decision, `AGENTS.md` migration foundation).
 - Concurrent with Pack A after Pack 0 lands.
-- Coordination point: Pack A's first end-to-end skill is the canonical test
-  case for Pack B's checklist coverage.
+- Joint close-out is the Integration milestone below, not a pack-level
+  acceptance criterion.
+
+## Integration milestone: Pack A + Pack B coherence
+
+This milestone verifies that Pack A and Pack B produced a coherent system.
+It is explicitly **not** an acceptance criterion of either individual pack.
+Pack A and Pack B close out independently on their own acceptance criteria;
+the integration milestone is a separate checkpoint, reached after both
+packs have shipped.
+
+### Acceptance criteria
+
+- The first runtime skill drafted end-to-end through Pack A's workflow
+  passes `validateSkill` and every applicable rule in Pack B's checklist
+  on first PR submission.
+- PR review for that skill surfaces zero issues from the 13 enumerated
+  PR-hardening lessons.
+- The drafted skill passes its self-test against a physical or emulated
+  device.
+
+### If the milestone fails
+
+- A Pack A gap (workflow produced an untruthful or under-proved draft)
+  triggers a Pack A follow-on, not a rewrite of Pack B.
+- A Pack B gap (checklist missed a rule that caused the PR issue) triggers
+  a Pack B follow-on, not a rewrite of Pack A.
+- A gap in the runtime contract surface (e.g., richer verification kinds
+  needed) triggers the follow-on pack described in "Working assumptions
+  for Pack A and Pack B" above, not changes to Pack A or Pack B.
 
 ## Open questions
 
