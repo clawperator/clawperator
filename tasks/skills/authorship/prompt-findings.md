@@ -2,9 +2,7 @@
 
 Created: 2026-04-19
 
-Audit the current Clawperator skill authorship story and document the findings in:
-
-- `tasks/skills/authorship/findings-codex-1.md`
+Audit the current Clawperator skill authorship story and document the findings in `tasks/skills/authorship/<provided_file_name>.md`.
 
 This is a findings pass only.
 
@@ -183,7 +181,7 @@ Evaluate:
 
 ## Deliverable structure
 
-Write `tasks/skills/authorship/findings-codex-1.md` with these sections:
+Write `tasks/skills/authorship/<provided_file_name>.md` with these sections:
 
 1. Executive summary
 2. Scope and method
