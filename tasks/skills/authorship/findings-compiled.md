@@ -18,10 +18,12 @@ The bigger gap is earlier in the flow. For a request like:
 > and adds it to My List."
 
 the current system can truthfully tell a host agent that no installed runtime
-skill exists, but it does not give the agent a first-class next step. Today the
-path from "no skill found" to "we should author one" is under-specified. That
-forces the agent to improvise route discovery, scope, recording readiness, and
-the first truthful skill shape.
+skill exists, but it does not give the agent a first-class next step. The
+routing decision has at least three branches (author a reusable skill, fulfill
+as a one-shot direct automation using raw `clawperator`, or decline), and only
+the first has any documented front door today. That forces the agent to
+improvise route discovery, scope, recording readiness, and the first truthful
+skill shape, and biases the system toward over-authoring.
 
 The second gap is durable guidance. The strongest contract and design docs live
 in `clawperator`, but the place where contributors actually land and harden
@@ -99,12 +101,17 @@ Current behavior, hop by hop:
    [apps/node/src/adapters/skills-repo/localSkillsRegistry.ts](../../../apps/node/src/adapters/skills-repo/localSkillsRegistry.ts).
    No Netflix skill is installed. The agent now knows "no installed skill
    solves this."
-4. **The agent must now decide: author a skill.** Today, the front door it
-   discovers (via `~/.clawperator/AGENTS.md` and the symlinked authoring-skill
-   directories) is
-   [`skill-author-by-recording`](../../../.agents/skills/skill-author-by-recording/SKILL.md).
-   That skill is written for the case where the author already knows the app
-   route and is ready to record.
+4. **The agent must now make a routing decision.** Three paths exist in
+   principle: (a) author a reusable runtime skill, (b) fulfill the request
+   as a one-shot direct automation using raw `clawperator` actions without
+   authoring any skill, or (c) decline with a reason (e.g., login-gated
+   content without credentials, irreversible mutation risk without explicit
+   user opt-in). Today, only path (a) has a first-class front door
+   ([`skill-author-by-recording`](../../../.agents/skills/skill-author-by-recording/SKILL.md)),
+   and that skill assumes the author already knows the app route. Paths (b)
+   and (c) have no documented workflow, so agents default to (a) even when
+   another path is the correct answer. This biases the system toward
+   over-authoring.
 5. **Gap surfaces here.** The agent has no route knowledge, no installed
    recording artifacts for Netflix, no decision on personalized-local versus
    shared-general, and no bounded way to do discovery before recording.
@@ -275,7 +282,8 @@ static validator change.**
 - The host-agent discovery route is good at answering "what can I run now?"
   and weak at answering "what should I do when nothing exists yet?"
 - In the anchor scenario, the runtime discovery path returns zero installed
-  skills and offers no authored next step.
+  skills and offers no documented routing next step (authoring, one-shot
+  direct automation, or decline).
 - There is no first-class discovery phase for unfamiliar app routes before
   recording.
 - The raw scaffold path is materially weaker than the exemplar authoring
@@ -583,7 +591,13 @@ is narrow enough to land in one reviewable PR.
 
 - No new authoring skills.
 - No changes to runtime contracts.
-- No Pack A or Pack B content.
+- No Pack A content.
+- No full Pack B rewrite beyond the prerequisite rule migration into
+  `../clawperator-skills/AGENTS.md`. Pack 0 migrates the seed rules from
+  `~/.clawperator/findings/skill-drafting/findings.md` so Pack B has a
+  foundation to build on; Pack B expands and codifies the 13 enumerated
+  PR-hardening lessons and the recurring failure patterns on top of that
+  seed.
 - No rewrites of `docs/skills/authoring.md`.
 
 ### Acceptance criteria
@@ -627,8 +641,13 @@ is a one-line change.
 ### Scope
 
 - Design the discovery phase for unfamiliar skill requests, with a bounded
-  runtime cost.
-- Define the handoff from discovery into recording/proving.
+  runtime cost and explicit routing across all branches: author a reusable
+  skill, fulfill as one-shot direct automation, or decline with a reason.
+  The default must not bias toward authoring when another branch is the
+  correct answer.
+- Define the handoff from discovery into each downstream branch:
+  recording/proving for reusable skills, raw `clawperator` invocation for
+  one-shot fulfillment, and decline-with-reason for unservable requests.
 - Define the host-agent route when runtime discovery returns zero matches,
   including the Telegram-to-local-shell hop.
 - Decide authoring-skill surface: sibling packaged skill, CLI probe, or both.
@@ -644,18 +663,23 @@ The discovery phase must produce a structured artifact that contains all of
 the following fields. Each field maps directly to a routing or safety
 decision that downstream authoring cannot make without it.
 
-| Field | Required value space | Decision it supports |
-| --- | --- | --- |
-| `existing_skill_verdict` | `match`, `partial_match`, or `none`, with the queried registry paths. | Whether authoring is warranted at all, or whether an existing skill should be reused or extended. |
-| `skill_classification` | `personalized-local` or `shared-general`, with supporting reasoning. | Target repo: `../clawperator-skills` public skills vs a local skill folder. |
-| `route_readiness` | `record_now`, `more_probing_needed`, or `block`, with the bounded evidence used. | Whether the handoff to recording can proceed now, the discovery phase must iterate, or the request must be declined. |
-| `recommended_proving_shape` | `replay` or `orchestrated`, with reasoning. | Which proving workflow to invoke. For cold-start requests with no existing recording, orchestrated is typically the more honest first shape (see Tradeoffs). |
-| `mutation_risk` | `read_only`, `reversible_mutation`, or `irreversible_mutation`, with account-side surface notes. | Whether self-tests can run safely, whether opt-in semantics are required, and whether explicit user confirmation must gate first runs. |
-| `discovery_budget_used` | Adb traffic count, screenshot count, elapsed wall time. | Prevents unbounded discovery; gates escalation to human when budget exceeded. |
+| Field | Required value space | Decision it supports | Required when |
+| --- | --- | --- | --- |
+| `recommended_next_step` | One of: `proceed_to_recording`, `iterate_discovery`, `one_shot_direct_automation`, `escalate_to_human`, `decline`, with reasoning. Explicit and singular. | Primary routing. Selects whether to author a reusable skill, collect more evidence, fulfill via raw `clawperator` without authoring, hand back to a human, or decline. | Always. |
+| `existing_skill_verdict` | `match`, `partial_match`, or `none`, with the queried registry paths. | Whether an existing skill should be reused or extended instead of authoring a new one. | Always. |
+| `target_app_package` | App label, Android package id, and any sub-route reached during discovery (e.g., `com.netflix.mediaclient` / `BrowseActivity`). | Anchors all downstream artifacts (recording, one-shot script, skill metadata) to the correct app surface. | Always. |
+| `route_confidence` | `high`, `medium`, or `low`, with the bounded evidence supporting the rating. | Whether the route is understood well enough to record or automate without false confidence. | Always. |
+| `mutation_risk` | `read_only`, `reversible_mutation`, or `irreversible_mutation`, with account-side surface notes. | Whether self-tests and probes can run safely; whether opt-in semantics or explicit user confirmation are required before any side-effecting run. | Always. |
+| `evidence_collected` | Inventory of captured artifacts from the discovery phase: snapshot paths, screenshot digests, prior findings referenced, failed probe notes. | Auditable record of what the discovery phase actually saw; seeds the recording setup or one-shot automation if the handoff proceeds. | Always. |
+| `discovery_budget_used` | Adb traffic count, screenshot count, elapsed wall time. | Prevents unbounded discovery; gates escalation to human when the budget is exceeded. | Always. |
+| `skill_classification` | `personalized-local` or `shared-general`, with supporting reasoning. | Target repo: `../clawperator-skills` public skills vs a local skill folder. | When `recommended_next_step == proceed_to_recording`. |
+| `recommended_proving_shape` | `replay` or `orchestrated`, with reasoning. For cold-start requests with no prior recording, orchestrated is typically the more honest first shape (see Tradeoffs). | Which proving workflow to invoke. | When `recommended_next_step == proceed_to_recording`. |
 
 The artifact serialization format (JSON, markdown, YAML) is an
 execution-time decision for Pack A. The minimum field set above is not
-negotiable: any artifact missing a field must be rejected by the workflow.
+negotiable: any artifact missing a field marked "Always" must be rejected
+by the workflow. Fields conditional on `recommended_next_step` are required
+only when that condition holds.
 
 ### Non-goals
 
