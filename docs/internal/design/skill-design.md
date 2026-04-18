@@ -14,7 +14,7 @@ Skills are the primary artifact for agents and humans.
 
 For the recording-to-skill workflow and the normalization rules that turn a
 raw capture into a reusable skill, see [Skill Authoring from
-Recordings](../skills/skill-from-recording.md).
+Recordings](../skills/authoring.md#recording-driven-workflow-stance).
 
 Each skill may include:
 - `SKILL.md` (canonical agent-facing interface)
