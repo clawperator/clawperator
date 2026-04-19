@@ -160,9 +160,10 @@ checklist work begins.
 ### Validation
 
 ```bash
-rg -n "docs/skill-development-workflow.md|docs/skill-authoring-guidelines.md|docs/device-prep-and-runtime-tips.md" ../clawperator-skills/README.md
-rg -n "resolveClawperatorBin|generated index|diagnostic|privacy" ../clawperator-skills/AGENTS.md
+# Verify AGENTS.md has migrated rule categories for all six failure patterns
+rg -n "resolveClawperatorBin|generated index|verification|diagnostic|parser|privacy" ../clawperator-skills/AGENTS.md
 rg -n "test_all.sh" ../clawperator-skills/README.md ../clawperator-skills/AGENTS.md
+# Verify README still routes to the local docs trio (these links must be intact for Phase 2 to land cleanly)
 rg -n "skill-development-workflow|skill-authoring-guidelines|device-prep-and-runtime-tips" ../clawperator-skills/README.md ../clawperator-skills/AGENTS.md
 ```
 
@@ -231,6 +232,7 @@ test -f ../clawperator-skills/docs/device-prep-and-runtime-tips.md
 rg -n "skill-migration" ../clawperator-skills/README.md ../clawperator-skills/AGENTS.md
 rg -n "skill-development-workflow|skill-authoring-guidelines|device-prep-and-runtime-tips" ../clawperator-skills/README.md ../clawperator-skills/AGENTS.md
 rg -n "test_all.sh|node --test|live-device|run.js" ../clawperator-skills/docs/skill-development-workflow.md ../clawperator-skills/docs/skill-authoring-guidelines.md
+../clawperator-skills/scripts/test_all.sh
 ```
 
 ### Expected Commit
@@ -265,12 +267,20 @@ helper pattern and the static validator catches the cheapest repeated mistakes.
    the allowed values used by the repo.
 3. Add an additive static check that detects registry changes without refreshed
    generated indexes.
-4. Update `docs/skills/authoring.md` or the Pack B findings if the validator
-   boundary needs an explicit note that these checks do not replace repo tests
-   or live proof for authored skills.
-5. Add focused regression coverage in `apps/node/src/test/unit/skills.test.ts`
-   for both new checks.
-6. Record the exact guardrails shipped in `findings.md`.
+4. Add regression coverage in `apps/node/src/test/unit/skills.test.ts`. Name
+   and implement every case below before committing:
+   - scaffold output contains `resolveClawperatorBin` and does not call the
+     bare `"clawperator"` string directly
+   - skill with missing `clawperator-skill-type` frontmatter → `validateSkill`
+     returns a rejection that names the missing field
+   - skill with an unrecognized `clawperator-skill-type` value → `validateSkill`
+     returns a rejection that names the bad value
+   - skill with a valid `clawperator-skill-type` (e.g., `"replay"`) →
+     `validateSkill` passes that check
+   - registry change without regenerated index → the freshness check returns a
+     rejection
+   - registry change with a regenerated index → the freshness check passes
+5. Record the exact guardrails shipped in `findings.md`.
 
 ### Acceptance Criteria
 
@@ -286,6 +296,10 @@ helper pattern and the static validator catches the cheapest repeated mistakes.
 ```bash
 npm --prefix apps/node run build
 npm --prefix apps/node run test
+# Verify the scaffold template source was updated
+rg -n "resolveClawperatorBin" apps/node/src/domain/skills/scaffoldSkill.ts
+# Verify the scaffold no longer embeds the bare binary name
+! rg -n '"clawperator"' apps/node/src/domain/skills/scaffoldSkill.ts
 ```
 
 ### Expected Commit
@@ -319,12 +333,15 @@ the full local checklist into public docs.
 3. Make the public authoring page name the current host-visible discovery
    command for installed authoring workflows:
    `clawperator authoring-skills list`.
-4. Explain the boundary:
-   - `validateSkill` catches a bounded static subset
+4. Explain the validator boundary using the specific checks shipped in Phase 3:
+   - `validateSkill` catches `clawperator-skill-type` frontmatter and stale
+     generated indexes, but does not replace off-device tests or live proof
    - `../clawperator-skills/scripts/test_all.sh` is the skills-repo off-device
      test entrypoint
    - the local skills-repo checklist remains required for truthfulness and
      author quality bar
+   Do not duplicate Phase 3 implementation details; point authors to
+   `validateSkill` output and the local checklist.
 5. Touch `docs/skills/development.md` only if it needs one small cross-link for
    discoverability.
 6. Record the public-doc link targets in `findings.md`.

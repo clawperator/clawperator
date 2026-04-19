@@ -183,7 +183,9 @@ instead of a hand-wavy “should work” target.
 ### Acceptance Criteria
 
 - the Pack A benchmark lives in `/evals`, not only in a manual findings note
-- the updated benchmark explicitly exercises `skill-author-by-agent-discovery`
+- the updated benchmark spec names `skill-author-by-agent-discovery` as the
+  required discovery front door; running the canary returns a known-red outcome
+  (skill not found or route incomplete) recorded in `findings.md`
 - `evals-run` and `evals-live-run` both describe how to run the Pack A
   benchmark on their respective device classes
 - any harness change needed for authored-skill proof is covered by focused
@@ -231,6 +233,9 @@ agents do not improvise a second authoring workflow.
    - produces the required discovery artifact
    - routes to exactly one next step
    - forbids direct durable skill authoring inside discovery
+   - enforces a concrete discovery budget (use the defaults from the plan's
+     Decision Rules unless `findings.md` justifies different numbers; record
+     the chosen values in `findings.md` before committing)
 3. Add `agents/openai.yaml` metadata for the new skill so agent discovery
    surfaces stay aligned with the actual workflow.
 4. Update `skill-author-by-recording` only enough to say:
@@ -254,7 +259,7 @@ agents do not improvise a second authoring workflow.
 ```bash
 test -f .agents/skills/skill-author-by-agent-discovery/SKILL.md
 test -f .agents/skills/skill-author-by-agent-discovery/agents/openai.yaml
-rg -n "recommended_next_step|existing_skill_verdict|route_confidence|mutation_risk|handoff_target" .agents/skills/skill-author-by-agent-discovery/SKILL.md
+rg -n "recommended_next_step|existing_skill_verdict|target_app_package|route_confidence|mutation_risk|evidence_collected|discovery_budget_used|skill_classification|handoff_target|handoff_reasoning" .agents/skills/skill-author-by-agent-discovery/SKILL.md
 rg -n "discovery|proving|skill-author-by-agent-discovery" .agents/skills/skill-author-by-recording/SKILL.md
 ```
 
@@ -292,8 +297,11 @@ machinery.
 
 1. Add the packaged authoring-skill symlink entry under
    `apps/node/authoring-skills/`.
-2. Inspect the existing packaging logic and update it only if the new skill
-   reveals a hard-coded single-skill assumption.
+2. Inspect `apps/node/src/domain/skills/copyAuthoringSkills.ts` for any
+   hard-coded single-skill assumptions (e.g., a hard-coded skill name or path
+   that must change to accommodate a second packaged skill). Record what you
+   find in `findings.md`. Update the file if a hard-coded assumption is present;
+   if not, record that the inspection confirmed no such assumption.
 3. Update the authoring-skills unit tests so they expect both packaged skills
    and continue to verify install, update, and discovery symlink behavior.
 4. Update the CLI help surfaces so a cold-start host agent can find the
@@ -440,9 +448,11 @@ Settings/About surface rooted at `com.android.settings`.
      discovery-before-recording rule
    - `~/.agents/AGENTS.md` points readers back to `~/.clawperator/AGENTS.md`
      and the runtime-skill discovery commands
-5. Run the new discovery skill against the anchor scenario in a Codex or local
-   host-agent execution context and capture the produced discovery artifact in
-   `findings.md`.
+5. Run `skill-author-by-agent-discovery` against the anchor scenario using a
+   local shell agent context (Claude Code or Codex) where `adb` and the
+   branch-local `clawperator` binary are accessible. Do not use a remote or
+   Telegram-routed context for this step. Capture the produced discovery
+   artifact in `findings.md`.
 6. Verify that the produced artifact contains every required field and that its
    selected route is explicit and singular.
 7. Run the updated Pack A eval twice in `full-repo` mode with explicit devices:

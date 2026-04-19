@@ -190,6 +190,9 @@ over-authoring and weak first drafts.
   Clawperator runtime skills.
 - The discovery artifact must contain every required field listed in
   `Decision Rules`. Missing required fields block handoff.
+- The default discovery budget unless `findings.md` justifies different numbers:
+  max 5 snapshots, max 3 screenshots, max 90 seconds wall time. The skill prompt
+  must enforce a concrete budget; record the actual values chosen in `findings.md`.
 - Do not add new runtime CLI probe commands in this pack. Use existing
   Clawperator surfaces and authoring-skill guidance.
 - Do not add a `skills create` alias by default. `skills new` is the low-level
@@ -240,6 +243,7 @@ over-authoring and weak first drafts.
 | Should the first Pack A eval require one universal cross-device Settings skill? | No. Require one target-specific authored skill for the AOSP emulator family and one for the Samsung family. |
 | What makes the eval pass acceptable? | Both authored skills emit valid `SkillResult`s on their originating devices and the required Android-version answer remains correct. |
 | Do Android security patch level and Google Play system update version block this pack? | No. Capture them only if the eval can do so truthfully without widening the scorer beyond safe scope. |
+| What are the default discovery budget limits? | max 5 snapshots, max 3 screenshots, max 90 seconds wall time. Record actual values chosen in `findings.md`. |
 
 ### Discovery artifact contract
 
