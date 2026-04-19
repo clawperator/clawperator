@@ -289,7 +289,7 @@ helper pattern and the static validator catches the cheapest repeated mistakes.
    the allowed values used by the repo. In this pack the target convention is
    `replay` and `orchestrated`, matching `docs/skills/authoring.md`, but the
    validator must preserve only one temporary compatibility exception for the
-   existing checked-in legacy skill
+   one existing checked-in out-of-convention skill
    `au.com.polyaire.airtouch5.set-zone-state`. New or other `script` metadata
    must still fail until a cleanup follow-up lands.
 3. Add an additive static check that detects stale generator-owned outputs from
@@ -309,7 +309,7 @@ helper pattern and the static validator catches the cheapest repeated mistakes.
      `validateSkill` passes that check
    - skill with a valid `clawperator-skill-type` of `"orchestrated"` →
      `validateSkill` also passes that check
-   - the existing legacy checked-in skill
+   - the one existing checked-in out-of-convention skill
      `au.com.polyaire.airtouch5.set-zone-state` with
      `clawperator-skill-type: script` → allowlisted compatibility path still
      passes until a cleanup follow-up migrates it
@@ -322,8 +322,9 @@ helper pattern and the static validator catches the cheapest repeated mistakes.
      timestamp-only churn
    - registry change with a regenerated index → the freshness check passes
 5. Record the exact guardrails shipped in `findings.md`, including whether any
-   live legacy `clawperator-skill-type: script` instances still exist and what
-   compatibility rule was chosen for them in this pack.
+   live checked-in out-of-convention `clawperator-skill-type: script`
+   instances still exist and what compatibility rule was chosen for them in
+   this pack.
 
 ### Acceptance Criteria
 
@@ -335,8 +336,8 @@ helper pattern and the static validator catches the cheapest repeated mistakes.
 - `validateSkill.ts` or its associated check rejects stale generated indexes
   with an actionable rerun message
 - unit tests cover the new guardrails, including the no-op freshness case
-- `findings.md` records the legacy-`script` compatibility decision if any live
-  checked-in instances still exist
+- `findings.md` records the `script`-compatibility decision if any live
+  checked-in out-of-convention instances still exist
 - the documented boundary still makes clear that validator checks do not replace
   `scripts/test_all.sh` or live-device proof
 
