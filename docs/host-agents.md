@@ -84,6 +84,13 @@ relevant installed match.
 | Discovery returns `proceed_to_recording`, or the route is already well understood | `skill-author-by-recording` | Run the proving workflow from a fresh recording and one self-test. |
 | You explicitly want the low-level manual scaffold instead of the installed guided workflows | `clawperator skills new <skill_id>` | Create a local scaffold only. |
 
+When the current host already has working Clawperator access to the target
+device, the discovery and recording route should stay agent-driven by default.
+Ask the human to step in only for real blockers such as sign-in, MFA,
+CAPTCHA, biometric unlock, payment approval, or another explicit
+human-consent gate, and name the blocker precisely instead of asking them to
+generically finish the flow.
+
 ## MCP Decision Rule
 
 Use `clawperator mcp serve` only when the host already wants MCP.

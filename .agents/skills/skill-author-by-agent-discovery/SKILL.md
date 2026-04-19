@@ -86,6 +86,16 @@ fake discovery. Route the work into a local shell context first.
   `escalate_to_human` or `decline` over false confidence.
 - Treat `skills new` as the low-level manual scaffold, not as the default
   zero-results route.
+- Default to autonomous execution when the current host can drive the device.
+  Do not ask the user to perform routine device actions that Clawperator can
+  perform itself.
+- Ask for user intervention only when the agent hits a real blocker that
+  Clawperator cannot truthfully clear alone, such as a hard sign-in screen,
+  MFA challenge, CAPTCHA, biometric gate, payment approval, or an approval
+  step whose meaning cannot be inferred safely.
+- When routing to `skill-author-by-recording`, pass forward whether the host
+  can drive the device autonomously and any known blockers that would require
+  human intervention.
 
 ## Discovery Budget
 
@@ -222,7 +232,8 @@ Apply the route directly:
 - `proceed_to_recording`
   - hand off to `skill-author-by-recording`
   - pass forward the user goal, package id, observed sub-route, mutation notes,
-    evidence inventory, and `skill_classification`
+    evidence inventory, `skill_classification`, autonomous-drive expectation,
+    and any known blockers
 - `iterate_discovery`
   - stop with a bounded next-probe recommendation in `handoff_reasoning`
   - do not keep looping indefinitely inside the same pass

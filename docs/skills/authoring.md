@@ -188,6 +188,24 @@ When you create a skill from a recording, use these current authoring rules:
 These are the current documented rules for recording-derived authoring. They
 should stay aligned with the `skill-author-by-recording` skill.
 
+## Autonomous Recording Rule
+
+When the current host already has working Clawperator access to the target
+device, discovery and recording should be agent-driven by default.
+
+Use these rules:
+
+- drive the device autonomously when the route is already truthful and the host
+  can execute it
+- do not ask the user to manually perform the recorded app flow if Clawperator
+  can perform that same flow itself
+- ask for user intervention only for real external blockers such as hard
+  sign-in, MFA, CAPTCHA, biometric unlock, payment approval, or another
+  explicit human-consent gate
+- if intervention is required, explain the exact blocker and the exact user
+  action needed instead of asking the user to generically "do the flow" or
+  reply `done`
+
 ## Sources
 
 - Scaffold implementation: `apps/node/src/domain/skills/scaffoldSkill.ts`
