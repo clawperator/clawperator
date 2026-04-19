@@ -15,6 +15,8 @@ and run both runtime targets on the same emulator.
 ## When To Use
 
 - Run the `android-version` eval.
+- Run the Pack A red or green `android-version` benchmark on the required AOSP
+  emulator surface with `--mode full-repo --skill-prompt prompt-skill.md`.
 - Decide whether a run should use the code version or the published version.
 - Set up the emulator for `local-dev`, `published`, or both.
 - Diagnose preflight failures, answer extraction failures, or agent auth issues.

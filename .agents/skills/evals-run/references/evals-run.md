@@ -23,6 +23,35 @@ uv run --project evals --extra dev python evals/run_eval.py android-version \
   --device <serial>
 ```
 
+## Pack A Benchmark On The AOSP Emulator
+
+Use this command for the Pack A red baseline and later green proof on the
+required AOSP emulator surface:
+
+```bash
+uv run --project evals --extra dev python evals/run_eval.py android-version \
+  --agent <agent> \
+  --model <model> \
+  --runtime local-dev \
+  --mode full-repo \
+  --skill-prompt prompt-skill.md \
+  --device <aosp_emulator_serial> \
+  --label <pack_a_label>
+```
+
+Rules:
+
+- Keep the benchmark on the existing `android-version` eval id.
+- Use the AOSP emulator here. The Samsung physical-device path is documented in
+  `evals-live-run`.
+- Pass `--device <aosp_emulator_serial>` explicitly even if only one emulator
+  is connected.
+- Before Phase 2 and Phase 3 land, a truthful canary is expected to stay red
+  because `skill-author-by-agent-discovery` is not installed yet.
+- The helper script remains useful for runtime-target comparison, but the Pack
+  A discovery-authored route uses the direct `--mode full-repo --skill-prompt
+  prompt-skill.md` invocation above.
+
 To run both runtime targets on the same emulator with the matching APK setup
 steps, use:
 
@@ -41,6 +70,9 @@ version before setup.
 - For `published`, download and install the APK that matches `clawperator version`.
 - `doctor_preflight_failed` means preflight stopped the run before the agent started.
 - `no_answer` means the transcript needs inspection for the answer marker and scorer behavior.
+- Pack A red-baseline expectation before the new discovery skill ships:
+  `skill_emitted = false`, `replay_status = "skipped"`, or a transcript that
+  explicitly reports the missing or incomplete discovery route.
 - Auth or provider errors such as `LLM not set` mean the agent config must be fixed before rerunning.
 
 ## Artifacts

@@ -200,6 +200,14 @@ artifacts are skipped and do not block stdout or stderr answer extraction.
 - Use the bundled helper script when you want one command to build the debug APK, install the matching APK for each runtime target, and run both paths on the same emulator.
 - Use `--mode full-repo` and `--skill-prompt prompt-skill.md` when you want to
   measure skill emission on the strongest available prompt surface.
+- For Pack A, the existing `android-version` benchmark is the required red and
+  then green proving surface for discovery-authored Settings/About-device
+  skills. The benchmark stays on the existing eval id, uses
+  `prompt-skill.md`, and treats `skill-author-by-agent-discovery` as the
+  required discovery front door before any skill can be emitted.
+- Pack A confidence requires explicit-device runs on one AOSP emulator and one
+  Samsung physical device. Keep the emulator path in `evals-run` and the
+  Samsung path in `evals-live-run`; do not silently substitute another OEM.
 - Use `--replay <run_id>` to inspect a previous run's emitted skill.
 - Pass `--device <serial>` explicitly whenever more than one device is
   connected.
