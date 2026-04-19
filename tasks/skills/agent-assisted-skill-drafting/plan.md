@@ -112,7 +112,9 @@ over-authoring and weak first drafts.
 - `apps/node/src/cli/registry.ts`: in scope for additive discoverability help
   only; do not redesign the CLI command tree in this pack
 - `sites/landing/public/install.sh`: in scope only for the authoring-skill
-  discovery guide block and related install-time guidance
+  discovery guide block and related install-time guidance, including the
+  installer-written local guide at `~/.clawperator/AGENTS.md` and the shared
+  bridge block in `~/.agents/AGENTS.md`
 - `docs/host-agents.md`: in scope for the explicit zero-results route
 - `docs/skills/authoring.md`: in scope for the discovery-to-proving handoff and
   packaged authoring-skill explanation
@@ -141,7 +143,7 @@ over-authoring and weak first drafts.
 | `apps/node/src/test/unit/authoringSkills.test.ts` | Packaging and install regression coverage | Phase 3 |
 | `apps/node/src/test/unit/authoringSkillsPack.test.ts` | Packaged authoring-skills tree coverage | Phase 3 |
 | `apps/node/src/test/unit/cliHelp.test.ts` | CLI help regression coverage for the discoverability route | Phase 3 |
-| `sites/landing/public/install.sh` | Install-time authoring-skill discovery hints | Phase 3 |
+| `sites/landing/public/install.sh` | Installer-written local guide at `~/.clawperator/AGENTS.md` and shared bridge at `~/.agents/AGENTS.md` advertise both authoring front doors | Phase 3 |
 | `docs/host-agents.md` | Host-agent zero-results route | Phase 4 |
 | `docs/skills/authoring.md` | Discovery-to-proving handoff and authoring-skill front-door guidance | Phase 4 |
 | `docs/internal/design/agent-host-integration.md` | Additive durable routing note only if the public docs need a matching internal rule | Phase 4 |
@@ -155,7 +157,7 @@ over-authoring and weak first drafts.
 | Current proving workflow | `.agents/skills/skill-author-by-recording/SKILL.md`, `docs/skills/authoring.md` |
 | Host-agent discovery route | `docs/host-agents.md`, `docs/internal/design/agent-host-integration.md` |
 | Current CLI help and command-surface discoverability | `apps/node/src/cli/registry.ts`, `apps/node/src/test/unit/cliHelp.test.ts` |
-| Packaged authoring-skill installation | `apps/node/src/domain/skills/copyAuthoringSkills.ts`, `sites/landing/public/install.sh` |
+| Packaged authoring-skill installation and installer-owned agent guides | `apps/node/src/domain/skills/copyAuthoringSkills.ts`, `sites/landing/public/install.sh` |
 | Authoring-skills CLI and test coverage | `apps/node/src/cli/commands/authoringSkills.ts`, `apps/node/src/test/unit/authoringSkills.test.ts`, `apps/node/src/test/unit/authoringSkillsPack.test.ts` |
 | Eval harness boundary and current benchmark model | `docs/internal/design/evals.md`, `evals/README.md` |
 | Existing Settings/About benchmark | `evals/specs/android-version/spec.json`, `evals/specs/android-version/prompt-skill.md`, `evals/run_eval.py` |
@@ -178,6 +180,14 @@ over-authoring and weak first drafts.
 - Prefer strengthening existing entrypoints before adding new CLI nouns:
   top-level help, `skills --help`, `authoring-skills --help`,
   install-generated guides, and public docs.
+- Treat the installer-written local guide at `~/.clawperator/AGENTS.md` as a
+  first-class discoverability surface. After install, it must advertise
+  `skill-author-by-agent-discovery` alongside `skill-author-by-recording` and
+  explain when discovery comes before recording.
+- Keep the shared bridge in `~/.agents/AGENTS.md` truthful and lightweight. It
+  should route agents toward the local guide and the existing runtime-skill
+  discovery commands without pretending the shared skill directories contain
+  Clawperator runtime skills.
 - The discovery artifact must contain every required field listed in
   `Decision Rules`. Missing required fields block handoff.
 - Do not add new runtime CLI probe commands in this pack. Use existing
@@ -266,6 +276,8 @@ The discovery phase must produce one artifact with all of the following fields.
 - Host-facing guidance still leaves "no installed skill found" as a dead end
 - The new discovery skill ships but is only discoverable by reading repo code
   or deep docs
+- The packaged skill installs correctly but the installer-written
+  `~/.clawperator/AGENTS.md` never mentions it
 - Authoring-skill install succeeds but the new skill is not discoverable in all
   three agent directories
 - `authoring-skills` help remains too thin to explain when it should be used or
@@ -290,6 +302,9 @@ After this pack ships:
   exists and is wired into the normal authoring-skills install flow
 - the zero-results route is visible from current host entrypoints, not only
   from deep docs
+- the installer-written `~/.clawperator/AGENTS.md` and shared
+  `~/.agents/AGENTS.md` bridge advertise `skill-author-by-agent-discovery`
+  truthfully and explain when discovery should precede recording
 - the new skill requires a discovery artifact that matches the contract above
 - `skill-author-by-recording` explicitly describes itself as the proving step
   after discovery, not the zero-results router
@@ -318,7 +333,7 @@ After this pack ships:
 | Knowledge | Permanent home |
 | --- | --- |
 | Discovery-to-proving front-door guidance | `docs/skills/authoring.md`, `docs/host-agents.md` |
-| Install-distributed authoring-skill discovery surface | `.agents/skills/skill-author-by-agent-discovery/`, `apps/node/authoring-skills/`, `sites/landing/public/install.sh` |
+| Install-distributed authoring-skill discovery surface | `.agents/skills/skill-author-by-agent-discovery/`, `apps/node/authoring-skills/`, `sites/landing/public/install.sh`, generated `~/.clawperator/AGENTS.md`, generated `~/.agents/AGENTS.md` |
 | CLI help discoverability for the zero-results route | `apps/node/src/cli/registry.ts`, `apps/node/src/test/unit/cliHelp.test.ts` |
 | Pack A benchmark and eval usage guidance | `evals/README.md`, `docs/internal/design/evals.md`, `.agents/skills/evals-run/`, `.agents/skills/evals-live-run/` |
 | Stable authoring-skill install behavior | `apps/node/src/domain/skills/copyAuthoringSkills.ts` and related tests |

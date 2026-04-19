@@ -95,7 +95,7 @@ Read these files IN THIS ORDER before writing anything.
 | 17 | `apps/node/src/cli/commands/authoringSkills.ts` | Install, update, and list CLI behavior |
 | 18 | `apps/node/src/test/unit/authoringSkills.test.ts` | Packaging and install regression coverage |
 | 19 | `apps/node/src/test/unit/authoringSkillsPack.test.ts` | Packaged authoring-skills tree expectations |
-| 20 | `sites/landing/public/install.sh` | Install-time authoring-skill discovery guide and shared bridge |
+| 20 | `sites/landing/public/install.sh` | Installer-written local guide at `~/.clawperator/AGENTS.md` plus the shared `~/.agents/AGENTS.md` bridge |
 | 21 | `.agents/skills/docs-author/SKILL.md` | Required docs workflow for Phase 4 |
 
 ## PR / Phase Plan
@@ -285,6 +285,8 @@ machinery.
 - `apps/node/src/test/unit/authoringSkills.test.ts`
 - `apps/node/src/test/unit/authoringSkillsPack.test.ts`
 - `sites/landing/public/install.sh`
+- generated `~/.clawperator/AGENTS.md` and `~/.agents/AGENTS.md` for
+  validation only after reinstall
 
 ### Steps
 
@@ -300,12 +302,23 @@ machinery.
    - `clawperator skills --help`
    - `clawperator authoring-skills --help`
    - `clawperator skills new --help` only as the manual-scaffold boundary
-5. Update the install-time authoring guide and shared agent bridge in
-   `install.sh` so a newly installed host agent can discover both front doors
-   and understands when to use each.
-6. Verify that the new packaged skill is discoverable via the branch-local CLI
+5. Update `write_agent_guide()` in `install.sh` so the installer-written
+   `~/.clawperator/AGENTS.md`:
+   - names both packaged first-party authoring skills
+   - treats `skill-author-by-agent-discovery` as the zero-results front door
+   - explains that `skill-author-by-recording` remains the proving step after a
+     `proceed_to_recording` route
+6. Update `write_shared_agent_bridge()` in `install.sh` so the installer-owned
+   block in `~/.agents/AGENTS.md` points agents back to
+   `~/.clawperator/AGENTS.md` and the runtime-skill CLI discovery commands
+   without pretending shared agent skill directories contain Clawperator
+   runtime skills.
+7. Verify that the new packaged skill is discoverable via the branch-local CLI
    and that the help surfaces route no-match users toward authoring-skill
    discovery instead of a dead end.
+8. Re-run authoring-skills install with the branch-local CLI and inspect the
+   generated `~/.clawperator/AGENTS.md` and `~/.agents/AGENTS.md` surfaces so
+   the task proves the installed host guidance, not only the repo source.
 
 ### Acceptance Criteria
 
@@ -314,7 +327,12 @@ machinery.
 - authoring-skills tests pass with both packaged skills present
 - branch-local help surfaces expose the zero-results route and distinguish
   runtime skills from authoring skills truthfully
-- install-time guidance mentions both discovery and recording authoring skills
+- the installer-written `~/.clawperator/AGENTS.md` mentions both
+  `skill-author-by-agent-discovery` and `skill-author-by-recording` by name
+- the installer-written `~/.clawperator/AGENTS.md` explains that discovery is
+  the no-match front door and recording is the proving follow-up
+- the installer-owned bridge block in `~/.agents/AGENTS.md` points agents to
+  `~/.clawperator/AGENTS.md` and does not hide the authoring-skills route
 - the branch-local CLI lists both installed authoring skills after install
 
 ### Validation
@@ -328,6 +346,7 @@ node apps/node/dist/cli/index.js authoring-skills --help
 node apps/node/dist/cli/index.js skills new --help
 node apps/node/dist/cli/index.js authoring-skills install --format json
 node apps/node/dist/cli/index.js authoring-skills list --format json
+rg -n "skill-author-by-agent-discovery|skill-author-by-recording|authoring-skills|AGENTS.md" ~/.clawperator/AGENTS.md ~/.agents/AGENTS.md
 ```
 
 ### Expected Commit
@@ -415,21 +434,27 @@ Settings/About surface rooted at `com.android.settings`.
 3. Verify that the installed authoring-skills list includes:
    - `skill-author-by-agent-discovery`
    - `skill-author-by-recording`
-4. Run the new discovery skill against the anchor scenario in a Codex or local
+4. Verify that the installer-written discoverability surfaces mention the new
+   front door:
+   - `~/.clawperator/AGENTS.md` names both authoring skills and explains the
+     discovery-before-recording rule
+   - `~/.agents/AGENTS.md` points readers back to `~/.clawperator/AGENTS.md`
+     and the runtime-skill discovery commands
+5. Run the new discovery skill against the anchor scenario in a Codex or local
    host-agent execution context and capture the produced discovery artifact in
    `findings.md`.
-5. Verify that the produced artifact contains every required field and that its
+6. Verify that the produced artifact contains every required field and that its
    selected route is explicit and singular.
-6. Run the updated Pack A eval twice in `full-repo` mode with explicit devices:
+7. Run the updated Pack A eval twice in `full-repo` mode with explicit devices:
    - once on an AOSP emulator
    - once on a Samsung physical device
-7. For each eval run, verify all of the following:
+8. For each eval run, verify all of the following:
    - the route actually used `skill-author-by-agent-discovery`
    - the run produced a target-specific authored skill rather than a single
      over-generalized Settings skill
    - the authored skill emitted a valid `SkillResult`
    - the required Android-version answer remained correct on that device
-8. Record the run ids, sanitized device labels, authored-skill identities, and
+9. Record the run ids, sanitized device labels, authored-skill identities, and
    any follow-up gaps in `findings.md`. Do not silently widen the pack.
 
 ### Acceptance Criteria
@@ -437,6 +462,8 @@ Settings/About surface rooted at `com.android.settings`.
 - `findings.md` exists and records the install checks, anchor-scenario run, and
   dual-device eval matrix
 - both authoring skills are discoverable through the installed branch-local CLI
+- the installed `~/.clawperator/AGENTS.md` and `~/.agents/AGENTS.md` surfaces
+  were inspected and recorded in `findings.md`
 - the anchor-scenario discovery artifact contains every required field
 - one AOSP emulator run id and one Samsung run id are recorded
 - each target-specific authored skill emits a valid `SkillResult` on its
@@ -448,6 +475,7 @@ Settings/About surface rooted at `com.android.settings`.
 npm --prefix apps/node run build
 node apps/node/dist/cli/index.js authoring-skills install --format json
 node apps/node/dist/cli/index.js authoring-skills list --format json
+rg -n "skill-author-by-agent-discovery|skill-author-by-recording|authoring-skills|AGENTS.md" ~/.clawperator/AGENTS.md ~/.agents/AGENTS.md
 uv run --project evals --extra dev python evals/run_eval.py android-version --agent codex --model gpt-5.4 --mode full-repo --runtime local-dev --skill-prompt prompt-skill.md --device <aosp_emulator_serial> --label pack-a-aosp
 uv run --project evals --extra dev python evals/run_eval.py android-version --agent codex --model gpt-5.4 --mode full-repo --runtime local-dev --skill-prompt prompt-skill.md --device <samsung_device_serial> --label pack-a-samsung
 ./scripts/docs_build.sh
