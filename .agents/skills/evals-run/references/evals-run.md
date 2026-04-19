@@ -52,6 +52,55 @@ Rules:
   A discovery-authored route uses the direct `--mode full-repo --skill-prompt
   prompt-skill.md` invocation above.
 
+## Pack A Device Matrix Helper
+
+When you want one local-dev Pack A run on the connected AOSP emulator and one
+on the connected physical device, use:
+
+```bash
+.agents/skills/evals-run/scripts/run_pack_a_android_version_matrix.sh <agent> <model>
+```
+
+By default, the helper:
+
+- auto-detects exactly one connected emulator and exactly one connected
+  physical device
+- builds the branch-local Node CLI once
+- assembles the debug APK once
+- runs `operator setup` on both devices with the `.dev` operator package
+- runs the Pack A eval twice with:
+  - `--runtime local-dev`
+  - `--mode full-repo`
+  - `--skill-prompt prompt-skill.md`
+- prints a short per-device summary with:
+  - `outcome.status`
+  - `answer_normalized`
+  - `route_requirements_met`
+  - `skill_generation_passed`
+  - `replay_status`
+
+Current Pack A expectation:
+
+- use the required Samsung physical device for the physical leg when you are
+  collecting acceptance proof, not another OEM handset
+
+Optional flags:
+
+- `--aosp-device <serial>` to override emulator auto-detection
+- `--physical-device <serial>` to override physical-device auto-detection
+- `--label-prefix <prefix>` to control the per-run labels
+- `--dry-run` to print the planned setup and eval commands without executing
+  them
+
+Example:
+
+```bash
+.agents/skills/evals-run/scripts/run_pack_a_android_version_matrix.sh codex gpt-5.4 \
+  --aosp-device <aosp_emulator_serial> \
+  --physical-device <physical_device_serial> \
+  --label-prefix verify-pack-a
+```
+
 To run both runtime targets on the same emulator with the matching APK setup
 steps, use:
 

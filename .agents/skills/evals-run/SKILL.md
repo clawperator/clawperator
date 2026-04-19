@@ -11,6 +11,9 @@ Read [`references/evals-run.md`](references/evals-run.md) for the operational ru
 Use [`scripts/run_android_version_eval.sh`](scripts/run_android_version_eval.sh)
 when you want the skill to install the matching APK for the selected runtime
 and run both runtime targets on the same emulator.
+Use [`scripts/run_pack_a_android_version_matrix.sh`](scripts/run_pack_a_android_version_matrix.sh)
+when you want one local-dev Pack A run on the connected AOSP emulator and one
+on the connected physical device.
 
 ## When To Use
 

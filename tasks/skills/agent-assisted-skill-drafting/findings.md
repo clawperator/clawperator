@@ -638,6 +638,24 @@ discovery front door is implemented.
     - `uv run --project evals --extra dev pytest evals/harness/test_run_eval.py -q`
     - `uv run --project evals --extra dev pytest evals/harness/test_rescore.py -q`
     - `uv run --project evals --extra dev pytest evals/harness -q`
+- Post-acceptance Pack A matrix helper added locally on 2026-04-20:
+  - `.agents/skills/evals-run/scripts/run_pack_a_android_version_matrix.sh`
+    now runs the local-dev Pack A `android-version` eval sequentially on one
+    AOSP emulator and one physical device
+  - the helper:
+    - auto-detects one emulator and one physical device unless explicit serials
+      are provided
+    - builds the branch-local Node CLI once
+    - assembles the debug APK once
+    - runs `operator setup` on both devices with the `.dev` operator package
+    - runs the Pack A eval twice with `--mode full-repo --skill-prompt prompt-skill.md`
+    - prints a short per-device summary from `result.json`
+    - supports `--dry-run` for command preview without execution
+  - `.agents/skills/evals-run/SKILL.md` and
+    `references/evals-run.md` now document the new helper and its flags
+  - validation run for this follow-up:
+    - `bash -n .agents/skills/evals-run/scripts/run_pack_a_android_version_matrix.sh`
+    - `.agents/skills/evals-run/scripts/run_pack_a_android_version_matrix.sh codex gpt-5.4 --dry-run --aosp-device <aosp_emulator_serial> --physical-device <physical_device_serial> --label-prefix verify-pack-a`
 - No blocker remains for this pack.
 - Optional follow-up after review:
   - clean up this task pack with `tasks/skills/task-cleanup/` once the branch
