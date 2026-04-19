@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.6.5] - 2026-04-20
+
+This release sharpens authoring discoverability and the skill-authoring workflow, while tightening validation and eval coverage around the new discovery-first path.
+
+### 🤖 Node API & CLI
+- **Changed:** Improved authoring discoverability so the CLI now routes hosts toward `authoring-skills list`, clarifies the runtime-skill versus authoring-skill boundary, and makes `skills new` explicit as the low-level scaffold path.
+- **Fixed:** Hardened skill authoring validation and scaffolds by requiring runtime-skill frontmatter, making scaffolded `run.js` files self-contained, preserving quoted Windows `CLAWPERATOR_BIN` paths, preferring the branch-local Node CLI, and keeping single-skill validation usable for fresh scaffolds while enforcing generated-index freshness in repo-wide validation.
+- **Added:** Added `skill-author-by-agent-discovery` as the discovery front door, kept `skill-author-by-recording` as the proving handoff, and hardened Pack A eval coverage so route evidence is required.
+
+### 📚 Documentation & Website
+- **Changed:** Added `docs/host-agents.md` as the canonical post-install route and repointed setup, quickstart, skills, MCP, index, and design guidance around that flow.
+- **Changed:** Updated the authoring docs, CLI next-step messaging, generated docs artifacts, and install validation coverage to match the shipped discovery-first workflow.
+
+Pull requests:
+- [feat(cli): improve authoring discoverability](https://github.com/clawperator/clawperator/pull/200)
+- [tasks(skills): create authoring discoverability and skill authorship task packs](https://github.com/clawperator/clawperator/pull/201)
+- [fix(skills): harden skill authoring validation and scaffolds](https://github.com/clawperator/clawperator/pull/202)
+- [feat(skills): add discovery-first authoring skills and eval hardening](https://github.com/clawperator/clawperator/pull/203)
+
 ## [0.6.4] - 2026-04-18
 
 This release sharpens the post-install host orientation flow and updates the surrounding CLI and docs guidance to point users at the right entry points.
