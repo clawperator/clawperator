@@ -174,9 +174,12 @@ workable for maintainers and brittle for everyone else.
   or the public authoring page.
 - `scaffoldSkill.ts` must emit `resolveClawperatorBin` usage so the scaffold
   matches exemplar practice.
-- `clawperator-skill-type` values in this pack are exactly `replay` and
-  `orchestrated`, matching the current documented convention. Do not invent
-  `script` or widen the enum here.
+- `clawperator-skill-type` target values in this pack are `replay` and
+  `orchestrated`, matching the current documented convention.
+- The validator must remain compatible with current repo state while that
+  migration is incomplete. Legacy checked-in `script` metadata may continue to
+  pass temporarily for existing skills, but do not emit `script` from scaffold
+  output, docs, or new examples in this pack.
 - `validateSkill.ts` must add only the named static checks:
   `clawperator-skill-type` frontmatter and generated-index freshness.
 - Generated-index freshness must be judged against the outputs owned by
@@ -212,7 +215,7 @@ workable for maintainers and brittle for everyone else.
 | When must an authored skill change add a colocated `*.test.js`? | When the change adds or modifies pure off-device JS logic such as parsers, normalizers, argument handling, helper resolution, or output shaping. |
 | When is live-device proof still mandatory? | For selector, navigation, recording, artifact-compare, checkpoint, or terminal-verification behavior, regardless of off-device tests. |
 | How should skills be structured when they need tests? | Keep `run.js` thin and extract testable logic into importable modules under `skills/**/scripts/` or `skills/utils/`, with colocated `*.test.js` files discoverable by `node --test`. |
-| What values are allowed for `clawperator-skill-type` in this pack? | `replay` and `orchestrated` only, matching the current documented convention. |
+| What values are allowed for `clawperator-skill-type` in this pack? | Target convention is `replay` and `orchestrated`. Validator compatibility may temporarily accept legacy checked-in `script` values until a cleanup follow-up lands, but this pack must not emit new `script` usage. |
 | Which mechanical checks belong in this pack? | Only `clawperator-skill-type` frontmatter and generated-index freshness. |
 | How is generated-index freshness judged? | Against the generator-owned outputs from `../clawperator-skills/scripts/generate_skill_indexes.sh`; stale means the normalized generated artifacts would change, not merely `generatedAt` timestamps, and the failure should tell authors to rerun the script. |
 | What helper pattern must the scaffold follow? | `resolveClawperatorBin`, matching the exemplar skills. |
@@ -234,6 +237,8 @@ workable for maintainers and brittle for everyone else.
 - Authors keep embedding parser or normalization logic directly in `run.js`
   without extracting a testable module and colocated `*.test.js`
 - The scaffold continues to disagree with the exemplar helper pattern
+- PR-2 tightens the validator in a way that breaks current repo state because a
+  legacy checked-in `script` skill was not accounted for
 - The freshness check only covers one generated file or fires on timestamp-only
   churn, so stale generator-owned artifacts still slip through or unchanged
   repos fail validation
@@ -258,7 +263,10 @@ After PR-1:
 After PR-2:
 
 - the scaffold matches exemplar helper usage
-- `validateSkill.ts` rejects missing or invalid `clawperator-skill-type`
+- `validateSkill.ts` rejects missing or invalid `clawperator-skill-type`,
+  enforces `replay` / `orchestrated` as the active convention, and preserves
+  temporary compatibility for existing legacy `script` metadata until cleanup
+  lands
 - the repo catches stale generated indexes after registry changes and tells
   authors to rerun `../clawperator-skills/scripts/generate_skill_indexes.sh`
 - main repo public docs point authors at the restored local guidance without

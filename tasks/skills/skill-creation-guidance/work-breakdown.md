@@ -286,8 +286,10 @@ helper pattern and the static validator catches the cheapest repeated mistakes.
    `resolveClawperatorBin`, matching the exemplar skills.
 2. Add an additive static check in `validateSkill.ts` that requires
    `clawperator-skill-type` frontmatter on `SKILL.md` and validates it against
-   the allowed values used by the repo. In this pack those values are exactly
-   `replay` and `orchestrated`, matching `docs/skills/authoring.md`.
+   the allowed values used by the repo. In this pack the target convention is
+   `replay` and `orchestrated`, matching `docs/skills/authoring.md`, but the
+   validator must preserve temporary compatibility for existing checked-in
+   legacy `script` metadata until a cleanup follow-up lands.
 3. Add an additive static check that detects stale generator-owned outputs from
    `../clawperator-skills/scripts/generate_skill_indexes.sh`. Base the check on
    real generated-artifact drift, not raw timestamp fields such as
@@ -305,22 +307,30 @@ helper pattern and the static validator catches the cheapest repeated mistakes.
      `validateSkill` passes that check
    - skill with a valid `clawperator-skill-type` of `"orchestrated"` →
      `validateSkill` also passes that check
+   - existing legacy checked-in skill metadata with
+     `clawperator-skill-type: script` → compatibility path still passes until a
+     cleanup follow-up migrates it
    - registry change without regenerated index → the freshness check returns a
      rejection that points to
      `../clawperator-skills/scripts/generate_skill_indexes.sh`
    - unchanged generated fixtures → the freshness check does not fail on
      timestamp-only churn
    - registry change with a regenerated index → the freshness check passes
-5. Record the exact guardrails shipped in `findings.md`.
+5. Record the exact guardrails shipped in `findings.md`, including whether any
+   live legacy `clawperator-skill-type: script` instances still exist and what
+   compatibility rule was chosen for them in this pack.
 
 ### Acceptance Criteria
 
 - the scaffold output matches exemplar helper usage on `resolveClawperatorBin`
 - `validateSkill.ts` rejects missing or invalid `clawperator-skill-type` and
-  only accepts `replay` and `orchestrated`
+  enforces `replay` / `orchestrated` as the active convention while preserving
+  temporary compatibility for existing legacy `script` metadata
 - `validateSkill.ts` or its associated check rejects stale generated indexes
   with an actionable rerun message
 - unit tests cover the new guardrails, including the no-op freshness case
+- `findings.md` records the legacy-`script` compatibility decision if any live
+  checked-in instances still exist
 - the documented boundary still makes clear that validator checks do not replace
   `scripts/test_all.sh` or live-device proof
 
@@ -331,7 +341,7 @@ npm --prefix apps/node run build
 npm --prefix apps/node run test
 # Verify the scaffold template source was updated
 rg -n "resolveClawperatorBin" apps/node/src/domain/skills/scaffoldSkill.ts
-rg -n "clawperator-skill-type|generate_skill_indexes.sh|generatedAt" apps/node/src/domain/skills/validateSkill.ts
+rg -n "clawperator-skill-type|generate_skill_indexes.sh" apps/node/src/domain/skills/validateSkill.ts
 ```
 
 ### Expected Commit
