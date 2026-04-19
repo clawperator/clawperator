@@ -452,6 +452,30 @@ describe("cmdAuthoringSkillsList", () => {
     });
   });
 
+  it("returns the documented json shape for installed authoring skills", async () => {
+    const root = await makeTempRoot();
+    const installDir = join(root, "home", ".clawperator", "authoring-skills");
+    const skillDir = join(installDir, "skill-author-by-recording");
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(join(skillDir, "SKILL.md"), "# skill-author-by-recording\n", "utf8");
+
+    const output = await cmdAuthoringSkillsList({
+      format: "json",
+      installDir,
+    });
+
+    assert.deepEqual(JSON.parse(output), {
+      skills: [
+        {
+          name: "skill-author-by-recording",
+          skillPath: join(skillDir, "SKILL.md"),
+        },
+      ],
+      count: 1,
+      installedDir: installDir,
+    });
+  });
+
   it("surfaces filesystem errors instead of reporting an empty install", async () => {
     const root = await makeTempRoot();
     const installDir = join(root, "unreadable-install-dir");
