@@ -89,6 +89,9 @@ discovery front door is implemented.
 - `node apps/node/dist/cli/index.js authoring-skills list --format json`
 - `bash -lc 'source sites/landing/public/install.sh; AUTHORING_SKILLS_INSTALL_DIR="$HOME/.clawperator/authoring-skills"; write_agent_guide; write_shared_agent_bridge'`
 - `rg -n "skill-author-by-agent-discovery|skill-author-by-recording|authoring-skills|AGENTS.md" ~/.clawperator/AGENTS.md ~/.agents/AGENTS.md`
+- `./scripts/docs_build.sh`
+- `grep -ri "receiver" docs/api/ docs/skills/ docs/troubleshooting/ docs/index.md docs/setup.md`
+- `grep -r "observe snapshot\|action click\|action press" docs/`
 
 ## Eval run ids
 
@@ -150,6 +153,12 @@ discovery front door is implemented.
   - `sites/landing/public/install.sh`
   - `~/.clawperator/AGENTS.md`
   - `~/.agents/AGENTS.md`
+- Phase 4 additionally updated and checked:
+  - `docs/host-agents.md`
+  - `docs/skills/authoring.md`
+  - `docs/internal/design/agent-host-integration.md`
+  - `sites/docs/static/llms-full.txt`
+  - `sites/landing/public/llms-full.txt`
 
 ## Authored skills and `SkillResult` validity
 
@@ -212,6 +221,22 @@ discovery front door is implemented.
 - The installer-owned bridge block in `~/.agents/AGENTS.md` now points agents
   back to the local guide plus runtime-skill discovery commands without
   claiming the shared skill dirs contain runtime skills.
+- Phase 4 public docs now mirror the shipped route:
+  - `docs/host-agents.md` names the zero-results route and its verification
+    commands
+  - `docs/skills/authoring.md` treats discovery as the zero-results front door
+    and recording as the proving workflow
+  - `docs/internal/design/agent-host-integration.md` records the durable
+    install / bridge assumption so future host-agent work does not regress it
+- `./scripts/docs_build.sh` passed after the Phase 4 doc updates.
+- Auxiliary docs-author greps found existing unrelated hits outside the Phase 4
+  scope:
+  - `docs/api/environment.md` still mentions the legacy `--receiver-package`
+    alias while documenting env precedence
+  - `docs/internal/documentation-drafting-north-star.md` intentionally contains
+    deprecated-command examples as anti-pattern text
+  - these did not block the pack because the phase validation requirement is
+    `./scripts/docs_build.sh`
 
 ## Problems encountered
 
@@ -274,10 +299,21 @@ discovery front door is implemented.
     and `~/.agents/AGENTS.md` now advertise the discovery-to-proving route
   - `plan.md` and `work-breakdown.md` now reflect live pack status:
     completed phases `1, 2, 3`, current / next `Phase 4`
+- Phase 4 is now complete locally.
+- Phase 4 acceptance result:
+  - `docs/host-agents.md` now documents the zero-results authoring route from
+    runtime discovery to discovery-first handoff
+  - `docs/skills/authoring.md` now documents the installed front doors in the
+    correct order: discovery first, recording second, scaffold only by explicit
+    choice
+  - `docs/internal/design/agent-host-integration.md` now records the durable
+    guide / bridge expectation for the discovery-to-proving route
+  - `./scripts/docs_build.sh` passed and regenerated the shipped
+    `llms-full.txt` outputs
+  - `plan.md` and `work-breakdown.md` now reflect live pack status:
+    completed phases `1, 2, 3, 4`, current / next `Phase 5`
 
 ## Deferred follow-up
 
-- Phase 4: update public host-agent and authoring docs with the zero-results
-  route.
 - Phase 5: run the anchor scenario plus the AOSP emulator and Samsung physical
   eval matrix and record authored-skill proof.

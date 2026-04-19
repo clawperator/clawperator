@@ -24,9 +24,9 @@ repaired. Once unblocked, the execution order is:
 | State | in_progress |
 | Total PRs | 1 |
 | Total phases | 5 |
-| Completed | 1, 2, 3 |
-| Remaining | 4, 5 |
-| Current / Next | Phase 4 |
+| Completed | 1, 2, 3, 4 |
+| Remaining | 5 |
+| Current / Next | Phase 5 |
 | Blockers | none |
 
 ## Progress Update
@@ -41,6 +41,10 @@ repaired. Once unblocked, the execution order is:
 - Phase 3 validation completed locally on 2026-04-19. The packaged discovery
   install wiring, CLI help-surface guidance, and installer-written host-agent
   guide refresh are recorded in
+  `tasks/skills/agent-assisted-skill-drafting/findings.md`.
+- Phase 4 validation completed locally on 2026-04-19. The public host-agent
+  route, authoring-workflow docs, and durable internal host-integration note
+  refresh are recorded in
   `tasks/skills/agent-assisted-skill-drafting/findings.md`.
 
 ## Hard Rules

@@ -2,26 +2,31 @@
 
 ## Purpose
 
-Document the current authoring contract for local skills: scaffolded files, `SKILL.md`, run scripts, artifact compilation, and validation.
+Document the current authoring contract for local skills: zero-results
+discovery, recording-based proving, scaffolded files, `SKILL.md`, run scripts,
+artifact compilation, and validation.
 
-## Preferred Creation Path
+## Preferred Authoring Route
 
-The preferred current way to create a new recording-derived skill is to use
-the `skill-author-by-recording` skill.
+Use this order:
 
-That workflow is the current canonical front door for creating skills from a
-fresh recording because it:
+| Situation | Start here | Stop when |
+| --- | --- | --- |
+| An installed runtime skill already matches the request | `clawperator skills for-app`, `clawperator skills search`, `clawperator skills get` | You have a truthful runtime skill to run. |
+| Runtime-skill discovery returned no relevant match and you need the host-visible zero-results route | `clawperator authoring-skills list --json`, then `skill-author-by-agent-discovery` | Discovery emits one artifact and chooses exactly one next step. |
+| Discovery returned `proceed_to_recording`, or the route is already well understood | `skill-author-by-recording` | One recording-derived skill shape is authored and its self-test surfaces a `SkillResult`. |
+| You explicitly want the low-level manual scaffold instead of the installed guided workflows | `clawperator skills new <skill_id>` | The local scaffold exists and the registry entry was added. |
 
-- gathers the plain-language goal first
-- resets the target app before recording
-- keeps recording artifacts under `~/.clawperator/recordings/<session_id>/`
-- recommends replay versus orchestrated truthfully from the evidence
-- retains the compare baseline in the expected place
-- runs one self-test and surfaces the resulting `SkillResult`
+Current route rules:
 
-Use raw `clawperator skills new <skill_id>` scaffolding directly when you are
-doing manual skill construction or editing an existing skill shape, not when
-you want the preferred end-to-end recording-to-skill workflow.
+- Start with runtime-skill discovery first.
+- If runtime-skill discovery returns no relevant match, use
+  `skill-author-by-agent-discovery` as the zero-results front door.
+- Use `skill-author-by-recording` only after discovery returns
+  `proceed_to_recording`, or when the route is already well understood.
+- Use raw `clawperator skills new <skill_id>` scaffolding only when you
+  explicitly want the low-level manual surface instead of the installed guided
+  authoring workflows.
 
 ## Host-Agent Discovery Rule
 
@@ -33,7 +38,10 @@ use this order:
 2. If runtime-skill discovery returns no relevant match and you need to inspect
    installed guided authoring workflows on the current host, run
    `clawperator authoring-skills list --json`.
-3. Use `clawperator skills new <skill_id>` only when you explicitly want the
+3. Start with `skill-author-by-agent-discovery` as the zero-results front door.
+4. Use `skill-author-by-recording` only after discovery returns
+   `proceed_to_recording`, or when the route is already well understood.
+5. Use `clawperator skills new <skill_id>` only when you explicitly want the
    low-level manual scaffold instead of an installed authoring workflow.
 
 Verification pattern:
@@ -48,6 +56,8 @@ Expected signals:
 - top-level `count`
 - top-level `installedDir`
 - each listed authoring skill includes `name` and `skillPath`
+- `skills[].name` includes `skill-author-by-agent-discovery`
+- `skills[].name` includes `skill-author-by-recording`
 
 ## Skills Repo Entry Points
 
@@ -93,6 +103,13 @@ Current install model:
 | Codex default discovery dir | `~/.codex/skills/` | used when `CODEX_HOME` is unset |
 | Generic agents discovery dir | `~/.agents/skills/` | symlinks into the canonical store for generic agent runtimes |
 
+Current packaged first-party authoring skills:
+
+| Skill | Role | Boundary |
+| --- | --- | --- |
+| `skill-author-by-agent-discovery` | zero-results front door | Produces one discovery artifact, chooses exactly one next step, and does not author a durable runtime skill directly. |
+| `skill-author-by-recording` | proving workflow | Records a real device flow, authors one skill shape, and runs one self-test that surfaces the emitted `SkillResult`. |
+
 Maintenance and repair commands:
 
 | Command | Use it when | First-run requirement |
@@ -110,6 +127,8 @@ Current command behavior:
   reports the result as an update rather than a first install
 - `clawperator authoring-skills list` reports installed skill names and the
   absolute `SKILL.md` path for each installed authoring skill
+- the current packaged install set contains
+  `skill-author-by-agent-discovery` and `skill-author-by-recording`
 
 Current doctor behavior:
 
@@ -152,8 +171,9 @@ Expected signals:
 
 When you create a skill from a recording, use these current authoring rules:
 
-- use the `skill-author-by-recording` skill as the normal way to create a new
-  recording-derived skill
+- use the `skill-author-by-recording` skill as the proving workflow after
+  discovery returned `proceed_to_recording`, or when the route is already well
+  understood
 - start from the user's plain-language goal, not from a final prechosen
   `skill_id`
 - derive the first-pass `skill_id` after inspecting the recording evidence
@@ -204,18 +224,21 @@ Use this route when hardening a runtime skill:
 
 1. Discover installed guided authoring workflows with
    `clawperator authoring-skills list --json` when you need a host-visible
-   front door.
-2. Scaffold only when you want the low-level manual surface:
+   front door and runtime-skill discovery returned no relevant match.
+2. Start with `skill-author-by-agent-discovery`, then move to
+   `skill-author-by-recording` only after discovery returns
+   `proceed_to_recording`, or when the route is already well understood.
+3. Scaffold only when you want the low-level manual surface:
    `clawperator skills new <skill_id>`.
-3. Run `clawperator skills validate <skill_id> --dry-run` for skill-local file,
+4. Run `clawperator skills validate <skill_id> --dry-run` for skill-local file,
    metadata, and artifact checks.
-4. Regenerate indexes with `./scripts/generate_skill_indexes.sh` in
+5. Regenerate indexes with `./scripts/generate_skill_indexes.sh` in
    `clawperator-skills` when registry-linked metadata changes.
-5. Run `clawperator skills validate --all --dry-run` after regenerating those
+6. Run `clawperator skills validate --all --dry-run` after regenerating those
    indexes.
-6. Run `./scripts/test_all.sh` in `clawperator-skills` when the change touches
+7. Run `./scripts/test_all.sh` in `clawperator-skills` when the change touches
    pure off-device JS logic.
-7. Prove UI behavior on a real target device or emulator when the change affects
+8. Prove UI behavior on a real target device or emulator when the change affects
    selectors, navigation, checkpoints, compare baselines, or terminal
    verification.
 
