@@ -4,7 +4,7 @@ Parent plan: `tasks/skills/agent-assisted-skill-drafting/plan.md`
 
 ## Executive Summary
 
-1 PR, 4 phases, all in `clawperator`. The pack stays blocked until
+2 PRs, 5 phases, all in `clawperator`. The pack stays blocked until
 `tasks/skills/skill-creation-guidance/` PR-2 lands, because Pack A assumes the
 skills authoring surface, scaffold helper, and validator baseline are already
 repaired. Once unblocked, the execution order is:
@@ -13,17 +13,20 @@ repaired. Once unblocked, the execution order is:
   discovery artifact contract
 - Phase 2: wire install and packaged-skill discovery surfaces
 - Phase 3: update host and authoring docs for the zero-results route
-- Phase 4: prove the workflow end to end and capture findings
+- Phase 4: bind the workflow to `/evals` and update the repo-local eval helper
+  skills
+- Phase 5: run the dual-device emulator-plus-Samsung eval proof and capture
+  findings
 
 ## Status
 
 | Item | Value |
 | --- | --- |
 | State | blocked |
-| Total PRs | 1 |
-| Total phases | 4 |
+| Total PRs | 2 |
+| Total phases | 5 |
 | Completed | none |
-| Remaining | 1, 2, 3, 4 |
+| Remaining | 1, 2, 3, 4, 5 |
 | Current / Next | Phase 1 |
 | Blockers | `tasks/skills/skill-creation-guidance/` PR-2 must merge or be finalized locally first |
 
@@ -40,14 +43,24 @@ repaired. Once unblocked, the execution order is:
 - The discovery skill must not author a durable runtime skill directly.
 - Do not add new Node runtime contracts or new general-purpose CLI probes in
   this pack.
+- Use `/evals` as the proving surface for cross-device confidence. Do not leave
+  eval integration as a note in `findings.md` only.
+- Start with the existing `android-version` benchmark. Do not invent a new eval
+  id unless the current benchmark cannot express the authored-skill flow.
+- The acceptance matrix is one AOSP emulator and one Samsung physical device.
+  Pass `--device <serial>` explicitly on every eval run.
+- The Pack A eval must exercise `skill-author-by-agent-discovery`, not only the
+  older temp skill-emission path.
+- Each target-specific authored skill must emit a valid `SkillResult` on its
+  originating device. Do not treat a plain answer line alone as enough.
 - Use the branch-local Node build for any CLI validation. Do not rely on a
   globally installed `clawperator` binary.
 - Use `.agents/skills/docs-author/SKILL.md` for the docs phase instead of
   re-deriving the docs workflow.
 - Create `tasks/skills/agent-assisted-skill-drafting/findings.md` during
-  Phase 4 and append to it as validation progresses.
+  Phase 5 and append to it as validation progresses.
 - One commit per phase. Do not batch the new skill, install wiring, docs, and
-  proof into one opaque commit.
+  eval work into one opaque commit.
 
 ## Required Reading
 
@@ -62,30 +75,41 @@ Read these files IN THIS ORDER before writing anything.
 | 5 | `docs/skills/authoring.md` | Current public authoring front door |
 | 6 | `docs/host-agents.md` | Current host-agent discovery route |
 | 7 | `docs/internal/design/agent-host-integration.md` | Durable host-agent assumptions |
-| 8 | `apps/node/src/domain/skills/copyAuthoringSkills.ts` | Packaged authoring-skill install and discovery wiring |
-| 9 | `apps/node/src/cli/commands/authoringSkills.ts` | Install, update, and list CLI behavior |
-| 10 | `apps/node/src/test/unit/authoringSkills.test.ts` | Packaging and install regression coverage |
-| 11 | `apps/node/src/test/unit/authoringSkillsPack.test.ts` | Packaged authoring-skills tree expectations |
-| 12 | `sites/landing/public/install.sh` | Install-time authoring-skill discovery guide |
-| 13 | `.agents/skills/docs-author/SKILL.md` | Required docs workflow for Phase 3 |
+| 8 | `docs/internal/design/evals.md` | Eval boundary and current skill-score model |
+| 9 | `evals/README.md` | Operational eval-harness usage and current benchmark constraints |
+| 10 | `evals/specs/android-version/spec.json` | Existing Settings/About benchmark contract |
+| 11 | `evals/specs/android-version/prompt-skill.md` | Current skill-generation route that Pack A must update |
+| 12 | `.agents/skills/evals-run/SKILL.md` | Emulator-facing eval helper workflow |
+| 13 | `.agents/skills/evals-live-run/SKILL.md` | Physical-device eval helper workflow |
+| 14 | `apps/node/src/domain/skills/copyAuthoringSkills.ts` | Packaged authoring-skill install and discovery wiring |
+| 15 | `apps/node/src/cli/commands/authoringSkills.ts` | Install, update, and list CLI behavior |
+| 16 | `apps/node/src/test/unit/authoringSkills.test.ts` | Packaging and install regression coverage |
+| 17 | `apps/node/src/test/unit/authoringSkillsPack.test.ts` | Packaged authoring-skills tree expectations |
+| 18 | `sites/landing/public/install.sh` | Install-time authoring-skill discovery guide |
+| 19 | `.agents/skills/docs-author/SKILL.md` | Required docs workflow for Phase 3 |
 
 ## PR / Phase Plan
 
 | PR | Repo | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- | --- |
-| PR-1 | `clawperator` | Add the discovery-first authoring skill, wire install/discovery surfaces, update docs, and prove the route | 1, 2, 3, 4 | thinking, default, thinking, thinking | `tasks/skills/skill-creation-guidance/` PR-2 merged or finalized locally |
+| PR-1 | `clawperator` | Add the discovery-first authoring skill, wire install/discovery surfaces, and update docs | 1, 2, 3 | thinking, default, thinking | `tasks/skills/skill-creation-guidance/` PR-2 merged or finalized locally |
+| PR-2 | `clawperator` | Bind the workflow to evals and prove the dual-device benchmark | 4, 5 | thinking, thinking | PR-1 merged or finalized locally |
 
 ## Findings File Requirement
 
-Create `tasks/skills/agent-assisted-skill-drafting/findings.md` during Phase 4
+Create `tasks/skills/agent-assisted-skill-drafting/findings.md` during Phase 5
 with these sections:
 
 - Goal
 - Dependency state
 - Anchor scenario
+- Eval design decision
+- Device matrix
 - Discovery artifact produced
 - Commands run
+- Eval run ids
 - Installed authoring-skill checks
+- Authored skills and `SkillResult` validity
 - Observations
 - Problems encountered
 - Fixes attempted
@@ -263,7 +287,7 @@ implicit instruction to improvise.
 docs(authoring): document discovery-to-proving workflow
 ```
 
-## Phase 4: Anchor-Scenario Proof And Findings
+## Phase 4: Eval Integration For Discovery-Authored Skills
 
 ### Agent Tier
 
@@ -271,9 +295,77 @@ thinking
 
 ### Goal
 
-Prove that the new front door works on the anchor scenario, is discoverable
-after install, and hands off cleanly into the existing recording workflow
-without inventing a second proving path.
+Make `/evals` a first-class proving surface for Pack A by updating the current
+Settings/About benchmark so it exercises `skill-author-by-agent-discovery`
+instead of treating skill generation as an unrelated optional sidecar.
+
+### Files or Surfaces To Change
+
+- `.agents/skills/evals-run/SKILL.md`
+- `.agents/skills/evals-run/references/evals-run.md`
+- `.agents/skills/evals-run/scripts/run_android_version_eval.sh` only if the
+  helper needs additive Pack A flags
+- `.agents/skills/evals-live-run/SKILL.md`
+- `.agents/skills/evals-live-run/references/evals-live-run.md`
+- `evals/README.md`
+- `docs/internal/design/evals.md`
+- `evals/specs/android-version/spec.json`
+- `evals/specs/android-version/prompt-skill.md`
+- `evals/specs/android-version/prompt-full-repo.md` only if the full-repo
+  prompt needs a matching route note
+- `evals/run_eval.py` and `evals/harness/` only if additive skill-score
+  recording or replay handling is required
+
+### Steps
+
+1. Start from the existing `android-version` benchmark. Only introduce a new
+   eval id if the current benchmark cannot truthfully express the authored-skill
+   flow.
+2. Update the skill-generation prompt path so the benchmark explicitly routes
+   through `skill-author-by-agent-discovery` to draft a target-specific
+   Settings/About skill.
+3. Keep the benchmark's required scored field on Android version unless a
+   truthful richer scorer for security patch or Google Play system update lands
+   cheaply within the same PR.
+4. Update `evals/README.md`, `docs/internal/design/evals.md`, and the two
+   repo-local eval helper skills so future agents know how this Pack A benchmark
+   works on emulator and live-device surfaces.
+5. If the harness needs additive scoring or artifact capture to verify authored
+   `SkillResult` validity, make that change here and add or update focused
+   harness tests.
+
+### Acceptance Criteria
+
+- the Pack A benchmark lives in `/evals`, not only in a manual findings note
+- the updated benchmark explicitly exercises `skill-author-by-agent-discovery`
+- `evals-run` and `evals-live-run` both describe how to run the Pack A
+  benchmark on their respective device classes
+- any harness change needed for authored-skill proof is covered by focused
+  tests
+
+### Validation
+
+```bash
+uv run --project evals --extra dev pytest evals/harness -q
+```
+
+### Expected Commit
+
+```text
+test(evals): bind discovery-authored skills to settings benchmark
+```
+
+## Phase 5: Dual-Device Eval Matrix And Findings
+
+### Agent Tier
+
+thinking
+
+### Goal
+
+Prove that the new front door works on the anchor scenario and under the eval
+matrix: one AOSP emulator plus one Samsung physical device, both on the
+Settings/About surface rooted at `com.android.settings`.
 
 ### Files or Surfaces To Change
 
@@ -293,18 +385,27 @@ without inventing a second proving path.
    `findings.md`.
 5. Verify that the produced artifact contains every required field and that its
    selected route is explicit and singular.
-6. If the result is `proceed_to_recording`, verify that the handoff target is
-   the existing recording skill rather than a newly improvised path.
-7. Record any gaps that remain after the proof as follow-up items in
-   `findings.md`. Do not silently widen the pack.
+6. Run the updated Pack A eval twice in `full-repo` mode with explicit devices:
+   - once on an AOSP emulator
+   - once on a Samsung physical device
+7. For each eval run, verify all of the following:
+   - the route actually used `skill-author-by-agent-discovery`
+   - the run produced a target-specific authored skill rather than a single
+     over-generalized Settings skill
+   - the authored skill emitted a valid `SkillResult`
+   - the required Android-version answer remained correct on that device
+8. Record the run ids, sanitized device labels, authored-skill identities, and
+   any follow-up gaps in `findings.md`. Do not silently widen the pack.
 
 ### Acceptance Criteria
 
 - `findings.md` exists and records the install checks, anchor-scenario run, and
-  final route result
+  dual-device eval matrix
 - both authoring skills are discoverable through the installed branch-local CLI
 - the anchor-scenario discovery artifact contains every required field
-- the recorded route is explicit, singular, and consistent with the plan
+- one AOSP emulator run id and one Samsung run id are recorded
+- each target-specific authored skill emits a valid `SkillResult` on its
+  originating device
 
 ### Validation
 
@@ -312,11 +413,13 @@ without inventing a second proving path.
 npm --prefix apps/node run build
 node apps/node/dist/cli/index.js authoring-skills install --format json
 node apps/node/dist/cli/index.js authoring-skills list --format json
+uv run --project evals --extra dev python evals/run_eval.py android-version --agent codex --model gpt-5.4 --mode full-repo --runtime local-dev --skill-prompt prompt-skill.md --device <aosp_emulator_serial> --label pack-a-aosp
+uv run --project evals --extra dev python evals/run_eval.py android-version --agent codex --model gpt-5.4 --mode full-repo --runtime local-dev --skill-prompt prompt-skill.md --device <samsung_device_serial> --label pack-a-samsung
 ./scripts/docs_build.sh
 ```
 
 ### Expected Commit
 
 ```text
-test(authoring): prove discovery-first skill drafting workflow
+test(authoring): prove discovery-first workflow across settings eval matrix
 ```
