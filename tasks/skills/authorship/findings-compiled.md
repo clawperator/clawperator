@@ -49,12 +49,6 @@ for analysis.
 
 ## Scope and method
 
-This synthesis merges three independent findings passes that were produced
-during the authorship research step:
-
-- one Claude findings pass
-- two Codex findings passes
-
 Approach:
 
 - Kept only the highest-signal points.
