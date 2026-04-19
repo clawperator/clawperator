@@ -288,8 +288,10 @@ helper pattern and the static validator catches the cheapest repeated mistakes.
    `clawperator-skill-type` frontmatter on `SKILL.md` and validates it against
    the allowed values used by the repo. In this pack the target convention is
    `replay` and `orchestrated`, matching `docs/skills/authoring.md`, but the
-   validator must preserve temporary compatibility for existing checked-in
-   legacy `script` metadata until a cleanup follow-up lands.
+   validator must preserve only one temporary compatibility exception for the
+   existing checked-in legacy skill
+   `au.com.polyaire.airtouch5.set-zone-state`. New or other `script` metadata
+   must still fail until a cleanup follow-up lands.
 3. Add an additive static check that detects stale generator-owned outputs from
    `../clawperator-skills/scripts/generate_skill_indexes.sh`. Base the check on
    real generated-artifact drift, not raw timestamp fields such as
@@ -307,9 +309,12 @@ helper pattern and the static validator catches the cheapest repeated mistakes.
      `validateSkill` passes that check
    - skill with a valid `clawperator-skill-type` of `"orchestrated"` →
      `validateSkill` also passes that check
-   - existing legacy checked-in skill metadata with
-     `clawperator-skill-type: script` → compatibility path still passes until a
-     cleanup follow-up migrates it
+   - the existing legacy checked-in skill
+     `au.com.polyaire.airtouch5.set-zone-state` with
+     `clawperator-skill-type: script` → allowlisted compatibility path still
+     passes until a cleanup follow-up migrates it
+   - a newly introduced or different skill with
+     `clawperator-skill-type: script` → `validateSkill` rejects it
    - registry change without regenerated index → the freshness check returns a
      rejection that points to
      `../clawperator-skills/scripts/generate_skill_indexes.sh`
@@ -325,7 +330,8 @@ helper pattern and the static validator catches the cheapest repeated mistakes.
 - the scaffold output matches exemplar helper usage on `resolveClawperatorBin`
 - `validateSkill.ts` rejects missing or invalid `clawperator-skill-type` and
   enforces `replay` / `orchestrated` as the active convention while preserving
-  temporary compatibility for existing legacy `script` metadata
+  only the explicit temporary exception for
+  `au.com.polyaire.airtouch5.set-zone-state`
 - `validateSkill.ts` or its associated check rejects stale generated indexes
   with an actionable rerun message
 - unit tests cover the new guardrails, including the no-op freshness case
