@@ -59,8 +59,22 @@ Pack A must not begin until PR-2 is merged or finalized locally.
 - Use `.agents/skills/docs-author/SKILL.md` for any main-repo docs changes.
 - Create `tasks/skills/skill-creation-guidance/findings.md` during execution
   and update it after every meaningful validation or design decision.
-- One commit per phase. Do not batch the skills-repo doc restoration, main-repo
-  guardrails, and final checklist codification into one opaque commit.
+- Do not start PR-2 until PR-1 is merged or finalized locally. Do not start
+  PR-3 until PR-2 is merged or finalized locally.
+- Keep repo ownership strict: PR-1 and PR-3 change only
+  `../clawperator-skills`, and PR-2 changes only `clawperator`. Do not mix both
+  repos in one PR or commit.
+- If execution changes a stable decision from the plan, update both
+  `plan.md` and `work-breakdown.md` before continuing.
+- Do not move to the next phase until the current phase validation passes and
+  `findings.md` records the decision or result that justified the phase.
+- Treat each phase acceptance as two-layer: the validation commands must pass,
+  and a short human review must confirm output accuracy, scope completeness,
+  evidence grounding, and format compliance for the surfaces changed in that
+  phase.
+- At least one reviewable commit per phase. Content-heavy phases may use
+  draft-plus-refine commits inside the same phase, but do not batch material
+  from later phases into an earlier phase commit.
 - Pack A stays blocked until Phase 4 is done and PR-2 is merged or finalized
   locally.
 
@@ -136,26 +150,32 @@ checklist work begins.
 1. Create `findings.md` with the required sections before the first content
    change.
 2. Record the current broken README-linked author surfaces in `findings.md`.
-3. Update `README.md` so it points at the intended local docs trio in
-   `../clawperator-skills/docs/` rather than missing files.
-4. Migrate the highest-value rules from
+3. Record the PR-1 repair path in `findings.md`: Phase 1 migrates the seed
+   rules and keeps top-level routing truthful, and Phase 2 restores the docs
+   trio and switches the final top-level links.
+4. If Phase 1 touches `README.md` or `AGENTS.md` before the docs trio exists,
+   keep that wording truthful: route readers toward `AGENTS.md` and
+   `../clawperator-skills/scripts/test_all.sh`, and do not point at dead files.
+5. Migrate the highest-value rules from
    `~/.clawperator/findings/skill-drafting/findings.md` into `AGENTS.md` as the
    seed author checklist.
-5. Add a short explicit route from the top-level author surface to
+6. Add a short explicit route from the top-level author surface to
    `../clawperator-skills/scripts/test_all.sh` so authors can discover the
    off-device test entrypoint immediately.
-6. Make sure the top-level author surfaces point readers toward the restored
-   durable guidance, not just toward raw repo layout.
-7. Keep the migration scoped: move the durable rules now, not the entire
+7. Record the exact Phase 2 docs destinations in `findings.md` so the next
+   phase can switch links without re-deciding structure.
+8. Keep the migration scoped: move the durable rules now, not the entire
    history of that file.
 
 ### Acceptance Criteria
 
-- `findings.md` records the README-link problem and the chosen repair path
-- `README.md` points at real local docs targets under `../clawperator-skills/docs/`
+- `findings.md` records the README-link problem, the chosen repair path, and
+  the exact Phase 2 docs destinations
 - `AGENTS.md` contains the migrated seed rules from the private findings file
-- the top-level author surface points at `../clawperator-skills/scripts/test_all.sh`
-- the top-level author surface points at the restored durable guidance
+- at least one top-level author surface points at
+  `../clawperator-skills/scripts/test_all.sh`
+- any Phase 1 top-level routing is truthful and does not point at missing local
+  docs
 
 ### Validation
 
@@ -163,8 +183,7 @@ checklist work begins.
 # Verify AGENTS.md has migrated rule categories for all six failure patterns
 rg -n "resolveClawperatorBin|generated index|verification|diagnostic|parser|privacy" ../clawperator-skills/AGENTS.md
 rg -n "test_all.sh" ../clawperator-skills/README.md ../clawperator-skills/AGENTS.md
-# Verify README still routes to the local docs trio (these links must be intact for Phase 2 to land cleanly)
-rg -n "skill-development-workflow|skill-authoring-guidelines|device-prep-and-runtime-tips" ../clawperator-skills/README.md ../clawperator-skills/AGENTS.md
+rg -n "README link decision|Current local author surface|Discoverability routes" tasks/skills/skill-creation-guidance/findings.md
 ```
 
 ### Expected Commit
@@ -197,24 +216,27 @@ and make `skill-migration.md` an explicitly secondary audit surface.
 
 1. Restore or rewrite the three local docs pages so they describe current
    behavior and point back to canonical contract docs where appropriate.
-2. Use `README.md` and `AGENTS.md` to route authors toward those local pages for
+2. Replace any temporary Phase 1 routing in `README.md` or `AGENTS.md` with
+   final links to the restored local docs trio.
+3. Use `README.md` and `AGENTS.md` to route authors toward those local pages for
    workflow and checklist help.
-3. Update `skill-migration.md` only enough to clarify that it is a migration and
+4. Update `skill-migration.md` only enough to clarify that it is a migration and
    audit log, not the main contribution guide.
-4. Make sure the restored local docs introduce the authored-skill structure and
+5. Make sure the restored local docs introduce the authored-skill structure and
    testing model at a high level:
    - `run.js` stays thin when possible
    - extract testable off-device logic into importable modules
    - colocate `*.test.js` where `scripts/test_all.sh` can pick them up
    - live-device proof still applies to UI behavior
-5. Keep the local pages concise and practical. Do not duplicate the entire
+6. Keep the local pages concise and practical. Do not duplicate the entire
    runtime contract from the main repo.
-6. Record the final local-doc layout and any unresolved gaps in `findings.md`.
+7. Record the final local-doc layout and any unresolved gaps in `findings.md`.
 
 ### Acceptance Criteria
 
 - all three local docs files exist under `../clawperator-skills/docs/`
-- `README.md` and `AGENTS.md` point at them
+- `README.md` and `AGENTS.md` point at them and no longer rely on temporary
+  Phase 1 routing
 - `skill-migration.md` no longer reads like the primary author workflow
 - the local docs point back to the main repo contracts instead of duplicating
   them wholesale
@@ -264,9 +286,13 @@ helper pattern and the static validator catches the cheapest repeated mistakes.
    `resolveClawperatorBin`, matching the exemplar skills.
 2. Add an additive static check in `validateSkill.ts` that requires
    `clawperator-skill-type` frontmatter on `SKILL.md` and validates it against
-   the allowed values used by the repo.
-3. Add an additive static check that detects registry changes without refreshed
-   generated indexes.
+   the allowed values used by the repo. In this pack those values are exactly
+   `replay` and `orchestrated`, matching `docs/skills/authoring.md`.
+3. Add an additive static check that detects stale generator-owned outputs from
+   `../clawperator-skills/scripts/generate_skill_indexes.sh`. Base the check on
+   real generated-artifact drift, not raw timestamp fields such as
+   `generatedAt`, and make the failure message tell authors to rerun the
+   generator.
 4. Add regression coverage in `apps/node/src/test/unit/skills.test.ts`. Name
    and implement every case below before committing:
    - scaffold output contains `resolveClawperatorBin` and does not call the
@@ -277,17 +303,24 @@ helper pattern and the static validator catches the cheapest repeated mistakes.
      returns a rejection that names the bad value
    - skill with a valid `clawperator-skill-type` (e.g., `"replay"`) →
      `validateSkill` passes that check
+   - skill with a valid `clawperator-skill-type` of `"orchestrated"` →
+     `validateSkill` also passes that check
    - registry change without regenerated index → the freshness check returns a
-     rejection
+     rejection that points to
+     `../clawperator-skills/scripts/generate_skill_indexes.sh`
+   - unchanged generated fixtures → the freshness check does not fail on
+     timestamp-only churn
    - registry change with a regenerated index → the freshness check passes
 5. Record the exact guardrails shipped in `findings.md`.
 
 ### Acceptance Criteria
 
 - the scaffold output matches exemplar helper usage on `resolveClawperatorBin`
-- `validateSkill.ts` rejects missing or invalid `clawperator-skill-type`
+- `validateSkill.ts` rejects missing or invalid `clawperator-skill-type` and
+  only accepts `replay` and `orchestrated`
 - `validateSkill.ts` or its associated check rejects stale generated indexes
-- unit tests cover the new guardrails
+  with an actionable rerun message
+- unit tests cover the new guardrails, including the no-op freshness case
 - the documented boundary still makes clear that validator checks do not replace
   `scripts/test_all.sh` or live-device proof
 
@@ -298,8 +331,7 @@ npm --prefix apps/node run build
 npm --prefix apps/node run test
 # Verify the scaffold template source was updated
 rg -n "resolveClawperatorBin" apps/node/src/domain/skills/scaffoldSkill.ts
-# Verify the scaffold no longer embeds the bare binary name
-! rg -n '"clawperator"' apps/node/src/domain/skills/scaffoldSkill.ts
+rg -n "clawperator-skill-type|generate_skill_indexes.sh|generatedAt" apps/node/src/domain/skills/validateSkill.ts
 ```
 
 ### Expected Commit
@@ -389,7 +421,9 @@ they open a PR.
 ### Steps
 
 1. Promote the 13 PR-hardening lessons from the findings pass into the local
-   checklist, with grouped rules and concrete negative examples.
+   checklist, with grouped rules and concrete negative examples. Record a
+   one-to-one mapping in `findings.md` from each lesson or recurring failure
+   pattern to the section that now owns it.
 2. Add a durable testing matrix that tells authors exactly when to run and when
    to extend:
    - `../clawperator-skills/scripts/test_all.sh`
@@ -416,6 +450,7 @@ they open a PR.
 
 - every recurring failure pattern from the compiled findings has a durable local
   rule
+- `findings.md` records where each recurring lesson now lives
 - the local checklist contains an explicit testing matrix for authored-skill
   changes
 - the local checklist distinguishes mechanical guardrails from author-only

@@ -138,6 +138,7 @@ workable for maintainers and brittle for everyone else.
 | Private findings that must become durable | `~/.clawperator/findings/skill-drafting/findings.md` |
 | Scaffold output behavior | `apps/node/src/domain/skills/scaffoldSkill.ts` |
 | Static validator behavior | `apps/node/src/domain/skills/validateSkill.ts`, `apps/node/src/test/unit/skills.test.ts` |
+| Current skill-type convention and allowed values | `docs/skills/authoring.md` |
 | Public authoring docs that should cross-link rather than duplicate | `docs/skills/authoring.md`, `docs/skills/development.md` |
 
 ## Deterministic Versus Judgment
@@ -173,12 +174,23 @@ workable for maintainers and brittle for everyone else.
   or the public authoring page.
 - `scaffoldSkill.ts` must emit `resolveClawperatorBin` usage so the scaffold
   matches exemplar practice.
+- `clawperator-skill-type` values in this pack are exactly `replay` and
+  `orchestrated`, matching the current documented convention. Do not invent
+  `script` or widen the enum here.
 - `validateSkill.ts` must add only the named static checks:
   `clawperator-skill-type` frontmatter and generated-index freshness.
+- Generated-index freshness must be judged against the outputs owned by
+  `../clawperator-skills/scripts/generate_skill_indexes.sh`. Ignore
+  timestamp-only churn such as `generatedAt`; failure must reflect real
+  generated-artifact drift and tell authors to rerun the generator.
 - Do not widen this pack into runtime parser enforcement or new verification
   semantics.
 - `skill-migration.md` remains an active migration and audit log, not the
   primary authoring front door.
+- Phase 1 may record the intended docs-trio destinations and migrate seed
+  rules, but it must not leave top-level author surfaces pointing at missing
+  files. Final README and `AGENTS.md` links to the restored docs trio land in
+  Phase 2.
 
 **Judgment required:**
 
@@ -200,8 +212,11 @@ workable for maintainers and brittle for everyone else.
 | When must an authored skill change add a colocated `*.test.js`? | When the change adds or modifies pure off-device JS logic such as parsers, normalizers, argument handling, helper resolution, or output shaping. |
 | When is live-device proof still mandatory? | For selector, navigation, recording, artifact-compare, checkpoint, or terminal-verification behavior, regardless of off-device tests. |
 | How should skills be structured when they need tests? | Keep `run.js` thin and extract testable logic into importable modules under `skills/**/scripts/` or `skills/utils/`, with colocated `*.test.js` files discoverable by `node --test`. |
+| What values are allowed for `clawperator-skill-type` in this pack? | `replay` and `orchestrated` only, matching the current documented convention. |
 | Which mechanical checks belong in this pack? | Only `clawperator-skill-type` frontmatter and generated-index freshness. |
+| How is generated-index freshness judged? | Against the generator-owned outputs from `../clawperator-skills/scripts/generate_skill_indexes.sh`; stale means the normalized generated artifacts would change, not merely `generatedAt` timestamps, and the failure should tell authors to rerun the script. |
 | What helper pattern must the scaffold follow? | `resolveClawperatorBin`, matching the exemplar skills. |
+| Can README or `AGENTS.md` point at the docs trio before those files exist? | No. Interim Phase 1 routing must stay truthful; switch the final top-level links in Phase 2 once the files exist. |
 | When can Pack A begin? | After this pack's PR-2 is merged or landed locally. |
 
 ## Failure Modes To Prevent
@@ -214,9 +229,14 @@ workable for maintainers and brittle for everyone else.
   some combination
 - Durable author guidance exists but is only discoverable by opening deep local
   docs directly instead of being routed from top-level author surfaces
+- Phase 1 "repairs" README or `AGENTS.md` by pointing at docs that do not exist
+  yet, leaving PR-1 temporarily misleading
 - Authors keep embedding parser or normalization logic directly in `run.js`
   without extracting a testable module and colocated `*.test.js`
 - The scaffold continues to disagree with the exemplar helper pattern
+- The freshness check only covers one generated file or fires on timestamp-only
+  churn, so stale generator-owned artifacts still slip through or unchanged
+  repos fail validation
 - The validator grows into runtime parser or verification-contract work
 - Local guidance duplicates the main runtime contracts and immediately starts to
   drift
@@ -239,7 +259,8 @@ After PR-2:
 
 - the scaffold matches exemplar helper usage
 - `validateSkill.ts` rejects missing or invalid `clawperator-skill-type`
-- the repo catches stale generated indexes after registry changes
+- the repo catches stale generated indexes after registry changes and tells
+  authors to rerun `../clawperator-skills/scripts/generate_skill_indexes.sh`
 - main repo public docs point authors at the restored local guidance without
   duplicating the contract surface
 

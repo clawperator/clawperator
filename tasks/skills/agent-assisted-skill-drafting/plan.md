@@ -98,6 +98,8 @@ over-authoring and weak first drafts.
 - Broad new scoring work for Android security patch level or Google Play system
   update version if the existing eval harness cannot score those truthfully in
   this pack
+- Checking in the eval-authored Settings/About-device skills as shipped runtime
+  skills for either device family
 - Rewriting `../clawperator-skills/AGENTS.md` or the broader skills-repo
   quality bar work tracked in `tasks/skills/skill-creation-guidance/`
 
@@ -164,6 +166,7 @@ over-authoring and weak first drafts.
 | Repo-local eval helper skills | `.agents/skills/evals-run/SKILL.md`, `.agents/skills/evals-live-run/SKILL.md` |
 | Runtime skill discovery precedence | `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts` |
 | Dependency pack that must land first | `tasks/skills/skill-creation-guidance/plan.md` |
+| Dependency execution boundary | `tasks/skills/skill-creation-guidance/work-breakdown.md` |
 
 ## Deterministic Versus Judgment
 
@@ -206,9 +209,15 @@ over-authoring and weak first drafts.
   - later phases change the workflow until that same benchmark goes green
 - The required confidence matrix is one AOSP emulator plus one Samsung physical
   device. Use explicit `--device` selection for both.
+- If the required Samsung physical device is unavailable or unusable, stop and
+  mark the pack blocked. Do not substitute a second emulator or another OEM
+  without updating the pack.
 - Pack A success requires two target-specific authored skills under the eval
   pass, one per device family. Do not redefine success as a single universal
   Settings skill.
+- The eval-authored Settings/About-device skills are validation artifacts, not
+  shipped repo deliverables. Record their identity and evidence in
+  `findings.md`, but do not check them in as part of this pack.
 - The required scored field remains Android version unless a truthful richer
   scorer lands inside this pack. Android security patch level and Google Play
   system update version are allowed as additive evidence fields, not required
@@ -241,7 +250,9 @@ over-authoring and weak first drafts.
 | Should this pack add new runtime contracts or verification kinds? | No. Record any need as follow-up. |
 | What eval surface should prove this pack first? | `/evals`, starting with `android-version` on the Settings/About-device surface rooted at `com.android.settings`. |
 | Should the first Pack A eval require one universal cross-device Settings skill? | No. Require one target-specific authored skill for the AOSP emulator family and one for the Samsung family. |
+| What if the Samsung physical device is unavailable or unusable? | Stop and mark the pack blocked. Do not substitute a second emulator or another OEM without updating the pack. |
 | What makes the eval pass acceptable? | Both authored skills emit valid `SkillResult`s on their originating devices and the required Android-version answer remains correct. |
+| Are the eval-authored Settings/About-device skills deliverables of this pack? | No. They are validation artifacts recorded in `findings.md` unless a follow-up pack explicitly promotes them. |
 | Do Android security patch level and Google Play system update version block this pack? | No. Capture them only if the eval can do so truthfully without widening the scorer beyond safe scope. |
 | What are the default discovery budget limits? | max 5 snapshots, max 3 screenshots, max 90 seconds wall time. Record actual values chosen in `findings.md`. |
 
@@ -290,9 +301,13 @@ The discovery phase must produce one artifact with all of the following fields.
   harness
 - The Pack A eval only proves one device family and misses OEM and Android-skin
   variance
+- The pack silently substitutes another device and claims the required
+  emulator-plus-Samsung matrix passed
 - The eval proves an answer but not a valid authored `SkillResult`
 - The eval reuses the old temp skill-emission path without exercising
   `skill-author-by-agent-discovery`
+- The eval-generated authored skills or device-specific artifacts get committed
+  as if they are shipped deliverables of this pack
 - Pack A silently reopens runtime-contract questions that belong in a follow-up
   pack
 - Docs and skill prompts disagree about whether discovery, recording, or
@@ -321,6 +336,8 @@ After this pack ships:
 - `tasks/skills/agent-assisted-skill-drafting/findings.md` proves the workflow
   on the anchor scenario and records a successful or failed dual-device eval
   matrix with follow-up gaps called out explicitly
+- the pack does not require checking in the eval-authored Settings/About-device
+  skills; `findings.md` records their identity and proof instead
 
 ## Idempotency
 
