@@ -74,6 +74,7 @@ describe("version compatibility", () => {
     assert.strictEqual(isVersionCompatible("0.1.4", "0.6.3"), false);
     assert.strictEqual(isVersionCompatible("0.1.4", "0.6.4"), false);
     assert.strictEqual(isVersionCompatible("0.1.4", "0.6.5"), false);
+    assert.strictEqual(isVersionCompatible("0.1.4", "0.6.6"), false);
   });
 
   it("rejects prerelease-style versions in compatibility checks", () => {
