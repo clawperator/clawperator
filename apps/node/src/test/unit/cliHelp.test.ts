@@ -136,6 +136,7 @@ describe("CLI help", () => {
     assert.match(stdout, /exec <json-or-file> \[--validate-only\]/);
     assert.match(stdout, /https:\/\/docs\.clawperator\.com\/host-agents\//);
     assert.match(stdout, /skills for-app <package_id>/);
+    assert.match(stdout, /authoring-skills list/);
     assert.match(stdout, /mcp serve/);
   });
 
@@ -228,8 +229,26 @@ describe("CLI help", () => {
     assert.match(stdout, /skills for-app <package_id>/);
     assert.match(stdout, /skills search --keyword <text>/);
     assert.match(stdout, /skills get <skill_id>/);
+    assert.match(stdout, /authoring-skills list/);
     assert.match(stdout, /clawperator mcp serve/);
     assert.match(stdout, /https:\/\/docs\.clawperator\.com\/host-agents\//);
+  });
+
+  it("shows authoring-skills discovery guidance", async () => {
+    const { stdout, code } = await runCli(["authoring-skills", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator authoring-skills/);
+    assert.match(stdout, /authoring-skills list/);
+    assert.match(stdout, /Runtime skills still live under 'clawperator skills/);
+    assert.match(stdout, /https:\/\/docs\.clawperator\.com\/skills\/authoring\//);
+  });
+
+  it("shows manual-scaffold boundary in skills new help", async () => {
+    const { stdout, code } = await runCli(["skills", "new", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator skills new/);
+    assert.match(stdout, /low-level manual scaffold/i);
+    assert.match(stdout, /authoring-skills list/);
   });
 
   it("inspect ui --help falls back to top-level help", async () => {
