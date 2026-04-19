@@ -235,9 +235,9 @@ function getSkillPrefixShard(skillId: string): string {
   return createHash("sha1").update(skillId).digest("hex").slice(0, 2);
 }
 
-function stripGeneratedArtifactNoise(value: unknown): unknown {
+function stripGeneratedArtifactTimestamps(value: unknown): unknown {
   if (Array.isArray(value)) {
-    return value.map((entry) => stripGeneratedArtifactNoise(entry));
+    return value.map((entry) => stripGeneratedArtifactTimestamps(entry));
   }
 
   if (typeof value !== "object" || value === null) {
@@ -246,8 +246,24 @@ function stripGeneratedArtifactNoise(value: unknown): unknown {
 
   return Object.fromEntries(
     Object.entries(value)
-      .filter(([key]) => key !== "generatedAt" && key !== "sha256")
-      .map(([key, entryValue]) => [key, stripGeneratedArtifactNoise(entryValue)])
+      .filter(([key]) => key !== "generatedAt")
+      .map(([key, entryValue]) => [key, stripGeneratedArtifactTimestamps(entryValue)])
+  );
+}
+
+function stripGeneratedArtifactChecksums(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => stripGeneratedArtifactChecksums(entry));
+  }
+
+  if (typeof value !== "object" || value === null) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => key !== "sha256")
+      .map(([key, entryValue]) => [key, stripGeneratedArtifactChecksums(entryValue)])
   );
 }
 
@@ -358,9 +374,101 @@ async function readGeneratedShardDirectory(directoryPath: string): Promise<Recor
   return Object.fromEntries(pairs);
 }
 
-function areGeneratedArtifactsEqual(actual: unknown, expected: unknown): boolean {
-  return JSON.stringify(normalizeStableJsonValue(stripGeneratedArtifactNoise(actual)))
-    === JSON.stringify(normalizeStableJsonValue(stripGeneratedArtifactNoise(expected)));
+function areGeneratedArtifactsEqual(
+  actual: unknown,
+  expected: unknown,
+  options: { ignoreSha256?: boolean } = {},
+): boolean {
+  const normalize = (value: unknown) => {
+    const withoutTimestamps = stripGeneratedArtifactTimestamps(value);
+    const withoutChecksums = options.ignoreSha256
+      ? stripGeneratedArtifactChecksums(withoutTimestamps)
+      : withoutTimestamps;
+    return JSON.stringify(normalizeStableJsonValue(withoutChecksums));
+  };
+
+  return normalize(actual) === normalize(expected);
+}
+
+function computeSha256Hex(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function readManifestEntryChecksum(value: unknown): string | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const sha256 = (value as { sha256?: unknown }).sha256;
+  return typeof sha256 === "string" && sha256.length > 0 ? sha256 : null;
+}
+
+async function validateGeneratedManifestChecksums(
+  manifest: unknown,
+  repoRoot: string,
+): Promise<ValidateSkillError | null> {
+  if (typeof manifest !== "object" || manifest === null) {
+    return buildGeneratedArtifactsStaleError(
+      join(repoRoot, "skills", "generated", "manifest.json"),
+      "manifest.json has an invalid structure. Rerun scripts/generate_skill_indexes.sh in the skills repo.",
+    );
+  }
+
+  const entries: Array<{ label: string; file: string; sha256: string | null }> = [];
+  const recordManifestEntry = (label: string, file: string, value: unknown) => {
+    entries.push({ label, file, sha256: readManifestEntryChecksum(value) });
+  };
+
+  const manifestRecord = manifest as {
+    artifacts?: Record<string, unknown>;
+    shards?: { byApp?: unknown[]; byPrefix?: unknown[] };
+  };
+  const artifacts = manifestRecord.artifacts ?? {};
+  recordManifestEntry("manifest registry artifact", "skills/skills-registry.json", artifacts.registry);
+  recordManifestEntry("manifest min-index artifact", "skills/generated/skills-index.min.json", artifacts.minIndex);
+  recordManifestEntry("manifest jsonl artifact", "skills/generated/skills-index.jsonl", artifacts.jsonlIndex);
+
+  const byAppEntries = Array.isArray(manifestRecord.shards?.byApp) ? manifestRecord.shards.byApp : [];
+  for (const entry of byAppEntries) {
+    if (typeof entry !== "object" || entry === null || typeof (entry as { file?: unknown }).file !== "string") {
+      return buildGeneratedArtifactsStaleError(
+        join(repoRoot, "skills", "generated", "manifest.json"),
+        "manifest.json has an invalid by-app shard entry. Rerun scripts/generate_skill_indexes.sh in the skills repo.",
+      );
+    }
+    recordManifestEntry(`manifest by-app shard ${(entry as { file: string }).file}`, (entry as { file: string }).file, entry);
+  }
+
+  const byPrefixEntries = Array.isArray(manifestRecord.shards?.byPrefix) ? manifestRecord.shards.byPrefix : [];
+  for (const entry of byPrefixEntries) {
+    if (typeof entry !== "object" || entry === null || typeof (entry as { file?: unknown }).file !== "string") {
+      return buildGeneratedArtifactsStaleError(
+        join(repoRoot, "skills", "generated", "manifest.json"),
+        "manifest.json has an invalid by-prefix shard entry. Rerun scripts/generate_skill_indexes.sh in the skills repo.",
+      );
+    }
+    recordManifestEntry(`manifest by-prefix shard ${(entry as { file: string }).file}`, (entry as { file: string }).file, entry);
+  }
+
+  for (const entry of entries) {
+    if (entry.sha256 === null) {
+      return buildGeneratedArtifactsStaleError(
+        join(repoRoot, "skills", "generated", "manifest.json"),
+        `${entry.label} is missing a sha256 checksum. Rerun scripts/generate_skill_indexes.sh in the skills repo.`,
+      );
+    }
+
+    const artifactPath = join(repoRoot, entry.file);
+    const actualSha256 = computeSha256Hex(await readFile(artifactPath, "utf8"));
+    if (actualSha256 !== entry.sha256) {
+      return buildGeneratedArtifactsStaleError(
+        artifactPath,
+        `${entry.label} sha256 does not match the current file contents. Rerun scripts/generate_skill_indexes.sh in the skills repo.`,
+      );
+    }
+  }
+
+  return null;
 }
 
 function buildGeneratedArtifactsStaleError(path: string, detail: string): ValidateSkillError {
@@ -413,22 +521,39 @@ async function validateGeneratedArtifactsFresh(
       byPrefix: await readGeneratedShardDirectory(byPrefixDir),
     };
 
-    const comparisons: Array<{ label: string; path: string; actualValue: unknown; expectedValue: unknown }> = [
+    const comparisons: Array<{
+      label: string;
+      path: string;
+      actualValue: unknown;
+      expectedValue: unknown;
+      ignoreSha256?: boolean;
+    }> = [
       { label: "skills-registry.json", path: resolvedRegistryPath, actualValue: actual.registry, expectedValue: expected.registry },
       { label: "skills-index.min.json", path: minIndexPath, actualValue: actual.minIndex, expectedValue: expected.minIndex },
       { label: "skills-index.jsonl", path: jsonlPath, actualValue: actual.jsonl, expectedValue: expected.jsonl },
-      { label: "manifest.json", path: manifestPath, actualValue: actual.manifest, expectedValue: expected.manifest },
+      {
+        label: "manifest.json",
+        path: manifestPath,
+        actualValue: actual.manifest,
+        expectedValue: expected.manifest,
+        ignoreSha256: true,
+      },
       { label: "generated by-app shards", path: byAppDir, actualValue: actual.byApp, expectedValue: expected.byApp },
       { label: "generated by-prefix shards", path: byPrefixDir, actualValue: actual.byPrefix, expectedValue: expected.byPrefix },
     ];
 
     for (const comparison of comparisons) {
-      if (!areGeneratedArtifactsEqual(comparison.actualValue, comparison.expectedValue)) {
+      if (!areGeneratedArtifactsEqual(comparison.actualValue, comparison.expectedValue, { ignoreSha256: comparison.ignoreSha256 })) {
         return buildGeneratedArtifactsStaleError(
           comparison.path,
           `${comparison.label} do not match the current registry contents. Rerun scripts/generate_skill_indexes.sh in the skills repo.`,
         );
       }
+    }
+
+    const manifestChecksumValidation = await validateGeneratedManifestChecksums(actual.manifest, repoRoot);
+    if (manifestChecksumValidation !== null) {
+      return manifestChecksumValidation;
     }
 
     return null;

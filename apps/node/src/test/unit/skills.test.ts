@@ -110,65 +110,84 @@ function buildGeneratedArtifactsForTest(skills: Array<Record<string, unknown>>) 
   }
 
   const sortedPrefixes = Array.from(byPrefix.keys()).sort();
-
-  return {
-    minIndex: {
+  const stringifyGeneratedArtifact = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
+  const computeSha256Hex = (value: string): string => createHash("sha256").update(value).digest("hex");
+  const minIndex = {
+    schemaVersion: "1.0",
+    generatedAt: "2026-04-19T00:00:00Z",
+    count: sortedSkills.length,
+    skills: sortedSkills.map((skill) => ({
+      id: skill.id,
+      applicationId: skill.applicationId,
+      intent: skill.intent,
+      summary: skill.summary,
+      path: skill.path,
+    })),
+  };
+  const jsonl = `${sortedSkills.map((skill) => JSON.stringify(skill)).join("\n")}\n`;
+  const byAppArtifacts = Object.fromEntries(appIds.map((applicationId) => [
+    `${applicationId}.json`,
+    {
       schemaVersion: "1.0",
       generatedAt: "2026-04-19T00:00:00Z",
-      count: sortedSkills.length,
-      skills: sortedSkills.map((skill) => ({
-        id: skill.id,
-        applicationId: skill.applicationId,
-        intent: skill.intent,
-        summary: skill.summary,
-        path: skill.path,
-      })),
+      applicationId,
+      count: sortedSkills.filter((skill) => String(skill.applicationId) === applicationId).length,
+      skills: sortedSkills.filter((skill) => String(skill.applicationId) === applicationId),
     },
-    jsonl: `${sortedSkills.map((skill) => JSON.stringify(skill)).join("\n")}\n`,
+  ]));
+  const byPrefixArtifacts = Object.fromEntries(sortedPrefixes.map((prefix) => [
+    `${prefix}.json`,
+    {
+      schemaVersion: "1.0",
+      generatedAt: "2026-04-19T00:00:00Z",
+      prefix,
+      count: (byPrefix.get(prefix) ?? []).length,
+      skills: byPrefix.get(prefix) ?? [],
+    },
+  ]));
+  const registryContents = stringifyGeneratedArtifact({
+    $schema: "./skills-registry.schema.json",
+    schemaVersion: "1.0",
+    generatedAt: "2026-04-19T00:00:00Z",
+    skills: sortedSkills,
+  });
+  const minIndexContents = stringifyGeneratedArtifact(minIndex);
+  const byAppChecksums = Object.fromEntries(
+    Object.entries(byAppArtifacts).map(([fileName, payload]) => [fileName, computeSha256Hex(stringifyGeneratedArtifact(payload))])
+  );
+  const byPrefixChecksums = Object.fromEntries(
+    Object.entries(byPrefixArtifacts).map(([fileName, payload]) => [fileName, computeSha256Hex(stringifyGeneratedArtifact(payload))])
+  );
+
+  return {
+    minIndex,
+    jsonl,
     manifest: {
       schemaVersion: "1.0",
       generatedAt: "2026-04-19T00:00:00Z",
       totalSkills: sortedSkills.length,
       artifacts: {
-        registry: { file: "skills/skills-registry.json", sha256: "fixture", count: sortedSkills.length },
-        minIndex: { file: "skills/generated/skills-index.min.json", sha256: "fixture", count: sortedSkills.length },
-        jsonlIndex: { file: "skills/generated/skills-index.jsonl", sha256: "fixture", count: sortedSkills.length },
+        registry: { file: "skills/skills-registry.json", sha256: computeSha256Hex(registryContents), count: sortedSkills.length },
+        minIndex: { file: "skills/generated/skills-index.min.json", sha256: computeSha256Hex(minIndexContents), count: sortedSkills.length },
+        jsonlIndex: { file: "skills/generated/skills-index.jsonl", sha256: computeSha256Hex(jsonl), count: sortedSkills.length },
       },
       shards: {
         byApp: appIds.map((applicationId) => ({
           applicationId,
           file: `skills/generated/by-app/${applicationId}.json`,
-          sha256: "fixture",
+          sha256: byAppChecksums[`${applicationId}.json`],
           count: sortedSkills.filter((skill) => String(skill.applicationId) === applicationId).length,
         })),
         byPrefix: sortedPrefixes.map((prefix) => ({
           prefix,
           file: `skills/generated/by-prefix/${prefix}.json`,
-          sha256: "fixture",
+          sha256: byPrefixChecksums[`${prefix}.json`],
           count: (byPrefix.get(prefix) ?? []).length,
         })),
       },
     },
-    byApp: Object.fromEntries(appIds.map((applicationId) => [
-      `${applicationId}.json`,
-      {
-        schemaVersion: "1.0",
-        generatedAt: "2026-04-19T00:00:00Z",
-        applicationId,
-        count: sortedSkills.filter((skill) => String(skill.applicationId) === applicationId).length,
-        skills: sortedSkills.filter((skill) => String(skill.applicationId) === applicationId),
-      },
-    ])),
-    byPrefix: Object.fromEntries(sortedPrefixes.map((prefix) => [
-      `${prefix}.json`,
-      {
-        schemaVersion: "1.0",
-        generatedAt: "2026-04-19T00:00:00Z",
-        prefix,
-        count: (byPrefix.get(prefix) ?? []).length,
-        skills: byPrefix.get(prefix) ?? [],
-      },
-    ])),
+    byApp: byAppArtifacts,
+    byPrefix: byPrefixArtifacts,
   };
 }
 
@@ -1379,20 +1398,35 @@ describe("validateSkill", () => {
         "utf8"
       );
       const generatedRoot = join(temp.root, "skills", "generated");
+      const minIndexContents = `${JSON.stringify({
+        schemaVersion: "1.0",
+        generatedAt: "2030-01-01T00:00:00Z",
+        count: 1,
+        skills: [{
+          id: entry.id,
+          applicationId: entry.applicationId,
+          intent: entry.intent,
+          summary: entry.summary,
+          path: entry.path,
+        }],
+      }, null, 2)}\n`;
+      const byAppContents = `${JSON.stringify({
+        schemaVersion: "1.0",
+        generatedAt: "2030-01-01T00:00:00Z",
+        applicationId: "com.test",
+        count: 1,
+        skills: [entry],
+      }, null, 2)}\n`;
+      const byPrefixContents = `${JSON.stringify({
+        schemaVersion: "1.0",
+        generatedAt: "2030-01-01T00:00:00Z",
+        prefix: getGeneratedPrefixShard(entry.id),
+        count: 1,
+        skills: [entry],
+      }, null, 2)}\n`;
       await writeFile(
         join(generatedRoot, "skills-index.min.json"),
-        `${JSON.stringify({
-          schemaVersion: "1.0",
-          generatedAt: "2030-01-01T00:00:00Z",
-          count: 1,
-          skills: [{
-            id: entry.id,
-            applicationId: entry.applicationId,
-            intent: entry.intent,
-            summary: entry.summary,
-            path: entry.path,
-          }],
-        }, null, 2)}\n`,
+        minIndexContents,
         "utf8"
       );
       await writeFile(
@@ -1402,42 +1436,85 @@ describe("validateSkill", () => {
           generatedAt: "2030-01-01T00:00:00Z",
           totalSkills: 1,
           artifacts: {
-            registry: { file: "skills/skills-registry.json", sha256: "churn", count: 1 },
-            minIndex: { file: "skills/generated/skills-index.min.json", sha256: "churn", count: 1 },
-            jsonlIndex: { file: "skills/generated/skills-index.jsonl", sha256: "churn", count: 1 },
+            registry: {
+              file: "skills/skills-registry.json",
+              sha256: createHash("sha256").update(
+                `${JSON.stringify({ $schema: "./skills-registry.schema.json", schemaVersion: "1.0", generatedAt: "2026-04-19T00:00:00Z", skills: [entry] }, null, 2)}\n`
+              ).digest("hex"),
+              count: 1,
+            },
+            minIndex: { file: "skills/generated/skills-index.min.json", sha256: createHash("sha256").update(minIndexContents).digest("hex"), count: 1 },
+            jsonlIndex: {
+              file: "skills/generated/skills-index.jsonl",
+              sha256: createHash("sha256").update(`${JSON.stringify(entry)}\n`).digest("hex"),
+              count: 1,
+            },
           },
           shards: {
-            byApp: [{ applicationId: "com.test", file: "skills/generated/by-app/com.test.json", sha256: "churn", count: 1 }],
-            byPrefix: [{ prefix: getGeneratedPrefixShard(entry.id), file: `skills/generated/by-prefix/${getGeneratedPrefixShard(entry.id)}.json`, sha256: "churn", count: 1 }],
+            byApp: [{
+              applicationId: "com.test",
+              file: "skills/generated/by-app/com.test.json",
+              sha256: createHash("sha256").update(byAppContents).digest("hex"),
+              count: 1,
+            }],
+            byPrefix: [{
+              prefix: getGeneratedPrefixShard(entry.id),
+              file: `skills/generated/by-prefix/${getGeneratedPrefixShard(entry.id)}.json`,
+              sha256: createHash("sha256").update(byPrefixContents).digest("hex"),
+              count: 1,
+            }],
           },
         }, null, 2)}\n`,
         "utf8"
       );
       await writeFile(
         join(generatedRoot, "by-app", "com.test.json"),
-        `${JSON.stringify({
-          schemaVersion: "1.0",
-          generatedAt: "2030-01-01T00:00:00Z",
-          applicationId: "com.test",
-          count: 1,
-          skills: [entry],
-        }, null, 2)}\n`,
+        byAppContents,
         "utf8"
       );
       await writeFile(
         join(generatedRoot, "by-prefix", `${getGeneratedPrefixShard(entry.id)}.json`),
-        `${JSON.stringify({
-          schemaVersion: "1.0",
-          generatedAt: "2030-01-01T00:00:00Z",
-          prefix: getGeneratedPrefixShard(entry.id),
-          count: 1,
-          skills: [entry],
-        }, null, 2)}\n`,
+        byPrefixContents,
         "utf8"
       );
 
       const result = await validateSkill("com.test.generated-at-only", temp.registryPath);
       assert.ok(result.ok, result.ok ? "" : result.message);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("fails generated index freshness when manifest sha256 values drift", async () => {
+    const entry = {
+      id: "com.test.manifest-sha-drift",
+      applicationId: "com.test",
+      intent: "temp",
+      summary: "Manifest checksum drift",
+      path: "skills/com.test.manifest-sha-drift",
+      skillFile: "skills/com.test.manifest-sha-drift/SKILL.md",
+      scripts: ["skills/com.test.manifest-sha-drift/scripts/run.js"],
+      artifacts: [],
+    };
+    const temp = await createTempValidationSkillRepo({
+      skillId: "com.test.manifest-sha-drift",
+      registrySkills: [entry],
+      generatedSkills: [entry],
+    });
+
+    try {
+      const manifestPath = join(temp.root, "skills", "generated", "manifest.json");
+      const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+        artifacts: { minIndex: { sha256: string } };
+      };
+      manifest.artifacts.minIndex.sha256 = "deadbeef";
+      await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+      const result = await validateAllSkills(temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /generate_skill_indexes\.sh/i);
+      assert.match(result.details?.failures[0]?.details?.reason ?? "", /sha256 does not match the current file contents/i);
     } finally {
       await temp.cleanup();
     }
