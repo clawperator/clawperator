@@ -1,6 +1,6 @@
 ---
 name: skill-author-by-agent-discovery
-description: Route a no-match Clawperator request through bounded discovery before choosing one truthful next step: reuse an existing skill, proceed to recording, continue bounded discovery, fulfill one-shot, escalate, or decline.
+description: "Route a no-match Clawperator request through bounded discovery before choosing one truthful next step: reuse an existing skill, proceed to recording, continue bounded discovery, fulfill one-shot, escalate, or decline."
 ---
 
 # Skill Author By Agent Discovery

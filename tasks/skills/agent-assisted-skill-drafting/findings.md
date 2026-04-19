@@ -55,12 +55,19 @@ discovery front door is implemented.
 
 ## Discovery artifact produced
 
-- None yet.
-- Phase 1 only defines the eval red baseline and does not ship the new
+- Phase 1 only defined the eval red baseline and did not yet ship the new
   discovery skill.
 - Phase 2 defines the durable discovery artifact contract and includes an
   explicit Netflix / House of Cards example artifact in
   `.agents/skills/skill-author-by-agent-discovery/SKILL.md`.
+- The first official Phase 5 AOSP green-proof rerun did produce a discovery
+  artifact in transcript form before it stalled later in scaffold editing:
+  - `recommended_next_step = "proceed_to_recording"`
+  - `skill_classification = "shared-general"`
+  - `handoff_target = "skill-author-by-recording"`
+  - the artifact was singular and explicit, and it routed into recording
+    instead of inventing a direct wrapper or reusing an unrelated Settings
+    skill
 
 ## Commands run
 
@@ -92,6 +99,24 @@ discovery front door is implemented.
 - `./scripts/docs_build.sh`
 - `grep -ri "receiver" docs/api/ docs/skills/ docs/troubleshooting/ docs/index.md docs/setup.md`
 - `grep -r "observe snapshot\|action click\|action press" docs/`
+- `npm --prefix apps/node run build`
+- `uv run --project evals --extra dev pytest evals/harness/test_run_eval.py -q`
+- `node apps/node/dist/cli/index.js authoring-skills install --format json`
+- `node apps/node/dist/cli/index.js authoring-skills list --format json`
+- `rg -n "skill-author-by-agent-discovery|skill-author-by-recording|authoring-skills|AGENTS.md" ~/.clawperator/AGENTS.md ~/.agents/AGENTS.md`
+- `uv run --project evals --extra dev python evals/run_eval.py android-version --agent codex --model gpt-5.4 --mode full-repo --runtime local-dev --skill-prompt prompt-skill.md --device emulator-5554 --label pack-a-aosp`
+- `node apps/node/dist/cli/index.js skills validate com.android.settings.read-android-version-aosp-replay --json`
+- `node apps/node/dist/cli/index.js skills run com.android.settings.read-android-version-aosp-replay --device emulator-5554 --operator-package com.clawperator.operator.dev --json`
+- `node apps/node/dist/cli/index.js skills new com.android.settings.read-android-version-samsung-replay --json`
+- `node apps/node/dist/cli/index.js skills validate com.android.settings.read-android-version-samsung-replay --json`
+- `node apps/node/dist/cli/index.js skills run com.android.settings.read-android-version-samsung-replay --device <samsung_device_serial> --operator-package com.clawperator.operator.dev --json`
+- `adb -s <samsung_device_serial> shell dumpsys power`
+- `adb -s <samsung_device_serial> shell dumpsys window policy`
+- `adb -s <samsung_device_serial> shell cmd lock_settings get-disabled`
+- `adb -s <samsung_device_serial> shell wm dismiss-keyguard`
+- `adb -s <samsung_device_serial> shell input keyevent 82`
+- `node apps/node/dist/cli/index.js press home --device <samsung_device_serial> --operator-package com.clawperator.operator.dev --json`
+- `python` one-off registry cleanup to remove temporary AOSP / Samsung replay skills from `~/.clawperator/skills/skills/skills-registry.json`
 
 ## Eval run ids
 
@@ -99,6 +124,9 @@ discovery front door is implemented.
   - `android-version-20260419-163614-317-d8e252-codex-gpt-5-4-pack-a-red-baseline`
 - Accepted Phase 1 red-baseline canary:
   - `android-version-20260419-163739-522-0da380-codex-gpt-5-4-pack-a-red-baseline`
+- Official Phase 5 AOSP green-proof rerun that reached discovery, recording,
+  export, and scaffold creation before stalling:
+  - `android-version-20260419-181353-562-fef9f9-codex-gpt-5-4-pack-a-aosp`
 
 ## Installed authoring-skill checks
 
@@ -169,6 +197,20 @@ discovery front door is implemented.
   - `replay_status = "skipped"`
 - No `SkillResult` validity claim is made yet because the required discovery
   front door is still absent and the prompt correctly omitted the skill block.
+- Phase 5 benchmark-hardening proof did produce one local sandbox replay skill
+  on the AOSP emulator after the official rerun exposed scaffold-authoring
+  drift:
+  - skill id: `com.android.settings.read-android-version-aosp-replay`
+  - `skills validate` passed
+  - `skills run` emitted `CLAWPERATOR_EVAL_ANSWER: 15`
+  - `skills run` emitted one terminal `[Clawperator-Skill-Result]` frame that
+    parsed successfully
+- The temporary AOSP sandbox skill and the matching temporary Samsung scaffold
+  were removed from the local runtime registry before stopping, so a later
+  official rerun will still hit the truthful no-match discovery route first.
+- Samsung `SkillResult` proof could not be completed because the physical
+  device was blocked at a secure pattern keyguard before Settings could be
+  reached.
 
 ## Observations
 
@@ -244,6 +286,17 @@ discovery front door is implemented.
 - The first canary run failed preflight with `VERSION_INCOMPATIBLE` because the
   branch-local CLI was `0.6.5` but the emulator still had
   `com.clawperator.operator.dev` at `0.5.5-d`.
+- The first official Phase 5 AOSP green-proof rerun did not fail on the
+  discovery route or on Settings navigation. It stalled after `skills new`
+  while the eval agent inspected scaffold files instead of writing the replay
+  implementation and self-test.
+- The required Samsung physical device is currently unusable for Pack A
+  proving because it wakes into a secure pattern bouncer:
+  - snapshot text showed `For your security, draw your pattern`
+  - `adb shell dumpsys window policy` reported:
+    - `showing=true`
+    - `secure=true`
+    - `mInputRestricted=true`
 
 ## Fixes attempted
 
@@ -253,6 +306,25 @@ discovery front door is implemented.
 - Reinstalled the matching debug operator to the emulator with the branch-local
   CLI via `operator setup`.
 - Reran the exact Pack A canary command after the local-dev runtime was aligned.
+- Repaired Phase 5 benchmark defects that the first official green-proof runs
+  exposed:
+  - `evals/run_eval.py` now honors the Pack A Android timeout and turn budget
+    from `spec.json` when the CLI does not override them explicitly
+  - `evals/harness/test_run_eval.py` now covers spec-default budget resolution
+  - `evals/specs/android-version/prompt-skill.md` now includes the proven
+    minimal replay overwrite shape, fixed AOSP / Samsung route constants, and
+    stronger scaffold-repair guidance
+- Validated the repaired replay pattern in a local AOSP sandbox skill run:
+  - `skills validate` passed
+  - `skills run` emitted the correct Android version answer `15`
+  - `skills run` emitted a valid terminal `SkillResult`
+- Attempted non-destructive Samsung unlock dismissal to recover the device for
+  the required physical-device matrix:
+  - `adb shell wm dismiss-keyguard`
+  - `adb shell input keyevent 82`
+  - `clawperator press home`
+  - the device remained on the secure pattern keyguard, so the phase stopped
+    there instead of substituting another device
 
 ## Final route result
 
@@ -312,8 +384,28 @@ discovery front door is implemented.
     `llms-full.txt` outputs
   - `plan.md` and `work-breakdown.md` now reflect live pack status:
     completed phases `1, 2, 3, 4`, current / next `Phase 5`
+- Phase 5 is not complete.
+- Phase 5 partial result:
+  - the benchmark-hardening repairs are now implemented locally
+  - the official AOSP green-proof rerun reached the correct discovery route and
+    selected `proceed_to_recording`, then completed recording, export, and
+    scaffold creation before stalling in scaffold editing
+  - the AOSP replay shape was still proven locally via a sandbox
+    `skills validate` + `skills run` pass that emitted the correct answer and a
+    valid `SkillResult`
+  - the required Samsung physical-device matrix cannot complete truthfully on
+    2026-04-19 because the required Samsung device is currently locked behind a
+    secure pattern keyguard
+  - per the pack instructions, execution stopped at that blocker instead of
+    substituting another device or pretending the matrix passed
 
 ## Deferred follow-up
 
-- Phase 5: run the anchor scenario plus the AOSP emulator and Samsung physical
-  eval matrix and record authored-skill proof.
+- Unlock the Samsung physical device so Pack A can reach Android Settings
+  without a human credential prompt.
+- Resume Phase 5 after the Samsung blocker is cleared:
+  - rerun the official AOSP eval with the repaired prompt
+  - rerun the official Samsung eval on the unlocked physical device
+  - run the anchor-scenario discovery pass and record the exact local-shell
+    prompt or invocation plus the resulting discovery artifact
+  - append the final run ids and authored-skill proof to this file

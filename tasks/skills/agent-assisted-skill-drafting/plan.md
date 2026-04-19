@@ -31,13 +31,13 @@ and one Samsung physical device.
 
 | Item | Value |
 | --- | --- |
-| State | in_progress |
+| State | blocked |
 | Total PRs | 1 |
 | Total phases | 5 |
 | Completed | 1, 2, 3, 4 |
 | Remaining | 5 |
-| Current / Next | Phase 5 |
-| Blockers | none |
+| Current / Next | Phase 5 blocked on Samsung unlock |
+| Blockers | Samsung physical device `<samsung_device_serial>` is locked behind a secure pattern keyguard |
 
 ## Progress Update
 
@@ -56,6 +56,16 @@ and one Samsung physical device.
   route, authoring-workflow docs, and durable internal host-integration note
   refresh are recorded in
   `tasks/skills/agent-assisted-skill-drafting/findings.md`.
+- Phase 5 is currently blocked on 2026-04-19. The first official green-proof
+  reruns exposed two truthful benchmark defects that Phase 1 did not surface:
+  `run_eval.py` was still defaulting Android evals to a shorter timeout than
+  `spec.json`, and `prompt-skill.md` still needed tighter repair-loop guidance
+  for scaffold overwrite, replay frontmatter, selector usage, and the fixed
+  AOSP / Samsung Settings search routes. Those benchmark repairs are now
+  implemented locally, and the AOSP replay shape was proven in a sandbox
+  self-test, but the required Samsung physical device is presently locked
+  behind a secure pattern keyguard so the dual-device matrix cannot complete
+  truthfully until the device is unlocked.
 
 ## Goal
 
@@ -153,8 +163,8 @@ over-authoring and weak first drafts.
 | `.agents/skills/evals-live-run/` | Physical-device Pack A eval guidance and red-baseline workflow | Phase 1 |
 | `evals/README.md` | Eval-harness guidance for the Pack A benchmark | Phase 1 |
 | `docs/internal/design/evals.md` | Durable eval-boundary note for Pack A | Phase 1 |
-| `evals/specs/android-version/` | Existing benchmark prompt and scoring surface that Pack A should extend first | Phase 1 |
-| `evals/run_eval.py` and `evals/harness/` | Only if additive scoring or artifact capture is required for authored-skill proof | Phase 1 |
+| `evals/specs/android-version/` | Existing benchmark prompt and scoring surface that Pack A should extend first, plus any late benchmark-hardening repair required by Phase 5 green proof | Phase 1, Phase 5 if needed |
+| `evals/run_eval.py` and `evals/harness/` | Only if additive scoring or artifact capture is required for authored-skill proof, or if Phase 5 green proof exposes a truthful benchmark-budget defect | Phase 1, Phase 5 if needed |
 | `.agents/skills/skill-author-by-agent-discovery/` | New discovery-first authoring skill, prompt contract, and `agents/openai.yaml` metadata | Phase 2 |
 | `.agents/skills/skill-author-by-recording/SKILL.md` | Additive handoff and boundary clarification only | Phase 2 |
 | `apps/node/authoring-skills/skill-author-by-agent-discovery` | New packaged-skill symlink entry | Phase 3 |

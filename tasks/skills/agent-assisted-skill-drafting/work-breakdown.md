@@ -21,13 +21,13 @@ repaired. Once unblocked, the execution order is:
 
 | Item | Value |
 | --- | --- |
-| State | in_progress |
+| State | blocked |
 | Total PRs | 1 |
 | Total phases | 5 |
 | Completed | 1, 2, 3, 4 |
 | Remaining | 5 |
-| Current / Next | Phase 5 |
-| Blockers | none |
+| Current / Next | Phase 5 blocked on Samsung unlock |
+| Blockers | Samsung physical device `<samsung_device_serial>` is locked behind a secure pattern keyguard |
 
 ## Progress Update
 
@@ -46,6 +46,15 @@ repaired. Once unblocked, the execution order is:
   route, authoring-workflow docs, and durable internal host-integration note
   refresh are recorded in
   `tasks/skills/agent-assisted-skill-drafting/findings.md`.
+- Phase 5 is currently blocked on 2026-04-19. The first official green-proof
+  reruns showed that the benchmark still needed one truthful repair pass:
+  Android eval runs were not honoring the longer `spec.json` timeout by
+  default, and the skill-generation prompt needed tighter guardrails around
+  scaffold overwrite, replay frontmatter, selector usage, and the fixed AOSP /
+  Samsung proving routes before the final matrix reruns. Those repairs are now
+  implemented locally, but execution stopped after the Samsung physical device
+  surfaced a secure pattern keyguard that makes the required live-device proof
+  unusable without human unlock.
 
 ## Hard Rules
 
@@ -471,6 +480,15 @@ Settings/About surface rooted at `com.android.settings`.
 ### Files or Surfaces To Change
 
 - `tasks/skills/agent-assisted-skill-drafting/findings.md`
+- `evals/specs/android-version/prompt-skill.md` only if the official green
+  proof exposes benchmark prompt defects that keep the route from completing
+  truthfully
+- `evals/specs/android-version/spec.json` only if the official green proof
+  needs a benchmark-budget repair that stays within the existing Pack A
+  contract
+- `evals/run_eval.py` and `evals/harness/test_run_eval.py` only if the
+  official green proof exposes a runner defect that prevents the benchmark from
+  honoring its declared Pack A budget
 
 ### Steps
 
@@ -497,15 +515,18 @@ Settings/About surface rooted at `com.android.settings`.
 7. Run the updated Pack A eval twice in `full-repo` mode with explicit devices:
    - once on an AOSP emulator
    - once on a Samsung physical device
-8. For each eval run, verify all of the following:
+8. If an official rerun exposes a truthful benchmark defect rather than a
+   product-surface defect, patch the existing benchmark prompt / budget /
+   runner here before rerunning and record the evidence in `findings.md`.
+9. For each eval run, verify all of the following:
    - the route actually used `skill-author-by-agent-discovery`
    - the run produced a target-specific authored skill rather than a single
      over-generalized Settings skill
    - the authored skill emitted a valid `SkillResult`
    - the required Android-version answer remained correct on that device
-9. Record the exact local-shell prompt or invocation used for the anchor
+10. Record the exact local-shell prompt or invocation used for the anchor
    scenario in `findings.md`. Do not summarize it from memory.
-10. Record the run ids, sanitized device labels, authored-skill identities, and
+11. Record the run ids, sanitized device labels, authored-skill identities, and
     any follow-up gaps in `findings.md`. Do not silently widen the pack.
 
 ### Acceptance Criteria
@@ -521,11 +542,15 @@ Settings/About surface rooted at `com.android.settings`.
 - one AOSP emulator run id and one Samsung run id are recorded
 - each target-specific authored skill emits a valid `SkillResult` on its
   originating device
+- any Phase 5 benchmark-hardening repair is recorded in `findings.md` and kept
+  inside the existing `android-version` eval instead of widening Pack A to a
+  new benchmark
 
 ### Validation
 
 ```bash
 npm --prefix apps/node run build
+uv run --project evals --extra dev pytest evals/harness/test_run_eval.py -q
 node apps/node/dist/cli/index.js authoring-skills install --format json
 node apps/node/dist/cli/index.js authoring-skills list --format json
 rg -n "skill-author-by-agent-discovery|skill-author-by-recording|authoring-skills|AGENTS.md" ~/.clawperator/AGENTS.md ~/.agents/AGENTS.md

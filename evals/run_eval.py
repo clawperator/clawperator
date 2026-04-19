@@ -51,6 +51,8 @@ SUPPORTED_AGENTS = {
 }
 SUPPORTED_MODES = {"public-surface", "full-repo"}
 SUPPORTED_RUNTIMES = {"local-dev", "published"}
+DEFAULT_ANDROID_TIMEOUT_S = 300
+DEFAULT_ANDROID_MAX_TURNS = 40
 
 
 def _load_spec(eval_id: str) -> dict:
@@ -60,6 +62,24 @@ def _load_spec(eval_id: str) -> dict:
     spec = json.loads(spec_path.read_text(encoding="utf-8"))
     spec["spec_dir"] = str(spec_path.parent)
     return spec
+
+
+def _resolve_android_eval_budget(args: argparse.Namespace, spec: dict) -> tuple[int, int]:
+    budget = spec.get("budget")
+    if not isinstance(budget, dict):
+        budget = {}
+
+    spec_timeout_s = budget.get("default_timeout_s")
+    if not isinstance(spec_timeout_s, int) or spec_timeout_s <= 0:
+        spec_timeout_s = DEFAULT_ANDROID_TIMEOUT_S
+
+    spec_max_turns = budget.get("default_max_turns")
+    if not isinstance(spec_max_turns, int) or spec_max_turns <= 0:
+        spec_max_turns = DEFAULT_ANDROID_MAX_TURNS
+
+    timeout_s = args.timeout_s if args.timeout_s is not None else spec_timeout_s
+    max_turns = args.max_turns if args.max_turns is not None else spec_max_turns
+    return timeout_s, max_turns
 
 
 def _resolve_prompt_path(eval_id: str, spec: dict, mode: str, skill_prompt: str | None) -> Path:
@@ -425,8 +445,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--operator-package")
     parser.add_argument("--mode", default="public-surface", choices=sorted(SUPPORTED_MODES))
     parser.add_argument("--runtime", default="local-dev", choices=sorted(SUPPORTED_RUNTIMES))
-    parser.add_argument("--timeout-s", type=int, default=300)
-    parser.add_argument("--max-turns", type=int, default=40)
+    parser.add_argument("--timeout-s", type=int)
+    parser.add_argument("--max-turns", type=int)
     parser.add_argument("--skill-prompt")
     parser.add_argument("--replay")
     parser.add_argument("--replay-timeout-s", type=int, default=DEFAULT_REPLAY_TIMEOUT_S)
@@ -455,9 +475,9 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--replay is not supported for solax-orchestrated-cold-start")
         if args.rescore is not None:
             parser.error("--rescore is not supported for solax-orchestrated-cold-start")
-        if args.timeout_s != 300:
+        if args.timeout_s is not None and args.timeout_s != DEFAULT_ANDROID_TIMEOUT_S:
             parser.error("--timeout-s is not supported for solax-orchestrated-cold-start")
-        if args.max_turns != 40:
+        if args.max_turns is not None and args.max_turns != DEFAULT_ANDROID_MAX_TURNS:
             parser.error("--max-turns is not supported for solax-orchestrated-cold-start")
         if args.runs_dir != str(ROOT / "evals" / "runs"):
             parser.error("--runs-dir is not supported for solax-orchestrated-cold-start")
@@ -493,6 +513,7 @@ def main(argv: list[str] | None = None) -> int:
 
     spec = _load_spec(args.eval_id)
     spec["runtime_target"] = args.runtime
+    args.timeout_s, args.max_turns = _resolve_android_eval_budget(args, spec)
 
     if args.replay is not None:
         if not args.replay:

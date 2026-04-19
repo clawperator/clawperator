@@ -287,6 +287,26 @@ def test_load_replay_runtime_published_can_use_display_command():
     assert runtime_target == "published"
 
 
+def test_resolve_android_eval_budget_uses_spec_defaults():
+    args = SimpleNamespace(timeout_s=None, max_turns=None)
+    spec = {"budget": {"default_timeout_s": 600, "default_max_turns": 55}}
+
+    timeout_s, max_turns = run_eval._resolve_android_eval_budget(args, spec)
+
+    assert timeout_s == 600
+    assert max_turns == 55
+
+
+def test_resolve_android_eval_budget_prefers_cli_overrides():
+    args = SimpleNamespace(timeout_s=420, max_turns=21)
+    spec = {"budget": {"default_timeout_s": 600, "default_max_turns": 55}}
+
+    timeout_s, max_turns = run_eval._resolve_android_eval_budget(args, spec)
+
+    assert timeout_s == 420
+    assert max_turns == 21
+
+
 def test_replay_cli_rejects_missing_recorded_device_serial(tmp_path):
     runs_dir = tmp_path / "runs"
     run_dir = runs_dir / "android-version-20260404-000000-aaaaaa-claude-claude-sonnet"
