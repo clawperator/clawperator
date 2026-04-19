@@ -23,6 +23,32 @@ Use raw `clawperator skills new <skill_id>` scaffolding directly when you are
 doing manual skill construction or editing an existing skill shape, not when
 you want the preferred end-to-end recording-to-skill workflow.
 
+## Host-Agent Discovery Rule
+
+When a host-facing agent is trying to decide how to create or maintain a skill,
+use this order:
+
+1. Discover runtime skills first with `clawperator skills for-app` or
+   `clawperator skills search`.
+2. If runtime-skill discovery returns no relevant match and you need to inspect
+   installed guided authoring workflows on the current host, run
+   `clawperator authoring-skills list --json`.
+3. Use `clawperator skills new <skill_id>` only when you explicitly want the
+   low-level manual scaffold instead of an installed authoring workflow.
+
+Verification pattern:
+
+```bash
+clawperator authoring-skills list --json
+```
+
+Expected signals:
+
+- top-level `skills`
+- top-level `count`
+- top-level `installedDir`
+- each listed authoring skill includes `name` and `skillPath`
+
 ## Authoring Skills Install
 
 Authoring skills are AI agent programs that help create or maintain skills.

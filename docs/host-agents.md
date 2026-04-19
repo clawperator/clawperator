@@ -3,7 +3,8 @@
 ## Purpose
 
 Choose the correct Clawperator front door after install: runtime-skill discovery
-through `clawperator skills`, long-running tool registration through
+through `clawperator skills`, installed authoring-workflow discovery through
+`clawperator authoring-skills`, long-running tool registration through
 `clawperator mcp serve`, or direct action work through the CLI and local API.
 
 ## When To Read This Page
@@ -40,6 +41,7 @@ Use this order:
 | You only know user-language terms such as app name or intent | `clawperator skills search --keyword <text> --json` | Search is the fallback when you do not have the package id yet. |
 | You already have a skill id and want the exact metadata | `clawperator skills get <skill_id> --json` | Confirms the registry entry before a run. |
 | You want to execute a skill through the wrapper | `clawperator skills run <skill_id> ... --json` | Uses the runtime-skill wrapper and its validation gate. |
+| Runtime-skill discovery returned no relevant match and you need to inspect installed guided authoring workflows on this host | `clawperator authoring-skills list --json` | Authoring skills are separate from runtime skills and expose host-agent authoring helpers installed under `~/.clawperator/authoring-skills/`. |
 | Your host already supports stdio MCP and wants registered tools such as `devices`, `snapshot`, `execute`, and `configure` | `clawperator mcp serve` | MCP is the transport surface for long-running tool registration. |
 | You already know the exact action payload you want to send | [Quickstart](quickstart.md) | Quickstart covers the observe / decide / act loop directly. |
 
@@ -60,6 +62,10 @@ Decision rules:
 - Use `skills search --keyword` when you only have a user-language term.
 - Use `skills get` before `skills run` when you need to confirm the exact id or summary.
 - Use `skills run` only after discovery, not as the first probe.
+- If discovery returns zero relevant matches and the next job is skill creation
+  rather than raw execution, inspect installed authoring skills with
+  `clawperator authoring-skills list --json` and then continue to
+  [Authoring](skills/authoring.md).
 
 ## MCP Decision Rule
 
@@ -106,6 +112,16 @@ cat ~/.clawperator/mcp-config-snippet.json
 clawperator mcp serve
 ```
 
+5. If the registry is readable but no installed runtime skill matches the
+   request, inspect the installed authoring-workflow helpers:
+
+```bash
+clawperator authoring-skills list --json
+```
+
+Then continue to [Authoring](skills/authoring.md) for the current authoring
+boundary and install model.
+
 ## Durable Post-Install Files
 
 These files help a host orient after install:
@@ -116,6 +132,7 @@ These files help a host orient after install:
 | `~/.clawperator/install-state.json` | Durable install metadata | Check `registryPath`, `cliVersion`, and `lastDeviceSerial` without rerunning install. |
 | `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config | Use it when you choose the MCP route. |
 | `~/.clawperator/skills/skills/skills-registry.json` | Installed runtime-skills registry | Verify it exists when `skills list` or `skills for-app` cannot discover skills. |
+| `~/.clawperator/authoring-skills/` | Installed first-party authoring skills | Inspect it through `clawperator authoring-skills list --json` when runtime discovery returns no relevant match. |
 
 ## Verification
 
@@ -126,12 +143,14 @@ clawperator skills for-app com.android.settings --json
 clawperator skills search --keyword settings --json
 clawperator skills get com.android.settings.capture-overview --json
 clawperator skills list --json
+clawperator authoring-skills list --json
 ```
 
 Check:
 
 - `skills for-app`, `skills search`, and `skills list` return top-level `skills` and `count`
 - `skills get` returns a top-level `skill`
+- `authoring-skills list` returns top-level `skills`, `count`, and `installedDir`
 
 For MCP:
 
@@ -151,4 +170,5 @@ Check:
 | Install and device readiness | [Setup](setup.md) |
 | Raw observe / decide / act loop | [Quickstart](quickstart.md) |
 | Runtime-skill registry and wrapper behavior | [Skills Overview](skills/overview.md) |
+| Authoring-workflow install and current boundaries | [Authoring](skills/authoring.md) |
 | MCP client setup and tool surface | [MCP Server](api/mcp.md) |

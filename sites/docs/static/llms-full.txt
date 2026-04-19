@@ -458,7 +458,8 @@ See [Logging](api/logging.md) for complete documentation.
 ## Purpose
 
 Choose the correct Clawperator front door after install: runtime-skill discovery
-through `clawperator skills`, long-running tool registration through
+through `clawperator skills`, installed authoring-workflow discovery through
+`clawperator authoring-skills`, long-running tool registration through
 `clawperator mcp serve`, or direct action work through the CLI and local API.
 
 ## When To Read This Page
@@ -495,6 +496,7 @@ Use this order:
 | You only know user-language terms such as app name or intent | `clawperator skills search --keyword <text> --json` | Search is the fallback when you do not have the package id yet. |
 | You already have a skill id and want the exact metadata | `clawperator skills get <skill_id> --json` | Confirms the registry entry before a run. |
 | You want to execute a skill through the wrapper | `clawperator skills run <skill_id> ... --json` | Uses the runtime-skill wrapper and its validation gate. |
+| Runtime-skill discovery returned no relevant match and you need to inspect installed guided authoring workflows on this host | `clawperator authoring-skills list --json` | Authoring skills are separate from runtime skills and expose host-agent authoring helpers installed under `~/.clawperator/authoring-skills/`. |
 | Your host already supports stdio MCP and wants registered tools such as `devices`, `snapshot`, `execute`, and `configure` | `clawperator mcp serve` | MCP is the transport surface for long-running tool registration. |
 | You already know the exact action payload you want to send | [Quickstart](quickstart.md) | Quickstart covers the observe / decide / act loop directly. |
 
@@ -515,6 +517,10 @@ Decision rules:
 - Use `skills search --keyword` when you only have a user-language term.
 - Use `skills get` before `skills run` when you need to confirm the exact id or summary.
 - Use `skills run` only after discovery, not as the first probe.
+- If discovery returns zero relevant matches and the next job is skill creation
+  rather than raw execution, inspect installed authoring skills with
+  `clawperator authoring-skills list --json` and then continue to
+  [Authoring](skills/authoring.md).
 
 ## MCP Decision Rule
 
@@ -561,6 +567,16 @@ cat ~/.clawperator/mcp-config-snippet.json
 clawperator mcp serve
 ```
 
+5. If the registry is readable but no installed runtime skill matches the
+   request, inspect the installed authoring-workflow helpers:
+
+```bash
+clawperator authoring-skills list --json
+```
+
+Then continue to [Authoring](skills/authoring.md) for the current authoring
+boundary and install model.
+
 ## Durable Post-Install Files
 
 These files help a host orient after install:
@@ -571,6 +587,7 @@ These files help a host orient after install:
 | `~/.clawperator/install-state.json` | Durable install metadata | Check `registryPath`, `cliVersion`, and `lastDeviceSerial` without rerunning install. |
 | `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config | Use it when you choose the MCP route. |
 | `~/.clawperator/skills/skills/skills-registry.json` | Installed runtime-skills registry | Verify it exists when `skills list` or `skills for-app` cannot discover skills. |
+| `~/.clawperator/authoring-skills/` | Installed first-party authoring skills | Inspect it through `clawperator authoring-skills list --json` when runtime discovery returns no relevant match. |
 
 ## Verification
 
@@ -581,12 +598,14 @@ clawperator skills for-app com.android.settings --json
 clawperator skills search --keyword settings --json
 clawperator skills get com.android.settings.capture-overview --json
 clawperator skills list --json
+clawperator authoring-skills list --json
 ```
 
 Check:
 
 - `skills for-app`, `skills search`, and `skills list` return top-level `skills` and `count`
 - `skills get` returns a top-level `skill`
+- `authoring-skills list` returns top-level `skills`, `count`, and `installedDir`
 
 For MCP:
 
@@ -606,6 +625,7 @@ Check:
 | Install and device readiness | [Setup](setup.md) |
 | Raw observe / decide / act loop | [Quickstart](quickstart.md) |
 | Runtime-skill registry and wrapper behavior | [Skills Overview](skills/overview.md) |
+| Authoring-workflow install and current boundaries | [Authoring](skills/authoring.md) |
 | MCP client setup and tool surface | [MCP Server](api/mcp.md) |
 
 ---
@@ -1296,7 +1316,7 @@ This page is generated from the Node CLI registry and command sources.
 | `wait-for-nav` | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]` | wait-for-navigation, wait_for_navigation | --app, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --validate-only, --dry-run, --timeout, --device, --operator-package, --json | Wait for app or screen navigation to complete |
 | `read-value` | `read-value --label <text> [--json]` | read-kv, read-key-value-pair, read_key_value_pair | --label, --label-id, --label-desc, --all, --validate-only, --dry-run, --json | Read the value associated with a labeled element |
 | `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills for-app <package_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --json, --output<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
-| `authoring-skills` | `authoring-skills list`<br>`authoring-skills install`<br>`authoring-skills update` | - | -<br>Subcommands: install, update, list | Manage first-party authoring skills for Claude Code and Codex |
+| `authoring-skills` | `authoring-skills list`<br>`authoring-skills install`<br>`authoring-skills update` | - | -<br>Subcommands: install, update, list | Manage first-party authoring skills for Claude Code, Codex, and generic agent runtimes |
 | `recording` | `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]`<br>`recording stop`<br>`recording pull`<br>`recording parse --input <file> [--out <file>]`<br>`recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]`<br>`recording compare --baseline <export.json> --result <skills-run.json> [--mode <auto|literal|semantic>]` | record | --session-id, --out, --input, --snapshots, --baseline, --result, --mode, --device, --operator-package<br>Subcommands: compare, export | Manage recording sessions on the Operator app |
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `mcp` | `mcp serve` | - | - | Start the first-party MCP server |
@@ -1404,7 +1424,7 @@ This page is generated from the Node CLI registry and command sources.
 | --- | --- | --- | --- | --- |
 | `exec` | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]`<br>`exec best-effort --goal <text> [--device <id>] [--operator-package <package>]` | execute | --payload, --validate-only, --dry-run, --goal, --device, --operator-package, --execution, --input, --file | Execute a validated command payload |
 | `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills for-app <package_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --json, --output<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
-| `authoring-skills` | `authoring-skills list`<br>`authoring-skills install`<br>`authoring-skills update` | - | -<br>Subcommands: install, update, list | Manage first-party authoring skills for Claude Code and Codex |
+| `authoring-skills` | `authoring-skills list`<br>`authoring-skills install`<br>`authoring-skills update` | - | -<br>Subcommands: install, update, list | Manage first-party authoring skills for Claude Code, Codex, and generic agent runtimes |
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `mcp` | `mcp serve` | - | - | Start the first-party MCP server |
 
@@ -1425,7 +1445,7 @@ This page is generated from the Node CLI registry and command sources.
 
 ### `authoring-skills`
 
-- Summary: Manage first-party authoring skills for Claude Code and Codex
+- Summary: Manage first-party authoring skills for Claude Code, Codex, and generic agent runtimes
 - Syntax: `authoring-skills list`, `authoring-skills install`, `authoring-skills update`
 - Aliases: -
 - Flags: -
@@ -9387,6 +9407,32 @@ fresh recording because it:
 Use raw `clawperator skills new <skill_id>` scaffolding directly when you are
 doing manual skill construction or editing an existing skill shape, not when
 you want the preferred end-to-end recording-to-skill workflow.
+
+## Host-Agent Discovery Rule
+
+When a host-facing agent is trying to decide how to create or maintain a skill,
+use this order:
+
+1. Discover runtime skills first with `clawperator skills for-app` or
+   `clawperator skills search`.
+2. If runtime-skill discovery returns no relevant match and you need to inspect
+   installed guided authoring workflows on the current host, run
+   `clawperator authoring-skills list --json`.
+3. Use `clawperator skills new <skill_id>` only when you explicitly want the
+   low-level manual scaffold instead of an installed authoring workflow.
+
+Verification pattern:
+
+```bash
+clawperator authoring-skills list --json
+```
+
+Expected signals:
+
+- top-level `skills`
+- top-level `count`
+- top-level `installedDir`
+- each listed authoring skill includes `name` and `skillPath`
 
 ## Authoring Skills Install
 
