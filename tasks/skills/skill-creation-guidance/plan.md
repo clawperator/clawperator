@@ -68,6 +68,9 @@ workable for maintainers and brittle for everyone else.
   - when live-device proof is still mandatory
 - Define the authored-skill structure guidance needed to make off-device logic
   testable, including when to extract logic from `run.js` into testable modules
+- Make the guidance discoverable from the top-level surfaces authors actually
+  read first: `../clawperator-skills/README.md`,
+  `../clawperator-skills/AGENTS.md`, and `docs/skills/authoring.md`
 - Cross-link the main repo docs to the restored local author-guidance surface
 - Codify the recurring PR-hardening lessons and negative examples in the skills
   repo
@@ -101,6 +104,8 @@ workable for maintainers and brittle for everyone else.
   checks only; do not widen this pack into runtime parser concerns
 - `docs/skills/authoring.md`: in scope only for cross-links and guardrail
   references; do not rewrite the whole public authoring guide
+- Discoverability gaps in CLI help or install-generated host-agent bridges are
+  owned by `tasks/skills/agent-assisted-skill-drafting/`, not by this pack
 
 ## Surfaces and Ownership
 
@@ -163,6 +168,9 @@ workable for maintainers and brittle for everyone else.
   off-device tests also exist.
 - Skills-repo guidance must define a clear test matrix for authored changes:
   off-device tests, shell syntax, `skills validate`, and live proof.
+- Guidance discoverability is part of the contract. Do not strand the durable
+  author rules in deep docs that are unreachable from the README, `AGENTS.md`,
+  or the public authoring page.
 - `scaffoldSkill.ts` must emit `resolveClawperatorBin` usage so the scaffold
   matches exemplar practice.
 - `validateSkill.ts` must add only the named static checks:
@@ -188,6 +196,7 @@ workable for maintainers and brittle for everyone else.
 | Where do the migrated private findings live first? | `../clawperator-skills/AGENTS.md` as the local checklist seed. |
 | What is `skill-migration.md` after this pack? | An active migration and audit log, not the primary contribution guide. |
 | What is the canonical off-device test entrypoint for authored skill logic? | `../clawperator-skills/scripts/test_all.sh`. Guidance must route authors there explicitly. |
+| Where must the durable author guidance be discoverable from? | `../clawperator-skills/README.md`, `../clawperator-skills/AGENTS.md`, and `docs/skills/authoring.md`. |
 | When must an authored skill change add a colocated `*.test.js`? | When the change adds or modifies pure off-device JS logic such as parsers, normalizers, argument handling, helper resolution, or output shaping. |
 | When is live-device proof still mandatory? | For selector, navigation, recording, artifact-compare, checkpoint, or terminal-verification behavior, regardless of off-device tests. |
 | How should skills be structured when they need tests? | Keep `run.js` thin and extract testable logic into importable modules under `skills/**/scripts/` or `skills/utils/`, with colocated `*.test.js` files discoverable by `node --test`. |
@@ -203,6 +212,8 @@ workable for maintainers and brittle for everyone else.
 - The guidance still leaves authors guessing whether a change needs
   `scripts/test_all.sh`, shell syntax checks, `skills validate`, live proof, or
   some combination
+- Durable author guidance exists but is only discoverable by opening deep local
+  docs directly instead of being routed from top-level author surfaces
 - Authors keep embedding parser or normalization logic directly in `run.js`
   without extracting a testable module and colocated `*.test.js`
 - The scaffold continues to disagree with the exemplar helper pattern
@@ -221,6 +232,7 @@ After PR-1:
 - `../clawperator-skills/AGENTS.md` contains the migrated seed rules
 - local guidance names `../clawperator-skills/scripts/test_all.sh` as the
   canonical off-device test entrypoint
+- top-level author surfaces route readers toward the durable local guidance
 - `skill-migration.md` has an explicit, limited role
 
 After PR-2:
@@ -255,6 +267,7 @@ After PR-3:
 | --- | --- |
 | Local runtime-skill author checklist | `../clawperator-skills/AGENTS.md` |
 | Local workflow and prep guidance | `../clawperator-skills/docs/` |
+| Guidance discoverability from author starting points | `../clawperator-skills/README.md`, `../clawperator-skills/AGENTS.md`, `docs/skills/authoring.md` |
 | Skills-repo test entrypoint and authored-test policy | `../clawperator-skills/scripts/test_all.sh`, `../clawperator-skills/AGENTS.md`, `../clawperator-skills/docs/skill-authoring-guidelines.md` |
 | Static authoring guardrails | `apps/node/src/domain/skills/scaffoldSkill.ts`, `apps/node/src/domain/skills/validateSkill.ts`, and tests |
 | Public pointers back to the local guidance surface | `docs/skills/authoring.md`, and `docs/skills/development.md` only if needed |

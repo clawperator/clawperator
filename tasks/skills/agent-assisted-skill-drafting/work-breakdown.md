@@ -42,6 +42,13 @@ repaired. Once unblocked, the execution order is:
 - The discovery skill must not author a durable runtime skill directly.
 - Do not add new Node runtime contracts or new general-purpose CLI probes in
   this pack.
+- Discoverability is part of the shipped surface. Do not assume host agents
+  will find the new route from deep docs alone.
+- Prefer strengthening existing help and bridge surfaces before adding new CLI
+  nouns.
+- Do not add a `skills create` alias by default. `skills new` remains the
+  low-level manual scaffold unless evidence in `findings.md` proves a stronger
+  alias is still required after the help and bridge work lands.
 - Use `/evals` as the proving surface for cross-device confidence. Do not leave
   eval integration as a note in `findings.md` only.
 - Start with the existing `android-version` benchmark. Do not invent a new eval
@@ -82,12 +89,14 @@ Read these files IN THIS ORDER before writing anything.
 | 11 | `docs/skills/authoring.md` | Current public authoring front door |
 | 12 | `docs/host-agents.md` | Current host-agent discovery route |
 | 13 | `docs/internal/design/agent-host-integration.md` | Durable host-agent assumptions |
-| 14 | `apps/node/src/domain/skills/copyAuthoringSkills.ts` | Packaged authoring-skill install and discovery wiring |
-| 15 | `apps/node/src/cli/commands/authoringSkills.ts` | Install, update, and list CLI behavior |
-| 16 | `apps/node/src/test/unit/authoringSkills.test.ts` | Packaging and install regression coverage |
-| 17 | `apps/node/src/test/unit/authoringSkillsPack.test.ts` | Packaged authoring-skills tree expectations |
-| 18 | `sites/landing/public/install.sh` | Install-time authoring-skill discovery guide |
-| 19 | `.agents/skills/docs-author/SKILL.md` | Required docs workflow for Phase 4 |
+| 14 | `apps/node/src/cli/registry.ts` | Current CLI help route and discoverability wording |
+| 15 | `apps/node/src/test/unit/cliHelp.test.ts` | Existing help-surface regression coverage |
+| 16 | `apps/node/src/domain/skills/copyAuthoringSkills.ts` | Packaged authoring-skill install and discovery wiring |
+| 17 | `apps/node/src/cli/commands/authoringSkills.ts` | Install, update, and list CLI behavior |
+| 18 | `apps/node/src/test/unit/authoringSkills.test.ts` | Packaging and install regression coverage |
+| 19 | `apps/node/src/test/unit/authoringSkillsPack.test.ts` | Packaged authoring-skills tree expectations |
+| 20 | `sites/landing/public/install.sh` | Install-time authoring-skill discovery guide and shared bridge |
+| 21 | `.agents/skills/docs-author/SKILL.md` | Required docs workflow for Phase 4 |
 
 ## PR / Phase Plan
 
@@ -109,6 +118,7 @@ with these sections:
 - Commands run
 - Eval run ids
 - Installed authoring-skill checks
+- Discoverability surfaces checked
 - Authored skills and `SkillResult` validity
 - Observations
 - Problems encountered
@@ -269,6 +279,8 @@ machinery.
 ### Files or Surfaces To Change
 
 - `apps/node/authoring-skills/skill-author-by-agent-discovery`
+- `apps/node/src/cli/registry.ts`
+- `apps/node/src/test/unit/cliHelp.test.ts`
 - `apps/node/src/domain/skills/copyAuthoringSkills.ts` if additive handling is required
 - `apps/node/src/test/unit/authoringSkills.test.ts`
 - `apps/node/src/test/unit/authoringSkillsPack.test.ts`
@@ -282,15 +294,26 @@ machinery.
    reveals a hard-coded single-skill assumption.
 3. Update the authoring-skills unit tests so they expect both packaged skills
    and continue to verify install, update, and discovery symlink behavior.
-4. Update the install-time authoring guide in `install.sh` so a newly installed
-   host agent can discover both front doors and understands when to use each.
-5. Verify that the new packaged skill is discoverable via the branch-local CLI.
+4. Update the CLI help surfaces so a cold-start host agent can find the
+   zero-results route from:
+   - `clawperator --help`
+   - `clawperator skills --help`
+   - `clawperator authoring-skills --help`
+   - `clawperator skills new --help` only as the manual-scaffold boundary
+5. Update the install-time authoring guide and shared agent bridge in
+   `install.sh` so a newly installed host agent can discover both front doors
+   and understands when to use each.
+6. Verify that the new packaged skill is discoverable via the branch-local CLI
+   and that the help surfaces route no-match users toward authoring-skill
+   discovery instead of a dead end.
 
 ### Acceptance Criteria
 
 - `apps/node/authoring-skills/skill-author-by-agent-discovery` points at the
   new repo-local skill directory
 - authoring-skills tests pass with both packaged skills present
+- branch-local help surfaces expose the zero-results route and distinguish
+  runtime skills from authoring skills truthfully
 - install-time guidance mentions both discovery and recording authoring skills
 - the branch-local CLI lists both installed authoring skills after install
 
@@ -299,6 +322,10 @@ machinery.
 ```bash
 npm --prefix apps/node run build
 npm --prefix apps/node run test
+node apps/node/dist/cli/index.js --help
+node apps/node/dist/cli/index.js skills --help
+node apps/node/dist/cli/index.js authoring-skills --help
+node apps/node/dist/cli/index.js skills new --help
 node apps/node/dist/cli/index.js authoring-skills install --format json
 node apps/node/dist/cli/index.js authoring-skills list --format json
 ```

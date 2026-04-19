@@ -53,6 +53,9 @@ Pack A must not begin until PR-2 is merged or finalized locally.
 - The finished guidance must also define a structure rule: keep `run.js` thin
   and extract testable off-device logic into importable modules under
   `skills/**/scripts/` or `skills/utils/` when practical.
+- Guidance discoverability is part of the deliverable. Do not leave the durable
+  author rules buried in deep docs that are unreachable from top-level author
+  surfaces.
 - Use `.agents/skills/docs-author/SKILL.md` for any main-repo docs changes.
 - Create `tasks/skills/skill-creation-guidance/findings.md` during execution
   and update it after every meaningful validation or design decision.
@@ -102,6 +105,7 @@ these sections:
 - Migrated rules
 - Mechanical guardrails shipped
 - Testing matrix decisions
+- Discoverability routes
 - Validation commands
 - Observations
 - Problems encountered
@@ -140,7 +144,9 @@ checklist work begins.
 5. Add a short explicit route from the top-level author surface to
    `../clawperator-skills/scripts/test_all.sh` so authors can discover the
    off-device test entrypoint immediately.
-6. Keep the migration scoped: move the durable rules now, not the entire
+6. Make sure the top-level author surfaces point readers toward the restored
+   durable guidance, not just toward raw repo layout.
+7. Keep the migration scoped: move the durable rules now, not the entire
    history of that file.
 
 ### Acceptance Criteria
@@ -149,6 +155,7 @@ checklist work begins.
 - `README.md` points at real local docs targets under `../clawperator-skills/docs/`
 - `AGENTS.md` contains the migrated seed rules from the private findings file
 - the top-level author surface points at `../clawperator-skills/scripts/test_all.sh`
+- the top-level author surface points at the restored durable guidance
 
 ### Validation
 
@@ -156,6 +163,7 @@ checklist work begins.
 rg -n "docs/skill-development-workflow.md|docs/skill-authoring-guidelines.md|docs/device-prep-and-runtime-tips.md" ../clawperator-skills/README.md
 rg -n "resolveClawperatorBin|generated index|diagnostic|privacy" ../clawperator-skills/AGENTS.md
 rg -n "test_all.sh" ../clawperator-skills/README.md ../clawperator-skills/AGENTS.md
+rg -n "skill-development-workflow|skill-authoring-guidelines|device-prep-and-runtime-tips" ../clawperator-skills/README.md ../clawperator-skills/AGENTS.md
 ```
 
 ### Expected Commit
@@ -211,6 +219,8 @@ and make `skill-migration.md` an explicitly secondary audit surface.
   them wholesale
 - the local docs introduce the testing and structure model before the full
   checklist lands in PR-3
+- the local docs are reachable from the top-level author surfaces without
+  repo archaeology
 
 ### Validation
 
@@ -219,6 +229,7 @@ test -f ../clawperator-skills/docs/skill-development-workflow.md
 test -f ../clawperator-skills/docs/skill-authoring-guidelines.md
 test -f ../clawperator-skills/docs/device-prep-and-runtime-tips.md
 rg -n "skill-migration" ../clawperator-skills/README.md ../clawperator-skills/AGENTS.md
+rg -n "skill-development-workflow|skill-authoring-guidelines|device-prep-and-runtime-tips" ../clawperator-skills/README.md ../clawperator-skills/AGENTS.md
 rg -n "test_all.sh|node --test|live-device|run.js" ../clawperator-skills/docs/skill-development-workflow.md ../clawperator-skills/docs/skill-authoring-guidelines.md
 ```
 
@@ -305,15 +316,18 @@ the full local checklist into public docs.
 1. Use `.agents/skills/docs-author/SKILL.md` for the docs workflow.
 2. In `docs/skills/authoring.md`, add explicit links to the restored local
    skills-repo guidance for author workflow, checklist, and device/runtime prep.
-3. Explain the boundary:
+3. Make the public authoring page name the current host-visible discovery
+   command for installed authoring workflows:
+   `clawperator authoring-skills list`.
+4. Explain the boundary:
    - `validateSkill` catches a bounded static subset
    - `../clawperator-skills/scripts/test_all.sh` is the skills-repo off-device
      test entrypoint
    - the local skills-repo checklist remains required for truthfulness and
      author quality bar
-4. Touch `docs/skills/development.md` only if it needs one small cross-link for
+5. Touch `docs/skills/development.md` only if it needs one small cross-link for
    discoverability.
-5. Record the public-doc link targets in `findings.md`.
+6. Record the public-doc link targets in `findings.md`.
 
 ### Acceptance Criteria
 
@@ -321,6 +335,8 @@ the full local checklist into public docs.
 - the docs explain validator guardrails versus checklist guardrails correctly
 - the docs point at the skills-repo off-device test entrypoint instead of
   implying `skills validate` is the whole test story
+- the docs point at `clawperator authoring-skills list` as the current
+  host-visible discovery surface for installed authoring workflows
 - docs build succeeds
 
 ### Validation
