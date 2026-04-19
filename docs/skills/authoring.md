@@ -890,7 +890,10 @@ Notes on those literals:
 - `commandId` is `${skillId}-${Date.now()}`
 - the default `operatorPackage` fallback inside the scaffolded script is `com.clawperator.operator`
 - the child `execFileSync()` timeout inside scaffolded `run.js` is `120000`
-- the scaffolded script currently invokes the literal `"clawperator"` binary, not `process.env.CLAWPERATOR_BIN`
+- the scaffolded script resolves the Clawperator command through
+  `resolveClawperatorBin()` from `skills/utils/common.js`
+- that helper honors `CLAWPERATOR_BIN` and may contribute both a command and
+  helper-provided args before `exec`
 
 The scaffolded `run.sh` just forwards to `run.js`.
 
@@ -902,12 +905,15 @@ Current wrapper expectations:
 
 Important boundary:
 
-- the wrapper injects `CLAWPERATOR_BIN`, but the scaffolded default `run.js` does not currently read it
-- if you want branch-local skill execution to use the resolved wrapper binary, update the scaffolded script explicitly
+- the wrapper injects `CLAWPERATOR_BIN`, and the scaffolded default `run.js`
+  now reads it through `resolveClawperatorBin()`
+- branch-local or explicit wrapper resolution should work without hand-editing
+  the default scaffold just to pick up `CLAWPERATOR_BIN`
 
 Current scaffold behavior on nested `clawperator exec` failure is also worth knowing:
 
-- if `execFileSync("clawperator", ...)` throws but produced stdout, the scaffolded script writes that stdout and exits `0`
+- if `execFileSync()` of the resolved Clawperator command throws but produced
+  stdout, the scaffolded script writes that stdout and exits `0`
 - only failures with no stdout fall through to `stderr` plus `exit 1`
 
 ## Structured Skill Result Contract

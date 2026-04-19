@@ -208,6 +208,17 @@ Phase 5 validation result on 2026-04-19:
     structure examples
   - includes sanitized negative examples for each recurring failure pattern
 
+Post-completion correction validation on 2026-04-19:
+
+- Skills-repo README wording was corrected so the top-level entrypoint now
+  describes `clawperator-skill-type` as an enforced `SKILL.md` frontmatter
+  field for new and updated work instead of a naming-only convention.
+- `docs/skills/authoring.md` scaffold notes were corrected to describe the
+  shipped `resolveClawperatorBin()` helper path and current
+  `CLAWPERATOR_BIN` behavior.
+- Follow-up validation reran the public docs build, the skills-repo off-device
+  test entrypoint, and `git diff --check` in both repos.
+
 ## Observations
 
 - `../clawperator-skills` already had uncommitted Phase 1-aligned edits in
@@ -230,6 +241,11 @@ Phase 5 validation result on 2026-04-19:
   - testing-matrix ownership -> `Testing Matrix`,
     `Mechanical Guardrails Versus Author Checklist`, and
     `Validation Checklist`
+- Post-completion review caught two stale guidance statements that survived the
+  first completion pass:
+  - `../clawperator-skills/README.md` still described skill type as naming-only
+  - `docs/skills/authoring.md` still described the pre-Phase-3 scaffold helper
+    behavior
 
 ## Problems encountered
 
