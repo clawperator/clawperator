@@ -102,6 +102,16 @@ follow-up routing decisions needed for Phase 2.
   - the one allowlisted `script` skill still passes while other `script` values fail
   - stale generated indexes fail validation with a rerun message
   - timestamp-only generated drift does not fail freshness checks
+- Phase 5 codifies the full local testing matrix in `../clawperator-skills/AGENTS.md`:
+  - pure off-device JS logic must add or update colocated `*.test.js` and run
+    `./scripts/test_all.sh`
+  - shell wrapper changes must run shell syntax checks
+  - authored-skill changes must run
+    `clawperator skills validate <skill_id> --dry-run`
+  - registry-linked metadata changes must run
+    `./scripts/generate_skill_indexes.sh`
+  - selector, navigation, checkpoint, compare-baseline, recording, and terminal
+    verification changes still require live-device proof
 
 ## Discoverability routes
 
@@ -176,6 +186,28 @@ Phase 4 validation result on 2026-04-19:
   discovery surface and explains the validator-versus-checklist boundary using
   the Phase 3 guardrails.
 
+Phase 5 validation result on 2026-04-19:
+
+- `../clawperator-skills/scripts/test_all.sh` passed with 14 tests green.
+- The required grep check passed for:
+  - `Verification drift`
+  - `Generated index drift`
+  - `Shared helper bypass`
+  - `Diagnostics`
+  - `Parser ambiguity`
+  - `Privacy`
+  - `test_all.sh`
+  - `node --test`
+  - `live-device`
+  - `run.js`
+- `git diff --check` passed in `../clawperator-skills`.
+- Human review confirmed `AGENTS.md` now:
+  - distinguishes mechanical validator guardrails from author-only checklist work
+  - defines when to add colocated `*.test.js`
+  - names `skills/utils/common.test.js` and `amazon_parser.test.js` as the
+    structure examples
+  - includes sanitized negative examples for each recurring failure pattern
+
 ## Observations
 
 - `../clawperator-skills` already had uncommitted Phase 1-aligned edits in
@@ -184,6 +216,20 @@ Phase 4 validation result on 2026-04-19:
 - The pack uses `findings.md` in `clawperator` as the execution log while PR-1
   ownership stays with `../clawperator-skills`. For now this log is treated as
   execution bookkeeping rather than a PR-1 content surface.
+- Phase 5 lesson-to-section ownership in `../clawperator-skills/AGENTS.md`:
+  - lesson 1 and recurring failure pattern 1 -> `Verification drift`
+  - lesson 2 and recurring failure pattern 2 -> `Generated index drift`
+  - lesson 3 and recurring failure pattern 3 -> `Shared helper bypass`
+  - lessons 4, 5, 7, and 12 and recurring failure pattern 4 ->
+    `Diagnostics Truthfulness`
+  - lessons 6, 8, 9, 10, and 11 and recurring failure pattern 5 ->
+    `Parser ambiguity and robustness`
+  - lesson 13 and recurring failure pattern 6 -> `Privacy Hygiene`
+  - structure guidance for extracted logic and colocated tests ->
+    `Structure Rule: Keep run.js Thin`
+  - testing-matrix ownership -> `Testing Matrix`,
+    `Mechanical Guardrails Versus Author Checklist`, and
+    `Validation Checklist`
 
 ## Problems encountered
 
@@ -204,5 +250,8 @@ Phase 4 validation result on 2026-04-19:
 
 ## Deferred follow-up
 
-- Phase 5 should expand the local checklist into the full testing matrix and
-  negative-example guidance.
+- The separate `tasks/skills/agent-assisted-skill-drafting/` pack remains
+  intentionally out of scope for this execution.
+- The one legacy compatibility exception for
+  `au.com.polyaire.airtouch5.set-zone-state` still needs its own cleanup pass
+  if the repo wants to retire `clawperator-skill-type: script` completely.

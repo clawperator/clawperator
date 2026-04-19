@@ -21,12 +21,12 @@ the shared baseline is stable.
 
 | Item | Value |
 | --- | --- |
-| State | in progress |
+| State | completed |
 | Total PRs | 3 |
 | Total phases | 5 |
-| Completed | 1, 2, 3, 4 |
-| Remaining | 5 |
-| Current / Next | Phase 5 |
+| Completed | 1, 2, 3, 4, 5 |
+| Remaining | none |
+| Current / Next | pack complete |
 | Blockers | none |
 
 ## Progress Update
@@ -43,15 +43,22 @@ the shared baseline is stable.
 - PR-2 reviewable commits in `clawperator`:
   - `8a87e76` `fix(skills): harden skill authoring guardrails`
   - `fdb039e` `docs(skills): cross-link runtime skill author guidance`
+- PR-3 reviewable commit in `../clawperator-skills`:
+  - `1552251` `docs(skills): codify runtime skill author checklist`
 - Validation completed for PR-1:
   - Phase 1 validation grep checks
   - Phase 2 routing and stale-reference checks
   - `../clawperator-skills/scripts/test_all.sh`
   - `git diff --check` in both repos
 - Validation completed for PR-2 so far:
+- Validation completed for PR-2:
   - `npm --prefix apps/node run build`
   - `npm --prefix apps/node run test`
   - `./scripts/docs_build.sh`
+- Validation completed for PR-3:
+  - `../clawperator-skills/scripts/test_all.sh`
+  - Phase 5 checklist grep check in `../clawperator-skills/AGENTS.md`
+  - `git diff --check` in `../clawperator-skills`
 - Execution details and validation results are recorded in
   `tasks/skills/skill-creation-guidance/findings.md`.
 
