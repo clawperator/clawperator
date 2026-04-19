@@ -93,9 +93,9 @@ fake discovery. Route the work into a local shell context first.
   Clawperator cannot truthfully clear alone, such as a hard sign-in screen,
   MFA challenge, CAPTCHA, biometric gate, payment approval, or an approval
   step whose meaning cannot be inferred safely.
-- When routing to `skill-author-by-recording`, pass forward whether the host
-  can drive the device autonomously and any known blockers that would require
-  human intervention.
+- When routing to `skill-author-by-recording`, pass forward the observed app
+  route, mutation notes, evidence inventory, classification, and any known
+  setup caveats that matter to the recording pass.
 
 ## Discovery Budget
 
@@ -232,8 +232,7 @@ Apply the route directly:
 - `proceed_to_recording`
   - hand off to `skill-author-by-recording`
   - pass forward the user goal, package id, observed sub-route, mutation notes,
-    evidence inventory, `skill_classification`, autonomous-drive expectation,
-    and any known blockers
+    evidence inventory, `skill_classification`, and any known setup caveats
 - `iterate_discovery`
   - stop with a bounded next-probe recommendation in `handoff_reasoning`
   - do not keep looping indefinitely inside the same pass

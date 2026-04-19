@@ -188,23 +188,19 @@ When you create a skill from a recording, use these current authoring rules:
 These are the current documented rules for recording-derived authoring. They
 should stay aligned with the `skill-author-by-recording` skill.
 
-## Autonomous Recording Rule
+## Discovery And Recording Boundary
 
-When the current host already has working Clawperator access to the target
-device, discovery and recording should be agent-driven by default.
+Keep the two front doors distinct:
 
-Use these rules:
-
-- drive the device autonomously when the route is already truthful and the host
-  can execute it
-- do not ask the user to manually perform the recorded app flow if Clawperator
-  can perform that same flow itself
-- ask for user intervention only for real external blockers such as hard
-  sign-in, MFA, CAPTCHA, biometric unlock, payment approval, or another
-  explicit human-consent gate
-- if intervention is required, explain the exact blocker and the exact user
-  action needed instead of asking the user to generically "do the flow" or
-  reply `done`
+- `skill-author-by-agent-discovery` is the agent-driven zero-results route when
+  runtime-skill discovery found no clear match
+- `skill-author-by-recording` is the proving workflow where the user performs
+  the recorded phone flow once recording starts
+- discovery may hand off route notes, mutation notes, classification, and
+  setup caveats, but it should not silently turn recording into continued
+  autonomous device driving
+- if you already know the route well enough to skip discovery, the recording
+  workflow is still user-performed once recording begins
 
 ## Sources
 

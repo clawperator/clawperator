@@ -101,15 +101,6 @@ Reuse those contracts. Do not invent a parallel recording, skill, or
 - Be explicit about authoring mode. `From scratch` means no same-app exemplar
   reuse. `Assisted from nearby patterns` means exemplar reuse is allowed, but
   you must disclose it.
-- Default to autonomous device driving when the current host already has
-  working Clawperator access to the target device.
-- Do not ask the user to manually perform the recorded app flow if the agent
-  can truthfully drive that same flow with Clawperator.
-- Ask for user intervention only when blocked by a real external gate the
-  agent cannot clear alone, such as sign-in, MFA, CAPTCHA, biometric unlock,
-  payment approval, or another explicit human-consent screen.
-- If user intervention becomes necessary, say exactly what blocker forced it
-  and why the agent could not continue autonomously.
 
 ## Inputs To Gather Up Front
 
@@ -186,9 +177,7 @@ Tell the user what you are about to do:
 - confirm the target app or apps and close them first so recording starts from
   a fresh state
 - start recording
-- drive the flow yourself when the host can control the device autonomously
-- ask the user to perform the flow only if a real blocker prevents autonomous
-  execution
+- ask them to perform the flow once
 - stop recording and pull the raw capture
 - export the recording artifact
 - derive the skill id from the observed app and the user's goal
@@ -249,23 +238,13 @@ command before or while running it.
 clawperator recording start --session-id <session_id> --device <device_serial> --operator-package <operator_package> --json
 ```
 
-Then either:
+Then tell the human clearly that recording is active and it is their turn to
+perform the target phone flow.
 
-- continue with autonomous device driving when the current host can control the
-  device truthfully, or
-- if a real blocker requires human action, explain the exact blocker and the
-  exact action the user must take before the agent can continue
+### 4. Human Performs The Flow
 
-### 4. Conditional Human Intervention
-
-Only use this step if a real blocker forced human intervention.
-
-If the agent can drive the device, it should perform the workflow itself and
-continue directly to stop, pull, and export.
-
-If the human must take over, say exactly what action is needed and why the
-agent could not truthfully continue alone. Do not request a generic "do the
-flow once" handoff when the device is otherwise controllable.
+Pause for the human to do the workflow on the device. Do not guess what
+happened. When they say the flow is complete, continue.
 
 ### 5. Stop, Pull, And Export
 
