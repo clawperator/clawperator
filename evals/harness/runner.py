@@ -191,23 +191,37 @@ def _write_json_file(path: Path, payload: dict[str, Any]) -> None:
     temp_path.replace(path)
 
 
+def _strip_marked_blocks(transcript: str, start_marker: str, end_marker: str) -> str:
+    pattern = re.compile(
+        r"^[ \t]*"
+        + re.escape(start_marker)
+        + r"[ \t]*$\n?"
+        + r".*?"
+        + r"\n?^[ \t]*"
+        + re.escape(end_marker)
+        + r"[ \t]*$\n?",
+        re.DOTALL | re.MULTILINE,
+    )
+    return pattern.sub("", transcript)
+
+
 def _iter_transcript_json_objects(transcript: str):
-    for raw_line in transcript.splitlines():
+    for line_number, raw_line in enumerate(transcript.splitlines()):
         try:
             payload = json.loads(raw_line)
         except json.JSONDecodeError:
             continue
         if isinstance(payload, dict):
-            yield payload
+            yield line_number, payload
 
 
 def _iter_command_execution_records(transcript: str):
-    for payload in _iter_transcript_json_objects(transcript):
+    for line_number, payload in _iter_transcript_json_objects(transcript):
         item = payload.get("item") if payload.get("type") == "item.completed" else payload
         if not isinstance(item, dict):
             continue
         if item.get("type") == "command_execution":
-            yield item
+            yield line_number, item
 
 
 def _normalize_command_tokens(tokens: Any) -> list[str]:
@@ -272,8 +286,31 @@ def _is_authoring_skills_list_command(record: dict[str, Any]) -> bool:
     return False
 
 
-def _extract_discovery_artifacts(transcript: str) -> list[dict[str, Any]]:
-    artifacts: list[dict[str, Any]] = []
+def _is_runtime_skill_discovery_command(record: dict[str, Any]) -> bool:
+    for tokens in _extract_command_token_lists(record):
+        lowered = [token.lower() for token in tokens]
+        for index in range(len(lowered) - 1):
+            if lowered[index] == "skills" and lowered[index + 1] in {"for-app", "search", "get"}:
+                if _tokens_request_json_output(tokens):
+                    return True
+    return False
+
+
+def _normalize_command_signature(command: str) -> str | None:
+    if not isinstance(command, str) or not command.strip():
+        return None
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        tokens = command.split()
+    normalized_tokens = [token.strip().lower() for token in tokens if isinstance(token, str) and token.strip()]
+    if not normalized_tokens:
+        return None
+    return " ".join(normalized_tokens)
+
+
+def _extract_discovery_artifacts(transcript: str) -> list[tuple[int, dict[str, Any]]]:
+    artifacts: list[tuple[int, dict[str, Any]]] = []
     for match in _DISCOVERY_ARTIFACT_FENCE_RE.finditer(transcript):
         candidate = match.group(1).strip()
         try:
@@ -283,8 +320,198 @@ def _extract_discovery_artifacts(transcript: str) -> list[dict[str, Any]]:
         if not isinstance(payload, dict):
             continue
         if _DISCOVERY_ARTIFACT_REQUIRED_KEYS.issubset(payload.keys()):
-            artifacts.append(payload)
+            line_number = transcript.count("\n", 0, match.start()) + 1
+            artifacts.append((line_number, payload))
     return artifacts
+
+
+def _extract_non_empty_string_list(value: Any) -> list[str] | None:
+    if not isinstance(value, list) or len(value) == 0:
+        return None
+    items: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item.strip():
+            return None
+        items.append(item.strip())
+    return items
+
+
+def _extract_artifact_registry_commands(existing_skill_verdict: dict[str, Any]) -> list[str] | None:
+    commands = _extract_non_empty_string_list(existing_skill_verdict.get("commands"))
+    if commands is not None:
+        return commands
+    return _extract_non_empty_string_list(existing_skill_verdict.get("queried_registry_paths"))
+
+
+def _coerce_non_negative_number(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)) and value >= 0:
+        return float(value)
+    return None
+
+
+def _validate_discovery_artifact(
+    artifact: dict[str, Any],
+    *,
+    skill_generation: Any,
+    runtime_probe_signatures: set[str],
+    authoring_probe_signatures: set[str],
+) -> list[str]:
+    errors: list[str] = []
+
+    target_package_expected = (
+        skill_generation.get("target_app_package").strip()
+        if isinstance(skill_generation, dict) and isinstance(skill_generation.get("target_app_package"), str)
+        else None
+    )
+    required_proving_handoff = (
+        skill_generation.get("required_proving_handoff").strip()
+        if isinstance(skill_generation, dict) and isinstance(skill_generation.get("required_proving_handoff"), str)
+        else None
+    )
+    expected_recording_handoff = required_proving_handoff or "skill-author-by-recording"
+
+    target_app_package = artifact.get("target_app_package")
+    if not isinstance(target_app_package, dict):
+        errors.append("discovery artifact is missing object field `target_app_package`")
+    elif target_package_expected is not None:
+        package_id = target_app_package.get("package_id")
+        if not isinstance(package_id, str) or package_id.strip() != target_package_expected:
+            errors.append(f"discovery artifact target_app_package.package_id must be `{target_package_expected}`")
+        app_label = target_app_package.get("app_label")
+        if not isinstance(app_label, str) or not app_label.strip():
+            app_label = target_app_package.get("label")
+        if not isinstance(app_label, str) or not app_label.strip():
+            errors.append("discovery artifact target_app_package must include a non-empty app label")
+        sub_route = target_app_package.get("sub_route")
+        if not isinstance(sub_route, str) or not sub_route.strip():
+            sub_route = target_app_package.get("sub_route_observed")
+        if not isinstance(sub_route, str) or not sub_route.strip():
+            errors.append("discovery artifact target_app_package must include a non-empty sub-route observation")
+
+    existing_skill_verdict = artifact.get("existing_skill_verdict")
+    if not isinstance(existing_skill_verdict, dict):
+        errors.append("discovery artifact is missing object field `existing_skill_verdict`")
+    else:
+        status = existing_skill_verdict.get("status")
+        if status not in {"match", "partial_match", "none"}:
+            errors.append("discovery artifact existing_skill_verdict.status must be `match`, `partial_match`, or `none`")
+        commands = _extract_artifact_registry_commands(existing_skill_verdict)
+        if commands is None:
+            errors.append(
+                "discovery artifact existing_skill_verdict must include a non-empty `commands` or `queried_registry_paths` string array"
+            )
+        else:
+            artifact_registry_signatures = {
+                signature
+                for signature in (_normalize_command_signature(command) for command in commands)
+                if signature is not None
+            }
+            artifact_runtime_probe_signatures = {
+                signature for signature in artifact_registry_signatures if " skills " in f" {signature} "
+            }
+            if runtime_probe_signatures and artifact_runtime_probe_signatures.isdisjoint(runtime_probe_signatures):
+                errors.append(
+                    "discovery artifact existing_skill_verdict commands must include a runtime-skill discovery command seen in the transcript"
+                )
+            if authoring_probe_signatures and artifact_registry_signatures.isdisjoint(authoring_probe_signatures):
+                errors.append(
+                    "discovery artifact existing_skill_verdict commands must include `authoring-skills list --json` evidence seen in the transcript"
+                )
+
+    route_confidence = artifact.get("route_confidence")
+    if not isinstance(route_confidence, dict):
+        errors.append("discovery artifact is missing object field `route_confidence`")
+    else:
+        if route_confidence.get("level") not in {"high", "medium", "low"}:
+            errors.append("discovery artifact route_confidence.level must be `high`, `medium`, or `low`")
+        evidence = _extract_non_empty_string_list(route_confidence.get("evidence"))
+        if evidence is None:
+            errors.append("discovery artifact route_confidence.evidence must be a non-empty string array")
+
+    mutation_risk = artifact.get("mutation_risk")
+    if not isinstance(mutation_risk, dict):
+        errors.append("discovery artifact is missing object field `mutation_risk`")
+    else:
+        if mutation_risk.get("level") not in {"read_only", "reversible_mutation", "irreversible_mutation"}:
+            errors.append(
+                "discovery artifact mutation_risk.level must be `read_only`, `reversible_mutation`, or `irreversible_mutation`"
+            )
+        notes = mutation_risk.get("notes")
+        if isinstance(notes, str):
+            if not notes.strip():
+                errors.append("discovery artifact mutation_risk.notes must be a non-empty string or string array")
+        elif _extract_non_empty_string_list(notes) is None:
+            errors.append("discovery artifact mutation_risk.notes must be a non-empty string or string array")
+
+    evidence_collected = artifact.get("evidence_collected")
+    if not isinstance(evidence_collected, dict):
+        errors.append("discovery artifact is missing object field `evidence_collected`")
+    else:
+        for key in ("snapshots", "screenshots", "failed_probes"):
+            values = evidence_collected.get(key)
+            if not isinstance(values, list):
+                errors.append(f"discovery artifact evidence_collected.{key} must be an array")
+
+    discovery_budget_used = artifact.get("discovery_budget_used")
+    if not isinstance(discovery_budget_used, dict):
+        errors.append("discovery artifact is missing object field `discovery_budget_used`")
+    else:
+        snapshot_count = _coerce_non_negative_number(
+            discovery_budget_used.get("snapshot_count", discovery_budget_used.get("snapshots"))
+        )
+        if snapshot_count is None:
+            errors.append("discovery artifact discovery_budget_used must include a non-negative snapshot count")
+        elif snapshot_count > 5:
+            errors.append("discovery artifact discovery_budget_used snapshot count exceeds the Pack A discovery budget")
+
+        screenshot_count = _coerce_non_negative_number(
+            discovery_budget_used.get("screenshot_count", discovery_budget_used.get("screenshots"))
+        )
+        if screenshot_count is None:
+            errors.append("discovery artifact discovery_budget_used must include a non-negative screenshot count")
+        elif screenshot_count > 3:
+            errors.append("discovery artifact discovery_budget_used screenshot count exceeds the Pack A discovery budget")
+
+        elapsed_seconds = _coerce_non_negative_number(
+            discovery_budget_used.get("elapsed_seconds", discovery_budget_used.get("elapsed_wall_time_s"))
+        )
+        if elapsed_seconds is None:
+            errors.append("discovery artifact discovery_budget_used must include non-negative elapsed wall time")
+        elif elapsed_seconds > 90:
+            errors.append("discovery artifact discovery_budget_used elapsed wall time exceeds the Pack A discovery budget")
+
+    recommended_next_step = artifact.get("recommended_next_step")
+    handoff_target = artifact.get("handoff_target")
+    if recommended_next_step not in {
+        "use_existing_skill",
+        "proceed_to_recording",
+        "iterate_discovery",
+        "one_shot_direct_automation",
+        "escalate_to_human",
+        "decline",
+    }:
+        errors.append(
+            "discovery artifact recommended_next_step must be one of `use_existing_skill`, `proceed_to_recording`, `iterate_discovery`, `one_shot_direct_automation`, `escalate_to_human`, or `decline`"
+        )
+    handoff_reasoning = artifact.get("handoff_reasoning")
+    if not isinstance(handoff_reasoning, str) or not handoff_reasoning.strip():
+        errors.append("discovery artifact handoff_reasoning must be a non-empty string")
+    if recommended_next_step == "proceed_to_recording":
+        if handoff_target != expected_recording_handoff:
+            errors.append(
+                f"discovery artifact handoff_target must be `{expected_recording_handoff}` when recommended_next_step is `proceed_to_recording`"
+            )
+        skill_classification = artifact.get("skill_classification")
+        if skill_classification not in {"shared-general", "personalized-local"}:
+            errors.append(
+                "discovery artifact skill_classification must be `shared-general` or `personalized-local` when recommended_next_step is `proceed_to_recording`"
+            )
+        if isinstance(existing_skill_verdict, dict) and existing_skill_verdict.get("status") == "match":
+            errors.append("discovery artifact cannot route to `proceed_to_recording` when existing_skill_verdict.status is `match`")
+
+    return errors
 
 
 def _skill_generation_failure_reason(skill_score: dict[str, Any]) -> str | None:
@@ -338,25 +565,89 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
         else None
     )
 
-    authoring_skills_list_seen = any(_is_authoring_skills_list_command(record) for record in _iter_command_execution_records(transcript))
-    discovery_artifacts = _extract_discovery_artifacts(transcript)
-    discovery_artifact_seen = len(discovery_artifacts) > 0
-    required_authoring_front_door_seen = required_authoring_front_door is None or discovery_artifact_seen
-    required_proving_handoff_seen = required_proving_handoff is None
-    if required_proving_handoff is not None:
-        for artifact in discovery_artifacts:
-            if artifact.get("recommended_next_step") != "proceed_to_recording":
-                continue
-            if artifact.get("handoff_target") == required_proving_handoff:
-                required_proving_handoff_seen = True
-                break
+    start_marker = (
+        skill_generation.get("skill_start_marker")
+        if isinstance(skill_generation, dict) and isinstance(skill_generation.get("skill_start_marker"), str)
+        else "CLAWPERATOR_SKILL_START"
+    )
+    end_marker = (
+        skill_generation.get("skill_end_marker")
+        if isinstance(skill_generation, dict) and isinstance(skill_generation.get("skill_end_marker"), str)
+        else "CLAWPERATOR_SKILL_END"
+    )
+    route_transcript = _strip_marked_blocks(transcript, start_marker, end_marker)
+    command_execution_records = list(_iter_command_execution_records(route_transcript))
+    authoring_skills_list_positions = [
+        line_number
+        for line_number, record in command_execution_records
+        if _is_authoring_skills_list_command(record)
+    ]
+    authoring_skills_list_signatures: set[str] = set()
+    runtime_skill_discovery_signatures: set[str] = set()
+    runtime_skill_discovery_positions: list[int] = []
+    for line_number, record in command_execution_records:
+        if _is_authoring_skills_list_command(record):
+            for token_list in _extract_command_token_lists(record):
+                signature = _normalize_command_signature(" ".join(token_list))
+                if signature is not None:
+                    authoring_skills_list_signatures.add(signature)
+        if not _is_runtime_skill_discovery_command(record):
+            continue
+        runtime_skill_discovery_positions.append(line_number)
+        for token_list in _extract_command_token_lists(record):
+            signature = _normalize_command_signature(" ".join(token_list))
+            if signature is not None:
+                runtime_skill_discovery_signatures.add(signature)
 
+    authoring_skills_list_seen = len(authoring_skills_list_positions) > 0
+    runtime_skill_discovery_seen = len(runtime_skill_discovery_positions) > 0
+    runtime_skill_discovery_before_authoring = bool(
+        runtime_skill_discovery_positions
+        and authoring_skills_list_positions
+        and min(runtime_skill_discovery_positions) < min(authoring_skills_list_positions)
+    )
+
+    discovery_artifacts = _extract_discovery_artifacts(route_transcript)
+    discovery_artifact_count = len(discovery_artifacts)
+    discovery_artifact_seen = discovery_artifact_count > 0
+    discovery_artifact_errors: list[str] = []
+    if discovery_artifact_count == 1:
+        discovery_artifact_line_number, discovery_artifact = discovery_artifacts[0]
+        discovery_artifact_errors = _validate_discovery_artifact(
+            discovery_artifact,
+            skill_generation=skill_generation,
+            runtime_probe_signatures=runtime_skill_discovery_signatures,
+            authoring_probe_signatures=authoring_skills_list_signatures,
+        )
+        if authoring_skills_list_positions and discovery_artifact_line_number <= min(authoring_skills_list_positions):
+            discovery_artifact_errors.append(
+                "structured discovery artifact must appear after `clawperator authoring-skills list --json`"
+            )
+    elif discovery_artifact_count > 1:
+        discovery_artifact_errors.append("expected exactly one structured discovery artifact before skill emission")
+
+    discovery_artifact_valid = discovery_artifact_count == 1 and len(discovery_artifact_errors) == 0
+    required_authoring_front_door_seen = required_authoring_front_door is None or discovery_artifact_valid
+    required_proving_handoff_seen = required_proving_handoff is None
+    if required_proving_handoff is not None and discovery_artifact_valid:
+        _, artifact = discovery_artifacts[0]
+        if artifact.get("recommended_next_step") == "proceed_to_recording" and artifact.get("handoff_target") == required_proving_handoff:
+            required_proving_handoff_seen = True
     route_requirement_errors: list[str] = []
     if required_authoring_front_door is not None or required_proving_handoff is not None:
+        if not runtime_skill_discovery_seen:
+            route_requirement_errors.append(
+                "missing structured command evidence for runtime-skill discovery (`clawperator skills for-app/search/get --json`)"
+            )
+        elif not runtime_skill_discovery_before_authoring:
+            route_requirement_errors.append(
+                "runtime-skill discovery must appear before `clawperator authoring-skills list --json`"
+            )
         if not authoring_skills_list_seen:
             route_requirement_errors.append(
                 "missing structured command evidence for `clawperator authoring-skills list --json`"
             )
+    route_requirement_errors.extend(discovery_artifact_errors)
     if required_authoring_front_door is not None and not required_authoring_front_door_seen:
         route_requirement_errors.append(
             f"missing structured discovery artifact for required_authoring_front_door `{required_authoring_front_door}`"
@@ -369,8 +660,12 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
     return {
         "required_authoring_front_door": required_authoring_front_door,
         "required_proving_handoff": required_proving_handoff,
+        "runtime_skill_discovery_seen": runtime_skill_discovery_seen,
+        "runtime_skill_discovery_before_authoring": runtime_skill_discovery_before_authoring,
         "authoring_skills_list_seen": authoring_skills_list_seen,
+        "discovery_artifact_count": discovery_artifact_count,
         "discovery_artifact_seen": discovery_artifact_seen,
+        "discovery_artifact_valid": discovery_artifact_valid,
         "required_authoring_front_door_seen": required_authoring_front_door_seen,
         "required_proving_handoff_seen": required_proving_handoff_seen,
         "route_requirements_met": len(route_requirement_errors) == 0,

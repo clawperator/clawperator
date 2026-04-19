@@ -545,6 +545,31 @@ discovery front door is implemented.
     - `npm --prefix apps/node run test`
     - `./gradlew app:assembleDebug app:testDebugUnitTest`
     - `git diff --check`
+- Post-acceptance route-contract hardening completed locally on 2026-04-20:
+  - `evals/harness/runner.py` now treats copied or hand-authored discovery JSON
+    as insufficient proof unless it matches the structured transcript evidence
+  - the Pack A scorer now requires:
+    - one structured runtime-skill discovery command in JSON mode before the
+      authoring front door
+    - one structured `authoring-skills list` command in JSON mode
+    - exactly one structured discovery artifact after the authoring-skill
+      listing
+    - discovery-artifact registry provenance that cites the same runtime and
+      authoring registry commands the transcript actually executed
+    - route-specific artifact validation for:
+      `target_app_package.package_id`, app label, sub-route observation,
+      `skill_classification`, `route_confidence`, `mutation_risk`,
+      `evidence_collected`, and `discovery_budget_used`
+  - new regressions cover:
+    - copied registry evidence
+    - wrong target package metadata
+    - missing `skill_classification`
+    - runtime discovery after authoring instead of before
+  - validation run for this follow-up:
+    - `python -m py_compile evals/harness/runner.py evals/harness/test_run_eval.py evals/run_eval.py evals/harness/test_rescore.py`
+    - `uv run --project evals --extra dev pytest evals/harness/test_run_eval.py -q`
+    - `uv run --project evals --extra dev pytest evals/harness/test_rescore.py -q`
+    - `uv run --project evals --extra dev pytest evals/harness -q`
 - No blocker remains for this pack.
 - Optional follow-up after review:
   - clean up this task pack with `tasks/skills/task-cleanup/` once the branch

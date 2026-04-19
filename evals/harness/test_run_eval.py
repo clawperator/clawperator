@@ -374,11 +374,8 @@ def test_extract_answer_candidate_handles_codex_item_completed_json():
     assert answer == "15"
 
 
-def test_attach_skill_score_records_replay_error_without_raising(monkeypatch, tmp_path):
-    run_dir = tmp_path / "run"
-    run_dir.mkdir()
-    (run_dir / "transcript.txt").write_text(
-        "CLAWPERATOR_SKILL_START\n"
+def _skill_payload_json() -> str:
+    return (
         "{"
         '"id":"com.example.android-version",'
         '"applicationId":"com.example",'
@@ -389,7 +386,45 @@ def test_attach_skill_score_records_replay_error_without_raising(monkeypatch, tm
         '"scripts":["skills/com.example.android-version/scripts/run.js"],'
         '"artifacts":[],'
         '"scriptContents":{"skills/com.example.android-version/scripts/run.js":"console.log(\\"15\\")\\n"}'
+        "}"
+    )
+
+
+def _valid_discovery_artifact_json(
+    *,
+    package_id: str = "com.android.settings",
+    include_classification: bool = True,
+    runtime_command: str = "clawperator skills for-app com.android.settings --json",
+    authoring_command: str = "clawperator authoring-skills list --json",
+    registry_field: str = "commands",
+) -> str:
+    skill_classification_line = '  "skill_classification": "shared-general",\n' if include_classification else ""
+    registry_entries = json.dumps([runtime_command, authoring_command])
+    return (
+        "```json\n"
+        "{\n"
+        '  "recommended_next_step": "proceed_to_recording",\n'
+        f'  "existing_skill_verdict": {{"status": "none", "{registry_field}": {registry_entries}}},\n'
+        f'  "target_app_package": {{"app_label": "Settings", "package_id": "{package_id}", "sub_route": "About phone"}},\n'
+        '  "route_confidence": {"level": "high", "evidence": ["Observed About phone route"]},\n'
+        '  "mutation_risk": {"level": "read_only", "notes": "Settings inspection only"},\n'
+        '  "evidence_collected": {"snapshots": ["snapshot-1"], "screenshots": [], "failed_probes": []},\n'
+        '  "discovery_budget_used": {"snapshots": 1, "screenshots": 0, "elapsed_wall_time_s": 12},\n'
+        f"{skill_classification_line}"
+        '  "handoff_target": "skill-author-by-recording",\n'
+        '  "handoff_reasoning": "The route is understood enough to prove via recording."\n'
         "}\n"
+        "```\n"
+    )
+
+
+def test_attach_skill_score_records_replay_error_without_raising(monkeypatch, tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "transcript.txt").write_text(
+        "CLAWPERATOR_SKILL_START\n"
+        + _skill_payload_json()
+        + "\n"
         "CLAWPERATOR_SKILL_END\n",
         encoding="utf-8",
     )
@@ -430,17 +465,8 @@ def test_attach_skill_score_requires_pack_a_route_evidence(monkeypatch, tmp_path
         '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator authoring-skills list --json"}}\n'
         "Discovery route: skill-author-by-agent-discovery -> skill-author-by-recording\n"
         "CLAWPERATOR_SKILL_START\n"
-        "{"
-        '"id":"com.example.android-version",'
-        '"applicationId":"com.example",'
-        '"intent":"android-version",'
-        '"summary":"Determine Android version",'
-        '"path":"skills/com.example.android-version",'
-        '"skillFile":"skills/com.example.android-version/SKILL.md",'
-        '"scripts":["skills/com.example.android-version/scripts/run.js"],'
-        '"artifacts":[],'
-        '"scriptContents":{"skills/com.example.android-version/scripts/run.js":"console.log(\\"15\\")\\n"}'
-        "}\n"
+        + _skill_payload_json()
+        + "\n"
         "CLAWPERATOR_SKILL_END\n",
         encoding="utf-8",
     )
@@ -481,6 +507,8 @@ def test_attach_skill_score_requires_pack_a_route_evidence(monkeypatch, tmp_path
     )
 
     assert updated["skill_score"]["route_requirements_met"] is False
+    assert updated["skill_score"]["runtime_skill_discovery_seen"] is False
+    assert updated["skill_score"]["runtime_skill_discovery_before_authoring"] is False
     assert updated["skill_score"]["authoring_skills_list_seen"] is True
     assert updated["skill_score"]["discovery_artifact_seen"] is False
     assert updated["skill_score"]["required_authoring_front_door_seen"] is False
@@ -491,6 +519,7 @@ def test_attach_skill_score_requires_pack_a_route_evidence(monkeypatch, tmp_path
     assert (
         updated["skill_score"]["route_requirement_errors"]
         == [
+            "missing structured command evidence for runtime-skill discovery (`clawperator skills for-app/search/get --json`)",
             "missing structured discovery artifact for required_authoring_front_door `skill-author-by-agent-discovery`",
             "missing structured discovery handoff for required_proving_handoff `skill-author-by-recording`",
         ]
@@ -501,34 +530,19 @@ def test_attach_skill_score_accepts_pack_a_route_evidence(monkeypatch, tmp_path)
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     (run_dir / "transcript.txt").write_text(
-        '{"type":"item.completed","item":{"type":"command_execution","command":"node apps/node/dist/cli/index.js authoring-skills list --format json"}}\n'
-        "```json\n"
-        "{\n"
-        '  "recommended_next_step": "proceed_to_recording",\n'
-        '  "existing_skill_verdict": {"status": "none", "commands": ["clawperator skills for-app com.android.settings --json"]},\n'
-        '  "target_app_package": {"app_label": "Settings", "package_id": "com.android.settings", "sub_route": "About phone"},\n'
-        '  "route_confidence": {"level": "high", "evidence": ["Observed About phone route"]},\n'
-        '  "mutation_risk": {"level": "read_only", "notes": "Settings inspection only"},\n'
-        '  "evidence_collected": {"snapshots": ["snapshot-1"], "screenshots": [], "failed_probes": []},\n'
-        '  "discovery_budget_used": {"snapshots": 1, "screenshots": 0, "elapsed_wall_time_s": 12},\n'
-        '  "skill_classification": "shared-general",\n'
-        '  "handoff_target": "skill-author-by-recording",\n'
-        '  "handoff_reasoning": "The route is understood enough to prove via recording."\n'
-        "}\n"
-        "```\n"
-        "CLAWPERATOR_SKILL_START\n"
-        "{"
-        '"id":"com.example.android-version",'
-        '"applicationId":"com.example",'
-        '"intent":"android-version",'
-        '"summary":"Determine Android version",'
-        '"path":"skills/com.example.android-version",'
-        '"skillFile":"skills/com.example.android-version/SKILL.md",'
-        '"scripts":["skills/com.example.android-version/scripts/run.js"],'
-        '"artifacts":[],'
-        '"scriptContents":{"skills/com.example.android-version/scripts/run.js":"console.log(\\"15\\")\\n"}'
-        "}\n"
-        "CLAWPERATOR_SKILL_END\n",
+        (
+            '{"type":"item.completed","item":{"type":"command_execution","command":"node apps/node/dist/cli/index.js skills for-app com.android.settings --json"}}\n'
+            '{"type":"item.completed","item":{"type":"command_execution","command":"node apps/node/dist/cli/index.js authoring-skills list --format json"}}\n'
+            + _valid_discovery_artifact_json(
+                runtime_command="node apps/node/dist/cli/index.js skills for-app com.android.settings --json",
+                authoring_command="node apps/node/dist/cli/index.js authoring-skills list --format json",
+                registry_field="queried_registry_paths",
+            )
+            + "CLAWPERATOR_SKILL_START\n"
+            + _skill_payload_json()
+            + "\n"
+            + "CLAWPERATOR_SKILL_END\n"
+        ),
         encoding="utf-8",
     )
     result = {"run_id": "run-1", "outcome": {"status": "pass"}}
@@ -568,7 +582,11 @@ def test_attach_skill_score_accepts_pack_a_route_evidence(monkeypatch, tmp_path)
     )
 
     assert updated["skill_score"]["authoring_skills_list_seen"] is True
+    assert updated["skill_score"]["runtime_skill_discovery_seen"] is True
+    assert updated["skill_score"]["runtime_skill_discovery_before_authoring"] is True
+    assert updated["skill_score"]["discovery_artifact_count"] == 1
     assert updated["skill_score"]["discovery_artifact_seen"] is True
+    assert updated["skill_score"]["discovery_artifact_valid"] is True
     assert updated["skill_score"]["required_authoring_front_door_seen"] is True
     assert updated["skill_score"]["required_proving_handoff_seen"] is True
     assert updated["skill_score"]["route_requirements_met"] is True
@@ -576,3 +594,237 @@ def test_attach_skill_score_accepts_pack_a_route_evidence(monkeypatch, tmp_path)
     assert updated["skill_score"]["skill_generation_passed"] is True
     assert updated["outcome"]["status"] == "pass"
     assert updated["outcome"]["failure_reason"] is None
+
+
+def test_attach_skill_score_rejects_copied_registry_provenance(monkeypatch, tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "transcript.txt").write_text(
+        (
+            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator skills for-app com.android.settings --json"}}\n'
+            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator authoring-skills list --json"}}\n'
+            + _valid_discovery_artifact_json(
+                runtime_command='clawperator skills search --keyword "Netflix" --json',
+                authoring_command="clawperator authoring-skills list --json",
+            )
+            + "CLAWPERATOR_SKILL_START\n"
+            + _skill_payload_json()
+            + "\nCLAWPERATOR_SKILL_END\n"
+        ),
+        encoding="utf-8",
+    )
+    result = {"run_id": "run-1", "outcome": {"status": "pass"}}
+    env = SimpleNamespace(
+        clawperator_cmd=["node", "/repo/apps/node/dist/cli/index.js"],
+        operator_package="com.clawperator.operator.dev",
+        device_serial="device-123",
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_replay",
+        lambda **kwargs: {
+            "skill_emitted": True,
+            "skill_valid": True,
+            "skill_validation_errors": [],
+            "replay_attempted": True,
+            "replay_status": "pass",
+            "replay_answer_normalized": "15",
+            "replay_answer_correct": True,
+            "replay_wall_clock_s": 1.25,
+        },
+    )
+
+    updated = runner._attach_skill_score(
+        run_dir=run_dir,
+        result=result,
+        spec={
+            "skill_generation": {
+                "replay_timeout_s": 60,
+                "required_authoring_front_door": "skill-author-by-agent-discovery",
+                "required_proving_handoff": "skill-author-by-recording",
+                "target_app_package": "com.android.settings",
+            }
+        },
+        skill_prompt_name="prompt-skill.md",
+        env=env,
+    )
+
+    assert updated["skill_score"]["discovery_artifact_valid"] is False
+    assert updated["skill_score"]["route_requirements_met"] is False
+    assert (
+        "discovery artifact existing_skill_verdict commands must include a runtime-skill discovery command seen in the transcript"
+        in updated["skill_score"]["route_requirement_errors"]
+    )
+    assert updated["outcome"]["status"] == "fail"
+
+
+def test_attach_skill_score_rejects_wrong_package_metadata(monkeypatch, tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "transcript.txt").write_text(
+        (
+            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator skills for-app com.android.settings --json"}}\n'
+            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator authoring-skills list --json"}}\n'
+            + _valid_discovery_artifact_json(package_id="com.example.settings")
+            + "CLAWPERATOR_SKILL_START\n"
+            + _skill_payload_json()
+            + "\nCLAWPERATOR_SKILL_END\n"
+        ),
+        encoding="utf-8",
+    )
+    result = {"run_id": "run-1", "outcome": {"status": "pass"}}
+    env = SimpleNamespace(
+        clawperator_cmd=["node", "/repo/apps/node/dist/cli/index.js"],
+        operator_package="com.clawperator.operator.dev",
+        device_serial="device-123",
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_replay",
+        lambda **kwargs: {
+            "skill_emitted": True,
+            "skill_valid": True,
+            "skill_validation_errors": [],
+            "replay_attempted": True,
+            "replay_status": "pass",
+            "replay_answer_normalized": "15",
+            "replay_answer_correct": True,
+            "replay_wall_clock_s": 1.25,
+        },
+    )
+
+    updated = runner._attach_skill_score(
+        run_dir=run_dir,
+        result=result,
+        spec={
+            "skill_generation": {
+                "replay_timeout_s": 60,
+                "required_authoring_front_door": "skill-author-by-agent-discovery",
+                "required_proving_handoff": "skill-author-by-recording",
+                "target_app_package": "com.android.settings",
+            }
+        },
+        skill_prompt_name="prompt-skill.md",
+        env=env,
+    )
+
+    assert updated["skill_score"]["discovery_artifact_valid"] is False
+    assert updated["skill_score"]["route_requirements_met"] is False
+    assert "discovery artifact target_app_package.package_id must be `com.android.settings`" in updated["skill_score"]["route_requirement_errors"]
+    assert updated["outcome"]["status"] == "fail"
+
+
+def test_attach_skill_score_requires_skill_classification_for_recording_handoff(monkeypatch, tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "transcript.txt").write_text(
+        (
+            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator skills for-app com.android.settings --json"}}\n'
+            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator authoring-skills list --json"}}\n'
+            + _valid_discovery_artifact_json(include_classification=False)
+            + "CLAWPERATOR_SKILL_START\n"
+            + _skill_payload_json()
+            + "\nCLAWPERATOR_SKILL_END\n"
+        ),
+        encoding="utf-8",
+    )
+    result = {"run_id": "run-1", "outcome": {"status": "pass"}}
+    env = SimpleNamespace(
+        clawperator_cmd=["node", "/repo/apps/node/dist/cli/index.js"],
+        operator_package="com.clawperator.operator.dev",
+        device_serial="device-123",
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_replay",
+        lambda **kwargs: {
+            "skill_emitted": True,
+            "skill_valid": True,
+            "skill_validation_errors": [],
+            "replay_attempted": True,
+            "replay_status": "pass",
+            "replay_answer_normalized": "15",
+            "replay_answer_correct": True,
+            "replay_wall_clock_s": 1.25,
+        },
+    )
+
+    updated = runner._attach_skill_score(
+        run_dir=run_dir,
+        result=result,
+        spec={
+            "skill_generation": {
+                "replay_timeout_s": 60,
+                "required_authoring_front_door": "skill-author-by-agent-discovery",
+                "required_proving_handoff": "skill-author-by-recording",
+                "target_app_package": "com.android.settings",
+            }
+        },
+        skill_prompt_name="prompt-skill.md",
+        env=env,
+    )
+
+    assert updated["skill_score"]["discovery_artifact_valid"] is False
+    assert updated["skill_score"]["route_requirements_met"] is False
+    assert (
+        "discovery artifact skill_classification must be `shared-general` or `personalized-local` when recommended_next_step is `proceed_to_recording`"
+        in updated["skill_score"]["route_requirement_errors"]
+    )
+    assert updated["outcome"]["status"] == "fail"
+
+
+def test_attach_skill_score_requires_runtime_discovery_before_authoring(monkeypatch, tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "transcript.txt").write_text(
+        (
+            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator authoring-skills list --json"}}\n'
+            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator skills for-app com.android.settings --json"}}\n'
+            + _valid_discovery_artifact_json()
+            + "CLAWPERATOR_SKILL_START\n"
+            + _skill_payload_json()
+            + "\nCLAWPERATOR_SKILL_END\n"
+        ),
+        encoding="utf-8",
+    )
+    result = {"run_id": "run-1", "outcome": {"status": "pass"}}
+    env = SimpleNamespace(
+        clawperator_cmd=["node", "/repo/apps/node/dist/cli/index.js"],
+        operator_package="com.clawperator.operator.dev",
+        device_serial="device-123",
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_replay",
+        lambda **kwargs: {
+            "skill_emitted": True,
+            "skill_valid": True,
+            "skill_validation_errors": [],
+            "replay_attempted": True,
+            "replay_status": "pass",
+            "replay_answer_normalized": "15",
+            "replay_answer_correct": True,
+            "replay_wall_clock_s": 1.25,
+        },
+    )
+
+    updated = runner._attach_skill_score(
+        run_dir=run_dir,
+        result=result,
+        spec={
+            "skill_generation": {
+                "replay_timeout_s": 60,
+                "required_authoring_front_door": "skill-author-by-agent-discovery",
+                "required_proving_handoff": "skill-author-by-recording",
+                "target_app_package": "com.android.settings",
+            }
+        },
+        skill_prompt_name="prompt-skill.md",
+        env=env,
+    )
+
+    assert updated["skill_score"]["runtime_skill_discovery_seen"] is True
+    assert updated["skill_score"]["runtime_skill_discovery_before_authoring"] is False
+    assert updated["skill_score"]["route_requirements_met"] is False
+    assert "runtime-skill discovery must appear before `clawperator authoring-skills list --json`" in updated["skill_score"]["route_requirement_errors"]
+    assert updated["outcome"]["status"] == "fail"
