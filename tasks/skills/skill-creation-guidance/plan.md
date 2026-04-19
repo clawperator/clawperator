@@ -21,13 +21,30 @@ the shared baseline is stable.
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | in progress |
 | Total PRs | 3 |
 | Total phases | 5 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4, 5 |
-| Current / Next | Phase 1 |
+| Completed | 1, 2 |
+| Remaining | 3, 4, 5 |
+| Current / Next | Phase 3 |
 | Blockers | none |
+
+## Progress Update
+
+- PR-1 is finalized locally.
+- Completed phases:
+  - Phase 1: local author-surface decision and seed rule migration
+  - Phase 2: final main-repo docs routing and `skill-migration.md` clarification
+- PR-1 reviewable commits in `../clawperator-skills`:
+  - `62e3894` `docs(skills): repair local authoring surface entrypoints`
+  - `c7ffa68` `docs(skills): route authoring entrypoints to main docs`
+- Validation completed for PR-1:
+  - Phase 1 validation grep checks
+  - Phase 2 routing and stale-reference checks
+  - `../clawperator-skills/scripts/test_all.sh`
+  - `git diff --check` in both repos
+- Execution details and validation results are recorded in
+  `tasks/skills/skill-creation-guidance/findings.md`.
 
 ## Goal
 

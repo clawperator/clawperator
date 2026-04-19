@@ -19,13 +19,26 @@ Pack A must not begin until PR-2 is merged or finalized locally.
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | in progress |
 | Total PRs | 3 |
 | Total phases | 5 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4, 5 |
-| Current / Next | Phase 1 |
+| Completed | 1, 2 |
+| Remaining | 3, 4, 5 |
+| Current / Next | Phase 3 |
 | Blockers | none |
+
+## Progress Update
+
+- PR-1 is finalized locally in `../clawperator-skills`.
+- Completed phases:
+  - Phase 1 with commit `62e3894` `docs(skills): repair local authoring surface entrypoints`
+  - Phase 2 with commit `c7ffa68` `docs(skills): route authoring entrypoints to main docs`
+- PR-1 validations passed:
+  - Phase 1 grep checks for migrated rule categories, `test_all.sh`, and findings sections
+  - Phase 2 route checks, stale-reference checks, and `../clawperator-skills/docs/` absence check
+  - `../clawperator-skills/scripts/test_all.sh`
+  - `git diff --check` in both repos
+- `tasks/skills/skill-creation-guidance/findings.md` contains the detailed decision log and validation results for Phases 1 and 2.
 
 ## Hard Rules
 
@@ -110,7 +123,7 @@ Read these files IN THIS ORDER before writing anything.
 
 | PR | Repo | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- | --- |
-| PR-1 | `../clawperator-skills` | Repair local author surface and route it to durable main-repo docs | 1, 2 | thinking, default | none |
+| PR-1 | `../clawperator-skills` | Repair local author surface and route it to durable main-repo docs | 1, 2 | thinking, default | done locally |
 | PR-2 | `clawperator` | Add scaffold and validator guardrails, then cross-link main-repo docs | 3, 4 | thinking, default | PR-1 merged or finalized locally |
 | PR-3 | `../clawperator-skills` | Codify the full local checklist, testing matrix, and negative examples | 5 | thinking | PR-2 merged or finalized locally |
 
@@ -134,6 +147,8 @@ these sections:
 This file is an execution log and decision record, not a prewritten placeholder.
 
 ## Phase 1: Local Author-Surface Decision And Seed Rule Migration
+
+Status: completed locally on 2026-04-19
 
 ### Agent Tier
 
@@ -202,6 +217,8 @@ docs(skills): repair local authoring surface entrypoints
 ```
 
 ## Phase 2: Finalize Main-Repo Docs Routing And Clarify `skill-migration.md`
+
+Status: completed locally on 2026-04-19
 
 ### Agent Tier
 
