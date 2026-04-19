@@ -596,6 +596,67 @@ def test_attach_skill_score_accepts_pack_a_route_evidence(monkeypatch, tmp_path)
     assert updated["outcome"]["failure_reason"] is None
 
 
+def test_attach_skill_score_accepts_equivalent_registry_launchers(monkeypatch, tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "transcript.txt").write_text(
+        (
+            '{"type":"item.completed","item":{"type":"command_execution","command":"node apps/node/dist/cli/index.js skills for-app com.android.settings --json"}}\n'
+            '{"type":"item.completed","item":{"type":"command_execution","command":"node apps/node/dist/cli/index.js authoring-skills list --format json"}}\n'
+            + _valid_discovery_artifact_json(
+                runtime_command="clawperator skills for-app com.android.settings --json",
+                authoring_command="clawperator authoring-skills list --json",
+            )
+            + "CLAWPERATOR_SKILL_START\n"
+            + _skill_payload_json()
+            + "\n"
+            + "CLAWPERATOR_SKILL_END\n"
+        ),
+        encoding="utf-8",
+    )
+    result = {"run_id": "run-1", "outcome": {"status": "pass"}}
+    env = SimpleNamespace(
+        clawperator_cmd=["node", "/repo/apps/node/dist/cli/index.js"],
+        operator_package="com.clawperator.operator.dev",
+        device_serial="device-123",
+    )
+
+    monkeypatch.setattr(
+        runner,
+        "run_replay",
+        lambda **kwargs: {
+            "skill_emitted": True,
+            "skill_valid": True,
+            "skill_validation_errors": [],
+            "replay_attempted": True,
+            "replay_status": "pass",
+            "replay_answer_normalized": "15",
+            "replay_answer_correct": True,
+            "replay_wall_clock_s": 1.25,
+        },
+    )
+
+    updated = runner._attach_skill_score(
+        run_dir=run_dir,
+        result=result,
+        spec={
+            "skill_generation": {
+                "replay_timeout_s": 60,
+                "required_authoring_front_door": "skill-author-by-agent-discovery",
+                "required_proving_handoff": "skill-author-by-recording",
+                "target_app_package": "com.android.settings",
+            }
+        },
+        skill_prompt_name="prompt-skill.md",
+        env=env,
+    )
+
+    assert updated["skill_score"]["discovery_artifact_valid"] is True
+    assert updated["skill_score"]["route_requirements_met"] is True
+    assert updated["skill_score"]["skill_generation_passed"] is True
+    assert updated["outcome"]["status"] == "pass"
+
+
 def test_attach_skill_score_rejects_copied_registry_provenance(monkeypatch, tmp_path):
     run_dir = tmp_path / "run"
     run_dir.mkdir()

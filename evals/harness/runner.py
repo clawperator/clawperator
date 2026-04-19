@@ -309,6 +309,50 @@ def _normalize_command_signature(command: str) -> str | None:
     return " ".join(normalized_tokens)
 
 
+def _canonicalize_registry_command_tokens(tokens: list[str]) -> str | None:
+    normalized_tokens = [token.strip().lower() for token in tokens if isinstance(token, str) and token.strip()]
+    if not normalized_tokens:
+        return None
+
+    for index in range(len(normalized_tokens) - 1):
+        token = normalized_tokens[index]
+        next_token = normalized_tokens[index + 1]
+        if token == "skills" and next_token in {"for-app", "search", "get"}:
+            relevant_tokens = normalized_tokens[index:]
+            break
+        if token == "authoring-skills" and next_token == "list":
+            relevant_tokens = normalized_tokens[index:]
+            break
+    else:
+        return None
+
+    canonical_tokens: list[str] = []
+    json_requested = False
+    cursor = 0
+    while cursor < len(relevant_tokens):
+        token = relevant_tokens[cursor]
+        if token == "--json":
+            json_requested = True
+            cursor += 1
+            continue
+        if token in {"--output", "--format"} and cursor + 1 < len(relevant_tokens) and relevant_tokens[cursor + 1] == "json":
+            json_requested = True
+            cursor += 2
+            continue
+        canonical_tokens.append(token)
+        cursor += 1
+    if json_requested:
+        canonical_tokens.append("--json")
+    return " ".join(canonical_tokens)
+
+
+def _canonicalize_registry_command_signature(command: str) -> str | None:
+    normalized_signature = _normalize_command_signature(command)
+    if normalized_signature is None:
+        return None
+    return _canonicalize_registry_command_tokens(normalized_signature.split())
+
+
 def _extract_discovery_artifacts(transcript: str) -> list[tuple[int, dict[str, Any]]]:
     artifacts: list[tuple[int, dict[str, Any]]] = []
     for match in _DISCOVERY_ARTIFACT_FENCE_RE.finditer(transcript):
@@ -405,7 +449,7 @@ def _validate_discovery_artifact(
         else:
             artifact_registry_signatures = {
                 signature
-                for signature in (_normalize_command_signature(command) for command in commands)
+                for signature in (_canonicalize_registry_command_signature(command) for command in commands)
                 if signature is not None
             }
             artifact_runtime_probe_signatures = {
@@ -588,14 +632,14 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
     for line_number, record in command_execution_records:
         if _is_authoring_skills_list_command(record):
             for token_list in _extract_command_token_lists(record):
-                signature = _normalize_command_signature(" ".join(token_list))
+                signature = _canonicalize_registry_command_tokens(token_list)
                 if signature is not None:
                     authoring_skills_list_signatures.add(signature)
         if not _is_runtime_skill_discovery_command(record):
             continue
         runtime_skill_discovery_positions.append(line_number)
         for token_list in _extract_command_token_lists(record):
-            signature = _normalize_command_signature(" ".join(token_list))
+            signature = _canonicalize_registry_command_tokens(token_list)
             if signature is not None:
                 runtime_skill_discovery_signatures.add(signature)
 

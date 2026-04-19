@@ -592,6 +592,26 @@ discovery front door is implemented.
   - validation run for this follow-up:
     - `./validation/install/test_authoring_skills.sh`
     - `./validation/install/test_main.sh`
+- Post-acceptance provenance-equivalence hardening completed locally on
+  2026-04-20:
+  - `evals/harness/runner.py` now compares canonical registry subcommands
+    instead of full launcher strings when validating discovery-artifact
+    provenance
+  - the Pack A scorer now treats these as equivalent when the actual registry
+    subcommand matches:
+    - `clawperator skills ...`
+    - `node .../dist/cli/index.js skills ...`
+    - `clawperator authoring-skills list --json`
+    - `node .../dist/cli/index.js authoring-skills list --format json`
+  - `sites/landing/public/install.sh` now advertises
+    `clawperator authoring-skills list --json` consistently in both the local
+    AGENTS guide and the shared bridge snippet
+  - validation run for this follow-up:
+    - `uv run --project evals --extra dev pytest evals/harness/test_run_eval.py -q`
+    - `uv run --project evals --extra dev pytest evals/harness/test_rescore.py -q`
+    - `./validation/install/test_authoring_skills.sh`
+    - `./validation/install/test_main.sh`
+    - `git diff --check`
 - No blocker remains for this pack.
 - Optional follow-up after review:
   - clean up this task pack with `tasks/skills/task-cleanup/` once the branch

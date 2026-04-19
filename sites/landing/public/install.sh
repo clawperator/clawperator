@@ -1150,7 +1150,7 @@ EOF
 
 Recommended no-match flow:
 - Start with `clawperator skills for-app <package_id>` or `clawperator skills search --keyword "<term>"`
-- If there is no relevant runtime-skill match, inspect `clawperator authoring-skills list`
+- If there is no relevant runtime-skill match, inspect `clawperator authoring-skills list --json`
 - Start the guided route with `skill-author-by-agent-discovery`
 - Use `skill-author-by-recording` only after discovery returns `proceed_to_recording`
 EOF
@@ -1246,7 +1246,7 @@ const bridgeBlock = [
   "- `clawperator skills for-app <package_id>`",
   "- `clawperator skills search --keyword \"<term>\"`",
   "- `clawperator skills get <skill_id>`",
-  "- `clawperator authoring-skills list`",
+  "- `clawperator authoring-skills list --json`",
   "",
   "If runtime-skill discovery finds no relevant match, follow the local guide for the authoring front doors installed on this host.",
   "Confirm the local guide lists both `skill-author-by-agent-discovery` and `skill-author-by-recording` before starting the discovery-to-proving route.",
