@@ -58,12 +58,26 @@ follow-up routing decisions needed for Phase 2.
 
 ## Mechanical guardrails shipped
 
-- None in Phase 1.
-- Phase 1 records the intended Phase 3 guardrail scope only:
-  - scaffold output should use `resolveClawperatorBin`
-  - static validation should cover `clawperator-skill-type`
-  - static validation should cover generated-index freshness without failing on
-    timestamp-only churn
+- Phase 3 shipped these guardrails in `clawperator`:
+  - `scaffoldSkill.ts` now emits exemplar-style helper usage with
+    `resolveClawperatorBin` and `resolveOperatorPackage` instead of calling the
+    bare `"clawperator"` string directly
+  - scaffolded `SKILL.md` files now include
+    `clawperator-skill-type: replay` in frontmatter so the low-level scaffold
+    stays immediately valid under the active convention
+  - `validateSkill.ts` now rejects missing `clawperator-skill-type` frontmatter
+  - `validateSkill.ts` now rejects unsupported `clawperator-skill-type` values
+    and enforces `replay` and `orchestrated` as the active convention
+  - the only temporary compatibility path preserved is
+    `au.com.polyaire.airtouch5.set-zone-state` with
+    `clawperator-skill-type: script`
+  - `validateSkill.ts` now checks generator-owned outputs for stale registry
+    drift when the repo contains `scripts/generate_skill_indexes.sh`
+  - generated-index freshness ignores timestamp-only churn such as
+    `generatedAt`
+  - bundled Node test fixtures that exercise validation and skill execution now
+    carry explicit `clawperator-skill-type` frontmatter so the new validation
+    floor does not force unrelated run-path tests through a false failure mode
 
 ## Testing matrix decisions
 
@@ -81,6 +95,13 @@ follow-up routing decisions needed for Phase 2.
 - The full authored-skill testing matrix still belongs to later phases:
   colocated `*.test.js` expectations, `skills validate`, and live-device proof
   boundaries are not fully closed in Phase 1.
+- Phase 3 regression coverage now explicitly proves:
+  - scaffold output contains `resolveClawperatorBin`
+  - missing and invalid `clawperator-skill-type` fail validation
+  - `replay` and `orchestrated` pass validation
+  - the one allowlisted `script` skill still passes while other `script` values fail
+  - stale generated indexes fail validation with a rerun message
+  - timestamp-only generated drift does not fail freshness checks
 
 ## Discoverability routes
 
@@ -102,6 +123,10 @@ follow-up routing decisions needed for Phase 2.
 - `rg -n "README link decision|Current local author surface|Discoverability routes" tasks/skills/skill-creation-guidance/findings.md`
 - `git diff --check` in `../clawperator-skills`
 - `git diff --check` in `clawperator`
+- `npm --prefix apps/node run build`
+- `npm --prefix apps/node run test`
+- `rg -n "resolveClawperatorBin" apps/node/src/domain/skills/scaffoldSkill.ts`
+- `rg -n "clawperator-skill-type|generate_skill_indexes.sh" apps/node/src/domain/skills/validateSkill.ts`
 
 Phase 1 validation result on 2026-04-19:
 
@@ -120,6 +145,15 @@ Phase 2 validation result on 2026-04-19:
 - Verified the old missing local-doc names no longer appear in README or AGENTS.
 - `../clawperator-skills/scripts/test_all.sh` passed with 14 tests green.
 - `git diff --check` passed in both repositories after the Phase 2 edits.
+
+Phase 3 validation result on 2026-04-19:
+
+- `npm --prefix apps/node run build` passed.
+- `npm --prefix apps/node run test` passed with 1067 tests green.
+- Verified scaffold source now contains `resolveClawperatorBin`.
+- Verified validator source now contains both `clawperator-skill-type` and
+  `generate_skill_indexes.sh` checks.
+- `git diff --check` passed before the Phase 3 commit path.
 
 ## Observations
 
@@ -142,10 +176,14 @@ Phase 2 validation result on 2026-04-19:
   the stable plan decision not to create `../clawperator-skills/docs/`.
 - No Phase 2 code or docs blocker surfaced once the final routing destinations
   were made explicit.
+- Phase 3 widened the touched file set beyond the three headline implementation
+  files because bundled Node test fixtures needed `SKILL.md` frontmatter to
+  stay truthful under the new validator rule. That fixture update is part of
+  keeping the regression suite aligned with shipped behavior, not a plan change.
 
 ## Deferred follow-up
 
-- Phase 3 should add the scaffold and validator guardrails without widening into
-  runtime parser enforcement.
+- Phase 4 should update the public docs to describe the validator boundary and
+  the skills-repo test route without copying the full local checklist.
 - Phase 5 should expand the local checklist into the full testing matrix and
   negative-example guidance.

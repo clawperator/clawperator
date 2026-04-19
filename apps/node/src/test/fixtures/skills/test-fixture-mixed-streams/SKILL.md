@@ -1,2 +1,7 @@
-# Mixed Streams Fixture
+---
+name: test-fixture-mixed-streams
+clawperator-skill-type: replay
+description: Test fixture for mixed stdout and stderr streaming behavior.
+---
 
+# Mixed Streams Fixture

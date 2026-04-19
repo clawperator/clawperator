@@ -1,5 +1,6 @@
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { createHash } from "node:crypto";
 import {
   loadRegistry,
   findSkillById,
@@ -23,6 +24,19 @@ import {
 
 const SKILL_DRY_RUN_SKIP_REASON =
   "skill has no pre-compiled artifacts; payload is generated at runtime by the skill script";
+const VALID_SKILL_TYPES = new Set(["replay", "orchestrated"]);
+const SKILL_TYPE_COMPAT_ALLOWLIST = new Map([
+  ["au.com.polyaire.airtouch5.set-zone-state", "script"],
+]);
+
+interface GeneratedIndexArtifactsSnapshot {
+  registry: unknown;
+  minIndex: unknown;
+  jsonl: unknown[];
+  manifest: unknown;
+  byApp: Record<string, unknown>;
+  byPrefix: Record<string, unknown>;
+}
 
 export interface ValidateSkillDryRunSkipped {
   payloadValidation: "skipped";
@@ -134,6 +148,298 @@ function findUnsupportedContractInputSchemas(skill: SkillEntry): string[] {
     .map(([inputName]) => inputName);
 }
 
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function extractFrontmatterBlock(rawSkillFile: string): string | null {
+  const match = rawSkillFile.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  return match ? match[1] : null;
+}
+
+function normalizeSkillTypeValue(rawValue: string): string {
+  const trimmed = rawValue.trim();
+  if (
+    (trimmed.startsWith("\"") && trimmed.endsWith("\""))
+    || (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
+function readSkillTypeFrontmatter(rawSkillFile: string): string | undefined {
+  const frontmatter = extractFrontmatterBlock(rawSkillFile);
+  if (frontmatter === null) {
+    return undefined;
+  }
+
+  const match = frontmatter.match(/^clawperator-skill-type:\s*([^\r\n#]+?)\s*(?:#.*)?$/m);
+  if (!match) {
+    return undefined;
+  }
+
+  const normalized = normalizeSkillTypeValue(match[1] ?? "");
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function validateSkillTypeFrontmatter(
+  skill: SkillEntry,
+  skillFilePath: string,
+  rawSkillFile: string,
+): ValidateSkillError | null {
+  const skillType = readSkillTypeFrontmatter(rawSkillFile);
+  if (skillType === undefined) {
+    return {
+      ok: false,
+      code: SKILL_VALIDATION_FAILED,
+      message: `Skill ${skill.id} is missing required clawperator-skill-type frontmatter`,
+      details: {
+        path: skillFilePath,
+        missingFields: ["clawperator-skill-type"],
+        reason: "SKILL.md frontmatter must declare clawperator-skill-type: replay or orchestrated.",
+      },
+    };
+  }
+
+  if (VALID_SKILL_TYPES.has(skillType)) {
+    return null;
+  }
+
+  const allowlistedType = SKILL_TYPE_COMPAT_ALLOWLIST.get(skill.id);
+  if (allowlistedType === skillType) {
+    return null;
+  }
+
+  return {
+    ok: false,
+    code: SKILL_VALIDATION_FAILED,
+    message: `Skill ${skill.id} has an unsupported clawperator-skill-type frontmatter value`,
+    details: {
+      path: skillFilePath,
+      reason: `Expected clawperator-skill-type to be replay or orchestrated; found ${JSON.stringify(skillType)}.`,
+    },
+  };
+}
+
+function sortSkillsForGeneratedArtifacts(skills: SkillEntry[]): SkillEntry[] {
+  return [...skills].sort((left, right) => left.id.localeCompare(right.id));
+}
+
+function getSkillPrefixShard(skillId: string): string {
+  return createHash("sha1").update(skillId).digest("hex").slice(0, 2);
+}
+
+function stripGeneratedArtifactNoise(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => stripGeneratedArtifactNoise(entry));
+  }
+
+  if (typeof value !== "object" || value === null) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => key !== "generatedAt" && key !== "sha256")
+      .map(([key, entryValue]) => [key, stripGeneratedArtifactNoise(entryValue)])
+  );
+}
+
+function buildExpectedGeneratedArtifacts(registry: { skills: SkillEntry[] }): GeneratedIndexArtifactsSnapshot {
+  const sortedSkills = sortSkillsForGeneratedArtifacts(registry.skills);
+  const appIds = Array.from(new Set(sortedSkills.map((skill) => skill.applicationId))).sort();
+  const prefixMap = new Map<string, SkillEntry[]>();
+
+  for (const skill of sortedSkills) {
+    const prefix = getSkillPrefixShard(skill.id);
+    const existing = prefixMap.get(prefix) ?? [];
+    existing.push(skill);
+    prefixMap.set(prefix, existing);
+  }
+
+  const sortedPrefixes = Array.from(prefixMap.keys()).sort();
+  const byApp = Object.fromEntries(appIds.map((applicationId) => {
+    const filteredSkills = sortedSkills.filter((skill) => skill.applicationId === applicationId);
+    return [
+      `${applicationId}.json`,
+      {
+        schemaVersion: "1.0",
+        applicationId,
+        count: filteredSkills.length,
+        skills: filteredSkills,
+      },
+    ];
+  }));
+  const byPrefix = Object.fromEntries(sortedPrefixes.map((prefix) => {
+    const filteredSkills = prefixMap.get(prefix) ?? [];
+    return [
+      `${prefix}.json`,
+      {
+        schemaVersion: "1.0",
+        prefix,
+        count: filteredSkills.length,
+        skills: filteredSkills,
+      },
+    ];
+  }));
+
+  return {
+    registry: {
+      $schema: "./skills-registry.schema.json",
+      schemaVersion: "1.0",
+      skills: sortedSkills,
+    },
+    minIndex: {
+      schemaVersion: "1.0",
+      count: sortedSkills.length,
+      skills: sortedSkills.map((skill) => ({
+        id: skill.id,
+        applicationId: skill.applicationId,
+        intent: skill.intent,
+        summary: skill.summary,
+        path: skill.path,
+      })),
+    },
+    jsonl: sortedSkills,
+    manifest: {
+      schemaVersion: "1.0",
+      totalSkills: sortedSkills.length,
+      artifacts: {
+        registry: { file: "skills/skills-registry.json", count: sortedSkills.length },
+        minIndex: { file: "skills/generated/skills-index.min.json", count: sortedSkills.length },
+        jsonlIndex: { file: "skills/generated/skills-index.jsonl", count: sortedSkills.length },
+      },
+      shards: {
+        byApp: appIds.map((applicationId) => ({
+          applicationId,
+          file: `skills/generated/by-app/${applicationId}.json`,
+          count: sortedSkills.filter((skill) => skill.applicationId === applicationId).length,
+        })),
+        byPrefix: sortedPrefixes.map((prefix) => ({
+          prefix,
+          file: `skills/generated/by-prefix/${prefix}.json`,
+          count: (prefixMap.get(prefix) ?? []).length,
+        })),
+      },
+    },
+    byApp,
+    byPrefix,
+  };
+}
+
+async function readJsonFile(path: string): Promise<unknown> {
+  return JSON.parse(await readFile(path, "utf8")) as unknown;
+}
+
+async function readJsonlFile(path: string): Promise<unknown[]> {
+  const raw = await readFile(path, "utf8");
+  return raw
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0)
+    .map((line) => JSON.parse(line) as unknown);
+}
+
+async function readGeneratedShardDirectory(directoryPath: string): Promise<Record<string, unknown>> {
+  const entries = (await readdir(directoryPath))
+    .filter((entry) => entry.endsWith(".json"))
+    .sort();
+
+  const pairs = await Promise.all(entries.map(async (entry) => {
+    const path = join(directoryPath, entry);
+    return [entry, await readJsonFile(path)] as const;
+  }));
+
+  return Object.fromEntries(pairs);
+}
+
+function areGeneratedArtifactsEqual(actual: unknown, expected: unknown): boolean {
+  return JSON.stringify(normalizeStableJsonValue(stripGeneratedArtifactNoise(actual)))
+    === JSON.stringify(normalizeStableJsonValue(stripGeneratedArtifactNoise(expected)));
+}
+
+function buildGeneratedArtifactsStaleError(path: string, detail: string): ValidateSkillError {
+  return {
+    ok: false,
+    code: SKILL_VALIDATION_FAILED,
+    message: "Generated skill indexes are stale. Rerun scripts/generate_skill_indexes.sh in the skills repo.",
+    details: {
+      path,
+      reason: detail,
+    },
+  };
+}
+
+async function validateGeneratedArtifactsFresh(
+  registry: { skills: SkillEntry[] },
+  resolvedRegistryPath: string,
+): Promise<ValidateSkillError | null> {
+  const repoRoot = getRepoRoot(resolvedRegistryPath);
+  const generatorScriptPath = join(repoRoot, "scripts", "generate_skill_indexes.sh");
+  if (!(await fileExists(generatorScriptPath))) {
+    return null;
+  }
+
+  const generatedRoot = join(repoRoot, "skills", "generated");
+  const minIndexPath = join(generatedRoot, "skills-index.min.json");
+  const jsonlPath = join(generatedRoot, "skills-index.jsonl");
+  const manifestPath = join(generatedRoot, "manifest.json");
+  const byAppDir = join(generatedRoot, "by-app");
+  const byPrefixDir = join(generatedRoot, "by-prefix");
+
+  const requiredPaths = [resolvedRegistryPath, minIndexPath, jsonlPath, manifestPath, byAppDir, byPrefixDir];
+  for (const path of requiredPaths) {
+    if (!(await fileExists(path))) {
+      return buildGeneratedArtifactsStaleError(
+        path,
+        `Missing generator-owned artifact at ${path}. Rerun scripts/generate_skill_indexes.sh in the skills repo.`,
+      );
+    }
+  }
+
+  try {
+    const expected = buildExpectedGeneratedArtifacts(registry);
+    const actual = {
+      registry: await readJsonFile(resolvedRegistryPath),
+      minIndex: await readJsonFile(minIndexPath),
+      jsonl: await readJsonlFile(jsonlPath),
+      manifest: await readJsonFile(manifestPath),
+      byApp: await readGeneratedShardDirectory(byAppDir),
+      byPrefix: await readGeneratedShardDirectory(byPrefixDir),
+    };
+
+    const comparisons: Array<{ label: string; path: string; actualValue: unknown; expectedValue: unknown }> = [
+      { label: "skills-registry.json", path: resolvedRegistryPath, actualValue: actual.registry, expectedValue: expected.registry },
+      { label: "skills-index.min.json", path: minIndexPath, actualValue: actual.minIndex, expectedValue: expected.minIndex },
+      { label: "skills-index.jsonl", path: jsonlPath, actualValue: actual.jsonl, expectedValue: expected.jsonl },
+      { label: "manifest.json", path: manifestPath, actualValue: actual.manifest, expectedValue: expected.manifest },
+      { label: "generated by-app shards", path: byAppDir, actualValue: actual.byApp, expectedValue: expected.byApp },
+      { label: "generated by-prefix shards", path: byPrefixDir, actualValue: actual.byPrefix, expectedValue: expected.byPrefix },
+    ];
+
+    for (const comparison of comparisons) {
+      if (!areGeneratedArtifactsEqual(comparison.actualValue, comparison.expectedValue)) {
+        return buildGeneratedArtifactsStaleError(
+          comparison.path,
+          `${comparison.label} do not match the current registry contents. Rerun scripts/generate_skill_indexes.sh in the skills repo.`,
+        );
+      }
+    }
+
+    return null;
+  } catch (error) {
+    return buildGeneratedArtifactsStaleError(
+      generatorScriptPath,
+      `Could not verify generated skill indexes: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
 async function validateLoadedSkill(
   skill: SkillEntry,
   resolvedRegistryPath: string,
@@ -206,6 +512,7 @@ async function validateLoadedSkill(
   }
 
   const raw = await readFile(skillJsonPath, "utf8");
+  const rawSkillFile = await readFile(skillFilePath, "utf8");
   let parsed: Partial<SkillEntry>;
   try {
     parsed = JSON.parse(raw) as Partial<SkillEntry>;
@@ -245,6 +552,11 @@ async function validateLoadedSkill(
         mismatchFields,
       },
     };
+  }
+
+  const skillTypeValidation = validateSkillTypeFrontmatter(skill, skillFilePath, rawSkillFile);
+  if (skillTypeValidation !== null) {
+    return skillTypeValidation;
   }
 
   const manifestResult = parseSkillManifestMetadata(skillJsonPath, parsed);
@@ -386,6 +698,10 @@ export async function validateSkill(
     if (!skill) {
       return { ok: false, code: SKILL_NOT_FOUND, message: `Skill not found: ${skillId}` };
     }
+    const generatedArtifactsValidation = await validateGeneratedArtifactsFresh(loaded.registry, loaded.resolvedPath);
+    if (generatedArtifactsValidation !== null) {
+      return generatedArtifactsValidation;
+    }
     return await validateLoadedSkill(skill, loaded.resolvedPath, options);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
@@ -399,6 +715,26 @@ export async function validateAllSkills(
 ): Promise<ValidateAllSkillsResult | ValidateAllSkillsError> {
   try {
     const loaded = await loadRegistry(registryPath);
+    const generatedArtifactsValidation = await validateGeneratedArtifactsFresh(loaded.registry, loaded.resolvedPath);
+    if (generatedArtifactsValidation !== null) {
+      return {
+        ok: false,
+        code: generatedArtifactsValidation.code,
+        message: generatedArtifactsValidation.message,
+        registryPath: loaded.resolvedPath,
+        details: {
+          totalSkills: loaded.registry.skills.length,
+          validCount: 0,
+          invalidCount: loaded.registry.skills.length,
+          failures: [{
+            skillId: "<generated-indexes>",
+            code: generatedArtifactsValidation.code,
+            message: generatedArtifactsValidation.message,
+            details: generatedArtifactsValidation.details,
+          }],
+        },
+      };
+    }
     const validSkills: ValidateAllSkillsResult["validSkills"] = [];
     const failures: NonNullable<ValidateAllSkillsError["details"]>["failures"] = [];
 

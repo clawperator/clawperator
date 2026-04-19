@@ -82,6 +82,7 @@ An external agent or human author must write the reusable skill logic.
 
   return `---
 name: ${skillId}
+clawperator-skill-type: replay
 description: |-
 ${indentYamlBlockScalar(summary, 2)}
 ---
@@ -114,14 +115,18 @@ node "$DIR/run.js" "$@"
 function buildScriptTemplate(skillId: string, applicationId: string): string {
   return `#!/usr/bin/env node
 
-import { execFileSync } from "node:child_process";
+const { execFileSync } = require("node:child_process");
+const { resolveClawperatorBin, resolveOperatorPackage } = require("../../utils/common.js");
 
-const [, , deviceId, operatorPackage = process.env.CLAWPERATOR_OPERATOR_PACKAGE || "com.clawperator.operator"] = process.argv;
+const [, , deviceId, operatorPackageArg] = process.argv;
 
 if (!deviceId) {
   console.error("Usage: node run.js <device_id> [operator_package]");
   process.exit(1);
 }
+
+const operatorPackage = resolveOperatorPackage(operatorPackageArg);
+const resolvedClawperatorBin = resolveClawperatorBin();
 
 const execution = {
   commandId: "${skillId}-" + Date.now(),
@@ -140,8 +145,9 @@ const execution = {
 
 try {
   const stdout = execFileSync(
-    "clawperator",
+    resolvedClawperatorBin.cmd,
     [
+      ...resolvedClawperatorBin.args,
       "exec",
       "--device",
       deviceId,
