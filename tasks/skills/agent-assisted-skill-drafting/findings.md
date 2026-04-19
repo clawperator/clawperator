@@ -490,6 +490,39 @@ discovery front door is implemented.
 
 ## Deferred follow-up
 
+- Post-acceptance review hardening completed locally on 2026-04-19:
+  - the review note claiming Samsung proof was still missing was stale by this
+    point because commit `1db2cb8` had already recorded the accepted Samsung
+    and AOSP reruns
+  - `evals/harness/runner.py` now enforces the Pack A route fields during
+    skill scoring:
+    - `required_authoring_front_door`
+    - `required_proving_handoff`
+    - transcript evidence for `clawperator authoring-skills list --json`
+  - the saved `skill_score` now records:
+    - `route_requirements_met`
+    - `route_requirement_errors`
+    - `skill_generation_passed`
+    so a direct bypass of `skill-author-by-agent-discovery` no longer counts as
+    a green Pack A skill-generation result
+  - `sites/landing/public/install.sh` now advertises
+    `skill-author-by-agent-discovery` only when it is actually installed on the
+    host and falls back to repair guidance when the packaged front doors are
+    incomplete
+  - `validation/install/test_authoring_skills.sh`,
+    `validation/install/test_main.sh`, and the aggregate
+    `validation/install/test_install.sh` now cover:
+    - both packaged authoring skills
+    - the discovery-first no-match guidance
+    - the partial-install fallback when the discovery front door is missing
+  - validation run for this follow-up:
+    - `uv run --project evals --extra dev pytest evals/harness/test_run_eval.py -q`
+    - `uv run --project evals --extra dev pytest evals/harness/test_rescore.py -q`
+    - `./validation/install/test_authoring_skills.sh`
+    - `./validation/install/test_main.sh`
+    - `./validation/install/test_install.sh`
+    - `./gradlew app:assembleDebug app:testDebugUnitTest`
+    - `git diff --check`
 - No blocker remains for this pack.
 - Optional follow-up after review:
   - clean up this task pack with `tasks/skills/task-cleanup/` once the branch

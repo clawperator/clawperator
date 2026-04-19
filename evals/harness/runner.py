@@ -179,6 +179,98 @@ def _write_json_file(path: Path, payload: dict[str, Any]) -> None:
     temp_path.replace(path)
 
 
+def _iter_nested_text_values(value: Any):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, list):
+        for item in value:
+            yield from _iter_nested_text_values(item)
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from _iter_nested_text_values(item)
+
+
+def _iter_transcript_evidence_strings(transcript: str):
+    for raw_line in transcript.splitlines():
+        stripped = raw_line.strip()
+        if stripped:
+            yield stripped
+        try:
+            payload = json.loads(raw_line)
+        except json.JSONDecodeError:
+            continue
+        for text in _iter_nested_text_values(payload):
+            normalized = text.strip()
+            if normalized:
+                yield normalized
+
+
+def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -> dict[str, Any]:
+    required_authoring_front_door = (
+        skill_generation.get("required_authoring_front_door").strip()
+        if isinstance(skill_generation, dict) and isinstance(skill_generation.get("required_authoring_front_door"), str)
+        else None
+    )
+    required_proving_handoff = (
+        skill_generation.get("required_proving_handoff").strip()
+        if isinstance(skill_generation, dict) and isinstance(skill_generation.get("required_proving_handoff"), str)
+        else None
+    )
+
+    authoring_skills_list_seen = False
+    required_authoring_front_door_seen = required_authoring_front_door is None
+    required_proving_handoff_seen = required_proving_handoff is None
+
+    required_authoring_front_door_token = required_authoring_front_door.lower() if required_authoring_front_door else None
+    required_proving_handoff_token = required_proving_handoff.lower() if required_proving_handoff else None
+
+    for candidate in _iter_transcript_evidence_strings(transcript):
+        lowered = candidate.lower()
+        if "authoring-skills list" in lowered:
+            authoring_skills_list_seen = True
+        if required_authoring_front_door_token is not None and required_authoring_front_door_token in lowered:
+            required_authoring_front_door_seen = True
+        if required_proving_handoff_token is not None and required_proving_handoff_token in lowered:
+            required_proving_handoff_seen = True
+
+    route_requirement_errors: list[str] = []
+    if required_authoring_front_door is not None or required_proving_handoff is not None:
+        if not authoring_skills_list_seen:
+            route_requirement_errors.append("missing transcript evidence for `clawperator authoring-skills list --json`")
+    if required_authoring_front_door is not None and not required_authoring_front_door_seen:
+        route_requirement_errors.append(
+            f"missing transcript evidence for required_authoring_front_door `{required_authoring_front_door}`"
+        )
+    if required_proving_handoff is not None and not required_proving_handoff_seen:
+        route_requirement_errors.append(
+            f"missing transcript evidence for required_proving_handoff `{required_proving_handoff}`"
+        )
+
+    return {
+        "required_authoring_front_door": required_authoring_front_door,
+        "required_proving_handoff": required_proving_handoff,
+        "authoring_skills_list_seen": authoring_skills_list_seen,
+        "required_authoring_front_door_seen": required_authoring_front_door_seen,
+        "required_proving_handoff_seen": required_proving_handoff_seen,
+        "route_requirements_met": len(route_requirement_errors) == 0,
+        "route_requirement_errors": route_requirement_errors,
+    }
+
+
+def _apply_skill_generation_contract(skill_score: dict[str, Any], transcript: str, skill_generation: Any) -> dict[str, Any]:
+    next_skill_score = dict(skill_score)
+    route_requirements = _evaluate_skill_route_requirements(transcript, skill_generation)
+    next_skill_score.update(route_requirements)
+    next_skill_score["skill_generation_passed"] = bool(
+        next_skill_score.get("skill_emitted")
+        and next_skill_score.get("skill_valid")
+        and next_skill_score.get("replay_status") == "pass"
+        and next_skill_score.get("replay_answer_correct")
+        and next_skill_score.get("route_requirements_met")
+    )
+    return next_skill_score
+
+
 def _replay_error_skill_score(
     error: Exception,
     *,
@@ -248,6 +340,7 @@ def _attach_skill_score(
             skill_valid=skill_valid,
             skill_validation_errors=skill_validation_errors,
         )
+    skill_score = _apply_skill_generation_contract(skill_score, transcript, skill_generation)
     replay_result = dict(result)
     replay_result["skill_score"] = skill_score
     _write_json_file(run_dir / "result.json", replay_result)

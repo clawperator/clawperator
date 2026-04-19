@@ -421,3 +421,138 @@ def test_attach_skill_score_records_replay_error_without_raising(monkeypatch, tm
     assert saved["skill_score"]["replay_status"] == "error"
     assert saved["skill_score"]["skill_emitted"] is True
     assert saved["skill_score"]["skill_valid"] is True
+
+
+def test_attach_skill_score_requires_pack_a_route_evidence(monkeypatch, tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "transcript.txt").write_text(
+        "CLAWPERATOR_SKILL_START\n"
+        "{"
+        '"id":"com.example.android-version",'
+        '"applicationId":"com.example",'
+        '"intent":"android-version",'
+        '"summary":"Determine Android version",'
+        '"path":"skills/com.example.android-version",'
+        '"skillFile":"skills/com.example.android-version/SKILL.md",'
+        '"scripts":["skills/com.example.android-version/scripts/run.js"],'
+        '"artifacts":[],'
+        '"scriptContents":{"skills/com.example.android-version/scripts/run.js":"console.log(\\"15\\")\\n"}'
+        "}\n"
+        "CLAWPERATOR_SKILL_END\n",
+        encoding="utf-8",
+    )
+    result = {"run_id": "run-1", "outcome": {"status": "pass"}}
+    env = SimpleNamespace(
+        clawperator_cmd=["node", "/repo/apps/node/dist/cli/index.js"],
+        operator_package="com.clawperator.operator.dev",
+        device_serial="device-123",
+    )
+
+    monkeypatch.setattr(
+        runner,
+        "run_replay",
+        lambda **kwargs: {
+            "skill_emitted": True,
+            "skill_valid": True,
+            "skill_validation_errors": [],
+            "replay_attempted": True,
+            "replay_status": "pass",
+            "replay_answer_normalized": "15",
+            "replay_answer_correct": True,
+            "replay_wall_clock_s": 1.25,
+        },
+    )
+
+    updated = runner._attach_skill_score(
+        run_dir=run_dir,
+        result=result,
+        spec={
+            "skill_generation": {
+                "replay_timeout_s": 60,
+                "required_authoring_front_door": "skill-author-by-agent-discovery",
+                "required_proving_handoff": "skill-author-by-recording",
+            }
+        },
+        skill_prompt_name="prompt-skill.md",
+        env=env,
+    )
+
+    assert updated["skill_score"]["route_requirements_met"] is False
+    assert updated["skill_score"]["authoring_skills_list_seen"] is False
+    assert updated["skill_score"]["required_authoring_front_door_seen"] is False
+    assert updated["skill_score"]["required_proving_handoff_seen"] is False
+    assert updated["skill_score"]["skill_generation_passed"] is False
+    assert (
+        updated["skill_score"]["route_requirement_errors"]
+        == [
+            "missing transcript evidence for `clawperator authoring-skills list --json`",
+            "missing transcript evidence for required_authoring_front_door `skill-author-by-agent-discovery`",
+            "missing transcript evidence for required_proving_handoff `skill-author-by-recording`",
+        ]
+    )
+
+
+def test_attach_skill_score_accepts_pack_a_route_evidence(monkeypatch, tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "transcript.txt").write_text(
+        '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator authoring-skills list --json"}}\n'
+        '{"type":"item.completed","item":{"type":"agent_message","text":"Discovery route: skill-author-by-agent-discovery -> skill-author-by-recording"}}\n'
+        "CLAWPERATOR_SKILL_START\n"
+        "{"
+        '"id":"com.example.android-version",'
+        '"applicationId":"com.example",'
+        '"intent":"android-version",'
+        '"summary":"Determine Android version",'
+        '"path":"skills/com.example.android-version",'
+        '"skillFile":"skills/com.example.android-version/SKILL.md",'
+        '"scripts":["skills/com.example.android-version/scripts/run.js"],'
+        '"artifacts":[],'
+        '"scriptContents":{"skills/com.example.android-version/scripts/run.js":"console.log(\\"15\\")\\n"}'
+        "}\n"
+        "CLAWPERATOR_SKILL_END\n",
+        encoding="utf-8",
+    )
+    result = {"run_id": "run-1", "outcome": {"status": "pass"}}
+    env = SimpleNamespace(
+        clawperator_cmd=["node", "/repo/apps/node/dist/cli/index.js"],
+        operator_package="com.clawperator.operator.dev",
+        device_serial="device-123",
+    )
+
+    monkeypatch.setattr(
+        runner,
+        "run_replay",
+        lambda **kwargs: {
+            "skill_emitted": True,
+            "skill_valid": True,
+            "skill_validation_errors": [],
+            "replay_attempted": True,
+            "replay_status": "pass",
+            "replay_answer_normalized": "15",
+            "replay_answer_correct": True,
+            "replay_wall_clock_s": 1.25,
+        },
+    )
+
+    updated = runner._attach_skill_score(
+        run_dir=run_dir,
+        result=result,
+        spec={
+            "skill_generation": {
+                "replay_timeout_s": 60,
+                "required_authoring_front_door": "skill-author-by-agent-discovery",
+                "required_proving_handoff": "skill-author-by-recording",
+            }
+        },
+        skill_prompt_name="prompt-skill.md",
+        env=env,
+    )
+
+    assert updated["skill_score"]["authoring_skills_list_seen"] is True
+    assert updated["skill_score"]["required_authoring_front_door_seen"] is True
+    assert updated["skill_score"]["required_proving_handoff_seen"] is True
+    assert updated["skill_score"]["route_requirements_met"] is True
+    assert updated["skill_score"]["route_requirement_errors"] == []
+    assert updated["skill_score"]["skill_generation_passed"] is True
