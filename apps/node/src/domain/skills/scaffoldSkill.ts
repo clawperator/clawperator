@@ -124,6 +124,8 @@ function parseCommandSpec(commandSpec) {
   let current = "";
   let quote = null;
 
+  // The generated run.js compares literal runtime characters here; the
+  // backslashes in this template string only escape the embedded source.
   for (let index = 0; index < commandSpec.length; index += 1) {
     const char = commandSpec[index];
 

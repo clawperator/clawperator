@@ -61,7 +61,7 @@ repository, use these surfaces together:
   for the repo-local checklist and recurring review failures
 - `./scripts/test_all.sh` in `clawperator-skills` for off-device `node --test`
   runs on pure JS helper, parser, normalizer, and output-shaping logic
-- `./scripts/generate_skill_indexes.sh` in `clawperator-skills` whenever
+- run `./scripts/generate_skill_indexes.sh` in `clawperator-skills` whenever
   registry-linked metadata changes
 
 Use this page for the durable workflow and contract rules. Use the
