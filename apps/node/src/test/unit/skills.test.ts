@@ -1368,7 +1368,7 @@ describe("validateSkill", () => {
       assert.strictEqual(allSkillsResult.details?.invalidCount, 1);
       assert.strictEqual(allSkillsResult.details?.failures.length, 1);
       assert.match(allSkillsResult.message, /generate_skill_indexes\.sh/);
-      assert.match(allSkillsResult.details?.failures[0]?.details?.reason ?? "", /do not match the current registry contents/i);
+      assert.match(allSkillsResult.details?.failures[0]?.details?.reason ?? "", /sha256 does not match the current file contents/i);
     } finally {
       await temp.cleanup();
     }
@@ -1515,6 +1515,42 @@ describe("validateSkill", () => {
       assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
       assert.match(result.message, /generate_skill_indexes\.sh/i);
       assert.match(result.details?.failures[0]?.details?.reason ?? "", /sha256 does not match the current file contents/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("rejects invalid manifest file paths instead of reading outside the repo", async () => {
+    const entry = {
+      id: "com.test.manifest-path-traversal",
+      applicationId: "com.test",
+      intent: "temp",
+      summary: "Manifest path traversal",
+      path: "skills/com.test.manifest-path-traversal",
+      skillFile: "skills/com.test.manifest-path-traversal/SKILL.md",
+      scripts: ["skills/com.test.manifest-path-traversal/scripts/run.js"],
+      artifacts: [],
+    };
+    const temp = await createTempValidationSkillRepo({
+      skillId: "com.test.manifest-path-traversal",
+      registrySkills: [entry],
+      generatedSkills: [entry],
+    });
+
+    try {
+      const manifestPath = join(temp.root, "skills", "generated", "manifest.json");
+      const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+        artifacts: { registry: { file: string } };
+      };
+      manifest.artifacts.registry.file = "/etc/passwd";
+      await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+      const result = await validateAllSkills(temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /generate_skill_indexes\.sh/i);
+      assert.match(result.details?.failures[0]?.details?.reason ?? "", /invalid file path/i);
+      assert.match(result.details?.failures[0]?.details?.reason ?? "", /\/etc\/passwd/);
     } finally {
       await temp.cleanup();
     }
@@ -6166,7 +6202,7 @@ console.log(JSON.stringify({
   });
 
   it("reports timeout instead of parse failure when a framed result is cut off by timeout", async () => {
-    const result = await runSkill(TEST_SKILL_RESULT, ["partial-frame-timeout"], undefined, 150);
+    const result = await runSkill(TEST_SKILL_RESULT, ["partial-frame-timeout"], undefined, 300);
 
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);

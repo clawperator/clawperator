@@ -132,9 +132,9 @@ function parseCommandSpec(commandSpec) {
         quote = null;
       } else if (
         char === "\\\\"
-        && quote === "\\\""
+        && quote === '"'
         && index + 1 < commandSpec.length
-        && (commandSpec[index + 1] === "\\\"" || commandSpec[index + 1] === "\\\\")
+        && (commandSpec[index + 1] === '"' || commandSpec[index + 1] === "\\\\")
       ) {
         index += 1;
         current += commandSpec[index];
@@ -144,7 +144,7 @@ function parseCommandSpec(commandSpec) {
       continue;
     }
 
-    if (char === "\\\"" || char === "'") {
+    if (char === '"' || char === "'") {
       quote = char;
       continue;
     }

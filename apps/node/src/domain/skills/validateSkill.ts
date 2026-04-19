@@ -424,9 +424,36 @@ async function validateGeneratedManifestChecksums(
     shards?: { byApp?: unknown[]; byPrefix?: unknown[] };
   };
   const artifacts = manifestRecord.artifacts ?? {};
-  recordManifestEntry("manifest registry artifact", "skills/skills-registry.json", artifacts.registry);
-  recordManifestEntry("manifest min-index artifact", "skills/generated/skills-index.min.json", artifacts.minIndex);
-  recordManifestEntry("manifest jsonl artifact", "skills/generated/skills-index.jsonl", artifacts.jsonlIndex);
+
+  const readManifestEntryFile = (label: string, value: unknown): string | null => {
+    if (typeof value !== "object" || value === null || typeof (value as { file?: unknown }).file !== "string") {
+      return null;
+    }
+    const file = (value as { file: string }).file;
+    recordManifestEntry(label, file, value);
+    return file;
+  };
+
+  if (readManifestEntryFile("manifest registry artifact", artifacts.registry) === null) {
+    return buildGeneratedArtifactsStaleError(
+      join(repoRoot, "skills", "generated", "manifest.json"),
+      "manifest.json has an invalid registry artifact entry. Rerun scripts/generate_skill_indexes.sh in the skills repo.",
+    );
+  }
+
+  if (readManifestEntryFile("manifest min-index artifact", artifacts.minIndex) === null) {
+    return buildGeneratedArtifactsStaleError(
+      join(repoRoot, "skills", "generated", "manifest.json"),
+      "manifest.json has an invalid min-index artifact entry. Rerun scripts/generate_skill_indexes.sh in the skills repo.",
+    );
+  }
+
+  if (readManifestEntryFile("manifest jsonl artifact", artifacts.jsonlIndex) === null) {
+    return buildGeneratedArtifactsStaleError(
+      join(repoRoot, "skills", "generated", "manifest.json"),
+      "manifest.json has an invalid jsonl artifact entry. Rerun scripts/generate_skill_indexes.sh in the skills repo.",
+    );
+  }
 
   const byAppEntries = Array.isArray(manifestRecord.shards?.byApp) ? manifestRecord.shards.byApp : [];
   for (const entry of byAppEntries) {
@@ -451,14 +478,23 @@ async function validateGeneratedManifestChecksums(
   }
 
   for (const entry of entries) {
-    if (entry.sha256 === null) {
+      if (entry.sha256 === null) {
+        return buildGeneratedArtifactsStaleError(
+          join(repoRoot, "skills", "generated", "manifest.json"),
+          `${entry.label} is missing a sha256 checksum. Rerun scripts/generate_skill_indexes.sh in the skills repo.`,
+        );
+      }
+
+    let artifactPath: string;
+    try {
+      artifactPath = resolveRepoRelativeSkillPath(repoRoot, entry.file);
+    } catch {
       return buildGeneratedArtifactsStaleError(
         join(repoRoot, "skills", "generated", "manifest.json"),
-        `${entry.label} is missing a sha256 checksum. Rerun scripts/generate_skill_indexes.sh in the skills repo.`,
+        `${entry.label} has an invalid file path ${JSON.stringify(entry.file)}. Rerun scripts/generate_skill_indexes.sh in the skills repo.`,
       );
     }
 
-    const artifactPath = join(repoRoot, entry.file);
     const actualSha256 = computeSha256Hex(await readFile(artifactPath, "utf8"));
     if (actualSha256 !== entry.sha256) {
       return buildGeneratedArtifactsStaleError(
@@ -521,6 +557,11 @@ async function validateGeneratedArtifactsFresh(
       byPrefix: await readGeneratedShardDirectory(byPrefixDir),
     };
 
+    const manifestChecksumValidation = await validateGeneratedManifestChecksums(actual.manifest, repoRoot);
+    if (manifestChecksumValidation !== null) {
+      return manifestChecksumValidation;
+    }
+
     const comparisons: Array<{
       label: string;
       path: string;
@@ -549,11 +590,6 @@ async function validateGeneratedArtifactsFresh(
           `${comparison.label} do not match the current registry contents. Rerun scripts/generate_skill_indexes.sh in the skills repo.`,
         );
       }
-    }
-
-    const manifestChecksumValidation = await validateGeneratedManifestChecksums(actual.manifest, repoRoot);
-    if (manifestChecksumValidation !== null) {
-      return manifestChecksumValidation;
     }
 
     return null;
