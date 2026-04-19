@@ -271,6 +271,7 @@ Usage:
 
 Notes:
   - Copies packaged first-party authoring skills to ~/.clawperator/authoring-skills/
+  - Installs both packaged front doors: 'skill-author-by-agent-discovery' and 'skill-author-by-recording'
   - Creates Claude Code, Codex, and generic agents discovery directories unconditionally
   - Symlinks each installed skill into ~/.claude/skills/, the Codex skills dir, and ~/.agents/skills/
   - Use 'clawperator authoring-skills list' after install to inspect the available authoring front doors on this host
@@ -296,6 +297,8 @@ Notes:
   - Lists installed first-party authoring skills from ~/.clawperator/authoring-skills/
   - Shows the absolute SKILL.md path for each installed authoring skill
   - Use this when runtime-skill discovery returned no relevant match and you need to inspect the installed authoring workflows on this host
+  - 'skill-author-by-agent-discovery' is the zero-results front door
+  - 'skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'
   - Runtime skills still live under 'clawperator skills ...'; authoring skills are separate host-agent helpers
 `;
 
@@ -311,7 +314,8 @@ Notes:
   - --summary overrides the default TODO summary written to skill.json and SKILL.md.
   - --recording-context copies a recording export JSON file into the new skill folder as reference evidence for an external authoring agent or human.
   - Updates the configured registry JSON so the new skill appears in skills list.
-  - This is the low-level manual scaffold. Inspect 'clawperator authoring-skills list' first when you want an installed guided authoring workflow instead of raw scaffolding.
+  - This is the low-level manual scaffold. If runtime-skill discovery found no relevant match, inspect 'clawperator authoring-skills list' first and start with 'skill-author-by-agent-discovery'.
+  - Use 'skill-author-by-recording' only after discovery returns 'proceed_to_recording', or when the app route is already well understood and you need the proving workflow.
 `;
 
 const HELP_RECORDING = `clawperator recording
@@ -2107,7 +2111,8 @@ Notes:
   - Start with 'clawperator skills for-app <package_id>' when you know the Android package id.
   - Use 'clawperator skills search --keyword <text>' when you only have app names or user-language intent terms.
   - Use 'clawperator skills get <skill_id>' before 'clawperator skills run <skill_id>' when discovery already returned an id.
-  - If runtime-skill discovery returns no relevant match and you need guided skill creation help, use 'clawperator authoring-skills list'.
+  - If runtime-skill discovery returns no relevant match and you need guided skill creation help, use 'clawperator authoring-skills list' and start with 'skill-author-by-agent-discovery'.
+  - Use 'skill-author-by-recording' after discovery returns 'proceed_to_recording', or when the route is already well understood and you need the proving workflow.
   - If your host already supports stdio MCP and wants registered tools instead of runtime-skill discovery, use 'clawperator mcp serve'.
   - Post-install orientation: https://docs.clawperator.com/host-agents/
 `,
@@ -2305,6 +2310,8 @@ Usage:
 
 Notes:
   - Use 'clawperator authoring-skills list' to inspect the installed guided authoring workflows on this host.
+  - 'skill-author-by-agent-discovery' is the zero-results front door when runtime-skill discovery found no relevant match.
+  - 'skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'.
   - Runtime skills still live under 'clawperator skills ...'; authoring skills are separate host-agent helpers.
   - Post-install authoring guidance: https://docs.clawperator.com/skills/authoring/
 `,
@@ -2745,7 +2752,8 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "Notes:",
     "  - Post-install host-agent orientation: https://docs.clawperator.com/host-agents/",
     "  - Start runtime-skill discovery with 'clawperator skills for-app <package_id>' when you know the Android package, or 'clawperator skills search --keyword <text>' when you do not.",
-    "  - If runtime-skill discovery returns no relevant match and you need guided authoring help, use 'clawperator authoring-skills list'.",
+    "  - If runtime-skill discovery returns no relevant match and you need guided authoring help, use 'clawperator authoring-skills list' and start with 'skill-author-by-agent-discovery'.",
+    "  - Use 'skill-author-by-recording' only after discovery returns 'proceed_to_recording', or when the app route is already well understood and you need the proving workflow.",
     "  - Use 'clawperator mcp serve' when the host already supports stdio MCP and wants registered Clawperator tools.",
     "  - operator setup is the canonical setup command. operator install remains an alias.",
     "  - recording is the canonical command family; 'record' is a supported short alias.",

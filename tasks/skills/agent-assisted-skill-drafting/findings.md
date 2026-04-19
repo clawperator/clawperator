@@ -79,6 +79,16 @@ discovery front door is implemented.
 - `test -f .agents/skills/skill-author-by-agent-discovery/agents/openai.yaml`
 - `rg -n "recommended_next_step|existing_skill_verdict|target_app_package|route_confidence|mutation_risk|evidence_collected|discovery_budget_used|skill_classification|handoff_target|handoff_reasoning" .agents/skills/skill-author-by-agent-discovery/SKILL.md`
 - `rg -n "discovery|proving|skill-author-by-agent-discovery" .agents/skills/skill-author-by-recording/SKILL.md`
+- `npm --prefix apps/node run build`
+- `npm --prefix apps/node run test`
+- `node apps/node/dist/cli/index.js --help`
+- `node apps/node/dist/cli/index.js skills --help`
+- `node apps/node/dist/cli/index.js authoring-skills --help`
+- `node apps/node/dist/cli/index.js skills new --help`
+- `node apps/node/dist/cli/index.js authoring-skills install --format json`
+- `node apps/node/dist/cli/index.js authoring-skills list --format json`
+- `bash -lc 'source sites/landing/public/install.sh; AUTHORING_SKILLS_INSTALL_DIR="$HOME/.clawperator/authoring-skills"; write_agent_guide; write_shared_agent_bridge'`
+- `rg -n "skill-author-by-agent-discovery|skill-author-by-recording|authoring-skills|AGENTS.md" ~/.clawperator/AGENTS.md ~/.agents/AGENTS.md`
 
 ## Eval run ids
 
@@ -98,6 +108,18 @@ discovery front door is implemented.
 - That transcript evidence is sufficient for the Phase 1 red baseline because
   the prompt now requires the missing discovery front door before skill
   emission is allowed.
+- Phase 3 install check with the branch-local CLI now reports both packaged
+  first-party authoring skills:
+  - `skill-author-by-agent-discovery`
+  - `skill-author-by-recording`
+- `authoring-skills list --format json` now returns both installed skill
+  entries with absolute `SKILL.md` paths under
+  `~/.clawperator/authoring-skills/`.
+- The packaged discovery skill is now wired through all shared agent discovery
+  directories created by the CLI install:
+  - `~/.claude/skills/`
+  - `~/.codex/skills/`
+  - `~/.agents/skills/`
 
 ## Discoverability surfaces checked
 
@@ -118,6 +140,16 @@ discovery front door is implemented.
   - `.agents/skills/skill-author-by-recording/SKILL.md`
   - `tasks/skills/agent-assisted-skill-drafting/plan.md`
   - `tasks/skills/agent-assisted-skill-drafting/work-breakdown.md`
+- Phase 3 additionally updated and checked:
+  - `apps/node/authoring-skills/skill-author-by-agent-discovery`
+  - `apps/node/src/cli/registry.ts`
+  - `apps/node/src/cli/commands/authoringSkills.ts`
+  - `apps/node/src/test/unit/cliHelp.test.ts`
+  - `apps/node/src/test/unit/authoringSkills.test.ts`
+  - `apps/node/src/test/unit/authoringSkillsPack.test.ts`
+  - `sites/landing/public/install.sh`
+  - `~/.clawperator/AGENTS.md`
+  - `~/.agents/AGENTS.md`
 
 ## Authored skills and `SkillResult` validity
 
@@ -161,6 +193,25 @@ discovery front door is implemented.
     `proceed_to_recording`
 - The task-pack status blocks in `plan.md` and `work-breakdown.md` now track
   live progress instead of leaving the pack at its pre-execution blocked state.
+- Phase 3 code inspection result:
+  - `apps/node/src/domain/skills/copyAuthoringSkills.ts` already discovers
+    packaged authoring skills generically by scanning subdirectories for
+    `SKILL.md`
+  - no hard-coded single-skill assumption needed to be repaired there
+  - install wiring work stayed additive: packaged symlink entry, help text,
+    tests, and installer-authored guidance
+- The branch-local CLI help surfaces now route no-match users to the discovery
+  front door instead of stopping at a generic `authoring-skills list` hint:
+  - `clawperator --help`
+  - `clawperator skills --help`
+  - `clawperator authoring-skills --help`
+  - `clawperator skills new --help`
+- The installer-written local guide at `~/.clawperator/AGENTS.md` now names
+  both packaged front doors, treats discovery as the zero-results first step,
+  and keeps recording as the proving step after `proceed_to_recording`.
+- The installer-owned bridge block in `~/.agents/AGENTS.md` now points agents
+  back to the local guide plus runtime-skill discovery commands without
+  claiming the shared skill dirs contain runtime skills.
 
 ## Problems encountered
 
@@ -208,11 +259,24 @@ discovery front door is implemented.
     after discovery instead of the zero-results router
   - `plan.md` and `work-breakdown.md` now reflect live pack status:
     completed phases `1, 2`, current / next `Phase 3`
+- Phase 3 is now complete locally.
+- Phase 3 acceptance result:
+  - `apps/node/authoring-skills/skill-author-by-agent-discovery` now packages
+    the discovery front door alongside the recording front door
+  - authoring-skills tests now cover both packaged skills and the pack script
+    now proves multi-symlink materialize / restore behavior
+  - the built CLI help now tells no-match users to start with
+    `skill-author-by-agent-discovery` and keeps
+    `skill-author-by-recording` as the proving handoff
+  - `authoring-skills install --format json` installs both packaged skills and
+    `authoring-skills list --format json` lists both installed skills
+  - the refreshed installer-owned host guides at `~/.clawperator/AGENTS.md`
+    and `~/.agents/AGENTS.md` now advertise the discovery-to-proving route
+  - `plan.md` and `work-breakdown.md` now reflect live pack status:
+    completed phases `1, 2, 3`, current / next `Phase 4`
 
 ## Deferred follow-up
 
-- Phase 3: wire packaged install, CLI help, and installer-generated host-agent
-  discoverability surfaces.
 - Phase 4: update public host-agent and authoring docs with the zero-results
   route.
 - Phase 5: run the anchor scenario plus the AOSP emulator and Samsung physical
