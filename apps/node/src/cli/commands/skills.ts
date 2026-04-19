@@ -498,7 +498,7 @@ export async function cmdSkillsNew(
       skillPath: result.skillPath,
       files: result.files,
       ...(result.recordingContextPath ? { recordingContextPath: result.recordingContextPath } : {}),
-      next: "Edit SKILL.md and scripts/run.js, then verify with: clawperator skills validate <skill_id>",
+      next: "Edit `SKILL.md` and `scripts/run.js`, then run `clawperator skills validate <skill_id>`; if this repo uses generated indexes, rerun `scripts/generate_skill_indexes.sh` and `clawperator skills validate --all`",
     }, options);
   }
   return formatError({ code: result.code, message: result.message }, options);

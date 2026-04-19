@@ -116,7 +116,120 @@ function buildScriptTemplate(skillId: string, applicationId: string): string {
   return `#!/usr/bin/env node
 
 const { execFileSync } = require("node:child_process");
-const { resolveClawperatorBin, resolveOperatorPackage } = require("../../utils/common.js");
+const { existsSync } = require("node:fs");
+const { extname, resolve } = require("node:path");
+
+function parseCommandSpec(commandSpec) {
+  const parts = [];
+  let current = "";
+  let quote = null;
+
+  for (let index = 0; index < commandSpec.length; index += 1) {
+    const char = commandSpec[index];
+
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+      } else if (
+        char === "\\\\"
+        && quote === "\\\""
+        && index + 1 < commandSpec.length
+        && (commandSpec[index + 1] === "\\\"" || commandSpec[index + 1] === "\\\\")
+      ) {
+        index += 1;
+        current += commandSpec[index];
+      } else {
+        current += char;
+      }
+      continue;
+    }
+
+    if (char === "\\\"" || char === "'") {
+      quote = char;
+      continue;
+    }
+
+    if (/\\s/.test(char)) {
+      if (current !== "") {
+        parts.push(current);
+        current = "";
+      }
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (quote) {
+    return null;
+  }
+
+  if (current !== "") {
+    parts.push(current);
+  }
+
+  if (parts.length === 0) {
+    return null;
+  }
+
+  return { cmd: parts[0], args: parts.slice(1) };
+}
+
+function getLocalClawperatorCliPath() {
+  const configuredCliPath = process.env.CLAWPERATOR_CLI_PATH;
+  const candidates = [
+    configuredCliPath,
+    resolve(__dirname, "..", "..", "..", "..", "apps", "node", "dist", "cli", "index.js"),
+    resolve(__dirname, "..", "..", "..", "..", "clawperator", "apps", "node", "dist", "cli", "index.js"),
+  ].filter((candidate) => typeof candidate === "string" && candidate.length > 0);
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function resolveClawperatorBin() {
+  const explicitBin = process.env.CLAWPERATOR_BIN;
+  if (explicitBin) {
+    if (existsSync(explicitBin)) {
+      if (extname(explicitBin) === ".js") {
+        return { cmd: process.execPath, args: [explicitBin] };
+      }
+      return { cmd: explicitBin, args: [] };
+    }
+
+    const parsed = parseCommandSpec(explicitBin);
+    if (parsed !== null) {
+      return parsed;
+    }
+
+    return { cmd: explicitBin, args: [] };
+  }
+
+  const localCliPath = getLocalClawperatorCliPath();
+  if (localCliPath !== null) {
+    return { cmd: process.execPath, args: [localCliPath] };
+  }
+
+  return { cmd: "clawperator", args: [] };
+}
+
+function resolveOperatorPackage(explicitPkg) {
+  if (explicitPkg !== undefined && explicitPkg !== null && explicitPkg !== "") {
+    return explicitPkg;
+  }
+
+  const envPkg = process.env.CLAWPERATOR_OPERATOR_PACKAGE;
+  if (envPkg !== undefined && envPkg !== "") {
+    return envPkg;
+  }
+
+  return "com.clawperator.operator";
+}
 
 const [, , deviceId, operatorPackageArg] = process.argv;
 

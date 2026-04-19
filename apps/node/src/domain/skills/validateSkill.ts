@@ -698,10 +698,6 @@ export async function validateSkill(
     if (!skill) {
       return { ok: false, code: SKILL_NOT_FOUND, message: `Skill not found: ${skillId}` };
     }
-    const generatedArtifactsValidation = await validateGeneratedArtifactsFresh(loaded.registry, loaded.resolvedPath);
-    if (generatedArtifactsValidation !== null) {
-      return generatedArtifactsValidation;
-    }
     return await validateLoadedSkill(skill, loaded.resolvedPath, options);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
@@ -725,7 +721,7 @@ export async function validateAllSkills(
         details: {
           totalSkills: loaded.registry.skills.length,
           validCount: 0,
-          invalidCount: loaded.registry.skills.length,
+          invalidCount: 1,
           failures: [{
             skillId: "<generated-indexes>",
             code: generatedArtifactsValidation.code,

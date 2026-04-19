@@ -306,6 +306,25 @@ function runNodeSnippet(
   });
 }
 
+function runNodeFile(
+  filePath: string,
+  args: string[],
+  options?: { cwd?: string; env?: NodeJS.ProcessEnv }
+): Promise<{ stdout: string; stderr: string; code: number }> {
+  return new Promise((resolve) => {
+    const proc = spawn(process.execPath, [filePath, ...args], {
+      cwd: options?.cwd ?? packageRoot,
+      env: options?.env ?? process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    proc.stdout?.on("data", (d) => (stdout += d.toString()));
+    proc.stderr?.on("data", (d) => (stderr += d.toString()));
+    proc.on("close", (code) => resolve({ stdout, stderr, code: code ?? -1 }));
+  });
+}
+
 function normalizeMacTmpPath(path: string): string {
   return normalize(path).replace(/^\/private(?=\/var\/)/, "");
 }
@@ -1294,7 +1313,7 @@ describe("validateSkill", () => {
     }
   });
 
-  it("rejects stale generated indexes when the registry changes without rerunning the generator", async () => {
+  it("allows single-skill validation before generated indexes are regenerated", async () => {
     const staleEntry = {
       id: "com.test.stale-generated-index",
       applicationId: "com.test",
@@ -1322,10 +1341,15 @@ describe("validateSkill", () => {
         "utf8"
       );
       const result = await validateSkill("com.test.stale-generated-index", temp.registryPath);
-      assert.ok(!result.ok);
-      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
-      assert.match(result.message, /generate_skill_indexes\.sh/);
-      assert.match(result.details?.reason ?? "", /do not match the current registry contents/i);
+      assert.ok(result.ok, result.ok ? "" : result.message);
+
+      const allSkillsResult = await validateAllSkills(temp.registryPath);
+      assert.ok(!allSkillsResult.ok);
+      assert.strictEqual(allSkillsResult.code, SKILL_VALIDATION_FAILED);
+      assert.strictEqual(allSkillsResult.details?.invalidCount, 1);
+      assert.strictEqual(allSkillsResult.details?.failures.length, 1);
+      assert.match(allSkillsResult.message, /generate_skill_indexes\.sh/);
+      assert.match(allSkillsResult.details?.failures[0]?.details?.reason ?? "", /do not match the current registry contents/i);
     } finally {
       await temp.cleanup();
     }
@@ -2361,6 +2385,8 @@ describe("scaffoldSkill", () => {
       assert.match(runShContent, /node "\$DIR\/run\.js" "\$@"/);
       assert.match(runJsContent, /resolveClawperatorBin/);
       assert.match(runJsContent, /resolveOperatorPackage/);
+      assert.match(runJsContent, /getLocalClawperatorCliPath/);
+      assert.doesNotMatch(runJsContent, /\.\.\/\.\.\/utils\/common\.js/);
       assert.doesNotMatch(runJsContent, /execFileSync\(\s*"clawperator"/);
       assert.match(skillMarkdown, /clawperator-skill-type: replay/);
       assert.ok((runShStats.mode & 0o111) !== 0, `Expected run.sh to be executable, mode=${runShStats.mode.toString(8)}`);
@@ -2373,6 +2399,82 @@ describe("scaffoldSkill", () => {
       });
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("scaffolded run.js preserves backslashes in quoted CLAWPERATOR_BIN command specs", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-windows-bin-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+
+    try {
+      const skillId = "com.example.demo.capture-windows-bin";
+      const result = await scaffoldSkill(skillId, registryPath);
+      if (!result.ok) assert.fail(result.message);
+
+      const runJsPath = join(tempRoot, "skills", skillId, "scripts", "run.js");
+      const fakeNodePath = join(tempRoot, "C:\\Program Files\\nodejs\\node.exe");
+      const fakeCliPath = join(tempRoot, "C:\\clawperator apps\\node\\dist\\cli\\index.js");
+
+      await writeFile(fakeNodePath, `#!/bin/sh\nexec "${process.execPath}" "$@"\n`, "utf8");
+      await chmod(fakeNodePath, 0o755);
+      await writeFile(
+        fakeCliPath,
+        "process.stdout.write(JSON.stringify({ argv: process.argv.slice(2) }));\n",
+        "utf8"
+      );
+
+      const executionResult = await runNodeFile(runJsPath, ["device-123"], {
+        env: {
+          ...process.env,
+          CLAWPERATOR_BIN: `"${fakeNodePath}" "${fakeCliPath}"`,
+        },
+      });
+
+      assert.strictEqual(executionResult.code, 0, executionResult.stderr);
+      const parsed = JSON.parse(executionResult.stdout) as { argv?: string[] };
+      assert.deepStrictEqual(parsed.argv?.slice(0, 4), ["exec", "--device", "device-123", "--operator-package"]);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("scaffolded run.js prefers a local build over the global clawperator binary when CLAWPERATOR_BIN is unset", async () => {
+    const outerRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-local-cli-"));
+    const tempRoot = join(outerRoot, "repo");
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+
+    try {
+      const skillId = "com.example.demo.capture-local-cli";
+      const result = await scaffoldSkill(skillId, registryPath);
+      if (!result.ok) assert.fail(result.message);
+
+      const runJsPath = join(tempRoot, "skills", skillId, "scripts", "run.js");
+      const fakeCliPath = join(outerRoot, "apps", "node", "dist", "cli", "index.js");
+      await mkdir(dirname(fakeCliPath), { recursive: true });
+      await writeFile(
+        fakeCliPath,
+        "process.stdout.write(JSON.stringify({ argv: process.argv.slice(2) }));\n",
+        "utf8"
+      );
+
+      const executionResult = await runNodeFile(runJsPath, ["device-456"], {
+        env: {
+          ...process.env,
+          CLAWPERATOR_BIN: "",
+        },
+      });
+
+      assert.strictEqual(executionResult.code, 0, executionResult.stderr);
+      const parsed = JSON.parse(executionResult.stdout) as { argv?: string[] };
+      assert.deepStrictEqual(parsed.argv?.slice(0, 4), ["exec", "--device", "device-456", "--operator-package"]);
+    } finally {
+      await rm(outerRoot, { recursive: true, force: true });
     }
   });
 
@@ -2631,7 +2733,7 @@ describe("scaffoldSkill", () => {
       assert.ok(parsed.files?.some((file) => file.endsWith("/scripts/run.sh")));
       assert.strictEqual(
         parsed.next,
-        "Edit SKILL.md and scripts/run.js, then verify with: clawperator skills validate <skill_id>"
+        "Edit `SKILL.md` and `scripts/run.js`, then run `clawperator skills validate <skill_id>`; if this repo uses generated indexes, rerun `scripts/generate_skill_indexes.sh` and `clawperator skills validate --all`"
       );
 
       const registryRaw = await readFile(registryPath, "utf8");
