@@ -247,11 +247,18 @@ uv run --project evals --extra dev python evals/run_eval.py android-version \
 
 Truth boundary for that red baseline:
 
-- the main Android-version answer may still pass
-- `skill_emitted = false` and `replay_status = "skipped"` are acceptable red
-  outcomes before `skill-author-by-agent-discovery` is implemented
-- a transcript that explicitly reports the missing discovery route is also a
-  truthful red outcome
+- the main Android-version answer may still be correct, but the overall
+  `outcome.status` stays `fail` until the Pack A discovery-to-proving route is
+  actually proven
+- `skill_emitted = false` and `replay_status = "skipped"` are still truthful
+  red outcomes before `skill-author-by-agent-discovery` is implemented, but
+  they now fail the run instead of leaving it green
+- when `skill_generation_passed = false`, the harness applies the skill gate
+  to the top-level run outcome and typically records
+  `failure_reason = "skill_route_not_proven"` for missing route evidence or
+  `failure_reason = "skill_not_emitted"` when no skill was emitted
+- a transcript that explicitly reports the missing discovery route is still a
+  truthful red outcome, but it remains a failing run until the route is proven
 
 When you use `--skill-prompt prompt-skill.md` and the spec provides
 `skill_generation`, the run records a `skill_score` block in `result.json`.
@@ -352,6 +359,10 @@ Key fields:
 - `metrics.turns_budget` - the configured max turn budget
 - `skill_score` - present when the run used the skill prompt and the spec has
   `skill_generation`
+- `skill_score.route_requirements_met` - whether the transcript proved the
+  required Pack A discovery route
+- `skill_score.skill_generation_passed` - whether emitted skill validation,
+  replay, answer correctness, and route proof all succeeded
 - `artifacts.transcript` - transcript file name
 - `artifacts.config` - config file name
 

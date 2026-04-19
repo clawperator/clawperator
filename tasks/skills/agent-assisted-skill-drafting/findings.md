@@ -570,6 +570,28 @@ discovery front door is implemented.
     - `uv run --project evals --extra dev pytest evals/harness/test_run_eval.py -q`
     - `uv run --project evals --extra dev pytest evals/harness/test_rescore.py -q`
     - `uv run --project evals --extra dev pytest evals/harness -q`
+- Post-acceptance review alignment completed locally on 2026-04-20:
+  - `evals/README.md` now describes the current Pack A red-baseline truth
+    boundary correctly:
+    - answer correctness can still be true
+    - overall `outcome.status` remains `fail` until the discovery-to-proving
+      route is proven
+    - `skill_generation_passed = false` now maps to top-level failure reasons
+      such as `skill_route_not_proven` or `skill_not_emitted`
+  - `.agents/skills/skill-author-by-agent-discovery/SKILL.md` and
+    `agents/openai.yaml` now use the same nested
+    `discovery_budget_used` field names as the Pack A harness and tests:
+    - `snapshots`
+    - `screenshots`
+    - `elapsed_wall_time_s`
+  - review comments claiming the installer validation helper had shifted
+    positional parameters were stale:
+    - `validation/install/test_authoring_skills.sh` already maps `$4`, `$5`,
+      and `$6` correctly for `authoring_mode`, `output_file`, and `guide_file`
+    - the current harness passed unchanged
+  - validation run for this follow-up:
+    - `./validation/install/test_authoring_skills.sh`
+    - `./validation/install/test_main.sh`
 - No blocker remains for this pack.
 - Optional follow-up after review:
   - clean up this task pack with `tasks/skills/task-cleanup/` once the branch

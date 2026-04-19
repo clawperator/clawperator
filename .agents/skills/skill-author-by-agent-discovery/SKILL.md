@@ -117,7 +117,7 @@ the following top-level keys.
 | `route_confidence` | Object with `level` set to `high`, `medium`, or `low`, plus supporting evidence |
 | `mutation_risk` | Object with `level` set to `read_only`, `reversible_mutation`, or `irreversible_mutation`, plus notes |
 | `evidence_collected` | Object inventorying captured artifacts and failed probes |
-| `discovery_budget_used` | Object recording snapshot count, screenshot count, and elapsed wall time |
+| `discovery_budget_used` | Object recording `snapshots`, `screenshots`, and `elapsed_wall_time_s` |
 | `skill_classification` | Include only when `recommended_next_step = proceed_to_recording`; value must be `shared-general` or `personalized-local` |
 | `handoff_target` | One of `skill-author-by-recording`, `raw-clawperator`, `human`, `none` |
 | `handoff_reasoning` | Short justification for the chosen route |
@@ -297,9 +297,9 @@ probe still leaves the route uncertain, a truthful artifact can look like:
     ]
   },
   "discovery_budget_used": {
-    "snapshot_count": 2,
-    "screenshot_count": 1,
-    "elapsed_seconds": 34
+    "snapshots": 2,
+    "screenshots": 1,
+    "elapsed_wall_time_s": 34
   },
   "handoff_target": "none",
   "handoff_reasoning": "One more bounded discovery pass is needed before recording can be truthful."
