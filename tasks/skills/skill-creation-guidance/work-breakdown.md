@@ -22,23 +22,29 @@ Pack A must not begin until PR-2 is merged or finalized locally.
 | State | in progress |
 | Total PRs | 3 |
 | Total phases | 5 |
-| Completed | 1, 2 |
-| Remaining | 3, 4, 5 |
-| Current / Next | Phase 3 |
+| Completed | 1, 2, 3, 4 |
+| Remaining | 5 |
+| Current / Next | Phase 5 |
 | Blockers | none |
 
 ## Progress Update
 
-- PR-1 is finalized locally in `../clawperator-skills`.
+- PR-1 merged in `../clawperator-skills` at `90f1e0ec77dec3b6ff587cb42265702627a7b6db`.
 - Completed phases:
   - Phase 1 with commit `62e3894` `docs(skills): repair local authoring surface entrypoints`
   - Phase 2 with commit `c7ffa68` `docs(skills): route authoring entrypoints to main docs`
+  - Phase 3 with commit `8a87e76` `fix(skills): harden skill authoring guardrails`
+  - Phase 4 with commit `fdb039e` `docs(skills): cross-link runtime skill author guidance`
 - PR-1 validations passed:
   - Phase 1 grep checks for migrated rule categories, `test_all.sh`, and findings sections
   - Phase 2 route checks, stale-reference checks, and `../clawperator-skills/docs/` absence check
   - `../clawperator-skills/scripts/test_all.sh`
   - `git diff --check` in both repos
-- `tasks/skills/skill-creation-guidance/findings.md` contains the detailed decision log and validation results for Phases 1 and 2.
+- PR-2 validations passed so far:
+  - `npm --prefix apps/node run build`
+  - `npm --prefix apps/node run test`
+  - `./scripts/docs_build.sh`
+- `tasks/skills/skill-creation-guidance/findings.md` contains the detailed decision log and validation results for Phases 1 through 4.
 
 ## Hard Rules
 
@@ -292,6 +298,8 @@ docs(skills): route authoring entrypoints to main docs
 
 ## Phase 3: Scaffold And Validator Guardrails
 
+Status: completed locally on 2026-04-19
+
 ### Agent Tier
 
 thinking
@@ -385,6 +393,8 @@ fix(skills): harden skill authoring guardrails
 ```
 
 ## Phase 4: Main-Repo Docs Alignment
+
+Status: completed locally on 2026-04-19
 
 ### Agent Tier
 

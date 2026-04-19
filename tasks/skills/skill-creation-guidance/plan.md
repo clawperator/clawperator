@@ -24,25 +24,34 @@ the shared baseline is stable.
 | State | in progress |
 | Total PRs | 3 |
 | Total phases | 5 |
-| Completed | 1, 2 |
-| Remaining | 3, 4, 5 |
-| Current / Next | Phase 3 |
+| Completed | 1, 2, 3, 4 |
+| Remaining | 5 |
+| Current / Next | Phase 5 |
 | Blockers | none |
 
 ## Progress Update
 
-- PR-1 is finalized locally.
+- PR-1 merged in `../clawperator-skills` at `90f1e0ec77dec3b6ff587cb42265702627a7b6db`.
 - Completed phases:
   - Phase 1: local author-surface decision and seed rule migration
   - Phase 2: final main-repo docs routing and `skill-migration.md` clarification
+  - Phase 3: scaffold and validator guardrails in `clawperator`
+  - Phase 4: durable public-doc alignment for the workflow and validation boundary
 - PR-1 reviewable commits in `../clawperator-skills`:
   - `62e3894` `docs(skills): repair local authoring surface entrypoints`
   - `c7ffa68` `docs(skills): route authoring entrypoints to main docs`
+- PR-2 reviewable commits in `clawperator`:
+  - `8a87e76` `fix(skills): harden skill authoring guardrails`
+  - `fdb039e` `docs(skills): cross-link runtime skill author guidance`
 - Validation completed for PR-1:
   - Phase 1 validation grep checks
   - Phase 2 routing and stale-reference checks
   - `../clawperator-skills/scripts/test_all.sh`
   - `git diff --check` in both repos
+- Validation completed for PR-2 so far:
+  - `npm --prefix apps/node run build`
+  - `npm --prefix apps/node run test`
+  - `./scripts/docs_build.sh`
 - Execution details and validation results are recorded in
   `tasks/skills/skill-creation-guidance/findings.md`.
 
