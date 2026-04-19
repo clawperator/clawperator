@@ -60,7 +60,9 @@ Pack A must not begin until PR-2 is merged or finalized locally.
 - Create `tasks/skills/skill-creation-guidance/findings.md` during execution
   and update it after every meaningful validation or design decision.
 - Do not start PR-2 until PR-1 is merged or finalized locally. Do not start
-  PR-3 until PR-2 is merged or finalized locally.
+  PR-3 until PR-2 is merged or finalized locally. Finalized locally means all
+  phases in the prior PR have passing validation commands and `findings.md`
+  records the decisions or results from each phase.
 - Keep repo ownership strict: PR-1 and PR-3 change only
   `../clawperator-skills`, and PR-2 changes only `clawperator`. Do not mix both
   repos in one PR or commit.

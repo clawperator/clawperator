@@ -32,7 +32,9 @@ repaired. Once unblocked, the execution order is:
 ## Hard Rules
 
 - Do not start this pack until `tasks/skills/skill-creation-guidance/` PR-2 is
-  merged or finalized locally.
+  merged or finalized locally. Finalized locally means Phases 3 and 4 of that
+  pack are complete with passing validation commands and `findings.md` records
+  the guardrails shipped (scaffold fix, validator checks, and docs cross-links).
 - Use the hybrid model exactly as written in the plan: discovery routes,
   recording proves.
 - Name the new packaged skill `skill-author-by-agent-discovery`. Do not rename
