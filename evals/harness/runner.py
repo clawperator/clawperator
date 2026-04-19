@@ -369,6 +369,16 @@ def _extract_discovery_artifacts(transcript: str) -> list[tuple[int, dict[str, A
     return artifacts
 
 
+def _find_transcript_token_line(transcript: str, token: str) -> int | None:
+    needle = token.strip().lower()
+    if not needle:
+        return None
+    for line_number, raw_line in enumerate(transcript.splitlines()):
+        if needle in raw_line.lower():
+            return line_number
+    return None
+
+
 def _extract_non_empty_string_list(value: Any) -> list[str] | None:
     if not isinstance(value, list) or len(value) == 0:
         return None
@@ -528,6 +538,10 @@ def _validate_discovery_artifact(
 
     recommended_next_step = artifact.get("recommended_next_step")
     handoff_target = artifact.get("handoff_target")
+    if handoff_target not in {"skill-author-by-recording", "raw-clawperator", "human", "none"}:
+        errors.append(
+            "discovery artifact handoff_target must be one of `skill-author-by-recording`, `raw-clawperator`, `human`, or `none`"
+        )
     if recommended_next_step not in {
         "use_existing_skill",
         "proceed_to_recording",
@@ -539,21 +553,32 @@ def _validate_discovery_artifact(
         errors.append(
             "discovery artifact recommended_next_step must be one of `use_existing_skill`, `proceed_to_recording`, `iterate_discovery`, `one_shot_direct_automation`, `escalate_to_human`, or `decline`"
         )
+    expected_handoff_target_by_route = {
+        "use_existing_skill": "none",
+        "proceed_to_recording": expected_recording_handoff,
+        "iterate_discovery": "none",
+        "one_shot_direct_automation": "raw-clawperator",
+        "escalate_to_human": "human",
+        "decline": "none",
+    }
+    expected_handoff_target = expected_handoff_target_by_route.get(recommended_next_step)
+    if expected_handoff_target is not None and handoff_target != expected_handoff_target:
+        errors.append(
+            f"discovery artifact handoff_target must be `{expected_handoff_target}` when recommended_next_step is `{recommended_next_step}`"
+        )
     handoff_reasoning = artifact.get("handoff_reasoning")
     if not isinstance(handoff_reasoning, str) or not handoff_reasoning.strip():
         errors.append("discovery artifact handoff_reasoning must be a non-empty string")
+    skill_classification = artifact.get("skill_classification")
     if recommended_next_step == "proceed_to_recording":
-        if handoff_target != expected_recording_handoff:
-            errors.append(
-                f"discovery artifact handoff_target must be `{expected_recording_handoff}` when recommended_next_step is `proceed_to_recording`"
-            )
-        skill_classification = artifact.get("skill_classification")
         if skill_classification not in {"shared-general", "personalized-local"}:
             errors.append(
                 "discovery artifact skill_classification must be `shared-general` or `personalized-local` when recommended_next_step is `proceed_to_recording`"
             )
         if isinstance(existing_skill_verdict, dict) and existing_skill_verdict.get("status") == "match":
             errors.append("discovery artifact cannot route to `proceed_to_recording` when existing_skill_verdict.status is `match`")
+    elif skill_classification is not None:
+        errors.append("discovery artifact skill_classification must be omitted unless recommended_next_step is `proceed_to_recording`")
 
     return errors
 
@@ -671,7 +696,27 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
         discovery_artifact_errors.append("expected exactly one structured discovery artifact before skill emission")
 
     discovery_artifact_valid = discovery_artifact_count == 1 and len(discovery_artifact_errors) == 0
-    required_authoring_front_door_seen = required_authoring_front_door is None or discovery_artifact_valid
+    required_authoring_front_door_line = (
+        _find_transcript_token_line(route_transcript, required_authoring_front_door)
+        if required_authoring_front_door is not None
+        else None
+    )
+    required_authoring_front_door_explicitly_seen = required_authoring_front_door is None or required_authoring_front_door_line is not None
+    required_authoring_front_door_after_authoring = required_authoring_front_door is None or bool(
+        required_authoring_front_door_line is not None
+        and (
+            not authoring_skills_list_positions
+            or required_authoring_front_door_line > min(authoring_skills_list_positions)
+        )
+    )
+    required_authoring_front_door_seen = bool(
+        required_authoring_front_door is None
+        or (
+            discovery_artifact_valid
+            and required_authoring_front_door_explicitly_seen
+            and required_authoring_front_door_after_authoring
+        )
+    )
     required_proving_handoff_seen = required_proving_handoff is None
     if required_proving_handoff is not None and discovery_artifact_valid:
         _, artifact = discovery_artifacts[0]
@@ -692,6 +737,14 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
                 "missing structured command evidence for `clawperator authoring-skills list --json`"
             )
     route_requirement_errors.extend(discovery_artifact_errors)
+    if required_authoring_front_door is not None and not required_authoring_front_door_explicitly_seen:
+        route_requirement_errors.append(
+            f"missing explicit transcript signal for required_authoring_front_door `{required_authoring_front_door}`"
+        )
+    elif required_authoring_front_door is not None and not required_authoring_front_door_after_authoring:
+        route_requirement_errors.append(
+            f"required_authoring_front_door `{required_authoring_front_door}` must appear after `clawperator authoring-skills list --json`"
+        )
     if required_authoring_front_door is not None and not required_authoring_front_door_seen:
         route_requirement_errors.append(
             f"missing structured discovery artifact for required_authoring_front_door `{required_authoring_front_door}`"
@@ -710,6 +763,8 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
         "discovery_artifact_count": discovery_artifact_count,
         "discovery_artifact_seen": discovery_artifact_seen,
         "discovery_artifact_valid": discovery_artifact_valid,
+        "required_authoring_front_door_explicitly_seen": required_authoring_front_door_explicitly_seen,
+        "required_authoring_front_door_after_authoring": required_authoring_front_door_after_authoring,
         "required_authoring_front_door_seen": required_authoring_front_door_seen,
         "required_proving_handoff_seen": required_proving_handoff_seen,
         "route_requirements_met": len(route_requirement_errors) == 0,
@@ -728,6 +783,60 @@ def _apply_skill_generation_contract(skill_score: dict[str, Any], transcript: st
         and next_skill_score.get("replay_answer_correct")
         and next_skill_score.get("route_requirements_met")
     )
+    return next_skill_score
+
+
+def _synthesize_skill_score_for_contract(
+    *,
+    transcript: str,
+    skill_generation: Any,
+    clawperator_cmd: list[str],
+    operator_package: str,
+    existing_skill_score: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    next_skill_score = dict(existing_skill_score) if isinstance(existing_skill_score, dict) else {}
+    start_marker = (
+        skill_generation.get("skill_start_marker")
+        if isinstance(skill_generation, dict) and isinstance(skill_generation.get("skill_start_marker"), str)
+        else "CLAWPERATOR_SKILL_START"
+    )
+    end_marker = (
+        skill_generation.get("skill_end_marker")
+        if isinstance(skill_generation, dict) and isinstance(skill_generation.get("skill_end_marker"), str)
+        else "CLAWPERATOR_SKILL_END"
+    )
+
+    skill_json = extract_skill(transcript, start_marker, end_marker)
+    skill_emitted = skill_json is not None
+    skill_valid = False
+    skill_validation_errors: list[str] = []
+    if skill_json is not None:
+        skill_valid, skill_validation_errors = validate_skill(
+            skill_json,
+            clawperator_cmd,
+            operator_package,
+        )
+
+    next_skill_score["skill_emitted"] = skill_emitted
+    next_skill_score["skill_valid"] = skill_valid
+    next_skill_score["skill_validation_errors"] = skill_validation_errors
+    if "replay_attempted" not in next_skill_score or not isinstance(next_skill_score.get("replay_attempted"), bool):
+        next_skill_score["replay_attempted"] = False
+    if not isinstance(next_skill_score.get("replay_status"), str) or not next_skill_score.get("replay_status"):
+        next_skill_score["replay_status"] = "skipped" if not skill_emitted or not skill_valid else "error"
+    if "replay_answer_normalized" not in next_skill_score:
+        next_skill_score["replay_answer_normalized"] = None
+    if "replay_answer_correct" not in next_skill_score or not isinstance(next_skill_score.get("replay_answer_correct"), bool):
+        next_skill_score["replay_answer_correct"] = False
+    if "replay_wall_clock_s" not in next_skill_score or not isinstance(next_skill_score.get("replay_wall_clock_s"), (int, float)):
+        next_skill_score["replay_wall_clock_s"] = 0.0
+    if (
+        next_skill_score.get("replay_status") == "error"
+        and skill_emitted
+        and skill_valid
+        and not isinstance(next_skill_score.get("replay_error"), str)
+    ):
+        next_skill_score["replay_error"] = "rescore missing replay metadata in result.json"
     return next_skill_score
 
 

@@ -194,6 +194,59 @@ def test_rescore_preserves_skill_generation_gate(tmp_path):
     assert rescored["skill_score"]["skill_generation_passed"] is False
 
 
+def test_rescore_rebuilds_skill_generation_gate_when_skill_score_is_missing(tmp_path):
+    runs_dir = tmp_path / "runs"
+    run_dir = runs_dir / "android-version-20260404-000000-aaaaaa-claude-claude-sonnet"
+    run_dir.mkdir(parents=True)
+
+    _write_json(
+        run_dir / "config.json",
+        {
+            "eval_id": "android-version",
+            "spec": {"prompt_file": "prompt-skill.md"},
+            "environment": {
+                "ground_truth_android_version": "15",
+                "clawperator_cmd": ["node", "/repo/apps/node/dist/cli/index.js"],
+                "runtime_clawperator_cmd": ["node", "/repo/apps/node/dist/cli/index.js"],
+                "operator_package": "com.clawperator.operator.dev",
+            },
+        },
+    )
+    _write_json(
+        run_dir / "result.json",
+        {
+            "run_id": run_dir.name,
+            "eval_id": "android-version",
+            "outcome": {
+                "status": "pass",
+                "answer_extracted_raw": "15",
+                "answer_normalized": "15",
+                "ground_truth_normalized": "15",
+                "answer_correct": True,
+                "failure_reason": None,
+            },
+            "metrics": {
+                "used_disallowed_tool": False,
+                "answer_emitted": True,
+                "violations": {"used_adb": False},
+                "wall_clock_s": 1.0,
+            },
+            "environment": {"ground_truth_android_version": "15"},
+        },
+    )
+    (run_dir / "transcript.txt").write_text(
+        "CLAWPERATOR_EVAL_ANSWER: 15\n",
+        encoding="utf-8",
+    )
+
+    rescored = _rescore_run(runs_dir, run_dir.name)
+
+    assert rescored["outcome"]["status"] == "fail"
+    assert rescored["outcome"]["failure_reason"] == "skill_route_not_proven"
+    assert rescored["skill_score"]["skill_emitted"] is False
+    assert rescored["skill_score"]["skill_generation_passed"] is False
+
+
 def test_rescore_rejects_missing_outcome_or_metrics(tmp_path):
     runs_dir = tmp_path / "runs"
     run_dir = runs_dir / "android-version-20260404-000000-aaaaaa-claude-claude-sonnet"

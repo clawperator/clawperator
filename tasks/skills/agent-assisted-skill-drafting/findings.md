@@ -612,6 +612,32 @@ discovery front door is implemented.
     - `./validation/install/test_authoring_skills.sh`
     - `./validation/install/test_main.sh`
     - `git diff --check`
+- Post-acceptance route-identity and rescore hardening completed locally on
+  2026-04-20:
+  - Pack A now requires an explicit transcript signal for the required
+    discovery front door instead of treating any valid discovery artifact as
+    proof that `skill-author-by-agent-discovery` ran
+  - the scorer now enforces `handoff_target` for every discovery route, not
+    only `proceed_to_recording`:
+    - `use_existing_skill` -> `none`
+    - `proceed_to_recording` -> `skill-author-by-recording`
+    - `iterate_discovery` -> `none`
+    - `one_shot_direct_automation` -> `raw-clawperator`
+    - `escalate_to_human` -> `human`
+    - `decline` -> `none`
+  - `evals/run_eval.py --rescore` now rebuilds a conservative `skill_score`
+    whenever the run actually used `prompt-skill.md`, even if older
+    `result.json` artifacts did not save the replay-era score block
+  - new regressions cover:
+    - generic discovery evidence without an explicit
+      `skill-author-by-agent-discovery` signal
+    - wrong handoff targets for non-recording routes
+    - older skill-prompt runs with no saved `skill_score`
+  - validation run for this follow-up:
+    - `python -m py_compile evals/harness/runner.py evals/harness/test_run_eval.py evals/harness/test_rescore.py evals/run_eval.py`
+    - `uv run --project evals --extra dev pytest evals/harness/test_run_eval.py -q`
+    - `uv run --project evals --extra dev pytest evals/harness/test_rescore.py -q`
+    - `uv run --project evals --extra dev pytest evals/harness -q`
 - No blocker remains for this pack.
 - Optional follow-up after review:
   - clean up this task pack with `tasks/skills/task-cleanup/` once the branch

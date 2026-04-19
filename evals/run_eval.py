@@ -43,6 +43,7 @@ from evals.harness.runner import (
     _apply_skill_generation_contract,
     _apply_skill_generation_outcome,
     _prepare_clawperator_launcher,
+    _synthesize_skill_score_for_contract,
 )
 from evals.harness.replay import run_replay, DEFAULT_REPLAY_TIMEOUT_S
 from evals.harness.scorer import score
@@ -120,6 +121,21 @@ def _load_replay_runtime(config: dict) -> tuple[list[str], str, str]:
             clawperator_cmd = _resolve_clawperator_cmd(runtime_target)
 
     return clawperator_cmd, operator_package, runtime_target
+
+
+def _config_used_skill_prompt(config: dict, spec: dict) -> bool:
+    skill_generation = spec.get("skill_generation")
+    if not isinstance(skill_generation, dict):
+        return False
+    skill_prompt_name = skill_generation.get("skill_prompt")
+    if not isinstance(skill_prompt_name, str) or not skill_prompt_name.strip():
+        return False
+    config_spec = config.get("spec")
+    if not isinstance(config_spec, dict):
+        return False
+    prompt_file = config_spec.get("prompt_file")
+    skill_prompt_file = config_spec.get("skill_prompt_file")
+    return prompt_file == skill_prompt_name or skill_prompt_file == skill_prompt_name
 
 
 def _public_preflight_details(preflight_details: dict | None) -> dict | None:
@@ -243,12 +259,21 @@ def _rescore_run(runs_dir: Path, run_id: str) -> dict:
     eval_id = config.get("eval_id") or result.get("eval_id")
     if isinstance(eval_id, str):
         spec = _load_spec(eval_id)
+        skill_generation = spec.get("skill_generation")
         skill_score = result.get("skill_score")
-        if isinstance(skill_score, dict) and any(key in skill_score for key in ("skill_emitted", "skill_valid", "replay_status")):
+        if skill_generation and (_config_used_skill_prompt(config, spec) or isinstance(skill_score, dict)):
+            clawperator_cmd, operator_package, _ = _load_replay_runtime(config)
+            prepared_skill_score = _synthesize_skill_score_for_contract(
+                transcript=transcript,
+                skill_generation=skill_generation,
+                clawperator_cmd=clawperator_cmd,
+                operator_package=operator_package,
+                existing_skill_score=skill_score if isinstance(skill_score, dict) else None,
+            )
             rescored_skill_score = _apply_skill_generation_contract(
-                dict(skill_score),
+                prepared_skill_score,
                 transcript,
-                spec.get("skill_generation"),
+                skill_generation,
             )
             rescored = _apply_skill_generation_outcome(rescored, rescored_skill_score)
     result_rescored_path = run_dir / "result-rescored.json"
