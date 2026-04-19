@@ -359,10 +359,10 @@ Use this exact evaluation posture:
     }
 
     if (!version) {
-      throw new Error(`Could not extract Android version from the ${routeNote} snapshot.`);
+      throw new Error("Could not extract Android version from the " + routeNote + " snapshot.");
     }
 
-    console.log(`CLAWPERATOR_EVAL_ANSWER: ${version}`);
+    console.log("CLAWPERATOR_EVAL_ANSWER: " + version);
     console.log(skillResultFramePrefix);
     console.log(JSON.stringify({
       contractVersion: skillResultContractVersion,
@@ -381,7 +381,7 @@ Use this exact evaluation posture:
         {
           id: "settings-route-opened",
           status: "ok",
-          note: `Navigated through Settings search to ${routeNote}.`,
+          note: "Navigated through Settings search to " + routeNote + ".",
         },
         {
           id: "android-version-read",
@@ -397,11 +397,11 @@ Use this exact evaluation posture:
         status: "verified",
         expected: {
           kind: "text",
-          text: `Numeric Android version from Settings -> ${routeNote}`,
+          text: "Numeric Android version from Settings -> " + routeNote,
         },
         observed: {
           kind: "text",
-          text: `CLAWPERATOR_EVAL_ANSWER: ${version}`,
+          text: "CLAWPERATOR_EVAL_ANSWER: " + version,
         },
         note: "<terminal_note>",
       },

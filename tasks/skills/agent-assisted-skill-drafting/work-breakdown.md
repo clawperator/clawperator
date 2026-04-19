@@ -21,13 +21,13 @@ repaired. Once unblocked, the execution order is:
 
 | Item | Value |
 | --- | --- |
-| State | blocked |
+| State | completed |
 | Total PRs | 1 |
 | Total phases | 5 |
-| Completed | 1, 2, 3, 4 |
-| Remaining | 5 |
-| Current / Next | Phase 5 blocked on Samsung unlock |
-| Blockers | Samsung physical device `<samsung_device_serial>` is locked behind a secure pattern keyguard |
+| Completed | 1, 2, 3, 4, 5 |
+| Remaining | none |
+| Current / Next | Done |
+| Blockers | none |
 
 ## Progress Update
 
@@ -46,15 +46,10 @@ repaired. Once unblocked, the execution order is:
   route, authoring-workflow docs, and durable internal host-integration note
   refresh are recorded in
   `tasks/skills/agent-assisted-skill-drafting/findings.md`.
-- Phase 5 is currently blocked on 2026-04-19. The first official green-proof
-  reruns showed that the benchmark still needed one truthful repair pass:
-  Android eval runs were not honoring the longer `spec.json` timeout by
-  default, and the skill-generation prompt needed tighter guardrails around
-  scaffold overwrite, replay frontmatter, selector usage, and the fixed AOSP /
-  Samsung proving routes before the final matrix reruns. Those repairs are now
-  implemented locally, but execution stopped after the Samsung physical device
-  surfaced a secure pattern keyguard that makes the required live-device proof
-  unusable without human unlock.
+- Phase 5 completed locally on 2026-04-19. The benchmark-hardening repairs,
+  official Samsung rerun, anchor-scenario discovery pass, and official AOSP
+  rerun are recorded in
+  `tasks/skills/agent-assisted-skill-drafting/findings.md`.
 
 ## Hard Rules
 

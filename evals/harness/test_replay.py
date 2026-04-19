@@ -346,7 +346,13 @@ def test_build_replay_env_sets_clawperator_bin_for_multipart_command(tmp_path):
         ["node", "/repo/apps/node/dist/cli/index.js"],
     )
 
-    assert env["CLAWPERATOR_BIN"] == 'node /repo/apps/node/dist/cli/index.js'
+    wrapper_path = Path(env["CLAWPERATOR_BIN"])
+    assert wrapper_path == registry_path.parent / ".clawperator-bin-replay-wrapper.sh"
+    assert wrapper_path.read_text(encoding="utf-8") == (
+        "#!/bin/sh\n"
+        "exec node /repo/apps/node/dist/cli/index.js \"$@\"\n"
+    )
+    assert wrapper_path.stat().st_mode & 0o111
 
 
 def test_materialize_skill_package_writes_skill_json_with_registry_shape_only(tmp_path):

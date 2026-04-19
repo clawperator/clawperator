@@ -31,13 +31,13 @@ and one Samsung physical device.
 
 | Item | Value |
 | --- | --- |
-| State | blocked |
+| State | completed |
 | Total PRs | 1 |
 | Total phases | 5 |
-| Completed | 1, 2, 3, 4 |
-| Remaining | 5 |
-| Current / Next | Phase 5 blocked on Samsung unlock |
-| Blockers | Samsung physical device `<samsung_device_serial>` is locked behind a secure pattern keyguard |
+| Completed | 1, 2, 3, 4, 5 |
+| Remaining | none |
+| Current / Next | Done |
+| Blockers | none |
 
 ## Progress Update
 
@@ -56,16 +56,10 @@ and one Samsung physical device.
   route, authoring-workflow docs, and durable internal host-integration note
   refresh are recorded in
   `tasks/skills/agent-assisted-skill-drafting/findings.md`.
-- Phase 5 is currently blocked on 2026-04-19. The first official green-proof
-  reruns exposed two truthful benchmark defects that Phase 1 did not surface:
-  `run_eval.py` was still defaulting Android evals to a shorter timeout than
-  `spec.json`, and `prompt-skill.md` still needed tighter repair-loop guidance
-  for scaffold overwrite, replay frontmatter, selector usage, and the fixed
-  AOSP / Samsung Settings search routes. Those benchmark repairs are now
-  implemented locally, and the AOSP replay shape was proven in a sandbox
-  self-test, but the required Samsung physical device is presently locked
-  behind a secure pattern keyguard so the dual-device matrix cannot complete
-  truthfully until the device is unlocked.
+- Phase 5 completed locally on 2026-04-19. The benchmark-hardening repairs,
+  official Samsung rerun, anchor-scenario discovery pass, and official AOSP
+  rerun are recorded in
+  `tasks/skills/agent-assisted-skill-drafting/findings.md`.
 
 ## Goal
 

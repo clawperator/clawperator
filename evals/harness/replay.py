@@ -235,7 +235,19 @@ def _build_replay_env(registry_path: Path, clawperator_cmd: list[str]) -> dict[s
         "CLAWPERATOR_SKILLS_REGISTRY": str(registry_path),
     }
     if clawperator_cmd and all(isinstance(part, str) and part for part in clawperator_cmd):
-        env["CLAWPERATOR_BIN"] = shlex.join(clawperator_cmd)
+        if len(clawperator_cmd) == 1:
+            env["CLAWPERATOR_BIN"] = clawperator_cmd[0]
+        else:
+            wrapper_path = registry_path.parent / ".clawperator-bin-replay-wrapper.sh"
+            wrapper_path.parent.mkdir(parents=True, exist_ok=True)
+            wrapper_lines = [
+                "#!/bin/sh",
+                f"exec {shlex.join(clawperator_cmd)} \"$@\"",
+                "",
+            ]
+            wrapper_path.write_text("\n".join(wrapper_lines), encoding="utf-8")
+            wrapper_path.chmod(0o755)
+            env["CLAWPERATOR_BIN"] = str(wrapper_path)
     return env
 
 
