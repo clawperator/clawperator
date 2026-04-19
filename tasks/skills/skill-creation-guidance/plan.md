@@ -50,7 +50,6 @@ the shared baseline is stable.
   - Phase 2 routing and stale-reference checks
   - `../clawperator-skills/scripts/test_all.sh`
   - `git diff --check` in both repos
-- Validation completed for PR-2 so far:
 - Validation completed for PR-2:
   - `npm --prefix apps/node run build`
   - `npm --prefix apps/node run test`

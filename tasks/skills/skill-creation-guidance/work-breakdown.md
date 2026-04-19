@@ -41,7 +41,6 @@ Pack A must not begin until PR-2 is merged or finalized locally.
   - Phase 2 route checks, stale-reference checks, and `../clawperator-skills/docs/` absence check
   - `../clawperator-skills/scripts/test_all.sh`
   - `git diff --check` in both repos
-- PR-2 validations passed so far:
 - PR-2 validations passed:
   - `npm --prefix apps/node run build`
   - `npm --prefix apps/node run test`

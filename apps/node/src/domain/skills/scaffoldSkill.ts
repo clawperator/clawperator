@@ -179,7 +179,7 @@ function getLocalClawperatorCliPath() {
   const configuredCliPath = process.env.CLAWPERATOR_CLI_PATH;
   const candidates = [
     configuredCliPath,
-    resolve(__dirname, "..", "..", "..", "..", "apps", "node", "dist", "cli", "index.js"),
+    resolve(__dirname, "..", "..", "..", "apps", "node", "dist", "cli", "index.js"),
     resolve(__dirname, "..", "..", "..", "..", "clawperator", "apps", "node", "dist", "cli", "index.js"),
   ].filter((candidate) => typeof candidate === "string" && candidate.length > 0);
 

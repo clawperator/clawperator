@@ -2532,7 +2532,7 @@ describe("scaffoldSkill", () => {
       if (!result.ok) assert.fail(result.message);
 
       const runJsPath = join(tempRoot, "skills", skillId, "scripts", "run.js");
-      const fakeCliPath = join(outerRoot, "apps", "node", "dist", "cli", "index.js");
+      const fakeCliPath = join(tempRoot, "apps", "node", "dist", "cli", "index.js");
       await mkdir(dirname(fakeCliPath), { recursive: true });
       await writeFile(
         fakeCliPath,
