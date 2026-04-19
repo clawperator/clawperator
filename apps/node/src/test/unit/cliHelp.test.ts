@@ -137,6 +137,8 @@ describe("CLI help", () => {
     assert.match(stdout, /https:\/\/docs\.clawperator\.com\/host-agents\//);
     assert.match(stdout, /skills for-app <package_id>/);
     assert.match(stdout, /authoring-skills list/);
+    assert.match(stdout, /skill-author-by-agent-discovery/);
+    assert.match(stdout, /skill-author-by-recording/);
     assert.match(stdout, /mcp serve/);
   });
 
@@ -230,6 +232,8 @@ describe("CLI help", () => {
     assert.match(stdout, /skills search --keyword <text>/);
     assert.match(stdout, /skills get <skill_id>/);
     assert.match(stdout, /authoring-skills list/);
+    assert.match(stdout, /skill-author-by-agent-discovery/);
+    assert.match(stdout, /skill-author-by-recording/);
     assert.match(stdout, /clawperator mcp serve/);
     assert.match(stdout, /https:\/\/docs\.clawperator\.com\/host-agents\//);
   });
@@ -239,6 +243,8 @@ describe("CLI help", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator authoring-skills/);
     assert.match(stdout, /authoring-skills list/);
+    assert.match(stdout, /skill-author-by-agent-discovery/);
+    assert.match(stdout, /skill-author-by-recording/);
     assert.match(stdout, /Runtime skills still live under 'clawperator skills/);
     assert.match(stdout, /https:\/\/docs\.clawperator\.com\/skills\/authoring\//);
   });
@@ -249,6 +255,8 @@ describe("CLI help", () => {
     assert.match(stdout, /clawperator skills new/);
     assert.match(stdout, /low-level manual scaffold/i);
     assert.match(stdout, /authoring-skills list/);
+    assert.match(stdout, /skill-author-by-agent-discovery/);
+    assert.match(stdout, /skill-author-by-recording/);
   });
 
   it("inspect ui --help falls back to top-level help", async () => {

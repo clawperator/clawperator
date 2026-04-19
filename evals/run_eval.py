@@ -37,7 +37,14 @@ from evals.harness.live_skill_eval import (
     SOLAX_COLD_START_EVAL_ID,
     run_solax_orchestrated_cold_start_eval,
 )
-from evals.harness.runner import build_prompt, run_eval, _prepare_clawperator_launcher
+from evals.harness.runner import (
+    build_prompt,
+    run_eval,
+    _apply_skill_generation_contract,
+    _apply_skill_generation_outcome,
+    _prepare_clawperator_launcher,
+    _synthesize_skill_score_for_contract,
+)
 from evals.harness.replay import run_replay, DEFAULT_REPLAY_TIMEOUT_S
 from evals.harness.scorer import score
 from evals.harness.timeutil import format_timestamp
@@ -51,6 +58,8 @@ SUPPORTED_AGENTS = {
 }
 SUPPORTED_MODES = {"public-surface", "full-repo"}
 SUPPORTED_RUNTIMES = {"local-dev", "published"}
+DEFAULT_ANDROID_TIMEOUT_S = 300
+DEFAULT_ANDROID_MAX_TURNS = 40
 
 
 def _load_spec(eval_id: str) -> dict:
@@ -60,6 +69,32 @@ def _load_spec(eval_id: str) -> dict:
     spec = json.loads(spec_path.read_text(encoding="utf-8"))
     spec["spec_dir"] = str(spec_path.parent)
     return spec
+
+
+def _resolve_android_eval_budget(args: argparse.Namespace, spec: dict) -> tuple[int, int]:
+    budget = spec.get("budget")
+    if not isinstance(budget, dict):
+        budget = {}
+
+    spec_timeout_s = budget.get("default_timeout_s")
+    if not isinstance(spec_timeout_s, int) or spec_timeout_s <= 0:
+        spec_timeout_s = DEFAULT_ANDROID_TIMEOUT_S
+
+    spec_max_turns = budget.get("default_max_turns")
+    if not isinstance(spec_max_turns, int) or spec_max_turns <= 0:
+        spec_max_turns = DEFAULT_ANDROID_MAX_TURNS
+
+    cli_timeout_s = args.timeout_s
+    if not isinstance(cli_timeout_s, int) or cli_timeout_s <= 0:
+        cli_timeout_s = None
+
+    cli_max_turns = args.max_turns
+    if not isinstance(cli_max_turns, int) or cli_max_turns <= 0:
+        cli_max_turns = None
+
+    timeout_s = cli_timeout_s if cli_timeout_s is not None else spec_timeout_s
+    max_turns = cli_max_turns if cli_max_turns is not None else spec_max_turns
+    return timeout_s, max_turns
 
 
 def _resolve_prompt_path(eval_id: str, spec: dict, mode: str, skill_prompt: str | None) -> Path:
@@ -94,6 +129,21 @@ def _load_replay_runtime(config: dict) -> tuple[list[str], str, str]:
             clawperator_cmd = _resolve_clawperator_cmd(runtime_target)
 
     return clawperator_cmd, operator_package, runtime_target
+
+
+def _config_used_skill_prompt(config: dict, spec: dict) -> bool:
+    skill_generation = spec.get("skill_generation")
+    if not isinstance(skill_generation, dict):
+        return False
+    skill_prompt_name = skill_generation.get("skill_prompt")
+    if not isinstance(skill_prompt_name, str) or not skill_prompt_name.strip():
+        return False
+    config_spec = config.get("spec")
+    if not isinstance(config_spec, dict):
+        return False
+    prompt_file = config_spec.get("prompt_file")
+    skill_prompt_file = config_spec.get("skill_prompt_file")
+    return prompt_file == skill_prompt_name or skill_prompt_file == skill_prompt_name
 
 
 def _public_preflight_details(preflight_details: dict | None) -> dict | None:
@@ -214,6 +264,26 @@ def _rescore_run(runs_dir: Path, run_id: str) -> dict:
     violations = dict(rescored["metrics"].get("violations", {}))
     violations["used_adb"] = bool(score_result.used_disallowed_tool)
     rescored["metrics"]["violations"] = violations
+    eval_id = config.get("eval_id") or result.get("eval_id")
+    if isinstance(eval_id, str):
+        spec = _load_spec(eval_id)
+        skill_generation = spec.get("skill_generation")
+        skill_score = result.get("skill_score")
+        if skill_generation and (_config_used_skill_prompt(config, spec) or isinstance(skill_score, dict)):
+            clawperator_cmd, operator_package, _ = _load_replay_runtime(config)
+            prepared_skill_score = _synthesize_skill_score_for_contract(
+                transcript=transcript,
+                skill_generation=skill_generation,
+                clawperator_cmd=clawperator_cmd,
+                operator_package=operator_package,
+                existing_skill_score=skill_score if isinstance(skill_score, dict) else None,
+            )
+            rescored_skill_score = _apply_skill_generation_contract(
+                prepared_skill_score,
+                transcript,
+                skill_generation,
+            )
+            rescored = _apply_skill_generation_outcome(rescored, rescored_skill_score)
     result_rescored_path = run_dir / "result-rescored.json"
     _write_json_file(result_rescored_path, rescored)
     return rescored
@@ -425,8 +495,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--operator-package")
     parser.add_argument("--mode", default="public-surface", choices=sorted(SUPPORTED_MODES))
     parser.add_argument("--runtime", default="local-dev", choices=sorted(SUPPORTED_RUNTIMES))
-    parser.add_argument("--timeout-s", type=int, default=300)
-    parser.add_argument("--max-turns", type=int, default=40)
+    parser.add_argument("--timeout-s", type=int)
+    parser.add_argument("--max-turns", type=int)
     parser.add_argument("--skill-prompt")
     parser.add_argument("--replay")
     parser.add_argument("--replay-timeout-s", type=int, default=DEFAULT_REPLAY_TIMEOUT_S)
@@ -455,9 +525,9 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--replay is not supported for solax-orchestrated-cold-start")
         if args.rescore is not None:
             parser.error("--rescore is not supported for solax-orchestrated-cold-start")
-        if args.timeout_s != 300:
+        if args.timeout_s is not None and args.timeout_s != DEFAULT_ANDROID_TIMEOUT_S:
             parser.error("--timeout-s is not supported for solax-orchestrated-cold-start")
-        if args.max_turns != 40:
+        if args.max_turns is not None and args.max_turns != DEFAULT_ANDROID_MAX_TURNS:
             parser.error("--max-turns is not supported for solax-orchestrated-cold-start")
         if args.runs_dir != str(ROOT / "evals" / "runs"):
             parser.error("--runs-dir is not supported for solax-orchestrated-cold-start")
@@ -490,9 +560,14 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--skills-registry is only supported for solax-orchestrated-cold-start")
     if hasattr(args, "runs"):
         parser.error("--runs is only supported for solax-orchestrated-cold-start")
+    if args.timeout_s is not None and args.timeout_s <= 0:
+        parser.error("--timeout-s must be greater than 0")
+    if args.max_turns is not None and args.max_turns <= 0:
+        parser.error("--max-turns must be greater than 0")
 
     spec = _load_spec(args.eval_id)
     spec["runtime_target"] = args.runtime
+    args.timeout_s, args.max_turns = _resolve_android_eval_budget(args, spec)
 
     if args.replay is not None:
         if not args.replay:
@@ -511,10 +586,17 @@ def main(argv: list[str] | None = None) -> int:
             timeout_s=args.replay_timeout_s,
         )
         result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
-        replay_result = dict(result)
-        replay_result["skill_score"] = skill_score
+        eval_id = config.get("eval_id") or result.get("eval_id")
+        if isinstance(eval_id, str):
+            spec = _load_spec(eval_id)
+            skill_score = _apply_skill_generation_contract(
+                dict(skill_score),
+                (run_dir / "transcript.txt").read_text(encoding="utf-8"),
+                spec.get("skill_generation"),
+            )
+        replay_result = _apply_skill_generation_outcome(result, skill_score)
         _write_json_file(run_dir / "result-replay.json", replay_result)
-        status = skill_score["replay_status"].upper()
+        status = replay_result.get("outcome", {}).get("status", skill_score["replay_status"]).upper()
         answer = skill_score["replay_answer_normalized"] or "none"
         print(run_dir)
         print(f"{status} | replay/{runtime_target} | {skill_score['replay_wall_clock_s']:.1f}s | answer={answer}")

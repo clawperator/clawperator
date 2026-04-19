@@ -73,7 +73,7 @@ export async function cmdAuthoringSkillsList(
         skills: [],
         count: 0,
         installedDir: installDir,
-        message: "No installed authoring skills found. Run clawperator authoring-skills install.",
+        message: "No installed authoring skills found. Run clawperator authoring-skills install to get skill-author-by-agent-discovery and skill-author-by-recording.",
       }, options);
     }
 

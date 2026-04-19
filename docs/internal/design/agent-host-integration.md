@@ -107,6 +107,14 @@ Key implications:
    host agent is most likely to inspect first
 4. the runtime-skills registry depends on shell-session propagation unless the
    CLI itself falls back to the installed home-directory path
+5. the local guide and shared-agent bridge now explicitly advertise the
+   discovery-to-proving route:
+   - `skill-author-by-agent-discovery` is the zero-results front door
+   - `skill-author-by-recording` is the proving workflow after
+     `proceed_to_recording`
+   - the shared bridge points back to `~/.clawperator/AGENTS.md` plus
+     `clawperator skills ...` and `clawperator authoring-skills list`
+     without pretending shared skill dirs contain runtime skills
 
 Refs:
 

@@ -52,67 +52,98 @@ afterEach(async () => {
 });
 
 describe("authoringSkillsPack.mjs", () => {
-  it("prepack materializes authoring skill symlinks into directories and writes state for restoration", async () => {
+  it("prepack materializes multiple authoring skill symlinks into directories and writes state for restoration", async () => {
     const { root, scriptPath, authoringSkillsDir } = await makeTempPackage();
     const sourceSkillsRoot = join(root, "sources");
-    const sourceSkillDir = join(sourceSkillsRoot, "skill-author-by-recording");
-    await mkdir(sourceSkillDir, { recursive: true });
-    await mkdir(join(sourceSkillDir, "agents"), { recursive: true });
-    await writeFile(join(sourceSkillDir, "SKILL.md"), "# skill-author-by-recording\n", "utf8");
-    await writeFile(join(sourceSkillDir, "agents", "openai.yaml"), "name: demo\n", "utf8");
+    const skillNames = ["skill-author-by-agent-discovery", "skill-author-by-recording"];
+    for (const skillName of skillNames) {
+      const sourceSkillDir = join(sourceSkillsRoot, skillName);
+      await mkdir(sourceSkillDir, { recursive: true });
+      await mkdir(join(sourceSkillDir, "agents"), { recursive: true });
+      await writeFile(join(sourceSkillDir, "SKILL.md"), `# ${skillName}\n`, "utf8");
+      await writeFile(join(sourceSkillDir, "agents", "openai.yaml"), "name: demo\n", "utf8");
 
-    const symlinkPath = join(authoringSkillsDir, "skill-author-by-recording");
-    const linkedTarget = process.platform === "win32"
-      ? sourceSkillDir
-      : "../sources/skill-author-by-recording";
-    await import("node:fs/promises").then(({ symlink }) => symlink(linkedTarget, symlinkPath, directorySymlinkType));
+      const symlinkPath = join(authoringSkillsDir, skillName);
+      const linkedTarget = process.platform === "win32"
+        ? sourceSkillDir
+        : `../sources/${skillName}`;
+      await import("node:fs/promises").then(({ symlink }) => symlink(linkedTarget, symlinkPath, directorySymlinkType));
+    }
 
     await runNodeScript(scriptPath, "prepack", root);
 
-    const entryStat = await lstat(symlinkPath);
-    assert.equal(entryStat.isDirectory(), true);
-    assert.equal(entryStat.isSymbolicLink(), false);
-    assert.equal(await readFile(join(symlinkPath, "SKILL.md"), "utf8"), "# skill-author-by-recording\n");
-    assert.equal(await readFile(join(symlinkPath, "agents", "openai.yaml"), "utf8"), "name: demo\n");
+    for (const skillName of skillNames) {
+      const symlinkPath = join(authoringSkillsDir, skillName);
+      const entryStat = await lstat(symlinkPath);
+      assert.equal(entryStat.isDirectory(), true);
+      assert.equal(entryStat.isSymbolicLink(), false);
+      assert.equal(await readFile(join(symlinkPath, "SKILL.md"), "utf8"), `# ${skillName}\n`);
+      assert.equal(await readFile(join(symlinkPath, "agents", "openai.yaml"), "utf8"), "name: demo\n");
+    }
 
     const statePath = join(root, ".authoring-skills-pack-state.json");
     const state = JSON.parse(await readFile(statePath, "utf8")) as {
       symlinks: Array<{ entry: string; target: string }>;
     };
+    state.symlinks.sort((left, right) => left.entry.localeCompare(right.entry));
     assert.deepEqual(state, {
       symlinks: [
         {
+          entry: "skill-author-by-agent-discovery",
+          target: process.platform === "win32"
+            ? join(sourceSkillsRoot, "skill-author-by-agent-discovery")
+            : "../sources/skill-author-by-agent-discovery",
+        },
+        {
           entry: "skill-author-by-recording",
-          target: linkedTarget,
+          target: process.platform === "win32"
+            ? join(sourceSkillsRoot, "skill-author-by-recording")
+            : "../sources/skill-author-by-recording",
         },
       ],
     });
   });
 
-  it("postpack restores symlinks from saved state and removes the temporary state file", async () => {
+  it("postpack restores multiple symlinks from saved state and removes the temporary state file", async () => {
     const { root, scriptPath, authoringSkillsDir } = await makeTempPackage();
-    const restoredTarget = process.platform === "win32"
-      ? join(root, "sources", "skill-author-by-recording")
-      : "../sources/skill-author-by-recording";
-    const skillDir = join(authoringSkillsDir, "skill-author-by-recording");
-    await mkdir(skillDir, { recursive: true });
-    await writeFile(join(skillDir, "SKILL.md"), "# materialized\n", "utf8");
+    const restoredTargets = [
+      {
+        entry: "skill-author-by-agent-discovery",
+        target: process.platform === "win32"
+          ? join(root, "sources", "skill-author-by-agent-discovery")
+          : "../sources/skill-author-by-agent-discovery",
+      },
+      {
+        entry: "skill-author-by-recording",
+        target: process.platform === "win32"
+          ? join(root, "sources", "skill-author-by-recording")
+          : "../sources/skill-author-by-recording",
+      },
+    ];
+    for (const { entry } of restoredTargets) {
+      const skillDir = join(authoringSkillsDir, entry);
+      await mkdir(skillDir, { recursive: true });
+      await writeFile(join(skillDir, "SKILL.md"), "# materialized\n", "utf8");
+    }
     await writeFile(
       join(root, ".authoring-skills-pack-state.json"),
       `${JSON.stringify({
-        symlinks: [{ entry: "skill-author-by-recording", target: restoredTarget }],
+        symlinks: restoredTargets,
       }, null, 2)}\n`,
       "utf8"
     );
 
     await runNodeScript(scriptPath, "postpack", root);
 
-    const entryStat = await lstat(skillDir);
-    assert.equal(entryStat.isSymbolicLink(), true);
-    assert.equal(
-      normalizeDirectorySymlinkTarget(authoringSkillsDir, await readlink(skillDir)),
-      normalizeDirectorySymlinkTarget(authoringSkillsDir, restoredTarget)
-    );
+    for (const { entry, target } of restoredTargets) {
+      const skillDir = join(authoringSkillsDir, entry);
+      const entryStat = await lstat(skillDir);
+      assert.equal(entryStat.isSymbolicLink(), true);
+      assert.equal(
+        normalizeDirectorySymlinkTarget(authoringSkillsDir, await readlink(skillDir)),
+        normalizeDirectorySymlinkTarget(authoringSkillsDir, target)
+      );
+    }
     await assert.rejects(() => readFile(join(root, ".authoring-skills-pack-state.json"), "utf8"));
   });
 

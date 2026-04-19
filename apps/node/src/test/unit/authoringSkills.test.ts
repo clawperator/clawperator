@@ -5,7 +5,7 @@ import { join, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { getCliVersion } from "../../domain/version/compatibility.js";
 import { cmdAuthoringSkillsInstall, cmdAuthoringSkillsList } from "../../cli/commands/authoringSkills.js";
-import { copyAuthoringSkills } from "../../domain/skills/copyAuthoringSkills.js";
+import { copyAuthoringSkills, listPackagedAuthoringSkills } from "../../domain/skills/copyAuthoringSkills.js";
 
 const tempRoots: string[] = [];
 const directorySymlinkType = process.platform === "win32" ? "junction" : "dir";
@@ -17,12 +17,18 @@ async function makeTempRoot(): Promise<string> {
 }
 
 async function createSourceSkill(root: string, skillName: string): Promise<string> {
+  return createSourceSkills(root, [skillName]);
+}
+
+async function createSourceSkills(root: string, skillNames: string[]): Promise<string> {
   const sourceDir = join(root, "source");
-  const skillDir = join(sourceDir, skillName);
-  await mkdir(skillDir, { recursive: true });
-  await mkdir(join(skillDir, "agents"), { recursive: true });
-  await writeFile(join(skillDir, "SKILL.md"), `# ${skillName}\n`, "utf8");
-  await writeFile(join(skillDir, "agents", "openai.yaml"), "name: demo\n", "utf8");
+  for (const skillName of skillNames) {
+    const skillDir = join(sourceDir, skillName);
+    await mkdir(skillDir, { recursive: true });
+    await mkdir(join(skillDir, "agents"), { recursive: true });
+    await writeFile(join(skillDir, "SKILL.md"), `# ${skillName}\n`, "utf8");
+    await writeFile(join(skillDir, "agents", "openai.yaml"), "name: demo\n", "utf8");
+  }
   return sourceDir;
 }
 
@@ -31,17 +37,23 @@ afterEach(async () => {
 });
 
 describe("copyAuthoringSkills", () => {
-  it("discovers a skill by finding a subdirectory with SKILL.md and copies it to the install target", async () => {
+  it("discovers multiple skills by finding subdirectories with SKILL.md and copies them to the install target", async () => {
     const root = await makeTempRoot();
-    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const sourceDir = await createSourceSkills(root, [
+      "skill-author-by-agent-discovery",
+      "skill-author-by-recording",
+    ]);
     const installedDir = join(root, "home", ".clawperator", "authoring-skills");
+    const claudeSkillsDir = join(root, "home", ".claude", "skills");
+    const codexSkillsDir = join(root, "home", ".codex", "skills");
+    const agentsSkillsDir = join(root, "home", ".agents", "skills");
 
     const result = await copyAuthoringSkills({
       sourceDir,
       installedDir,
-      claudeSkillsDir: join(root, "home", ".claude", "skills"),
-      codexSkillsDir: join(root, "home", ".codex", "skills"),
-      agentsSkillsDir: join(root, "home", ".agents", "skills"),
+      claudeSkillsDir,
+      codexSkillsDir,
+      agentsSkillsDir,
       cliVersion: "1.2.3",
     });
 
@@ -49,9 +61,18 @@ describe("copyAuthoringSkills", () => {
     if (!result.ok) {
       assert.fail("expected successful copyAuthoringSkills result");
     }
-    assert.deepEqual(result.skills, ["skill-author-by-recording"]);
+    assert.deepEqual(result.skills, ["skill-author-by-agent-discovery", "skill-author-by-recording"]);
+    assert.equal(await readFile(join(installedDir, "skill-author-by-agent-discovery", "SKILL.md"), "utf8"), "# skill-author-by-agent-discovery\n");
+    assert.equal(await readFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "utf8"), "# skill-author-by-recording\n");
+    assert.equal(await readFile(join(installedDir, "skill-author-by-agent-discovery", "agents", "openai.yaml"), "utf8"), "name: demo\n");
     assert.equal(await readFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "utf8"), "# skill-author-by-recording\n");
     assert.equal(await readFile(join(installedDir, "skill-author-by-recording", "agents", "openai.yaml"), "utf8"), "name: demo\n");
+    assert.equal(await readlink(join(claudeSkillsDir, "skill-author-by-agent-discovery")), join(installedDir, "skill-author-by-agent-discovery"));
+    assert.equal(await readlink(join(claudeSkillsDir, "skill-author-by-recording")), join(installedDir, "skill-author-by-recording"));
+    assert.equal(await readlink(join(codexSkillsDir, "skill-author-by-agent-discovery")), join(installedDir, "skill-author-by-agent-discovery"));
+    assert.equal(await readlink(join(codexSkillsDir, "skill-author-by-recording")), join(installedDir, "skill-author-by-recording"));
+    assert.equal(await readlink(join(agentsSkillsDir, "skill-author-by-agent-discovery")), join(installedDir, "skill-author-by-agent-discovery"));
+    assert.equal(await readlink(join(agentsSkillsDir, "skill-author-by-recording")), join(installedDir, "skill-author-by-recording"));
   });
 
   it("ignores subdirectories without SKILL.md", async () => {
@@ -402,7 +423,10 @@ describe("copyAuthoringSkills", () => {
 describe("cmdAuthoringSkillsInstall", () => {
   it("preserves legacy top-level discovery dirs alongside agentDiscoveryDirs in json output", async () => {
     const root = await makeTempRoot();
-    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const sourceDir = await createSourceSkills(root, [
+      "skill-author-by-agent-discovery",
+      "skill-author-by-recording",
+    ]);
     const installedDir = join(root, "home", ".clawperator", "authoring-skills");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
     const codexSkillsDir = join(root, "home", ".codex", "skills");
@@ -419,12 +443,14 @@ describe("cmdAuthoringSkillsInstall", () => {
     });
 
     const parsed = JSON.parse(rendered) as {
+      skills: string[];
       installedDir: string;
       claudeSkillsDir: string;
       codexSkillsDir: string;
       agentDiscoveryDirs: Array<{ label: string; dir: string }>;
     };
 
+    assert.deepEqual(parsed.skills, ["skill-author-by-agent-discovery", "skill-author-by-recording"]);
     assert.equal(parsed.installedDir, installedDir);
     assert.equal(parsed.claudeSkillsDir, claudeSkillsDir);
     assert.equal(parsed.codexSkillsDir, codexSkillsDir);
@@ -448,15 +474,18 @@ describe("cmdAuthoringSkillsList", () => {
       skills: [],
       count: 0,
       installedDir: join(root, "missing-install-dir"),
-      message: "No installed authoring skills found. Run clawperator authoring-skills install.",
+      message: "No installed authoring skills found. Run clawperator authoring-skills install to get skill-author-by-agent-discovery and skill-author-by-recording.",
     });
   });
 
   it("returns the documented json shape for installed authoring skills", async () => {
     const root = await makeTempRoot();
     const installDir = join(root, "home", ".clawperator", "authoring-skills");
+    const discoveryDir = join(installDir, "skill-author-by-agent-discovery");
     const skillDir = join(installDir, "skill-author-by-recording");
+    await mkdir(discoveryDir, { recursive: true });
     await mkdir(skillDir, { recursive: true });
+    await writeFile(join(discoveryDir, "SKILL.md"), "# skill-author-by-agent-discovery\n", "utf8");
     await writeFile(join(skillDir, "SKILL.md"), "# skill-author-by-recording\n", "utf8");
 
     const output = await cmdAuthoringSkillsList({
@@ -467,11 +496,15 @@ describe("cmdAuthoringSkillsList", () => {
     assert.deepEqual(JSON.parse(output), {
       skills: [
         {
+          name: "skill-author-by-agent-discovery",
+          skillPath: join(discoveryDir, "SKILL.md"),
+        },
+        {
           name: "skill-author-by-recording",
           skillPath: join(skillDir, "SKILL.md"),
         },
       ],
-      count: 1,
+      count: 2,
       installedDir: installDir,
     });
   });
@@ -492,5 +525,12 @@ describe("cmdAuthoringSkillsList", () => {
     } finally {
       await chmod(installDir, 0o755);
     }
+  });
+});
+
+describe("listPackagedAuthoringSkills", () => {
+  it("lists both packaged first-party authoring skills from the repo tree", async () => {
+    const skills = await listPackagedAuthoringSkills();
+    assert.deepEqual(skills, ["skill-author-by-agent-discovery", "skill-author-by-recording"]);
   });
 });

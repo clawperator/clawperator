@@ -16,6 +16,8 @@ retyping the full command.
 ## When To Use
 
 - Run the Solax orchestrated cold-start eval on a real device.
+- Run the Pack A `android-version` benchmark on the required Samsung physical
+  device with `--mode full-repo --skill-prompt prompt-skill.md`.
 - Re-run repeated cold-start proving with explicit `--device` and
   `--operator-package`.
 - Debug the Solax orchestrated skill directly with retained logs.

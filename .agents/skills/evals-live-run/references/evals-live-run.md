@@ -30,6 +30,32 @@ npm --prefix apps/node run build
 
 - When multiple devices are connected, always pass `--device <serial>`.
 
+## Run The Pack A Samsung Benchmark
+
+Use this command for the Pack A red baseline and later green proof on the
+required Samsung physical device:
+
+```bash
+uv run --project evals --extra dev python evals/run_eval.py android-version \
+  --agent <agent> \
+  --model <model> \
+  --runtime local-dev \
+  --mode full-repo \
+  --skill-prompt prompt-skill.md \
+  --device <samsung_serial> \
+  --label <pack_a_label>
+```
+
+Rules:
+
+- This path is Samsung-only for Pack A. Do not substitute another OEM or a
+  second emulator.
+- Keep explicit `--device <samsung_serial>` on every run.
+- Before the discovery-first authoring skill ships, a truthful canary is
+  expected to stay red because the required front door does not exist yet.
+- The Pack A benchmark stays on the `android-version` eval id rooted at
+  `com.android.settings`.
+
 ## Run The Solax Cold-Start Eval
 
 One run:
@@ -109,6 +135,9 @@ This prints the newest Solax batch directory and its `summary.json`.
 
 ## Interpretation
 
+- Pack A red-baseline expectation before the new discovery skill exists:
+  `skill_emitted = false`, `replay_status = "skipped"`, or a transcript that
+  records the missing discovery route explicitly.
 - `cold_start_verified` means the run started from a restarted outside-app
   state, selected a different target than the observed persisted value, and
   verified the final persisted row.

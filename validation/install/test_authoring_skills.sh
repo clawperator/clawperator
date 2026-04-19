@@ -233,9 +233,11 @@ run_guide_case() {
     local label="$1"
     local version_mode="$2"
     local runtime_mode="$3"
-    local output_file="$4"
-    local guide_file="$5"
+    local authoring_mode="$4"
+    local output_file="$5"
+    local guide_file="$6"
 
+    AUTHORING_MODE="$authoring_mode" \
     HOME="$TMP_DIR/home-$label" \
     OS=Linux \
     bash -c '
@@ -245,10 +247,22 @@ run_guide_case() {
         unset SKILLS_REGISTRY_PATH
         unset SKILLS_SETUP_STATUS
         export AUTHORING_SKILLS_INSTALL_DIR="$HOME/.clawperator/authoring-skills"
-        mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-recording"
-        mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-audit"
-        printf "# skill-author-by-recording\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-recording/SKILL.md"
-        printf "# skill-audit\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-audit/SKILL.md"
+        if [ "$AUTHORING_MODE" = "complete" ]; then
+          mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-agent-discovery"
+          mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-recording"
+          mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-audit"
+          printf "# skill-author-by-agent-discovery\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-agent-discovery/SKILL.md"
+          printf "# skill-author-by-recording\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-recording/SKILL.md"
+          printf "# skill-audit\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-audit/SKILL.md"
+        elif [ "$AUTHORING_MODE" = "recording-only" ]; then
+          mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-recording"
+          mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-audit"
+          printf "# skill-author-by-recording\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-recording/SKILL.md"
+          printf "# skill-audit\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-audit/SKILL.md"
+        else
+          printf "unexpected authoring mode: %s\n" "$AUTHORING_MODE" >&2
+          exit 1
+        fi
         if [ "$2" = "with-version" ]; then
           printf "1.2.3\n" > "$AUTHORING_SKILLS_INSTALL_DIR/version.txt"
         fi
@@ -282,9 +296,9 @@ JSON
 ]}
 JSON
         fi
-        write_agent_guide > "$4"
-        printf "%s\n" "$HOME/.clawperator/AGENTS.md" > "$5"
-    ' _ "$INSTALL_SCRIPT" "$version_mode" "$runtime_mode" "$output_file" "$guide_file"
+        write_agent_guide > "$5"
+        printf "%s\n" "$HOME/.clawperator/AGENTS.md" > "$6"
+    ' _ "$INSTALL_SCRIPT" "$version_mode" "$runtime_mode" "$authoring_mode" "$output_file" "$guide_file"
 }
 
 run_missing_guide_case() {
@@ -688,7 +702,7 @@ assert_contains "$AUTHORING_FAILURE_VALUES" "install=$TMP_DIR/home-authoring-fai
 echo "=== Scenario 7: guide writer lists installed skills and refresh guidance ==="
 GUIDE_OUT="$TMP_DIR/guide.out"
 GUIDE_PATH_FILE="$TMP_DIR/guide.path"
-run_guide_case guide-missing-version without-version with-runtime-registry "$GUIDE_OUT" "$GUIDE_PATH_FILE"
+run_guide_case guide-missing-version without-version with-runtime-registry complete "$GUIDE_OUT" "$GUIDE_PATH_FILE"
 GUIDE_PATH="$(cat "$GUIDE_PATH_FILE")"
 assert_contains "$GUIDE_OUT" "Wrote agent guide" "guide-missing-version"
 assert_contains "$GUIDE_PATH" "## Runtime Skills" "guide-missing-version file"
@@ -717,28 +731,47 @@ assert_contains "$GUIDE_PATH" "  example:" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "clawperator skills run com.google.android.apps.chromecast.app.get-climate-replay" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "clawperator skills run com.google.android.apps.chromecast.app.set-temperature-replay --target-temperature <target_temperature> --unit-name <unit_name>" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "com.spotify.music" "guide-missing-version file"
+assert_contains "$GUIDE_PATH" "skill-author-by-agent-discovery" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "skill-author-by-recording" "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "skill-audit" "guide-missing-version file"
+assert_contains "$GUIDE_PATH" "Recommended no-match flow:" "guide-missing-version file"
+assert_contains "$GUIDE_PATH" 'Start the guided route with `skill-author-by-agent-discovery`' "guide-missing-version file"
+assert_contains "$GUIDE_PATH" 'Use `skill-author-by-recording` only after discovery returns `proceed_to_recording`' "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "Version metadata is missing for this install." "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "clawperator authoring-skills update" "guide-missing-version file"
 
 echo "=== Scenario 8: guide writer with version omits refresh guidance ==="
 GUIDE_WITH_VERSION_OUT="$TMP_DIR/guide-with-version.out"
 GUIDE_WITH_VERSION_PATH_FILE="$TMP_DIR/guide-with-version.path"
-run_guide_case guide-with-version with-version with-runtime-registry "$GUIDE_WITH_VERSION_OUT" "$GUIDE_WITH_VERSION_PATH_FILE"
+run_guide_case guide-with-version with-version with-runtime-registry complete "$GUIDE_WITH_VERSION_OUT" "$GUIDE_WITH_VERSION_PATH_FILE"
 GUIDE_WITH_VERSION_PATH="$(cat "$GUIDE_WITH_VERSION_PATH_FILE")"
 assert_contains "$GUIDE_WITH_VERSION_OUT" "Wrote agent guide" "guide-with-version"
 assert_not_contains "$GUIDE_WITH_VERSION_PATH" "Runtime skills not available on this host right now." "guide-with-version file"
+assert_contains "$GUIDE_WITH_VERSION_PATH" "skill-author-by-agent-discovery" "guide-with-version file"
 assert_contains "$GUIDE_WITH_VERSION_PATH" "skill-author-by-recording" "guide-with-version file"
+assert_contains "$GUIDE_WITH_VERSION_PATH" 'Start the guided route with `skill-author-by-agent-discovery`' "guide-with-version file"
 assert_not_contains "$GUIDE_WITH_VERSION_PATH" "Version metadata is missing for this install." "guide-with-version file"
 assert_not_contains "$GUIDE_WITH_VERSION_PATH" "clawperator authoring-skills update" "guide-with-version file"
 assert_mode "$GUIDE_WITH_VERSION_PATH" "600" "guide-with-version mode"
 assert_mode "$TMP_DIR/home-guide-with-version/.clawperator" "700" "guide-with-version dir mode"
 
+echo "=== Scenario 8b: guide writer falls back when the discovery front door is missing ==="
+GUIDE_PARTIAL_OUT="$TMP_DIR/guide-partial.out"
+GUIDE_PARTIAL_PATH_FILE="$TMP_DIR/guide-partial.path"
+run_guide_case guide-partial without-version with-runtime-registry recording-only "$GUIDE_PARTIAL_OUT" "$GUIDE_PARTIAL_PATH_FILE"
+GUIDE_PARTIAL_PATH="$(cat "$GUIDE_PARTIAL_PATH_FILE")"
+assert_contains "$GUIDE_PARTIAL_OUT" "Wrote agent guide" "guide-partial"
+assert_not_contains "$GUIDE_PARTIAL_PATH" 'skill-author-by-agent-discovery`: zero-results front door when' "guide-partial file"
+assert_contains "$GUIDE_PARTIAL_PATH" "skill-author-by-recording" "guide-partial file"
+assert_contains "$GUIDE_PARTIAL_PATH" "Installed authoring front doors are incomplete on this host." "guide-partial file"
+assert_contains "$GUIDE_PARTIAL_PATH" 'missing `skill-author-by-agent-discovery`' "guide-partial file"
+assert_contains "$GUIDE_PARTIAL_PATH" "clawperator authoring-skills update" "guide-partial file"
+assert_not_contains "$GUIDE_PARTIAL_PATH" 'Start the guided route with `skill-author-by-agent-discovery`' "guide-partial file"
+
 echo "=== Scenario 9: guide writer prefers configured runtime registry path ==="
 GUIDE_CONFIGURED_OUT="$TMP_DIR/guide-configured.out"
 GUIDE_CONFIGURED_PATH_FILE="$TMP_DIR/guide-configured.path"
-run_guide_case guide-configured without-version with-configured-runtime-registry "$GUIDE_CONFIGURED_OUT" "$GUIDE_CONFIGURED_PATH_FILE"
+run_guide_case guide-configured without-version with-configured-runtime-registry complete "$GUIDE_CONFIGURED_OUT" "$GUIDE_CONFIGURED_PATH_FILE"
 GUIDE_CONFIGURED_PATH="$(cat "$GUIDE_CONFIGURED_PATH_FILE")"
 assert_contains "$GUIDE_CONFIGURED_OUT" "Wrote agent guide" "guide-configured"
 assert_contains "$GUIDE_CONFIGURED_PATH" "$TMP_DIR/home-guide-configured/.clawperator/custom-runtime/skills-registry.json" "guide-configured file"
@@ -748,7 +781,7 @@ assert_not_contains "$GUIDE_CONFIGURED_PATH" "Runtime skills not available on th
 echo "=== Scenario 10: guide writer uses readable CLAWPERATOR_SKILLS_REGISTRY on rerun paths ==="
 GUIDE_ENV_OUT="$TMP_DIR/guide-env.out"
 GUIDE_ENV_PATH_FILE="$TMP_DIR/guide-env.path"
-run_guide_case guide-env without-version with-env-runtime-registry "$GUIDE_ENV_OUT" "$GUIDE_ENV_PATH_FILE"
+run_guide_case guide-env without-version with-env-runtime-registry complete "$GUIDE_ENV_OUT" "$GUIDE_ENV_PATH_FILE"
 GUIDE_ENV_PATH="$(cat "$GUIDE_ENV_PATH_FILE")"
 assert_contains "$GUIDE_ENV_OUT" "Wrote agent guide" "guide-env"
 assert_contains "$GUIDE_ENV_PATH" "$TMP_DIR/home-guide-env/.clawperator/env-runtime/skills-registry.json" "guide-env file"
@@ -767,7 +800,7 @@ assert_contains "$GUIDE_MISSING_PATH" "clawperator authoring-skills install" "gu
 echo "=== Scenario 12: guide writer degrades cleanly when runtime registry is unreadable ==="
 GUIDE_INVALID_OUT="$TMP_DIR/guide-invalid.out"
 GUIDE_INVALID_PATH_FILE="$TMP_DIR/guide-invalid.path"
-run_guide_case guide-invalid-runtime without-version with-invalid-runtime-registry "$GUIDE_INVALID_OUT" "$GUIDE_INVALID_PATH_FILE"
+run_guide_case guide-invalid-runtime without-version with-invalid-runtime-registry complete "$GUIDE_INVALID_OUT" "$GUIDE_INVALID_PATH_FILE"
 GUIDE_INVALID_PATH="$(cat "$GUIDE_INVALID_PATH_FILE")"
 assert_contains "$GUIDE_INVALID_OUT" "Wrote agent guide" "guide-invalid-runtime"
 assert_contains "$GUIDE_INVALID_PATH" "Runtime skills not available on this host right now." "guide-invalid-runtime file"
@@ -958,6 +991,8 @@ assert_contains "$BRIDGE_EXISTING_PATH" 'clawperator skills for-app <package_id>
 assert_contains "$BRIDGE_EXISTING_PATH" 'clawperator skills search --keyword "<term>"' "bridge-existing file"
 assert_contains "$BRIDGE_EXISTING_PATH" 'clawperator skills get <skill_id>' "bridge-existing file"
 assert_contains "$BRIDGE_EXISTING_PATH" 'Do not mirror them into shared agent skill directories.' "bridge-existing file"
+assert_contains "$BRIDGE_EXISTING_PATH" 'follow the local guide for the authoring front doors installed on this host.' "bridge-existing file"
+assert_contains "$BRIDGE_EXISTING_PATH" 'Confirm the local guide lists both `skill-author-by-agent-discovery` and `skill-author-by-recording` before starting the discovery-to-proving route.' "bridge-existing file"
 assert_not_contains "$BRIDGE_EXISTING_PATH" "### Application" "bridge-existing file"
 assert_occurrence_count "$BRIDGE_EXISTING_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:START -->" "1" "bridge-existing start marker count"
 assert_occurrence_count "$BRIDGE_EXISTING_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:END -->" "1" "bridge-existing end marker count"

@@ -1068,7 +1068,10 @@ write_agent_guide() {
     local AGENT_GUIDE_PATH="$HOME/.clawperator/AGENTS.md"
     local AUTHORING_SKILLS_GUIDE_DIR="${AUTHORING_SKILLS_INSTALL_DIR:-$HOME/.clawperator/authoring-skills}"
     local SKILL_DIR=""
+    local SKILL_NAME=""
     local HAS_SKILLS=0
+    local HAS_DISCOVERY_SKILL=0
+    local HAS_RECORDING_SKILL=0
 
     ensure_private_clawperator_dir
 
@@ -1098,7 +1101,12 @@ EOF
         for SKILL_DIR in "$AUTHORING_SKILLS_GUIDE_DIR"/*/; do
             if [ -f "${SKILL_DIR}SKILL.md" ]; then
                 HAS_SKILLS=1
-                break
+                SKILL_NAME="$(basename "$SKILL_DIR")"
+                if [ "$SKILL_NAME" = "skill-author-by-agent-discovery" ]; then
+                    HAS_DISCOVERY_SKILL=1
+                elif [ "$SKILL_NAME" = "skill-author-by-recording" ]; then
+                    HAS_RECORDING_SKILL=1
+                fi
             fi
         done
     fi
@@ -1111,14 +1119,57 @@ EOF
 First-party Clawperator authoring skills are installed at:
 ${AUTHORING_SKILLS_GUIDE_DIR}
 
-Available skills:
+EOF
+        if [ "$HAS_DISCOVERY_SKILL" -eq 1 ]; then
+            cat >> "$AGENT_GUIDE_PATH" <<'EOF'
+- \`skill-author-by-agent-discovery\`: zero-results front door when
+  \`clawperator skills for-app <package_id>\` and
+  \`clawperator skills search --keyword "<term>"\` found no relevant runtime
+  skill. Discovery stays bounded, produces one routing artifact, and chooses
+  the next truthful step.
+EOF
+        fi
+        if [ "$HAS_RECORDING_SKILL" -eq 1 ]; then
+            cat >> "$AGENT_GUIDE_PATH" <<'EOF'
+- \`skill-author-by-recording\`: proving workflow after discovery returns
+  \`proceed_to_recording\`, or when the app route is already well understood
+  and you need a real-device recording to draft a reusable runtime skill.
+EOF
+        fi
+        cat >> "$AGENT_GUIDE_PATH" <<'EOF'
+
+Installed entries on this host:
 EOF
         for SKILL_DIR in "$AUTHORING_SKILLS_GUIDE_DIR"/*/; do
             if [ -f "${SKILL_DIR}SKILL.md" ]; then
                 printf -- '- %s\n' "$(basename "$SKILL_DIR")" >> "$AGENT_GUIDE_PATH"
             fi
         done
-        if [ ! -f "$AUTHORING_SKILLS_GUIDE_DIR/version.txt" ]; then
+        if [ "$HAS_DISCOVERY_SKILL" -eq 1 ] && [ "$HAS_RECORDING_SKILL" -eq 1 ]; then
+            cat >> "$AGENT_GUIDE_PATH" <<'EOF'
+
+Recommended no-match flow:
+- Start with `clawperator skills for-app <package_id>` or `clawperator skills search --keyword "<term>"`
+- If there is no relevant runtime-skill match, inspect `clawperator authoring-skills list --json`
+- Start the guided route with `skill-author-by-agent-discovery`
+- Use `skill-author-by-recording` only after discovery returns `proceed_to_recording`
+EOF
+        else
+            cat >> "$AGENT_GUIDE_PATH" <<'EOF'
+
+Installed authoring front doors are incomplete on this host.
+
+Repair it with:
+- run `clawperator authoring-skills update`
+EOF
+            if [ "$HAS_DISCOVERY_SKILL" -ne 1 ]; then
+                printf -- '- missing `%s`\n' "skill-author-by-agent-discovery" >> "$AGENT_GUIDE_PATH"
+            fi
+            if [ "$HAS_RECORDING_SKILL" -ne 1 ]; then
+                printf -- '- missing `%s`\n' "skill-author-by-recording" >> "$AGENT_GUIDE_PATH"
+            fi
+        fi
+        if [ ! -f "$AUTHORING_SKILLS_GUIDE_DIR/version.txt" ] && [ "$HAS_DISCOVERY_SKILL" -eq 1 ] && [ "$HAS_RECORDING_SKILL" -eq 1 ]; then
             cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
 Version metadata is missing for this install.
@@ -1132,6 +1183,10 @@ EOF
 ## Authoring Skills
 
 First-party Clawperator authoring skills are not currently configured on this host.
+
+Expected packaged front doors after install:
+- `skill-author-by-agent-discovery`: zero-results front door when runtime-skill discovery found no relevant match
+- `skill-author-by-recording`: proving workflow after discovery returns `proceed_to_recording`
 
 Repair or manual bootstrap:
 - run `clawperator authoring-skills install`
@@ -1191,7 +1246,10 @@ const bridgeBlock = [
   "- `clawperator skills for-app <package_id>`",
   "- `clawperator skills search --keyword \"<term>\"`",
   "- `clawperator skills get <skill_id>`",
+  "- `clawperator authoring-skills list --json`",
   "",
+  "If runtime-skill discovery finds no relevant match, follow the local guide for the authoring front doors installed on this host.",
+  "Confirm the local guide lists both `skill-author-by-agent-discovery` and `skill-author-by-recording` before starting the discovery-to-proving route.",
   "Use `clawperator skills run <skill_id>` after you have identified the right runtime skill.",
   endMarker,
 ].join("\n");

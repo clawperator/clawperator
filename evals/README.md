@@ -201,6 +201,25 @@ Knowledge modes:
 The `android-version` eval can also score whether the agent emitted a reusable
 skill package.
 
+For Pack A, this is the benchmark that must become the red and then green proof
+surface for discovery-authored Settings/About-device skills. The required route
+is:
+
+1. keep the eval id as `android-version`
+2. run with `--mode full-repo`
+3. use `--skill-prompt prompt-skill.md`
+4. treat `skill-author-by-agent-discovery` as the required discovery front door
+5. treat `skill-author-by-recording` as the proving handoff when discovery says
+   `proceed_to_recording`
+
+Current Pack A device matrix:
+
+- AOSP emulator for the repo-local `evals-run` path
+- Samsung physical device for the repo-local `evals-live-run` path
+
+Do not substitute another OEM or a second emulator for the Samsung leg without
+updating the pack.
+
 Use the skill prompt variant to enable that scoring:
 
 ```bash
@@ -211,6 +230,35 @@ uv run --project evals --extra dev python evals/run_eval.py android-version \
   --skill-prompt prompt-skill.md \
   --device <serial>
 ```
+
+For the initial Pack A red baseline, use the branch-local runtime and expect
+the skill path to remain red until the discovery-first front door exists:
+
+```bash
+uv run --project evals --extra dev python evals/run_eval.py android-version \
+  --agent codex \
+  --model gpt-5.4 \
+  --runtime local-dev \
+  --mode full-repo \
+  --skill-prompt prompt-skill.md \
+  --device <serial> \
+  --label pack-a-red-baseline
+```
+
+Truth boundary for that red baseline:
+
+- the main Android-version answer may still be correct, but the overall
+  `outcome.status` stays `fail` until the Pack A discovery-to-proving route is
+  actually proven
+- `skill_emitted = false` and `replay_status = "skipped"` are still truthful
+  red outcomes before `skill-author-by-agent-discovery` is implemented, but
+  they now fail the run instead of leaving it green
+- when `skill_generation_passed = false`, the harness applies the skill gate
+  to the top-level run outcome and typically records
+  `failure_reason = "skill_route_not_proven"` for missing route evidence or
+  `failure_reason = "skill_not_emitted"` when no skill was emitted
+- a transcript that explicitly reports the missing discovery route is still a
+  truthful red outcome, but it remains a failing run until the route is proven
 
 When you use `--skill-prompt prompt-skill.md` and the spec provides
 `skill_generation`, the run records a `skill_score` block in `result.json`.
@@ -311,6 +359,10 @@ Key fields:
 - `metrics.turns_budget` - the configured max turn budget
 - `skill_score` - present when the run used the skill prompt and the spec has
   `skill_generation`
+- `skill_score.route_requirements_met` - whether the transcript proved the
+  required Pack A discovery route
+- `skill_score.skill_generation_passed` - whether emitted skill validation,
+  replay, answer correctness, and route proof all succeeded
 - `artifacts.transcript` - transcript file name
 - `artifacts.config` - config file name
 
