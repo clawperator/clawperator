@@ -221,8 +221,8 @@ over-authoring and weak first drafts.
 - The exact wording and examples inside the new skill prompt
 - Whether `docs/internal/design/agent-host-integration.md` needs a small
   matching durable note in addition to the public docs
-- The concrete discovery budget numbers, as long as the result is bounded and
-  justified in `findings.md`
+- Whether the default discovery budget needs a justified deviation in
+  `findings.md`
 - Whether the Pack A eval can stay entirely inside the current
   `android-version` benchmark or needs a narrow sibling prompt variant for the
   authored-skill flow
