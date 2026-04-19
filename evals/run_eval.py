@@ -84,8 +84,16 @@ def _resolve_android_eval_budget(args: argparse.Namespace, spec: dict) -> tuple[
     if not isinstance(spec_max_turns, int) or spec_max_turns <= 0:
         spec_max_turns = DEFAULT_ANDROID_MAX_TURNS
 
-    timeout_s = args.timeout_s if args.timeout_s is not None else spec_timeout_s
-    max_turns = args.max_turns if args.max_turns is not None else spec_max_turns
+    cli_timeout_s = args.timeout_s
+    if not isinstance(cli_timeout_s, int) or cli_timeout_s <= 0:
+        cli_timeout_s = None
+
+    cli_max_turns = args.max_turns
+    if not isinstance(cli_max_turns, int) or cli_max_turns <= 0:
+        cli_max_turns = None
+
+    timeout_s = cli_timeout_s if cli_timeout_s is not None else spec_timeout_s
+    max_turns = cli_max_turns if cli_max_turns is not None else spec_max_turns
     return timeout_s, max_turns
 
 

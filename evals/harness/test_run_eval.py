@@ -307,6 +307,16 @@ def test_resolve_android_eval_budget_prefers_cli_overrides():
     assert max_turns == 21
 
 
+def test_resolve_android_eval_budget_ignores_non_positive_cli_overrides():
+    args = SimpleNamespace(timeout_s=0, max_turns=-1)
+    spec = {"budget": {"default_timeout_s": 600, "default_max_turns": 55}}
+
+    timeout_s, max_turns = run_eval._resolve_android_eval_budget(args, spec)
+
+    assert timeout_s == 600
+    assert max_turns == 55
+
+
 @pytest.mark.parametrize(
     "argv",
     [
