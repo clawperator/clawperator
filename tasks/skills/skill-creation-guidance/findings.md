@@ -115,6 +115,16 @@ follow-up routing decisions needed for Phase 2.
   - README routes to durable main-repo docs plus local checklist and test entrypoints
   - AGENTS stays the local checklist surface and points back to the durable main-repo docs
   - `skill-migration.md` is explicitly secondary to README and AGENTS
+- Phase 4 public-doc routes now in place:
+  - `docs/skills/authoring.md` names `clawperator authoring-skills list --json`
+    as the host-visible authoring-workflow discovery command
+  - `docs/skills/authoring.md` points runtime-skill authors back to the
+    `clawperator-skills` `README.md` and `AGENTS.md` entrypoints
+  - `docs/skills/authoring.md` points authors to
+    `./scripts/test_all.sh` for off-device JS tests and
+    `./scripts/generate_skill_indexes.sh` for registry-linked refresh work
+  - public docs now explain that `skills validate` is the static gate, not the
+    whole testing story
 
 ## Validation commands
 
@@ -155,6 +165,17 @@ Phase 3 validation result on 2026-04-19:
   `generate_skill_indexes.sh` checks.
 - `git diff --check` passed before the Phase 3 commit path.
 
+Phase 4 validation result on 2026-04-19:
+
+- `./scripts/docs_build.sh` passed end to end.
+- Human review confirmed `docs/skills/authoring.md` now points authors to the
+  `clawperator-skills` README, AGENTS checklist, `test_all.sh`, and
+  `generate_skill_indexes.sh` without duplicating the full local checklist.
+- Human review confirmed the public page names
+  `clawperator authoring-skills list --json` as the current host-visible
+  discovery surface and explains the validator-versus-checklist boundary using
+  the Phase 3 guardrails.
+
 ## Observations
 
 - `../clawperator-skills` already had uncommitted Phase 1-aligned edits in
@@ -183,7 +204,5 @@ Phase 3 validation result on 2026-04-19:
 
 ## Deferred follow-up
 
-- Phase 4 should update the public docs to describe the validator boundary and
-  the skills-repo test route without copying the full local checklist.
 - Phase 5 should expand the local checklist into the full testing matrix and
   negative-example guidance.
