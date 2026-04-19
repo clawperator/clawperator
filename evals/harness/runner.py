@@ -28,6 +28,18 @@ from .timeutil import format_timestamp
 DOCS_URL = "https://docs.clawperator.com"
 TRANSCRIPT_CAP_BYTES = 10 * 1024 * 1024
 _SENSITIVE_KEY_RE = ("KEY", "SECRET", "TOKEN", "PASSWORD")
+_DISCOVERY_ARTIFACT_REQUIRED_KEYS = {
+    "recommended_next_step",
+    "existing_skill_verdict",
+    "target_app_package",
+    "route_confidence",
+    "mutation_risk",
+    "evidence_collected",
+    "discovery_budget_used",
+    "handoff_target",
+    "handoff_reasoning",
+}
+_DISCOVERY_ARTIFACT_FENCE_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL | re.IGNORECASE)
 
 
 def build_prompt(template_path: str, variables: dict) -> str:
@@ -179,30 +191,139 @@ def _write_json_file(path: Path, payload: dict[str, Any]) -> None:
     temp_path.replace(path)
 
 
-def _iter_nested_text_values(value: Any):
-    if isinstance(value, str):
-        yield value
-    elif isinstance(value, list):
-        for item in value:
-            yield from _iter_nested_text_values(item)
-    elif isinstance(value, dict):
-        for item in value.values():
-            yield from _iter_nested_text_values(item)
-
-
-def _iter_transcript_evidence_strings(transcript: str):
+def _iter_transcript_json_objects(transcript: str):
     for raw_line in transcript.splitlines():
-        stripped = raw_line.strip()
-        if stripped:
-            yield stripped
         try:
             payload = json.loads(raw_line)
         except json.JSONDecodeError:
             continue
-        for text in _iter_nested_text_values(payload):
-            normalized = text.strip()
-            if normalized:
-                yield normalized
+        if isinstance(payload, dict):
+            yield payload
+
+
+def _iter_command_execution_records(transcript: str):
+    for payload in _iter_transcript_json_objects(transcript):
+        item = payload.get("item") if payload.get("type") == "item.completed" else payload
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") == "command_execution":
+            yield item
+
+
+def _normalize_command_tokens(tokens: Any) -> list[str]:
+    if not isinstance(tokens, list):
+        return []
+    normalized: list[str] = []
+    for token in tokens:
+        if isinstance(token, str) and token.strip():
+            normalized.append(token.strip())
+    return normalized
+
+
+def _extract_command_token_lists(record: dict[str, Any]) -> list[list[str]]:
+    token_lists: list[list[str]] = []
+
+    command = record.get("command")
+    if isinstance(command, str) and command.strip():
+        try:
+            parsed = shlex.split(command)
+        except ValueError:
+            parsed = command.split()
+        if parsed:
+            token_lists.append(parsed)
+    elif isinstance(command, list):
+        parsed = _normalize_command_tokens(command)
+        if parsed:
+            token_lists.append(parsed)
+    elif isinstance(command, dict):
+        executable = command.get("executable")
+        args = _normalize_command_tokens(command.get("args"))
+        if isinstance(executable, str) and executable.strip():
+            token_lists.append([executable.strip(), *args])
+        argv = _normalize_command_tokens(command.get("argv"))
+        if argv:
+            token_lists.append(argv)
+
+    for key in ("argv", "args", "command_argv", "commandArgs"):
+        parsed = _normalize_command_tokens(record.get(key))
+        if parsed:
+            token_lists.append(parsed)
+
+    return token_lists
+
+
+def _tokens_request_json_output(tokens: list[str]) -> bool:
+    lowered = [token.lower() for token in tokens]
+    if "--json" in lowered:
+        return True
+    for index, token in enumerate(lowered[:-1]):
+        if token in {"--output", "--format"} and lowered[index + 1] == "json":
+            return True
+    return False
+
+
+def _is_authoring_skills_list_command(record: dict[str, Any]) -> bool:
+    for tokens in _extract_command_token_lists(record):
+        lowered = [token.lower() for token in tokens]
+        for index in range(len(lowered) - 1):
+            if lowered[index] == "authoring-skills" and lowered[index + 1] == "list":
+                if _tokens_request_json_output(tokens):
+                    return True
+    return False
+
+
+def _extract_discovery_artifacts(transcript: str) -> list[dict[str, Any]]:
+    artifacts: list[dict[str, Any]] = []
+    for match in _DISCOVERY_ARTIFACT_FENCE_RE.finditer(transcript):
+        candidate = match.group(1).strip()
+        try:
+            payload = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        if _DISCOVERY_ARTIFACT_REQUIRED_KEYS.issubset(payload.keys()):
+            artifacts.append(payload)
+    return artifacts
+
+
+def _skill_generation_failure_reason(skill_score: dict[str, Any]) -> str | None:
+    if skill_score.get("skill_generation_passed"):
+        return None
+    if not skill_score.get("route_requirements_met", True):
+        return "skill_route_not_proven"
+    if not skill_score.get("skill_emitted"):
+        return "skill_not_emitted"
+    if not skill_score.get("skill_valid"):
+        return "skill_invalid"
+    replay_status = skill_score.get("replay_status")
+    if replay_status == "skipped":
+        return "skill_replay_skipped"
+    if replay_status == "error":
+        return "skill_replay_error"
+    if replay_status == "no_answer":
+        return "skill_replay_no_answer"
+    if replay_status == "fail":
+        return "skill_replay_failed"
+    return "skill_generation_failed"
+
+
+def _apply_skill_generation_outcome(result: dict[str, Any], skill_score: dict[str, Any]) -> dict[str, Any]:
+    next_result = dict(result)
+    next_result["skill_score"] = skill_score
+
+    outcome = result.get("outcome")
+    if not isinstance(outcome, dict):
+        return next_result
+
+    next_outcome = dict(outcome)
+    if next_outcome.get("status") == "pass" and not skill_score.get("skill_generation_passed", True):
+        next_outcome["status"] = "fail"
+        next_outcome["failure_reason"] = _skill_generation_failure_reason(skill_score)
+    elif next_outcome.get("status") == "pass" and "failure_reason" not in next_outcome:
+        next_outcome["failure_reason"] = None
+    next_result["outcome"] = next_outcome
+    return next_result
 
 
 def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -> dict[str, Any]:
@@ -217,39 +338,39 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
         else None
     )
 
-    authoring_skills_list_seen = False
-    required_authoring_front_door_seen = required_authoring_front_door is None
+    authoring_skills_list_seen = any(_is_authoring_skills_list_command(record) for record in _iter_command_execution_records(transcript))
+    discovery_artifacts = _extract_discovery_artifacts(transcript)
+    discovery_artifact_seen = len(discovery_artifacts) > 0
+    required_authoring_front_door_seen = required_authoring_front_door is None or discovery_artifact_seen
     required_proving_handoff_seen = required_proving_handoff is None
-
-    required_authoring_front_door_token = required_authoring_front_door.lower() if required_authoring_front_door else None
-    required_proving_handoff_token = required_proving_handoff.lower() if required_proving_handoff else None
-
-    for candidate in _iter_transcript_evidence_strings(transcript):
-        lowered = candidate.lower()
-        if "authoring-skills list" in lowered:
-            authoring_skills_list_seen = True
-        if required_authoring_front_door_token is not None and required_authoring_front_door_token in lowered:
-            required_authoring_front_door_seen = True
-        if required_proving_handoff_token is not None and required_proving_handoff_token in lowered:
-            required_proving_handoff_seen = True
+    if required_proving_handoff is not None:
+        for artifact in discovery_artifacts:
+            if artifact.get("recommended_next_step") != "proceed_to_recording":
+                continue
+            if artifact.get("handoff_target") == required_proving_handoff:
+                required_proving_handoff_seen = True
+                break
 
     route_requirement_errors: list[str] = []
     if required_authoring_front_door is not None or required_proving_handoff is not None:
         if not authoring_skills_list_seen:
-            route_requirement_errors.append("missing transcript evidence for `clawperator authoring-skills list --json`")
+            route_requirement_errors.append(
+                "missing structured command evidence for `clawperator authoring-skills list --json`"
+            )
     if required_authoring_front_door is not None and not required_authoring_front_door_seen:
         route_requirement_errors.append(
-            f"missing transcript evidence for required_authoring_front_door `{required_authoring_front_door}`"
+            f"missing structured discovery artifact for required_authoring_front_door `{required_authoring_front_door}`"
         )
     if required_proving_handoff is not None and not required_proving_handoff_seen:
         route_requirement_errors.append(
-            f"missing transcript evidence for required_proving_handoff `{required_proving_handoff}`"
+            f"missing structured discovery handoff for required_proving_handoff `{required_proving_handoff}`"
         )
 
     return {
         "required_authoring_front_door": required_authoring_front_door,
         "required_proving_handoff": required_proving_handoff,
         "authoring_skills_list_seen": authoring_skills_list_seen,
+        "discovery_artifact_seen": discovery_artifact_seen,
         "required_authoring_front_door_seen": required_authoring_front_door_seen,
         "required_proving_handoff_seen": required_proving_handoff_seen,
         "route_requirements_met": len(route_requirement_errors) == 0,
@@ -341,8 +462,7 @@ def _attach_skill_score(
             skill_validation_errors=skill_validation_errors,
         )
     skill_score = _apply_skill_generation_contract(skill_score, transcript, skill_generation)
-    replay_result = dict(result)
-    replay_result["skill_score"] = skill_score
+    replay_result = _apply_skill_generation_outcome(result, skill_score)
     _write_json_file(run_dir / "result.json", replay_result)
     return replay_result
 

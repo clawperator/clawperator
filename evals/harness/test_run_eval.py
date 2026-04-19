@@ -427,6 +427,8 @@ def test_attach_skill_score_requires_pack_a_route_evidence(monkeypatch, tmp_path
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     (run_dir / "transcript.txt").write_text(
+        '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator authoring-skills list --json"}}\n'
+        "Discovery route: skill-author-by-agent-discovery -> skill-author-by-recording\n"
         "CLAWPERATOR_SKILL_START\n"
         "{"
         '"id":"com.example.android-version",'
@@ -479,16 +481,18 @@ def test_attach_skill_score_requires_pack_a_route_evidence(monkeypatch, tmp_path
     )
 
     assert updated["skill_score"]["route_requirements_met"] is False
-    assert updated["skill_score"]["authoring_skills_list_seen"] is False
+    assert updated["skill_score"]["authoring_skills_list_seen"] is True
+    assert updated["skill_score"]["discovery_artifact_seen"] is False
     assert updated["skill_score"]["required_authoring_front_door_seen"] is False
     assert updated["skill_score"]["required_proving_handoff_seen"] is False
     assert updated["skill_score"]["skill_generation_passed"] is False
+    assert updated["outcome"]["status"] == "fail"
+    assert updated["outcome"]["failure_reason"] == "skill_route_not_proven"
     assert (
         updated["skill_score"]["route_requirement_errors"]
         == [
-            "missing transcript evidence for `clawperator authoring-skills list --json`",
-            "missing transcript evidence for required_authoring_front_door `skill-author-by-agent-discovery`",
-            "missing transcript evidence for required_proving_handoff `skill-author-by-recording`",
+            "missing structured discovery artifact for required_authoring_front_door `skill-author-by-agent-discovery`",
+            "missing structured discovery handoff for required_proving_handoff `skill-author-by-recording`",
         ]
     )
 
@@ -497,8 +501,21 @@ def test_attach_skill_score_accepts_pack_a_route_evidence(monkeypatch, tmp_path)
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     (run_dir / "transcript.txt").write_text(
-        '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator authoring-skills list --json"}}\n'
-        '{"type":"item.completed","item":{"type":"agent_message","text":"Discovery route: skill-author-by-agent-discovery -> skill-author-by-recording"}}\n'
+        '{"type":"item.completed","item":{"type":"command_execution","command":"node apps/node/dist/cli/index.js authoring-skills list --format json"}}\n'
+        "```json\n"
+        "{\n"
+        '  "recommended_next_step": "proceed_to_recording",\n'
+        '  "existing_skill_verdict": {"status": "none", "commands": ["clawperator skills for-app com.android.settings --json"]},\n'
+        '  "target_app_package": {"app_label": "Settings", "package_id": "com.android.settings", "sub_route": "About phone"},\n'
+        '  "route_confidence": {"level": "high", "evidence": ["Observed About phone route"]},\n'
+        '  "mutation_risk": {"level": "read_only", "notes": "Settings inspection only"},\n'
+        '  "evidence_collected": {"snapshots": ["snapshot-1"], "screenshots": [], "failed_probes": []},\n'
+        '  "discovery_budget_used": {"snapshots": 1, "screenshots": 0, "elapsed_wall_time_s": 12},\n'
+        '  "skill_classification": "shared-general",\n'
+        '  "handoff_target": "skill-author-by-recording",\n'
+        '  "handoff_reasoning": "The route is understood enough to prove via recording."\n'
+        "}\n"
+        "```\n"
         "CLAWPERATOR_SKILL_START\n"
         "{"
         '"id":"com.example.android-version",'
@@ -551,8 +568,11 @@ def test_attach_skill_score_accepts_pack_a_route_evidence(monkeypatch, tmp_path)
     )
 
     assert updated["skill_score"]["authoring_skills_list_seen"] is True
+    assert updated["skill_score"]["discovery_artifact_seen"] is True
     assert updated["skill_score"]["required_authoring_front_door_seen"] is True
     assert updated["skill_score"]["required_proving_handoff_seen"] is True
     assert updated["skill_score"]["route_requirements_met"] is True
     assert updated["skill_score"]["route_requirement_errors"] == []
     assert updated["skill_score"]["skill_generation_passed"] is True
+    assert updated["outcome"]["status"] == "pass"
+    assert updated["outcome"]["failure_reason"] is None

@@ -37,7 +37,13 @@ from evals.harness.live_skill_eval import (
     SOLAX_COLD_START_EVAL_ID,
     run_solax_orchestrated_cold_start_eval,
 )
-from evals.harness.runner import build_prompt, run_eval, _prepare_clawperator_launcher
+from evals.harness.runner import (
+    build_prompt,
+    run_eval,
+    _apply_skill_generation_contract,
+    _apply_skill_generation_outcome,
+    _prepare_clawperator_launcher,
+)
 from evals.harness.replay import run_replay, DEFAULT_REPLAY_TIMEOUT_S
 from evals.harness.scorer import score
 from evals.harness.timeutil import format_timestamp
@@ -234,6 +240,17 @@ def _rescore_run(runs_dir: Path, run_id: str) -> dict:
     violations = dict(rescored["metrics"].get("violations", {}))
     violations["used_adb"] = bool(score_result.used_disallowed_tool)
     rescored["metrics"]["violations"] = violations
+    eval_id = config.get("eval_id") or result.get("eval_id")
+    if isinstance(eval_id, str):
+        spec = _load_spec(eval_id)
+        skill_score = result.get("skill_score")
+        if isinstance(skill_score, dict) and any(key in skill_score for key in ("skill_emitted", "skill_valid", "replay_status")):
+            rescored_skill_score = _apply_skill_generation_contract(
+                dict(skill_score),
+                transcript,
+                spec.get("skill_generation"),
+            )
+            rescored = _apply_skill_generation_outcome(rescored, rescored_skill_score)
     result_rescored_path = run_dir / "result-rescored.json"
     _write_json_file(result_rescored_path, rescored)
     return rescored
@@ -532,10 +549,17 @@ def main(argv: list[str] | None = None) -> int:
             timeout_s=args.replay_timeout_s,
         )
         result = json.loads((run_dir / "result.json").read_text(encoding="utf-8"))
-        replay_result = dict(result)
-        replay_result["skill_score"] = skill_score
+        eval_id = config.get("eval_id") or result.get("eval_id")
+        if isinstance(eval_id, str):
+            spec = _load_spec(eval_id)
+            skill_score = _apply_skill_generation_contract(
+                dict(skill_score),
+                (run_dir / "transcript.txt").read_text(encoding="utf-8"),
+                spec.get("skill_generation"),
+            )
+        replay_result = _apply_skill_generation_outcome(result, skill_score)
         _write_json_file(run_dir / "result-replay.json", replay_result)
-        status = skill_score["replay_status"].upper()
+        status = replay_result.get("outcome", {}).get("status", skill_score["replay_status"]).upper()
         answer = skill_score["replay_answer_normalized"] or "none"
         print(run_dir)
         print(f"{status} | replay/{runtime_target} | {skill_score['replay_wall_clock_s']:.1f}s | answer={answer}")

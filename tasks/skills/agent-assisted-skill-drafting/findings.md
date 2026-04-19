@@ -523,6 +523,28 @@ discovery front door is implemented.
     - `./validation/install/test_install.sh`
     - `./gradlew app:assembleDebug app:testDebugUnitTest`
     - `git diff --check`
+- Post-acceptance review hardening completed locally on 2026-04-20:
+  - Pack A route checks now change the top-level eval result instead of staying
+    advisory inside `skill_score`
+  - `evals/harness/runner.py` no longer treats free-text narration or echoed
+    docs as route proof:
+    - `clawperator authoring-skills list --json` must be present as structured
+      `command_execution` evidence
+    - the discovery-front-door proof must come from the structured fenced JSON
+      discovery artifact
+    - the proving handoff must come from structured artifact fields such as
+      `recommended_next_step = "proceed_to_recording"` and
+      `handoff_target = "skill-author-by-recording"`
+  - rescore and replay paths now reapply the same Pack A route contract so a
+    green answer alone cannot silently restore a false-green eval outcome
+  - validation run for this follow-up:
+    - `uv run --project evals --extra dev pytest evals/harness/test_run_eval.py -q`
+    - `uv run --project evals --extra dev pytest evals/harness/test_rescore.py -q`
+    - `uv run --project evals --extra dev pytest evals/harness -q`
+    - `npm --prefix apps/node run build`
+    - `npm --prefix apps/node run test`
+    - `./gradlew app:assembleDebug app:testDebugUnitTest`
+    - `git diff --check`
 - No blocker remains for this pack.
 - Optional follow-up after review:
   - clean up this task pack with `tasks/skills/task-cleanup/` once the branch
