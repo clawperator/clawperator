@@ -651,6 +651,7 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
         for line_number, record in command_execution_records
         if _is_authoring_skills_list_command(record)
     ]
+    authoring_skills_list_line_numbers = [position + 1 for position in authoring_skills_list_positions]
     authoring_skills_list_signatures: set[str] = set()
     runtime_skill_discovery_signatures: set[str] = set()
     runtime_skill_discovery_positions: list[int] = []
@@ -688,7 +689,7 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
             runtime_probe_signatures=runtime_skill_discovery_signatures,
             authoring_probe_signatures=authoring_skills_list_signatures,
         )
-        if authoring_skills_list_positions and discovery_artifact_line_number <= min(authoring_skills_list_positions):
+        if authoring_skills_list_line_numbers and discovery_artifact_line_number <= min(authoring_skills_list_line_numbers):
             discovery_artifact_errors.append(
                 "structured discovery artifact must appear after `clawperator authoring-skills list --json`"
             )
