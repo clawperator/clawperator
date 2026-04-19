@@ -46,8 +46,8 @@ Rules:
   `evals-live-run`.
 - Pass `--device <aosp_emulator_serial>` explicitly even if only one emulator
   is connected.
-- Before Phase 2 and Phase 3 land, a truthful canary is expected to stay red
-  because `skill-author-by-agent-discovery` is not installed yet.
+- A truthful canary stays red until the discovery front door is actually
+  installed and the Pack A route can emit and replay a valid skill.
 - The helper script remains useful for runtime-target comparison, but the Pack
   A discovery-authored route uses the direct `--mode full-repo --skill-prompt
   prompt-skill.md` invocation above.
