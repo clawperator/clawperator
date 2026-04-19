@@ -5,7 +5,7 @@
 This pack turns the compiled authorship findings into one concrete workflow:
 keep recording as the proving workflow, but add a discovery-first front door
 for cases where the agent does not yet know the app route well enough to
-record truthfully. This is a 2 PR, 5 phase pack in `clawperator`, and it is
+record truthfully. This is a 1 PR, 5 phase pack in `clawperator`, and it is
 blocked until the prerequisite guardrails in
 `tasks/skills/skill-creation-guidance/` PR-2 are merged or landed locally.
 
@@ -16,17 +16,18 @@ packaged sibling authoring skill named
 recording workflow when a reusable runtime skill should actually be authored.
 
 This pack also makes evals part of the acceptance path instead of an informal
-follow-up. PR-2 binds the new workflow to the existing `/evals` harness, using
-the current `android-version` benchmark as the seed Settings/About-device task
-and proving it on two divergent device families: one AOSP emulator and one
-Samsung physical device.
+follow-up. The pack is intentionally eval-driven: Phase 1 updates the existing
+`android-version` benchmark so it becomes the Pack A red baseline, then the
+remaining phases implement `skill-author-by-agent-discovery` and its wiring
+until the benchmark passes on two divergent device families: one AOSP emulator
+and one Samsung physical device.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
 | State | blocked |
-| Total PRs | 2 |
+| Total PRs | 1 |
 | Total phases | 5 |
 | Completed | none |
 | Remaining | 1, 2, 3, 4, 5 |
@@ -115,23 +116,23 @@ over-authoring and weak first drafts.
 
 | Surface | What changes | Owner |
 | --- | --- | --- |
-| `.agents/skills/skill-author-by-agent-discovery/` | New discovery-first authoring skill, prompt contract, and `agents/openai.yaml` metadata | Phase 1 |
-| `apps/node/authoring-skills/skill-author-by-agent-discovery` | New packaged-skill symlink entry | Phase 2 |
-| `.agents/skills/skill-author-by-recording/SKILL.md` | Additive handoff and boundary clarification only | Phase 1 |
-| `apps/node/src/domain/skills/copyAuthoringSkills.ts` | Install and discovery wiring only if the new packaged skill needs additive support | Phase 2 |
-| `apps/node/src/test/unit/authoringSkills.test.ts` | Packaging and install regression coverage | Phase 2 |
-| `apps/node/src/test/unit/authoringSkillsPack.test.ts` | Packaged authoring-skills tree coverage | Phase 2 |
-| `docs/host-agents.md` | Host-agent zero-results route | Phase 3 |
-| `docs/skills/authoring.md` | Discovery-to-proving handoff and authoring-skill front-door guidance | Phase 3 |
-| `docs/internal/design/agent-host-integration.md` | Additive durable routing note only if the public docs need a matching internal rule | Phase 3 |
-| `sites/landing/public/install.sh` | Install-time authoring-skill discovery hints | Phase 2 |
-| `.agents/skills/evals-run/` | Emulator-facing Pack A eval guidance | Phase 4 |
-| `.agents/skills/evals-live-run/` | Physical-device Pack A eval guidance | Phase 4 |
-| `evals/README.md` | Eval-harness guidance for the Pack A benchmark | Phase 4 |
-| `docs/internal/design/evals.md` | Durable eval-boundary note for Pack A | Phase 4 |
-| `evals/specs/android-version/` | Existing benchmark prompt and scoring surface that Pack A should extend first | Phase 4 |
-| `evals/run_eval.py` and `evals/harness/` | Only if additive scoring or artifact capture is required for authored-skill proof | Phase 4 |
-| `tasks/skills/agent-assisted-skill-drafting/findings.md` | Execution-time proof of the workflow, including eval matrix runs | Phase 5 |
+| `.agents/skills/evals-run/` | Emulator-facing Pack A eval guidance and red-baseline workflow | Phase 1 |
+| `.agents/skills/evals-live-run/` | Physical-device Pack A eval guidance and red-baseline workflow | Phase 1 |
+| `evals/README.md` | Eval-harness guidance for the Pack A benchmark | Phase 1 |
+| `docs/internal/design/evals.md` | Durable eval-boundary note for Pack A | Phase 1 |
+| `evals/specs/android-version/` | Existing benchmark prompt and scoring surface that Pack A should extend first | Phase 1 |
+| `evals/run_eval.py` and `evals/harness/` | Only if additive scoring or artifact capture is required for authored-skill proof | Phase 1 |
+| `.agents/skills/skill-author-by-agent-discovery/` | New discovery-first authoring skill, prompt contract, and `agents/openai.yaml` metadata | Phase 2 |
+| `.agents/skills/skill-author-by-recording/SKILL.md` | Additive handoff and boundary clarification only | Phase 2 |
+| `apps/node/authoring-skills/skill-author-by-agent-discovery` | New packaged-skill symlink entry | Phase 3 |
+| `apps/node/src/domain/skills/copyAuthoringSkills.ts` | Install and discovery wiring only if the new packaged skill needs additive support | Phase 3 |
+| `apps/node/src/test/unit/authoringSkills.test.ts` | Packaging and install regression coverage | Phase 3 |
+| `apps/node/src/test/unit/authoringSkillsPack.test.ts` | Packaged authoring-skills tree coverage | Phase 3 |
+| `sites/landing/public/install.sh` | Install-time authoring-skill discovery hints | Phase 3 |
+| `docs/host-agents.md` | Host-agent zero-results route | Phase 4 |
+| `docs/skills/authoring.md` | Discovery-to-proving handoff and authoring-skill front-door guidance | Phase 4 |
+| `docs/internal/design/agent-host-integration.md` | Additive durable routing note only if the public docs need a matching internal rule | Phase 4 |
+| `tasks/skills/agent-assisted-skill-drafting/findings.md` | Execution-time red/green proof of the workflow, including eval matrix runs | Phase 1, Phase 5 |
 
 ## Source Of Truth
 
@@ -166,6 +167,9 @@ over-authoring and weak first drafts.
   only a one-off manual proof.
 - Use the existing `android-version` eval as the first Pack A benchmark and
   extend it before inventing a new eval id.
+- Treat the Pack A eval as the red/green spec for implementation:
+  - Phase 1 makes the benchmark explicit and records the current red baseline
+  - later phases change the workflow until that same benchmark goes green
 - The required confidence matrix is one AOSP emulator plus one Samsung physical
   device. Use explicit `--device` selection for both.
 - Pack A success requires two target-specific authored skills under the eval
