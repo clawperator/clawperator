@@ -49,11 +49,11 @@ for analysis.
 
 ## Scope and method
 
-This synthesis merges:
+This synthesis merges three independent findings passes that were produced
+during the authorship research step:
 
-- [findings-claude.md](./findings-claude.md)
-- [findings-codex-1.md](./findings-codex-1.md)
-- [findings-codex-2.md](./findings-codex-2.md)
+- one Claude findings pass
+- two Codex findings passes
 
 Approach:
 
