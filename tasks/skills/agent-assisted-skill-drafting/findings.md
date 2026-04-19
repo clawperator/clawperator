@@ -58,6 +58,9 @@ discovery front door is implemented.
 - None yet.
 - Phase 1 only defines the eval red baseline and does not ship the new
   discovery skill.
+- Phase 2 defines the durable discovery artifact contract and includes an
+  explicit Netflix / House of Cards example artifact in
+  `.agents/skills/skill-author-by-agent-discovery/SKILL.md`.
 
 ## Commands run
 
@@ -72,6 +75,10 @@ discovery front door is implemented.
 - `./gradlew :app:assembleDebug`
 - `node apps/node/dist/cli/index.js operator setup --apk apps/android/app/build/outputs/apk/debug/app-debug.apk --device emulator-5554 --operator-package com.clawperator.operator.dev --output json`
 - `uv run --project evals --extra dev python evals/run_eval.py android-version --agent codex --model gpt-5.4 --mode full-repo --runtime local-dev --skill-prompt prompt-skill.md --device emulator-5554 --label pack-a-red-baseline`
+- `test -f .agents/skills/skill-author-by-agent-discovery/SKILL.md`
+- `test -f .agents/skills/skill-author-by-agent-discovery/agents/openai.yaml`
+- `rg -n "recommended_next_step|existing_skill_verdict|target_app_package|route_confidence|mutation_risk|evidence_collected|discovery_budget_used|skill_classification|handoff_target|handoff_reasoning" .agents/skills/skill-author-by-agent-discovery/SKILL.md`
+- `rg -n "discovery|proving|skill-author-by-agent-discovery" .agents/skills/skill-author-by-recording/SKILL.md`
 
 ## Eval run ids
 
@@ -105,6 +112,12 @@ discovery front door is implemented.
   - `.agents/skills/evals-live-run/references/evals-live-run.md`
 - CLI help, installer-owned `AGENTS.md` surfaces, and public authoring docs are
   deferred to later phases exactly as the pack requires.
+- Phase 2 additionally updated and checked:
+  - `.agents/skills/skill-author-by-agent-discovery/SKILL.md`
+  - `.agents/skills/skill-author-by-agent-discovery/agents/openai.yaml`
+  - `.agents/skills/skill-author-by-recording/SKILL.md`
+  - `tasks/skills/agent-assisted-skill-drafting/plan.md`
+  - `tasks/skills/agent-assisted-skill-drafting/work-breakdown.md`
 
 ## Authored skills and `SkillResult` validity
 
@@ -135,6 +148,19 @@ discovery front door is implemented.
   - the transcript explicitly stated that the required
     `skill-author-by-agent-discovery` front door was missing and omitted the
     skill block accordingly
+- Phase 2 keeps the default discovery budget from the plan with no deviation:
+  - max 5 snapshots
+  - max 3 screenshots
+  - max 90 seconds wall time
+- Phase 2 will require the new discovery skill to emit the exact Pack A
+  top-level artifact keys from the plan and to treat `skill_classification` as
+  conditional only when `recommended_next_step = proceed_to_recording`.
+- Phase 2 also makes the boundary explicit:
+  - `skill-author-by-agent-discovery` is the zero-results router
+  - `skill-author-by-recording` is the proving workflow after
+    `proceed_to_recording`
+- The task-pack status blocks in `plan.md` and `work-breakdown.md` now track
+  live progress instead of leaving the pack at its pre-execution blocked state.
 
 ## Problems encountered
 
@@ -169,11 +195,22 @@ discovery front door is implemented.
   - the prompt names `skill-author-by-agent-discovery` as the required front door
   - the canary demonstrates the current missing-front-door red state instead of
     a hand-authored fallback skill
+- Phase 2 is now complete locally.
+- Phase 2 acceptance result:
+  - `.agents/skills/skill-author-by-agent-discovery/` now exists with both
+    `SKILL.md` and `agents/openai.yaml`
+  - the new skill names every required discovery artifact field from the plan
+  - the new skill enforces the default Pack A budget:
+    5 snapshots, 3 screenshots, 90 seconds wall time
+  - the Netflix / House of Cards anchor scenario is explicit in the new skill
+    prompt
+  - `skill-author-by-recording` now describes itself as the proving workflow
+    after discovery instead of the zero-results router
+  - `plan.md` and `work-breakdown.md` now reflect live pack status:
+    completed phases `1, 2`, current / next `Phase 3`
 
 ## Deferred follow-up
 
-- Phase 2: create `skill-author-by-agent-discovery` and lock the discovery
-  artifact contract.
 - Phase 3: wire packaged install, CLI help, and installer-generated host-agent
   discoverability surfaces.
 - Phase 4: update public host-agent and authoring docs with the zero-results

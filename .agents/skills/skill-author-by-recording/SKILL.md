@@ -1,6 +1,6 @@
 ---
 name: skill-author-by-recording
-description: Create or update a Clawperator skill from a fresh phone recording. Use when a developer wants one front-door workflow that records a real device flow, requires a plain-language goal up front, derives the skill id from the recording and goal, defaults to replay on the first pass unless orchestrated is explicitly requested or clearly more truthful, and runs one self-test that surfaces the emitted SkillResult.
+description: Create or update a Clawperator skill from a fresh phone recording. Use when a developer wants the proving workflow after discovery has identified recording as the truthful next step, or when the app route is already well understood, and wants one front-door workflow that records a real device flow, derives the skill id from the recording and goal, defaults to replay on the first pass unless orchestrated is explicitly requested or clearly more truthful, and runs one self-test that surfaces the emitted SkillResult.
 ---
 
 # Skill Author By Recording
@@ -8,13 +8,23 @@ description: Create or update a Clawperator skill from a fresh phone recording. 
 Guide a developer from "I can do this once on my phone" to "I now have a
 truthful authored skill artifact."
 
-This is one front door. Do not split the user across helper skills in this
-phase. The workflow must stay centered on:
+This is the proving workflow. Do not split the user across helper skills in
+this phase. The workflow must stay centered on:
 
 1. record the flow once
 2. keep the evidence
 3. author the right skill shape from that evidence
 4. run it once and inspect the result
+
+## Relationship To Discovery
+
+- `skill-author-by-agent-discovery` is now the zero-results front door when no
+  installed runtime skill clearly matches or the app route is still too
+  uncertain to record truthfully.
+- Use this skill after discovery returns `proceed_to_recording`, or when the
+  route is already known well enough that a separate discovery pass is not
+  needed.
+- Do not use this skill as the no-match router.
 
 ## What This Skill Owns
 
@@ -45,6 +55,8 @@ Reuse those contracts. Do not invent a parallel recording, skill, or
 ## Non-Negotiable Rules
 
 - Keep one human-facing entrypoint: `skill-author-by-recording`.
+- Treat this skill as the proving step after discovery, not as the zero-results
+  route selector.
 - Treat the recording export as evidence, not as a finished skill or runtime
   recipe.
 - Surface the concrete commands you run and the files they produce.
@@ -95,6 +107,7 @@ Reuse those contracts. Do not invent a parallel recording, skill, or
 Collect or confirm these inputs before recording:
 
 - plain-language goal
+- the discovery artifact when `skill-author-by-agent-discovery` already ran
 - target app or apps to reset before recording starts
 - whether the user explicitly wants `-replay`, `-orchestrated`, or wants the
   default replay-first path

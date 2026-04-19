@@ -31,13 +31,23 @@ and one Samsung physical device.
 
 | Item | Value |
 | --- | --- |
-| State | blocked |
+| State | in_progress |
 | Total PRs | 1 |
 | Total phases | 5 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4, 5 |
-| Current / Next | Phase 1 |
-| Blockers | `tasks/skills/skill-creation-guidance/` PR-2 must merge or be finalized locally first |
+| Completed | 1, 2 |
+| Remaining | 3, 4, 5 |
+| Current / Next | Phase 3 |
+| Blockers | none |
+
+## Progress Update
+
+- Phase 1 completed locally on 2026-04-19 with commit `aa96fc7`
+  `test(evals): define red baseline for discovery-authored settings eval`.
+- Phase 1 validation and the accepted Pack A red-baseline canary are recorded
+  in `tasks/skills/agent-assisted-skill-drafting/findings.md`.
+- Phase 2 validation completed locally on 2026-04-19. The new discovery skill,
+  the recording-skill boundary update, and the pack-status refresh are
+  recorded in `tasks/skills/agent-assisted-skill-drafting/findings.md`.
 
 ## Goal
 

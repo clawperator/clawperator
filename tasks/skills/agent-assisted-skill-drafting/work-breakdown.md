@@ -21,13 +21,23 @@ repaired. Once unblocked, the execution order is:
 
 | Item | Value |
 | --- | --- |
-| State | blocked |
+| State | in_progress |
 | Total PRs | 1 |
 | Total phases | 5 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4, 5 |
-| Current / Next | Phase 1 |
-| Blockers | `tasks/skills/skill-creation-guidance/` PR-2 must merge or be finalized locally first |
+| Completed | 1, 2 |
+| Remaining | 3, 4, 5 |
+| Current / Next | Phase 3 |
+| Blockers | none |
+
+## Progress Update
+
+- Phase 1 completed locally on 2026-04-19 with commit `aa96fc7`
+  `test(evals): define red baseline for discovery-authored settings eval`.
+- The accepted Phase 1 red-baseline canary and validation results are recorded
+  in `tasks/skills/agent-assisted-skill-drafting/findings.md`.
+- Phase 2 validation completed locally on 2026-04-19. The new discovery skill,
+  recording-skill boundary update, and pack-status refresh are recorded in
+  `tasks/skills/agent-assisted-skill-drafting/findings.md`.
 
 ## Hard Rules
 
