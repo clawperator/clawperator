@@ -49,6 +49,25 @@ Expected signals:
 - top-level `installedDir`
 - each listed authoring skill includes `name` and `skillPath`
 
+## Skills Repo Entry Points
+
+When you are editing runtime skills in the separate
+[`clawperator-skills`](https://github.com/clawperator/clawperator-skills)
+repository, use these surfaces together:
+
+- [README.md](https://github.com/clawperator/clawperator-skills/blob/main/README.md)
+  for the top-level route to durable docs and local entrypoints
+- [AGENTS.md](https://github.com/clawperator/clawperator-skills/blob/main/AGENTS.md)
+  for the repo-local checklist and recurring review failures
+- `./scripts/test_all.sh` in `clawperator-skills` for off-device `node --test`
+  runs on pure JS helper, parser, normalizer, and output-shaping logic
+- run `./scripts/generate_skill_indexes.sh` in `clawperator-skills` whenever
+  registry-linked metadata changes
+
+Use this page for the durable workflow and contract rules. Use the
+`clawperator-skills` entrypoints for the repo-local checklist and test
+commands while editing that repository.
+
 ## Authoring Skills Install
 
 Authoring skills are AI agent programs that help create or maintain skills.
@@ -157,6 +176,48 @@ should stay aligned with the `skill-author-by-recording` skill.
 - Runtime invocation: `apps/node/src/domain/skills/runSkill.ts`
 - Runtime env resolution: `apps/node/src/domain/skills/skillsConfig.ts`
 - CLI surface: `apps/node/src/cli/commands/skills.ts`
+- Authoring-skills CLI discovery: `apps/node/src/cli/registry.ts`, `apps/node/src/cli/commands/authoringSkills.ts`
+
+## Validation And Testing Boundary
+
+Use `clawperator skills validate` as the static gate. Use the
+`clawperator-skills` repo entrypoints for off-device tests and live proof.
+
+Current `validateSkill` coverage:
+
+- checks `skill.json` parity against the registry entry
+- checks required file presence
+- checks `clawperator-skill-type` frontmatter in `SKILL.md`
+- validates artifact payloads only under `--dry-run`
+
+Use `clawperator skills validate --all` to check generated-index freshness when
+the validated repo includes `scripts/generate_skill_indexes.sh`.
+
+Current `validateSkill` non-goals:
+
+- it does not replace `./scripts/test_all.sh` for pure off-device JS logic
+- it does not replace live-device proof for selector, navigation, recording,
+  compare-baseline, checkpoint, or terminal-verification behavior
+- it does not replace the repo-local checklist in `clawperator-skills/AGENTS.md`
+
+Use this route when hardening a runtime skill:
+
+1. Discover installed guided authoring workflows with
+   `clawperator authoring-skills list --json` when you need a host-visible
+   front door.
+2. Scaffold only when you want the low-level manual surface:
+   `clawperator skills new <skill_id>`.
+3. Run `clawperator skills validate <skill_id> --dry-run` for skill-local file,
+   metadata, and artifact checks.
+4. Regenerate indexes with `./scripts/generate_skill_indexes.sh` in
+   `clawperator-skills` when registry-linked metadata changes.
+5. Run `clawperator skills validate --all --dry-run` after regenerating those
+   indexes.
+6. Run `./scripts/test_all.sh` in `clawperator-skills` when the change touches
+   pure off-device JS logic.
+7. Prove UI behavior on a real target device or emulator when the change affects
+   selectors, navigation, checkpoints, compare baselines, or terminal
+   verification.
 
 ## What A New Skill Contains
 
@@ -365,7 +426,7 @@ Success output with recording context adds the copied path:
     "/abs/path/to/skills/com.example.recording.export-demo/scripts/run.sh",
     "/abs/path/to/skills/com.example.recording.export-demo/recording-context.json"
   ],
-  "next": "Edit SKILL.md and scripts/run.js, then verify with: clawperator skills validate <skill_id>"
+  "next": "Edit `SKILL.md` and `scripts/run.js`, then run `clawperator skills validate <skill_id>`; if this repo uses generated indexes, rerun `scripts/generate_skill_indexes.sh` and `clawperator skills validate --all`"
 }
 ```
 
@@ -395,6 +456,7 @@ The current scaffold writes `SKILL.md` with YAML frontmatter:
 ```markdown
 ---
 name: com.android.settings.capture-overview
+clawperator-skill-type: replay
 description: |-
   Capture a Settings overview snapshot
 ---
@@ -407,6 +469,7 @@ The scaffold always writes the frontmatter as a YAML block scalar under `descrip
 ```markdown
 ---
 name: com.example.multiline.capture
+clawperator-skill-type: replay
 description: |-
   Line1
   Line2: has colon
@@ -417,16 +480,21 @@ description: |-
 
 Current reality:
 
-- the scaffold always writes `name` and `description`
-- the validator does not currently parse the internals of `SKILL.md`
-- validation only checks that the file exists at the path referenced by the registry
+- the scaffold writes `name`, `clawperator-skill-type`, and `description`
+- `validateSkill` now reads `SKILL.md` frontmatter enough to require
+  `clawperator-skill-type`
+- `validateSkill` still does not treat `SKILL.md` as a full schema beyond that
+  frontmatter check
 
 Current skill-type convention:
 
-- `clawperator-skill-type` may be added to `SKILL.md` frontmatter as author-facing metadata
-- current expected values are `replay` and `orchestrated`
-- this field is documentation only today; the runtime and validator do not enforce or consume it yet
-- some legacy skills predate this convention and may not include the field or a suffix in the id
+- current active values are `replay` and `orchestrated`
+- new and updated skills should declare one of those values in `SKILL.md`
+  frontmatter
+- the validator enforces those values for current authoring work
+- one explicit temporary compatibility exception remains for the existing legacy
+  skill `au.com.polyaire.airtouch5.set-zone-state` with
+  `clawperator-skill-type: script`; do not use `script` for new work
 
 Recommended current practice:
 
@@ -434,10 +502,11 @@ Recommended current practice:
 - use a `-orchestrated` id suffix for agent-controlled skills
 - when a skill follows one of those conventions, keep the frontmatter `clawperator-skill-type` value aligned with the id suffix
 
-So the minimum current contract is:
+So the minimum current `SKILL.md` contract is:
 
 - `SKILL.md` exists
 - the registry entry points to it correctly
+- the frontmatter declares `clawperator-skill-type`
 
 The scaffold's usage section is a starting point, not a machine-enforced schema.
 
@@ -552,7 +621,10 @@ For `node_text_matches`, the runtime currently requires:
 This keeps `skill.json` claims tied to the shipped `SkillResult` contract instead
 of inventing a second result channel.
 
-Use `clawperator skills validate <skill_id> --json` to verify the file paths and metadata match:
+Use `clawperator skills validate <skill_id> --json` to verify the file paths
+and metadata match. After rerunning generated indexes in repos that own them,
+use `clawperator skills validate --all --json` for the repo-wide freshness
+check:
 
 ```bash
 clawperator skills validate com.example.demo.capture-state --json
@@ -825,7 +897,12 @@ Notes on those literals:
 - `commandId` is `${skillId}-${Date.now()}`
 - the default `operatorPackage` fallback inside the scaffolded script is `com.clawperator.operator`
 - the child `execFileSync()` timeout inside scaffolded `run.js` is `120000`
-- the scaffolded script currently invokes the literal `"clawperator"` binary, not `process.env.CLAWPERATOR_BIN`
+- the scaffolded script includes local `resolveClawperatorBin()` and
+  `resolveOperatorPackage()` helpers instead of requiring `skills/utils/common.js`
+- the local command resolver honors `CLAWPERATOR_BIN`, checks
+  `CLAWPERATOR_CLI_PATH`, prefers a detected branch-local `apps/node/dist/cli/index.js`
+  when present, and may contribute both a command and parsed helper args before
+  `exec`
 
 The scaffolded `run.sh` just forwards to `run.js`.
 
@@ -837,12 +914,17 @@ Current wrapper expectations:
 
 Important boundary:
 
-- the wrapper injects `CLAWPERATOR_BIN`, but the scaffolded default `run.js` does not currently read it
-- if you want branch-local skill execution to use the resolved wrapper binary, update the scaffolded script explicitly
+- the wrapper injects `CLAWPERATOR_BIN`, and the scaffolded default `run.js`
+  reads it through its local `resolveClawperatorBin()` helper
+- direct `node run.js ...` execution also prefers a detected branch-local
+  `apps/node/dist/cli/index.js` when available, before falling back to the
+  global `clawperator` binary
+- the scaffold no longer depends on a repo-level `skills/utils/common.js` file
 
 Current scaffold behavior on nested `clawperator exec` failure is also worth knowing:
 
-- if `execFileSync("clawperator", ...)` throws but produced stdout, the scaffolded script writes that stdout and exits `0`
+- if `execFileSync()` of the resolved Clawperator command throws but produced
+  stdout, the scaffolded script writes that stdout and exits `0`
 - only failures with no stdout fall through to `stderr` plus `exit 1`
 
 ## Structured Skill Result Contract
@@ -1264,7 +1346,7 @@ Exact defaults and follow-up behavior:
 
 - if `--summary` is omitted, the scaffold writes `TODO: describe <skill_id>`
 - blank or whitespace-only summaries are treated as omitted
-- `cmdSkillsNew()` returns `next: "Edit SKILL.md and scripts/run.js, then verify with: clawperator skills validate <skill_id>"`
+- `cmdSkillsNew()` returns `next: "Edit \`SKILL.md\` and \`scripts/run.js\`, then run \`clawperator skills validate <skill_id>\`; if this repo uses generated indexes, rerun \`scripts/generate_skill_indexes.sh\` and \`clawperator skills validate --all\`"`
 
 ### Scaffolding Error Cases
 
@@ -1303,6 +1385,8 @@ Run:
 clawperator skills new com.example.app.do-thing --summary "Do one deterministic workflow" --json
 clawperator skills get com.example.app.do-thing --json
 clawperator skills validate com.example.app.do-thing --json
+./scripts/generate_skill_indexes.sh
+clawperator skills validate --all --json
 ```
 
 Confirm:
@@ -1310,7 +1394,8 @@ Confirm:
 - `created` is `true`
 - `files` includes `SKILL.md`, `skill.json`, `scripts/run.js`, and `scripts/run.sh`
 - the new registry entry appears in `skills get`
-- validation succeeds without hand-editing file paths
+- per-skill validation succeeds without hand-editing file paths
+- `validate --all` succeeds after generated indexes are refreshed in repos that own them
 
 ## Blocked Terms
 
@@ -1333,8 +1418,8 @@ So for authoring:
 ## Practical Authoring Rules
 
 - keep `skill.json` and the registry in sync
-- let `skills validate --dry-run` prove artifact payloads
-- use `skills new --json`, then immediately verify with `skills get --json` and `skills validate --json`
+- let `skills validate --dry-run` prove skill-local artifact payloads
+- use `skills new --json`, then verify with `skills get --json` and `skills validate --json`; if the repo owns generated indexes, rerun the generator and finish with `skills validate --all --json`
 - use `skills compile-artifact` when a workflow should compile into deterministic execution JSON
 - treat `SKILL.md` as required documentation, but do not overstate its current machine enforcement
 

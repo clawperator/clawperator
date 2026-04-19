@@ -6,7 +6,8 @@ Parent plan: `tasks/skills/skill-creation-guidance/plan.md`
 
 3 PRs, 5 phases across `../clawperator-skills` and `clawperator`.
 
-- PR-1 repairs the local skills-repo author surface and migrates the seed rules
+- PR-1 repairs the local skills-repo author surface, routes it to durable
+  main-repo docs, and migrates the seed rules
 - PR-2 lands the main-repo scaffold and validator guardrails that Pack A
   depends on
 - PR-3 finishes the full local checklist and negative examples once the shared
@@ -18,20 +19,46 @@ Pack A must not begin until PR-2 is merged or finalized locally.
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | completed |
 | Total PRs | 3 |
 | Total phases | 5 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4, 5 |
-| Current / Next | Phase 1 |
+| Completed | 1, 2, 3, 4, 5 |
+| Remaining | none |
+| Current / Next | pack complete |
 | Blockers | none |
+
+## Progress Update
+
+- PR-1 merged in `../clawperator-skills` at `90f1e0ec77dec3b6ff587cb42265702627a7b6db`.
+- Completed phases:
+  - Phase 1 with commit `62e3894` `docs(skills): repair local authoring surface entrypoints`
+  - Phase 2 with commit `c7ffa68` `docs(skills): route authoring entrypoints to main docs`
+  - Phase 3 with commit `8a87e76` `fix(skills): harden skill authoring guardrails`
+  - Phase 4 with commit `fdb039e` `docs(skills): cross-link runtime skill author guidance`
+  - Phase 5 with commit `1552251` `docs(skills): codify runtime skill author checklist`
+- PR-1 validations passed:
+  - Phase 1 grep checks for migrated rule categories, `test_all.sh`, and findings sections
+  - Phase 2 route checks, stale-reference checks, and `../clawperator-skills/docs/` absence check
+  - `../clawperator-skills/scripts/test_all.sh`
+  - `git diff --check` in both repos
+- PR-2 validations passed:
+  - `npm --prefix apps/node run build`
+  - `npm --prefix apps/node run test`
+  - `./scripts/docs_build.sh`
+- PR-3 validations passed:
+  - `../clawperator-skills/scripts/test_all.sh`
+  - Phase 5 checklist grep check in `../clawperator-skills/AGENTS.md`
+  - `git diff --check` in `../clawperator-skills`
+- `tasks/skills/skill-creation-guidance/findings.md` contains the detailed decision log and validation results for all five phases.
 
 ## Hard Rules
 
 - Do not spin this back out into a third prerequisite pack. The shared
   prerequisite work is Phase 1 through Phase 4 of this pack.
-- Keep `../clawperator-skills/docs/` as the local guidance home. Do not "fix"
-  the README by deleting the local-doc promises without replacement.
+- Durable workflow and authoring docs live in `clawperator` under
+  `docs/skills/`. Do not create `../clawperator-skills/docs/` in this pack.
+  Repair skills-repo entrypoints by routing them to durable main-repo docs plus
+  local checklist and test-entrypoint surfaces.
 - Migrate the high-value rules from
   `~/.clawperator/findings/skill-drafting/findings.md` into repo-owned guidance
   before expanding the broader checklist.
@@ -99,14 +126,15 @@ Read these files IN THIS ORDER before writing anything.
 | 11 | `apps/node/src/domain/skills/scaffoldSkill.ts` | Current scaffold helper divergence |
 | 12 | `apps/node/src/domain/skills/validateSkill.ts` | Current static validation surface |
 | 13 | `apps/node/src/test/unit/skills.test.ts` | Validator regression coverage surface |
-| 14 | `docs/skills/authoring.md` | Public doc that should point to the local author surface |
-| 15 | `.agents/skills/docs-author/SKILL.md` | Required docs workflow for Phase 4 |
+| 14 | `docs/skills/authoring.md` | Durable main-repo authoring doc that the skills repo should route authors toward |
+| 15 | `docs/skills/development.md` | Optional durable addendum if the workflow/testing guidance needs one more public landing spot |
+| 16 | `.agents/skills/docs-author/SKILL.md` | Required docs workflow for Phase 4 |
 
 ## PR / Phase Plan
 
 | PR | Repo | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- | --- |
-| PR-1 | `../clawperator-skills` | Repair local author surface and restore truthful docs | 1, 2 | thinking, default | none |
+| PR-1 | `../clawperator-skills` | Repair local author surface and route it to durable main-repo docs | 1, 2 | thinking, default | done locally |
 | PR-2 | `clawperator` | Add scaffold and validator guardrails, then cross-link main-repo docs | 3, 4 | thinking, default | PR-1 merged or finalized locally |
 | PR-3 | `../clawperator-skills` | Codify the full local checklist, testing matrix, and negative examples | 5 | thinking | PR-2 merged or finalized locally |
 
@@ -131,6 +159,8 @@ This file is an execution log and decision record, not a prewritten placeholder.
 
 ## Phase 1: Local Author-Surface Decision And Seed Rule Migration
 
+Status: completed locally on 2026-04-19
+
 ### Agent Tier
 
 thinking
@@ -153,18 +183,21 @@ checklist work begins.
    change.
 2. Record the current broken README-linked author surfaces in `findings.md`.
 3. Record the PR-1 repair path in `findings.md`: Phase 1 migrates the seed
-   rules and keeps top-level routing truthful, and Phase 2 restores the docs
-   trio and switches the final top-level links.
-4. If Phase 1 touches `README.md` or `AGENTS.md` before the docs trio exists,
-   keep that wording truthful: route readers toward `AGENTS.md` and
-   `../clawperator-skills/scripts/test_all.sh`, and do not point at dead files.
+   rules and keeps top-level routing truthful, and Phase 2 switches the final
+   top-level links to durable main-repo docs plus the local checklist and test
+   entrypoints.
+4. If Phase 1 touches `README.md` or `AGENTS.md` before the final routing lands,
+   keep that wording truthful: route readers toward `AGENTS.md`,
+   `../clawperator-skills/scripts/test_all.sh`, and any already-valid
+   main-repo docs destinations. Do not point at dead files or promise a local
+   docs tree that will not exist.
 5. Migrate the highest-value rules from
    `~/.clawperator/findings/skill-drafting/findings.md` into `AGENTS.md` as the
    seed author checklist.
 6. Add a short explicit route from the top-level author surface to
    `../clawperator-skills/scripts/test_all.sh` so authors can discover the
    off-device test entrypoint immediately.
-7. Record the exact Phase 2 docs destinations in `findings.md` so the next
+7. Record the exact Phase 2 routing destinations in `findings.md` so the next
    phase can switch links without re-deciding structure.
 8. Keep the migration scoped: move the durable rules now, not the entire
    history of that file.
@@ -172,7 +205,7 @@ checklist work begins.
 ### Acceptance Criteria
 
 - `findings.md` records the README-link problem, the chosen repair path, and
-  the exact Phase 2 docs destinations
+  the exact Phase 2 routing destinations
 - `AGENTS.md` contains the migrated seed rules from the private findings file
 - at least one top-level author surface points at
   `../clawperator-skills/scripts/test_all.sh`
@@ -194,7 +227,9 @@ rg -n "README link decision|Current local author surface|Discoverability routes"
 docs(skills): repair local authoring surface entrypoints
 ```
 
-## Phase 2: Restore Local Docs Trio And Clarify `skill-migration.md`
+## Phase 2: Finalize Main-Repo Docs Routing And Clarify `skill-migration.md`
+
+Status: completed locally on 2026-04-19
 
 ### Agent Tier
 
@@ -202,70 +237,73 @@ default
 
 ### Goal
 
-Restore a truthful, current local docs trio in `../clawperator-skills/docs/`
-and make `skill-migration.md` an explicitly secondary audit surface.
+Finalize the skills-repo top-level author routes so they point at durable
+main-repo docs and the local checklist/test entrypoints, and make
+`skill-migration.md` an explicitly secondary audit surface.
 
 ### Files or Surfaces To Change
 
-- `../clawperator-skills/docs/skill-development-workflow.md`
-- `../clawperator-skills/docs/skill-authoring-guidelines.md`
-- `../clawperator-skills/docs/device-prep-and-runtime-tips.md`
 - `../clawperator-skills/README.md`
 - `../clawperator-skills/AGENTS.md`
 - `../clawperator-skills/skill-migration.md`
 
 ### Steps
 
-1. Restore or rewrite the three local docs pages so they describe current
-   behavior and point back to canonical contract docs where appropriate.
-2. Replace any temporary Phase 1 routing in `README.md` or `AGENTS.md` with
-   final links to the restored local docs trio.
-3. Use `README.md` and `AGENTS.md` to route authors toward those local pages for
-   workflow and checklist help.
-4. Update `skill-migration.md` only enough to clarify that it is a migration and
+1. Replace any temporary Phase 1 routing in `README.md` or `AGENTS.md` with
+   final links to durable main-repo docs under `docs/skills/`, using link forms
+   that resolve from `clawperator-skills` rather than sibling-relative local
+   paths.
+2. Keep `AGENTS.md` as the local checklist and repo-conventions surface, and
+   make `README.md` the top-level route that sends authors to:
+   - durable main-repo workflow and runtime docs
+   - `AGENTS.md` for local checklist and negative examples
+   - `../clawperator-skills/scripts/test_all.sh` for the off-device Node-test
+     entrypoint
+   - `../clawperator-skills/scripts/generate_skill_indexes.sh` for generated
+     registry/index refresh
+3. Update `skill-migration.md` only enough to clarify that it is a migration and
    audit log, not the main contribution guide.
-5. Make sure the restored local docs introduce the authored-skill structure and
-   testing model at a high level:
+4. Make sure the final top-level routes introduce the authored-skill structure
+   and testing model at a high level without inventing a new local docs home:
    - `run.js` stays thin when possible
    - extract testable off-device logic into importable modules
    - colocate `*.test.js` where `scripts/test_all.sh` can pick them up
    - live-device proof still applies to UI behavior
-6. Keep the local pages concise and practical. Do not duplicate the entire
-   runtime contract from the main repo.
-7. Record the final local-doc layout and any unresolved gaps in `findings.md`.
+5. Record the final routing layout and any unresolved gaps in `findings.md`.
 
 ### Acceptance Criteria
 
-- all three local docs files exist under `../clawperator-skills/docs/`
-- `README.md` and `AGENTS.md` point at them and no longer rely on temporary
-  Phase 1 routing
+- `README.md` and `AGENTS.md` point only at real, resolvable destinations and
+  no longer rely on temporary Phase 1 routing
+- `README.md` and `AGENTS.md` no longer promise or reference a nonexistent
+  `../clawperator-skills/docs/` tree
 - `skill-migration.md` no longer reads like the primary author workflow
-- the local docs point back to the main repo contracts instead of duplicating
-  them wholesale
-- the local docs introduce the testing and structure model before the full
-  checklist lands in PR-3
-- the local docs are reachable from the top-level author surfaces without
+- the top-level routes point to durable main-repo docs for workflow/runtime
+  guidance instead of duplicating those contracts locally
+- the top-level routes introduce the testing and structure model before the
+  full checklist lands in PR-3
+- the author path is reachable from the top-level skills-repo surfaces without
   repo archaeology
 
 ### Validation
 
 ```bash
-test -f ../clawperator-skills/docs/skill-development-workflow.md
-test -f ../clawperator-skills/docs/skill-authoring-guidelines.md
-test -f ../clawperator-skills/docs/device-prep-and-runtime-tips.md
+[ ! -d ../clawperator-skills/docs ]
 rg -n "skill-migration" ../clawperator-skills/README.md ../clawperator-skills/AGENTS.md
-rg -n "skill-development-workflow|skill-authoring-guidelines|device-prep-and-runtime-tips" ../clawperator-skills/README.md ../clawperator-skills/AGENTS.md
-rg -n "test_all.sh|node --test|live-device|run.js" ../clawperator-skills/docs/skill-development-workflow.md ../clawperator-skills/docs/skill-authoring-guidelines.md
+rg -n "docs/skills/authoring|docs/skills/development|test_all.sh|generate_skill_indexes.sh" ../clawperator-skills/README.md ../clawperator-skills/AGENTS.md
+! rg -n "skill-development-workflow|skill-authoring-guidelines|device-prep-and-runtime-tips|../clawperator-skills/docs/" ../clawperator-skills/README.md ../clawperator-skills/AGENTS.md
 ../clawperator-skills/scripts/test_all.sh
 ```
 
 ### Expected Commit
 
 ```text
-docs(skills): restore local skill authoring guides
+docs(skills): route authoring entrypoints to main docs
 ```
 
 ## Phase 3: Scaffold And Validator Guardrails
+
+Status: completed locally on 2026-04-19
 
 ### Agent Tier
 
@@ -361,15 +399,17 @@ fix(skills): harden skill authoring guardrails
 
 ## Phase 4: Main-Repo Docs Alignment
 
+Status: completed locally on 2026-04-19
+
 ### Agent Tier
 
 default
 
 ### Goal
 
-Point the main repo's public authoring docs at the restored local skills-repo
-guidance and explain the validator-versus-checklist boundary without copying
-the full local checklist into public docs.
+Make the main repo's public authoring docs the durable home for workflow and
+testing guidance, and explain the validator-versus-checklist boundary without
+copying the full local checklist into public docs.
 
 ### Files or Surfaces To Change
 
@@ -379,27 +419,32 @@ the full local checklist into public docs.
 ### Steps
 
 1. Use `.agents/skills/docs-author/SKILL.md` for the docs workflow.
-2. In `docs/skills/authoring.md`, add explicit links to the restored local
-   skills-repo guidance for author workflow, checklist, and device/runtime prep.
+2. In `docs/skills/authoring.md`, make the durable workflow and testing route
+   explicit for runtime-skill authors and add clear links back to the
+   skills-repo entrypoints they will actually use while editing that repo.
 3. Make the public authoring page name the current host-visible discovery
    command for installed authoring workflows:
    `clawperator authoring-skills list`.
-4. Explain the validator boundary using the specific checks shipped in Phase 3:
+4. Explain the validator boundary using the specific checks shipped in Phase 3,
+   and make the durable-doc split explicit:
    - `validateSkill` catches `clawperator-skill-type` frontmatter and stale
      generated indexes, but does not replace off-device tests or live proof
    - `../clawperator-skills/scripts/test_all.sh` is the skills-repo off-device
      test entrypoint
-   - the local skills-repo checklist remains required for truthfulness and
-     author quality bar
-   Do not duplicate Phase 3 implementation details; point authors to
-   `validateSkill` output and the local checklist.
+   - `docs/skills/authoring.md` owns the durable workflow/testing guidance
+   - the local skills-repo checklist remains required for repo-specific
+     truthfulness rules and author quality bar
+   Do not duplicate the full PR-3 checklist or Phase 3 implementation details;
+   point authors to `validateSkill` output and the local checklist where
+   appropriate.
 5. Touch `docs/skills/development.md` only if it needs one small cross-link for
    discoverability.
 6. Record the public-doc link targets in `findings.md`.
 
 ### Acceptance Criteria
 
-- `docs/skills/authoring.md` points authors at the restored local guidance
+- `docs/skills/authoring.md` is a durable home for the workflow/testing route
+  and points authors at the relevant skills-repo entrypoints
 - the docs explain validator guardrails versus checklist guardrails correctly
 - the docs point at the skills-repo off-device test entrypoint instead of
   implying `skills validate` is the whole test story
@@ -421,6 +466,8 @@ docs(skills): cross-link runtime skill author guidance
 
 ## Phase 5: Full Local Checklist And Negative Examples
 
+Status: completed locally on 2026-04-19
+
 ### Agent Tier
 
 thinking
@@ -434,7 +481,6 @@ they open a PR.
 ### Files or Surfaces To Change
 
 - `../clawperator-skills/AGENTS.md`
-- `../clawperator-skills/docs/skill-authoring-guidelines.md`
 - `../clawperator-skills/README.md` only if small route wording needs alignment
 
 ### Steps
@@ -483,7 +529,7 @@ they open a PR.
 
 ```bash
 ../clawperator-skills/scripts/test_all.sh
-rg -n "Verification drift|Generated index drift|Shared helper bypass|Diagnostics|Parser ambiguity|Privacy|test_all.sh|node --test|live-device|run.js" ../clawperator-skills/AGENTS.md ../clawperator-skills/docs/skill-authoring-guidelines.md
+rg -n "Verification drift|Generated index drift|Shared helper bypass|Diagnostics|Parser ambiguity|Privacy|test_all.sh|node --test|live-device|run.js" ../clawperator-skills/AGENTS.md
 ```
 
 ### Expected Commit

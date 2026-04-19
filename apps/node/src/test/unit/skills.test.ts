@@ -1,5 +1,6 @@
 import { describe, it, before, after, beforeEach, afterEach } from "node:test";
 import assert from "node:assert";
+import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { chmod, mkdtemp, mkdir, copyFile, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, normalize } from "node:path";
@@ -80,6 +81,192 @@ const VALID_RECORDING_EXPORT_JSON = `${JSON.stringify({
   },
 })}\n`;
 
+function makeSkillMarkdown(skillId: string, skillType = "replay"): string {
+  return `---
+name: ${skillId}
+clawperator-skill-type: ${skillType}
+description: |-
+  Test fixture for ${skillId}
+---
+
+# ${skillId}
+`;
+}
+
+function getGeneratedPrefixShard(skillId: string): string {
+  return createHash("sha1").update(skillId).digest("hex").slice(0, 2);
+}
+
+function buildGeneratedArtifactsForTest(skills: Array<Record<string, unknown>>) {
+  const sortedSkills = [...skills].sort((left, right) => String(left.id).localeCompare(String(right.id)));
+  const appIds = Array.from(new Set(sortedSkills.map((skill) => String(skill.applicationId)))).sort();
+  const byPrefix = new Map<string, Array<Record<string, unknown>>>();
+
+  for (const skill of sortedSkills) {
+    const prefix = getGeneratedPrefixShard(String(skill.id));
+    const existing = byPrefix.get(prefix) ?? [];
+    existing.push(skill);
+    byPrefix.set(prefix, existing);
+  }
+
+  const sortedPrefixes = Array.from(byPrefix.keys()).sort();
+  const stringifyGeneratedArtifact = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
+  const computeSha256Hex = (value: string): string => createHash("sha256").update(value).digest("hex");
+  const minIndex = {
+    schemaVersion: "1.0",
+    generatedAt: "2026-04-19T00:00:00Z",
+    count: sortedSkills.length,
+    skills: sortedSkills.map((skill) => ({
+      id: skill.id,
+      applicationId: skill.applicationId,
+      intent: skill.intent,
+      summary: skill.summary,
+      path: skill.path,
+    })),
+  };
+  const jsonl = `${sortedSkills.map((skill) => JSON.stringify(skill)).join("\n")}\n`;
+  const byAppArtifacts = Object.fromEntries(appIds.map((applicationId) => [
+    `${applicationId}.json`,
+    {
+      schemaVersion: "1.0",
+      generatedAt: "2026-04-19T00:00:00Z",
+      applicationId,
+      count: sortedSkills.filter((skill) => String(skill.applicationId) === applicationId).length,
+      skills: sortedSkills.filter((skill) => String(skill.applicationId) === applicationId),
+    },
+  ]));
+  const byPrefixArtifacts = Object.fromEntries(sortedPrefixes.map((prefix) => [
+    `${prefix}.json`,
+    {
+      schemaVersion: "1.0",
+      generatedAt: "2026-04-19T00:00:00Z",
+      prefix,
+      count: (byPrefix.get(prefix) ?? []).length,
+      skills: byPrefix.get(prefix) ?? [],
+    },
+  ]));
+  const registryContents = stringifyGeneratedArtifact({
+    $schema: "./skills-registry.schema.json",
+    schemaVersion: "1.0",
+    generatedAt: "2026-04-19T00:00:00Z",
+    skills: sortedSkills,
+  });
+  const minIndexContents = stringifyGeneratedArtifact(minIndex);
+  const byAppChecksums = Object.fromEntries(
+    Object.entries(byAppArtifacts).map(([fileName, payload]) => [fileName, computeSha256Hex(stringifyGeneratedArtifact(payload))])
+  );
+  const byPrefixChecksums = Object.fromEntries(
+    Object.entries(byPrefixArtifacts).map(([fileName, payload]) => [fileName, computeSha256Hex(stringifyGeneratedArtifact(payload))])
+  );
+
+  return {
+    minIndex,
+    jsonl,
+    manifest: {
+      schemaVersion: "1.0",
+      generatedAt: "2026-04-19T00:00:00Z",
+      totalSkills: sortedSkills.length,
+      artifacts: {
+        registry: { file: "skills/skills-registry.json", sha256: computeSha256Hex(registryContents), count: sortedSkills.length },
+        minIndex: { file: "skills/generated/skills-index.min.json", sha256: computeSha256Hex(minIndexContents), count: sortedSkills.length },
+        jsonlIndex: { file: "skills/generated/skills-index.jsonl", sha256: computeSha256Hex(jsonl), count: sortedSkills.length },
+      },
+      shards: {
+        byApp: appIds.map((applicationId) => ({
+          applicationId,
+          file: `skills/generated/by-app/${applicationId}.json`,
+          sha256: byAppChecksums[`${applicationId}.json`],
+          count: sortedSkills.filter((skill) => String(skill.applicationId) === applicationId).length,
+        })),
+        byPrefix: sortedPrefixes.map((prefix) => ({
+          prefix,
+          file: `skills/generated/by-prefix/${prefix}.json`,
+          sha256: byPrefixChecksums[`${prefix}.json`],
+          count: (byPrefix.get(prefix) ?? []).length,
+        })),
+      },
+    },
+    byApp: byAppArtifacts,
+    byPrefix: byPrefixArtifacts,
+  };
+}
+
+async function writeGeneratedArtifactsForTest(
+  repoRoot: string,
+  skills: Array<Record<string, unknown>>,
+): Promise<void> {
+  const generatedRoot = join(repoRoot, "skills", "generated");
+  const byAppDir = join(generatedRoot, "by-app");
+  const byPrefixDir = join(generatedRoot, "by-prefix");
+  const artifacts = buildGeneratedArtifactsForTest(skills);
+
+  await mkdir(join(repoRoot, "scripts"), { recursive: true });
+  await writeFile(join(repoRoot, "scripts", "generate_skill_indexes.sh"), "#!/usr/bin/env bash\n", "utf8");
+  await mkdir(byAppDir, { recursive: true });
+  await mkdir(byPrefixDir, { recursive: true });
+  await writeFile(join(generatedRoot, "skills-index.min.json"), `${JSON.stringify(artifacts.minIndex, null, 2)}\n`, "utf8");
+  await writeFile(join(generatedRoot, "skills-index.jsonl"), artifacts.jsonl, "utf8");
+  await writeFile(join(generatedRoot, "manifest.json"), `${JSON.stringify(artifacts.manifest, null, 2)}\n`, "utf8");
+
+  for (const [fileName, payload] of Object.entries(artifacts.byApp)) {
+    await writeFile(join(byAppDir, fileName), `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  }
+
+  for (const [fileName, payload] of Object.entries(artifacts.byPrefix)) {
+    await writeFile(join(byPrefixDir, fileName), `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  }
+}
+
+async function createTempValidationSkillRepo(options: {
+  skillId: string;
+  skillType?: string;
+  registrySkills?: Array<Record<string, unknown>>;
+  generatedSkills?: Array<Record<string, unknown>>;
+}): Promise<{ root: string; registryPath: string; entry: Record<string, unknown>; cleanup: () => Promise<void> }> {
+  const root = await mkdtemp(join(tmpdir(), "clawperator-skill-guardrails-"));
+  const skillsDir = join(root, "skills");
+  const skillDir = join(skillsDir, options.skillId);
+  const registryPath = join(skillsDir, "skills-registry.json");
+  const entry = {
+    id: options.skillId,
+    applicationId: "com.test",
+    intent: "temp",
+    summary: "Temporary validation skill",
+    path: `skills/${options.skillId}`,
+    skillFile: `skills/${options.skillId}/SKILL.md`,
+    scripts: [`skills/${options.skillId}/scripts/run.js`],
+    artifacts: [],
+  };
+
+  await mkdir(join(skillDir, "scripts"), { recursive: true });
+  await copyFile(
+    join(packageRoot, "src", "test", "fixtures", "skills", "com.test.echo", "scripts", "echo.js"),
+    join(skillDir, "scripts", "run.js")
+  );
+  await writeFile(join(skillDir, "SKILL.md"), makeSkillMarkdown(options.skillId, options.skillType ?? "replay"), "utf8");
+  await writeFile(join(skillDir, "skill.json"), `${JSON.stringify(entry, null, 2)}\n`, "utf8");
+
+  const registrySkills = options.registrySkills ?? [entry];
+  await writeFile(
+    registryPath,
+    `${JSON.stringify({ $schema: "./skills-registry.schema.json", schemaVersion: "1.0", generatedAt: "2026-04-19T00:00:00Z", skills: registrySkills }, null, 2)}\n`,
+    "utf8"
+  );
+
+  if (options.generatedSkills !== undefined) {
+    await writeGeneratedArtifactsForTest(root, options.generatedSkills);
+  }
+
+  return {
+    root,
+    registryPath,
+    entry,
+    cleanup: async () => {
+      await rm(root, { recursive: true, force: true });
+    },
+  };
+}
+
 before(() => {
   process.env.CLAWPERATOR_SKILLS_REGISTRY = TEST_REGISTRY_PATH;
 });
@@ -138,6 +325,25 @@ function runNodeSnippet(
   });
 }
 
+function runNodeFile(
+  filePath: string,
+  args: string[],
+  options?: { cwd?: string; env?: NodeJS.ProcessEnv }
+): Promise<{ stdout: string; stderr: string; code: number }> {
+  return new Promise((resolve) => {
+    const proc = spawn(process.execPath, [filePath, ...args], {
+      cwd: options?.cwd ?? packageRoot,
+      env: options?.env ?? process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    proc.stdout?.on("data", (d) => (stdout += d.toString()));
+    proc.stderr?.on("data", (d) => (stderr += d.toString()));
+    proc.on("close", (code) => resolve({ stdout, stderr, code: code ?? -1 }));
+  });
+}
+
 function normalizeMacTmpPath(path: string): string {
   return normalize(path).replace(/^\/private(?=\/var\/)/, "");
 }
@@ -174,7 +380,7 @@ async function createTempRegistryWithSkill(options: {
       ? join(skillDir, "SKILL.md")
       : join(root, options.skillFileRelativePath);
     await mkdir(dirname(skillProgramPath), { recursive: true });
-    await writeFile(skillProgramPath, `# ${options.skillId}\n`);
+    await writeFile(skillProgramPath, makeSkillMarkdown(options.skillId), "utf8");
   }
   await writeFile(join(skillDir, "skill.json"), options.skillJsonContents);
   let parsedSkillJson: Record<string, unknown> | null = null;
@@ -246,7 +452,7 @@ async function createTempRegistryWithInlineScript(options: {
     contract: options.contract,
   };
 
-  await writeFile(join(skillDir, "SKILL.md"), `# ${options.skillId}\n`, "utf8");
+  await writeFile(join(skillDir, "SKILL.md"), makeSkillMarkdown(options.skillId), "utf8");
   await writeFile(join(scriptsDir, "run.js"), options.scriptContents, "utf8");
   await chmod(join(scriptsDir, "run.js"), 0o755);
   await writeFile(join(skillDir, "skill.json"), `${JSON.stringify(entry, null, 2)}\n`, "utf8");
@@ -1022,7 +1228,7 @@ describe("validateSkill", () => {
     );
     await writeFile(registryPath, `${JSON.stringify({ skills: [entry] }, null, 2)}\n`, "utf8");
     await writeFile(join(skillDir, "skill.json"), `${JSON.stringify(entry, null, 2)}\n`, "utf8");
-    await writeFile(join(skillDir, "SKILL.md"), "# Valid Skill\n", "utf8");
+    await writeFile(join(skillDir, "SKILL.md"), makeSkillMarkdown("com.test.valid"), "utf8");
 
     try {
       const result = await validateSkill("com.test.valid", registryPath);
@@ -1032,6 +1238,351 @@ describe("validateSkill", () => {
       assert.ok(result.checks.scriptPaths.some((file) => file.endsWith("/run.js")));
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects skills that omit clawperator-skill-type frontmatter", async () => {
+    const temp = await createTempValidationSkillRepo({ skillId: "com.test.missing-skill-type" });
+
+    try {
+      await writeFile(join(temp.root, "skills", "com.test.missing-skill-type", "SKILL.md"), "# Missing frontmatter\n", "utf8");
+      const result = await validateSkill("com.test.missing-skill-type", temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /missing required clawperator-skill-type frontmatter/i);
+      assert.deepStrictEqual(result.details?.missingFields, ["clawperator-skill-type"]);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("rejects unrecognized clawperator-skill-type values", async () => {
+    const temp = await createTempValidationSkillRepo({
+      skillId: "com.test.invalid-skill-type",
+      skillType: "unknown",
+    });
+
+    try {
+      const result = await validateSkill("com.test.invalid-skill-type", temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /unsupported clawperator-skill-type/i);
+      assert.match(result.details?.reason ?? "", /unknown/);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("accepts a valid clawperator-skill-type of replay", async () => {
+    const temp = await createTempValidationSkillRepo({
+      skillId: "com.test.replay-skill-type",
+      skillType: "replay",
+    });
+
+    try {
+      const result = await validateSkill("com.test.replay-skill-type", temp.registryPath);
+      assert.ok(result.ok, result.ok ? "" : result.message);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("accepts a valid clawperator-skill-type of orchestrated", async () => {
+    const temp = await createTempValidationSkillRepo({
+      skillId: "com.test.orchestrated-skill-type",
+      skillType: "orchestrated",
+    });
+
+    try {
+      const result = await validateSkill("com.test.orchestrated-skill-type", temp.registryPath);
+      assert.ok(result.ok, result.ok ? "" : result.message);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("preserves the allowlisted script compatibility path for au.com.polyaire.airtouch5.set-zone-state", async () => {
+    const temp = await createTempValidationSkillRepo({
+      skillId: "au.com.polyaire.airtouch5.set-zone-state",
+      skillType: "script",
+    });
+
+    try {
+      const result = await validateSkill("au.com.polyaire.airtouch5.set-zone-state", temp.registryPath);
+      assert.ok(result.ok, result.ok ? "" : result.message);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("rejects non-allowlisted skills that declare clawperator-skill-type: script", async () => {
+    const temp = await createTempValidationSkillRepo({
+      skillId: "com.test.script-skill-type",
+      skillType: "script",
+    });
+
+    try {
+      const result = await validateSkill("com.test.script-skill-type", temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /unsupported clawperator-skill-type/i);
+      assert.match(result.details?.reason ?? "", /replay or orchestrated/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("allows single-skill validation before generated indexes are regenerated", async () => {
+    const staleEntry = {
+      id: "com.test.stale-generated-index",
+      applicationId: "com.test",
+      intent: "temp",
+      summary: "Old summary",
+      path: "skills/com.test.stale-generated-index",
+      skillFile: "skills/com.test.stale-generated-index/SKILL.md",
+      scripts: ["skills/com.test.stale-generated-index/scripts/run.js"],
+      artifacts: [],
+    };
+    const currentEntry = {
+      ...staleEntry,
+      summary: "New summary",
+    };
+    const temp = await createTempValidationSkillRepo({
+      skillId: "com.test.stale-generated-index",
+      registrySkills: [currentEntry],
+      generatedSkills: [staleEntry],
+    });
+
+    try {
+      await writeFile(
+        join(temp.root, "skills", "com.test.stale-generated-index", "skill.json"),
+        `${JSON.stringify(currentEntry, null, 2)}\n`,
+        "utf8"
+      );
+      const result = await validateSkill("com.test.stale-generated-index", temp.registryPath);
+      assert.ok(result.ok, result.ok ? "" : result.message);
+
+      const allSkillsResult = await validateAllSkills(temp.registryPath);
+      assert.ok(!allSkillsResult.ok);
+      assert.strictEqual(allSkillsResult.code, SKILL_VALIDATION_FAILED);
+      assert.strictEqual(allSkillsResult.details?.invalidCount, 1);
+      assert.strictEqual(allSkillsResult.details?.failures.length, 1);
+      assert.match(allSkillsResult.message, /generate_skill_indexes\.sh/);
+      assert.match(allSkillsResult.details?.failures[0]?.details?.reason ?? "", /sha256 does not match the current file contents/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("does not fail generated index freshness on generatedAt-only churn", async () => {
+    const entry = {
+      id: "com.test.generated-at-only",
+      applicationId: "com.test",
+      intent: "temp",
+      summary: "Generated-at churn",
+      path: "skills/com.test.generated-at-only",
+      skillFile: "skills/com.test.generated-at-only/SKILL.md",
+      scripts: ["skills/com.test.generated-at-only/scripts/run.js"],
+      artifacts: [],
+    };
+    const temp = await createTempValidationSkillRepo({
+      skillId: "com.test.generated-at-only",
+      registrySkills: [entry],
+      generatedSkills: [entry],
+    });
+
+    try {
+      await writeFile(
+        join(temp.root, "skills", "com.test.generated-at-only", "skill.json"),
+        `${JSON.stringify(entry, null, 2)}\n`,
+        "utf8"
+      );
+      const generatedRoot = join(temp.root, "skills", "generated");
+      const minIndexContents = `${JSON.stringify({
+        schemaVersion: "1.0",
+        generatedAt: "2030-01-01T00:00:00Z",
+        count: 1,
+        skills: [{
+          id: entry.id,
+          applicationId: entry.applicationId,
+          intent: entry.intent,
+          summary: entry.summary,
+          path: entry.path,
+        }],
+      }, null, 2)}\n`;
+      const byAppContents = `${JSON.stringify({
+        schemaVersion: "1.0",
+        generatedAt: "2030-01-01T00:00:00Z",
+        applicationId: "com.test",
+        count: 1,
+        skills: [entry],
+      }, null, 2)}\n`;
+      const byPrefixContents = `${JSON.stringify({
+        schemaVersion: "1.0",
+        generatedAt: "2030-01-01T00:00:00Z",
+        prefix: getGeneratedPrefixShard(entry.id),
+        count: 1,
+        skills: [entry],
+      }, null, 2)}\n`;
+      await writeFile(
+        join(generatedRoot, "skills-index.min.json"),
+        minIndexContents,
+        "utf8"
+      );
+      await writeFile(
+        join(generatedRoot, "manifest.json"),
+        `${JSON.stringify({
+          schemaVersion: "1.0",
+          generatedAt: "2030-01-01T00:00:00Z",
+          totalSkills: 1,
+          artifacts: {
+            registry: {
+              file: "skills/skills-registry.json",
+              sha256: createHash("sha256").update(
+                `${JSON.stringify({ $schema: "./skills-registry.schema.json", schemaVersion: "1.0", generatedAt: "2026-04-19T00:00:00Z", skills: [entry] }, null, 2)}\n`
+              ).digest("hex"),
+              count: 1,
+            },
+            minIndex: { file: "skills/generated/skills-index.min.json", sha256: createHash("sha256").update(minIndexContents).digest("hex"), count: 1 },
+            jsonlIndex: {
+              file: "skills/generated/skills-index.jsonl",
+              sha256: createHash("sha256").update(`${JSON.stringify(entry)}\n`).digest("hex"),
+              count: 1,
+            },
+          },
+          shards: {
+            byApp: [{
+              applicationId: "com.test",
+              file: "skills/generated/by-app/com.test.json",
+              sha256: createHash("sha256").update(byAppContents).digest("hex"),
+              count: 1,
+            }],
+            byPrefix: [{
+              prefix: getGeneratedPrefixShard(entry.id),
+              file: `skills/generated/by-prefix/${getGeneratedPrefixShard(entry.id)}.json`,
+              sha256: createHash("sha256").update(byPrefixContents).digest("hex"),
+              count: 1,
+            }],
+          },
+        }, null, 2)}\n`,
+        "utf8"
+      );
+      await writeFile(
+        join(generatedRoot, "by-app", "com.test.json"),
+        byAppContents,
+        "utf8"
+      );
+      await writeFile(
+        join(generatedRoot, "by-prefix", `${getGeneratedPrefixShard(entry.id)}.json`),
+        byPrefixContents,
+        "utf8"
+      );
+
+      const result = await validateSkill("com.test.generated-at-only", temp.registryPath);
+      assert.ok(result.ok, result.ok ? "" : result.message);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("fails generated index freshness when manifest sha256 values drift", async () => {
+    const entry = {
+      id: "com.test.manifest-sha-drift",
+      applicationId: "com.test",
+      intent: "temp",
+      summary: "Manifest checksum drift",
+      path: "skills/com.test.manifest-sha-drift",
+      skillFile: "skills/com.test.manifest-sha-drift/SKILL.md",
+      scripts: ["skills/com.test.manifest-sha-drift/scripts/run.js"],
+      artifacts: [],
+    };
+    const temp = await createTempValidationSkillRepo({
+      skillId: "com.test.manifest-sha-drift",
+      registrySkills: [entry],
+      generatedSkills: [entry],
+    });
+
+    try {
+      const manifestPath = join(temp.root, "skills", "generated", "manifest.json");
+      const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+        artifacts: { minIndex: { sha256: string } };
+      };
+      manifest.artifacts.minIndex.sha256 = "deadbeef";
+      await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+      const result = await validateAllSkills(temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /generate_skill_indexes\.sh/i);
+      assert.match(result.details?.failures[0]?.details?.reason ?? "", /sha256 does not match the current file contents/i);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("rejects invalid manifest file paths instead of reading outside the repo", async () => {
+    const entry = {
+      id: "com.test.manifest-path-traversal",
+      applicationId: "com.test",
+      intent: "temp",
+      summary: "Manifest path traversal",
+      path: "skills/com.test.manifest-path-traversal",
+      skillFile: "skills/com.test.manifest-path-traversal/SKILL.md",
+      scripts: ["skills/com.test.manifest-path-traversal/scripts/run.js"],
+      artifacts: [],
+    };
+    const temp = await createTempValidationSkillRepo({
+      skillId: "com.test.manifest-path-traversal",
+      registrySkills: [entry],
+      generatedSkills: [entry],
+    });
+
+    try {
+      const manifestPath = join(temp.root, "skills", "generated", "manifest.json");
+      const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+        artifacts: { registry: { file: string } };
+      };
+      manifest.artifacts.registry.file = "/etc/passwd";
+      await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+      const result = await validateAllSkills(temp.registryPath);
+      assert.ok(!result.ok);
+      assert.strictEqual(result.code, SKILL_VALIDATION_FAILED);
+      assert.match(result.message, /generate_skill_indexes\.sh/i);
+      assert.match(result.details?.failures[0]?.details?.reason ?? "", /invalid file path/i);
+      assert.match(result.details?.failures[0]?.details?.reason ?? "", /\/etc\/passwd/);
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it("accepts regenerated indexes when registry content and generated outputs match", async () => {
+    const entry = {
+      id: "com.test.fresh-generated-index",
+      applicationId: "com.test",
+      intent: "temp",
+      summary: "Fresh generated index",
+      path: "skills/com.test.fresh-generated-index",
+      skillFile: "skills/com.test.fresh-generated-index/SKILL.md",
+      scripts: ["skills/com.test.fresh-generated-index/scripts/run.js"],
+      artifacts: [],
+    };
+    const temp = await createTempValidationSkillRepo({
+      skillId: "com.test.fresh-generated-index",
+      registrySkills: [entry],
+      generatedSkills: [entry],
+    });
+
+    try {
+      await writeFile(
+        join(temp.root, "skills", "com.test.fresh-generated-index", "skill.json"),
+        `${JSON.stringify(entry, null, 2)}\n`,
+        "utf8"
+      );
+      const result = await validateSkill("com.test.fresh-generated-index", temp.registryPath);
+      assert.ok(result.ok, result.ok ? "" : result.message);
+    } finally {
+      await temp.cleanup();
     }
   });
 
@@ -1066,7 +1617,7 @@ describe("validateSkill", () => {
       }, null, 2)}\n`,
       "utf8"
     );
-    await writeFile(join(skillDir, "SKILL.md"), "# Keyword Parity Skill\n", "utf8");
+    await writeFile(join(skillDir, "SKILL.md"), makeSkillMarkdown("com.test.keyword-parity"), "utf8");
 
     try {
       const result = await validateSkill("com.test.keyword-parity", registryPath);
@@ -1098,7 +1649,7 @@ describe("validateSkill", () => {
       join(packageRoot, "src", "test", "fixtures", "skills", "com.test.echo", "scripts", "echo.js"),
       join(skillDir, "scripts", "run.js")
     );
-    await writeFile(join(skillDir, "SKILL.md"), "# Artifact Skill\n", "utf8");
+    await writeFile(join(skillDir, "SKILL.md"), makeSkillMarkdown("com.test.artifact"), "utf8");
     await writeFile(
       join(skillDir, "artifacts", "bad.json"),
       `${JSON.stringify({
@@ -1189,7 +1740,7 @@ describe("validateSkill", () => {
       }, null, 2)}\n`,
       "utf8"
     );
-    await writeFile(join(skillDir, "SKILL.md"), "# Broken Skill\n", "utf8");
+    await writeFile(join(skillDir, "SKILL.md"), makeSkillMarkdown("com.test.invalid"), "utf8");
 
     try {
       const result = await validateSkill("com.test.missing-scripts", registryPath);
@@ -1233,7 +1784,7 @@ describe("validateSkill", () => {
       }, null, 2)}\n`,
       "utf8"
     );
-    await writeFile(join(skillDir, "SKILL.md"), "# Broken Skill\n", "utf8");
+    await writeFile(join(skillDir, "SKILL.md"), makeSkillMarkdown("com.test.bad-registry-keywords"), "utf8");
 
     try {
       const result = await validateSkill("com.test.bad-registry-keywords", registryPath);
@@ -1277,7 +1828,7 @@ describe("validateSkill", () => {
       }, null, 2)}\n`,
       "utf8"
     );
-    await writeFile(join(skillDir, "SKILL.md"), "# Broken Skill\n", "utf8");
+    await writeFile(join(skillDir, "SKILL.md"), makeSkillMarkdown("com.test.bad-manifest-keywords"), "utf8");
 
     try {
       const result = await validateSkill("com.test.bad-manifest-keywords", registryPath);
@@ -1303,7 +1854,7 @@ describe("validateSkill", () => {
       join(packageRoot, "src", "test", "fixtures", "skills", "com.test.echo", "scripts", "echo.js"),
       join(scriptsDir, "echo.js")
     );
-    await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+    await writeFile(join(skillDir, "SKILL.md"), makeSkillMarkdown(skillId), "utf8");
     await writeFile(join(skillDir, "skill.json"), "{\n  \"id\": \"broken\"\n", "utf8");
     await writeFile(
       registryPath,
@@ -1648,8 +2199,8 @@ describe("validateAllSkills", () => {
       join(packageRoot, "src", "test", "fixtures", "skills", "com.test.echo", "scripts", "echo.js"),
       join(betaDir, "scripts", "run.js")
     );
-    await writeFile(join(alphaDir, "SKILL.md"), "# Alpha\n", "utf8");
-    await writeFile(join(betaDir, "SKILL.md"), "# Beta\n", "utf8");
+    await writeFile(join(alphaDir, "SKILL.md"), makeSkillMarkdown("com.example.alpha.capture"), "utf8");
+    await writeFile(join(betaDir, "SKILL.md"), makeSkillMarkdown("com.example.beta.capture"), "utf8");
     await writeFile(join(alphaDir, "skill.json"), `${JSON.stringify(alphaEntry, null, 2)}\n`, "utf8");
     await writeFile(join(betaDir, "skill.json"), `${JSON.stringify(betaEntry, null, 2)}\n`, "utf8");
     await writeFile(
@@ -1701,7 +2252,7 @@ describe("validateAllSkills", () => {
       join(packageRoot, "src", "test", "fixtures", "skills", "com.test.echo", "scripts", "echo.js"),
       join(validDir, "scripts", "run.js")
     );
-    await writeFile(join(validDir, "SKILL.md"), "# Valid\n", "utf8");
+    await writeFile(join(validDir, "SKILL.md"), makeSkillMarkdown("com.example.valid.capture"), "utf8");
     await writeFile(join(validDir, "skill.json"), `${JSON.stringify(validEntry, null, 2)}\n`, "utf8");
     await writeFile(join(invalidDir, "skill.json"), `${JSON.stringify(invalidEntry, null, 2)}\n`, "utf8");
     await writeFile(
@@ -1939,9 +2490,18 @@ describe("scaffoldSkill", () => {
       });
 
       const runShPath = join(tempRoot, "skills", skillId, "scripts", "run.sh");
+      const runJsPath = join(tempRoot, "skills", skillId, "scripts", "run.js");
       const runShContent = await readFile(runShPath, "utf8");
+      const runJsContent = await readFile(runJsPath, "utf8");
+      const skillMarkdown = await readFile(join(tempRoot, "skills", skillId, "SKILL.md"), "utf8");
       const runShStats = await stat(runShPath);
       assert.match(runShContent, /node "\$DIR\/run\.js" "\$@"/);
+      assert.match(runJsContent, /resolveClawperatorBin/);
+      assert.match(runJsContent, /resolveOperatorPackage/);
+      assert.match(runJsContent, /getLocalClawperatorCliPath/);
+      assert.doesNotMatch(runJsContent, /\.\.\/\.\.\/utils\/common\.js/);
+      assert.doesNotMatch(runJsContent, /execFileSync\(\s*"clawperator"/);
+      assert.match(skillMarkdown, /clawperator-skill-type: replay/);
       assert.ok((runShStats.mode & 0o111) !== 0, `Expected run.sh to be executable, mode=${runShStats.mode.toString(8)}`);
 
       const skillJson = JSON.parse(await readFile(join(tempRoot, "skills", skillId, "skill.json"), "utf8"));
@@ -1952,6 +2512,82 @@ describe("scaffoldSkill", () => {
       });
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("scaffolded run.js preserves backslashes in quoted CLAWPERATOR_BIN command specs", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-windows-bin-"));
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+
+    try {
+      const skillId = "com.example.demo.capture-windows-bin";
+      const result = await scaffoldSkill(skillId, registryPath);
+      if (!result.ok) assert.fail(result.message);
+
+      const runJsPath = join(tempRoot, "skills", skillId, "scripts", "run.js");
+      const fakeNodePath = join(tempRoot, "C:\\Program Files\\nodejs\\node.exe");
+      const fakeCliPath = join(tempRoot, "C:\\clawperator apps\\node\\dist\\cli\\index.js");
+
+      await writeFile(fakeNodePath, `#!/bin/sh\nexec "${process.execPath}" "$@"\n`, "utf8");
+      await chmod(fakeNodePath, 0o755);
+      await writeFile(
+        fakeCliPath,
+        "process.stdout.write(JSON.stringify({ argv: process.argv.slice(2) }));\n",
+        "utf8"
+      );
+
+      const executionResult = await runNodeFile(runJsPath, ["device-123"], {
+        env: {
+          ...process.env,
+          CLAWPERATOR_BIN: `"${fakeNodePath}" "${fakeCliPath}"`,
+        },
+      });
+
+      assert.strictEqual(executionResult.code, 0, executionResult.stderr);
+      const parsed = JSON.parse(executionResult.stdout) as { argv?: string[] };
+      assert.deepStrictEqual(parsed.argv?.slice(0, 4), ["exec", "--device", "device-123", "--operator-package"]);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("scaffolded run.js prefers a local build over the global clawperator binary when CLAWPERATOR_BIN is unset", async () => {
+    const outerRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-local-cli-"));
+    const tempRoot = join(outerRoot, "repo");
+    const registryDir = join(tempRoot, "skills");
+    const registryPath = join(registryDir, "skills-registry.json");
+    await mkdir(registryDir, { recursive: true });
+    await copyFile(TEST_REGISTRY_PATH, registryPath);
+
+    try {
+      const skillId = "com.example.demo.capture-local-cli";
+      const result = await scaffoldSkill(skillId, registryPath);
+      if (!result.ok) assert.fail(result.message);
+
+      const runJsPath = join(tempRoot, "skills", skillId, "scripts", "run.js");
+      const fakeCliPath = join(tempRoot, "apps", "node", "dist", "cli", "index.js");
+      await mkdir(dirname(fakeCliPath), { recursive: true });
+      await writeFile(
+        fakeCliPath,
+        "process.stdout.write(JSON.stringify({ argv: process.argv.slice(2) }));\n",
+        "utf8"
+      );
+
+      const executionResult = await runNodeFile(runJsPath, ["device-456"], {
+        env: {
+          ...process.env,
+          CLAWPERATOR_BIN: "",
+        },
+      });
+
+      assert.strictEqual(executionResult.code, 0, executionResult.stderr);
+      const parsed = JSON.parse(executionResult.stdout) as { argv?: string[] };
+      assert.deepStrictEqual(parsed.argv?.slice(0, 4), ["exec", "--device", "device-456", "--operator-package"]);
+    } finally {
+      await rm(outerRoot, { recursive: true, force: true });
     }
   });
 
@@ -2210,7 +2846,7 @@ describe("scaffoldSkill", () => {
       assert.ok(parsed.files?.some((file) => file.endsWith("/scripts/run.sh")));
       assert.strictEqual(
         parsed.next,
-        "Edit SKILL.md and scripts/run.js, then verify with: clawperator skills validate <skill_id>"
+        "Edit `SKILL.md` and `scripts/run.js`, then run `clawperator skills validate <skill_id>`; if this repo uses generated indexes, rerun `scripts/generate_skill_indexes.sh` and `clawperator skills validate --all`"
       );
 
       const registryRaw = await readFile(registryPath, "utf8");
@@ -3400,7 +4036,7 @@ describe("runSkill", () => {
         ),
         join(scriptsDir, "not-run.js")
       );
-      await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+      await writeFile(join(skillDir, "SKILL.md"), makeSkillMarkdown(skillId, "orchestrated"), "utf8");
       await writeFile(join(skillDir, "skill.json"), JSON.stringify(skillManifest), "utf8");
       const registryPath = join(root, "skills", "skills-registry.json");
       await writeFile(
@@ -3493,7 +4129,7 @@ describe("runSkill", () => {
         ),
         join(scriptsDir, "run.js")
       );
-      await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+      await writeFile(join(skillDir, "SKILL.md"), makeSkillMarkdown(skillId, "orchestrated"), "utf8");
       await writeFile(
         join(skillDir, "skill.json"),
         JSON.stringify({
@@ -3599,7 +4235,7 @@ describe("runSkill", () => {
         ),
         join(scriptsDir, "fake_codex.js")
       );
-      await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+      await writeFile(join(skillDir, "SKILL.md"), makeSkillMarkdown(skillId, "orchestrated"), "utf8");
       await writeFile(
         join(skillDir, "skill.json"),
         JSON.stringify({
@@ -3686,7 +4322,7 @@ describe("runSkill", () => {
         ),
         join(scriptsDir, "fake_codex.js")
       );
-      await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+      await writeFile(join(skillDir, "SKILL.md"), makeSkillMarkdown(skillId, "orchestrated"), "utf8");
       await writeFile(
         join(skillDir, "skill.json"),
         JSON.stringify({
@@ -4515,7 +5151,7 @@ describe("runSkill", () => {
     };
 
     try {
-      await writeFile(join(skillDir, "SKILL.md"), "# Unsupported Schema\n", "utf8");
+      await writeFile(join(skillDir, "SKILL.md"), makeSkillMarkdown(skillId), "utf8");
       await writeFile(join(skillDir, "scripts", "run.js"), "#!/usr/bin/env node\nconsole.log('fixture run');\n", "utf8");
       await writeFile(join(skillDir, "skill.json"), `${JSON.stringify(entry, null, 2)}\n`, "utf8");
       await writeFile(registryPath, `${JSON.stringify({ schemaVersion: "1.0", generatedAt: "2026-04-11T00:00:00Z", skills: [entry] }, null, 2)}\n`, "utf8");
@@ -4697,7 +5333,7 @@ console.log(JSON.stringify({
     };
 
     try {
-      await writeFile(join(skillDir, "SKILL.md"), `# ${skillId}\n`, "utf8");
+      await writeFile(join(skillDir, "SKILL.md"), makeSkillMarkdown(skillId), "utf8");
       await writeFile(join(skillDir, "scripts", "run.js"), scriptContents, "utf8");
       await writeFile(join(skillDir, "skill.json"), `${JSON.stringify(entry, null, 2)}\n`, "utf8");
       await writeFile(
@@ -5566,7 +6202,7 @@ console.log(JSON.stringify({
   });
 
   it("reports timeout instead of parse failure when a framed result is cut off by timeout", async () => {
-    const result = await runSkill(TEST_SKILL_RESULT, ["partial-frame-timeout"], undefined, 150);
+    const result = await runSkill(TEST_SKILL_RESULT, ["partial-frame-timeout"], undefined, 300);
 
     assert.ok(!result.ok);
     assert.strictEqual(result.code, SKILL_EXECUTION_TIMEOUT);
