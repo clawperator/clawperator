@@ -144,8 +144,13 @@ def test_rescore_preserves_skill_generation_gate(tmp_path):
         run_dir / "config.json",
         {
             "eval_id": "android-version",
-            "spec": {"skill_prompt_file": "prompt-skill.md"},
-            "environment": {"ground_truth_android_version": "15"},
+            "spec": {"prompt_file": "prompt-skill.md"},
+            "environment": {
+                "ground_truth_android_version": "15",
+                "clawperator_cmd": ["node", "/repo/apps/node/dist/cli/index.js"],
+                "runtime_clawperator_cmd": ["node", "/repo/apps/node/dist/cli/index.js"],
+                "operator_package": "com.clawperator.operator.dev",
+            },
         },
     )
     _write_json(
