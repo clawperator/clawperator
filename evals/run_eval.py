@@ -552,6 +552,10 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--skills-registry is only supported for solax-orchestrated-cold-start")
     if hasattr(args, "runs"):
         parser.error("--runs is only supported for solax-orchestrated-cold-start")
+    if args.timeout_s is not None and args.timeout_s <= 0:
+        parser.error("--timeout-s must be greater than 0")
+    if args.max_turns is not None and args.max_turns <= 0:
+        parser.error("--max-turns must be greater than 0")
 
     spec = _load_spec(args.eval_id)
     spec["runtime_target"] = args.runtime

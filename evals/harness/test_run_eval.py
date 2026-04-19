@@ -307,6 +307,22 @@ def test_resolve_android_eval_budget_prefers_cli_overrides():
     assert max_turns == 21
 
 
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["android-version", "--timeout-s", "0"],
+        ["android-version", "--timeout-s", "-1"],
+        ["android-version", "--max-turns", "0"],
+        ["android-version", "--max-turns", "-1"],
+    ],
+)
+def test_run_eval_rejects_non_positive_android_budgets(argv):
+    with pytest.raises(SystemExit) as excinfo:
+        run_eval.main(argv)
+
+    assert excinfo.value.code == 2
+
+
 def test_replay_cli_rejects_missing_recorded_device_serial(tmp_path):
     runs_dir = tmp_path / "runs"
     run_dir = runs_dir / "android-version-20260404-000000-aaaaaa-claude-claude-sonnet"

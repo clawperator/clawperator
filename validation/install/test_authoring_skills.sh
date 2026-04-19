@@ -237,6 +237,7 @@ run_guide_case() {
     local output_file="$5"
     local guide_file="$6"
 
+    AUTHORING_MODE="$authoring_mode" \
     HOME="$TMP_DIR/home-$label" \
     OS=Linux \
     bash -c '
@@ -246,20 +247,20 @@ run_guide_case() {
         unset SKILLS_REGISTRY_PATH
         unset SKILLS_SETUP_STATUS
         export AUTHORING_SKILLS_INSTALL_DIR="$HOME/.clawperator/authoring-skills"
-        if [ "$4" = "complete" ]; then
+        if [ "$AUTHORING_MODE" = "complete" ]; then
           mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-agent-discovery"
           mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-recording"
           mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-audit"
           printf "# skill-author-by-agent-discovery\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-agent-discovery/SKILL.md"
           printf "# skill-author-by-recording\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-recording/SKILL.md"
           printf "# skill-audit\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-audit/SKILL.md"
-        elif [ "$4" = "recording-only" ]; then
+        elif [ "$AUTHORING_MODE" = "recording-only" ]; then
           mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-recording"
           mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-audit"
           printf "# skill-author-by-recording\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-recording/SKILL.md"
           printf "# skill-audit\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-audit/SKILL.md"
         else
-          printf "unexpected authoring mode: %s\n" "$4" >&2
+          printf "unexpected authoring mode: %s\n" "$AUTHORING_MODE" >&2
           exit 1
         fi
         if [ "$2" = "with-version" ]; then
