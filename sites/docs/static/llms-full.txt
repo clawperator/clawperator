@@ -6895,7 +6895,7 @@ Parameters:
 | `selector` | yes | Target field selector |
 | `text` | yes | Text to enter |
 | `submit` | no | When `true`, submit after entry |
-| `clear` | no | When `true`, clear first |
+| `clear` | no | On Android `ACTION_SET_TEXT` targets, when `true` first dispatch `ACTION_SET_TEXT(\"\")`, then set the requested text |
 | `deviceId` | no | Explicit target device |
 | `operatorPackage` | no | Explicit operator package |
 | `timeoutMs` | no | Execution timeout. Defaults to `30000`. |
