@@ -1,0 +1,4 @@
+interface:
+  display_name: "Clawperator Agent Orientation"
+  short_description: "Orient an unfamiliar agent to the correct Clawperator front door"
+  default_prompt: "Use $clawperator-agent-orientation when Clawperator is available on the current host but you are not yet sure whether to use runtime skills, agent-skills, MCP, or raw CLI actions. Start by running `clawperator doctor --json`, continue only when `criticalOk` is true, keep the explanation short, point to the canonical docs for host-agents, setup, quickstart, API overview, snapshot, and MCP, highlight the critical commands (`devices`, `snapshot`, `click`, `skills list`, `agent-skills list`, and `mcp serve` when relevant), explain the observe -> decide -> act loop briefly, and end with one explicit next step rather than a broad taxonomy."

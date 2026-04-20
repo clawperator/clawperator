@@ -56,6 +56,7 @@ Expected signals:
 - top-level `count`
 - top-level `installedDir`
 - each listed agent-skill includes `name` and `skillPath`
+- `skills[].name` includes `clawperator-agent-orientation`
 - `skills[].name` includes `skill-author-by-agent-discovery`
 - `skills[].name` includes `skill-author-by-recording`
 
@@ -107,6 +108,7 @@ Current packaged first-party agent-skills:
 
 | Skill | Role | Boundary |
 | --- | --- | --- |
+| `clawperator-agent-orientation` | first-run orientation | Routes an unfamiliar host agent to the correct Clawperator front door and canonical docs without redefining the contracts. |
 | `skill-author-by-agent-discovery` | zero-results front door | Produces one discovery artifact, chooses exactly one next step, and does not author a durable runtime skill directly. |
 | `skill-author-by-recording` | proving workflow | Records a real device flow, authors one skill shape, and runs one self-test that surfaces the emitted `SkillResult`. |
 
@@ -128,7 +130,8 @@ Current command behavior:
 - `clawperator agent-skills list` reports installed skill names and the
   absolute `SKILL.md` path for each installed agent-skill
 - the current packaged install set contains
-  `skill-author-by-agent-discovery` and `skill-author-by-recording`
+  `clawperator-agent-orientation`, `skill-author-by-agent-discovery`, and
+  `skill-author-by-recording`
 
 Current doctor behavior:
 

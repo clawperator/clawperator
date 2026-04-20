@@ -243,6 +243,7 @@ describe("CLI help", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator agent-skills/);
     assert.match(stdout, /agent-skills list/);
+    assert.match(stdout, /clawperator-agent-orientation/);
     assert.match(stdout, /skill-author-by-agent-discovery/);
     assert.match(stdout, /skill-author-by-recording/);
     assert.match(stdout, /Runtime skills still live under 'clawperator skills/);

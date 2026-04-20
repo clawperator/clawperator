@@ -55,7 +55,7 @@ describe("agentSkillsPack.mjs", () => {
   it("prepack materializes multiple agent-skill symlinks into directories and writes state for restoration", async () => {
     const { root, scriptPath, agentSkillsDir } = await makeTempPackage();
     const sourceSkillsRoot = join(root, "sources");
-    const skillNames = ["skill-author-by-agent-discovery", "skill-author-by-recording"];
+    const skillNames = ["clawperator-agent-orientation", "skill-author-by-agent-discovery", "skill-author-by-recording"];
     for (const skillName of skillNames) {
       const sourceSkillDir = join(sourceSkillsRoot, skillName);
       await mkdir(sourceSkillDir, { recursive: true });
@@ -89,6 +89,12 @@ describe("agentSkillsPack.mjs", () => {
     assert.deepEqual(state, {
       symlinks: [
         {
+          entry: "clawperator-agent-orientation",
+          target: process.platform === "win32"
+            ? join(sourceSkillsRoot, "clawperator-agent-orientation")
+            : "../sources/clawperator-agent-orientation",
+        },
+        {
           entry: "skill-author-by-agent-discovery",
           target: process.platform === "win32"
             ? join(sourceSkillsRoot, "skill-author-by-agent-discovery")
@@ -107,6 +113,12 @@ describe("agentSkillsPack.mjs", () => {
   it("postpack restores multiple symlinks from saved state and removes the temporary state file", async () => {
     const { root, scriptPath, agentSkillsDir } = await makeTempPackage();
     const restoredTargets = [
+      {
+        entry: "clawperator-agent-orientation",
+        target: process.platform === "win32"
+          ? join(root, "sources", "clawperator-agent-orientation")
+          : "../sources/clawperator-agent-orientation",
+      },
       {
         entry: "skill-author-by-agent-discovery",
         target: process.platform === "win32"

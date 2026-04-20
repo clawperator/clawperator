@@ -297,6 +297,7 @@ Notes:
   - Lists installed first-party agent-skills from ~/.clawperator/agent-skills/
   - Shows the absolute SKILL.md path for each installed agent-skill
   - Use this when you need to inspect the installed host-agent helpers on this machine
+  - 'clawperator-agent-orientation' is the first-run orientation skill for unfamiliar hosts
   - 'skill-author-by-agent-discovery' is the zero-results front door
   - 'skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'
   - Runtime skills still live under 'clawperator skills ...'; agent-skills are separate host-agent helpers
@@ -2310,6 +2311,7 @@ Usage:
 
 Notes:
   - Use 'clawperator agent-skills list' to inspect the installed host-agent workflows on this machine.
+  - 'clawperator-agent-orientation' is the first-run orientation skill when the current host is unfamiliar.
   - 'skill-author-by-agent-discovery' is the zero-results front door when runtime-skill discovery found no relevant match.
   - 'skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'.
   - Runtime skills still live under 'clawperator skills ...'; agent-skills are separate host-agent helpers.

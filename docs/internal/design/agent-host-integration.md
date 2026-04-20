@@ -108,7 +108,9 @@ Key implications:
 4. the runtime-skills registry depends on shell-session propagation unless the
    CLI itself falls back to the installed home-directory path
 5. the local guide and shared-agent bridge now explicitly advertise the
-   discovery-to-proving route:
+   first-run and discovery-to-proving route:
+   - `clawperator-agent-orientation` is the packaged first-run orientation
+     front door
    - `skill-author-by-agent-discovery` is the zero-results front door
    - `skill-author-by-recording` is the proving workflow after
      `proceed_to_recording`

@@ -1070,6 +1070,7 @@ write_agent_guide() {
     local SKILL_DIR=""
     local SKILL_NAME=""
     local HAS_SKILLS=0
+    local HAS_ORIENTATION_SKILL=0
     local HAS_DISCOVERY_SKILL=0
     local HAS_RECORDING_SKILL=0
 
@@ -1102,7 +1103,9 @@ EOF
             if [ -f "${SKILL_DIR}SKILL.md" ]; then
                 HAS_SKILLS=1
                 SKILL_NAME="$(basename "$SKILL_DIR")"
-                if [ "$SKILL_NAME" = "skill-author-by-agent-discovery" ]; then
+                if [ "$SKILL_NAME" = "clawperator-agent-orientation" ]; then
+                    HAS_ORIENTATION_SKILL=1
+                elif [ "$SKILL_NAME" = "skill-author-by-agent-discovery" ]; then
                     HAS_DISCOVERY_SKILL=1
                 elif [ "$SKILL_NAME" = "skill-author-by-recording" ]; then
                     HAS_RECORDING_SKILL=1
@@ -1120,6 +1123,13 @@ First-party Clawperator agent-skills are installed at:
 ${AGENT_SKILLS_GUIDE_DIR}
 
 EOF
+        if [ "$HAS_ORIENTATION_SKILL" -eq 1 ]; then
+            cat >> "$AGENT_GUIDE_PATH" <<'EOF'
+- \`clawperator-agent-orientation\`: first-run orientation skill for an
+  unfamiliar host. It checks readiness, chooses the correct Clawperator front
+  door, and points back to the canonical public docs for the chosen path.
+EOF
+        fi
         if [ "$HAS_DISCOVERY_SKILL" -eq 1 ]; then
             cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 - \`skill-author-by-agent-discovery\`: zero-results front door when
@@ -1145,10 +1155,11 @@ EOF
                 printf -- '- %s\n' "$(basename "$SKILL_DIR")" >> "$AGENT_GUIDE_PATH"
             fi
         done
-        if [ "$HAS_DISCOVERY_SKILL" -eq 1 ] && [ "$HAS_RECORDING_SKILL" -eq 1 ]; then
+        if [ "$HAS_ORIENTATION_SKILL" -eq 1 ] && [ "$HAS_DISCOVERY_SKILL" -eq 1 ] && [ "$HAS_RECORDING_SKILL" -eq 1 ]; then
             cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
-Recommended no-match flow:
+Recommended first-run flow:
+- If the current host is unfamiliar, start with `clawperator-agent-orientation`
 - Start with `clawperator skills for-app <package_id>` or `clawperator skills search --keyword "<term>"`
 - If there is no relevant runtime-skill match, inspect `clawperator agent-skills list --json`
 - Start the guided route with `skill-author-by-agent-discovery`
@@ -1162,6 +1173,9 @@ Installed agent-skill front doors are incomplete on this host.
 Repair it with:
 - run `clawperator agent-skills update`
 EOF
+            if [ "$HAS_ORIENTATION_SKILL" -ne 1 ]; then
+                printf -- '- missing `%s`\n' "clawperator-agent-orientation" >> "$AGENT_GUIDE_PATH"
+            fi
             if [ "$HAS_DISCOVERY_SKILL" -ne 1 ]; then
                 printf -- '- missing `%s`\n' "skill-author-by-agent-discovery" >> "$AGENT_GUIDE_PATH"
             fi
@@ -1169,7 +1183,7 @@ EOF
                 printf -- '- missing `%s`\n' "skill-author-by-recording" >> "$AGENT_GUIDE_PATH"
             fi
         fi
-        if [ ! -f "$AGENT_SKILLS_GUIDE_DIR/version.txt" ] && [ "$HAS_DISCOVERY_SKILL" -eq 1 ] && [ "$HAS_RECORDING_SKILL" -eq 1 ]; then
+        if [ ! -f "$AGENT_SKILLS_GUIDE_DIR/version.txt" ] && [ "$HAS_ORIENTATION_SKILL" -eq 1 ] && [ "$HAS_DISCOVERY_SKILL" -eq 1 ] && [ "$HAS_RECORDING_SKILL" -eq 1 ]; then
             cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
 Version metadata is missing for this install.
@@ -1185,6 +1199,7 @@ EOF
 First-party Clawperator agent-skills are not currently configured on this host.
 
 Expected packaged front doors after install:
+- `clawperator-agent-orientation`: first-run orientation for unfamiliar hosts
 - `skill-author-by-agent-discovery`: zero-results front door when runtime-skill discovery found no relevant match
 - `skill-author-by-recording`: proving workflow after discovery returns `proceed_to_recording`
 
@@ -1249,7 +1264,7 @@ const bridgeBlock = [
   "- `clawperator agent-skills list --json`",
   "",
   "If runtime-skill discovery finds no relevant match, follow the local guide for the agent-skill front doors installed on this host.",
-  "Confirm the local guide lists both `skill-author-by-agent-discovery` and `skill-author-by-recording` before starting the discovery-to-proving route.",
+  "Confirm the local guide lists `clawperator-agent-orientation`, `skill-author-by-agent-discovery`, and `skill-author-by-recording` before starting the discovery-to-proving route.",
   "Use `clawperator skills run <skill_id>` after you have identified the right runtime skill.",
   endMarker,
 ].join("\n");
