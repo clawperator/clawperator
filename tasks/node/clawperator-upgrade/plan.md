@@ -15,13 +15,13 @@ and discoverable after a normal install.
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | completed on branch |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4 |
-| Current / Next | Phase 1 |
-| Blockers | none |
+| Completed | 1, 2, 3, 4 |
+| Remaining | none |
+| Current / Next | done |
+| Blockers | no task-specific blockers; `./validation/install/test_install.sh` still reports unrelated pre-existing failures in `serve` timeout coverage and authoring-skills pack tests |
 
 ## Goal
 
@@ -191,6 +191,9 @@ After PR-1:
 - Node-side help, inventory messaging, and packaged-skill unit tests treat
   `clawperator-upgrade` as a first-party packaged `agent-skill`
 
+Status:
+- completed in commit `0809aef feat(node): add packaged clawperator-upgrade agent-skill`
+
 After PR-2:
 
 - `install.sh` installs and locally documents `clawperator-upgrade` alongside
@@ -201,6 +204,26 @@ After PR-2:
 - `./scripts/docs_build.sh` regenerates `sites/landing/public/llms-full.txt`
   from the edited authored docs rather than relying on hand-edited generated
   output
+
+Status:
+- completed in commit `39e179d docs: wire clawperator-upgrade through install and host guidance`
+
+## Validation Status
+
+Completed on this branch:
+
+- `npm --prefix apps/node run build`
+- `node --test apps/node/dist/test/unit/agentSkillsPack.test.js apps/node/dist/test/unit/agentSkills.test.js apps/node/dist/test/unit/cliHelp.test.js`
+- `./validation/install/test_agent_skills.sh`
+- `./validation/install/test_main.sh`
+- `./scripts/docs_build.sh`
+
+Additional note:
+
+- `./validation/install/test_install.sh` was rerun after `npm --prefix apps/node ci`
+  and still fails for unrelated pre-existing repo issues outside this task pack:
+  one `dist/test/integration/serve.test.js` timeout assertion and the
+  authoring-skills pack tests.
 
 ## Idempotency
 

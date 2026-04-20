@@ -15,13 +15,13 @@ Clawperator install path. This pack intentionally does not add a top-level
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | completed on branch |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4 |
-| Current / Next | Phase 1 |
-| Blockers | none |
+| Completed | 1, 2, 3, 4 |
+| Remaining | none |
+| Current / Next | done |
+| Blockers | no task-specific blockers; the umbrella `./validation/install/test_install.sh` entrypoint still exposes unrelated pre-existing failures outside this pack |
 
 ## Hard Rules
 
@@ -77,6 +77,11 @@ Read these files IN THIS ORDER before writing anything.
 | --- | --- | --- | --- | --- |
 | PR-1 | Add and bundle `clawperator-upgrade` in the packaged `agent-skills` set | 1, 2 | thinking, default | none |
 | PR-2 | Install, guide, and document the new packaged skill | 3, 4 | default, default | PR-1 merged |
+
+Current branch status:
+
+- PR-1 scope completed in `0809aef feat(node): add packaged clawperator-upgrade agent-skill`
+- PR-2 scope completed in `39e179d docs: wire clawperator-upgrade through install and host guidance`
 
 ## Testing Model
 
@@ -140,6 +145,11 @@ npm --prefix apps/node run build
 npm --prefix apps/node run test -- --test-name-pattern="agentSkillsPack|agentSkills"
 ```
 
+Status:
+- completed
+- validated with `npm --prefix apps/node run build`
+- validated with `node --test apps/node/dist/test/unit/agentSkillsPack.test.js apps/node/dist/test/unit/agentSkills.test.js apps/node/dist/test/unit/cliHelp.test.js`
+
 ### Expected Commits
 
 ```text
@@ -148,6 +158,12 @@ feat(skill): add clawperator-upgrade agent-skill
 
 ```text
 test(node): cover clawperator-upgrade packaged skill
+```
+
+Actual checkpoint:
+
+```text
+0809aef feat(node): add packaged clawperator-upgrade agent-skill
 ```
 
 ## Phase 2: Update Node-Side Inventory and Help
@@ -200,6 +216,10 @@ npm --prefix apps/node run build
 npm --prefix apps/node run test -- --test-name-pattern="agentSkills|cli help|doctor"
 ```
 
+Status:
+- completed
+- covered by the same targeted Node validation run used for Phase 1
+
 ### Expected Commits
 
 ```text
@@ -208,6 +228,12 @@ feat(node): add clawperator-upgrade to agent-skills help
 
 ```text
 test(node): update first-party agent-skills inventory coverage
+```
+
+Actual checkpoint:
+
+```text
+0809aef feat(node): add packaged clawperator-upgrade agent-skill
 ```
 
 ## Phase 3: Install Script and Installer Harness Integration
@@ -271,6 +297,13 @@ npm --prefix apps/node run test -- --test-name-pattern="landing install.sh Node 
 ./validation/install/test_install.sh
 ```
 
+Status:
+- completed for task-owned installer surfaces
+- validated with `./validation/install/test_agent_skills.sh`
+- validated with `./validation/install/test_main.sh`
+- `./validation/install/test_install.sh` still fails for unrelated pre-existing
+  repo issues outside this pack after passing the task-owned shell harnesses
+
 ### Expected Commits
 
 ```text
@@ -279,6 +312,12 @@ feat(install): add clawperator-upgrade to local agent guide
 
 ```text
 test(install): cover clawperator-upgrade installer guidance
+```
+
+Actual checkpoint:
+
+```text
+39e179d docs: wire clawperator-upgrade through install and host guidance
 ```
 
 ## Phase 4: Public Docs and Durable Guidance
@@ -317,6 +356,31 @@ routes through the first-party `agent-skills` set.
 6. Re-read the edited docs against the code and installer text before final
    validation. Do not let the docs promise a different upgrade path than the
    new skill actually instructs.
+
+### Acceptance Criteria
+
+- `docs/host-agents.md`, `docs/skills/authoring.md`, and
+  `docs/internal/design/agent-host-integration.md` describe
+  `clawperator-upgrade` as the packaged whole-product upgrade route
+- generated `llms-full.txt` artifacts are refreshed through the docs build
+- docs wording stays aligned with the shipped installer guide and packaged
+  first-party inventory
+
+### Validation
+
+```bash
+./scripts/docs_build.sh
+```
+
+Status:
+- completed
+- validated with `./scripts/docs_build.sh`
+
+### Actual Checkpoint
+
+```text
+39e179d docs: wire clawperator-upgrade through install and host guidance
+```
 
 ### Acceptance Criteria
 
