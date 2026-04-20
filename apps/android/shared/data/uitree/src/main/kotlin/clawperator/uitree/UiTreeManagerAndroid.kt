@@ -76,6 +76,7 @@ class UiTreeManagerAndroid(
     override suspend fun setText(
         uiNode: UiNode,
         text: String,
+        clear: Boolean,
         submit: Boolean,
     ): Boolean {
         val accessibilityNodeInfo = uiNode.accessibilityNodeInfo as? AccessibilityNodeInfo ?: return false
@@ -85,6 +86,20 @@ class UiTreeManagerAndroid(
         if (!target.isFocused) {
             target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
             target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        }
+
+        // Clear via ACTION_SET_TEXT with an empty CharSequence so clear=true fails
+        // truthfully if the requested clear step cannot be performed.
+        if (clear) {
+            val clearArgs =
+                Bundle().apply {
+                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
+                }
+            val clearSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, clearArgs)
+            if (!clearSucceeded) {
+                Log.d("[UiTreeManager] ACTION_SET_TEXT clear failed for id=${uiNode.id} on ${target.debugNode()}")
+                return false
+            }
         }
 
         val args =

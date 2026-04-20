@@ -341,6 +341,7 @@ interface TaskUiScope {
     suspend fun enterText(
         matcher: NodeMatcher,
         text: String,
+        clear: Boolean = false,
         submit: Boolean = false,
         retry: TaskRetry = TaskRetry.None,
     )

@@ -210,6 +210,7 @@ class AgentCommandParserDefault : AgentCommandParser {
                     id = id,
                     matcher = params.parseMatcherRequired("matcher"),
                     text = params.stringRequired("text", MAX_MATCHER_VALUE_LENGTH),
+                    clear = params.booleanOrDefault("clear", false),
                     submit = params.booleanOrDefault("submit", false),
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
                 )

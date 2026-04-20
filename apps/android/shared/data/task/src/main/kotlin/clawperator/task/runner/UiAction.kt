@@ -135,6 +135,7 @@ sealed interface UiAction {
         override val id: String,
         val matcher: NodeMatcher,
         val text: String,
+        val clear: Boolean = false,
         val submit: Boolean = false,
         val retry: TaskRetry = TaskRetryPresets.UiReadiness,
     ) : UiAction

@@ -414,6 +414,7 @@ class TaskUiScopeTest(
     override suspend fun enterText(
         matcher: NodeMatcher,
         text: String,
+        clear: Boolean,
         submit: Boolean,
         retry: TaskRetry,
     ) {
@@ -425,7 +426,7 @@ class TaskUiScopeTest(
             throw IllegalStateException("Node is not editable: ${node.label}")
         }
 
-        println("[TaskUiScopeTest] Entered text into node: ${node.label} (len=${text.length}, submit=$submit)")
+        println("[TaskUiScopeTest] Entered text into node: ${node.label} (len=${text.length}, clear=$clear, submit=$submit)")
     }
 
     /**
