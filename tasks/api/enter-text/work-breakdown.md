@@ -248,7 +248,7 @@ Plus:
   `adb -s <device_serial> shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity`
 - validate the legacy route with the branch-local Node build, not the global
   CLI. Use:
-  `node apps/node/dist/cli.js type "hello" --selector '<matcher_json>' --device <device_serial> --operator-package com.clawperator.operator.dev`
+  `node apps/node/dist/cli/index.js type "hello" --selector '<matcher_json>' --device <device_serial> --operator-package com.clawperator.operator.dev`
 - the phase is not complete until it records either:
   - a live validation result for legacy-route replace and submit behavior on
     `<device_serial>`
@@ -453,7 +453,7 @@ Plus:
 - if a suitable target is available, launch the debug operator with:
   `adb -s <device_serial> shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity`
 - perform final live verification with the branch-local CLI, for example:
-  `node apps/node/dist/cli.js type "hello" --selector '<matcher_json>' --device <device_serial> --operator-package com.clawperator.operator.dev`
+  `node apps/node/dist/cli/index.js type "hello" --selector '<matcher_json>' --device <device_serial> --operator-package com.clawperator.operator.dev`
 
 Plus:
 - complete the live validation from Steps 8 and 9 when a suitable Android 13+

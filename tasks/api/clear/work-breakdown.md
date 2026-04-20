@@ -177,7 +177,7 @@ both cases plus the absent-clear default.
    ```bash
    ./gradlew app:installDebug
    adb -s <device_serial> shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity
-   node apps/node/dist/cli.js type "new text" --selector '<matcher_json>' --clear --device <device_serial> --operator-package com.clawperator.operator.dev
+   node apps/node/dist/cli/index.js type "new text" --selector '<matcher_json>' --clear --device <device_serial> --operator-package com.clawperator.operator.dev
    ```
    Verify the field was cleared before the new text was written. Use a field
    with pre-existing content so the clear effect is observable. Record the
