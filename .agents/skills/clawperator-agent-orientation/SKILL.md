@@ -51,18 +51,17 @@ Use this decision table:
 
 | Situation | Start here |
 | --- | --- |
-| You need to discover or run an installed app-specific workflow | `clawperator skills` |
+| Your first reasonable guess is an installed app-specific workflow | `clawperator skills` |
 | Runtime-skill discovery found no relevant match and you need the truthful zero-results route | `skill-author-by-agent-discovery` |
 | Discovery returned `proceed_to_recording`, or the app route is already well understood and now needs a proving workflow | `skill-author-by-recording` |
 | The host already supports stdio MCP and wants registered tools | `clawperator mcp serve` |
-| You already know the exact direct action or payload you want | raw CLI / local API via quickstart and API overview |
+| You already know the exact direct action or payload you want | raw CLI / local API via quickstart |
 
 ### 3. Run the cold-start checklist
 
 Run these commands in order when the host is ready:
 
 ```bash
-clawperator doctor --json
 clawperator devices
 clawperator snapshot --json
 clawperator skills list --json
