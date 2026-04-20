@@ -22,15 +22,15 @@
     "!dist/**/*.map",
     "README.md",
     "LICENSE",
-    "authoring-skills/"
+    "agent-skills/"
   ],
   "engines": {
     "node": ">=24.0.0"
   },
   "scripts": {
     "build": "tsc",
-    "prepack": "node scripts/authoringSkillsPack.mjs prepack",
-    "postpack": "node scripts/authoringSkillsPack.mjs postpack",
+    "prepack": "node scripts/agentSkillsPack.mjs prepack",
+    "postpack": "node scripts/agentSkillsPack.mjs postpack",
     "start": "node dist/cli/index.js",
     "test": "node --test dist/test/integration/*.test.js dist/test/unit/*.test.js dist/test/unit/doctor/*.test.js dist/cli/*.test.js",
     "test:unit": "node --test dist/test/unit/*.test.js dist/test/unit/doctor/*.test.js dist/cli/*.test.js",

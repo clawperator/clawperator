@@ -136,7 +136,7 @@ describe("CLI help", () => {
     assert.match(stdout, /exec <json-or-file> \[--validate-only\]/);
     assert.match(stdout, /https:\/\/docs\.clawperator\.com\/host-agents\//);
     assert.match(stdout, /skills for-app <package_id>/);
-    assert.match(stdout, /authoring-skills list/);
+    assert.match(stdout, /agent-skills list/);
     assert.match(stdout, /skill-author-by-agent-discovery/);
     assert.match(stdout, /skill-author-by-recording/);
     assert.match(stdout, /mcp serve/);
@@ -231,18 +231,18 @@ describe("CLI help", () => {
     assert.match(stdout, /skills for-app <package_id>/);
     assert.match(stdout, /skills search --keyword <text>/);
     assert.match(stdout, /skills get <skill_id>/);
-    assert.match(stdout, /authoring-skills list/);
+    assert.match(stdout, /agent-skills list/);
     assert.match(stdout, /skill-author-by-agent-discovery/);
     assert.match(stdout, /skill-author-by-recording/);
     assert.match(stdout, /clawperator mcp serve/);
     assert.match(stdout, /https:\/\/docs\.clawperator\.com\/host-agents\//);
   });
 
-  it("shows authoring-skills discovery guidance", async () => {
-    const { stdout, code } = await runCli(["authoring-skills", "--help"]);
+  it("shows agent-skills discovery guidance", async () => {
+    const { stdout, code } = await runCli(["agent-skills", "--help"]);
     assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator authoring-skills/);
-    assert.match(stdout, /authoring-skills list/);
+    assert.match(stdout, /clawperator agent-skills/);
+    assert.match(stdout, /agent-skills list/);
     assert.match(stdout, /skill-author-by-agent-discovery/);
     assert.match(stdout, /skill-author-by-recording/);
     assert.match(stdout, /Runtime skills still live under 'clawperator skills/);
@@ -254,7 +254,7 @@ describe("CLI help", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator skills new/);
     assert.match(stdout, /low-level manual scaffold/i);
-    assert.match(stdout, /authoring-skills list/);
+    assert.match(stdout, /agent-skills list/);
     assert.match(stdout, /skill-author-by-agent-discovery/);
     assert.match(stdout, /skill-author-by-recording/);
   });

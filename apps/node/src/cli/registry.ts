@@ -264,42 +264,42 @@ Notes:
       $HOME/.clawperator/skills/skills/skills-registry.json
 `;
 
-const HELP_AUTHORING_SKILLS_INSTALL = `clawperator authoring-skills install
+const HELP_AGENT_SKILLS_INSTALL = `clawperator agent-skills install
 
 Usage:
-  clawperator authoring-skills install [--output <json|pretty>]
+  clawperator agent-skills install [--output <json|pretty>]
 
 Notes:
-  - Copies packaged first-party authoring skills to ~/.clawperator/authoring-skills/
-  - Installs both packaged front doors: 'skill-author-by-agent-discovery' and 'skill-author-by-recording'
+  - Copies packaged first-party agent-skills to ~/.clawperator/agent-skills/
+  - Installs the packaged agent-skill front doors that help host agents operate Clawperator
   - Creates Claude Code, Codex, and generic agents discovery directories unconditionally
   - Symlinks each installed skill into ~/.claude/skills/, the Codex skills dir, and ~/.agents/skills/
-  - Use 'clawperator authoring-skills list' after install to inspect the available authoring front doors on this host
+  - Use 'clawperator agent-skills list' after install to inspect the available host-agent helpers on this machine
 `;
 
-const HELP_AUTHORING_SKILLS_UPDATE = `clawperator authoring-skills update
+const HELP_AGENT_SKILLS_UPDATE = `clawperator agent-skills update
 
 Usage:
-  clawperator authoring-skills update [--output <json|pretty>]
+  clawperator agent-skills update [--output <json|pretty>]
 
 Notes:
-  - Re-copies packaged first-party authoring skills into ~/.clawperator/authoring-skills/
+  - Re-copies packaged first-party agent-skills into ~/.clawperator/agent-skills/
   - Recreates Claude Code, Codex, and generic agents discovery symlinks
   - Safe to run multiple times
 `;
 
-const HELP_AUTHORING_SKILLS_LIST = `clawperator authoring-skills list
+const HELP_AGENT_SKILLS_LIST = `clawperator agent-skills list
 
 Usage:
-  clawperator authoring-skills list [--output <json|pretty>]
+  clawperator agent-skills list [--output <json|pretty>]
 
 Notes:
-  - Lists installed first-party authoring skills from ~/.clawperator/authoring-skills/
-  - Shows the absolute SKILL.md path for each installed authoring skill
-  - Use this when runtime-skill discovery returned no relevant match and you need to inspect the installed authoring workflows on this host
+  - Lists installed first-party agent-skills from ~/.clawperator/agent-skills/
+  - Shows the absolute SKILL.md path for each installed agent-skill
+  - Use this when you need to inspect the installed host-agent helpers on this machine
   - 'skill-author-by-agent-discovery' is the zero-results front door
   - 'skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'
-  - Runtime skills still live under 'clawperator skills ...'; authoring skills are separate host-agent helpers
+  - Runtime skills still live under 'clawperator skills ...'; agent-skills are separate host-agent helpers
 `;
 
 const HELP_SKILLS_NEW = `clawperator skills new
@@ -314,7 +314,7 @@ Notes:
   - --summary overrides the default TODO summary written to skill.json and SKILL.md.
   - --recording-context copies a recording export JSON file into the new skill folder as reference evidence for an external authoring agent or human.
   - Updates the configured registry JSON so the new skill appears in skills list.
-  - This is the low-level manual scaffold. If runtime-skill discovery found no relevant match, inspect 'clawperator authoring-skills list' first and start with 'skill-author-by-agent-discovery'.
+  - This is the low-level manual scaffold. If runtime-skill discovery found no relevant match, inspect 'clawperator agent-skills list' first and start with 'skill-author-by-agent-discovery'.
   - Use 'skill-author-by-recording' only after discovery returns 'proceed_to_recording', or when the app route is already well understood and you need the proving workflow.
 `;
 
@@ -2111,7 +2111,7 @@ Notes:
   - Start with 'clawperator skills for-app <package_id>' when you know the Android package id.
   - Use 'clawperator skills search --keyword <text>' when you only have app names or user-language intent terms.
   - Use 'clawperator skills get <skill_id>' before 'clawperator skills run <skill_id>' when discovery already returned an id.
-  - If runtime-skill discovery returns no relevant match and you need guided skill creation help, use 'clawperator authoring-skills list' and start with 'skill-author-by-agent-discovery'.
+  - If runtime-skill discovery returns no relevant match and you need guided skill creation help, use 'clawperator agent-skills list' and start with 'skill-author-by-agent-discovery'.
   - Use 'skill-author-by-recording' after discovery returns 'proceed_to_recording', or when the route is already well understood and you need the proving workflow.
   - If your host already supports stdio MCP and wants registered tools instead of runtime-skill discovery, use 'clawperator mcp serve'.
   - Post-install orientation: https://docs.clawperator.com/host-agents/
@@ -2296,47 +2296,47 @@ Notes:
   },
 };
 
-// authoring-skills
-COMMANDS["authoring-skills"] = {
-  name: "authoring-skills",
+// agent-skills
+COMMANDS["agent-skills"] = {
+  name: "agent-skills",
   group: "Execution",
-  summary: "Manage first-party authoring skills for Claude Code, Codex, and generic agent runtimes",
-  help: `clawperator authoring-skills
+  summary: "Manage first-party agent-skills for Claude Code, Codex, and generic agent runtimes",
+  help: `clawperator agent-skills
 
 Usage:
-  clawperator authoring-skills list
-  clawperator authoring-skills install
-  clawperator authoring-skills update
+  clawperator agent-skills list
+  clawperator agent-skills install
+  clawperator agent-skills update
 
 Notes:
-  - Use 'clawperator authoring-skills list' to inspect the installed guided authoring workflows on this host.
+  - Use 'clawperator agent-skills list' to inspect the installed host-agent workflows on this machine.
   - 'skill-author-by-agent-discovery' is the zero-results front door when runtime-skill discovery found no relevant match.
   - 'skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'.
-  - Runtime skills still live under 'clawperator skills ...'; authoring skills are separate host-agent helpers.
+  - Runtime skills still live under 'clawperator skills ...'; agent-skills are separate host-agent helpers.
   - Post-install authoring guidance: https://docs.clawperator.com/skills/authoring/
 `,
   subtopics: {
-    install: HELP_AUTHORING_SKILLS_INSTALL,
-    update: HELP_AUTHORING_SKILLS_UPDATE,
-    list: HELP_AUTHORING_SKILLS_LIST,
+    install: HELP_AGENT_SKILLS_INSTALL,
+    update: HELP_AGENT_SKILLS_UPDATE,
+    list: HELP_AGENT_SKILLS_LIST,
   },
-  topLevelBlock: `  authoring-skills list
-                                            List installed first-party authoring skills
-  authoring-skills install
-                                            Copy and wire packaged authoring skills for Claude Code, Codex, and generic agent runtimes
-  authoring-skills update
-                                            Refresh installed authoring skills and recreate discovery symlinks`,
+  topLevelBlock: `  agent-skills list
+                                            List installed first-party agent-skills
+  agent-skills install
+                                            Copy and wire packaged agent-skills for Claude Code, Codex, and generic agent runtimes
+  agent-skills update
+                                            Refresh installed agent-skills and recreate discovery symlinks`,
   handler: async (ctx) => {
     const { rest, format } = ctx;
     const out = { format, env: process.env };
     if (rest[0] === "list") {
-      return (await import("./commands/authoringSkills.js")).cmdAuthoringSkillsList(out);
+      return (await import("./commands/agentSkills.js")).cmdAgentSkillsList(out);
     } else if (rest[0] === "install") {
-      return (await import("./commands/authoringSkills.js")).cmdAuthoringSkillsInstall(out);
+      return (await import("./commands/agentSkills.js")).cmdAgentSkillsInstall(out);
     } else if (rest[0] === "update") {
-      return (await import("./commands/authoringSkills.js")).cmdAuthoringSkillsUpdate(out);
+      return (await import("./commands/agentSkills.js")).cmdAgentSkillsUpdate(out);
     } else {
-      return JSON.stringify({ code: "USAGE", message: "authoring-skills list|install|update" });
+      return JSON.stringify({ code: "USAGE", message: "agent-skills list|install|update" });
     }
   },
 };
@@ -2752,7 +2752,7 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "Notes:",
     "  - Post-install host-agent orientation: https://docs.clawperator.com/host-agents/",
     "  - Start runtime-skill discovery with 'clawperator skills for-app <package_id>' when you know the Android package, or 'clawperator skills search --keyword <text>' when you do not.",
-    "  - If runtime-skill discovery returns no relevant match and you need guided authoring help, use 'clawperator authoring-skills list' and start with 'skill-author-by-agent-discovery'.",
+    "  - If runtime-skill discovery returns no relevant match and you need guided authoring help, use 'clawperator agent-skills list' and start with 'skill-author-by-agent-discovery'.",
     "  - Use 'skill-author-by-recording' only after discovery returns 'proceed_to_recording', or when the app route is already well understood and you need the proving workflow.",
     "  - Use 'clawperator mcp serve' when the host already supports stdio MCP and wants registered Clawperator tools.",
     "  - operator setup is the canonical setup command. operator install remains an alias.",

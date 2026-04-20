@@ -33,8 +33,8 @@ dependencies for you.
 - `test_multidevice.sh`
   - covers `maybe_install_operator_apk()` behavior when multiple devices are
     connected
-- `test_authoring_skills.sh`
-  - covers authoring-skills shell glue including parser behavior,
+- `test_agent_skills.sh`
+  - covers agent-skills shell glue including parser behavior,
     `setup_authoring_skills_via_cli()`, `write_agent_guide()`, skip behavior,
     `CODEX_HOME` fallback, and installer metadata parsing
 - `test_main.sh`

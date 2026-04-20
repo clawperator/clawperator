@@ -276,11 +276,11 @@ def _tokens_request_json_output(tokens: list[str]) -> bool:
     return False
 
 
-def _is_authoring_skills_list_command(record: dict[str, Any]) -> bool:
+def _is_agent_skills_list_command(record: dict[str, Any]) -> bool:
     for tokens in _extract_command_token_lists(record):
         lowered = [token.lower() for token in tokens]
         for index in range(len(lowered) - 1):
-            if lowered[index] == "authoring-skills" and lowered[index + 1] == "list":
+            if lowered[index] == "agent-skills" and lowered[index + 1] == "list":
                 if _tokens_request_json_output(tokens):
                     return True
     return False
@@ -320,7 +320,7 @@ def _canonicalize_registry_command_tokens(tokens: list[str]) -> str | None:
         if token == "skills" and next_token in {"for-app", "search", "get"}:
             relevant_tokens = normalized_tokens[index:]
             break
-        if token == "authoring-skills" and next_token == "list":
+        if token == "agent-skills" and next_token == "list":
             relevant_tokens = normalized_tokens[index:]
             break
     else:
@@ -471,7 +471,7 @@ def _validate_discovery_artifact(
                 )
             if authoring_probe_signatures and artifact_registry_signatures.isdisjoint(authoring_probe_signatures):
                 errors.append(
-                    "discovery artifact existing_skill_verdict commands must include `authoring-skills list --json` evidence seen in the transcript"
+                    "discovery artifact existing_skill_verdict commands must include `agent-skills list --json` evidence seen in the transcript"
                 )
 
     route_confidence = artifact.get("route_confidence")
@@ -649,14 +649,14 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
     authoring_skills_list_positions = [
         line_number
         for line_number, record in command_execution_records
-        if _is_authoring_skills_list_command(record)
+        if _is_agent_skills_list_command(record)
     ]
     authoring_skills_list_line_numbers = [position + 1 for position in authoring_skills_list_positions]
     authoring_skills_list_signatures: set[str] = set()
     runtime_skill_discovery_signatures: set[str] = set()
     runtime_skill_discovery_positions: list[int] = []
     for line_number, record in command_execution_records:
-        if _is_authoring_skills_list_command(record):
+        if _is_agent_skills_list_command(record):
             for token_list in _extract_command_token_lists(record):
                 signature = _canonicalize_registry_command_tokens(token_list)
                 if signature is not None:
@@ -691,7 +691,7 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
         )
         if authoring_skills_list_line_numbers and discovery_artifact_line_number <= min(authoring_skills_list_line_numbers):
             discovery_artifact_errors.append(
-                "structured discovery artifact must appear after `clawperator authoring-skills list --json`"
+                "structured discovery artifact must appear after `clawperator agent-skills list --json`"
             )
     elif discovery_artifact_count > 1:
         discovery_artifact_errors.append("expected exactly one structured discovery artifact before skill emission")
@@ -731,11 +731,11 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
             )
         elif not runtime_skill_discovery_before_authoring:
             route_requirement_errors.append(
-                "runtime-skill discovery must appear before `clawperator authoring-skills list --json`"
+                "runtime-skill discovery must appear before `clawperator agent-skills list --json`"
             )
         if not authoring_skills_list_seen:
             route_requirement_errors.append(
-                "missing structured command evidence for `clawperator authoring-skills list --json`"
+                "missing structured command evidence for `clawperator agent-skills list --json`"
             )
     route_requirement_errors.extend(discovery_artifact_errors)
     if required_authoring_front_door is not None and not required_authoring_front_door_explicitly_seen:
@@ -744,7 +744,7 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
         )
     elif required_authoring_front_door is not None and not required_authoring_front_door_after_authoring:
         route_requirement_errors.append(
-            f"required_authoring_front_door `{required_authoring_front_door}` must appear after `clawperator authoring-skills list --json`"
+            f"required_authoring_front_door `{required_authoring_front_door}` must appear after `clawperator agent-skills list --json`"
         )
     if required_authoring_front_door is not None and not required_authoring_front_door_seen:
         route_requirement_errors.append(

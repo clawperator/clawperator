@@ -104,7 +104,7 @@ run_parser_case() {
     bash -c '
         source "$1" >/dev/null 2>&1
         trap - ERR
-        printf "%s" "$2" | parse_authoring_skills_install_result > "$3"
+        printf "%s" "$2" | parse_agent_skills_install_result > "$3"
     ' _ "$INSTALL_SCRIPT" "$input_json" "$output_file"
 }
 
@@ -157,7 +157,7 @@ case "${mode}" in
       printf '%s\n' '1.2.3'
       exit 0
     fi
-    if [ "\$1" = "authoring-skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
+    if [ "\$1" = "agent-skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
       cat <<'JSON'
 ${payload}
 JSON
@@ -169,7 +169,7 @@ JSON
       printf '%s\n' '1.2.3'
       exit 0
     fi
-    if [ "\$1" = "authoring-skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
+    if [ "\$1" = "agent-skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
       printf '%s\n' '${payload}'
       exit 1
     fi
@@ -198,7 +198,7 @@ EOF
     chmod +x "$mock_dir/clawperator"
 }
 
-run_setup_authoring_case() {
+run_setup_agent_skills_case() {
     local label="$1"
     local mode="$2"
     local payload="$3"
@@ -218,13 +218,13 @@ run_setup_authoring_case() {
         trap - ERR
         export CLAWPERATOR_BIN_PATH="$2"
         '"$extra_env"'
-        setup_authoring_skills_via_cli > "$3"
-        printf "%s\n" "$AUTHORING_SKILLS_SETUP_STATUS" > "$4"
+        setup_agent_skills_via_cli > "$3"
+        printf "%s\n" "$AGENT_SKILLS_SETUP_STATUS" > "$4"
         {
-          printf "install=%s\n" "$AUTHORING_SKILLS_INSTALL_DIR"
-          printf "claude=%s\n" "$AUTHORING_SKILLS_CLAUDE_DIR"
-          printf "codex=%s\n" "$AUTHORING_SKILLS_CODEX_DIR"
-          printf "agents=%s\n" "$AUTHORING_SKILLS_AGENTS_DIR"
+          printf "install=%s\n" "$AGENT_SKILLS_INSTALL_DIR"
+          printf "claude=%s\n" "$AGENT_SKILLS_CLAUDE_DIR"
+          printf "codex=%s\n" "$AGENT_SKILLS_CODEX_DIR"
+          printf "agents=%s\n" "$AGENT_SKILLS_AGENTS_DIR"
         } > "$5"
     ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$output_file" "$status_file" "$values_file"
 }
@@ -233,11 +233,11 @@ run_guide_case() {
     local label="$1"
     local version_mode="$2"
     local runtime_mode="$3"
-    local authoring_mode="$4"
+    local agent_skills_mode="$4"
     local output_file="$5"
     local guide_file="$6"
 
-    AUTHORING_MODE="$authoring_mode" \
+    AGENT_SKILLS_MODE="$agent_skills_mode" \
     HOME="$TMP_DIR/home-$label" \
     OS=Linux \
     bash -c '
@@ -246,25 +246,25 @@ run_guide_case() {
         unset CLAWPERATOR_SKILLS_REGISTRY
         unset SKILLS_REGISTRY_PATH
         unset SKILLS_SETUP_STATUS
-        export AUTHORING_SKILLS_INSTALL_DIR="$HOME/.clawperator/authoring-skills"
-        if [ "$AUTHORING_MODE" = "complete" ]; then
-          mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-agent-discovery"
-          mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-recording"
-          mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-audit"
-          printf "# skill-author-by-agent-discovery\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-agent-discovery/SKILL.md"
-          printf "# skill-author-by-recording\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-recording/SKILL.md"
-          printf "# skill-audit\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-audit/SKILL.md"
-        elif [ "$AUTHORING_MODE" = "recording-only" ]; then
-          mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-recording"
-          mkdir -p "$AUTHORING_SKILLS_INSTALL_DIR/skill-audit"
-          printf "# skill-author-by-recording\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-author-by-recording/SKILL.md"
-          printf "# skill-audit\n" > "$AUTHORING_SKILLS_INSTALL_DIR/skill-audit/SKILL.md"
+        export AGENT_SKILLS_INSTALL_DIR="$HOME/.clawperator/agent-skills"
+        if [ "$AGENT_SKILLS_MODE" = "complete" ]; then
+          mkdir -p "$AGENT_SKILLS_INSTALL_DIR/skill-author-by-agent-discovery"
+          mkdir -p "$AGENT_SKILLS_INSTALL_DIR/skill-author-by-recording"
+          mkdir -p "$AGENT_SKILLS_INSTALL_DIR/skill-audit"
+          printf "# skill-author-by-agent-discovery\n" > "$AGENT_SKILLS_INSTALL_DIR/skill-author-by-agent-discovery/SKILL.md"
+          printf "# skill-author-by-recording\n" > "$AGENT_SKILLS_INSTALL_DIR/skill-author-by-recording/SKILL.md"
+          printf "# skill-audit\n" > "$AGENT_SKILLS_INSTALL_DIR/skill-audit/SKILL.md"
+        elif [ "$AGENT_SKILLS_MODE" = "recording-only" ]; then
+          mkdir -p "$AGENT_SKILLS_INSTALL_DIR/skill-author-by-recording"
+          mkdir -p "$AGENT_SKILLS_INSTALL_DIR/skill-audit"
+          printf "# skill-author-by-recording\n" > "$AGENT_SKILLS_INSTALL_DIR/skill-author-by-recording/SKILL.md"
+          printf "# skill-audit\n" > "$AGENT_SKILLS_INSTALL_DIR/skill-audit/SKILL.md"
         else
-          printf "unexpected authoring mode: %s\n" "$AUTHORING_MODE" >&2
+          printf "unexpected agent-skills mode: %s\n" "$AGENT_SKILLS_MODE" >&2
           exit 1
         fi
         if [ "$2" = "with-version" ]; then
-          printf "1.2.3\n" > "$AUTHORING_SKILLS_INSTALL_DIR/version.txt"
+          printf "1.2.3\n" > "$AGENT_SKILLS_INSTALL_DIR/version.txt"
         fi
         if [ "$3" = "with-runtime-registry" ]; then
           mkdir -p "$HOME/.clawperator/skills/skills"
@@ -298,7 +298,7 @@ JSON
         fi
         write_agent_guide > "$5"
         printf "%s\n" "$HOME/.clawperator/AGENTS.md" > "$6"
-    ' _ "$INSTALL_SCRIPT" "$version_mode" "$runtime_mode" "$authoring_mode" "$output_file" "$guide_file"
+    ' _ "$INSTALL_SCRIPT" "$version_mode" "$runtime_mode" "$agent_skills_mode" "$output_file" "$guide_file"
 }
 
 run_missing_guide_case() {
@@ -314,7 +314,7 @@ run_missing_guide_case() {
         unset CLAWPERATOR_SKILLS_REGISTRY
         unset SKILLS_REGISTRY_PATH
         unset SKILLS_SETUP_STATUS
-        export AUTHORING_SKILLS_INSTALL_DIR="$HOME/.clawperator/nonexistent-authoring-skills"
+        export AGENT_SKILLS_INSTALL_DIR="$HOME/.clawperator/nonexistent-agent-skills"
         write_agent_guide > "$2"
         printf "%s\n" "$HOME/.clawperator/AGENTS.md" > "$3"
     ' _ "$INSTALL_SCRIPT" "$output_file" "$guide_file"
@@ -405,7 +405,7 @@ run_install_state_version_banner_case() {
 
 run_skip_case() {
     local output_skills="$1"
-    local output_authoring="$2"
+    local output_agent_skills="$2"
     local status_file="$3"
     local log_file="$4"
     local mock_dir="$TMP_DIR/mock-skip"
@@ -421,12 +421,12 @@ run_skip_case() {
         export CLAWPERATOR_BIN_PATH="$2"
         export CLAWPERATOR_INSTALL_SKIP_SKILLS=1
         setup_skills_via_cli > "$3"
-        setup_authoring_skills_via_cli > "$4"
+        setup_agent_skills_via_cli > "$4"
         {
           printf "skills=%s\n" "$SKILLS_SETUP_STATUS"
-          printf "authoring=%s\n" "$AUTHORING_SKILLS_SETUP_STATUS"
+          printf "agent=%s\n" "$AGENT_SKILLS_SETUP_STATUS"
         } > "$5"
-    ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$output_skills" "$output_authoring" "$status_file"
+    ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$output_skills" "$output_agent_skills" "$status_file"
 }
 
 run_mcp_config_case() {
@@ -631,73 +631,73 @@ if [ -s "$PARSE_BAD_OUT" ]; then
     exit 1
 fi
 
-echo "=== Scenario 3: authoring skills setup succeeds with explicit discovery dirs ==="
-AUTHORING_SUCCESS_OUT="$TMP_DIR/authoring-success.out"
-AUTHORING_SUCCESS_STATUS="$TMP_DIR/authoring-success.status"
-AUTHORING_SUCCESS_VALUES="$TMP_DIR/authoring-success.values"
-run_setup_authoring_case \
-    authoring-success \
+echo "=== Scenario 3: agent-skills setup succeeds with explicit discovery dirs ==="
+AGENT_SKILLS_SUCCESS_OUT="$TMP_DIR/agent-skills-success.out"
+AGENT_SKILLS_SUCCESS_STATUS="$TMP_DIR/agent-skills-success.status"
+AGENT_SKILLS_SUCCESS_VALUES="$TMP_DIR/agent-skills-success.values"
+run_setup_agent_skills_case \
+    agent-skills-success \
     success \
     '{"installedDir":"/custom/install","agentDiscoveryDirs":[{"label":"claude","dir":"/custom/claude"},{"label":"codex","dir":"/custom/codex"},{"label":"agents","dir":"/custom/agents"},{"label":"gemini","dir":"/custom/gemini"}]}' \
-    "$AUTHORING_SUCCESS_OUT" \
-    "$AUTHORING_SUCCESS_STATUS" \
-    "$AUTHORING_SUCCESS_VALUES"
-assert_equals "configured" "$(cat "$AUTHORING_SUCCESS_STATUS")" "authoring-success status"
-assert_contains "$AUTHORING_SUCCESS_OUT" "Authoring skills setup complete." "authoring-success"
-assert_contains "$AUTHORING_SUCCESS_VALUES" "install=/custom/install" "authoring-success values"
-assert_contains "$AUTHORING_SUCCESS_VALUES" "claude=/custom/claude" "authoring-success values"
-assert_contains "$AUTHORING_SUCCESS_VALUES" "codex=/custom/codex" "authoring-success values"
-assert_contains "$AUTHORING_SUCCESS_VALUES" "agents=/custom/agents" "authoring-success values"
+    "$AGENT_SKILLS_SUCCESS_OUT" \
+    "$AGENT_SKILLS_SUCCESS_STATUS" \
+    "$AGENT_SKILLS_SUCCESS_VALUES"
+assert_equals "configured" "$(cat "$AGENT_SKILLS_SUCCESS_STATUS")" "agent-skills-success status"
+assert_contains "$AGENT_SKILLS_SUCCESS_OUT" "Agent-skills setup complete." "agent-skills-success"
+assert_contains "$AGENT_SKILLS_SUCCESS_VALUES" "install=/custom/install" "agent-skills-success values"
+assert_contains "$AGENT_SKILLS_SUCCESS_VALUES" "claude=/custom/claude" "agent-skills-success values"
+assert_contains "$AGENT_SKILLS_SUCCESS_VALUES" "codex=/custom/codex" "agent-skills-success values"
+assert_contains "$AGENT_SKILLS_SUCCESS_VALUES" "agents=/custom/agents" "agent-skills-success values"
 
-echo "=== Scenario 4: partial authoring JSON falls back to defaults ==="
-AUTHORING_PARTIAL_OUT="$TMP_DIR/authoring-partial.out"
-AUTHORING_PARTIAL_STATUS="$TMP_DIR/authoring-partial.status"
-AUTHORING_PARTIAL_VALUES="$TMP_DIR/authoring-partial.values"
-run_setup_authoring_case \
-    authoring-partial \
+echo "=== Scenario 4: partial agent-skills JSON falls back to defaults ==="
+AGENT_SKILLS_PARTIAL_OUT="$TMP_DIR/agent-skills-partial.out"
+AGENT_SKILLS_PARTIAL_STATUS="$TMP_DIR/agent-skills-partial.status"
+AGENT_SKILLS_PARTIAL_VALUES="$TMP_DIR/agent-skills-partial.values"
+run_setup_agent_skills_case \
+    agent-skills-partial \
     success \
     '{"installedDir":"/partial/install","agentDiscoveryDirs":[{"label":"claude","dir":"/partial/claude"}]}' \
-    "$AUTHORING_PARTIAL_OUT" \
-    "$AUTHORING_PARTIAL_STATUS" \
-    "$AUTHORING_PARTIAL_VALUES"
-assert_equals "configured" "$(cat "$AUTHORING_PARTIAL_STATUS")" "authoring-partial status"
-assert_contains "$AUTHORING_PARTIAL_VALUES" "install=/partial/install" "authoring-partial values"
-assert_contains "$AUTHORING_PARTIAL_VALUES" "claude=/partial/claude" "authoring-partial values"
-assert_contains "$AUTHORING_PARTIAL_VALUES" "codex=$TMP_DIR/home-authoring-partial/.codex/skills/" "authoring-partial values"
-assert_contains "$AUTHORING_PARTIAL_VALUES" "agents=$TMP_DIR/home-authoring-partial/.agents/skills/" "authoring-partial values"
+    "$AGENT_SKILLS_PARTIAL_OUT" \
+    "$AGENT_SKILLS_PARTIAL_STATUS" \
+    "$AGENT_SKILLS_PARTIAL_VALUES"
+assert_equals "configured" "$(cat "$AGENT_SKILLS_PARTIAL_STATUS")" "agent-skills-partial status"
+assert_contains "$AGENT_SKILLS_PARTIAL_VALUES" "install=/partial/install" "agent-skills-partial values"
+assert_contains "$AGENT_SKILLS_PARTIAL_VALUES" "claude=/partial/claude" "agent-skills-partial values"
+assert_contains "$AGENT_SKILLS_PARTIAL_VALUES" "codex=$TMP_DIR/home-agent-skills-partial/.codex/skills/" "agent-skills-partial values"
+assert_contains "$AGENT_SKILLS_PARTIAL_VALUES" "agents=$TMP_DIR/home-agent-skills-partial/.agents/skills/" "agent-skills-partial values"
 
 echo "=== Scenario 5: CODEX_HOME fallback is used when codex dir is omitted ==="
-AUTHORING_CODEX_HOME_OUT="$TMP_DIR/authoring-codex-home.out"
-AUTHORING_CODEX_HOME_STATUS="$TMP_DIR/authoring-codex-home.status"
-AUTHORING_CODEX_HOME_VALUES="$TMP_DIR/authoring-codex-home.values"
-EXPECTED_CODEX_HOME_DIR="$TMP_DIR/home-authoring-codex-home/custom-codex-home/skills/"
-run_setup_authoring_case \
-    authoring-codex-home \
+AGENT_SKILLS_CODEX_HOME_OUT="$TMP_DIR/agent-skills-codex-home.out"
+AGENT_SKILLS_CODEX_HOME_STATUS="$TMP_DIR/agent-skills-codex-home.status"
+AGENT_SKILLS_CODEX_HOME_VALUES="$TMP_DIR/agent-skills-codex-home.values"
+EXPECTED_CODEX_HOME_DIR="$TMP_DIR/home-agent-skills-codex-home/custom-codex-home/skills/"
+run_setup_agent_skills_case \
+    agent-skills-codex-home \
     success \
     '{"installedDir":"/codex-home/install","agentDiscoveryDirs":[{"label":"claude","dir":"/codex-home/claude"}]}' \
-    "$AUTHORING_CODEX_HOME_OUT" \
-    "$AUTHORING_CODEX_HOME_STATUS" \
-    "$AUTHORING_CODEX_HOME_VALUES" \
+    "$AGENT_SKILLS_CODEX_HOME_OUT" \
+    "$AGENT_SKILLS_CODEX_HOME_STATUS" \
+    "$AGENT_SKILLS_CODEX_HOME_VALUES" \
     'export CODEX_HOME="$HOME/custom-codex-home"'
-assert_equals "configured" "$(cat "$AUTHORING_CODEX_HOME_STATUS")" "authoring-codex-home status"
-assert_contains "$AUTHORING_CODEX_HOME_VALUES" "codex=$EXPECTED_CODEX_HOME_DIR" "authoring-codex-home values"
-assert_contains "$AUTHORING_CODEX_HOME_VALUES" "agents=$TMP_DIR/home-authoring-codex-home/.agents/skills/" "authoring-codex-home values"
+assert_equals "configured" "$(cat "$AGENT_SKILLS_CODEX_HOME_STATUS")" "agent-skills-codex-home status"
+assert_contains "$AGENT_SKILLS_CODEX_HOME_VALUES" "codex=$EXPECTED_CODEX_HOME_DIR" "agent-skills-codex-home values"
+assert_contains "$AGENT_SKILLS_CODEX_HOME_VALUES" "agents=$TMP_DIR/home-agent-skills-codex-home/.agents/skills/" "agent-skills-codex-home values"
 
-echo "=== Scenario 6: authoring skills setup failure is non-fatal ==="
-AUTHORING_FAILURE_OUT="$TMP_DIR/authoring-failure.out"
-AUTHORING_FAILURE_STATUS="$TMP_DIR/authoring-failure.status"
-AUTHORING_FAILURE_VALUES="$TMP_DIR/authoring-failure.values"
-run_setup_authoring_case \
-    authoring-failure \
+echo "=== Scenario 6: agent-skills setup failure is non-fatal ==="
+AGENT_SKILLS_FAILURE_OUT="$TMP_DIR/agent-skills-failure.out"
+AGENT_SKILLS_FAILURE_STATUS="$TMP_DIR/agent-skills-failure.status"
+AGENT_SKILLS_FAILURE_VALUES="$TMP_DIR/agent-skills-failure.values"
+run_setup_agent_skills_case \
+    agent-skills-failure \
     failure \
     'authoring install conflict' \
-    "$AUTHORING_FAILURE_OUT" \
-    "$AUTHORING_FAILURE_STATUS" \
-    "$AUTHORING_FAILURE_VALUES"
-assert_equals "failed" "$(cat "$AUTHORING_FAILURE_STATUS")" "authoring-failure status"
-assert_contains "$AUTHORING_FAILURE_OUT" "Authoring skills setup failed via CLI." "authoring-failure"
-assert_contains "$AUTHORING_FAILURE_OUT" "authoring install conflict" "authoring-failure"
-assert_contains "$AUTHORING_FAILURE_VALUES" "install=$TMP_DIR/home-authoring-failure/.clawperator/authoring-skills/" "authoring-failure values"
+    "$AGENT_SKILLS_FAILURE_OUT" \
+    "$AGENT_SKILLS_FAILURE_STATUS" \
+    "$AGENT_SKILLS_FAILURE_VALUES"
+assert_equals "failed" "$(cat "$AGENT_SKILLS_FAILURE_STATUS")" "agent-skills-failure status"
+assert_contains "$AGENT_SKILLS_FAILURE_OUT" "Agent-skills setup failed via CLI." "agent-skills-failure"
+assert_contains "$AGENT_SKILLS_FAILURE_OUT" "authoring install conflict" "agent-skills-failure"
+assert_contains "$AGENT_SKILLS_FAILURE_VALUES" "install=$TMP_DIR/home-agent-skills-failure/.clawperator/agent-skills/" "agent-skills-failure values"
 
 echo "=== Scenario 7: guide writer lists installed skills and refresh guidance ==="
 GUIDE_OUT="$TMP_DIR/guide.out"
@@ -738,7 +738,7 @@ assert_contains "$GUIDE_PATH" "Recommended no-match flow:" "guide-missing-versio
 assert_contains "$GUIDE_PATH" 'Start the guided route with `skill-author-by-agent-discovery`' "guide-missing-version file"
 assert_contains "$GUIDE_PATH" 'Use `skill-author-by-recording` only after discovery returns `proceed_to_recording`' "guide-missing-version file"
 assert_contains "$GUIDE_PATH" "Version metadata is missing for this install." "guide-missing-version file"
-assert_contains "$GUIDE_PATH" "clawperator authoring-skills update" "guide-missing-version file"
+assert_contains "$GUIDE_PATH" "clawperator agent-skills update" "guide-missing-version file"
 
 echo "=== Scenario 8: guide writer with version omits refresh guidance ==="
 GUIDE_WITH_VERSION_OUT="$TMP_DIR/guide-with-version.out"
@@ -751,7 +751,7 @@ assert_contains "$GUIDE_WITH_VERSION_PATH" "skill-author-by-agent-discovery" "gu
 assert_contains "$GUIDE_WITH_VERSION_PATH" "skill-author-by-recording" "guide-with-version file"
 assert_contains "$GUIDE_WITH_VERSION_PATH" 'Start the guided route with `skill-author-by-agent-discovery`' "guide-with-version file"
 assert_not_contains "$GUIDE_WITH_VERSION_PATH" "Version metadata is missing for this install." "guide-with-version file"
-assert_not_contains "$GUIDE_WITH_VERSION_PATH" "clawperator authoring-skills update" "guide-with-version file"
+assert_not_contains "$GUIDE_WITH_VERSION_PATH" "clawperator agent-skills update" "guide-with-version file"
 assert_mode "$GUIDE_WITH_VERSION_PATH" "600" "guide-with-version mode"
 assert_mode "$TMP_DIR/home-guide-with-version/.clawperator" "700" "guide-with-version dir mode"
 
@@ -763,9 +763,9 @@ GUIDE_PARTIAL_PATH="$(cat "$GUIDE_PARTIAL_PATH_FILE")"
 assert_contains "$GUIDE_PARTIAL_OUT" "Wrote agent guide" "guide-partial"
 assert_not_contains "$GUIDE_PARTIAL_PATH" 'skill-author-by-agent-discovery`: zero-results front door when' "guide-partial file"
 assert_contains "$GUIDE_PARTIAL_PATH" "skill-author-by-recording" "guide-partial file"
-assert_contains "$GUIDE_PARTIAL_PATH" "Installed authoring front doors are incomplete on this host." "guide-partial file"
+assert_contains "$GUIDE_PARTIAL_PATH" "Installed agent-skill front doors are incomplete on this host." "guide-partial file"
 assert_contains "$GUIDE_PARTIAL_PATH" 'missing `skill-author-by-agent-discovery`' "guide-partial file"
-assert_contains "$GUIDE_PARTIAL_PATH" "clawperator authoring-skills update" "guide-partial file"
+assert_contains "$GUIDE_PARTIAL_PATH" "clawperator agent-skills update" "guide-partial file"
 assert_not_contains "$GUIDE_PARTIAL_PATH" 'Start the guided route with `skill-author-by-agent-discovery`' "guide-partial file"
 
 echo "=== Scenario 9: guide writer prefers configured runtime registry path ==="
@@ -788,14 +788,14 @@ assert_contains "$GUIDE_ENV_PATH" "$TMP_DIR/home-guide-env/.clawperator/env-runt
 assert_contains "$GUIDE_ENV_PATH" "from CLAWPERATOR_SKILLS_REGISTRY." "guide-env file"
 assert_not_contains "$GUIDE_ENV_PATH" "Runtime skills not available on this host right now." "guide-env file"
 
-echo "=== Scenario 11: guide writer shows fallback when authoring skills are absent ==="
+echo "=== Scenario 11: guide writer shows fallback when agent-skills are absent ==="
 GUIDE_MISSING_OUT="$TMP_DIR/guide-missing.out"
 GUIDE_MISSING_PATH_FILE="$TMP_DIR/guide-missing.path"
 run_missing_guide_case guide-absent "$GUIDE_MISSING_OUT" "$GUIDE_MISSING_PATH_FILE"
 GUIDE_MISSING_PATH="$(cat "$GUIDE_MISSING_PATH_FILE")"
 assert_contains "$GUIDE_MISSING_PATH" "Runtime skills not available on this host right now." "guide-absent file"
-assert_contains "$GUIDE_MISSING_PATH" "First-party Clawperator authoring skills are not currently configured on this host." "guide-absent file"
-assert_contains "$GUIDE_MISSING_PATH" "clawperator authoring-skills install" "guide-absent file"
+assert_contains "$GUIDE_MISSING_PATH" "First-party Clawperator agent-skills are not currently configured on this host." "guide-absent file"
+assert_contains "$GUIDE_MISSING_PATH" "clawperator agent-skills install" "guide-absent file"
 
 echo "=== Scenario 12: guide writer degrades cleanly when runtime registry is unreadable ==="
 GUIDE_INVALID_OUT="$TMP_DIR/guide-invalid.out"
@@ -901,17 +901,17 @@ assert_command_fails \
     "install-state timestamp format rejection" \
     assert_json_field_is_iso_timestamp "$NON_ISO_TIMESTAMP_JSON" "installedAt" "non-iso-timestamp"
 
-echo "=== Scenario 16: skip flag suppresses both runtime and authoring skills setup ==="
+echo "=== Scenario 16: skip flag suppresses both runtime and agent-skills setup ==="
 SKIP_SKILLS_OUT="$TMP_DIR/skip-skills.out"
-SKIP_AUTHORING_OUT="$TMP_DIR/skip-authoring.out"
+SKIP_AGENT_SKILLS_OUT="$TMP_DIR/skip-agent-skills.out"
 SKIP_STATUS="$TMP_DIR/skip.status"
 SKIP_LOG="$TMP_DIR/skip.log"
 touch "$SKIP_LOG"
-run_skip_case "$SKIP_SKILLS_OUT" "$SKIP_AUTHORING_OUT" "$SKIP_STATUS" "$SKIP_LOG"
+run_skip_case "$SKIP_SKILLS_OUT" "$SKIP_AGENT_SKILLS_OUT" "$SKIP_STATUS" "$SKIP_LOG"
 assert_contains "$SKIP_SKILLS_OUT" "Skipping skills setup because CLAWPERATOR_INSTALL_SKIP_SKILLS=1." "skip-skills"
-assert_contains "$SKIP_AUTHORING_OUT" "Skipping authoring skills setup because CLAWPERATOR_INSTALL_SKIP_SKILLS=1." "skip-authoring"
+assert_contains "$SKIP_AGENT_SKILLS_OUT" "Skipping agent-skills setup because CLAWPERATOR_INSTALL_SKIP_SKILLS=1." "skip-agent-skills"
 assert_contains "$SKIP_STATUS" "skills=skipped" "skip-status"
-assert_contains "$SKIP_STATUS" "authoring=skipped" "skip-status"
+assert_contains "$SKIP_STATUS" "agent=skipped" "skip-status"
 assert_equals "" "$(cat "$SKIP_LOG")" "skip command log"
 
 echo "=== Scenario 17: MCP config writer emits paste-ready node-form snippet ==="
@@ -991,7 +991,7 @@ assert_contains "$BRIDGE_EXISTING_PATH" 'clawperator skills for-app <package_id>
 assert_contains "$BRIDGE_EXISTING_PATH" 'clawperator skills search --keyword "<term>"' "bridge-existing file"
 assert_contains "$BRIDGE_EXISTING_PATH" 'clawperator skills get <skill_id>' "bridge-existing file"
 assert_contains "$BRIDGE_EXISTING_PATH" 'Do not mirror them into shared agent skill directories.' "bridge-existing file"
-assert_contains "$BRIDGE_EXISTING_PATH" 'follow the local guide for the authoring front doors installed on this host.' "bridge-existing file"
+assert_contains "$BRIDGE_EXISTING_PATH" 'follow the local guide for the agent-skill front doors installed on this host.' "bridge-existing file"
 assert_contains "$BRIDGE_EXISTING_PATH" 'Confirm the local guide lists both `skill-author-by-agent-discovery` and `skill-author-by-recording` before starting the discovery-to-proving route.' "bridge-existing file"
 assert_not_contains "$BRIDGE_EXISTING_PATH" "### Application" "bridge-existing file"
 assert_occurrence_count "$BRIDGE_EXISTING_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:START -->" "1" "bridge-existing start marker count"
@@ -1125,4 +1125,4 @@ run_operator_metadata_case \
 assert_equals "1" "$(cat "$METADATA_BAD_STATUS")" "metadata-bad status"
 assert_contains "$METADATA_BAD_OUT" "Failed to parse APK metadata" "metadata-bad output"
 
-echo "=== install.sh authoring-skills harness passed ==="
+echo "=== install.sh agent-skills harness passed ==="
