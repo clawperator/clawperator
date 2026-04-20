@@ -28,7 +28,7 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
     "prepack": "node scripts/agentSkillsPack.mjs prepack",
     "postpack": "node scripts/agentSkillsPack.mjs postpack",
     "start": "node dist/cli/index.js",
