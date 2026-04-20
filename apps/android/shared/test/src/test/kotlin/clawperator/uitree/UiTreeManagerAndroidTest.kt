@@ -149,7 +149,7 @@ class UiTreeManagerAndroidTest {
     @Test
     fun `setText uses api33 input connection when legacy set text is unavailable`() =
         runTest {
-            val session = FakeTextInputSession(initialText = "existing", surroundingTextAvailable = false)
+            val session = FakeTextInputSession(initialText = "existing")
             val manager = createManager(textInputConnectionSource = FakeTextInputConnectionSource(session))
             val nodeInfo = editableNode(includeSetTextAction = false)
             val uiNode = uiNode(nodeInfo)
@@ -160,7 +160,6 @@ class UiTreeManagerAndroidTest {
             assertEquals("hello", session.text)
             assertEquals(
                 listOf(
-                    "getSurroundingText(2147483647,2147483647)",
                     "setSelection(2147483647,2147483647)",
                     "deleteSurroundingText(2147483647,0)",
                     "commitText(hello,1)",
@@ -170,21 +169,11 @@ class UiTreeManagerAndroidTest {
         }
 
     @Test
-    fun `setText api33 path selects known text length before commit`() =
+    fun `setText api33 path uses delete fallback even when surrounding text is present`() =
         runTest {
             val session =
                 FakeTextInputSession(
                     initialText = "existing",
-                    editorInfo =
-                        FakeTextInputSession.editorInfo(
-                            initialSurroundingText =
-                                TextInputSurroundingText(
-                                    text = "existing",
-                                    selectionStart = 3,
-                                    selectionEnd = 3,
-                                    offset = 0,
-                                ),
-                        ),
                 )
             val manager = createManager(textInputConnectionSource = FakeTextInputConnectionSource(session))
             val nodeInfo = editableNode(includeSetTextAction = false)
@@ -196,7 +185,8 @@ class UiTreeManagerAndroidTest {
             assertEquals("hello", session.text)
             assertEquals(
                 listOf(
-                    "setSelection(0,8)",
+                    "setSelection(2147483647,2147483647)",
+                    "deleteSurroundingText(2147483647,0)",
                     "commitText(hello,1)",
                 ),
                 session.operations,
@@ -262,21 +252,11 @@ class UiTreeManagerAndroidTest {
         }
 
     @Test
-    fun `setText api33 path keeps selection step when clear is true`() =
+    fun `setText api33 path keeps replace semantics when clear is true`() =
         runTest {
             val session =
                 FakeTextInputSession(
                     initialText = "existing",
-                    editorInfo =
-                        FakeTextInputSession.editorInfo(
-                            initialSurroundingText =
-                                TextInputSurroundingText(
-                                    text = "existing",
-                                    selectionStart = 0,
-                                    selectionEnd = 8,
-                                    offset = 0,
-                                ),
-                        ),
                 )
             val manager = createManager(textInputConnectionSource = FakeTextInputConnectionSource(session))
             val nodeInfo = editableNode(includeSetTextAction = false)
@@ -288,8 +268,30 @@ class UiTreeManagerAndroidTest {
             assertEquals("hello", session.text)
             assertEquals(
                 listOf(
-                    "setSelection(0,8)",
+                    "setSelection(2147483647,2147483647)",
+                    "deleteSurroundingText(2147483647,0)",
                     "commitText(hello,1)",
+                ),
+                session.operations,
+            )
+        }
+
+    @Test
+    fun `setText api33 path returns false when delete fallback fails`() =
+        runTest {
+            val session = FakeTextInputSession(initialText = "existing", allowDeleteSurroundingText = false)
+            val manager = createManager(textInputConnectionSource = FakeTextInputConnectionSource(session))
+            val nodeInfo = editableNode(includeSetTextAction = false)
+            val uiNode = uiNode(nodeInfo)
+
+            val result = manager.setText(uiNode = uiNode, text = "hello", submit = false, clear = false)
+
+            assertFalse(result)
+            assertEquals("existing", session.text)
+            assertEquals(
+                listOf(
+                    "setSelection(2147483647,2147483647)",
+                    "deleteSurroundingText(2147483647,0)",
                 ),
                 session.operations,
             )
@@ -392,7 +394,7 @@ class UiTreeManagerAndroidTest {
         initialText: String,
         override val isActive: Boolean = true,
         override val editorInfo: TextInputEditorInfo? = editorInfo(),
-        private val surroundingTextAvailable: Boolean = true,
+        private val allowDeleteSurroundingText: Boolean = true,
     ) : TextInputSession {
         var text: String = initialText
             private set
@@ -405,9 +407,6 @@ class UiTreeManagerAndroidTest {
             afterLength: Int,
         ): TextInputSurroundingText? {
             operations += "getSurroundingText($beforeLength,$afterLength)"
-            if (!surroundingTextAvailable) {
-                return null
-            }
             return TextInputSurroundingText(
                 text = text,
                 selectionStart = selectionStart,
@@ -446,7 +445,7 @@ class UiTreeManagerAndroidTest {
             afterLength: Int,
         ): Boolean {
             operations += "deleteSurroundingText($beforeLength,$afterLength)"
-            if (!isActive) {
+            if (!isActive || !allowDeleteSurroundingText) {
                 return false
             }
             val cursor = maxOf(selectionStart, selectionEnd)

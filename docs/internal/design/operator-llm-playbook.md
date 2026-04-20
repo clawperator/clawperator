@@ -80,9 +80,9 @@ For app automation commands, default to:
   exposes it and falls back to a click only as best effort.
 - On the API 33 route, submit uses the editor-action path through the input
   connection when one is available.
-- API 33 replace behavior is not append-at-cursor behavior. The runtime first
-  tries full selection replacement and otherwise falls back to cursor-end plus
-  `deleteSurroundingText(Int.MAX_VALUE, 0)` before `commitText(...)`.
+- API 33 replace behavior is not append-at-cursor behavior. The runtime moves
+  the cursor to the end, uses `deleteSurroundingText(Int.MAX_VALUE, 0)`, then
+  `commitText(...)` to replace the field contents.
 - Runtime diagnostics for live validation now include
   `enter_text strategy=<strategy_name> submit_method=<submit_method>` on
   success and `enter_text strategy=api33_input_connection unavailable

@@ -397,7 +397,7 @@ class UiTreeManagerAndroid(
                 return null
             }
 
-            val replaceSucceeded = replaceText(session, editorInfo, request)
+            val replaceSucceeded = replaceText(session, request)
             if (!replaceSucceeded) {
                 logUnavailable(request, "replace_unavailable")
                 return null
@@ -410,14 +410,8 @@ class UiTreeManagerAndroid(
 
         private fun replaceText(
             session: TextInputSession,
-            editorInfo: TextInputEditorInfo,
             request: TextEntryRequest,
         ): Boolean {
-            val knownTextLength = resolveKnownTextLength(session, editorInfo)
-            if (knownTextLength != null && session.setSelection(0, knownTextLength)) {
-                return session.commitText(request.text, 1)
-            }
-
             val cursorMovedToEnd = session.setSelection(Int.MAX_VALUE, Int.MAX_VALUE)
             if (!cursorMovedToEnd) {
                 return false
@@ -430,13 +424,6 @@ class UiTreeManagerAndroid(
 
             return session.commitText(request.text, 1)
         }
-
-        private fun resolveKnownTextLength(
-            session: TextInputSession,
-            editorInfo: TextInputEditorInfo,
-        ): Int? =
-            editorInfo.initialSurroundingText?.text?.length
-                ?: session.getSurroundingText(Int.MAX_VALUE, Int.MAX_VALUE)?.text?.length
 
         private fun performSubmit(
             session: TextInputSession,

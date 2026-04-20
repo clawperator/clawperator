@@ -432,7 +432,7 @@ Semantics:
 - on that same `ACTION_SET_TEXT` route, `clear == false` or omitted keeps the existing single `ACTION_SET_TEXT` behavior
 - if the requested clear step fails on the `ACTION_SET_TEXT` route, Android stops before the real text set and the action fails
 - on Android 13+ (`Build.VERSION_CODES.TIRAMISU`) when the legacy `ACTION_SET_TEXT` route is unavailable, Android can fall back to the accessibility input-connection path for custom editors
-- that API 33 fallback still preserves replace-style behavior: it selects the full known text before `commitText(text, 1)` when length is available, otherwise it moves the cursor to the end, deletes preceding text, then commits the replacement text
+- that API 33 fallback still preserves replace-style behavior by moving the cursor to the end, deleting preceding text, then committing the replacement text
 - that API 33 replace sequence also preserves `clear == true` semantics even though there is no separate public strategy flag
 - `submit == true` is best effort after successful text entry
 - on the legacy route, Android prefers `ACTION_IME_ENTER` when the node exposes it and falls back to a click when it does not

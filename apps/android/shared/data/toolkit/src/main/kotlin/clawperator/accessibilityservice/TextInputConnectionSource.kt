@@ -91,6 +91,8 @@ private class AccessibilityInputMethodSession(
         end: Int,
     ): Boolean {
         val connection = inputMethod.currentInputConnection ?: return false
+        // AccessibilityInputConnection mutators are fire-and-forget on this API surface,
+        // so dispatch onto a non-null connection is the strongest signal available here.
         connection.setSelection(start, end)
         return true
     }

@@ -30,15 +30,21 @@ It is intentionally branch-local and temporary while the task pack is active.
 ## API 33 Replace Semantics
 
 - The task pack requires replace semantics, not append-at-cursor semantics.
-- The shipped API 33 implementation therefore uses a two-stage replace plan:
-  - Preferred path: if the current text length is knowable from
-    `EditorInfo.initialSurroundingText`, select `0..length` and replace via
-    `commitText(text, 1)`.
-  - Fallback path: if full length is not knowable, read `getSurroundingText()`,
-    and if that still does not provide a deterministic full-selection path,
-    move the cursor to the end with `setSelection(Int.MAX_VALUE, Int.MAX_VALUE)`
-    and clear preceding text with `deleteSurroundingText(Int.MAX_VALUE, 0)`
-    before `commitText(text, 1)`.
+- Review follow-up tightened the shipped API 33 implementation to the most
+  truthful deterministic path:
+  - move the cursor to the end with
+    `setSelection(Int.MAX_VALUE, Int.MAX_VALUE)`
+  - clear preceding text with `deleteSurroundingText(Int.MAX_VALUE, 0)`
+  - replace via `commitText(text, 1)`
+- We explicitly stopped inferring full-document length from surrounding-text
+  windows because those windows can be truncated and would otherwise create a
+  false-success partial-replace path.
+- The input-connection bridge still treats dispatch onto a non-null
+  accessibility input connection as success for mutating calls because this API
+  surface exposes those mutators as fire-and-forget rather than boolean-return
+  operations.
+- The strategy-level tests now carry the stronger correctness signal by
+  exercising delete-fallback failure and stale-session behavior directly.
 - We should keep watching whether any real editor rejects the fallback
   end-and-delete sequence even when an input connection is active. Unit tests
   prove the intended contract; live proof is still pending.
@@ -67,9 +73,9 @@ It is intentionally branch-local and temporary while the task pack is active.
     missing editor info
   - API 33 lower-SDK skip behavior
   - API 33 replace behavior for pre-populated content
-  - API 33 selection-before-commit behavior when the current text length is
-    known
-  - API 33 `clear=true` behavior with the selection step preserved
+  - API 33 delete-and-commit behavior even when surrounding text is present
+  - API 33 `clear=true` behavior with delete-and-commit replace semantics
+  - API 33 explicit failure when the delete fallback cannot complete
 
 ## Live Validation Findings
 
