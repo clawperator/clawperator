@@ -2,6 +2,7 @@ package clawperator.uitree
 
 import action.log.Log
 import android.accessibilityservice.AccessibilityService
+import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
 import clawperator.accessibilityservice.AccessibilityServiceManager
 import clawperator.accessibilityservice.boundsInScreenRect
@@ -14,7 +15,6 @@ import clawperator.accessibilityservice.dispatchSwipe
 import clawperator.accessibilityservice.firstClickableAncestorOrSelf
 import clawperator.accessibilityservice.firstEditableAncestorOrSelf
 import clawperator.accessibilityservice.firstFocusableAncestorOrSelf
-import android.os.Bundle
 
 class UiTreeManagerAndroid(
     private val accessibilityServiceManager: AccessibilityServiceManager,
