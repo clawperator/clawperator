@@ -549,7 +549,7 @@ def test_attach_skill_score_requires_pack_a_route_evidence(monkeypatch, tmp_path
     assert updated["skill_score"]["route_requirements_met"] is False
     assert updated["skill_score"]["runtime_skill_discovery_seen"] is False
     assert updated["skill_score"]["runtime_skill_discovery_before_authoring"] is False
-    assert updated["skill_score"]["authoring_skills_list_seen"] is True
+    assert updated["skill_score"]["agent_skills_list_seen"] is True
     assert updated["skill_score"]["discovery_artifact_seen"] is False
     assert updated["skill_score"]["required_authoring_front_door_seen"] is False
     assert updated["skill_score"]["required_proving_handoff_seen"] is False
@@ -622,7 +622,7 @@ def test_attach_skill_score_accepts_pack_a_route_evidence(monkeypatch, tmp_path)
         env=env,
     )
 
-    assert updated["skill_score"]["authoring_skills_list_seen"] is True
+    assert updated["skill_score"]["agent_skills_list_seen"] is True
     assert updated["skill_score"]["runtime_skill_discovery_seen"] is True
     assert updated["skill_score"]["runtime_skill_discovery_before_authoring"] is True
     assert updated["skill_score"]["discovery_artifact_count"] == 1
