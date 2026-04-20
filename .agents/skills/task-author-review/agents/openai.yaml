@@ -1,4 +1,4 @@
 interface:
   display_name: "Task Author Review"
   short_description: "Review and tighten an in-progress task pack against the real code"
-  default_prompt: "Use $task-author-review to review an active task pack under tasks/ from first principles. Treat code as the source of truth, inspect the relevant implementation before accepting any claim in the task pack, identify gaps or weak assumptions, and tighten the task pack directly so a weaker implementing agent could execute it literally."
+  default_prompt: "Use $task-author-review to review an active task pack under tasks/ from first principles. Treat code as the source of truth, inspect the relevant implementation before accepting any claim in the task pack, identify gaps or weak assumptions, and tighten the task pack directly so a weaker implementing agent could execute it literally. Pay special attention to whether the task pack includes the right testing and documentation coverage for the surfaces it changes."
