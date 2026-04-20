@@ -424,7 +424,7 @@ def _valid_discovery_artifact_json(
     include_classification: bool | None = None,
     existing_skill_status: str = "none",
     runtime_command: str = "clawperator skills for-app com.android.settings --json",
-    authoring_command: str = "clawperator authoring-skills list --json",
+    authoring_command: str = "clawperator agent-skills list --json",
     registry_field: str = "commands",
 ) -> str:
     if handoff_target is None:
@@ -502,7 +502,7 @@ def test_attach_skill_score_requires_pack_a_route_evidence(monkeypatch, tmp_path
     run_dir = tmp_path / "run"
     run_dir.mkdir()
     (run_dir / "transcript.txt").write_text(
-        '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator authoring-skills list --json"}}\n'
+        '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator agent-skills list --json"}}\n'
         "Discovery route: skill-author-by-agent-discovery -> skill-author-by-recording\n"
         "CLAWPERATOR_SKILL_START\n"
         + _skill_payload_json()
@@ -549,7 +549,7 @@ def test_attach_skill_score_requires_pack_a_route_evidence(monkeypatch, tmp_path
     assert updated["skill_score"]["route_requirements_met"] is False
     assert updated["skill_score"]["runtime_skill_discovery_seen"] is False
     assert updated["skill_score"]["runtime_skill_discovery_before_authoring"] is False
-    assert updated["skill_score"]["authoring_skills_list_seen"] is True
+    assert updated["skill_score"]["agent_skills_list_seen"] is True
     assert updated["skill_score"]["discovery_artifact_seen"] is False
     assert updated["skill_score"]["required_authoring_front_door_seen"] is False
     assert updated["skill_score"]["required_proving_handoff_seen"] is False
@@ -572,11 +572,11 @@ def test_attach_skill_score_accepts_pack_a_route_evidence(monkeypatch, tmp_path)
     (run_dir / "transcript.txt").write_text(
         (
             '{"type":"item.completed","item":{"type":"command_execution","command":"node apps/node/dist/cli/index.js skills for-app com.android.settings --json"}}\n'
-            '{"type":"item.completed","item":{"type":"command_execution","command":"node apps/node/dist/cli/index.js authoring-skills list --format json"}}\n'
+            '{"type":"item.completed","item":{"type":"command_execution","command":"node apps/node/dist/cli/index.js agent-skills list --format json"}}\n'
             "Using skill-author-by-agent-discovery for bounded discovery\n"
             + _valid_discovery_artifact_json(
                 runtime_command="node apps/node/dist/cli/index.js skills for-app com.android.settings --json",
-                authoring_command="node apps/node/dist/cli/index.js authoring-skills list --format json",
+                authoring_command="node apps/node/dist/cli/index.js agent-skills list --format json",
                 registry_field="queried_registry_paths",
             )
             + "CLAWPERATOR_SKILL_START\n"
@@ -622,7 +622,7 @@ def test_attach_skill_score_accepts_pack_a_route_evidence(monkeypatch, tmp_path)
         env=env,
     )
 
-    assert updated["skill_score"]["authoring_skills_list_seen"] is True
+    assert updated["skill_score"]["agent_skills_list_seen"] is True
     assert updated["skill_score"]["runtime_skill_discovery_seen"] is True
     assert updated["skill_score"]["runtime_skill_discovery_before_authoring"] is True
     assert updated["skill_score"]["discovery_artifact_count"] == 1
@@ -643,11 +643,11 @@ def test_attach_skill_score_accepts_equivalent_registry_launchers(monkeypatch, t
     (run_dir / "transcript.txt").write_text(
         (
             '{"type":"item.completed","item":{"type":"command_execution","command":"node apps/node/dist/cli/index.js skills for-app com.android.settings --json"}}\n'
-            '{"type":"item.completed","item":{"type":"command_execution","command":"node apps/node/dist/cli/index.js authoring-skills list --format json"}}\n'
+            '{"type":"item.completed","item":{"type":"command_execution","command":"node apps/node/dist/cli/index.js agent-skills list --format json"}}\n'
             "Using skill-author-by-agent-discovery for bounded discovery\n"
             + _valid_discovery_artifact_json(
                 runtime_command="clawperator skills for-app com.android.settings --json",
-                authoring_command="clawperator authoring-skills list --json",
+                authoring_command="clawperator agent-skills list --json",
             )
             + "CLAWPERATOR_SKILL_START\n"
             + _skill_payload_json()
@@ -705,7 +705,7 @@ def test_attach_skill_score_requires_explicit_front_door_signal(monkeypatch, tmp
     (run_dir / "transcript.txt").write_text(
         (
             '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator skills for-app com.android.settings --json"}}\n'
-            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator authoring-skills list --json"}}\n'
+            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator agent-skills list --json"}}\n'
             + _valid_discovery_artifact_json()
             + "CLAWPERATOR_SKILL_START\n"
             + _skill_payload_json()
@@ -765,10 +765,10 @@ def test_attach_skill_score_rejects_copied_registry_provenance(monkeypatch, tmp_
     (run_dir / "transcript.txt").write_text(
         (
             '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator skills for-app com.android.settings --json"}}\n'
-            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator authoring-skills list --json"}}\n'
+            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator agent-skills list --json"}}\n'
             + _valid_discovery_artifact_json(
                 runtime_command='clawperator skills search --keyword "Netflix" --json',
-                authoring_command="clawperator authoring-skills list --json",
+                authoring_command="clawperator agent-skills list --json",
             )
             + "CLAWPERATOR_SKILL_START\n"
             + _skill_payload_json()
@@ -827,7 +827,7 @@ def test_attach_skill_score_rejects_wrong_package_metadata(monkeypatch, tmp_path
     (run_dir / "transcript.txt").write_text(
         (
             '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator skills for-app com.android.settings --json"}}\n'
-            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator authoring-skills list --json"}}\n'
+            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator agent-skills list --json"}}\n'
             + _valid_discovery_artifact_json(package_id="com.example.settings")
             + "CLAWPERATOR_SKILL_START\n"
             + _skill_payload_json()
@@ -883,7 +883,7 @@ def test_attach_skill_score_requires_skill_classification_for_recording_handoff(
     (run_dir / "transcript.txt").write_text(
         (
             '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator skills for-app com.android.settings --json"}}\n'
-            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator authoring-skills list --json"}}\n'
+            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator agent-skills list --json"}}\n'
             + _valid_discovery_artifact_json(include_classification=False)
             + "CLAWPERATOR_SKILL_START\n"
             + _skill_payload_json()
@@ -968,7 +968,7 @@ def test_attach_skill_score_rejects_wrong_handoff_for_non_recording_routes(
     (run_dir / "transcript.txt").write_text(
         (
             '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator skills for-app com.android.settings --json"}}\n'
-            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator authoring-skills list --json"}}\n'
+            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator agent-skills list --json"}}\n'
             "Using skill-author-by-agent-discovery for bounded discovery\n"
             + _valid_discovery_artifact_json(
                 recommended_next_step=recommended_next_step,
@@ -1028,7 +1028,7 @@ def test_attach_skill_score_requires_runtime_discovery_before_authoring(monkeypa
     run_dir.mkdir()
     (run_dir / "transcript.txt").write_text(
         (
-            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator authoring-skills list --json"}}\n'
+            '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator agent-skills list --json"}}\n'
             '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator skills for-app com.android.settings --json"}}\n'
             + _valid_discovery_artifact_json()
             + "CLAWPERATOR_SKILL_START\n"
@@ -1076,5 +1076,5 @@ def test_attach_skill_score_requires_runtime_discovery_before_authoring(monkeypa
     assert updated["skill_score"]["runtime_skill_discovery_seen"] is True
     assert updated["skill_score"]["runtime_skill_discovery_before_authoring"] is False
     assert updated["skill_score"]["route_requirements_met"] is False
-    assert "runtime-skill discovery must appear before `clawperator authoring-skills list --json`" in updated["skill_score"]["route_requirement_errors"]
+    assert "runtime-skill discovery must appear before `clawperator agent-skills list --json`" in updated["skill_score"]["route_requirement_errors"]
     assert updated["outcome"]["status"] == "fail"

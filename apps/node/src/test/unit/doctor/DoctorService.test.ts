@@ -14,8 +14,8 @@ import {
   getOperatorApkSha256Url,
 } from "../../../domain/version/compatibility.js";
 
-function withTempAuthoringSkillsDir<T>(config: T, baseDir: string): T {
-  (config as T & { authoringSkillsDir?: string }).authoringSkillsDir = join(baseDir, "authoring-skills");
+function withTempAgentSkillsDir<T>(config: T, baseDir: string): T {
+  (config as T & { agentSkillsDir?: string }).agentSkillsDir = join(baseDir, "agent-skills");
   return config;
 }
 
@@ -59,7 +59,7 @@ describe("DoctorService", () => {
 
   it("treats missing APK as a critical failure and skips the handshake", async () => {
     const runner = new FakeProcessRunner();
-    const config = withTempAuthoringSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" }), fakeRegistryDir);
+    const config = withTempAgentSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" }), fakeRegistryDir);
 
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
@@ -94,7 +94,7 @@ describe("DoctorService", () => {
 
   it("fails when the installed APK is version-incompatible and skips the handshake", async () => {
     const runner = new FakeProcessRunner();
-    const config = withTempAuthoringSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" }), fakeRegistryDir);
+    const config = withTempAgentSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" }), fakeRegistryDir);
 
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
@@ -128,7 +128,7 @@ describe("DoctorService", () => {
 
   it("still reports the orchestrated agent CLI advisory when adb server startup fails", async () => {
     const runner = new FakeProcessRunner();
-    const config = withTempAuthoringSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" }), fakeRegistryDir);
+    const config = withTempAgentSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" }), fakeRegistryDir);
 
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
@@ -152,7 +152,7 @@ describe("DoctorService", () => {
 
   it("fails clearly when the installed APK version cannot be read", async () => {
     const runner = new FakeProcessRunner();
-    const config = withTempAuthoringSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" }), fakeRegistryDir);
+    const config = withTempAgentSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" }), fakeRegistryDir);
 
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
@@ -186,7 +186,7 @@ describe("DoctorService", () => {
     // block must finalize early; without this fix it would silently swallow the
     // exception and run all subsequent checks without a -s flag, causing adb errors.
     const runner = new FakeProcessRunner();
-    const config = withTempAuthoringSkillsDir(getDefaultRuntimeConfig({ runner }), fakeRegistryDir);
+    const config = withTempAgentSkillsDir(getDefaultRuntimeConfig({ runner }), fakeRegistryDir);
 
     // checkAdbPresence: isAdbAvailable → adb version
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
@@ -222,7 +222,7 @@ describe("DoctorService", () => {
 
   it("warns when the release package is requested but only debug is installed", async () => {
     const runner = new FakeProcessRunner();
-    const config = withTempAuthoringSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator" }), fakeRegistryDir);
+    const config = withTempAgentSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator" }), fakeRegistryDir);
 
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
@@ -250,7 +250,7 @@ describe("DoctorService", () => {
 
   it("treats package query failures as critical and skips the handshake", async () => {
     const runner = new FakeProcessRunner();
-    const config = withTempAuthoringSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" }), fakeRegistryDir);
+    const config = withTempAgentSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" }), fakeRegistryDir);
 
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
@@ -278,7 +278,7 @@ describe("DoctorService", () => {
 
   it("lists the release download instructions before the install command", async () => {
     const runner = new FakeProcessRunner();
-    const config = withTempAuthoringSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator" }), fakeRegistryDir);
+    const config = withTempAgentSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator" }), fakeRegistryDir);
 
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
@@ -333,7 +333,7 @@ describe("DoctorService logging", () => {
   it("logs one doctor.check entry per check", async () => {
     const runner = new FakeProcessRunner();
     const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
-    const config = withTempAuthoringSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" }), tempRoot);
+    const config = withTempAgentSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" }), tempRoot);
 
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });

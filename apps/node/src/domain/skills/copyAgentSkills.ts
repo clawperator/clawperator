@@ -4,9 +4,9 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getCliVersion } from "../version/compatibility.js";
-import { DEFAULT_AUTHORING_SKILLS_DIR } from "./skillsConfig.js";
+import { DEFAULT_AGENT_SKILLS_DIR } from "./skillsConfig.js";
 
-const AUTHORING_SKILLS_SOURCE_ENV_VAR = "CLAWPERATOR_AUTHORING_SKILLS";
+const AGENT_SKILLS_SOURCE_ENV_VAR = "CLAWPERATOR_AGENT_SKILLS";
 const VERSION_FILENAME = "version.txt";
 
 export interface AgentDiscoveryDirEntry {
@@ -14,20 +14,20 @@ export interface AgentDiscoveryDirEntry {
   dir: string;
 }
 
-export interface CopyAuthoringSkillsSuccess {
+export interface CopyAgentSkillsSuccess {
   ok: true;
   skills: string[];
   installedDir: string;
   agentDiscoveryDirs: AgentDiscoveryDirEntry[];
 }
 
-export interface CopyAuthoringSkillsError {
+export interface CopyAgentSkillsError {
   ok: false;
   code: string;
   message: string;
 }
 
-export interface CopyAuthoringSkillsOptions {
+export interface CopyAgentSkillsOptions {
   sourceDir?: string;
   installedDir?: string;
   claudeSkillsDir?: string;
@@ -39,42 +39,42 @@ export interface CopyAuthoringSkillsOptions {
   cliVersion?: string;
 }
 
-function resolveAuthoringSkillsSourceDir(): string {
-  return resolve(dirname(fileURLToPath(import.meta.url)), "../../../authoring-skills");
+function resolveAgentSkillsSourceDir(): string {
+  return resolve(dirname(fileURLToPath(import.meta.url)), "../../../agent-skills");
 }
 
-export function resolvePackagedAuthoringSkillsSourceDir(
-  options: Pick<CopyAuthoringSkillsOptions, "sourceDir" | "env"> = {}
+export function resolvePackagedAgentSkillsSourceDir(
+  options: Pick<CopyAgentSkillsOptions, "sourceDir" | "env"> = {}
 ): string {
   const env = options.env ?? process.env;
   return options.sourceDir
-    ?? (env[AUTHORING_SKILLS_SOURCE_ENV_VAR] !== undefined && env[AUTHORING_SKILLS_SOURCE_ENV_VAR] !== ""
-      ? env[AUTHORING_SKILLS_SOURCE_ENV_VAR]
-      : resolveAuthoringSkillsSourceDir());
+    ?? (env[AGENT_SKILLS_SOURCE_ENV_VAR] !== undefined && env[AGENT_SKILLS_SOURCE_ENV_VAR] !== ""
+      ? env[AGENT_SKILLS_SOURCE_ENV_VAR]
+      : resolveAgentSkillsSourceDir());
 }
 
-function resolveHomeDir(options: CopyAuthoringSkillsOptions): string {
+function resolveHomeDir(options: CopyAgentSkillsOptions): string {
   return resolve(options.homeDir ?? homedir());
 }
 
-export function resolveAuthoringSkillsInstalledDir(options: Pick<CopyAuthoringSkillsOptions, "installedDir" | "homeDir"> = {}): string {
+export function resolveAgentSkillsInstalledDir(options: Pick<CopyAgentSkillsOptions, "installedDir" | "homeDir"> = {}): string {
   if (options.installedDir) {
     return resolve(options.installedDir);
   }
   if (options.homeDir) {
-    return join(resolveHomeDir(options), ".clawperator", "authoring-skills");
+    return join(resolveHomeDir(options), ".clawperator", "agent-skills");
   }
-  return DEFAULT_AUTHORING_SKILLS_DIR;
+  return DEFAULT_AGENT_SKILLS_DIR;
 }
 
-export function resolveClaudeSkillsDir(options: CopyAuthoringSkillsOptions): string {
+export function resolveClaudeSkillsDir(options: CopyAgentSkillsOptions): string {
   if (options.claudeSkillsDir) {
     return resolve(options.claudeSkillsDir);
   }
   return join(resolveHomeDir(options), ".claude", "skills");
 }
 
-export function resolveCodexSkillsDir(options: CopyAuthoringSkillsOptions): string {
+export function resolveCodexSkillsDir(options: CopyAgentSkillsOptions): string {
   if (options.codexSkillsDir) {
     return resolve(options.codexSkillsDir);
   }
@@ -86,14 +86,14 @@ export function resolveCodexSkillsDir(options: CopyAuthoringSkillsOptions): stri
   return join(resolveHomeDir(options), ".codex", "skills");
 }
 
-export function resolveAgentsSkillsDir(options: CopyAuthoringSkillsOptions): string {
+export function resolveAgentsSkillsDir(options: CopyAgentSkillsOptions): string {
   if (options.agentsSkillsDir) {
     return resolve(options.agentsSkillsDir);
   }
   return join(resolveHomeDir(options), ".agents", "skills");
 }
 
-function resolveAgentDiscoveryDirs(options: CopyAuthoringSkillsOptions): AgentDiscoveryDirEntry[] {
+function resolveAgentDiscoveryDirs(options: CopyAgentSkillsOptions): AgentDiscoveryDirEntry[] {
   return [
     { label: "claude", dir: resolveClaudeSkillsDir(options) },
     { label: "codex", dir: resolveCodexSkillsDir(options) },
@@ -119,7 +119,7 @@ async function pathExistsNoFollow(path: string): Promise<boolean> {
   }
 }
 
-async function discoverAuthoringSkills(sourceDir: string): Promise<string[]> {
+async function discoverAgentSkills(sourceDir: string): Promise<string[]> {
   const entries = await readdir(sourceDir);
   const skills: string[] = [];
 
@@ -143,8 +143,8 @@ async function discoverAuthoringSkills(sourceDir: string): Promise<string[]> {
   return skills;
 }
 
-export async function listPackagedAuthoringSkills(sourceDir = resolveAuthoringSkillsSourceDir()): Promise<string[]> {
-  return discoverAuthoringSkills(sourceDir);
+export async function listPackagedAgentSkills(sourceDir = resolveAgentSkillsSourceDir()): Promise<string[]> {
+  return discoverAgentSkills(sourceDir);
 }
 
 async function ensureDirectory(path: string): Promise<void> {
@@ -164,18 +164,18 @@ async function resolveSymlinkTarget(path: string): Promise<string | undefined> {
   }
 }
 
-export interface ManagedAuthoringSkillLinkInspection {
+export interface ManagedAgentSkillLinkInspection {
   ok: boolean;
   status: "missing" | "conflict" | "broken" | "wrong-target" | "ok";
   actualTarget?: string;
   expectedTarget: string;
 }
 
-export async function inspectManagedAuthoringSkillLink(
+export async function inspectManagedAgentSkillLink(
   linkPath: string,
   installedDir: string,
   skillName: string
-): Promise<ManagedAuthoringSkillLinkInspection> {
+): Promise<ManagedAgentSkillLinkInspection> {
   const expectedTarget = normalizeOwnedSkillTarget(installedDir, skillName);
 
   let entryStat;
@@ -241,7 +241,7 @@ export async function inspectManagedAuthoringSkillLink(
 }
 
 async function isManagedAgentSymlink(linkPath: string, installedDir: string, skillName: string): Promise<boolean> {
-  const inspection = await inspectManagedAuthoringSkillLink(linkPath, installedDir, skillName);
+  const inspection = await inspectManagedAgentSkillLink(linkPath, installedDir, skillName);
   // A dangling symlink that points at the correct expected target is still considered managed:
   // it means Clawperator previously installed the link but the install dir was subsequently
   // removed. The install/update flow is allowed to recreate it.
@@ -333,11 +333,11 @@ async function removeStaleInstalledSkills(installedDir: string, activeSkills: Se
   }
 }
 
-export async function copyAuthoringSkills(
-  options: CopyAuthoringSkillsOptions = {}
-): Promise<CopyAuthoringSkillsSuccess | CopyAuthoringSkillsError> {
-  const sourceDir = resolvePackagedAuthoringSkillsSourceDir(options);
-  const installedDir = resolveAuthoringSkillsInstalledDir(options);
+export async function copyAgentSkills(
+  options: CopyAgentSkillsOptions = {}
+): Promise<CopyAgentSkillsSuccess | CopyAgentSkillsError> {
+  const sourceDir = resolvePackagedAgentSkillsSourceDir(options);
+  const installedDir = resolveAgentSkillsInstalledDir(options);
   const agentDiscoveryDirs = resolveAgentDiscoveryDirs(options);
 
   let sourceStat;
@@ -346,26 +346,26 @@ export async function copyAuthoringSkills(
   } catch {
     return {
       ok: false,
-      code: "AUTHORING_SKILLS_SOURCE_NOT_FOUND",
-      message: `Authoring skills source directory not found: ${sourceDir}`,
+      code: "AGENT_SKILLS_SOURCE_NOT_FOUND",
+      message: `Agent-skills source directory not found: ${sourceDir}`,
     };
   }
 
   if (!sourceStat.isDirectory()) {
     return {
       ok: false,
-      code: "AUTHORING_SKILLS_SOURCE_NOT_FOUND",
-      message: `Authoring skills source path is not a directory: ${sourceDir}`,
+      code: "AGENT_SKILLS_SOURCE_NOT_FOUND",
+      message: `Agent-skills source path is not a directory: ${sourceDir}`,
     };
   }
 
   try {
-    const skills = await discoverAuthoringSkills(sourceDir);
+    const skills = await discoverAgentSkills(sourceDir);
     if (skills.length === 0) {
       return {
         ok: false,
-        code: "AUTHORING_SKILLS_SOURCE_EMPTY",
-        message: `No packaged authoring skills with SKILL.md were found in ${sourceDir}`,
+        code: "AGENT_SKILLS_SOURCE_EMPTY",
+        message: `No packaged agent-skills with SKILL.md were found in ${sourceDir}`,
       };
     }
     await ensureDirectory(installedDir);
@@ -406,13 +406,13 @@ export async function copyAuthoringSkills(
     const message = error instanceof Error ? error.message : String(error);
     return {
       ok: false,
-      code: "AUTHORING_SKILLS_INSTALL_FAILED",
+      code: "AGENT_SKILLS_INSTALL_FAILED",
       message,
     };
   }
 }
 
-export async function listInstalledAuthoringSkills(installDir = DEFAULT_AUTHORING_SKILLS_DIR): Promise<Array<{ name: string; skillPath: string }>> {
+export async function listInstalledAgentSkills(installDir = DEFAULT_AGENT_SKILLS_DIR): Promise<Array<{ name: string; skillPath: string }>> {
   const entries = await readdir(installDir);
   const skills: Array<{ name: string; skillPath: string }> = [];
 

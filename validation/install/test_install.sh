@@ -8,7 +8,7 @@ run_node_install_validation() {
         -u CLAWPERATOR_SKILLS_REGISTRY \
         -u CLAWPERATOR_DEFAULT_ANDROID_DEVICE_ID \
         -u CLAWPERATOR_OPERATOR_PACKAGE \
-        -u CLAWPERATOR_AUTHORING_SKILLS \
+        -u CLAWPERATOR_AGENT_SKILLS \
         -u CLAWPERATOR_BIN \
         -u CLAWPERATOR_SKILL_AGENT_CLI \
         -u CLAWPERATOR_LOG_DIR \
@@ -43,7 +43,7 @@ echo "=== Running install-related validation harnesses (including shared-agent b
 bash validation/test_doctor.sh
 bash validation/install/test_multidevice.sh
 bash validation/install/test_java.sh
-bash validation/install/test_authoring_skills.sh
+bash validation/install/test_agent_skills.sh
 bash validation/install/test_main.sh
 
 echo "=== install-related test suite passed ==="

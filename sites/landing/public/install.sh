@@ -21,11 +21,11 @@ DEFAULT_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operat
 INSTALL_COMMAND="curl -fsSL https://clawperator.com/install.sh | bash"
 SKILLS_SETUP_STATUS="not-run"
 SKILLS_REGISTRY_PATH=""
-AUTHORING_SKILLS_SETUP_STATUS="not-run"
-AUTHORING_SKILLS_INSTALL_DIR=""
-AUTHORING_SKILLS_CLAUDE_DIR=""
-AUTHORING_SKILLS_CODEX_DIR=""
-AUTHORING_SKILLS_AGENTS_DIR=""
+AGENT_SKILLS_SETUP_STATUS="not-run"
+AGENT_SKILLS_INSTALL_DIR=""
+AGENT_SKILLS_CLAUDE_DIR=""
+AGENT_SKILLS_CODEX_DIR=""
+AGENT_SKILLS_AGENTS_DIR=""
 CLAWPERATOR_BIN_PATH=""
 LAST_DEVICE_SERIAL=""
 BLANK_RUNTIME_SKILLS_REGISTRY_WARNED=0
@@ -443,7 +443,7 @@ process.stdin.on("end", () => {
 ' 2>/dev/null || true
 }
 
-parse_authoring_skills_install_result() {
+parse_agent_skills_install_result() {
     node -e '
 let raw = "";
 process.stdin.setEncoding("utf8");
@@ -541,60 +541,60 @@ setup_skills_via_cli() {
     fi
 }
 
-setup_authoring_skills_via_cli() {
-    local DEFAULT_AUTHORING_SKILLS_INSTALL_DIR="$HOME/.clawperator/authoring-skills/"
-    local DEFAULT_AUTHORING_SKILLS_CLAUDE_DIR="$HOME/.claude/skills/"
-    local DEFAULT_AUTHORING_SKILLS_CODEX_DIR="${CODEX_HOME:-$HOME/.codex}/skills/"
-    local DEFAULT_AUTHORING_SKILLS_AGENTS_DIR="$HOME/.agents/skills/"
-    local AUTHORING_SKILLS_OUTPUT=""
+setup_agent_skills_via_cli() {
+    local DEFAULT_AGENT_SKILLS_INSTALL_DIR="$HOME/.clawperator/agent-skills/"
+    local DEFAULT_AGENT_SKILLS_CLAUDE_DIR="$HOME/.claude/skills/"
+    local DEFAULT_AGENT_SKILLS_CODEX_DIR="${CODEX_HOME:-$HOME/.codex}/skills/"
+    local DEFAULT_AGENT_SKILLS_AGENTS_DIR="$HOME/.agents/skills/"
+    local AGENT_SKILLS_OUTPUT=""
 
-    AUTHORING_SKILLS_INSTALL_DIR="$DEFAULT_AUTHORING_SKILLS_INSTALL_DIR"
-    AUTHORING_SKILLS_CLAUDE_DIR="$DEFAULT_AUTHORING_SKILLS_CLAUDE_DIR"
-    AUTHORING_SKILLS_CODEX_DIR="$DEFAULT_AUTHORING_SKILLS_CODEX_DIR"
-    AUTHORING_SKILLS_AGENTS_DIR="$DEFAULT_AUTHORING_SKILLS_AGENTS_DIR"
+    AGENT_SKILLS_INSTALL_DIR="$DEFAULT_AGENT_SKILLS_INSTALL_DIR"
+    AGENT_SKILLS_CLAUDE_DIR="$DEFAULT_AGENT_SKILLS_CLAUDE_DIR"
+    AGENT_SKILLS_CODEX_DIR="$DEFAULT_AGENT_SKILLS_CODEX_DIR"
+    AGENT_SKILLS_AGENTS_DIR="$DEFAULT_AGENT_SKILLS_AGENTS_DIR"
 
     if [ "${CLAWPERATOR_INSTALL_SKIP_SKILLS:-0}" = "1" ]; then
-        AUTHORING_SKILLS_SETUP_STATUS="skipped"
-        echo -e "${YELLOW}⚠️  Skipping authoring skills setup because CLAWPERATOR_INSTALL_SKIP_SKILLS=1.${NC}"
+        AGENT_SKILLS_SETUP_STATUS="skipped"
+        echo -e "${YELLOW}⚠️  Skipping agent-skills setup because CLAWPERATOR_INSTALL_SKIP_SKILLS=1.${NC}"
         return 0
     fi
 
-    echo -e "${BLUE}Setting up authoring skills...${NC}"
-    if AUTHORING_SKILLS_OUTPUT="$("$CLAWPERATOR_BIN_PATH" authoring-skills install --output json)"; then
-        local PARSED_AUTHORING_LINE=""
-        while IFS= read -r PARSED_AUTHORING_LINE; do
-            case "$PARSED_AUTHORING_LINE" in
+    echo -e "${BLUE}Setting up agent-skills...${NC}"
+    if AGENT_SKILLS_OUTPUT="$("$CLAWPERATOR_BIN_PATH" agent-skills install --output json)"; then
+        local PARSED_AGENT_SKILLS_LINE=""
+        while IFS= read -r PARSED_AGENT_SKILLS_LINE; do
+            case "$PARSED_AGENT_SKILLS_LINE" in
                 installedDir=*)
-                    AUTHORING_SKILLS_INSTALL_DIR="${PARSED_AUTHORING_LINE#installedDir=}"
+                    AGENT_SKILLS_INSTALL_DIR="${PARSED_AGENT_SKILLS_LINE#installedDir=}"
                     ;;
                 # agentDiscoveryDir:<label>=<path> entries - matched by label so new agents
                 # (e.g. gemini) can be added to the CLI without breaking this script.
                 agentDiscoveryDir:claude=*)
-                    AUTHORING_SKILLS_CLAUDE_DIR="${PARSED_AUTHORING_LINE#agentDiscoveryDir:claude=}"
+                    AGENT_SKILLS_CLAUDE_DIR="${PARSED_AGENT_SKILLS_LINE#agentDiscoveryDir:claude=}"
                     ;;
                 agentDiscoveryDir:codex=*)
-                    AUTHORING_SKILLS_CODEX_DIR="${PARSED_AUTHORING_LINE#agentDiscoveryDir:codex=}"
+                    AGENT_SKILLS_CODEX_DIR="${PARSED_AGENT_SKILLS_LINE#agentDiscoveryDir:codex=}"
                     ;;
                 agentDiscoveryDir:agents=*)
-                    AUTHORING_SKILLS_AGENTS_DIR="${PARSED_AUTHORING_LINE#agentDiscoveryDir:agents=}"
+                    AGENT_SKILLS_AGENTS_DIR="${PARSED_AGENT_SKILLS_LINE#agentDiscoveryDir:agents=}"
                     ;;
             esac
-        done < <(printf '%s' "$AUTHORING_SKILLS_OUTPUT" | parse_authoring_skills_install_result)
+        done < <(printf '%s' "$AGENT_SKILLS_OUTPUT" | parse_agent_skills_install_result)
 
-        AUTHORING_SKILLS_SETUP_STATUS="configured"
-        echo -e "${GREEN}✅ Authoring skills setup complete.${NC}"
-        echo -e "${GREEN}   Installed at: ${AUTHORING_SKILLS_INSTALL_DIR}${NC}"
-        echo -e "${GREEN}   Claude skills dir: ${AUTHORING_SKILLS_CLAUDE_DIR}${NC}"
-        echo -e "${GREEN}   Codex skills dir: ${AUTHORING_SKILLS_CODEX_DIR}${NC}"
-        echo -e "${GREEN}   Agents skills dir: ${AUTHORING_SKILLS_AGENTS_DIR}${NC}"
+        AGENT_SKILLS_SETUP_STATUS="configured"
+        echo -e "${GREEN}✅ Agent-skills setup complete.${NC}"
+        echo -e "${GREEN}   Installed at: ${AGENT_SKILLS_INSTALL_DIR}${NC}"
+        echo -e "${GREEN}   Claude skills dir: ${AGENT_SKILLS_CLAUDE_DIR}${NC}"
+        echo -e "${GREEN}   Codex skills dir: ${AGENT_SKILLS_CODEX_DIR}${NC}"
+        echo -e "${GREEN}   Agents skills dir: ${AGENT_SKILLS_AGENTS_DIR}${NC}"
         return 0
     fi
 
-    AUTHORING_SKILLS_SETUP_STATUS="failed"
-    echo -e "${YELLOW}⚠️  Authoring skills setup failed via CLI. Resolve the issue below, then re-run 'clawperator authoring-skills install'.${NC}"
+    AGENT_SKILLS_SETUP_STATUS="failed"
+    echo -e "${YELLOW}⚠️  Agent-skills setup failed via CLI. Resolve the issue below, then re-run 'clawperator agent-skills install'.${NC}"
     echo -e "${YELLOW}   Re-running after resolving the conflict is safe.${NC}"
-    if [ -n "$AUTHORING_SKILLS_OUTPUT" ]; then
-        echo "$AUTHORING_SKILLS_OUTPUT"
+    if [ -n "$AGENT_SKILLS_OUTPUT" ]; then
+        echo "$AGENT_SKILLS_OUTPUT"
     fi
     return 0
 }
@@ -1066,7 +1066,7 @@ EOF
 
 write_agent_guide() {
     local AGENT_GUIDE_PATH="$HOME/.clawperator/AGENTS.md"
-    local AUTHORING_SKILLS_GUIDE_DIR="${AUTHORING_SKILLS_INSTALL_DIR:-$HOME/.clawperator/authoring-skills}"
+    local AGENT_SKILLS_GUIDE_DIR="${AGENT_SKILLS_INSTALL_DIR:-$HOME/.clawperator/agent-skills}"
     local SKILL_DIR=""
     local SKILL_NAME=""
     local HAS_SKILLS=0
@@ -1097,8 +1097,8 @@ EOF
 
     # Treat any install tree with at least one SKILL.md as configured, even if
     # version metadata is missing and the install should be refreshed.
-    if [ -d "$AUTHORING_SKILLS_GUIDE_DIR" ]; then
-        for SKILL_DIR in "$AUTHORING_SKILLS_GUIDE_DIR"/*/; do
+    if [ -d "$AGENT_SKILLS_GUIDE_DIR" ]; then
+        for SKILL_DIR in "$AGENT_SKILLS_GUIDE_DIR"/*/; do
             if [ -f "${SKILL_DIR}SKILL.md" ]; then
                 HAS_SKILLS=1
                 SKILL_NAME="$(basename "$SKILL_DIR")"
@@ -1114,10 +1114,10 @@ EOF
     if [ "$HAS_SKILLS" -eq 1 ]; then
         cat >> "$AGENT_GUIDE_PATH" <<EOF
 
-## Authoring Skills
+## Agent-Skills
 
-First-party Clawperator authoring skills are installed at:
-${AUTHORING_SKILLS_GUIDE_DIR}
+First-party Clawperator agent-skills are installed at:
+${AGENT_SKILLS_GUIDE_DIR}
 
 EOF
         if [ "$HAS_DISCOVERY_SKILL" -eq 1 ]; then
@@ -1140,7 +1140,7 @@ EOF
 
 Installed entries on this host:
 EOF
-        for SKILL_DIR in "$AUTHORING_SKILLS_GUIDE_DIR"/*/; do
+        for SKILL_DIR in "$AGENT_SKILLS_GUIDE_DIR"/*/; do
             if [ -f "${SKILL_DIR}SKILL.md" ]; then
                 printf -- '- %s\n' "$(basename "$SKILL_DIR")" >> "$AGENT_GUIDE_PATH"
             fi
@@ -1150,17 +1150,17 @@ EOF
 
 Recommended no-match flow:
 - Start with `clawperator skills for-app <package_id>` or `clawperator skills search --keyword "<term>"`
-- If there is no relevant runtime-skill match, inspect `clawperator authoring-skills list --json`
+- If there is no relevant runtime-skill match, inspect `clawperator agent-skills list --json`
 - Start the guided route with `skill-author-by-agent-discovery`
 - Use `skill-author-by-recording` only after discovery returns `proceed_to_recording`
 EOF
         else
             cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
-Installed authoring front doors are incomplete on this host.
+Installed agent-skill front doors are incomplete on this host.
 
 Repair it with:
-- run `clawperator authoring-skills update`
+- run `clawperator agent-skills update`
 EOF
             if [ "$HAS_DISCOVERY_SKILL" -ne 1 ]; then
                 printf -- '- missing `%s`\n' "skill-author-by-agent-discovery" >> "$AGENT_GUIDE_PATH"
@@ -1169,27 +1169,27 @@ EOF
                 printf -- '- missing `%s`\n' "skill-author-by-recording" >> "$AGENT_GUIDE_PATH"
             fi
         fi
-        if [ ! -f "$AUTHORING_SKILLS_GUIDE_DIR/version.txt" ] && [ "$HAS_DISCOVERY_SKILL" -eq 1 ] && [ "$HAS_RECORDING_SKILL" -eq 1 ]; then
+        if [ ! -f "$AGENT_SKILLS_GUIDE_DIR/version.txt" ] && [ "$HAS_DISCOVERY_SKILL" -eq 1 ] && [ "$HAS_RECORDING_SKILL" -eq 1 ]; then
             cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
 Version metadata is missing for this install.
 Refresh it with:
-- run `clawperator authoring-skills update`
+- run `clawperator agent-skills update`
 EOF
         fi
     else
         cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
-## Authoring Skills
+## Agent-Skills
 
-First-party Clawperator authoring skills are not currently configured on this host.
+First-party Clawperator agent-skills are not currently configured on this host.
 
 Expected packaged front doors after install:
 - `skill-author-by-agent-discovery`: zero-results front door when runtime-skill discovery found no relevant match
 - `skill-author-by-recording`: proving workflow after discovery returns `proceed_to_recording`
 
 Repair or manual bootstrap:
-- run `clawperator authoring-skills install`
+- run `clawperator agent-skills install`
 EOF
     fi
 
@@ -1246,9 +1246,9 @@ const bridgeBlock = [
   "- `clawperator skills for-app <package_id>`",
   "- `clawperator skills search --keyword \"<term>\"`",
   "- `clawperator skills get <skill_id>`",
-  "- `clawperator authoring-skills list --json`",
+  "- `clawperator agent-skills list --json`",
   "",
-  "If runtime-skill discovery finds no relevant match, follow the local guide for the authoring front doors installed on this host.",
+  "If runtime-skill discovery finds no relevant match, follow the local guide for the agent-skill front doors installed on this host.",
   "Confirm the local guide lists both `skill-author-by-agent-discovery` and `skill-author-by-recording` before starting the discovery-to-proving route.",
   "Use `clawperator skills run <skill_id>` after you have identified the right runtime skill.",
   endMarker,
@@ -1698,7 +1698,7 @@ main() {
     
     # Setup skills via CLI (best-effort)
     setup_skills_via_cli
-    setup_authoring_skills_via_cli
+    setup_agent_skills_via_cli
     write_agent_guide
     write_shared_agent_bridge
     write_install_state
@@ -1771,13 +1771,13 @@ main() {
         echo -e "   ${YELLOW}export CLAWPERATOR_SKILLS_REGISTRY=\"\$HOME/.clawperator/skills/skills/skills-registry.json\"${NC}"
     fi
     echo ""
-    if [ "$AUTHORING_SKILLS_SETUP_STATUS" = "configured" ]; then
-        echo -e "6. Authoring skills installed at:"
-        echo -e "   ${BLUE}${AUTHORING_SKILLS_INSTALL_DIR}${NC}"
+    if [ "$AGENT_SKILLS_SETUP_STATUS" = "configured" ]; then
+        echo -e "6. Agent-skills installed at:"
+        echo -e "   ${BLUE}${AGENT_SKILLS_INSTALL_DIR}${NC}"
     else
-        echo -e "6. ${YELLOW}Authoring skills were not configured during install.${NC}"
+        echo -e "6. ${YELLOW}Agent-skills were not configured during install.${NC}"
         echo -e "   To repair this later, run:"
-        echo -e "   ${YELLOW}clawperator authoring-skills install${NC}"
+        echo -e "   ${YELLOW}clawperator agent-skills install${NC}"
     fi
     echo ""
     print_durable_artifact_summary

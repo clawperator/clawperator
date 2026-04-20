@@ -3,27 +3,27 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const packageDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const authoringSkillsDir = resolve(packageDir, "authoring-skills");
-const statePath = resolve(packageDir, ".authoring-skills-pack-state.json");
+const agentSkillsDir = resolve(packageDir, "agent-skills");
+const statePath = resolve(packageDir, ".agent-skills-pack-state.json");
 const directorySymlinkType = process.platform === "win32" ? "junction" : "dir";
 
 function normalizeDirectorySymlinkTarget(target) {
-  return process.platform === "win32" ? resolve(authoringSkillsDir, target) : target;
+  return process.platform === "win32" ? resolve(agentSkillsDir, target) : target;
 }
 
 async function prepack() {
-  const entries = await readdir(authoringSkillsDir);
+  const entries = await readdir(agentSkillsDir);
   const symlinks = [];
 
   for (const entry of entries) {
-    const entryPath = resolve(authoringSkillsDir, entry);
+    const entryPath = resolve(agentSkillsDir, entry);
     const stat = await lstat(entryPath);
     if (!stat.isSymbolicLink()) {
       continue;
     }
 
     const target = await readlink(entryPath);
-    const resolvedTarget = resolve(authoringSkillsDir, target);
+    const resolvedTarget = resolve(agentSkillsDir, target);
     symlinks.push({ entry, target });
 
     await rm(entryPath, { force: true });
@@ -47,7 +47,7 @@ async function postpack() {
 
   const { symlinks } = JSON.parse(rawState);
   for (const { entry, target } of symlinks) {
-    const entryPath = resolve(authoringSkillsDir, entry);
+    const entryPath = resolve(agentSkillsDir, entry);
     await rm(entryPath, { recursive: true, force: true });
     await symlink(normalizeDirectorySymlinkTarget(target), entryPath, directorySymlinkType);
   }

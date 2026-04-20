@@ -9,13 +9,13 @@ import {
   checkNodeVersion,
   checkDefaultOrchestratedSkillAgentCli,
   checkInstalledOrchestratedSkillAgentCliAvailability,
-  checkAuthoringSkillsStaleness,
+  checkAgentSkillsStaleness,
 } from "../../../domain/doctor/checks/hostChecks.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
 import { getCliVersion } from "../../../domain/version/compatibility.js";
-import { listPackagedAuthoringSkills } from "../../../domain/skills/copyAuthoringSkills.js";
+import { listPackagedAgentSkills } from "../../../domain/skills/copyAgentSkills.js";
 
 describe("Doctor: hostChecks", () => {
     const tempRoots: string[] = [];
@@ -31,20 +31,20 @@ describe("Doctor: hostChecks", () => {
         return root;
     }
 
-    async function getExpectedAuthoringSkills(): Promise<string[]> {
-        return listPackagedAuthoringSkills();
+    async function getExpectedAgentSkills(): Promise<string[]> {
+        return listPackagedAgentSkills();
     }
 
     async function createDirectorySymlink(targetPath: string, linkPath: string): Promise<void> {
         await symlink(targetPath, linkPath, directorySymlinkType);
     }
 
-    async function seedHealthyAuthoringSkillsInstall(
+    async function seedHealthyAgentSkillsInstall(
         installedDir: string,
         discoveryDirs: string[],
         version = getCliVersion()
     ): Promise<string[]> {
-        const skillNames = await getExpectedAuthoringSkills();
+        const skillNames = await getExpectedAgentSkills();
         await mkdir(installedDir, { recursive: true });
         for (const discoveryDir of discoveryDirs) {
             await mkdir(discoveryDir, { recursive: true });
@@ -760,66 +760,66 @@ describe("Doctor: hostChecks", () => {
         });
     });
 
-    describe("checkAuthoringSkillsStaleness", () => {
-        it("passes when the authoring skills install dir does not exist", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-missing-");
+    describe("checkAgentSkillsStaleness", () => {
+        it("passes when the agent-skills install dir does not exist", async () => {
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-missing-");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
 
-            const result = await checkAuthoringSkillsStaleness(config, {
-                installedDir: join(root, "missing-authoring-skills"),
+            const result = await checkAgentSkillsStaleness(config, {
+                installedDir: join(root, "missing-agent-skills"),
             });
 
             assert.strictEqual(result.status, "pass");
-            assert.strictEqual(result.summary, "Authoring skills not yet installed.");
+            assert.strictEqual(result.summary, "Agent-skills not yet installed.");
         });
 
         it("derives the default installed dir from homeDir when installedDir is unset", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-alt-home-");
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-alt-home-");
             const homeDir = join(root, "alt-home");
-            const installedDir = join(homeDir, ".clawperator", "authoring-skills");
+            const installedDir = join(homeDir, ".clawperator", "agent-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
 
-            const result = await checkAuthoringSkillsStaleness(config, { homeDir });
+            const result = await checkAgentSkillsStaleness(config, { homeDir });
 
             assert.strictEqual(result.status, "pass");
-            assert.strictEqual(result.summary, "Authoring skills not yet installed.");
+            assert.strictEqual(result.summary, "Agent-skills not yet installed.");
             assert.deepStrictEqual(result.evidence, {
                 installedDir,
             });
         });
 
-        it("warns when the authoring skills install path is a regular file", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-file-conflict-");
-            const installedDir = join(root, "authoring-skills");
+        it("warns when the agent-skills install path is a regular file", async () => {
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-file-conflict-");
+            const installedDir = join(root, "agent-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
             await writeFile(installedDir, "not a directory\n", "utf8");
 
-            const result = await checkAuthoringSkillsStaleness(config, { installedDir });
+            const result = await checkAgentSkillsStaleness(config, { installedDir });
 
             assert.strictEqual(result.status, "warn");
-            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
-            assert.strictEqual(result.summary, `Authoring skills install path exists but is not a directory: ${installedDir}.`);
+            assert.strictEqual(result.code, ERROR_CODES.AGENT_SKILLS_STALE);
+            assert.strictEqual(result.summary, `Agent-skills install path exists but is not a directory: ${installedDir}.`);
             assert.deepStrictEqual(result.fix?.steps, [
                 { kind: "manual", value: `Remove or rename the conflicting path at ${installedDir}.` },
-                { kind: "shell", value: "clawperator authoring-skills install" },
+                { kind: "shell", value: "clawperator agent-skills install" },
             ]);
         });
 
-        it("warns when the authoring skills install path is a dangling symlink", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-dangling-link-");
-            const installedDir = join(root, "authoring-skills");
+        it("warns when the agent-skills install path is a dangling symlink", async () => {
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-dangling-link-");
+            const installedDir = join(root, "agent-skills");
             const missingTarget = join(root, "missing-target");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
             await createDirectorySymlink(missingTarget, installedDir);
 
-            const result = await checkAuthoringSkillsStaleness(config, { installedDir });
+            const result = await checkAgentSkillsStaleness(config, { installedDir });
 
             assert.strictEqual(result.status, "warn");
-            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
-            assert.strictEqual(result.summary, `Authoring skills install path is a dangling symlink: ${installedDir}.`);
+            assert.strictEqual(result.code, ERROR_CODES.AGENT_SKILLS_STALE);
+            assert.strictEqual(result.summary, `Agent-skills install path is a dangling symlink: ${installedDir}.`);
             assert.deepStrictEqual(result.fix?.steps, [
                 { kind: "manual", value: `Remove or rename the conflicting path at ${installedDir}.` },
-                { kind: "shell", value: "clawperator authoring-skills install" },
+                { kind: "shell", value: "clawperator agent-skills install" },
             ]);
             assert.deepStrictEqual(result.evidence, {
                 installedDir,
@@ -829,11 +829,11 @@ describe("Doctor: hostChecks", () => {
         });
 
         it("warns when the CLI version metadata cannot be read", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-cli-version-fail-");
-            const installedDir = join(root, "authoring-skills");
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-cli-version-fail-");
+            const installedDir = join(root, "agent-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
 
-            const result = await checkAuthoringSkillsStaleness(config, {
+            const result = await checkAgentSkillsStaleness(config, {
                 installedDir,
                 getCliVersionFn: () => {
                     throw new Error("package.json version is missing");
@@ -841,34 +841,34 @@ describe("Doctor: hostChecks", () => {
             });
 
             assert.strictEqual(result.status, "warn");
-            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
+            assert.strictEqual(result.code, ERROR_CODES.AGENT_SKILLS_STALE);
             assert.strictEqual(result.summary, "CLI version metadata could not be read.");
         });
 
-        it("warns when the authoring skills install dir exists but version.txt is missing", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-no-version-");
-            const installedDir = join(root, "authoring-skills");
+        it("warns when the agent-skills install dir exists but version.txt is missing", async () => {
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-no-version-");
+            const installedDir = join(root, "agent-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
             await mkdir(installedDir, { recursive: true });
 
-            const result = await checkAuthoringSkillsStaleness(config, { installedDir });
+            const result = await checkAgentSkillsStaleness(config, { installedDir });
 
             assert.strictEqual(result.status, "warn");
-            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
-            assert.strictEqual(result.summary, "Authoring skills version file is missing.");
-            assert.deepStrictEqual(result.fix?.steps, [{ kind: "shell", value: "clawperator authoring-skills update" }]);
+            assert.strictEqual(result.code, ERROR_CODES.AGENT_SKILLS_STALE);
+            assert.strictEqual(result.summary, "Agent-skills version file is missing.");
+            assert.deepStrictEqual(result.fix?.steps, [{ kind: "shell", value: "clawperator agent-skills update" }]);
         });
 
         it("passes when version.txt matches the current CLI version", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-current-");
-            const installedDir = join(root, "authoring-skills");
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-current-");
+            const installedDir = join(root, "agent-skills");
             const claudeSkillsDir = join(root, "claude-skills");
             const codexSkillsDir = join(root, "codex-skills");
             const agentsSkillsDir = join(root, "agents-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            await seedHealthyAgentSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
 
-            const result = await checkAuthoringSkillsStaleness(config, {
+            const result = await checkAgentSkillsStaleness(config, {
                 installedDir,
                 claudeSkillsDir,
                 codexSkillsDir,
@@ -876,7 +876,7 @@ describe("Doctor: hostChecks", () => {
             });
 
             assert.strictEqual(result.status, "pass");
-            assert.strictEqual(result.summary, "Authoring skills are up to date.");
+            assert.strictEqual(result.summary, "Agent-skills are up to date.");
             assert.deepStrictEqual(result.evidence, {
                 installedDir,
                 installedVersion: getCliVersion(),
@@ -885,16 +885,16 @@ describe("Doctor: hostChecks", () => {
         });
 
         it("warns when the Claude discovery link is missing", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-missing-claude-link-");
-            const installedDir = join(root, "authoring-skills");
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-missing-claude-link-");
+            const installedDir = join(root, "agent-skills");
             const claudeSkillsDir = join(root, "claude-skills");
             const codexSkillsDir = join(root, "codex-skills");
             const agentsSkillsDir = join(root, "agents-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            const [targetSkill] = await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            const [targetSkill] = await seedHealthyAgentSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
             await rm(join(claudeSkillsDir, targetSkill), { force: true });
 
-            const result = await checkAuthoringSkillsStaleness(config, {
+            const result = await checkAgentSkillsStaleness(config, {
                 installedDir,
                 claudeSkillsDir,
                 codexSkillsDir,
@@ -902,8 +902,8 @@ describe("Doctor: hostChecks", () => {
             });
 
             assert.strictEqual(result.status, "warn");
-            assert.strictEqual(result.summary, "Authoring skills discovery links are incomplete or invalid.");
-            assert.deepStrictEqual(result.fix?.steps, [{ kind: "shell", value: "clawperator authoring-skills update" }]);
+            assert.strictEqual(result.summary, "Agent-skills discovery links are incomplete or invalid.");
+            assert.deepStrictEqual(result.fix?.steps, [{ kind: "shell", value: "clawperator agent-skills update" }]);
             assert.deepStrictEqual(result.evidence, {
                 installedDir,
                 installedVersion: getCliVersion(),
@@ -922,16 +922,16 @@ describe("Doctor: hostChecks", () => {
         });
 
         it("warns when the Codex discovery link is missing", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-missing-codex-link-");
-            const installedDir = join(root, "authoring-skills");
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-missing-codex-link-");
+            const installedDir = join(root, "agent-skills");
             const claudeSkillsDir = join(root, "claude-skills");
             const codexSkillsDir = join(root, "codex-skills");
             const agentsSkillsDir = join(root, "agents-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            const [targetSkill] = await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            const [targetSkill] = await seedHealthyAgentSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
             await rm(join(codexSkillsDir, targetSkill), { force: true });
 
-            const result = await checkAuthoringSkillsStaleness(config, {
+            const result = await checkAgentSkillsStaleness(config, {
                 installedDir,
                 claudeSkillsDir,
                 codexSkillsDir,
@@ -939,7 +939,7 @@ describe("Doctor: hostChecks", () => {
             });
 
             assert.strictEqual(result.status, "warn");
-            assert.strictEqual(result.summary, "Authoring skills discovery links are incomplete or invalid.");
+            assert.strictEqual(result.summary, "Agent-skills discovery links are incomplete or invalid.");
             assert.deepStrictEqual(result.evidence, {
                 installedDir,
                 installedVersion: getCliVersion(),
@@ -958,19 +958,19 @@ describe("Doctor: hostChecks", () => {
         });
 
         it("warns when a managed discovery link points to the wrong target", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-wrong-link-target-");
-            const installedDir = join(root, "authoring-skills");
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-wrong-link-target-");
+            const installedDir = join(root, "agent-skills");
             const claudeSkillsDir = join(root, "claude-skills");
             const codexSkillsDir = join(root, "codex-skills");
             const agentsSkillsDir = join(root, "agents-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            const [targetSkill] = await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            const [targetSkill] = await seedHealthyAgentSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
             const wrongTargetRoot = join(root, "wrong-target", targetSkill);
             await mkdir(wrongTargetRoot, { recursive: true });
             await rm(join(claudeSkillsDir, targetSkill), { force: true });
             await createDirectorySymlink(wrongTargetRoot, join(claudeSkillsDir, targetSkill));
 
-            const result = await checkAuthoringSkillsStaleness(config, {
+            const result = await checkAgentSkillsStaleness(config, {
                 installedDir,
                 claudeSkillsDir,
                 codexSkillsDir,
@@ -978,7 +978,7 @@ describe("Doctor: hostChecks", () => {
             });
 
             assert.strictEqual(result.status, "warn");
-            assert.strictEqual(result.summary, "Authoring skills discovery links are incomplete or invalid.");
+            assert.strictEqual(result.summary, "Agent-skills discovery links are incomplete or invalid.");
             assert.deepStrictEqual(result.evidence, {
                 installedDir,
                 installedVersion: getCliVersion(),
@@ -997,17 +997,17 @@ describe("Doctor: hostChecks", () => {
         });
 
         it("warns when a discovery entry is a conflicting non-symlink", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-conflicting-entry-");
-            const installedDir = join(root, "authoring-skills");
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-conflicting-entry-");
+            const installedDir = join(root, "agent-skills");
             const claudeSkillsDir = join(root, "claude-skills");
             const codexSkillsDir = join(root, "codex-skills");
             const agentsSkillsDir = join(root, "agents-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            const [targetSkill] = await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            const [targetSkill] = await seedHealthyAgentSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
             await rm(join(claudeSkillsDir, targetSkill), { force: true });
             await writeFile(join(claudeSkillsDir, targetSkill), "not a symlink\n", "utf8");
 
-            const result = await checkAuthoringSkillsStaleness(config, {
+            const result = await checkAgentSkillsStaleness(config, {
                 installedDir,
                 claudeSkillsDir,
                 codexSkillsDir,
@@ -1015,7 +1015,7 @@ describe("Doctor: hostChecks", () => {
             });
 
             assert.strictEqual(result.status, "warn");
-            assert.strictEqual(result.summary, "Authoring skills discovery links are incomplete or invalid.");
+            assert.strictEqual(result.summary, "Agent-skills discovery links are incomplete or invalid.");
             assert.deepStrictEqual(result.evidence, {
                 installedDir,
                 installedVersion: getCliVersion(),
@@ -1034,18 +1034,18 @@ describe("Doctor: hostChecks", () => {
         });
 
         it("warns when a managed discovery link is dangling", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-broken-link-");
-            const installedDir = join(root, "authoring-skills");
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-broken-link-");
+            const installedDir = join(root, "agent-skills");
             const claudeSkillsDir = join(root, "claude-skills");
             const codexSkillsDir = join(root, "codex-skills");
             const agentsSkillsDir = join(root, "agents-skills");
             const missingTarget = join(root, "missing-target");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            const [targetSkill] = await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            const [targetSkill] = await seedHealthyAgentSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
             await rm(join(claudeSkillsDir, targetSkill), { force: true });
             await createDirectorySymlink(missingTarget, join(claudeSkillsDir, targetSkill));
 
-            const result = await checkAuthoringSkillsStaleness(config, {
+            const result = await checkAgentSkillsStaleness(config, {
                 installedDir,
                 claudeSkillsDir,
                 codexSkillsDir,
@@ -1053,7 +1053,7 @@ describe("Doctor: hostChecks", () => {
             });
 
             assert.strictEqual(result.status, "warn");
-            assert.strictEqual(result.summary, "Authoring skills discovery links are incomplete or invalid.");
+            assert.strictEqual(result.summary, "Agent-skills discovery links are incomplete or invalid.");
             assert.deepStrictEqual(result.evidence, {
                 installedDir,
                 installedVersion: getCliVersion(),
@@ -1072,15 +1072,15 @@ describe("Doctor: hostChecks", () => {
         });
 
         it("warns when version.txt differs from the current CLI version", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-stale-");
-            const installedDir = join(root, "authoring-skills");
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-stale-");
+            const installedDir = join(root, "agent-skills");
             const claudeSkillsDir = join(root, "claude-skills");
             const codexSkillsDir = join(root, "codex-skills");
             const agentsSkillsDir = join(root, "agents-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir], "0.0.1");
+            await seedHealthyAgentSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir], "0.0.1");
 
-            const result = await checkAuthoringSkillsStaleness(config, {
+            const result = await checkAgentSkillsStaleness(config, {
                 installedDir,
                 claudeSkillsDir,
                 codexSkillsDir,
@@ -1088,8 +1088,8 @@ describe("Doctor: hostChecks", () => {
             });
 
             assert.strictEqual(result.status, "warn");
-            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
-            assert.strictEqual(result.summary, `Authoring skills (v0.0.1) are outdated (CLI is v${getCliVersion()}).`);
+            assert.strictEqual(result.code, ERROR_CODES.AGENT_SKILLS_STALE);
+            assert.strictEqual(result.summary, `Agent-skills (v0.0.1) are outdated (CLI is v${getCliVersion()}).`);
             assert.deepStrictEqual(result.evidence, {
                 installedDir,
                 installedVersion: "0.0.1",
@@ -1098,18 +1098,18 @@ describe("Doctor: hostChecks", () => {
         });
 
         it("warns when version.txt matches but no installed skill directory contains SKILL.md", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-empty-tree-");
-            const installedDir = join(root, "authoring-skills");
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-empty-tree-");
+            const installedDir = join(root, "agent-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            const expectedSkills = await getExpectedAuthoringSkills();
+            const expectedSkills = await getExpectedAgentSkills();
             await mkdir(join(installedDir, "broken-skill"), { recursive: true });
             await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
 
-            const result = await checkAuthoringSkillsStaleness(config, { installedDir });
+            const result = await checkAgentSkillsStaleness(config, { installedDir });
 
             assert.strictEqual(result.status, "warn");
-            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
-            assert.strictEqual(result.summary, "Authoring skills install is missing expected packaged skills.");
+            assert.strictEqual(result.code, ERROR_CODES.AGENT_SKILLS_STALE);
+            assert.strictEqual(result.summary, "Agent-skills install is missing expected packaged skills.");
             assert.deepStrictEqual(result.evidence, {
                 installedDir,
                 installedVersion: getCliVersion(),
@@ -1120,13 +1120,13 @@ describe("Doctor: hostChecks", () => {
         });
 
         it("warns when an expected skill path cannot be inspected for a non-ENOENT reason", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-uninspectable-skill-");
-            const installedDir = join(root, "authoring-skills");
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-uninspectable-skill-");
+            const installedDir = join(root, "agent-skills");
             const claudeSkillsDir = join(root, "claude-skills");
             const codexSkillsDir = join(root, "codex-skills");
             const agentsSkillsDir = join(root, "agents-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            const [targetSkill] = await getExpectedAuthoringSkills();
+            const [targetSkill] = await getExpectedAgentSkills();
             await mkdir(installedDir, { recursive: true });
             await mkdir(claudeSkillsDir, { recursive: true });
             await mkdir(codexSkillsDir, { recursive: true });
@@ -1137,7 +1137,7 @@ describe("Doctor: hostChecks", () => {
             await createDirectorySymlink(join(installedDir, targetSkill), join(agentsSkillsDir, targetSkill));
             await writeFile(join(installedDir, "version.txt"), `${getCliVersion()}\n`, "utf8");
 
-            const result = await checkAuthoringSkillsStaleness(config, {
+            const result = await checkAgentSkillsStaleness(config, {
                 installedDir,
                 claudeSkillsDir,
                 codexSkillsDir,
@@ -1145,9 +1145,9 @@ describe("Doctor: hostChecks", () => {
             });
 
             assert.strictEqual(result.status, "warn");
-            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
-            assert.strictEqual(result.summary, "Authoring skills install could not be fully inspected.");
-            const expectedSkills = await getExpectedAuthoringSkills();
+            assert.strictEqual(result.code, ERROR_CODES.AGENT_SKILLS_STALE);
+            assert.strictEqual(result.summary, "Agent-skills install could not be fully inspected.");
+            const expectedSkills = await getExpectedAgentSkills();
             assert.deepStrictEqual(result.evidence, {
                 installedDir,
                 installedVersion: getCliVersion(),
@@ -1156,33 +1156,33 @@ describe("Doctor: hostChecks", () => {
             });
         });
 
-        it("respects CLAWPERATOR_AUTHORING_SKILLS when deriving the expected packaged skill set", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-override-source-");
-            const sourceDir = join(root, "custom-authoring-skills");
-            const installedDir = join(root, "authoring-skills");
+        it("respects CLAWPERATOR_AGENT_SKILLS when deriving the expected packaged skill set", async () => {
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-override-source-");
+            const sourceDir = join(root, "custom-agent-skills");
+            const installedDir = join(root, "agent-skills");
             const claudeSkillsDir = join(root, "claude-skills");
             const codexSkillsDir = join(root, "codex-skills");
             const agentsSkillsDir = join(root, "agents-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            const customSkill = "custom-authoring-skill";
+            const customSkill = "custom-agent-skill";
 
             await mkdir(join(sourceDir, customSkill), { recursive: true });
             await writeFile(join(sourceDir, customSkill, "SKILL.md"), `# ${customSkill}\n`, "utf8");
-            await seedHealthyAuthoringSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            await seedHealthyAgentSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
 
-            const result = await checkAuthoringSkillsStaleness(config, {
+            const result = await checkAgentSkillsStaleness(config, {
                 installedDir,
                 claudeSkillsDir,
                 codexSkillsDir,
                 agentsSkillsDir,
                 env: {
                     ...process.env,
-                    CLAWPERATOR_AUTHORING_SKILLS: sourceDir,
+                    CLAWPERATOR_AGENT_SKILLS: sourceDir,
                 },
             });
 
             assert.strictEqual(result.status, "warn");
-            assert.strictEqual(result.summary, "Authoring skills install is missing expected packaged skills.");
+            assert.strictEqual(result.summary, "Agent-skills install is missing expected packaged skills.");
             assert.deepStrictEqual(result.evidence, {
                 installedDir,
                 installedVersion: getCliVersion(),
@@ -1193,18 +1193,18 @@ describe("Doctor: hostChecks", () => {
         });
 
         it("warns when version.txt cannot be read for a non-ENOENT reason", async () => {
-            const root = await makeTempRoot("clawperator-doctor-authoring-skills-unreadable-version-");
-            const installedDir = join(root, "authoring-skills");
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-unreadable-version-");
+            const installedDir = join(root, "agent-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
             await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
             await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
             await mkdir(join(installedDir, "version.txt"), { recursive: true });
 
-            const result = await checkAuthoringSkillsStaleness(config, { installedDir });
+            const result = await checkAgentSkillsStaleness(config, { installedDir });
 
             assert.strictEqual(result.status, "warn");
-            assert.strictEqual(result.code, ERROR_CODES.AUTHORING_SKILLS_STALE);
-            assert.strictEqual(result.summary, "Authoring skills version file could not be read.");
+            assert.strictEqual(result.code, ERROR_CODES.AGENT_SKILLS_STALE);
+            assert.strictEqual(result.summary, "Agent-skills version file could not be read.");
             assert.deepStrictEqual(result.evidence, {
                 installedDir,
                 versionPath: join(installedDir, "version.txt"),

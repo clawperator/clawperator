@@ -55,7 +55,7 @@ discovery-to-proving route first:
 2. If runtime-skill discovery returns no relevant match, inspect the installed
    authoring-workflow front doors with:
 
-   `clawperator authoring-skills list --json`
+   `clawperator agent-skills list --json`
 
 3. For this benchmark, `skill-author-by-agent-discovery` is the required
    discovery front door. It should decide whether to hand off to
@@ -66,7 +66,7 @@ discovery-to-proving route first:
 5. Before you omit the skill markers, you must show the route attempt in the
    transcript:
    - runtime-skill discovery command(s)
-   - `clawperator authoring-skills list --json`
+   - `clawperator agent-skills list --json`
    - the discovery decision and why it blocked or handed off
 6. If `skill-author-by-agent-discovery` is unavailable, incomplete, or cannot
    truthfully finish the route yet, still return the Android version answer but

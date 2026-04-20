@@ -1,16 +1,16 @@
 import { stat } from "node:fs/promises";
-import { DEFAULT_AUTHORING_SKILLS_DIR } from "../../domain/skills/skillsConfig.js";
+import { DEFAULT_AGENT_SKILLS_DIR } from "../../domain/skills/skillsConfig.js";
 import {
-  copyAuthoringSkills,
-  listInstalledAuthoringSkills,
+  copyAgentSkills,
+  listInstalledAgentSkills,
   resolveClaudeSkillsDir,
   resolveCodexSkillsDir,
-  type CopyAuthoringSkillsOptions,
-} from "../../domain/skills/copyAuthoringSkills.js";
+  type CopyAgentSkillsOptions,
+} from "../../domain/skills/copyAgentSkills.js";
 import type { OutputOptions } from "../output.js";
 import { formatError, formatSuccess } from "../output.js";
 
-export interface AuthoringSkillCommandOptions extends CopyAuthoringSkillsOptions {
+export interface AgentSkillCommandOptions extends CopyAgentSkillsOptions {
   format: OutputOptions["format"];
 }
 
@@ -26,19 +26,19 @@ async function isMissingDir(path: string): Promise<boolean> {
   }
 }
 
-function getAuthoringSkillsEnvHint(env: NodeJS.ProcessEnv | undefined): string | undefined {
-  const sourceDir = env?.CLAWPERATOR_AUTHORING_SKILLS;
+function getAgentSkillsEnvHint(env: NodeJS.ProcessEnv | undefined): string | undefined {
+  const sourceDir = env?.CLAWPERATOR_AGENT_SKILLS;
   if (sourceDir === undefined || sourceDir === "") {
     return undefined;
   }
-  return `Using CLAWPERATOR_AUTHORING_SKILLS=${sourceDir}`;
+  return `Using CLAWPERATOR_AGENT_SKILLS=${sourceDir}`;
 }
 
-async function runAuthoringSkillsInstall(
+async function runAgentSkillsInstall(
   action: "install" | "update",
-  options: AuthoringSkillCommandOptions
+  options: AgentSkillCommandOptions
 ): Promise<string> {
-  const result = await copyAuthoringSkills(options);
+  const result = await copyAgentSkills(options);
   if (!result.ok) {
     return formatError({ code: result.code, message: result.message }, options);
   }
@@ -50,34 +50,34 @@ async function runAuthoringSkillsInstall(
     claudeSkillsDir: resolveClaudeSkillsDir(options),
     codexSkillsDir: resolveCodexSkillsDir(options),
     agentDiscoveryDirs: result.agentDiscoveryDirs,
-    message: `Authoring skills ${action === "install" ? "installed" : "updated"}.`,
-    envHint: getAuthoringSkillsEnvHint(options.env),
+    message: `Agent-skills ${action === "install" ? "installed" : "updated"}.`,
+    envHint: getAgentSkillsEnvHint(options.env),
   }, options);
 }
 
-export async function cmdAuthoringSkillsInstall(options: AuthoringSkillCommandOptions): Promise<string> {
-  return runAuthoringSkillsInstall("install", options);
+export async function cmdAgentSkillsInstall(options: AgentSkillCommandOptions): Promise<string> {
+  return runAgentSkillsInstall("install", options);
 }
 
-export async function cmdAuthoringSkillsUpdate(options: AuthoringSkillCommandOptions): Promise<string> {
-  return runAuthoringSkillsInstall("update", options);
+export async function cmdAgentSkillsUpdate(options: AgentSkillCommandOptions): Promise<string> {
+  return runAgentSkillsInstall("update", options);
 }
 
-export async function cmdAuthoringSkillsList(
+export async function cmdAgentSkillsList(
   options: { format: OutputOptions["format"]; installDir?: string }
 ): Promise<string> {
-  const installDir = options.installDir ?? DEFAULT_AUTHORING_SKILLS_DIR;
+  const installDir = options.installDir ?? DEFAULT_AGENT_SKILLS_DIR;
   try {
     if (await isMissingDir(installDir)) {
       return formatSuccess({
         skills: [],
         count: 0,
         installedDir: installDir,
-        message: "No installed authoring skills found. Run clawperator authoring-skills install to get skill-author-by-agent-discovery and skill-author-by-recording.",
+        message: "No installed agent-skills found. Run clawperator agent-skills install to get skill-author-by-agent-discovery and skill-author-by-recording.",
       }, options);
     }
 
-    const skills = await listInstalledAuthoringSkills(installDir);
+    const skills = await listInstalledAgentSkills(installDir);
     return formatSuccess({
       skills,
       count: skills.length,
@@ -85,6 +85,6 @@ export async function cmdAuthoringSkillsList(
     }, options);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return formatError({ code: "AUTHORING_SKILLS_LIST_FAILED", message }, options);
+    return formatError({ code: "AGENT_SKILLS_LIST_FAILED", message }, options);
   }
 }

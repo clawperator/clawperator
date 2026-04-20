@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 export const SKILLS_REPO_URL = "https://github.com/clawperator/clawperator-skills";
 export const DEFAULT_SKILLS_DIR = join(homedir(), ".clawperator", "skills");
-export const DEFAULT_AUTHORING_SKILLS_DIR = join(homedir(), ".clawperator", "authoring-skills");
+export const DEFAULT_AGENT_SKILLS_DIR = join(homedir(), ".clawperator", "agent-skills");
 export const DEFAULT_SKILLS_REGISTRY_SUBPATH = join("skills", "skills-registry.json");
 
 export const CLAWPERATOR_BIN_ENV_VAR = "CLAWPERATOR_BIN";

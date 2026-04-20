@@ -4,14 +4,14 @@ import { chmod, mkdtemp, mkdir, readFile, readlink, rm, stat, symlink, writeFile
 import { join, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { getCliVersion } from "../../domain/version/compatibility.js";
-import { cmdAuthoringSkillsInstall, cmdAuthoringSkillsList } from "../../cli/commands/authoringSkills.js";
-import { copyAuthoringSkills, listPackagedAuthoringSkills } from "../../domain/skills/copyAuthoringSkills.js";
+import { cmdAgentSkillsInstall, cmdAgentSkillsList } from "../../cli/commands/agentSkills.js";
+import { copyAgentSkills, listPackagedAgentSkills } from "../../domain/skills/copyAgentSkills.js";
 
 const tempRoots: string[] = [];
 const directorySymlinkType = process.platform === "win32" ? "junction" : "dir";
 
 async function makeTempRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "clawperator-authoring-skills-"));
+  const root = await mkdtemp(join(tmpdir(), "clawperator-agent-skills-"));
   tempRoots.push(root);
   return root;
 }
@@ -36,19 +36,19 @@ afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-describe("copyAuthoringSkills", () => {
+describe("copyAgentSkills", () => {
   it("discovers multiple skills by finding subdirectories with SKILL.md and copies them to the install target", async () => {
     const root = await makeTempRoot();
     const sourceDir = await createSourceSkills(root, [
       "skill-author-by-agent-discovery",
       "skill-author-by-recording",
     ]);
-    const installedDir = join(root, "home", ".clawperator", "authoring-skills");
+    const installedDir = join(root, "home", ".clawperator", "agent-skills");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
     const codexSkillsDir = join(root, "home", ".codex", "skills");
     const agentsSkillsDir = join(root, "home", ".agents", "skills");
 
-    const result = await copyAuthoringSkills({
+    const result = await copyAgentSkills({
       sourceDir,
       installedDir,
       claudeSkillsDir,
@@ -59,7 +59,7 @@ describe("copyAuthoringSkills", () => {
 
     assert.equal(result.ok, true);
     if (!result.ok) {
-      assert.fail("expected successful copyAuthoringSkills result");
+      assert.fail("expected successful copyAgentSkills result");
     }
     assert.deepEqual(result.skills, ["skill-author-by-agent-discovery", "skill-author-by-recording"]);
     assert.equal(await readFile(join(installedDir, "skill-author-by-agent-discovery", "SKILL.md"), "utf8"), "# skill-author-by-agent-discovery\n");
@@ -81,9 +81,9 @@ describe("copyAuthoringSkills", () => {
     await mkdir(join(sourceDir, "missing-skill-file"), { recursive: true });
     await mkdir(join(sourceDir, "real-skill"), { recursive: true });
     await writeFile(join(sourceDir, "real-skill", "SKILL.md"), "# real-skill\n", "utf8");
-    const installedDir = join(root, "home", ".clawperator", "authoring-skills");
+    const installedDir = join(root, "home", ".clawperator", "agent-skills");
 
-    const result = await copyAuthoringSkills({
+    const result = await copyAgentSkills({
       sourceDir,
       installedDir,
       claudeSkillsDir: join(root, "home", ".claude", "skills"),
@@ -94,7 +94,7 @@ describe("copyAuthoringSkills", () => {
 
     assert.equal(result.ok, true);
     if (!result.ok) {
-      assert.fail("expected successful copyAuthoringSkills result");
+      assert.fail("expected successful copyAgentSkills result");
     }
     assert.deepEqual(result.skills, ["real-skill"]);
     await assert.rejects(() => stat(join(installedDir, "missing-skill-file")));
@@ -103,9 +103,9 @@ describe("copyAuthoringSkills", () => {
   it("writes version.txt with the current CLI version", async () => {
     const root = await makeTempRoot();
     const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
-    const installedDir = join(root, "home", ".clawperator", "authoring-skills");
+    const installedDir = join(root, "home", ".clawperator", "agent-skills");
 
-    const result = await copyAuthoringSkills({
+    const result = await copyAgentSkills({
       sourceDir,
       installedDir,
       claudeSkillsDir: join(root, "home", ".claude", "skills"),
@@ -122,9 +122,9 @@ describe("copyAuthoringSkills", () => {
     const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
 
-    const result = await copyAuthoringSkills({
+    const result = await copyAgentSkills({
       sourceDir,
-      installedDir: join(root, "home", ".clawperator", "authoring-skills"),
+      installedDir: join(root, "home", ".clawperator", "agent-skills"),
       claudeSkillsDir,
       codexSkillsDir: join(root, "home", ".codex", "skills"),
       agentsSkillsDir: join(root, "home", ".agents", "skills"),
@@ -140,10 +140,10 @@ describe("copyAuthoringSkills", () => {
     const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
     const homeDir = join(root, "home");
 
-    const result = await copyAuthoringSkills({
+    const result = await copyAgentSkills({
       sourceDir,
       homeDir,
-      installedDir: join(homeDir, ".clawperator", "authoring-skills"),
+      installedDir: join(homeDir, ".clawperator", "agent-skills"),
       claudeSkillsDir: join(homeDir, ".claude", "skills"),
       cliVersion: "1.2.3",
     });
@@ -157,9 +157,9 @@ describe("copyAuthoringSkills", () => {
     const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
     const codexHome = join(root, "custom-codex-home");
 
-    const result = await copyAuthoringSkills({
+    const result = await copyAgentSkills({
       sourceDir,
-      installedDir: join(root, "home", ".clawperator", "authoring-skills"),
+      installedDir: join(root, "home", ".clawperator", "agent-skills"),
       claudeSkillsDir: join(root, "home", ".claude", "skills"),
       agentsSkillsDir: join(root, "home", ".agents", "skills"),
       env: { ...process.env, CODEX_HOME: codexHome },
@@ -173,10 +173,10 @@ describe("copyAuthoringSkills", () => {
   it("places a symlink in ~/.claude/skills/<skill-name> pointing to the installed skill dir", async () => {
     const root = await makeTempRoot();
     const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
-    const installedDir = join(root, "home", ".clawperator", "authoring-skills");
+    const installedDir = join(root, "home", ".clawperator", "agent-skills");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
 
-    const result = await copyAuthoringSkills({
+    const result = await copyAgentSkills({
       sourceDir,
       installedDir,
       claudeSkillsDir,
@@ -197,15 +197,15 @@ describe("copyAuthoringSkills", () => {
     const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
     const options = {
       sourceDir,
-      installedDir: join(root, "home", ".clawperator", "authoring-skills"),
+      installedDir: join(root, "home", ".clawperator", "agent-skills"),
       claudeSkillsDir: join(root, "home", ".claude", "skills"),
       codexSkillsDir: join(root, "home", ".codex", "skills"),
       agentsSkillsDir: join(root, "home", ".agents", "skills"),
       cliVersion: "1.2.3",
     };
 
-    const first = await copyAuthoringSkills(options);
-    const second = await copyAuthoringSkills(options);
+    const first = await copyAgentSkills(options);
+    const second = await copyAgentSkills(options);
 
     assert.deepEqual(second, first);
     assert.equal(await readFile(join(options.installedDir, "skill-author-by-recording", "SKILL.md"), "utf8"), "# skill-author-by-recording\n");
@@ -214,7 +214,7 @@ describe("copyAuthoringSkills", () => {
   it("normalizes relative directory overrides so managed symlinks remain idempotent", async () => {
     const root = await makeTempRoot();
     const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
-    const installedDir = join(root, "home", ".clawperator", "authoring-skills");
+    const installedDir = join(root, "home", ".clawperator", "agent-skills");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
     const codexSkillsDir = join(root, "home", ".codex", "skills");
     const agentsSkillsDir = join(root, "home", ".agents", "skills");
@@ -227,8 +227,8 @@ describe("copyAuthoringSkills", () => {
       cliVersion: "1.2.3",
     };
 
-    const first = await copyAuthoringSkills(options);
-    const second = await copyAuthoringSkills(options);
+    const first = await copyAgentSkills(options);
+    const second = await copyAgentSkills(options);
 
     assert.equal(first.ok, true);
     assert.deepEqual(second, first);
@@ -238,9 +238,9 @@ describe("copyAuthoringSkills", () => {
   it("returns an error result when the npm package source dir does not exist", async () => {
     const root = await makeTempRoot();
 
-    const result = await copyAuthoringSkills({
+    const result = await copyAgentSkills({
       sourceDir: join(root, "missing-source"),
-      installedDir: join(root, "home", ".clawperator", "authoring-skills"),
+      installedDir: join(root, "home", ".clawperator", "agent-skills"),
       claudeSkillsDir: join(root, "home", ".claude", "skills"),
       codexSkillsDir: join(root, "home", ".codex", "skills"),
       agentsSkillsDir: join(root, "home", ".agents", "skills"),
@@ -249,19 +249,19 @@ describe("copyAuthoringSkills", () => {
 
     assert.deepEqual(result, {
       ok: false,
-      code: "AUTHORING_SKILLS_SOURCE_NOT_FOUND",
-      message: `Authoring skills source directory not found: ${join(root, "missing-source")}`,
+      code: "AGENT_SKILLS_SOURCE_NOT_FOUND",
+      message: `Agent-skills source directory not found: ${join(root, "missing-source")}`,
     });
   });
 
-  it("returns an error when the packaged authoring skills tree is empty", async () => {
+  it("returns an error when the packaged agent-skills tree is empty", async () => {
     const root = await makeTempRoot();
     const sourceDir = join(root, "source");
     await mkdir(sourceDir, { recursive: true });
 
-    const result = await copyAuthoringSkills({
+    const result = await copyAgentSkills({
       sourceDir,
-      installedDir: join(root, "home", ".clawperator", "authoring-skills"),
+      installedDir: join(root, "home", ".clawperator", "agent-skills"),
       claudeSkillsDir: join(root, "home", ".claude", "skills"),
       codexSkillsDir: join(root, "home", ".codex", "skills"),
       agentsSkillsDir: join(root, "home", ".agents", "skills"),
@@ -270,20 +270,20 @@ describe("copyAuthoringSkills", () => {
 
     assert.deepEqual(result, {
       ok: false,
-      code: "AUTHORING_SKILLS_SOURCE_EMPTY",
-      message: `No packaged authoring skills with SKILL.md were found in ${sourceDir}`,
+      code: "AGENT_SKILLS_SOURCE_EMPTY",
+      message: `No packaged agent-skills with SKILL.md were found in ${sourceDir}`,
     });
   });
 
   it("removes stale installed skills that are no longer present in the packaged source", async () => {
     const root = await makeTempRoot();
     const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
-    const installedDir = join(root, "home", ".clawperator", "authoring-skills");
+    const installedDir = join(root, "home", ".clawperator", "agent-skills");
     const staleSkillDir = join(installedDir, "old-skill");
     await mkdir(staleSkillDir, { recursive: true });
     await writeFile(join(staleSkillDir, "SKILL.md"), "# old-skill\n", "utf8");
 
-    const result = await copyAuthoringSkills({
+    const result = await copyAgentSkills({
       sourceDir,
       installedDir,
       claudeSkillsDir: join(root, "home", ".claude", "skills"),
@@ -311,9 +311,9 @@ describe("copyAuthoringSkills", () => {
     await symlink(unrelatedTarget, join(codexSkillsDir, "other-skill"), directorySymlinkType);
     await symlink(unrelatedTarget, join(agentsSkillsDir, "other-skill"), directorySymlinkType);
 
-    const result = await copyAuthoringSkills({
+    const result = await copyAgentSkills({
       sourceDir,
-      installedDir: join(root, "home", ".clawperator", "authoring-skills"),
+      installedDir: join(root, "home", ".clawperator", "agent-skills"),
       claudeSkillsDir,
       codexSkillsDir,
       agentsSkillsDir,
@@ -336,9 +336,9 @@ describe("copyAuthoringSkills", () => {
     await mkdir(codexSkillsDir, { recursive: true });
     await mkdir(agentsSkillsDir, { recursive: true });
 
-    const result = await copyAuthoringSkills({
+    const result = await copyAgentSkills({
       sourceDir,
-      installedDir: join(root, "home", ".clawperator", "authoring-skills"),
+      installedDir: join(root, "home", ".clawperator", "agent-skills"),
       claudeSkillsDir,
       codexSkillsDir,
       agentsSkillsDir,
@@ -348,7 +348,7 @@ describe("copyAuthoringSkills", () => {
     assert.equal(result.ok, false);
     assert.deepEqual(result, {
       ok: false,
-      code: "AUTHORING_SKILLS_INSTALL_FAILED",
+      code: "AGENT_SKILLS_INSTALL_FAILED",
       message: `Refusing to overwrite non-Clawperator skill entry: ${join(claudeSkillsDir, "skill-author-by-recording")}`,
     });
     assert.equal((await stat(join(claudeSkillsDir, "skill-author-by-recording"))).isDirectory(), true);
@@ -357,7 +357,7 @@ describe("copyAuthoringSkills", () => {
   it("replaces a broken managed symlink instead of failing with EEXIST", async () => {
     const root = await makeTempRoot();
     const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
-    const installedDir = join(root, "home", ".clawperator", "authoring-skills");
+    const installedDir = join(root, "home", ".clawperator", "agent-skills");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
     const codexSkillsDir = join(root, "home", ".codex", "skills");
     const agentsSkillsDir = join(root, "home", ".agents", "skills");
@@ -370,7 +370,7 @@ describe("copyAuthoringSkills", () => {
     await symlink(targetSkillDir, join(codexSkillsDir, "skill-author-by-recording"), directorySymlinkType);
     await symlink(targetSkillDir, join(agentsSkillsDir, "skill-author-by-recording"), directorySymlinkType);
 
-    const result = await copyAuthoringSkills({
+    const result = await copyAgentSkills({
       sourceDir,
       installedDir,
       claudeSkillsDir,
@@ -389,7 +389,7 @@ describe("copyAuthoringSkills", () => {
   it("preflights discovery conflicts before replacing an already installed skill", async () => {
     const root = await makeTempRoot();
     const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
-    const installedDir = join(root, "home", ".clawperator", "authoring-skills");
+    const installedDir = join(root, "home", ".clawperator", "agent-skills");
     const targetSkillDir = join(installedDir, "skill-author-by-recording");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
     const codexSkillsDir = join(root, "home", ".codex", "skills");
@@ -402,7 +402,7 @@ describe("copyAuthoringSkills", () => {
     await mkdir(agentsSkillsDir, { recursive: true });
     await mkdir(join(codexSkillsDir, "skill-author-by-recording"), { recursive: true });
 
-    const result = await copyAuthoringSkills({
+    const result = await copyAgentSkills({
       sourceDir,
       installedDir,
       claudeSkillsDir,
@@ -413,26 +413,26 @@ describe("copyAuthoringSkills", () => {
 
     assert.deepEqual(result, {
       ok: false,
-      code: "AUTHORING_SKILLS_INSTALL_FAILED",
+      code: "AGENT_SKILLS_INSTALL_FAILED",
       message: `Refusing to overwrite non-Clawperator skill entry: ${join(codexSkillsDir, "skill-author-by-recording")}`,
     });
     assert.equal(await readFile(join(targetSkillDir, "SKILL.md"), "utf8"), "# existing-installed-version\n");
   });
 });
 
-describe("cmdAuthoringSkillsInstall", () => {
+describe("cmdAgentSkillsInstall", () => {
   it("preserves legacy top-level discovery dirs alongside agentDiscoveryDirs in json output", async () => {
     const root = await makeTempRoot();
     const sourceDir = await createSourceSkills(root, [
       "skill-author-by-agent-discovery",
       "skill-author-by-recording",
     ]);
-    const installedDir = join(root, "home", ".clawperator", "authoring-skills");
+    const installedDir = join(root, "home", ".clawperator", "agent-skills");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
     const codexSkillsDir = join(root, "home", ".codex", "skills");
     const agentsSkillsDir = join(root, "home", ".agents", "skills");
 
-    const rendered = await cmdAuthoringSkillsInstall({
+    const rendered = await cmdAgentSkillsInstall({
       format: "json",
       sourceDir,
       installedDir,
@@ -462,10 +462,10 @@ describe("cmdAuthoringSkillsInstall", () => {
   });
 });
 
-describe("cmdAuthoringSkillsList", () => {
+describe("cmdAgentSkillsList", () => {
   it("returns a helpful message when install dir does not exist", async () => {
     const root = await makeTempRoot();
-    const output = await cmdAuthoringSkillsList({
+    const output = await cmdAgentSkillsList({
       format: "json",
       installDir: join(root, "missing-install-dir"),
     });
@@ -474,13 +474,13 @@ describe("cmdAuthoringSkillsList", () => {
       skills: [],
       count: 0,
       installedDir: join(root, "missing-install-dir"),
-      message: "No installed authoring skills found. Run clawperator authoring-skills install to get skill-author-by-agent-discovery and skill-author-by-recording.",
+      message: "No installed agent-skills found. Run clawperator agent-skills install to get skill-author-by-agent-discovery and skill-author-by-recording.",
     });
   });
 
-  it("returns the documented json shape for installed authoring skills", async () => {
+  it("returns the documented json shape for installed agent-skills", async () => {
     const root = await makeTempRoot();
-    const installDir = join(root, "home", ".clawperator", "authoring-skills");
+    const installDir = join(root, "home", ".clawperator", "agent-skills");
     const discoveryDir = join(installDir, "skill-author-by-agent-discovery");
     const skillDir = join(installDir, "skill-author-by-recording");
     await mkdir(discoveryDir, { recursive: true });
@@ -488,7 +488,7 @@ describe("cmdAuthoringSkillsList", () => {
     await writeFile(join(discoveryDir, "SKILL.md"), "# skill-author-by-agent-discovery\n", "utf8");
     await writeFile(join(skillDir, "SKILL.md"), "# skill-author-by-recording\n", "utf8");
 
-    const output = await cmdAuthoringSkillsList({
+    const output = await cmdAgentSkillsList({
       format: "json",
       installDir,
     });
@@ -516,21 +516,21 @@ describe("cmdAuthoringSkillsList", () => {
     await chmod(installDir, 0o000);
 
     try {
-      const output = await cmdAuthoringSkillsList({
+      const output = await cmdAgentSkillsList({
         format: "json",
         installDir,
       });
       const parsed = JSON.parse(output);
-      assert.equal(parsed.code, "AUTHORING_SKILLS_LIST_FAILED");
+      assert.equal(parsed.code, "AGENT_SKILLS_LIST_FAILED");
     } finally {
       await chmod(installDir, 0o755);
     }
   });
 });
 
-describe("listPackagedAuthoringSkills", () => {
-  it("lists both packaged first-party authoring skills from the repo tree", async () => {
-    const skills = await listPackagedAuthoringSkills();
+describe("listPackagedAgentSkills", () => {
+  it("lists both packaged first-party agent-skills from the repo tree", async () => {
+    const skills = await listPackagedAgentSkills();
     assert.deepEqual(skills, ["skill-author-by-agent-discovery", "skill-author-by-recording"]);
   });
 });

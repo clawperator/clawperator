@@ -180,16 +180,16 @@ JSON
   exit 0
 fi
 
-if [ "\$1" = "authoring-skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
+if [ "\$1" = "agent-skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
   HOME_DIR="\${HOME:?}"
-  AUTHORING_DIR="\$HOME_DIR/.clawperator/authoring-skills"
-  mkdir -p "\$AUTHORING_DIR/skill-author-by-agent-discovery"
-  mkdir -p "\$AUTHORING_DIR/skill-author-by-recording"
-  printf '# skill-author-by-agent-discovery\n' > "\$AUTHORING_DIR/skill-author-by-agent-discovery/SKILL.md"
-  printf '# skill-author-by-recording\n' > "\$AUTHORING_DIR/skill-author-by-recording/SKILL.md"
-  printf '1.2.3\n' > "\$AUTHORING_DIR/version.txt"
+  AGENT_SKILLS_DIR="\$HOME_DIR/.clawperator/agent-skills"
+  mkdir -p "\$AGENT_SKILLS_DIR/skill-author-by-agent-discovery"
+  mkdir -p "\$AGENT_SKILLS_DIR/skill-author-by-recording"
+  printf '# skill-author-by-agent-discovery\n' > "\$AGENT_SKILLS_DIR/skill-author-by-agent-discovery/SKILL.md"
+  printf '# skill-author-by-recording\n' > "\$AGENT_SKILLS_DIR/skill-author-by-recording/SKILL.md"
+  printf '1.2.3\n' > "\$AGENT_SKILLS_DIR/version.txt"
   cat <<JSON
-{"installedDir":"\$AUTHORING_DIR","agentDiscoveryDirs":[{"label":"claude","dir":"\$HOME_DIR/.claude/skills"},{"label":"codex","dir":"\$HOME_DIR/.codex/skills"},{"label":"agents","dir":"\$HOME_DIR/.agents/skills"}]}
+{"installedDir":"\$AGENT_SKILLS_DIR","agentDiscoveryDirs":[{"label":"claude","dir":"\$HOME_DIR/.claude/skills"},{"label":"codex","dir":"\$HOME_DIR/.codex/skills"},{"label":"agents","dir":"\$HOME_DIR/.agents/skills"}]}
 JSON
   exit 0
 fi
@@ -360,7 +360,7 @@ SUCCESS_INSTALL_STATE_PATH="$TMP_DIR/home-main-success/.clawperator/install-stat
 SUCCESS_MCP_CONFIG_PATH="$TMP_DIR/home-main-success/.clawperator/mcp-config-snippet.json"
 assert_contains "$SUCCESS_STDOUT" "Installation Successful!" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Skills registry configured at:" "main-success stdout"
-assert_contains "$SUCCESS_STDOUT" "Authoring skills installed at:" "main-success stdout"
+assert_contains "$SUCCESS_STDOUT" "Agent-skills installed at:" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/skills/skills/skills-registry.json" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Doctor pretty output (success)" "main-success stdout"
 assert_contains "$SUCCESS_GUIDE_PATH" "## Runtime Skills" "main-success guide"
@@ -429,7 +429,7 @@ assert_contains "$SUCCESS_TRACE" "install_cli" "main-success trace"
 assert_contains "$SUCCESS_TRACE" "show_star_hint" "main-success trace"
 assert_contains "$SUCCESS_CLI_LOG" "doctor --format json" "main-success cli log"
 assert_contains "$SUCCESS_CLI_LOG" "skills install --output json" "main-success cli log"
-assert_contains "$SUCCESS_CLI_LOG" "authoring-skills install --output json" "main-success cli log"
+assert_contains "$SUCCESS_CLI_LOG" "agent-skills install --output json" "main-success cli log"
 assert_contains "$SUCCESS_CLI_LOG" "doctor --output pretty" "main-success cli log"
 
 echo "=== Scenario 2: final doctor failure aborts after setup ==="
@@ -466,7 +466,7 @@ assert_contains "$FAIL_GUIDE_PATH" 'Start the guided route with `skill-author-by
 assert_json_field_equals "$FAIL_INSTALL_STATE_PATH" "registryPath" "$TMP_DIR/home-main-fail/.clawperator/skills/skills/skills-registry.json" "main-fail install-state registryPath"
 assert_json_field_equals "$FAIL_INSTALL_STATE_PATH" "lastDeviceSerial" "serial-solo" "main-fail install-state lastDeviceSerial"
 assert_contains "$FAIL_CLI_LOG" "skills install --output json" "main-fail cli log"
-assert_contains "$FAIL_CLI_LOG" "authoring-skills install --output json" "main-fail cli log"
+assert_contains "$FAIL_CLI_LOG" "agent-skills install --output json" "main-fail cli log"
 assert_contains "$FAIL_CLI_LOG" "doctor --output pretty" "main-fail cli log"
 
 echo "=== Scenario 3: final doctor multi-device path returns success with manual guidance ==="

@@ -50,7 +50,7 @@ Clawperator already documents:
 
 1. the CLI and Node API
 2. runtime skills
-3. authoring skills
+3. agent-skills
 4. the MCP server
 
 What was missing during the onboarding findings pass was the host-agent layer:
@@ -95,14 +95,14 @@ Today `sites/landing/public/install.sh` does these host-relevant things:
 1. installs `clawperator`
 2. installs runtime skills under `~/.clawperator/skills`
 3. appends `CLAWPERATOR_SKILLS_REGISTRY` to shell rc files
-4. installs authoring skills into shared agent skill directories
+4. installs agent-skills into shared agent skill directories
 5. writes `~/.clawperator/AGENTS.md`
 
 Key implications:
 
 1. runtime skills are installed, but not exposed through host-agent discovery
    conventions
-2. authoring skills are exposed through host-agent discovery conventions
+2. agent-skills are exposed through host-agent discovery conventions
 3. the generated guide lives under `~/.clawperator/AGENTS.md`, not the places a
    host agent is most likely to inspect first
 4. the runtime-skills registry depends on shell-session propagation unless the
@@ -113,7 +113,7 @@ Key implications:
    - `skill-author-by-recording` is the proving workflow after
      `proceed_to_recording`
    - the shared bridge points back to `~/.clawperator/AGENTS.md` plus
-     `clawperator skills ...` and `clawperator authoring-skills list`
+     `clawperator skills ...` and `clawperator agent-skills list`
      without pretending shared skill dirs contain runtime skills
 
 Refs:

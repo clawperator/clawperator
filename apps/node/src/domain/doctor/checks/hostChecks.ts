@@ -15,22 +15,22 @@ import {
 import { isOrchestratedHarnessScriptPath, resolveRepoRelativeSkillPath } from "../../skills/pathUtils.js";
 import { readSkillManifestMetadata } from "../../skills/skillManifest.js";
 import {
-  inspectManagedAuthoringSkillLink,
-  listPackagedAuthoringSkills,
-  resolveAuthoringSkillsInstalledDir,
-  resolvePackagedAuthoringSkillsSourceDir,
+  inspectManagedAgentSkillLink,
+  listPackagedAgentSkills,
+  resolveAgentSkillsInstalledDir,
+  resolvePackagedAgentSkillsSourceDir,
   resolveClaudeSkillsDir,
   resolveCodexSkillsDir,
   resolveAgentsSkillsDir,
-} from "../../skills/copyAuthoringSkills.js";
+} from "../../skills/copyAgentSkills.js";
 import { getCliVersion } from "../../version/compatibility.js";
 
 const DEFAULT_ORCHESTRATED_SKILL_AGENT_CLI = "codex";
 const ORCHESTRATED_SKILL_AGENT_CLI_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_CLI";
-const AUTHORING_SKILLS_VERSION_FILENAME = "version.txt";
-const AUTHORING_SKILLS_UPDATE_COMMAND = "clawperator authoring-skills update";
+const AGENT_SKILLS_VERSION_FILENAME = "version.txt";
+const AGENT_SKILLS_UPDATE_COMMAND = "clawperator agent-skills update";
 
-export interface CheckAuthoringSkillsStalenessOptions {
+export interface CheckAgentSkillsStalenessOptions {
   installedDir?: string;
   sourceDir?: string;
   cliVersion?: string;
@@ -47,39 +47,39 @@ function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
   return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
 }
 
-function buildAuthoringSkillsWarn(
+function buildAgentSkillsWarn(
   summary: string,
   detail: string,
   evidence: Record<string, unknown>,
   fixOverride?: DoctorCheckResult["fix"]
 ): DoctorCheckResult {
   return {
-    id: "host.authoring-skills.staleness",
+    id: "host.agent-skills.staleness",
     status: "warn",
-    code: ERROR_CODES.AUTHORING_SKILLS_STALE,
+    code: ERROR_CODES.AGENT_SKILLS_STALE,
     summary,
     detail,
     fix: fixOverride ?? {
-      title: "Update authoring skills",
+      title: "Update agent-skills",
       platform: "any",
       steps: [
-        { kind: "shell", value: AUTHORING_SKILLS_UPDATE_COMMAND },
+        { kind: "shell", value: AGENT_SKILLS_UPDATE_COMMAND },
       ],
     },
     evidence,
   };
 }
 
-function buildAuthoringSkillsPathRepairFix(installedDir: string): DoctorCheckResult["fix"] {
+function buildAgentSkillsPathRepairFix(installedDir: string): DoctorCheckResult["fix"] {
   return {
-    title: "Repair authoring skills install path",
+    title: "Repair agent-skills install path",
     platform: "any",
     steps: [
       {
         kind: "manual",
         value: `Remove or rename the conflicting path at ${installedDir}.`,
       },
-      { kind: "shell", value: "clawperator authoring-skills install" },
+      { kind: "shell", value: "clawperator agent-skills install" },
     ],
   };
 }
@@ -91,7 +91,7 @@ function isUnsetRegistryConfigurationError(detail: string): boolean {
   );
 }
 
-async function findMissingInstalledAuthoringSkills(
+async function findMissingInstalledAgentSkills(
   installedDir: string,
   expectedSkills: string[]
 ): Promise<string[]> {
@@ -115,7 +115,7 @@ async function findMissingInstalledAuthoringSkills(
   return missingSkills;
 }
 
-interface BrokenAuthoringDiscoveryEntry {
+interface BrokenAgentDiscoveryEntry {
   dirLabel: string;
   discoveryDir: string;
   skillName: string;
@@ -124,11 +124,11 @@ interface BrokenAuthoringDiscoveryEntry {
   actualTarget?: string;
 }
 
-async function findBrokenAuthoringDiscoveryEntries(
+async function findBrokenAgentDiscoveryEntries(
   installedDir: string,
   expectedSkills: string[],
-  options: CheckAuthoringSkillsStalenessOptions
-): Promise<BrokenAuthoringDiscoveryEntry[]> {
+  options: CheckAgentSkillsStalenessOptions
+): Promise<BrokenAgentDiscoveryEntry[]> {
   const discoveryDirs = [
     {
       dirLabel: "claude",
@@ -155,11 +155,11 @@ async function findBrokenAuthoringDiscoveryEntries(
     },
   ];
 
-  const brokenEntries: BrokenAuthoringDiscoveryEntry[] = [];
+  const brokenEntries: BrokenAgentDiscoveryEntry[] = [];
 
   for (const { dirLabel, discoveryDir } of discoveryDirs) {
     for (const skillName of expectedSkills) {
-      const inspection = await inspectManagedAuthoringSkillLink(
+      const inspection = await inspectManagedAgentSkillLink(
         join(discoveryDir, skillName),
         installedDir,
         skillName
@@ -459,20 +459,20 @@ export async function checkInstalledOrchestratedSkillAgentCliAvailability(_confi
   };
 }
 
-export async function checkAuthoringSkillsStaleness(
+export async function checkAgentSkillsStaleness(
   _config: RuntimeConfig,
-  options: CheckAuthoringSkillsStalenessOptions = {}
+  options: CheckAgentSkillsStalenessOptions = {}
 ): Promise<DoctorCheckResult> {
-  const installedDir = resolveAuthoringSkillsInstalledDir({
+  const installedDir = resolveAgentSkillsInstalledDir({
     installedDir: options.installedDir,
     homeDir: options.homeDir,
   });
-  const versionPath = join(installedDir, AUTHORING_SKILLS_VERSION_FILENAME);
+  const versionPath = join(installedDir, AGENT_SKILLS_VERSION_FILENAME);
   let cliVersion: string;
   try {
     cliVersion = options.cliVersion ?? (options.getCliVersionFn ?? getCliVersion)();
   } catch (error) {
-    return buildAuthoringSkillsWarn(
+    return buildAgentSkillsWarn(
       "CLI version metadata could not be read.",
       error instanceof Error ? error.message : String(error),
       {
@@ -484,36 +484,36 @@ export async function checkAuthoringSkillsStaleness(
   try {
     const installedDirStat = await stat(installedDir);
     if (!installedDirStat.isDirectory()) {
-      return buildAuthoringSkillsWarn(
-        `Authoring skills install path exists but is not a directory: ${installedDir}.`,
-        "Remove or rename the conflicting path first, then re-run the authoring skills installer.",
+      return buildAgentSkillsWarn(
+        `Agent-skills install path exists but is not a directory: ${installedDir}.`,
+        "Remove or rename the conflicting path first, then re-run the agent-skills installer.",
         {
           installedDir,
           cliVersion,
         },
-        buildAuthoringSkillsPathRepairFix(installedDir)
+        buildAgentSkillsPathRepairFix(installedDir)
       );
     }
   } catch (error) {
     if (isMissingPathError(error)) {
       try {
         const danglingEntryStat = await lstat(installedDir);
-        return buildAuthoringSkillsWarn(
+        return buildAgentSkillsWarn(
           danglingEntryStat.isSymbolicLink()
-            ? `Authoring skills install path is a dangling symlink: ${installedDir}.`
-            : `Authoring skills install path could not be resolved cleanly: ${installedDir}.`,
-          "Remove or rename the broken path first, then re-run the authoring skills installer.",
+            ? `Agent-skills install path is a dangling symlink: ${installedDir}.`
+            : `Agent-skills install path could not be resolved cleanly: ${installedDir}.`,
+          "Remove or rename the broken path first, then re-run the agent-skills installer.",
           {
             installedDir,
             cliVersion,
             pathType: danglingEntryStat.isSymbolicLink() ? "dangling-symlink" : "unresolved-entry",
           },
-          buildAuthoringSkillsPathRepairFix(installedDir)
+          buildAgentSkillsPathRepairFix(installedDir)
         );
       } catch (lstatError) {
         if (!isMissingPathError(lstatError)) {
-          return buildAuthoringSkillsWarn(
-            "Authoring skills install state could not be inspected.",
+          return buildAgentSkillsWarn(
+            "Agent-skills install state could not be inspected.",
             lstatError instanceof Error ? lstatError.message : String(lstatError),
             {
               installedDir,
@@ -522,17 +522,17 @@ export async function checkAuthoringSkillsStaleness(
           );
         }
         return {
-          id: "host.authoring-skills.staleness",
+          id: "host.agent-skills.staleness",
           status: "pass",
-          summary: "Authoring skills not yet installed.",
+          summary: "Agent-skills not yet installed.",
           evidence: {
             installedDir,
           },
         };
       }
     }
-    return buildAuthoringSkillsWarn(
-      "Authoring skills install state could not be inspected.",
+    return buildAgentSkillsWarn(
+      "Agent-skills install state could not be inspected.",
       error instanceof Error ? error.message : String(error),
       {
         installedDir,
@@ -546,8 +546,8 @@ export async function checkAuthoringSkillsStaleness(
     installedVersion = (await readFile(versionPath, "utf8")).trim();
   } catch (error) {
     if (!isMissingPathError(error)) {
-      return buildAuthoringSkillsWarn(
-        "Authoring skills version file could not be read.",
+      return buildAgentSkillsWarn(
+        "Agent-skills version file could not be read.",
         error instanceof Error ? error.message : String(error),
         {
           installedDir,
@@ -556,9 +556,9 @@ export async function checkAuthoringSkillsStaleness(
         }
       );
     }
-    return buildAuthoringSkillsWarn(
-      "Authoring skills version file is missing.",
-      `Expected ${versionPath} to contain the installed authoring skills version.`,
+    return buildAgentSkillsWarn(
+      "Agent-skills version file is missing.",
+      `Expected ${versionPath} to contain the installed agent-skills version.`,
       {
         installedDir,
         versionPath,
@@ -568,9 +568,9 @@ export async function checkAuthoringSkillsStaleness(
   }
 
   if (installedVersion === "") {
-    return buildAuthoringSkillsWarn(
-      "Authoring skills version file is empty.",
-      `Expected ${versionPath} to contain the installed authoring skills version.`,
+    return buildAgentSkillsWarn(
+      "Agent-skills version file is empty.",
+      `Expected ${versionPath} to contain the installed agent-skills version.`,
       {
         installedDir,
         versionPath,
@@ -579,17 +579,17 @@ export async function checkAuthoringSkillsStaleness(
     );
   }
 
-  const sourceDir = resolvePackagedAuthoringSkillsSourceDir({
+  const sourceDir = resolvePackagedAgentSkillsSourceDir({
     sourceDir: options.sourceDir,
     env: options.env,
   });
 
   let expectedSkills: string[];
   try {
-    expectedSkills = await listPackagedAuthoringSkills(sourceDir);
+    expectedSkills = await listPackagedAgentSkills(sourceDir);
   } catch (error) {
-    return buildAuthoringSkillsWarn(
-      "Packaged authoring skills could not be inspected.",
+    return buildAgentSkillsWarn(
+      "Packaged agent-skills could not be inspected.",
       error instanceof Error ? error.message : String(error),
       {
         installedDir,
@@ -600,9 +600,9 @@ export async function checkAuthoringSkillsStaleness(
   }
 
   if (expectedSkills.length === 0) {
-    return buildAuthoringSkillsWarn(
-      "Packaged authoring skills list is empty.",
-      "Expected at least one packaged authoring skill containing SKILL.md.",
+    return buildAgentSkillsWarn(
+      "Packaged agent-skills list is empty.",
+      "Expected at least one packaged agent-skill containing SKILL.md.",
       {
         installedDir,
         installedVersion,
@@ -613,10 +613,10 @@ export async function checkAuthoringSkillsStaleness(
 
   let missingSkills: string[];
   try {
-    missingSkills = await findMissingInstalledAuthoringSkills(installedDir, expectedSkills);
+    missingSkills = await findMissingInstalledAgentSkills(installedDir, expectedSkills);
   } catch (error) {
-    return buildAuthoringSkillsWarn(
-      "Authoring skills install could not be fully inspected.",
+    return buildAgentSkillsWarn(
+      "Agent-skills install could not be fully inspected.",
       error instanceof Error ? error.message : String(error),
       {
         installedDir,
@@ -628,9 +628,9 @@ export async function checkAuthoringSkillsStaleness(
   }
 
   if (missingSkills.length > 0) {
-    return buildAuthoringSkillsWarn(
-      "Authoring skills install is missing expected packaged skills.",
-      "Re-run the authoring skills installer to restore the packaged first-party skill set.",
+    return buildAgentSkillsWarn(
+      "Agent-skills install is missing expected packaged skills.",
+      "Re-run the agent-skills installer to restore the packaged first-party skill set.",
       {
         installedDir,
         installedVersion,
@@ -641,12 +641,12 @@ export async function checkAuthoringSkillsStaleness(
     );
   }
 
-  let brokenDiscoveryEntries: BrokenAuthoringDiscoveryEntry[];
+  let brokenDiscoveryEntries: BrokenAgentDiscoveryEntry[];
   try {
-    brokenDiscoveryEntries = await findBrokenAuthoringDiscoveryEntries(installedDir, expectedSkills, options);
+    brokenDiscoveryEntries = await findBrokenAgentDiscoveryEntries(installedDir, expectedSkills, options);
   } catch (error) {
-    return buildAuthoringSkillsWarn(
-      "Authoring skills discovery links could not be inspected.",
+    return buildAgentSkillsWarn(
+      "Agent-skills discovery links could not be inspected.",
       error instanceof Error ? error.message : String(error),
       {
         installedDir,
@@ -657,7 +657,7 @@ export async function checkAuthoringSkillsStaleness(
   }
 
   if (brokenDiscoveryEntries.length > 0) {
-    const brokenDiscoveryByDir: Record<string, BrokenAuthoringDiscoveryEntry[]> = {};
+    const brokenDiscoveryByDir: Record<string, BrokenAgentDiscoveryEntry[]> = {};
     for (const entry of brokenDiscoveryEntries) {
       (brokenDiscoveryByDir[entry.dirLabel] ??= []).push(entry);
     }
@@ -665,8 +665,8 @@ export async function checkAuthoringSkillsStaleness(
     const detailParts = Object.entries(brokenDiscoveryByDir)
       .map(([dirLabel, entries]) => `${dirLabel}: ${entries.map((entry) => `${entry.skillName} (${entry.issue})`).join(", ")}`);
 
-    return buildAuthoringSkillsWarn(
-      "Authoring skills discovery links are incomplete or invalid.",
+    return buildAgentSkillsWarn(
+      "Agent-skills discovery links are incomplete or invalid.",
       `Managed discovery entries are broken in ${affectedDirs.join(" and ")} skill directories. ${detailParts.join("; ")}`,
       {
         installedDir,
@@ -679,9 +679,9 @@ export async function checkAuthoringSkillsStaleness(
 
   if (installedVersion === cliVersion) {
     return {
-      id: "host.authoring-skills.staleness",
+      id: "host.agent-skills.staleness",
       status: "pass",
-      summary: "Authoring skills are up to date.",
+      summary: "Agent-skills are up to date.",
       evidence: {
         installedDir,
         installedVersion,
@@ -691,16 +691,16 @@ export async function checkAuthoringSkillsStaleness(
   }
 
   return {
-    id: "host.authoring-skills.staleness",
+    id: "host.agent-skills.staleness",
     status: "warn",
-    code: ERROR_CODES.AUTHORING_SKILLS_STALE,
-    summary: `Authoring skills (v${installedVersion}) are outdated (CLI is v${cliVersion}).`,
-    detail: "Installed authoring skills should be refreshed to match the current CLI version.",
+    code: ERROR_CODES.AGENT_SKILLS_STALE,
+    summary: `Agent-skills (v${installedVersion}) are outdated (CLI is v${cliVersion}).`,
+    detail: "Installed agent-skills should be refreshed to match the current CLI version.",
     fix: {
-      title: "Update authoring skills",
+      title: "Update agent-skills",
       platform: "any",
       steps: [
-        { kind: "shell", value: AUTHORING_SKILLS_UPDATE_COMMAND },
+        { kind: "shell", value: AGENT_SKILLS_UPDATE_COMMAND },
       ],
     },
     evidence: {
