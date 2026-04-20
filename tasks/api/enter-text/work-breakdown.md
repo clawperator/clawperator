@@ -27,10 +27,21 @@ API stable and treat API 33 support as an Android implementation detail.
 - Keep the public `enter_text` action shape stable for this pack. Do not add a
   new public strategy or mode flag unless implementation evidence proves that
   unavoidable and both task-pack files are updated first.
+- Preserve current replace-style behavior for successful `enter_text` calls. Do
+  not let the API 33 route silently become append-at-cursor behavior.
 - Do not fold the dedicated `clear` bug into this pack. `clear` work belongs to
   `tasks/api/clear/`.
 - Use an internal first-match-wins strategy ladder. Do not route by app package
   name or app-specific hacks.
+- Keep `submit` best effort unless the public contract is intentionally updated
+  first. This pack should not introduce new hard failures for callers whose
+  text entry succeeds but no truthful submit action exists.
+- Treat API 33 input-method state as service-owned lifecycle state. Null
+  current input connection, finished input, or missing editor info must be
+  explicit availability cases, not crashes.
+- Do not wire the API 33 route by scattering raw `AccessibilityService`
+  lifecycle checks through `UiTreeManagerAndroid`. Add a focused helper or
+  bridge if needed.
 - Every phase that introduces behavior must add the tests that prove that
   behavior in the same phase and commit.
 - Treat Android unit tests as the primary gate for the API 33 path. Live
@@ -61,6 +72,7 @@ Read these files IN THIS ORDER before writing anything.
 | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt` | Step-result shaping for `enter_text` |
 | `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/accessibilityservice/OperatorAccessibilityService.kt` | Accessibility service lifecycle and capabilities |
 | `apps/android/shared/data/resources/src/main/res/xml/accessibility_service_config.xml` | Service-declared accessibility capabilities |
+| `apps/android/shared/data/toolkit/src/main/kotlin/clawperator/accessibilityservice/AccessibilityServiceManager.kt` | Current Android bridge boundary for service-owned state |
 | `apps/android/shared/test/src/test/kotlin/clawperator/task/runner/UiActionEngineDefaultTest.kt` | Existing Android task-layer regression patterns |
 | `apps/android/shared/data/operator/src/commonTest/kotlin/actiontask/operator/agent/AgentCommandParserDefaultTest.kt` | Android parser test surface in case additive fields are needed |
 | `docs/api/actions.md` | Current public `enter_text` behavior docs |
@@ -84,7 +96,8 @@ thinking
 
 Replace the single opaque Android text-entry implementation with an explicit
 internal strategy seam that can support multiple truthful text-entry methods
-without changing the public `enter_text` action shape.
+without changing the public `enter_text` action shape or current replace-style
+success semantics.
 
 ### Files or Surfaces To Change
 
@@ -99,25 +112,39 @@ without changing the public `enter_text` action shape.
    selection explicit.
 2. Refactor `UiTreeManagerAndroid` so the current `ACTION_SET_TEXT` route lives
    behind that seam instead of as the only implementation.
-3. Keep the public `enter_text` action shape unchanged while making additive
+3. Preserve the existing replace-style behavior as a named invariant in the
+   seam. If the seam cannot express that invariant cleanly, stop and update the
+   plan before continuing.
+4. Decide whether the future API 33 path needs a dedicated Android helper or
+   bridge for service-owned input-method session state. If yes, introduce the
+   interface boundary in this phase or record the exact Phase 3 ownership point.
+5. Keep the public `enter_text` action shape unchanged while making additive
    task/runtime diagnostics possible if needed.
-4. Add Android regression tests that prove the seam exists and that the legacy
+6. Add Android regression tests that prove the seam exists and that the legacy
    path still works through it.
-5. Stop after the seam and tests are stable. Do not add API 33 service work in
+7. Stop after the seam and tests are stable. Do not add API 33 service work in
    this phase.
 
 ### Acceptance Criteria
 
 - The Android runtime no longer has only one implicit text-entry path.
 - The public `enter_text` action shape remains unchanged.
+- The seam preserves current replace-style semantics as an explicit invariant.
 - Tests prove the seam and the routed legacy path in the same phase.
 
 ### Validation
 
 ```bash
+npm --prefix apps/node run build
+npm --prefix apps/node run test
 ./gradlew app:assembleDebug app:testDebugUnitTest
 git diff --check
 ```
+
+Plus:
+- the phase is not complete until the implementation records the live-validation
+  preconditions from the phase steps, including whether a suitable Android 13+
+  target and exercised custom-editor path were actually available
 
 ### Expected Commit
 
@@ -148,30 +175,43 @@ before the API 33 path is added.
 1. Implement a truthful submit order for the existing accessibility-node route.
    At minimum, prefer a real editor action such as `ACTION_IME_ENTER` when the
    node exposes it before falling back to a click.
-2. Decide which additive step-data fields are worth surfacing, such as
+2. Add or preserve tests that prove the legacy route still behaves like replace
+   text, not append text, after the seam refactor.
+3. Decide which additive step-data fields are worth surfacing, such as
    `strategyUsed` or `submitMethod`, without turning the step result into a
    transport dump.
-3. Add Android regressions for:
+4. Add Android regressions for:
+   - legacy route still replaces existing text when successful
    - node exposes `ACTION_SET_TEXT` and `ACTION_IME_ENTER`
    - node exposes `ACTION_SET_TEXT` but not `ACTION_IME_ENTER`
    - submit fallback remains explicit best effort instead of pretending it is a
      real editor action
-4. Keep this phase scoped to the existing route. Do not add API 33 service
+   - submit unavailable does not create a new hard failure when text entry
+     itself succeeded
+5. Keep this phase scoped to the existing route. Do not add API 33 service
    capability work yet.
 
 ### Acceptance Criteria
 
 - `submit=true` no longer means only "click after text set" when a real editor
   action is available.
+- Legacy replace-style behavior is still covered explicitly.
 - Any observable step-data additions are stable and intentional.
 - Tests cover both truthful editor-action routing and fallback behavior.
 
 ### Validation
 
 ```bash
+npm --prefix apps/node run build
+npm --prefix apps/node run test
 ./gradlew app:assembleDebug app:testDebugUnitTest
 git diff --check
 ```
+
+Plus:
+- the phase is not complete until the implementation records the live-validation
+  preconditions from the phase steps, including whether a suitable Android 13+
+  target and exercised custom-editor path were actually available
 
 ### Expected Commit
 
@@ -204,20 +244,35 @@ ladder as an implementation detail.
 
 1. Add the Android accessibility-service capabilities needed for API 33
    accessibility IME support.
-2. Implement the service-side InputMethod lifecycle and input-connection access
-   needed by the runtime.
+2. Implement the service-side `InputMethod` lifecycle and input-connection
+   access needed by the runtime. Use `onCreateInputMethod()`,
+   `getInputMethod()`, current input connection, and current editor info
+   explicitly rather than assuming they are always present.
 3. Integrate the API 33 input-connection path into the internal strategy ladder
    without changing the public `enter_text` shape.
 4. Be explicit about the first-match-wins strategy order when both
-   `ACTION_SET_TEXT` and the API 33 input-connection path are available.
-5. Add Android regressions for at minimum:
+   `ACTION_SET_TEXT` and the API 33 input-connection path are available. Keep
+   the legacy `ACTION_SET_TEXT` route first unless the plan is updated with a
+   concrete reason to reorder it.
+5. Preserve replace-style semantics on the API 33 route. Do not treat plain
+   `commitText()` insertion as equivalent to current `enter_text` behavior
+   unless the surrounding selection and replacement semantics are proven.
+6. Add Android regressions for at minimum:
    - API 33 path selected for a focused editor that lacks a reliable
      `ACTION_SET_TEXT` route
+   - API 33 path preserves replace behavior for pre-populated text or selected
+     text instead of appending unexpectedly
    - API 33 path skipped on lower API levels
-   - API 33 path unavailable or unbound falls back cleanly to the legacy route
+   - API 33 path unavailable because the current input connection is null,
+     finished, or stale falls back cleanly to the legacy route
+   - API 33 path unavailable and no legacy route exists returns an explicit
+     failure rather than a fake success
    - submit behavior on the API 33 path uses the editor-action path rather than
      a blind click when possible
-6. Record the live-validation preconditions for this phase in the PR notes or
+7. If implementation evidence shows the API 33 route cannot preserve current
+   semantics without new public API knobs, stop and update both task-pack files
+   before continuing. Do not paper over that gap with undocumented behavior.
+8. Record the live-validation preconditions for this phase in the PR notes or
    execution log: Android 13+ target, accessibility service enabled, and an app
    surface that actually exercises the custom-editor path.
 
@@ -225,15 +280,24 @@ ladder as an implementation detail.
 
 - The accessibility service supports the API 33 accessibility IME path.
 - `enter_text` can use that path internally without new public API fields.
+- The API 33 route either preserves replace-style semantics or fails/skips
+  explicitly instead of silently changing semantics.
 - Tests prove routing between the legacy and API 33 paths, including the lower
   API fallback case.
 
 ### Validation
 
 ```bash
+npm --prefix apps/node run build
+npm --prefix apps/node run test
 ./gradlew app:assembleDebug app:testDebugUnitTest
 git diff --check
 ```
+
+Plus:
+- record the live-validation preconditions from Step 8 in the PR notes or
+  execution log, including whether an Android 13+ target and a real custom-editor
+  path were available
 
 ### Expected Commit
 
@@ -250,7 +314,7 @@ default
 ### Goal
 
 Document the improved runtime behavior accurately and prove the final path with
- the best available validation, keeping the public API stable.
+the best available validation, keeping the public API stable.
 
 ### Files or Surfaces To Change
 
@@ -262,42 +326,52 @@ Document the improved runtime behavior accurately and prove the final path with
 ### Steps
 
 1. Use `.agents/skills/docs-author/SKILL.md` for the authored-doc updates.
-2. Update public docs to describe the stable public API and the improved
-   Android runtime behavior. Do not document speculative future flags.
-3. Update internal design guidance that currently calls out Android text-entry
-   limitations so it reflects the shipped behavior.
-4. Run `./scripts/docs_build.sh`.
-5. If a suitable Android 13+ target is available, perform live validation
-   against:
-   - a standard accessible text field
-   - a custom-editor surface that exercises the API 33 path
-   Record exactly which target and app surfaces were used.
-6. If the live path is blocked by host-state constraints, record the exact
-   missing precondition and rely on the phase unit tests as the primary gate.
+2. Update `docs/api/actions.md` so public `enter_text` docs reflect the shipped
+   runtime behavior without adding speculative new API shape. Be explicit about
+   current replace semantics, best-effort submit semantics, and any observable
+   strategy diagnostics.
+3. Update `docs/api/mcp.md` if MCP-facing callers can observe new runtime step
+   data or changed behavior.
+4. Update `docs/internal/design/operator-llm-playbook.md` so internal guidance
+   no longer describes the old Android limitation.
+5. Run `./scripts/docs_build.sh`.
+6. Re-run the Android and Node validation commands from Phases 1 to 3.
+7. Install and launch the debug APK on the selected validation target:
+   - `./gradlew app:installDebug`
+   - `adb shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity`
+8. If a suitable Android 13+ target exists, do a live validation pass with the
+   branch-local Node build and the `.dev` operator package against:
+   - one standard accessible text field that uses `ACTION_SET_TEXT`
+   - one custom-editor path that requires the API 33 input-connection route
+9. Record which target was used for live validation, including device or
+   emulator serial and operator package variant.
 
 ### Acceptance Criteria
 
-- Public docs describe the stable `enter_text` API without new strategy flags.
-- Public and internal docs accurately describe the improved Android runtime
-  behavior and remaining limitations.
+- Public docs describe the shipped runtime behavior accurately.
+- Internal docs no longer describe the old Android limitation.
 - `./scripts/docs_build.sh` passes.
-- Live validation is either completed and recorded with exact target details or
-  explicitly blocked with named host-state preconditions.
+- Final validation covers contract compatibility, Android unit coverage, and
+  live validation preconditions or blocked reasons explicitly.
 
 ### Validation
 
 ```bash
+npm --prefix apps/node run build
+npm --prefix apps/node run test
 ./gradlew app:assembleDebug app:testDebugUnitTest
+./gradlew app:installDebug
 ./scripts/docs_build.sh
 git diff --check
 ```
 
-### Expected Commits
+Plus:
+- complete the live validation from Steps 8 and 9 when a suitable Android 13+
+  target exists, or record the exact blocked reason naming the missing
+  precondition
+
+### Expected Commit
 
 ```text
-docs(api): update enter_text runtime behavior guidance
-```
-
-```text
-docs(internal): update operator enter_text guidance
+docs(api): document android enter_text runtime upgrade
 ```

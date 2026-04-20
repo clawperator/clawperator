@@ -25,7 +25,8 @@ propagation and tests. Phase 2 updates docs and completes validation.
 
 After this pack ships, `clear=true` on `enter_text` must either perform a real
 clear-before-type flow on Android or fail explicitly. It must no longer be
-silently ignored.
+silently ignored, and it must stay truthful if the broader `enter_text`
+strategy seam lands before this bug fix does.
 
 ## Why Now
 
@@ -38,6 +39,7 @@ broader text-entry work.
 - Propagate `clear` through the Android parser and task/runtime layers
 - Implement a real Android clear-before-type behavior for supported text-entry
   routes
+- Preserve current replace-style text-entry behavior when `clear=false`
 - Add regression coverage in the same phase that introduces the behavior
 - Update public and internal docs that describe `clear`
 
@@ -60,6 +62,9 @@ broader text-entry work.
   `TaskUiScope.kt`, `TaskUiScopeDefault.kt`, and
   `apps/android/shared/data/uitree/src/main/kotlin/clawperator/uitree/UiTreeManagerAndroid.kt`:
   fully in scope for end-to-end Android clear behavior
+- `apps/android/shared/data/uitree/src/main/kotlin/clawperator/uitree/UiTreeManager.kt`:
+  in scope if a shared text-entry request or result seam is needed to keep the
+  fix aligned with broader `enter_text` work
 - `docs/api/actions.md`, `docs/api/mcp.md`, and
   `docs/internal/design/operator-llm-playbook.md`: in scope for correcting the
   public and internal contract description
@@ -73,7 +78,7 @@ broader text-entry work.
 | `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/agent/AgentCommandParser.kt` | Parse `clear` into Android action state | Phase 1 |
 | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiAction.kt` | Carry `clear` through the Android task layer | Phase 1 |
 | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/TaskUiScope.kt`, `TaskUiScopeDefault.kt` | Execute clear-before-type semantics | Phase 1 |
-| `apps/android/shared/data/uitree/src/main/kotlin/clawperator/uitree/UiTreeManagerAndroid.kt` | Implement real clear behavior for supported paths | Phase 1 |
+| `apps/android/shared/data/uitree/src/main/kotlin/clawperator/uitree/UiTreeManager.kt`, `UiTreeManagerAndroid.kt` | Implement real clear behavior for supported paths and align with any text-entry seam already on the branch | Phase 1 |
 | Android and Node tests | Regression coverage for `clear` | Phase 1 |
 | `docs/api/actions.md`, `docs/api/mcp.md`, `docs/internal/design/operator-llm-playbook.md` | Correct docs about `clear` behavior | Phase 2 |
 
@@ -100,6 +105,9 @@ broader text-entry work.
 - If `clear=true` is requested and the runtime cannot perform the requested
   clear behavior on the chosen route, fail explicitly rather than silently
   behaving like `clear=false`.
+- If the broader `enter_text` seam has already landed when this pack is
+  implemented, fix `clear` through that seam instead of reintroducing a
+  one-off path that will diverge immediately.
 - Tests that prove the new behavior must ship in the same phase as the code
   change.
 
@@ -115,8 +123,10 @@ broader text-entry work.
 | Question | Rule |
 | --- | --- |
 | Should `clear` remain public? | Yes. The contract already exists; this pack makes it truthful. |
-| How should clear work on `ACTION_SET_TEXT`-capable targets? | Clear first by sending empty text, then write the requested text. |
+| How should clear work on `ACTION_SET_TEXT`-capable targets? | Use the documented Android clear path of setting empty text before writing the requested text, even if the caller-visible final text matches the replace-style `clear=false` route. |
 | What happens if `clear=true` is requested but the route cannot clear? | Fail explicitly. Do not silently degrade to `clear=false`. |
+| What if the broader `enter_text` pack lands first? | Rebase onto the current seam and implement `clear` through it. Do not restore a second text-entry path just for this bug fix. |
+| What if a newer route such as API 33 input connection exists by implementation time? | Either support `clear=true` on that route in the same change or fail explicitly on that route. Do not leave one strategy silently ignoring `clear`. |
 | Can tests be deferred to the docs phase? | No. Phase 1 introduces the behavior and must include the proving tests. |
 | Should this pack redesign `enter_text` strategy selection? | No. That belongs to `tasks/api/enter-text/`. |
 
@@ -124,6 +134,9 @@ broader text-entry work.
 
 - `clear=true` is still accepted but ignored
 - Clear works in one code path but the Android parser still drops the flag
+- `clear=true` works only on the legacy route and is silently ignored again if a
+  newer strategy is present on the branch
+- `clear=false` stops preserving current replace-style behavior
 - Tests cover only CLI help text and not real end-to-end runtime behavior
 - Docs keep claiming `clear` works differently from shipped behavior
 - The fix is folded into the broader enter-text upgrade and loses review focus

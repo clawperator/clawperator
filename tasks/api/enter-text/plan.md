@@ -28,7 +28,8 @@ validation.
 After this pack ships, `enter_text` should remain the same public action shape
 but use a stronger Android runtime strategy ladder under the hood, including
 API 33 accessibility IME/input-connection support for custom editors that do
-not expose a reliable `ACTION_SET_TEXT` path.
+not expose a reliable `ACTION_SET_TEXT` path, while preserving the current
+effective replace-text semantics for successful calls.
 
 ## Why Now
 
@@ -43,12 +44,16 @@ expanding the public API into transport-specific flags or strategy knobs.
 
 - Keep the public `enter_text` action shape stable while upgrading Android
   runtime behavior
+- Preserve current replace-style `enter_text` semantics. Do not silently change
+  successful calls into append-at-cursor behavior on custom editors.
 - Add an internal Android text-entry strategy layer instead of a single
   `ACTION_SET_TEXT` implementation
 - Improve submit behavior so it uses real editor actions when available instead
   of relying on a blind post-entry click
 - Add API 33 accessibility IME/input-connection support through the Android
   accessibility service
+- Add explicit stop conditions if implementation evidence shows the current
+  public API cannot truthfully preserve replace and submit semantics
 - Add Android-side tests for strategy selection, submit handling, and API 33
   fallback behavior
 - Update public and internal docs for the improved runtime behavior and any
@@ -77,6 +82,9 @@ expanding the public API into transport-specific flags or strategy knobs.
 - `apps/android/shared/data/resources/src/main/res/xml/accessibility_service_config.xml`:
   in scope for any required service capabilities that are part of the API 33
   path
+- `apps/android/shared/data/toolkit/src/main/kotlin/clawperator/accessibilityservice/AccessibilityServiceManager.kt`:
+  in scope if the API 33 path needs an explicit bridge for current input-method
+  session state rather than raw `AccessibilityService` access
 - `apps/node/src/contracts/execution.ts` and `apps/node/src/cli/registry.ts`:
   preserve the current public `enter_text` shape unless a later blocked
   implementation forces a documented plan change
@@ -94,6 +102,7 @@ expanding the public API into transport-specific flags or strategy knobs.
 | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt` | Preserve public step type while carrying additive runtime details | PR-1 / Phase 2 |
 | `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/accessibilityservice/OperatorAccessibilityService.kt` | Accessibility IME capability and InputMethod lifecycle | PR-2 / Phase 3 |
 | `apps/android/shared/data/resources/src/main/res/xml/accessibility_service_config.xml` | Service capability declaration for API 33 path if required | PR-2 / Phase 3 |
+| `apps/android/shared/data/toolkit/src/main/kotlin/clawperator/accessibilityservice/AccessibilityServiceManager.kt` | Introduce or extend an Android-only bridge for input-method session state if direct raw-service access would leak lifecycle complexity | PR-2 / Phase 3 |
 | `apps/android/shared/test/` and `apps/android/shared/data/operator/src/commonTest/` | Android regressions for strategy routing and API 33 behavior | All phases that introduce behavior |
 | `docs/api/actions.md` | Public `enter_text` runtime behavior notes | PR-2 / Phase 4 |
 | `docs/api/mcp.md` | Public MCP text-entry behavior if observable output changes | PR-2 / Phase 4 |
@@ -106,7 +115,7 @@ expanding the public API into transport-specific flags or strategy knobs.
 | Current `enter_text` task findings | `tasks/api/enter-text/findings.md` |
 | Android text-entry runtime path | `apps/android/shared/data/uitree/src/main/kotlin/clawperator/uitree/UiTreeManagerAndroid.kt` |
 | Android text-entry task flow | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/TaskUiScopeDefault.kt`, `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt` |
-| Android accessibility service capabilities | `apps/android/shared/data/resources/src/main/res/xml/accessibility_service_config.xml`, `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/accessibilityservice/OperatorAccessibilityService.kt` |
+| Android accessibility service capabilities and service-owned state | `apps/android/shared/data/resources/src/main/res/xml/accessibility_service_config.xml`, `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/accessibilityservice/OperatorAccessibilityService.kt`, `apps/android/shared/data/toolkit/src/main/kotlin/clawperator/accessibilityservice/AccessibilityServiceManager.kt` |
 | Public action contract | `apps/node/src/contracts/execution.ts`, `apps/node/src/cli/registry.ts`, `docs/api/actions.md` |
 | Existing Android task and parser tests | `apps/android/shared/test/src/test/kotlin/clawperator/task/runner/UiActionEngineDefaultTest.kt`, `apps/android/shared/data/operator/src/commonTest/kotlin/actiontask/operator/agent/AgentCommandParserDefaultTest.kt` |
 | Public docs regeneration boundary | `./scripts/docs_build.sh`, `sites/docs/source-map.yaml`, `sites/docs/mkdocs.yml` |
@@ -120,12 +129,18 @@ expanding the public API into transport-specific flags or strategy knobs.
 - Do not add new public `enter_text` parameters unless a later blocked
   implementation proves the stable-API goal impossible and both this plan and
   `work-breakdown.md` are updated before continuing.
+- Preserve current effective replace semantics for successful `enter_text`
+  calls. If an internal strategy cannot deterministically replace text, it must
+  not silently append or duplicate content.
 - The Android runtime must use an internal first-match-wins strategy ladder,
   not package-specific hacks.
 - The strategy ladder must prefer a truthful editor-action path over the
   current blind post-entry click when submit behavior is requested.
 - Phase 3 must use API 33 accessibility IME support through the accessibility
   service rather than inventing an ADB-side workaround for custom editors.
+- Phase 3 must treat API 33 input-method state as service-owned lifecycle
+  state. Null, stale, or finished input sessions are availability outcomes, not
+  crash cases.
 - Every phase that introduces behavior must ship the tests that prove it in the
   same phase and commit.
 - Unit tests are the primary gate for the API 33 path because live validation
@@ -136,8 +151,6 @@ expanding the public API into transport-specific flags or strategy knobs.
 
 - The exact internal result model for strategy attempts and strategy-used
   diagnostics
-- The exact first-match-wins order between the legacy node-action path and the
-  API 33 input-connection path when both are available
 - How much runtime strategy detail should surface in public step data versus
   internal logs only
 - Which public docs need explicit wording updates versus brief clarifications
@@ -148,22 +161,30 @@ expanding the public API into transport-specific flags or strategy knobs.
 | --- | --- |
 | Should the public `enter_text` API gain a new mode or strategy field? | No for this pack. Keep the API stable and make strategy selection an Android implementation detail unless a later blocked implementation proves that impossible. |
 | How should the runtime choose a text-entry method? | Use a first-match-wins internal strategy ladder. No package-name routing. |
-| What is the baseline strategy order? | Phase 1 must define a seam and Phase 2 must harden the existing accessibility-node path. Phase 3 must add the API 33 input-connection path and integrate it into the internal strategy ladder. |
-| How should `submit=true` behave? | Prefer a truthful editor action such as `ACTION_IME_ENTER` or the API 33 editor-action path. Only use a click fallback as explicit best effort when no real editor action is available. |
+| What is the baseline strategy order? | Focus target first. Prefer `ACTION_SET_TEXT` when the matched node or editable ancestor exposes it because it already matches current replace semantics. Use the API 33 input-connection route only when the legacy replace route is unavailable or demonstrably failed. |
+| What if the API 33 path can only insert at the cursor? | Do not silently change semantics. Either make the input-connection path perform deterministic replace-style entry, skip that strategy, or stop and update the plan before implementation continues. |
+| How should `submit=true` behave? | Keep it as best-effort submit after successful text entry so current callers do not start failing unexpectedly. Prefer a truthful editor action such as `ACTION_IME_ENTER` or an API 33 editor action when available, and expose fallback or skipped-submit diagnostics if user-visible step data changes. |
 | How should custom editors be supported? | Through API 33 accessibility IME/input-connection support in the Android accessibility service, not by expanding the public API. |
-| What happens if the API 33 path is unavailable? | Keep the existing accessibility-node path and other supported internal fallbacks. Do not fail solely because the device is below API 33 if another supported strategy works. |
+| What happens if the API 33 path is unavailable? | Keep the existing accessibility-node path and other supported internal fallbacks. Do not fail solely because the device is below API 33 or because the input session is null, unstarted, or finished if another supported strategy works. |
 | When must docs change? | Any user-visible runtime behavior change, observable step-data addition, or new limitation note must be documented in the same pack. |
 | How should live validation be treated? | Required when a suitable Android 13+ target and exercised app/editor path are available. If host-state constraints prevent that, unit tests remain the primary gate and the task notes the blocked live preconditions explicitly. |
+| When must the plan be updated before code continues? | If preserving API stability would require new public knobs, if deterministic replace semantics cannot be preserved on the API 33 route, or if truthful submit behavior would require a public contract change. |
 
 ## Failure Modes To Prevent
 
 - Public API complexity leaks into new `enter_text` flags even though the team
   wants the API 33 path hidden behind stable semantics
+- The API 33 path silently changes successful `enter_text` calls from replace to
+  append or duplicate behavior
 - The runtime still has only one real text-entry method after the pack lands
 - `submit=true` still means "click after set text" even when real editor
   actions are available
+- `submit=true` starts hard-failing callers that previously succeeded because a
+  truthful editor action is unavailable
 - API 33 support is added only as a disconnected helper and never integrated
   into the actual `enter_text` path
+- API 33 support is wired directly against raw `AccessibilityService`
+  lifecycle state without a testable bridge or null-session handling
 - Tests cover only synthetic success cases and do not prove routing between
   legacy and API 33 strategies
 - Live validation is listed without naming the Android 13+ device or emulator
@@ -178,6 +199,7 @@ After PR-1:
   of a single opaque `ACTION_SET_TEXT` implementation.
 - `submit=true` prefers a truthful editor-action path when available on the
   existing accessibility-node route.
+- The legacy route still preserves replace-style behavior.
 - Android tests prove the new seam and strategy routing for the pre-API-33
   path.
 
@@ -187,6 +209,8 @@ After PR-2:
   method path.
 - `enter_text` can use that API 33 path as an internal implementation detail
   when it is the best available strategy.
+- The API 33 route preserves replace-style behavior or is skipped/fails
+  explicitly rather than silently changing semantics.
 - Public and internal docs reflect the improved runtime behavior without
   exposing new public API complexity.
 
