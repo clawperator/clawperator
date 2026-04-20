@@ -29,8 +29,9 @@ API stable and treat API 33 support as an Android implementation detail.
   unavoidable and both task-pack files are updated first.
 - Preserve current replace-style behavior for successful `enter_text` calls. Do
   not let the API 33 route silently become append-at-cursor behavior.
-- Do not fold the dedicated `clear` bug into this pack. `clear` work belongs to
-  `tasks/api/clear/`.
+- Do not fold the dedicated `clear` bug into this pack. That bug should be
+  fixed directly as a focused bug and not reintroduced here as a second task
+  pack.
 - Use an internal first-match-wins strategy ladder. Do not route by app package
   name or app-specific hacks.
 - Keep `submit` best effort unless the public contract is intentionally updated
@@ -47,9 +48,20 @@ API stable and treat API 33 support as an Android implementation detail.
 - Treat Android unit tests as the primary gate for the API 33 path. Live
   validation is still required when a suitable Android 13+ target and exercised
   editor path are available.
+- Use the branch-local Node build for validation. Do not use a globally
+  installed `clawperator` binary for any phase in this pack.
+- Prefer the debug operator variant for local verification and pass
+  `--operator-package com.clawperator.operator.dev` unless the phase is
+  explicitly about the release APK.
+- When multiple Android targets are connected, require explicit device
+  selection with `--device <device_serial>` or `adb -s <device_serial> ...`.
+- Do not record or commit raw device serials. Use placeholders such as
+  `<device_serial>` in notes, prompts, or task artifacts.
 - If a live validation path is blocked, record the exact host-state
   precondition that was missing. Do not silently treat "no suitable target" as
   proof.
+- Clipboard mutation is out of scope for this pack. Do not add an `ACTION_PASTE`
+  fallback unless the plan is updated first with explicit privacy guardrails.
 - Use `.agents/skills/docs-author/SKILL.md` for the public-doc phase. Do not
   hand-wave docs updates as generic cleanup.
 - Do not edit generated docs directly. Update authored docs and then run
@@ -66,7 +78,6 @@ Read these files IN THIS ORDER before writing anything.
 | File | Why it matters |
 | --- | --- |
 | `tasks/api/enter-text/plan.md` | Stable contract and scope boundaries |
-| `tasks/api/enter-text/findings.md` | Current code-path research and Android API guidance |
 | `apps/android/shared/data/uitree/src/main/kotlin/clawperator/uitree/UiTreeManagerAndroid.kt` | Current single-path text-entry implementation |
 | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/TaskUiScopeDefault.kt` | Task-level `enter_text` flow |
 | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt` | Step-result shaping for `enter_text` |
@@ -138,13 +149,17 @@ success semantics.
 npm --prefix apps/node run build
 npm --prefix apps/node run test
 ./gradlew app:assembleDebug app:testDebugUnitTest
+./gradlew app:installDebug
 git diff --check
 ```
 
 Plus:
-- the phase is not complete until the implementation records the live-validation
-  preconditions from the phase steps, including whether a suitable Android 13+
-  target and exercised custom-editor path were actually available
+- if a target is available, launch the debug operator with:
+  `adb -s <device_serial> shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity`
+- the phase is not complete until it records either:
+  - a live validation result against the branch-local build on
+    `<device_serial>`
+  - or an explicit blocked reason naming the missing precondition
 
 ### Expected Commit
 
@@ -205,13 +220,20 @@ before the API 33 path is added.
 npm --prefix apps/node run build
 npm --prefix apps/node run test
 ./gradlew app:assembleDebug app:testDebugUnitTest
+./gradlew app:installDebug
 git diff --check
 ```
 
 Plus:
-- the phase is not complete until the implementation records the live-validation
-  preconditions from the phase steps, including whether a suitable Android 13+
-  target and exercised custom-editor path were actually available
+- if a target is available, launch the debug operator with:
+  `adb -s <device_serial> shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity`
+- validate the legacy route with the branch-local Node build, not the global
+  CLI. Use:
+  `node apps/node/dist/cli.js type "hello" --selector '<matcher_json>' --device <device_serial> --operator-package com.clawperator.operator.dev`
+- the phase is not complete until it records either:
+  - a live validation result for legacy-route replace and submit behavior on
+    `<device_serial>`
+  - or an explicit blocked reason naming the missing precondition
 
 ### Expected Commit
 
@@ -291,13 +313,16 @@ ladder as an implementation detail.
 npm --prefix apps/node run build
 npm --prefix apps/node run test
 ./gradlew app:assembleDebug app:testDebugUnitTest
+./gradlew app:installDebug
 git diff --check
 ```
 
 Plus:
+- if a suitable target is available, launch the debug operator with:
+  `adb -s <device_serial> shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity`
 - record the live-validation preconditions from Step 8 in the PR notes or
-  execution log, including whether an Android 13+ target and a real custom-editor
-  path were available
+  execution log, including whether an Android 13+ target and a real
+  custom-editor path were available
 
 ### Expected Commit
 
@@ -336,15 +361,20 @@ the best available validation, keeping the public API stable.
    no longer describes the old Android limitation.
 5. Run `./scripts/docs_build.sh`.
 6. Re-run the Android and Node validation commands from Phases 1 to 3.
-7. Install and launch the debug APK on the selected validation target:
+7. Build the branch-local Node CLI and use it for live validation. Do not use a
+   global `clawperator` binary.
+8. If multiple targets are connected, choose the intended one explicitly with
+   `--device <device_serial>` and `adb -s <device_serial> ...`.
+9. Install and launch the debug APK on the selected validation target:
    - `./gradlew app:installDebug`
-   - `adb shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity`
-8. If a suitable Android 13+ target exists, do a live validation pass with the
+   - `adb -s <device_serial> shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity`
+10. If a suitable Android 13+ target exists, do a live validation pass with the
    branch-local Node build and the `.dev` operator package against:
    - one standard accessible text field that uses `ACTION_SET_TEXT`
    - one custom-editor path that requires the API 33 input-connection route
-9. Record which target was used for live validation, including device or
-   emulator serial and operator package variant.
+11. Record which target class was used for live validation using placeholders
+   such as `<device_serial>` plus the operator package variant. Do not record
+   raw device identifiers.
 
 ### Acceptance Criteria
 
@@ -364,6 +394,12 @@ npm --prefix apps/node run test
 ./scripts/docs_build.sh
 git diff --check
 ```
+
+Plus:
+- if a suitable target is available, launch the debug operator with:
+  `adb -s <device_serial> shell am start -n com.clawperator.operator.dev/clawperator.activity.MainActivity`
+- perform final live verification with the branch-local CLI, for example:
+  `node apps/node/dist/cli.js type "hello" --selector '<matcher_json>' --device <device_serial> --operator-package com.clawperator.operator.dev`
 
 Plus:
 - complete the live validation from Steps 8 and 9 when a suitable Android 13+

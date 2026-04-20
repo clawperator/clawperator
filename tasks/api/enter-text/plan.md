@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This pack turns the current `enter_text` research into an executable
+This pack turns the current `enter_text` investigation into an executable
 implementation plan. The desired outcome is better Android text-entry
 reliability, especially for custom editors, while keeping the public
 Clawperator API stable. This is cross-surface work with Android ownership and
@@ -61,7 +61,8 @@ expanding the public API into transport-specific flags or strategy knobs.
 
 ## Out of Scope
 
-- The dedicated `clear` contract bug tracked separately under `tasks/api/clear/`
+- The dedicated `clear` contract bug, which should be fixed directly as a
+  focused bug rather than merged as a standalone single-PR task pack
 - New public `enter_text` parameters such as `mode`, `strategy`, or
   `preferInputConnection`, unless later implementation evidence proves the
   stable API goal impossible and this plan is updated first
@@ -112,7 +113,6 @@ expanding the public API into transport-specific flags or strategy knobs.
 
 | Topic | Verify against |
 | --- | --- |
-| Current `enter_text` task findings | `tasks/api/enter-text/findings.md` |
 | Android text-entry runtime path | `apps/android/shared/data/uitree/src/main/kotlin/clawperator/uitree/UiTreeManagerAndroid.kt` |
 | Android text-entry task flow | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/TaskUiScopeDefault.kt`, `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt` |
 | Android accessibility service capabilities and service-owned state | `apps/android/shared/data/resources/src/main/res/xml/accessibility_service_config.xml`, `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/accessibilityservice/OperatorAccessibilityService.kt`, `apps/android/shared/data/toolkit/src/main/kotlin/clawperator/accessibilityservice/AccessibilityServiceManager.kt` |
@@ -129,6 +129,9 @@ expanding the public API into transport-specific flags or strategy knobs.
 - Do not add new public `enter_text` parameters unless a later blocked
   implementation proves the stable-API goal impossible and both this plan and
   `work-breakdown.md` are updated before continuing.
+- Do not rely on deleted or superseded task notes as implementation authority.
+  This `plan.md` plus `work-breakdown.md` are the only task-pack source of
+  truth for this branch.
 - Preserve current effective replace semantics for successful `enter_text`
   calls. If an internal strategy cannot deterministically replace text, it must
   not silently append or duplicate content.
@@ -141,6 +144,9 @@ expanding the public API into transport-specific flags or strategy knobs.
 - Phase 3 must treat API 33 input-method state as service-owned lifecycle
   state. Null, stale, or finished input sessions are availability outcomes, not
   crash cases.
+- Clipboard-based fallback is out of scope for this pack unless the plan is
+  updated first with explicit privacy guardrails, including preserving and
+  restoring clipboard state and avoiding durable logging of clipboard contents.
 - Every phase that introduces behavior must ship the tests that prove it in the
   same phase and commit.
 - Unit tests are the primary gate for the API 33 path because live validation
@@ -165,9 +171,10 @@ expanding the public API into transport-specific flags or strategy knobs.
 | What if the API 33 path can only insert at the cursor? | Do not silently change semantics. Either make the input-connection path perform deterministic replace-style entry, skip that strategy, or stop and update the plan before implementation continues. |
 | How should `submit=true` behave? | Keep it as best-effort submit after successful text entry so current callers do not start failing unexpectedly. Prefer a truthful editor action such as `ACTION_IME_ENTER` or an API 33 editor action when available, and expose fallback or skipped-submit diagnostics if user-visible step data changes. |
 | How should custom editors be supported? | Through API 33 accessibility IME/input-connection support in the Android accessibility service, not by expanding the public API. |
+| Is clipboard paste part of this pack? | No by default. Do not add `ACTION_PASTE` or clipboard mutation in this pack unless the plan is updated first with explicit privacy and restore rules. |
 | What happens if the API 33 path is unavailable? | Keep the existing accessibility-node path and other supported internal fallbacks. Do not fail solely because the device is below API 33 or because the input session is null, unstarted, or finished if another supported strategy works. |
 | When must docs change? | Any user-visible runtime behavior change, observable step-data addition, or new limitation note must be documented in the same pack. |
-| How should live validation be treated? | Required when a suitable Android 13+ target and exercised app/editor path are available. If host-state constraints prevent that, unit tests remain the primary gate and the task notes the blocked live preconditions explicitly. |
+| How should live validation be treated? | Required as part of the Android validation loop using the branch-local Node build, explicit `--device <device_serial>` selection when multiple targets exist, and `--operator-package com.clawperator.operator.dev` for local verification. If host-state constraints prevent that, unit tests remain the primary gate and the task notes the blocked live preconditions explicitly. |
 | When must the plan be updated before code continues? | If preserving API stability would require new public knobs, if deterministic replace semantics cannot be preserved on the API 33 route, or if truthful submit behavior would require a public contract change. |
 
 ## Failure Modes To Prevent
@@ -187,8 +194,11 @@ expanding the public API into transport-specific flags or strategy knobs.
   lifecycle state without a testable bridge or null-session handling
 - Tests cover only synthetic success cases and do not prove routing between
   legacy and API 33 strategies
-- Live validation is listed without naming the Android 13+ device or emulator
-  preconditions
+- Live validation is attempted against the wrong target, a stale global CLI, or
+  the release APK instead of the branch-local Node build and `.dev` operator
+  package
+- Validation notes leak raw device serials or other local identifiers instead
+  of placeholders such as `<device_serial>`
 - Docs drift and keep describing the old limitations after the runtime changes
 
 ## Output Contract
