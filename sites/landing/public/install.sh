@@ -1070,9 +1070,9 @@ write_agent_guide() {
     local SKILL_DIR=""
     local SKILL_NAME=""
     local HAS_SKILLS=0
-    local HAS_ORIENTATION_SKILL=0
-    local HAS_DISCOVERY_SKILL=0
-    local HAS_RECORDING_SKILL=0
+    local HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL=0
+    local HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL=0
+    local HAS_SKILL_AUTHORSHIP_RECORDING_SKILL=0
 
     ensure_private_clawperator_dir
 
@@ -1104,11 +1104,11 @@ EOF
                 HAS_SKILLS=1
                 SKILL_NAME="$(basename "$SKILL_DIR")"
                 if [ "$SKILL_NAME" = "clawperator-agent-orientation" ]; then
-                    HAS_ORIENTATION_SKILL=1
+                    HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL=1
                 elif [ "$SKILL_NAME" = "skill-author-by-agent-discovery" ]; then
-                    HAS_DISCOVERY_SKILL=1
+                    HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL=1
                 elif [ "$SKILL_NAME" = "skill-author-by-recording" ]; then
-                    HAS_RECORDING_SKILL=1
+                    HAS_SKILL_AUTHORSHIP_RECORDING_SKILL=1
                 fi
             fi
         done
@@ -1123,14 +1123,14 @@ First-party Clawperator agent-skills are installed at:
 ${AGENT_SKILLS_GUIDE_DIR}
 
 EOF
-        if [ "$HAS_ORIENTATION_SKILL" -eq 1 ]; then
+        if [ "$HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL" -eq 1 ]; then
             cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 - \`clawperator-agent-orientation\`: first-run orientation skill for an
   unfamiliar host. It checks readiness, chooses the correct Clawperator front
   door, and points back to the canonical public docs for the chosen path.
 EOF
         fi
-        if [ "$HAS_DISCOVERY_SKILL" -eq 1 ]; then
+        if [ "$HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL" -eq 1 ]; then
             cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 - \`skill-author-by-agent-discovery\`: zero-results front door when
   \`clawperator skills for-app <package_id>\` and
@@ -1139,7 +1139,7 @@ EOF
   the next truthful step.
 EOF
         fi
-        if [ "$HAS_RECORDING_SKILL" -eq 1 ]; then
+        if [ "$HAS_SKILL_AUTHORSHIP_RECORDING_SKILL" -eq 1 ]; then
             cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 - \`skill-author-by-recording\`: proving workflow after discovery returns
   \`proceed_to_recording\`, or when the app route is already well understood
@@ -1155,7 +1155,7 @@ EOF
                 printf -- '- %s\n' "$(basename "$SKILL_DIR")" >> "$AGENT_GUIDE_PATH"
             fi
         done
-        if [ "$HAS_ORIENTATION_SKILL" -eq 1 ] && [ "$HAS_DISCOVERY_SKILL" -eq 1 ] && [ "$HAS_RECORDING_SKILL" -eq 1 ]; then
+        if [ "$HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL" -eq 1 ] && [ "$HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL" -eq 1 ] && [ "$HAS_SKILL_AUTHORSHIP_RECORDING_SKILL" -eq 1 ]; then
             cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
 Recommended first-run flow:
@@ -1173,17 +1173,17 @@ Installed agent-skill front doors are incomplete on this host.
 Repair it with:
 - run `clawperator agent-skills update`
 EOF
-            if [ "$HAS_ORIENTATION_SKILL" -ne 1 ]; then
+            if [ "$HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL" -ne 1 ]; then
                 printf -- '- missing `%s`\n' "clawperator-agent-orientation" >> "$AGENT_GUIDE_PATH"
             fi
-            if [ "$HAS_DISCOVERY_SKILL" -ne 1 ]; then
+            if [ "$HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL" -ne 1 ]; then
                 printf -- '- missing `%s`\n' "skill-author-by-agent-discovery" >> "$AGENT_GUIDE_PATH"
             fi
-            if [ "$HAS_RECORDING_SKILL" -ne 1 ]; then
+            if [ "$HAS_SKILL_AUTHORSHIP_RECORDING_SKILL" -ne 1 ]; then
                 printf -- '- missing `%s`\n' "skill-author-by-recording" >> "$AGENT_GUIDE_PATH"
             fi
         fi
-        if [ ! -f "$AGENT_SKILLS_GUIDE_DIR/version.txt" ] && [ "$HAS_ORIENTATION_SKILL" -eq 1 ] && [ "$HAS_DISCOVERY_SKILL" -eq 1 ] && [ "$HAS_RECORDING_SKILL" -eq 1 ]; then
+        if [ ! -f "$AGENT_SKILLS_GUIDE_DIR/version.txt" ] && [ "$HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL" -eq 1 ] && [ "$HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL" -eq 1 ] && [ "$HAS_SKILL_AUTHORSHIP_RECORDING_SKILL" -eq 1 ]; then
             cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
 Version metadata is missing for this install.
