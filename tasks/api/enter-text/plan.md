@@ -61,8 +61,8 @@ expanding the public API into transport-specific flags or strategy knobs.
 
 ## Out of Scope
 
-- The dedicated `clear` contract bug, which should be fixed directly as a
-  focused bug rather than merged as a standalone single-PR task pack
+- The dedicated `clear` contract bug, which has its own task pack in
+  `tasks/api/clear/` and must not be folded into this pack
 - New public `enter_text` parameters such as `mode`, `strategy`, or
   `preferInputConnection`, unless later implementation evidence proves the
   stable API goal impossible and this plan is updated first
@@ -117,7 +117,8 @@ expanding the public API into transport-specific flags or strategy knobs.
 | Android text-entry task flow | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/TaskUiScopeDefault.kt`, `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt` |
 | Android accessibility service capabilities and service-owned state | `apps/android/shared/data/resources/src/main/res/xml/accessibility_service_config.xml`, `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/accessibilityservice/OperatorAccessibilityService.kt`, `apps/android/shared/data/toolkit/src/main/kotlin/clawperator/accessibilityservice/AccessibilityServiceManager.kt` |
 | Public action contract | `apps/node/src/contracts/execution.ts`, `apps/node/src/cli/registry.ts`, `docs/api/actions.md` |
-| Existing Android task and parser tests | `apps/android/shared/test/src/test/kotlin/clawperator/task/runner/UiActionEngineDefaultTest.kt`, `apps/android/shared/data/operator/src/commonTest/kotlin/actiontask/operator/agent/AgentCommandParserDefaultTest.kt` |
+| Existing Android task and parser tests | `apps/android/shared/test/src/test/kotlin/clawperator/task/runner/UiActionEngineDefaultTest.kt`, `apps/android/shared/data/operator/src/commonTest/kotlin/actiontask/operator/agent/AgentCommandParserDefaultTest.kt`. Verify before Phase 1 begins that both files include baseline tests for `enter_text` dispatch and parsing. If those tests are absent, add them as the first commit of Phase 1 before any seam refactoring. |
+| API 33 accessibility IME capability flag | `FLAG_REQUEST_IME_ACCESSIBILITY_MODE` - must be added to `android:accessibilityFlags` in `apps/android/shared/data/resources/src/main/res/xml/accessibility_service_config.xml`. Read the current attribute value before Phase 3 begins and combine the new flag rather than overwriting existing flags. |
 | Public docs regeneration boundary | `./scripts/docs_build.sh`, `sites/docs/source-map.yaml`, `sites/docs/mkdocs.yml` |
 
 ## Deterministic Versus Judgment
@@ -147,6 +148,11 @@ expanding the public API into transport-specific flags or strategy knobs.
 - Clipboard-based fallback is out of scope for this pack unless the plan is
   updated first with explicit privacy guardrails, including preserving and
   restoring clipboard state and avoiding durable logging of clipboard contents.
+- Do not add a `clear` parameter to the strategy seam interface in Phases 1
+  through 3. If the dedicated `clear` bug fix (`tasks/api/clear/`) ships before
+  Phase 1 of this pack begins, carry the existing `clear` field through the
+  seam interface unchanged without implementing clear behavior here. If the
+  `clear` bug fix has not shipped, the seam interface must not anticipate it.
 - Every phase that introduces behavior must ship the tests that prove it in the
   same phase and commit.
 - Unit tests are the primary gate for the API 33 path because live validation
@@ -169,9 +175,10 @@ expanding the public API into transport-specific flags or strategy knobs.
 | How should the runtime choose a text-entry method? | Use a first-match-wins internal strategy ladder. No package-name routing. |
 | What is the baseline strategy order? | Focus target first. Prefer `ACTION_SET_TEXT` when the matched node or editable ancestor exposes it because it already matches current replace semantics. Use the API 33 input-connection route only when the legacy replace route is unavailable or demonstrably failed. |
 | What if the API 33 path can only insert at the cursor? | Do not silently change semantics. Either make the input-connection path perform deterministic replace-style entry, skip that strategy, or stop and update the plan before implementation continues. |
-| How should `submit=true` behave? | Keep it as best-effort submit after successful text entry so current callers do not start failing unexpectedly. Prefer a truthful editor action such as `ACTION_IME_ENTER` or an API 33 editor action when available, and expose fallback or skipped-submit diagnostics if user-visible step data changes. |
+| How should `submit=true` behave? | Keep it as best-effort submit after successful text entry so current callers do not start failing unexpectedly. On the pre-API-33 accessibility-node route, check for `AccessibilityNodeInfoCompat.ACTION_IME_ENTER` in the node's action list (the constant is available from API 30) and prefer it over a click fallback when present. If `ACTION_IME_ENTER` is absent, fall back to a click. On the API 33 path (Phase 3), prefer the editor-action path through the `InputConnection`. Expose fallback or skipped-submit diagnostics if user-visible step data changes. Do not turn submit into a hard failure when text entry succeeded but no truthful submit action is available. |
 | How should custom editors be supported? | Through API 33 accessibility IME/input-connection support in the Android accessibility service, not by expanding the public API. |
 | Is clipboard paste part of this pack? | No by default. Do not add `ACTION_PASTE` or clipboard mutation in this pack unless the plan is updated first with explicit privacy and restore rules. |
+| What if all internal strategies fail for an `enter_text` call? | Return an explicit error result using the existing `set_text_failed` failure point. Do not return fake success or silently skip text entry when no strategy succeeded. |
 | What happens if the API 33 path is unavailable? | Keep the existing accessibility-node path and other supported internal fallbacks. Do not fail solely because the device is below API 33 or because the input session is null, unstarted, or finished if another supported strategy works. |
 | When must docs change? | Any user-visible runtime behavior change, observable step-data addition, or new limitation note must be documented in the same pack. |
 | How should live validation be treated? | Required as part of the Android validation loop using the branch-local Node build, explicit `--device <device_serial>` selection when multiple targets exist, and `--operator-package com.clawperator.operator.dev` for local verification. If host-state constraints prevent that, unit tests remain the primary gate and the task notes the blocked live preconditions explicitly. |
@@ -194,6 +201,9 @@ expanding the public API into transport-specific flags or strategy knobs.
   lifecycle state without a testable bridge or null-session handling
 - Tests cover only synthetic success cases and do not prove routing between
   legacy and API 33 strategies
+- The strategy seam drops the `clear` field if the `clear` bug fix shipped
+  before Phase 1 began, causing callers who pass `clear=true` to silently
+  regress after the seam lands
 - Live validation is attempted against the wrong target, a stale global CLI, or
   the release APK instead of the branch-local Node build and `.dev` operator
   package

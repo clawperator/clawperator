@@ -119,21 +119,35 @@ success semantics.
 
 ### Steps
 
-1. Define an internal result or strategy model that makes text-entry method
-   selection explicit.
-2. Refactor `UiTreeManagerAndroid` so the current `ACTION_SET_TEXT` route lives
+1. Before writing any seam code, open `UiActionEngineDefaultTest.kt` and
+   `AgentCommandParserDefaultTest.kt` and verify whether either file contains
+   baseline tests for `enter_text` action dispatch and parsing. If those tests
+   are absent, add them as the first commit of this phase before any refactoring.
+   The current path must be covered before it is restructured.
+2. Define an internal result or strategy model that makes text-entry method
+   selection explicit. Model the strategy seam as a sealed class or enum
+   internal to `UiTreeManagerAndroid` - not as a new public interface or a new
+   module-level abstraction. The seam must be able to express the first-match-
+   wins ladder without adding public dependencies or changing the signature of
+   `UiTreeManager.setText()` from the caller's perspective unless Phase 3 test
+   isolation requires a dedicated bridge interface (see Step 4).
+3. Refactor `UiTreeManagerAndroid` so the current `ACTION_SET_TEXT` route lives
    behind that seam instead of as the only implementation.
-3. Preserve the existing replace-style behavior as a named invariant in the
+4. Preserve the existing replace-style behavior as a named invariant in the
    seam. If the seam cannot express that invariant cleanly, stop and update the
    plan before continuing.
-4. Decide whether the future API 33 path needs a dedicated Android helper or
-   bridge for service-owned input-method session state. If yes, introduce the
-   interface boundary in this phase or record the exact Phase 3 ownership point.
-5. Keep the public `enter_text` action shape unchanged while making additive
+5. Decide whether the API 33 path needs a dedicated bridge interface for service-
+   owned input-method session state so that path can be unit tested without a
+   running accessibility service. If yes, define the interface boundary
+   (for example, an `InputConnectionSource` interface wrapping
+   `getInputMethod()?.currentInputConnection()`) as a stub in this phase and
+   leave it unimplemented until Phase 3. Record the exact Phase 3 ownership
+   point if the interface is deferred.
+6. Keep the public `enter_text` action shape unchanged while making additive
    task/runtime diagnostics possible if needed.
-6. Add Android regression tests that prove the seam exists and that the legacy
+7. Add Android regression tests that prove the seam exists and that the legacy
    path still works through it.
-7. Stop after the seam and tests are stable. Do not add API 33 service work in
+8. Stop after the seam and tests are stable. Do not add API 33 service work in
    this phase.
 
 ### Acceptance Criteria
@@ -188,8 +202,13 @@ before the API 33 path is added.
 ### Steps
 
 1. Implement a truthful submit order for the existing accessibility-node route.
-   At minimum, prefer a real editor action such as `ACTION_IME_ENTER` when the
-   node exposes it before falling back to a click.
+   Detect `AccessibilityNodeInfoCompat.ACTION_IME_ENTER` by checking
+   `AccessibilityNodeInfoCompat.wrap(node).actionList` and prefer it over a
+   click fallback when present. This constant is available from API 30. If the
+   runtime must support below API 30, wrap the check with
+   `Build.VERSION.SDK_INT >= Build.VERSION_CODES.R`. Do not assume all nodes
+   expose `ACTION_IME_ENTER` - the click fallback remains the best-effort path
+   when it is absent.
 2. Add or preserve tests that prove the legacy route still behaves like replace
    text, not append text, after the seam refactor.
 3. Decide which additive step-data fields are worth surfacing, such as
@@ -265,20 +284,41 @@ ladder as an implementation detail.
 ### Steps
 
 1. Add the Android accessibility-service capabilities needed for API 33
-   accessibility IME support.
+   accessibility IME support. The required capability is
+   `FLAG_REQUEST_IME_ACCESSIBILITY_MODE`. Open
+   `apps/android/shared/data/resources/src/main/res/xml/accessibility_service_config.xml`
+   and read the current `android:accessibilityFlags` value before adding to it.
+   Combine the new flag value with any existing flags rather than overwriting them.
+   If the attribute does not yet exist, add it. Verify the service configuration
+   loads correctly after the change by building and inspecting the manifest.
 2. Implement the service-side `InputMethod` lifecycle and input-connection
    access needed by the runtime. Use `onCreateInputMethod()`,
    `getInputMethod()`, current input connection, and current editor info
-   explicitly rather than assuming they are always present.
+   explicitly rather than assuming they are always present. Wrap all API 33
+   method calls with `@RequiresApi(Build.VERSION_CODES.TIRAMISU)` annotations.
+   At the strategy ladder dispatch point in `UiTreeManagerAndroid`, guard the
+   API 33 branch with `if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)`.
+   Do not scatter the version check across multiple call sites.
 3. Integrate the API 33 input-connection path into the internal strategy ladder
-   without changing the public `enter_text` shape.
+   without changing the public `enter_text` shape. Use the `InputConnectionSource`
+   bridge interface introduced in Phase 1 (or stubbed there) so the path can be
+   unit tested without running a real accessibility service. The mock must be
+   able to simulate a null connection, a finished connection, and an active
+   connection returning a real `InputConnection` double.
 4. Be explicit about the first-match-wins strategy order when both
    `ACTION_SET_TEXT` and the API 33 input-connection path are available. Keep
    the legacy `ACTION_SET_TEXT` route first unless the plan is updated with a
    concrete reason to reorder it.
 5. Preserve replace-style semantics on the API 33 route. Do not treat plain
-   `commitText()` insertion as equivalent to current `enter_text` behavior
-   unless the surrounding selection and replacement semantics are proven.
+   `commitText()` insertion as equivalent to current `enter_text` behavior.
+   The replace-safe sequence for `InputConnection` is: select all existing text
+   using `setSelection(0, currentLength)` based on the current editor info, then
+   call `commitText(text, 1)`. If selection state is unreliable, fall back to
+   `deleteSurroundingText(Int.MAX_VALUE, Int.MAX_VALUE)` followed by
+   `commitText(text, 1)`. Document which sequence was chosen and prove with a
+   test that pre-existing text is fully replaced and not appended to. If neither
+   sequence can guarantee deterministic replace semantics, skip the API 33 route
+   and return an explicit error rather than silently changing behavior.
 6. Add Android regressions for at minimum:
    - API 33 path selected for a focused editor that lacks a reliable
      `ACTION_SET_TEXT` route
