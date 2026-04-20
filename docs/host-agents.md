@@ -181,7 +181,7 @@ clawperator agent-skills list --json
 
 Check:
 
-- `clawperator --help` and `clawperator skills --help` point zero-match users to `clawperator agent-skills list`
+- `clawperator --help` and `clawperator skills --help` name `clawperator-agent-orientation` as the first-run surface for unfamiliar hosts and point zero-match users to `clawperator agent-skills list`
 - `clawperator agent-skills --help` names `clawperator-agent-orientation` as the first-run orientation skill, `skill-author-by-agent-discovery` as the zero-results front door, and `skill-author-by-recording` as the proving workflow
 - `skills for-app`, `skills search`, and `skills list` return top-level `skills` and `count`
 - `skills get` returns a top-level `skill`

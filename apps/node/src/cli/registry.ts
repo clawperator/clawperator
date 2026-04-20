@@ -2112,6 +2112,7 @@ Notes:
   - Start with 'clawperator skills for-app <package_id>' when you know the Android package id.
   - Use 'clawperator skills search --keyword <text>' when you only have app names or user-language intent terms.
   - Use 'clawperator skills get <skill_id>' before 'clawperator skills run <skill_id>' when discovery already returned an id.
+  - If the current host is unfamiliar, inspect 'clawperator agent-skills list' and start with 'clawperator-agent-orientation' before choosing runtime skills, MCP, or raw CLI actions.
   - If runtime-skill discovery returns no relevant match and you need guided skill creation help, use 'clawperator agent-skills list' and start with 'skill-author-by-agent-discovery'.
   - Use 'skill-author-by-recording' after discovery returns 'proceed_to_recording', or when the route is already well understood and you need the proving workflow.
   - If your host already supports stdio MCP and wants registered tools instead of runtime-skill discovery, use 'clawperator mcp serve'.
@@ -2753,6 +2754,7 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "",
     "Notes:",
     "  - Post-install host-agent orientation: https://docs.clawperator.com/host-agents/",
+    "  - If the current host is unfamiliar, inspect 'clawperator agent-skills list' and start with 'clawperator-agent-orientation' before choosing runtime skills, MCP, or raw CLI actions.",
     "  - Start runtime-skill discovery with 'clawperator skills for-app <package_id>' when you know the Android package, or 'clawperator skills search --keyword <text>' when you do not.",
     "  - If runtime-skill discovery returns no relevant match and you need guided authoring help, use 'clawperator agent-skills list' and start with 'skill-author-by-agent-discovery'.",
     "  - Use 'skill-author-by-recording' only after discovery returns 'proceed_to_recording', or when the app route is already well understood and you need the proving workflow.",
