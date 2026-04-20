@@ -283,9 +283,9 @@ ladder as an implementation detail.
 
 ### Steps
 
-1. Add the Android accessibility-service capabilities needed for API 33
-   accessibility IME support. The required capability is
-   `FLAG_REQUEST_IME_ACCESSIBILITY_MODE`. Open
+1. Add the Android accessibility-service capability needed for API 33
+   accessibility IME support. The required flag is
+   `AccessibilityServiceInfo.FLAG_INPUT_METHOD_EDITOR`. Open
    `apps/android/shared/data/resources/src/main/res/xml/accessibility_service_config.xml`
    and read the current `android:accessibilityFlags` value before adding to it.
    Combine the new flag value with any existing flags rather than overwriting them.
