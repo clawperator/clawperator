@@ -313,7 +313,7 @@ class UiTreeManagerAndroid(
                 val clearSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, clearArgs)
                 if (!clearSucceeded) {
                     Log.d(
-                        "[UiTreeManager] ACTION_SET_TEXT clear failed for id=${request.uiNode.id} on ${target.debugNodeRedacted()}",
+                        "[UiTreeManager] enter_text strategy=$name clear_failed for id=${request.uiNode.id} on ${target.debugNodeRedacted()}",
                     )
                     return null
                 }
@@ -326,7 +326,9 @@ class UiTreeManagerAndroid(
 
             val setTextSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
             if (!setTextSucceeded) {
-                Log.d("[UiTreeManager] ACTION_SET_TEXT failed for id=${request.uiNode.id} on ${target.debugNodeRedacted()}")
+                Log.d(
+                    "[UiTreeManager] enter_text strategy=$name set_text_failed for id=${request.uiNode.id} on ${target.debugNodeRedacted()}",
+                )
                 return null
             }
 
@@ -391,12 +393,6 @@ class UiTreeManagerAndroid(
                 return null
             }
 
-            val editorInfo = session.editorInfo
-            if (editorInfo == null) {
-                logUnavailable(request, "editor_info_missing")
-                return null
-            }
-
             val replaceSucceeded = replaceText(session, request)
             if (!replaceSucceeded) {
                 logUnavailable(request, "replace_unavailable")
@@ -404,7 +400,7 @@ class UiTreeManagerAndroid(
             }
 
             return TextEntryAttemptResult(
-                submitMethod = performSubmit(session, editorInfo, request.submit),
+                submitMethod = performSubmit(session, session.editorInfo, request.submit),
             )
         }
 
@@ -427,14 +423,14 @@ class UiTreeManagerAndroid(
 
         private fun performSubmit(
             session: TextInputSession,
-            editorInfo: TextInputEditorInfo,
+            editorInfo: TextInputEditorInfo?,
             submitRequested: Boolean,
         ): SubmitMethod {
             if (!submitRequested) {
                 return SubmitMethod.NotRequested
             }
 
-            val editorAction = resolveEditorAction(editorInfo) ?: return SubmitMethod.Unavailable
+            val editorAction = editorInfo?.let(::resolveEditorAction) ?: return SubmitMethod.Unavailable
             return if (session.performEditorAction(editorAction)) {
                 SubmitMethod.ImeEnterAction
             } else {

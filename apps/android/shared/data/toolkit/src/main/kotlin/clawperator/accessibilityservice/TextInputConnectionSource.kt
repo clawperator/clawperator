@@ -4,7 +4,6 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.InputMethod
 import android.os.Build
 import android.view.inputmethod.EditorInfo
-import android.view.inputmethod.SurroundingText
 import androidx.annotation.RequiresApi
 
 interface TextInputConnectionSource {
@@ -14,11 +13,6 @@ interface TextInputConnectionSource {
 interface TextInputSession {
     val isActive: Boolean
     val editorInfo: TextInputEditorInfo?
-
-    fun getSurroundingText(
-        beforeLength: Int,
-        afterLength: Int,
-    ): TextInputSurroundingText?
 
     fun setSelection(
         start: Int,
@@ -41,16 +35,6 @@ interface TextInputSession {
 data class TextInputEditorInfo(
     val actionId: Int,
     val imeOptions: Int,
-    val initialSelectionStart: Int,
-    val initialSelectionEnd: Int,
-    val initialSurroundingText: TextInputSurroundingText?,
-)
-
-data class TextInputSurroundingText(
-    val text: CharSequence,
-    val selectionStart: Int,
-    val selectionEnd: Int,
-    val offset: Int,
 )
 
 object NoOpTextInputConnectionSource : TextInputConnectionSource {
@@ -77,14 +61,6 @@ private class AccessibilityInputMethodSession(
 
     override val editorInfo: TextInputEditorInfo?
         get() = inputMethod.currentInputEditorInfo?.toTextInputEditorInfo()
-
-    override fun getSurroundingText(
-        beforeLength: Int,
-        afterLength: Int,
-    ): TextInputSurroundingText? =
-        inputMethod.currentInputConnection
-            ?.getSurroundingText(beforeLength, afterLength, 0)
-            ?.toTextInputSurroundingText()
 
     override fun setSelection(
         start: Int,
@@ -127,17 +103,4 @@ private fun EditorInfo.toTextInputEditorInfo(): TextInputEditorInfo =
     TextInputEditorInfo(
         actionId = actionId,
         imeOptions = imeOptions,
-        initialSelectionStart = initialSelStart,
-        initialSelectionEnd = initialSelEnd,
-        initialSurroundingText =
-            getInitialSurroundingText(Int.MAX_VALUE, Int.MAX_VALUE, 0)?.toTextInputSurroundingText(),
-    )
-
-@RequiresApi(Build.VERSION_CODES.TIRAMISU)
-private fun SurroundingText.toTextInputSurroundingText(): TextInputSurroundingText =
-    TextInputSurroundingText(
-        text = text,
-        selectionStart = selectionStart,
-        selectionEnd = selectionEnd,
-        offset = offset,
     )

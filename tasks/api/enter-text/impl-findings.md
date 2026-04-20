@@ -43,6 +43,9 @@ It is intentionally branch-local and temporary while the task pack is active.
   accessibility input connection as success for mutating calls because this API
   surface exposes those mutators as fire-and-forget rather than boolean-return
   operations.
+- `currentInputEditorInfo` is nullable on the Android API surface, so the API
+  33 route now requires editor metadata only for best-effort submit. Missing
+  editor info no longer blocks replace-style text entry.
 - The strategy-level tests now carry the stronger correctness signal by
   exercising delete-fallback failure and stale-session behavior directly.
 - We should keep watching whether any real editor rejects the fallback
@@ -60,8 +63,9 @@ It is intentionally branch-local and temporary while the task pack is active.
   - overriding `onCreateInputMethod()` and returning a service-owned
     `InputMethod` implementation on API 33+
 - Extra lifecycle diagnostics were added around `onCreateInputMethod()`,
-  `onStartInput()`, `onFinishInput()`, and `onUpdateSelection()` so live runs
-  can truthfully identify whether the API 33 path is actually active.
+  `onStartInput()`, `onFinishInput()`, and `onUpdateSelection()` on debug
+  builds so live runs can truthfully identify whether the API 33 path is
+  actually active without widening production logcat exposure unnecessarily.
 
 ## Test Findings
 
@@ -69,11 +73,11 @@ It is intentionally branch-local and temporary while the task pack is active.
   - strategy routing through the legacy path
   - legacy `submit=true` editor-action vs click fallback behavior
   - API 33 routing when `ACTION_SET_TEXT` is unavailable
-  - API 33 explicit failure cases for missing session, inactive session, and
-    missing editor info
+  - API 33 explicit failure cases for missing session and inactive session
   - API 33 lower-SDK skip behavior
   - API 33 replace behavior for pre-populated content
   - API 33 delete-and-commit behavior even when surrounding text is present
+  - API 33 replace success even when editor info is missing
   - API 33 `clear=true` behavior with delete-and-commit replace semantics
   - API 33 explicit failure when the delete fallback cannot complete
 

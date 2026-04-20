@@ -37,9 +37,14 @@ class OperatorAccessibilityService :
     }
 
     override fun onCreateInputMethod(): InputMethod {
-        Log.d("[Operator-AccessibilityService] onCreateInputMethod()")
+        if (buildConfig.debug) {
+            Log.d("[Operator-AccessibilityService] onCreateInputMethod()")
+        }
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            OperatorAccessibilityInputMethod(this)
+            OperatorAccessibilityInputMethod(
+                service = this,
+                enableLifecycleDiagnostics = buildConfig.debug,
+            )
         } else {
             super.onCreateInputMethod()
         }
@@ -158,19 +163,24 @@ class OperatorAccessibilityService :
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 private class OperatorAccessibilityInputMethod(
     service: AccessibilityService,
+    private val enableLifecycleDiagnostics: Boolean,
 ) : InputMethod(service) {
     override fun onStartInput(
         attribute: EditorInfo,
         restarting: Boolean,
     ) {
-        Log.d(
-            "[Operator-AccessibilityService] onStartInput(restarting=$restarting actionId=${attribute.actionId} imeOptions=${attribute.imeOptions})",
-        )
+        logLifecycle {
+            Log.d(
+                "[Operator-AccessibilityService] onStartInput(restarting=$restarting actionId=${attribute.actionId} imeOptions=${attribute.imeOptions})",
+            )
+        }
         super.onStartInput(attribute, restarting)
     }
 
     override fun onFinishInput() {
-        Log.d("[Operator-AccessibilityService] onFinishInput()")
+        logLifecycle {
+            Log.d("[Operator-AccessibilityService] onFinishInput()")
+        }
         super.onFinishInput()
     }
 
@@ -182,9 +192,11 @@ private class OperatorAccessibilityInputMethod(
         candidatesStart: Int,
         candidatesEnd: Int,
     ) {
-        Log.d(
-            "[Operator-AccessibilityService] onUpdateSelection(old=$oldSelStart:$oldSelEnd new=$newSelStart:$newSelEnd)",
-        )
+        logLifecycle {
+            Log.d(
+                "[Operator-AccessibilityService] onUpdateSelection(old=$oldSelStart:$oldSelEnd new=$newSelStart:$newSelEnd)",
+            )
+        }
         super.onUpdateSelection(
             oldSelStart,
             oldSelEnd,
@@ -193,6 +205,12 @@ private class OperatorAccessibilityInputMethod(
             candidatesStart,
             candidatesEnd,
         )
+    }
+
+    private inline fun logLifecycle(block: () -> Unit) {
+        if (enableLifecycleDiagnostics) {
+            block()
+        }
     }
 }
 

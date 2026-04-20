@@ -7,7 +7,6 @@ import clawperator.accessibilityservice.NoOpTextInputConnectionSource
 import clawperator.accessibilityservice.TextInputConnectionSource
 import clawperator.accessibilityservice.TextInputEditorInfo
 import clawperator.accessibilityservice.TextInputSession
-import clawperator.accessibilityservice.TextInputSurroundingText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -239,7 +238,7 @@ class UiTreeManagerAndroidTest {
         }
 
     @Test
-    fun `setText api33 path returns false when editor info is missing and legacy route is unavailable`() =
+    fun `setText api33 path keeps text entry successful when editor info is missing`() =
         runTest {
             val session = FakeTextInputSession(initialText = "existing", editorInfo = null)
             val manager = createManager(textInputConnectionSource = FakeTextInputConnectionSource(session))
@@ -248,7 +247,16 @@ class UiTreeManagerAndroidTest {
 
             val result = manager.setText(uiNode = uiNode, text = "hello", submit = true, clear = false)
 
-            assertFalse(result)
+            assertTrue(result)
+            assertEquals("hello", session.text)
+            assertEquals(
+                listOf(
+                    "setSelection(2147483647,2147483647)",
+                    "deleteSurroundingText(2147483647,0)",
+                    "commitText(hello,1)",
+                ),
+                session.operations,
+            )
         }
 
     @Test
@@ -402,19 +410,6 @@ class UiTreeManagerAndroidTest {
         private var selectionStart: Int = initialText.length
         private var selectionEnd: Int = initialText.length
 
-        override fun getSurroundingText(
-            beforeLength: Int,
-            afterLength: Int,
-        ): TextInputSurroundingText? {
-            operations += "getSurroundingText($beforeLength,$afterLength)"
-            return TextInputSurroundingText(
-                text = text,
-                selectionStart = selectionStart,
-                selectionEnd = selectionEnd,
-                offset = 0,
-            )
-        }
-
         override fun setSelection(
             start: Int,
             end: Int,
@@ -483,14 +478,10 @@ class UiTreeManagerAndroidTest {
             fun editorInfo(
                 actionId: Int = 0,
                 imeOptions: Int = 0,
-                initialSurroundingText: TextInputSurroundingText? = null,
             ): TextInputEditorInfo =
                 TextInputEditorInfo(
                     actionId = actionId,
                     imeOptions = imeOptions,
-                    initialSelectionStart = 0,
-                    initialSelectionEnd = 0,
-                    initialSurroundingText = initialSurroundingText,
                 )
         }
     }
