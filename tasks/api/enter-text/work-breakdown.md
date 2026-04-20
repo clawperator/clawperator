@@ -29,9 +29,9 @@ API stable and treat API 33 support as an Android implementation detail.
   unavoidable and both task-pack files are updated first.
 - Preserve current replace-style behavior for successful `enter_text` calls. Do
   not let the API 33 route silently become append-at-cursor behavior.
-- Do not fold the dedicated `clear` bug into this pack. That bug should be
-  fixed directly as a focused bug and not reintroduced here as a second task
-  pack.
+- Do not fold the dedicated `clear` bug into this pack. That bug has its own
+  task pack at `tasks/api/clear/` and must remain there. Phase 3 of this pack
+  extends `clear` to the API 33 route only after the `clear` bug fix has shipped.
 - Use an internal first-match-wins strategy ladder. Do not route by app package
   name or app-specific hacks.
 - Keep `submit` best effort unless the public contract is intentionally updated
@@ -312,13 +312,24 @@ ladder as an implementation detail.
 5. Preserve replace-style semantics on the API 33 route. Do not treat plain
    `commitText()` insertion as equivalent to current `enter_text` behavior.
    The replace-safe sequence for `InputConnection` is: select all existing text
-   using `setSelection(0, currentLength)` based on the current editor info, then
-   call `commitText(text, 1)`. If selection state is unreliable, fall back to
-   `deleteSurroundingText(Int.MAX_VALUE, Int.MAX_VALUE)` followed by
-   `commitText(text, 1)`. Document which sequence was chosen and prove with a
-   test that pre-existing text is fully replaced and not appended to. If neither
-   sequence can guarantee deterministic replace semantics, skip the API 33 route
-   and return an explicit error rather than silently changing behavior.
+   using `setSelection(0, currentLength)` derived from editor info, then call
+   `commitText(text, 1)` to replace the selection. If text length cannot be
+   determined from editor info, read current content via `getExtractedText()` or
+   `getSurroundingText()`. If the selection-based approach is unavailable, move
+   the cursor to the end of the field with `setSelection(Int.MAX_VALUE,
+   Int.MAX_VALUE)`, then use `deleteSurroundingText(Int.MAX_VALUE, 0)` to delete
+   everything before the cursor. Do not call `deleteSurroundingText` after a
+   `setSelection` call that creates a non-empty selection: that API explicitly
+   excludes selected text and will leave the selected content in place. Document
+   which sequence was chosen and prove with a test that pre-existing text is
+   fully replaced and not appended to. If no sequence can guarantee deterministic
+   replace semantics, skip the API 33 route and return an explicit error rather
+   than silently changing behavior.
+   If the `clear` bug fix (`tasks/api/clear/`) has already shipped, the
+   selection-based replace sequence inherently satisfies `clear=true` semantics.
+   Ensure the selection step is never skipped when `clear=true` is active. If
+   the clear bug fix has not yet shipped by Phase 3, do not add `clear` handling
+   to the API 33 path in this phase.
 6. Add Android regressions for at minimum:
    - API 33 path selected for a focused editor that lacks a reliable
      `ACTION_SET_TEXT` route
@@ -331,6 +342,9 @@ ladder as an implementation detail.
      failure rather than a fake success
    - submit behavior on the API 33 path uses the editor-action path rather than
      a blind click when possible
+   - `clear=true` on the API 33 path (when the `clear` bug fix has already
+     shipped): prior content is replaced rather than appended; the selection
+     step is not skipped when `clear=true` is active
 7. If implementation evidence shows the API 33 route cannot preserve current
    semantics without new public API knobs, stop and update both task-pack files
    before continuing. Do not paper over that gap with undocumented behavior.

@@ -149,10 +149,14 @@ expanding the public API into transport-specific flags or strategy knobs.
   updated first with explicit privacy guardrails, including preserving and
   restoring clipboard state and avoiding durable logging of clipboard contents.
 - Do not add a `clear` parameter to the strategy seam interface in Phases 1
-  through 3. If the dedicated `clear` bug fix (`tasks/api/clear/`) ships before
+  and 2. If the dedicated `clear` bug fix (`tasks/api/clear/`) ships before
   Phase 1 of this pack begins, carry the existing `clear` field through the
-  seam interface unchanged without implementing clear behavior here. If the
-  `clear` bug fix has not shipped, the seam interface must not anticipate it.
+  seam interface unchanged. In Phase 3, if the clear bug fix has shipped,
+  extend `clear` behavior to the API 33 `InputConnection` route: the selection-
+  based replace sequence inherently satisfies `clear=true` semantics, so ensure
+  the selection step is never skipped when `clear=true` is passed. If the
+  `clear` bug fix has not yet shipped by Phase 3, do not add a `clear` parameter
+  to the API 33 path at that time.
 - Every phase that introduces behavior must ship the tests that prove it in the
   same phase and commit.
 - Unit tests are the primary gate for the API 33 path because live validation

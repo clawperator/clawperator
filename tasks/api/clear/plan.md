@@ -61,8 +61,10 @@ no signal that the field was ignored.
 
 ## Out of Scope
 
-- Implementing `clear` for the API 33 input-connection path - that is part of
-  the enter_text strategy pack (`tasks/api/enter-text/`)
+- Implementing `clear` for the API 33 input-connection path in this pack.
+  Once this pack ships, Phase 3 of the enter_text strategy pack
+  (`tasks/api/enter-text/`) will extend `clear` behavior to the API 33
+  `InputConnection` route using the selection-based replace sequence.
 - Changing the Node or CLI contract shape - `clear` already exists there
 - Non-Android runtimes
 
