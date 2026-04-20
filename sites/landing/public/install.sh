@@ -1160,7 +1160,7 @@ EOF
 
 Recommended first-run flow:
 - If the current host is unfamiliar, start with `clawperator-agent-orientation`
-- Start with `clawperator skills for-app <package_id>` or `clawperator skills search --keyword "<term>"`
+- Choose one runtime-skill discovery probe: `clawperator skills for-app <package_id>` or `clawperator skills search --keyword "<term>"`
 - If there is no relevant runtime-skill match, inspect `clawperator agent-skills list --json`
 - Start the guided route with `skill-author-by-agent-discovery`
 - Use `skill-author-by-recording` only after discovery returns `proceed_to_recording`
@@ -1257,7 +1257,7 @@ const bridgeBlock = [
   "",
   "Start here:",
   `- \`${localAgentGuidePath}\``,
-  "- `clawperator skills list`",
+  "- if the host is unfamiliar and the local guide lists it, start with `clawperator-agent-orientation`",
   "- `clawperator skills for-app <package_id>`",
   "- `clawperator skills search --keyword \"<term>\"`",
   "- `clawperator skills get <skill_id>`",

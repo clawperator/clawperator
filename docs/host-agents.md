@@ -31,13 +31,24 @@ Continue only when:
 
 If you have not reached that state yet, finish [Setup](setup.md) first.
 
+Before any device-touching command, identify the target device:
+
+```bash
+clawperator devices
+```
+
+If more than one device is connected, carry `--device <device_serial>` through
+later `snapshot`, `skills run`, and direct-action commands.
+
 ## First Route After Install
 
 Use this order:
 
 1. Read this page.
 2. If packaged first-party agent-skills are installed and you are unfamiliar
-   with this host, start with `clawperator-agent-orientation`.
+   with this host, start with `clawperator-agent-orientation`. It should verify
+   readiness, separate runtime skills from agent-skills, and end with one
+   concrete next step.
 3. If you need an app-specific capability, start with `clawperator skills`.
 4. If your host already speaks stdio MCP and wants registered tools, use `clawperator mcp serve`.
 5. If you already know you need raw actions and result envelopes, continue to [Quickstart](quickstart.md).
@@ -72,6 +83,8 @@ Decision rules:
 - Use `skills search --keyword` when you only have a user-language term.
 - Use `skills get` before `skills run` when you need to confirm the exact id or summary.
 - Use `skills run` only after discovery, not as the first probe.
+- Do not start with `skills list` unless the real task is inventory rather than
+  app-oriented discovery.
 - If discovery returns zero relevant matches and the next job is skill creation
   rather than raw execution, inspect installed agent-skills with
   `clawperator agent-skills list --json`, start with
