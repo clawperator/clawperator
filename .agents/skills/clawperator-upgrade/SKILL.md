@@ -88,7 +88,7 @@ Use this decision table:
 | Doctor result | Outcome |
 | --- | --- |
 | exit code `0` and `criticalOk: true` | Report that Clawperator is ready and name the next truthful front door for the user’s task. |
-| doctor returns a blocking failure | Summarize the failing checks and point to the existing repair route already named by doctor or the setup docs. |
+| non-zero exit code or `criticalOk: false` | Summarize the failing checks and point to the existing repair route already named by doctor or the setup docs. |
 
 Rules:
 
@@ -97,7 +97,7 @@ Rules:
 - if doctor indicates setup is incomplete, keep the next step grounded in the
   real failing surface
 
-### 4. Name the next truthful action
+### 5. Name the next truthful action
 
 After a successful upgrade:
 
@@ -108,7 +108,7 @@ After a successful upgrade:
 - if the user explicitly needs repair after doctor failure, point at the
   existing setup or repair guidance instead of widening scope
 
-### 5. End with a short status summary
+### 6. End with a short status summary
 
 Finish with:
 
