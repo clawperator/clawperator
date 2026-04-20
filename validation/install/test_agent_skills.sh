@@ -776,6 +776,7 @@ assert_contains "$GUIDE_PARTIAL_PATH" "skill-author-by-recording" "guide-partial
 assert_contains "$GUIDE_PARTIAL_PATH" "Installed agent-skill front doors are incomplete on this host." "guide-partial file"
 assert_contains "$GUIDE_PARTIAL_PATH" 'missing `skill-author-by-agent-discovery`' "guide-partial file"
 assert_contains "$GUIDE_PARTIAL_PATH" "clawperator agent-skills update" "guide-partial file"
+assert_contains "$GUIDE_PARTIAL_PATH" "Version metadata is missing for this install." "guide-partial file"
 assert_not_contains "$GUIDE_PARTIAL_PATH" 'Start the guided route with `skill-author-by-agent-discovery`' "guide-partial file"
 
 echo "=== Scenario 9: guide writer prefers configured runtime registry path ==="

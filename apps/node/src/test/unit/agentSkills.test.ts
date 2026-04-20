@@ -68,7 +68,6 @@ describe("copyAgentSkills", () => {
     assert.equal(await readFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "utf8"), "# skill-author-by-recording\n");
     assert.equal(await readFile(join(installedDir, "clawperator-agent-orientation", "agents", "openai.yaml"), "utf8"), "name: demo\n");
     assert.equal(await readFile(join(installedDir, "skill-author-by-agent-discovery", "agents", "openai.yaml"), "utf8"), "name: demo\n");
-    assert.equal(await readFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "utf8"), "# skill-author-by-recording\n");
     assert.equal(await readFile(join(installedDir, "skill-author-by-recording", "agents", "openai.yaml"), "utf8"), "name: demo\n");
     assert.equal(await readlink(join(claudeSkillsDir, "clawperator-agent-orientation")), join(installedDir, "clawperator-agent-orientation"));
     assert.equal(await readlink(join(claudeSkillsDir, "skill-author-by-agent-discovery")), join(installedDir, "skill-author-by-agent-discovery"));

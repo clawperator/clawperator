@@ -1183,7 +1183,7 @@ EOF
                 printf -- '- missing `%s`\n' "skill-author-by-recording" >> "$AGENT_GUIDE_PATH"
             fi
         fi
-        if [ ! -f "$AGENT_SKILLS_GUIDE_DIR/version.txt" ] && [ "$HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL" -eq 1 ] && [ "$HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL" -eq 1 ] && [ "$HAS_SKILL_AUTHORSHIP_RECORDING_SKILL" -eq 1 ]; then
+        if [ ! -f "$AGENT_SKILLS_GUIDE_DIR/version.txt" ] && [ "$HAS_SKILLS" -eq 1 ]; then
             cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
 Version metadata is missing for this install.
