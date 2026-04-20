@@ -10,6 +10,9 @@ This page also defines the zero-results route: when runtime-skill discovery
 finds no relevant match, start with `skill-author-by-agent-discovery` and use
 `skill-author-by-recording` only after discovery returns
 `proceed_to_recording`, or when the route is already well understood.
+If packaged first-party agent-skills are installed, `clawperator-agent-orientation`
+is the first-run packaged front door for this route and should point back to
+this page.
 
 ## When To Read This Page
 
@@ -28,19 +31,33 @@ Continue only when:
 
 If you have not reached that state yet, finish [Setup](setup.md) first.
 
+Before any device-touching command, identify the target device:
+
+```bash
+clawperator devices
+```
+
+If more than one device is connected, carry `--device <device_serial>` through
+later `snapshot`, `skills run`, and direct-action commands.
+
 ## First Route After Install
 
 Use this order:
 
 1. Read this page.
-2. If you need an app-specific capability, start with `clawperator skills`.
-3. If your host already speaks stdio MCP and wants registered tools, use `clawperator mcp serve`.
-4. If you already know you need raw actions and result envelopes, continue to [Quickstart](quickstart.md).
+2. If packaged first-party agent-skills are installed and you are unfamiliar
+   with this host, start with `clawperator-agent-orientation`. It should verify
+   readiness, separate runtime skills from agent-skills, and end with one
+   concrete next step.
+3. If you need an app-specific capability, start with `clawperator skills`.
+4. If your host already speaks stdio MCP and wants registered tools, use `clawperator mcp serve`.
+5. If you already know you need raw actions and result envelopes, continue to [Quickstart](quickstart.md).
 
 ## Choose The Front Door
 
 | Situation | Start here | Why |
 | --- | --- | --- |
+| You are unfamiliar with this host and want the packaged first-run orientation surface | `clawperator-agent-orientation` | Thin packaged router that points back to this page and the canonical docs. |
 | You know the Android package id and want the fastest answer to "what can this host do for this app?" | `clawperator skills for-app <package_id> --json` | `skills for-app` is the primary app-oriented discovery surface. |
 | You only know user-language terms such as app name or intent | `clawperator skills search --keyword <text> --json` | Search is the fallback when you do not have the package id yet. |
 | You already have a skill id and want the exact metadata | `clawperator skills get <skill_id> --json` | Confirms the registry entry before a run. |
@@ -66,6 +83,8 @@ Decision rules:
 - Use `skills search --keyword` when you only have a user-language term.
 - Use `skills get` before `skills run` when you need to confirm the exact id or summary.
 - Use `skills run` only after discovery, not as the first probe.
+- Do not start with `skills list` unless the real task is inventory rather than
+  app-oriented discovery.
 - If discovery returns zero relevant matches and the next job is skill creation
   rather than raw execution, inspect installed agent-skills with
   `clawperator agent-skills list --json`, start with
@@ -175,12 +194,12 @@ clawperator agent-skills list --json
 
 Check:
 
-- `clawperator --help` and `clawperator skills --help` point zero-match users to `clawperator agent-skills list`
-- `clawperator agent-skills --help` names `skill-author-by-agent-discovery` as the zero-results front door and `skill-author-by-recording` as the proving workflow
+- `clawperator --help` and `clawperator skills --help` name `clawperator-agent-orientation` as the first-run surface for unfamiliar hosts and point zero-match users to `clawperator agent-skills list`
+- `clawperator agent-skills --help` names `clawperator-agent-orientation` as the first-run orientation skill, `skill-author-by-agent-discovery` as the zero-results front door, and `skill-author-by-recording` as the proving workflow
 - `skills for-app`, `skills search`, and `skills list` return top-level `skills` and `count`
 - `skills get` returns a top-level `skill`
 - `agent-skills list` returns top-level `skills`, `count`, and `installedDir`
-- `agent-skills list` includes `skill-author-by-agent-discovery` and `skill-author-by-recording` in `skills[].name`
+- `agent-skills list` includes `clawperator-agent-orientation`, `skill-author-by-agent-discovery`, and `skill-author-by-recording` in `skills[].name`
 
 For MCP:
 
