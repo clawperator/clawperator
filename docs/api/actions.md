@@ -425,9 +425,10 @@ Semantics:
 
 - `submit` defaults to `false` in the built-in CLI builders
 - `clear` defaults to `false` in the built-in CLI builders
-- when `clear == true`, Android first dispatches `ACTION_SET_TEXT` with an empty string, then dispatches `ACTION_SET_TEXT` with the requested `text`
-- when `clear == false` or omitted, Android keeps the existing single `ACTION_SET_TEXT` behavior
-- if the requested clear step fails, Android stops before the real text set and the action fails
+- on Android targets that support `ACTION_SET_TEXT`, `clear == true` first dispatches `ACTION_SET_TEXT` with an empty string, then dispatches `ACTION_SET_TEXT` with the requested `text`
+- on those same `ACTION_SET_TEXT` targets, `clear == false` or omitted keeps the existing single `ACTION_SET_TEXT` behavior
+- if the requested clear step fails on that `ACTION_SET_TEXT` path, Android stops before the real text set and the action fails
+- custom editors that rely on the separate API 33 input-connection route are not yet covered by this `clear` guarantee
 
 Success data:
 

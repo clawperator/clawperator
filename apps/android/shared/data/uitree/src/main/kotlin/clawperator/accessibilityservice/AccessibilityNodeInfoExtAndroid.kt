@@ -522,6 +522,16 @@ fun AccessibilityNodeInfo.debugNode(): String {
     return "class=$className text=\"$text\" bounds=$bounds clickable=$isClickable"
 }
 
+/**
+ * Creates a redacted debug string for sensitive flows such as text entry failures.
+ * Omits text-bearing fields so logs do not leak field contents or content descriptions.
+ */
+fun AccessibilityNodeInfo.debugNodeRedacted(): String {
+    val className = className ?: "?"
+    val bounds = boundsInScreenRect
+    return "class=$className bounds=$bounds clickable=$isClickable enabled=$isEnabled"
+}
+
 suspend fun AccessibilityService.dispatchSingleTap(
     x: Float,
     y: Float,

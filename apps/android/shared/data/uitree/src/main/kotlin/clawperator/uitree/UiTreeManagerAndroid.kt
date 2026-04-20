@@ -7,6 +7,7 @@ import clawperator.accessibilityservice.AccessibilityServiceManager
 import clawperator.accessibilityservice.boundsInScreenRect
 import clawperator.accessibilityservice.currentAccessibilityService
 import clawperator.accessibilityservice.debugNode
+import clawperator.accessibilityservice.debugNodeRedacted
 import clawperator.accessibilityservice.dispatchLongPress
 import clawperator.accessibilityservice.dispatchSingleTap
 import clawperator.accessibilityservice.dispatchSwipe
@@ -97,7 +98,7 @@ class UiTreeManagerAndroid(
                 }
             val clearSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, clearArgs)
             if (!clearSucceeded) {
-                Log.d("[UiTreeManager] ACTION_SET_TEXT clear failed for id=${uiNode.id} on ${target.debugNode()}")
+                Log.d("[UiTreeManager] ACTION_SET_TEXT clear failed for id=${uiNode.id} on ${target.debugNodeRedacted()}")
                 return false
             }
         }
@@ -109,7 +110,7 @@ class UiTreeManagerAndroid(
 
         val setTextSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
         if (!setTextSucceeded) {
-            Log.d("[UiTreeManager] ACTION_SET_TEXT failed for id=${uiNode.id} on ${target.debugNode()}")
+            Log.d("[UiTreeManager] ACTION_SET_TEXT failed for id=${uiNode.id} on ${target.debugNodeRedacted()}")
             return false
         }
 
