@@ -12,6 +12,7 @@ Define the canonical `ExecutionAction.type` values, the exact parameters each ac
 - CLI-built payload defaults: `apps/node/src/domain/actions/` and `apps/node/src/domain/observe/`
 - Android payload parsing: `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/agent/AgentCommandParser.kt`
 - Android action/result behavior: `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiAction.kt` and `UiActionEngine.kt`
+- Android text-entry runtime behavior: `apps/android/shared/data/uitree/src/main/kotlin/clawperator/uitree/UiTreeManagerAndroid.kt`
 
 ## General Rules
 
@@ -425,10 +426,18 @@ Semantics:
 
 - `submit` defaults to `false` in the built-in CLI builders
 - `clear` defaults to `false` in the built-in CLI builders
-- on Android targets that support `ACTION_SET_TEXT`, `clear == true` first dispatches `ACTION_SET_TEXT` with an empty string, then dispatches `ACTION_SET_TEXT` with the requested `text`
-- on those same `ACTION_SET_TEXT` targets, `clear == false` or omitted keeps the existing single `ACTION_SET_TEXT` behavior
-- if the requested clear step fails on that `ACTION_SET_TEXT` path, Android stops before the real text set and the action fails
-- custom editors that rely on the separate API 33 input-connection route are not yet covered by this `clear` guarantee
+- Android uses an internal first-match-wins text-entry ladder while keeping the public `enter_text` shape unchanged
+- Android prefers the editable node `ACTION_SET_TEXT` route when it is available because that path already matches current replace-text semantics
+- on that `ACTION_SET_TEXT` route, `clear == true` first dispatches `ACTION_SET_TEXT("")`, then dispatches `ACTION_SET_TEXT` with the requested `text`
+- on that same `ACTION_SET_TEXT` route, `clear == false` or omitted keeps the existing single `ACTION_SET_TEXT` behavior
+- if the requested clear step fails on the `ACTION_SET_TEXT` route, Android stops before the real text set and the action fails
+- on Android 13+ (`Build.VERSION_CODES.TIRAMISU`) when the legacy `ACTION_SET_TEXT` route is unavailable, Android can fall back to the accessibility input-connection path for custom editors
+- that API 33 fallback still preserves replace-style behavior: it selects the full known text before `commitText(text, 1)` when length is available, otherwise it moves the cursor to the end, deletes preceding text, then commits the replacement text
+- that API 33 replace sequence also preserves `clear == true` semantics even though there is no separate public strategy flag
+- `submit == true` is best effort after successful text entry
+- on the legacy route, Android prefers `ACTION_IME_ENTER` when the node exposes it and falls back to a click when it does not
+- on the API 33 input-connection route, Android prefers `performEditorAction(...)`
+- if text entry succeeds but no truthful submit action is available, the step still succeeds and `submit` does not become a new hard-failure condition
 
 Success data:
 
@@ -455,6 +464,27 @@ Example:
   }
 }
 ```
+
+Verification pattern:
+
+```bash
+clawperator type "battery" --id "com.android.settings:id/search_src_text" --clear
+```
+
+Success conditions:
+
+- exit code `0`
+- `envelope.status == "success"`
+- `envelope.stepResults[0].actionType == "enter_text"`
+- `envelope.stepResults[0].success == true`
+- `envelope.stepResults[0].data.clear == "true"`
+
+Android live-route verification:
+
+- when validating against the debug operator on device, operator logs include
+  `enter_text strategy=<strategy_name> submit_method=<submit_method>`
+- current shipped strategy names are `legacy_action_set_text` and
+  `api33_input_connection`
 
 ### `press_key`
 

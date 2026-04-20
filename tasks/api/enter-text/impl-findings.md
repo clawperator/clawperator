@@ -7,8 +7,8 @@ It is intentionally branch-local and temporary while the task pack is active.
 
 - Phase 1 completed in `refactor(android): add enter_text strategy seam`
 - Phase 2 completed in `feat(android): improve enter_text submit routing`
-- Phase 3 in progress locally at the time of this note
-- Phase 4 not started yet
+- Phase 3 completed in `feat(android): add api33 input-connection enter_text path`
+- Phase 4 completed locally at the time of this note
 
 ## Runtime Findings
 
@@ -88,13 +88,20 @@ It is intentionally branch-local and temporary while the task pack is active.
     during exploration.
   - Other candidate surfaces produced timeouts or unreliable command envelopes,
     so they are not evidence.
-- At the time of writing, no live run has shown the new input-method lifecycle
-  logs (`onCreateInputMethod`, `onStartInput`, `onFinishInput`,
-  `onUpdateSelection`) and no live run has emitted
-  `enter_text strategy=api33_input_connection ...`.
-- Because of that, API 33 live verification is currently blocked on proving
-  that the service capability is active on-device and on finding an editor that
-  truthfully requires the custom input-connection route.
+- A later Amazon pass improved the live picture materially:
+  - after clicking into the search surface and targeting
+    `com.amazon.mShop.android.shopping:id/rs_search_src_text`, live logs showed
+    `OperatorAccessibilityInputMethod` `onStartInput(...)` events from the
+    `.dev` accessibility service
+  - that proves the API 33 accessibility input-method capability is active on
+    the device for at least one real editor session
+  - the same run still logged
+    `enter_text strategy=legacy_action_set_text submit_method=not_requested`,
+    so Amazon search remains a legacy-route proof, not an API 33 strategy proof
+- Because of that, the remaining API 33 live-verification gap is now narrower:
+  the service capability is active, but we still do not have a truthful live
+  editor surface that skips `ACTION_SET_TEXT` and forces
+  `api33_input_connection`.
 
 ## Device / Environment Notes
 
@@ -103,6 +110,23 @@ It is intentionally branch-local and temporary while the task pack is active.
 - Local live verification should keep using the `.dev` operator package.
 - Device placeholders must remain redacted in notes and summaries; do not add
   raw serials here.
+
+## Validation Notes
+
+- Phase 3 validation completed with:
+  - `npm --prefix apps/node run build`
+  - `npm --prefix apps/node run test`
+  - `./gradlew shared:test:testDebugUnitTest --tests 'clawperator.uitree.UiTreeManagerAndroidTest'`
+  - `./gradlew app:assembleDebug app:testDebugUnitTest`
+  - `./gradlew app:installDebug`
+  - `git diff --check`
+- Phase 4 validation completed with:
+  - `PATH='/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin' ./scripts/docs_build.sh`
+  - `npm --prefix apps/node run build`
+  - `npm --prefix apps/node run test`
+  - `./gradlew app:assembleDebug app:testDebugUnitTest`
+  - `./gradlew app:installDebug`
+  - `git diff --check`
 
 ## Follow-up Watch List
 

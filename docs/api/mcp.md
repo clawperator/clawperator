@@ -416,11 +416,21 @@ Parameters:
 | --- | --- | --- |
 | `selector` | yes | Target field selector |
 | `text` | yes | Text to enter |
-| `submit` | no | When `true`, submit after entry |
-| `clear` | no | On Android `ACTION_SET_TEXT` targets, when `true` first dispatch `ACTION_SET_TEXT("")`, then set the requested text |
+| `submit` | no | When `true`, request best-effort submit after entry |
+| `clear` | no | Replace-style entry remains the goal. On Android `ACTION_SET_TEXT` targets, `true` first dispatches `ACTION_SET_TEXT("")`; on Android 13+ custom editors the runtime can use the API 33 input-connection fallback while still replacing existing content |
 | `deviceId` | no | Explicit target device |
 | `operatorPackage` | no | Explicit operator package |
 | `timeoutMs` | no | Execution timeout. Defaults to `30000`. |
+
+Behavior notes:
+
+- the MCP `type` tool builds a normal `enter_text` execution and returns the
+  standard execution payload
+- Android prefers a real editor action for `submit=true` when one is available
+- if submit is requested but no truthful submit action exists after text entry,
+  the text-entry step still succeeds
+- for the full action contract and runtime details, see
+  [Actions - `enter_text`](actions.md#enter_text)
 
 Example call:
 
