@@ -41,6 +41,7 @@ describe("copyAgentSkills", () => {
     const root = await makeTempRoot();
     const sourceDir = await createSourceSkills(root, [
       "clawperator-agent-orientation",
+      "clawperator-upgrade",
       "skill-author-by-agent-discovery",
       "skill-author-by-recording",
     ]);
@@ -62,20 +63,25 @@ describe("copyAgentSkills", () => {
     if (!result.ok) {
       assert.fail("expected successful copyAgentSkills result");
     }
-    assert.deepEqual(result.skills, ["clawperator-agent-orientation", "skill-author-by-agent-discovery", "skill-author-by-recording"]);
+    assert.deepEqual(result.skills, ["clawperator-agent-orientation", "clawperator-upgrade", "skill-author-by-agent-discovery", "skill-author-by-recording"]);
     assert.equal(await readFile(join(installedDir, "clawperator-agent-orientation", "SKILL.md"), "utf8"), "# clawperator-agent-orientation\n");
+    assert.equal(await readFile(join(installedDir, "clawperator-upgrade", "SKILL.md"), "utf8"), "# clawperator-upgrade\n");
     assert.equal(await readFile(join(installedDir, "skill-author-by-agent-discovery", "SKILL.md"), "utf8"), "# skill-author-by-agent-discovery\n");
     assert.equal(await readFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "utf8"), "# skill-author-by-recording\n");
     assert.equal(await readFile(join(installedDir, "clawperator-agent-orientation", "agents", "openai.yaml"), "utf8"), "name: demo\n");
+    assert.equal(await readFile(join(installedDir, "clawperator-upgrade", "agents", "openai.yaml"), "utf8"), "name: demo\n");
     assert.equal(await readFile(join(installedDir, "skill-author-by-agent-discovery", "agents", "openai.yaml"), "utf8"), "name: demo\n");
     assert.equal(await readFile(join(installedDir, "skill-author-by-recording", "agents", "openai.yaml"), "utf8"), "name: demo\n");
     assert.equal(await readlink(join(claudeSkillsDir, "clawperator-agent-orientation")), join(installedDir, "clawperator-agent-orientation"));
+    assert.equal(await readlink(join(claudeSkillsDir, "clawperator-upgrade")), join(installedDir, "clawperator-upgrade"));
     assert.equal(await readlink(join(claudeSkillsDir, "skill-author-by-agent-discovery")), join(installedDir, "skill-author-by-agent-discovery"));
     assert.equal(await readlink(join(claudeSkillsDir, "skill-author-by-recording")), join(installedDir, "skill-author-by-recording"));
     assert.equal(await readlink(join(codexSkillsDir, "clawperator-agent-orientation")), join(installedDir, "clawperator-agent-orientation"));
+    assert.equal(await readlink(join(codexSkillsDir, "clawperator-upgrade")), join(installedDir, "clawperator-upgrade"));
     assert.equal(await readlink(join(codexSkillsDir, "skill-author-by-agent-discovery")), join(installedDir, "skill-author-by-agent-discovery"));
     assert.equal(await readlink(join(codexSkillsDir, "skill-author-by-recording")), join(installedDir, "skill-author-by-recording"));
     assert.equal(await readlink(join(agentsSkillsDir, "clawperator-agent-orientation")), join(installedDir, "clawperator-agent-orientation"));
+    assert.equal(await readlink(join(agentsSkillsDir, "clawperator-upgrade")), join(installedDir, "clawperator-upgrade"));
     assert.equal(await readlink(join(agentsSkillsDir, "skill-author-by-agent-discovery")), join(installedDir, "skill-author-by-agent-discovery"));
     assert.equal(await readlink(join(agentsSkillsDir, "skill-author-by-recording")), join(installedDir, "skill-author-by-recording"));
   });
@@ -430,6 +436,7 @@ describe("cmdAgentSkillsInstall", () => {
     const root = await makeTempRoot();
     const sourceDir = await createSourceSkills(root, [
       "clawperator-agent-orientation",
+      "clawperator-upgrade",
       "skill-author-by-agent-discovery",
       "skill-author-by-recording",
     ]);
@@ -456,7 +463,7 @@ describe("cmdAgentSkillsInstall", () => {
       agentDiscoveryDirs: Array<{ label: string; dir: string }>;
     };
 
-    assert.deepEqual(parsed.skills, ["clawperator-agent-orientation", "skill-author-by-agent-discovery", "skill-author-by-recording"]);
+    assert.deepEqual(parsed.skills, ["clawperator-agent-orientation", "clawperator-upgrade", "skill-author-by-agent-discovery", "skill-author-by-recording"]);
     assert.equal(parsed.installedDir, installedDir);
     assert.equal(parsed.claudeSkillsDir, claudeSkillsDir);
     assert.equal(parsed.codexSkillsDir, codexSkillsDir);
@@ -480,7 +487,7 @@ describe("cmdAgentSkillsList", () => {
       skills: [],
       count: 0,
       installedDir: join(root, "missing-install-dir"),
-      message: "No installed agent-skills found. Run clawperator agent-skills install to get clawperator-agent-orientation, skill-author-by-agent-discovery, and skill-author-by-recording.",
+      message: "No installed agent-skills found. Run clawperator agent-skills install to get clawperator-agent-orientation, clawperator-upgrade, skill-author-by-agent-discovery, and skill-author-by-recording.",
     });
   });
 
@@ -488,12 +495,15 @@ describe("cmdAgentSkillsList", () => {
     const root = await makeTempRoot();
     const installDir = join(root, "home", ".clawperator", "agent-skills");
     const orientationDir = join(installDir, "clawperator-agent-orientation");
+    const upgradeDir = join(installDir, "clawperator-upgrade");
     const discoveryDir = join(installDir, "skill-author-by-agent-discovery");
     const skillDir = join(installDir, "skill-author-by-recording");
     await mkdir(orientationDir, { recursive: true });
+    await mkdir(upgradeDir, { recursive: true });
     await mkdir(discoveryDir, { recursive: true });
     await mkdir(skillDir, { recursive: true });
     await writeFile(join(orientationDir, "SKILL.md"), "# clawperator-agent-orientation\n", "utf8");
+    await writeFile(join(upgradeDir, "SKILL.md"), "# clawperator-upgrade\n", "utf8");
     await writeFile(join(discoveryDir, "SKILL.md"), "# skill-author-by-agent-discovery\n", "utf8");
     await writeFile(join(skillDir, "SKILL.md"), "# skill-author-by-recording\n", "utf8");
 
@@ -509,6 +519,10 @@ describe("cmdAgentSkillsList", () => {
           skillPath: join(orientationDir, "SKILL.md"),
         },
         {
+          name: "clawperator-upgrade",
+          skillPath: join(upgradeDir, "SKILL.md"),
+        },
+        {
           name: "skill-author-by-agent-discovery",
           skillPath: join(discoveryDir, "SKILL.md"),
         },
@@ -517,7 +531,7 @@ describe("cmdAgentSkillsList", () => {
           skillPath: join(skillDir, "SKILL.md"),
         },
       ],
-      count: 3,
+      count: 4,
       installedDir: installDir,
     });
   });
@@ -544,6 +558,6 @@ describe("cmdAgentSkillsList", () => {
 describe("listPackagedAgentSkills", () => {
   it("lists all packaged first-party agent-skills from the repo tree", async () => {
     const skills = await listPackagedAgentSkills();
-    assert.deepEqual(skills, ["clawperator-agent-orientation", "skill-author-by-agent-discovery", "skill-author-by-recording"]);
+    assert.deepEqual(skills, ["clawperator-agent-orientation", "clawperator-upgrade", "skill-author-by-agent-discovery", "skill-author-by-recording"]);
   });
 });

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Clawperator Upgrade"
+  short_description: "Upgrade Clawperator through the canonical installer and verify readiness"
+  default_prompt: "Use $clawperator-upgrade when this machine already has Clawperator and needs the truthful whole-product upgrade path. Run `curl -fsSL https://clawperator.com/install.sh | bash` first, then run `clawperator doctor --json`, report whether `criticalOk` is true, and end with one explicit next command or one canonical repair link. Do not replace the installer with `npm install -g clawperator@latest`, `clawperator skills update`, or `clawperator agent-skills update` as the primary path."

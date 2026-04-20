@@ -298,6 +298,7 @@ Notes:
   - Shows the absolute SKILL.md path for each installed agent-skill
   - Use this when you need to inspect the installed host-agent helpers on this machine
   - 'clawperator-agent-orientation' is the first-run orientation skill for unfamiliar hosts
+  - 'clawperator-upgrade' is the whole-product upgrade route through install.sh and doctor
   - 'skill-author-by-agent-discovery' is the zero-results front door
   - 'skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'
   - Runtime skills still live under 'clawperator skills ...'; agent-skills are separate host-agent helpers
@@ -2113,6 +2114,7 @@ Notes:
   - Use 'clawperator skills search --keyword <text>' when you only have app names or user-language intent terms.
   - Use 'clawperator skills get <skill_id>' before 'clawperator skills run <skill_id>' when discovery already returned an id.
   - If the current host is unfamiliar, inspect 'clawperator agent-skills list' and start with 'clawperator-agent-orientation' before choosing runtime skills, MCP, or raw CLI actions.
+  - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator agent-skills list' and use 'clawperator-upgrade' before trying component-level repair commands.
   - If runtime-skill discovery returns no relevant match and you need guided skill creation help, use 'clawperator agent-skills list' and start with 'skill-author-by-agent-discovery'.
   - Use 'skill-author-by-recording' after discovery returns 'proceed_to_recording', or when the route is already well understood and you need the proving workflow.
   - If your host already supports stdio MCP and wants registered tools instead of runtime-skill discovery, use 'clawperator mcp serve'.
@@ -2313,6 +2315,7 @@ Usage:
 Notes:
   - Use 'clawperator agent-skills list' to inspect the installed host-agent workflows on this machine.
   - 'clawperator-agent-orientation' is the first-run orientation skill when the current host is unfamiliar.
+  - 'clawperator-upgrade' is the packaged whole-product upgrade route through install.sh and doctor.
   - 'skill-author-by-agent-discovery' is the zero-results front door when runtime-skill discovery found no relevant match.
   - 'skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'.
   - Runtime skills still live under 'clawperator skills ...'; agent-skills are separate host-agent helpers.
@@ -2755,6 +2758,7 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "Notes:",
     "  - Post-install host-agent orientation: https://docs.clawperator.com/host-agents/",
     "  - If the current host is unfamiliar, inspect 'clawperator agent-skills list' and start with 'clawperator-agent-orientation' before choosing runtime skills, MCP, or raw CLI actions.",
+    "  - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator agent-skills list' and use 'clawperator-upgrade' before trying component-level repair commands.",
     "  - Start runtime-skill discovery with 'clawperator skills for-app <package_id>' when you know the Android package, or 'clawperator skills search --keyword <text>' when you do not.",
     "  - If runtime-skill discovery returns no relevant match and you need guided authoring help, use 'clawperator agent-skills list' and start with 'skill-author-by-agent-discovery'.",
     "  - Use 'skill-author-by-recording' only after discovery returns 'proceed_to_recording', or when the app route is already well understood and you need the proving workflow.",
