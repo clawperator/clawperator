@@ -1,6 +1,6 @@
 ---
 name: clawperator-agent-orientation
-description: Get an unfamiliar agent operational with Clawperator in a few minutes by checking readiness, choosing the correct front door, and routing to the canonical docs for runtime skills, MCP, snapshots, clicks, and direct execution.
+description: First-run orientation for unfamiliar agents. Verifies host readiness, routes to the correct front door (runtime skills, agent-skills, MCP, or raw CLI), and ends with one canonical doc link.
 ---
 
 # Clawperator Agent Orientation
@@ -14,32 +14,17 @@ which canonical docs to trust."
 
 ## What This Skill Owns
 
-- verify the local host is ready to use
-- choose the correct front door for the next step
-- point the agent to the canonical docs for the chosen path
-- give the shortest useful command sequence for a cold start
+- verify the local host is ready to use Clawperator
+- choose the correct front door for the agent's next step
+- end with one canonical doc link for the chosen route
 
 ## What This Skill Does Not Own
 
-- do not become a second source of truth for API contracts
-- do not replace `https://docs.clawperator.com/host-agents/`
+- do not restate API contracts or action parameters in full
+- do not replace `https://docs.clawperator.com/host-agents/` as the source of truth
 - do not replace `skill-author-by-agent-discovery`
 - do not replace `skill-author-by-recording`
 - do not run an unbounded discovery or authoring workflow inside this skill
-
-## Required Reading During Use
-
-Read these canonical docs and reuse their current contracts:
-
-- `https://docs.clawperator.com/host-agents/`
-- `https://docs.clawperator.com/setup/`
-- `https://docs.clawperator.com/quickstart/`
-- `https://docs.clawperator.com/api/overview/`
-- `https://docs.clawperator.com/api/snapshot/`
-- `https://docs.clawperator.com/api/mcp/`
-
-Use the docs above as the source of truth. This skill should route to them, not
-restate them in full.
 
 ## Workflow
 
@@ -56,8 +41,9 @@ Continue only when:
 - exit code is `0`
 - `criticalOk` is `true`
 
-If readiness fails, stop and route the user to `setup.md` / the public setup
-page rather than guessing.
+If `criticalOk` is `false`, stop immediately. Tell the agent to finish setup
+at `https://docs.clawperator.com/setup/` before continuing. Do not guess or
+attempt a workaround.
 
 ### 2. Choose the correct front door
 
@@ -71,40 +57,9 @@ Use this decision table:
 | The host already supports stdio MCP and wants registered tools | `clawperator mcp serve` |
 | You already know the exact direct action or payload you want | raw CLI / local API via quickstart and API overview |
 
-### 3. Call out the critical commands
+### 3. Run the cold-start checklist
 
-For first-run orientation, point to these commands before deeper detail:
-
-```bash
-clawperator devices
-clawperator snapshot --json
-clawperator click --text "Settings" --json
-clawperator skills list --json
-clawperator agent-skills list --json
-```
-
-If the host wants MCP, add:
-
-```bash
-clawperator mcp serve
-```
-
-### 4. Explain the operating loop briefly
-
-Keep the explanation short:
-
-1. Observe with `snapshot` or runtime-skill discovery.
-2. Decide whether the next step is runtime skills, agent-skills, MCP, or raw actions.
-3. Act with the smallest truthful command surface.
-
-### 5. End with one clear next step
-
-Do not dump every possible path. Finish by naming the single next command or
-doc page the agent should use now.
-
-## First 5 Commands
-
-Use this as the default cold-start checklist when the host is ready:
+Run these commands in order when the host is ready:
 
 ```bash
 clawperator doctor --json
@@ -114,14 +69,35 @@ clawperator skills list --json
 clawperator agent-skills list --json
 ```
 
+Add `clawperator mcp serve` only if the host has already chosen the MCP route.
+
+The checklist shows what is connected, what the screen looks like right now,
+what runtime skills are installed, and what agent-skills are available. It does
+not choose a route - that is Step 2.
+
+### 4. Explain the operating loop in one sentence
+
+Clawperator observes with `snapshot`, decides using runtime skills or direct
+actions, and acts on the device with the smallest truthful command surface.
+
+### 5. End with one explicit next step
+
+Name one command or one URL - not a taxonomy. Examples of good endings:
+
+- "Your next step is `clawperator skills for-app <package_id> --json`."
+- "Runtime-skill discovery returned zero matches. Use `skill-author-by-agent-discovery` next. See `https://docs.clawperator.com/host-agents/`."
+- "You are ready for raw actions. See `https://docs.clawperator.com/quickstart/`."
+
+Use the routing table from Step 2 to pick the single correct ending.
+
 ## Output Style
 
-When using this skill:
+Be concise. Name the chosen front door explicitly and end with one link:
 
-- be concise
-- name the chosen front door explicitly
-- link to the canonical public doc page for that route
-- if the next job is zero-results routing, name
-  `skill-author-by-agent-discovery` directly
-- if the next job is proving from a known route, name
-  `skill-author-by-recording` directly
+| Chosen front door | End with this link |
+| --- | --- |
+| `clawperator skills` | `https://docs.clawperator.com/host-agents/` |
+| `skill-author-by-agent-discovery` | `https://docs.clawperator.com/host-agents/` |
+| `skill-author-by-recording` | `https://docs.clawperator.com/skills/authoring/` |
+| `clawperator mcp serve` | `https://docs.clawperator.com/api/mcp/` |
+| raw CLI / direct actions | `https://docs.clawperator.com/quickstart/` |
