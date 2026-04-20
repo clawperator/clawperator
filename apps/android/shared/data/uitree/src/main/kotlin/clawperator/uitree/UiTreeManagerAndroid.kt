@@ -2,8 +2,10 @@ package clawperator.uitree
 
 import action.log.Log
 import android.accessibilityservice.AccessibilityService
+import android.os.Build
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import clawperator.accessibilityservice.AccessibilityServiceManager
 import clawperator.accessibilityservice.boundsInScreenRect
 import clawperator.accessibilityservice.currentAccessibilityService
@@ -99,10 +101,11 @@ class UiTreeManagerAndroid(
             if (!strategy.supports(request.replacementSemantics)) {
                 continue
             }
-            if (strategy.attempt(request)) {
-                Log.d("[UiTreeManager] enter_text strategy=${strategy.name} succeeded for id=${uiNode.id}")
-                return true
-            }
+            val attempt = strategy.attempt(request) ?: continue
+            Log.d(
+                "[UiTreeManager] enter_text strategy=${strategy.name} submit_method=${attempt.submitMethod.wireValue} succeeded for id=${uiNode.id}",
+            )
+            return true
         }
 
         Log.d("[UiTreeManager] All enter_text strategies failed for id=${uiNode.id}")
@@ -256,7 +259,20 @@ class UiTreeManagerAndroid(
 
         fun supports(replacementSemantics: ReplacementSemantics): Boolean
 
-        suspend fun attempt(request: TextEntryRequest): Boolean
+        suspend fun attempt(request: TextEntryRequest): TextEntryAttemptResult?
+    }
+
+    private data class TextEntryAttemptResult(
+        val submitMethod: SubmitMethod,
+    )
+
+    private enum class SubmitMethod(
+        val wireValue: String,
+    ) {
+        NotRequested("not_requested"),
+        ImeEnterAction("ime_action"),
+        ClickFallback("click_fallback"),
+        Unavailable("submit_unavailable"),
     }
 
     private object LegacySetTextStrategy : TextEntryStrategy {
@@ -265,7 +281,7 @@ class UiTreeManagerAndroid(
         override fun supports(replacementSemantics: ReplacementSemantics): Boolean =
             replacementSemantics == ReplacementSemantics.ReplaceExistingContent
 
-        override suspend fun attempt(request: TextEntryRequest): Boolean {
+        override suspend fun attempt(request: TextEntryRequest): TextEntryAttemptResult? {
             val target = request.target
 
             // Best-effort focus before setting text.
@@ -286,7 +302,7 @@ class UiTreeManagerAndroid(
                     Log.d(
                         "[UiTreeManager] ACTION_SET_TEXT clear failed for id=${request.uiNode.id} on ${target.debugNodeRedacted()}",
                     )
-                    return false
+                    return null
                 }
             }
 
@@ -298,16 +314,41 @@ class UiTreeManagerAndroid(
             val setTextSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
             if (!setTextSucceeded) {
                 Log.d("[UiTreeManager] ACTION_SET_TEXT failed for id=${request.uiNode.id} on ${target.debugNodeRedacted()}")
+                return null
+            }
+
+            return TextEntryAttemptResult(submitMethod = performLegacySubmit(target, request.submit))
+        }
+
+        private fun performLegacySubmit(
+            target: AccessibilityNodeInfo,
+            submitRequested: Boolean,
+        ): SubmitMethod {
+            if (!submitRequested) {
+                return SubmitMethod.NotRequested
+            }
+
+            if (
+                supportsImeEnterAction(target) &&
+                target.performAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_IME_ENTER.id)
+            ) {
+                return SubmitMethod.ImeEnterAction
+            }
+
+            return if (target.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                SubmitMethod.ClickFallback
+            } else {
+                SubmitMethod.Unavailable
+            }
+        }
+
+        private fun supportsImeEnterAction(target: AccessibilityNodeInfo): Boolean {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
                 return false
             }
-
-            if (request.submit) {
-                // Not all API levels/vendors expose a reliable IME submit action here.
-                // Best-effort: click target after text set to trigger app-side listeners.
-                target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            return AccessibilityNodeInfoCompat.wrap(target).actionList.any { action ->
+                action.id == AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_IME_ENTER.id
             }
-
-            return true
         }
     }
 }
