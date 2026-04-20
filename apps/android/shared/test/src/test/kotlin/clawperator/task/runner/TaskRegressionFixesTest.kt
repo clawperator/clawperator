@@ -442,7 +442,6 @@ class TaskRegressionFixesTest : ActionTest {
             uiScope.enterText(
                 matcher = NodeMatcher(resourceId = "com.example:id/search"),
                 text = "hello",
-                clear = false,
                 submit = false,
                 retry = TaskRetry.None,
             )

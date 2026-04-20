@@ -39,8 +39,8 @@ interface UiTreeManager {
     suspend fun setText(
         uiNode: UiNode,
         text: String,
-        clear: Boolean = false,
         submit: Boolean = false,
+        clear: Boolean = false,
     ): Boolean
 
     /**

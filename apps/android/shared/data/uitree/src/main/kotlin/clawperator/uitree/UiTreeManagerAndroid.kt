@@ -77,8 +77,8 @@ class UiTreeManagerAndroid(
     override suspend fun setText(
         uiNode: UiNode,
         text: String,
-        clear: Boolean,
         submit: Boolean,
+        clear: Boolean,
     ): Boolean {
         val accessibilityNodeInfo = uiNode.accessibilityNodeInfo as? AccessibilityNodeInfo ?: return false
         val target = accessibilityNodeInfo.firstEditableAncestorOrSelf() ?: accessibilityNodeInfo

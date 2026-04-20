@@ -507,8 +507,8 @@ class TaskUiScopeDefault(
     override suspend fun enterText(
         matcher: NodeMatcher,
         text: String,
-        clear: Boolean,
         submit: Boolean,
+        clear: Boolean,
         retry: TaskRetry,
     ) = withRetry(
         retry = retry,

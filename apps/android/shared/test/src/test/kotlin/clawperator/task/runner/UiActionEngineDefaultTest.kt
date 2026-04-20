@@ -160,6 +160,41 @@ class UiActionEngineDefaultTest : ActionTest {
         }
 
     @Test
+    fun `execute enter_text defaults clear false when omitted`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope()
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan =
+                        UiActionPlan(
+                            commandId = "cmd-enter-text-default-clear",
+                            taskId = "task-enter-text-default-clear",
+                            source = "test",
+                            actions =
+                                listOf(
+                                    UiAction.EnterText(
+                                        id = "type-1",
+                                        matcher = nodeMatcher { resourceId("com.example:id/search") },
+                                        text = "hello",
+                                        submit = true,
+                                    ),
+                                ),
+                        ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("enter_text", stepResult.actionType)
+            assertEquals("hello", uiScope.enteredText)
+            assertEquals(false, uiScope.enterTextClear)
+            assertEquals(true, uiScope.enterTextSubmit)
+            assertEquals("false", stepResult.data["clear"])
+        }
+
+    @Test
     fun `execute snapshot_ui returns overlay metadata when available`() =
         actionTest {
             val uiScope = RecordingTaskUiScope()
@@ -1832,8 +1867,8 @@ open class RecordingTaskUiScope(
     override suspend fun enterText(
         matcher: NodeMatcher,
         text: String,
-        clear: Boolean,
         submit: Boolean,
+        clear: Boolean,
         retry: TaskRetry,
     ) {
         enteredText = text
