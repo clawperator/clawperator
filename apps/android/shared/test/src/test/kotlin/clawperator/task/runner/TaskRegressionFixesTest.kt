@@ -19,8 +19,10 @@ import clawperator.urlnavigator.UrlNavigator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.advanceUntilIdle
 import java.lang.reflect.Proxy
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -29,6 +31,12 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TaskRegressionFixesTest : ActionTest {
+    private data class RecordedSetTextCall(
+        val text: String,
+        val clear: Boolean,
+        val submit: Boolean,
+    )
+
     @Test
     fun `wait_for_navigation times out when target package never changes`() =
         actionTest {
@@ -259,6 +267,186 @@ class TaskRegressionFixesTest : ActionTest {
             advanceUntilIdle()
 
             assertFalse(result.await().success)
+        }
+
+    @Test
+    fun `enterText emits clear failure context when setText fails`() =
+        actionTest {
+            val events = mutableListOf<TaskEvent>()
+            val setTextCalls = mutableListOf<RecordedSetTextCall>()
+            val sink =
+                object : TaskStatusSink {
+                    override fun emit(event: TaskEvent) {
+                        events += event
+                    }
+                }
+            val uiScope =
+                TaskUiScopeDefault(
+                    uiTreeInspector =
+                        StaticUiTreeInspector(
+                            UiTree(
+                                root =
+                                    testNode(
+                                        id = "root",
+                                        role = UiRole.Container,
+                                        children =
+                                            listOf(
+                                                testNode(
+                                                    id = "search",
+                                                    role = UiRole.TextField,
+                                                    resourceId = "com.example:id/search",
+                                                ),
+                                            ),
+                                    ),
+                                windowId = 1,
+                            ),
+                        ),
+                    uiTreeFilterer = IdentityUiTreeFilterer,
+                    uiTreeFormatter = unusedProxy(),
+                    uiTreeManager =
+                        object : UiTreeManager {
+                            override suspend fun triggerClick(uiNode: UiNode, clickTypes: clawperator.uitree.UiTreeClickTypes): Boolean =
+                                error("unused in test")
+
+                            override suspend fun clickAt(
+                                x: Float,
+                                y: Float,
+                                clickTypes: clawperator.uitree.UiTreeClickTypes,
+                            ): Boolean = error("unused in test")
+
+                            override suspend fun setText(
+                                uiNode: UiNode,
+                                text: String,
+                                submit: Boolean,
+                                clear: Boolean,
+                            ): Boolean {
+                                setTextCalls += RecordedSetTextCall(text = text, clear = clear, submit = submit)
+                                return false
+                            }
+
+                            override suspend fun swipeWithinVertical(
+                                uiNode: UiNode,
+                                startYRatio: Float,
+                                endYRatio: Float,
+                                durationMs: Long,
+                            ): Boolean = error("unused in test")
+
+                            override suspend fun swipeWithinHorizontal(
+                                uiNode: UiNode,
+                                startXRatio: Float,
+                                endXRatio: Float,
+                                durationMs: Long,
+                            ): Boolean = error("unused in test")
+                        },
+                    coroutineScopeIo = backgroundScope,
+                )
+
+            val error =
+                withContext(EmptyCoroutineContext + TaskStatusElement(sink)) {
+                    assertFailsWith<IllegalStateException> {
+                        uiScope.enterText(
+                            matcher = NodeMatcher(resourceId = "com.example:id/search"),
+                            text = "hello",
+                            submit = false,
+                            clear = true,
+                            retry = TaskRetry.None,
+                        )
+                    }
+                }
+
+            assertEquals("Failed to set text on matching UI node", error.message)
+            assertEquals(listOf(RecordedSetTextCall(text = "hello", clear = true, submit = false)), setTextCalls)
+            assertTrue(
+                events.any { event ->
+                    event is TaskEvent.StageFailure &&
+                        event.id.contains("enterText(") &&
+                        event.id.contains("resourceId=com.example:id/search") &&
+                        event.reason == "Failed to set text on matching UI node"
+                },
+            )
+            assertTrue(
+                events.any { event ->
+                    event is TaskEvent.Log &&
+                        event.message.contains("failure_point=set_text_failed") &&
+                        event.message.contains("clear=true") &&
+                        event.message.contains("submit=false")
+                },
+            )
+        }
+
+    @Test
+    fun `enterText forwards default false clear and submit to setText`() =
+        actionTest {
+            val setTextCalls = mutableListOf<RecordedSetTextCall>()
+            val uiScope =
+                TaskUiScopeDefault(
+                    uiTreeInspector =
+                        StaticUiTreeInspector(
+                            UiTree(
+                                root =
+                                    testNode(
+                                        id = "root",
+                                        role = UiRole.Container,
+                                        children =
+                                            listOf(
+                                                testNode(
+                                                    id = "search",
+                                                    role = UiRole.TextField,
+                                                    resourceId = "com.example:id/search",
+                                                ),
+                                            ),
+                                    ),
+                                windowId = 1,
+                            ),
+                        ),
+                    uiTreeFilterer = IdentityUiTreeFilterer,
+                    uiTreeFormatter = unusedProxy(),
+                    uiTreeManager =
+                        object : UiTreeManager {
+                            override suspend fun triggerClick(uiNode: UiNode, clickTypes: clawperator.uitree.UiTreeClickTypes): Boolean =
+                                error("unused in test")
+
+                            override suspend fun clickAt(
+                                x: Float,
+                                y: Float,
+                                clickTypes: clawperator.uitree.UiTreeClickTypes,
+                            ): Boolean = error("unused in test")
+
+                            override suspend fun setText(
+                                uiNode: UiNode,
+                                text: String,
+                                submit: Boolean,
+                                clear: Boolean,
+                            ): Boolean {
+                                setTextCalls += RecordedSetTextCall(text = text, clear = clear, submit = submit)
+                                return true
+                            }
+
+                            override suspend fun swipeWithinVertical(
+                                uiNode: UiNode,
+                                startYRatio: Float,
+                                endYRatio: Float,
+                                durationMs: Long,
+                            ): Boolean = error("unused in test")
+
+                            override suspend fun swipeWithinHorizontal(
+                                uiNode: UiNode,
+                                startXRatio: Float,
+                                endXRatio: Float,
+                                durationMs: Long,
+                            ): Boolean = error("unused in test")
+                        },
+                    coroutineScopeIo = backgroundScope,
+                )
+
+            uiScope.enterText(
+                matcher = NodeMatcher(resourceId = "com.example:id/search"),
+                text = "hello",
+                submit = false,
+                retry = TaskRetry.None,
+            )
+
+            assertEquals(listOf(RecordedSetTextCall(text = "hello", clear = false, submit = false)), setTextCalls)
         }
 }
 

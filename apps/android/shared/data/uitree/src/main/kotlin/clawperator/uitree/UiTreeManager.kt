@@ -40,6 +40,7 @@ interface UiTreeManager {
         uiNode: UiNode,
         text: String,
         submit: Boolean = false,
+        clear: Boolean = false,
     ): Boolean
 
     /**

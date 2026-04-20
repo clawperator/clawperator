@@ -61,8 +61,9 @@ expanding the public API into transport-specific flags or strategy knobs.
 
 ## Out of Scope
 
-- The dedicated `clear` contract bug, which has its own task pack in
-  `tasks/api/clear/` and must not be folded into this pack
+- Reworking the already-shipped baseline `clear` contract on the legacy
+  `ACTION_SET_TEXT` route. This pack only extends that existing `clear`
+  behavior to the API 33 input-connection route in Phase 3.
 - New public `enter_text` parameters such as `mode`, `strategy`, or
   `preferInputConnection`, unless later implementation evidence proves the
   stable API goal impossible and this plan is updated first
@@ -148,15 +149,12 @@ expanding the public API into transport-specific flags or strategy knobs.
 - Clipboard-based fallback is out of scope for this pack unless the plan is
   updated first with explicit privacy guardrails, including preserving and
   restoring clipboard state and avoiding durable logging of clipboard contents.
-- Do not add a `clear` parameter to the strategy seam interface in Phases 1
-  and 2. If the dedicated `clear` bug fix (`tasks/api/clear/`) ships before
-  Phase 1 of this pack begins, carry the existing `clear` field through the
-  seam interface unchanged. In Phase 3, if the clear bug fix has shipped,
-  extend `clear` behavior to the API 33 `InputConnection` route: the selection-
-  based replace sequence inherently satisfies `clear=true` semantics, so ensure
-  the selection step is never skipped when `clear=true` is passed. If the
-  `clear` bug fix has not yet shipped by Phase 3, do not add a `clear` parameter
-  to the API 33 path at that time.
+- Do not invent a new `clear` parameter for the strategy seam in Phases 1 and
+  2. Carry the existing shipped `clear` field through the seam unchanged. In
+  Phase 3, extend that existing `clear` behavior to the API 33
+  `InputConnection` route: the selection-based replace sequence inherently
+  satisfies `clear=true` semantics, so ensure the selection step is never
+  skipped when `clear=true` is passed.
 - Every phase that introduces behavior must ship the tests that prove it in the
   same phase and commit.
 - Unit tests are the primary gate for the API 33 path because live validation

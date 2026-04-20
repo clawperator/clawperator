@@ -415,6 +415,7 @@ class TaskUiScopeTest(
         matcher: NodeMatcher,
         text: String,
         submit: Boolean,
+        clear: Boolean,
         retry: TaskRetry,
     ) {
         val node =
@@ -425,7 +426,7 @@ class TaskUiScopeTest(
             throw IllegalStateException("Node is not editable: ${node.label}")
         }
 
-        println("[TaskUiScopeTest] Entered text into node: ${node.label} (len=${text.length}, submit=$submit)")
+        println("[TaskUiScopeTest] Entered text into node: ${node.label} (len=${text.length}, clear=$clear, submit=$submit)")
     }
 
     /**

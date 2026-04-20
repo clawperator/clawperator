@@ -136,6 +136,7 @@ sealed interface UiAction {
         val matcher: NodeMatcher,
         val text: String,
         val submit: Boolean = false,
+        val clear: Boolean = false,
         val retry: TaskRetry = TaskRetryPresets.UiReadiness,
     ) : UiAction
 

@@ -130,6 +130,117 @@ class AgentCommandParserDefaultTest {
     }
 
     @Test
+    fun `parse enter_text clear true`() {
+        val action = parseSingleAction(
+            """
+            {
+              "id": "type-1",
+              "type": "enter_text",
+              "params": {
+                "matcher": { "resourceId": "com.example:id/search" },
+                "text": "hello",
+                "clear": true
+              }
+            }
+            """.trimIndent(),
+        )
+
+        val enterText = assertIs<UiAction.EnterText>(action)
+        assertTrue(enterText.clear)
+    }
+
+    @Test
+    fun `parse enter_text clear false`() {
+        val action = parseSingleAction(
+            """
+            {
+              "id": "type-1",
+              "type": "enter_text",
+              "params": {
+                "matcher": { "resourceId": "com.example:id/search" },
+                "text": "hello",
+                "clear": false
+              }
+            }
+            """.trimIndent(),
+        )
+
+        val enterText = assertIs<UiAction.EnterText>(action)
+        assertEquals(false, enterText.clear)
+    }
+
+    @Test
+    fun `parse enter_text clear defaults false when absent`() {
+        val action = parseSingleAction(
+            """
+            {
+              "id": "type-1",
+              "type": "enter_text",
+              "params": {
+                "matcher": { "resourceId": "com.example:id/search" },
+                "text": "hello"
+              }
+            }
+            """.trimIndent(),
+        )
+
+        val enterText = assertIs<UiAction.EnterText>(action)
+        assertEquals(false, enterText.clear)
+    }
+
+    @Test
+    fun `parse enter_text rejects non boolean clear string`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-1",
+              "taskId": "task-1",
+              "source": "debug",
+              "actions": [
+                {
+                  "id": "type-1",
+                  "type": "enter_text",
+                  "params": {
+                    "matcher": { "resourceId": "com.example:id/search" },
+                    "text": "hello",
+                    "clear": "true"
+                  }
+                }
+              ]
+            }
+            """.trimIndent()
+
+        val result = parser.parse(payload)
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `parse enter_text rejects non boolean clear number`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-1",
+              "taskId": "task-1",
+              "source": "debug",
+              "actions": [
+                {
+                  "id": "type-1",
+                  "type": "enter_text",
+                  "params": {
+                    "matcher": { "resourceId": "com.example:id/search" },
+                    "text": "hello",
+                    "clear": 1
+                  }
+                }
+              ]
+            }
+            """.trimIndent()
+
+        val result = parser.parse(payload)
+        assertTrue(result.isFailure)
+    }
+
+    @Test
     fun `parse rejects blank recording session id`() {
         val payload =
             """
@@ -402,5 +513,21 @@ class AgentCommandParserDefaultTest {
         assertTrue(result.isSuccess)
         val action = result.getOrThrow().actions[0] as UiAction.PressKey
         assertEquals(UiSystemKey.BACK, action.key)
+    }
+
+    private fun parseSingleAction(actionJson: String): UiAction {
+        val payload =
+            """
+            {
+              "commandId": "cmd-1",
+              "taskId": "task-1",
+              "source": "debug",
+              "actions": [
+                $actionJson
+              ]
+            }
+            """.trimIndent()
+
+        return parser.parse(payload).getOrThrow().actions.single()
     }
 }

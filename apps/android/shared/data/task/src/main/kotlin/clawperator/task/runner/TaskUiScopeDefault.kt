@@ -508,6 +508,7 @@ class TaskUiScopeDefault(
         matcher: NodeMatcher,
         text: String,
         submit: Boolean,
+        clear: Boolean,
         retry: TaskRetry,
     ) = withRetry(
         retry = retry,
@@ -515,6 +516,7 @@ class TaskUiScopeDefault(
         successPayload = { _, elapsedMs, attempt ->
             payload(
                 "matcher" to matcher.toString(),
+                "clear" to clear,
                 "submit" to submit,
                 "text_length" to text.length,
                 "elapsed_ms" to elapsedMs,
@@ -531,6 +533,7 @@ class TaskUiScopeDefault(
                 }
             payload(
                 "matcher" to matcher.toString(),
+                "clear" to clear,
                 "submit" to submit,
                 "text_length" to text.length,
                 "failure_point" to failurePoint,
@@ -538,7 +541,7 @@ class TaskUiScopeDefault(
             )
         },
     ) {
-        Log.d("$TAG Entering text into node matching: $matcher (len=${text.length}, submit=$submit)")
+        Log.d("$TAG Entering text into node matching: $matcher (len=${text.length}, clear=$clear, submit=$submit)")
 
         val uiTreeRaw =
             uiTreeInspector.getCurrentUiTree()
@@ -550,7 +553,13 @@ class TaskUiScopeDefault(
             findNodeByMatcher(matcher, uiTree)
                 ?: throw IllegalStateException("No UI node found matching criteria: $matcher")
 
-        val setTextSuccessful = uiTreeManager.setText(uiNode, text, submit)
+        val setTextSuccessful =
+            uiTreeManager.setText(
+                uiNode = uiNode,
+                text = text,
+                submit = submit,
+                clear = clear,
+            )
         if (!setTextSuccessful) {
             throw IllegalStateException("Failed to set text on matching UI node")
         }

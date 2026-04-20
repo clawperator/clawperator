@@ -417,23 +417,29 @@ Example:
 | Required | `matcher`, `text` |
 | `matcher` | required `NodeMatcher` |
 | `text` | required non-empty string |
+| `clear` | optional boolean |
 | `submit` | optional boolean |
 | `retry` | optional retry object in raw `exec` JSON; Android defaults to `UiReadiness` |
 
 Semantics:
 
 - `submit` defaults to `false` in the built-in CLI builders
-- the shared `ActionParams` schema still includes `clear`, but the current Android parser and `UiAction.EnterText` model do not consume it, so do not rely on it
+- `clear` defaults to `false` in the built-in CLI builders
+- on Android targets that support `ACTION_SET_TEXT`, `clear == true` first dispatches `ACTION_SET_TEXT` with an empty string, then dispatches `ACTION_SET_TEXT` with the requested `text`
+- on those same `ACTION_SET_TEXT` targets, `clear == false` or omitted keeps the existing single `ACTION_SET_TEXT` behavior
+- if the requested clear step fails on that `ACTION_SET_TEXT` path, Android stops before the real text set and the action fails
+- custom editors that rely on the separate API 33 input-connection route are not yet covered by this `clear` guarantee
 
 Success data:
 
 - Node does not declare a richer static schema here
-- current Android runtime behavior returns `data.text` and `data.submit`
+- current Android runtime behavior returns `data.text`, `data.clear`, and `data.submit`
 
 Common failures:
 
 - `EXECUTION_VALIDATION_FAILED` for missing matcher or blank text
 - runtime failures such as `NODE_NOT_FOUND`
+- Android task-status failure payloads use `failure_point = set_text_failed` when the clear or text-set step cannot be completed
 
 Example:
 
@@ -444,6 +450,7 @@ Example:
   "params": {
     "matcher": { "resourceId": "com.example:id/search" },
     "text": "hello world",
+    "clear": true,
     "submit": false
   }
 }

@@ -2,18 +2,19 @@ package clawperator.uitree
 
 import action.log.Log
 import android.accessibilityservice.AccessibilityService
+import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
 import clawperator.accessibilityservice.AccessibilityServiceManager
 import clawperator.accessibilityservice.boundsInScreenRect
 import clawperator.accessibilityservice.currentAccessibilityService
 import clawperator.accessibilityservice.debugNode
+import clawperator.accessibilityservice.debugNodeRedacted
 import clawperator.accessibilityservice.dispatchLongPress
 import clawperator.accessibilityservice.dispatchSingleTap
 import clawperator.accessibilityservice.dispatchSwipe
 import clawperator.accessibilityservice.firstClickableAncestorOrSelf
 import clawperator.accessibilityservice.firstEditableAncestorOrSelf
 import clawperator.accessibilityservice.firstFocusableAncestorOrSelf
-import android.os.Bundle
 
 class UiTreeManagerAndroid(
     private val accessibilityServiceManager: AccessibilityServiceManager,
@@ -77,6 +78,7 @@ class UiTreeManagerAndroid(
         uiNode: UiNode,
         text: String,
         submit: Boolean,
+        clear: Boolean,
     ): Boolean {
         val accessibilityNodeInfo = uiNode.accessibilityNodeInfo as? AccessibilityNodeInfo ?: return false
         val target = accessibilityNodeInfo.firstEditableAncestorOrSelf() ?: accessibilityNodeInfo
@@ -87,6 +89,20 @@ class UiTreeManagerAndroid(
             target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
         }
 
+        // Clear via ACTION_SET_TEXT with an empty CharSequence so clear=true fails
+        // truthfully if the requested clear step cannot be performed.
+        if (clear) {
+            val clearArgs =
+                Bundle().apply {
+                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
+                }
+            val clearSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, clearArgs)
+            if (!clearSucceeded) {
+                Log.d("[UiTreeManager] ACTION_SET_TEXT clear failed for id=${uiNode.id} on ${target.debugNodeRedacted()}")
+                return false
+            }
+        }
+
         val args =
             Bundle().apply {
                 putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
@@ -94,7 +110,7 @@ class UiTreeManagerAndroid(
 
         val setTextSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
         if (!setTextSucceeded) {
-            Log.d("[UiTreeManager] ACTION_SET_TEXT failed for id=${uiNode.id} on ${target.debugNode()}")
+            Log.d("[UiTreeManager] ACTION_SET_TEXT failed for id=${uiNode.id} on ${target.debugNodeRedacted()}")
             return false
         }
 

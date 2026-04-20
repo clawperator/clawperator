@@ -211,6 +211,7 @@ class AgentCommandParserDefault : AgentCommandParser {
                     matcher = params.parseMatcherRequired("matcher"),
                     text = params.stringRequired("text", MAX_MATCHER_VALUE_LENGTH),
                     submit = params.booleanOrDefault("submit", false),
+                    clear = params.booleanOrDefaultStrict("clear", false),
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
                 )
             "snapshot_ui" ->
@@ -400,6 +401,15 @@ class AgentCommandParserDefault : AgentCommandParser {
         key: String,
         default: Boolean,
     ): Boolean = booleanOrNull(key) ?: default
+
+    private fun JsonObject.booleanOrDefaultStrict(
+        key: String,
+        default: Boolean,
+    ): Boolean {
+        val value = this[key] ?: return default
+        val primitive = value as? JsonPrimitive ?: error("$key must be a boolean")
+        return primitive.booleanOrNull ?: error("$key must be a boolean")
+    }
 
     private fun JsonObject.booleanOrNull(key: String): Boolean? = (this[key] as? JsonPrimitive)?.booleanOrNull
 }

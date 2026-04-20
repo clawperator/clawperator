@@ -714,6 +714,7 @@ class UiActionEngineDefault(
                 matcher = action.matcher,
                 text = action.text,
                 submit = action.submit,
+                clear = action.clear,
                 retry = action.retry,
             )
         }
@@ -723,6 +724,7 @@ class UiActionEngineDefault(
             data =
                 mapOf(
                     "text" to action.text,
+                    "clear" to action.clear.toString(),
                     "submit" to action.submit.toString(),
                 ),
         )

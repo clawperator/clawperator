@@ -342,6 +342,7 @@ interface TaskUiScope {
         matcher: NodeMatcher,
         text: String,
         submit: Boolean = false,
+        clear: Boolean = false,
         retry: TaskRetry = TaskRetry.None,
     )
 }

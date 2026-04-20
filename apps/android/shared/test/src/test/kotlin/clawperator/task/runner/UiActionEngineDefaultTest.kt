@@ -88,6 +88,113 @@ class UiActionEngineDefaultTest : ActionTest {
         }
 
     @Test
+    fun `execute enter_text forwards clear true`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope()
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan =
+                        UiActionPlan(
+                            commandId = "cmd-enter-text-clear",
+                            taskId = "task-enter-text-clear",
+                            source = "test",
+                            actions =
+                                listOf(
+                                    UiAction.EnterText(
+                                        id = "type-1",
+                                        matcher = nodeMatcher { resourceId("com.example:id/search") },
+                                        text = "hello",
+                                        submit = false,
+                                        clear = true,
+                                    ),
+                                ),
+                        ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("enter_text", stepResult.actionType)
+            assertEquals("hello", uiScope.enteredText)
+            assertEquals(true, uiScope.enterTextClear)
+            assertEquals(false, uiScope.enterTextSubmit)
+            assertEquals("true", stepResult.data["clear"])
+        }
+
+    @Test
+    fun `execute enter_text forwards clear false`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope()
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan =
+                        UiActionPlan(
+                            commandId = "cmd-enter-text-no-clear",
+                            taskId = "task-enter-text-no-clear",
+                            source = "test",
+                            actions =
+                                listOf(
+                                    UiAction.EnterText(
+                                        id = "type-1",
+                                        matcher = nodeMatcher { resourceId("com.example:id/search") },
+                                        text = "hello",
+                                        submit = true,
+                                        clear = false,
+                                    ),
+                                ),
+                        ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("enter_text", stepResult.actionType)
+            assertEquals("hello", uiScope.enteredText)
+            assertEquals(false, uiScope.enterTextClear)
+            assertEquals(true, uiScope.enterTextSubmit)
+            assertEquals("false", stepResult.data["clear"])
+        }
+
+    @Test
+    fun `execute enter_text defaults clear false when omitted`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope()
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan =
+                        UiActionPlan(
+                            commandId = "cmd-enter-text-default-clear",
+                            taskId = "task-enter-text-default-clear",
+                            source = "test",
+                            actions =
+                                listOf(
+                                    UiAction.EnterText(
+                                        id = "type-1",
+                                        matcher = nodeMatcher { resourceId("com.example:id/search") },
+                                        text = "hello",
+                                        submit = true,
+                                    ),
+                                ),
+                        ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("enter_text", stepResult.actionType)
+            assertEquals("hello", uiScope.enteredText)
+            assertEquals(false, uiScope.enterTextClear)
+            assertEquals(true, uiScope.enterTextSubmit)
+            assertEquals("false", stepResult.data["clear"])
+        }
+
+    @Test
     fun `execute snapshot_ui returns overlay metadata when available`() =
         actionTest {
             val uiScope = RecordingTaskUiScope()
@@ -1586,6 +1693,10 @@ open class RecordingTaskUiScope(
     var scrollOnceCalled: Boolean = false
     var clickCalled: Boolean = false
     var clickCoordinate: action.math.geometry.Point? = null
+    var enteredText: String? = null
+    var enterTextClear: Boolean? = null
+    var enterTextSubmit: Boolean? = null
+    var enterTextRetry: TaskRetry? = null
 
     override suspend fun getValidatedText(
         matcher: NodeMatcher,
@@ -1757,9 +1868,13 @@ open class RecordingTaskUiScope(
         matcher: NodeMatcher,
         text: String,
         submit: Boolean,
+        clear: Boolean,
         retry: TaskRetry,
     ) {
-        // Test implementation - no-op
+        enteredText = text
+        enterTextClear = clear
+        enterTextSubmit = submit
+        enterTextRetry = retry
     }
 }
 
