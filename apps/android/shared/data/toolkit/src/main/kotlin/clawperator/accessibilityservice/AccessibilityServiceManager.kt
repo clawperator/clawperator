@@ -9,11 +9,16 @@ interface AccessibilityServiceManager {
     val isRunning: Flow<Boolean>
 }
 
-class AccessibilityServiceManagerAndroid : AccessibilityServiceManager {
+class AccessibilityServiceManagerAndroid :
+    AccessibilityServiceManager,
+    TextInputConnectionSource {
     val currentAccessibilityServiceFlow: MutableStateFlow<AccessibilityService?> = MutableStateFlow(null)
 
     override val isRunning: Flow<Boolean>
         get() = mapDistinct(currentAccessibilityServiceFlow) { it != null }
+
+    override fun currentSession(): TextInputSession? =
+        currentAccessibilityServiceFlow.value?.currentTextInputSession()
 
     fun setCurrentAccessibilityService(
         service: AccessibilityService,

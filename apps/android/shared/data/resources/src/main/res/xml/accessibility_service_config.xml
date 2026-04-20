@@ -14,7 +14,7 @@ user privacy by not requesting unnecessary event types or feedback.
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/accessibility_service_summary"
     android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
-    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows|flagInputMethodEditor"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="5000"
     android:canRetrieveWindowContent="true"

@@ -5,8 +5,13 @@ import android.accessibilityservice.AccessibilityService
 import android.os.Build
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.inputmethod.EditorInfo
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import clawperator.accessibilityservice.AccessibilityServiceManager
+import clawperator.accessibilityservice.NoOpTextInputConnectionSource
+import clawperator.accessibilityservice.TextInputConnectionSource
+import clawperator.accessibilityservice.TextInputEditorInfo
+import clawperator.accessibilityservice.TextInputSession
 import clawperator.accessibilityservice.boundsInScreenRect
 import clawperator.accessibilityservice.currentAccessibilityService
 import clawperator.accessibilityservice.debugNode
@@ -22,7 +27,8 @@ class UiTreeManagerAndroid(
     private val accessibilityServiceManager: AccessibilityServiceManager,
 ) : UiTreeManager {
     // Phase 1 defines the testable boundary for the API 33 path without wiring it yet.
-    private val inputConnectionSource: TextInputConnectionSource = NoOpTextInputConnectionSource
+    private val inputConnectionSource: TextInputConnectionSource =
+        accessibilityServiceManager as? TextInputConnectionSource ?: NoOpTextInputConnectionSource
 
     override suspend fun triggerClick(
         uiNode: UiNode,
@@ -99,6 +105,10 @@ class UiTreeManagerAndroid(
 
         for (strategy in textEntryStrategies) {
             if (!strategy.supports(request.replacementSemantics)) {
+                continue
+            }
+            val minimumSdk = strategy.minimumSdk
+            if (minimumSdk != null && Build.VERSION.SDK_INT < minimumSdk) {
                 continue
             }
             val attempt = strategy.attempt(request) ?: continue
@@ -239,6 +249,7 @@ class UiTreeManagerAndroid(
     private val textEntryStrategies: List<TextEntryStrategy> =
         listOf(
             LegacySetTextStrategy,
+            Api33InputConnectionStrategy(),
         )
 
     private data class TextEntryRequest(
@@ -256,6 +267,8 @@ class UiTreeManagerAndroid(
 
     private sealed interface TextEntryStrategy {
         val name: String
+        val minimumSdk: Int?
+            get() = null
 
         fun supports(replacementSemantics: ReplacementSemantics): Boolean
 
@@ -351,14 +364,119 @@ class UiTreeManagerAndroid(
             }
         }
     }
-}
 
-internal interface TextInputConnectionSource {
-    fun currentSession(): TextInputSession?
-}
+    private inner class Api33InputConnectionStrategy : TextEntryStrategy {
+        override val name: String = "api33_input_connection"
+        override val minimumSdk: Int = Build.VERSION_CODES.TIRAMISU
 
-internal interface TextInputSession
+        override fun supports(replacementSemantics: ReplacementSemantics): Boolean =
+            replacementSemantics == ReplacementSemantics.ReplaceExistingContent
 
-private object NoOpTextInputConnectionSource : TextInputConnectionSource {
-    override fun currentSession(): TextInputSession? = null
+        override suspend fun attempt(request: TextEntryRequest): TextEntryAttemptResult? {
+            val target = request.target
+
+            if (!target.isFocused) {
+                target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            }
+
+            val session = inputConnectionSource.currentSession()
+            if (session == null) {
+                logUnavailable(request, "session_unavailable")
+                return null
+            }
+
+            if (!session.isActive) {
+                logUnavailable(request, "input_finished")
+                return null
+            }
+
+            val editorInfo = session.editorInfo
+            if (editorInfo == null) {
+                logUnavailable(request, "editor_info_missing")
+                return null
+            }
+
+            val replaceSucceeded = replaceText(session, editorInfo, request)
+            if (!replaceSucceeded) {
+                logUnavailable(request, "replace_unavailable")
+                return null
+            }
+
+            return TextEntryAttemptResult(
+                submitMethod = performSubmit(session, editorInfo, request.submit),
+            )
+        }
+
+        private fun replaceText(
+            session: TextInputSession,
+            editorInfo: TextInputEditorInfo,
+            request: TextEntryRequest,
+        ): Boolean {
+            val knownTextLength = resolveKnownTextLength(session, editorInfo)
+            if (knownTextLength != null && session.setSelection(0, knownTextLength)) {
+                return session.commitText(request.text, 1)
+            }
+
+            val cursorMovedToEnd = session.setSelection(Int.MAX_VALUE, Int.MAX_VALUE)
+            if (!cursorMovedToEnd) {
+                return false
+            }
+
+            val cleared = session.deleteSurroundingText(Int.MAX_VALUE, 0)
+            if (!cleared) {
+                return false
+            }
+
+            return session.commitText(request.text, 1)
+        }
+
+        private fun resolveKnownTextLength(
+            session: TextInputSession,
+            editorInfo: TextInputEditorInfo,
+        ): Int? =
+            editorInfo.initialSurroundingText?.text?.length
+                ?: session.getSurroundingText(Int.MAX_VALUE, Int.MAX_VALUE)?.text?.length
+
+        private fun performSubmit(
+            session: TextInputSession,
+            editorInfo: TextInputEditorInfo,
+            submitRequested: Boolean,
+        ): SubmitMethod {
+            if (!submitRequested) {
+                return SubmitMethod.NotRequested
+            }
+
+            val editorAction = resolveEditorAction(editorInfo) ?: return SubmitMethod.Unavailable
+            return if (session.performEditorAction(editorAction)) {
+                SubmitMethod.ImeEnterAction
+            } else {
+                SubmitMethod.Unavailable
+            }
+        }
+
+        private fun resolveEditorAction(editorInfo: TextInputEditorInfo): Int? {
+            if (editorInfo.actionId != 0) {
+                return editorInfo.actionId
+            }
+
+            val action = editorInfo.imeOptions and EditorInfo.IME_MASK_ACTION
+            if (action == EditorInfo.IME_ACTION_NONE || action == EditorInfo.IME_ACTION_UNSPECIFIED) {
+                return null
+            }
+            if ((editorInfo.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0) {
+                return null
+            }
+            return action
+        }
+
+        private fun logUnavailable(
+            request: TextEntryRequest,
+            reason: String,
+        ) {
+            Log.d(
+                "[UiTreeManager] enter_text strategy=$name unavailable reason=$reason for id=${request.uiNode.id}",
+            )
+        }
+    }
 }
