@@ -317,8 +317,8 @@ class TaskRegressionFixesTest : ActionTest {
                             override suspend fun setText(
                                 uiNode: UiNode,
                                 text: String,
-                                clear: Boolean,
                                 submit: Boolean,
+                                clear: Boolean,
                             ): Boolean {
                                 setTextCalls += RecordedSetTextCall(text = text, clear = clear, submit = submit)
                                 return false
@@ -415,8 +415,8 @@ class TaskRegressionFixesTest : ActionTest {
                             override suspend fun setText(
                                 uiNode: UiNode,
                                 text: String,
-                                clear: Boolean,
                                 submit: Boolean,
+                                clear: Boolean,
                             ): Boolean {
                                 setTextCalls += RecordedSetTextCall(text = text, clear = clear, submit = submit)
                                 return true

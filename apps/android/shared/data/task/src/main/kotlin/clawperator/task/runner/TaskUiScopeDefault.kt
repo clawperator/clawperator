@@ -553,7 +553,13 @@ class TaskUiScopeDefault(
             findNodeByMatcher(matcher, uiTree)
                 ?: throw IllegalStateException("No UI node found matching criteria: $matcher")
 
-        val setTextSuccessful = uiTreeManager.setText(uiNode, text, clear, submit)
+        val setTextSuccessful =
+            uiTreeManager.setText(
+                uiNode = uiNode,
+                text = text,
+                submit = submit,
+                clear = clear,
+            )
         if (!setTextSuccessful) {
             throw IllegalStateException("Failed to set text on matching UI node")
         }
