@@ -1119,6 +1119,36 @@ describe("Doctor: hostChecks", () => {
             });
         });
 
+        it("warns when the packaged install is missing clawperator-upgrade", async () => {
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-missing-upgrade-");
+            const installedDir = join(root, "agent-skills");
+            const claudeSkillsDir = join(root, "claude-skills");
+            const codexSkillsDir = join(root, "codex-skills");
+            const agentsSkillsDir = join(root, "agents-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const expectedSkills = await seedHealthyAgentSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+
+            await rm(join(installedDir, "clawperator-upgrade"), { recursive: true, force: true });
+
+            const result = await checkAgentSkillsStaleness(config, {
+                installedDir,
+                claudeSkillsDir,
+                codexSkillsDir,
+                agentsSkillsDir,
+            });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.code, ERROR_CODES.AGENT_SKILLS_STALE);
+            assert.strictEqual(result.summary, "Agent-skills install is missing expected packaged skills.");
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                installedVersion: getCliVersion(),
+                cliVersion: getCliVersion(),
+                expectedSkills,
+                missingSkills: ["clawperator-upgrade"],
+            });
+        });
+
         it("warns when an expected skill path cannot be inspected for a non-ENOENT reason", async () => {
             const root = await makeTempRoot("clawperator-doctor-agent-skills-uninspectable-skill-");
             const installedDir = join(root, "agent-skills");

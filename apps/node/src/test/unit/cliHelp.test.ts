@@ -136,6 +136,7 @@ describe("CLI help", () => {
     assert.match(stdout, /exec <json-or-file> \[--validate-only\]/);
     assert.match(stdout, /https:\/\/docs\.clawperator\.com\/host-agents\//);
     assert.match(stdout, /clawperator-agent-orientation/);
+    assert.match(stdout, /clawperator-upgrade/);
     assert.match(stdout, /skills for-app <package_id>/);
     assert.match(stdout, /agent-skills list/);
     assert.match(stdout, /skill-author-by-agent-discovery/);
@@ -233,6 +234,7 @@ describe("CLI help", () => {
     assert.match(stdout, /skills search --keyword <text>/);
     assert.match(stdout, /skills get <skill_id>/);
     assert.match(stdout, /clawperator-agent-orientation/);
+    assert.match(stdout, /clawperator-upgrade/);
     assert.match(stdout, /agent-skills list/);
     assert.match(stdout, /skill-author-by-agent-discovery/);
     assert.match(stdout, /skill-author-by-recording/);
@@ -246,6 +248,7 @@ describe("CLI help", () => {
     assert.match(stdout, /clawperator agent-skills/);
     assert.match(stdout, /agent-skills list/);
     assert.match(stdout, /clawperator-agent-orientation/);
+    assert.match(stdout, /clawperator-upgrade/);
     assert.match(stdout, /skill-author-by-agent-discovery/);
     assert.match(stdout, /skill-author-by-recording/);
     assert.match(stdout, /Runtime skills still live under 'clawperator skills/);

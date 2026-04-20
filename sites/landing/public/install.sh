@@ -1071,6 +1071,7 @@ write_agent_guide() {
     local SKILL_NAME=""
     local HAS_SKILLS=0
     local HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL=0
+    local HAS_CLAWPERATOR_UPGRADE_SKILL=0
     local HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL=0
     local HAS_SKILL_AUTHORSHIP_RECORDING_SKILL=0
 
@@ -1105,6 +1106,8 @@ EOF
                 SKILL_NAME="$(basename "$SKILL_DIR")"
                 if [ "$SKILL_NAME" = "clawperator-agent-orientation" ]; then
                     HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL=1
+                elif [ "$SKILL_NAME" = "clawperator-upgrade" ]; then
+                    HAS_CLAWPERATOR_UPGRADE_SKILL=1
                 elif [ "$SKILL_NAME" = "skill-author-by-agent-discovery" ]; then
                     HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL=1
                 elif [ "$SKILL_NAME" = "skill-author-by-recording" ]; then
@@ -1128,6 +1131,14 @@ EOF
 - \`clawperator-agent-orientation\`: first-run orientation skill for an
   unfamiliar host. It checks readiness, chooses the correct Clawperator front
   door, and points back to the canonical public docs for the chosen path.
+EOF
+        fi
+        if [ "$HAS_CLAWPERATOR_UPGRADE_SKILL" -eq 1 ]; then
+            cat >> "$AGENT_GUIDE_PATH" <<'EOF'
+- \`clawperator-upgrade\`: packaged whole-product upgrade route. It reruns the
+  canonical installer at \`https://clawperator.com/install.sh\`, verifies the
+  result with \`clawperator doctor --json\`, and reports the next blocking
+  repair step when setup is still incomplete.
 EOF
         fi
         if [ "$HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL" -eq 1 ]; then
@@ -1155,11 +1166,12 @@ EOF
                 printf -- '- %s\n' "$(basename "$SKILL_DIR")" >> "$AGENT_GUIDE_PATH"
             fi
         done
-        if [ "$HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL" -eq 1 ] && [ "$HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL" -eq 1 ] && [ "$HAS_SKILL_AUTHORSHIP_RECORDING_SKILL" -eq 1 ]; then
+        if [ "$HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL" -eq 1 ] && [ "$HAS_CLAWPERATOR_UPGRADE_SKILL" -eq 1 ] && [ "$HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL" -eq 1 ] && [ "$HAS_SKILL_AUTHORSHIP_RECORDING_SKILL" -eq 1 ]; then
             cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
 Recommended first-run flow:
 - If the current host is unfamiliar, start with `clawperator-agent-orientation`
+- If this installed Clawperator environment needs a whole-product refresh, use `clawperator-upgrade`
 - Choose one runtime-skill discovery probe: `clawperator skills for-app <package_id>` or `clawperator skills search --keyword "<term>"`
 - If there is no relevant runtime-skill match, inspect `clawperator agent-skills list --json`
 - Start the guided route with `skill-author-by-agent-discovery`
@@ -1175,6 +1187,9 @@ Repair it with:
 EOF
             if [ "$HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL" -ne 1 ]; then
                 printf -- '- missing `%s`\n' "clawperator-agent-orientation" >> "$AGENT_GUIDE_PATH"
+            fi
+            if [ "$HAS_CLAWPERATOR_UPGRADE_SKILL" -ne 1 ]; then
+                printf -- '- missing `%s`\n' "clawperator-upgrade" >> "$AGENT_GUIDE_PATH"
             fi
             if [ "$HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL" -ne 1 ]; then
                 printf -- '- missing `%s`\n' "skill-author-by-agent-discovery" >> "$AGENT_GUIDE_PATH"
@@ -1200,6 +1215,7 @@ First-party Clawperator agent-skills are not currently configured on this host.
 
 Expected packaged front doors after install:
 - `clawperator-agent-orientation`: first-run orientation for unfamiliar hosts
+- `clawperator-upgrade`: packaged whole-product upgrade route through install.sh and doctor
 - `skill-author-by-agent-discovery`: zero-results front door when runtime-skill discovery found no relevant match
 - `skill-author-by-recording`: proving workflow after discovery returns `proceed_to_recording`
 
@@ -1264,7 +1280,7 @@ const bridgeBlock = [
   "- `clawperator agent-skills list --json`",
   "",
   "If runtime-skill discovery finds no relevant match, follow the local guide for the agent-skill front doors installed on this host.",
-  "Confirm the local guide lists `clawperator-agent-orientation`, `skill-author-by-agent-discovery`, and `skill-author-by-recording` before starting the discovery-to-proving route.",
+  "Confirm the local guide lists `clawperator-agent-orientation`, `clawperator-upgrade`, `skill-author-by-agent-discovery`, and `skill-author-by-recording` before starting the discovery-to-proving route.",
   "Use `clawperator skills run <skill_id>` after you have identified the right runtime skill.",
   endMarker,
 ].join("\n");

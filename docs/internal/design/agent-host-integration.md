@@ -111,6 +111,8 @@ Key implications:
    first-run and discovery-to-proving route:
    - `clawperator-agent-orientation` is the packaged first-run orientation
      front door
+   - `clawperator-upgrade` is the packaged whole-product upgrade route through
+     the canonical installer plus `doctor`
    - `skill-author-by-agent-discovery` is the zero-results front door
    - `skill-author-by-recording` is the proving workflow after
      `proceed_to_recording`
