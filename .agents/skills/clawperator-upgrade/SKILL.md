@@ -5,8 +5,8 @@ description: Whole-product upgrade route for Clawperator. Re-runs the canonical 
 
 # Clawperator Upgrade
 
-Use this skill when the current machine already has Clawperator, but the agent
-needs the truthful whole-product upgrade path.
+Use this skill only when the current machine already has Clawperator and the
+user or calling workflow has explicitly chosen a whole-product upgrade.
 
 This is a thin packaged host-agent skill. It should route through the canonical
 installer and readiness checks that Clawperator already ships. It must not
@@ -20,6 +20,7 @@ re-implement install logic inside the skill body.
 - report whether the host is ready, or which existing repair route is still
   blocking readiness
 - keep upgrade guidance aligned with the installed first-party host-agent docs
+- require explicit upgrade intent before any host mutation begins
 
 ## What This Skill Does Not Own
 
@@ -30,10 +31,32 @@ re-implement install logic inside the skill body.
 - do not add or imply a top-level `clawperator upgrade` command
 - do not invent a second upgrade-health checker beyond `clawperator doctor --json`
 - do not restate all setup or repair docs from memory
+- do not turn passive diagnosis into an implicit upgrade
 
 ## Workflow
 
-### 1. Run the canonical installer first
+### 1. Confirm explicit upgrade intent first
+
+Only continue when the user or calling workflow has already chosen upgrade as
+the next step.
+
+Valid triggers:
+
+- the user explicitly asked to upgrade, update, refresh, or reinstall
+  Clawperator
+- the calling workflow explicitly selected `clawperator-upgrade`
+  as an opt-in route
+
+Stop and do not run the installer yet when:
+
+- you are still diagnosing a problem
+- you are only checking readiness or inventory
+- you merely suspect the install might be stale
+
+If explicit upgrade intent is missing, stop and say that upgrade is an opt-in
+host mutation.
+
+### 2. Run the canonical installer first
 
 Run:
 
@@ -47,7 +70,7 @@ Operator APK setup path.
 
 Do not replace this first step with direct npm self-upgrade commands.
 
-### 2. Verify readiness with doctor
+### 3. Verify readiness with doctor
 
 After the installer finishes, run:
 
@@ -58,7 +81,7 @@ clawperator doctor --json
 Prefer the structured JSON result. Continue from the doctor output instead of
 guessing whether the upgrade "probably worked."
 
-### 3. Decide between ready and blocked
+### 4. Decide between ready and blocked
 
 Use this decision table:
 
@@ -95,10 +118,12 @@ Finish with:
 
 Examples:
 
-- "The canonical installer completed and `clawperator doctor --json` reports `criticalOk: true`. Your next step is `clawperator-agent-orientation`."
+- "Upgrade was explicitly requested, the canonical installer completed, and `clawperator doctor --json` reports `criticalOk: true`. Your next step is `clawperator-agent-orientation`."
 - "The installer completed, but doctor still reports blocking setup failures. Follow the doctor-reported repair path or finish setup at `https://docs.clawperator.com/setup/`."
+- "Upgrade intent is not explicit yet, so I stopped before running `install.sh`."
 
 ## Output Style
 
 Be concise. Treat `install.sh` as the upgrade authority, `doctor --json` as the
-readiness authority, and end with one explicit next step.
+readiness authority, and end with one explicit next step. Name the
+upgrade-intent gate explicitly when you decline to run the installer.

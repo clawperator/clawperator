@@ -20,8 +20,9 @@ Use this order:
 Current route rules:
 
 - Start with runtime-skill discovery first.
-- If the installed Clawperator environment itself is stale, use
-  `clawperator-upgrade` before debugging component-level skill surfaces.
+- If the user or calling workflow explicitly chose to refresh the installed
+  Clawperator environment itself, use `clawperator-upgrade` before debugging
+  component-level skill surfaces.
 - If runtime-skill discovery returns no relevant match, use
   `skill-author-by-agent-discovery` as the zero-results front door.
 - Use `skill-author-by-recording` only after discovery returns
@@ -112,7 +113,7 @@ Current packaged first-party agent-skills:
 | Skill | Role | Boundary |
 | --- | --- | --- |
 | `clawperator-agent-orientation` | first-run orientation | Routes an unfamiliar host agent to the correct Clawperator front door and canonical docs without redefining the contracts. |
-| `clawperator-upgrade` | whole-product upgrade route | Re-runs `https://clawperator.com/install.sh`, verifies the result with `clawperator doctor --json`, and stays out of component-level self-update logic. |
+| `clawperator-upgrade` | whole-product upgrade route | Re-runs `https://clawperator.com/install.sh`, verifies the result with `clawperator doctor --json`, and stays out of component-level self-update logic. Use it only after explicit upgrade intent is established. |
 | `skill-author-by-agent-discovery` | zero-results front door | Produces one discovery artifact, chooses exactly one next step, and does not author a durable runtime skill directly. |
 | `skill-author-by-recording` | proving workflow | Records a real device flow, authors one skill shape, and runs one self-test that surfaces the emitted `SkillResult`. |
 
