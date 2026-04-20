@@ -19,6 +19,9 @@ import clawperator.accessibilityservice.firstFocusableAncestorOrSelf
 class UiTreeManagerAndroid(
     private val accessibilityServiceManager: AccessibilityServiceManager,
 ) : UiTreeManager {
+    // Phase 1 defines the testable boundary for the API 33 path without wiring it yet.
+    private val inputConnectionSource: TextInputConnectionSource = NoOpTextInputConnectionSource
+
     override suspend fun triggerClick(
         uiNode: UiNode,
         clickTypes: UiTreeClickTypes,
@@ -82,45 +85,28 @@ class UiTreeManagerAndroid(
     ): Boolean {
         val accessibilityNodeInfo = uiNode.accessibilityNodeInfo as? AccessibilityNodeInfo ?: return false
         val target = accessibilityNodeInfo.firstEditableAncestorOrSelf() ?: accessibilityNodeInfo
+        val request =
+            TextEntryRequest(
+                uiNode = uiNode,
+                target = target,
+                text = text,
+                submit = submit,
+                clear = clear,
+                replacementSemantics = ReplacementSemantics.ReplaceExistingContent,
+            )
 
-        // Best-effort focus before setting text.
-        if (!target.isFocused) {
-            target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-            target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-        }
-
-        // Clear via ACTION_SET_TEXT with an empty CharSequence so clear=true fails
-        // truthfully if the requested clear step cannot be performed.
-        if (clear) {
-            val clearArgs =
-                Bundle().apply {
-                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
-                }
-            val clearSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, clearArgs)
-            if (!clearSucceeded) {
-                Log.d("[UiTreeManager] ACTION_SET_TEXT clear failed for id=${uiNode.id} on ${target.debugNodeRedacted()}")
-                return false
+        for (strategy in textEntryStrategies) {
+            if (!strategy.supports(request.replacementSemantics)) {
+                continue
+            }
+            if (strategy.attempt(request)) {
+                Log.d("[UiTreeManager] enter_text strategy=${strategy.name} succeeded for id=${uiNode.id}")
+                return true
             }
         }
 
-        val args =
-            Bundle().apply {
-                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
-            }
-
-        val setTextSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
-        if (!setTextSucceeded) {
-            Log.d("[UiTreeManager] ACTION_SET_TEXT failed for id=${uiNode.id} on ${target.debugNodeRedacted()}")
-            return false
-        }
-
-        if (submit) {
-            // Not all API levels/vendors expose a reliable IME submit action here.
-            // Best-effort: click target after text set to trigger app-side listeners.
-            target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-        }
-
-        return true
+        Log.d("[UiTreeManager] All enter_text strategies failed for id=${uiNode.id}")
+        return false
     }
 
     override suspend fun swipeWithinVertical(
@@ -246,4 +232,92 @@ class UiTreeManagerAndroid(
 
         return false
     }
+
+    private val textEntryStrategies: List<TextEntryStrategy> =
+        listOf(
+            LegacySetTextStrategy,
+        )
+
+    private data class TextEntryRequest(
+        val uiNode: UiNode,
+        val target: AccessibilityNodeInfo,
+        val text: String,
+        val submit: Boolean,
+        val clear: Boolean,
+        val replacementSemantics: ReplacementSemantics,
+    )
+
+    private enum class ReplacementSemantics {
+        ReplaceExistingContent,
+    }
+
+    private sealed interface TextEntryStrategy {
+        val name: String
+
+        fun supports(replacementSemantics: ReplacementSemantics): Boolean
+
+        suspend fun attempt(request: TextEntryRequest): Boolean
+    }
+
+    private object LegacySetTextStrategy : TextEntryStrategy {
+        override val name: String = "legacy_action_set_text"
+
+        override fun supports(replacementSemantics: ReplacementSemantics): Boolean =
+            replacementSemantics == ReplacementSemantics.ReplaceExistingContent
+
+        override suspend fun attempt(request: TextEntryRequest): Boolean {
+            val target = request.target
+
+            // Best-effort focus before setting text.
+            if (!target.isFocused) {
+                target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            }
+
+            // Clear via ACTION_SET_TEXT with an empty CharSequence so clear=true fails
+            // truthfully if the requested clear step cannot be performed.
+            if (request.clear) {
+                val clearArgs =
+                    Bundle().apply {
+                        putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
+                    }
+                val clearSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, clearArgs)
+                if (!clearSucceeded) {
+                    Log.d(
+                        "[UiTreeManager] ACTION_SET_TEXT clear failed for id=${request.uiNode.id} on ${target.debugNodeRedacted()}",
+                    )
+                    return false
+                }
+            }
+
+            val args =
+                Bundle().apply {
+                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, request.text)
+                }
+
+            val setTextSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+            if (!setTextSucceeded) {
+                Log.d("[UiTreeManager] ACTION_SET_TEXT failed for id=${request.uiNode.id} on ${target.debugNodeRedacted()}")
+                return false
+            }
+
+            if (request.submit) {
+                // Not all API levels/vendors expose a reliable IME submit action here.
+                // Best-effort: click target after text set to trigger app-side listeners.
+                target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            }
+
+            return true
+        }
+    }
+}
+
+internal interface TextInputConnectionSource {
+    fun currentSession(): TextInputSession?
+}
+
+internal interface TextInputSession
+
+private object NoOpTextInputConnectionSource : TextInputConnectionSource {
+    override fun currentSession(): TextInputSession? = null
 }

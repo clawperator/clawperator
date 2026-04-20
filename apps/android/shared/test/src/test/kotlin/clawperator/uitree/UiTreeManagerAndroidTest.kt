@@ -19,7 +19,7 @@ import org.robolectric.shadows.ShadowAccessibilityNodeInfo
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class UiTreeManagerAndroidTest {
-    private val manager = UiTreeManagerAndroid(AccessibilityServiceManagerStub())
+    private val manager = UiTreeManagerAndroid(accessibilityServiceManager = AccessibilityServiceManagerStub())
 
     @Test
     fun `setText clear true performs empty set then text set`() =
@@ -63,6 +63,22 @@ class UiTreeManagerAndroidTest {
 
             assertTrue(result)
             assertEquals(listOf("hello"), performedSetTextValues(nodeInfo))
+        }
+
+    @Test
+    fun `setText fails when no text-entry strategy succeeds`() =
+        runTest {
+            val nodeInfo =
+                AccessibilityNodeInfo.obtain().apply {
+                    isEditable = true
+                    isFocused = true
+                }
+            val uiNode = uiNode(nodeInfo)
+
+            val result = manager.setText(uiNode = uiNode, text = "hello", submit = false, clear = false)
+
+            assertFalse(result)
+            assertEquals(emptyList(), performedSetTextValues(nodeInfo))
         }
 
     private fun editableNode(): AccessibilityNodeInfo =
