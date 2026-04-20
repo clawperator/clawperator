@@ -12,7 +12,8 @@ finds no relevant match, start with `skill-author-by-agent-discovery` and use
 `proceed_to_recording`, or when the route is already well understood.
 If packaged first-party agent-skills are installed, `clawperator-agent-orientation`
 is the first-run packaged front door for this route and should point back to
-this page.
+this page, while `clawperator-upgrade` is the packaged whole-product upgrade
+route through `install.sh` and `doctor`.
 
 ## When To Read This Page
 
@@ -49,15 +50,18 @@ Use this order:
    with this host, start with `clawperator-agent-orientation`. It should verify
    readiness, separate runtime skills from agent-skills, and end with one
    concrete next step.
-3. If you need an app-specific capability, start with `clawperator skills`.
-4. If your host already speaks stdio MCP and wants registered tools, use `clawperator mcp serve`.
-5. If you already know you need raw actions and result envelopes, continue to [Quickstart](quickstart.md).
+3. If the installed Clawperator environment needs a whole-product refresh, use
+   `clawperator-upgrade`.
+4. If you need an app-specific capability, start with `clawperator skills`.
+5. If your host already speaks stdio MCP and wants registered tools, use `clawperator mcp serve`.
+6. If you already know you need raw actions and result envelopes, continue to [Quickstart](quickstart.md).
 
 ## Choose The Front Door
 
 | Situation | Start here | Why |
 | --- | --- | --- |
 | You are unfamiliar with this host and want the packaged first-run orientation surface | `clawperator-agent-orientation` | Thin packaged router that points back to this page and the canonical docs. |
+| The local Clawperator install needs a whole-product refresh before you trust any downstream route | `clawperator-upgrade` | Re-runs the canonical installer at `https://clawperator.com/install.sh`, then verifies readiness with `clawperator doctor --json`. |
 | You know the Android package id and want the fastest answer to "what can this host do for this app?" | `clawperator skills for-app <package_id> --json` | `skills for-app` is the primary app-oriented discovery surface. |
 | You only know user-language terms such as app name or intent | `clawperator skills search --keyword <text> --json` | Search is the fallback when you do not have the package id yet. |
 | You already have a skill id and want the exact metadata | `clawperator skills get <skill_id> --json` | Confirms the registry entry before a run. |
@@ -195,11 +199,12 @@ clawperator agent-skills list --json
 Check:
 
 - `clawperator --help` and `clawperator skills --help` name `clawperator-agent-orientation` as the first-run surface for unfamiliar hosts and point zero-match users to `clawperator agent-skills list`
-- `clawperator agent-skills --help` names `clawperator-agent-orientation` as the first-run orientation skill, `skill-author-by-agent-discovery` as the zero-results front door, and `skill-author-by-recording` as the proving workflow
+- `clawperator --help` and `clawperator skills --help` name `clawperator-upgrade` as the packaged whole-product refresh route
+- `clawperator agent-skills --help` names `clawperator-agent-orientation` as the first-run orientation skill, `clawperator-upgrade` as the packaged whole-product upgrade route, `skill-author-by-agent-discovery` as the zero-results front door, and `skill-author-by-recording` as the proving workflow
 - `skills for-app`, `skills search`, and `skills list` return top-level `skills` and `count`
 - `skills get` returns a top-level `skill`
 - `agent-skills list` returns top-level `skills`, `count`, and `installedDir`
-- `agent-skills list` includes `clawperator-agent-orientation`, `skill-author-by-agent-discovery`, and `skill-author-by-recording` in `skills[].name`
+- `agent-skills list` includes `clawperator-agent-orientation`, `clawperator-upgrade`, `skill-author-by-agent-discovery`, and `skill-author-by-recording` in `skills[].name`
 
 For MCP:
 
