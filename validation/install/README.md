@@ -35,7 +35,7 @@ dependencies for you.
     connected
 - `test_agent_skills.sh`
   - covers agent-skills shell glue including parser behavior,
-    `setup_authoring_skills_via_cli()`, `write_agent_guide()`, skip behavior,
+    `setup_agent_skills_via_cli()`, `write_agent_guide()`, skip behavior,
     `CODEX_HOME` fallback, and installer metadata parsing
 - `test_main.sh`
   - covers hermetic `main()` smoke paths including success, final-doctor
