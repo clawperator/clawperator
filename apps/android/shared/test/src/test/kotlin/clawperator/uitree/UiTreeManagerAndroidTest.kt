@@ -27,7 +27,7 @@ class UiTreeManagerAndroidTest {
             val nodeInfo = editableNode()
             val uiNode = uiNode(nodeInfo)
 
-            val result = manager.setText(uiNode = uiNode, text = "hello", clear = true, submit = false)
+            val result = manager.setText(uiNode = uiNode, text = "hello", submit = false, clear = true)
 
             assertTrue(result)
             assertEquals(listOf("", "hello"), performedSetTextValues(nodeInfo))
@@ -47,7 +47,7 @@ class UiTreeManagerAndroidTest {
             }
             val uiNode = uiNode(nodeInfo)
 
-            val result = manager.setText(uiNode = uiNode, text = "hello", clear = true, submit = false)
+            val result = manager.setText(uiNode = uiNode, text = "hello", submit = false, clear = true)
 
             assertFalse(result)
             assertEquals(listOf(""), performedSetTextValues(nodeInfo))
@@ -59,7 +59,7 @@ class UiTreeManagerAndroidTest {
             val nodeInfo = editableNode()
             val uiNode = uiNode(nodeInfo)
 
-            val result = manager.setText(uiNode = uiNode, text = "hello", clear = false, submit = false)
+            val result = manager.setText(uiNode = uiNode, text = "hello", submit = false, clear = false)
 
             assertTrue(result)
             assertEquals(listOf("hello"), performedSetTextValues(nodeInfo))

@@ -713,8 +713,8 @@ class UiActionEngineDefault(
             enterText(
                 matcher = action.matcher,
                 text = action.text,
-                clear = action.clear,
                 submit = action.submit,
+                clear = action.clear,
                 retry = action.retry,
             )
         }
