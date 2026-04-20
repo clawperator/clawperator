@@ -146,6 +146,11 @@ expanding the public API into transport-specific flags or strategy knobs.
 - Phase 3 must treat API 33 input-method state as service-owned lifecycle
   state. Null, stale, or finished input sessions are availability outcomes, not
   crash cases.
+- The implementation must leave an observable verification trail for strategy
+  selection. At minimum, Phase 3 must emit strategy-selection logs or
+  equivalent runtime diagnostics that make it possible to confirm whether a
+  given `enter_text` call used the legacy `ACTION_SET_TEXT` route or the API 33
+  input-connection route during live validation.
 - Clipboard-based fallback is out of scope for this pack unless the plan is
   updated first with explicit privacy guardrails, including preserving and
   restoring clipboard state and avoiding durable logging of clipboard contents.
@@ -183,7 +188,7 @@ expanding the public API into transport-specific flags or strategy knobs.
 | What if all internal strategies fail for an `enter_text` call? | Return an explicit error result using the existing `set_text_failed` failure point. Do not return fake success or silently skip text entry when no strategy succeeded. |
 | What happens if the API 33 path is unavailable? | Keep the existing accessibility-node path and other supported internal fallbacks. Do not fail solely because the device is below API 33 or because the input session is null, unstarted, or finished if another supported strategy works. |
 | When must docs change? | Any user-visible runtime behavior change, observable step-data addition, or new limitation note must be documented in the same pack. |
-| How should live validation be treated? | Required as part of the Android validation loop using the branch-local Node build, explicit `--device <device_serial>` selection when multiple targets exist, and `--operator-package com.clawperator.operator.dev` for local verification. If host-state constraints prevent that, unit tests remain the primary gate and the task notes the blocked live preconditions explicitly. |
+| How should live validation be treated? | Required as part of the Android validation loop using the branch-local Node build, explicit `--device <device_serial>` selection when multiple targets exist, and `--operator-package com.clawperator.operator.dev` for local verification. Prefer existing Amazon or Play Store search skills as live-verification harnesses when they truthfully exercise the relevant text-entry route. If host-state constraints prevent that, or if those skills only prove the legacy route, unit tests remain the primary gate and the task notes the blocked live preconditions explicitly. |
 | When must the plan be updated before code continues? | If preserving API stability would require new public knobs, if deterministic replace semantics cannot be preserved on the API 33 route, or if truthful submit behavior would require a public contract change. |
 
 ## Failure Modes To Prevent
@@ -211,6 +216,8 @@ expanding the public API into transport-specific flags or strategy knobs.
   package
 - Validation notes leak raw device serials or other local identifiers instead
   of placeholders such as `<device_serial>`
+- Live validation claims the API 33 route worked without logs or equivalent
+  diagnostics proving which strategy actually ran
 - Docs drift and keep describing the old limitations after the runtime changes
 
 ## Output Contract

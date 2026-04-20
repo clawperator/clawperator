@@ -48,6 +48,9 @@ API stable and treat API 33 support as an Android implementation detail.
 - Treat Android unit tests as the primary gate for the API 33 path. Live
   validation is still required when a suitable Android 13+ target and exercised
   editor path are available.
+- Do not claim the API 33 path was validated unless strategy-selection logs or
+  equivalent runtime diagnostics prove that the API 33 route actually ran for
+  the tested `enter_text` call.
 - Use the branch-local Node build for validation. Do not use a globally
   installed `clawperator` binary for any phase in this pack.
 - Prefer the debug operator variant for local verification and pass
@@ -224,6 +227,9 @@ before the API 33 path is added.
      itself succeeded
 5. Keep this phase scoped to the existing route. Do not add API 33 service
    capability work yet.
+6. If this phase adds strategy diagnostics, keep them stable and low-noise so
+   they remain useful in Phase 3 live verification rather than becoming
+   ephemeral debug spam.
 
 ### Acceptance Criteria
 
@@ -305,6 +311,10 @@ ladder as an implementation detail.
    unit tested without running a real accessibility service. The mock must be
    able to simulate a null connection, a finished connection, and an active
    connection returning a real `InputConnection` double.
+   Ensure the implementation exposes strategy-selection logs or equivalent
+   runtime diagnostics that let live validation confirm whether a given
+   `enter_text` call used the legacy `ACTION_SET_TEXT` route or the API 33
+   input-connection route.
 4. Be explicit about the first-match-wins strategy order when both
    `ACTION_SET_TEXT` and the API 33 input-connection path are available. Keep
    the legacy `ACTION_SET_TEXT` route first unless the plan is updated with a
@@ -347,7 +357,12 @@ ladder as an implementation detail.
    before continuing. Do not paper over that gap with undocumented behavior.
 8. Record the live-validation preconditions for this phase in the PR notes or
    execution log: Android 13+ target, accessibility service enabled, and an app
-   surface that actually exercises the custom-editor path.
+   surface that actually exercises the custom-editor path. Prefer existing
+   Amazon or Play Store search skills as live-verification harnesses when they
+   truthfully exercise the relevant path. If they only prove the legacy route,
+   record that and use a better target or fall back to unit tests plus the
+   strategy-selection diagnostics rather than claiming the API 33 path was
+   proven.
 
 ### Acceptance Criteria
 
@@ -357,6 +372,8 @@ ladder as an implementation detail.
   explicitly instead of silently changing semantics.
 - Tests prove routing between the legacy and API 33 paths, including the lower
   API fallback case.
+- Live verification can distinguish the legacy and API 33 routes through
+  strategy-selection logs or equivalent diagnostics.
 
 ### Validation
 
@@ -423,9 +440,14 @@ the best available validation, keeping the public API stable.
    branch-local Node build and the `.dev` operator package against:
    - one standard accessible text field that uses `ACTION_SET_TEXT`
    - one custom-editor path that requires the API 33 input-connection route
+   Prefer existing Amazon or Play Store search skills as the live-verification
+   harness when they truthfully cover those paths. If they do not, use a more
+   suitable direct target and record why the skill path was insufficient.
 11. Record which target class was used for live validation using placeholders
-   such as `<device_serial>` plus the operator package variant. Do not record
-   raw device identifiers.
+   such as `<device_serial>` plus the operator package variant. Record whether
+   the strategy-selection logs or equivalent diagnostics showed the legacy route
+   or the API 33 route for each validation case. Do not record raw device
+   identifiers.
 
 ### Acceptance Criteria
 
@@ -434,6 +456,8 @@ the best available validation, keeping the public API stable.
 - `./scripts/docs_build.sh` passes.
 - Final validation covers contract compatibility, Android unit coverage, and
   live validation preconditions or blocked reasons explicitly.
+- Final live validation includes evidence showing which text-entry strategy ran
+  for the exercised cases.
 
 ### Validation
 
