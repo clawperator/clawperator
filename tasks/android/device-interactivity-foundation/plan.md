@@ -21,13 +21,13 @@ This pack does not add a new public `clawperator` wake or unlock API.
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | completed |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4 |
-| Current / Next | Phase 1 |
-| Blockers | none, but `doctor-enhancements` should not begin implementation until this pack is merged |
+| Completed | 1, 2, 3, 4 |
+| Remaining | none |
+| Current / Next | Complete; next dependent pack is `tasks/api/doctor-enhancements/` |
+| Blockers | none |
 
 ## Goal
 
@@ -238,6 +238,26 @@ After PR-2:
 - the helper verifies wake success using structured postconditions rather than
   assuming command success means interaction readiness
 - real-device validation proves the intended sleep-then-wake path on at least
+  one physical device
+
+## Closeout
+
+Implemented on branch `codex/device-interactivity-foundation` with focused
+commits for:
+
+- Android truth-model correction and regression coverage
+- internal Android `doctor_ping` diagnostics
+- Node internal interactivity probe and wake helper
+- durable internal documentation updates after live-device validation
+
+Validated during implementation with:
+
+- `./gradlew app:testDebugUnitTest`
+- `./gradlew app:assembleDebug`
+- `npm --prefix apps/node run build`
+- `npm --prefix apps/node run test`
+- physical Samsung-device proof using the debug operator package and the
+  branch-local Node build
   one physical device
 - internal docs capture any updated caveats discovered during implementation
 

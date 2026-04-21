@@ -13,12 +13,12 @@ must land before `tasks/api/doctor-enhancements/` moves into implementation.
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | completed |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4 |
-| Current / Next | Phase 1 |
+| Completed | 1, 2, 3, 4 |
+| Remaining | none |
+| Current / Next | Complete; hand off to `tasks/api/doctor-enhancements/` |
 | Blockers | none |
 
 ## Hard Rules
