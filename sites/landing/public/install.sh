@@ -1508,13 +1508,15 @@ maybe_install_operator_apk() {
             return 0
         fi
         local all_ready=true
+        local critical_count=0
         while IFS=$'\t' read -r device_id device_state; do
             [ -n "$device_id" ] || continue
             if [ "$device_state" = "device" ]; then
-                if "$CLAWPERATOR_BIN_PATH" doctor --device "$device_id" --json > /dev/null 2>&1; then
-                    echo -e "${GREEN}  ✅ ${device_id} - ready${NC}"
+                if doctor_report_connected_device "$device_id"; then
+                    if [ "${DOCTOR_DEVICE_STATUS:-}" = "critical" ]; then
+                        critical_count=$((critical_count + 1))
+                    fi
                 else
-                    echo -e "${YELLOW}  ⚠  ${device_id} - setup required: clawperator operator setup --apk ${APK_LOCAL_PATH} --device ${device_id}${NC}"
                     all_ready=false
                 fi
             else
@@ -1523,7 +1525,11 @@ maybe_install_operator_apk() {
             fi
         done < <(list_detected_android_devices)
         if [ "$all_ready" = true ]; then
-            echo -e "${GREEN}All devices ready. No setup required.${NC}"
+            if [ "$critical_count" -gt 0 ]; then
+                echo -e "${YELLOW}All devices passed critical checks. No setup required.${NC}"
+            else
+                echo -e "${GREEN}All devices ready. No setup required.${NC}"
+            fi
             return 0
         fi
 
@@ -1619,6 +1625,21 @@ process.stdin.on('data', c => d += c).on('end', () => {
 " 2>/dev/null
 }
 
+doctor_report_all_checks_pass() {
+    local json="$1"
+    printf '%s' "$json" | node -e "
+let d='';
+process.stdin.on('data', c => d += c).on('end', () => {
+  try {
+    const r = JSON.parse(d);
+    const checks = Array.isArray(r.checks) ? r.checks : [];
+    const allPass = checks.every((c) => c && c.status === 'pass');
+    process.exitCode = allPass ? 0 : 1;
+  } catch { process.exitCode = 1; }
+});
+" 2>/dev/null
+}
+
 doctor_check_code() {
     local json="$1"
     local check_id="$2"
@@ -1635,6 +1656,28 @@ process.stdin.on('data', c => d += c).on('end', () => {
 " 2>/dev/null
 }
 
+doctor_report_connected_device() {
+    local device_id="$1"
+    local doctor_json
+
+    doctor_json="$("$CLAWPERATOR_BIN_PATH" doctor --device "$device_id" --format json || true)"
+    if doctor_report_all_checks_pass "$doctor_json"; then
+        DOCTOR_DEVICE_STATUS="pass"
+        echo -e "${GREEN}  ✅ ${device_id} - ready${NC}"
+        return 0
+    fi
+
+    if doctor_report_ok "$doctor_json"; then
+        DOCTOR_DEVICE_STATUS="critical"
+        echo -e "${YELLOW}  ⚠  ${device_id} - critical checks passed; warnings remain.${NC}"
+        return 0
+    fi
+
+    DOCTOR_DEVICE_STATUS="fail"
+    echo -e "${YELLOW}  ⚠  ${device_id} - setup required: clawperator operator setup --apk ${APK_LOCAL_PATH} --device ${device_id}${NC}"
+    return 1
+}
+
 doctor_each_connected_device() {
     if [ -z "${CLAWPERATOR_BIN_PATH:-}" ]; then
         return 0
@@ -1645,19 +1688,27 @@ doctor_each_connected_device() {
     local ready_count=0
 
     echo -e "${BLUE}Checking each connected device with Clawperator Doctor...${NC}"
+    local critical_count=0
+    local fail_count=0
     while IFS= read -r device_id; do
         [ -n "$device_id" ] || continue
         device_count=$((device_count + 1))
-        if "$CLAWPERATOR_BIN_PATH" doctor --device "$device_id" --format json > /dev/null 2>&1; then
-            echo -e "${GREEN}  ✅ ${device_id} - ready${NC}"
+        if doctor_report_connected_device "$device_id"; then
             ready_count=$((ready_count + 1))
+            if [ "${DOCTOR_DEVICE_STATUS:-}" = "critical" ]; then
+                critical_count=$((critical_count + 1))
+            fi
         else
-            echo -e "${YELLOW}  ⚠  ${device_id} - doctor reported setup is still required.${NC}"
+            fail_count=$((fail_count + 1))
         fi
     done < <(list_connected_devices)
 
     if [ "$device_count" -gt 0 ] && [ "$ready_count" -eq "$device_count" ]; then
-        echo -e "${GREEN}All connected devices passed doctor checks.${NC}"
+        if [ "$critical_count" -gt 0 ]; then
+            echo -e "${YELLOW}All connected devices passed critical checks.${NC}"
+        else
+            echo -e "${GREEN}All connected devices passed doctor checks.${NC}"
+        fi
     fi
 }
 

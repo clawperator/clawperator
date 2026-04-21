@@ -111,13 +111,13 @@ JSON
       cat <<'JSON'
 {"ok":false,"criticalOk":false,"checks":[{"id":"readiness.handshake","status":"fail","code":"HANDSHAKE_FAILED"}]}
 JSON
-      exit 0
+      exit 1
       ;;
     final-fail:3)
       cat <<'JSON'
 {"ok":false,"criticalOk":false,"checks":[{"id":"readiness.handshake","status":"fail","code":"HANDSHAKE_FAILED"}]}
 JSON
-      exit 0
+      exit 1
       ;;
     multi-device:1|multi-device:2)
       cat <<'JSON'
@@ -137,11 +137,35 @@ JSON
 JSON
       exit 0
       ;;
+    multi-device-warning:1|multi-device-warning:2)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+      exit 0
+      ;;
+    multi-device-warning:3)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[{"id":"device.discovery","status":"warn","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
+JSON
+      exit 0
+      ;;
+    multi-device-warning:4)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[{"id":"readiness.handshake","status":"warn","code":"HANDSHAKE_PERMISSION_ADVISORY"}]}
+JSON
+      exit 0
+      ;;
+    multi-device-warning:5)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+      exit 0
+      ;;
     apk-remediation:1)
       cat <<'JSON'
 {"ok":false,"criticalOk":false,"checks":[{"id":"readiness.apk.presence","status":"fail","code":"OPERATOR_NOT_INSTALLED"}]}
 JSON
-      exit 0
+      exit 1
       ;;
     apk-remediation:2|apk-remediation:3)
       cat <<'JSON'
@@ -227,6 +251,13 @@ if [ "$1" = "devices" ]; then
 List of devices attached
 serial-alpha	device
 serial-beta	device
+OUT
+      ;;
+    multi-device-warning)
+      cat <<'OUT'
+List of devices attached
+serial-warning	device
+serial-ready	device
 OUT
       ;;
     stale-device)
@@ -524,7 +555,34 @@ assert_contains "$MULTI_CLI_LOG" "doctor --device serial-alpha --format json" "m
 assert_contains "$MULTI_CLI_LOG" "doctor --device serial-beta --format json" "main-multi cli log"
 assert_json_field_null "$TMP_DIR/home-main-multi/.clawperator/install-state.json" "lastDeviceSerial" "main-multi install-state lastDeviceSerial"
 
-echo "=== Scenario 4: APK remediation path runs before final success ==="
+echo "=== Scenario 4: final doctor multi-device path reports warnings honestly ==="
+MULTI_WARN_STDOUT="$TMP_DIR/main-multi-warn.stdout"
+MULTI_WARN_STDERR="$TMP_DIR/main-multi-warn.stderr"
+MULTI_WARN_TRACE="$TMP_DIR/main-multi-warn.trace"
+MULTI_WARN_CLI_LOG="$TMP_DIR/main-multi-warn.cli.log"
+MULTI_WARN_GUIDE_PATH_FILE="$TMP_DIR/main-multi-warn.guide.path"
+MULTI_WARN_STATE="$TMP_DIR/main-multi-warn.state"
+run_main_case \
+    main-multi-warn \
+    multi-device-warning \
+    0 \
+    "$MULTI_WARN_STDOUT" \
+    "$MULTI_WARN_STDERR" \
+    "$MULTI_WARN_TRACE" \
+    "$MULTI_WARN_CLI_LOG" \
+    "$MULTI_WARN_GUIDE_PATH_FILE" \
+    "$MULTI_WARN_STATE"
+
+assert_contains "$MULTI_WARN_STDOUT" "Installation Complete (Device Selection Required)" "main-multi-warn stdout"
+assert_contains "$MULTI_WARN_STDOUT" "critical checks passed; warnings remain." "main-multi-warn stdout"
+assert_contains "$MULTI_WARN_STDOUT" "All connected devices passed critical checks." "main-multi-warn stdout"
+assert_contains "$MULTI_WARN_STDOUT" "serial-warning - critical checks passed; warnings remain." "main-multi-warn stdout"
+assert_contains "$MULTI_WARN_STDOUT" "serial-ready - ready" "main-multi-warn stdout"
+assert_not_contains "$MULTI_WARN_STDOUT" "serial-warning - ready" "main-multi-warn stdout"
+assert_contains "$MULTI_WARN_CLI_LOG" "doctor --device serial-warning --format json" "main-multi-warn cli log"
+assert_contains "$MULTI_WARN_CLI_LOG" "doctor --device serial-ready --format json" "main-multi-warn cli log"
+
+echo "=== Scenario 5: APK remediation path runs before final success ==="
 REMEDIATE_STDOUT="$TMP_DIR/main-remediation.stdout"
 REMEDIATE_STDERR="$TMP_DIR/main-remediation.stderr"
 REMEDIATE_TRACE="$TMP_DIR/main-remediation.trace"
@@ -554,7 +612,7 @@ assert_contains "$REMEDIATE_TRACE" "maybe_install_operator_apk" "main-remediatio
 assert_contains "$REMEDIATE_CLI_LOG" "doctor --format json" "main-remediation cli log"
 assert_contains "$REMEDIATE_CLI_LOG" "doctor --output pretty" "main-remediation cli log"
 
-echo "=== Scenario 5: handshake recovery still targets the single ready device when stale adb entries exist ==="
+echo "=== Scenario 6: handshake recovery still targets the single ready device when stale adb entries exist ==="
 STALE_STDOUT="$TMP_DIR/main-stale.stdout"
 STALE_STDERR="$TMP_DIR/main-stale.stderr"
 STALE_TRACE="$TMP_DIR/main-stale.trace"
@@ -577,7 +635,7 @@ assert_contains "$STALE_STDOUT" "Installation Successful!" "main-stale stdout"
 assert_contains "$STALE_CLI_LOG" "grant-device-permissions --device serial-solo --operator-package com.clawperator.operator" "main-stale cli log"
 assert_json_field_equals "$STALE_INSTALL_STATE_PATH" "lastDeviceSerial" "serial-solo" "main-stale install-state lastDeviceSerial"
 
-echo "=== Scenario 6: stdin entrypoint runs without BASH_SOURCE errors ==="
+echo "=== Scenario 7: stdin entrypoint runs without BASH_SOURCE errors ==="
 STDIN_STDOUT="$TMP_DIR/stdin.stdout"
 STDIN_STDERR="$TMP_DIR/stdin.stderr"
 STDIN_STATUS="$TMP_DIR/stdin.status"

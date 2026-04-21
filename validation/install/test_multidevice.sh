@@ -51,10 +51,16 @@ EOF
             cat > "$mock_dir/clawperator" <<'EOF'
 #!/usr/bin/env bash
 if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-ready ]; then
+    cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
     exit 0
 fi
 
 if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-bad ]; then
+    cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.handshake","status":"fail","code":"HANDSHAKE_FAILED"}]}
+JSON
     exit 1
 fi
 
@@ -74,6 +80,38 @@ EOF
             cat > "$mock_dir/clawperator" <<'EOF'
 #!/usr/bin/env bash
 if [ "$1" = doctor ] && [ "$2" = --device ]; then
+    cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+    exit 0
+fi
+
+exit 2
+EOF
+            ;;
+        critical-warning)
+            cat > "$mock_dir/adb" <<'EOF'
+#!/usr/bin/env bash
+cat <<'OUT'
+List of devices attached
+serial-warning	device
+serial-ready	device
+OUT
+EOF
+            chmod +x "$mock_dir/adb"
+            cat > "$mock_dir/clawperator" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-warning ]; then
+    cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[{"id":"readiness.handshake","status":"warn","code":"HANDSHAKE_PERMISSION_ADVISORY"}]}
+JSON
+    exit 0
+fi
+
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-ready ]; then
+    cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
     exit 0
 fi
 
@@ -149,5 +187,13 @@ run_scenario \
     "All devices ready. No setup required." \
     "Skipping APK install until every connected device is ready." \
     "Installing operator APK on connected device..."
+
+echo "=== Scenario 3: warning-only devices are reported honestly ==="
+run_scenario \
+    critical-warning \
+    0 \
+    "All devices passed critical checks. No setup required." \
+    "All devices ready. No setup required." \
+    "Skipping APK install until every connected device is ready."
 
 echo "=== install.sh multi-device harness passed ==="
