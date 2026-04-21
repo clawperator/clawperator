@@ -340,6 +340,46 @@ describe("ensureDeviceAwake", () => {
     );
   });
 
+  it("returns transport_failed when an adb wake command fails and the device stays asleep", async () => {
+    const { config, runner } = createConfig();
+    runner.queueResult({ code: 1, stdout: "", stderr: "device offline" });
+
+    const result = await ensureDeviceAwake(config, {
+      probeInteractiveStateFn: probeSequence([
+        { ok: true, state: state() },
+        { ok: true, state: state({ deviceLocked: true, userUnlocked: false }) },
+      ]),
+      settleDelayMs: 0,
+    });
+
+    assert.strictEqual(result.status, "transport_failed");
+    assert.deepStrictEqual(result.state, state({ deviceLocked: true, userUnlocked: false }));
+    assert.deepStrictEqual(result.error, {
+      code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+      message: "Wake attempt cmd_power_wakeup failed before the device became interactive: device offline",
+    });
+    assert.strictEqual(runner.calls.length, 1);
+    assert.deepStrictEqual(runner.calls[0]?.args, ["-s", "test-device", "shell", "cmd", "power", "wakeup"]);
+  });
+
+  it("still returns awake when adb reports failure but the postcondition is interactive", async () => {
+    const { config, runner } = createConfig();
+    runner.queueResult({ code: 1, stdout: "", stderr: "transient shell failure" });
+
+    const result = await ensureDeviceAwake(config, {
+      probeInteractiveStateFn: probeSequence([
+        { ok: true, state: state() },
+        { ok: true, state: state({ screenOn: true, interactive: true }) },
+      ]),
+      settleDelayMs: 0,
+    });
+
+    assert.strictEqual(result.status, "awake");
+    assert.deepStrictEqual(result.state, state({ screenOn: true, interactive: true }));
+    assert.strictEqual(runner.calls.length, 1);
+    assert.deepStrictEqual(runner.calls[0]?.args, ["-s", "test-device", "shell", "cmd", "power", "wakeup"]);
+  });
+
   it("returns probe_failed when a post-attempt probe fails", async () => {
     const { config, runner } = createConfig();
     runner.queueResult({ code: 0, stdout: "", stderr: "" });

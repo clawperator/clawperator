@@ -39,6 +39,7 @@ export interface EnsureDeviceAwakeResult {
     | "awake"
     | "awake_but_locked"
     | "still_asleep"
+    | "transport_failed"
     | "probe_failed";
   attempts: WakeAttempt[];
   state?: InternalInteractiveState;
@@ -230,6 +231,23 @@ export async function ensureDeviceAwake(
     }
 
     lastObservedState = postAttemptProbe.state;
+    if (didWakeCommandFail(adbResult)) {
+      if (postAttemptProbe.state.interactive) {
+        return {
+          status: postAttemptProbe.state.deviceLocked ? "awake_but_locked" : "awake",
+          attempts,
+          state: postAttemptProbe.state,
+        };
+      }
+
+      return {
+        status: "transport_failed",
+        attempts,
+        state: postAttemptProbe.state,
+        error: buildWakeTransportFailure(adbResult, command.method),
+      };
+    }
+
     if (!postAttemptProbe.state.interactive) {
       continue;
     }
@@ -260,6 +278,21 @@ function parseStrictBoolean(stepResult: StepResult, key: string): boolean {
   throw new Error(
     `doctor_ping returned an invalid boolean for ${key}: ${value === undefined ? "missing" : JSON.stringify(value)}`
   );
+}
+
+function didWakeCommandFail(adbResult: AdbResult): boolean {
+  return adbResult.code === null || adbResult.code !== 0;
+}
+
+function buildWakeTransportFailure(
+  adbResult: AdbResult,
+  method: WakeAttemptMethod
+): InteractiveStateProbeFailure {
+  const detail = adbResult.stderr.trim() || adbResult.stdout.trim() || "Unknown adb transport failure.";
+  return {
+    code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+    message: `Wake attempt ${method} failed before the device became interactive: ${detail}`,
+  };
 }
 
 async function sleep(durationMs: number): Promise<void> {
