@@ -46,6 +46,28 @@ interface PerformExecutionResult {
   result: RunExecutionResult;
 }
 
+function validateNonNegativeFiniteNumber(
+  value: unknown,
+  fieldName: string
+): { code: string; message: string; [k: string]: unknown } | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return {
+      code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+      message: `${fieldName} must be a finite number`,
+    };
+  }
+  if (value < 0) {
+    return {
+      code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+      message: `${fieldName} must be a non-negative number`,
+    };
+  }
+  return undefined;
+}
+
 export function attachSnapshotsToStepResults(stepResults: ResultEnvelope["stepResults"], snapshots: string[]): void {
   const snapshotSteps = stepResults.filter(step => step.actionType === "snapshot_ui" && step.success);
   if (snapshotSteps.length === 0 || snapshots.length === 0) {
@@ -328,6 +350,22 @@ async function performExecution(
     execution = validateExecution(executionInput);
   } catch (e) {
     return { result: { ok: false, error: e as { code: string; message: string; [k: string]: unknown } } };
+  }
+
+  const resultEnvelopeTimeoutError = validateNonNegativeFiniteNumber(
+    options.resultEnvelopeTimeoutMs,
+    "resultEnvelopeTimeoutMs"
+  );
+  if (resultEnvelopeTimeoutError !== undefined) {
+    return { execution, result: { ok: false, error: resultEnvelopeTimeoutError } };
+  }
+
+  const logcatBroadcastDelayError = validateNonNegativeFiniteNumber(
+    options.logcatBroadcastDelayMs,
+    "logcatBroadcastDelayMs"
+  );
+  if (logcatBroadcastDelayError !== undefined) {
+    return { execution, result: { ok: false, error: logcatBroadcastDelayError } };
   }
 
   if (options.timeoutMs !== undefined) {

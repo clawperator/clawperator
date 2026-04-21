@@ -1145,6 +1145,60 @@ describe("buildTimeoutError", () => {
     assert.strictEqual(event.deviceId, "device-123");
     assert.strictEqual(event.envelope.hint, undefined);
   });
+
+  it("rejects invalid resultEnvelopeTimeoutMs overrides before dispatch", async () => {
+    const runner = new FakeProcessRunner();
+    const result = await runExecution(
+      {
+        commandId: "cmd-timeout-invalid-1",
+        taskId: "task-timeout-invalid-1",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 1000,
+        actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 0 } }],
+      },
+      {
+        deviceId: "device-123",
+        operatorPackage: "com.test.operator.dev",
+        runner,
+        resultEnvelopeTimeoutMs: Number.NaN,
+      }
+    );
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.EXECUTION_VALIDATION_FAILED);
+      assert.strictEqual(result.error.message, "resultEnvelopeTimeoutMs must be a finite number");
+    }
+    assert.deepStrictEqual(runner.calls, []);
+  });
+
+  it("rejects invalid logcatBroadcastDelayMs overrides before dispatch", async () => {
+    const runner = new FakeProcessRunner();
+    const result = await runExecution(
+      {
+        commandId: "cmd-timeout-invalid-2",
+        taskId: "task-timeout-invalid-2",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 1000,
+        actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 0 } }],
+      },
+      {
+        deviceId: "device-123",
+        operatorPackage: "com.test.operator.dev",
+        runner,
+        logcatBroadcastDelayMs: -1,
+      }
+    );
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.EXECUTION_VALIDATION_FAILED);
+      assert.strictEqual(result.error.message, "logcatBroadcastDelayMs must be a non-negative number");
+    }
+    assert.deepStrictEqual(runner.calls, []);
+  });
 });
 
 describe("runExecution logging", () => {
