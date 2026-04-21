@@ -32,7 +32,7 @@ export function buildServeSkillRunOptions(
   deviceId: string | undefined,
   operatorPackage: string,
   args: readonly string[] | undefined
-): { scriptArgs: string[]; skillEnv: SkillRunEnv | undefined } {
+): { scriptArgs: string[]; skillEnv: SkillRunEnv } {
   const scriptArgs = args ? [...args] : [];
   const skillEnv: SkillRunEnv = {
     CLAWPERATOR_OPERATOR_PACKAGE: operatorPackage,
