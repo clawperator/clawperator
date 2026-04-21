@@ -15,6 +15,24 @@ This page is intentionally narrow:
 - Use [Errors](errors.md) for exact error codes and recovery
 - Use [Devices](devices.md) for target selection rules
 
+## Readiness Gate
+
+Before treating a target as ready for interactive automation, use
+[Doctor](doctor.md) and require:
+
+- exit code `0`
+- `criticalOk == true`
+- `readiness.device.interactive.status == "pass"`
+
+That doctor check exposes structured evidence:
+
+- `deviceLocked`
+- `screenOn`
+- `userUnlocked`
+
+If doctor reports `DEVICE_NOT_INTERACTIVE`, recover the device state first and
+rerun doctor before moving on to execution commands.
+
 ## Execution Payload
 
 Authoritative source: `apps/node/src/contracts/execution.ts`
