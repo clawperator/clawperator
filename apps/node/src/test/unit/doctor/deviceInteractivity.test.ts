@@ -4,6 +4,7 @@ import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtim
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import {
   ensureDeviceAwake,
+  isInteractiveAutomationReady,
   parseDoctorPingInteractiveState,
   probeInteractiveState,
   type InternalInteractiveState,
@@ -230,6 +231,21 @@ describe("ensureDeviceAwake", () => {
     assert.deepStrictEqual(runner.calls, []);
   });
 
+  it("treats post-boot locked state as awake but not ready", async () => {
+    const { config, runner } = createConfig();
+
+    const result = await ensureDeviceAwake(config, {
+      probeInteractiveStateFn: probeSequence([
+        { ok: true, state: state({ screenOn: true, interactive: true, deviceLocked: false, userUnlocked: false }) },
+      ]),
+      settleDelayMs: 0,
+    });
+
+    assert.strictEqual(result.status, "awake_but_locked");
+    assert.deepStrictEqual(result.state, state({ screenOn: true, interactive: true, deviceLocked: false, userUnlocked: false }));
+    assert.deepStrictEqual(runner.calls, []);
+  });
+
   it("uses the host wake retry order until the device becomes interactive", async () => {
     const { config, runner } = createConfig();
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
@@ -403,5 +419,14 @@ describe("ensureDeviceAwake", () => {
     });
     assert.strictEqual(runner.calls.length, 1);
     assert.deepStrictEqual(runner.calls[0]?.args, ["-s", "test-device", "shell", "cmd", "power", "wakeup"]);
+  });
+});
+
+describe("isInteractiveAutomationReady", () => {
+  it("requires screen-on, unlocked, and user-unlocked state", () => {
+    assert.strictEqual(isInteractiveAutomationReady({ screenOn: true, deviceLocked: false, userUnlocked: true }), true);
+    assert.strictEqual(isInteractiveAutomationReady({ screenOn: false, deviceLocked: false, userUnlocked: true }), false);
+    assert.strictEqual(isInteractiveAutomationReady({ screenOn: true, deviceLocked: true, userUnlocked: true }), false);
+    assert.strictEqual(isInteractiveAutomationReady({ screenOn: true, deviceLocked: false, userUnlocked: false }), false);
   });
 });

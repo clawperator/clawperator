@@ -189,6 +189,26 @@ describe("checkDeviceInteractiveState", () => {
         });
     });
 
+    it("fails when the screen is on but the device is still locked", async () => {
+        const result = await checkDeviceInteractiveState(
+            config,
+            async () => ({
+                ok: true as const,
+                state: {
+                    screenOn: true,
+                    interactive: true,
+                    deviceLocked: true,
+                    userUnlocked: true,
+                },
+            })
+        );
+
+        assert.strictEqual(result.status, "fail");
+        assert.strictEqual(result.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
+        assert.match(result.detail ?? "", /deviceLocked=true/);
+        assert.strictEqual(result.fix?.docsUrl, "https://docs.clawperator.com/api/devices/");
+    });
+
     it("fails closed when the foundation probe cannot verify state", async () => {
         const result = await checkDeviceInteractiveState(
             config,

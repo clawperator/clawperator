@@ -10,7 +10,7 @@ import { broadcastAgentCommand } from "../../adapters/android-bridge/broadcastAg
 import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
 import { runAdb, formatCommandLine } from "../../adapters/android-bridge/adbClient.js";
 import { checkApkPresence } from "../doctor/checks/readinessChecks.js";
-import { buildDeviceNotInteractiveError, probeInteractiveState } from "../doctor/checks/deviceInteractivity.js";
+import { buildDeviceNotInteractiveError, isInteractiveAutomationReady, probeInteractiveState } from "../doctor/checks/deviceInteractivity.js";
 import { getOperatorPackageApkPath } from "../version/compatibility.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
@@ -418,7 +418,7 @@ async function performExecution(
       };
     }
 
-    if (!interactiveState.state.interactive) {
+    if (!isInteractiveAutomationReady(interactiveState.state)) {
       return {
         execution,
         result: {

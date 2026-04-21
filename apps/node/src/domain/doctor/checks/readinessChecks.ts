@@ -4,7 +4,13 @@ import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatResultReader.js";
-import { buildDeviceNotInteractiveError, probeInteractiveState, runDoctorPingCommand, toInteractiveStateEvidence } from "./deviceInteractivity.js";
+import {
+  buildDeviceNotInteractiveError,
+  isInteractiveAutomationReady,
+  probeInteractiveState,
+  runDoctorPingCommand,
+  toInteractiveStateEvidence,
+} from "./deviceInteractivity.js";
 import {
   getAlternateOperatorVariant,
   getCliVersion,
@@ -297,7 +303,7 @@ export async function checkDeviceInteractiveState(
 
   const evidence = toInteractiveStateEvidence(result.state);
 
-  if (result.state.interactive) {
+  if (isInteractiveAutomationReady(result.state)) {
     return {
       id: "readiness.device.interactive",
       status: "pass",
@@ -322,7 +328,7 @@ export async function checkDeviceInteractiveState(
         { kind: "manual", value: "Unlock the device if the keyguard is showing." },
         { kind: "manual", value: "Complete the post-boot unlock if Android still reports the user as locked." },
       ],
-      docsUrl: DOCTOR_DOCS_URLS.operator,
+      docsUrl: DOCTOR_DOCS_URLS.devices,
     },
     deviceGuidance: {
       screen: "Lock screen / current screen",

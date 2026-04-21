@@ -108,6 +108,12 @@ export function parseDoctorPingInteractiveState(stepResult: StepResult): Interna
   };
 }
 
+export function isInteractiveAutomationReady(
+  state: Pick<InternalInteractiveState, "screenOn" | "deviceLocked" | "userUnlocked">
+): boolean {
+  return state.screenOn && !state.deviceLocked && state.userUnlocked;
+}
+
 export async function probeInteractiveState(
   config: RuntimeConfig,
   waitForEnvelope: WaitForResultEnvelopeFn = waitForResultEnvelope
@@ -207,9 +213,9 @@ export async function ensureDeviceAwake(
     };
   }
 
-  if (initialProbe.state.interactive) {
+  if (initialProbe.state.screenOn) {
     return {
-      status: initialProbe.state.deviceLocked ? "awake_but_locked" : "already_awake",
+      status: isInteractiveAutomationReady(initialProbe.state) ? "already_awake" : "awake_but_locked",
       attempts: [],
       state: initialProbe.state,
     };
@@ -241,9 +247,9 @@ export async function ensureDeviceAwake(
 
     lastObservedState = postAttemptProbe.state;
     if (didWakeCommandFail(adbResult)) {
-      if (postAttemptProbe.state.interactive) {
+      if (postAttemptProbe.state.screenOn) {
         return {
-          status: postAttemptProbe.state.deviceLocked ? "awake_but_locked" : "awake",
+          status: isInteractiveAutomationReady(postAttemptProbe.state) ? "awake" : "awake_but_locked",
           attempts,
           state: postAttemptProbe.state,
         };
@@ -257,12 +263,12 @@ export async function ensureDeviceAwake(
       };
     }
 
-    if (!postAttemptProbe.state.interactive) {
+    if (!postAttemptProbe.state.screenOn) {
       continue;
     }
 
     return {
-      status: postAttemptProbe.state.deviceLocked ? "awake_but_locked" : "awake",
+      status: isInteractiveAutomationReady(postAttemptProbe.state) ? "awake" : "awake_but_locked",
       attempts,
       state: postAttemptProbe.state,
     };

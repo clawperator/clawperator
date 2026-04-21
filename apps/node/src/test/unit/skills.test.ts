@@ -322,7 +322,14 @@ function runCli(
       let stderr = "";
       proc.stdout?.on("data", (d) => (stdout += d.toString()));
       proc.stderr?.on("data", (d) => (stderr += d.toString()));
-      proc.on("close", (code) => resolve({ stdout, stderr, code: code ?? -1 }));
+      proc.on("close", (code) => {
+        void (async () => {
+          if (fakeAdbDir) {
+            await rm(fakeAdbDir, { recursive: true, force: true });
+          }
+          resolve({ stdout, stderr, code: code ?? -1 });
+        })();
+      });
     });
   })();
 }
@@ -6862,6 +6869,33 @@ describe("cmdSkillsRun preflight gate", () => {
       assert.strictEqual(result.apkPresence.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
     }
     assert.strictEqual(probeCalls, 0);
+  });
+
+  it("treats an awake but locked target as not interactive", async () => {
+    const result = await resolveInteractiveSkillTarget("com.clawperator.operator.dev", {
+      deviceId: "resolved-device-123",
+      resolveDeviceImpl: async () => ({ deviceId: "resolved-device-123", serial: "resolved-device-123" }),
+      checkApkPresenceImpl: async () => passingApkPresence,
+      probeInteractiveStateImpl: async () => ({
+        ok: true,
+        state: {
+          screenOn: true,
+          interactive: true,
+          deviceLocked: true,
+          userUnlocked: true,
+        },
+      }),
+    });
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
+      assert.deepStrictEqual(result.error.details, {
+        screenOn: true,
+        deviceLocked: true,
+        userUnlocked: true,
+      });
+    }
   });
 
   it("aborts invalid artifact skills before runSkill is called", async () => {

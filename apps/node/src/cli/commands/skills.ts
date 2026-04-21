@@ -20,6 +20,7 @@ import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeCo
 import { checkApkPresence } from "../../domain/doctor/checks/readinessChecks.js";
 import {
   buildDeviceNotInteractiveError,
+  isInteractiveAutomationReady,
   probeInteractiveState,
 } from "../../domain/doctor/checks/deviceInteractivity.js";
 import { resolveDevice } from "../../domain/devices/resolveDevice.js";
@@ -284,7 +285,7 @@ export async function resolveInteractiveSkillTarget(
     };
   }
 
-  if (!probe.state.interactive) {
+  if (!isInteractiveAutomationReady(probe.state)) {
     return {
       ok: false,
       error: {

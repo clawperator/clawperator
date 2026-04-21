@@ -641,6 +641,49 @@ describe("runExecution", () => {
       ]
     );
   });
+
+  it("fails before dispatch when the screen is on but the device is still locked", async () => {
+    const runner = new FakeProcessRunner();
+    const execution: Execution = {
+      commandId: "cmd-awake-but-locked",
+      taskId: "task-awake-but-locked",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "sleep-1", type: "sleep", params: { durationMs: 0 } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+
+    const result = await runExecution(execution, {
+      deviceId: "test-device-1",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+      probeInteractiveStateFn: async () => ({
+        ok: true,
+        state: {
+          screenOn: true,
+          interactive: true,
+          deviceLocked: true,
+          userUnlocked: true,
+        },
+      }),
+    });
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
+      assert.deepStrictEqual(result.error.details, {
+        deviceLocked: true,
+        screenOn: true,
+        userUnlocked: true,
+      });
+    }
+    assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
+  });
 });
 
 describe("buildTimeoutError", () => {
