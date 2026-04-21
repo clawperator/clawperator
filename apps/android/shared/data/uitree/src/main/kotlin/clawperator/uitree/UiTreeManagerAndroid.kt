@@ -26,7 +26,7 @@ import clawperator.accessibilityservice.firstFocusableAncestorOrSelf
 class UiTreeManagerAndroid(
     private val accessibilityServiceManager: AccessibilityServiceManager,
 ) : UiTreeManager {
-    // Phase 1 defines the testable boundary for the API 33 path without wiring it yet.
+    // Use the service manager as the API 33 text-input bridge when available.
     private val inputConnectionSource: TextInputConnectionSource =
         accessibilityServiceManager as? TextInputConnectionSource ?: NoOpTextInputConnectionSource
 

@@ -84,6 +84,23 @@ class OperatorAccessibilityServiceTest {
         }
     }
 
+    @Test
+    @Config(sdk = [32], manifest = Config.NONE, application = Application::class)
+    fun `pre api33 service still loads and connects without ime editor flag`() {
+        withServiceKoin(debug = true) { manager ->
+            val service = Robolectric.buildService(OperatorAccessibilityService::class.java).create().get()
+            service.serviceInfo = AccessibilityServiceInfo()
+
+            ReflectionHelpers.callInstanceMethod<Unit>(service, "onServiceConnected")
+
+            assertTrue((service.serviceInfo.flags and AccessibilityServiceInfo.FLAG_INPUT_METHOD_EDITOR) == 0)
+            assertSame(service, manager.currentAccessibilityServiceFlow.value)
+
+            service.onDestroy()
+            assertSame(null, manager.currentAccessibilityServiceFlow.value)
+        }
+    }
+
     private fun withServiceKoin(
         debug: Boolean,
         block: (AccessibilityServiceManagerAndroid) -> Unit,
