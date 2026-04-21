@@ -186,6 +186,7 @@ export async function runHandshake(
   config: RuntimeConfig,
   _waitForResultEnvelope = waitForResultEnvelope
 ): Promise<DoctorCheckResult> {
+  await runAdb(config, ["logcat", "-c"]);
   const result = await runDoctorPingCommand(config, _waitForResultEnvelope);
 
   if (result.ok) {

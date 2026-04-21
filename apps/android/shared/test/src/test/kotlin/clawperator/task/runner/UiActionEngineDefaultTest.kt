@@ -1,13 +1,14 @@
 package clawperator.task.runner
 
 import action.developeroptions.DeveloperOptionsManager
-import action.devicestate.DeviceStateMock
+import action.devicestate.DeviceState
 import action.math.geometry.Rect
 import clawperator.test.ActionTest
 import clawperator.test.actionTest
 import clawperator.uitree.ToggleState
 import clawperator.uitree.UiTreeClickTypes
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -239,10 +240,12 @@ class UiActionEngineDefaultTest : ActionTest {
         actionTest {
             val taskScope = RecordingTaskScope(RecordingTaskUiScope())
             val deviceState =
-                DeviceStateMock(
-                    _queryDeviceLocked = true,
-                    _isScreenOn = false,
-                    _isUserUnlocked = false,
+                DirectQueryDeviceStateFake(
+                    queryScreenOnValue = false,
+                    eventedScreenOnValue = true,
+                    queryDeviceLockedValue = true,
+                    eventedDeviceLockedValue = false,
+                    userUnlockedValue = false,
                 )
             val engine =
                 UiActionEngineDefault(
@@ -1920,6 +1923,30 @@ open class RecordingTaskUiScope(
 private class DeveloperOptionsManagerMock : DeveloperOptionsManager {
     override val isEnabled: Flow<Boolean> = flowOf(true)
     override val isUsbDebuggingEnabled: Flow<Boolean> = flowOf(true)
+}
+
+private class DirectQueryDeviceStateFake(
+    private val queryScreenOnValue: Boolean,
+    eventedScreenOnValue: Boolean,
+    private val queryDeviceLockedValue: Boolean,
+    eventedDeviceLockedValue: Boolean,
+    private val userUnlockedValue: Boolean,
+) : DeviceState {
+    override val queryDeviceLocked: Boolean
+        get() = queryDeviceLockedValue
+
+    override val isDeviceLocked = MutableStateFlow(eventedDeviceLockedValue)
+
+    override val isScreenOn = MutableStateFlow(eventedScreenOnValue)
+
+    override fun queryScreenOn(): Boolean = queryScreenOnValue
+
+    override val isUserUnlocked: Boolean
+        get() = userUnlockedValue
+
+    override fun registerForUserUnlock(block: () -> Unit) {}
+
+    override val isPhone: Boolean = true
 }
 
 private class UiGlobalActionDispatcherMock(

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { runAdb, type AdbResult } from "../../../adapters/android-bridge/adbClient.js";
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope, type LogcatResult } from "../../../adapters/android-bridge/logcatResultReader.js";
@@ -45,6 +46,7 @@ export interface EnsureDeviceAwakeResult {
     | "awake"
     | "awake_but_locked"
     | "still_asleep"
+    | "transport_failed"
     | "probe_failed";
   attempts: WakeAttempt[];
   state?: InternalInteractiveState;
@@ -78,7 +80,7 @@ export async function runDoctorPingCommand(
   config: RuntimeConfig,
   waitForEnvelope: WaitForResultEnvelopeFn = waitForResultEnvelope
 ): Promise<LogcatResult> {
-  const commandId = `handshake-${Date.now()}`;
+  const commandId = `doctor-handshake-${Date.now()}-${randomUUID()}`;
   const payload = JSON.stringify({
     commandId,
     taskId: "doctor-handshake",
@@ -88,8 +90,6 @@ export async function runDoctorPingCommand(
     timeoutMs: 5000,
   });
 
-  await runAdb(config, ["logcat", "-c"]);
-
   return waitForEnvelope(
     config,
     { commandId, timeoutMs: 7000 },
@@ -98,9 +98,11 @@ export async function runDoctorPingCommand(
 }
 
 export function parseDoctorPingInteractiveState(stepResult: StepResult): InternalInteractiveState {
+  const screenOn = parseStrictBoolean(stepResult, "screen_on");
+
   return {
-    screenOn: parseStrictBoolean(stepResult, "screen_on"),
-    interactive: parseStrictBoolean(stepResult, "screen_on"),
+    screenOn,
+    interactive: screenOn,
     deviceLocked: parseStrictBoolean(stepResult, "device_locked"),
     userUnlocked: parseStrictBoolean(stepResult, "user_unlocked"),
   };
@@ -161,6 +163,14 @@ export async function probeInteractiveState(
     };
   }
 
+  if (!doctorPingStep.success) {
+    return {
+      ok: false,
+      code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
+      message: "doctor_ping step result was unsuccessful.",
+    };
+  }
+
   try {
     return {
       ok: true,
@@ -199,7 +209,7 @@ export async function ensureDeviceAwake(
 
   if (initialProbe.state.interactive) {
     return {
-      status: "already_awake",
+      status: initialProbe.state.deviceLocked ? "awake_but_locked" : "already_awake",
       attempts: [],
       state: initialProbe.state,
     };
@@ -230,6 +240,23 @@ export async function ensureDeviceAwake(
     }
 
     lastObservedState = postAttemptProbe.state;
+    if (didWakeCommandFail(adbResult)) {
+      if (postAttemptProbe.state.interactive) {
+        return {
+          status: postAttemptProbe.state.deviceLocked ? "awake_but_locked" : "awake",
+          attempts,
+          state: postAttemptProbe.state,
+        };
+      }
+
+      return {
+        status: "transport_failed",
+        attempts,
+        state: postAttemptProbe.state,
+        error: buildWakeTransportFailure(adbResult, command.method),
+      };
+    }
+
     if (!postAttemptProbe.state.interactive) {
       continue;
     }
@@ -265,6 +292,21 @@ export function buildDeviceNotInteractiveError(
     code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
     message: `Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=${state.screenOn} deviceLocked=${state.deviceLocked} userUnlocked=${state.userUnlocked}`,
     details: toInteractiveStateEvidence(state),
+  };
+}
+
+function didWakeCommandFail(adbResult: AdbResult): boolean {
+  return adbResult.code === null || adbResult.code !== 0;
+}
+
+function buildWakeTransportFailure(
+  adbResult: AdbResult,
+  method: WakeAttemptMethod
+): InteractiveStateProbeFailure {
+  const detail = adbResult.stderr.trim() || adbResult.stdout.trim() || "Unknown adb transport failure.";
+  return {
+    code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+    message: `Wake attempt ${method} failed before the device became interactive: ${detail}`,
   };
 }
 
