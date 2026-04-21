@@ -1,6 +1,6 @@
 # Device Interactivity Foundation Work Breakdown
 
-Parent plan: `tasks/device-interactivity-foundation/plan.md`
+Parent plan: `tasks/android/device-interactivity-foundation/plan.md`
 
 ## Executive Summary
 
@@ -42,7 +42,7 @@ Read these files in this order before coding.
 
 | File | Why it matters |
 | --- | --- |
-| `tasks/device-interactivity-foundation/plan.md` | Stable scope and non-goals |
+| `tasks/android/device-interactivity-foundation/plan.md` | Stable scope and non-goals |
 | `docs/internal/android/device-locked-reference.md` | Captured platform distinctions and validated host wake findings |
 | `apps/android/shared/core/common/src/main/kotlin/action/devicestate/DeviceState.kt` | Current contract comments still encode the wrong `screen off => locked` story |
 | `apps/android/shared/core/common/src/main/kotlin/action/devicestate/DeviceStateSystem.kt` | Current evented state bug and direct-query model |
