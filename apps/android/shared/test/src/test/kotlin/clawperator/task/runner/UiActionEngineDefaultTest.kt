@@ -1,6 +1,7 @@
 package clawperator.task.runner
 
 import action.developeroptions.DeveloperOptionsManager
+import action.devicestate.DeviceStateMock
 import action.math.geometry.Rect
 import clawperator.test.ActionTest
 import clawperator.test.actionTest
@@ -231,6 +232,44 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals("true", stepResult.data["has_overlay"])
             assertEquals("com.android.permissioncontroller", stepResult.data["overlay_package"])
             assertEquals("2", stepResult.data["window_count"])
+        }
+
+    @Test
+    fun `execute doctor_ping reports direct device-state diagnostics`() =
+        actionTest {
+            val taskScope = RecordingTaskScope(RecordingTaskUiScope())
+            val deviceState =
+                DeviceStateMock(
+                    _queryDeviceLocked = true,
+                    _isScreenOn = false,
+                    _isUserUnlocked = false,
+                )
+            val engine =
+                UiActionEngineDefault(
+                    DeveloperOptionsManagerMock(),
+                    UiGlobalActionDispatcherMock(),
+                    deviceState,
+                )
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan =
+                        UiActionPlan(
+                            commandId = "cmd-doctor-ping",
+                            taskId = "task-doctor-ping",
+                            source = "test",
+                            actions = listOf(UiAction.DoctorPing(id = "doctor-1")),
+                        ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("doctor_ping", stepResult.actionType)
+            assertEquals("true", stepResult.data["developer_options_enabled"])
+            assertEquals("true", stepResult.data["usb_debugging_enabled"])
+            assertEquals("false", stepResult.data["screen_on"])
+            assertEquals("true", stepResult.data["device_locked"])
+            assertEquals("false", stepResult.data["user_unlocked"])
         }
 
     @Test
