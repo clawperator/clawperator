@@ -377,20 +377,18 @@ export function buildDeviceNotInteractiveError(
   };
 }
 
-export function toPublicInteractiveAutomationError(
-  error: { code: string; message: string }
-): { code: string; message: string } {
+export function toPublicInteractiveAutomationError<T extends { code: string; message: string; details?: unknown }>(
+  error: T
+): Omit<T, "details" | "message"> & { message: string } {
   if (error.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE) {
+    const { details: _details, message: _message, ...rest } = error;
     return {
-      code: error.code,
+      ...rest,
       message: "Device is not interactive. Interactive automation requires an awake, usable device state.",
     };
   }
 
-  return {
-    code: error.code,
-    message: error.message,
-  };
+  return error;
 }
 
 function didWakeCommandFail(adbResult: AdbResult): boolean {

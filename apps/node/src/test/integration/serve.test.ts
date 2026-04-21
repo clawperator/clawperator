@@ -326,6 +326,7 @@ describe("serve API integration", () => {
         error: {
           code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
           message: "Device is not interactive. screenOn=false",
+          deviceId: "resolved-device-123",
         },
       }),
     });
@@ -342,10 +343,11 @@ describe("serve API integration", () => {
       assert.strictEqual(res.status, 409);
       const body = await res.json() as {
         ok: boolean;
-        error: { code: string; message?: string; details?: { screenOn?: boolean; deviceLocked?: boolean; userUnlocked?: boolean } };
+        error: { code: string; deviceId?: string; message?: string; details?: { screenOn?: boolean; deviceLocked?: boolean; userUnlocked?: boolean } };
       };
       assert.strictEqual(body.ok, false);
       assert.strictEqual(body.error.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
+      assert.strictEqual(body.error.deviceId, "resolved-device-123");
       assert.strictEqual(body.error.details, undefined);
       assert.strictEqual(body.error.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
       await assert.rejects(readFile(markerPath, "utf8"));

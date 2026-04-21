@@ -7136,6 +7136,7 @@ describe("cmdSkillsRun preflight gate", () => {
           error: {
             code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
             message: "Device is not interactive. screenOn=false",
+            deviceId: "resolved-device-123",
           },
         }),
       }
@@ -7143,11 +7144,13 @@ describe("cmdSkillsRun preflight gate", () => {
 
     const parsed = JSON.parse(stdout) as {
       code?: string;
+      deviceId?: string;
       details?: { screenOn?: boolean; deviceLocked?: boolean; userUnlocked?: boolean };
       message?: string;
     };
     assert.strictEqual(runCalls, 0);
     assert.strictEqual(parsed.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
+    assert.strictEqual(parsed.deviceId, "resolved-device-123");
     assert.strictEqual(parsed.details, undefined);
     assert.strictEqual(parsed.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
   });
