@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { checkApkPresence, runHandshake } from "../../../domain/doctor/checks/readinessChecks.js";
+import { checkApkPresence, checkDeviceInteractiveState, runHandshake } from "../../../domain/doctor/checks/readinessChecks.js";
 import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
@@ -130,5 +130,75 @@ describe("runHandshake", () => {
         const result = await runHandshake(config, mockWait);
         assert.strictEqual(result.status, "fail");
         assert.strictEqual(result.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
+    });
+});
+
+describe("checkDeviceInteractiveState", () => {
+    const config = getDefaultRuntimeConfig({
+        runner: new FakeProcessRunner(),
+        deviceId: "test-device",
+        operatorPackage: "com.test.operator",
+    });
+
+    it("passes when the foundation probe reports an interactive device", async () => {
+        const result = await checkDeviceInteractiveState(
+            config,
+            async () => ({
+                ok: true as const,
+                state: {
+                    screenOn: true,
+                    interactive: true,
+                    deviceLocked: false,
+                    userUnlocked: true,
+                },
+            })
+        );
+
+        assert.strictEqual(result.status, "pass");
+        assert.strictEqual(result.id, "readiness.device.interactive");
+        assert.deepStrictEqual(result.evidence, {
+            deviceLocked: false,
+            screenOn: true,
+            userUnlocked: true,
+        });
+    });
+
+    it("fails with DEVICE_NOT_INTERACTIVE and evidence when the device is not interactive", async () => {
+        const result = await checkDeviceInteractiveState(
+            config,
+            async () => ({
+                ok: true as const,
+                state: {
+                    screenOn: false,
+                    interactive: false,
+                    deviceLocked: true,
+                    userUnlocked: false,
+                },
+            })
+        );
+
+        assert.strictEqual(result.status, "fail");
+        assert.strictEqual(result.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
+        assert.match(result.detail ?? "", /screenOn=false/);
+        assert.deepStrictEqual(result.evidence, {
+            deviceLocked: true,
+            screenOn: false,
+            userUnlocked: false,
+        });
+    });
+
+    it("fails closed when the foundation probe cannot verify state", async () => {
+        const result = await checkDeviceInteractiveState(
+            config,
+            async () => ({
+                ok: false as const,
+                code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
+                message: "doctor_ping returned an invalid boolean for screen_on: missing",
+            })
+        );
+
+        assert.strictEqual(result.status, "fail");
+        assert.strictEqual(result.code, ERROR_CODES.RESULT_ENVELOPE_MALFORMED);
+        assert.strictEqual(result.summary, "Could not verify whether the device is interactive.");
     });
 });

@@ -114,6 +114,45 @@ describe("cmdDoctor", () => {
     assert.strictEqual(parsed.checks[0].fix.docsUrl, DOCTOR_DOCS_URLS.setup);
   });
 
+  it("preserves interactive-state evidence in JSON output", async () => {
+    const output = await cmdDoctor(
+      {
+        format: "json",
+      },
+      {
+        doctorService: {
+          run: async () => ({
+            ok: false,
+            criticalOk: false,
+            deviceId: "test-device-1",
+            operatorPackage: "com.test.operator",
+            checks: [
+              {
+                id: "readiness.device.interactive",
+                status: "fail",
+                code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+                summary: "Device is not interactive.",
+                evidence: {
+                  deviceLocked: true,
+                  screenOn: false,
+                  userUnlocked: false,
+                },
+              },
+            ],
+          }),
+        },
+      }
+    );
+
+    const parsed = JSON.parse(output);
+    assert.strictEqual(parsed.checks[0].code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
+    assert.deepStrictEqual(parsed.checks[0].evidence, {
+      deviceLocked: true,
+      screenOn: false,
+      userUnlocked: false,
+    });
+  });
+
   it("omits docsUrl in JSON output when a fix does not provide one", async () => {
     const output = await cmdDoctor(
       {

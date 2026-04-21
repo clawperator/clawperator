@@ -17,6 +17,7 @@ import {
   checkApkPresence,
   checkVersionCompatibility,
   checkSettings,
+  checkDeviceInteractiveState,
   runHandshake,
   runSmokeTest
 } from "./checks/readinessChecks.js";
@@ -36,11 +37,19 @@ export interface RunDoctorOptions {
   logger?: Logger;
 }
 
+export interface DoctorServiceDeps {
+  runHandshake?: typeof runHandshake;
+  checkDeviceInteractiveState?: typeof checkDeviceInteractiveState;
+  runSmokeTest?: typeof runSmokeTest;
+}
+
 type RuntimeConfigWithDoctorOverrides = RuntimeConfig & {
   agentSkillsDir?: string;
 };
 
 export class DoctorService {
+  constructor(private readonly deps: DoctorServiceDeps = {}) {}
+
   async run(options: RunDoctorOptions): Promise<DoctorReport> {
     const config = options.logger === undefined ? options.config : { ...options.config, logger: options.logger };
     const { full } = options;
@@ -131,14 +140,18 @@ export class DoctorService {
 
     // 6. Handshake
     if (apkPresence.status === "pass" && versionCompatibilityPassed) {
-      const handshake = await runHandshake(config);
+      const handshake = await (this.deps.runHandshake ?? runHandshake)(config);
       checks.push(handshake);
       if (this.shouldHaltOnFailure(handshake)) return this.finalize(checks, config, options.fix);
+
+      const interactiveState = await (this.deps.checkDeviceInteractiveState ?? checkDeviceInteractiveState)(config);
+      checks.push(interactiveState);
+      if (this.shouldHaltOnFailure(interactiveState)) return this.finalize(checks, config, options.fix);
     }
 
     // 7. Smoke Test (Only if full)
     if (full && apkPresence.status === "pass" && versionCompatibilityPassed) {
-      const smoke = await runSmokeTest(config);
+      const smoke = await (this.deps.runSmokeTest ?? runSmokeTest)(config);
       checks.push(smoke);
       if (this.shouldHaltOnFailure(smoke)) return this.finalize(checks, config, options.fix);
     }

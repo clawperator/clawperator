@@ -4,7 +4,7 @@ import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatResultReader.js";
-import { runDoctorPingCommand } from "./deviceInteractivity.js";
+import { probeInteractiveState, runDoctorPingCommand } from "./deviceInteractivity.js";
 import {
   getAlternateOperatorVariant,
   getCliVersion,
@@ -275,6 +275,47 @@ export async function runHandshake(
     status: "fail",
     summary: "Handshake failed with an unknown error.",
     detail: "error" in result ? result.error : "Unknown error",
+  };
+}
+
+export async function checkDeviceInteractiveState(
+  config: RuntimeConfig,
+  _probeInteractiveState = probeInteractiveState
+): Promise<DoctorCheckResult> {
+  const result = await _probeInteractiveState(config);
+
+  if (!result.ok) {
+    return {
+      id: "readiness.device.interactive",
+      status: "fail",
+      code: result.code,
+      summary: "Could not verify whether the device is interactive.",
+      detail: result.message,
+    };
+  }
+
+  const evidence = {
+    deviceLocked: result.state.deviceLocked,
+    screenOn: result.state.screenOn,
+    userUnlocked: result.state.userUnlocked,
+  };
+
+  if (result.state.interactive) {
+    return {
+      id: "readiness.device.interactive",
+      status: "pass",
+      summary: "Device is interactive.",
+      evidence,
+    };
+  }
+
+  return {
+    id: "readiness.device.interactive",
+    status: "fail",
+    code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+    summary: "Device is not interactive.",
+    detail: `Interactive automation requires an awake, usable device state. screenOn=${result.state.screenOn} deviceLocked=${result.state.deviceLocked} userUnlocked=${result.state.userUnlocked}`,
+    evidence,
   };
 }
 
