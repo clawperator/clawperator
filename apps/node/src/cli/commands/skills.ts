@@ -19,8 +19,7 @@ import { getAlternateOperatorVariant } from "../../domain/version/compatibility.
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { checkApkPresence } from "../../domain/doctor/checks/readinessChecks.js";
 import {
-  buildDeviceNotInteractiveError,
-  isInteractiveAutomationReady,
+  ensureInteractiveAutomationReady,
   probeInteractiveState,
 } from "../../domain/doctor/checks/deviceInteractivity.js";
 import { resolveDevice } from "../../domain/devices/resolveDevice.js";
@@ -238,12 +237,14 @@ export async function resolveInteractiveSkillTarget(
     logger?: Logger;
     resolveDeviceImpl?: typeof resolveDevice;
     checkApkPresenceImpl?: typeof checkApkPresence;
+    ensureInteractiveAutomationReadyImpl?: typeof ensureInteractiveAutomationReady;
     probeInteractiveStateImpl?: typeof probeInteractiveState;
   }
 ): Promise<ResolveInteractiveSkillTargetResult> {
   const logger = options?.logger;
   const resolveDeviceImpl = options?.resolveDeviceImpl ?? resolveDevice;
   const checkApkPresenceImpl = options?.checkApkPresenceImpl ?? checkApkPresence;
+  const ensureInteractiveAutomationReadyImpl = options?.ensureInteractiveAutomationReadyImpl ?? ensureInteractiveAutomationReady;
   const probeInteractiveStateImpl = options?.probeInteractiveStateImpl ?? probeInteractiveState;
 
   let resolvedDevice;
@@ -276,23 +277,16 @@ export async function resolveInteractiveSkillTarget(
     };
   }
 
-  const probe = await probeInteractiveStateImpl(config);
-  if (!probe.ok) {
+  const readiness = await ensureInteractiveAutomationReadyImpl(config, {
+    probeInteractiveStateFn: probeInteractiveStateImpl,
+  });
+  if (!readiness.ok) {
     return {
       ok: false,
       error: {
-        code: probe.code,
-        message: probe.message,
-        deviceId: resolvedDevice.deviceId,
-      },
-    };
-  }
-
-  if (!isInteractiveAutomationReady(probe.state)) {
-    return {
-      ok: false,
-      error: {
-        ...buildDeviceNotInteractiveError(probe.state),
+        code: readiness.error.code,
+        message: readiness.error.message,
+        details: readiness.error.details,
         deviceId: resolvedDevice.deviceId,
       },
     };

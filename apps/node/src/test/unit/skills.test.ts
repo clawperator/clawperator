@@ -6898,6 +6898,31 @@ describe("cmdSkillsRun preflight gate", () => {
     }
   });
 
+  it("accepts a target when the shared readiness helper wakes the device", async () => {
+    let readinessCalls = 0;
+
+    const result = await resolveInteractiveSkillTarget("com.clawperator.operator.dev", {
+      deviceId: "resolved-device-123",
+      resolveDeviceImpl: async () => ({ deviceId: "resolved-device-123", serial: "resolved-device-123" }),
+      checkApkPresenceImpl: async () => passingApkPresence,
+      ensureInteractiveAutomationReadyImpl: async () => {
+        readinessCalls += 1;
+        return {
+          ok: true,
+          state: {
+            screenOn: true,
+            interactive: true,
+            deviceLocked: false,
+            userUnlocked: true,
+          },
+        };
+      },
+    });
+
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(readinessCalls, 1);
+  });
+
   it("uses the configured adb path for wrapper preflight", async () => {
     const observedAdbPaths: string[] = [];
 

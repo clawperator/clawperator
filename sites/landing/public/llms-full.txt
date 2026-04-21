@@ -4032,6 +4032,10 @@ Meaning:
   - `screenOn`
   - `deviceLocked`
   - `userUnlocked`
+- direct execution and high-level skill wrappers may make a bounded host-side
+  wake attempt first when the screen is off
+- if the device remains asleep, is still locked, or still requires post-boot
+  unlock, the runtime returns this error instead of proceeding
 
 Typical recovery:
 
@@ -9551,7 +9555,9 @@ The serve wrapper uses the same underlying registry and `runSkill()` runtime, wi
 
 Important boundary:
 
-- the serve route validates the skill, resolves `operatorPackage`, and only runs the pre-spawn interactive-state probe after the requested Operator package check passes for the resolved target
+- the serve route validates the skill, resolves `operatorPackage`, and after the requested Operator package check passes it uses the same bounded pre-spawn readiness preparation as `skills run`
+- when the screen is off, that preparation may wake the device before the skill process is spawned
+- it still fails with `DEVICE_NOT_INTERACTIVE` for awake-but-locked or post-boot-locked states
 - it does not go through the full CLI `cmdSkillsRun()` path, so it still does not include the CLI banner behavior
 - serve accepts optional request fields:
   - `deviceId`
@@ -11759,8 +11765,17 @@ Verification pattern:
 
 High-level wrapper enforcement now matches that readiness contract:
 
-- `clawperator skills run` resolves the target tuple, checks the requested Operator package first, and only probes interactive state when that package check passes for the target
-- `POST /skills/:skillId/run` in serve performs the same pre-spawn target check ordering
+- `clawperator skills run` resolves the target tuple, checks the requested Operator package first, and when the target is asleep it makes a bounded host-side wake attempt before failing with `DEVICE_NOT_INTERACTIVE`
+- `POST /skills/:skillId/run` in serve performs the same pre-spawn readiness preparation
+
+Current bounded wake behavior:
+
+- if the device is already awake and ready, the wrapper proceeds immediately
+- if the screen is off, the wrapper tries host-side wake in the internal retry
+  order and then re-checks readiness
+- if the device is awake but still locked, or Android still reports
+  `userUnlocked == false`, the wrapper fails with `DEVICE_NOT_INTERACTIVE`
+- the wrapper does not attempt credential entry or secure-keyguard bypass
 
 Wrapper-level non-interactive failure shape:
 

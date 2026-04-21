@@ -4,6 +4,7 @@ import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtim
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import {
   ensureDeviceAwake,
+  ensureInteractiveAutomationReady,
   isInteractiveAutomationReady,
   parseDoctorPingInteractiveState,
   probeInteractiveState,
@@ -428,5 +429,107 @@ describe("isInteractiveAutomationReady", () => {
     assert.strictEqual(isInteractiveAutomationReady({ screenOn: false, deviceLocked: false, userUnlocked: true }), false);
     assert.strictEqual(isInteractiveAutomationReady({ screenOn: true, deviceLocked: true, userUnlocked: true }), false);
     assert.strictEqual(isInteractiveAutomationReady({ screenOn: true, deviceLocked: false, userUnlocked: false }), false);
+  });
+});
+
+describe("ensureInteractiveAutomationReady", () => {
+  const readyState: InternalInteractiveState = {
+    screenOn: true,
+    interactive: true,
+    deviceLocked: false,
+    userUnlocked: true,
+  };
+
+  it("returns success when the shared wake helper makes the device ready", async () => {
+    const config = getDefaultRuntimeConfig({
+      runner: new FakeProcessRunner(),
+      deviceId: "test-device",
+      operatorPackage: "com.test.operator",
+    });
+
+    const result = await ensureInteractiveAutomationReady(config, {
+      ensureDeviceAwakeFn: async () => ({
+        status: "awake",
+        attempts: [],
+        state: readyState,
+      }),
+    });
+
+    assert.deepStrictEqual(result, {
+      ok: true,
+      state: readyState,
+    });
+  });
+
+  it("returns DEVICE_NOT_INTERACTIVE when the device remains asleep after wake attempts", async () => {
+    const config = getDefaultRuntimeConfig({
+      runner: new FakeProcessRunner(),
+      deviceId: "test-device",
+      operatorPackage: "com.test.operator",
+    });
+
+    const result = await ensureInteractiveAutomationReady(config, {
+      ensureDeviceAwakeFn: async () => ({
+        status: "still_asleep",
+        attempts: [],
+        state: {
+          screenOn: false,
+          interactive: false,
+          deviceLocked: false,
+          userUnlocked: true,
+        },
+      }),
+    });
+
+    assert.deepStrictEqual(result, {
+      ok: false,
+      error: {
+        code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+        message: "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=false userUnlocked=true",
+        details: {
+          screenOn: false,
+          deviceLocked: false,
+          userUnlocked: true,
+        },
+      },
+    });
+  });
+
+  it("passes through bounded wake failures", async () => {
+    const config = getDefaultRuntimeConfig({
+      runner: new FakeProcessRunner(),
+      deviceId: "test-device",
+      operatorPackage: "com.test.operator",
+    });
+
+    const result = await ensureInteractiveAutomationReady(config, {
+      ensureDeviceAwakeFn: async () => ({
+        status: "transport_failed",
+        attempts: [],
+        state: {
+          screenOn: false,
+          interactive: false,
+          deviceLocked: false,
+          userUnlocked: true,
+        },
+        error: {
+          code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+          message: "Wake attempt cmd_power_wakeup failed before the device became interactive: transport error",
+        },
+      }),
+    });
+
+    assert.deepStrictEqual(result, {
+      ok: false,
+      error: {
+        code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+        message: "Wake attempt cmd_power_wakeup failed before the device became interactive: transport error",
+        details: {
+          screenOn: false,
+          deviceLocked: false,
+          userUnlocked: true,
+        },
+      },
+    });
   });
 });

@@ -41,8 +41,17 @@ Verification pattern:
 
 High-level wrapper enforcement now matches that readiness contract:
 
-- `clawperator skills run` resolves the target tuple, checks the requested Operator package first, and only probes interactive state when that package check passes for the target
-- `POST /skills/:skillId/run` in serve performs the same pre-spawn target check ordering
+- `clawperator skills run` resolves the target tuple, checks the requested Operator package first, and when the target is asleep it makes a bounded host-side wake attempt before failing with `DEVICE_NOT_INTERACTIVE`
+- `POST /skills/:skillId/run` in serve performs the same pre-spawn readiness preparation
+
+Current bounded wake behavior:
+
+- if the device is already awake and ready, the wrapper proceeds immediately
+- if the screen is off, the wrapper tries host-side wake in the internal retry
+  order and then re-checks readiness
+- if the device is awake but still locked, or Android still reports
+  `userUnlocked == false`, the wrapper fails with `DEVICE_NOT_INTERACTIVE`
+- the wrapper does not attempt credential entry or secure-keyguard bypass
 
 Wrapper-level non-interactive failure shape:
 

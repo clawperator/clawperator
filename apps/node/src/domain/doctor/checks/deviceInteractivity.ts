@@ -26,9 +26,19 @@ export interface InteractiveStateProbeFailure {
   message: string;
 }
 
+export interface InteractiveAutomationReadyError {
+  code: ErrorCode;
+  message: string;
+  details?: InteractiveStateEvidence;
+}
+
 export type InteractiveStateProbeResult =
   | { ok: true; state: InternalInteractiveState }
   | { ok: false; code: ErrorCode; message: string };
+
+export type InteractiveAutomationReadyResult =
+  | { ok: true; state: InternalInteractiveState }
+  | { ok: false; error: InteractiveAutomationReadyError };
 
 export type WakeAttemptMethod =
   | "cmd_power_wakeup"
@@ -279,6 +289,61 @@ export async function ensureDeviceAwake(
     attempts,
     state: lastObservedState,
   };
+}
+
+export async function ensureInteractiveAutomationReady(
+  config: RuntimeConfig,
+  options?: {
+    ensureDeviceAwakeFn?: typeof ensureDeviceAwake;
+    probeInteractiveStateFn?: typeof probeInteractiveState;
+    settleDelayMs?: number;
+  }
+): Promise<InteractiveAutomationReadyResult> {
+  const ensureDeviceAwakeFn = options?.ensureDeviceAwakeFn ?? ensureDeviceAwake;
+  const wakeResult = await ensureDeviceAwakeFn(config, {
+    probeInteractiveStateFn: options?.probeInteractiveStateFn,
+    settleDelayMs: options?.settleDelayMs,
+  });
+
+  switch (wakeResult.status) {
+    case "already_awake":
+    case "awake":
+      if (wakeResult.state && isInteractiveAutomationReady(wakeResult.state)) {
+        return { ok: true, state: wakeResult.state };
+      }
+      return {
+        ok: false,
+        error: {
+          code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
+          message: "Interactive readiness helper returned success without a usable device state.",
+        },
+      };
+    case "awake_but_locked":
+    case "still_asleep":
+      if (wakeResult.state) {
+        return {
+          ok: false,
+          error: buildDeviceNotInteractiveError(wakeResult.state),
+        };
+      }
+      return {
+        ok: false,
+        error: {
+          code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+          message: "Device is not interactive and no interactive-state evidence was available.",
+        },
+      };
+    case "probe_failed":
+    case "transport_failed":
+      return {
+        ok: false,
+        error: {
+          code: wakeResult.error?.code ?? ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+          message: wakeResult.error?.message ?? "Could not prepare the device for interactive automation.",
+          details: wakeResult.state ? toInteractiveStateEvidence(wakeResult.state) : undefined,
+        },
+      };
+  }
 }
 
 export function toInteractiveStateEvidence(

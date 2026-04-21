@@ -264,6 +264,10 @@ Meaning:
   - `screenOn`
   - `deviceLocked`
   - `userUnlocked`
+- direct execution and high-level skill wrappers may make a bounded host-side
+  wake attempt first when the screen is off
+- if the device remains asleep, is still locked, or still requires post-boot
+  unlock, the runtime returns this error instead of proceeding
 
 Typical recovery:
 

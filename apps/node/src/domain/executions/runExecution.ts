@@ -10,7 +10,7 @@ import { broadcastAgentCommand } from "../../adapters/android-bridge/broadcastAg
 import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
 import { runAdb, formatCommandLine } from "../../adapters/android-bridge/adbClient.js";
 import { checkApkPresence } from "../doctor/checks/readinessChecks.js";
-import { buildDeviceNotInteractiveError, isInteractiveAutomationReady, probeInteractiveState } from "../doctor/checks/deviceInteractivity.js";
+import { ensureInteractiveAutomationReady, probeInteractiveState } from "../doctor/checks/deviceInteractivity.js";
 import { getOperatorPackageApkPath } from "../version/compatibility.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
@@ -28,6 +28,7 @@ export interface RunExecutionOptions {
   operatorPackage?: string;
   adbPath?: string;
   runner?: RuntimeConfig["runner"];
+  ensureInteractiveAutomationReadyFn?: typeof ensureInteractiveAutomationReady;
   probeInteractiveStateFn?: typeof probeInteractiveState;
   timeoutMs?: number;
   warn?: (message: string) => void;
@@ -402,28 +403,20 @@ async function performExecution(
   }
 
   try {
-    const probeInteractiveStateFn = options.probeInteractiveStateFn ?? probeInteractiveState;
-    const interactiveState = await probeInteractiveStateFn(config);
+    const ensureInteractiveAutomationReadyFn = options.ensureInteractiveAutomationReadyFn ?? ensureInteractiveAutomationReady;
+    const interactiveState = await ensureInteractiveAutomationReadyFn(config, {
+      probeInteractiveStateFn: options.probeInteractiveStateFn,
+    });
     if (!interactiveState.ok) {
       return {
         execution,
         result: {
           ok: false,
           error: {
-            code: interactiveState.code,
-            message: interactiveState.message,
+            code: interactiveState.error.code,
+            message: interactiveState.error.message,
+            details: interactiveState.error.details,
           },
-          deviceId,
-        },
-      };
-    }
-
-    if (!isInteractiveAutomationReady(interactiveState.state)) {
-      return {
-        execution,
-        result: {
-          ok: false,
-          error: buildDeviceNotInteractiveError(interactiveState.state),
           deviceId,
         },
       };

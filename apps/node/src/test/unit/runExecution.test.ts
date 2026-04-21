@@ -610,13 +610,16 @@ describe("runExecution", () => {
       deviceId: "test-device-1",
       operatorPackage: "com.test.operator.dev",
       runner,
-      probeInteractiveStateFn: async () => ({
-        ok: true,
-        state: {
-          screenOn: false,
-          interactive: false,
-          deviceLocked: true,
-          userUnlocked: true,
+      ensureInteractiveAutomationReadyFn: async () => ({
+        ok: false,
+        error: {
+          code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+          message: "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=true userUnlocked=true",
+          details: {
+            screenOn: false,
+            deviceLocked: true,
+            userUnlocked: true,
+          },
         },
       }),
     });
@@ -662,13 +665,16 @@ describe("runExecution", () => {
       deviceId: "test-device-1",
       operatorPackage: "com.test.operator.dev",
       runner,
-      probeInteractiveStateFn: async () => ({
-        ok: true,
-        state: {
-          screenOn: true,
-          interactive: true,
-          deviceLocked: true,
-          userUnlocked: true,
+      ensureInteractiveAutomationReadyFn: async () => ({
+        ok: false,
+        error: {
+          code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+          message: "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=true deviceLocked=true userUnlocked=true",
+          details: {
+            screenOn: true,
+            deviceLocked: true,
+            userUnlocked: true,
+          },
         },
       }),
     });
@@ -683,6 +689,65 @@ describe("runExecution", () => {
       });
     }
     assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
+  });
+
+  it("continues after the shared readiness helper wakes a sleeping device", async () => {
+    const runner = new FakeProcessRunner();
+    const execution: Execution = {
+      commandId: "cmd-central-wake",
+      taskId: "task-central-wake",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "sleep-1", type: "sleep", params: { durationMs: 0 } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" });
+    runner.spawn = (() => {
+      const proc = new EventEmitter() as EventEmitter & {
+        stdout?: EventEmitter;
+        stderr?: EventEmitter;
+        kill: () => void;
+      };
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      setTimeout(() => {
+        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+          commandId: "cmd-central-wake",
+          taskId: "task-central-wake",
+          status: "success",
+          stepResults: [{ id: "sleep-1", actionType: "sleep", success: true, data: {} }],
+          error: null,
+        })}\n`));
+        proc.emit("close", 0, null);
+      }, 5);
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+
+    const result = await runExecution(execution, {
+      deviceId: "test-device-1",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+      ensureInteractiveAutomationReadyFn: async () => ({
+        ok: true,
+        state: {
+          screenOn: true,
+          interactive: true,
+          deviceLocked: false,
+          userUnlocked: true,
+        },
+      }),
+    });
+
+    assert.strictEqual(result.ok, true);
+    assert.ok(runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -c"));
+    assert.ok(runner.calls.some(call => call.args.join(" ") === "-s test-device-1 shell am broadcast -a app.clawperator.operator.ACTION_AGENT_COMMAND -p com.test.operator.dev --es payload [redacted]"));
   });
 });
 

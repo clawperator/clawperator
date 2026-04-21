@@ -396,7 +396,7 @@ describe("serve API integration", () => {
     const adbAwarePort = adbAwareAddr && typeof adbAwareAddr === "object" ? adbAwareAddr.port : 0;
 
     try {
-      const res = await fetch(`http://localhost:${adbAwarePort}/skills/com.test.no-spawn-proof/run`, {
+      const res = await fetch(`http://localhost:${adbAwarePort}/skills/com.test.skill-result/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),

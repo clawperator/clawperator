@@ -711,7 +711,9 @@ The serve wrapper uses the same underlying registry and `runSkill()` runtime, wi
 
 Important boundary:
 
-- the serve route validates the skill, resolves `operatorPackage`, and only runs the pre-spawn interactive-state probe after the requested Operator package check passes for the resolved target
+- the serve route validates the skill, resolves `operatorPackage`, and after the requested Operator package check passes it uses the same bounded pre-spawn readiness preparation as `skills run`
+- when the screen is off, that preparation may wake the device before the skill process is spawned
+- it still fails with `DEVICE_NOT_INTERACTIVE` for awake-but-locked or post-boot-locked states
 - it does not go through the full CLI `cmdSkillsRun()` path, so it still does not include the CLI banner behavior
 - serve accepts optional request fields:
   - `deviceId`
