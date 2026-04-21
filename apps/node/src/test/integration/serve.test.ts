@@ -58,6 +58,11 @@ describe("serve API integration", () => {
       resolveInteractiveSkillTargetImpl: async (_operatorPackage, options) => ({
         ok: true,
         deviceId: options?.deviceId ?? "resolved-device-123",
+        apkPresence: {
+          id: "readiness.apk.presence",
+          status: "pass",
+          summary: "Operator APK is installed.",
+        },
       }),
     });
     const addr = server.address();

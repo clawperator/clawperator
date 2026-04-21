@@ -314,6 +314,24 @@ export async function checkDeviceInteractiveState(
     code: error.code,
     summary: "Device is not interactive.",
     detail: error.message.replace(/^Device is not interactive\. /, ""),
+    fix: {
+      title: "Recover interactive device state",
+      platform: "any",
+      steps: [
+        { kind: "manual", value: "Wake the device if the screen is off." },
+        { kind: "manual", value: "Unlock the device if the keyguard is showing." },
+        { kind: "manual", value: "Complete the post-boot unlock if Android still reports the user as locked." },
+      ],
+      docsUrl: DOCTOR_DOCS_URLS.operator,
+    },
+    deviceGuidance: {
+      screen: "Lock screen / current screen",
+      steps: [
+        "Wake the device if the screen is off.",
+        "Unlock the device if the keyguard is showing.",
+        "Complete the post-boot unlock if Android still reports the user as locked.",
+      ],
+    },
     evidence,
   };
 }

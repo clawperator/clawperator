@@ -436,7 +436,7 @@ What the wrapper does:
 Argument passing rules:
 
 - if `--device` was provided, the wrapper passes that explicit device id through `CLAWPERATOR_DEVICE_ID`, and `runSkill()` prepends it as the first script argument for script-driven skills
-- if `--device` was omitted, the wrapper still may resolve a single connected device for preflight, but it does not inject that implicit device selection into the child env or argv
+- if `--device` was omitted, the wrapper still may resolve a single connected device for preflight, but it does not inject that implicit device selection into the child env or argv, and inherited ambient `CLAWPERATOR_DEVICE_ID` is cleared for the child process
 - unknown trailing tokens such as `--limit 40` are forwarded to the script unchanged
 - use `--` when you need to force literal passthrough for tokens that would otherwise be parsed as wrapper flags
 - `CLAWPERATOR_BIN` and `CLAWPERATOR_OPERATOR_PACKAGE` are injected into the script environment
@@ -711,7 +711,7 @@ The serve wrapper uses the same underlying registry and `runSkill()` runtime, wi
 
 Important boundary:
 
-- the serve route validates the skill, resolves `operatorPackage`, and runs the same pre-spawn interactive-state probe before calling `runSkill()`
+- the serve route validates the skill, resolves `operatorPackage`, and only runs the pre-spawn interactive-state probe after the requested Operator package check passes for the resolved target
 - it does not go through the full CLI `cmdSkillsRun()` path, so it still does not include the CLI banner behavior
 - serve accepts optional request fields:
   - `deviceId`

@@ -19,6 +19,7 @@ describe("buildServeSkillRunOptions", () => {
 
     assert.deepStrictEqual(result.scriptArgs, ["40"]);
     assert.deepStrictEqual(result.skillEnv, {
+      CLAWPERATOR_DEVICE_ID: undefined,
       CLAWPERATOR_OPERATOR_PACKAGE: "com.test.operator",
     });
   });

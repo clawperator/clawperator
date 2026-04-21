@@ -11,6 +11,7 @@ import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
 import { SKILL_RESULT_FRAME_PREFIX } from "../../contracts/skillResult.js";
 import { SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
+import type { DoctorCheckResult } from "../../contracts/doctor.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
 import { getCliVersion } from "../../domain/version/compatibility.js";
@@ -199,10 +200,11 @@ interface CommandLikeError {
   code: string;
   message: string;
   details?: Record<string, unknown>;
+  deviceId?: string;
 }
 
 export type ResolveInteractiveSkillTargetResult =
-  | { ok: true; deviceId: string }
+  | { ok: true; deviceId: string; apkPresence: DoctorCheckResult }
   | { ok: false; error: CommandLikeError };
 
 function normalizeCommandLikeError(error: unknown): CommandLikeError {
@@ -233,11 +235,13 @@ export async function resolveInteractiveSkillTarget(
     deviceId?: string;
     logger?: Logger;
     resolveDeviceImpl?: typeof resolveDevice;
+    checkApkPresenceImpl?: typeof checkApkPresence;
     probeInteractiveStateImpl?: typeof probeInteractiveState;
   }
 ): Promise<ResolveInteractiveSkillTargetResult> {
   const logger = options?.logger;
   const resolveDeviceImpl = options?.resolveDeviceImpl ?? resolveDevice;
+  const checkApkPresenceImpl = options?.checkApkPresenceImpl ?? checkApkPresence;
   const probeInteractiveStateImpl = options?.probeInteractiveStateImpl ?? probeInteractiveState;
 
   let resolvedDevice;
@@ -254,17 +258,28 @@ export async function resolveInteractiveSkillTarget(
     };
   }
 
-  const probe = await probeInteractiveStateImpl(getDefaultRuntimeConfig({
+  const config = getDefaultRuntimeConfig({
     deviceId: resolvedDevice.deviceId,
     operatorPackage,
     logger,
-  }));
+  });
+  const apkPresence = await checkApkPresenceImpl(config);
+  if (apkPresence.status !== "pass") {
+    return {
+      ok: true,
+      deviceId: resolvedDevice.deviceId,
+      apkPresence,
+    };
+  }
+
+  const probe = await probeInteractiveStateImpl(config);
   if (!probe.ok) {
     return {
       ok: false,
       error: {
         code: probe.code,
         message: probe.message,
+        deviceId: resolvedDevice.deviceId,
       },
     };
   }
@@ -272,13 +287,17 @@ export async function resolveInteractiveSkillTarget(
   if (!probe.state.interactive) {
     return {
       ok: false,
-      error: buildDeviceNotInteractiveError(probe.state),
+      error: {
+        ...buildDeviceNotInteractiveError(probe.state),
+        deviceId: resolvedDevice.deviceId,
+      },
     };
   }
 
   return {
     ok: true,
     deviceId: resolvedDevice.deviceId,
+    apkPresence,
   };
 }
 
@@ -397,6 +416,7 @@ export async function cmdSkillsRun(
   const env: SkillRunEnv = {
     [CLAWPERATOR_BIN_ENV_VAR]: resolvedBin,
     [CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR]: resolvedOperatorPackage,
+    [CLAWPERATOR_DEVICE_ID_ENV_VAR]: undefined,
   };
   if (options.deviceId !== undefined) {
     if (options.deviceId.trim().length === 0) {
@@ -433,24 +453,13 @@ export async function cmdSkillsRun(
     return formatError(interactiveTarget.error, options);
   }
 
-  const config = getDefaultRuntimeConfig({
-    deviceId: interactiveTarget.deviceId,
-    operatorPackage: resolvedOperatorPackage,
-    logger: cliLogger,
-  });
-  let apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
-  try {
-    const apkPresence = await checkApkPresence(config);
-    if (apkPresence.status === "pass") {
-      apkStatus = `OK (${resolvedOperatorPackage})`;
-    } else if (apkPresence.status === "warn") {
-      const alternateVariant = getAlternateOperatorVariant(resolvedOperatorPackage);
-      apkStatus = `WARN - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""} Use --operator-package ${alternateVariant} or reinstall the matching APK.`;
-    } else {
-      apkStatus = `FAIL - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""}`;
-    }
-  } catch {
-    apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
+  const apkPresence = interactiveTarget.apkPresence;
+  let apkStatus = `OK (${resolvedOperatorPackage})`;
+  if (apkPresence.status === "warn") {
+    const alternateVariant = getAlternateOperatorVariant(resolvedOperatorPackage);
+    apkStatus = `WARN - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""} Use --operator-package ${alternateVariant} or reinstall the matching APK.`;
+  } else if (apkPresence.status === "fail") {
+    apkStatus = `FAIL - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""}`;
   }
 
   const logDate = new Date();

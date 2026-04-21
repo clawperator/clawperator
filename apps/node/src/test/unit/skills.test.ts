@@ -27,7 +27,7 @@ import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { parseSkillManifestMetadata } from "../../domain/skills/skillManifest.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
-import { cmdSkillsRun } from "../../cli/commands/skills.js";
+import { cmdSkillsRun, resolveInteractiveSkillTarget } from "../../cli/commands/skills.js";
 import { createClawperatorLogger } from "../../adapters/logger.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import {
@@ -6812,10 +6812,57 @@ console.log(JSON.stringify({
 });
 
 describe("cmdSkillsRun preflight gate", () => {
+  const passingApkPresence = {
+    id: "readiness.apk.presence",
+    status: "pass",
+    summary: "Operator APK (com.clawperator.operator.dev) is installed.",
+  } as const;
   const allowInteractiveTarget = async () => ({
     ok: true,
     deviceId: "resolved-device-123",
+    apkPresence: passingApkPresence,
   } as const);
+
+  it("skips the interactive probe when operator readiness is not pass", async () => {
+    let probeCalls = 0;
+
+    const result = await resolveInteractiveSkillTarget("com.clawperator.operator.dev", {
+      deviceId: "resolved-device-123",
+      resolveDeviceImpl: async () => ({ deviceId: "resolved-device-123", serial: "resolved-device-123" }),
+      checkApkPresenceImpl: async () => ({
+        id: "readiness.apk.presence",
+        status: "fail",
+        code: ERROR_CODES.OPERATOR_NOT_INSTALLED,
+        summary: "Operator APK not installed.",
+        detail: "Package com.clawperator.operator.dev was not found on the device.",
+        fix: {
+          title: "Install Operator APK",
+          platform: "any",
+          steps: [{ kind: "shell", value: "clawperator operator setup --apk /tmp/operator-debug.apk --device resolved-device-123 --operator-package com.clawperator.operator.dev" }],
+        },
+      }),
+      probeInteractiveStateImpl: async () => {
+        probeCalls += 1;
+        return {
+          ok: true,
+          state: {
+            screenOn: true,
+            interactive: true,
+            deviceLocked: false,
+            userUnlocked: true,
+          },
+        };
+      },
+    });
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.deviceId, "resolved-device-123");
+      assert.strictEqual(result.apkPresence.status, "fail");
+      assert.strictEqual(result.apkPresence.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
+    }
+    assert.strictEqual(probeCalls, 0);
+  });
 
   it("aborts invalid artifact skills before runSkill is called", async () => {
     let runCalls = 0;
@@ -6995,6 +7042,7 @@ describe("cmdSkillsRun preflight gate", () => {
         resolveInteractiveSkillTargetImpl: async () => ({
           ok: true,
           deviceId: "resolved-device-123",
+          apkPresence: passingApkPresence,
         }),
       }
     );
@@ -7062,6 +7110,7 @@ describe("cmdSkillsRun preflight gate", () => {
           resolveInteractiveSkillTargetImpl: async () => ({
             ok: true,
             deviceId: "resolved-device-123",
+            apkPresence: ${JSON.stringify(passingApkPresence)},
           }),
           runSkillImpl: async () => ({
             ok: true,
@@ -7331,6 +7380,27 @@ describe("runSkill env vars", () => {
     // Without env parameter, these should be undefined (not injected by runSkill)
     assert.ok(result.output.includes("CLAWPERATOR_BIN:undefined"), `Expected CLAWPERATOR_BIN to be undefined when not passed, got: ${result.output}`);
     assert.ok(result.output.includes("CLAWPERATOR_OPERATOR_PACKAGE:undefined"), `Expected CLAWPERATOR_OPERATOR_PACKAGE to be undefined when not passed, got: ${result.output}`);
+  });
+
+  it("clears inherited CLAWPERATOR_DEVICE_ID when env explicitly omits device selection", async () => {
+    const originalDeviceId = process.env.CLAWPERATOR_DEVICE_ID;
+    process.env.CLAWPERATOR_DEVICE_ID = "ambient-device-123";
+
+    try {
+      const result = await runSkill("com.test.env-echo", [], undefined, undefined, {
+        CLAWPERATOR_BIN: "/custom/bin/clawperator",
+        CLAWPERATOR_OPERATOR_PACKAGE: "com.test.package",
+        CLAWPERATOR_DEVICE_ID: undefined,
+      });
+      assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+      assert.ok(result.output.includes("CLAWPERATOR_DEVICE_ID:undefined"), `Expected inherited device id to be cleared, got: ${result.output}`);
+    } finally {
+      if (originalDeviceId === undefined) {
+        delete process.env.CLAWPERATOR_DEVICE_ID;
+      } else {
+        process.env.CLAWPERATOR_DEVICE_ID = originalDeviceId;
+      }
+    }
   });
 
   it("keeps device selection in env for agent-driven skills instead of polluting forwarded inputs", async () => {

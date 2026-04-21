@@ -36,10 +36,8 @@ export function buildServeSkillRunOptions(
   const scriptArgs = args ? [...args] : [];
   const skillEnv: SkillRunEnv = {
     CLAWPERATOR_OPERATOR_PACKAGE: operatorPackage,
+    CLAWPERATOR_DEVICE_ID: deviceId,
   };
-  if (deviceId !== undefined) {
-    skillEnv.CLAWPERATOR_DEVICE_ID = deviceId;
-  }
   return { scriptArgs, skillEnv };
 }
 

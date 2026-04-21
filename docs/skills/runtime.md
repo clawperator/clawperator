@@ -41,8 +41,8 @@ Verification pattern:
 
 High-level wrapper enforcement now matches that readiness contract:
 
-- `clawperator skills run` resolves the target tuple, probes interactive state, and fails before skill spawn when the device is not interactive
-- `POST /skills/:skillId/run` in serve performs the same pre-spawn probe
+- `clawperator skills run` resolves the target tuple, checks the requested Operator package first, and only probes interactive state when that package check passes for the target
+- `POST /skills/:skillId/run` in serve performs the same pre-spawn target check ordering
 
 Wrapper-level non-interactive failure shape:
 
@@ -75,7 +75,7 @@ Resolution behavior:
 - `CLAWPERATOR_BIN` uses explicit env override first, then a local sibling build, then global `clawperator`
 - `CLAWPERATOR_OPERATOR_PACKAGE` uses the explicit wrapper flag first, then environment, then `com.clawperator.operator`
 
-The wrapper also preserves the rest of `process.env` when spawning the child process.
+The wrapper preserves the rest of `process.env` when spawning the child process, but it explicitly clears inherited `CLAWPERATOR_DEVICE_ID` unless the caller passed an explicit device selection.
 
 The exact `CLAWPERATOR_BIN` resolution order from `resolveSkillBin()` is:
 

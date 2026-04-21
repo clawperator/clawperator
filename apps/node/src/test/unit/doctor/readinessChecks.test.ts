@@ -180,6 +180,8 @@ describe("checkDeviceInteractiveState", () => {
         assert.strictEqual(result.status, "fail");
         assert.strictEqual(result.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
         assert.match(result.detail ?? "", /screenOn=false/);
+        assert.strictEqual(result.fix?.title, "Recover interactive device state");
+        assert.strictEqual(result.deviceGuidance?.screen, "Lock screen / current screen");
         assert.deepStrictEqual(result.evidence, {
             deviceLocked: true,
             screenOn: false,
