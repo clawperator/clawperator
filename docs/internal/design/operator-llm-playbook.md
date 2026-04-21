@@ -59,7 +59,7 @@ For app automation commands, default to:
 | :--- | :--- | :--- |
 | `open_app` | `applicationId: string` | Launches app by package ID |
 | `close_app` | `applicationId: string` | Node runs `adb shell am force-stop` pre-flight, normalizes the step result only when that close succeeds, and otherwise returns a structured execution failure |
-| `enter_text` | `matcher: NodeMatcher`, `text: string`, `submit?: boolean`, `clear?: boolean` | CLI: `type` (synonym: `fill`). `submit: true` presses Enter after typing. On Android `ACTION_SET_TEXT` targets, `clear: true` first dispatches `ACTION_SET_TEXT("")`, then sets the requested text. The separate API 33 input-connection route does not yet carry the same `clear` guarantee. |
+| `enter_text` | `matcher: NodeMatcher`, `text: string`, `submit?: boolean`, `clear?: boolean` | CLI: `type` (synonym: `fill`). Android keeps the public action stable and chooses the text-entry route internally. It prefers `ACTION_SET_TEXT` when available, falls back to the API 33 accessibility input-connection path for custom editors when needed, preserves replace-style behavior on both routes, and treats `submit` as best-effort rather than a new hard-failure condition. |
 | `click` | `matcher: NodeMatcher`, `clickType?: "default"\|"long_click"\|"focus"` | CLI: `click` (synonym: `tap`) |
 | `read_text` | `matcher: NodeMatcher`, `validator?: "temperature"`, `retry?: object` | CLI: `read`. Result in `data.text`. Other validator values are rejected by the runtime |
 | `wait_for_node` | `matcher: NodeMatcher`, `retry?: object` | CLI: `wait`. Waits with internal retry |
@@ -71,6 +71,27 @@ For app automation commands, default to:
 | `sleep` | `durationMs: number` | Pause between steps. Must fit within the execution `timeoutMs` budget |
 
 **`enter_text` vs CLI `type`:** The CLI command is `type` (synonym: `fill`) but the action type field in execution payloads is `enter_text`. These map to the same runtime action. When building execution payloads directly, always use `enter_text`.
+
+**Android `enter_text` runtime notes:**
+
+- Strategy order is fixed: legacy `ACTION_SET_TEXT` first, API 33
+  input-connection fallback second.
+- On the legacy route, `submit=true` prefers `ACTION_IME_ENTER` when the node
+  exposes it and falls back to a click only as best effort.
+- On the API 33 route, submit uses the editor-action path through the input
+  connection when one is available.
+- API 33 replace behavior is not append-at-cursor behavior. The runtime moves
+  the cursor to the end, uses `deleteSurroundingText(Int.MAX_VALUE, 0)`, then
+  `commitText(...)` to replace the field contents.
+- Debug-build runtime diagnostics for live validation now include
+  `enter_text strategy=<strategy_name> submit_method=<submit_method>` on
+  success and `enter_text strategy=api33_input_connection unavailable
+  reason=<reason>` when the API 33 path cannot run.
+- If the API 33 delete-then-commit replace fallback clears the field but
+  `commitText(...)` fails, the runtime emits a warning-level
+  `enter_text strategy=api33_input_connection partial_failure reason=commit_failed_after_delete`
+  diagnostic so the destructive edge is visible in logcat without logging the
+  field contents.
 
 **NodeMatcher fields:** `resourceId`, `contentDescEquals`, `textEquals`, `textContains`, `contentDescContains`, `role`. All fields are AND-combined. Prefer `resourceId` when available. Full reference in `docs/api/selectors.md`.
 

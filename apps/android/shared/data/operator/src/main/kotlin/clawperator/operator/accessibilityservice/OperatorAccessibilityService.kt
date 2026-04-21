@@ -5,8 +5,12 @@ import action.buildconfig.BuildConfig
 import action.log.Log
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.accessibilityservice.InputMethod
+import android.os.Build
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
+import android.view.inputmethod.EditorInfo
+import androidx.annotation.RequiresApi
 import clawperator.accessibilityservice.AccessibilityServiceManagerAndroid
 import clawperator.operator.recording.RecordingEventFilter
 import clawperator.routine.RoutineManager
@@ -32,6 +36,20 @@ class OperatorAccessibilityService :
         }
     }
 
+    override fun onCreateInputMethod(): InputMethod {
+        if (buildConfig.debug) {
+            Log.d("[Operator-AccessibilityService] onCreateInputMethod()")
+        }
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            OperatorAccessibilityInputMethod(
+                service = this,
+                enableLifecycleDiagnostics = buildConfig.debug,
+            )
+        } else {
+            super.onCreateInputMethod()
+        }
+    }
+
     override fun onServiceConnected() {
         Log.d("[Operator-AccessibilityService] onServiceConnected()")
 
@@ -44,6 +62,9 @@ class OperatorAccessibilityService :
                     AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or
                     AccessibilityServiceInfo.FLAG_REQUEST_TOUCH_EXPLORATION_MODE or
                     AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    flags = flags or AccessibilityServiceInfo.FLAG_INPUT_METHOD_EDITOR
+                }
 
                 // Keep TYPE_VIEW_SCROLLED in the production mask because recording mode
                 // needs to observe scroll events and RecordingEventFilter records them
@@ -136,6 +157,60 @@ class OperatorAccessibilityService :
             onInterrupt()
         }
         Log.d("[Operator-AccessibilityService] onInterrupt()")
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+private class OperatorAccessibilityInputMethod(
+    service: AccessibilityService,
+    private val enableLifecycleDiagnostics: Boolean,
+) : InputMethod(service) {
+    override fun onStartInput(
+        attribute: EditorInfo,
+        restarting: Boolean,
+    ) {
+        logLifecycle {
+            Log.d(
+                "[Operator-AccessibilityService] onStartInput(restarting=$restarting actionId=${attribute.actionId} imeOptions=${attribute.imeOptions})",
+            )
+        }
+        super.onStartInput(attribute, restarting)
+    }
+
+    override fun onFinishInput() {
+        logLifecycle {
+            Log.d("[Operator-AccessibilityService] onFinishInput()")
+        }
+        super.onFinishInput()
+    }
+
+    override fun onUpdateSelection(
+        oldSelStart: Int,
+        oldSelEnd: Int,
+        newSelStart: Int,
+        newSelEnd: Int,
+        candidatesStart: Int,
+        candidatesEnd: Int,
+    ) {
+        logLifecycle {
+            Log.d(
+                "[Operator-AccessibilityService] onUpdateSelection(old=$oldSelStart:$oldSelEnd new=$newSelStart:$newSelEnd)",
+            )
+        }
+        super.onUpdateSelection(
+            oldSelStart,
+            oldSelEnd,
+            newSelStart,
+            newSelEnd,
+            candidatesStart,
+            candidatesEnd,
+        )
+    }
+
+    private inline fun logLifecycle(block: () -> Unit) {
+        if (enableLifecycleDiagnostics) {
+            block()
+        }
     }
 }
 

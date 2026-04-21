@@ -2,9 +2,16 @@ package clawperator.uitree
 
 import action.log.Log
 import android.accessibilityservice.AccessibilityService
+import android.os.Build
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.inputmethod.EditorInfo
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import clawperator.accessibilityservice.AccessibilityServiceManager
+import clawperator.accessibilityservice.NoOpTextInputConnectionSource
+import clawperator.accessibilityservice.TextInputConnectionSource
+import clawperator.accessibilityservice.TextInputEditorInfo
+import clawperator.accessibilityservice.TextInputSession
 import clawperator.accessibilityservice.boundsInScreenRect
 import clawperator.accessibilityservice.currentAccessibilityService
 import clawperator.accessibilityservice.debugNode
@@ -19,6 +26,10 @@ import clawperator.accessibilityservice.firstFocusableAncestorOrSelf
 class UiTreeManagerAndroid(
     private val accessibilityServiceManager: AccessibilityServiceManager,
 ) : UiTreeManager {
+    // Use the service manager as the API 33 text-input bridge when available.
+    private val inputConnectionSource: TextInputConnectionSource =
+        accessibilityServiceManager as? TextInputConnectionSource ?: NoOpTextInputConnectionSource
+
     override suspend fun triggerClick(
         uiNode: UiNode,
         clickTypes: UiTreeClickTypes,
@@ -82,45 +93,33 @@ class UiTreeManagerAndroid(
     ): Boolean {
         val accessibilityNodeInfo = uiNode.accessibilityNodeInfo as? AccessibilityNodeInfo ?: return false
         val target = accessibilityNodeInfo.firstEditableAncestorOrSelf() ?: accessibilityNodeInfo
+        val request =
+            TextEntryRequest(
+                uiNode = uiNode,
+                target = target,
+                text = text,
+                submit = submit,
+                clear = clear,
+                replacementSemantics = ReplacementSemantics.ReplaceExistingContent,
+            )
 
-        // Best-effort focus before setting text.
-        if (!target.isFocused) {
-            target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-            target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-        }
-
-        // Clear via ACTION_SET_TEXT with an empty CharSequence so clear=true fails
-        // truthfully if the requested clear step cannot be performed.
-        if (clear) {
-            val clearArgs =
-                Bundle().apply {
-                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
-                }
-            val clearSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, clearArgs)
-            if (!clearSucceeded) {
-                Log.d("[UiTreeManager] ACTION_SET_TEXT clear failed for id=${uiNode.id} on ${target.debugNodeRedacted()}")
-                return false
+        for (strategy in textEntryStrategies) {
+            if (!strategy.supports(request.replacementSemantics)) {
+                continue
             }
-        }
-
-        val args =
-            Bundle().apply {
-                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+            val minimumSdk = strategy.minimumSdk
+            if (minimumSdk != null && Build.VERSION.SDK_INT < minimumSdk) {
+                continue
             }
-
-        val setTextSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
-        if (!setTextSucceeded) {
-            Log.d("[UiTreeManager] ACTION_SET_TEXT failed for id=${uiNode.id} on ${target.debugNodeRedacted()}")
-            return false
+            val attempt = strategy.attempt(request) ?: continue
+            Log.d(
+                "[UiTreeManager] enter_text strategy=${strategy.name} submit_method=${attempt.submitMethod.wireValue} succeeded for id=${uiNode.id}",
+            )
+            return true
         }
 
-        if (submit) {
-            // Not all API levels/vendors expose a reliable IME submit action here.
-            // Best-effort: click target after text set to trigger app-side listeners.
-            target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-        }
-
-        return true
+        Log.d("[UiTreeManager] All enter_text strategies failed for id=${uiNode.id}")
+        return false
     }
 
     override suspend fun swipeWithinVertical(
@@ -245,5 +244,258 @@ class UiTreeManagerAndroid(
         }
 
         return false
+    }
+
+    private val textEntryStrategies: List<TextEntryStrategy> =
+        listOf(
+            LegacySetTextStrategy,
+            Api33InputConnectionStrategy(),
+        )
+
+    private data class TextEntryRequest(
+        val uiNode: UiNode,
+        val target: AccessibilityNodeInfo,
+        val text: String,
+        val submit: Boolean,
+        val clear: Boolean,
+        val replacementSemantics: ReplacementSemantics,
+    )
+
+    private enum class ReplacementSemantics {
+        ReplaceExistingContent,
+    }
+
+    private sealed interface TextEntryStrategy {
+        val name: String
+        val minimumSdk: Int?
+            get() = null
+
+        fun supports(replacementSemantics: ReplacementSemantics): Boolean
+
+        suspend fun attempt(request: TextEntryRequest): TextEntryAttemptResult?
+    }
+
+    private data class TextEntryAttemptResult(
+        val submitMethod: SubmitMethod,
+    )
+
+    private enum class SubmitMethod(
+        val wireValue: String,
+    ) {
+        NotRequested("not_requested"),
+        ImeEditorAction("ime_action"),
+        ClickFallback("click_fallback"),
+        Unavailable("submit_unavailable"),
+    }
+
+    private object LegacySetTextStrategy : TextEntryStrategy {
+        override val name: String = "legacy_action_set_text"
+
+        override fun supports(replacementSemantics: ReplacementSemantics): Boolean =
+            replacementSemantics == ReplacementSemantics.ReplaceExistingContent
+
+        override suspend fun attempt(request: TextEntryRequest): TextEntryAttemptResult? {
+            val target = request.target
+
+            // Best-effort focus before setting text.
+            if (!target.isFocused) {
+                target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            }
+
+            // Clear via ACTION_SET_TEXT with an empty CharSequence so clear=true fails
+            // truthfully if the requested clear step cannot be performed.
+            if (request.clear) {
+                val clearArgs =
+                    Bundle().apply {
+                        putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
+                    }
+                val clearSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, clearArgs)
+                if (!clearSucceeded) {
+                    Log.d(
+                        "[UiTreeManager] enter_text strategy=$name clear_failed for id=${request.uiNode.id} on ${target.debugNodeRedacted()}",
+                    )
+                    return null
+                }
+            }
+
+            val args =
+                Bundle().apply {
+                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, request.text)
+                }
+
+            val setTextSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+            if (!setTextSucceeded) {
+                Log.d(
+                    "[UiTreeManager] enter_text strategy=$name set_text_failed for id=${request.uiNode.id} on ${target.debugNodeRedacted()}",
+                )
+                return null
+            }
+
+            return TextEntryAttemptResult(submitMethod = performLegacySubmit(target, request.submit))
+        }
+
+        private fun performLegacySubmit(
+            target: AccessibilityNodeInfo,
+            submitRequested: Boolean,
+        ): SubmitMethod {
+            if (!submitRequested) {
+                return SubmitMethod.NotRequested
+            }
+
+            if (
+                supportsImeEnterAction(target) &&
+                target.performAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_IME_ENTER.id)
+            ) {
+                return SubmitMethod.ImeEditorAction
+            }
+
+            return if (target.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                SubmitMethod.ClickFallback
+            } else {
+                SubmitMethod.Unavailable
+            }
+        }
+
+        private fun supportsImeEnterAction(target: AccessibilityNodeInfo): Boolean {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                return false
+            }
+            return AccessibilityNodeInfoCompat.wrap(target).actionList.any { action ->
+                action.id == AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_IME_ENTER.id
+            }
+        }
+    }
+
+    private inner class Api33InputConnectionStrategy : TextEntryStrategy {
+        override val name: String = "api33_input_connection"
+        override val minimumSdk: Int = Build.VERSION_CODES.TIRAMISU
+
+        override fun supports(replacementSemantics: ReplacementSemantics): Boolean =
+            replacementSemantics == ReplacementSemantics.ReplaceExistingContent
+
+        override suspend fun attempt(request: TextEntryRequest): TextEntryAttemptResult? {
+            val target = request.target
+
+            if (!target.isFocused) {
+                target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                // InputMethod session ownership updates asynchronously after focus changes.
+                // Stop here and let the existing UiReadiness retry rerun once the editor session
+                // catches up instead of mutating a stale or not-yet-started connection.
+                logUnavailable(request, "session_pending_after_focus")
+                return null
+            }
+
+            val session = inputConnectionSource.currentSession()
+            if (session == null) {
+                logUnavailable(request, "session_unavailable")
+                return null
+            }
+
+            if (!session.isActive) {
+                logUnavailable(request, "input_finished")
+                return null
+            }
+
+            when (val replaceResult = replaceText(session, request)) {
+                ReplaceTextResult.Success -> Unit
+                is ReplaceTextResult.Unavailable -> {
+                    if (replaceResult.partialFailure) {
+                        logPartialFailure(request, replaceResult.reason)
+                    } else {
+                        logUnavailable(request, replaceResult.reason)
+                    }
+                    return null
+                }
+            }
+
+            return TextEntryAttemptResult(
+                submitMethod = performSubmit(session, session.editorInfo, request.submit),
+            )
+        }
+
+        private fun replaceText(
+            session: TextInputSession,
+            request: TextEntryRequest,
+        ): ReplaceTextResult {
+            val cursorMovedToEnd = session.setSelection(Int.MAX_VALUE, Int.MAX_VALUE)
+            if (!cursorMovedToEnd) {
+                return ReplaceTextResult.Unavailable(reason = "selection_unavailable")
+            }
+
+            val cleared = session.deleteSurroundingText(Int.MAX_VALUE, 0)
+            if (!cleared) {
+                return ReplaceTextResult.Unavailable(reason = "delete_unavailable")
+            }
+
+            return if (session.commitText(request.text, 1)) {
+                ReplaceTextResult.Success
+            } else {
+                ReplaceTextResult.Unavailable(
+                    reason = "commit_failed_after_delete",
+                    partialFailure = true,
+                )
+            }
+        }
+
+        private fun performSubmit(
+            session: TextInputSession,
+            editorInfo: TextInputEditorInfo?,
+            submitRequested: Boolean,
+        ): SubmitMethod {
+            if (!submitRequested) {
+                return SubmitMethod.NotRequested
+            }
+
+            val editorAction = editorInfo?.let(::resolveEditorAction) ?: return SubmitMethod.Unavailable
+            return if (session.performEditorAction(editorAction)) {
+                SubmitMethod.ImeEditorAction
+            } else {
+                SubmitMethod.Unavailable
+            }
+        }
+
+        private fun resolveEditorAction(editorInfo: TextInputEditorInfo): Int? {
+            if (editorInfo.actionId != 0) {
+                return editorInfo.actionId
+            }
+
+            val action = editorInfo.imeOptions and EditorInfo.IME_MASK_ACTION
+            if (action == EditorInfo.IME_ACTION_NONE || action == EditorInfo.IME_ACTION_UNSPECIFIED) {
+                return null
+            }
+            if ((editorInfo.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0) {
+                return null
+            }
+            return action
+        }
+
+        private fun logUnavailable(
+            request: TextEntryRequest,
+            reason: String,
+        ) {
+            Log.d(
+                "[UiTreeManager] enter_text strategy=$name unavailable reason=$reason for id=${request.uiNode.id}",
+            )
+        }
+
+        private fun logPartialFailure(
+            request: TextEntryRequest,
+            reason: String,
+        ) {
+            Log.w(
+                "[UiTreeManager] enter_text strategy=$name partial_failure reason=$reason for id=${request.uiNode.id}",
+            )
+        }
+    }
+
+    private sealed interface ReplaceTextResult {
+        data object Success : ReplaceTextResult
+
+        data class Unavailable(
+            val reason: String,
+            val partialFailure: Boolean = false,
+        ) : ReplaceTextResult
     }
 }
