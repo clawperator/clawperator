@@ -19,6 +19,7 @@ Before `clawperator skills run`, the target should already satisfy the normal Cl
 2. expected Operator package installed
 3. accessibility service running
 4. version compatibility healthy
+5. interactive device state healthy
 
 Recommended verification:
 
@@ -30,12 +31,32 @@ Treat the device as ready only when:
 
 - exit code `0`
 - `criticalOk == true`
+- `checks` includes `readiness.device.interactive` with `status: "pass"`
 
 Verification pattern:
 
 - run `clawperator doctor --json --device <device_serial> --operator-package <package>`
 - confirm `report.operatorPackage` matches the package you plan to use inside the skill
 - confirm the doctor report is for the same `deviceId` you plan to pass to `skills run`
+
+High-level wrapper enforcement now matches that readiness contract:
+
+- `clawperator skills run` resolves the target tuple, probes interactive state, and fails before skill spawn when the device is not interactive
+- `POST /skills/:skillId/run` in serve performs the same pre-spawn probe
+
+Wrapper-level non-interactive failure shape:
+
+```json
+{
+  "code": "DEVICE_NOT_INTERACTIVE",
+  "message": "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=true userUnlocked=true",
+  "details": {
+    "deviceLocked": true,
+    "screenOn": false,
+    "userUnlocked": true
+  }
+}
+```
 
 For first-time setup, use [Setup](../setup.md). For runtime recovery, use [Operator App](../troubleshooting/operator.md).
 
@@ -47,6 +68,7 @@ The wrapper injects these environment variables:
 | --- | --- |
 | `CLAWPERATOR_BIN` | command the skill should use when it needs to invoke Clawperator |
 | `CLAWPERATOR_OPERATOR_PACKAGE` | Operator package the skill should target on its internal CLI calls |
+| `CLAWPERATOR_DEVICE_ID` | explicit device selection only; present only when the caller passed `--device` or serve `deviceId` |
 
 Resolution behavior:
 
@@ -83,10 +105,13 @@ Then verify the skill's internal `clawperator` calls behave against the intended
 
 `runSkill()` itself does not invent a device id. The CLI wrapper decides argument passing.
 
-Current `skills run` behavior:
+Current high-level wrapper behavior:
 
-- if `--device <serial>` is present, the wrapper prepends that serial as the first child argument
-- then it appends any forwarded args after `--`
+- both CLI `skills run` and serve `POST /skills/:skillId/run` may resolve a target device for readiness preflight even when the caller omitted explicit device selection
+- that implicit resolution is preflight-only
+- if `--device <serial>` or serve `deviceId` is present, the wrapper writes that explicit value into `CLAWPERATOR_DEVICE_ID`
+- for script-driven skills, `runSkill()` then prepends `CLAWPERATOR_DEVICE_ID` as the first child argument
+- then the wrapper appends any forwarded args after `--`
 
 That means most scripts should expect:
 
@@ -107,7 +132,7 @@ Confirm that your script receives:
 - first positional child argument: `<device_serial>`
 - remaining forwarded args after that: `--mode`, `smoke`
 
-If `--device` is omitted, the wrapper passes no synthetic device argument at all.
+If `--device` is omitted, the wrapper still may resolve a single connected device for preflight, but it passes no synthetic device argument into the child process.
 
 ## Timeout Behavior
 
@@ -169,7 +194,8 @@ clawperator skills run com.android.settings.capture-overview --device <device_se
 
 Why:
 
-- the wrapper forwards the selected device id into the child script
+- the wrapper uses the resolved target device for pre-spawn readiness
+- the wrapper forwards only explicit caller-supplied device selection into the child script
 - the child script can then pass that same serial into its internal Clawperator calls
 
 Without explicit targeting, skill behavior depends on what the script itself does. The wrapper does not auto-add a device argument unless one was provided.

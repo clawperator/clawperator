@@ -426,15 +426,17 @@ What the wrapper does:
 1. resolves `CLAWPERATOR_BIN` for the child process
 2. resolves `CLAWPERATOR_OPERATOR_PACKAGE` for the child process
 3. validates the skill with `validateSkill(skillId, undefined, { dryRun: true })` unless `--skip-validate` is passed
-4. loads the registry entry
-5. chooses a script, preferring `.js`, then `.sh`, then the first listed script
-6. spawns the script
-7. captures raw stdout and stderr
-8. enforces a timeout
+4. resolves the target device and probes interactive state
+5. loads the registry entry
+6. chooses a script, preferring `.js`, then `.sh`, then the first listed script
+7. spawns the script
+8. captures raw stdout and stderr
+9. enforces a timeout
 
 Argument passing rules:
 
-- if `--device` was provided, the wrapper prepends that device id as the first script argument
+- if `--device` was provided, the wrapper passes that explicit device id through `CLAWPERATOR_DEVICE_ID`, and `runSkill()` prepends it as the first script argument for script-driven skills
+- if `--device` was omitted, the wrapper still may resolve a single connected device for preflight, but it does not inject that implicit device selection into the child env or argv
 - unknown trailing tokens such as `--limit 40` are forwarded to the script unchanged
 - use `--` when you need to force literal passthrough for tokens that would otherwise be parsed as wrapper flags
 - `CLAWPERATOR_BIN` and `CLAWPERATOR_OPERATOR_PACKAGE` are injected into the script environment
@@ -477,6 +479,26 @@ Check these exact fields:
 - `exitCode` is `0` on success
 - `durationMs` is the measured wrapper runtime
 - `timeoutMs` is present only when a timeout override was passed on the CLI
+
+To verify the wrapper-side readiness gate, run against a sleeping or locked device:
+
+```bash
+clawperator skills run com.android.settings.capture-overview --device <device_serial> --json
+```
+
+Expected pre-spawn failure shape:
+
+```json
+{
+  "code": "DEVICE_NOT_INTERACTIVE",
+  "message": "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=true userUnlocked=true",
+  "details": {
+    "deviceLocked": true,
+    "screenOn": false,
+    "userUnlocked": true
+  }
+}
+```
 
 To verify wrapper-side output assertions, run:
 
@@ -639,6 +661,21 @@ The pre-run validation gate can stop the command before script execution. `cmdSk
 }
 ```
 
+The readiness gate can also stop the command before script execution when the
+resolved device is not interactive:
+
+```json
+{
+  "code": "DEVICE_NOT_INTERACTIVE",
+  "message": "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=true userUnlocked=true",
+  "details": {
+    "deviceLocked": true,
+    "screenOn": false,
+    "userUnlocked": true
+  }
+}
+```
+
 For script-only skills, dry-run payload validation is skipped on purpose. The success payload from `skills validate --dry-run` includes:
 
 ```json
@@ -674,8 +711,14 @@ The serve wrapper uses the same underlying registry and `runSkill()` runtime, wi
 
 Important boundary:
 
-- the serve route calls `runSkill()` directly
-- it does not go through the full CLI `cmdSkillsRun()` path, so it does not include the CLI pre-run validation gate or the CLI banner behavior
+- the serve route validates the skill, resolves `operatorPackage`, and runs the same pre-spawn interactive-state probe before calling `runSkill()`
+- it does not go through the full CLI `cmdSkillsRun()` path, so it still does not include the CLI banner behavior
+- serve accepts optional request fields:
+  - `deviceId`
+  - `operatorPackage`
+  - `args`
+  - `timeoutMs`
+  - `expectContains`
 
 ## Error Codes
 
