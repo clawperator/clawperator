@@ -2,6 +2,8 @@ package clawperator.task.runner
 
 import action.log.Log
 import action.developeroptions.DeveloperOptionsManager
+import action.devicestate.DeviceState
+import action.devicestate.DeviceStateMock
 import clawperator.uitree.UiTreeClickType
 import clawperator.uitree.UiTreeClickTypes
 import kotlinx.coroutines.flow.first
@@ -17,8 +19,20 @@ interface UiActionEngine {
 class UiActionEngineDefault(
     private val developerOptionsManager: DeveloperOptionsManager,
     private val globalActionDispatcher: UiGlobalActionDispatcher,
+    private val deviceState: DeviceState,
     private val recordingManager: RecordingManager = RecordingManagerNoOp,
 ) : UiActionEngine {
+    constructor(
+        developerOptionsManager: DeveloperOptionsManager,
+        globalActionDispatcher: UiGlobalActionDispatcher,
+        recordingManager: RecordingManager = RecordingManagerNoOp,
+    ) : this(
+        developerOptionsManager = developerOptionsManager,
+        globalActionDispatcher = globalActionDispatcher,
+        deviceState = DeviceStateMock(),
+        recordingManager = recordingManager,
+    )
+
     companion object {
         private const val TAG = "[UiActionEngine]"
     }
@@ -755,6 +769,9 @@ class UiActionEngineDefault(
             data = mapOf(
                 "developer_options_enabled" to optionsEnabled.toString(),
                 "usb_debugging_enabled" to usbDebuggingEnabled.toString(),
+                "screen_on" to deviceState.queryScreenOn().toString(),
+                "device_locked" to deviceState.queryDeviceLocked.toString(),
+                "user_unlocked" to deviceState.isUserUnlocked.toString(),
             ),
         )
     }

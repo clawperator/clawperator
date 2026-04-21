@@ -13,12 +13,12 @@ must land before `tasks/api/doctor-enhancements/` moves into implementation.
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | completed |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4 |
-| Current / Next | Phase 1 |
+| Completed | 1, 2, 3, 4 |
+| Remaining | none |
+| Current / Next | Complete; hand off to `tasks/api/doctor-enhancements/` after incorporating the post-review fixes from `codex/device-interactivity-foundation-review-fixes` |
 | Blockers | none |
 
 ## Hard Rules
@@ -354,3 +354,24 @@ Before asking for review, verify all of the following:
 - the helper name and docs use "wake" or "ensure awake", not "unlock"
 - no secure-keyguard bypass behavior was introduced
 - doctor changes remain deferred to `tasks/api/doctor-enhancements/`
+
+## Post-Review Status
+
+Review follow-up fixes were completed on
+`codex/device-interactivity-foundation-review-fixes` after the initial
+implementation branch shipped:
+
+- Node probe parsing now fails closed when `doctor_ping` returns an
+  unsuccessful step result
+- the initial interactive probe now preserves `awake_but_locked`
+- the reusable probe path no longer clears logcat on every call; that remains
+  scoped to the handshake path
+- Android test coverage now proves `doctor_ping` uses direct queries rather
+  than evented flows
+- wake-helper semantics now distinguish `transport_failed` from `still_asleep`
+
+Those fixes were revalidated with:
+
+- `./gradlew app:testDebugUnitTest`
+- `npm --prefix apps/node run build`
+- `npm --prefix apps/node run test`

@@ -98,8 +98,9 @@ It also listens for:
 
 ## Important Repo-Specific Caveat
 
+Before the device interactivity foundation work landed,
 [`DeviceStateSystem.kt`](../../../apps/android/shared/core/common/src/main/kotlin/action/devicestate/DeviceStateSystem.kt)
-currently sets:
+used to set:
 
 ```kotlin
 Intent.ACTION_SCREEN_OFF -> {
@@ -108,24 +109,26 @@ Intent.ACTION_SCREEN_OFF -> {
 }
 ```
 
-This is an overreach.
+That was an overreach.
 
 `ACTION_SCREEN_OFF` does not prove that the device is actually locked. It only
 proves that the screen turned off.
 
-Consequences:
+Consequences of the old behavior:
 
-- the evented `isDeviceLocked` flow can temporarily report a false locked state
-- this is especially relevant on devices with no secure lock screen configured
-- a plain screen-off event can be misdiagnosed as "device on lock screen"
+- the evented `isDeviceLocked` flow could temporarily report a false locked
+  state
+- this was especially relevant on devices with no secure lock screen
+  configured
+- a plain screen-off event could be misdiagnosed as "device on lock screen"
 
-Safer interpretation:
+Shipped behavior after the fix:
 
-- `queryDeviceLocked` is the trustworthy immediate source of truth for actual
-  device lock state
-- `queryScreenOn()` / `isScreenOn` is the trustworthy source of truth for wake
-  / interactivity state
-- these should be reported separately in readiness / diagnostics surfaces
+- `ACTION_SCREEN_OFF` updates only `isScreenOn`
+- `ACTION_SCREEN_ON` refreshes the evented lock flow from `queryDeviceLocked`
+- `ACTION_USER_PRESENT` clears the evented lock flow
+- point-in-time truth for diagnostics should still come from direct queries such
+  as `queryScreenOn()`, `queryDeviceLocked`, and `isUserUnlocked`
 
 ## Host-Side Wake Research
 
@@ -173,6 +176,92 @@ Reasoning:
 
 Avoid using `KEYCODE_POWER` as the primary recovery primitive because it is a
 toggle and therefore less deterministic.
+
+## Shipped Foundation
+
+The device interactivity foundation work added two internal-only seams that
+later readiness work can depend on:
+
+- Android `doctor_ping` now reports:
+  - `screen_on`
+  - `device_locked`
+  - `user_unlocked`
+- those `doctor_ping` fields come from direct `DeviceState` queries in
+  [`UiActionEngine.kt`](../../../apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt),
+  not from event flows
+- Node now has internal helpers in
+  [`deviceInteractivity.ts`](../../../apps/node/src/domain/doctor/checks/deviceInteractivity.ts)
+  for:
+  - strict parsing of the `doctor_ping` booleans
+  - probing current interactivity state
+  - bounded host-side wake attempts
+
+These helpers are internal building blocks. They do not add a public wake or
+unlock API.
+
+### Internal Wake Helper Semantics
+
+The shipped Node wake helper:
+
+1. probes interactive state first
+2. returns a no-op result when the device is already awake
+3. when the device is asleep, tries host-side wake in this order:
+   1. `adb shell cmd power wakeup`
+   2. `adb shell input keyevent KEYCODE_WAKEUP`
+   3. `adb shell input keyevent KEYCODE_HOME`
+4. after each attempt, re-probes the structured interactive state
+5. stops immediately when the device becomes interactive
+6. if the device becomes awake but `deviceLocked == true`, returns that state
+   without attempting authentication bypass
+7. fails closed when probe data is missing or malformed
+
+## 2026-04-21 Samsung Validation
+
+Live validation on a physical Samsung device used the debug package
+`com.clawperator.operator.dev` and the branch-local Node build.
+
+What was verified:
+
+- baseline host state:
+  - `mWakefulness=Awake`
+  - `screenState=SCREEN_STATE_ON`
+  - `interactiveState=INTERACTIVE_STATE_AWAKE`
+- baseline internal probe:
+  - `screenOn=true`
+  - `interactive=true`
+  - `deviceLocked=false`
+  - `userUnlocked=true`
+- `ensureDeviceAwake()` returns `already_awake` and skips adb wake commands
+  when the device is already interactive
+- after `adb shell cmd power sleep`, host state changed to:
+  - `mWakefulness=Asleep`
+  - `screenState=SCREEN_STATE_OFF`
+  - `interactiveState=INTERACTIVE_STATE_SLEEP`
+- the internal probe also reported:
+  - `screenOn=false`
+  - `interactive=false`
+  - `deviceLocked=false`
+  - `userUnlocked=true`
+- `ensureDeviceAwake()` woke the device successfully on the first retry step
+  using `adb shell cmd power wakeup`
+- post-wake host state returned to:
+  - `mWakefulness=Awake`
+  - `screenState=SCREEN_STATE_ON`
+  - `interactiveState=INTERACTIVE_STATE_AWAKE`
+- post-wake internal probe returned:
+  - `screenOn=true`
+  - `interactive=true`
+  - `deviceLocked=false`
+  - `userUnlocked=true`
+
+What was not reproduced in this run:
+
+- an `awake but locked` secure-keyguard state
+- fallback use of `KEYCODE_WAKEUP` or `KEYCODE_HOME` from the shipped helper
+
+Those fallback commands were already validated manually on this Samsung during
+the host-side wake research above, but the shipped helper did not need them in
+this proof run.
 
 ## Accessibility Wake Notes
 

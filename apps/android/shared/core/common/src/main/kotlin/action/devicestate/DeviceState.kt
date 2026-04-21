@@ -17,10 +17,9 @@ interface DeviceState {
     /**
      * Similar to [queryDeviceLocked] but provides events upon locking/unlocking
      * of device.
-     * One major difference is that this value will be true when screen is turned off,
-     * regardless of the fact that the device is actually locked or not. This doesn't
-     * cause any problems because the value is turned false when the screen turns
-     * on and the device was never locked.
+     *
+     * Unlike [queryDeviceLocked], this flow is updated from broadcast events and can
+     * lag behind point-in-time state queries during transitions.
      */
     val isDeviceLocked: Flow<Boolean>
 
