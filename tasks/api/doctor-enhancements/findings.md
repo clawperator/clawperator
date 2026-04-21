@@ -188,10 +188,10 @@ Recommendation:
   - a narrow reusable interactive-state probe, if needed
 - Do not reuse the entire doctor sequence as a per-command preflight.
 
-### 4. A CLI-only `skills run` gate would miss a real parallel entrypoint
+### 4. Skill-entry wrappers should preserve the original product goal
 
-The current findings mention `clawperator skills run`, but they miss that there
-is another skill execution surface:
+The current findings mention `clawperator skills run`, but there is another
+skill execution surface:
 
 - CLI: `cmdSkillsRun()` in `apps/node/src/cli/commands/skills.ts`
 - HTTP: `POST /skills/:skillId/run` in `apps/node/src/cli/commands/serve.ts`
@@ -204,21 +204,70 @@ Important differences:
 - `runSkill()` itself is only a process launcher plus result-frame verifier. It
   does not know device readiness.
 
-Implication:
+From the original problem statement, the desired product behavior is:
 
-- We do not need a high-level skill-entry readiness gate if stable failure on
-  the first internal CLI call is acceptable.
+- a central, obvious "device not ready" result before a skill run starts
+- no need for individual skills to invent lock-screen-specific handling
+
+That means the earlier recommendation to let skills fail only on their first
+internal `clawperator exec` call was too weak for the stated goal.
 
 Recommendation:
 
-- Do not add pre-spawn readiness enforcement to `cmdSkillsRun()` or
-  `/skills/:skillId/run` in this change.
-- Let skills fail via the first internal `clawperator exec` or similar command
-  after Node preflight has applied there.
-- Keep the task pack explicit that the skill wrappers remain launchers, not
-  readiness authorities.
+- Add pre-spawn readiness enforcement to both high-level skill entrypoints:
+  - CLI `cmdSkillsRun()`
+  - HTTP `POST /skills/:skillId/run`
+- Keep the gate narrow:
+  - resolve the target tuple
+  - run the shared interactive-state probe
+  - fail before spawning the skill process if the device is not interactive
+- Keep `runSkill()` itself as a launcher and verifier, not a readiness
+  authority.
 
-### 5. Shared skill helpers are part of the architecture and cannot be ignored
+This preserves one clear product contract:
+
+- high-level skill wrappers fail early with the same structured readiness
+  surface
+- direct skill scripts and helper-driven `clawperator exec` calls still rely on
+  low-level execution preflight
+
+### 5. The serve skill-run surface needs an `operatorPackage` decision
+
+Earlier in this task pack, readiness is correctly framed as specific to:
+
+- resolved `deviceId`
+- chosen `operatorPackage`
+
+But `POST /skills/:skillId/run` currently accepts only:
+
+- `deviceId`
+- `args`
+- `timeoutMs`
+- `expectContains`
+
+and does not accept `operatorPackage`.
+
+Implication:
+
+- the current serve skill-run surface cannot participate fully in the same
+  target-specific readiness contract as the CLI wrapper
+- without a change here, wrapper-level readiness would drift across the two
+  skill entrypoints
+
+Recommendation:
+
+- add optional `operatorPackage` input to `POST /skills/:skillId/run`
+- resolve it with the same precedence used elsewhere in serve:
+  - explicit request value first
+  - then request-independent environment/default resolution
+- pass the resolved package both to:
+  - the pre-spawn readiness probe
+  - the skill env as `CLAWPERATOR_OPERATOR_PACKAGE`
+
+This keeps the target tuple explicit and consistent across CLI and HTTP skill
+entrypoints.
+
+### 6. Shared skill helpers are part of the architecture and cannot be ignored
 
 `../clawperator-skills/skills/utils/common.js` still shells out to
 `clawperator exec` directly. That helper is used by runtime skill scripts
@@ -236,10 +285,12 @@ Recommendation:
 - Keep the shared helper thin, and do not add standalone readiness probing
   there for this change.
 - Once Node preflight is added to direct execution paths, scripts using
-  `clawperator exec` through this helper will inherit the stable failure on
-  their first internal CLI call.
+  `clawperator exec` through this helper will inherit the stable low-level
+  failure on their first internal CLI call.
+- This is acceptable because the stronger early-failure contract belongs at the
+  high-level skill wrappers, not inside every direct script helper.
 
-### 6. The task pack currently blurs two different failure surfaces
+### 7. The task pack currently blurs two different failure surfaces
 
 This is the most important contract distinction the original findings missed.
 
@@ -270,10 +321,13 @@ Recommendation:
 - Return top-level `ok: false` before dispatch when the resolved device is not
   interactive.
 - Update HTTP status mapping and other Node callers accordingly.
+- Use an explicit serve mapping for the new top-level error instead of letting
+  it fall through to `500`. Prefer a deliberate conflict-style status such as
+  `409` for the non-interactive-device preflight path.
 - Do not introduce an Android envelope error code for this change unless later
   race handling makes it necessary.
 
-### 7. A Node-only preflight is race-prone; the Android runtime remains the final authority
+### 8. A Node-only preflight is race-prone; the Android runtime remains the final authority
 
 Even if Node checks interactive state immediately before a run, the device can
 lock after the preflight and before or during command execution.
@@ -290,7 +344,7 @@ Recommendation:
 - Record this as an accepted limitation of the current rollout, not as
   something to solve in the same task by adding Android envelope authority.
 
-### 8. The rollout implications are broader than the original findings listed
+### 9. The rollout implications are broader than the original findings listed
 
 Missing implications from the earlier draft:
 
@@ -301,10 +355,18 @@ Missing implications from the earlier draft:
 - `apps/node/src/cli/commands/serve.ts`
   - `mapErrorToStatus()` will need a deliberate mapping if Node starts
     returning this as a top-level error
+- `apps/node/src/cli/commands/serve.ts`
+  - `POST /skills/:skillId/run` needs optional `operatorPackage` request input
+    and env propagation
+- `apps/node/src/cli/commands/skills.ts`
+  - `cmdSkillsRun()` needs pre-spawn readiness enforcement instead of only a
+    banner-time APK check
 - `docs/api/doctor.md`
   - update check reference and success semantics
 - `docs/skills/runtime.md`
   - update the device prep checklist
+- `docs/skills/overview.md`
+  - update `skills run` behavior to document wrapper-level readiness failure
 - `docs/api/errors.md` and possibly `docs/api/overview.md`
   - update them for the new public Node preflight error surface
 - `../clawperator-skills`
@@ -345,28 +407,63 @@ Missing implications from the earlier draft:
 - Add a narrow Node preflight probe before dispatch in execution entrypoints
   such as `runExecution()`.
 - Treat that probe as a top-level Node error surface with `ok: false`.
-- Do not add pre-spawn readiness enforcement to high-level skill wrappers in
-  this change.
+- Add the same narrow pre-spawn readiness probe to high-level skill wrappers:
+  - CLI `cmdSkillsRun()`
+  - HTTP `POST /skills/:skillId/run`
+- Add optional `operatorPackage` input to `POST /skills/:skillId/run` so the
+  HTTP skill entrypoint can participate in the same target-specific readiness
+  contract as the CLI wrapper.
 - Do not add a new Android envelope error code in this change.
 - Do not reuse the full doctor sequence before every command.
 
 ### Phase 5: Cover all affected entrypoints
 
-Because the chosen change is a low-level Node preflight contract, cover:
+Because the chosen change is both a low-level Node preflight contract and a
+high-level skill-wrapper contract, cover:
 
 - CLI `exec` and action wrappers
 - HTTP `/execute`, `/snapshot`, `/screenshot`
 - MCP tools via `runExecution()`
-- skill scripts indirectly through their first internal CLI call
+- CLI `skills run`
+- HTTP `POST /skills/:skillId/run`
+- direct skill scripts indirectly through their first internal CLI call
+
+### Phase 6: Validation matrix
+
+Implementation is not done until the following are covered:
+
+1. Doctor contract:
+   - doctor JSON includes the new interactive-state check
+   - `criticalOk` is `false` when the device is not interactive
+   - check evidence includes the chosen booleans
+2. Direct execution preflight:
+   - `runExecution()` returns top-level `ok: false` for the new condition
+   - no Android dispatch happens on that path
+3. Serve HTTP mapping:
+   - `/execute`, `/snapshot`, and `/screenshot` return the chosen non-500
+     status for the preflight failure
+4. MCP normalization:
+   - MCP tools surface the preflight failure as an MCP error result
+5. Skill wrapper behavior:
+   - `cmdSkillsRun()` fails before spawning the skill process when the device is
+     not interactive
+   - `POST /skills/:skillId/run` does the same
+   - the serve skill-run route accepts and propagates optional
+     `operatorPackage`
+6. Direct script helper path:
+   - at least one helper-driven skill path still fails deterministically on the
+     first internal CLI call when bypassing the wrapper gate
 
 ## Resolved Decisions
 
 1. The failing predicate is the broader "device not interactive" state, not
    only keyguard lock.
 2. Enforcement for this task belongs in `doctor` and in narrow Node preflight.
-3. Skills do not need a pre-spawn gate. Stable failure on the first internal
-   CLI call is sufficient.
-4. Android envelope-level enforcement is out of scope for this task and the
+3. High-level skill wrappers do need a pre-spawn gate so the product preserves
+   one central readiness result before skill execution starts.
+4. Direct script helpers remain thin and rely on low-level execution preflight
+   on their first internal CLI call.
+5. Android envelope-level enforcement is out of scope for this task and the
    remaining race is accepted for now.
 
 ## Bottom Line
@@ -387,6 +484,11 @@ The sharper implementation-ready path is:
   diagnostic contract
 - make doctor report `DEVICE_NOT_INTERACTIVE` as part of canonical readiness
 - add narrow Node preflight enforcement before execution dispatch
-- let skill wrappers remain thin and rely on first internal CLI-call failure
+- add wrapper-level pre-spawn readiness enforcement for both skill entrypoints
+- add optional `operatorPackage` to the serve skill-run route so target
+  selection stays explicit and consistent
+- leave direct script helpers thin so they still rely on first internal
+  CLI-call failure when bypassing wrappers
+- pin the validation matrix before implementation starts
 - document the accepted race instead of expanding this task into Android
   envelope authority
