@@ -358,6 +358,40 @@ Missing implications from the earlier draft:
 - `apps/node/src/cli/commands/serve.ts`
   - `POST /skills/:skillId/run` needs optional `operatorPackage` request input
     and env propagation
+
+## Implementation Tightening
+
+### 10. Implicitly resolved device selection must stay out of the spawned skill env
+
+This was confirmed during phase-4 implementation against the current
+`runSkill()` contract.
+
+What the code actually does:
+
+- for script-driven skills, `runSkill()` prepends `CLAWPERATOR_DEVICE_ID` to the
+  child argv when that env var is present
+- agent-driven skills keep device selection in env and do not consume it as a
+  positional child arg
+
+Implication:
+
+- if a high-level wrapper resolves an implicit default device and always writes
+  that serial into `CLAWPERATOR_DEVICE_ID`, script-driven skills silently
+  receive a new first positional arg even though the caller did not pass
+  `--device`
+- that changes current runtime behavior and breaks the wrapper boundary this
+  pack was supposed to preserve
+
+Chosen implementation rule:
+
+- use the resolved device id for wrapper preflight only
+- propagate `CLAWPERATOR_DEVICE_ID` into the spawned skill env only when the
+  caller explicitly supplied `--device` or HTTP `deviceId`
+- still propagate the resolved `CLAWPERATOR_OPERATOR_PACKAGE` into the skill env
+  for both CLI and serve wrappers
+
+This keeps the early readiness gate while preserving the existing `runSkill()`
+launcher contract for implicit device resolution.
 - `apps/node/src/cli/commands/skills.ts`
   - `cmdSkillsRun()` needs pre-spawn readiness enforcement instead of only a
     banner-time APK check

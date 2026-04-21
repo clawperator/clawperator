@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { createClawperatorLogger } from "../../adapters/logger.js";
+import { ERROR_CODES } from "../../contracts/errors.js";
 
 async function createTempRegistryWithSkill(options: {
   skillId: string;
@@ -50,7 +51,15 @@ describe("serve API integration", () => {
 
   before(async () => {
     process.env.CLAWPERATOR_SKILLS_REGISTRY = testRegistryPath;
-    server = await startServer({ port: 0, host: "localhost", verbose: false });
+    server = await startServer({
+      port: 0,
+      host: "localhost",
+      verbose: false,
+      resolveInteractiveSkillTargetImpl: async (_operatorPackage, options) => ({
+        ok: true,
+        deviceId: options?.deviceId ?? "resolved-device-123",
+      }),
+    });
     const addr = server.address();
     if (addr && typeof addr === "object") {
       port = addr.port;
@@ -266,6 +275,95 @@ describe("serve API integration", () => {
     assert.strictEqual(body.ok, false);
     assert.strictEqual(body.error.code, "INVALID_DEVICE_ID");
     assert.match(body.error.message, /non-empty string/i);
+  });
+
+  test("POST /skills/:skillId/run fails before spawn when the device is not interactive", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-serve-skill-no-spawn-"));
+    const markerPath = join(tempRoot, "spawned.txt");
+    const scriptPath = join(tempRoot, "run.js");
+    await writeFile(
+      scriptPath,
+      `import { writeFileSync } from "node:fs";\nwriteFileSync(${JSON.stringify(markerPath)}, "spawned\\n");\nconsole.log("should-not-run");\n`,
+      "utf8"
+    );
+    const skillId = "com.test.no-spawn";
+    const skillEntry = {
+      id: skillId,
+      applicationId: "com.test",
+      intent: "no-spawn",
+      summary: "No spawn proof",
+      path: `skills/${skillId}`,
+      skillFile: `skills/${skillId}/SKILL.md`,
+      scripts: [`skills/${skillId}/scripts/run.js`],
+      artifacts: [],
+    };
+    const registry = await createTempRegistryWithSkill({
+      skillId,
+      scriptSourcePath: scriptPath,
+      skillJsonContents: JSON.stringify(skillEntry, null, 2),
+      registrySkillEntry: skillEntry,
+    });
+    await writeFile(
+      join(dirname(registry.registryPath), skillId, "SKILL.md"),
+      `---\nname: ${skillId}\nclawperator-skill-type: replay\ndescription: |-\n  No spawn proof\n---\n\n# ${skillId}\n`,
+      "utf8"
+    );
+
+    const originalRegistryPath = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+    process.env.CLAWPERATOR_SKILLS_REGISTRY = registry.registryPath;
+
+    const blockingServer = await startServer({
+      port: 0,
+      host: "localhost",
+      verbose: false,
+      resolveInteractiveSkillTargetImpl: async () => ({
+        ok: false,
+        error: {
+          code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+          message: "Device is not interactive.",
+          details: {
+            screenOn: false,
+            deviceLocked: true,
+            userUnlocked: true,
+          },
+        },
+      }),
+    });
+    const blockingAddr = blockingServer.address();
+    const blockingPort = blockingAddr && typeof blockingAddr === "object" ? blockingAddr.port : 0;
+
+    try {
+      const res = await fetch(`http://localhost:${blockingPort}/skills/${skillId}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      assert.strictEqual(res.status, 409);
+      const body = await res.json() as {
+        ok: boolean;
+        error: { code: string; details?: { screenOn?: boolean; deviceLocked?: boolean; userUnlocked?: boolean } };
+      };
+      assert.strictEqual(body.ok, false);
+      assert.strictEqual(body.error.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
+      assert.deepStrictEqual(body.error.details, {
+        screenOn: false,
+        deviceLocked: true,
+        userUnlocked: true,
+      });
+      await assert.rejects(readFile(markerPath, "utf8"));
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        blockingServer.close((err) => (err ? reject(err) : resolve()));
+      });
+      if (originalRegistryPath === undefined) {
+        delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+      } else {
+        process.env.CLAWPERATOR_SKILLS_REGISTRY = originalRegistryPath;
+      }
+      await registry.cleanup();
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   });
 
   test("POST /skills/:skillId/run returns skillResult on framed success", async () => {

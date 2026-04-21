@@ -29,6 +29,7 @@ import { validateAllSkills, validateSkill } from "../../domain/skills/validateSk
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 import { cmdSkillsRun } from "../../cli/commands/skills.js";
 import { createClawperatorLogger } from "../../adapters/logger.js";
+import { ERROR_CODES } from "../../contracts/errors.js";
 import {
   SKILL_NOT_FOUND,
   ARTIFACT_NOT_FOUND,
@@ -290,21 +291,40 @@ function runCli(
   options?: { env?: NodeJS.ProcessEnv }
 ): Promise<{ stdout: string; stderr: string; code: number }> {
   const cliPath = join(packageRoot, "dist", "cli", "index.js");
-  return new Promise((resolve) => {
-    const proc = spawn(process.execPath, [cliPath, ...args], {
-      cwd: packageRoot,
-      env: options?.env ?? {
-        ...process.env,
-        CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
-      },
-      stdio: ["ignore", "pipe", "pipe"],
+  return (async () => {
+    const baseEnv = options?.env ?? {
+      ...process.env,
+      CLAWPERATOR_SKILLS_REGISTRY: TEST_REGISTRY_PATH,
+    };
+    const skillsRunIndex = args.findIndex((arg, index) => arg === "skills" && args[index + 1] === "run");
+    const needsFakeAdb = skillsRunIndex >= 0
+      && !((baseEnv.PATH ?? "").includes("clawperator-fake-adb-"));
+    const fakeAdbDir = needsFakeAdb
+      ? await createFakeAdb({
+          installed: true,
+          operatorPackage: "com.clawperator.operator.dev",
+        })
+      : undefined;
+    const env = fakeAdbDir
+      ? {
+          ...baseEnv,
+          PATH: `${fakeAdbDir}${baseEnv.PATH ? `:${baseEnv.PATH}` : ""}`,
+        }
+      : baseEnv;
+
+    return new Promise((resolve) => {
+      const proc = spawn(process.execPath, [cliPath, ...args], {
+        cwd: packageRoot,
+        env,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let stdout = "";
+      let stderr = "";
+      proc.stdout?.on("data", (d) => (stdout += d.toString()));
+      proc.stderr?.on("data", (d) => (stderr += d.toString()));
+      proc.on("close", (code) => resolve({ stdout, stderr, code: code ?? -1 }));
     });
-    let stdout = "";
-    let stderr = "";
-    proc.stdout?.on("data", (d) => (stdout += d.toString()));
-    proc.stderr?.on("data", (d) => (stderr += d.toString()));
-    proc.on("close", (code) => resolve({ stdout, stderr, code: code ?? -1 }));
-  });
+  })();
 }
 
 function runNodeSnippet(
@@ -582,22 +602,71 @@ async function createFakeAdb(options: {
   installedPackage?: string;
   packageListCode?: number;
   packageListStderr?: string;
+  deviceSerial?: string;
+  interactiveState?: {
+    screenOn: boolean;
+    deviceLocked: boolean;
+    userUnlocked: boolean;
+  };
 }): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "clawperator-fake-adb-"));
   const scriptPath = join(dir, "adb");
+  const commandIdPath = join(dir, "doctor-command-id");
+  const deviceSerial = options.deviceSerial ?? "device-123";
+  const interactiveState = options.interactiveState ?? {
+    screenOn: true,
+    deviceLocked: false,
+    userUnlocked: true,
+  };
   const script = [
     "#!/bin/sh",
     "if [ \"$1\" = \"-s\" ]; then",
     "  shift 2",
+    "fi",
+    "if [ \"$1\" = \"devices\" ]; then",
+    "  printf 'List of devices attached\\n'",
+    `  printf '%s\\tdevice\\n' ${JSON.stringify(deviceSerial)}`,
+    "  exit 0",
     "fi",
     "if [ \"$1\" = \"shell\" ] && [ \"$2\" = \"pm\" ] && [ \"$3\" = \"list\" ] && [ \"$4\" = \"packages\" ]; then",
     `  if [ ${JSON.stringify(options.packageListCode ?? 0)} -ne 0 ]; then`,
     `    printf '%s\\n' ${JSON.stringify(options.packageListStderr ?? "package query failed")} 1>&2`,
     `    exit ${JSON.stringify(options.packageListCode ?? 1)}`,
     "  fi",
-    `  if [ ${JSON.stringify(options.installed ? 0 : 1)} -eq 0 ] && [ \"$5\" = ${JSON.stringify(options.installedPackage ?? options.operatorPackage)} ]; then`,
-    `    printf 'package:%s\\n' \"$5\"`,
+    `  if [ ${JSON.stringify(options.installed ? 0 : 1)} -eq 0 ]; then`,
+    ...(options.installedPackage === undefined
+      ? ["    printf 'package:%s\\n' \"$5\""]
+      : [
+          `    if [ \"$5\" = ${JSON.stringify(options.installedPackage)} ]; then`,
+          "      printf 'package:%s\\n' \"$5\"",
+          "    fi",
+        ]),
     "  fi",
+    "  exit 0",
+    "fi",
+    "if [ \"$1\" = \"logcat\" ] && [ \"$2\" = \"-c\" ]; then",
+    `  rm -f ${JSON.stringify(commandIdPath)}`,
+    "  exit 0",
+    "fi",
+    "if [ \"$1\" = \"logcat\" ]; then",
+    "  i=0",
+    `  while [ ! -s ${JSON.stringify(commandIdPath)} ] && [ \"$i\" -lt 80 ]; do`,
+    "    sleep 0.05",
+    "    i=$((i + 1))",
+    "  done",
+    `  if [ -s ${JSON.stringify(commandIdPath)} ]; then`,
+    `    command_id=$(cat ${JSON.stringify(commandIdPath)})`,
+    `    printf '04-21 00:00:00.000 I TaskScopeDefault: [Clawperator-Result] {\"commandId\":\"%s\",\"taskId\":\"doctor-handshake\",\"status\":\"success\",\"stepResults\":[{\"id\":\"h1\",\"actionType\":\"doctor_ping\",\"success\":true,\"data\":{\"developer_options_enabled\":\"true\",\"usb_debugging_enabled\":\"true\",\"screen_on\":${JSON.stringify(String(interactiveState.screenOn))},\"device_locked\":${JSON.stringify(String(interactiveState.deviceLocked))},\"user_unlocked\":${JSON.stringify(String(interactiveState.userUnlocked))}}}],\"error\":null}\\n' \"$command_id\"`,
+    "  fi",
+    "  exit 0",
+    "fi",
+    "if [ \"$1\" = \"shell\" ]; then",
+    "  command=$2",
+    "  command_id=$(printf '%s' \"$command\" | sed -n 's/.*\"commandId\":\"\\([^\"]*\\)\".*/\\1/p')",
+    "  if [ -n \"$command_id\" ]; then",
+    `    printf '%s' \"$command_id\" > ${JSON.stringify(commandIdPath)}`,
+    "  fi",
+    "  printf 'Broadcast completed: result=0\\n'",
     "  exit 0",
     "fi",
     "if [ \"$1\" = \"version\" ]; then",
@@ -6743,6 +6812,11 @@ console.log(JSON.stringify({
 });
 
 describe("cmdSkillsRun preflight gate", () => {
+  const allowInteractiveTarget = async () => ({
+    ok: true,
+    deviceId: "resolved-device-123",
+  } as const);
+
   it("aborts invalid artifact skills before runSkill is called", async () => {
     let runCalls = 0;
     const fakeRunSkill = async () => {
@@ -6793,7 +6867,11 @@ describe("cmdSkillsRun preflight gate", () => {
       undefined,
       undefined,
       undefined,
-      { format: "json", runSkillImpl: fakeRunSkill as typeof runSkill }
+      {
+        format: "json",
+        runSkillImpl: fakeRunSkill as typeof runSkill,
+        resolveInteractiveSkillTargetImpl: allowInteractiveTarget,
+      }
     );
     const parsed = JSON.parse(stdout) as { skillId?: string; output?: string };
     assert.strictEqual(runCalls, 1);
@@ -6838,6 +6916,95 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.match(parsed.message ?? "", /Skill not found/);
   });
 
+  it("fails before skill spawn when the resolved target is not interactive", async () => {
+    let runCalls = 0;
+
+    const stdout = await cmdSkillsRun(
+      TEST_SKILL_VALID_ARTIFACT,
+      [],
+      undefined,
+      undefined,
+      undefined,
+      {
+        format: "json",
+        skipValidate: true,
+        runSkillImpl: async () => {
+          runCalls += 1;
+          return {
+            ok: true,
+            status: "success",
+            skillId: TEST_SKILL_VALID_ARTIFACT,
+            output: "RUN_OK",
+            exitCode: 0,
+            durationMs: 1,
+            skillResult: null,
+          } as const;
+        },
+        resolveInteractiveSkillTargetImpl: async () => ({
+          ok: false,
+          error: {
+            code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+            message: "Device is not interactive.",
+            details: {
+              screenOn: false,
+              deviceLocked: true,
+              userUnlocked: true,
+            },
+          },
+        }),
+      }
+    );
+
+    const parsed = JSON.parse(stdout) as {
+      code?: string;
+      details?: { screenOn?: boolean; deviceLocked?: boolean; userUnlocked?: boolean };
+    };
+    assert.strictEqual(runCalls, 0);
+    assert.strictEqual(parsed.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
+    assert.deepStrictEqual(parsed.details, {
+      screenOn: false,
+      deviceLocked: true,
+      userUnlocked: true,
+    });
+  });
+
+  it("uses the resolved device for wrapper preflight without injecting implicit device selection into skill env", async () => {
+    let observedEnv: Record<string, string | undefined> | undefined;
+
+    const stdout = await cmdSkillsRun(
+      TEST_SKILL_VALID_ARTIFACT,
+      ["--limit", "40"],
+      undefined,
+      undefined,
+      "com.clawperator.operator.dev",
+      {
+        format: "json",
+        skipValidate: true,
+        runSkillImpl: async (_skillId, _args, _registryPath, _timeoutMs, env) => {
+          observedEnv = env;
+          return {
+            ok: true,
+            status: "success",
+            skillId: TEST_SKILL_VALID_ARTIFACT,
+            output: "RUN_OK",
+            exitCode: 0,
+            durationMs: 1,
+            skillResult: null,
+          } as const;
+        },
+        resolveInteractiveSkillTargetImpl: async () => ({
+          ok: true,
+          deviceId: "resolved-device-123",
+        }),
+      }
+    );
+
+    const parsed = JSON.parse(stdout) as { skillId?: string };
+    assert.strictEqual(parsed.skillId, TEST_SKILL_VALID_ARTIFACT);
+    assert.strictEqual(observedEnv?.CLAWPERATOR_DEVICE_ID, undefined);
+    assert.strictEqual(observedEnv?.CLAWPERATOR_OPERATOR_PACKAGE, "com.clawperator.operator.dev");
+  });
+
   it("passes forwarded skill args through unchanged in cmdSkillsRun", async () => {
     let observedArgs: string[] | null = null;
     const fakeRunSkill = async (_skillId: string, args: string[]) => {
@@ -6864,6 +7031,7 @@ describe("cmdSkillsRun preflight gate", () => {
         skipValidate: true,
         deviceId: "device-123",
         runSkillImpl: fakeRunSkill as typeof runSkill,
+        resolveInteractiveSkillTargetImpl: allowInteractiveTarget,
       }
     );
 
@@ -6891,6 +7059,10 @@ describe("cmdSkillsRun preflight gate", () => {
         {
           format: "json",
           skipValidate: true,
+          resolveInteractiveSkillTargetImpl: async () => ({
+            ok: true,
+            deviceId: "resolved-device-123",
+          }),
           runSkillImpl: async () => ({
             ok: true,
             status: "success",
@@ -7004,7 +7176,12 @@ describe("cmdSkillsRun preflight gate", () => {
       undefined,
       undefined,
       undefined,
-      { format: "json", skipValidate: true, runSkillImpl: fakeRunSkill as typeof runSkill }
+      {
+        format: "json",
+        skipValidate: true,
+        runSkillImpl: fakeRunSkill as typeof runSkill,
+        resolveInteractiveSkillTargetImpl: allowInteractiveTarget,
+      }
     );
     const parsed = JSON.parse(stdout) as { skillId?: string; output?: string };
     assert.strictEqual(runCalls, 1);

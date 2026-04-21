@@ -17,6 +17,11 @@ import { getCliVersion } from "../../domain/version/compatibility.js";
 import { getAlternateOperatorVariant } from "../../domain/version/compatibility.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { checkApkPresence } from "../../domain/doctor/checks/readinessChecks.js";
+import {
+  buildDeviceNotInteractiveError,
+  probeInteractiveState,
+} from "../../domain/doctor/checks/deviceInteractivity.js";
+import { resolveDevice } from "../../domain/devices/resolveDevice.js";
 import type { Logger } from "../../adapters/logger.js";
 import type { LogEvent } from "../../contracts/logging.js";
 import {
@@ -190,6 +195,93 @@ function sanitizePrettySkillStdout(stdout: string | undefined, skillResultPresen
   return stripTrailingSkillResultFrame(stdout);
 }
 
+interface CommandLikeError {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export type ResolveInteractiveSkillTargetResult =
+  | { ok: true; deviceId: string }
+  | { ok: false; error: CommandLikeError };
+
+function normalizeCommandLikeError(error: unknown): CommandLikeError {
+  if (typeof error === "object" && error !== null) {
+    const maybeCode = "code" in error ? error.code : undefined;
+    const maybeMessage = "message" in error ? error.message : undefined;
+    const maybeDetails = "details" in error ? error.details : undefined;
+    if (typeof maybeCode === "string" && typeof maybeMessage === "string") {
+      return {
+        code: maybeCode,
+        message: maybeMessage,
+        details: typeof maybeDetails === "object" && maybeDetails !== null
+          ? maybeDetails as Record<string, unknown>
+          : undefined,
+      };
+    }
+  }
+
+  return {
+    code: "INTERNAL_ERROR",
+    message: error instanceof Error ? error.message : String(error),
+  };
+}
+
+export async function resolveInteractiveSkillTarget(
+  operatorPackage: string,
+  options?: {
+    deviceId?: string;
+    logger?: Logger;
+    resolveDeviceImpl?: typeof resolveDevice;
+    probeInteractiveStateImpl?: typeof probeInteractiveState;
+  }
+): Promise<ResolveInteractiveSkillTargetResult> {
+  const logger = options?.logger;
+  const resolveDeviceImpl = options?.resolveDeviceImpl ?? resolveDevice;
+  const probeInteractiveStateImpl = options?.probeInteractiveStateImpl ?? probeInteractiveState;
+
+  let resolvedDevice;
+  try {
+    resolvedDevice = await resolveDeviceImpl(getDefaultRuntimeConfig({
+      deviceId: options?.deviceId,
+      operatorPackage,
+      logger,
+    }));
+  } catch (error) {
+    return {
+      ok: false,
+      error: normalizeCommandLikeError(error),
+    };
+  }
+
+  const probe = await probeInteractiveStateImpl(getDefaultRuntimeConfig({
+    deviceId: resolvedDevice.deviceId,
+    operatorPackage,
+    logger,
+  }));
+  if (!probe.ok) {
+    return {
+      ok: false,
+      error: {
+        code: probe.code,
+        message: probe.message,
+      },
+    };
+  }
+
+  if (!probe.state.interactive) {
+    return {
+      ok: false,
+      error: buildDeviceNotInteractiveError(probe.state),
+    };
+  }
+
+  return {
+    ok: true,
+    deviceId: resolvedDevice.deviceId,
+  };
+}
+
 export async function cmdSkillsList(options: { format: OutputOptions["format"] }): Promise<string> {
   const result = await listSkills();
   if (result.ok) {
@@ -293,6 +385,7 @@ export async function cmdSkillsRun(
     deviceId?: string;
     runSkillImpl?: typeof runSkill;
     validateSkillImpl?: typeof validateSkill;
+    resolveInteractiveSkillTargetImpl?: typeof resolveInteractiveSkillTarget;
     logger?: Logger;
   }
 ): Promise<string> {
@@ -318,6 +411,7 @@ export async function cmdSkillsRun(
   const runSkillImpl = options.runSkillImpl ?? runSkill;
   const validateSkillImpl = options.validateSkillImpl ?? validateSkill;
   const cliLogger = options.logger?.child({ skillId, deviceId: options.deviceId });
+  const resolveInteractiveSkillTargetImpl = options.resolveInteractiveSkillTargetImpl ?? resolveInteractiveSkillTarget;
   let validationSkipped = false;
   if (!options.skipValidate) {
     const validation = await validateSkillImpl(skillId, undefined, { dryRun: true });
@@ -331,8 +425,16 @@ export async function cmdSkillsRun(
     validationSkipped = validation.dryRun?.payloadValidation === "skipped";
   }
 
-  const config = getDefaultRuntimeConfig({
+  const interactiveTarget = await resolveInteractiveSkillTargetImpl(resolvedOperatorPackage, {
     deviceId: options.deviceId,
+    logger: cliLogger,
+  });
+  if (!interactiveTarget.ok) {
+    return formatError(interactiveTarget.error, options);
+  }
+
+  const config = getDefaultRuntimeConfig({
+    deviceId: interactiveTarget.deviceId,
     operatorPackage: resolvedOperatorPackage,
     logger: cliLogger,
   });

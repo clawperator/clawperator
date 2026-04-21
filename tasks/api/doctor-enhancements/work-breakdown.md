@@ -318,8 +318,9 @@ that behavior.
    `POST /skills/:skillId/run`.
 3. Add optional `operatorPackage` input to the serve skill-run route.
 4. Extend `buildServeSkillRunOptions()` or an equivalent small helper so the
-   route can pass both `deviceId` and resolved `operatorPackage` into skill
-   env deterministically, then cover that helper in `serveCommand.test.ts`.
+   route can pass the resolved `operatorPackage` into skill env and pass
+   `deviceId` only when the caller explicitly supplied one, then cover that
+   helper in `serveCommand.test.ts`.
 5. Resolve `operatorPackage` for that route with the same precedence used
    elsewhere in serve:
    - explicit request value first
@@ -327,12 +328,16 @@ that behavior.
 6. Pass the resolved package both to:
    - the pre-spawn readiness probe
    - the skill env as `CLAWPERATOR_OPERATOR_PACKAGE`
+   Keep any implicitly resolved device id preflight-only. Do not write it into
+   `CLAWPERATOR_DEVICE_ID`, because `runSkill()` currently prepends that env var
+   into argv for script-driven skills.
 7. Keep `runSkill()` itself unchanged as a launcher/verifier boundary.
 8. Add focused regressions:
    - `skills.test.ts`: `cmdSkillsRun()` fails before spawn when the target is
      not interactive
    - `serveCommand.test.ts`: the route helper passes resolved
-     `CLAWPERATOR_OPERATOR_PACKAGE` and `CLAWPERATOR_DEVICE_ID`
+     `CLAWPERATOR_OPERATOR_PACKAGE` and explicit
+     `CLAWPERATOR_DEVICE_ID`
    - route-level serve coverage only if the no-spawn failure can be proved
      deterministically in the current harness
 9. Use `.agents/skills/docs-author/SKILL.md` for the public-doc updates in:
@@ -348,7 +353,9 @@ that behavior.
 - `POST /skills/:skillId/run` accepts and propagates optional `operatorPackage`.
 - `runSkill()` remains a launcher/verifier rather than becoming a readiness
   authority.
-- Serve helper/unit coverage proves the resolved env tuple for the route.
+- Serve helper/unit coverage proves the route env tuple:
+  - resolved `CLAWPERATOR_OPERATOR_PACKAGE` always
+  - `CLAWPERATOR_DEVICE_ID` only for explicit caller-supplied device selection
 - Authored skills docs match the shipped wrapper behavior.
 
 ### Validation

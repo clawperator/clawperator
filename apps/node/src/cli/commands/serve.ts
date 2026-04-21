@@ -18,22 +18,28 @@ import { provisionEmulator } from "../../domain/android-emulators/provision.js";
 import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 import type { Logger } from "../../adapters/logger.js";
 import { resolveOperatorPackageForRequest } from "../../domain/config/resolveOperatorPackage.js";
+import { resolveInteractiveSkillTarget } from "./skills.js";
 
 interface ServeOptions {
   port: number;
   host: string;
   verbose: boolean;
   logger?: Logger;
+  resolveInteractiveSkillTargetImpl?: typeof resolveInteractiveSkillTarget;
 }
 
 export function buildServeSkillRunOptions(
   deviceId: string | undefined,
+  operatorPackage: string,
   args: readonly string[] | undefined
 ): { scriptArgs: string[]; skillEnv: SkillRunEnv | undefined } {
   const scriptArgs = args ? [...args] : [];
-  const skillEnv = deviceId !== undefined
-    ? { CLAWPERATOR_DEVICE_ID: deviceId }
-    : undefined;
+  const skillEnv: SkillRunEnv = {
+    CLAWPERATOR_OPERATOR_PACKAGE: operatorPackage,
+  };
+  if (deviceId !== undefined) {
+    skillEnv.CLAWPERATOR_DEVICE_ID = deviceId;
+  }
   return { scriptArgs, skillEnv };
 }
 
@@ -455,10 +461,17 @@ export async function startServer(options: ServeOptions): Promise<Server> {
 
       const {
         deviceId,
+        operatorPackage,
         args,
         timeoutMs,
         expectContains,
-      } = req.body as { deviceId?: unknown; args?: unknown; timeoutMs?: unknown; expectContains?: unknown };
+      } = req.body as {
+        deviceId?: unknown;
+        operatorPackage?: unknown;
+        args?: unknown;
+        timeoutMs?: unknown;
+        expectContains?: unknown;
+      };
 
       if (deviceId !== undefined && typeof deviceId !== "string") {
         res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
@@ -466,6 +479,15 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       }
       if (typeof deviceId === "string" && deviceId.trim().length === 0) {
         res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a non-empty string when provided" } });
+        return;
+      }
+
+      if (operatorPackage !== undefined && typeof operatorPackage !== "string") {
+        res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a string" } });
+        return;
+      }
+      if (typeof operatorPackage === "string" && operatorPackage.trim().length === 0) {
+        res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a non-empty string" } });
         return;
       }
 
@@ -485,11 +507,6 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       }
 
       const requestedArgs = Array.isArray(args) ? args.map(String) : undefined;
-      const { scriptArgs, skillEnv } = buildServeSkillRunOptions(
-        typeof deviceId === "string" ? deviceId : undefined,
-        requestedArgs
-      );
-
       const expectContainsArg =
         typeof expectContains === "string" ? expectContains : undefined;
       const validation = await validateSkill(req.params.skillId, undefined, { dryRun: true });
@@ -511,6 +528,34 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         });
         return;
       }
+
+      const resolvedOperatorPackage = resolveOperatorPackageForRequest(
+        typeof operatorPackage === "string" ? operatorPackage : undefined
+      );
+      const resolveInteractiveSkillTargetImpl = options.resolveInteractiveSkillTargetImpl ?? resolveInteractiveSkillTarget;
+      const interactiveTarget = await resolveInteractiveSkillTargetImpl(resolvedOperatorPackage, {
+        deviceId: typeof deviceId === "string" ? deviceId : undefined,
+        logger: options.logger,
+      });
+      if (!interactiveTarget.ok) {
+        res.status(mapServeErrorCodeToStatus(interactiveTarget.error.code)).json({
+          status: "failed",
+          ok: false,
+          error: {
+            ...interactiveTarget.error,
+            skillId: req.params.skillId,
+            timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
+            expectedSubstring: expectContainsArg,
+          },
+        });
+        return;
+      }
+
+      const { scriptArgs, skillEnv } = buildServeSkillRunOptions(
+        typeof deviceId === "string" ? deviceId : undefined,
+        resolvedOperatorPackage,
+        requestedArgs
+      );
 
       const result = await runSkill(
         req.params.skillId,
