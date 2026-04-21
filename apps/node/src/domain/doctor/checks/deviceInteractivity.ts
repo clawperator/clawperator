@@ -82,8 +82,6 @@ export async function runDoctorPingCommand(
     timeoutMs: 5000,
   });
 
-  await runAdb(config, ["logcat", "-c"]);
-
   return waitForEnvelope(
     config,
     { commandId, timeoutMs: 7000 },
@@ -155,6 +153,14 @@ export async function probeInteractiveState(
     };
   }
 
+  if (!doctorPingStep.success) {
+    return {
+      ok: false,
+      code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
+      message: "doctor_ping step result was unsuccessful.",
+    };
+  }
+
   try {
     return {
       ok: true,
@@ -193,7 +199,7 @@ export async function ensureDeviceAwake(
 
   if (initialProbe.state.interactive) {
     return {
-      status: "already_awake",
+      status: initialProbe.state.deviceLocked ? "awake_but_locked" : "already_awake",
       attempts: [],
       state: initialProbe.state,
     };

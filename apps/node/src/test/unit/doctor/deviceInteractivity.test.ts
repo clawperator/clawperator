@@ -132,6 +132,40 @@ describe("probeInteractiveState", () => {
       message: "doctor_ping returned an invalid boolean for screen_on: missing",
     });
   });
+
+  it("fails closed when doctor ping returns an unsuccessful step result", async () => {
+    const { config, runner } = createConfig();
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+    const mockWait = async () => ({
+      ok: true as const,
+      envelope: {
+        status: "success" as const,
+        commandId: "test-cmd",
+        taskId: "test-task",
+        stepResults: [
+          {
+            id: "h1",
+            actionType: "doctor_ping",
+            success: false,
+            data: {
+              screen_on: "true",
+              device_locked: "false",
+              user_unlocked: "true",
+            },
+          },
+        ],
+      },
+      terminalSource: "clawperator_result" as const,
+    });
+
+    const result = await probeInteractiveState(config, mockWait as any);
+    assert.deepStrictEqual(result, {
+      ok: false,
+      code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
+      message: "doctor_ping step result was unsuccessful.",
+    });
+  });
 });
 
 describe("ensureDeviceAwake", () => {
@@ -178,6 +212,21 @@ describe("ensureDeviceAwake", () => {
 
     assert.strictEqual(result.status, "already_awake");
     assert.deepStrictEqual(result.state, state({ screenOn: true, interactive: true }));
+    assert.deepStrictEqual(runner.calls, []);
+  });
+
+  it("reports awake but locked when the initial probe is already interactive", async () => {
+    const { config, runner } = createConfig();
+
+    const result = await ensureDeviceAwake(config, {
+      probeInteractiveStateFn: probeSequence([
+        { ok: true, state: state({ screenOn: true, interactive: true, deviceLocked: true, userUnlocked: false }) },
+      ]),
+      settleDelayMs: 0,
+    });
+
+    assert.strictEqual(result.status, "awake_but_locked");
+    assert.deepStrictEqual(result.state, state({ screenOn: true, interactive: true, deviceLocked: true, userUnlocked: false }));
     assert.deepStrictEqual(runner.calls, []);
   });
 
@@ -261,5 +310,58 @@ describe("ensureDeviceAwake", () => {
       message: "doctor_ping returned an invalid boolean for screen_on: missing",
     });
     assert.deepStrictEqual(runner.calls, []);
+  });
+
+  it("returns still_asleep after exhausting all wake attempts", async () => {
+    const { config, runner } = createConfig();
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+    const result = await ensureDeviceAwake(config, {
+      probeInteractiveStateFn: probeSequence([
+        { ok: true, state: state() },
+        { ok: true, state: state() },
+        { ok: true, state: state() },
+        { ok: true, state: state({ deviceLocked: true, userUnlocked: false }) },
+      ]),
+      settleDelayMs: 0,
+    });
+
+    assert.strictEqual(result.status, "still_asleep");
+    assert.deepStrictEqual(result.state, state({ deviceLocked: true, userUnlocked: false }));
+    assert.deepStrictEqual(
+      runner.calls.map(call => call.args),
+      [
+        ["-s", "test-device", "shell", "cmd", "power", "wakeup"],
+        ["-s", "test-device", "shell", "input", "keyevent", "KEYCODE_WAKEUP"],
+        ["-s", "test-device", "shell", "input", "keyevent", "KEYCODE_HOME"],
+      ]
+    );
+  });
+
+  it("returns probe_failed when a post-attempt probe fails", async () => {
+    const { config, runner } = createConfig();
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+    const result = await ensureDeviceAwake(config, {
+      probeInteractiveStateFn: probeSequence([
+        { ok: true, state: state() },
+        {
+          ok: false,
+          code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
+          message: "doctor_ping step result was unsuccessful.",
+        },
+      ]),
+      settleDelayMs: 0,
+    });
+
+    assert.strictEqual(result.status, "probe_failed");
+    assert.deepStrictEqual(result.error, {
+      code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
+      message: "doctor_ping step result was unsuccessful.",
+    });
+    assert.strictEqual(runner.calls.length, 1);
+    assert.deepStrictEqual(runner.calls[0]?.args, ["-s", "test-device", "shell", "cmd", "power", "wakeup"]);
   });
 });
