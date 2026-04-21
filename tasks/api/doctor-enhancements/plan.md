@@ -22,13 +22,34 @@ decisions that the implementing agent should not re-derive.
 
 | Item | Value |
 | --- | --- |
-| State | blocked |
+| State | implemented on branch, pending PR/review |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4 |
-| Current / Next | Phase 1 after the device-interactivity foundation is merged |
-| Blockers | `tasks/android/device-interactivity-foundation/` must land first |
+| Completed | 1, 2, 3, 4 |
+| Remaining | none |
+| Current / Next | Ready for PR/review on `api/doctor-enhancements` |
+| Blockers | none on the current branch; broad Node suite termination still needs follow-up if required before merge |
+
+## Implementation Status
+
+Implemented on branch `api/doctor-enhancements` with these reviewed breakpoints:
+
+- `55bbef1 feat(node): add doctor interactive state check`
+- `cc35fd3 docs(api): document doctor interactive readiness check`
+- `0bffc67 feat(node): fail direct execution when device is not interactive`
+- `f9553a4 feat(node): gate skill wrappers on interactive device state`
+- `67f410c docs(skills): document skill wrapper readiness behavior`
+
+Current branch status:
+
+- PR-1 scope is implemented on the branch: doctor check, critical gating, and
+  canonical API docs
+- PR-2 scope is implemented on the branch: direct execution preflight, serve
+  and MCP alignment, skill-wrapper pre-spawn gating, serve `operatorPackage`
+  support, and skills docs
+- `tasks/api/doctor-enhancements/findings.md` and
+  `tasks/api/doctor-enhancements/work-breakdown.md` were tightened to reflect
+  the shipped wrapper constraint around implicit device resolution
 
 ## Goal
 

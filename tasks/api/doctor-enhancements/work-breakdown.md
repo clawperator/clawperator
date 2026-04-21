@@ -7,20 +7,31 @@ Parent plan: `tasks/api/doctor-enhancements/plan.md`
 2 PRs, 4 phases. PR-1 adds the new doctor check, makes it critical, and updates
 the canonical doctor/error docs. PR-2 adds narrow Node preflight enforcement
 for direct execution paths plus high-level skill wrappers, then updates serve,
-MCP, and skills docs to match. This pack is blocked until the
-`tasks/android/device-interactivity-foundation/` implementation is merged.
+MCP, and skills docs to match. All four phases are now implemented on
+`api/doctor-enhancements`; this pack remains as the implementation handoff and
+status record until PR review and merge are complete.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | blocked |
+| State | implemented on branch, pending PR/review |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4 |
-| Current / Next | Phase 1 after the foundation dependency merges |
-| Blockers | `tasks/android/device-interactivity-foundation/` must be implemented and merged first |
+| Completed | 1, 2, 3, 4 |
+| Remaining | none |
+| Current / Next | Ready for PR/review on `api/doctor-enhancements` |
+| Blockers | none on the current branch; if required before merge, investigate the broad Node suite run that printed passing output but did not terminate cleanly in the desktop thread |
+
+## Implemented Commits
+
+| Phase | Commit | Status |
+| --- | --- | --- |
+| 1 | `55bbef1 feat(node): add doctor interactive state check` | done |
+| 2 | `cc35fd3 docs(api): document doctor interactive readiness check` | done |
+| 3 | `0bffc67 feat(node): fail direct execution when device is not interactive` | done |
+| 4a | `f9553a4 feat(node): gate skill wrappers on interactive device state` | done |
+| 4b | `67f410c docs(skills): document skill wrapper readiness behavior` | done |
 
 ## Hard Rules
 
@@ -74,10 +85,12 @@ Read these files IN THIS ORDER before writing anything.
 
 | PR | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
-| PR-1 | Add the doctor interactive-state check and canonical docs | 1, 2 | thinking, default | foundation implementation merged |
-| PR-2 | Add Node preflight enforcement and skill-wrapper integration | 3, 4 | thinking, default | PR-1 merged |
+| PR-1 | Add the doctor interactive-state check and canonical docs | 1, 2 | thinking, default | implemented on branch |
+| PR-2 | Add Node preflight enforcement and skill-wrapper integration | 3, 4 | thinking, default | implemented on branch |
 
 ## Phase 1: Add the Critical Doctor Interactive-State Check
+
+Status: done on `api/doctor-enhancements` via `55bbef1`
 
 ### Agent Tier
 
@@ -160,6 +173,8 @@ feat(node): add doctor interactive state check
 
 ## Phase 2: Update Canonical Doctor And Error Docs
 
+Status: done on `api/doctor-enhancements` via `cc35fd3`
+
 ### Agent Tier
 
 default
@@ -207,6 +222,8 @@ docs(api): document doctor interactive readiness check
 ```
 
 ## Phase 3: Add Narrow Node Preflight Enforcement For Direct Execution
+
+Status: done on `api/doctor-enhancements` via `0bffc67`
 
 ### Agent Tier
 
@@ -289,6 +306,8 @@ feat(node): fail direct execution when device is not interactive
 ```
 
 ## Phase 4: Add High-Level Skill-Wrapper Enforcement And Skills Docs
+
+Status: done on `api/doctor-enhancements` via `f9553a4` and `67f410c`
 
 ### Agent Tier
 
