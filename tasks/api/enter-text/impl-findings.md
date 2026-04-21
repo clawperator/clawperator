@@ -26,6 +26,10 @@ It is intentionally branch-local and temporary while the task pack is active.
   accessibility service.
 - The API 33 route is guarded by `Build.VERSION.SDK_INT >= TIRAMISU` and only
   runs after the legacy route is unavailable or fails.
+- The API 33 route now treats a fresh focus handoff as an availability outcome
+  rather than mutating immediately. If the target was not already focused, the
+  strategy returns unavailable and lets the existing `UiReadiness` retry rerun
+  after the service-owned input session catches up.
 
 ## API 33 Replace Semantics
 
@@ -74,12 +78,19 @@ It is intentionally branch-local and temporary while the task pack is active.
   - legacy `submit=true` editor-action vs click fallback behavior
   - API 33 routing when `ACTION_SET_TEXT` is unavailable
   - API 33 explicit failure cases for missing session and inactive session
+  - API 33 retry handoff behavior when focus must move before the input session
+    is safe to use
   - API 33 lower-SDK skip behavior
   - API 33 replace behavior for pre-populated content
   - API 33 delete-and-commit behavior even when surrounding text is present
   - API 33 replace success even when editor info is missing
   - API 33 `clear=true` behavior with delete-and-commit replace semantics
   - API 33 explicit failure when the delete fallback cannot complete
+- Service-level coverage now also verifies:
+  - `OperatorAccessibilityService.onCreateInputMethod()` creates the custom
+    API 33 accessibility IME
+  - `OperatorAccessibilityService.onServiceConnected()` advertises
+    `FLAG_INPUT_METHOD_EDITOR` and registers the current service instance
 
 ## Live Validation Findings
 

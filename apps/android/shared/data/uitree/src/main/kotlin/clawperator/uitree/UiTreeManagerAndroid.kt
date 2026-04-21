@@ -380,6 +380,11 @@ class UiTreeManagerAndroid(
             if (!target.isFocused) {
                 target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
                 target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                // InputMethod session ownership updates asynchronously after focus changes.
+                // Stop here and let the existing UiReadiness retry rerun once the editor session
+                // catches up instead of mutating a stale or not-yet-started connection.
+                logUnavailable(request, "session_pending_after_focus")
+                return null
             }
 
             val session = inputConnectionSource.currentSession()

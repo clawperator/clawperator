@@ -260,6 +260,26 @@ class UiTreeManagerAndroidTest {
         }
 
     @Test
+    fun `setText api33 path waits for retry after focus handoff`() =
+        runTest {
+            val session = FakeTextInputSession(initialText = "existing")
+            val manager = createManager(textInputConnectionSource = FakeTextInputConnectionSource(session))
+            val nodeInfo =
+                editableNode(includeSetTextAction = false).apply {
+                    isFocused = false
+                }
+            val uiNode = uiNode(nodeInfo)
+
+            val result = manager.setText(uiNode = uiNode, text = "hello", submit = false, clear = false)
+
+            assertFalse(result)
+            assertEquals("existing", session.text)
+            assertEquals(emptyList(), session.operations)
+            assertTrue(performedActionIds(nodeInfo).contains(AccessibilityNodeInfo.ACTION_FOCUS))
+            assertTrue(performedActionIds(nodeInfo).contains(AccessibilityNodeInfo.ACTION_CLICK))
+        }
+
+    @Test
     fun `setText api33 path keeps replace semantics when clear is true`() =
         runTest {
             val session =
