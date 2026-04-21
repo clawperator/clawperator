@@ -233,6 +233,7 @@ function normalizeCommandLikeError(error: unknown): CommandLikeError {
 export async function resolveInteractiveSkillTarget(
   operatorPackage: string,
   options?: {
+    adbPath?: string;
     deviceId?: string;
     logger?: Logger;
     resolveDeviceImpl?: typeof resolveDevice;
@@ -248,6 +249,7 @@ export async function resolveInteractiveSkillTarget(
   let resolvedDevice;
   try {
     resolvedDevice = await resolveDeviceImpl(getDefaultRuntimeConfig({
+      adbPath: options?.adbPath,
       deviceId: options?.deviceId,
       operatorPackage,
       logger,
@@ -260,6 +262,7 @@ export async function resolveInteractiveSkillTarget(
   }
 
   const config = getDefaultRuntimeConfig({
+    adbPath: options?.adbPath,
     deviceId: resolvedDevice.deviceId,
     operatorPackage,
     logger,
@@ -447,6 +450,7 @@ export async function cmdSkillsRun(
   }
 
   const interactiveTarget = await resolveInteractiveSkillTargetImpl(resolvedOperatorPackage, {
+    adbPath: process.env.ADB_PATH,
     deviceId: options.deviceId,
     logger: cliLogger,
   });

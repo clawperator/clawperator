@@ -6898,6 +6898,42 @@ describe("cmdSkillsRun preflight gate", () => {
     }
   });
 
+  it("uses the configured adb path for wrapper preflight", async () => {
+    const observedAdbPaths: string[] = [];
+
+    const result = await resolveInteractiveSkillTarget("com.clawperator.operator.dev", {
+      adbPath: "/custom/platform-tools/adb",
+      deviceId: "resolved-device-123",
+      resolveDeviceImpl: async (config) => {
+        observedAdbPaths.push(config.adbPath);
+        return { deviceId: "resolved-device-123", serial: "resolved-device-123" };
+      },
+      checkApkPresenceImpl: async (config) => {
+        observedAdbPaths.push(config.adbPath);
+        return passingApkPresence;
+      },
+      probeInteractiveStateImpl: async (config) => {
+        observedAdbPaths.push(config.adbPath);
+        return {
+          ok: true,
+          state: {
+            screenOn: true,
+            interactive: true,
+            deviceLocked: false,
+            userUnlocked: true,
+          },
+        };
+      },
+    });
+
+    assert.strictEqual(result.ok, true);
+    assert.deepStrictEqual(observedAdbPaths, [
+      "/custom/platform-tools/adb",
+      "/custom/platform-tools/adb",
+      "/custom/platform-tools/adb",
+    ]);
+  });
+
   it("aborts invalid artifact skills before runSkill is called", async () => {
     let runCalls = 0;
     const fakeRunSkill = async () => {

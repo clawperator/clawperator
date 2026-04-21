@@ -532,6 +532,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       );
       const resolveInteractiveSkillTargetImpl = options.resolveInteractiveSkillTargetImpl ?? resolveInteractiveSkillTarget;
       const interactiveTarget = await resolveInteractiveSkillTargetImpl(resolvedOperatorPackage, {
+        adbPath: process.env.ADB_PATH,
         deviceId: typeof deviceId === "string" ? deviceId : undefined,
         logger: options.logger,
       });

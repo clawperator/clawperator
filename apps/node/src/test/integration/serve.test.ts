@@ -371,6 +371,51 @@ describe("serve API integration", () => {
     }
   });
 
+  test("POST /skills/:skillId/run forwards ADB_PATH into wrapper preflight", async () => {
+    const originalAdbPath = process.env.ADB_PATH;
+    process.env.ADB_PATH = "/custom/platform-tools/adb";
+
+    let capturedAdbPath: string | undefined;
+    const adbAwareServer = await startServer({
+      port: 0,
+      host: "localhost",
+      verbose: false,
+      resolveInteractiveSkillTargetImpl: async (_operatorPackage, options) => {
+        capturedAdbPath = options?.adbPath;
+        return {
+          ok: false,
+          error: {
+            code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+            message: "Device is not interactive.",
+          },
+        };
+      },
+    });
+
+    const adbAwareAddr = adbAwareServer.address();
+    const adbAwarePort = adbAwareAddr && typeof adbAwareAddr === "object" ? adbAwareAddr.port : 0;
+
+    try {
+      const res = await fetch(`http://localhost:${adbAwarePort}/skills/com.test.no-spawn-proof/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      assert.strictEqual(res.status, 409);
+      assert.strictEqual(capturedAdbPath, "/custom/platform-tools/adb");
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        adbAwareServer.close((err) => (err ? reject(err) : resolve()));
+      });
+      if (originalAdbPath === undefined) {
+        delete process.env.ADB_PATH;
+      } else {
+        process.env.ADB_PATH = originalAdbPath;
+      }
+    }
+  });
+
   test("POST /skills/:skillId/run returns skillResult on framed success", async () => {
     const res = await fetch(`http://localhost:${port}/skills/com.test.skill-result/run`, {
       method: "POST",
