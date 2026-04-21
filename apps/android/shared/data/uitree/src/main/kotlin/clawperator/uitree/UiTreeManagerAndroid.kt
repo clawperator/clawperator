@@ -398,10 +398,16 @@ class UiTreeManagerAndroid(
                 return null
             }
 
-            val replaceSucceeded = replaceText(session, request)
-            if (!replaceSucceeded) {
-                logUnavailable(request, "replace_unavailable")
-                return null
+            when (val replaceResult = replaceText(session, request)) {
+                ReplaceTextResult.Success -> Unit
+                is ReplaceTextResult.Unavailable -> {
+                    if (replaceResult.partialFailure) {
+                        logPartialFailure(request, replaceResult.reason)
+                    } else {
+                        logUnavailable(request, replaceResult.reason)
+                    }
+                    return null
+                }
             }
 
             return TextEntryAttemptResult(
@@ -412,18 +418,25 @@ class UiTreeManagerAndroid(
         private fun replaceText(
             session: TextInputSession,
             request: TextEntryRequest,
-        ): Boolean {
+        ): ReplaceTextResult {
             val cursorMovedToEnd = session.setSelection(Int.MAX_VALUE, Int.MAX_VALUE)
             if (!cursorMovedToEnd) {
-                return false
+                return ReplaceTextResult.Unavailable(reason = "selection_unavailable")
             }
 
             val cleared = session.deleteSurroundingText(Int.MAX_VALUE, 0)
             if (!cleared) {
-                return false
+                return ReplaceTextResult.Unavailable(reason = "delete_unavailable")
             }
 
-            return session.commitText(request.text, 1)
+            return if (session.commitText(request.text, 1)) {
+                ReplaceTextResult.Success
+            } else {
+                ReplaceTextResult.Unavailable(
+                    reason = "commit_failed_after_delete",
+                    partialFailure = true,
+                )
+            }
         }
 
         private fun performSubmit(
@@ -466,5 +479,23 @@ class UiTreeManagerAndroid(
                 "[UiTreeManager] enter_text strategy=$name unavailable reason=$reason for id=${request.uiNode.id}",
             )
         }
+
+        private fun logPartialFailure(
+            request: TextEntryRequest,
+            reason: String,
+        ) {
+            Log.w(
+                "[UiTreeManager] enter_text strategy=$name partial_failure reason=$reason for id=${request.uiNode.id}",
+            )
+        }
+    }
+
+    private sealed interface ReplaceTextResult {
+        data object Success : ReplaceTextResult
+
+        data class Unavailable(
+            val reason: String,
+            val partialFailure: Boolean = false,
+        ) : ReplaceTextResult
     }
 }

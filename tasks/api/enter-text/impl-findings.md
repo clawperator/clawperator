@@ -52,6 +52,10 @@ It is intentionally branch-local and temporary while the task pack is active.
   editor info no longer blocks replace-style text entry.
 - The strategy-level tests now carry the stronger correctness signal by
   exercising delete-fallback failure and stale-session behavior directly.
+- If delete succeeds but `commitText(...)` fails, the runtime now emits a
+  warning-level `partial_failure` log with reason
+  `commit_failed_after_delete` so on-device logcat makes the destructive edge
+  explicit without logging field contents.
 - We should keep watching whether any real editor rejects the fallback
   end-and-delete sequence even when an input connection is active. Unit tests
   prove the intended contract; live proof is still pending.
@@ -86,6 +90,8 @@ It is intentionally branch-local and temporary while the task pack is active.
   - API 33 replace success even when editor info is missing
   - API 33 `clear=true` behavior with delete-and-commit replace semantics
   - API 33 explicit failure when the delete fallback cannot complete
+  - API 33 explicit failure when commit fails after delete has already cleared
+    the field
 - Service-level coverage now also verifies:
   - `OperatorAccessibilityService.onCreateInputMethod()` creates the custom
     API 33 accessibility IME
@@ -123,6 +129,11 @@ It is intentionally branch-local and temporary while the task pack is active.
   the service capability is active, but we still do not have a truthful live
   editor surface that skips `ACTION_SET_TEXT` and forces
   `api33_input_connection`.
+- A later live regression run used the updated Netflix My List replay skill with
+  a requested profile argument, `title=House of Cards`, and `action=add` on the
+  Samsung device. That run completed end to end and verified
+  `House of Cards :: My List state=on`, which proves the new `enter_text`
+  behavior did not break the current Netflix search-driven skill path.
 
 ## Device / Environment Notes
 

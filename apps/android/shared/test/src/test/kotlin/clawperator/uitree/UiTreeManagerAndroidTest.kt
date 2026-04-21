@@ -326,6 +326,32 @@ class UiTreeManagerAndroidTest {
         }
 
     @Test
+    fun `setText api33 path returns false when commit fails after delete`() =
+        runTest {
+            val session =
+                FakeTextInputSession(
+                    initialText = "existing",
+                    allowCommitText = false,
+                )
+            val manager = createManager(textInputConnectionSource = FakeTextInputConnectionSource(session))
+            val nodeInfo = editableNode(includeSetTextAction = false)
+            val uiNode = uiNode(nodeInfo)
+
+            val result = manager.setText(uiNode = uiNode, text = "hello", submit = false, clear = false)
+
+            assertFalse(result)
+            assertEquals("", session.text)
+            assertEquals(
+                listOf(
+                    "setSelection(2147483647,2147483647)",
+                    "deleteSurroundingText(2147483647,0)",
+                    "commitText(hello,1)",
+                ),
+                session.operations,
+            )
+        }
+
+    @Test
     @Config(sdk = [32])
     fun `setText skips api33 path on lower api levels`() =
         runTest {
@@ -423,6 +449,7 @@ class UiTreeManagerAndroidTest {
         override val isActive: Boolean = true,
         override val editorInfo: TextInputEditorInfo? = editorInfo(),
         private val allowDeleteSurroundingText: Boolean = true,
+        private val allowCommitText: Boolean = true,
     ) : TextInputSession {
         var text: String = initialText
             private set
@@ -477,7 +504,7 @@ class UiTreeManagerAndroidTest {
             newCursorPosition: Int,
         ): Boolean {
             operations += "commitText($text,$newCursorPosition)"
-            if (!isActive) {
+            if (!isActive || !allowCommitText) {
                 return false
             }
             val start = minOf(selectionStart, selectionEnd)
