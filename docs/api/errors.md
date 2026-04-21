@@ -251,13 +251,16 @@ Recovery options:
 
 Current shipped surface:
 
-- this code currently appears on the doctor check
-  `readiness.device.interactive`
+- the doctor check `readiness.device.interactive`
+- direct execution preflight before dispatch
+- high-level skill-wrapper pre-spawn checks in:
+  - `clawperator skills run`
+  - `POST /skills/:skillId/run`
 
 Meaning:
 
 - the target device is not currently ready for interactive automation
-- doctor evidence tells you why:
+- the reported evidence tells you why:
   - `screenOn`
   - `deviceLocked`
   - `userUnlocked`
