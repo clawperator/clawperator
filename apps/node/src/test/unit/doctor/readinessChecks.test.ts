@@ -153,7 +153,7 @@ describe("runHandshake", () => {
         assert.strictEqual(result.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
     });
 
-    it("returns fail when handshake evidence is malformed", async () => {
+    it("passes without evidence when handshake interactive state is malformed", async () => {
         const { config, runner } = createConfig();
         runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
@@ -179,9 +179,8 @@ describe("runHandshake", () => {
         });
 
         const result = await runHandshake(config, mockWait);
-        assert.strictEqual(result.status, "fail");
-        assert.strictEqual(result.code, ERROR_CODES.RESULT_ENVELOPE_MALFORMED);
-        assert.match(result.detail ?? "", /screen_on/);
+        assert.strictEqual(result.status, "pass");
+        assert.strictEqual(result.evidence, undefined);
     });
 });
 

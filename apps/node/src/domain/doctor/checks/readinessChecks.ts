@@ -202,23 +202,17 @@ export async function runHandshake(
     if (result.envelope.status === "success") {
       const doctorPingStep = result.envelope.stepResults.find(step => step.actionType === "doctor_ping");
       const interactiveEvidence = doctorPingStep?.success
-        ? tryBuildInteractiveStateEvidence(doctorPingStep)
-        : { ok: true as const, evidence: undefined };
-      if (!interactiveEvidence.ok) {
-        return {
-          id: "readiness.handshake",
-          status: "fail",
-          code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
-          summary: "Handshake failed (malformed result envelope).",
-          detail: interactiveEvidence.message,
-        };
-      }
+        ? (() => {
+            const parsedEvidence = tryBuildInteractiveStateEvidence(doctorPingStep);
+            return parsedEvidence.ok ? parsedEvidence.evidence : undefined;
+          })()
+        : undefined;
       return {
         id: "readiness.handshake",
         status: "pass",
         summary: "Handshake successful.",
         detail: "Node successfully dispatched a command and received a valid result envelope.",
-        evidence: interactiveEvidence.evidence,
+        evidence: interactiveEvidence,
       };
     } else {
       const deviceFlag = config.deviceId ? ` --device ${config.deviceId}` : "";

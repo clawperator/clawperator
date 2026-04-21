@@ -377,7 +377,7 @@ describe("ensureDeviceAwake", () => {
     assert.deepStrictEqual(result.state, state({ deviceLocked: true, userUnlocked: false }));
     assert.deepStrictEqual(result.error, {
       code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
-      message: "Wake attempt keycode_home failed before the device became interactive: device offline",
+      message: "Wake attempt keycode_home failed before the device screen turned on: device offline",
     });
     assert.strictEqual(runner.calls.length, 3);
     assert.deepStrictEqual(
@@ -570,7 +570,7 @@ describe("ensureInteractiveAutomationReady", () => {
         },
         error: {
           code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
-          message: "Wake attempt cmd_power_wakeup failed before the device became interactive: transport error",
+          message: "Wake attempt cmd_power_wakeup failed before the device screen turned on: transport error",
         },
       }),
     });
@@ -579,7 +579,7 @@ describe("ensureInteractiveAutomationReady", () => {
       ok: false,
       error: {
         code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
-        message: "Wake attempt cmd_power_wakeup failed before the device became interactive: transport error",
+        message: "Wake attempt cmd_power_wakeup failed before the device screen turned on: transport error",
         details: {
           screenOn: false,
           deviceLocked: false,

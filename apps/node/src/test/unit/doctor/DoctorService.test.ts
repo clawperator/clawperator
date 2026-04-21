@@ -429,6 +429,55 @@ describe("DoctorService", () => {
       userUnlocked: true,
     });
   });
+
+  it("falls back to the dedicated interactive check when handshake evidence is unavailable", async () => {
+    const runner = new FakeProcessRunner();
+    const config = withTempAgentSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" }), fakeRegistryDir);
+    let interactiveCheckCalls = 0;
+
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "33\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Physical size: 1080x2400\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Physical density: 420\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator.dev\n", stderr: "" });
+    runner.queueResult({
+      code: 0,
+      stdout: `    versionCode=606060 minSdk=21 targetSdk=35\n    versionName=${getCliVersion()}-d\n`,
+      stderr: "",
+    });
+    runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
+
+    const report = await new DoctorService({
+      runHandshake: async () => ({
+        id: "readiness.handshake",
+        status: "pass",
+        summary: "Handshake successful.",
+        evidence: undefined,
+      }),
+      checkDeviceInteractiveState: async () => {
+        interactiveCheckCalls += 1;
+        return {
+          id: "readiness.device.interactive",
+          status: "fail",
+          code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
+          summary: "Could not verify whether the device is interactive.",
+          detail: "doctor_ping returned an invalid boolean for screen_on: missing",
+        };
+      },
+    }).run({ config });
+
+    assert.strictEqual(interactiveCheckCalls, 1);
+    const interactiveCheck = report.checks.find(check => check.id === "readiness.device.interactive");
+    assert.ok(interactiveCheck);
+    assert.strictEqual(interactiveCheck?.status, "fail");
+    assert.strictEqual(interactiveCheck?.code, ERROR_CODES.RESULT_ENVELOPE_MALFORMED);
+  });
 });
 
 describe("DoctorService logging", () => {

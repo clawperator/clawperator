@@ -402,7 +402,7 @@ function buildWakeTransportFailure(
   const detail = adbResult.stderr.trim() || adbResult.stdout.trim() || "Unknown adb transport failure.";
   return {
     code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
-    message: `Wake attempt ${method} failed before the device became interactive: ${detail}`,
+    message: `Wake attempt ${method} failed before the device screen turned on: ${detail}`,
   };
 }
 
