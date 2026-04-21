@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { runAdb, type AdbResult } from "../../../adapters/android-bridge/adbClient.js";
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope, type LogcatResult } from "../../../adapters/android-bridge/logcatResultReader.js";
@@ -73,7 +74,7 @@ export async function runDoctorPingCommand(
   config: RuntimeConfig,
   waitForEnvelope: WaitForResultEnvelopeFn = waitForResultEnvelope
 ): Promise<LogcatResult> {
-  const commandId = `handshake-${Date.now()}`;
+  const commandId = `doctor-handshake-${Date.now()}-${randomUUID()}`;
   const payload = JSON.stringify({
     commandId,
     taskId: "doctor-handshake",
@@ -91,9 +92,11 @@ export async function runDoctorPingCommand(
 }
 
 export function parseDoctorPingInteractiveState(stepResult: StepResult): InternalInteractiveState {
+  const screenOn = parseStrictBoolean(stepResult, "screen_on");
+
   return {
-    screenOn: parseStrictBoolean(stepResult, "screen_on"),
-    interactive: parseStrictBoolean(stepResult, "screen_on"),
+    screenOn,
+    interactive: screenOn,
     deviceLocked: parseStrictBoolean(stepResult, "device_locked"),
     userUnlocked: parseStrictBoolean(stepResult, "user_unlocked"),
   };
