@@ -4028,10 +4028,12 @@ Current shipped surface:
 Meaning:
 
 - the target device is not currently ready for interactive automation
-- the reported evidence tells you why:
+- the doctor check reports structured evidence telling you why:
   - `screenOn`
   - `deviceLocked`
   - `userUnlocked`
+- execution and skill-wrapper failures use a generic top-level error message rather
+  than exposing lock-state evidence on the public execution surface
 - direct execution and high-level skill wrappers may make a bounded host-side
   wake attempt first when the screen is off
 - if the device remains asleep, is still locked, or still requires post-boot
@@ -9335,12 +9337,7 @@ Expected pre-spawn failure shape:
 ```json
 {
   "code": "DEVICE_NOT_INTERACTIVE",
-  "message": "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=true userUnlocked=true",
-  "details": {
-    "deviceLocked": true,
-    "screenOn": false,
-    "userUnlocked": true
-  }
+  "message": "Device is not interactive. Interactive automation requires an awake, usable device state."
 }
 ```
 
@@ -9511,12 +9508,7 @@ resolved device is not interactive:
 ```json
 {
   "code": "DEVICE_NOT_INTERACTIVE",
-  "message": "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=true userUnlocked=true",
-  "details": {
-    "deviceLocked": true,
-    "screenOn": false,
-    "userUnlocked": true
-  }
+  "message": "Device is not interactive. Interactive automation requires an awake, usable device state."
 }
 ```
 
@@ -11782,14 +11774,13 @@ Wrapper-level non-interactive failure shape:
 ```json
 {
   "code": "DEVICE_NOT_INTERACTIVE",
-  "message": "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=true userUnlocked=true",
-  "details": {
-    "deviceLocked": true,
-    "screenOn": false,
-    "userUnlocked": true
-  }
+  "message": "Device is not interactive. Interactive automation requires an awake, usable device state."
 }
 ```
+
+Use `clawperator doctor --json` when you need the structured evidence fields
+(`screenOn`, `deviceLocked`, `userUnlocked`) that explain why the device is not
+ready.
 
 For first-time setup, use [Setup](../setup.md). For runtime recovery, use [Operator App](../troubleshooting/operator.md).
 

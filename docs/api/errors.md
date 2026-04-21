@@ -260,10 +260,12 @@ Current shipped surface:
 Meaning:
 
 - the target device is not currently ready for interactive automation
-- the reported evidence tells you why:
+- the doctor check reports structured evidence telling you why:
   - `screenOn`
   - `deviceLocked`
   - `userUnlocked`
+- execution and skill-wrapper failures use a generic top-level error message rather
+  than exposing lock-state evidence on the public execution surface
 - direct execution and high-level skill wrappers may make a bounded host-side
   wake attempt first when the screen is off
 - if the device remains asleep, is still locked, or still requires post-boot

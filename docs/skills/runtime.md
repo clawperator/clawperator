@@ -58,14 +58,13 @@ Wrapper-level non-interactive failure shape:
 ```json
 {
   "code": "DEVICE_NOT_INTERACTIVE",
-  "message": "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=true userUnlocked=true",
-  "details": {
-    "deviceLocked": true,
-    "screenOn": false,
-    "userUnlocked": true
-  }
+  "message": "Device is not interactive. Interactive automation requires an awake, usable device state."
 }
 ```
+
+Use `clawperator doctor --json` when you need the structured evidence fields
+(`screenOn`, `deviceLocked`, `userUnlocked`) that explain why the device is not
+ready.
 
 For first-time setup, use [Setup](../setup.md). For runtime recovery, use [Operator App](../troubleshooting/operator.md).
 

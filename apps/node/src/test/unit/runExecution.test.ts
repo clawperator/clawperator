@@ -628,12 +628,8 @@ describe("runExecution", () => {
     if (!result.ok) {
       assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
       assert.strictEqual(result.deviceId, "test-device-1");
-      assert.deepStrictEqual(result.error.details, {
-        deviceLocked: true,
-        screenOn: false,
-        userUnlocked: true,
-      });
-      assert.match(result.error.message, /Device is not interactive/);
+      assert.strictEqual(result.error.details, undefined);
+      assert.strictEqual(result.error.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
     }
     assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
     assert.deepStrictEqual(
@@ -682,11 +678,8 @@ describe("runExecution", () => {
     assert.strictEqual(result.ok, false);
     if (!result.ok) {
       assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
-      assert.deepStrictEqual(result.error.details, {
-        deviceLocked: true,
-        screenOn: true,
-        userUnlocked: true,
-      });
+      assert.strictEqual(result.error.details, undefined);
+      assert.strictEqual(result.error.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
     }
     assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
   });

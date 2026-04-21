@@ -491,12 +491,7 @@ Expected pre-spawn failure shape:
 ```json
 {
   "code": "DEVICE_NOT_INTERACTIVE",
-  "message": "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=true userUnlocked=true",
-  "details": {
-    "deviceLocked": true,
-    "screenOn": false,
-    "userUnlocked": true
-  }
+  "message": "Device is not interactive. Interactive automation requires an awake, usable device state."
 }
 ```
 
@@ -667,12 +662,7 @@ resolved device is not interactive:
 ```json
 {
   "code": "DEVICE_NOT_INTERACTIVE",
-  "message": "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=true userUnlocked=true",
-  "details": {
-    "deviceLocked": true,
-    "screenOn": false,
-    "userUnlocked": true
-  }
+  "message": "Device is not interactive. Interactive automation requires an awake, usable device state."
 }
 ```
 

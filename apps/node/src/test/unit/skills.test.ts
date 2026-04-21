@@ -6890,11 +6890,28 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.strictEqual(result.ok, false);
     if (!result.ok) {
       assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
-      assert.deepStrictEqual(result.error.details, {
-        screenOn: true,
-        deviceLocked: true,
-        userUnlocked: true,
-      });
+      assert.strictEqual(result.error.details, undefined);
+      assert.strictEqual(result.error.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
+    }
+  });
+
+  it("normalizes thrown readiness preflight errors into a structured command error", async () => {
+    const result = await resolveInteractiveSkillTarget("com.clawperator.operator.dev", {
+      deviceId: "resolved-device-123",
+      resolveDeviceImpl: async () => ({ deviceId: "resolved-device-123", serial: "resolved-device-123" }),
+      checkApkPresenceImpl: async () => {
+        throw Object.assign(new Error("adb shell broke"), {
+          code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+          details: { command: "pm list packages" },
+        });
+      },
+    });
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_SHELL_UNAVAILABLE);
+      assert.strictEqual(result.error.message, "adb shell broke");
+      assert.deepStrictEqual(result.error.details, { command: "pm list packages" });
     }
   });
 
@@ -7086,12 +7103,7 @@ describe("cmdSkillsRun preflight gate", () => {
           ok: false,
           error: {
             code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
-            message: "Device is not interactive.",
-            details: {
-              screenOn: false,
-              deviceLocked: true,
-              userUnlocked: true,
-            },
+            message: "Device is not interactive. screenOn=false",
           },
         }),
       }
@@ -7100,14 +7112,12 @@ describe("cmdSkillsRun preflight gate", () => {
     const parsed = JSON.parse(stdout) as {
       code?: string;
       details?: { screenOn?: boolean; deviceLocked?: boolean; userUnlocked?: boolean };
+      message?: string;
     };
     assert.strictEqual(runCalls, 0);
     assert.strictEqual(parsed.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
-    assert.deepStrictEqual(parsed.details, {
-      screenOn: false,
-      deviceLocked: true,
-      userUnlocked: true,
-    });
+    assert.strictEqual(parsed.details, undefined);
+    assert.strictEqual(parsed.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
   });
 
   it("uses the resolved device for wrapper preflight without injecting implicit device selection into skill env", async () => {

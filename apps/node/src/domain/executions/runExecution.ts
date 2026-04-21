@@ -10,7 +10,7 @@ import { broadcastAgentCommand } from "../../adapters/android-bridge/broadcastAg
 import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
 import { runAdb, formatCommandLine } from "../../adapters/android-bridge/adbClient.js";
 import { checkApkPresence } from "../doctor/checks/readinessChecks.js";
-import { ensureInteractiveAutomationReady, probeInteractiveState } from "../doctor/checks/deviceInteractivity.js";
+import { ensureInteractiveAutomationReady, probeInteractiveState, toPublicInteractiveAutomationError } from "../doctor/checks/deviceInteractivity.js";
 import { getOperatorPackageApkPath } from "../version/compatibility.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
@@ -408,14 +408,14 @@ async function performExecution(
       probeInteractiveStateFn: options.probeInteractiveStateFn,
     });
     if (!interactiveState.ok) {
+      const publicError = toPublicInteractiveAutomationError(interactiveState.error);
       return {
         execution,
         result: {
           ok: false,
           error: {
-            code: interactiveState.error.code,
-            message: interactiveState.error.message,
-            details: interactiveState.error.details,
+            code: publicError.code,
+            message: publicError.message,
           },
           deviceId,
         },

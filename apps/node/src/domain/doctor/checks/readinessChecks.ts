@@ -2,15 +2,18 @@ import { runAdb } from "../../../adapters/android-bridge/adbClient.js";
 import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
+import type { StepResult } from "../../../contracts/result.js";
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatResultReader.js";
 import {
   buildDeviceNotInteractiveError,
   isInteractiveAutomationReady,
+  parseDoctorPingInteractiveState,
   probeInteractiveState,
   runDoctorPingCommand,
   toInteractiveStateEvidence,
 } from "./deviceInteractivity.js";
+import type { InternalInteractiveState, InteractiveStateProbeResult } from "./deviceInteractivity.js";
 import {
   getAlternateOperatorVariant,
   getCliVersion,
@@ -197,11 +200,16 @@ export async function runHandshake(
 
   if (result.ok) {
     if (result.envelope.status === "success") {
+      const doctorPingStep = result.envelope.stepResults.find(step => step.actionType === "doctor_ping");
+      const interactiveEvidence = doctorPingStep?.success
+        ? tryBuildInteractiveStateEvidence(doctorPingStep)
+        : undefined;
       return {
         id: "readiness.handshake",
         status: "pass",
         summary: "Handshake successful.",
         detail: "Node successfully dispatched a command and received a valid result envelope.",
+        evidence: interactiveEvidence,
       };
     } else {
       const deviceFlag = config.deviceId ? ` --device ${config.deviceId}` : "";
@@ -291,6 +299,12 @@ export async function checkDeviceInteractiveState(
 ): Promise<DoctorCheckResult> {
   const result = await _probeInteractiveState(config);
 
+  return buildDeviceInteractiveStateCheckResult(result);
+}
+
+export function buildDeviceInteractiveStateCheckResult(
+  result: InteractiveStateProbeResult
+): DoctorCheckResult {
   if (!result.ok) {
     return {
       id: "readiness.device.interactive",
@@ -301,9 +315,15 @@ export async function checkDeviceInteractiveState(
     };
   }
 
-  const evidence = toInteractiveStateEvidence(result.state);
+  return buildDeviceInteractiveStateCheckFromState(result.state);
+}
 
-  if (isInteractiveAutomationReady(result.state)) {
+export function buildDeviceInteractiveStateCheckFromState(
+  state: InternalInteractiveState
+): DoctorCheckResult {
+  const evidence = toInteractiveStateEvidence(state);
+
+  if (isInteractiveAutomationReady(state)) {
     return {
       id: "readiness.device.interactive",
       status: "pass",
@@ -312,7 +332,7 @@ export async function checkDeviceInteractiveState(
     };
   }
 
-  const error = buildDeviceNotInteractiveError(result.state);
+  const error = buildDeviceNotInteractiveError(state);
 
   return {
     id: "readiness.device.interactive",
@@ -340,6 +360,14 @@ export async function checkDeviceInteractiveState(
     },
     evidence,
   };
+}
+
+function tryBuildInteractiveStateEvidence(stepResult: StepResult): Record<string, unknown> | undefined {
+  try {
+    return toInteractiveStateEvidence(parseDoctorPingInteractiveState(stepResult));
+  } catch {
+    return undefined;
+  }
 }
 
 export async function runSmokeTest(config: RuntimeConfig): Promise<DoctorCheckResult> {

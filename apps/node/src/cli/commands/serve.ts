@@ -19,6 +19,7 @@ import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_E
 import type { Logger } from "../../adapters/logger.js";
 import { resolveOperatorPackageForRequest } from "../../domain/config/resolveOperatorPackage.js";
 import { resolveInteractiveSkillTarget } from "./skills.js";
+import { toPublicInteractiveAutomationError } from "../../domain/doctor/checks/deviceInteractivity.js";
 
 interface ServeOptions {
   port: number;
@@ -537,11 +538,12 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         logger: options.logger,
       });
       if (!interactiveTarget.ok) {
+        const publicError = toPublicInteractiveAutomationError(interactiveTarget.error);
         res.status(mapServeErrorCodeToStatus(interactiveTarget.error.code)).json({
           status: "failed",
           ok: false,
           error: {
-            ...interactiveTarget.error,
+            ...publicError,
             skillId: req.params.skillId,
             timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
             expectedSubstring: expectContainsArg,
