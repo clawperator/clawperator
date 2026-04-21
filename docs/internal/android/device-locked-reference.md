@@ -210,8 +210,10 @@ The shipped Node wake helper:
    2. `adb shell input keyevent KEYCODE_WAKEUP`
    3. `adb shell input keyevent KEYCODE_HOME`
 4. after each attempt, re-probes the structured interactive state
-5. stops immediately when the device becomes interactive
-6. if the device becomes awake but `deviceLocked == true`, returns that state
+5. stops immediately when the device becomes awake and reports whether it is
+   actually ready or still locked
+6. if the device becomes awake but `deviceLocked == true` or
+   `userUnlocked == false`, returns that state
    without attempting authentication bypass
 7. fails closed when probe data is missing or malformed
 

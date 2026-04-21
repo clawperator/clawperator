@@ -129,6 +129,7 @@ Notes:
 | Family | Typical codes | What to do next |
 | --- | --- | --- |
 | Device targeting | `NO_DEVICES`, `DEVICE_NOT_FOUND`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Run `clawperator devices`, pick one device, and retry with `--device <serial>` |
+| Interactive readiness | `DEVICE_NOT_INTERACTIVE` | Wake or unlock the target, rerun `clawperator doctor --json`, and confirm the interactive-state check passes |
 | Operator setup | `OPERATOR_NOT_INSTALLED`, `OPERATOR_VARIANT_MISMATCH`, `OPERATOR_INSTALL_FAILED`, `OPERATOR_GRANT_FAILED`, `OPERATOR_VERIFY_FAILED` | Install or repair the expected Operator APK, then rerun the command |
 | Host tooling | `ADB_NOT_FOUND`, `ADB_SERVER_FAILED`, `HOST_DEPENDENCY_MISSING`, `ANDROID_SDK_TOOL_MISSING`, `SCRCPY_NOT_FOUND` | Repair the host environment before retrying |
 | Payload or flag validation | `MISSING_ARGUMENT`, `EXECUTION_VALIDATION_FAILED`, `EXECUTION_ACTION_UNSUPPORTED`, `PAYLOAD_TOO_LARGE` | Change the command or payload. Do not retry unchanged |
@@ -245,6 +246,36 @@ Recovery options:
 
 - pass the installed package via `--operator-package`
 - or reinstall the intended APK variant
+
+### `DEVICE_NOT_INTERACTIVE`
+
+Current shipped surface:
+
+- the doctor check `readiness.device.interactive`
+- direct execution preflight before dispatch
+- high-level skill-wrapper pre-spawn checks in:
+  - `clawperator skills run`
+  - `POST /skills/:skillId/run`
+
+Meaning:
+
+- the target device is not currently ready for interactive automation
+- the reported evidence tells you why:
+  - `screenOn`
+  - `deviceLocked`
+  - `userUnlocked`
+- direct execution and high-level skill wrappers may make a bounded host-side
+  wake attempt first when the screen is off
+- if the device remains asleep, is still locked, or still requires post-boot
+  unlock, the runtime returns this error instead of proceeding
+
+Typical recovery:
+
+- wake the device if `screenOn == false`
+- unlock the device if `deviceLocked == true`
+- complete the post-boot unlock if `userUnlocked == false`
+- rerun `clawperator doctor --json` and require
+  `readiness.device.interactive.status == "pass"`
 
 ### `NODE_NOT_FOUND`
 

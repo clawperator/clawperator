@@ -185,6 +185,16 @@ Each entry in `checks[]` has:
       "status": "pass",
       "summary": "Handshake successful.",
       "detail": "Node successfully dispatched a command and received a valid result envelope."
+    },
+    {
+      "id": "readiness.device.interactive",
+      "status": "pass",
+      "summary": "Device is interactive.",
+      "evidence": {
+        "deviceLocked": false,
+        "screenOn": true,
+        "userUnlocked": true
+      }
     }
   ],
   "nextActions": [
@@ -210,38 +220,20 @@ Success conditions:
   "operatorPackage": "com.clawperator.operator.dev",
   "checks": [
     {
-      "id": "readiness.handshake",
+      "id": "readiness.device.interactive",
       "status": "fail",
-      "code": "RESULT_ENVELOPE_TIMEOUT",
-      "summary": "Handshake timed out.",
-      "detail": "No [Clawperator-Result] envelope received within 7000ms. Broadcast dispatch: sent. Operator package: com.clawperator.operator.dev. Device: emulator-5554. No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --json --device emulator-5554 --operator-package com.clawperator.operator.dev' to diagnose.",
-      "fix": {
-        "title": "Grant accessibility permissions via adb",
-        "platform": "any",
-        "steps": [
-          {
-            "kind": "shell",
-            "value": "clawperator grant-device-permissions --device emulator-5554 --operator-package com.clawperator.operator.dev"
-          },
-          {
-            "kind": "shell",
-            "value": "clawperator snapshot --device emulator-5554 --operator-package com.clawperator.operator.dev --timeout 5000 --verbose"
-          }
-        ],
-        "docsUrl": "https://docs.clawperator.com/troubleshooting/operator/"
-      },
-      "deviceGuidance": {
-        "screen": "Accessibility Settings",
-        "steps": [
-          "Ensure Clawperator Accessibility Service is ON in Android Settings"
-        ]
+      "code": "DEVICE_NOT_INTERACTIVE",
+      "summary": "Device is not interactive.",
+      "detail": "Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=true userUnlocked=false",
+      "evidence": {
+        "deviceLocked": true,
+        "screenOn": false,
+        "userUnlocked": false
       }
     }
   ],
   "nextActions": [
-    "clawperator grant-device-permissions --device emulator-5554 --operator-package com.clawperator.operator.dev",
-    "clawperator snapshot --device emulator-5554 --operator-package com.clawperator.operator.dev --timeout 5000 --verbose",
-    "On device, open Accessibility Settings and follow the listed steps."
+    "On device, wake and unlock the target before rerunning doctor."
   ]
 }
 ```
@@ -299,7 +291,8 @@ Doctor runs checks in this order:
 | 8 | `readiness.version.compatibility` | only if APK presence passed |
 | 9 | `readiness.settings.dev_options`, `readiness.settings.usb_debugging` | after device capability and APK presence checks; these still run even when version compatibility was skipped |
 | 10 | `readiness.handshake` | only if APK presence passed and version compatibility passed |
-| 11 | `readiness.smoke` | only with `--full`, and only if APK presence and version compatibility passed |
+| 11 | `readiness.device.interactive` | only if handshake passed |
+| 12 | `readiness.smoke` | only with `--full`, and only if handshake and interactive-state checks passed |
 
 Halting rule:
 
@@ -324,6 +317,7 @@ build.android.launch
 readiness.apk.presence
 readiness.version.compatibility
 readiness.handshake
+readiness.device.interactive
 readiness.smoke
 ```
 
@@ -411,6 +405,7 @@ For a failing check, pretty output includes:
 | `readiness.settings.dev_options` | `pass`, `warn` | `DEVICE_DEV_OPTIONS_DISABLED` | developer options setting is enabled |
 | `readiness.settings.usb_debugging` | `pass`, `warn` | `DEVICE_USB_DEBUGGING_DISABLED` | USB debugging setting is enabled |
 | `readiness.handshake` | `pass`, `fail` | `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `RESULT_ENVELOPE_TIMEOUT`, `BROADCAST_FAILED`, `OPERATOR_NOT_INSTALLED` | Node can dispatch and receive a valid result envelope |
+| `readiness.device.interactive` | `pass`, `fail` | `DEVICE_NOT_INTERACTIVE`, or the underlying probe failure code if state could not be verified | the target is awake enough for interactive automation, with evidence fields `deviceLocked`, `screenOn`, and `userUnlocked` |
 | `readiness.smoke` | `pass`, `fail` | `SMOKE_OPEN_SETTINGS_FAILED` | smoke execution can open Settings and produce at least one successful `snapshot_ui` step |
 
 ## Common Failure Recovery
@@ -499,6 +494,28 @@ Recovery:
 - run `clawperator grant-device-permissions ...`
 - follow `deviceGuidance.screen == "Accessibility Settings"`
 - rerun doctor
+
+### `DEVICE_NOT_INTERACTIVE`
+
+Meaning:
+
+- handshake succeeded, so the runtime is reachable
+- the follow-up interactive-state probe reported that the target is not ready
+  for interactive automation
+- inspect the check evidence:
+  - `screenOn`
+  - `deviceLocked`
+  - `userUnlocked`
+
+Recovery:
+
+- wake the device if `screenOn == false`
+- unlock the device if `deviceLocked == true`
+- complete the post-boot unlock if `userUnlocked == false`
+- rerun `clawperator doctor --json` and require:
+  - exit code `0`
+  - `criticalOk == true`
+  - `readiness.device.interactive.status == "pass"`
 
 ## Agent Sequence
 

@@ -15,14 +15,30 @@ export interface InternalInteractiveState {
   userUnlocked: boolean;
 }
 
+export interface InteractiveStateEvidence extends Record<string, unknown> {
+  deviceLocked: boolean;
+  screenOn: boolean;
+  userUnlocked: boolean;
+}
+
 export interface InteractiveStateProbeFailure {
   code: ErrorCode;
   message: string;
 }
 
+export interface InteractiveAutomationReadyError {
+  code: ErrorCode;
+  message: string;
+  details?: InteractiveStateEvidence;
+}
+
 export type InteractiveStateProbeResult =
   | { ok: true; state: InternalInteractiveState }
   | { ok: false; code: ErrorCode; message: string };
+
+export type InteractiveAutomationReadyResult =
+  | { ok: true; state: InternalInteractiveState }
+  | { ok: false; error: InteractiveAutomationReadyError };
 
 export type WakeAttemptMethod =
   | "cmd_power_wakeup"
@@ -100,6 +116,12 @@ export function parseDoctorPingInteractiveState(stepResult: StepResult): Interna
     deviceLocked: parseStrictBoolean(stepResult, "device_locked"),
     userUnlocked: parseStrictBoolean(stepResult, "user_unlocked"),
   };
+}
+
+export function isInteractiveAutomationReady(
+  state: Pick<InternalInteractiveState, "screenOn" | "deviceLocked" | "userUnlocked">
+): boolean {
+  return state.screenOn && !state.deviceLocked && state.userUnlocked;
 }
 
 export async function probeInteractiveState(
@@ -201,9 +223,9 @@ export async function ensureDeviceAwake(
     };
   }
 
-  if (initialProbe.state.interactive) {
+  if (initialProbe.state.screenOn) {
     return {
-      status: initialProbe.state.deviceLocked ? "awake_but_locked" : "already_awake",
+      status: isInteractiveAutomationReady(initialProbe.state) ? "already_awake" : "awake_but_locked",
       attempts: [],
       state: initialProbe.state,
     };
@@ -235,9 +257,9 @@ export async function ensureDeviceAwake(
 
     lastObservedState = postAttemptProbe.state;
     if (didWakeCommandFail(adbResult)) {
-      if (postAttemptProbe.state.interactive) {
+      if (postAttemptProbe.state.screenOn) {
         return {
-          status: postAttemptProbe.state.deviceLocked ? "awake_but_locked" : "awake",
+          status: isInteractiveAutomationReady(postAttemptProbe.state) ? "awake" : "awake_but_locked",
           attempts,
           state: postAttemptProbe.state,
         };
@@ -251,12 +273,12 @@ export async function ensureDeviceAwake(
       };
     }
 
-    if (!postAttemptProbe.state.interactive) {
+    if (!postAttemptProbe.state.screenOn) {
       continue;
     }
 
     return {
-      status: postAttemptProbe.state.deviceLocked ? "awake_but_locked" : "awake",
+      status: isInteractiveAutomationReady(postAttemptProbe.state) ? "awake" : "awake_but_locked",
       attempts,
       state: postAttemptProbe.state,
     };
@@ -266,6 +288,96 @@ export async function ensureDeviceAwake(
     status: "still_asleep",
     attempts,
     state: lastObservedState,
+  };
+}
+
+export async function ensureInteractiveAutomationReady(
+  config: RuntimeConfig,
+  options?: {
+    ensureDeviceAwakeFn?: typeof ensureDeviceAwake;
+    probeInteractiveStateFn?: typeof probeInteractiveState;
+    settleDelayMs?: number;
+  }
+): Promise<InteractiveAutomationReadyResult> {
+  const ensureDeviceAwakeFn = options?.ensureDeviceAwakeFn ?? ensureDeviceAwake;
+  const wakeResult = await ensureDeviceAwakeFn(config, {
+    probeInteractiveStateFn: options?.probeInteractiveStateFn,
+    settleDelayMs: options?.settleDelayMs,
+  });
+
+  switch (wakeResult.status) {
+    case "already_awake":
+    case "awake":
+      if (wakeResult.state && isInteractiveAutomationReady(wakeResult.state)) {
+        return { ok: true, state: wakeResult.state };
+      }
+      return {
+        ok: false,
+        error: {
+          code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
+          message: "Interactive readiness helper returned success without a usable device state.",
+        },
+      };
+    case "awake_but_locked":
+    case "still_asleep":
+      if (wakeResult.state) {
+        return {
+          ok: false,
+          error: buildDeviceNotInteractiveError(wakeResult.state),
+        };
+      }
+      return {
+        ok: false,
+        error: {
+          code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+          message: "Device is not interactive and no interactive-state evidence was available.",
+        },
+      };
+    case "probe_failed":
+    case "transport_failed":
+      return {
+        ok: false,
+        error: {
+          code: wakeResult.error?.code ?? ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+          message: wakeResult.error?.message ?? "Could not prepare the device for interactive automation.",
+          details: wakeResult.state ? toInteractiveStateEvidence(wakeResult.state) : undefined,
+        },
+      };
+  }
+}
+
+export function toInteractiveStateEvidence(
+  state: Pick<InternalInteractiveState, "deviceLocked" | "screenOn" | "userUnlocked">
+): InteractiveStateEvidence {
+  return {
+    deviceLocked: state.deviceLocked,
+    screenOn: state.screenOn,
+    userUnlocked: state.userUnlocked,
+  };
+}
+
+export function buildDeviceNotInteractiveError(
+  state: Pick<InternalInteractiveState, "deviceLocked" | "screenOn" | "userUnlocked">
+): { code: ErrorCode; message: string; details: InteractiveStateEvidence } {
+  return {
+    code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+    message: `Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=${state.screenOn} deviceLocked=${state.deviceLocked} userUnlocked=${state.userUnlocked}`,
+    details: toInteractiveStateEvidence(state),
+  };
+}
+
+function didWakeCommandFail(adbResult: AdbResult): boolean {
+  return adbResult.code === null || adbResult.code !== 0;
+}
+
+function buildWakeTransportFailure(
+  adbResult: AdbResult,
+  method: WakeAttemptMethod
+): InteractiveStateProbeFailure {
+  const detail = adbResult.stderr.trim() || adbResult.stdout.trim() || "Unknown adb transport failure.";
+  return {
+    code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+    message: `Wake attempt ${method} failed before the device became interactive: ${detail}`,
   };
 }
 

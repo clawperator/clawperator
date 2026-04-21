@@ -4,7 +4,13 @@ import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatResultReader.js";
-import { runDoctorPingCommand } from "./deviceInteractivity.js";
+import {
+  buildDeviceNotInteractiveError,
+  isInteractiveAutomationReady,
+  probeInteractiveState,
+  runDoctorPingCommand,
+  toInteractiveStateEvidence,
+} from "./deviceInteractivity.js";
 import {
   getAlternateOperatorVariant,
   getCliVersion,
@@ -276,6 +282,63 @@ export async function runHandshake(
     status: "fail",
     summary: "Handshake failed with an unknown error.",
     detail: "error" in result ? result.error : "Unknown error",
+  };
+}
+
+export async function checkDeviceInteractiveState(
+  config: RuntimeConfig,
+  _probeInteractiveState = probeInteractiveState
+): Promise<DoctorCheckResult> {
+  const result = await _probeInteractiveState(config);
+
+  if (!result.ok) {
+    return {
+      id: "readiness.device.interactive",
+      status: "fail",
+      code: result.code,
+      summary: "Could not verify whether the device is interactive.",
+      detail: result.message,
+    };
+  }
+
+  const evidence = toInteractiveStateEvidence(result.state);
+
+  if (isInteractiveAutomationReady(result.state)) {
+    return {
+      id: "readiness.device.interactive",
+      status: "pass",
+      summary: "Device is interactive.",
+      evidence,
+    };
+  }
+
+  const error = buildDeviceNotInteractiveError(result.state);
+
+  return {
+    id: "readiness.device.interactive",
+    status: "fail",
+    code: error.code,
+    summary: "Device is not interactive.",
+    detail: error.message.replace(/^Device is not interactive\. /, ""),
+    fix: {
+      title: "Recover interactive device state",
+      platform: "any",
+      steps: [
+        { kind: "manual", value: "Wake the device if the screen is off." },
+        { kind: "manual", value: "Unlock the device if the keyguard is showing." },
+        { kind: "manual", value: "Complete the post-boot unlock if Android still reports the user as locked." },
+      ],
+      docsUrl: DOCTOR_DOCS_URLS.devices,
+    },
+    deviceGuidance: {
+      screen: "Lock screen / current screen",
+      steps: [
+        "Wake the device if the screen is off.",
+        "Unlock the device if the keyguard is showing.",
+        "Complete the post-boot unlock if Android still reports the user as locked.",
+      ],
+    },
+    evidence,
   };
 }
 
