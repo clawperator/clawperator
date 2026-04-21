@@ -10,7 +10,7 @@ import { broadcastAgentCommand } from "../../adapters/android-bridge/broadcastAg
 import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
 import { runAdb, formatCommandLine } from "../../adapters/android-bridge/adbClient.js";
 import { checkApkPresence } from "../doctor/checks/readinessChecks.js";
-import { ensureInteractiveAutomationReady, probeInteractiveState } from "../doctor/checks/deviceInteractivity.js";
+import { ensureInteractiveAutomationReady, probeInteractiveState, toPublicInteractiveAutomationError } from "../doctor/checks/deviceInteractivity.js";
 import { getOperatorPackageApkPath } from "../version/compatibility.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
@@ -284,6 +284,28 @@ export async function runCloseAppPreflight(
   return { ok: true, successfulCloseActionIds };
 }
 
+function isCloseAppOnlyExecution(execution: Execution): boolean {
+  return execution.actions.length > 0
+    && execution.actions.every(action => action.type === "close_app" && !!action.params?.applicationId);
+}
+
+function buildCloseAppOnlySuccessEnvelope(execution: Execution): ResultEnvelope {
+  return {
+    commandId: execution.commandId,
+    taskId: execution.taskId,
+    status: "success",
+    stepResults: execution.actions.map(action => ({
+      id: action.id,
+      actionType: "close_app",
+      success: true,
+      data: {
+        application_id: action.params?.applicationId ?? "",
+      },
+    })),
+    error: null,
+  };
+}
+
 /**
  * Internal helper to validate, resolve device, and perform actual execution.
  */
@@ -403,29 +425,42 @@ async function performExecution(
   }
 
   try {
+    // Host-side close_app preflight is safe even when the device is not yet interactive.
+    const closeAppPreflight = await runCloseAppPreflight(execution, config);
+    if (!closeAppPreflight.ok) {
+      return { execution, result: { ok: false, error: closeAppPreflight.error, deviceId } };
+    }
+
+    if (isCloseAppOnlyExecution(execution)) {
+      const envelope = buildCloseAppOnlySuccessEnvelope(execution);
+      emitResult(deviceId, envelope);
+      return {
+        execution,
+        result: {
+          ok: true,
+          envelope,
+          deviceId,
+          terminalSource: "clawperator_result",
+        },
+      };
+    }
+
     const ensureInteractiveAutomationReadyFn = options.ensureInteractiveAutomationReadyFn ?? ensureInteractiveAutomationReady;
     const interactiveState = await ensureInteractiveAutomationReadyFn(config, {
       probeInteractiveStateFn: options.probeInteractiveStateFn,
     });
     if (!interactiveState.ok) {
+      const publicError = interactiveState.error.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE
+        ? toPublicInteractiveAutomationError(interactiveState.error)
+        : interactiveState.error;
       return {
         execution,
         result: {
           ok: false,
-          error: {
-            code: interactiveState.error.code,
-            message: interactiveState.error.message,
-            details: interactiveState.error.details,
-          },
+          error: publicError,
           deviceId,
         },
       };
-    }
-
-    // 1. Handle pre-flight side effects (e.g., force-close apps via adb)
-    const closeAppPreflight = await runCloseAppPreflight(execution, config);
-    if (!closeAppPreflight.ok) {
-      return { execution, result: { ok: false, error: closeAppPreflight.error, deviceId } };
     }
 
     // 2. Clear logcat so we only see this command's output

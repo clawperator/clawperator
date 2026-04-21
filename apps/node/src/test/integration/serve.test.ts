@@ -325,12 +325,8 @@ describe("serve API integration", () => {
         ok: false,
         error: {
           code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
-          message: "Device is not interactive.",
-          details: {
-            screenOn: false,
-            deviceLocked: true,
-            userUnlocked: true,
-          },
+          message: "Device is not interactive. screenOn=false",
+          deviceId: "resolved-device-123",
         },
       }),
     });
@@ -347,15 +343,105 @@ describe("serve API integration", () => {
       assert.strictEqual(res.status, 409);
       const body = await res.json() as {
         ok: boolean;
-        error: { code: string; details?: { screenOn?: boolean; deviceLocked?: boolean; userUnlocked?: boolean } };
+        error: { code: string; deviceId?: string; message?: string; details?: { screenOn?: boolean; deviceLocked?: boolean; userUnlocked?: boolean } };
       };
       assert.strictEqual(body.ok, false);
       assert.strictEqual(body.error.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
-      assert.deepStrictEqual(body.error.details, {
-        screenOn: false,
-        deviceLocked: true,
-        userUnlocked: true,
+      assert.strictEqual(body.error.deviceId, "resolved-device-123");
+      assert.strictEqual(body.error.details, undefined);
+      assert.strictEqual(body.error.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
+      await assert.rejects(readFile(markerPath, "utf8"));
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        blockingServer.close((err) => (err ? reject(err) : resolve()));
       });
+      if (originalRegistryPath === undefined) {
+        delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+      } else {
+        process.env.CLAWPERATOR_SKILLS_REGISTRY = originalRegistryPath;
+      }
+      await registry.cleanup();
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("POST /skills/:skillId/run preserves non-interactive-preflight diagnostics for other failures", async () => {
+    const skillId = "com.test.serve-preflight-diagnostics";
+    const tempRoot = await mkdtemp(join(tmpdir(), "serve-skill-preflight-"));
+    const scriptPath = join(tempRoot, "run.js");
+    const markerPath = join(tempRoot, "spawned.marker");
+    await writeFile(
+      scriptPath,
+      `import { writeFile } from "node:fs/promises";\nawait writeFile(${JSON.stringify(markerPath)}, "spawned", "utf8");\nconsole.log("RUN_OK");\n`,
+      "utf8"
+    );
+
+    const skillEntry = {
+      id: skillId,
+      summary: "Serve preflight diagnostics test skill",
+      applicationId: "com.test.app",
+      intent: "Verify serve preflight diagnostics",
+      tags: ["test"],
+      entryPoint: "scripts/run.js",
+      path: `skills/${skillId}`,
+      skillFile: `skills/${skillId}/SKILL.md`,
+      scripts: [`skills/${skillId}/scripts/run.js`],
+      artifacts: [],
+    };
+    const registry = await createTempRegistryWithSkill({
+      skillId,
+      scriptSourcePath: scriptPath,
+      skillJsonContents: JSON.stringify(skillEntry, null, 2),
+      registrySkillEntry: skillEntry,
+    });
+    await writeFile(
+      join(dirname(registry.registryPath), skillId, "SKILL.md"),
+      `---\nname: ${skillId}\nclawperator-skill-type: replay\ndescription: |-\n  No spawn proof\n---\n\n# ${skillId}\n`,
+      "utf8"
+    );
+
+    const originalRegistryPath = process.env.CLAWPERATOR_SKILLS_REGISTRY;
+    process.env.CLAWPERATOR_SKILLS_REGISTRY = registry.registryPath;
+
+    const blockingServer = await startServer({
+      port: 0,
+      host: "localhost",
+      verbose: false,
+      resolveInteractiveSkillTargetImpl: async () => ({
+        ok: false,
+        error: {
+          code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+          message: "adb shell broke",
+          details: { command: "cmd power wakeup" },
+          deviceId: "resolved-device-123",
+        },
+      }),
+    });
+    const blockingAddr = blockingServer.address();
+    const blockingPort = blockingAddr && typeof blockingAddr === "object" ? blockingAddr.port : 0;
+
+    try {
+      const res = await fetch(`http://localhost:${blockingPort}/skills/${skillId}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      assert.strictEqual(res.status, 503);
+      const body = await res.json() as {
+        ok: boolean;
+        error: {
+          code: string;
+          message?: string;
+          details?: { command?: string };
+          deviceId?: string;
+        };
+      };
+      assert.strictEqual(body.ok, false);
+      assert.strictEqual(body.error.code, ERROR_CODES.DEVICE_SHELL_UNAVAILABLE);
+      assert.deepStrictEqual(body.error.details, { command: "cmd power wakeup" });
+      assert.strictEqual(body.error.deviceId, "resolved-device-123");
+      assert.strictEqual(body.error.message, "adb shell broke");
       await assert.rejects(readFile(markerPath, "utf8"));
     } finally {
       await new Promise<void>((resolve, reject) => {

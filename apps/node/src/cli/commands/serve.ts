@@ -19,6 +19,7 @@ import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_E
 import type { Logger } from "../../adapters/logger.js";
 import { resolveOperatorPackageForRequest } from "../../domain/config/resolveOperatorPackage.js";
 import { resolveInteractiveSkillTarget } from "./skills.js";
+import { toPublicInteractiveAutomationError } from "../../domain/doctor/checks/deviceInteractivity.js";
 
 interface ServeOptions {
   port: number;
@@ -32,7 +33,7 @@ export function buildServeSkillRunOptions(
   deviceId: string | undefined,
   operatorPackage: string,
   args: readonly string[] | undefined
-): { scriptArgs: string[]; skillEnv: SkillRunEnv | undefined } {
+): { scriptArgs: string[]; skillEnv: SkillRunEnv } {
   const scriptArgs = args ? [...args] : [];
   const skillEnv: SkillRunEnv = {
     CLAWPERATOR_OPERATOR_PACKAGE: operatorPackage,
@@ -51,6 +52,8 @@ export function mapServeErrorCodeToStatus(code: string): number {
     case ERROR_CODES.PAYLOAD_TOO_LARGE: return 413;
     case ERROR_CODES.RESULT_ENVELOPE_TIMEOUT: return 504;
     case ERROR_CODES.DEVICE_NOT_INTERACTIVE: return 409;
+    case ERROR_CODES.DEVICE_ACCESSIBILITY_NOT_RUNNING: return 409;
+    case ERROR_CODES.DEVICE_SHELL_UNAVAILABLE: return 503;
     case ERROR_CODES.EMULATOR_NOT_FOUND: return 404;
     case ERROR_CODES.EMULATOR_NOT_RUNNING: return 404;
     case ERROR_CODES.EMULATOR_UNSUPPORTED: return 409;
@@ -537,11 +540,15 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         logger: options.logger,
       });
       if (!interactiveTarget.ok) {
+        const interactiveError = interactiveTarget.error;
+        const publicError = interactiveError.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE
+          ? toPublicInteractiveAutomationError(interactiveError)
+          : interactiveError;
         res.status(mapServeErrorCodeToStatus(interactiveTarget.error.code)).json({
           status: "failed",
           ok: false,
           error: {
-            ...interactiveTarget.error,
+            ...publicError,
             skillId: req.params.skillId,
             timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
             expectedSubstring: expectContainsArg,

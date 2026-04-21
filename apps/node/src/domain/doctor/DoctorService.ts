@@ -15,6 +15,7 @@ import {
 } from "./checks/deviceChecks.js";
 import {
   checkApkPresence,
+  buildDeviceInteractiveStateCheckFromState,
   checkVersionCompatibility,
   checkSettings,
   checkDeviceInteractiveState,
@@ -144,7 +145,10 @@ export class DoctorService {
       checks.push(handshake);
       if (this.shouldHaltOnFailure(handshake)) return this.finalize(checks, config, options.fix);
 
-      const interactiveState = await (this.deps.checkDeviceInteractiveState ?? checkDeviceInteractiveState)(config);
+      const handshakeInteractiveState = extractInteractiveStateFromEvidence(handshake.evidence);
+      const interactiveState = handshakeInteractiveState
+        ? buildDeviceInteractiveStateCheckFromState(handshakeInteractiveState)
+        : await (this.deps.checkDeviceInteractiveState ?? checkDeviceInteractiveState)(config);
       checks.push(interactiveState);
       if (this.shouldHaltOnFailure(interactiveState)) return this.finalize(checks, config, options.fix);
     }
@@ -224,4 +228,23 @@ export class DoctorService {
   private shouldHaltOnFailure(check: DoctorCheckResult): boolean {
     return check.status === "fail" && isCriticalDoctorCheck(check);
   }
+}
+
+function extractInteractiveStateFromEvidence(
+  evidence: DoctorCheckResult["evidence"]
+): { screenOn: boolean; deviceLocked: boolean; userUnlocked: boolean } | undefined {
+  if (
+    evidence !== undefined
+    && typeof evidence.screenOn === "boolean"
+    && typeof evidence.deviceLocked === "boolean"
+    && typeof evidence.userUnlocked === "boolean"
+  ) {
+    return {
+      screenOn: evidence.screenOn,
+      deviceLocked: evidence.deviceLocked,
+      userUnlocked: evidence.userUnlocked,
+    };
+  }
+
+  return undefined;
 }

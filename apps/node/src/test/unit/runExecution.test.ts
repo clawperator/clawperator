@@ -628,12 +628,8 @@ describe("runExecution", () => {
     if (!result.ok) {
       assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
       assert.strictEqual(result.deviceId, "test-device-1");
-      assert.deepStrictEqual(result.error.details, {
-        deviceLocked: true,
-        screenOn: false,
-        userUnlocked: true,
-      });
-      assert.match(result.error.message, /Device is not interactive/);
+      assert.strictEqual(result.error.details, undefined);
+      assert.strictEqual(result.error.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
     }
     assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
     assert.deepStrictEqual(
@@ -682,11 +678,56 @@ describe("runExecution", () => {
     assert.strictEqual(result.ok, false);
     if (!result.ok) {
       assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
+      assert.strictEqual(result.error.details, undefined);
+      assert.strictEqual(result.error.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
+    }
+    assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
+  });
+
+  it("preserves non-interactive-preflight diagnostics for transport or probe failures", async () => {
+    const runner = new FakeProcessRunner();
+    const execution: Execution = {
+      commandId: "cmd-interactive-transport-failure",
+      taskId: "task-interactive-transport-failure",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "sleep-1", type: "sleep", params: { durationMs: 0 } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+
+    const result = await runExecution(execution, {
+      deviceId: "test-device-1",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+      ensureInteractiveAutomationReadyFn: async () => ({
+        ok: false,
+        error: {
+          code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+          message: "adb shell broke",
+          details: {
+            screenOn: false,
+            deviceLocked: false,
+            userUnlocked: true,
+          },
+        },
+      }),
+    });
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_SHELL_UNAVAILABLE);
+      assert.strictEqual(result.error.message, "adb shell broke");
       assert.deepStrictEqual(result.error.details, {
-        deviceLocked: true,
-        screenOn: true,
+        screenOn: false,
+        deviceLocked: false,
         userUnlocked: true,
       });
+      assert.strictEqual(result.deviceId, "test-device-1");
     }
     assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
   });
@@ -747,7 +788,105 @@ describe("runExecution", () => {
 
     assert.strictEqual(result.ok, true);
     assert.ok(runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -c"));
-    assert.ok(runner.calls.some(call => call.args.join(" ") === "-s test-device-1 shell am broadcast -a app.clawperator.operator.ACTION_AGENT_COMMAND -p com.test.operator.dev --es payload [redacted]"));
+  });
+
+  it("allows close_app-only executions to succeed without the interactive gate", async () => {
+    const runner = new FakeProcessRunner();
+    const execution: Execution = {
+      commandId: "cmd-close-only",
+      taskId: "task-close-only",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "close-1", type: "close_app", params: { applicationId: "com.example.app" } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+    let readinessCalls = 0;
+    const result = await runExecution(execution, {
+      deviceId: "test-device-1",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+      ensureInteractiveAutomationReadyFn: async () => {
+        readinessCalls += 1;
+        return {
+          ok: false,
+          error: {
+            code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+            message: "Device is not interactive.",
+          },
+        };
+      },
+    });
+
+    assert.strictEqual(readinessCalls, 0);
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.envelope.status, "success");
+      assert.deepStrictEqual(result.envelope.stepResults, [
+        {
+          id: "close-1",
+          actionType: "close_app",
+          success: true,
+          data: { application_id: "com.example.app" },
+        },
+      ]);
+    }
+    assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
+  });
+
+  it("emits a terminal result event for close_app-only fast-path executions", async () => {
+    const runner = new FakeProcessRunner();
+    const execution: Execution = {
+      commandId: "cmd-close-only-event",
+      taskId: "task-close-only-event",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "close-1", type: "close_app", params: { applicationId: "com.example.app" } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+    const resultEvent = once(clawperatorEvents, CLAWPERATOR_EVENT_TYPES.RESULT);
+    const result = await runExecution(execution, {
+      deviceId: "test-device-1",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const [event] = await resultEvent as [{ deviceId: string; envelope: ResultEnvelope }];
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.envelope.status, "success");
+      assert.deepStrictEqual(result.envelope.stepResults, [
+        {
+          id: "close-1",
+          actionType: "close_app",
+          success: true,
+          data: { application_id: "com.example.app" },
+        },
+      ]);
+    }
+    assert.strictEqual(event.deviceId, "test-device-1");
+    assert.strictEqual(event.envelope.status, "success");
+    assert.deepStrictEqual(event.envelope.stepResults, [
+      {
+        id: "close-1",
+        actionType: "close_app",
+        success: true,
+        data: { application_id: "com.example.app" },
+      },
+    ]);
   });
 });
 

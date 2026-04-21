@@ -6890,11 +6890,60 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.strictEqual(result.ok, false);
     if (!result.ok) {
       assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
+      assert.strictEqual(result.error.details, undefined);
+      assert.strictEqual(result.error.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
+    }
+  });
+
+  it("normalizes thrown readiness preflight errors into a structured command error", async () => {
+    const result = await resolveInteractiveSkillTarget("com.clawperator.operator.dev", {
+      deviceId: "resolved-device-123",
+      resolveDeviceImpl: async () => ({ deviceId: "resolved-device-123", serial: "resolved-device-123" }),
+      checkApkPresenceImpl: async () => {
+        throw Object.assign(new Error("adb shell broke"), {
+          code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+          details: { command: "pm list packages" },
+        });
+      },
+    });
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_SHELL_UNAVAILABLE);
+      assert.strictEqual(result.error.message, "adb shell broke");
+      assert.deepStrictEqual(result.error.details, { command: "pm list packages" });
+    }
+  });
+
+  it("preserves non-interactive-preflight diagnostics from the shared readiness helper", async () => {
+    const result = await resolveInteractiveSkillTarget("com.clawperator.operator.dev", {
+      deviceId: "resolved-device-123",
+      resolveDeviceImpl: async () => ({ deviceId: "resolved-device-123", serial: "resolved-device-123" }),
+      checkApkPresenceImpl: async () => passingApkPresence,
+      ensureInteractiveAutomationReadyImpl: async () => ({
+        ok: false,
+        error: {
+          code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+          message: "adb shell broke",
+          details: {
+            screenOn: false,
+            deviceLocked: false,
+            userUnlocked: true,
+          },
+        },
+      }),
+    });
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_SHELL_UNAVAILABLE);
+      assert.strictEqual(result.error.message, "adb shell broke");
       assert.deepStrictEqual(result.error.details, {
-        screenOn: true,
-        deviceLocked: true,
+        screenOn: false,
+        deviceLocked: false,
         userUnlocked: true,
       });
+      assert.strictEqual(result.error.deviceId, "resolved-device-123");
     }
   });
 
@@ -7086,12 +7135,8 @@ describe("cmdSkillsRun preflight gate", () => {
           ok: false,
           error: {
             code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
-            message: "Device is not interactive.",
-            details: {
-              screenOn: false,
-              deviceLocked: true,
-              userUnlocked: true,
-            },
+            message: "Device is not interactive. screenOn=false",
+            deviceId: "resolved-device-123",
           },
         }),
       }
@@ -7099,15 +7144,64 @@ describe("cmdSkillsRun preflight gate", () => {
 
     const parsed = JSON.parse(stdout) as {
       code?: string;
+      deviceId?: string;
       details?: { screenOn?: boolean; deviceLocked?: boolean; userUnlocked?: boolean };
+      message?: string;
     };
     assert.strictEqual(runCalls, 0);
     assert.strictEqual(parsed.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
-    assert.deepStrictEqual(parsed.details, {
-      screenOn: false,
-      deviceLocked: true,
-      userUnlocked: true,
-    });
+    assert.strictEqual(parsed.deviceId, "resolved-device-123");
+    assert.strictEqual(parsed.details, undefined);
+    assert.strictEqual(parsed.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
+  });
+
+  it("preserves non-interactive-preflight diagnostics when wrapper readiness fails for another reason", async () => {
+    let runCalls = 0;
+
+    const stdout = await cmdSkillsRun(
+      TEST_SKILL_VALID_ARTIFACT,
+      [],
+      undefined,
+      undefined,
+      undefined,
+      {
+        format: "json",
+        skipValidate: true,
+        runSkillImpl: async () => {
+          runCalls += 1;
+          return {
+            ok: true,
+            status: "success",
+            skillId: TEST_SKILL_VALID_ARTIFACT,
+            output: "RUN_OK",
+            exitCode: 0,
+            durationMs: 1,
+            skillResult: null,
+          } as const;
+        },
+        resolveInteractiveSkillTargetImpl: async () => ({
+          ok: false,
+          error: {
+            code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+            message: "adb shell broke",
+            details: { command: "cmd power wakeup" },
+            deviceId: "resolved-device-123",
+          },
+        }),
+      }
+    );
+
+    const parsed = JSON.parse(stdout) as {
+      code?: string;
+      details?: { command?: string };
+      deviceId?: string;
+      message?: string;
+    };
+    assert.strictEqual(runCalls, 0);
+    assert.strictEqual(parsed.code, ERROR_CODES.DEVICE_SHELL_UNAVAILABLE);
+    assert.deepStrictEqual(parsed.details, { command: "cmd power wakeup" });
+    assert.strictEqual(parsed.deviceId, "resolved-device-123");
+    assert.strictEqual(parsed.message, "adb shell broke");
   });
 
   it("uses the resolved device for wrapper preflight without injecting implicit device selection into skill env", async () => {

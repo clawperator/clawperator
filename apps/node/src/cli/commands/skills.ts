@@ -9,6 +9,7 @@ import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill, type SkillRunEnv } from "../../domain/skills/runSkill.js";
 import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
+import { ERROR_CODES } from "../../contracts/errors.js";
 import { SKILL_RESULT_FRAME_PREFIX } from "../../contracts/skillResult.js";
 import { SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
 import type { DoctorCheckResult } from "../../contracts/doctor.js";
@@ -21,6 +22,7 @@ import { checkApkPresence } from "../../domain/doctor/checks/readinessChecks.js"
 import {
   ensureInteractiveAutomationReady,
   probeInteractiveState,
+  toPublicInteractiveAutomationError,
 } from "../../domain/doctor/checks/deviceInteractivity.js";
 import { resolveDevice } from "../../domain/devices/resolveDevice.js";
 import type { Logger } from "../../adapters/logger.js";
@@ -241,62 +243,62 @@ export async function resolveInteractiveSkillTarget(
     probeInteractiveStateImpl?: typeof probeInteractiveState;
   }
 ): Promise<ResolveInteractiveSkillTargetResult> {
-  const logger = options?.logger;
-  const resolveDeviceImpl = options?.resolveDeviceImpl ?? resolveDevice;
-  const checkApkPresenceImpl = options?.checkApkPresenceImpl ?? checkApkPresence;
-  const ensureInteractiveAutomationReadyImpl = options?.ensureInteractiveAutomationReadyImpl ?? ensureInteractiveAutomationReady;
-  const probeInteractiveStateImpl = options?.probeInteractiveStateImpl ?? probeInteractiveState;
-
-  let resolvedDevice;
   try {
-    resolvedDevice = await resolveDeviceImpl(getDefaultRuntimeConfig({
+    const logger = options?.logger;
+    const resolveDeviceImpl = options?.resolveDeviceImpl ?? resolveDevice;
+    const checkApkPresenceImpl = options?.checkApkPresenceImpl ?? checkApkPresence;
+    const ensureInteractiveAutomationReadyImpl = options?.ensureInteractiveAutomationReadyImpl ?? ensureInteractiveAutomationReady;
+    const probeInteractiveStateImpl = options?.probeInteractiveStateImpl ?? probeInteractiveState;
+
+    const resolvedDevice = await resolveDeviceImpl(getDefaultRuntimeConfig({
       adbPath: options?.adbPath,
       deviceId: options?.deviceId,
       operatorPackage,
       logger,
     }));
+
+    const config = getDefaultRuntimeConfig({
+      adbPath: options?.adbPath,
+      deviceId: resolvedDevice.deviceId,
+      operatorPackage,
+      logger,
+    });
+    const apkPresence = await checkApkPresenceImpl(config);
+    if (apkPresence.status !== "pass") {
+      return {
+        ok: true,
+        deviceId: resolvedDevice.deviceId,
+        apkPresence,
+      };
+    }
+
+    const readiness = await ensureInteractiveAutomationReadyImpl(config, {
+      probeInteractiveStateFn: probeInteractiveStateImpl,
+    });
+    if (!readiness.ok) {
+      const publicError = readiness.error.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE
+        ? toPublicInteractiveAutomationError(readiness.error)
+        : readiness.error;
+      return {
+        ok: false,
+        error: {
+          ...publicError,
+          deviceId: resolvedDevice.deviceId,
+        },
+      };
+    }
+
+    return {
+      ok: true,
+        deviceId: resolvedDevice.deviceId,
+        apkPresence,
+      };
   } catch (error) {
     return {
       ok: false,
       error: normalizeCommandLikeError(error),
     };
   }
-
-  const config = getDefaultRuntimeConfig({
-    adbPath: options?.adbPath,
-    deviceId: resolvedDevice.deviceId,
-    operatorPackage,
-    logger,
-  });
-  const apkPresence = await checkApkPresenceImpl(config);
-  if (apkPresence.status !== "pass") {
-    return {
-      ok: true,
-      deviceId: resolvedDevice.deviceId,
-      apkPresence,
-    };
-  }
-
-  const readiness = await ensureInteractiveAutomationReadyImpl(config, {
-    probeInteractiveStateFn: probeInteractiveStateImpl,
-  });
-  if (!readiness.ok) {
-    return {
-      ok: false,
-      error: {
-        code: readiness.error.code,
-        message: readiness.error.message,
-        details: readiness.error.details,
-        deviceId: resolvedDevice.deviceId,
-      },
-    };
-  }
-
-  return {
-    ok: true,
-    deviceId: resolvedDevice.deviceId,
-    apkPresence,
-  };
 }
 
 export async function cmdSkillsList(options: { format: OutputOptions["format"] }): Promise<string> {
@@ -449,7 +451,13 @@ export async function cmdSkillsRun(
     logger: cliLogger,
   });
   if (!interactiveTarget.ok) {
-    return formatError(interactiveTarget.error, options);
+    const interactiveError = interactiveTarget.error;
+    return formatError(
+      interactiveError.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE
+        ? toPublicInteractiveAutomationError(interactiveError)
+        : interactiveError,
+      options
+    );
   }
 
   const apkPresence = interactiveTarget.apkPresence;

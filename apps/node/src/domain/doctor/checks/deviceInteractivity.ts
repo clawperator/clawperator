@@ -10,7 +10,6 @@ export type WaitForResultEnvelopeFn = typeof waitForResultEnvelope;
 
 export interface InternalInteractiveState {
   screenOn: boolean;
-  interactive: boolean;
   deviceLocked: boolean;
   userUnlocked: boolean;
 }
@@ -108,11 +107,8 @@ export async function runDoctorPingCommand(
 }
 
 export function parseDoctorPingInteractiveState(stepResult: StepResult): InternalInteractiveState {
-  const screenOn = parseStrictBoolean(stepResult, "screen_on");
-
   return {
-    screenOn,
-    interactive: screenOn,
+    screenOn: parseStrictBoolean(stepResult, "screen_on"),
     deviceLocked: parseStrictBoolean(stepResult, "device_locked"),
     userUnlocked: parseStrictBoolean(stepResult, "user_unlocked"),
   };
@@ -233,6 +229,8 @@ export async function ensureDeviceAwake(
 
   const attempts: WakeAttempt[] = [];
   let lastObservedState = initialProbe.state;
+  let lastTransportFailure: InteractiveStateProbeFailure | undefined;
+  let observedSuccessfulWakeTransport = false;
 
   for (const command of WAKE_COMMANDS) {
     const adbResult = await runAdb(config, command.args);
@@ -265,13 +263,11 @@ export async function ensureDeviceAwake(
         };
       }
 
-      return {
-        status: "transport_failed",
-        attempts,
-        state: postAttemptProbe.state,
-        error: buildWakeTransportFailure(adbResult, command.method),
-      };
+      lastTransportFailure = buildWakeTransportFailure(adbResult, command.method);
+      continue;
     }
+
+    observedSuccessfulWakeTransport = true;
 
     if (!postAttemptProbe.state.screenOn) {
       continue;
@@ -281,6 +277,15 @@ export async function ensureDeviceAwake(
       status: isInteractiveAutomationReady(postAttemptProbe.state) ? "awake" : "awake_but_locked",
       attempts,
       state: postAttemptProbe.state,
+    };
+  }
+
+  if (lastTransportFailure && !observedSuccessfulWakeTransport) {
+    return {
+      status: "transport_failed",
+      attempts,
+      state: lastObservedState,
+      error: lastTransportFailure,
     };
   }
 
@@ -311,11 +316,17 @@ export async function ensureInteractiveAutomationReady(
       if (wakeResult.state && isInteractiveAutomationReady(wakeResult.state)) {
         return { ok: true, state: wakeResult.state };
       }
+      if (wakeResult.state) {
+        return {
+          ok: false,
+          error: buildDeviceNotInteractiveError(wakeResult.state),
+        };
+      }
       return {
         ok: false,
         error: {
-          code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
-          message: "Interactive readiness helper returned success without a usable device state.",
+          code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+          message: "Device is not interactive and no interactive-state evidence was available.",
         },
       };
     case "awake_but_locked":
@@ -366,6 +377,20 @@ export function buildDeviceNotInteractiveError(
   };
 }
 
+export function toPublicInteractiveAutomationError<T extends { code: string; message: string; details?: unknown }>(
+  error: T
+): Omit<T, "details" | "message"> & { message: string } {
+  if (error.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE) {
+    const { details: _details, message: _message, ...rest } = error;
+    return {
+      ...rest,
+      message: "Device is not interactive. Interactive automation requires an awake, usable device state.",
+    };
+  }
+
+  return error;
+}
+
 function didWakeCommandFail(adbResult: AdbResult): boolean {
   return adbResult.code === null || adbResult.code !== 0;
 }
@@ -377,7 +402,7 @@ function buildWakeTransportFailure(
   const detail = adbResult.stderr.trim() || adbResult.stdout.trim() || "Unknown adb transport failure.";
   return {
     code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
-    message: `Wake attempt ${method} failed before the device became interactive: ${detail}`,
+    message: `Wake attempt ${method} failed before the device screen turned on: ${detail}`,
   };
 }
 
@@ -393,21 +418,6 @@ function parseStrictBoolean(stepResult: StepResult, key: string): boolean {
   throw new Error(
     `doctor_ping returned an invalid boolean for ${key}: ${value === undefined ? "missing" : JSON.stringify(value)}`
   );
-}
-
-function didWakeCommandFail(adbResult: AdbResult): boolean {
-  return adbResult.code === null || adbResult.code !== 0;
-}
-
-function buildWakeTransportFailure(
-  adbResult: AdbResult,
-  method: WakeAttemptMethod
-): InteractiveStateProbeFailure {
-  const detail = adbResult.stderr.trim() || adbResult.stdout.trim() || "Unknown adb transport failure.";
-  return {
-    code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
-    message: `Wake attempt ${method} failed before the device became interactive: ${detail}`,
-  };
 }
 
 async function sleep(durationMs: number): Promise<void> {

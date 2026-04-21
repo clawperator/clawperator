@@ -61,13 +61,34 @@ describe("runHandshake", () => {
 
         const mockWait = async () => ({
             ok: true as const,
-            envelope: { status: "success" as const, commandId: "test-cmd", taskId: "test-task", stepResults: [] },
+            envelope: {
+                status: "success" as const,
+                commandId: "test-cmd",
+                taskId: "test-task",
+                stepResults: [{
+                    id: "h1",
+                    actionType: "doctor_ping",
+                    success: true,
+                    data: {
+                        developer_options_enabled: "true",
+                        usb_debugging_enabled: "true",
+                        screen_on: "true",
+                        device_locked: "false",
+                        user_unlocked: "true",
+                    },
+                }],
+            },
             terminalSource: "clawperator_result" as const,
         });
 
         const result = await runHandshake(config, mockWait);
         assert.strictEqual(result.status, "pass");
         assert.strictEqual(result.id, "readiness.handshake");
+        assert.deepStrictEqual(result.evidence, {
+            screenOn: true,
+            deviceLocked: false,
+            userUnlocked: true,
+        });
     });
 
     it("returns fail when envelope status is error", async () => {
@@ -131,6 +152,36 @@ describe("runHandshake", () => {
         assert.strictEqual(result.status, "fail");
         assert.strictEqual(result.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
     });
+
+    it("passes without evidence when handshake interactive state is malformed", async () => {
+        const { config, runner } = createConfig();
+        runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+        const mockWait = async () => ({
+            ok: true as const,
+            envelope: {
+                status: "success" as const,
+                commandId: "test-cmd",
+                taskId: "test-task",
+                stepResults: [{
+                    id: "h1",
+                    actionType: "doctor_ping",
+                    success: true,
+                    data: {
+                        developer_options_enabled: "true",
+                        usb_debugging_enabled: "true",
+                        device_locked: "false",
+                        user_unlocked: "true",
+                    },
+                }],
+            },
+            terminalSource: "clawperator_result" as const,
+        });
+
+        const result = await runHandshake(config, mockWait);
+        assert.strictEqual(result.status, "pass");
+        assert.strictEqual(result.evidence, undefined);
+    });
 });
 
 describe("checkDeviceInteractiveState", () => {
@@ -147,7 +198,6 @@ describe("checkDeviceInteractiveState", () => {
                 ok: true as const,
                 state: {
                     screenOn: true,
-                    interactive: true,
                     deviceLocked: false,
                     userUnlocked: true,
                 },
@@ -170,7 +220,6 @@ describe("checkDeviceInteractiveState", () => {
                 ok: true as const,
                 state: {
                     screenOn: false,
-                    interactive: false,
                     deviceLocked: true,
                     userUnlocked: false,
                 },
@@ -196,7 +245,6 @@ describe("checkDeviceInteractiveState", () => {
                 ok: true as const,
                 state: {
                     screenOn: true,
-                    interactive: true,
                     deviceLocked: true,
                     userUnlocked: true,
                 },
