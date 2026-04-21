@@ -72,14 +72,17 @@ Do not replace this first step with direct npm self-upgrade commands.
 
 ### 3. Verify readiness with doctor
 
-After the installer finishes, run:
+After the installer finishes, run `clawperator devices` and then run:
 
 ```bash
 clawperator doctor --json
 ```
 
-Prefer the structured JSON result. Continue from the doctor output instead of
-guessing whether the upgrade "probably worked."
+Prefer the structured JSON result. If more than one device is connected, run
+`clawperator doctor --device <device_id> --json` once for each connected
+device, and only report the upgrade ready when every connected device reports
+`criticalOk: true`. Continue from the doctor output instead of guessing whether
+the upgrade "probably worked."
 
 ### 4. Decide between ready and blocked
 
@@ -87,15 +90,20 @@ Use this decision table:
 
 | Doctor result | Outcome |
 | --- | --- |
-| exit code `0` and `criticalOk: true` | Report that Clawperator is ready and name the next truthful front door for the user’s task. |
+| exit code `0` and `criticalOk: true` for every connected device | Report that Clawperator is ready and name the next truthful front door for the user’s task. |
 | non-zero exit code or `criticalOk: false` | Summarize the failing checks and point to the existing repair route already named by doctor or the setup docs. |
 
 Rules:
 
 - do not invent a custom remediation tree inside this skill
 - do not claim success when doctor still reports blocking issues
+- do not claim success until every connected device has been checked with doctor
+  and every connected device reports `criticalOk: true`
 - if doctor indicates setup is incomplete, keep the next step grounded in the
   real failing surface
+- do not ask the user whether to proceed with the doctor-reported repair path
+  or the next command; pick the explicit next action from doctor or the setup
+  docs and state it directly
 
 ### 5. Name the next truthful action
 
@@ -107,6 +115,13 @@ After a successful upgrade:
   `clawperator skills search --keyword <text> --json`
 - if the user explicitly needs repair after doctor failure, point at the
   existing setup or repair guidance instead of widening scope
+
+After a blocked upgrade:
+
+- do not ask a follow-up question
+- surface the first concrete doctor fix or nextActions item
+- if doctor provides multiple fix steps, keep the response to the first
+  actionable repair step and the canonical docs URL
 
 ### 6. End with a short status summary
 
@@ -126,4 +141,5 @@ Examples:
 
 Be concise. Treat `install.sh` as the upgrade authority, `doctor --json` as the
 readiness authority, and end with one explicit next step. Name the
-upgrade-intent gate explicitly when you decline to run the installer.
+upgrade-intent gate explicitly when you decline to run the installer. Never
+ask the user to choose the next repair step after doctor has already named it.
