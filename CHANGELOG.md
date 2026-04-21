@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.7.0] - 2026-04-21
+
+This release expands the packaged skill surfaces, adds interactive-device doctor and wake handling in the Node runtime, and brings Android `enter_text` behavior up to the current API 33 contract.
+
+### 🤖 Node API & CLI
+- **Changed:** Renamed the packaged `authoring-skills` surface to `agent-skills`, including the CLI help, installer wiring, and the related runtime docs.
+- **Added:** Shipped first-party `clawperator-agent-orientation` and `clawperator-upgrade` skills in the Node-distributed skill set.
+- **Added:** Added device interactivity checks, readiness preflights, and bounded wake handling so doctor, skill wrappers, and `serve` can fail closed on locked devices.
+- **Changed:** Tightened doctor and direct-execution handling around interactive-state diagnostics and status reporting.
+
+### 📚 Documentation & Website
+- **Changed:** Updated the host-agent, doctor, skills, API, and release docs to match the new `agent-skills` surface and interactive readiness behavior.
+- **Changed:** Refreshed generated docs artifacts and install guidance for the new packaged skills and release outputs.
+
+### 📱 Android Operator APK
+- **Fixed:** Separated screen-off from device-locked state in the operator truth model and updated the `enter_text.clear` contract.
+- **Added:** Upgraded the Android `enter_text` runtime for API 33 with the accessibility IME fallback path.
+
+Pull requests:
+- [refactor: rename authoring-skills surface to agent-skills](https://github.com/clawperator/clawperator/pull/204)
+- [feat: add first-party clawperator agent orientation skill](https://github.com/clawperator/clawperator/pull/205)
+- [feat(skill): add packaged clawperator-upgrade agent-skill](https://github.com/clawperator/clawperator/pull/207)
+- [fix(android): `enter_text` clear contract](https://github.com/clawperator/clawperator/pull/209)
+- [feat(android): upgrade enter_text runtime for API 33](https://github.com/clawperator/clawperator/pull/211)
+- [feat: add device interactivity foundation](https://github.com/clawperator/clawperator/pull/213)
+- [feat(node): add doctor enhancements](https://github.com/clawperator/clawperator/pull/214)
+- [feat(node): add device interactivity checks and bounded wake preflight](https://github.com/clawperator/clawperator/pull/215)
+
 ## [0.6.5] - 2026-04-20
 
 This release sharpens authoring discoverability and the skill-authoring workflow, while tightening validation and eval coverage around the new discovery-first path.
