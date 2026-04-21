@@ -4,9 +4,8 @@ import action.keyguard.KeyguardManager
 import action.power.PowerManager
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
-import android.content.IntentFilter
-import android.test.mock.MockContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -23,8 +22,7 @@ class DeviceStateSystemTest {
                 keyguardManager = MutableKeyguardManager(deviceLocked = false),
             )
 
-        deviceState.register(context)
-        context.dispatch(Intent.ACTION_SCREEN_OFF)
+        context.dispatch(deviceState, Intent.ACTION_SCREEN_OFF)
 
         assertFalse(deviceState.isScreenOn.value)
         assertFalse(deviceState.isDeviceLocked.value)
@@ -41,8 +39,7 @@ class DeviceStateSystemTest {
             )
 
         deviceState.isDeviceLocked.value = true
-        deviceState.register(context)
-        context.dispatch(Intent.ACTION_SCREEN_OFF)
+        context.dispatch(deviceState, Intent.ACTION_SCREEN_OFF)
 
         assertFalse(deviceState.isScreenOn.value)
         assertTrue(deviceState.isDeviceLocked.value)
@@ -60,8 +57,7 @@ class DeviceStateSystemTest {
             )
 
         deviceState.isDeviceLocked.value = false
-        deviceState.register(context)
-        context.dispatch(Intent.ACTION_SCREEN_ON)
+        context.dispatch(deviceState, Intent.ACTION_SCREEN_ON)
 
         assertTrue(deviceState.isScreenOn.value)
         assertTrue(deviceState.isDeviceLocked.value)
@@ -78,34 +74,29 @@ class DeviceStateSystemTest {
             )
 
         deviceState.isDeviceLocked.value = true
-        deviceState.register(context)
-        context.dispatch(Intent.ACTION_USER_PRESENT)
+        context.dispatch(deviceState, Intent.ACTION_USER_PRESENT)
 
         assertFalse(deviceState.isDeviceLocked.value)
     }
 }
 
-private class BroadcastCapturingContext : MockContext() {
-    private val receivers = mutableListOf<BroadcastReceiver>()
-
-    override fun registerReceiver(
-        receiver: BroadcastReceiver?,
-        filter: IntentFilter?,
-    ): Intent? {
-        receiver?.let { receivers += it }
-        return null
+private class BroadcastCapturingContext : ContextWrapper(null) {
+    fun dispatch(
+        deviceState: DeviceStateSystem,
+        action: String,
+    ) {
+        val field = DeviceStateSystem::class.java.getDeclaredField("broadcastReceiver")
+        field.isAccessible = true
+        val receiver = field.get(deviceState) as BroadcastReceiver
+        val intent = FakeIntent(action)
+        receiver.onReceive(this, intent)
     }
+}
 
-    override fun unregisterReceiver(receiver: BroadcastReceiver?) {
-        receiver?.let { receivers.remove(it) }
-    }
-
-    fun dispatch(action: String) {
-        val intent = Intent(action)
-        receivers.toList().forEach { receiver ->
-            receiver.onReceive(this, intent)
-        }
-    }
+private class FakeIntent(
+    private val actionValue: String,
+) : Intent() {
+    override fun getAction(): String = actionValue
 }
 
 private class FakePowerManager(
