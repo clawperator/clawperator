@@ -756,6 +756,7 @@ When a handler returns an enum-backed error from `errors.ts`, `serve.ts` maps it
 | `EXECUTION_VALIDATION_FAILED` | `400` |
 | `PAYLOAD_TOO_LARGE` | `413` |
 | `RESULT_ENVELOPE_TIMEOUT` | `504` |
+| `DEVICE_NOT_INTERACTIVE` | `409` |
 | `EMULATOR_NOT_FOUND` | `404` |
 | `EMULATOR_NOT_RUNNING` | `404` |
 | `EMULATOR_UNSUPPORTED` | `409` |

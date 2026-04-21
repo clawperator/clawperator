@@ -15,14 +15,30 @@ export interface InternalInteractiveState {
   userUnlocked: boolean;
 }
 
+export interface InteractiveStateEvidence extends Record<string, unknown> {
+  deviceLocked: boolean;
+  screenOn: boolean;
+  userUnlocked: boolean;
+}
+
 export interface InteractiveStateProbeFailure {
   code: ErrorCode;
   message: string;
 }
 
+export interface InteractiveAutomationReadyError {
+  code: ErrorCode;
+  message: string;
+  details?: InteractiveStateEvidence;
+}
+
 export type InteractiveStateProbeResult =
   | { ok: true; state: InternalInteractiveState }
   | { ok: false; code: ErrorCode; message: string };
+
+export type InteractiveAutomationReadyResult =
+  | { ok: true; state: InternalInteractiveState }
+  | { ok: false; error: InteractiveAutomationReadyError };
 
 export type WakeAttemptMethod =
   | "cmd_power_wakeup"
@@ -100,6 +116,12 @@ export function parseDoctorPingInteractiveState(stepResult: StepResult): Interna
     deviceLocked: parseStrictBoolean(stepResult, "device_locked"),
     userUnlocked: parseStrictBoolean(stepResult, "user_unlocked"),
   };
+}
+
+export function isInteractiveAutomationReady(
+  state: Pick<InternalInteractiveState, "screenOn" | "deviceLocked" | "userUnlocked">
+): boolean {
+  return state.screenOn && !state.deviceLocked && state.userUnlocked;
 }
 
 export async function probeInteractiveState(
@@ -201,9 +223,9 @@ export async function ensureDeviceAwake(
     };
   }
 
-  if (initialProbe.state.interactive) {
+  if (initialProbe.state.screenOn) {
     return {
-      status: initialProbe.state.deviceLocked ? "awake_but_locked" : "already_awake",
+      status: isInteractiveAutomationReady(initialProbe.state) ? "already_awake" : "awake_but_locked",
       attempts: [],
       state: initialProbe.state,
     };
@@ -211,6 +233,8 @@ export async function ensureDeviceAwake(
 
   const attempts: WakeAttempt[] = [];
   let lastObservedState = initialProbe.state;
+  let lastTransportFailure: InteractiveStateProbeFailure | undefined;
+  let observedSuccessfulWakeTransport = false;
 
   for (const command of WAKE_COMMANDS) {
     const adbResult = await runAdb(config, command.args);
@@ -235,30 +259,37 @@ export async function ensureDeviceAwake(
 
     lastObservedState = postAttemptProbe.state;
     if (didWakeCommandFail(adbResult)) {
-      if (postAttemptProbe.state.interactive) {
+      if (postAttemptProbe.state.screenOn) {
         return {
-          status: postAttemptProbe.state.deviceLocked ? "awake_but_locked" : "awake",
+          status: isInteractiveAutomationReady(postAttemptProbe.state) ? "awake" : "awake_but_locked",
           attempts,
           state: postAttemptProbe.state,
         };
       }
 
-      return {
-        status: "transport_failed",
-        attempts,
-        state: postAttemptProbe.state,
-        error: buildWakeTransportFailure(adbResult, command.method),
-      };
+      lastTransportFailure = buildWakeTransportFailure(adbResult, command.method);
+      continue;
     }
 
-    if (!postAttemptProbe.state.interactive) {
+    observedSuccessfulWakeTransport = true;
+
+    if (!postAttemptProbe.state.screenOn) {
       continue;
     }
 
     return {
-      status: postAttemptProbe.state.deviceLocked ? "awake_but_locked" : "awake",
+      status: isInteractiveAutomationReady(postAttemptProbe.state) ? "awake" : "awake_but_locked",
       attempts,
       state: postAttemptProbe.state,
+    };
+  }
+
+  if (lastTransportFailure && !observedSuccessfulWakeTransport) {
+    return {
+      status: "transport_failed",
+      attempts,
+      state: lastObservedState,
+      error: lastTransportFailure,
     };
   }
 
@@ -269,18 +300,95 @@ export async function ensureDeviceAwake(
   };
 }
 
-function parseStrictBoolean(stepResult: StepResult, key: string): boolean {
-  const value = stepResult.data[key];
-  if (value === "true") {
-    return true;
+export async function ensureInteractiveAutomationReady(
+  config: RuntimeConfig,
+  options?: {
+    ensureDeviceAwakeFn?: typeof ensureDeviceAwake;
+    probeInteractiveStateFn?: typeof probeInteractiveState;
+    settleDelayMs?: number;
   }
-  if (value === "false") {
-    return false;
+): Promise<InteractiveAutomationReadyResult> {
+  const ensureDeviceAwakeFn = options?.ensureDeviceAwakeFn ?? ensureDeviceAwake;
+  const wakeResult = await ensureDeviceAwakeFn(config, {
+    probeInteractiveStateFn: options?.probeInteractiveStateFn,
+    settleDelayMs: options?.settleDelayMs,
+  });
+
+  switch (wakeResult.status) {
+    case "already_awake":
+    case "awake":
+      if (wakeResult.state && isInteractiveAutomationReady(wakeResult.state)) {
+        return { ok: true, state: wakeResult.state };
+      }
+      return {
+        ok: false,
+        error: {
+          code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
+          message: "Interactive readiness helper returned success without a usable device state.",
+        },
+      };
+    case "awake_but_locked":
+    case "still_asleep":
+      if (wakeResult.state) {
+        return {
+          ok: false,
+          error: buildDeviceNotInteractiveError(wakeResult.state),
+        };
+      }
+      return {
+        ok: false,
+        error: {
+          code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+          message: "Device is not interactive and no interactive-state evidence was available.",
+        },
+      };
+    case "probe_failed":
+    case "transport_failed":
+      return {
+        ok: false,
+        error: {
+          code: wakeResult.error?.code ?? ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+          message: wakeResult.error?.message ?? "Could not prepare the device for interactive automation.",
+          details: wakeResult.state ? toInteractiveStateEvidence(wakeResult.state) : undefined,
+        },
+      };
+  }
+}
+
+export function toInteractiveStateEvidence(
+  state: Pick<InternalInteractiveState, "deviceLocked" | "screenOn" | "userUnlocked">
+): InteractiveStateEvidence {
+  return {
+    deviceLocked: state.deviceLocked,
+    screenOn: state.screenOn,
+    userUnlocked: state.userUnlocked,
+  };
+}
+
+export function buildDeviceNotInteractiveError(
+  state: Pick<InternalInteractiveState, "deviceLocked" | "screenOn" | "userUnlocked">
+): { code: ErrorCode; message: string; details: InteractiveStateEvidence } {
+  return {
+    code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+    message: `Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=${state.screenOn} deviceLocked=${state.deviceLocked} userUnlocked=${state.userUnlocked}`,
+    details: toInteractiveStateEvidence(state),
+  };
+}
+
+export function toPublicInteractiveAutomationError(
+  error: { code: string; message: string }
+): { code: string; message: string } {
+  if (error.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE) {
+    return {
+      code: error.code,
+      message: "Device is not interactive. Interactive automation requires an awake, usable device state.",
+    };
   }
 
-  throw new Error(
-    `doctor_ping returned an invalid boolean for ${key}: ${value === undefined ? "missing" : JSON.stringify(value)}`
-  );
+  return {
+    code: error.code,
+    message: error.message,
+  };
 }
 
 function didWakeCommandFail(adbResult: AdbResult): boolean {
@@ -296,6 +404,20 @@ function buildWakeTransportFailure(
     code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
     message: `Wake attempt ${method} failed before the device became interactive: ${detail}`,
   };
+}
+
+function parseStrictBoolean(stepResult: StepResult, key: string): boolean {
+  const value = stepResult.data[key];
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+
+  throw new Error(
+    `doctor_ping returned an invalid boolean for ${key}: ${value === undefined ? "missing" : JSON.stringify(value)}`
+  );
 }
 
 async function sleep(durationMs: number): Promise<void> {

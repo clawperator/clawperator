@@ -1025,6 +1025,24 @@ This page is intentionally narrow:
 - Use [Errors](errors.md) for exact error codes and recovery
 - Use [Devices](devices.md) for target selection rules
 
+## Readiness Gate
+
+Before treating a target as ready for interactive automation, use
+[Doctor](doctor.md) and require:
+
+- exit code `0`
+- `criticalOk == true`
+- `readiness.device.interactive.status == "pass"`
+
+That doctor check exposes structured evidence:
+
+- `deviceLocked`
+- `screenOn`
+- `userUnlocked`
+
+If doctor reports `DEVICE_NOT_INTERACTIVE`, recover the device state first and
+rerun doctor before moving on to execution commands.
+
 ## Execution Payload
 
 Authoritative source: `apps/node/src/contracts/execution.ts`
@@ -3809,6 +3827,7 @@ Only the codes defined in `apps/node/src/contracts/errors.ts` are part of the pu
 | `DEVICE_DEV_OPTIONS_DISABLED` | Device dev options disabled | - |
 | `DEVICE_USB_DEBUGGING_DISABLED` | Device usb debugging disabled | - |
 | `DEVICE_ACCESSIBILITY_NOT_RUNNING` | Device accessibility not running | - |
+| `DEVICE_NOT_INTERACTIVE` | Device not interactive | - |
 | `ANDROID_BUILD_FAILED` | Android build failed | - |
 | `ANDROID_INSTALL_FAILED` | Android install failed | - |
 | `ANDROID_APP_LAUNCH_FAILED` | Android app launch failed | - |
@@ -3878,6 +3897,7 @@ Notes:
 | Family | Typical codes | What to do next |
 | --- | --- | --- |
 | Device targeting | `NO_DEVICES`, `DEVICE_NOT_FOUND`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Run `clawperator devices`, pick one device, and retry with `--device <serial>` |
+| Interactive readiness | `DEVICE_NOT_INTERACTIVE` | Wake or unlock the target, rerun `clawperator doctor --json`, and confirm the interactive-state check passes |
 | Operator setup | `OPERATOR_NOT_INSTALLED`, `OPERATOR_VARIANT_MISMATCH`, `OPERATOR_INSTALL_FAILED`, `OPERATOR_GRANT_FAILED`, `OPERATOR_VERIFY_FAILED` | Install or repair the expected Operator APK, then rerun the command |
 | Host tooling | `ADB_NOT_FOUND`, `ADB_SERVER_FAILED`, `HOST_DEPENDENCY_MISSING`, `ANDROID_SDK_TOOL_MISSING`, `SCRCPY_NOT_FOUND` | Repair the host environment before retrying |
 | Payload or flag validation | `MISSING_ARGUMENT`, `EXECUTION_VALIDATION_FAILED`, `EXECUTION_ACTION_UNSUPPORTED`, `PAYLOAD_TOO_LARGE` | Change the command or payload. Do not retry unchanged |
@@ -3994,6 +4014,36 @@ Recovery options:
 
 - pass the installed package via `--operator-package`
 - or reinstall the intended APK variant
+
+### `DEVICE_NOT_INTERACTIVE`
+
+Current shipped surface:
+
+- the doctor check `readiness.device.interactive`
+- direct execution preflight before dispatch
+- high-level skill-wrapper pre-spawn checks in:
+  - `clawperator skills run`
+  - `POST /skills/:skillId/run`
+
+Meaning:
+
+- the target device is not currently ready for interactive automation
+- the reported evidence tells you why:
+  - `screenOn`
+  - `deviceLocked`
+  - `userUnlocked`
+- direct execution and high-level skill wrappers may make a bounded host-side
+  wake attempt first when the screen is off
+- if the device remains asleep, is still locked, or still requires post-boot
+  unlock, the runtime returns this error instead of proceeding
+
+Typical recovery:
+
+- wake the device if `screenOn == false`
+- unlock the device if `deviceLocked == true`
+- complete the post-boot unlock if `userUnlocked == false`
+- rerun `clawperator doctor --json` and require
+  `readiness.device.interactive.status == "pass"`
 
 ### `NODE_NOT_FOUND`
 
@@ -4506,6 +4556,16 @@ Each entry in `checks[]` has:
       "status": "pass",
       "summary": "Handshake successful.",
       "detail": "Node successfully dispatched a command and received a valid result envelope."
+    },
+    {
+      "id": "readiness.device.interactive",
+      "status": "pass",
+      "summary": "Device is interactive.",
+      "evidence": {
+        "deviceLocked": false,
+        "screenOn": true,
+        "userUnlocked": true
+      }
     }
   ],
   "nextActions": [
@@ -4531,38 +4591,20 @@ Success conditions:
   "operatorPackage": "com.clawperator.operator.dev",
   "checks": [
     {
-      "id": "readiness.handshake",
+      "id": "readiness.device.interactive",
       "status": "fail",
-      "code": "RESULT_ENVELOPE_TIMEOUT",
-      "summary": "Handshake timed out.",
-      "detail": "No [Clawperator-Result] envelope received within 7000ms. Broadcast dispatch: sent. Operator package: com.clawperator.operator.dev. Device: emulator-5554. No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --json --device emulator-5554 --operator-package com.clawperator.operator.dev' to diagnose.",
-      "fix": {
-        "title": "Grant accessibility permissions via adb",
-        "platform": "any",
-        "steps": [
-          {
-            "kind": "shell",
-            "value": "clawperator grant-device-permissions --device emulator-5554 --operator-package com.clawperator.operator.dev"
-          },
-          {
-            "kind": "shell",
-            "value": "clawperator snapshot --device emulator-5554 --operator-package com.clawperator.operator.dev --timeout 5000 --verbose"
-          }
-        ],
-        "docsUrl": "https://docs.clawperator.com/troubleshooting/operator/"
-      },
-      "deviceGuidance": {
-        "screen": "Accessibility Settings",
-        "steps": [
-          "Ensure Clawperator Accessibility Service is ON in Android Settings"
-        ]
+      "code": "DEVICE_NOT_INTERACTIVE",
+      "summary": "Device is not interactive.",
+      "detail": "Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=true userUnlocked=false",
+      "evidence": {
+        "deviceLocked": true,
+        "screenOn": false,
+        "userUnlocked": false
       }
     }
   ],
   "nextActions": [
-    "clawperator grant-device-permissions --device emulator-5554 --operator-package com.clawperator.operator.dev",
-    "clawperator snapshot --device emulator-5554 --operator-package com.clawperator.operator.dev --timeout 5000 --verbose",
-    "On device, open Accessibility Settings and follow the listed steps."
+    "On device, wake and unlock the target before rerunning doctor."
   ]
 }
 ```
@@ -4620,7 +4662,8 @@ Doctor runs checks in this order:
 | 8 | `readiness.version.compatibility` | only if APK presence passed |
 | 9 | `readiness.settings.dev_options`, `readiness.settings.usb_debugging` | after device capability and APK presence checks; these still run even when version compatibility was skipped |
 | 10 | `readiness.handshake` | only if APK presence passed and version compatibility passed |
-| 11 | `readiness.smoke` | only with `--full`, and only if APK presence and version compatibility passed |
+| 11 | `readiness.device.interactive` | only if handshake passed |
+| 12 | `readiness.smoke` | only with `--full`, and only if handshake and interactive-state checks passed |
 
 Halting rule:
 
@@ -4645,6 +4688,7 @@ build.android.launch
 readiness.apk.presence
 readiness.version.compatibility
 readiness.handshake
+readiness.device.interactive
 readiness.smoke
 ```
 
@@ -4732,6 +4776,7 @@ For a failing check, pretty output includes:
 | `readiness.settings.dev_options` | `pass`, `warn` | `DEVICE_DEV_OPTIONS_DISABLED` | developer options setting is enabled |
 | `readiness.settings.usb_debugging` | `pass`, `warn` | `DEVICE_USB_DEBUGGING_DISABLED` | USB debugging setting is enabled |
 | `readiness.handshake` | `pass`, `fail` | `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `RESULT_ENVELOPE_TIMEOUT`, `BROADCAST_FAILED`, `OPERATOR_NOT_INSTALLED` | Node can dispatch and receive a valid result envelope |
+| `readiness.device.interactive` | `pass`, `fail` | `DEVICE_NOT_INTERACTIVE`, or the underlying probe failure code if state could not be verified | the target is awake enough for interactive automation, with evidence fields `deviceLocked`, `screenOn`, and `userUnlocked` |
 | `readiness.smoke` | `pass`, `fail` | `SMOKE_OPEN_SETTINGS_FAILED` | smoke execution can open Settings and produce at least one successful `snapshot_ui` step |
 
 ## Common Failure Recovery
@@ -4820,6 +4865,28 @@ Recovery:
 - run `clawperator grant-device-permissions ...`
 - follow `deviceGuidance.screen == "Accessibility Settings"`
 - rerun doctor
+
+### `DEVICE_NOT_INTERACTIVE`
+
+Meaning:
+
+- handshake succeeded, so the runtime is reachable
+- the follow-up interactive-state probe reported that the target is not ready
+  for interactive automation
+- inspect the check evidence:
+  - `screenOn`
+  - `deviceLocked`
+  - `userUnlocked`
+
+Recovery:
+
+- wake the device if `screenOn == false`
+- unlock the device if `deviceLocked == true`
+- complete the post-boot unlock if `userUnlocked == false`
+- rerun `clawperator doctor --json` and require:
+  - exit code `0`
+  - `criticalOk == true`
+  - `readiness.device.interactive.status == "pass"`
 
 ## Agent Sequence
 
@@ -6461,6 +6528,7 @@ When a handler returns an enum-backed error from `errors.ts`, `serve.ts` maps it
 | `EXECUTION_VALIDATION_FAILED` | `400` |
 | `PAYLOAD_TOO_LARGE` | `413` |
 | `RESULT_ENVELOPE_TIMEOUT` | `504` |
+| `DEVICE_NOT_INTERACTIVE` | `409` |
 | `EMULATOR_NOT_FOUND` | `404` |
 | `EMULATOR_NOT_RUNNING` | `404` |
 | `EMULATOR_UNSUPPORTED` | `409` |
@@ -9202,15 +9270,17 @@ What the wrapper does:
 1. resolves `CLAWPERATOR_BIN` for the child process
 2. resolves `CLAWPERATOR_OPERATOR_PACKAGE` for the child process
 3. validates the skill with `validateSkill(skillId, undefined, { dryRun: true })` unless `--skip-validate` is passed
-4. loads the registry entry
-5. chooses a script, preferring `.js`, then `.sh`, then the first listed script
-6. spawns the script
-7. captures raw stdout and stderr
-8. enforces a timeout
+4. resolves the target device and probes interactive state
+5. loads the registry entry
+6. chooses a script, preferring `.js`, then `.sh`, then the first listed script
+7. spawns the script
+8. captures raw stdout and stderr
+9. enforces a timeout
 
 Argument passing rules:
 
-- if `--device` was provided, the wrapper prepends that device id as the first script argument
+- if `--device` was provided, the wrapper passes that explicit device id through `CLAWPERATOR_DEVICE_ID`, and `runSkill()` prepends it as the first script argument for script-driven skills
+- if `--device` was omitted, the wrapper still may resolve a single connected device for preflight, but it does not inject that implicit device selection into the child env or argv, and inherited ambient `CLAWPERATOR_DEVICE_ID` is cleared for the child process
 - unknown trailing tokens such as `--limit 40` are forwarded to the script unchanged
 - use `--` when you need to force literal passthrough for tokens that would otherwise be parsed as wrapper flags
 - `CLAWPERATOR_BIN` and `CLAWPERATOR_OPERATOR_PACKAGE` are injected into the script environment
@@ -9253,6 +9323,26 @@ Check these exact fields:
 - `exitCode` is `0` on success
 - `durationMs` is the measured wrapper runtime
 - `timeoutMs` is present only when a timeout override was passed on the CLI
+
+To verify the wrapper-side readiness gate, run against a sleeping or locked device:
+
+```bash
+clawperator skills run com.android.settings.capture-overview --device <device_serial> --json
+```
+
+Expected pre-spawn failure shape:
+
+```json
+{
+  "code": "DEVICE_NOT_INTERACTIVE",
+  "message": "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=true userUnlocked=true",
+  "details": {
+    "deviceLocked": true,
+    "screenOn": false,
+    "userUnlocked": true
+  }
+}
+```
 
 To verify wrapper-side output assertions, run:
 
@@ -9415,6 +9505,21 @@ The pre-run validation gate can stop the command before script execution. `cmdSk
 }
 ```
 
+The readiness gate can also stop the command before script execution when the
+resolved device is not interactive:
+
+```json
+{
+  "code": "DEVICE_NOT_INTERACTIVE",
+  "message": "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=true userUnlocked=true",
+  "details": {
+    "deviceLocked": true,
+    "screenOn": false,
+    "userUnlocked": true
+  }
+}
+```
+
 For script-only skills, dry-run payload validation is skipped on purpose. The success payload from `skills validate --dry-run` includes:
 
 ```json
@@ -9450,8 +9555,16 @@ The serve wrapper uses the same underlying registry and `runSkill()` runtime, wi
 
 Important boundary:
 
-- the serve route calls `runSkill()` directly
-- it does not go through the full CLI `cmdSkillsRun()` path, so it does not include the CLI pre-run validation gate or the CLI banner behavior
+- the serve route validates the skill, resolves `operatorPackage`, and after the requested Operator package check passes it uses the same bounded pre-spawn readiness preparation as `skills run`
+- when the screen is off, that preparation may wake the device before the skill process is spawned
+- it still fails with `DEVICE_NOT_INTERACTIVE` for awake-but-locked or post-boot-locked states
+- it does not go through the full CLI `cmdSkillsRun()` path, so it still does not include the CLI banner behavior
+- serve accepts optional request fields:
+  - `deviceId`
+  - `operatorPackage`
+  - `args`
+  - `timeoutMs`
+  - `expectContains`
 
 ## Error Codes
 
@@ -11630,6 +11743,7 @@ Before `clawperator skills run`, the target should already satisfy the normal Cl
 2. expected Operator package installed
 3. accessibility service running
 4. version compatibility healthy
+5. interactive device state healthy
 
 Recommended verification:
 
@@ -11641,12 +11755,41 @@ Treat the device as ready only when:
 
 - exit code `0`
 - `criticalOk == true`
+- `checks` includes `readiness.device.interactive` with `status: "pass"`
 
 Verification pattern:
 
 - run `clawperator doctor --json --device <device_serial> --operator-package <package>`
 - confirm `report.operatorPackage` matches the package you plan to use inside the skill
 - confirm the doctor report is for the same `deviceId` you plan to pass to `skills run`
+
+High-level wrapper enforcement now matches that readiness contract:
+
+- `clawperator skills run` resolves the target tuple, checks the requested Operator package first, and when the target is asleep it makes a bounded host-side wake attempt before failing with `DEVICE_NOT_INTERACTIVE`
+- `POST /skills/:skillId/run` in serve performs the same pre-spawn readiness preparation
+
+Current bounded wake behavior:
+
+- if the device is already awake and ready, the wrapper proceeds immediately
+- if the screen is off, the wrapper tries host-side wake in the internal retry
+  order and then re-checks readiness
+- if the device is awake but still locked, or Android still reports
+  `userUnlocked == false`, the wrapper fails with `DEVICE_NOT_INTERACTIVE`
+- the wrapper does not attempt credential entry or secure-keyguard bypass
+
+Wrapper-level non-interactive failure shape:
+
+```json
+{
+  "code": "DEVICE_NOT_INTERACTIVE",
+  "message": "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=true userUnlocked=true",
+  "details": {
+    "deviceLocked": true,
+    "screenOn": false,
+    "userUnlocked": true
+  }
+}
+```
 
 For first-time setup, use [Setup](../setup.md). For runtime recovery, use [Operator App](../troubleshooting/operator.md).
 
@@ -11658,13 +11801,14 @@ The wrapper injects these environment variables:
 | --- | --- |
 | `CLAWPERATOR_BIN` | command the skill should use when it needs to invoke Clawperator |
 | `CLAWPERATOR_OPERATOR_PACKAGE` | Operator package the skill should target on its internal CLI calls |
+| `CLAWPERATOR_DEVICE_ID` | explicit device selection only; present only when the caller passed `--device` or serve `deviceId` |
 
 Resolution behavior:
 
 - `CLAWPERATOR_BIN` uses explicit env override first, then a local sibling build, then global `clawperator`
 - `CLAWPERATOR_OPERATOR_PACKAGE` uses the explicit wrapper flag first, then environment, then `com.clawperator.operator`
 
-The wrapper also preserves the rest of `process.env` when spawning the child process.
+The wrapper preserves the rest of `process.env` when spawning the child process, but it explicitly clears inherited `CLAWPERATOR_DEVICE_ID` unless the caller passed an explicit device selection.
 
 The exact `CLAWPERATOR_BIN` resolution order from `resolveSkillBin()` is:
 
@@ -11694,10 +11838,13 @@ Then verify the skill's internal `clawperator` calls behave against the intended
 
 `runSkill()` itself does not invent a device id. The CLI wrapper decides argument passing.
 
-Current `skills run` behavior:
+Current high-level wrapper behavior:
 
-- if `--device <serial>` is present, the wrapper prepends that serial as the first child argument
-- then it appends any forwarded args after `--`
+- both CLI `skills run` and serve `POST /skills/:skillId/run` may resolve a target device for readiness preflight even when the caller omitted explicit device selection
+- that implicit resolution is preflight-only
+- if `--device <serial>` or serve `deviceId` is present, the wrapper writes that explicit value into `CLAWPERATOR_DEVICE_ID`
+- for script-driven skills, `runSkill()` then prepends `CLAWPERATOR_DEVICE_ID` as the first child argument
+- then the wrapper appends any forwarded args after `--`
 
 That means most scripts should expect:
 
@@ -11718,7 +11865,7 @@ Confirm that your script receives:
 - first positional child argument: `<device_serial>`
 - remaining forwarded args after that: `--mode`, `smoke`
 
-If `--device` is omitted, the wrapper passes no synthetic device argument at all.
+If `--device` is omitted, the wrapper still may resolve a single connected device for preflight, but it passes no synthetic device argument into the child process.
 
 ## Timeout Behavior
 
@@ -11780,7 +11927,8 @@ clawperator skills run com.android.settings.capture-overview --device <device_se
 
 Why:
 
-- the wrapper forwards the selected device id into the child script
+- the wrapper uses the resolved target device for pre-spawn readiness
+- the wrapper forwards only explicit caller-supplied device selection into the child script
 - the child script can then pass that same serial into its internal Clawperator calls
 
 Without explicit targeting, skill behavior depends on what the script itself does. The wrapper does not auto-add a device argument unless one was provided.

@@ -303,6 +303,76 @@ describe("DoctorService", () => {
       "clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device test-device-1",
     ]);
   });
+
+  it("marks non-interactive devices critical and skips smoke", async () => {
+    const runner = new FakeProcessRunner();
+    const config = withTempAgentSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator.dev" }), fakeRegistryDir);
+    let smokeCalled = false;
+
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: 'openjdk version "21.0.1"', stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "33\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Physical size: 1080x2400\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Physical density: 420\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator.dev\n", stderr: "" });
+    runner.queueResult({
+      code: 0,
+      stdout: `    versionCode=606060 minSdk=21 targetSdk=35\n    versionName=${getCliVersion()}-d\n`,
+      stderr: "",
+    });
+    runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
+
+    const report = await new DoctorService({
+      runHandshake: async () => ({
+        id: "readiness.handshake",
+        status: "pass",
+        summary: "Handshake successful.",
+      }),
+      checkDeviceInteractiveState: async () => ({
+        id: "readiness.device.interactive",
+        status: "fail",
+        code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+        summary: "Device is not interactive.",
+        evidence: {
+          deviceLocked: true,
+          screenOn: false,
+          userUnlocked: false,
+        },
+      }),
+      runSmokeTest: async () => {
+        smokeCalled = true;
+        return {
+          id: "readiness.smoke",
+          status: "pass",
+          summary: "Smoke test successful.",
+        };
+      },
+    }).run({ config, full: true });
+
+    assert.strictEqual(report.criticalOk, false);
+    assert.strictEqual(report.ok, false);
+    assert.strictEqual(smokeCalled, false);
+
+    const interactiveCheck = report.checks.find(check => check.id === "readiness.device.interactive");
+    assert.ok(interactiveCheck);
+    assert.strictEqual(interactiveCheck.status, "fail");
+    assert.strictEqual(interactiveCheck.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
+    assert.deepStrictEqual(interactiveCheck.evidence, {
+      deviceLocked: true,
+      screenOn: false,
+      userUnlocked: false,
+    });
+    assert.ok(!report.checks.some(check => check.id === "readiness.smoke"));
+  });
 });
 
 describe("DoctorService logging", () => {

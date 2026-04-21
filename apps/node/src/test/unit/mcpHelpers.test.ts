@@ -10,7 +10,7 @@ import { mapSelectorToNodeMatcher, mcpSelectorSchema } from "../../mcp/selectors
 import { createSessionDefaults } from "../../mcp/session.js";
 import { applySnapshotMaxChars, applySnapshotMaxCharsToEnvelope, getCoreMcpTools } from "../../mcp/tools/core.js";
 import { getNamedMcpTools } from "../../mcp/tools/named.js";
-import { executionToolOptionsSchema, mergeWithSessionDefaults, type ExecutionToolOptions } from "../../mcp/tools/common.js";
+import { buildExecutionToolFailureResult, executionToolOptionsSchema, mergeWithSessionDefaults, type ExecutionToolOptions } from "../../mcp/tools/common.js";
 
 describe("createMcpExecutionIds", () => {
   it("generates distinct IDs with the expected prefix", () => {
@@ -522,6 +522,31 @@ describe("normalizeMcpError", () => {
       details: {
         safe: "ok",
       },
+    });
+  });
+
+  it("returns an MCP error result for DEVICE_NOT_INTERACTIVE preflight failures", () => {
+    const result = buildExecutionToolFailureResult({
+      code: "DEVICE_NOT_INTERACTIVE",
+      message: "Device is not interactive.",
+      details: {
+        deviceLocked: true,
+        screenOn: false,
+        userUnlocked: true,
+      },
+      deviceId: "device-123",
+    });
+
+    assert.strictEqual(result.isError, true);
+    assert.deepStrictEqual(result.structuredContent, {
+      code: "DEVICE_NOT_INTERACTIVE",
+      message: "Device is not interactive.",
+      details: {
+        deviceLocked: true,
+        screenOn: false,
+        userUnlocked: true,
+      },
+      deviceId: "device-123",
     });
   });
 

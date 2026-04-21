@@ -11,12 +11,18 @@ import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
 import { SKILL_RESULT_FRAME_PREFIX } from "../../contracts/skillResult.js";
 import { SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
+import type { DoctorCheckResult } from "../../contracts/doctor.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
 import { getCliVersion } from "../../domain/version/compatibility.js";
 import { getAlternateOperatorVariant } from "../../domain/version/compatibility.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { checkApkPresence } from "../../domain/doctor/checks/readinessChecks.js";
+import {
+  ensureInteractiveAutomationReady,
+  probeInteractiveState,
+} from "../../domain/doctor/checks/deviceInteractivity.js";
+import { resolveDevice } from "../../domain/devices/resolveDevice.js";
 import type { Logger } from "../../adapters/logger.js";
 import type { LogEvent } from "../../contracts/logging.js";
 import {
@@ -190,6 +196,109 @@ function sanitizePrettySkillStdout(stdout: string | undefined, skillResultPresen
   return stripTrailingSkillResultFrame(stdout);
 }
 
+interface CommandLikeError {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+  deviceId?: string;
+}
+
+export type ResolveInteractiveSkillTargetResult =
+  | { ok: true; deviceId: string; apkPresence: DoctorCheckResult }
+  | { ok: false; error: CommandLikeError };
+
+function normalizeCommandLikeError(error: unknown): CommandLikeError {
+  if (typeof error === "object" && error !== null) {
+    const maybeCode = "code" in error ? error.code : undefined;
+    const maybeMessage = "message" in error ? error.message : undefined;
+    const maybeDetails = "details" in error ? error.details : undefined;
+    if (typeof maybeCode === "string" && typeof maybeMessage === "string") {
+      return {
+        code: maybeCode,
+        message: maybeMessage,
+        details: typeof maybeDetails === "object" && maybeDetails !== null
+          ? maybeDetails as Record<string, unknown>
+          : undefined,
+      };
+    }
+  }
+
+  return {
+    code: "INTERNAL_ERROR",
+    message: error instanceof Error ? error.message : String(error),
+  };
+}
+
+export async function resolveInteractiveSkillTarget(
+  operatorPackage: string,
+  options?: {
+    adbPath?: string;
+    deviceId?: string;
+    logger?: Logger;
+    resolveDeviceImpl?: typeof resolveDevice;
+    checkApkPresenceImpl?: typeof checkApkPresence;
+    ensureInteractiveAutomationReadyImpl?: typeof ensureInteractiveAutomationReady;
+    probeInteractiveStateImpl?: typeof probeInteractiveState;
+  }
+): Promise<ResolveInteractiveSkillTargetResult> {
+  const logger = options?.logger;
+  const resolveDeviceImpl = options?.resolveDeviceImpl ?? resolveDevice;
+  const checkApkPresenceImpl = options?.checkApkPresenceImpl ?? checkApkPresence;
+  const ensureInteractiveAutomationReadyImpl = options?.ensureInteractiveAutomationReadyImpl ?? ensureInteractiveAutomationReady;
+  const probeInteractiveStateImpl = options?.probeInteractiveStateImpl ?? probeInteractiveState;
+
+  let resolvedDevice;
+  try {
+    resolvedDevice = await resolveDeviceImpl(getDefaultRuntimeConfig({
+      adbPath: options?.adbPath,
+      deviceId: options?.deviceId,
+      operatorPackage,
+      logger,
+    }));
+  } catch (error) {
+    return {
+      ok: false,
+      error: normalizeCommandLikeError(error),
+    };
+  }
+
+  const config = getDefaultRuntimeConfig({
+    adbPath: options?.adbPath,
+    deviceId: resolvedDevice.deviceId,
+    operatorPackage,
+    logger,
+  });
+  const apkPresence = await checkApkPresenceImpl(config);
+  if (apkPresence.status !== "pass") {
+    return {
+      ok: true,
+      deviceId: resolvedDevice.deviceId,
+      apkPresence,
+    };
+  }
+
+  const readiness = await ensureInteractiveAutomationReadyImpl(config, {
+    probeInteractiveStateFn: probeInteractiveStateImpl,
+  });
+  if (!readiness.ok) {
+    return {
+      ok: false,
+      error: {
+        code: readiness.error.code,
+        message: readiness.error.message,
+        details: readiness.error.details,
+        deviceId: resolvedDevice.deviceId,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    deviceId: resolvedDevice.deviceId,
+    apkPresence,
+  };
+}
+
 export async function cmdSkillsList(options: { format: OutputOptions["format"] }): Promise<string> {
   const result = await listSkills();
   if (result.ok) {
@@ -293,6 +402,7 @@ export async function cmdSkillsRun(
     deviceId?: string;
     runSkillImpl?: typeof runSkill;
     validateSkillImpl?: typeof validateSkill;
+    resolveInteractiveSkillTargetImpl?: typeof resolveInteractiveSkillTarget;
     logger?: Logger;
   }
 ): Promise<string> {
@@ -304,6 +414,7 @@ export async function cmdSkillsRun(
   const env: SkillRunEnv = {
     [CLAWPERATOR_BIN_ENV_VAR]: resolvedBin,
     [CLAWPERATOR_OPERATOR_PACKAGE_ENV_VAR]: resolvedOperatorPackage,
+    [CLAWPERATOR_DEVICE_ID_ENV_VAR]: undefined,
   };
   if (options.deviceId !== undefined) {
     if (options.deviceId.trim().length === 0) {
@@ -318,6 +429,7 @@ export async function cmdSkillsRun(
   const runSkillImpl = options.runSkillImpl ?? runSkill;
   const validateSkillImpl = options.validateSkillImpl ?? validateSkill;
   const cliLogger = options.logger?.child({ skillId, deviceId: options.deviceId });
+  const resolveInteractiveSkillTargetImpl = options.resolveInteractiveSkillTargetImpl ?? resolveInteractiveSkillTarget;
   let validationSkipped = false;
   if (!options.skipValidate) {
     const validation = await validateSkillImpl(skillId, undefined, { dryRun: true });
@@ -331,24 +443,22 @@ export async function cmdSkillsRun(
     validationSkipped = validation.dryRun?.payloadValidation === "skipped";
   }
 
-  const config = getDefaultRuntimeConfig({
+  const interactiveTarget = await resolveInteractiveSkillTargetImpl(resolvedOperatorPackage, {
+    adbPath: process.env.ADB_PATH,
     deviceId: options.deviceId,
-    operatorPackage: resolvedOperatorPackage,
     logger: cliLogger,
   });
-  let apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
-  try {
-    const apkPresence = await checkApkPresence(config);
-    if (apkPresence.status === "pass") {
-      apkStatus = `OK (${resolvedOperatorPackage})`;
-    } else if (apkPresence.status === "warn") {
-      const alternateVariant = getAlternateOperatorVariant(resolvedOperatorPackage);
-      apkStatus = `WARN - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""} Use --operator-package ${alternateVariant} or reinstall the matching APK.`;
-    } else {
-      apkStatus = `FAIL - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""}`;
-    }
-  } catch {
-    apkStatus = `MISSING - run \`clawperator operator setup --apk <path>\``;
+  if (!interactiveTarget.ok) {
+    return formatError(interactiveTarget.error, options);
+  }
+
+  const apkPresence = interactiveTarget.apkPresence;
+  let apkStatus = `OK (${resolvedOperatorPackage})`;
+  if (apkPresence.status === "warn") {
+    const alternateVariant = getAlternateOperatorVariant(resolvedOperatorPackage);
+    apkStatus = `WARN - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""} Use --operator-package ${alternateVariant} or reinstall the matching APK.`;
+  } else if (apkPresence.status === "fail") {
+    apkStatus = `FAIL - ${apkPresence.summary}${apkPresence.detail ? ` ${apkPresence.detail}` : ""}`;
   }
 
   const logDate = new Date();

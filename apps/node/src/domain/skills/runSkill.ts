@@ -604,6 +604,13 @@ export async function runSkill(
     ...process.env,
     ...env,
   };
+  if (env !== undefined) {
+    for (const [key, value] of Object.entries(env)) {
+      if (value === undefined) {
+        delete childEnv[key];
+      }
+    }
+  }
   try {
     const loaded = await loadRegistry(registryPath);
     resolvedRegistryPath = loaded.resolvedPath;

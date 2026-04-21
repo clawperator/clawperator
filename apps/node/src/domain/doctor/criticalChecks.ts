@@ -13,6 +13,7 @@ export const CRITICAL_DOCTOR_CHECK_PREFIXES = [
   "readiness.apk.presence",
   "readiness.version.compatibility",
   "readiness.handshake",
+  "readiness.device.interactive",
   "readiness.smoke",
 ] as const;
 
