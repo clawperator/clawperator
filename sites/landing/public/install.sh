@@ -1512,7 +1512,7 @@ maybe_install_operator_apk() {
         while IFS=$'\t' read -r device_id device_state; do
             [ -n "$device_id" ] || continue
             if [ "$device_state" = "device" ]; then
-                if doctor_report_connected_device "$device_id"; then
+                if doctor_report_connected_device "$device_id" "$DEFAULT_OPERATOR_PACKAGE"; then
                     if [ "${DOCTOR_DEVICE_STATUS:-}" = "critical" ]; then
                         critical_count=$((critical_count + 1))
                     fi
@@ -1658,9 +1658,10 @@ process.stdin.on('data', c => d += c).on('end', () => {
 
 doctor_report_connected_device() {
     local device_id="$1"
+    local operator_package="$2"
     local doctor_json
 
-    doctor_json="$("$CLAWPERATOR_BIN_PATH" doctor --device "$device_id" --format json || true)"
+    doctor_json="$("$CLAWPERATOR_BIN_PATH" doctor --device "$device_id" --format json --operator-package "$operator_package" 2>/dev/null || true)"
     if doctor_report_all_checks_pass "$doctor_json"; then
         DOCTOR_DEVICE_STATUS="pass"
         echo -e "${GREEN}  ✅ ${device_id} - ready${NC}"
@@ -1684,24 +1685,26 @@ doctor_each_connected_device() {
     fi
 
     local device_id=""
+    local device_state=""
     local device_count=0
     local ready_count=0
 
     echo -e "${BLUE}Checking each connected device with Clawperator Doctor...${NC}"
     local critical_count=0
-    local fail_count=0
-    while IFS= read -r device_id; do
+    while IFS=$'\t' read -r device_id device_state; do
         [ -n "$device_id" ] || continue
         device_count=$((device_count + 1))
-        if doctor_report_connected_device "$device_id"; then
-            ready_count=$((ready_count + 1))
-            if [ "${DOCTOR_DEVICE_STATUS:-}" = "critical" ]; then
-                critical_count=$((critical_count + 1))
+        if [ "$device_state" = "device" ]; then
+            if doctor_report_connected_device "$device_id" "$DEFAULT_OPERATOR_PACKAGE"; then
+                ready_count=$((ready_count + 1))
+                if [ "${DOCTOR_DEVICE_STATUS:-}" = "critical" ]; then
+                    critical_count=$((critical_count + 1))
+                fi
             fi
         else
-            fail_count=$((fail_count + 1))
+            echo -e "${YELLOW}  ⚠  ${device_id} - ADB state: ${device_state}. Unlock the device or restart ADB before setup.${NC}"
         fi
-    done < <(list_connected_devices)
+    done < <(list_detected_android_devices)
 
     if [ "$device_count" -gt 0 ] && [ "$ready_count" -eq "$device_count" ]; then
         if [ "$critical_count" -gt 0 ]; then
@@ -1716,7 +1719,7 @@ print_manual_operator_setup_commands() {
     echo -e "${YELLOW}Complete Android setup on one target device with one of:${NC}"
     while IFS= read -r device_id; do
         [ -n "$device_id" ] || continue
-        echo -e "${YELLOW}  clawperator operator setup --apk ${APK_LOCAL_PATH} --device ${device_id}${NC}"
+        echo -e "${YELLOW}  clawperator operator setup --apk ${APK_LOCAL_PATH} --device ${device_id} --operator-package ${DEFAULT_OPERATOR_PACKAGE}${NC}"
     done < <(list_connected_devices)
 }
 
@@ -1750,7 +1753,7 @@ EOF
 run_doctor_and_fix() {
     echo -e "${BLUE}Running Clawperator Doctor to verify environment...${NC}"
     local DOCTOR_JSON
-    DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json || true)"
+    DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json --operator-package "$DEFAULT_OPERATOR_PACKAGE" 2>/dev/null || true)"
 
     # Check for ADB
     if doctor_check_status "$DOCTOR_JSON" "host.adb.presence" "fail"; then
@@ -1770,7 +1773,7 @@ run_doctor_and_fix() {
 
     # Check for Handshake (permissions)
     # Re-run doctor to see if APK install fixed handshake, or if we need to grant permissions
-    DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json || true)"
+    DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json --operator-package "$DEFAULT_OPERATOR_PACKAGE" 2>/dev/null || true)"
     maybe_record_unambiguous_connected_device_serial
     if doctor_check_status "$DOCTOR_JSON" "readiness.handshake" "fail"; then
         local DEVICE_COUNT
@@ -1825,14 +1828,14 @@ main() {
     echo ""
     echo -e "${BLUE}Final Doctor Check...${NC}"
     local FINAL_DOCTOR_JSON
-    FINAL_DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json || true)"
+    FINAL_DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json --operator-package "$DEFAULT_OPERATOR_PACKAGE" 2>/dev/null || true)"
     if doctor_check_code "$FINAL_DOCTOR_JSON" "device.discovery" "MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"; then
         echo -e "${YELLOW}⚠️  Host install completed, but Android setup is still pending because more than one device is connected.${NC}"
         doctor_each_connected_device
         print_manual_operator_setup_commands
         echo ""
         echo -e "${YELLOW}After setup, verify one device explicitly with:${NC}"
-        echo -e "${YELLOW}  clawperator doctor --device <device_id> --output pretty${NC}"
+        echo -e "${YELLOW}  clawperator doctor --device <device_id> --output pretty --operator-package ${DEFAULT_OPERATOR_PACKAGE}${NC}"
         echo ""
         echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
         echo -e "${GREEN}  Installation Complete (Device Selection Required)${NC}"
@@ -1842,11 +1845,11 @@ main() {
     fi
     if ! doctor_report_ok "$FINAL_DOCTOR_JSON"; then
         echo -e "${RED}❌ Final doctor check failed.${NC}"
-        "$CLAWPERATOR_BIN_PATH" doctor --output pretty || true
+        "$CLAWPERATOR_BIN_PATH" doctor --output pretty --operator-package "$DEFAULT_OPERATOR_PACKAGE" 2>/dev/null || true
         print_durable_artifact_summary
         return 1
     fi
-    "$CLAWPERATOR_BIN_PATH" doctor --output pretty
+    "$CLAWPERATOR_BIN_PATH" doctor --output pretty --operator-package "$DEFAULT_OPERATOR_PACKAGE" 2>/dev/null
 
     echo ""
     echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"

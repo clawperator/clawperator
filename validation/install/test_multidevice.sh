@@ -48,7 +48,7 @@ serial-bad	unauthorized
 OUT
 EOF
             chmod +x "$mock_dir/adb"
-            cat > "$mock_dir/clawperator" <<'EOF'
+cat > "$mock_dir/clawperator" <<'EOF'
 #!/usr/bin/env bash
 if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-ready ]; then
     cat <<'JSON'
