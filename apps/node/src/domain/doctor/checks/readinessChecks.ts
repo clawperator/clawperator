@@ -4,6 +4,7 @@ import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatResultReader.js";
+import { runDoctorPingCommand } from "./deviceInteractivity.js";
 import {
   getAlternateOperatorVariant,
   getCliVersion,
@@ -185,24 +186,7 @@ export async function runHandshake(
   config: RuntimeConfig,
   _waitForResultEnvelope = waitForResultEnvelope
 ): Promise<DoctorCheckResult> {
-  const commandId = `handshake-${Date.now()}`;
-  const payload = JSON.stringify({
-    commandId,
-    taskId: "doctor-handshake",
-    source: "clawperator-doctor",
-    expectedFormat: "android-ui-automator",
-    actions: [{ id: "h1", type: "doctor_ping" }],
-    timeoutMs: 5000,
-  });
-
-  // Clear logcat for clean handshake capture
-  await runAdb(config, ["logcat", "-c"]);
-
-  const result = await _waitForResultEnvelope(
-    config,
-    { commandId, timeoutMs: 7000 },
-    async () => broadcastAgentCommand(config, payload)
-  );
+  const result = await runDoctorPingCommand(config, _waitForResultEnvelope);
 
   if (result.ok) {
     if (result.envelope.status === "success") {
