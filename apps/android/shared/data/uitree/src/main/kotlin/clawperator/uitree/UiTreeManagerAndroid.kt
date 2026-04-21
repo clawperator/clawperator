@@ -283,7 +283,7 @@ class UiTreeManagerAndroid(
         val wireValue: String,
     ) {
         NotRequested("not_requested"),
-        ImeEnterAction("ime_action"),
+        ImeEditorAction("ime_action"),
         ClickFallback("click_fallback"),
         Unavailable("submit_unavailable"),
     }
@@ -347,7 +347,7 @@ class UiTreeManagerAndroid(
                 supportsImeEnterAction(target) &&
                 target.performAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_IME_ENTER.id)
             ) {
-                return SubmitMethod.ImeEnterAction
+                return SubmitMethod.ImeEditorAction
             }
 
             return if (target.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
@@ -450,7 +450,7 @@ class UiTreeManagerAndroid(
 
             val editorAction = editorInfo?.let(::resolveEditorAction) ?: return SubmitMethod.Unavailable
             return if (session.performEditorAction(editorAction)) {
-                SubmitMethod.ImeEnterAction
+                SubmitMethod.ImeEditorAction
             } else {
                 SubmitMethod.Unavailable
             }

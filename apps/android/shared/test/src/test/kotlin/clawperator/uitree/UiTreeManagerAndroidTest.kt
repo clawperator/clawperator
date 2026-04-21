@@ -58,6 +58,37 @@ class UiTreeManagerAndroidTest {
         }
 
     @Test
+    fun `setText clear failure can fall through to api33 input connection`() =
+        runTest {
+            val session = FakeTextInputSession(initialText = "existing")
+            val manager = createManager(textInputConnectionSource = FakeTextInputConnectionSource(session))
+            val nodeInfo = editableNode()
+            val shadow = Shadow.extract<ShadowAccessibilityNodeInfo>(nodeInfo)
+            shadow.setOnPerformActionListener { action, arguments ->
+                if (action != AccessibilityNodeInfo.ACTION_SET_TEXT) {
+                    true
+                } else {
+                    arguments?.getCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE) != ""
+                }
+            }
+            val uiNode = uiNode(nodeInfo)
+
+            val result = manager.setText(uiNode = uiNode, text = "hello", submit = false, clear = true)
+
+            assertTrue(result)
+            assertEquals(listOf(""), performedSetTextValues(nodeInfo))
+            assertEquals("hello", session.text)
+            assertEquals(
+                listOf(
+                    "setSelection(2147483647,2147483647)",
+                    "deleteSurroundingText(2147483647,0)",
+                    "commitText(hello,1)",
+                ),
+                session.operations,
+            )
+        }
+
+    @Test
     fun `setText clear false performs one text set`() =
         runTest {
             val manager = createManager()
