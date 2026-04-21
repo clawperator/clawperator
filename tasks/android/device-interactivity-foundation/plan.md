@@ -26,7 +26,7 @@ This pack does not add a new public `clawperator` wake or unlock API.
 | Total phases | 4 |
 | Completed | 1, 2, 3, 4 |
 | Remaining | none |
-| Current / Next | Complete; next dependent pack is `tasks/api/doctor-enhancements/` |
+| Current / Next | Complete; implementation landed on `android/device-interactivity-foundation`, with post-review fixes on `codex/device-interactivity-foundation-review-fixes`; next dependent pack is `tasks/api/doctor-enhancements/` |
 | Blockers | none |
 
 ## Goal
@@ -242,13 +242,23 @@ After PR-2:
 
 ## Closeout
 
-Implemented on branch `codex/device-interactivity-foundation` with focused
+Implemented on branch `android/device-interactivity-foundation` with focused
 commits for:
 
 - Android truth-model correction and regression coverage
 - internal Android `doctor_ping` diagnostics
 - Node internal interactivity probe and wake helper
 - durable internal documentation updates after live-device validation
+
+Post-review follow-up fixes were landed on
+`codex/device-interactivity-foundation-review-fixes` for:
+
+- failing closed on unsuccessful `doctor_ping` steps
+- preserving `awake_but_locked` on the initial interactive probe
+- keeping `logcat -c` out of the reusable probe path
+- proving the Android `doctor_ping` payload uses direct queries rather than
+  evented flows
+- separating wake transport failure from `still_asleep`
 
 Validated during implementation with:
 
@@ -258,7 +268,12 @@ Validated during implementation with:
 - `npm --prefix apps/node run test`
 - physical Samsung-device proof using the debug operator package and the
   branch-local Node build
-  one physical device
+
+Validated during post-review fixes with:
+
+- `./gradlew app:testDebugUnitTest`
+- `npm --prefix apps/node run build`
+- `npm --prefix apps/node run test`
 - internal docs capture any updated caveats discovered during implementation
 
 ## Idempotency
