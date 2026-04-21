@@ -198,7 +198,6 @@ describe("checkDeviceInteractiveState", () => {
                 ok: true as const,
                 state: {
                     screenOn: true,
-                    interactive: true,
                     deviceLocked: false,
                     userUnlocked: true,
                 },
@@ -221,7 +220,6 @@ describe("checkDeviceInteractiveState", () => {
                 ok: true as const,
                 state: {
                     screenOn: false,
-                    interactive: false,
                     deviceLocked: true,
                     userUnlocked: false,
                 },
@@ -247,7 +245,6 @@ describe("checkDeviceInteractiveState", () => {
                 ok: true as const,
                 state: {
                     screenOn: true,
-                    interactive: true,
                     deviceLocked: true,
                     userUnlocked: true,
                 },

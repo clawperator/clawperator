@@ -147,10 +147,7 @@ export class DoctorService {
 
       const handshakeInteractiveState = extractInteractiveStateFromEvidence(handshake.evidence);
       const interactiveState = handshakeInteractiveState
-        ? buildDeviceInteractiveStateCheckFromState({
-            ...handshakeInteractiveState,
-            interactive: handshakeInteractiveState.screenOn,
-          })
+        ? buildDeviceInteractiveStateCheckFromState(handshakeInteractiveState)
         : await (this.deps.checkDeviceInteractiveState ?? checkDeviceInteractiveState)(config);
       checks.push(interactiveState);
       if (this.shouldHaltOnFailure(interactiveState)) return this.finalize(checks, config, options.fix);

@@ -10,7 +10,6 @@ export type WaitForResultEnvelopeFn = typeof waitForResultEnvelope;
 
 export interface InternalInteractiveState {
   screenOn: boolean;
-  interactive: boolean;
   deviceLocked: boolean;
   userUnlocked: boolean;
 }
@@ -108,11 +107,8 @@ export async function runDoctorPingCommand(
 }
 
 export function parseDoctorPingInteractiveState(stepResult: StepResult): InternalInteractiveState {
-  const screenOn = parseStrictBoolean(stepResult, "screen_on");
-
   return {
-    screenOn,
-    interactive: screenOn,
+    screenOn: parseStrictBoolean(stepResult, "screen_on"),
     deviceLocked: parseStrictBoolean(stepResult, "device_locked"),
     userUnlocked: parseStrictBoolean(stepResult, "user_unlocked"),
   };
@@ -320,11 +316,17 @@ export async function ensureInteractiveAutomationReady(
       if (wakeResult.state && isInteractiveAutomationReady(wakeResult.state)) {
         return { ok: true, state: wakeResult.state };
       }
+      if (wakeResult.state) {
+        return {
+          ok: false,
+          error: buildDeviceNotInteractiveError(wakeResult.state),
+        };
+      }
       return {
         ok: false,
         error: {
-          code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
-          message: "Interactive readiness helper returned success without a usable device state.",
+          code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+          message: "Device is not interactive and no interactive-state evidence was available.",
         },
       };
     case "awake_but_locked":
