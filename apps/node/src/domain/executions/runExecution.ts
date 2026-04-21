@@ -28,6 +28,8 @@ export interface RunExecutionOptions {
   operatorPackage?: string;
   adbPath?: string;
   runner?: RuntimeConfig["runner"];
+  resultEnvelopeTimeoutMs?: number;
+  logcatBroadcastDelayMs?: number;
   ensureInteractiveAutomationReadyFn?: typeof ensureInteractiveAutomationReady;
   probeInteractiveStateFn?: typeof probeInteractiveState;
   timeoutMs?: number;
@@ -472,7 +474,8 @@ async function performExecution(
       config,
       {
         commandId: execution.commandId,
-        timeoutMs: execution.timeoutMs + 5000, // buffer for envelope write
+        timeoutMs: options.resultEnvelopeTimeoutMs ?? (execution.timeoutMs + 5000), // buffer for envelope write
+        broadcastDelayMs: options.logcatBroadcastDelayMs,
         lastCorrelatedLines: 30,
       },
       async () => {
