@@ -94,7 +94,6 @@ class DeviceStateSystem(
                 when (intent.action) {
                     Intent.ACTION_SCREEN_OFF -> {
                         isScreenOn.value = false
-                        isDeviceLocked.value = true
                         Log.d("ACTION_SCREEN_OFF")
                     }
                     Intent.ACTION_SCREEN_ON -> {
