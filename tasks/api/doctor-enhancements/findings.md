@@ -373,6 +373,44 @@ Missing implications from the earlier draft:
   - no behavioral change required beyond inheriting the first-call failure from
     Node preflight
 
+### 10. The current serve and MCP test seams do not naturally prove this new contract end to end
+
+The current codebase has:
+
+- `runExecution.test.ts` for direct execution behavior
+- `serveCommand.test.ts` for small exported serve helpers
+- `serve.test.ts` for black-box HTTP integration
+- `mcpHelpers.test.ts` for MCP helper behavior
+- `mcp.test.ts` for black-box stdio integration
+
+Important limitation:
+
+- the serve and MCP integration harnesses do not currently inject a fake
+  interactive-state probe or fake `runExecution()` result
+- black-box integration tests will only hit `DEVICE_NOT_INTERACTIVE`
+  deterministically if the test environment provides a real device in that
+  exact state, which is not a stable default assumption for repo tests
+
+Recommendation:
+
+- keep deterministic proof centered on unit tests for the new preflight and for
+  any newly exported serve or MCP helper used to map or normalize the error
+- add or update black-box integration coverage only if the implementation also
+  introduces a deterministic seam that avoids live-device coupling
+
+### 11. The test runner guidance must match the actual Node test script
+
+`apps/node/package.json` uses Node's built-in test runner:
+
+- `npm --prefix apps/node run test`
+- `node --test ...`
+
+Implication:
+
+- Jest-style flags such as `--runInBand` are not valid task-pack guidance here
+- if the pack wants targeted doctor coverage, it should name explicit built
+  `dist/` test files after `npm --prefix apps/node run build`
+
 ## Recommended Path Forward
 
 ### Phase 1: Define the contract precisely

@@ -110,6 +110,9 @@ doctor and Node enforcement contract.
   scope for doctor reporting and Node preflight enforcement
 - `apps/node/src/cli/commands/serve.ts` and `apps/node/src/cli/commands/skills.ts`:
   in scope for HTTP mapping and high-level skill-wrapper enforcement
+- `apps/node/src/test/unit/serveCommand.test.ts` and
+  `apps/node/src/test/unit/mcpHelpers.test.ts`: in scope if a small exported
+  helper is the cleanest deterministic way to prove serve/MCP mapping behavior
 
 ## Surfaces and Ownership
 
@@ -118,14 +121,14 @@ doctor and Node enforcement contract.
 | `apps/node/src/contracts/errors.ts` | Add `DEVICE_NOT_INTERACTIVE` stable code | PR-1 / Phase 1 |
 | `apps/node/src/domain/doctor/checks/readinessChecks.ts` | Add interactive-state doctor check using the foundation probe | PR-1 / Phase 1 |
 | `apps/node/src/domain/doctor/criticalChecks.ts` | Mark the new doctor check critical | PR-1 / Phase 1 |
-| `apps/node/src/contracts/doctor.ts` | Preserve/extend doctor evidence shape as needed for the new check | PR-1 / Phase 1 |
+| `apps/node/src/contracts/doctor.ts` | Change only if an exported helper type or docs-facing contract aid is genuinely needed; avoid churn to the generic evidence shape otherwise | PR-1 / Phase 1 |
 | `apps/node/src/test/unit/doctor/readinessChecks.test.ts`, `apps/node/src/test/unit/doctor/DoctorService.test.ts`, `apps/node/src/test/unit/doctorCommand.test.ts` | Doctor contract and `criticalOk` regression coverage | PR-1 / Phase 1 |
 | `docs/api/doctor.md`, `docs/api/errors.md`, `docs/api/overview.md` | Public doctor/error contract docs | PR-1 / Phase 2 |
 | `apps/node/src/domain/executions/runExecution.ts` | Top-level Node preflight failure before dispatch | PR-2 / Phase 3 |
-| `apps/node/src/cli/commands/serve.ts` | HTTP status mapping plus `operatorPackage` handling for skill-run route | PR-2 / Phase 3 and Phase 4 |
-| `apps/node/src/mcp/tools/common.ts` | MCP normalization of the top-level preflight failure | PR-2 / Phase 3 |
+| `apps/node/src/cli/commands/serve.ts` plus a small exported helper if needed | HTTP status mapping plus `operatorPackage` handling for skill-run route | PR-2 / Phase 3 and Phase 4 |
+| `apps/node/src/mcp/tools/common.ts` plus a small adjacent helper if needed | MCP normalization of the top-level preflight failure | PR-2 / Phase 3 |
 | `apps/node/src/cli/commands/skills.ts` | CLI skill-wrapper pre-spawn readiness gate | PR-2 / Phase 4 |
-| `apps/node/src/test/unit/runExecution.test.ts`, `apps/node/src/test/integration/serve.test.ts`, `apps/node/src/test/integration/mcp.test.ts`, `apps/node/src/test/unit/skills.test.ts` | Execution, serve, MCP, and wrapper regressions | PR-2 / Phase 3 and Phase 4 |
+| `apps/node/src/test/unit/runExecution.test.ts`, `apps/node/src/test/unit/serveCommand.test.ts`, `apps/node/src/test/unit/mcpHelpers.test.ts`, `apps/node/src/test/unit/skills.test.ts`, and deterministic integration coverage only where the existing harness can actually prove the new condition | Execution, serve, MCP, and wrapper regressions | PR-2 / Phase 3 and Phase 4 |
 | `docs/skills/runtime.md`, `docs/skills/overview.md` | Public skills docs for wrapper-level readiness behavior | PR-2 / Phase 4 |
 
 ## Source Of Truth
@@ -151,8 +154,12 @@ doctor and Node enforcement contract.
 - The doctor check must be target-specific to resolved `deviceId` plus chosen
   `operatorPackage`
 - The doctor check is critical and therefore must affect `criticalOk`
+- The new doctor check should run after handshake succeeds and before optional
+  smoke so a non-interactive device fails the critical gate before smoke work
 - Node preflight failure for this condition is a top-level `ok: false` result
   before Android dispatch
+- Prefer reusing the merged foundation probe/helper rather than sending a
+  second ad hoc `doctor_ping` dispatch or re-parsing payloads in multiple ways
 - High-level skill wrappers do require a pre-spawn readiness gate
 - Direct script helpers remain thin and inherit low-level failure on their first
   internal `clawperator exec` call
@@ -178,6 +185,7 @@ doctor and Node enforcement contract.
 | What is the doctor check id? | Use `readiness.device.interactive` so it matches existing `readiness.*` naming. |
 | What evidence must the doctor check expose? | `deviceLocked`, `screenOn`, and `userUnlocked`. Do not collapse them into one derived string. |
 | What code should doctor and Node use? | `DEVICE_NOT_INTERACTIVE`. Do not introduce a narrower `DEVICE_LOCKED` code for this pack. |
+| Where should the new doctor check run in `DoctorService`? | After a successful handshake and before optional smoke, so it can rely on a working runtime and block smoke on the same critical condition. |
 | Does this pack call the full doctor sequence before every command? | No. Use the narrow interactive-state probe only. |
 | Where does top-level Node enforcement happen? | In `runExecution()` for direct execution entrypoints, plus explicit pre-spawn gates in CLI/HTTP high-level skill wrappers. |
 | How should serve map the new top-level error? | HTTP `409 Conflict`. |
@@ -192,11 +200,16 @@ doctor and Node enforcement contract.
 - Surfacing `device locked` as the contract when the real predicate is broader
 - Adding doctor reporting without making the check critical
 - Returning `500` from serve for the new preflight failure
+- Adding a second bespoke `doctor_ping` dispatch in doctor when the merged
+  foundation already exposes a reusable probe/helper
 - Letting `/skills/:skillId/run` drift from CLI behavior because it still cannot
   express `operatorPackage`
 - Making `runSkill()` a readiness authority instead of keeping it a launcher
 - Breaking MCP behavior by letting the new top-level Node failure fall through
   unnormalized
+- Requiring brittle live-device integration tests for serve/MCP mapping when
+  the current harness can prove the behavior more deterministically through
+  exported helpers and unit coverage
 - Updating code without the paired authored docs
 
 ## Output Contract

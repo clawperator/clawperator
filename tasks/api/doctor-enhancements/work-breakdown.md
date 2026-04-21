@@ -33,10 +33,15 @@ MCP, and skills docs to match. This pack is blocked until the
 - Make the new doctor check critical in the same phase and commit as the check
   itself. Do not ship a non-critical readiness check and defer `criticalOk`
   integration.
+- Place the new doctor check after handshake and before optional smoke. Do not
+  let smoke run first on a device that should already fail the critical
+  readiness gate.
 - Keep `runSkill()` as a process launcher and verifier. Do not move wrapper
   readiness policy into `runSkill()` in this pack.
 - Add tests in the same phase and commit as each behavior change. Do not defer
   coverage to a later cleanup phase.
+- Prefer deterministic unit coverage for serve/MCP mapping helpers over
+  black-box integration tests that would require a live non-interactive device.
 - Do not edit generated docs directly. Use `.agents/skills/docs-author/SKILL.md`
   for authored public-doc phases and then run `./scripts/docs_build.sh`.
 - Keep `tasks/api/doctor-enhancements/findings.md` as a companion analysis
@@ -57,9 +62,11 @@ Read these files IN THIS ORDER before writing anything.
 | `apps/node/src/domain/doctor/criticalChecks.ts` | Critical doctor check gating |
 | `apps/node/src/domain/executions/runExecution.ts` | Top-level Node preflight boundary |
 | `apps/node/src/cli/commands/serve.ts` | HTTP mapping and `POST /skills/:skillId/run` behavior |
+| `apps/node/src/test/unit/serveCommand.test.ts` | Existing unit seam for exported serve helpers |
 | `apps/node/src/cli/commands/skills.ts` | CLI high-level skill-wrapper behavior |
 | `apps/node/src/domain/skills/runSkill.ts` | Launcher boundary that must stay thin |
 | `apps/node/src/mcp/tools/common.ts` | MCP normalization path for top-level Node failures |
+| `apps/node/src/test/unit/mcpHelpers.test.ts` | Existing unit seam for MCP helper behavior |
 | `apps/node/src/contracts/errors.ts` and `apps/node/src/contracts/doctor.ts` | Stable public contract surfaces |
 | `docs/api/doctor.md`, `docs/api/errors.md`, `docs/api/overview.md`, `docs/skills/runtime.md`, `docs/skills/overview.md` | Authored public-doc surfaces that must change with shipped behavior |
 
@@ -85,9 +92,10 @@ an explicit critical check with stable evidence and the public error code
 ### Files or Surfaces To Change
 
 - `apps/node/src/contracts/errors.ts`
-- `apps/node/src/contracts/doctor.ts`
 - `apps/node/src/domain/doctor/checks/readinessChecks.ts`
 - `apps/node/src/domain/doctor/criticalChecks.ts`
+- `apps/node/src/contracts/doctor.ts` only if an exported helper type or docs-
+  facing contract aid is genuinely needed
 - `apps/node/src/test/unit/doctor/readinessChecks.test.ts`
 - `apps/node/src/test/unit/doctor/DoctorService.test.ts`
 - `apps/node/src/test/unit/doctorCommand.test.ts`
@@ -99,19 +107,24 @@ an explicit critical check with stable evidence and the public error code
    from task prose alone.
 2. Add `DEVICE_NOT_INTERACTIVE` to `apps/node/src/contracts/errors.ts`.
 3. Add the new doctor check in `readinessChecks.ts` using the narrow
-   interactive-state probe from the foundation work. Do not invoke the full
-   doctor sequence or duplicate handshake/version logic.
+   interactive-state probe from the foundation work. Reuse the merged
+   foundation helper/probe result if it already exists. Do not invoke the full
+   doctor sequence or duplicate handshake/version logic with a second bespoke
+   dispatch path.
 4. Use the doctor check id `readiness.device.interactive`.
 5. Ensure the failing check reports explicit evidence fields:
    - `deviceLocked`
    - `screenOn`
    - `userUnlocked`
-6. Mark the new check critical in `criticalChecks.ts` in the same commit.
-7. Add focused regression coverage:
+6. Insert the new check into `DoctorService` after handshake succeeds and
+   before optional smoke so the same critical condition blocks smoke.
+7. Mark the new check critical in `criticalChecks.ts` in the same commit.
+8. Add focused regression coverage:
    - `readinessChecks.test.ts`: pass/fail behavior and evidence shape
    - `DoctorService.test.ts`: `criticalOk` becomes `false` when the check fails
+     and smoke is skipped on that path
    - `doctorCommand.test.ts`: JSON output preserves the new check and evidence
-8. Do not change execution, serve, MCP, or skill-wrapper behavior in this
+9. Do not change execution, serve, MCP, or skill-wrapper behavior in this
    phase.
 
 ### Acceptance Criteria
@@ -120,17 +133,19 @@ an explicit critical check with stable evidence and the public error code
 - `doctor` includes `readiness.device.interactive`.
 - The check evidence includes `deviceLocked`, `screenOn`, and `userUnlocked`.
 - `criticalOk` becomes `false` when the device is not interactive.
+- The new check runs before optional smoke and prevents smoke from running when
+  it fails.
 - Regression tests cover both the new check and the `criticalOk` impact.
 
 ### Validation
 
 ```bash
 npm --prefix apps/node run build
-npm --prefix apps/node run test -- --runInBand doctor
+node --test apps/node/dist/test/unit/doctor/readinessChecks.test.js apps/node/dist/test/unit/doctor/DoctorService.test.js apps/node/dist/test/unit/doctorCommand.test.js
 ```
 
-If the targeted test selector is not supported in this repo’s current test
-runner, run the full Node test suite instead:
+If additional adjacent tests are touched or the targeted set is no longer
+sufficient, run the full Node test suite instead:
 
 ```bash
 npm --prefix apps/node run build
@@ -209,8 +224,13 @@ and MCP aligned with that contract.
 - `apps/node/src/cli/commands/serve.ts`
 - `apps/node/src/mcp/tools/common.ts`
 - `apps/node/src/test/unit/runExecution.test.ts`
-- `apps/node/src/test/integration/serve.test.ts`
-- `apps/node/src/test/integration/mcp.test.ts`
+- `apps/node/src/test/unit/serveCommand.test.ts` if a small exported helper is
+  added for HTTP status mapping
+- `apps/node/src/test/unit/mcpHelpers.test.ts` or a focused adjacent unit test
+  if a small helper is added for MCP normalization
+- integration coverage only if the implementation also introduces a
+  deterministic seam that proves `DEVICE_NOT_INTERACTIVE` without live-device
+  dependence
 
 ### Steps
 
@@ -227,11 +247,16 @@ and MCP aligned with that contract.
    - `/screenshot`
 4. Update `apps/node/src/mcp/tools/common.ts` so MCP tools surface this as an
    MCP error result rather than a generic success payload or transport crash.
-5. Add focused regressions:
+5. If `serve.ts` or `common.ts` need a tiny exported helper to make that mapping
+   deterministic, add it and cover it in unit tests instead of forcing brittle
+   black-box integration.
+6. Add focused regressions:
    - `runExecution.test.ts`: returns top-level `ok: false` and does not dispatch
-   - `serve.test.ts`: the affected routes return `409`
-   - `mcp.test.ts`: the new preflight failure becomes an MCP error result
-6. Keep skill-wrapper behavior out of this phase.
+   - serve unit or integration coverage: the affected routes map the error to
+     `409`
+   - MCP unit or integration coverage: the new preflight failure becomes an MCP
+     error result
+7. Keep skill-wrapper behavior out of this phase.
 
 ### Acceptance Criteria
 
@@ -240,7 +265,8 @@ and MCP aligned with that contract.
 - No Android dispatch occurs on that path.
 - Serve direct execution routes map the error to `409`.
 - MCP tools return an error result for the new condition.
-- Regression tests prove each of those behaviors.
+- Regression tests prove each of those behaviors without depending on a live
+  device being in the exact failing state.
 
 ### Validation
 
@@ -253,10 +279,8 @@ Required cases:
 
 - non-interactive probe result -> `runExecution()` top-level `ok: false`
 - non-interactive probe result -> no broadcast/dispatch call
-- `/execute` returns `409`
-- `/snapshot` returns `409`
-- `/screenshot` returns `409`
-- MCP execution tool returns an MCP error result
+- serve mapping path -> `/execute`, `/snapshot`, and `/screenshot` return `409`
+- MCP execution path -> returns an MCP error result
 
 ### Expected Commit
 
@@ -281,7 +305,9 @@ that behavior.
 - `apps/node/src/cli/commands/skills.ts`
 - `apps/node/src/cli/commands/serve.ts`
 - `apps/node/src/test/unit/skills.test.ts`
-- `apps/node/src/test/integration/serve.test.ts`
+- `apps/node/src/test/unit/serveCommand.test.ts`
+- integration coverage for `POST /skills/:skillId/run` only if the route
+  behavior can be proved deterministically without a live-device dependency
 - `docs/skills/runtime.md`
 - `docs/skills/overview.md`
 
@@ -291,23 +317,28 @@ that behavior.
 2. Add the same pre-spawn readiness enforcement to HTTP
    `POST /skills/:skillId/run`.
 3. Add optional `operatorPackage` input to the serve skill-run route.
-4. Resolve `operatorPackage` for that route with the same precedence used
+4. Extend `buildServeSkillRunOptions()` or an equivalent small helper so the
+   route can pass both `deviceId` and resolved `operatorPackage` into skill
+   env deterministically, then cover that helper in `serveCommand.test.ts`.
+5. Resolve `operatorPackage` for that route with the same precedence used
    elsewhere in serve:
    - explicit request value first
    - then default/environment resolution
-5. Pass the resolved package both to:
+6. Pass the resolved package both to:
    - the pre-spawn readiness probe
    - the skill env as `CLAWPERATOR_OPERATOR_PACKAGE`
-6. Keep `runSkill()` itself unchanged as a launcher/verifier boundary.
-7. Add focused regressions:
+7. Keep `runSkill()` itself unchanged as a launcher/verifier boundary.
+8. Add focused regressions:
    - `skills.test.ts`: `cmdSkillsRun()` fails before spawn when the target is
      not interactive
-   - `serve.test.ts`: `POST /skills/:skillId/run` does the same
-   - `serve.test.ts`: route accepts and propagates optional `operatorPackage`
-8. Use `.agents/skills/docs-author/SKILL.md` for the public-doc updates in:
+   - `serveCommand.test.ts`: the route helper passes resolved
+     `CLAWPERATOR_OPERATOR_PACKAGE` and `CLAWPERATOR_DEVICE_ID`
+   - route-level serve coverage only if the no-spawn failure can be proved
+     deterministically in the current harness
+9. Use `.agents/skills/docs-author/SKILL.md` for the public-doc updates in:
    - `docs/skills/runtime.md`
    - `docs/skills/overview.md`
-9. Run `./scripts/docs_build.sh` after the authored-doc edits.
+10. Run `./scripts/docs_build.sh` after the authored-doc edits.
 
 ### Acceptance Criteria
 
@@ -317,6 +348,7 @@ that behavior.
 - `POST /skills/:skillId/run` accepts and propagates optional `operatorPackage`.
 - `runSkill()` remains a launcher/verifier rather than becoming a readiness
   authority.
+- Serve helper/unit coverage proves the resolved env tuple for the route.
 - Authored skills docs match the shipped wrapper behavior.
 
 ### Validation
@@ -331,9 +363,10 @@ git diff --check
 Required cases:
 
 - CLI `skills run` pre-spawn failure -> no child process launch
-- serve `POST /skills/:skillId/run` pre-spawn failure -> no child process launch
-- serve `POST /skills/:skillId/run` with `operatorPackage` -> env and probe use
-  the resolved package
+- serve helper path -> resolved `operatorPackage` and `deviceId` are propagated
+  into skill env correctly
+- serve route pre-spawn failure -> no child process launch, if the current test
+  harness can prove that deterministically
 - helper-driven direct skill path remains unchanged and still relies on the
   first internal CLI call
 
