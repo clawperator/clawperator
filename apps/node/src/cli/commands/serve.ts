@@ -52,6 +52,7 @@ export function mapServeErrorCodeToStatus(code: string): number {
     case ERROR_CODES.PAYLOAD_TOO_LARGE: return 413;
     case ERROR_CODES.RESULT_ENVELOPE_TIMEOUT: return 504;
     case ERROR_CODES.DEVICE_NOT_INTERACTIVE: return 409;
+    case ERROR_CODES.DEVICE_ACCESSIBILITY_NOT_RUNNING: return 409;
     case ERROR_CODES.EMULATOR_NOT_FOUND: return 404;
     case ERROR_CODES.EMULATOR_NOT_RUNNING: return 404;
     case ERROR_CODES.EMULATOR_UNSUPPORTED: return 409;

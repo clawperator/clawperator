@@ -284,6 +284,28 @@ export async function runCloseAppPreflight(
   return { ok: true, successfulCloseActionIds };
 }
 
+function isCloseAppOnlyExecution(execution: Execution): boolean {
+  return execution.actions.length > 0
+    && execution.actions.every(action => action.type === "close_app" && !!action.params?.applicationId);
+}
+
+function buildCloseAppOnlySuccessEnvelope(execution: Execution): ResultEnvelope {
+  return {
+    commandId: execution.commandId,
+    taskId: execution.taskId,
+    status: "success",
+    stepResults: execution.actions.map(action => ({
+      id: action.id,
+      actionType: "close_app",
+      success: true,
+      data: {
+        application_id: action.params?.applicationId ?? "",
+      },
+    })),
+    error: null,
+  };
+}
+
 /**
  * Internal helper to validate, resolve device, and perform actual execution.
  */
@@ -403,6 +425,24 @@ async function performExecution(
   }
 
   try {
+    // Host-side close_app preflight is safe even when the device is not yet interactive.
+    const closeAppPreflight = await runCloseAppPreflight(execution, config);
+    if (!closeAppPreflight.ok) {
+      return { execution, result: { ok: false, error: closeAppPreflight.error, deviceId } };
+    }
+
+    if (isCloseAppOnlyExecution(execution)) {
+      return {
+        execution,
+        result: {
+          ok: true,
+          envelope: buildCloseAppOnlySuccessEnvelope(execution),
+          deviceId,
+          terminalSource: "clawperator_result",
+        },
+      };
+    }
+
     const ensureInteractiveAutomationReadyFn = options.ensureInteractiveAutomationReadyFn ?? ensureInteractiveAutomationReady;
     const interactiveState = await ensureInteractiveAutomationReadyFn(config, {
       probeInteractiveStateFn: options.probeInteractiveStateFn,
@@ -420,12 +460,6 @@ async function performExecution(
           deviceId,
         },
       };
-    }
-
-    // 1. Handle pre-flight side effects (e.g., force-close apps via adb)
-    const closeAppPreflight = await runCloseAppPreflight(execution, config);
-    if (!closeAppPreflight.ok) {
-      return { execution, result: { ok: false, error: closeAppPreflight.error, deviceId } };
     }
 
     // 2. Clear logcat so we only see this command's output

@@ -39,4 +39,8 @@ describe("mapServeErrorCodeToStatus", () => {
   it("maps DEVICE_NOT_INTERACTIVE to 409 Conflict for direct execution routes", () => {
     assert.strictEqual(mapServeErrorCodeToStatus(ERROR_CODES.DEVICE_NOT_INTERACTIVE), 409);
   });
+
+  it("maps DEVICE_ACCESSIBILITY_NOT_RUNNING to 409 Conflict for direct execution routes", () => {
+    assert.strictEqual(mapServeErrorCodeToStatus(ERROR_CODES.DEVICE_ACCESSIBILITY_NOT_RUNNING), 409);
+  });
 });
