@@ -91,7 +91,8 @@ printf '%s\n' "\$*" >> "$log_file"
 STATE_FILE="\${MOCK_MAIN_STATE_FILE:?}"
 SCENARIO="\${MOCK_MAIN_SCENARIO:?}"
 
-if [ "\$1" = "doctor" ] && [ "\$2" = "--format" ] && [ "\$3" = "json" ]; then
+case "\$*" in
+  doctor\ --format\ json|doctor\ --device\ *\ --format\ json)
   count=0
   if [ -f "\$STATE_FILE" ]; then
     count="\$(cat "\$STATE_FILE")"
@@ -130,6 +131,12 @@ JSON
 JSON
       exit 0
       ;;
+    multi-device:4|multi-device:5)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+      exit 0
+      ;;
     apk-remediation:1)
       cat <<'JSON'
 {"ok":false,"criticalOk":false,"checks":[{"id":"readiness.apk.presence","status":"fail","code":"OPERATOR_NOT_INSTALLED"}]}
@@ -142,12 +149,13 @@ JSON
 JSON
       exit 0
       ;;
-    *)
+    *) 
       printf '%s\n' "unexpected doctor call state: \$SCENARIO:\$count" >&2
       exit 9
       ;;
   esac
-fi
+  ;;
+esac
 
 if [ "\$1" = "doctor" ] && [ "\$2" = "--output" ] && [ "\$3" = "pretty" ]; then
   if [ "\$SCENARIO" = "final-fail" ]; then
@@ -501,6 +509,9 @@ run_main_case \
 
 assert_contains "$MULTI_STDOUT" "Installation Complete (Device Selection Required)" "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "Host install completed, but Android setup is still pending because more than one device is connected." "main-multi stdout"
+assert_contains "$MULTI_STDOUT" "Checking each connected device with Clawperator Doctor..." "main-multi stdout"
+assert_contains "$MULTI_STDOUT" "serial-alpha - ready" "main-multi stdout"
+assert_contains "$MULTI_STDOUT" "serial-beta - ready" "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "clawperator doctor --device <device_id> --output pretty" "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi/.clawperator/downloads/operator.apk --device serial-alpha" "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi/.clawperator/downloads/operator.apk --device serial-beta" "main-multi stdout"
@@ -509,6 +520,8 @@ assert_contains "$MULTI_STDOUT" "$TMP_DIR/home-main-multi/.clawperator/install-s
 assert_contains "$MULTI_STDOUT" "$TMP_DIR/home-main-multi/.clawperator/mcp-config-snippet.json" "main-multi stdout durable mcp"
 assert_not_contains "$MULTI_STDOUT" "Final doctor check failed." "main-multi stdout"
 assert_not_contains "$MULTI_STDOUT" "Doctor pretty output" "main-multi stdout"
+assert_contains "$MULTI_CLI_LOG" "doctor --device serial-alpha --format json" "main-multi cli log"
+assert_contains "$MULTI_CLI_LOG" "doctor --device serial-beta --format json" "main-multi cli log"
 assert_json_field_null "$TMP_DIR/home-main-multi/.clawperator/install-state.json" "lastDeviceSerial" "main-multi install-state lastDeviceSerial"
 
 echo "=== Scenario 4: APK remediation path runs before final success ==="

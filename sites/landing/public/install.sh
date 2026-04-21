@@ -1635,6 +1635,32 @@ process.stdin.on('data', c => d += c).on('end', () => {
 " 2>/dev/null
 }
 
+doctor_each_connected_device() {
+    if [ -z "${CLAWPERATOR_BIN_PATH:-}" ]; then
+        return 0
+    fi
+
+    local device_id=""
+    local device_count=0
+    local ready_count=0
+
+    echo -e "${BLUE}Checking each connected device with Clawperator Doctor...${NC}"
+    while IFS= read -r device_id; do
+        [ -n "$device_id" ] || continue
+        device_count=$((device_count + 1))
+        if "$CLAWPERATOR_BIN_PATH" doctor --device "$device_id" --format json > /dev/null 2>&1; then
+            echo -e "${GREEN}  ✅ ${device_id} - ready${NC}"
+            ready_count=$((ready_count + 1))
+        else
+            echo -e "${YELLOW}  ⚠  ${device_id} - doctor reported setup is still required.${NC}"
+        fi
+    done < <(list_connected_devices)
+
+    if [ "$device_count" -gt 0 ] && [ "$ready_count" -eq "$device_count" ]; then
+        echo -e "${GREEN}All connected devices passed doctor checks.${NC}"
+    fi
+}
+
 print_manual_operator_setup_commands() {
     echo -e "${YELLOW}Complete Android setup on one target device with one of:${NC}"
     while IFS= read -r device_id; do
@@ -1751,6 +1777,7 @@ main() {
     FINAL_DOCTOR_JSON="$("$CLAWPERATOR_BIN_PATH" doctor --format json || true)"
     if doctor_check_code "$FINAL_DOCTOR_JSON" "device.discovery" "MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"; then
         echo -e "${YELLOW}⚠️  Host install completed, but Android setup is still pending because more than one device is connected.${NC}"
+        doctor_each_connected_device
         print_manual_operator_setup_commands
         echo ""
         echo -e "${YELLOW}After setup, verify one device explicitly with:${NC}"

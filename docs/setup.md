@@ -25,6 +25,10 @@ curl -fsSL https://clawperator.com/install.sh | bash
 
 If the installer succeeds, skip to [5. Verify readiness with doctor](#5-verify-readiness-with-doctor).
 
+When more than one ready device is connected, the installer runs `doctor`
+against each connected device before it falls back to the manual device
+selection guidance.
+
 Alternatively, install the CLI only via npm (Node.js 24+ required):
 
 ```bash
