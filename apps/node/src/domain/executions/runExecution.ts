@@ -432,11 +432,13 @@ async function performExecution(
     }
 
     if (isCloseAppOnlyExecution(execution)) {
+      const envelope = buildCloseAppOnlySuccessEnvelope(execution);
+      emitResult(deviceId, envelope);
       return {
         execution,
         result: {
           ok: true,
-          envelope: buildCloseAppOnlySuccessEnvelope(execution),
+          envelope,
           deviceId,
           terminalSource: "clawperator_result",
         },

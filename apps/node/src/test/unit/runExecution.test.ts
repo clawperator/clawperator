@@ -839,6 +839,55 @@ describe("runExecution", () => {
     }
     assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
   });
+
+  it("emits a terminal result event for close_app-only fast-path executions", async () => {
+    const runner = new FakeProcessRunner();
+    const execution: Execution = {
+      commandId: "cmd-close-only-event",
+      taskId: "task-close-only-event",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "close-1", type: "close_app", params: { applicationId: "com.example.app" } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+    const resultEvent = once(clawperatorEvents, CLAWPERATOR_EVENT_TYPES.RESULT);
+    const result = await runExecution(execution, {
+      deviceId: "test-device-1",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const [event] = await resultEvent as [{ deviceId: string; envelope: ResultEnvelope }];
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.envelope.status, "success");
+      assert.deepStrictEqual(result.envelope.stepResults, [
+        {
+          id: "close-1",
+          actionType: "close_app",
+          success: true,
+          data: { application_id: "com.example.app" },
+        },
+      ]);
+    }
+    assert.strictEqual(event.deviceId, "test-device-1");
+    assert.strictEqual(event.envelope.status, "success");
+    assert.deepStrictEqual(event.envelope.stepResults, [
+      {
+        id: "close-1",
+        actionType: "close_app",
+        success: true,
+        data: { application_id: "com.example.app" },
+      },
+    ]);
+  });
 });
 
 describe("buildTimeoutError", () => {
