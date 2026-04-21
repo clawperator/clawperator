@@ -9,6 +9,7 @@ import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill, type SkillRunEnv } from "../../domain/skills/runSkill.js";
 import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
+import { ERROR_CODES } from "../../contracts/errors.js";
 import { SKILL_RESULT_FRAME_PREFIX } from "../../contracts/skillResult.js";
 import { SKILL_OUTPUT_ASSERTION_FAILED } from "../../contracts/skills.js";
 import type { DoctorCheckResult } from "../../contracts/doctor.js";
@@ -275,12 +276,13 @@ export async function resolveInteractiveSkillTarget(
       probeInteractiveStateFn: probeInteractiveStateImpl,
     });
     if (!readiness.ok) {
-      const publicError = toPublicInteractiveAutomationError(readiness.error);
+      const publicError = readiness.error.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE
+        ? toPublicInteractiveAutomationError(readiness.error)
+        : readiness.error;
       return {
         ok: false,
         error: {
-          code: publicError.code,
-          message: publicError.message,
+          ...publicError,
           deviceId: resolvedDevice.deviceId,
         },
       };
@@ -449,7 +451,13 @@ export async function cmdSkillsRun(
     logger: cliLogger,
   });
   if (!interactiveTarget.ok) {
-    return formatError(toPublicInteractiveAutomationError(interactiveTarget.error), options);
+    const interactiveError = interactiveTarget.error;
+    return formatError(
+      interactiveError.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE
+        ? toPublicInteractiveAutomationError(interactiveError)
+        : interactiveError,
+      options
+    );
   }
 
   const apkPresence = interactiveTarget.apkPresence;

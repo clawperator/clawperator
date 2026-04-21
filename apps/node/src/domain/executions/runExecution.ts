@@ -448,15 +448,14 @@ async function performExecution(
       probeInteractiveStateFn: options.probeInteractiveStateFn,
     });
     if (!interactiveState.ok) {
-      const publicError = toPublicInteractiveAutomationError(interactiveState.error);
+      const publicError = interactiveState.error.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE
+        ? toPublicInteractiveAutomationError(interactiveState.error)
+        : interactiveState.error;
       return {
         execution,
         result: {
           ok: false,
-          error: {
-            code: publicError.code,
-            message: publicError.message,
-          },
+          error: publicError,
           deviceId,
         },
       };

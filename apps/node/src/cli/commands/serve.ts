@@ -540,7 +540,10 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         logger: options.logger,
       });
       if (!interactiveTarget.ok) {
-        const publicError = toPublicInteractiveAutomationError(interactiveTarget.error);
+        const interactiveError = interactiveTarget.error;
+        const publicError = interactiveError.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE
+          ? toPublicInteractiveAutomationError(interactiveError)
+          : interactiveError;
         res.status(mapServeErrorCodeToStatus(interactiveTarget.error.code)).json({
           status: "failed",
           ok: false,

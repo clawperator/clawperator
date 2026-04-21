@@ -684,6 +684,54 @@ describe("runExecution", () => {
     assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
   });
 
+  it("preserves non-interactive-preflight diagnostics for transport or probe failures", async () => {
+    const runner = new FakeProcessRunner();
+    const execution: Execution = {
+      commandId: "cmd-interactive-transport-failure",
+      taskId: "task-interactive-transport-failure",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "sleep-1", type: "sleep", params: { durationMs: 0 } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+
+    const result = await runExecution(execution, {
+      deviceId: "test-device-1",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+      ensureInteractiveAutomationReadyFn: async () => ({
+        ok: false,
+        error: {
+          code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+          message: "adb shell broke",
+          details: {
+            screenOn: false,
+            deviceLocked: false,
+            userUnlocked: true,
+          },
+        },
+      }),
+    });
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_SHELL_UNAVAILABLE);
+      assert.strictEqual(result.error.message, "adb shell broke");
+      assert.deepStrictEqual(result.error.details, {
+        screenOn: false,
+        deviceLocked: false,
+        userUnlocked: true,
+      });
+      assert.strictEqual(result.deviceId, "test-device-1");
+    }
+    assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
+  });
+
   it("continues after the shared readiness helper wakes a sleeping device", async () => {
     const runner = new FakeProcessRunner();
     const execution: Execution = {
