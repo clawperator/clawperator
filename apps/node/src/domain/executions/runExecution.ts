@@ -28,6 +28,8 @@ export interface RunExecutionOptions {
   operatorPackage?: string;
   adbPath?: string;
   runner?: RuntimeConfig["runner"];
+  resultEnvelopeTimeoutMs?: number;
+  logcatBroadcastDelayMs?: number;
   ensureInteractiveAutomationReadyFn?: typeof ensureInteractiveAutomationReady;
   probeInteractiveStateFn?: typeof probeInteractiveState;
   timeoutMs?: number;
@@ -42,6 +44,36 @@ export type RunExecutionResult =
 interface PerformExecutionResult {
   execution?: Execution;
   result: RunExecutionResult;
+}
+
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
+function validateNonNegativeFiniteNumber(
+  value: unknown,
+  fieldName: string
+): { code: string; message: string; [k: string]: unknown } | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return {
+      code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+      message: `${fieldName} must be a finite number`,
+    };
+  }
+  if (value < 0) {
+    return {
+      code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+      message: `${fieldName} must be a non-negative number`,
+    };
+  }
+  if (value > MAX_TIMER_DELAY_MS) {
+    return {
+      code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+      message: `${fieldName} must not exceed ${MAX_TIMER_DELAY_MS}`,
+    };
+  }
+  return undefined;
 }
 
 export function attachSnapshotsToStepResults(stepResults: ResultEnvelope["stepResults"], snapshots: string[]): void {
@@ -328,6 +360,22 @@ async function performExecution(
     return { result: { ok: false, error: e as { code: string; message: string; [k: string]: unknown } } };
   }
 
+  const resultEnvelopeTimeoutError = validateNonNegativeFiniteNumber(
+    options.resultEnvelopeTimeoutMs,
+    "resultEnvelopeTimeoutMs"
+  );
+  if (resultEnvelopeTimeoutError !== undefined) {
+    return { execution, result: { ok: false, error: resultEnvelopeTimeoutError } };
+  }
+
+  const logcatBroadcastDelayError = validateNonNegativeFiniteNumber(
+    options.logcatBroadcastDelayMs,
+    "logcatBroadcastDelayMs"
+  );
+  if (logcatBroadcastDelayError !== undefined) {
+    return { execution, result: { ok: false, error: logcatBroadcastDelayError } };
+  }
+
   if (options.timeoutMs !== undefined) {
     if (!Number.isFinite(options.timeoutMs)) {
       return {
@@ -472,7 +520,8 @@ async function performExecution(
       config,
       {
         commandId: execution.commandId,
-        timeoutMs: execution.timeoutMs + 5000, // buffer for envelope write
+        timeoutMs: options.resultEnvelopeTimeoutMs ?? (execution.timeoutMs + 5000), // buffer for envelope write
+        broadcastDelayMs: options.logcatBroadcastDelayMs,
         lastCorrelatedLines: 30,
       },
       async () => {

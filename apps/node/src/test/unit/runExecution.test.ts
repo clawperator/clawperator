@@ -1060,6 +1060,17 @@ describe("buildTimeoutError", () => {
         deviceId: "device-123",
         operatorPackage: "com.test.operator.dev",
         runner,
+        resultEnvelopeTimeoutMs: 10,
+        logcatBroadcastDelayMs: 0,
+        ensureInteractiveAutomationReadyFn: async () => ({
+          ok: true,
+          state: {
+            screenOn: true,
+            interactive: true,
+            deviceLocked: false,
+            userUnlocked: true,
+          },
+        }),
       }
     );
 
@@ -1075,69 +1086,172 @@ describe("buildTimeoutError", () => {
   });
 
   it("does not emit the timeout hint when correlated log lines were captured", async () => {
-    const originalSetTimeout = global.setTimeout;
-    try {
-      // Speed up waitForResultEnvelope: broadcast delay is 300ms, and execution timeout is 6000ms (1000 payload + 5000 buffer).
-      // We keep ordering: broadcast should happen before the timeout, but still fast for unit tests.
-      global.setTimeout = ((handler: (...args: any[]) => void, ms?: number, ...args: any[]) => {
-        const adjustedMs =
-          ms === 300 ? 5
-            : ms === 6000 ? 30
-              : ms;
-        return originalSetTimeout(handler, adjustedMs, ...args);
-      }) as typeof global.setTimeout;
+    const runner = new FakeProcessRunner();
+    runner.spawn = (() => {
+      const proc = new EventEmitter() as EventEmitter & {
+        stdout?: EventEmitter;
+        stderr?: EventEmitter;
+        kill: (signal?: string) => void;
+      };
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
 
-      const runner = new FakeProcessRunner();
-      runner.spawn = (() => {
-        const proc = new EventEmitter() as EventEmitter & {
-          stdout?: EventEmitter;
-          stderr?: EventEmitter;
-          kill: (signal?: string) => void;
-        };
-        proc.stdout = new EventEmitter();
-        proc.stderr = new EventEmitter();
-        proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from("TaskScopeDefault: example\n"));
+      });
 
-        // Ensure we capture correlated TaskScopeDefault lines before the timeout fires.
-        originalSetTimeout(() => {
-          proc.stdout?.emit("data", Buffer.from("TaskScopeDefault: example\n"));
-        }, 10);
+      return proc;
+    }) as FakeProcessRunner["spawn"];
 
-        return proc;
-      }) as FakeProcessRunner["spawn"];
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" }); // logcat -c
+    runner.queueResult({ code: 0, stdout: "", stderr: "" }); // broadcast
 
-      runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
-      runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
-      runner.queueResult({ code: 0, stdout: "", stderr: "" }); // logcat -c
-      runner.queueResult({ code: 0, stdout: "", stderr: "" }); // broadcast
-
-      const resultEvent = once(clawperatorEvents, CLAWPERATOR_EVENT_TYPES.RESULT);
-      const result = await runExecution(
-        {
-          commandId: "cmd-timeout-6",
-          taskId: "task-timeout-6",
-          source: "test",
-          expectedFormat: "android-ui-automator",
-          timeoutMs: 1000,
-          actions: [{ id: "snap-1", type: "snapshot_ui" }],
-        },
-        {
-          deviceId: "device-123",
-          operatorPackage: "com.test.operator.dev",
-          runner,
-        }
-      );
-
-      const [event] = await resultEvent;
-      assert.strictEqual(result.ok, false);
-      if (!result.ok) {
-        assert.strictEqual(result.error.hint, undefined);
+    const resultEvent = once(clawperatorEvents, CLAWPERATOR_EVENT_TYPES.RESULT);
+    const result = await runExecution(
+      {
+        commandId: "cmd-timeout-6",
+        taskId: "task-timeout-6",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 1000,
+        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+      },
+      {
+        deviceId: "device-123",
+        operatorPackage: "com.test.operator.dev",
+        runner,
+        resultEnvelopeTimeoutMs: 100,
+        logcatBroadcastDelayMs: 0,
+        ensureInteractiveAutomationReadyFn: async () => ({
+          ok: true,
+          state: {
+            screenOn: true,
+            interactive: true,
+            deviceLocked: false,
+            userUnlocked: true,
+          },
+        }),
       }
-      assert.strictEqual(event.deviceId, "device-123");
-      assert.strictEqual(event.envelope.hint, undefined);
-    } finally {
-      global.setTimeout = originalSetTimeout;
+    );
+
+    const [event] = await resultEvent;
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.hint, undefined);
     }
+    assert.strictEqual(event.deviceId, "device-123");
+    assert.strictEqual(event.envelope.hint, undefined);
+  });
+
+  it("rejects invalid resultEnvelopeTimeoutMs overrides before dispatch", async () => {
+    const runner = new FakeProcessRunner();
+    const result = await runExecution(
+      {
+        commandId: "cmd-timeout-invalid-1",
+        taskId: "task-timeout-invalid-1",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 1000,
+        actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 0 } }],
+      },
+      {
+        deviceId: "device-123",
+        operatorPackage: "com.test.operator.dev",
+        runner,
+        resultEnvelopeTimeoutMs: Number.NaN,
+      }
+    );
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.EXECUTION_VALIDATION_FAILED);
+      assert.strictEqual(result.error.message, "resultEnvelopeTimeoutMs must be a finite number");
+    }
+    assert.deepStrictEqual(runner.calls, []);
+  });
+
+  it("rejects oversized resultEnvelopeTimeoutMs overrides before dispatch", async () => {
+    const runner = new FakeProcessRunner();
+    const result = await runExecution(
+      {
+        commandId: "cmd-timeout-invalid-1b",
+        taskId: "task-timeout-invalid-1b",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 1000,
+        actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 0 } }],
+      },
+      {
+        deviceId: "device-123",
+        operatorPackage: "com.test.operator.dev",
+        runner,
+        resultEnvelopeTimeoutMs: 2_147_483_648,
+      }
+    );
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.EXECUTION_VALIDATION_FAILED);
+      assert.strictEqual(result.error.message, "resultEnvelopeTimeoutMs must not exceed 2147483647");
+    }
+    assert.deepStrictEqual(runner.calls, []);
+  });
+
+  it("rejects invalid logcatBroadcastDelayMs overrides before dispatch", async () => {
+    const runner = new FakeProcessRunner();
+    const result = await runExecution(
+      {
+        commandId: "cmd-timeout-invalid-2",
+        taskId: "task-timeout-invalid-2",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 1000,
+        actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 0 } }],
+      },
+      {
+        deviceId: "device-123",
+        operatorPackage: "com.test.operator.dev",
+        runner,
+        logcatBroadcastDelayMs: -1,
+      }
+    );
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.EXECUTION_VALIDATION_FAILED);
+      assert.strictEqual(result.error.message, "logcatBroadcastDelayMs must be a non-negative number");
+    }
+    assert.deepStrictEqual(runner.calls, []);
+  });
+
+  it("rejects oversized logcatBroadcastDelayMs overrides before dispatch", async () => {
+    const runner = new FakeProcessRunner();
+    const result = await runExecution(
+      {
+        commandId: "cmd-timeout-invalid-2b",
+        taskId: "task-timeout-invalid-2b",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 1000,
+        actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 0 } }],
+      },
+      {
+        deviceId: "device-123",
+        operatorPackage: "com.test.operator.dev",
+        runner,
+        logcatBroadcastDelayMs: 2_147_483_648,
+      }
+    );
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.EXECUTION_VALIDATION_FAILED);
+      assert.strictEqual(result.error.message, "logcatBroadcastDelayMs must not exceed 2147483647");
+    }
+    assert.deepStrictEqual(runner.calls, []);
   });
 });
 
@@ -1163,7 +1277,7 @@ describe("runExecution logging", () => {
     return scriptPath;
   }
 
-  function createLogcatRunner(envelopeLine: string, delayMs = 350): FakeProcessRunner {
+  function createLogcatRunner(envelopeLine: string, delayMs = 5): FakeProcessRunner {
     const runner = new FakeProcessRunner();
     runner.spawn = (() => {
       const proc = new EventEmitter() as EventEmitter & {
@@ -1194,7 +1308,7 @@ describe("runExecution logging", () => {
         stepResults: [{ id: "a1", actionType: "enter_text", success: true, data: {} }],
         error: null,
       })}`,
-      1200
+      5
     );
 
     runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
@@ -1226,6 +1340,17 @@ describe("runExecution logging", () => {
         adbPath,
         runner,
         logger,
+        resultEnvelopeTimeoutMs: 100,
+        logcatBroadcastDelayMs: 0,
+        ensureInteractiveAutomationReadyFn: async () => ({
+          ok: true,
+          state: {
+            screenOn: true,
+            interactive: true,
+            deviceLocked: false,
+            userUnlocked: true,
+          },
+        }),
       }
     );
 
@@ -1250,7 +1375,7 @@ describe("runExecution logging", () => {
         stepResults: [{ id: "a1", actionType: "enter_text", success: true, data: {} }],
         error: null,
       })}`,
-      1200
+      5
     );
 
     runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
@@ -1282,6 +1407,17 @@ describe("runExecution logging", () => {
         adbPath,
         runner,
         logger,
+        resultEnvelopeTimeoutMs: 100,
+        logcatBroadcastDelayMs: 0,
+        ensureInteractiveAutomationReadyFn: async () => ({
+          ok: true,
+          state: {
+            screenOn: true,
+            interactive: true,
+            deviceLocked: false,
+            userUnlocked: true,
+          },
+        }),
       }
     );
 

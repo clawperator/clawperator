@@ -10,6 +10,7 @@ import { formatCommandLine } from "./adbClient.js";
 export interface LogcatResultOptions {
   commandId: string;
   timeoutMs: number;
+  broadcastDelayMs?: number;
   /** Last N lines to include in timeout diagnostics */
   lastCorrelatedLines?: number;
 }
@@ -29,7 +30,15 @@ export async function waitForResultEnvelope(
   options: LogcatResultOptions,
   onBroadcast: () => Promise<{ success: boolean; stdout?: string; stderr?: string }>
 ): Promise<LogcatResult> {
-  const { commandId, timeoutMs, lastCorrelatedLines = 20 } = options;
+  const {
+    commandId,
+    timeoutMs: rawTimeoutMs,
+    lastCorrelatedLines = 20,
+    broadcastDelayMs: rawBroadcastDelayMs = 300,
+  } = options;
+  const timeoutMs = Number.isFinite(rawTimeoutMs) && rawTimeoutMs >= 0 ? rawTimeoutMs : 0;
+  const broadcastDelayMs =
+    Number.isFinite(rawBroadcastDelayMs) && rawBroadcastDelayMs >= 0 ? rawBroadcastDelayMs : 0;
   const deviceArgs = config.deviceId ? ["-s", config.deviceId] : [];
   const args = [...deviceArgs, "logcat", "-v", "time", "-T", "1"];
   const commandLine = formatCommandLine(config.adbPath, args);
@@ -166,7 +175,7 @@ export async function waitForResultEnvelope(
 
     // Start broadcast after logcat is attached (short delay)
     (async () => {
-      await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, broadcastDelayMs));
       try {
         const result = await onBroadcast();
         if (!result.success) {
