@@ -152,6 +152,37 @@ describe("runHandshake", () => {
         assert.strictEqual(result.status, "fail");
         assert.strictEqual(result.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
     });
+
+    it("returns fail when handshake evidence is malformed", async () => {
+        const { config, runner } = createConfig();
+        runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+        const mockWait = async () => ({
+            ok: true as const,
+            envelope: {
+                status: "success" as const,
+                commandId: "test-cmd",
+                taskId: "test-task",
+                stepResults: [{
+                    id: "h1",
+                    actionType: "doctor_ping",
+                    success: true,
+                    data: {
+                        developer_options_enabled: "true",
+                        usb_debugging_enabled: "true",
+                        device_locked: "false",
+                        user_unlocked: "true",
+                    },
+                }],
+            },
+            terminalSource: "clawperator_result" as const,
+        });
+
+        const result = await runHandshake(config, mockWait);
+        assert.strictEqual(result.status, "fail");
+        assert.strictEqual(result.code, ERROR_CODES.RESULT_ENVELOPE_MALFORMED);
+        assert.match(result.detail ?? "", /screen_on/);
+    });
 });
 
 describe("checkDeviceInteractiveState", () => {
