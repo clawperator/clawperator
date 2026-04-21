@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { buildServeSkillRunOptions } from "../../cli/commands/serve.js";
+import { buildServeSkillRunOptions, mapServeErrorCodeToStatus } from "../../cli/commands/serve.js";
+import { ERROR_CODES } from "../../contracts/errors.js";
 
 describe("buildServeSkillRunOptions", () => {
   it("passes device selection via env without prepending it to skill args", () => {
@@ -26,5 +27,11 @@ describe("buildServeSkillRunOptions", () => {
     assert.deepStrictEqual(result.skillEnv, {
       CLAWPERATOR_DEVICE_ID: "",
     });
+  });
+});
+
+describe("mapServeErrorCodeToStatus", () => {
+  it("maps DEVICE_NOT_INTERACTIVE to 409 Conflict for direct execution routes", () => {
+    assert.strictEqual(mapServeErrorCodeToStatus(ERROR_CODES.DEVICE_NOT_INTERACTIVE), 409);
   });
 });

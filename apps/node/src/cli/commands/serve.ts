@@ -37,6 +37,24 @@ export function buildServeSkillRunOptions(
   return { scriptArgs, skillEnv };
 }
 
+export function mapServeErrorCodeToStatus(code: string): number {
+  switch (code) {
+    case ERROR_CODES.EXECUTION_CONFLICT_IN_FLIGHT: return 423;
+    case ERROR_CODES.DEVICE_NOT_FOUND: return 404;
+    case ERROR_CODES.NO_DEVICES: return 404;
+    case ERROR_CODES.MULTIPLE_DEVICES_DEVICE_ID_REQUIRED: return 400;
+    case ERROR_CODES.EXECUTION_VALIDATION_FAILED: return 400;
+    case ERROR_CODES.PAYLOAD_TOO_LARGE: return 413;
+    case ERROR_CODES.RESULT_ENVELOPE_TIMEOUT: return 504;
+    case ERROR_CODES.DEVICE_NOT_INTERACTIVE: return 409;
+    case ERROR_CODES.EMULATOR_NOT_FOUND: return 404;
+    case ERROR_CODES.EMULATOR_NOT_RUNNING: return 404;
+    case ERROR_CODES.EMULATOR_UNSUPPORTED: return 409;
+    case ERROR_CODES.EMULATOR_ALREADY_RUNNING: return 409;
+    default: return 500;
+  }
+}
+
 export async function cmdServe(options: ServeOptions): Promise<void> {
   try {
     await startServer(options);
@@ -97,23 +115,6 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     }
   });
 
-  function mapErrorToStatus(code: string): number {
-    switch (code) {
-      case ERROR_CODES.EXECUTION_CONFLICT_IN_FLIGHT: return 423;
-      case ERROR_CODES.DEVICE_NOT_FOUND: return 404;
-      case ERROR_CODES.NO_DEVICES: return 404;
-      case ERROR_CODES.MULTIPLE_DEVICES_DEVICE_ID_REQUIRED: return 400;
-      case ERROR_CODES.EXECUTION_VALIDATION_FAILED: return 400;
-      case ERROR_CODES.PAYLOAD_TOO_LARGE: return 413;
-      case ERROR_CODES.RESULT_ENVELOPE_TIMEOUT: return 504;
-      case ERROR_CODES.EMULATOR_NOT_FOUND: return 404;
-      case ERROR_CODES.EMULATOR_NOT_RUNNING: return 404;
-      case ERROR_CODES.EMULATOR_UNSUPPORTED: return 409;
-      case ERROR_CODES.EMULATOR_ALREADY_RUNNING: return 409;
-      default: return 500;
-    }
-  }
-
   function getEmulatorConfig() {
     return getDefaultRuntimeConfig({
       adbPath: process.env.ADB_PATH,
@@ -167,7 +168,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       if (result.ok) {
         res.json(result);
       } else {
-        res.status(mapErrorToStatus(result.error.code)).json(result);
+        res.status(mapServeErrorCodeToStatus(result.error.code)).json(result);
       }
     } catch (e) {
       res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(e) } });
@@ -221,7 +222,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       if (result.ok) {
         res.json(result);
       } else {
-        res.status(mapErrorToStatus(result.error.code)).json(result);
+        res.status(mapServeErrorCodeToStatus(result.error.code)).json(result);
       }
     } catch (e) {
       res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(e) } });
@@ -278,7 +279,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       if (result.ok) {
         res.json(result);
       } else {
-        res.status(mapErrorToStatus(result.error.code)).json(result);
+        res.status(mapServeErrorCodeToStatus(result.error.code)).json(result);
       }
     } catch (e) {
       res.status(500).json({ ok: false, error: { code: "INTERNAL_ERROR", message: String(e) } });
@@ -320,7 +321,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       res.json({ ok: true, avds });
     } catch (error) {
       const e = error as { code?: string; message?: string };
-      res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
+      res.status(mapServeErrorCodeToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
     }
   });
 
@@ -331,7 +332,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       res.json({ ok: true, devices });
     } catch (error) {
       const e = error as { code?: string; message?: string };
-      res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
+      res.status(mapServeErrorCodeToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
     }
   });
 
@@ -343,7 +344,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       res.json({ ok: true, ...avd });
     } catch (error) {
       const e = error as { code?: string; message?: string };
-      res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
+      res.status(mapServeErrorCodeToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
     }
   });
 
@@ -367,7 +368,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       res.json({ ok: true, ...avd });
     } catch (error) {
       const e = error as { code?: string; message?: string };
-      res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
+      res.status(mapServeErrorCodeToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
     }
   });
 
@@ -377,12 +378,12 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       const name = req.params.name;
       const avd = await inspectConfiguredAvd(name);
       if (!avd.exists) {
-        res.status(mapErrorToStatus(ERROR_CODES.EMULATOR_NOT_FOUND)).json({ ok: false, error: { code: ERROR_CODES.EMULATOR_NOT_FOUND, message: `AVD ${name} not found` } });
+        res.status(mapServeErrorCodeToStatus(ERROR_CODES.EMULATOR_NOT_FOUND)).json({ ok: false, error: { code: ERROR_CODES.EMULATOR_NOT_FOUND, message: `AVD ${name} not found` } });
         return;
       }
       const runningList = await listRunningEmulators(config);
       if (runningList.some((e) => e.avdName === name)) {
-        res.status(mapErrorToStatus(ERROR_CODES.EMULATOR_ALREADY_RUNNING)).json({ ok: false, error: { code: ERROR_CODES.EMULATOR_ALREADY_RUNNING, message: `Emulator ${name} is already running` } });
+        res.status(mapServeErrorCodeToStatus(ERROR_CODES.EMULATOR_ALREADY_RUNNING)).json({ ok: false, error: { code: ERROR_CODES.EMULATOR_ALREADY_RUNNING, message: `Emulator ${name} is already running` } });
         return;
       }
       startAvd(config, name);
@@ -392,7 +393,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       res.json({ ok: true, type: "emulator", avdName: name, serial, booted: true });
     } catch (error) {
       const e = error as { code?: string; message?: string };
-      res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
+      res.status(mapServeErrorCodeToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
     }
   });
 
@@ -403,7 +404,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       res.json({ ok: true, avdName: req.params.name, stopped: true });
     } catch (error) {
       const e = error as { code?: string; message?: string };
-      res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
+      res.status(mapServeErrorCodeToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
     }
   });
 
@@ -414,7 +415,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       res.json({ ok: true, avdName: req.params.name, deleted: true });
     } catch (error) {
       const e = error as { code?: string; message?: string };
-      res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
+      res.status(mapServeErrorCodeToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
     }
   });
 
@@ -425,7 +426,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       res.json({ ok: true, ...result });
     } catch (error) {
       const e = error as { code?: string; message?: string };
-      res.status(mapErrorToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
+      res.status(mapServeErrorCodeToStatus(e.code ?? "INTERNAL_ERROR")).json({ ok: false, error: { code: e.code ?? "INTERNAL_ERROR", message: e.message ?? String(error) } });
     }
   });
 

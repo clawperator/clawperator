@@ -10,6 +10,7 @@ import { broadcastAgentCommand } from "../../adapters/android-bridge/broadcastAg
 import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
 import { runAdb, formatCommandLine } from "../../adapters/android-bridge/adbClient.js";
 import { checkApkPresence } from "../doctor/checks/readinessChecks.js";
+import { buildDeviceNotInteractiveError, probeInteractiveState } from "../doctor/checks/deviceInteractivity.js";
 import { getOperatorPackageApkPath } from "../version/compatibility.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
@@ -27,6 +28,7 @@ export interface RunExecutionOptions {
   operatorPackage?: string;
   adbPath?: string;
   runner?: RuntimeConfig["runner"];
+  probeInteractiveStateFn?: typeof probeInteractiveState;
   timeoutMs?: number;
   warn?: (message: string) => void;
   logger?: Logger;
@@ -400,6 +402,33 @@ async function performExecution(
   }
 
   try {
+    const probeInteractiveStateFn = options.probeInteractiveStateFn ?? probeInteractiveState;
+    const interactiveState = await probeInteractiveStateFn(config);
+    if (!interactiveState.ok) {
+      return {
+        execution,
+        result: {
+          ok: false,
+          error: {
+            code: interactiveState.code,
+            message: interactiveState.message,
+          },
+          deviceId,
+        },
+      };
+    }
+
+    if (!interactiveState.state.interactive) {
+      return {
+        execution,
+        result: {
+          ok: false,
+          error: buildDeviceNotInteractiveError(interactiveState.state),
+          deviceId,
+        },
+      };
+    }
+
     // 1. Handle pre-flight side effects (e.g., force-close apps via adb)
     const closeAppPreflight = await runCloseAppPreflight(execution, config);
     if (!closeAppPreflight.ok) {

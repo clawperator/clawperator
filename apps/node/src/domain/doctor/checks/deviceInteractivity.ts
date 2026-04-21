@@ -14,6 +14,12 @@ export interface InternalInteractiveState {
   userUnlocked: boolean;
 }
 
+export interface InteractiveStateEvidence extends Record<string, unknown> {
+  deviceLocked: boolean;
+  screenOn: boolean;
+  userUnlocked: boolean;
+}
+
 export interface InteractiveStateProbeFailure {
   code: ErrorCode;
   message: string;
@@ -239,6 +245,26 @@ export async function ensureDeviceAwake(
     status: "still_asleep",
     attempts,
     state: lastObservedState,
+  };
+}
+
+export function toInteractiveStateEvidence(
+  state: Pick<InternalInteractiveState, "deviceLocked" | "screenOn" | "userUnlocked">
+): InteractiveStateEvidence {
+  return {
+    deviceLocked: state.deviceLocked,
+    screenOn: state.screenOn,
+    userUnlocked: state.userUnlocked,
+  };
+}
+
+export function buildDeviceNotInteractiveError(
+  state: Pick<InternalInteractiveState, "deviceLocked" | "screenOn" | "userUnlocked">
+): { code: ErrorCode; message: string; details: InteractiveStateEvidence } {
+  return {
+    code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+    message: `Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=${state.screenOn} deviceLocked=${state.deviceLocked} userUnlocked=${state.userUnlocked}`,
+    details: toInteractiveStateEvidence(state),
   };
 }
 

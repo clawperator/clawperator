@@ -589,6 +589,58 @@ describe("runExecution", () => {
       ]
     );
   });
+
+  it("fails before dispatch when the resolved device is not interactive", async () => {
+    const runner = new FakeProcessRunner();
+    const execution: Execution = {
+      commandId: "cmd-interactive-preflight",
+      taskId: "task-interactive-preflight",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "sleep-1", type: "sleep", params: { durationMs: 0 } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+
+    const result = await runExecution(execution, {
+      deviceId: "test-device-1",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+      probeInteractiveStateFn: async () => ({
+        ok: true,
+        state: {
+          screenOn: false,
+          interactive: false,
+          deviceLocked: true,
+          userUnlocked: true,
+        },
+      }),
+    });
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
+      assert.strictEqual(result.deviceId, "test-device-1");
+      assert.deepStrictEqual(result.error.details, {
+        deviceLocked: true,
+        screenOn: false,
+        userUnlocked: true,
+      });
+      assert.match(result.error.message, /Device is not interactive/);
+    }
+    assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
+    assert.deepStrictEqual(
+      runner.calls.map(call => call.args.join(" ")),
+      [
+        "-s test-device-1 devices",
+        "-s test-device-1 shell pm list packages com.test.operator.dev",
+      ]
+    );
+  });
 });
 
 describe("buildTimeoutError", () => {

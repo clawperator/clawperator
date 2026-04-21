@@ -70,7 +70,7 @@ export async function runExecutionTool(
     });
 
     if (!result.ok) {
-      return buildMcpErrorResult(result.error);
+      return buildExecutionToolFailureResult(result.error);
     }
 
     if (result.envelope.status === "failed") {
@@ -87,6 +87,12 @@ export async function runExecutionTool(
   } catch (error) {
     return buildMcpErrorResult(error);
   }
+}
+
+export function buildExecutionToolFailureResult(
+  error: { code: string; message: string; [k: string]: unknown }
+): McpToolResult {
+  return buildMcpErrorResult(error);
 }
 
 export function applyMcpExecutionMetadata(

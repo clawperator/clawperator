@@ -4,7 +4,7 @@ import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatResultReader.js";
-import { probeInteractiveState, runDoctorPingCommand } from "./deviceInteractivity.js";
+import { buildDeviceNotInteractiveError, probeInteractiveState, runDoctorPingCommand, toInteractiveStateEvidence } from "./deviceInteractivity.js";
 import {
   getAlternateOperatorVariant,
   getCliVersion,
@@ -294,11 +294,7 @@ export async function checkDeviceInteractiveState(
     };
   }
 
-  const evidence = {
-    deviceLocked: result.state.deviceLocked,
-    screenOn: result.state.screenOn,
-    userUnlocked: result.state.userUnlocked,
-  };
+  const evidence = toInteractiveStateEvidence(result.state);
 
   if (result.state.interactive) {
     return {
@@ -309,12 +305,14 @@ export async function checkDeviceInteractiveState(
     };
   }
 
+  const error = buildDeviceNotInteractiveError(result.state);
+
   return {
     id: "readiness.device.interactive",
     status: "fail",
-    code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+    code: error.code,
     summary: "Device is not interactive.",
-    detail: `Interactive automation requires an awake, usable device state. screenOn=${result.state.screenOn} deviceLocked=${result.state.deviceLocked} userUnlocked=${result.state.userUnlocked}`,
+    detail: error.message.replace(/^Device is not interactive\. /, ""),
     evidence,
   };
 }
