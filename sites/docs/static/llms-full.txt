@@ -2375,6 +2375,10 @@ Android live-route verification:
 
 - when validating against the debug operator on device, operator logs include
   `enter_text strategy=<strategy_name> submit_method=<submit_method>`
+- on the API 33 route, warning-level logs can also include
+  `enter_text strategy=api33_input_connection partial_failure reason=<reason>`
+  when the fallback delete step succeeds but the final `commitText(...)` does
+  not
 - current shipped strategy names are `legacy_action_set_text` and
   `api33_input_connection`
 

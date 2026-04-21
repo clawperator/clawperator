@@ -87,6 +87,11 @@ For app automation commands, default to:
   `enter_text strategy=<strategy_name> submit_method=<submit_method>` on
   success and `enter_text strategy=api33_input_connection unavailable
   reason=<reason>` when the API 33 path cannot run.
+- If the API 33 delete-then-commit replace fallback clears the field but
+  `commitText(...)` fails, the runtime emits a warning-level
+  `enter_text strategy=api33_input_connection partial_failure reason=commit_failed_after_delete`
+  diagnostic so the destructive edge is visible in logcat without logging the
+  field contents.
 
 **NodeMatcher fields:** `resourceId`, `contentDescEquals`, `textEquals`, `textContains`, `contentDescContains`, `role`. All fields are AND-combined. Prefer `resourceId` when available. Full reference in `docs/api/selectors.md`.
 
