@@ -46,6 +46,8 @@ interface PerformExecutionResult {
   result: RunExecutionResult;
 }
 
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
 function validateNonNegativeFiniteNumber(
   value: unknown,
   fieldName: string
@@ -63,6 +65,12 @@ function validateNonNegativeFiniteNumber(
     return {
       code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
       message: `${fieldName} must be a non-negative number`,
+    };
+  }
+  if (value > MAX_TIMER_DELAY_MS) {
+    return {
+      code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+      message: `${fieldName} must not exceed ${MAX_TIMER_DELAY_MS}`,
     };
   }
   return undefined;

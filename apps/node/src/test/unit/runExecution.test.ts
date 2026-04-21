@@ -1097,9 +1097,9 @@ describe("buildTimeoutError", () => {
       proc.stderr = new EventEmitter();
       proc.kill = () => undefined;
 
-      setTimeout(() => {
+      process.nextTick(() => {
         proc.stdout?.emit("data", Buffer.from("TaskScopeDefault: example\n"));
-      }, 1);
+      });
 
       return proc;
     }) as FakeProcessRunner["spawn"];
@@ -1123,7 +1123,7 @@ describe("buildTimeoutError", () => {
         deviceId: "device-123",
         operatorPackage: "com.test.operator.dev",
         runner,
-        resultEnvelopeTimeoutMs: 20,
+        resultEnvelopeTimeoutMs: 100,
         logcatBroadcastDelayMs: 0,
         ensureInteractiveAutomationReadyFn: async () => ({
           ok: true,
@@ -1173,6 +1173,33 @@ describe("buildTimeoutError", () => {
     assert.deepStrictEqual(runner.calls, []);
   });
 
+  it("rejects oversized resultEnvelopeTimeoutMs overrides before dispatch", async () => {
+    const runner = new FakeProcessRunner();
+    const result = await runExecution(
+      {
+        commandId: "cmd-timeout-invalid-1b",
+        taskId: "task-timeout-invalid-1b",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 1000,
+        actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 0 } }],
+      },
+      {
+        deviceId: "device-123",
+        operatorPackage: "com.test.operator.dev",
+        runner,
+        resultEnvelopeTimeoutMs: 2_147_483_648,
+      }
+    );
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.EXECUTION_VALIDATION_FAILED);
+      assert.strictEqual(result.error.message, "resultEnvelopeTimeoutMs must not exceed 2147483647");
+    }
+    assert.deepStrictEqual(runner.calls, []);
+  });
+
   it("rejects invalid logcatBroadcastDelayMs overrides before dispatch", async () => {
     const runner = new FakeProcessRunner();
     const result = await runExecution(
@@ -1196,6 +1223,33 @@ describe("buildTimeoutError", () => {
     if (!result.ok) {
       assert.strictEqual(result.error.code, ERROR_CODES.EXECUTION_VALIDATION_FAILED);
       assert.strictEqual(result.error.message, "logcatBroadcastDelayMs must be a non-negative number");
+    }
+    assert.deepStrictEqual(runner.calls, []);
+  });
+
+  it("rejects oversized logcatBroadcastDelayMs overrides before dispatch", async () => {
+    const runner = new FakeProcessRunner();
+    const result = await runExecution(
+      {
+        commandId: "cmd-timeout-invalid-2b",
+        taskId: "task-timeout-invalid-2b",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 1000,
+        actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 0 } }],
+      },
+      {
+        deviceId: "device-123",
+        operatorPackage: "com.test.operator.dev",
+        runner,
+        logcatBroadcastDelayMs: 2_147_483_648,
+      }
+    );
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.EXECUTION_VALIDATION_FAILED);
+      assert.strictEqual(result.error.message, "logcatBroadcastDelayMs must not exceed 2147483647");
     }
     assert.deepStrictEqual(runner.calls, []);
   });
