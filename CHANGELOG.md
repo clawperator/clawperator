@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.7.1] - 2026-04-22
+
+This release keeps the Node runtime focused on deterministic timeout handling for `runExecution`.
+
+### 🤖 Node API & CLI
+- **Fixed:** Stabilized `runExecution` timeout handling by adding test-friendly overrides for the result-envelope timeout and logcat broadcast delay.
+
+Pull requests:
+- [fix(node): stabilize runExecution timeout tests](https://github.com/clawperator/clawperator/pull/217)
+
 ## [0.7.0] - 2026-04-21
 
 This release expands the packaged skill surfaces, adds interactive-device doctor and wake handling in the Node runtime, and brings Android `enter_text` behavior up to the current API 33 contract.
