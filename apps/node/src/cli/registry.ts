@@ -304,6 +304,19 @@ Notes:
   - Runtime skills still live under 'clawperator skills ...'; bundled skills are separate host-agent helpers
 `;
 
+const HELP_HOST = `clawperator host
+
+Usage:
+  clawperator host materialize-artifacts [--installed-at <iso8601>] [--apk-version <version>] [--last-device-serial <serial>] [--output <json|pretty>]
+
+Notes:
+  - Materializes CLI-owned durable host artifacts under ~/.clawperator/.
+  - Writes install-state JSON, MCP config snippet JSON, local AGENTS.md, and the shared-agent bridge when ~/.agents/AGENTS.md exists.
+  - Reports per-artifact outcomes as written, updated, skipped, or failed.
+  - Safe to rerun. Unchanged artifacts are reported as skipped.
+  - Use --installed-at to pin install-state output deterministically for tests or installer orchestration.
+`;
+
 const HELP_SKILLS_NEW = `clawperator skills new
 
 Usage:
@@ -961,6 +974,46 @@ COMMANDS["operator"] = {
           : "Use: clawperator operator setup --apk <path>",
       });
     }
+  },
+};
+
+// host
+COMMANDS["host"] = {
+  name: "host",
+  group: "Setup",
+  supportedFlags: (rest) => {
+    const sub = rest[0];
+    if (sub === "materialize-artifacts") {
+      return ["--installed-at", "--apk-version", "--last-device-serial"];
+    }
+    return [];
+  },
+  summary: "Materialize durable host artifacts owned by the CLI",
+  help: HELP_HOST,
+  subtopics: {
+    "materialize-artifacts": HELP_HOST,
+  },
+  topLevelBlock: `  host materialize-artifacts [--installed-at <iso8601>] [--apk-version <version>] [--last-device-serial <serial>]
+                                            Write install-state, MCP snippet, local AGENTS.md, and the shared-agent bridge`,
+  handler: async (ctx) => {
+    const { rest, format, verbose } = ctx;
+    const sub = rest[0];
+    if (sub === "materialize-artifacts") {
+      return (await import("./commands/host.js")).cmdHostMaterializeArtifacts({
+        format,
+        verbose,
+        installedAt: getStringOptStrict(rest, "--installed-at", ["--installed-at", "--apk-version", "--last-device-serial"]),
+        apkVersion: getStringOptStrict(rest, "--apk-version", ["--installed-at", "--apk-version", "--last-device-serial"]),
+        lastDeviceSerial: getStringOptStrict(rest, "--last-device-serial", ["--installed-at", "--apk-version", "--last-device-serial"]),
+      });
+    }
+
+    return JSON.stringify({
+      code: "USAGE",
+      message: sub
+        ? `Unknown host subcommand '${sub}'. Use: clawperator host materialize-artifacts`
+        : "Use: clawperator host materialize-artifacts",
+    });
   },
 };
 

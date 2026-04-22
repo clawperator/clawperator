@@ -290,6 +290,15 @@ describe("CLI help", () => {
     assert.match(stdout, /clawperator-skill-author-by-recording/);
   });
 
+  it("shows host artifact materialization help", async () => {
+    const { stdout, code } = await runCli(["host", "materialize-artifacts", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator host/);
+    assert.match(stdout, /materialize-artifacts/);
+    assert.match(stdout, /install-state JSON/);
+    assert.match(stdout, /shared-agent bridge/);
+  });
+
   it("inspect ui --help falls back to top-level help", async () => {
     // inspect ui is removed; --help with an unknown command falls back to top-level help.
     const { stdout, code } = await runCli(["inspect", "ui", "--help"]);
