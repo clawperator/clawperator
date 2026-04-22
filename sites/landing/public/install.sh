@@ -17,7 +17,8 @@ APK_METADATA_URL="${CLAWPERATOR_APK_METADATA_URL:-https://downloads.clawperator.
 APK_DOWNLOAD_DIR="${HOME}/.clawperator/downloads"
 APK_LOCAL_PATH="${APK_DOWNLOAD_DIR}/operator.apk"
 APK_SHA_PATH="${APK_DOWNLOAD_DIR}/operator.apk.sha256"
-DEFAULT_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operator}"
+RELEASE_OPERATOR_PACKAGE="com.clawperator.operator"
+DEFAULT_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-$RELEASE_OPERATOR_PACKAGE}"
 INSTALL_COMMAND="curl -fsSL https://clawperator.com/install.sh | bash"
 SKILLS_SETUP_STATUS="not-run"
 SKILLS_REGISTRY_PATH=""
@@ -1530,15 +1531,24 @@ print_operator_apk_redownload_hint() {
     echo -e "${YELLOW}  curl -fsSL https://clawperator.com/operator.apk -o ${APK_LOCAL_PATH}${NC}"
 }
 
-print_operator_setup_command() {
+operator_setup_command_text() {
     local device_id="${1:-}"
     local operator_package="${2:-$DEFAULT_OPERATOR_PACKAGE}"
+    local operator_package_flag=""
+
+    if [ "$operator_package" != "$RELEASE_OPERATOR_PACKAGE" ]; then
+        operator_package_flag=" --operator-package ${operator_package}"
+    fi
 
     if [ -n "$device_id" ]; then
-        echo -e "${YELLOW}  clawperator operator setup --apk ${APK_LOCAL_PATH} --device ${device_id} --operator-package ${operator_package}${NC}"
+        printf 'clawperator operator setup --apk %s --device %s%s' "$APK_LOCAL_PATH" "$device_id" "$operator_package_flag"
     else
-        echo -e "${YELLOW}  clawperator operator setup --apk ${APK_LOCAL_PATH} --operator-package ${operator_package}${NC}"
+        printf 'clawperator operator setup --apk %s%s' "$APK_LOCAL_PATH" "$operator_package_flag"
     fi
+}
+
+print_operator_setup_command() {
+    echo -e "${YELLOW}  $(operator_setup_command_text "${1:-}" "${2:-$DEFAULT_OPERATOR_PACKAGE}")${NC}"
 }
 
 print_manual_operator_setup_commands() {
@@ -1588,7 +1598,7 @@ install_operator_apk_on_devices() {
         if "$CLAWPERATOR_BIN_PATH" operator setup --apk "$APK_LOCAL_PATH" --device "$device_id" --operator-package "$DEFAULT_OPERATOR_PACKAGE" > /dev/null 2>&1; then
             echo -e "${GREEN}  ✅ ${device_id} - operator APK installed and permissions granted.${NC}"
         else
-            echo -e "${RED}  ❌ ${device_id} - operator setup failed. Redownload https://clawperator.com/operator.apk, then run: clawperator operator setup --apk ${APK_LOCAL_PATH} --device ${device_id} --operator-package ${DEFAULT_OPERATOR_PACKAGE}${NC}"
+            echo -e "${RED}  ❌ ${device_id} - operator setup failed. Redownload https://clawperator.com/operator.apk, then run: $(operator_setup_command_text "$device_id" "$DEFAULT_OPERATOR_PACKAGE")${NC}"
             failed_installs=$((failed_installs + 1))
         fi
     done
@@ -1877,7 +1887,7 @@ doctor_report_connected_device() {
     fi
 
     DOCTOR_DEVICE_STATUS="fail"
-    echo -e "${YELLOW}  ⚠  ${device_id} - setup required after redownloading https://clawperator.com/operator.apk: clawperator operator setup --apk ${APK_LOCAL_PATH} --device ${device_id} --operator-package ${operator_package}${NC}"
+    echo -e "${YELLOW}  ⚠  ${device_id} - setup required after redownloading https://clawperator.com/operator.apk: $(operator_setup_command_text "$device_id" "$operator_package")${NC}"
     return 1
 }
 

@@ -15,7 +15,7 @@ assert_contains() {
     local file="$1"
     local needle="$2"
     local label="$3"
-    if ! grep -Fq "$needle" "$file"; then
+    if ! grep -Fq -- "$needle" "$file"; then
         echo "ERROR: $label missing expected output: $needle" >&2
         echo "--- $file ---" >&2
         cat "$file" >&2
@@ -28,7 +28,7 @@ assert_not_contains() {
     local file="$1"
     local needle="$2"
     local label="$3"
-    if grep -Fq "$needle" "$file"; then
+    if grep -Fq -- "$needle" "$file"; then
         echo "ERROR: $label unexpectedly contained: $needle" >&2
         echo "--- $file ---" >&2
         cat "$file" >&2

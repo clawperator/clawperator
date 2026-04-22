@@ -23,7 +23,7 @@ assert_contains() {
     local file="$1"
     local needle="$2"
     local label="$3"
-    if ! grep -Fq "$needle" "$file"; then
+    if ! grep -Fq -- "$needle" "$file"; then
         echo "ERROR: $label missing expected output: $needle" >&2
         echo "--- stdout ---" >&2
         cat "$file" >&2
@@ -36,7 +36,7 @@ assert_not_contains() {
     local file="$1"
     local needle="$2"
     local label="$3"
-    if grep -Fq "$needle" "$file"; then
+    if grep -Fq -- "$needle" "$file"; then
         echo "ERROR: $label unexpectedly contained: $needle" >&2
         echo "--- stdout ---" >&2
         cat "$file" >&2
@@ -295,6 +295,21 @@ run_scenario() {
     fi
 }
 
+capture_setup_prompt() {
+    local operator_package="${1:-}"
+    local output_file="$2"
+    local home_dir="$TMP_DIR/prompt-home"
+    mkdir -p "$home_dir"
+
+    HOME="$home_dir" \
+    CLAWPERATOR_OPERATOR_PACKAGE="$operator_package" \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        print_operator_setup_command "serial-check" "${CLAWPERATOR_OPERATOR_PACKAGE:-}"
+    ' _ "$INSTALL_SCRIPT" >"$output_file"
+}
+
 echo "=== Scenario 1: ready devices stay ready while unauthorized devices are reported ==="
 run_scenario \
     partial \
@@ -356,5 +371,16 @@ run_scenario \
 assert_contains "$TMP_DIR/stale-many.stdout" "Installing operator APK on serial-beta..." "stale-many stdout"
 assert_contains "$TMP_DIR/stale-many.stdout" "serial-offline - ADB state: offline. Unlock the device or restart ADB before setup." "stale-many stdout"
 assert_contains "$TMP_DIR/stale-many.stdout" "Other detected devices were skipped until they are ready for ADB." "stale-many stdout"
+
+echo "=== Scenario 8: manual setup prompt omits the default operator package flag ==="
+DEFAULT_PROMPT_STDOUT="$TMP_DIR/default-prompt.stdout"
+capture_setup_prompt "com.clawperator.operator" "$DEFAULT_PROMPT_STDOUT"
+assert_contains "$DEFAULT_PROMPT_STDOUT" "clawperator operator setup --apk $TMP_DIR/prompt-home/.clawperator/downloads/operator.apk --device serial-check" "default-prompt stdout"
+assert_not_contains "$DEFAULT_PROMPT_STDOUT" "--operator-package" "default-prompt stdout"
+
+echo "=== Scenario 9: manual setup prompt preserves non-default operator package guidance ==="
+DEV_PROMPT_STDOUT="$TMP_DIR/dev-prompt.stdout"
+capture_setup_prompt "com.clawperator.operator.dev" "$DEV_PROMPT_STDOUT"
+assert_contains "$DEV_PROMPT_STDOUT" "clawperator operator setup --apk $TMP_DIR/prompt-home/.clawperator/downloads/operator.apk --device serial-check --operator-package com.clawperator.operator.dev" "dev-prompt stdout"
 
 echo "=== install.sh multi-device harness passed ==="
