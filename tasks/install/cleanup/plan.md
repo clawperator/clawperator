@@ -161,8 +161,6 @@ before more install and upgrade work builds on it.
 
 - Exact CLI nouning for the new surfaces, as long as they remain consistent
   with the findings and existing CLI structure
-- Whether the remediation entrypoint should extend `doctor --fix` or live under
-  a new install-oriented CLI surface
 - Whether shell RC mutation is deleted outright or retained behind an explicit
   opt-in flag or env var
 - The smallest authored docs set needed in Phase 5 to keep install and upgrade
@@ -173,13 +171,16 @@ before more install and upgrade work builds on it.
 | Question | Rule |
 | --- | --- |
 | Should host artifact writers move before remediation policy? | Yes. Phase 1 and Phase 2 go first because they are high leverage and lower risk than policy migration. |
-| Should APK download move before doctor-policy migration? | Yes. The reusable operator artifact surface should exist before remediation starts depending on it. |
+| Should APK download move before doctor-policy migration? | Yes. The reusable `operator download` surface must exist before Phase 4 wires it as a `kind: "shell"` fix step. |
 | Should multi-device remediation stay in shell once CLI-owned? | No. Phase 4 moves the policy into the CLI and removes the shell-side second policy engine. |
+| What is the multi-device remediation CLI surface shape? | Add a new `clawperator install remediate` command (or equivalent under `install` group) that enumerates connected devices and applies per-device `operator download` + `doctor --fix --device <id>`. Do not extend `doctor --fix` for multi-device; `doctor` is single-device by contract. |
+| What does `doctor --fix` do today? | `DoctorService.finalize()` runs `kind: "shell"` fix steps when `autoFix` is true. For `readiness.apk.presence` fail, there is one `kind: "shell"` step (`operator setup`) but the preceding download step is `kind: "manual"` and is not executed. Phase 3 adds `operator download` and Phase 4 changes the download step to `kind: "shell"` so `--fix` can complete APK setup without manual intervention. |
 | What happens to `validation/install/` when behavior moves? | Replace shell-branch coverage with CLI or integration coverage in the same phase. Do not leave a gap. |
-| When should `clawperator-upgrade` change? | Only in Phase 5 after the CLI-first upgrade sequence is real. |
+| When should `clawperator-upgrade` change? | Only in Phase 5 after the CLI-first upgrade sequence is real. Do one coordinated update in Phase 5 rather than partial updates after each prior phase, to avoid agents mixing old and new guidance. |
 | What should the upgrade skill do after this task? | Use CLI-first upgrade when the CLI is reachable; fall back to `install.sh` only for environment repair. |
 | How should docs be updated? | Use `.agents/skills/docs-author/SKILL.md` in Phase 5. Do not edit generated docs directly. |
 | What happens if findings and implementation reality diverge? | Append a dated `## Execution Notes` section to `tasks/install/cleanup/findings.md` before the phase commit. |
+| Should shell RC mutation for `CLAWPERATOR_SKILLS_REGISTRY` be removed? | Yes, but only after confirming `docs/setup.md` documents the installed-home fallback path (`~/.clawperator/skills/skills/skills-registry.json`) as the supported default. Fix docs first if they still say to set the env var. |
 
 ## Failure Modes To Prevent
 
@@ -211,7 +212,12 @@ After PR-2:
 
 After PR-3:
 
-- the CLI owns doctor-driven install remediation and multi-device policy
+- a new `clawperator install remediate` command (or equivalent) owns
+  multi-device install policy; `install.sh` calls it instead of looping
+- `readiness.apk.presence` `kind: "shell"` fix steps include `operator download`
+  so `doctor --fix --device <id>` completes APK setup end-to-end
+- `readiness.handshake` fail includes a `kind: "shell"` fix step for
+  `grant-device-permissions` so `doctor --fix` handles permission recovery
 - `install.sh` no longer re-parses `doctor --json` check ids to make product
   decisions
 

@@ -62,12 +62,14 @@ Read these files IN THIS ORDER before writing anything.
 | File | Why it matters |
 | --- | --- |
 | `tasks/install/cleanup/plan.md` | Stable contract, sequencing, and scope boundaries |
-| `tasks/install/cleanup/findings.md` | Authoritative migration rationale and end-state decisions |
+| `tasks/install/cleanup/findings.md` | Authoritative migration rationale, code-verified decisions, and open design constraints |
 | `sites/landing/public/install.sh` | Current installer behavior and the shell logic being thinned |
 | `validation/install/README.md` | Install validation maintenance rule and existing harness ownership |
 | `apps/node/src/cli/registry.ts` | Existing CLI command structure and help-surface conventions |
 | `apps/node/src/cli/commands/doctor.ts` | Current `doctor` command surface and `--fix` behavior |
-| `apps/node/src/domain/doctor/DoctorService.ts` | Current doctor policy and autofix machinery |
+| `apps/node/src/domain/doctor/DoctorService.ts` | `finalize()` lines 166-226: current autofix mechanism that runs `kind: "shell"` fix steps |
+| `apps/node/src/domain/doctor/checks/readinessChecks.ts` | APK presence and handshake check fix steps - what is `kind: "shell"` today vs `kind: "manual"` |
+| `apps/node/src/domain/version/compatibility.ts` | `getOperatorPackageApkPath()` - canonical APK path that Phase 3 download command must write to |
 | `apps/node/src/cli/commands/operatorSetup.ts` | Existing operator setup contract |
 | `apps/node/src/domain/device/setupOperator.ts` | Existing operator install-grant-verify domain flow |
 | `apps/node/src/cli/commands/bundledSkills.ts` | Existing pattern for install-oriented CLI subcommands returning structured results |
@@ -248,27 +250,37 @@ CLI-owned operator surface so `install.sh` no longer owns that product logic.
 
 1. Add a CLI-owned operator artifact surface such as
    `clawperator operator download` or equivalent. It must cover:
-   - metadata fetch
+   - metadata fetch from `APK_METADATA_URL`
+     (default: `https://downloads.clawperator.com/operator/latest.json`)
    - metadata parse
    - APK download
-   - checksum acquisition
+   - checksum acquisition (inline from metadata, or separate file)
    - checksum verification
-2. Return a structured result with at minimum:
-   - local APK path
-   - operator version
-   - checksum or verification status
-   - any package-flavor or operator-package compatibility data needed by the
-     installer
-3. Replace the shell-side metadata parsing and checksum flow in `install.sh`
-   with the CLI surface from step 1.
-4. Add tests in the same phase. Required cases:
-   - valid metadata with inline checksum
-   - valid metadata with external checksum file
-   - missing required metadata fields
-   - malformed metadata
-   - checksum mismatch
-   - installer path delegates to the CLI rather than parsing JSON in shell
-5. Keep manual recovery text truthful if the new CLI surface fails. Do not
+2. The command must write the APK to `getOperatorPackageApkPath(operatorPackage)`
+   from `apps/node/src/domain/version/compatibility.ts`. This path is already
+   canonical: the `readiness.apk.presence` fix step hardcodes it. Do not invent
+   a new download path.
+3. Return a structured result with at minimum:
+   - `localPath` - absolute path of the written APK
+   - `operatorVersion` - version string from metadata
+   - `sha256` - verified checksum
+   - `operatorPackage` - the resolved package name
+4. Support `--operator-package <pkg>` and `--output <json|pretty>`.
+   Exit non-zero if download or verification fails.
+5. Replace the shell-side metadata parsing and checksum flow in `install.sh`
+   with a call to the new CLI surface. The installer reads `localPath` from the
+   JSON result and passes it to `clawperator operator setup`.
+6. Add tests in the same phase. Required cases:
+   - valid metadata with inline checksum → writes APK to canonical path, exits 0
+   - valid metadata with external checksum file → same
+   - missing required metadata field (`version`, `apk_url`, `sha256_url`) →
+     non-zero exit, structured error
+   - malformed metadata JSON → non-zero exit
+   - checksum mismatch → non-zero exit with clear error
+   - `--output json` emits `localPath`, `operatorVersion`, `sha256`,
+     `operatorPackage` fields on success
+   - installer path in shell invokes the CLI rather than parsing JSON itself
+7. Keep manual recovery text truthful if the new CLI surface fails. Do not
    leave stale shell-generated instructions behind.
 
 ### Acceptance Criteria
@@ -310,12 +322,48 @@ Move doctor-driven remediation and multi-device install policy into the CLI so
 `install.sh` stops parsing internal doctor check ids and maintaining its own
 policy engine.
 
+### Background: current `doctor --fix` state
+
+Before writing any code, read `apps/node/src/domain/doctor/DoctorService.ts`
+lines 166-226 and `apps/node/src/domain/doctor/checks/readinessChecks.ts`
+lines 30-118.
+
+Key facts:
+- `--fix` already exists. `DoctorService.finalize()` runs `kind: "shell"` fix
+  steps when `autoFix` is true; it skips `kind: "manual"` steps.
+- `readiness.apk.presence` fail currently has one `kind: "shell"` step
+  (`operator setup`) but the preceding APK download step is `kind: "manual"`.
+  `--fix` runs the setup step but cannot download the APK without the Phase 3
+  command existing first.
+- `readiness.handshake` fail currently has no `kind: "shell"` fix step.
+- `doctor` takes a single `--device`. Multi-device looping is not inside doctor
+  today and must not be added to `doctor --fix`.
+
+Do not re-derive this state from the code at execution time. Use it as the
+established starting point.
+
+### Multi-Device Surface Decision
+
+**Use Option B from `findings.md`:** Add a new `clawperator install remediate`
+command (or equivalent under an `install` group) that:
+
+1. enumerates all connected ADB devices
+2. for each device needing APK setup: runs `operator download` (if needed) then
+   `doctor --fix --device <id>`
+3. emits a structured per-device result and overall summary
+
+Do not extend `doctor --fix` for multi-device. `doctor` is single-device by
+contract. Do not leave this choice to the implementer.
+
 ### Files or Surfaces To Change
 
-- `apps/node/src/cli/commands/doctor.ts` or a new install-oriented command
-- `apps/node/src/domain/doctor/DoctorService.ts`
-- any justified helper under `apps/node/src/domain/doctor/` or
-  `apps/node/src/domain/device/`
+- new file `apps/node/src/cli/commands/installRemediate.ts` (or equivalent
+  under an `install` CLI group)
+- `apps/node/src/cli/registry.ts` - register the new command
+- `apps/node/src/domain/doctor/checks/readinessChecks.ts` - change APK
+  download fix step kind and add handshake fix step
+- `apps/node/src/domain/doctor/DoctorService.ts` - if any autofix plumbing
+  changes are needed
 - `sites/landing/public/install.sh`
 - `apps/node/src/test/` coverage
 - `validation/install/test_main.sh`
@@ -324,31 +372,53 @@ policy engine.
 
 ### Steps
 
-1. Expand `doctor --fix` or add a new install-oriented CLI surface that owns:
-   - single-device remediation decisions
-   - multi-device target collection
-   - APK setup targeting
-   - permission re-grant recovery
-   - structured per-device and overall install summary output
-2. Treat the new CLI result as authoritative. Do not re-derive policy from raw
-   `doctor --json` output in shell once this phase lands.
-3. Remove shell-side policy helpers from `install.sh` that exist only to
-   interpret doctor JSON and multi-device readiness.
-4. Add tests in the same phase. Required cases:
-   - no connected device
-   - single device needing APK remediation
-   - multiple devices with mixed ready, warn, stale, and shell-unavailable
-     states
+1. In `apps/node/src/domain/doctor/checks/readinessChecks.ts`, change the APK
+   download fix step for `readiness.apk.presence` fail from `kind: "manual"` to
+   `kind: "shell"` with value `clawperator operator download [--operator-package
+   <pkg>]`. The subsequent `operator setup` step is already `kind: "shell"` and
+   is correct. Do not change it.
+2. In `readinessChecks.ts`, add a `kind: "shell"` fix step to the
+   `readiness.handshake` fail case with value
+   `clawperator grant-device-permissions --device <id> [--operator-package <pkg>]`.
+   The `grant-device-permissions` command already exists.
+3. Add a new `clawperator install remediate` command:
+   - enumerate connected ADB devices
+   - for each device where `doctor --json --device <id>` shows APK setup or
+     version compatibility fail: run `operator download` (skip if APK already
+     current) then `doctor --fix --device <id>`
+   - emit structured output: per-device status map and overall `ok` boolean
+   - support `--operator-package <pkg>` and `--output <json|pretty>`
+4. Replace the shell-side policy helpers in `install.sh` that parse doctor
+   JSON and multi-device readiness with a call to `clawperator install
+   remediate`. The installer reads the structured result and renders a summary.
+5. Add tests in the same phase. Required cases:
+
+   For `readinessChecks.ts` fix step changes:
+   - `readiness.apk.presence` fail fix steps now include a `kind: "shell"` download
+     step before the setup step
+   - `readiness.handshake` fail fix steps include a `kind: "shell"` grant step
+   - `doctor --fix --device <id>` with APK absent and Phase 3 download command
+     available: verifies download step runs before setup step in autofix path
+
+   For `clawperator install remediate`:
+   - no connected device → exits 0, reports no devices
+   - single device needing APK remediation → remediates, structured result
+   - multiple devices with mixed ready, warn, stale, and
+     `DEVICE_SHELL_UNAVAILABLE` states → correct per-device status, overall `ok`
+     reflects whether any device needed and failed setup
    - permission re-grant recovery when handshake fails after setup
-   - stable structured summary output from the CLI-owned remediation surface
-5. Keep the installer summary truthful by rendering the CLI result, not by
-   rebuilding the state machine in shell.
-6. Replace shell-harness assumptions in `validation/install/` as the behavior
+   - `--output json` emits stable per-device result shape
+
+6. Keep the installer summary truthful by rendering the CLI result. Do not
+   rebuild the state machine in shell.
+7. Replace shell-harness assumptions in `validation/install/` as the behavior
    moves. Do not leave tests asserting removed shell internals.
 
 ### Acceptance Criteria
 
-- the CLI owns remediation policy and multi-device install logic
+- `readiness.apk.presence` fail has a `kind: "shell"` download step
+- `readiness.handshake` fail has a `kind: "shell"` grant step
+- a new CLI-owned multi-device install remediation surface exists
 - `install.sh` no longer parses internal doctor check ids to make product
   decisions
 - replacement tests prove the migrated behavior in the same phase
@@ -356,8 +426,10 @@ policy engine.
 Human review checklist:
 
 - one policy engine exists after this phase, not two
-- multi-device behavior is still explicit and reviewable
+- multi-device behavior is explicit and reviewable through the new command
 - summary output is derived from CLI results rather than shell re-interpretation
+- `readinessChecks.ts` fix step kinds are correct - no step was accidentally
+  changed from shell to manual or vice versa
 
 ### Validation
 
@@ -368,10 +440,18 @@ bash -n sites/landing/public/install.sh
 ./validation/install/test_install.sh
 ```
 
-### Expected Commit
+### Expected Commits
 
 ```text
-feat(node): move installer remediation into the CLI
+fix(node): wire operator download and handshake grant as shell fix steps
+```
+
+```text
+feat(node): add install remediate command for multi-device setup policy
+```
+
+```text
+refactor(install): delegate remediation and multi-device policy to CLI
 ```
 
 ## Phase 5: Final Installer Thinning, Docs, and Upgrade Skill
@@ -398,9 +478,15 @@ CLI-first upgrade path with `install.sh` retained as recovery-only fallback.
 ### Steps
 
 1. Revisit shell RC mutation for `CLAWPERATOR_SKILLS_REGISTRY`.
-   Preferred outcome: remove default RC mutation entirely. If a hard repo
-   constraint forces retention, make it explicit opt-in only and document the
-   rule clearly.
+   Before removing, read `docs/setup.md` and any related authored install docs.
+   If they still say to set `CLAWPERATOR_SKILLS_REGISTRY`, update the docs first
+   to document the installed-home fallback path
+   (`~/.clawperator/skills/skills/skills-registry.json`) as the supported
+   default before removing the mutation. Do not remove the RC mutation while the
+   docs still tell users to set the env var.
+   Preferred outcome after docs are correct: remove default RC mutation entirely.
+   If a hard repo constraint forces retention, make it explicit opt-in only and
+   document the rule clearly.
 2. Update the installer summary and install docs so they describe the new
    ownership split truthfully:
    - shell bootstrap first
@@ -408,14 +494,31 @@ CLI-first upgrade path with `install.sh` retained as recovery-only fallback.
    - durable artifacts and remediation surfaces
 3. Use `.agents/skills/docs-author/SKILL.md` for authored docs updates.
 4. Update `clawperator-upgrade/SKILL.md` so the normal upgrade path is:
-   1. check CLI reachability
-   2. if reachable, run the CLI-first upgrade sequence
-   3. if not reachable, fall back to `curl -fsSL https://clawperator.com/install.sh | bash`
-5. Update `clawperator-upgrade/agents/openai.yaml` in the same phase so its
-   prompt metadata matches the new `SKILL.md` workflow.
-6. Update validation docs and harness ownership text so they describe the new
+   1. check CLI reachability (`clawperator --version`)
+   2. if reachable, run the full CLI upgrade sequence:
+      ```
+      npm install -g clawperator@latest
+      clawperator install remediate
+      clawperator bundled-skills update
+      clawperator skills install
+      clawperator host materialize-artifacts
+      clawperator doctor --json
+      ```
+   3. if not reachable (CLI missing or broken), fall back to
+      `curl -fsSL https://clawperator.com/install.sh | bash` as recovery only
+   Do this as one coordinated update in this phase. Do not make partial updates
+   to the skill across earlier phases; partial updates risk agents mixing old
+   and new guidance.
+5. Remove the prohibitions in `SKILL.md` against `npm install -g clawperator@latest`,
+   `clawperator bundled-skills update`, and `clawperator skills update` as
+   standalone upgrades. Replace with a single prohibition: do not use any one
+   command as a substitute for the full upgrade sequence above.
+6. Update `clawperator-upgrade/agents/openai.yaml` `default_prompt` in the same
+   commit so it matches the new `SKILL.md` workflow and references the
+   CLI-reachability gate.
+7. Update validation docs and harness ownership text so they describe the new
    split between shell bootstrap coverage and CLI coverage.
-7. Add or update tests in the same phase. Required cases:
+8. Add or update tests in the same phase. Required cases:
    - shell RC mutation no longer happens by default, or only happens when the
      explicit opt-in path is enabled
    - installer docs and validation readme no longer describe removed shell
