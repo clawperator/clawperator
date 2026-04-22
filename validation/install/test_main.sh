@@ -245,6 +245,24 @@ JSON
 JSON
       exit 0
       ;;
+    multi-device-shell-unavailable:1|multi-device-shell-unavailable:4|multi-device-shell-unavailable:5)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[{"id":"device.discovery","status":"warn","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
+JSON
+      exit 0
+      ;;
+    multi-device-shell-unavailable:2|multi-device-shell-unavailable:6)
+      cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.apk.presence","status":"fail","code":"DEVICE_SHELL_UNAVAILABLE"}]}
+JSON
+      exit 1
+      ;;
+    multi-device-shell-unavailable:3|multi-device-shell-unavailable:7)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+      exit 0
+      ;;
     multi-device-all-unready:1|multi-device-all-unready:2|multi-device-all-unready:3)
       cat <<'JSON'
 {"ok":true,"criticalOk":true,"checks":[{"id":"device.discovery","status":"warn","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
@@ -416,6 +434,13 @@ OUT
 List of devices attached
 serial-alpha	device
 serial-bad	device
+OUT
+      ;;
+    multi-device-shell-unavailable)
+      cat <<'OUT'
+List of devices attached
+serial-bad	device
+serial-ready	device
 OUT
       ;;
     multi-device-all-unready)
@@ -944,7 +969,7 @@ assert_contains "$MULTI_STALE_DEV_STDOUT" "Automatic APK installation is only av
 assert_contains "$MULTI_STALE_DEV_STDOUT" "Use a matching local debug APK before manual setup:" "main-multi-stale-dev stdout"
 assert_contains "$MULTI_STALE_DEV_STDOUT" "$TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk" "main-multi-stale-dev stdout"
 assert_contains "$MULTI_STALE_DEV_STDOUT" "serial-alpha - setup required with a matching local debug APK at $TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk" "main-multi-stale-dev stdout"
-assert_contains "$MULTI_STALE_DEV_STDOUT" "clawperator operator setup --apk '$TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk' --device 'serial-alpha' --operator-package com.clawperator.operator.dev" "main-multi-stale-dev stdout"
+assert_contains "$MULTI_STALE_DEV_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk --device serial-alpha --operator-package com.clawperator.operator.dev" "main-multi-stale-dev stdout"
 assert_contains "$MULTI_STALE_DEV_STDOUT" "serial-beta - ready" "main-multi-stale-dev stdout"
 assert_not_contains "$MULTI_STALE_DEV_STDOUT" "Mock download_operator_apk" "main-multi-stale-dev stdout"
 assert_not_contains "$MULTI_STALE_DEV_STDOUT" "Mock verify_operator_apk" "main-multi-stale-dev stdout"
@@ -1077,5 +1102,34 @@ assert_contains "$PARTIAL_FAIL_STDOUT" "Installing operator APK on serial-beta..
 assert_contains "$PARTIAL_FAIL_STDOUT" "serial-alpha - ready" "main-partial-fail stdout"
 assert_contains "$PARTIAL_FAIL_STDOUT" "Installation Complete (Device Selection Required)" "main-partial-fail stdout"
 assert_not_contains "$PARTIAL_FAIL_STDOUT" "Installation Successful!" "main-partial-fail stdout"
+
+echo "=== Scenario 13: shell-unavailable devices do not fall back to manual APK setup commands ==="
+SHELL_UNAVAILABLE_STDOUT="$TMP_DIR/main-shell-unavailable.stdout"
+SHELL_UNAVAILABLE_STDERR="$TMP_DIR/main-shell-unavailable.stderr"
+SHELL_UNAVAILABLE_TRACE="$TMP_DIR/main-shell-unavailable.trace"
+SHELL_UNAVAILABLE_CLI_LOG="$TMP_DIR/main-shell-unavailable.cli.log"
+SHELL_UNAVAILABLE_GUIDE_PATH_FILE="$TMP_DIR/main-shell-unavailable.guide.path"
+SHELL_UNAVAILABLE_STATE="$TMP_DIR/main-shell-unavailable.state"
+run_main_case \
+    main-shell-unavailable \
+    multi-device-shell-unavailable \
+    0 \
+    "$SHELL_UNAVAILABLE_STDOUT" \
+    "$SHELL_UNAVAILABLE_STDERR" \
+    "$SHELL_UNAVAILABLE_TRACE" \
+    "$SHELL_UNAVAILABLE_CLI_LOG" \
+    "$SHELL_UNAVAILABLE_GUIDE_PATH_FILE" \
+    "$SHELL_UNAVAILABLE_STATE" \
+    "" \
+    "yes"
+
+assert_contains "$SHELL_UNAVAILABLE_STDOUT" "serial-bad - ADB shell is inaccessible. Resolve ADB connectivity before setup." "main-shell-unavailable stdout"
+assert_contains "$SHELL_UNAVAILABLE_STDOUT" "serial-bad - ADB shell is inaccessible. Resolve ADB connectivity, then rerun: clawperator doctor --device serial-bad --output pretty --operator-package com.clawperator.operator" "main-shell-unavailable stdout"
+assert_contains "$SHELL_UNAVAILABLE_STDOUT" "serial-ready - ready" "main-shell-unavailable stdout"
+assert_contains "$SHELL_UNAVAILABLE_STDOUT" "each ready device passed Clawperator Doctor" "main-shell-unavailable stdout"
+assert_contains "$SHELL_UNAVAILABLE_STDOUT" "Resolve any ADB-state warnings above, then rerun install.sh or a device-specific doctor/setup command." "main-shell-unavailable stdout"
+assert_not_contains "$SHELL_UNAVAILABLE_STDOUT" "Complete Android setup on one target device with one of:" "main-shell-unavailable stdout"
+assert_not_contains "$SHELL_UNAVAILABLE_STDOUT" "some devices still need setup" "main-shell-unavailable stdout"
+assert_not_contains "$SHELL_UNAVAILABLE_STDOUT" "setup required after redownloading https://clawperator.com/operator.apk" "main-shell-unavailable stdout"
 
 echo "=== install.sh main smoke harness passed ==="

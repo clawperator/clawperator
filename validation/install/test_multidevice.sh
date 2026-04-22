@@ -327,7 +327,7 @@ run_scenario() {
 capture_setup_prompt() {
     local operator_package="${1:-}"
     local output_file="$2"
-    local home_dir="$TMP_DIR/prompt-home"
+    local home_dir="$TMP_DIR/prompt home'space"
     mkdir -p "$home_dir"
 
     HOME="$home_dir" \
@@ -335,7 +335,22 @@ capture_setup_prompt() {
     bash -c '
         source "$1" >/dev/null 2>&1
         trap - ERR
-        print_operator_setup_command "serial-check" "${CLAWPERATOR_OPERATOR_PACKAGE:-}"
+        print_operator_setup_command "serial check'\''special" "${CLAWPERATOR_OPERATOR_PACKAGE:-}"
+    ' _ "$INSTALL_SCRIPT" >"$output_file"
+}
+
+capture_redownload_hint() {
+    local operator_package="${1:-}"
+    local output_file="$2"
+    local home_dir="$TMP_DIR/prompt home'space"
+    mkdir -p "$home_dir"
+
+    HOME="$home_dir" \
+    CLAWPERATOR_OPERATOR_PACKAGE="$operator_package" \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        print_operator_apk_redownload_hint
     ' _ "$INSTALL_SCRIPT" >"$output_file"
 }
 
@@ -406,19 +421,31 @@ assert_contains "$TMP_DIR/stale-many.stdout" "Other detected devices were skippe
 echo "=== Scenario 8: manual setup prompt omits the default operator package flag ==="
 DEFAULT_PROMPT_STDOUT="$TMP_DIR/default-prompt.stdout"
 capture_setup_prompt "com.clawperator.operator" "$DEFAULT_PROMPT_STDOUT"
-assert_contains "$DEFAULT_PROMPT_STDOUT" "clawperator operator setup --apk '$TMP_DIR/prompt-home/.clawperator/downloads/operator.apk' --device 'serial-check'" "default-prompt stdout"
+PROMPT_HOME="$TMP_DIR/prompt home'space"
+EXPECTED_DEFAULT_APK_PATH="$(printf '%q' "$PROMPT_HOME/.clawperator/downloads/operator.apk")"
+EXPECTED_SPECIAL_DEVICE_ID="$(printf '%q' "serial check'special")"
+assert_contains "$DEFAULT_PROMPT_STDOUT" "clawperator operator setup --apk $EXPECTED_DEFAULT_APK_PATH --device $EXPECTED_SPECIAL_DEVICE_ID" "default-prompt stdout"
 assert_not_contains "$DEFAULT_PROMPT_STDOUT" "--operator-package" "default-prompt stdout"
 
 echo "=== Scenario 9: manual setup prompt preserves non-default operator package guidance ==="
 DEV_PROMPT_STDOUT="$TMP_DIR/dev-prompt.stdout"
 capture_setup_prompt "com.clawperator.operator.dev" "$DEV_PROMPT_STDOUT"
-assert_contains "$DEV_PROMPT_STDOUT" "clawperator operator setup --apk '$TMP_DIR/prompt-home/.clawperator/downloads/operator-debug.apk' --device 'serial-check' --operator-package com.clawperator.operator.dev" "dev-prompt stdout"
+EXPECTED_DEV_APK_PATH="$(printf '%q' "$PROMPT_HOME/.clawperator/downloads/operator-debug.apk")"
+assert_contains "$DEV_PROMPT_STDOUT" "clawperator operator setup --apk $EXPECTED_DEV_APK_PATH --device $EXPECTED_SPECIAL_DEVICE_ID --operator-package com.clawperator.operator.dev" "dev-prompt stdout"
 
-echo "=== Scenario 10: DEVICE_SHELL_UNAVAILABLE is not treated as an APK install target ==="
+echo "=== Scenario 10: redownload hint shell-quotes the output path ==="
+REDOWNLOAD_HINT_STDOUT="$TMP_DIR/redownload-hint.stdout"
+capture_redownload_hint "com.clawperator.operator" "$REDOWNLOAD_HINT_STDOUT"
+assert_contains "$REDOWNLOAD_HINT_STDOUT" "curl -fsSL https://clawperator.com/operator.apk -o $EXPECTED_DEFAULT_APK_PATH" "redownload-hint stdout"
+
+echo "=== Scenario 11: DEVICE_SHELL_UNAVAILABLE stays in the ADB recovery lane ==="
 run_scenario \
     shell-unavailable \
     0 \
-    "All connected devices already have the required APK." \
-    "Installing operator APK on serial-bad..."
+    "Some ready devices need ADB recovery before setup. Skipping automatic APK install for those devices until ADB shell works." \
+    "Installing operator APK on serial-bad..." \
+    "All connected devices already have the required APK."
+assert_contains "$TMP_DIR/shell-unavailable.stdout" "serial-bad - ADB shell is inaccessible. Resolve ADB connectivity before setup." "shell-unavailable stdout"
+assert_not_contains "$TMP_DIR/shell-unavailable.stdout" "Complete Android setup on one target device with one of:" "shell-unavailable stdout"
 
 echo "=== install.sh multi-device harness passed ==="

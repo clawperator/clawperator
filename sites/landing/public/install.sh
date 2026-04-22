@@ -44,6 +44,7 @@ DOCTOR_PROBE_FAILURE_COUNT=0
 MULTI_DEVICE_APK_TARGET_DEVICES=()
 MULTI_DEVICE_APK_PROBE_FAILURE_COUNT=0
 MULTI_DEVICE_APK_PROBE_FAILED_DEVICES=()
+MULTI_DEVICE_APK_ADB_RECOVERY_DEVICES=()
 MULTI_DEVICE_APK_CLEAN_DEVICES=()
 MULTI_DEVICE_APK_WARN_DEVICES=()
 MULTI_DEVICE_APK_INSTALL_FAILURES=0
@@ -63,7 +64,7 @@ cleanup_temp_files() {
 }
 
 shell_quote() {
-    printf "'%s'" "$1"
+    printf '%q' "$1"
 }
 
 on_error() {
@@ -1549,7 +1550,7 @@ operator_package_uses_public_release_apk() {
 print_operator_apk_redownload_hint() {
     if operator_package_uses_public_release_apk; then
         echo -e "${YELLOW}Redownload the latest stable APK before manual setup:${NC}"
-        echo -e "${YELLOW}  curl -fsSL https://clawperator.com/operator.apk -o ${APK_LOCAL_PATH}${NC}"
+        echo -e "${YELLOW}  curl -fsSL https://clawperator.com/operator.apk -o $(shell_quote "$APK_LOCAL_PATH")${NC}"
         return 0
     fi
 
@@ -1572,7 +1573,7 @@ operator_setup_command_text() {
     local operator_package_flag=""
 
     if [ "$operator_package" != "$RELEASE_OPERATOR_PACKAGE" ]; then
-        operator_package_flag=" --operator-package ${operator_package}"
+        operator_package_flag=" --operator-package $(shell_quote "$operator_package")"
     fi
 
     if [ -n "$device_id" ]; then
@@ -1580,6 +1581,13 @@ operator_setup_command_text() {
     else
         printf 'clawperator operator setup --apk %s%s' "$(shell_quote "$APK_LOCAL_PATH")" "$operator_package_flag"
     fi
+}
+
+doctor_command_text() {
+    local device_id="${1:-}"
+    local operator_package="${2:-$DEFAULT_OPERATOR_PACKAGE}"
+
+    printf 'clawperator doctor --device %s --output pretty --operator-package %s' "$(shell_quote "$device_id")" "$(shell_quote "$operator_package")"
 }
 
 print_operator_setup_command() {
@@ -1688,15 +1696,22 @@ reset_multi_device_apk_target_scan() {
     MULTI_DEVICE_APK_TARGET_DEVICES=()
     MULTI_DEVICE_APK_PROBE_FAILURE_COUNT=0
     MULTI_DEVICE_APK_PROBE_FAILED_DEVICES=()
+    MULTI_DEVICE_APK_ADB_RECOVERY_DEVICES=()
     MULTI_DEVICE_APK_CLEAN_DEVICES=()
     MULTI_DEVICE_APK_WARN_DEVICES=()
     MULTI_DEVICE_APK_INSTALL_FAILURES=0
 }
 
+doctor_device_needs_adb_recovery() {
+    local json="$1"
+
+    doctor_check_code "$json" "readiness.apk.presence" "DEVICE_SHELL_UNAVAILABLE"
+}
+
 doctor_device_requires_apk_setup() {
     local json="$1"
 
-    if doctor_check_code "$json" "readiness.apk.presence" "DEVICE_SHELL_UNAVAILABLE"; then
+    if doctor_device_needs_adb_recovery "$json"; then
         return 1
     fi
 
@@ -1734,6 +1749,9 @@ collect_multi_device_apk_setup_targets() {
         fi
         if doctor_device_requires_apk_setup "$doctor_json"; then
             MULTI_DEVICE_APK_TARGET_DEVICES+=("$device_id")
+        elif doctor_device_needs_adb_recovery "$doctor_json"; then
+            echo -e "${YELLOW}  ⚠  ${device_id} - ADB shell is inaccessible. Resolve ADB connectivity before setup.${NC}"
+            MULTI_DEVICE_APK_ADB_RECOVERY_DEVICES+=("$device_id")
         elif doctor_report_all_checks_pass "$doctor_json"; then
             MULTI_DEVICE_APK_CLEAN_DEVICES+=("$device_id")
         elif doctor_report_ok "$doctor_json"; then
@@ -1793,6 +1811,8 @@ maybe_install_operator_apk() {
         if [ "${#install_target_devices[@]}" -eq 0 ]; then
             if [ "$MULTI_DEVICE_APK_PROBE_FAILURE_COUNT" -gt 0 ]; then
                 echo -e "${YELLOW}Some ready devices could not be inspected with Clawperator Doctor. Skipping automatic APK install for those devices until the probe succeeds.${NC}"
+            elif [ "${#MULTI_DEVICE_APK_ADB_RECOVERY_DEVICES[@]}" -gt 0 ]; then
+                echo -e "${YELLOW}Some ready devices need ADB recovery before setup. Skipping automatic APK install for those devices until ADB shell works.${NC}"
             elif [ "$READY_DEVICE_COUNT" -eq 0 ] && [ "$adb_attention_count" -gt 0 ]; then
                 echo -e "${YELLOW}No connected device is ready for ADB yet. Skipping APK install until one device is ready.${NC}"
             elif [ "$adb_attention_count" -gt 0 ]; then
@@ -1939,9 +1959,9 @@ doctor_report_connected_device() {
         return 0
     fi
 
-    if doctor_check_code "$doctor_json" "readiness.apk.presence" "DEVICE_SHELL_UNAVAILABLE"; then
-        DOCTOR_DEVICE_STATUS="fail"
-        echo -e "${YELLOW}  ⚠  ${device_id} - ADB shell is inaccessible. Resolve ADB connectivity, then rerun: clawperator doctor --device ${device_id} --output pretty --operator-package ${operator_package}${NC}"
+    if doctor_device_needs_adb_recovery "$doctor_json"; then
+        DOCTOR_DEVICE_STATUS="adb-recovery"
+        echo -e "${YELLOW}  ⚠  ${device_id} - ADB shell is inaccessible. Resolve ADB connectivity, then rerun: $(doctor_command_text "$device_id" "$operator_package")${NC}"
         return 1
     fi
 
@@ -2019,6 +2039,8 @@ doctor_each_connected_device() {
                     else
                         if [ "${DOCTOR_DEVICE_STATUS:-}" = "probe-failure" ]; then
                             DOCTOR_PROBE_FAILURE_COUNT=$((DOCTOR_PROBE_FAILURE_COUNT + 1))
+                        elif [ "${DOCTOR_DEVICE_STATUS:-}" = "adb-recovery" ]; then
+                            DOCTOR_ADB_UNREADY_DEVICE_COUNT=$((DOCTOR_ADB_UNREADY_DEVICE_COUNT + 1))
                         else
                             DOCTOR_SETUP_REQUIRED_COUNT=$((DOCTOR_SETUP_REQUIRED_COUNT + 1))
                             DOCTOR_PENDING_SETUP_DEVICES+=("$device_id")
