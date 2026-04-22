@@ -64,7 +64,7 @@ Key findings from that check:
   a home-screen workspace, or how to reliably reach an app when the launcher
   is the starting surface.
 
-## Low-Hanging Fruit
+## Immediate Opportunities
 
 These are the changes that appear realistic to ship soon without changing core
 runtime semantics. Each item is a docs or help-text addition only.
@@ -143,7 +143,7 @@ enough.
 
 This is a registry.ts help-text addition only.
 
-## Enhancements
+## Follow-Up Enhancements
 
 These ideas seem valuable, but they are not the low-hanging-fruit changes for
 this round.
@@ -187,7 +187,7 @@ This requires a new CLI command and Android runtime support.
 
 ## Practical Conclusion
 
-For the near term, focus on the low-hanging-fruit bucket:
+For the near term, focus on the immediate-opportunities bucket:
 
 1. add a prominent "never guess selectors" callout to quickstart
 2. document launcher and home-screen navigation patterns in navigation.md
