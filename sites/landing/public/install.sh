@@ -1565,7 +1565,7 @@ operator_apk_manual_setup_source_text() {
     if operator_package_uses_public_release_apk; then
         printf 'after redownloading https://clawperator.com/operator.apk'
     else
-        printf 'with a matching local debug APK at %s' "$APK_LOCAL_PATH"
+        printf 'with a matching local debug APK at %s' "$(shell_quote "$APK_LOCAL_PATH")"
     fi
 }
 
