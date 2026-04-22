@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, chmod, lstat, unlink, writeFile, readdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
-import { DEFAULT_BUNDLED_SKILLS_DIR, DEFAULT_OPERATOR_PACKAGE } from "../skills/skillsConfig.js";
+import { DEFAULT_OPERATOR_PACKAGE } from "../skills/skillsConfig.js";
 import { getCliVersion } from "../version/compatibility.js";
 
 export type HostArtifactKey =
@@ -54,6 +54,13 @@ export interface HostSetupOptions {
 
 function isNonFatalHostArtifactFailure(result: HostArtifactOutcome): boolean {
   return result.artifact === "sharedAgentBridge" && result.status === "failed";
+}
+
+function resolveBundledSkillsDir(options: HostSetupOptions): string {
+  if (options.bundledSkillsDir !== undefined) {
+    return options.bundledSkillsDir;
+  }
+  return join(getHomeDir(options.env), ".clawperator", "bundled-skills");
 }
 
 interface RuntimeSkillSummary {
@@ -321,6 +328,9 @@ function buildInstallStateContent(options: HostSetupOptions, resolvedRegistryPat
 
 function resolveCliJsPath(options: HostSetupOptions): string {
   const explicitPath = options.cliJsPath;
+  if (explicitPath === null) {
+    return "";
+  }
   if (typeof explicitPath === "string") {
     return explicitPath;
   }
@@ -445,7 +455,7 @@ async function buildAgentGuideContent(
   options: HostSetupOptions,
   runtimeGuide: RuntimeGuideInfo,
 ): Promise<string> {
-  const bundledSkillsDir = options.bundledSkillsDir ?? DEFAULT_BUNDLED_SKILLS_DIR;
+  const bundledSkillsDir = resolveBundledSkillsDir(options);
   const { installed, hasVersionFile } = await listInstalledBundledSkillNames(bundledSkillsDir);
   const hasSkills = installed.length > 0;
   const hasOrientation = installed.includes("clawperator-agent-orientation");

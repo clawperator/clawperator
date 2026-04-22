@@ -166,6 +166,31 @@ describe("setupHost", () => {
     }
   });
 
+  it("treats cliJsPath null as an explicit request to use wrapper-form MCP config output", async () => {
+    const homeDir = await makeTempHome();
+
+    try {
+      await setupHost({
+        env: {
+          HOME: homeDir,
+          CLAWPERATOR_BIN_PATH: "/usr/local/bin/clawperator",
+        },
+        installedAt: "2026-04-23T10:11:12Z",
+        cliJsPath: null,
+        processExecPath: "/usr/local/bin/node",
+      });
+
+      const snippetPath = join(homeDir, ".clawperator", "mcp-config-snippet.json");
+      const parsed = JSON.parse(await readFile(snippetPath, "utf8"));
+
+      assert.strictEqual(parsed.claudeDesktop.entry.clawperator.command, "/usr/local/bin/clawperator");
+      assert.deepStrictEqual(parsed.claudeDesktop.entry.clawperator.args, ["mcp", "serve"]);
+      assert.match(parsed.notes[2], /npm shell wrapper/);
+    } finally {
+      await rm(homeDir, { recursive: true, force: true });
+    }
+  });
+
   it("keeps the shared-agent bridge bounded and idempotent", async () => {
     const homeDir = await makeTempHome();
 

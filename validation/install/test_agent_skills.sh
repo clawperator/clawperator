@@ -183,6 +183,16 @@ JSON
       exit 0
     fi
     ;;
+  host-partial)
+    if [ "\$1" = "--version" ]; then
+      printf '%s\n' '1.2.3'
+      exit 0
+    fi
+    if [ "\$1" = "host" ] && [ "\$2" = "setup" ]; then
+      printf '%s\n' '{"ok":true,"summary":{"written":1,"updated":0,"skipped":0,"failed":0},"artifacts":[{"artifact":"installState","status":"written","path":"/tmp/install-state.json"},{"artifact":"mcpConfigSnippet","status":"written","path":"/tmp/mcp.json"},{"artifact":"agentGuide","status":"written","path":"/tmp/AGENTS.md"}]}'
+      exit 0
+    fi
+    ;;
 esac
 
 if [ "\$1" = "host" ] && [ "\$2" = "setup" ]; then
@@ -425,6 +435,37 @@ JSON
     ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$mock_dir/clawperator.cli.js" "$env_registry_path" "$output_file" "$status_file" "$guide_path_file" "$install_state_path_file" "$registry_path_file"
 }
 
+run_host_artifacts_incomplete_case() {
+    local label="$1"
+    local output_file="$2"
+    local status_file="$3"
+    local cli_log_file="$4"
+    local mock_dir="$TMP_DIR/mock-host-$label"
+
+    setup_mock_clawperator "$mock_dir" "host-partial" "{}" "$cli_log_file"
+    printf '// mock cli entrypoint for installer delegation tests\n' > "$mock_dir/clawperator.cli.js"
+
+    HOME="$TMP_DIR/home-host-$label" \
+    OS=Linux \
+    PATH="$mock_dir:$PATH" \
+    EXPECTED_NODE_BIN="$EXPECTED_NODE_BIN" \
+    REAL_NODE_CLI="$REAL_NODE_CLI" \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        export CLAWPERATOR_BIN_PATH="$2"
+        export CLAWPERATOR_CLI_JS_PATH="$3"
+        export CLAWPERATOR_HOST_ARTIFACTS_INSTALLED_AT="2026-04-23T10:11:12Z"
+
+        set +e
+        setup_host_artifacts_via_cli > "$4" 2>&1
+        status="$?"
+        set -e
+
+        printf "first=%s\n" "$status" > "$5"
+    ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$mock_dir/clawperator.cli.js" "$output_file" "$status_file"
+}
+
 EXPECTED_NODE_BIN="$(node -p 'process.execPath')"
 
 echo "=== Scenario 1: parser extracts installed and discovery dirs ==="
@@ -629,7 +670,19 @@ assert_contains "$HOST_ENV_REGISTRY_STATUS" "first=0" "host-env-registry status"
 assert_json_field_equals "$HOST_ENV_REGISTRY_STATE_PATH" "registryPath" "$HOST_ENV_REGISTRY_PATH" "host-env-registry install-state registryPath"
 assert_contains "$HOST_ENV_REGISTRY_GUIDE_PATH" "$HOST_ENV_REGISTRY_PATH" "host-env-registry guide"
 
-echo "=== Scenario 11: skip flag suppresses both runtime and bundled-skills setup ==="
+echo "=== Scenario 11: delegated host artifacts reject incomplete parsed results ==="
+HOST_INCOMPLETE_OUT="$TMP_DIR/host-incomplete.out"
+HOST_INCOMPLETE_STATUS="$TMP_DIR/host-incomplete.status"
+HOST_INCOMPLETE_CLI_LOG="$TMP_DIR/host-incomplete.cli.log"
+run_host_artifacts_incomplete_case \
+    incomplete \
+    "$HOST_INCOMPLETE_OUT" \
+    "$HOST_INCOMPLETE_STATUS" \
+    "$HOST_INCOMPLETE_CLI_LOG"
+assert_contains "$HOST_INCOMPLETE_STATUS" "first=1" "host-incomplete status"
+assert_contains "$HOST_INCOMPLETE_OUT" "Host setup via CLI returned incomplete artifact results." "host-incomplete output"
+
+echo "=== Scenario 12: skip flag suppresses both runtime and bundled-skills setup ==="
 SKIP_SKILLS_OUT="$TMP_DIR/skip-skills.out"
 SKIP_BUNDLED_SKILLS_OUT="$TMP_DIR/skip-bundled-skills.out"
 SKIP_STATUS="$TMP_DIR/skip.status"
@@ -642,7 +695,7 @@ assert_contains "$SKIP_STATUS" "skills=skipped" "skip-status"
 assert_contains "$SKIP_STATUS" "bundled=skipped" "skip-status"
 assert_equals "" "$(cat "$SKIP_LOG")" "skip command log"
 
-echo "=== Scenario 12: durable summary points at local artifacts ==="
+echo "=== Scenario 13: durable summary points at local artifacts ==="
 DURABLE_SUMMARY_OUT="$TMP_DIR/durable-summary.out"
 run_durable_summary_case authoring "$DURABLE_SUMMARY_OUT"
 assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawperator/AGENTS.md" "durable-summary"

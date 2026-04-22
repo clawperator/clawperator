@@ -850,6 +850,17 @@ setup_host_artifacts_via_cli() {
         return 1
     fi
 
+    if [ -z "$HOST_INSTALL_STATE_STATUS" ] || \
+       [ -z "$HOST_MCP_STATUS" ] || \
+       [ -z "$HOST_AGENT_GUIDE_STATUS" ] || \
+       [ -z "$HOST_SHARED_BRIDGE_STATUS" ]; then
+        echo -e "${RED}❌ Host setup via CLI returned incomplete artifact results.${NC}"
+        if [ -n "$HOST_ARTIFACTS_OUTPUT" ]; then
+            echo "$HOST_ARTIFACTS_OUTPUT"
+        fi
+        return 1
+    fi
+
     print_host_artifact_outcome "Local AGENTS.md" "$HOST_AGENT_GUIDE_STATUS" "$HOST_AGENT_GUIDE_PATH" "$HOST_AGENT_GUIDE_MESSAGE"
     print_host_artifact_outcome "Install state" "$HOST_INSTALL_STATE_STATUS" "$HOST_INSTALL_STATE_PATH" "$HOST_INSTALL_STATE_MESSAGE"
     print_host_artifact_outcome "MCP config snippet" "$HOST_MCP_STATUS" "$HOST_MCP_PATH" "$HOST_MCP_MESSAGE"
