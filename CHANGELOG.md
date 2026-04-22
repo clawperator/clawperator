@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.7.3] - 2026-04-22
+
+This release improves the installer handoff for multi-device setups and standardizes the public APK recovery guidance.
+
+### 📚 Documentation & Website
+- **Changed:** Improved `install.sh` so multi-device installs inspect each ready device, remediate stale APKs, and keep the final handoff honest when some devices still need attention.
+- **Changed:** Standardized the public guidance on the canonical stable APK URL and made the manual setup prompts package-aware, shell-safe, and clearer for `DEVICE_SHELL_UNAVAILABLE` cases.
+
+Pull requests:
+- [fix(install): multi-device installer remediation and APK guidance](https://github.com/clawperator/clawperator/pull/223)
+
 ## [0.7.2] - 2026-04-22
 
 This release moves the shipped first-party skills into the bundled Node skill tree and tightens the installer and docs guidance for multi-device setups.
