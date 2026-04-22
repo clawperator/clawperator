@@ -39,7 +39,7 @@ npm install -g clawperator
 Success conditions:
 
 - `clawperator version` exits `0` and prints a version string.
-- If you used `install.sh`, the installer also downloads the current release APK to `~/.clawperator/downloads/operator.apk`.
+- If you used `install.sh`, the installer also downloads the current release APK to `~/.clawperator/downloads/operator.apk` for that run. For later manual setup or recovery, redownload from `https://clawperator.com/operator.apk`.
 
 ### Durable host-agent artifacts from `install.sh`
 
@@ -135,6 +135,16 @@ adb kill-server && adb start-server
 If more than one target is connected, record the serial you will use and pass `--device <serial>` on every later command.
 
 ## 3. Install the Operator APK
+
+To avoid stale cached copies, always refresh the stable release APK before
+running setup or reinstall:
+
+```bash
+mkdir -p ~/.clawperator/downloads
+curl -fsSL https://clawperator.com/operator.apk -o ~/.clawperator/downloads/operator.apk
+```
+
+Canonical public APK URL: `https://clawperator.com/operator.apk`
 
 ```bash
 clawperator operator setup --apk ~/.clawperator/downloads/operator.apk

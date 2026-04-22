@@ -2029,7 +2029,7 @@ main() {
     echo -e "   ${BLUE}${CLAWPERATOR_BIN_PATH:-clawperator}${NC}"
     echo -e "2. The latest operator APK (${YELLOW}${OPERATOR_VERSION:-unknown}${NC}) is saved at:"
     echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
-    echo -e "3. Stable download URL:"
+    echo -e "3. Canonical stable APK URL (redownload this for later manual setup):"
     echo -e "   ${BLUE}https://clawperator.com/operator.apk${NC}"
     echo -e "4. Historical releases and artifacts remain at:"
     echo -e "   ${BLUE}https://github.com/clawperator/clawperator/releases${NC}"
