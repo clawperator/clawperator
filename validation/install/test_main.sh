@@ -536,6 +536,7 @@ run_main_case() {
                 printf "mock apk\n" > "$APK_LOCAL_PATH"
                 printf "mock sha\n" > "$APK_SHA_PATH"
                 OPERATOR_VERSION="9.9.9"
+                OPERATOR_APK_DOWNLOADED_THIS_RUN=1
                 echo "Mock download_operator_apk"
                 return 0
             }
@@ -600,6 +601,7 @@ run_main_case() {
                 printf "mock apk\n" > "$APK_LOCAL_PATH"
                 printf "mock sha\n" > "$APK_SHA_PATH"
                 OPERATOR_VERSION="9.9.9"
+                OPERATOR_APK_DOWNLOADED_THIS_RUN=1
                 echo "Mock download_operator_apk"
                 return 0
             }
@@ -672,11 +674,12 @@ SUCCESS_MCP_CONFIG_PATH="$TMP_DIR/home-main-success/.clawperator/mcp-config-snip
 assert_contains "$SUCCESS_STDOUT" "Installation Successful!" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Skills registry configured at:" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Bundled-skills installed at:" "main-success stdout"
-assert_contains "$SUCCESS_STDOUT" "The latest operator APK (" "main-success stdout"
-assert_contains "$SUCCESS_STDOUT" "Canonical stable APK URL (redownload this for later manual setup):" "main-success stdout"
+assert_contains "$SUCCESS_STDOUT" "No verified local operator APK was downloaded during this run." "main-success stdout"
+assert_contains "$SUCCESS_STDOUT" "Canonical stable APK URL (download this for manual setup):" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "https://clawperator.com/operator.apk" "main-success stdout"
 assert_not_contains "$SUCCESS_STDOUT" "https://clawperator.com/apk" "main-success stdout"
 assert_not_contains "$SUCCESS_STDOUT" "https://clawperator.com/install.apk" "main-success stdout"
+assert_not_contains "$SUCCESS_STDOUT" "APK download path (downloaded this run)" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "$TMP_DIR/home-main-success/.clawperator/skills/skills/skills-registry.json" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Doctor pretty output (success)" "main-success stdout"
 assert_contains "$SUCCESS_GUIDE_PATH" "## Runtime Skills" "main-success guide"
@@ -1058,6 +1061,8 @@ assert_contains "$REMEDIATE_STDOUT" "Mock download_operator_apk" "main-remediati
 assert_contains "$REMEDIATE_STDOUT" "Mock verify_operator_apk" "main-remediation stdout"
 assert_contains "$REMEDIATE_STDOUT" "Mock maybe_install_operator_apk" "main-remediation stdout"
 assert_contains "$REMEDIATE_STDOUT" "Installation Successful!" "main-remediation stdout"
+assert_contains "$REMEDIATE_STDOUT" "APK download path (downloaded this run) for operator version" "main-remediation stdout"
+assert_contains "$REMEDIATE_STDOUT" "Canonical stable APK URL (redownload this for later manual setup):" "main-remediation stdout"
 assert_json_field_equals "$REMEDIATE_INSTALL_STATE_PATH" "apkVersion" "9.9.9" "main-remediation install-state apkVersion"
 assert_contains "$REMEDIATE_TRACE" "download_operator_apk" "main-remediation trace"
 assert_contains "$REMEDIATE_TRACE" "verify_operator_apk" "main-remediation trace"

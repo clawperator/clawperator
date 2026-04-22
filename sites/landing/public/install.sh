@@ -48,6 +48,7 @@ MULTI_DEVICE_APK_ADB_RECOVERY_DEVICES=()
 MULTI_DEVICE_APK_CLEAN_DEVICES=()
 MULTI_DEVICE_APK_WARN_DEVICES=()
 MULTI_DEVICE_APK_INSTALL_FAILURES=0
+OPERATOR_APK_DOWNLOADED_THIS_RUN=0
 
 TEMP_FILES=()
 
@@ -1436,6 +1437,7 @@ download_operator_apk() {
 
     echo -e "${BLUE}Downloading operator APK ${OPERATOR_VERSION}...${NC}"
     curl -fsSL "$OPERATOR_APK_URL" -o "$APK_LOCAL_PATH"
+    OPERATOR_APK_DOWNLOADED_THIS_RUN=1
 
     if [ -n "$OPERATOR_EXPECTED_SHA256" ]; then
         echo "$OPERATOR_EXPECTED_SHA256" > "$APK_SHA_PATH"
@@ -1555,7 +1557,7 @@ print_operator_apk_redownload_hint() {
     fi
 
     echo -e "${YELLOW}Use a matching local debug APK before manual setup:${NC}"
-    echo -e "${YELLOW}  ${APK_LOCAL_PATH}${NC}"
+    echo -e "${YELLOW}  $(shell_quote "$APK_LOCAL_PATH")${NC}"
     echo -e "${YELLOW}  If you do not already have one, rebuild the debug APK from the same checkout before rerunning setup.${NC}"
 }
 
@@ -2254,9 +2256,14 @@ main() {
     echo -e "1. ${YELLOW}Clawperator binary installed at:${NC}"
     echo -e "   ${BLUE}${CLAWPERATOR_BIN_PATH:-clawperator}${NC}"
     if operator_package_uses_public_release_apk; then
-        echo -e "2. The latest operator APK (${YELLOW}${OPERATOR_VERSION:-unknown}${NC}) is saved at:"
-        echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
-        echo -e "3. Canonical stable APK URL (redownload this for later manual setup):"
+        if [ "${OPERATOR_APK_DOWNLOADED_THIS_RUN:-0}" -eq 1 ]; then
+            echo -e "2. APK download path (downloaded this run) for operator version ${YELLOW}${OPERATOR_VERSION:-unknown}${NC}:"
+            echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
+            echo -e "3. Canonical stable APK URL (redownload this for later manual setup):"
+        else
+            echo -e "2. No verified local operator APK was downloaded during this run."
+            echo -e "3. Canonical stable APK URL (download this for manual setup):"
+        fi
         echo -e "   ${BLUE}https://clawperator.com/operator.apk${NC}"
     else
         echo -e "2. Expected local debug APK path for ${DEFAULT_OPERATOR_PACKAGE}:"

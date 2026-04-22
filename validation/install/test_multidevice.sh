@@ -438,7 +438,12 @@ REDOWNLOAD_HINT_STDOUT="$TMP_DIR/redownload-hint.stdout"
 capture_redownload_hint "com.clawperator.operator" "$REDOWNLOAD_HINT_STDOUT"
 assert_contains "$REDOWNLOAD_HINT_STDOUT" "curl -fsSL https://clawperator.com/operator.apk -o $EXPECTED_DEFAULT_APK_PATH" "redownload-hint stdout"
 
-echo "=== Scenario 11: DEVICE_SHELL_UNAVAILABLE stays in the ADB recovery lane ==="
+echo "=== Scenario 11: debug APK hint shell-quotes the local path ==="
+DEBUG_HINT_STDOUT="$TMP_DIR/debug-hint.stdout"
+capture_redownload_hint "com.clawperator.operator.dev" "$DEBUG_HINT_STDOUT"
+assert_contains "$DEBUG_HINT_STDOUT" "$EXPECTED_DEV_APK_PATH" "debug-hint stdout"
+
+echo "=== Scenario 12: DEVICE_SHELL_UNAVAILABLE stays in the ADB recovery lane ==="
 run_scenario \
     shell-unavailable \
     0 \
