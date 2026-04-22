@@ -19,9 +19,10 @@ product decisions or code.
 ## Sources
 
 - `~/.clawperator/findings/openclaw-usage-2026-04-22/findings-and-recommendations.md`
-- `tasks/discovery/findings.md`
-- `tasks/docs/discovery-immediate-opportunities/plan.md`
-- `tasks/docs/discovery-immediate-opportunities/work-breakdown.md`
+- `docs/quickstart.md`
+- `docs/api/navigation.md`
+- `docs/api/selectors.md`
+- `apps/node/src/cli/registry.ts`
 
 ## What Shipped
 
@@ -98,6 +99,8 @@ Why deferred:
 
 - This file is intended to survive cleanup of
   `tasks/docs/discovery-immediate-opportunities/`.
+- It supersedes the temporary findings and task-pack notes that were used to
+  ship the immediate-opportunity pass.
 - If either deferred item becomes committed product behavior, migrate the
   resulting knowledge into the permanent docs or code-owned comments and then
   remove or narrow the corresponding section here.
