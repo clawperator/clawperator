@@ -199,6 +199,52 @@ JSON
 JSON
       exit 0
       ;;
+    multi-device-stale-dev:1|multi-device-stale-dev:4|multi-device-stale-dev:5)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[{"id":"device.discovery","status":"warn","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
+JSON
+      exit 0
+      ;;
+    multi-device-stale-dev:2)
+      cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.version.compatibility","status":"fail","code":"VERSION_INCOMPATIBLE"}]}
+JSON
+      exit 1
+      ;;
+    multi-device-stale-dev:3|multi-device-stale-dev:7)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+      exit 0
+      ;;
+    multi-device-stale-dev:6)
+      cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.version.compatibility","status":"fail","code":"VERSION_INCOMPATIBLE"}]}
+JSON
+      exit 1
+      ;;
+    multi-device-stale-probe:1|multi-device-stale-probe:4|multi-device-stale-probe:5)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[{"id":"device.discovery","status":"warn","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
+JSON
+      exit 0
+      ;;
+    multi-device-stale-probe:2)
+      cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.version.compatibility","status":"fail","code":"VERSION_INCOMPATIBLE"}]}
+JSON
+      exit 1
+      ;;
+    multi-device-stale-probe:3|multi-device-stale-probe:7)
+      printf '%s\n' 'not-json'
+      exit 1
+      ;;
+    multi-device-stale-probe:6)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+      exit 0
+      ;;
     multi-device-all-unready:1|multi-device-all-unready:2|multi-device-all-unready:3)
       cat <<'JSON'
 {"ok":true,"criticalOk":true,"checks":[{"id":"device.discovery","status":"warn","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
@@ -228,6 +274,9 @@ if [ "\$1" = "operator" ] && [ "\$2" = "setup" ] && [ "\$3" = "--apk" ]; then
       exit 0
       ;;
     multi-device-stale:serial-beta)
+      exit 0
+      ;;
+    multi-device-stale-probe:serial-alpha)
       exit 0
       ;;
   esac
@@ -316,6 +365,20 @@ OUT
 List of devices attached
 serial-alpha	device
 serial-beta	device
+OUT
+      ;;
+    multi-device-stale-dev)
+      cat <<'OUT'
+List of devices attached
+serial-alpha	device
+serial-beta	device
+OUT
+      ;;
+    multi-device-stale-probe)
+      cat <<'OUT'
+List of devices attached
+serial-alpha	device
+serial-bad	device
 OUT
       ;;
     multi-device-all-unready)
@@ -813,7 +876,70 @@ assert_contains "$MULTI_STALE_TRACE" "verify_operator_apk" "main-multi-stale tra
 assert_contains "$MULTI_STALE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale/.clawperator/downloads/operator.apk --device serial-alpha --operator-package com.clawperator.operator" "main-multi-stale cli log"
 assert_contains "$MULTI_STALE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale/.clawperator/downloads/operator.apk --device serial-beta --operator-package com.clawperator.operator" "main-multi-stale cli log"
 
-echo "=== Scenario 8: APK remediation path runs before final success ==="
+echo "=== Scenario 8: dev-package stale devices stay on package-aware manual guidance ==="
+MULTI_STALE_DEV_STDOUT="$TMP_DIR/main-multi-stale-dev.stdout"
+MULTI_STALE_DEV_STDERR="$TMP_DIR/main-multi-stale-dev.stderr"
+MULTI_STALE_DEV_TRACE="$TMP_DIR/main-multi-stale-dev.trace"
+MULTI_STALE_DEV_CLI_LOG="$TMP_DIR/main-multi-stale-dev.cli.log"
+MULTI_STALE_DEV_GUIDE_PATH_FILE="$TMP_DIR/main-multi-stale-dev.guide.path"
+MULTI_STALE_DEV_STATE="$TMP_DIR/main-multi-stale-dev.state"
+run_main_case \
+    main-multi-stale-dev \
+    multi-device-stale-dev \
+    0 \
+    "$MULTI_STALE_DEV_STDOUT" \
+    "$MULTI_STALE_DEV_STDERR" \
+    "$MULTI_STALE_DEV_TRACE" \
+    "$MULTI_STALE_DEV_CLI_LOG" \
+    "$MULTI_STALE_DEV_GUIDE_PATH_FILE" \
+    "$MULTI_STALE_DEV_STATE" \
+    "com.clawperator.operator.dev" \
+    "yes"
+
+assert_contains "$MULTI_STALE_DEV_STDOUT" "Automatic APK installation is only available for the stable release package. Complete setup manually for com.clawperator.operator.dev." "main-multi-stale-dev stdout"
+assert_contains "$MULTI_STALE_DEV_STDOUT" "Use a matching local debug APK before manual setup:" "main-multi-stale-dev stdout"
+assert_contains "$MULTI_STALE_DEV_STDOUT" "$TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk" "main-multi-stale-dev stdout"
+assert_contains "$MULTI_STALE_DEV_STDOUT" "serial-alpha - setup required with a matching local debug APK at $TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk" "main-multi-stale-dev stdout"
+assert_contains "$MULTI_STALE_DEV_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk --device serial-alpha --operator-package com.clawperator.operator.dev" "main-multi-stale-dev stdout"
+assert_not_contains "$MULTI_STALE_DEV_STDOUT" "Mock download_operator_apk" "main-multi-stale-dev stdout"
+assert_not_contains "$MULTI_STALE_DEV_STDOUT" "Mock verify_operator_apk" "main-multi-stale-dev stdout"
+assert_not_contains "$MULTI_STALE_DEV_STDOUT" "https://clawperator.com/operator.apk" "main-multi-stale-dev stdout"
+assert_not_contains "$MULTI_STALE_DEV_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk --device serial-alpha --operator-package com.clawperator.operator.dev" "main-multi-stale-dev cli log"
+
+echo "=== Scenario 9: probe failures do not block remediation for other stale ready devices ==="
+MULTI_STALE_PROBE_STDOUT="$TMP_DIR/main-multi-stale-probe.stdout"
+MULTI_STALE_PROBE_STDERR="$TMP_DIR/main-multi-stale-probe.stderr"
+MULTI_STALE_PROBE_TRACE="$TMP_DIR/main-multi-stale-probe.trace"
+MULTI_STALE_PROBE_CLI_LOG="$TMP_DIR/main-multi-stale-probe.cli.log"
+MULTI_STALE_PROBE_GUIDE_PATH_FILE="$TMP_DIR/main-multi-stale-probe.guide.path"
+MULTI_STALE_PROBE_STATE="$TMP_DIR/main-multi-stale-probe.state"
+run_main_case \
+    main-multi-stale-probe \
+    multi-device-stale-probe \
+    0 \
+    "$MULTI_STALE_PROBE_STDOUT" \
+    "$MULTI_STALE_PROBE_STDERR" \
+    "$MULTI_STALE_PROBE_TRACE" \
+    "$MULTI_STALE_PROBE_CLI_LOG" \
+    "$MULTI_STALE_PROBE_GUIDE_PATH_FILE" \
+    "$MULTI_STALE_PROBE_STATE" \
+    "" \
+    "yes"
+
+assert_contains "$MULTI_STALE_PROBE_STDOUT" "Mock download_operator_apk" "main-multi-stale-probe stdout"
+assert_contains "$MULTI_STALE_PROBE_STDOUT" "Mock verify_operator_apk" "main-multi-stale-probe stdout"
+assert_contains "$MULTI_STALE_PROBE_STDOUT" "Installing operator APK on serial-alpha..." "main-multi-stale-probe stdout"
+assert_contains "$MULTI_STALE_PROBE_STDOUT" "serial-alpha - operator APK installed and permissions granted." "main-multi-stale-probe stdout"
+assert_contains "$MULTI_STALE_PROBE_STDOUT" "serial-bad - could not inspect this device with Clawperator Doctor." "main-multi-stale-probe stdout"
+assert_contains "$MULTI_STALE_PROBE_STDOUT" "some devices could not be inspected with Clawperator Doctor" "main-multi-stale-probe stdout"
+assert_not_contains "$MULTI_STALE_PROBE_STDOUT" "All ready devices passed doctor checks." "main-multi-stale-probe stdout"
+assert_not_contains "$MULTI_STALE_PROBE_STDOUT" "each ready device passed Clawperator Doctor" "main-multi-stale-probe stdout"
+assert_contains "$MULTI_STALE_PROBE_TRACE" "download_operator_apk" "main-multi-stale-probe trace"
+assert_contains "$MULTI_STALE_PROBE_TRACE" "verify_operator_apk" "main-multi-stale-probe trace"
+assert_contains "$MULTI_STALE_PROBE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale-probe/.clawperator/downloads/operator.apk --device serial-alpha --operator-package com.clawperator.operator" "main-multi-stale-probe cli log"
+assert_not_contains "$MULTI_STALE_PROBE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale-probe/.clawperator/downloads/operator.apk --device serial-bad --operator-package com.clawperator.operator" "main-multi-stale-probe cli log"
+
+echo "=== Scenario 10: APK remediation path runs before final success ==="
 REMEDIATE_STDOUT="$TMP_DIR/main-remediation.stdout"
 REMEDIATE_STDERR="$TMP_DIR/main-remediation.stderr"
 REMEDIATE_TRACE="$TMP_DIR/main-remediation.trace"
@@ -866,7 +992,7 @@ assert_contains "$STALE_STDOUT" "Installation Successful!" "main-stale stdout"
 assert_contains "$STALE_CLI_LOG" "grant-device-permissions --device serial-solo --operator-package com.clawperator.operator" "main-stale cli log"
 assert_json_field_equals "$STALE_INSTALL_STATE_PATH" "lastDeviceSerial" "serial-solo" "main-stale install-state lastDeviceSerial"
 
-echo "=== Scenario 8: stdin entrypoint runs without BASH_SOURCE errors ==="
+echo "=== Scenario 11: stdin entrypoint runs without BASH_SOURCE errors ==="
 STDIN_STDOUT="$TMP_DIR/stdin.stdout"
 STDIN_STDERR="$TMP_DIR/stdin.stderr"
 STDIN_STATUS="$TMP_DIR/stdin.status"

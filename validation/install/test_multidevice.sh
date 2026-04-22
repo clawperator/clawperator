@@ -346,10 +346,12 @@ run_scenario \
 echo "=== Scenario 5: probe failures abort remediation instead of being ignored ==="
 run_scenario \
     probe-failure \
-    1 \
-    "Could not inspect every ready device with Clawperator Doctor." \
+    0 \
+    "Some ready devices could not be inspected with Clawperator Doctor. Skipping automatic APK install for those devices until the probe succeeds." \
     "Installing operator APK on serial-bad..." \
     "All connected devices already have the required APK."
+assert_contains "$TMP_DIR/probe-failure.stdout" "serial-bad - could not inspect this device with Clawperator Doctor." "probe-failure stdout"
+assert_not_contains "$TMP_DIR/probe-failure.stdout" "All ready devices already have the required APK." "probe-failure stdout"
 
 echo "=== Scenario 6: a stale ready device is upgraded in place ==="
 run_scenario \
@@ -381,6 +383,6 @@ assert_not_contains "$DEFAULT_PROMPT_STDOUT" "--operator-package" "default-promp
 echo "=== Scenario 9: manual setup prompt preserves non-default operator package guidance ==="
 DEV_PROMPT_STDOUT="$TMP_DIR/dev-prompt.stdout"
 capture_setup_prompt "com.clawperator.operator.dev" "$DEV_PROMPT_STDOUT"
-assert_contains "$DEV_PROMPT_STDOUT" "clawperator operator setup --apk $TMP_DIR/prompt-home/.clawperator/downloads/operator.apk --device serial-check --operator-package com.clawperator.operator.dev" "dev-prompt stdout"
+assert_contains "$DEV_PROMPT_STDOUT" "clawperator operator setup --apk $TMP_DIR/prompt-home/.clawperator/downloads/operator-debug.apk --device serial-check --operator-package com.clawperator.operator.dev" "dev-prompt stdout"
 
 echo "=== install.sh multi-device harness passed ==="

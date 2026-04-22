@@ -15,10 +15,14 @@ NC='\033[0m' # No Color
 
 APK_METADATA_URL="${CLAWPERATOR_APK_METADATA_URL:-https://downloads.clawperator.com/operator/latest.json}"
 APK_DOWNLOAD_DIR="${HOME}/.clawperator/downloads"
-APK_LOCAL_PATH="${APK_DOWNLOAD_DIR}/operator.apk"
-APK_SHA_PATH="${APK_DOWNLOAD_DIR}/operator.apk.sha256"
 RELEASE_OPERATOR_PACKAGE="com.clawperator.operator"
 DEFAULT_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-$RELEASE_OPERATOR_PACKAGE}"
+APK_FILE_BASENAME="operator.apk"
+if [ "$DEFAULT_OPERATOR_PACKAGE" != "$RELEASE_OPERATOR_PACKAGE" ]; then
+    APK_FILE_BASENAME="operator-debug.apk"
+fi
+APK_LOCAL_PATH="${APK_DOWNLOAD_DIR}/${APK_FILE_BASENAME}"
+APK_SHA_PATH="${APK_LOCAL_PATH}.sha256"
 INSTALL_COMMAND="curl -fsSL https://clawperator.com/install.sh | bash"
 SKILLS_SETUP_STATUS="not-run"
 SKILLS_REGISTRY_PATH=""
@@ -1407,6 +1411,12 @@ EOF
 }
 
 download_operator_apk() {
+    if ! operator_package_uses_public_release_apk; then
+        echo -e "${YELLOW}Automatic APK download is only available for the stable release package.${NC}"
+        print_operator_apk_redownload_hint
+        return 1
+    fi
+
     local METADATA_PATH
     METADATA_PATH="$(mktemp)"
     register_temp_file "$METADATA_PATH"
@@ -1526,9 +1536,28 @@ install_apk_response_is_yes() {
     return 1
 }
 
+operator_package_uses_public_release_apk() {
+    [ "$DEFAULT_OPERATOR_PACKAGE" = "$RELEASE_OPERATOR_PACKAGE" ]
+}
+
 print_operator_apk_redownload_hint() {
-    echo -e "${YELLOW}Redownload the latest stable APK before manual setup:${NC}"
-    echo -e "${YELLOW}  curl -fsSL https://clawperator.com/operator.apk -o ${APK_LOCAL_PATH}${NC}"
+    if operator_package_uses_public_release_apk; then
+        echo -e "${YELLOW}Redownload the latest stable APK before manual setup:${NC}"
+        echo -e "${YELLOW}  curl -fsSL https://clawperator.com/operator.apk -o ${APK_LOCAL_PATH}${NC}"
+        return 0
+    fi
+
+    echo -e "${YELLOW}Use a matching local debug APK before manual setup:${NC}"
+    echo -e "${YELLOW}  ${APK_LOCAL_PATH}${NC}"
+    echo -e "${YELLOW}  If you do not already have one, rebuild the debug APK from the same checkout before rerunning setup.${NC}"
+}
+
+operator_apk_manual_setup_source_text() {
+    if operator_package_uses_public_release_apk; then
+        printf 'after redownloading https://clawperator.com/operator.apk'
+    else
+        printf 'with a matching local debug APK at %s' "$APK_LOCAL_PATH"
+    fi
 }
 
 operator_setup_command_text() {
@@ -1580,6 +1609,12 @@ install_operator_apk_on_devices() {
         return 0
     fi
 
+    if ! operator_package_uses_public_release_apk; then
+        echo -e "${YELLOW}Automatic APK installation is only available for the stable release package. Complete setup manually for ${DEFAULT_OPERATOR_PACKAGE}.${NC}"
+        print_manual_operator_setup_commands "$@"
+        return 0
+    fi
+
     if [ "$install_target_count" -eq 1 ]; then
         prompt="Install operator APK ${OPERATOR_VERSION} on ${1} now?"
     else
@@ -1598,7 +1633,7 @@ install_operator_apk_on_devices() {
         if "$CLAWPERATOR_BIN_PATH" operator setup --apk "$APK_LOCAL_PATH" --device "$device_id" --operator-package "$DEFAULT_OPERATOR_PACKAGE" > /dev/null 2>&1; then
             echo -e "${GREEN}  ✅ ${device_id} - operator APK installed and permissions granted.${NC}"
         else
-            echo -e "${RED}  ❌ ${device_id} - operator setup failed. Redownload https://clawperator.com/operator.apk, then run: $(operator_setup_command_text "$device_id" "$DEFAULT_OPERATOR_PACKAGE")${NC}"
+            echo -e "${RED}  ❌ ${device_id} - operator setup failed. Retry $(operator_apk_manual_setup_source_text), then run: $(operator_setup_command_text "$device_id" "$DEFAULT_OPERATOR_PACKAGE")${NC}"
             failed_installs=$((failed_installs + 1))
         fi
     done
@@ -1679,7 +1714,7 @@ collect_multi_device_apk_setup_targets() {
         fi
 
         if ! doctor_json="$(doctor_device_json "$device_id" "$DEFAULT_OPERATOR_PACKAGE")"; then
-            echo -e "${RED}  ❌ ${device_id} - could not inspect this device with Clawperator Doctor. Aborting APK remediation until the probe succeeds.${NC}"
+            echo -e "${RED}  ❌ ${device_id} - could not inspect this device with Clawperator Doctor. Skipping automatic APK remediation for this device until the probe succeeds.${NC}"
             MULTI_DEVICE_APK_PROBE_FAILURE_COUNT=$((MULTI_DEVICE_APK_PROBE_FAILURE_COUNT + 1))
             MULTI_DEVICE_APK_PROBE_FAILED_DEVICES+=("$device_id")
             continue
@@ -1690,8 +1725,7 @@ collect_multi_device_apk_setup_targets() {
     done < <(list_detected_android_devices)
 
     if [ "$MULTI_DEVICE_APK_PROBE_FAILURE_COUNT" -gt 0 ]; then
-        echo -e "${RED}❌ Could not inspect every ready device with Clawperator Doctor. Resolve the probe failures above, then rerun install.sh.${NC}"
-        return 1
+        echo -e "${YELLOW}⚠️  Some ready devices could not be inspected with Clawperator Doctor. Automatic APK remediation will continue only for the devices that were inspected successfully.${NC}"
     fi
 
     return 0
@@ -1740,7 +1774,9 @@ maybe_install_operator_apk() {
             fi
         fi
         if [ "${#install_target_devices[@]}" -eq 0 ]; then
-            if [ "$READY_DEVICE_COUNT" -eq 0 ] && [ "$adb_attention_count" -gt 0 ]; then
+            if [ "$MULTI_DEVICE_APK_PROBE_FAILURE_COUNT" -gt 0 ]; then
+                echo -e "${YELLOW}Some ready devices could not be inspected with Clawperator Doctor. Skipping automatic APK install for those devices until the probe succeeds.${NC}"
+            elif [ "$READY_DEVICE_COUNT" -eq 0 ] && [ "$adb_attention_count" -gt 0 ]; then
                 echo -e "${YELLOW}No connected device is ready for ADB yet. Skipping APK install until one device is ready.${NC}"
             elif [ "$adb_attention_count" -gt 0 ]; then
                 echo -e "${GREEN}All ready devices already have the required APK.${NC}"
@@ -1887,7 +1923,7 @@ doctor_report_connected_device() {
     fi
 
     DOCTOR_DEVICE_STATUS="fail"
-    echo -e "${YELLOW}  ⚠  ${device_id} - setup required after redownloading https://clawperator.com/operator.apk: $(operator_setup_command_text "$device_id" "$operator_package")${NC}"
+    echo -e "${YELLOW}  ⚠  ${device_id} - setup required $(operator_apk_manual_setup_source_text): $(operator_setup_command_text "$device_id" "$operator_package")${NC}"
     return 1
 }
 
@@ -1943,13 +1979,13 @@ doctor_each_connected_device() {
     DOCTOR_READY_DEVICE_COUNT="$ready_count"
     DOCTOR_CRITICAL_DEVICE_COUNT="$critical_count"
 
-    if [ "$device_count" -gt 0 ] && [ "$ready_count" -eq "$device_count" ]; then
+    if [ "$DOCTOR_PROBE_FAILURE_COUNT" -eq 0 ] && [ "$device_count" -gt 0 ] && [ "$ready_count" -eq "$device_count" ]; then
         if [ "$critical_count" -gt 0 ]; then
             echo -e "${YELLOW}All connected devices passed critical checks.${NC}"
         else
             echo -e "${GREEN}All connected devices passed doctor checks.${NC}"
         fi
-    elif [ "$ready_count" -gt 0 ] && [ "$DOCTOR_SETUP_REQUIRED_COUNT" -eq 0 ]; then
+    elif [ "$DOCTOR_PROBE_FAILURE_COUNT" -eq 0 ] && [ "$ready_count" -gt 0 ] && [ "$DOCTOR_SETUP_REQUIRED_COUNT" -eq 0 ]; then
         echo -e "${GREEN}All ready devices passed doctor checks.${NC}"
     fi
 }
@@ -1998,18 +2034,22 @@ run_doctor_and_fix() {
     # doctor result can halt at device discovery before surfacing per-device APK
     # presence or version problems.
     if [ "$DETECTED_DEVICE_COUNT" -gt 1 ] && [ -n "${CLAWPERATOR_BIN_PATH:-}" ]; then
-        collect_multi_device_apk_setup_targets || return 1
+        collect_multi_device_apk_setup_targets
         if [ "${#MULTI_DEVICE_APK_TARGET_DEVICES[@]}" -gt 0 ]; then
-            download_operator_apk || return 1
-            verify_operator_apk || return 1
+            if operator_package_uses_public_release_apk; then
+                download_operator_apk || return 1
+                verify_operator_apk || return 1
+            fi
             maybe_install_operator_apk "${MULTI_DEVICE_APK_TARGET_DEVICES[@]}" || return 1
         fi
     elif doctor_check_status "$DOCTOR_JSON" "device.discovery" "fail" || \
          doctor_check_status "$DOCTOR_JSON" "readiness.apk.presence" "fail" || \
          doctor_check_status "$DOCTOR_JSON" "readiness.apk.presence" "warn" || \
          doctor_check_status "$DOCTOR_JSON" "readiness.version.compatibility" "fail"; then
-        download_operator_apk || return 1
-        verify_operator_apk || return 1
+        if operator_package_uses_public_release_apk; then
+            download_operator_apk || return 1
+            verify_operator_apk || return 1
+        fi
         maybe_install_operator_apk || return 1
     fi
 
@@ -2133,8 +2173,13 @@ main() {
     echo -e "   ${BLUE}${CLAWPERATOR_BIN_PATH:-clawperator}${NC}"
     echo -e "2. The latest operator APK (${YELLOW}${OPERATOR_VERSION:-unknown}${NC}) is saved at:"
     echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
-    echo -e "3. Canonical stable APK URL (redownload this for later manual setup):"
-    echo -e "   ${BLUE}https://clawperator.com/operator.apk${NC}"
+    if operator_package_uses_public_release_apk; then
+        echo -e "3. Canonical stable APK URL (redownload this for later manual setup):"
+        echo -e "   ${BLUE}https://clawperator.com/operator.apk${NC}"
+    else
+        echo -e "3. Expected local debug APK path for ${DEFAULT_OPERATOR_PACKAGE}:"
+        echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
+    fi
     echo -e "4. Historical releases and artifacts remain at:"
     echo -e "   ${BLUE}https://github.com/clawperator/clawperator/releases${NC}"
     echo ""
