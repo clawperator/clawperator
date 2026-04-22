@@ -111,7 +111,7 @@ wrong mental model.
 | `sites/landing/public/install.sh` | Bundled-skills install path and guide text | PR-1 / Phase 2, PR-2 / Phase 3 |
 | `validation/install/` | Installer regression expectations | PR-1 / Phase 2, PR-2 / Phase 3 |
 | `docs/host-agents.md`, `docs/skills/authoring.md`, `docs/skills/overview.md`, `docs/setup.md`, `docs/api/doctor.md`, `docs/internal/design/agent-host-integration.md` | Public and internal docs updates | PR-1 / Phase 2, PR-2 / Phase 3 |
-| `evals/harness/`, `evals/specs/` | Authoring-front-door command expectations and strings | PR-1 / Phase 2, PR-2 / Phase 3 |
+| `evals/harness/`, `evals/specs/` | Authoring-front-door command expectations and any prompt text that actually names the shipped ids or surface | PR-1 / Phase 2, PR-2 / Phase 3 |
 
 ## Source Of Truth
 
@@ -175,6 +175,10 @@ wrong mental model.
   acceptable as long as new user-facing behavior says `bundled-skills`
 - How much brief migration explanation belongs in public docs versus internal
   docs, as long as public docs use `bundled-skills` as the primary term
+- Whether `evals/specs/android-version/prompt-skill.md` needs Phase 2 edits,
+  Phase 3 edits, or both. Use judgment based on whether the prompt actually
+  names the shipped skill ids or the `agent-skills` surface after each phase's
+  changes.
 
 ## Decision Rules
 
@@ -188,6 +192,7 @@ wrong mental model.
 | What happens to the old install dir? | The primary and only supported install dir becomes `~/.clawperator/bundled-skills/`. Do not add migration or fallback logic for `~/.clawperator/agent-skills/` in this task. |
 | What happens to the doctor id? | Use `host.bundled-skills.staleness` as the only durable id after Phase 3. |
 | How should docs be authored? | Use `.agents/skills/docs-author/SKILL.md` for public docs touched in Phases 2 and 3. Do not hand-edit `sites/docs/.build/` or `sites/docs/site/`. |
+| How should `evals/specs/android-version/prompt-skill.md` be handled? | Use judgment. Edit it in Phase 2 if it names the old bare skill ids, edit it in Phase 3 if it names `agent-skills`, and do not touch it in a phase where the prompt text is unaffected. |
 | How should `findings.md` be handled during execution? | Treat it as authoritative input. It has already been aligned with the clean-break policy in this plan. Append `## Execution Notes` at the end only if implementation uncovers a material deviation later reviewers must see. |
 
 ## Failure Modes To Prevent

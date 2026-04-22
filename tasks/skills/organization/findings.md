@@ -270,8 +270,8 @@ documented contract field downstream consumers match on, so it stays
 unchanged even while the doctor check id and the user-facing fix text flip
 to the new vocabulary.
 
-Internal names move in the same PR: `copyAgentSkills.ts` -> `bundledSkills.ts`
-(or equivalent), `AGENT_SKILLS_INSTALL_DIR` and friends in `install.sh` ->
+Internal names move in the same PR: `copyAgentSkills.ts` ->
+`copyBundledSkills.ts`, `AGENT_SKILLS_INSTALL_DIR` and friends in `install.sh` ->
 `BUNDLED_SKILLS_*`, test filenames, exported symbol names. Leaving the
 internal names saying `agent-skills` after the rename would re-introduce the
 two-names problem on the inside of the repo.
@@ -389,7 +389,8 @@ Phase 3 - external surface rename `agent-skills` -> `bundled-skills`:
    existing JSON envelope keys (`skills`, `count`, `installedDir`,
    `agentDiscoveryDirs`) unchanged.
 6. Internal code rename in the same PR:
-   - `apps/node/src/domain/skills/copyAgentSkills.ts` file and exported
+   - `apps/node/src/domain/skills/copyAgentSkills.ts` ->
+     `apps/node/src/domain/skills/copyBundledSkills.ts` and exported
      symbols (`copyAgentSkills`, `DEFAULT_AGENT_SKILLS_DIR`,
      `AGENT_SKILLS_SOURCE_ENV_VAR`, `listInstalledAgentSkills`)
    - `apps/node/src/cli/commands/agentSkills.ts` file and exported command

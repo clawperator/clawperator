@@ -194,7 +194,7 @@ skill ids while keeping the public noun `agent-skills` unchanged until PR-2.
 - `evals/harness/runner.py`
 - `evals/harness/test_run_eval.py`
 - `evals/harness/test_rescore.py`
-- `evals/specs/android-version/prompt-skill.md`
+- `evals/specs/android-version/prompt-skill.md` if it names the old bare skill ids
 
 ### Steps
 
@@ -220,6 +220,8 @@ skill ids while keeping the public noun `agent-skills` unchanged until PR-2.
    - help or guidance docs and tests name the new skill ids
    - eval harness expectations for the zero-results authoring front door refer to
      the new skill ids
+   - `evals/specs/android-version/prompt-skill.md` is updated only if it
+     actually names the old bare skill ids
 7. Run the Phase 2 validation commands before committing.
 
 ### Acceptance Criteria
@@ -294,7 +296,7 @@ eval expectations, with no backwards-compatibility layer for the old surface.
 - `evals/harness/runner.py`
 - `evals/harness/test_run_eval.py`
 - `evals/harness/test_rescore.py`
-- `evals/specs/android-version/prompt-skill.md`
+- `evals/specs/android-version/prompt-skill.md` if it names `agent-skills`
 
 ### Steps
 
@@ -324,8 +326,7 @@ eval expectations, with no backwards-compatibility layer for the old surface.
    - any remaining `agent-skills` strings in CLI help or registry guidance
 6. Internal cleanup in this phase:
    - rename file paths: `agentSkills.ts` -> `bundledSkills.ts`,
-     `copyAgentSkills.ts` -> `copyBundledSkills.ts` (or an equivalent final
-     name), matching test-file renames
+     `copyAgentSkills.ts` -> `copyBundledSkills.ts`, matching test-file renames
    - rename exported symbols (`copyAgentSkills`, `DEFAULT_AGENT_SKILLS_DIR`,
      `AGENT_SKILLS_SOURCE_ENV_VAR`, `listInstalledAgentSkills`, command
      entry points) to their `bundledSkills` counterparts
@@ -350,6 +351,8 @@ eval expectations, with no backwards-compatibility layer for the old surface.
    - doctor results use `host.bundled-skills.staleness` with the
      unchanged `ERROR_CODES.AGENT_SKILLS_STALE`
    - installer harnesses and eval expectations accept the new command noun
+   - `evals/specs/android-version/prompt-skill.md` is updated only if it
+     actually names `agent-skills`
 10. Run the Phase 3 validation commands before committing.
 
 ### Acceptance Criteria
