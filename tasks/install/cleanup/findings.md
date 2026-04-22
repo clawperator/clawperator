@@ -243,6 +243,134 @@ test coverage must be replaced with CLI coverage before the shell test is remove
 
 ---
 
+## The Upgrade Skill - `clawperator-upgrade`
+
+### Current behavior
+
+`apps/node/bundled-skills/clawperator-upgrade/SKILL.md` defines one primary
+upgrade action:
+
+```bash
+curl -fsSL https://clawperator.com/install.sh | bash
+```
+
+The skill explicitly prohibits substituting:
+- `npm install -g clawperator@latest`
+- `clawperator bundled-skills update`
+- `clawperator skills update`
+
+The rationale was sound when written: none of those commands individually covered
+the full install surface (CLI + APK + skills + host artifacts), so using any one
+of them alone would produce an incomplete upgrade.
+
+### Why `install.sh` is the wrong primary path for upgrades
+
+The user's question identifies a real problem: on a machine that already has
+Clawperator, re-running `install.sh` is a poor upgrade path even today, and
+becomes worse after the cleanup.
+
+**Problems with `curl ... | bash` as an upgrade path:**
+
+1. **Security surface.** Fetching a shell script over the network and executing
+   it immediately is the right pattern for first install (the machine has
+   nothing yet). For upgrade on an already-trusted machine with an already-
+   installed CLI, it introduces unnecessary remote-execution trust on every
+   upgrade run.
+
+2. **Bootstrap steps are wasted work.** On an upgrade, Java, Node, adb, git,
+   and curl are already installed. Those checks are no-ops, but they still
+   run - and on some machines they trigger slow package-manager operations even
+   when nothing needs updating.
+
+3. **Opaque result.** `install.sh` emits human-readable output but has no
+   structured result contract. The upgrade skill treats it as a black box and
+   can only verify the outcome by running `clawperator doctor` afterward. If a
+   specific step fails mid-install the skill cannot identify which one.
+
+4. **After the cleanup, `install.sh` itself delegates to CLI commands.** If
+   the end state is a thin bootstrap stub that calls `clawperator doctor --fix`,
+   `clawperator host materialize-artifacts`, etc., then running `install.sh`
+   for upgrade is just a slow, network-dependent wrapper around commands the
+   skill could call directly.
+
+### What the upgrade path should be after the cleanup
+
+Once the cleanup phases ship, a targeted upgrade sequence via CLI commands
+covers everything install.sh currently handles post-bootstrap:
+
+```bash
+npm install -g clawperator@latest       # update CLI package
+clawperator doctor --fix                # update APK, fix device permissions
+clawperator bundled-skills update       # update bundled skills
+clawperator skills install              # refresh runtime skills registry
+clawperator host materialize-artifacts  # regenerate host artifacts (AGENTS.md, MCP snippet, etc.)
+clawperator doctor --json               # verify
+```
+
+Each step has a structured JSON result. The skill can check each one
+individually rather than treating the whole sequence as a black box.
+
+The existing prohibition on `npm install -g clawperator@latest` as "the
+primary path" was correct when that alone was insufficient. After the cleanup,
+the prohibition should be replaced with guidance to run the full CLI upgrade
+sequence above. The spirit - do not use a single partial command - is preserved;
+only the implementation changes.
+
+### When `install.sh` is still appropriate for upgrade
+
+One scenario justifies falling back to `install.sh` during an upgrade: when the
+host environment itself is broken - Java or Node missing or incompatible, adb
+not on PATH, corrupted npm global install. In that case, the CLI commands cannot
+run and the shell bootstrapper is the only recovery path.
+
+**Recommended upgrade decision tree:**
+
+1. Check whether the CLI is reachable: `clawperator --version`
+2. If reachable, run the targeted CLI upgrade sequence above.
+3. If not reachable (CLI missing, corrupt, or wrong runtime), fall back to
+   `curl -fsSL https://clawperator.com/install.sh | bash` as a full
+   environment repair, with an explicit note that this is a recovery path, not
+   the normal upgrade path.
+
+### Changes needed in the skill
+
+**`SKILL.md`** - update in the same PR as Phase 1 or Phase 2 of the cleanup
+(whichever introduces the first CLI command the skill should use):
+
+- Replace "run `curl -fsSL https://clawperator.com/install.sh | bash`" as the
+  primary action with the CLI upgrade sequence.
+- Replace the prohibition on individual commands with the complete list of
+  commands in order.
+- Add the CLI-reachability check as the branch point for CLI upgrade vs
+  install.sh recovery.
+- Update the "What This Skill Does Not Own" list to include
+  `clawperator doctor --fix` and `clawperator host materialize-artifacts` as
+  things that are components of the upgrade sequence, not standalone replacements
+  for it.
+
+**`agents/openai.yaml` `default_prompt`** - update the prohibition clause to
+match the new SKILL.md workflow. The current prompt says "Do not replace the
+installer with `npm install -g clawperator@latest` ..."; that clause should
+instead describe the full CLI upgrade sequence.
+
+### Sequencing with the install.sh cleanup
+
+The upgrade skill should not be updated before the CLI commands it needs exist.
+Appropriate timing:
+
+- After Phase 1 ships (`clawperator host materialize-artifacts`): update the
+  artifact-writing step in the skill.
+- After Phase 2 ships (expanded `clawperator doctor --fix`): update the
+  remediation step.
+- After Phase 3 ships (`clawperator operator download`): APK step is now
+  subsumed by `doctor --fix`; no direct skill change needed.
+- After all phases ship: replace the full `install.sh` primary path with the
+  CLI upgrade sequence and move `install.sh` to the recovery-only path.
+
+Do not update the skill to reference CLI commands that do not yet exist.
+
+---
+
 ## Risks And Tradeoffs
 
 **Benefits**
