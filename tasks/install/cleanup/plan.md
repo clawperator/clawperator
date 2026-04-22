@@ -8,9 +8,10 @@ Node CLI. This is cross-surface work spanning the landing-site installer, Node
 CLI commands, doctor behavior, install validation, public docs, and the shipped
 `clawperator-upgrade` bundled skill.
 
-This task ships in **4 PRs across 6 phases**. **PR-1** extracts host artifact
-generation into a CLI-owned surface, switches the installer to it, and then
-renames that surface to the final `clawperator host setup` shape. **PR-2**
+This task ships in **4 PRs across 6 phases**. **PR-1** contains **Phase 1,
+Phase 2, and Phase 2.5 together**: it extracts host artifact generation into a
+CLI-owned surface, switches the installer to it, and then renames that surface
+to the final `clawperator host setup` shape before merge. **PR-2**
 moves operator APK acquisition and verification into the CLI. **PR-3** moves
 doctor-driven remediation and multi-device install policy into the CLI.
 **PR-4** finishes the installer thinning, updates docs and validations, and
@@ -109,6 +110,14 @@ before more install and upgrade work builds on it.
 | `apps/node/src/test/` | Unit or integration coverage for each new CLI surface | PR-1 / Phases 1-2.5, PR-2 / Phase 3, PR-3 / Phase 4 |
 | `docs/` | Authored docs for install flow and upgrade guidance | PR-4 / Phase 5 |
 | `apps/node/bundled-skills/clawperator-upgrade/` | CLI-first upgrade flow, fallback to `install.sh` only for environment recovery | PR-4 / Phase 5 |
+
+## PR Boundaries
+
+- `PR-1` includes Phase 1, Phase 2, and Phase 2.5 in the same review and merge
+  unit. Do not split the naming refactor into a follow-up PR.
+- `PR-2` includes Phase 3.
+- `PR-3` includes Phase 4.
+- `PR-4` includes Phase 5.
 
 ## Verified Starting Point
 

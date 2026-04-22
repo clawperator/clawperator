@@ -86,6 +86,9 @@ Read these files IN THIS ORDER before writing anything.
 | PR-3 | Move doctor-driven remediation and multi-device install policy into the CLI | 4 | thinking | PR-2 merged |
 | PR-4 | Final installer thinning, docs, validation cleanup, and upgrade-skill follow-through | 5 | default | PR-3 merged |
 
+Important: Phase 1, Phase 2, and Phase 2.5 are one PR unit. Another agent may
+implement them as separate commits, but they should merge together as `PR-1`.
+
 ## Phase 1: Host Artifact CLI Surface
 
 ### Agent Tier
