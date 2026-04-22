@@ -240,6 +240,35 @@ fi
 exit 2
 EOF
             ;;
+        shell-unavailable)
+            cat > "$mock_dir/adb" <<'EOF'
+#!/usr/bin/env bash
+cat <<'OUT'
+List of devices attached
+serial-bad	device
+serial-ready	device
+OUT
+EOF
+            chmod +x "$mock_dir/adb"
+            cat > "$mock_dir/clawperator" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-bad ]; then
+    cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.apk.presence","status":"fail","code":"DEVICE_SHELL_UNAVAILABLE"}]}
+JSON
+    exit 1
+fi
+
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-ready ]; then
+    cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+    exit 0
+fi
+
+exit 2
+EOF
+            ;;
         *)
             echo "ERROR: unknown mock scenario: $scenario" >&2
             return 1
@@ -377,12 +406,19 @@ assert_contains "$TMP_DIR/stale-many.stdout" "Other detected devices were skippe
 echo "=== Scenario 8: manual setup prompt omits the default operator package flag ==="
 DEFAULT_PROMPT_STDOUT="$TMP_DIR/default-prompt.stdout"
 capture_setup_prompt "com.clawperator.operator" "$DEFAULT_PROMPT_STDOUT"
-assert_contains "$DEFAULT_PROMPT_STDOUT" "clawperator operator setup --apk $TMP_DIR/prompt-home/.clawperator/downloads/operator.apk --device serial-check" "default-prompt stdout"
+assert_contains "$DEFAULT_PROMPT_STDOUT" "clawperator operator setup --apk '$TMP_DIR/prompt-home/.clawperator/downloads/operator.apk' --device 'serial-check'" "default-prompt stdout"
 assert_not_contains "$DEFAULT_PROMPT_STDOUT" "--operator-package" "default-prompt stdout"
 
 echo "=== Scenario 9: manual setup prompt preserves non-default operator package guidance ==="
 DEV_PROMPT_STDOUT="$TMP_DIR/dev-prompt.stdout"
 capture_setup_prompt "com.clawperator.operator.dev" "$DEV_PROMPT_STDOUT"
-assert_contains "$DEV_PROMPT_STDOUT" "clawperator operator setup --apk $TMP_DIR/prompt-home/.clawperator/downloads/operator-debug.apk --device serial-check --operator-package com.clawperator.operator.dev" "dev-prompt stdout"
+assert_contains "$DEV_PROMPT_STDOUT" "clawperator operator setup --apk '$TMP_DIR/prompt-home/.clawperator/downloads/operator-debug.apk' --device 'serial-check' --operator-package com.clawperator.operator.dev" "dev-prompt stdout"
+
+echo "=== Scenario 10: DEVICE_SHELL_UNAVAILABLE is not treated as an APK install target ==="
+run_scenario \
+    shell-unavailable \
+    0 \
+    "All connected devices already have the required APK." \
+    "Installing operator APK on serial-bad..."
 
 echo "=== install.sh multi-device harness passed ==="

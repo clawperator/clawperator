@@ -46,6 +46,7 @@ MULTI_DEVICE_APK_PROBE_FAILURE_COUNT=0
 MULTI_DEVICE_APK_PROBE_FAILED_DEVICES=()
 MULTI_DEVICE_APK_CLEAN_DEVICES=()
 MULTI_DEVICE_APK_WARN_DEVICES=()
+MULTI_DEVICE_APK_INSTALL_FAILURES=0
 
 TEMP_FILES=()
 
@@ -59,6 +60,10 @@ cleanup_temp_files() {
             rm -f "$file"
         fi
     done
+}
+
+shell_quote() {
+    printf "'%s'" "$1"
 }
 
 on_error() {
@@ -1571,9 +1576,9 @@ operator_setup_command_text() {
     fi
 
     if [ -n "$device_id" ]; then
-        printf 'clawperator operator setup --apk %s --device %s%s' "$APK_LOCAL_PATH" "$device_id" "$operator_package_flag"
+        printf 'clawperator operator setup --apk %s --device %s%s' "$(shell_quote "$APK_LOCAL_PATH")" "$(shell_quote "$device_id")" "$operator_package_flag"
     else
-        printf 'clawperator operator setup --apk %s%s' "$APK_LOCAL_PATH" "$operator_package_flag"
+        printf 'clawperator operator setup --apk %s%s' "$(shell_quote "$APK_LOCAL_PATH")" "$operator_package_flag"
     fi
 }
 
@@ -1685,10 +1690,15 @@ reset_multi_device_apk_target_scan() {
     MULTI_DEVICE_APK_PROBE_FAILED_DEVICES=()
     MULTI_DEVICE_APK_CLEAN_DEVICES=()
     MULTI_DEVICE_APK_WARN_DEVICES=()
+    MULTI_DEVICE_APK_INSTALL_FAILURES=0
 }
 
 doctor_device_requires_apk_setup() {
     local json="$1"
+
+    if doctor_check_code "$json" "readiness.apk.presence" "DEVICE_SHELL_UNAVAILABLE"; then
+        return 1
+    fi
 
     if doctor_check_status "$json" "readiness.apk.presence" "fail" || \
        doctor_check_status "$json" "readiness.apk.presence" "warn" || \
@@ -1726,7 +1736,7 @@ collect_multi_device_apk_setup_targets() {
             MULTI_DEVICE_APK_TARGET_DEVICES+=("$device_id")
         elif doctor_report_all_checks_pass "$doctor_json"; then
             MULTI_DEVICE_APK_CLEAN_DEVICES+=("$device_id")
-        else
+        elif doctor_report_ok "$doctor_json"; then
             MULTI_DEVICE_APK_WARN_DEVICES+=("$device_id")
         fi
     done < <(list_detected_android_devices)
@@ -1929,6 +1939,12 @@ doctor_report_connected_device() {
         return 0
     fi
 
+    if doctor_check_code "$doctor_json" "readiness.apk.presence" "DEVICE_SHELL_UNAVAILABLE"; then
+        DOCTOR_DEVICE_STATUS="fail"
+        echo -e "${YELLOW}  ⚠  ${device_id} - ADB shell is inaccessible. Resolve ADB connectivity, then rerun: clawperator doctor --device ${device_id} --output pretty --operator-package ${operator_package}${NC}"
+        return 1
+    fi
+
     DOCTOR_DEVICE_STATUS="fail"
     echo -e "${YELLOW}  ⚠  ${device_id} - setup required $(operator_apk_manual_setup_source_text): $(operator_setup_command_text "$device_id" "$operator_package")${NC}"
     return 1
@@ -1964,12 +1980,9 @@ doctor_each_connected_device() {
         if [ "$device_state" = "device" ]; then
             # Reuse the status captured during the collect phase to avoid re-probing
             # devices whose state has not changed since the per-device scan.
+            # Probe-failed devices are always re-probed here so transient failures
+            # don't persist as stale errors in the final summary.
             _collect_status="unknown"
-            if [ "${#MULTI_DEVICE_APK_PROBE_FAILED_DEVICES[@]}" -gt 0 ]; then
-                for _f in "${MULTI_DEVICE_APK_PROBE_FAILED_DEVICES[@]}"; do
-                    [ "$_f" = "$device_id" ] && { _collect_status="probe-failure"; break; }
-                done
-            fi
             if [ "$_collect_status" = "unknown" ] && [ "${#MULTI_DEVICE_APK_TARGET_DEVICES[@]}" -gt 0 ]; then
                 for _f in "${MULTI_DEVICE_APK_TARGET_DEVICES[@]}"; do
                     [ "$_f" = "$device_id" ] && { _collect_status="target"; break; }
@@ -1986,10 +1999,6 @@ doctor_each_connected_device() {
                 done
             fi
             case "$_collect_status" in
-                probe-failure)
-                    DOCTOR_DEVICE_STATUS="probe-failure"
-                    DOCTOR_PROBE_FAILURE_COUNT=$((DOCTOR_PROBE_FAILURE_COUNT + 1))
-                    ;;
                 pass)
                     DOCTOR_DEVICE_STATUS="pass"
                     ready_count=$((ready_count + 1))
@@ -2088,7 +2097,7 @@ run_doctor_and_fix() {
                 download_operator_apk || return 1
                 verify_operator_apk || return 1
             fi
-            maybe_install_operator_apk "${MULTI_DEVICE_APK_TARGET_DEVICES[@]}" || return 1
+            maybe_install_operator_apk "${MULTI_DEVICE_APK_TARGET_DEVICES[@]}" || MULTI_DEVICE_APK_INSTALL_FAILURES=1
         fi
     elif doctor_check_status "$DOCTOR_JSON" "device.discovery" "fail" || \
          doctor_check_status "$DOCTOR_JSON" "readiness.apk.presence" "fail" || \
@@ -2196,6 +2205,9 @@ main() {
         echo -e "${GREEN}  Installation Complete (Device Selection Required)${NC}"
         echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
         print_durable_artifact_summary
+        if [ "${MULTI_DEVICE_APK_INSTALL_FAILURES:-0}" -eq 1 ]; then
+            return 1
+        fi
         return 0
     fi
     if ! doctor_report_ok "$FINAL_DOCTOR_JSON"; then

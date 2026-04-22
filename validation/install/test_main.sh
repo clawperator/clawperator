@@ -251,7 +251,37 @@ JSON
 JSON
       exit 0
       ;;
-    *) 
+    multi-device-partial-fail:1|multi-device-partial-fail:4|multi-device-partial-fail:5)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[{"id":"device.discovery","status":"warn","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
+JSON
+      exit 0
+      ;;
+    multi-device-partial-fail:2)
+      cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.version.compatibility","status":"fail","code":"VERSION_INCOMPATIBLE"}]}
+JSON
+      exit 1
+      ;;
+    multi-device-partial-fail:3)
+      cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.apk.presence","status":"fail","code":"OPERATOR_NOT_INSTALLED"}]}
+JSON
+      exit 1
+      ;;
+    multi-device-partial-fail:6)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+      exit 0
+      ;;
+    multi-device-partial-fail:7)
+      cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.version.compatibility","status":"fail","code":"VERSION_INCOMPATIBLE"}]}
+JSON
+      exit 1
+      ;;
+    *)
       printf '%s\n' "unexpected doctor call state: \$SCENARIO:\$count" >&2
       exit 9
       ;;
@@ -278,6 +308,13 @@ if [ "\$1" = "operator" ] && [ "\$2" = "setup" ] && [ "\$3" = "--apk" ]; then
       ;;
     multi-device-stale-probe:serial-alpha)
       exit 0
+      ;;
+    multi-device-partial-fail:serial-alpha)
+      exit 0
+      ;;
+    multi-device-partial-fail:serial-beta)
+      printf '%s\n' "mock operator setup failed for serial-beta" >&2
+      exit 1
       ;;
   esac
 fi
@@ -386,6 +423,13 @@ OUT
 List of devices attached
 serial-unauthorized	unauthorized
 serial-offline	offline
+OUT
+      ;;
+    multi-device-partial-fail)
+      cat <<'OUT'
+List of devices attached
+serial-alpha	device
+serial-beta	device
 OUT
       ;;
     stale-device)
@@ -900,7 +944,7 @@ assert_contains "$MULTI_STALE_DEV_STDOUT" "Automatic APK installation is only av
 assert_contains "$MULTI_STALE_DEV_STDOUT" "Use a matching local debug APK before manual setup:" "main-multi-stale-dev stdout"
 assert_contains "$MULTI_STALE_DEV_STDOUT" "$TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk" "main-multi-stale-dev stdout"
 assert_contains "$MULTI_STALE_DEV_STDOUT" "serial-alpha - setup required with a matching local debug APK at $TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk" "main-multi-stale-dev stdout"
-assert_contains "$MULTI_STALE_DEV_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk --device serial-alpha --operator-package com.clawperator.operator.dev" "main-multi-stale-dev stdout"
+assert_contains "$MULTI_STALE_DEV_STDOUT" "clawperator operator setup --apk '$TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk' --device 'serial-alpha' --operator-package com.clawperator.operator.dev" "main-multi-stale-dev stdout"
 assert_contains "$MULTI_STALE_DEV_STDOUT" "serial-beta - ready" "main-multi-stale-dev stdout"
 assert_not_contains "$MULTI_STALE_DEV_STDOUT" "Mock download_operator_apk" "main-multi-stale-dev stdout"
 assert_not_contains "$MULTI_STALE_DEV_STDOUT" "Mock verify_operator_apk" "main-multi-stale-dev stdout"
@@ -1005,5 +1049,33 @@ run_stdin_entrypoint_case \
 assert_exit_code "$(cat "$STDIN_STATUS")" 1 "stdin-entrypoint"
 assert_contains "$STDIN_STDOUT" "Unsupported OS: Plan9" "stdin-entrypoint stdout"
 assert_not_contains "$STDIN_STDERR" "BASH_SOURCE[0]: unbound variable" "stdin-entrypoint stderr"
+
+echo "=== Scenario 12: partial multi-device install failure still runs final summary and exits nonzero ==="
+PARTIAL_FAIL_STDOUT="$TMP_DIR/main-partial-fail.stdout"
+PARTIAL_FAIL_STDERR="$TMP_DIR/main-partial-fail.stderr"
+PARTIAL_FAIL_TRACE="$TMP_DIR/main-partial-fail.trace"
+PARTIAL_FAIL_CLI_LOG="$TMP_DIR/main-partial-fail.cli.log"
+PARTIAL_FAIL_GUIDE_PATH_FILE="$TMP_DIR/main-partial-fail.guide.path"
+PARTIAL_FAIL_STATE="$TMP_DIR/main-partial-fail.state"
+run_main_case \
+    main-partial-fail \
+    multi-device-partial-fail \
+    1 \
+    "$PARTIAL_FAIL_STDOUT" \
+    "$PARTIAL_FAIL_STDERR" \
+    "$PARTIAL_FAIL_TRACE" \
+    "$PARTIAL_FAIL_CLI_LOG" \
+    "$PARTIAL_FAIL_GUIDE_PATH_FILE" \
+    "$PARTIAL_FAIL_STATE" \
+    "" \
+    "yes"
+
+assert_contains "$PARTIAL_FAIL_STDOUT" "Mock download_operator_apk" "main-partial-fail stdout"
+assert_contains "$PARTIAL_FAIL_STDOUT" "Mock verify_operator_apk" "main-partial-fail stdout"
+assert_contains "$PARTIAL_FAIL_STDOUT" "Installing operator APK on serial-alpha..." "main-partial-fail stdout"
+assert_contains "$PARTIAL_FAIL_STDOUT" "Installing operator APK on serial-beta..." "main-partial-fail stdout"
+assert_contains "$PARTIAL_FAIL_STDOUT" "serial-alpha - ready" "main-partial-fail stdout"
+assert_contains "$PARTIAL_FAIL_STDOUT" "Installation Complete (Device Selection Required)" "main-partial-fail stdout"
+assert_not_contains "$PARTIAL_FAIL_STDOUT" "Installation Successful!" "main-partial-fail stdout"
 
 echo "=== install.sh main smoke harness passed ==="
