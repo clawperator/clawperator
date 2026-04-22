@@ -26,8 +26,9 @@ curl -fsSL https://clawperator.com/install.sh | bash
 If the installer succeeds, skip to [5. Verify readiness with doctor](#5-verify-readiness-with-doctor).
 
 When more than one adb-visible device is present, the installer reports each
-detected device, runs `doctor` against each ready `adb` device, and then
-falls back to the manual device selection guidance.
+detected device, runs `doctor` against each ready `adb` device, installs the
+current release APK on any ready device that is missing or incompatible, and
+then finishes with explicit `--device <serial>` guidance for later commands.
 
 Alternatively, install the CLI only via npm (Node.js 24+ required):
 

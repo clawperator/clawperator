@@ -32,6 +32,19 @@ assert_contains() {
     fi
 }
 
+assert_not_contains() {
+    local file="$1"
+    local needle="$2"
+    local label="$3"
+    if grep -Fq "$needle" "$file"; then
+        echo "ERROR: $label unexpectedly contained: $needle" >&2
+        echo "--- stdout ---" >&2
+        cat "$file" >&2
+        echo "--------------" >&2
+        return 1
+    fi
+}
+
 setup_mock_tools() {
     local scenario="$1"
     local mock_dir="$TMP_DIR/mock-$scenario"
@@ -89,7 +102,7 @@ fi
 exit 2
 EOF
             ;;
-        critical-warning)
+        warning-only)
             cat > "$mock_dir/adb" <<'EOF'
 #!/usr/bin/env bash
 cat <<'OUT'
@@ -118,21 +131,21 @@ fi
 exit 2
 EOF
             ;;
-        empty-checks)
+        stale-one)
             cat > "$mock_dir/adb" <<'EOF'
 #!/usr/bin/env bash
 cat <<'OUT'
 List of devices attached
-serial-empty	device
+serial-stale	device
 serial-ready	device
 OUT
 EOF
             chmod +x "$mock_dir/adb"
             cat > "$mock_dir/clawperator" <<'EOF'
 #!/usr/bin/env bash
-if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-empty ]; then
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-stale ]; then
     cat <<'JSON'
-{"ok":false,"criticalOk":false,"checks":[]}
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.version.compatibility","status":"fail","code":"VERSION_INCOMPATIBLE"}]}
 JSON
     exit 1
 fi
@@ -141,6 +154,44 @@ if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-ready ]; then
     cat <<'JSON'
 {"ok":true,"criticalOk":true,"checks":[]}
 JSON
+    exit 0
+fi
+
+if [ "$1" = operator ] && [ "$2" = setup ] && [ "$3" = --apk ] && [ "$5" = --device ] && [ "$6" = serial-stale ]; then
+    exit 0
+fi
+
+exit 2
+EOF
+            ;;
+        stale-many)
+            cat > "$mock_dir/adb" <<'EOF'
+#!/usr/bin/env bash
+cat <<'OUT'
+List of devices attached
+serial-alpha	device
+serial-beta	device
+serial-offline	offline
+OUT
+EOF
+            chmod +x "$mock_dir/adb"
+            cat > "$mock_dir/clawperator" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-alpha ]; then
+    cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.apk.presence","status":"fail","code":"OPERATOR_NOT_INSTALLED"}]}
+JSON
+    exit 1
+fi
+
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-beta ]; then
+    cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.version.compatibility","status":"fail","code":"VERSION_INCOMPATIBLE"}]}
+JSON
+    exit 1
+fi
+
+if [ "$1" = operator ] && [ "$2" = setup ] && [ "$3" = --apk ] && [ "$5" = --device ] && { [ "$6" = serial-alpha ] || [ "$6" = serial-beta ]; }; then
     exit 0
 fi
 
@@ -172,6 +223,7 @@ run_scenario() {
 
     PATH="$mock_dir:$PATH" \
     APK_LOCAL_PATH=/tmp/operator.apk \
+    OPERATOR_VERSION=9.9.9 \
     bash -c '
         source "$1" >/dev/null 2>&1
         trap - ERR
@@ -201,36 +253,50 @@ run_scenario() {
     fi
 }
 
-echo "=== Scenario 1: partial readiness stays in multi-device path ==="
+echo "=== Scenario 1: ready devices stay ready while unauthorized devices are reported ==="
 run_scenario \
     partial \
     0 \
-    "Skipping APK install until every connected device is ready." \
-    "All devices ready. No setup required." \
-    "Installing operator APK on connected device..."
+    "All ready devices already have the required APK." \
+    "Installing operator APK on serial-ready..." \
+    "Complete Android setup on one target device with one of:"
+assert_contains "$TMP_DIR/partial.stdout" "serial-bad - ADB state: unauthorized. Unlock the device or restart ADB before setup." "partial stdout"
 
-echo "=== Scenario 2: all devices ready succeeds ==="
+echo "=== Scenario 2: all ready devices do not reinstall ==="
 run_scenario \
     all-ready \
     0 \
-    "All devices ready. No setup required." \
-    "Skipping APK install until every connected device is ready." \
+    "All connected devices already have the required APK." \
+    "Installing operator APK on serial-ready..." \
     "Installing operator APK on connected device..."
 
-echo "=== Scenario 3: warning-only devices are reported honestly ==="
+echo "=== Scenario 3: warning-only devices are not treated as APK targets ==="
 run_scenario \
-    critical-warning \
+    warning-only \
     0 \
-    "All devices passed critical checks. No setup required." \
-    "All devices ready. No setup required." \
-    "Skipping APK install until every connected device is ready."
+    "All connected devices already have the required APK." \
+    "Installing operator APK on serial-warning..." \
+    "Complete Android setup on one target device with one of:"
 
-echo "=== Scenario 4: empty checks are not treated as ready ==="
+echo "=== Scenario 4: a stale ready device is upgraded in place ==="
 run_scenario \
-    empty-checks \
+    stale-one \
     0 \
-    "Skipping APK install until every connected device is ready." \
-    "serial-empty - ready"
-assert_contains "$TMP_DIR/empty-checks.stdout" "serial-empty - setup required: clawperator operator setup --apk $HOME/.clawperator/downloads/operator.apk --device serial-empty" "empty-checks stdout"
+    "Installing operator APK on serial-stale..." \
+    "Complete Android setup on one target device with one of:" \
+    "All connected devices already have the required APK."
+assert_contains "$TMP_DIR/stale-one.stdout" "serial-stale - operator APK installed and permissions granted." "stale-one stdout"
+assert_not_contains "$TMP_DIR/stale-one.stdout" "Installing operator APK on serial-ready..." "stale-one stdout"
+
+echo "=== Scenario 5: multiple stale ready devices are upgraded while offline devices are skipped ==="
+run_scenario \
+    stale-many \
+    0 \
+    "Installing operator APK on serial-alpha..." \
+    "Complete Android setup on one target device with one of:" \
+    "All connected devices already have the required APK."
+assert_contains "$TMP_DIR/stale-many.stdout" "Installing operator APK on serial-beta..." "stale-many stdout"
+assert_contains "$TMP_DIR/stale-many.stdout" "serial-offline - ADB state: offline. Unlock the device or restart ADB before setup." "stale-many stdout"
+assert_contains "$TMP_DIR/stale-many.stdout" "Other detected devices were skipped until they are ready for ADB." "stale-many stdout"
 
 echo "=== install.sh multi-device harness passed ==="

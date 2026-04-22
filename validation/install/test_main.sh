@@ -100,14 +100,14 @@ case "\$*" in
   count="\$((count + 1))"
   printf '%s' "\$count" > "\$STATE_FILE"
 
-  case "\$SCENARIO:\$count" in
-    success:1|success:2|success:3|final-fail:1|final-fail:2|stale-device:1|stale-device:3)
+    case "\$SCENARIO:\$count" in
+    success:1|success:2|success:3|final-fail:1|final-fail:2|stale-device:1|stale-device:2|stale-device:4)
       cat <<'JSON'
 {"ok":true,"criticalOk":true,"checks":[]}
 JSON
       exit 0
       ;;
-    stale-device:2)
+    stale-device:3)
       cat <<'JSON'
 {"ok":false,"criticalOk":false,"checks":[{"id":"readiness.handshake","status":"fail","code":"HANDSHAKE_FAILED"}]}
 JSON
@@ -119,44 +119,32 @@ JSON
 JSON
       exit 1
       ;;
-    multi-device:1|multi-device:2)
-      cat <<'JSON'
-{"ok":true,"criticalOk":true,"checks":[]}
-JSON
-      exit 0
-      ;;
-    multi-device:3)
+    multi-device:1|multi-device:4|multi-device:5)
       cat <<'JSON'
 {"ok":true,"criticalOk":true,"checks":[{"id":"device.discovery","status":"warn","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
 JSON
       exit 0
       ;;
-    multi-device:4|multi-device:5)
+    multi-device:2|multi-device:3|multi-device:6|multi-device:7)
       cat <<'JSON'
 {"ok":true,"criticalOk":true,"checks":[]}
 JSON
       exit 0
       ;;
-    multi-device-warning:1|multi-device-warning:2)
-      cat <<'JSON'
-{"ok":true,"criticalOk":true,"checks":[]}
-JSON
-      exit 0
-      ;;
-    multi-device-warning:3)
+    multi-device-warning:1|multi-device-warning:4|multi-device-warning:5)
       cat <<'JSON'
 {"ok":true,"criticalOk":true,"checks":[{"id":"device.discovery","status":"warn","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
 JSON
       exit 0
       ;;
-    multi-device-warning:4)
+    multi-device-warning:2|multi-device-warning:6)
       printf '%s\n' 'sensitive doctor stderr from warning device' >&2
       cat <<'JSON'
 {"ok":true,"criticalOk":true,"checks":[{"id":"readiness.handshake","status":"warn","code":"HANDSHAKE_PERMISSION_ADVISORY"}]}
 JSON
       exit 0
       ;;
-    multi-device-warning:5)
+    multi-device-warning:3|multi-device-warning:7)
       cat <<'JSON'
 {"ok":true,"criticalOk":true,"checks":[]}
 JSON
@@ -174,14 +162,32 @@ JSON
 JSON
       exit 0
       ;;
-    multi-device-mixed:1|multi-device-mixed:2|multi-device-mixed:3)
+    multi-device-mixed:1|multi-device-mixed:3|multi-device-mixed:4)
       cat <<'JSON'
 {"ok":true,"criticalOk":true,"checks":[{"id":"device.discovery","status":"warn","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
 JSON
       exit 0
       ;;
-    multi-device-mixed:4)
+    multi-device-mixed:2|multi-device-mixed:5)
       printf '%s\n' 'sensitive doctor stderr from mixed-state device' >&2
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+      exit 0
+      ;;
+    multi-device-stale:1|multi-device-stale:4|multi-device-stale:5)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[{"id":"device.discovery","status":"warn","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
+JSON
+      exit 0
+      ;;
+    multi-device-stale:2)
+      cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.version.compatibility","status":"fail","code":"VERSION_INCOMPATIBLE"}]}
+JSON
+      exit 1
+      ;;
+    multi-device-stale:3|multi-device-stale:6|multi-device-stale:7)
       cat <<'JSON'
 {"ok":true,"criticalOk":true,"checks":[]}
 JSON
@@ -202,6 +208,14 @@ if [ "\$1" = "doctor" ] && [ "\$2" = "--output" ] && [ "\$3" = "pretty" ]; then
     printf '%s\n' 'Doctor pretty output (success)'
   fi
   exit 0
+fi
+
+if [ "\$1" = "operator" ] && [ "\$2" = "setup" ] && [ "\$3" = "--apk" ]; then
+  case "\$SCENARIO:\$6" in
+    multi-device-stale:serial-alpha)
+      exit 0
+      ;;
+  esac
 fi
 
 if [ "\$1" = "--version" ]; then
@@ -274,16 +288,23 @@ serial-warning	device
 serial-ready	device
 OUT
       ;;
-    multi-device-mixed)
-      cat <<'OUT'
+	    multi-device-mixed)
+	      cat <<'OUT'
 List of devices attached
 serial-ready	device
 serial-unauthorized	unauthorized
 serial-offline	offline
 OUT
-      ;;
-    stale-device)
-      cat <<'OUT'
+	      ;;
+	    multi-device-stale)
+	      cat <<'OUT'
+List of devices attached
+serial-alpha	device
+serial-beta	device
+OUT
+	      ;;
+	    stale-device)
+	      cat <<'OUT'
 List of devices attached
 serial-solo	device
 stale-emulator	offline
@@ -608,7 +629,7 @@ assert_contains "$FAIL_CLI_LOG" "skills install --output json" "main-fail cli lo
 assert_contains "$FAIL_CLI_LOG" "bundled-skills install --output json" "main-fail cli log"
 assert_contains "$FAIL_CLI_LOG" "doctor --output pretty" "main-fail cli log"
 
-echo "=== Scenario 3: final doctor multi-device path returns success with manual guidance ==="
+echo "=== Scenario 3: final doctor multi-device path reports ready devices without fake pending setup ==="
 MULTI_STDOUT="$TMP_DIR/main-multi.stdout"
 MULTI_STDERR="$TMP_DIR/main-multi.stderr"
 MULTI_TRACE="$TMP_DIR/main-multi.trace"
@@ -627,18 +648,19 @@ run_main_case \
     "$MULTI_STATE"
 
 assert_contains "$MULTI_STDOUT" "Installation Complete (Device Selection Required)" "main-multi stdout"
-assert_contains "$MULTI_STDOUT" "Host install completed, but Android setup is still pending because more than one device is connected." "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "Checking each connected device with Clawperator Doctor..." "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "serial-alpha - ready" "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "serial-beta - ready" "main-multi stdout"
+assert_contains "$MULTI_STDOUT" "each connected device passed Clawperator Doctor" "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "clawperator doctor --device <device_id> --output pretty --operator-package com.clawperator.operator" "main-multi stdout"
-assert_contains "$MULTI_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi/.clawperator/downloads/operator.apk --device serial-alpha" "main-multi stdout"
-assert_contains "$MULTI_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi/.clawperator/downloads/operator.apk --device serial-beta" "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "$TMP_DIR/home-main-multi/.clawperator/AGENTS.md" "main-multi stdout durable guide"
 assert_contains "$MULTI_STDOUT" "$TMP_DIR/home-main-multi/.clawperator/install-state.json" "main-multi stdout durable install-state"
 assert_contains "$MULTI_STDOUT" "$TMP_DIR/home-main-multi/.clawperator/mcp-config-snippet.json" "main-multi stdout durable mcp"
 assert_not_contains "$MULTI_STDOUT" "Final doctor check failed." "main-multi stdout"
 assert_not_contains "$MULTI_STDOUT" "Doctor pretty output" "main-multi stdout"
+assert_not_contains "$MULTI_STDOUT" "Host install completed, but Android setup is still pending because more than one device is connected." "main-multi stdout"
+assert_not_contains "$MULTI_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi/.clawperator/downloads/operator.apk --device serial-alpha" "main-multi stdout"
+assert_not_contains "$MULTI_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi/.clawperator/downloads/operator.apk --device serial-beta" "main-multi stdout"
 assert_contains "$MULTI_CLI_LOG" "doctor --device serial-alpha --format json" "main-multi cli log"
 assert_contains "$MULTI_CLI_LOG" "doctor --device serial-beta --format json" "main-multi cli log"
 assert_json_field_null "$TMP_DIR/home-main-multi/.clawperator/install-state.json" "lastDeviceSerial" "main-multi install-state lastDeviceSerial"
@@ -664,6 +686,7 @@ run_main_case \
 assert_contains "$MULTI_WARN_STDOUT" "Installation Complete (Device Selection Required)" "main-multi-warn stdout"
 assert_contains "$MULTI_WARN_STDOUT" "critical checks passed; warnings remain." "main-multi-warn stdout"
 assert_contains "$MULTI_WARN_STDOUT" "All connected devices passed critical checks." "main-multi-warn stdout"
+assert_contains "$MULTI_WARN_STDOUT" "each connected device passed the critical doctor checks" "main-multi-warn stdout"
 assert_contains "$MULTI_WARN_STDOUT" "serial-warning - critical checks passed; warnings remain." "main-multi-warn stdout"
 assert_contains "$MULTI_WARN_STDOUT" "serial-ready - ready" "main-multi-warn stdout"
 assert_not_contains "$MULTI_WARN_STDOUT" "serial-warning - ready" "main-multi-warn stdout"
@@ -694,14 +717,43 @@ assert_contains "$MULTI_MIXED_STDOUT" "Installation Complete (Device Selection R
 assert_contains "$MULTI_MIXED_STDOUT" "serial-unauthorized - ADB state: unauthorized. Unlock the device or restart ADB before setup." "main-multi-mixed stdout"
 assert_contains "$MULTI_MIXED_STDOUT" "serial-offline - ADB state: offline. Unlock the device or restart ADB before setup." "main-multi-mixed stdout"
 assert_contains "$MULTI_MIXED_STDOUT" "serial-ready - ready" "main-multi-mixed stdout"
-assert_contains "$MULTI_MIXED_STDOUT" "Host install completed, but Android setup is still pending because more than one device is connected." "main-multi-mixed stdout"
-assert_contains "$MULTI_MIXED_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi-mixed/.clawperator/downloads/operator.apk --device serial-ready --operator-package com.clawperator.operator.dev" "main-multi-mixed stdout"
+assert_contains "$MULTI_MIXED_STDOUT" "each ready device passed Clawperator Doctor" "main-multi-mixed stdout"
+assert_contains "$MULTI_MIXED_STDOUT" "Resolve any ADB-state warnings above, then rerun install.sh or a device-specific doctor/setup command." "main-multi-mixed stdout"
 assert_contains "$MULTI_MIXED_STDOUT" "clawperator doctor --device <device_id> --output pretty --operator-package com.clawperator.operator.dev" "main-multi-mixed stdout"
 assert_contains "$MULTI_MIXED_CLI_LOG" "doctor --format json --operator-package com.clawperator.operator.dev" "main-multi-mixed cli log"
 assert_contains "$MULTI_MIXED_CLI_LOG" "doctor --device serial-ready --format json --operator-package com.clawperator.operator.dev" "main-multi-mixed cli log"
 assert_not_contains "$MULTI_MIXED_STDERR" "sensitive doctor stderr from mixed-state device" "main-multi-mixed stderr"
 
-echo "=== Scenario 6: APK remediation path runs before final success ==="
+echo "=== Scenario 6: multi-device stale APKs are remediated before final device-selection handoff ==="
+MULTI_STALE_STDOUT="$TMP_DIR/main-multi-stale.stdout"
+MULTI_STALE_STDERR="$TMP_DIR/main-multi-stale.stderr"
+MULTI_STALE_TRACE="$TMP_DIR/main-multi-stale.trace"
+MULTI_STALE_CLI_LOG="$TMP_DIR/main-multi-stale.cli.log"
+MULTI_STALE_GUIDE_PATH_FILE="$TMP_DIR/main-multi-stale.guide.path"
+MULTI_STALE_STATE="$TMP_DIR/main-multi-stale.state"
+run_main_case \
+    main-multi-stale \
+    multi-device-stale \
+    0 \
+    "$MULTI_STALE_STDOUT" \
+    "$MULTI_STALE_STDERR" \
+    "$MULTI_STALE_TRACE" \
+    "$MULTI_STALE_CLI_LOG" \
+    "$MULTI_STALE_GUIDE_PATH_FILE" \
+    "$MULTI_STALE_STATE"
+
+assert_contains "$MULTI_STALE_STDOUT" "Mock download_operator_apk" "main-multi-stale stdout"
+assert_contains "$MULTI_STALE_STDOUT" "Mock verify_operator_apk" "main-multi-stale stdout"
+assert_contains "$MULTI_STALE_STDOUT" "Mock maybe_install_operator_apk" "main-multi-stale stdout"
+assert_contains "$MULTI_STALE_STDOUT" "Installation Complete (Device Selection Required)" "main-multi-stale stdout"
+assert_contains "$MULTI_STALE_STDOUT" "serial-alpha - ready" "main-multi-stale stdout"
+assert_contains "$MULTI_STALE_STDOUT" "serial-beta - ready" "main-multi-stale stdout"
+assert_not_contains "$MULTI_STALE_STDOUT" "Host install completed, but Android setup is still pending because more than one device is connected." "main-multi-stale stdout"
+assert_contains "$MULTI_STALE_TRACE" "download_operator_apk" "main-multi-stale trace"
+assert_contains "$MULTI_STALE_TRACE" "verify_operator_apk" "main-multi-stale trace"
+assert_contains "$MULTI_STALE_TRACE" "maybe_install_operator_apk" "main-multi-stale trace"
+
+echo "=== Scenario 7: APK remediation path runs before final success ==="
 REMEDIATE_STDOUT="$TMP_DIR/main-remediation.stdout"
 REMEDIATE_STDERR="$TMP_DIR/main-remediation.stderr"
 REMEDIATE_TRACE="$TMP_DIR/main-remediation.trace"
