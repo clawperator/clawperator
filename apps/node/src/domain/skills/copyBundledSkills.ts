@@ -4,30 +4,30 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getCliVersion } from "../version/compatibility.js";
-import { DEFAULT_AGENT_SKILLS_DIR } from "./skillsConfig.js";
+import { DEFAULT_BUNDLED_SKILLS_DIR } from "./skillsConfig.js";
 
-const AGENT_SKILLS_SOURCE_ENV_VAR = "CLAWPERATOR_AGENT_SKILLS";
+const BUNDLED_SKILLS_SOURCE_ENV_VAR = "CLAWPERATOR_BUNDLED_SKILLS";
 const VERSION_FILENAME = "version.txt";
 
-export interface AgentDiscoveryDirEntry {
+export interface BundledSkillDiscoveryDirEntry {
   label: string;
   dir: string;
 }
 
-export interface CopyAgentSkillsSuccess {
+export interface CopyBundledSkillsSuccess {
   ok: true;
   skills: string[];
   installedDir: string;
-  agentDiscoveryDirs: AgentDiscoveryDirEntry[];
+  agentDiscoveryDirs: BundledSkillDiscoveryDirEntry[];
 }
 
-export interface CopyAgentSkillsError {
+export interface CopyBundledSkillsError {
   ok: false;
   code: string;
   message: string;
 }
 
-export interface CopyAgentSkillsOptions {
+export interface CopyBundledSkillsOptions {
   sourceDir?: string;
   installedDir?: string;
   claudeSkillsDir?: string;
@@ -39,42 +39,42 @@ export interface CopyAgentSkillsOptions {
   cliVersion?: string;
 }
 
-function resolveAgentSkillsSourceDir(): string {
+function resolveBundledSkillsSourceDir(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), "../../../bundled-skills");
 }
 
-export function resolvePackagedAgentSkillsSourceDir(
-  options: Pick<CopyAgentSkillsOptions, "sourceDir" | "env"> = {}
+export function resolvePackagedBundledSkillsSourceDir(
+  options: Pick<CopyBundledSkillsOptions, "sourceDir" | "env"> = {}
 ): string {
   const env = options.env ?? process.env;
   return options.sourceDir
-    ?? (env[AGENT_SKILLS_SOURCE_ENV_VAR] !== undefined && env[AGENT_SKILLS_SOURCE_ENV_VAR] !== ""
-      ? env[AGENT_SKILLS_SOURCE_ENV_VAR]
-      : resolveAgentSkillsSourceDir());
+    ?? (env[BUNDLED_SKILLS_SOURCE_ENV_VAR] !== undefined && env[BUNDLED_SKILLS_SOURCE_ENV_VAR] !== ""
+      ? env[BUNDLED_SKILLS_SOURCE_ENV_VAR]
+      : resolveBundledSkillsSourceDir());
 }
 
-function resolveHomeDir(options: CopyAgentSkillsOptions): string {
+function resolveHomeDir(options: CopyBundledSkillsOptions): string {
   return resolve(options.homeDir ?? homedir());
 }
 
-export function resolveAgentSkillsInstalledDir(options: Pick<CopyAgentSkillsOptions, "installedDir" | "homeDir"> = {}): string {
+export function resolveBundledSkillsInstalledDir(options: Pick<CopyBundledSkillsOptions, "installedDir" | "homeDir"> = {}): string {
   if (options.installedDir) {
     return resolve(options.installedDir);
   }
   if (options.homeDir) {
-    return join(resolveHomeDir(options), ".clawperator", "agent-skills");
+    return join(resolveHomeDir(options), ".clawperator", "bundled-skills");
   }
-  return DEFAULT_AGENT_SKILLS_DIR;
+  return DEFAULT_BUNDLED_SKILLS_DIR;
 }
 
-export function resolveClaudeSkillsDir(options: CopyAgentSkillsOptions): string {
+export function resolveClaudeSkillsDir(options: CopyBundledSkillsOptions): string {
   if (options.claudeSkillsDir) {
     return resolve(options.claudeSkillsDir);
   }
   return join(resolveHomeDir(options), ".claude", "skills");
 }
 
-export function resolveCodexSkillsDir(options: CopyAgentSkillsOptions): string {
+export function resolveCodexSkillsDir(options: CopyBundledSkillsOptions): string {
   if (options.codexSkillsDir) {
     return resolve(options.codexSkillsDir);
   }
@@ -86,14 +86,14 @@ export function resolveCodexSkillsDir(options: CopyAgentSkillsOptions): string {
   return join(resolveHomeDir(options), ".codex", "skills");
 }
 
-export function resolveAgentsSkillsDir(options: CopyAgentSkillsOptions): string {
+export function resolveAgentsSkillsDir(options: CopyBundledSkillsOptions): string {
   if (options.agentsSkillsDir) {
     return resolve(options.agentsSkillsDir);
   }
   return join(resolveHomeDir(options), ".agents", "skills");
 }
 
-function resolveAgentDiscoveryDirs(options: CopyAgentSkillsOptions): AgentDiscoveryDirEntry[] {
+function resolveAgentDiscoveryDirs(options: CopyBundledSkillsOptions): BundledSkillDiscoveryDirEntry[] {
   return [
     { label: "claude", dir: resolveClaudeSkillsDir(options) },
     { label: "codex", dir: resolveCodexSkillsDir(options) },
@@ -119,7 +119,7 @@ async function pathExistsNoFollow(path: string): Promise<boolean> {
   }
 }
 
-async function discoverAgentSkills(sourceDir: string): Promise<string[]> {
+async function discoverBundledSkills(sourceDir: string): Promise<string[]> {
   const entries = await readdir(sourceDir);
   const skills: string[] = [];
 
@@ -143,8 +143,8 @@ async function discoverAgentSkills(sourceDir: string): Promise<string[]> {
   return skills;
 }
 
-export async function listPackagedAgentSkills(sourceDir = resolveAgentSkillsSourceDir()): Promise<string[]> {
-  return discoverAgentSkills(sourceDir);
+export async function listPackagedBundledSkills(sourceDir = resolveBundledSkillsSourceDir()): Promise<string[]> {
+  return discoverBundledSkills(sourceDir);
 }
 
 async function ensureDirectory(path: string): Promise<void> {
@@ -164,18 +164,18 @@ async function resolveSymlinkTarget(path: string): Promise<string | undefined> {
   }
 }
 
-export interface ManagedAgentSkillLinkInspection {
+export interface ManagedBundledSkillLinkInspection {
   ok: boolean;
   status: "missing" | "conflict" | "broken" | "wrong-target" | "ok";
   actualTarget?: string;
   expectedTarget: string;
 }
 
-export async function inspectManagedAgentSkillLink(
+export async function inspectManagedBundledSkillLink(
   linkPath: string,
   installedDir: string,
   skillName: string
-): Promise<ManagedAgentSkillLinkInspection> {
+): Promise<ManagedBundledSkillLinkInspection> {
   const expectedTarget = normalizeOwnedSkillTarget(installedDir, skillName);
 
   let entryStat;
@@ -240,8 +240,8 @@ export async function inspectManagedAgentSkillLink(
   };
 }
 
-async function isManagedAgentSymlink(linkPath: string, installedDir: string, skillName: string): Promise<boolean> {
-  const inspection = await inspectManagedAgentSkillLink(linkPath, installedDir, skillName);
+async function isManagedBundledSkillSymlink(linkPath: string, installedDir: string, skillName: string): Promise<boolean> {
+  const inspection = await inspectManagedBundledSkillLink(linkPath, installedDir, skillName);
   // A dangling symlink that points at the correct expected target is still considered managed:
   // it means Clawperator previously installed the link but the install dir was subsequently
   // removed. The install/update flow is allowed to recreate it.
@@ -254,7 +254,7 @@ async function isManagedAgentSymlink(linkPath: string, installedDir: string, ski
 async function ensureManagedSymlink(targetPath: string, linkPath: string, installedDir: string, skillName: string): Promise<void> {
   const exists = await pathExistsNoFollow(linkPath);
   if (exists) {
-    const managed = await isManagedAgentSymlink(linkPath, installedDir, skillName);
+    const managed = await isManagedBundledSkillSymlink(linkPath, installedDir, skillName);
     if (!managed) {
       throw new Error(`Refusing to overwrite non-Clawperator skill entry: ${linkPath}`);
     }
@@ -271,13 +271,13 @@ async function assertManagedSymlinkWritable(linkPath: string, installedDir: stri
     return;
   }
 
-  const managed = await isManagedAgentSymlink(linkPath, installedDir, skillName);
+  const managed = await isManagedBundledSkillSymlink(linkPath, installedDir, skillName);
   if (!managed) {
     throw new Error(`Refusing to overwrite non-Clawperator skill entry: ${linkPath}`);
   }
 }
 
-async function removeStaleAgentSymlinks(agentDir: string, activeSkills: Set<string>, installedDir: string): Promise<void> {
+async function removeStaleBundledSkillSymlinks(agentDir: string, activeSkills: Set<string>, installedDir: string): Promise<void> {
   const entries = await readdir(agentDir);
   for (const entry of entries) {
     if (activeSkills.has(entry)) {
@@ -333,11 +333,11 @@ async function removeStaleInstalledSkills(installedDir: string, activeSkills: Se
   }
 }
 
-export async function copyAgentSkills(
-  options: CopyAgentSkillsOptions = {}
-): Promise<CopyAgentSkillsSuccess | CopyAgentSkillsError> {
-  const sourceDir = resolvePackagedAgentSkillsSourceDir(options);
-  const installedDir = resolveAgentSkillsInstalledDir(options);
+export async function copyBundledSkills(
+  options: CopyBundledSkillsOptions = {}
+): Promise<CopyBundledSkillsSuccess | CopyBundledSkillsError> {
+  const sourceDir = resolvePackagedBundledSkillsSourceDir(options);
+  const installedDir = resolveBundledSkillsInstalledDir(options);
   const agentDiscoveryDirs = resolveAgentDiscoveryDirs(options);
 
   let sourceStat;
@@ -346,26 +346,26 @@ export async function copyAgentSkills(
   } catch {
     return {
       ok: false,
-      code: "AGENT_SKILLS_SOURCE_NOT_FOUND",
-      message: `Agent-skills source directory not found: ${sourceDir}`,
+      code: "BUNDLED_SKILLS_SOURCE_NOT_FOUND",
+      message: `Bundled-skills source directory not found: ${sourceDir}`,
     };
   }
 
   if (!sourceStat.isDirectory()) {
     return {
       ok: false,
-      code: "AGENT_SKILLS_SOURCE_NOT_FOUND",
-      message: `Agent-skills source path is not a directory: ${sourceDir}`,
+      code: "BUNDLED_SKILLS_SOURCE_NOT_FOUND",
+      message: `Bundled-skills source path is not a directory: ${sourceDir}`,
     };
   }
 
   try {
-    const skills = await discoverAgentSkills(sourceDir);
+    const skills = await discoverBundledSkills(sourceDir);
     if (skills.length === 0) {
       return {
         ok: false,
-        code: "AGENT_SKILLS_SOURCE_EMPTY",
-        message: `No packaged agent-skills with SKILL.md were found in ${sourceDir}`,
+        code: "BUNDLED_SKILLS_SOURCE_EMPTY",
+        message: `No packaged bundled-skills with SKILL.md were found in ${sourceDir}`,
       };
     }
     await ensureDirectory(installedDir);
@@ -392,7 +392,7 @@ export async function copyAgentSkills(
     const activeSkills = new Set(skills);
     await removeStaleInstalledSkills(installedDir, activeSkills);
     for (const { dir } of agentDiscoveryDirs) {
-      await removeStaleAgentSymlinks(dir, activeSkills, installedDir);
+      await removeStaleBundledSkillSymlinks(dir, activeSkills, installedDir);
     }
     await writeFile(join(installedDir, VERSION_FILENAME), `${options.cliVersion ?? getCliVersion()}\n`, "utf8");
 
@@ -406,13 +406,13 @@ export async function copyAgentSkills(
     const message = error instanceof Error ? error.message : String(error);
     return {
       ok: false,
-      code: "AGENT_SKILLS_INSTALL_FAILED",
+      code: "BUNDLED_SKILLS_INSTALL_FAILED",
       message,
     };
   }
 }
 
-export async function listInstalledAgentSkills(installDir = DEFAULT_AGENT_SKILLS_DIR): Promise<Array<{ name: string; skillPath: string }>> {
+export async function listInstalledBundledSkills(installDir = DEFAULT_BUNDLED_SKILLS_DIR): Promise<Array<{ name: string; skillPath: string }>> {
   const entries = await readdir(installDir);
   const skills: Array<{ name: string; skillPath: string }> = [];
 
@@ -427,6 +427,6 @@ export async function listInstalledAgentSkills(installDir = DEFAULT_AGENT_SKILLS
   return skills;
 }
 
-export async function readAgentSymlinkTarget(path: string): Promise<string | undefined> {
+export async function readBundledSkillSymlinkTarget(path: string): Promise<string | undefined> {
   return resolveSymlinkTarget(path);
 }

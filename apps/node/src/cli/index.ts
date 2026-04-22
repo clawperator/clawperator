@@ -8,6 +8,7 @@ import {
   UsageError,
   didYouMean,
   generateTopLevelHelp,
+  isRemovedTopLevelCommand,
   resolveHelpFromRegistry,
   resolveSupportedFlagsFromRegistry,
   type HandlerContext,
@@ -289,6 +290,11 @@ async function main(): Promise<void> {
     throw error;
   }
   if (argvForGlobalMeta.includes("--help")) {
+    const [requestedHelpCommand] = global.rest;
+    if (requestedHelpCommand && isRemovedTopLevelCommand(requestedHelpCommand)) {
+      console.error(didYouMean(requestedHelpCommand, global.rest.slice(1), COMMANDS));
+      process.exit(1);
+    }
     console.log(resolveHelpFromRegistry(global.rest, COMMANDS));
     process.exit(0);
   }

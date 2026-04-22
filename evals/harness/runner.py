@@ -276,11 +276,11 @@ def _tokens_request_json_output(tokens: list[str]) -> bool:
     return False
 
 
-def _is_agent_skills_list_command(record: dict[str, Any]) -> bool:
+def _is_bundled_skills_list_command(record: dict[str, Any]) -> bool:
     for tokens in _extract_command_token_lists(record):
         lowered = [token.lower() for token in tokens]
         for index in range(len(lowered) - 1):
-            if lowered[index] == "agent-skills" and lowered[index + 1] == "list":
+            if lowered[index] == "bundled-skills" and lowered[index + 1] == "list":
                 if _tokens_request_json_output(tokens):
                     return True
     return False
@@ -320,7 +320,7 @@ def _canonicalize_registry_command_tokens(tokens: list[str]) -> str | None:
         if token == "skills" and next_token in {"for-app", "search", "get"}:
             relevant_tokens = normalized_tokens[index:]
             break
-        if token == "agent-skills" and next_token == "list":
+        if token == "bundled-skills" and next_token == "list":
             relevant_tokens = normalized_tokens[index:]
             break
     else:
@@ -471,7 +471,7 @@ def _validate_discovery_artifact(
                 )
             if authoring_probe_signatures and artifact_registry_signatures.isdisjoint(authoring_probe_signatures):
                 errors.append(
-                    "discovery artifact existing_skill_verdict commands must include `agent-skills list --json` evidence seen in the transcript"
+                    "discovery artifact existing_skill_verdict commands must include `bundled-skills list --json` evidence seen in the transcript"
                 )
 
     route_confidence = artifact.get("route_confidence")
@@ -646,21 +646,21 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
     )
     route_transcript = _strip_marked_blocks(transcript, start_marker, end_marker)
     command_execution_records = list(_iter_command_execution_records(route_transcript))
-    agent_skills_list_positions = [
+    bundled_skills_list_positions = [
         line_number
         for line_number, record in command_execution_records
-        if _is_agent_skills_list_command(record)
+        if _is_bundled_skills_list_command(record)
     ]
-    agent_skills_list_line_numbers = [position + 1 for position in agent_skills_list_positions]
-    agent_skills_list_signatures: set[str] = set()
+    bundled_skills_list_line_numbers = [position + 1 for position in bundled_skills_list_positions]
+    bundled_skills_list_signatures: set[str] = set()
     runtime_skill_discovery_signatures: set[str] = set()
     runtime_skill_discovery_positions: list[int] = []
     for line_number, record in command_execution_records:
-        if _is_agent_skills_list_command(record):
+        if _is_bundled_skills_list_command(record):
             for token_list in _extract_command_token_lists(record):
                 signature = _canonicalize_registry_command_tokens(token_list)
                 if signature is not None:
-                    agent_skills_list_signatures.add(signature)
+                    bundled_skills_list_signatures.add(signature)
         if not _is_runtime_skill_discovery_command(record):
             continue
         runtime_skill_discovery_positions.append(line_number)
@@ -669,12 +669,12 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
             if signature is not None:
                 runtime_skill_discovery_signatures.add(signature)
 
-    agent_skills_list_seen = len(agent_skills_list_positions) > 0
+    bundled_skills_list_seen = len(bundled_skills_list_positions) > 0
     runtime_skill_discovery_seen = len(runtime_skill_discovery_positions) > 0
     runtime_skill_discovery_before_authoring = bool(
         runtime_skill_discovery_positions
-        and agent_skills_list_positions
-        and min(runtime_skill_discovery_positions) < min(agent_skills_list_positions)
+        and bundled_skills_list_positions
+        and min(runtime_skill_discovery_positions) < min(bundled_skills_list_positions)
     )
 
     discovery_artifacts = _extract_discovery_artifacts(route_transcript)
@@ -687,11 +687,11 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
             discovery_artifact,
             skill_generation=skill_generation,
             runtime_probe_signatures=runtime_skill_discovery_signatures,
-            authoring_probe_signatures=agent_skills_list_signatures,
+            authoring_probe_signatures=bundled_skills_list_signatures,
         )
-        if agent_skills_list_line_numbers and discovery_artifact_line_number <= min(agent_skills_list_line_numbers):
+        if bundled_skills_list_line_numbers and discovery_artifact_line_number <= min(bundled_skills_list_line_numbers):
             discovery_artifact_errors.append(
-                "structured discovery artifact must appear after `clawperator agent-skills list --json`"
+                "structured discovery artifact must appear after `clawperator bundled-skills list --json`"
             )
     elif discovery_artifact_count > 1:
         discovery_artifact_errors.append("expected exactly one structured discovery artifact before skill emission")
@@ -706,8 +706,8 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
     required_authoring_front_door_after_authoring = required_authoring_front_door is None or bool(
         required_authoring_front_door_line is not None
         and (
-            not agent_skills_list_positions
-            or required_authoring_front_door_line > min(agent_skills_list_positions)
+            not bundled_skills_list_positions
+            or required_authoring_front_door_line > min(bundled_skills_list_positions)
         )
     )
     required_authoring_front_door_seen = bool(
@@ -731,11 +731,11 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
             )
         elif not runtime_skill_discovery_before_authoring:
             route_requirement_errors.append(
-                "runtime-skill discovery must appear before `clawperator agent-skills list --json`"
+                "runtime-skill discovery must appear before `clawperator bundled-skills list --json`"
             )
-        if not agent_skills_list_seen:
+        if not bundled_skills_list_seen:
             route_requirement_errors.append(
-                "missing structured command evidence for `clawperator agent-skills list --json`"
+                "missing structured command evidence for `clawperator bundled-skills list --json`"
             )
     route_requirement_errors.extend(discovery_artifact_errors)
     if required_authoring_front_door is not None and not required_authoring_front_door_explicitly_seen:
@@ -744,7 +744,7 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
         )
     elif required_authoring_front_door is not None and not required_authoring_front_door_after_authoring:
         route_requirement_errors.append(
-            f"required_authoring_front_door `{required_authoring_front_door}` must appear after `clawperator agent-skills list --json`"
+            f"required_authoring_front_door `{required_authoring_front_door}` must appear after `clawperator bundled-skills list --json`"
         )
     if required_authoring_front_door is not None and not required_authoring_front_door_seen:
         route_requirement_errors.append(
@@ -760,7 +760,7 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
         "required_proving_handoff": required_proving_handoff,
         "runtime_skill_discovery_seen": runtime_skill_discovery_seen,
         "runtime_skill_discovery_before_authoring": runtime_skill_discovery_before_authoring,
-        "agent_skills_list_seen": agent_skills_list_seen,
+        "bundled_skills_list_seen": bundled_skills_list_seen,
         "discovery_artifact_count": discovery_artifact_count,
         "discovery_artifact_seen": discovery_artifact_seen,
         "discovery_artifact_valid": discovery_artifact_valid,

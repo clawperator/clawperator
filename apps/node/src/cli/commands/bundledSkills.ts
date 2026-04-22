@@ -1,0 +1,90 @@
+import { stat } from "node:fs/promises";
+import { DEFAULT_BUNDLED_SKILLS_DIR } from "../../domain/skills/skillsConfig.js";
+import {
+  copyBundledSkills,
+  listInstalledBundledSkills,
+  resolveClaudeSkillsDir,
+  resolveCodexSkillsDir,
+  type CopyBundledSkillsOptions,
+} from "../../domain/skills/copyBundledSkills.js";
+import type { OutputOptions } from "../output.js";
+import { formatError, formatSuccess } from "../output.js";
+
+export interface BundledSkillCommandOptions extends CopyBundledSkillsOptions {
+  format: OutputOptions["format"];
+}
+
+async function isMissingDir(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return false;
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return true;
+    }
+    throw error;
+  }
+}
+
+function getBundledSkillsEnvHint(env: NodeJS.ProcessEnv | undefined): string | undefined {
+  const sourceDir = env?.CLAWPERATOR_BUNDLED_SKILLS;
+  if (sourceDir === undefined || sourceDir === "") {
+    return undefined;
+  }
+  return `Using CLAWPERATOR_BUNDLED_SKILLS=${sourceDir}`;
+}
+
+async function runBundledSkillsInstall(
+  action: "install" | "update",
+  options: BundledSkillCommandOptions
+): Promise<string> {
+  const result = await copyBundledSkills(options);
+  if (!result.ok) {
+    return formatError({ code: result.code, message: result.message }, options);
+  }
+
+  return formatSuccess({
+    skills: result.skills,
+    count: result.skills.length,
+    installedDir: result.installedDir,
+    claudeSkillsDir: resolveClaudeSkillsDir(options),
+    codexSkillsDir: resolveCodexSkillsDir(options),
+    agentDiscoveryDirs: result.agentDiscoveryDirs,
+    message: `Bundled-skills ${action === "install" ? "installed" : "updated"}.`,
+    envHint: getBundledSkillsEnvHint(options.env),
+  }, options);
+}
+
+export async function cmdBundledSkillsInstall(options: BundledSkillCommandOptions): Promise<string> {
+  return runBundledSkillsInstall("install", options);
+}
+
+export async function cmdBundledSkillsUpdate(options: BundledSkillCommandOptions): Promise<string> {
+  return runBundledSkillsInstall("update", options);
+}
+
+export async function cmdBundledSkillsList(
+  options: { format: OutputOptions["format"]; installDir?: string }
+): Promise<string> {
+  const installDir = options.installDir ?? DEFAULT_BUNDLED_SKILLS_DIR;
+  try {
+    if (await isMissingDir(installDir)) {
+      return formatSuccess({
+        skills: [],
+        count: 0,
+        installedDir: installDir,
+        message: "No installed bundled-skills found. Run clawperator bundled-skills install to get clawperator-agent-orientation, clawperator-upgrade, clawperator-skill-author-by-agent-discovery, and clawperator-skill-author-by-recording.",
+      }, options);
+    }
+
+    const skills = await listInstalledBundledSkills(installDir);
+    return formatSuccess({
+      skills,
+      count: skills.length,
+      installedDir: installDir,
+    }, options);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return formatError({ code: "BUNDLED_SKILLS_LIST_FAILED", message }, options);
+  }
+}

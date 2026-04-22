@@ -15,22 +15,22 @@ import {
 import { isOrchestratedHarnessScriptPath, resolveRepoRelativeSkillPath } from "../../skills/pathUtils.js";
 import { readSkillManifestMetadata } from "../../skills/skillManifest.js";
 import {
-  inspectManagedAgentSkillLink,
-  listPackagedAgentSkills,
-  resolveAgentSkillsInstalledDir,
-  resolvePackagedAgentSkillsSourceDir,
+  inspectManagedBundledSkillLink,
+  listPackagedBundledSkills,
+  resolveBundledSkillsInstalledDir,
+  resolvePackagedBundledSkillsSourceDir,
   resolveClaudeSkillsDir,
   resolveCodexSkillsDir,
   resolveAgentsSkillsDir,
-} from "../../skills/copyAgentSkills.js";
+} from "../../skills/copyBundledSkills.js";
 import { getCliVersion } from "../../version/compatibility.js";
 
 const DEFAULT_ORCHESTRATED_SKILL_AGENT_CLI = "codex";
 const ORCHESTRATED_SKILL_AGENT_CLI_ENV_VAR = "CLAWPERATOR_SKILL_AGENT_CLI";
-const AGENT_SKILLS_VERSION_FILENAME = "version.txt";
-const AGENT_SKILLS_UPDATE_COMMAND = "clawperator agent-skills update";
+const BUNDLED_SKILLS_VERSION_FILENAME = "version.txt";
+const BUNDLED_SKILLS_UPDATE_COMMAND = "clawperator bundled-skills update";
 
-export interface CheckAgentSkillsStalenessOptions {
+export interface CheckBundledSkillsStalenessOptions {
   installedDir?: string;
   sourceDir?: string;
   cliVersion?: string;
@@ -47,39 +47,39 @@ function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
   return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
 }
 
-function buildAgentSkillsWarn(
+function buildBundledSkillsWarn(
   summary: string,
   detail: string,
   evidence: Record<string, unknown>,
   fixOverride?: DoctorCheckResult["fix"]
 ): DoctorCheckResult {
   return {
-    id: "host.agent-skills.staleness",
+    id: "host.bundled-skills.staleness",
     status: "warn",
     code: ERROR_CODES.AGENT_SKILLS_STALE,
     summary,
     detail,
     fix: fixOverride ?? {
-      title: "Update agent-skills",
+      title: "Update bundled-skills",
       platform: "any",
       steps: [
-        { kind: "shell", value: AGENT_SKILLS_UPDATE_COMMAND },
+        { kind: "shell", value: BUNDLED_SKILLS_UPDATE_COMMAND },
       ],
     },
     evidence,
   };
 }
 
-function buildAgentSkillsPathRepairFix(installedDir: string): DoctorCheckResult["fix"] {
+function buildBundledSkillsPathRepairFix(installedDir: string): DoctorCheckResult["fix"] {
   return {
-    title: "Repair agent-skills install path",
+    title: "Repair bundled-skills install path",
     platform: "any",
     steps: [
       {
         kind: "manual",
         value: `Remove or rename the conflicting path at ${installedDir}.`,
       },
-      { kind: "shell", value: "clawperator agent-skills install" },
+      { kind: "shell", value: "clawperator bundled-skills install" },
     ],
   };
 }
@@ -127,7 +127,7 @@ interface BrokenAgentDiscoveryEntry {
 async function findBrokenAgentDiscoveryEntries(
   installedDir: string,
   expectedSkills: string[],
-  options: CheckAgentSkillsStalenessOptions
+  options: CheckBundledSkillsStalenessOptions
 ): Promise<BrokenAgentDiscoveryEntry[]> {
   const discoveryDirs = [
     {
@@ -159,7 +159,7 @@ async function findBrokenAgentDiscoveryEntries(
 
   for (const { dirLabel, discoveryDir } of discoveryDirs) {
     for (const skillName of expectedSkills) {
-      const inspection = await inspectManagedAgentSkillLink(
+      const inspection = await inspectManagedBundledSkillLink(
         join(discoveryDir, skillName),
         installedDir,
         skillName
@@ -459,20 +459,20 @@ export async function checkInstalledOrchestratedSkillAgentCliAvailability(_confi
   };
 }
 
-export async function checkAgentSkillsStaleness(
+export async function checkBundledSkillsStaleness(
   _config: RuntimeConfig,
-  options: CheckAgentSkillsStalenessOptions = {}
+  options: CheckBundledSkillsStalenessOptions = {}
 ): Promise<DoctorCheckResult> {
-  const installedDir = resolveAgentSkillsInstalledDir({
+  const installedDir = resolveBundledSkillsInstalledDir({
     installedDir: options.installedDir,
     homeDir: options.homeDir,
   });
-  const versionPath = join(installedDir, AGENT_SKILLS_VERSION_FILENAME);
+  const versionPath = join(installedDir, BUNDLED_SKILLS_VERSION_FILENAME);
   let cliVersion: string;
   try {
     cliVersion = options.cliVersion ?? (options.getCliVersionFn ?? getCliVersion)();
   } catch (error) {
-    return buildAgentSkillsWarn(
+    return buildBundledSkillsWarn(
       "CLI version metadata could not be read.",
       error instanceof Error ? error.message : String(error),
       {
@@ -484,36 +484,36 @@ export async function checkAgentSkillsStaleness(
   try {
     const installedDirStat = await stat(installedDir);
     if (!installedDirStat.isDirectory()) {
-      return buildAgentSkillsWarn(
-        `Agent-skills install path exists but is not a directory: ${installedDir}.`,
-        "Remove or rename the conflicting path first, then re-run the agent-skills installer.",
+      return buildBundledSkillsWarn(
+        `Bundled-skills install path exists but is not a directory: ${installedDir}.`,
+        "Remove or rename the conflicting path first, then re-run the bundled-skills installer.",
         {
           installedDir,
           cliVersion,
         },
-        buildAgentSkillsPathRepairFix(installedDir)
+        buildBundledSkillsPathRepairFix(installedDir)
       );
     }
   } catch (error) {
     if (isMissingPathError(error)) {
       try {
         const danglingEntryStat = await lstat(installedDir);
-        return buildAgentSkillsWarn(
+        return buildBundledSkillsWarn(
           danglingEntryStat.isSymbolicLink()
-            ? `Agent-skills install path is a dangling symlink: ${installedDir}.`
-            : `Agent-skills install path could not be resolved cleanly: ${installedDir}.`,
-          "Remove or rename the broken path first, then re-run the agent-skills installer.",
+            ? `Bundled-skills install path is a dangling symlink: ${installedDir}.`
+            : `Bundled-skills install path could not be resolved cleanly: ${installedDir}.`,
+          "Remove or rename the broken path first, then re-run the bundled-skills installer.",
           {
             installedDir,
             cliVersion,
             pathType: danglingEntryStat.isSymbolicLink() ? "dangling-symlink" : "unresolved-entry",
           },
-          buildAgentSkillsPathRepairFix(installedDir)
+          buildBundledSkillsPathRepairFix(installedDir)
         );
       } catch (lstatError) {
         if (!isMissingPathError(lstatError)) {
-          return buildAgentSkillsWarn(
-            "Agent-skills install state could not be inspected.",
+          return buildBundledSkillsWarn(
+            "Bundled-skills install state could not be inspected.",
             lstatError instanceof Error ? lstatError.message : String(lstatError),
             {
               installedDir,
@@ -522,17 +522,17 @@ export async function checkAgentSkillsStaleness(
           );
         }
         return {
-          id: "host.agent-skills.staleness",
+          id: "host.bundled-skills.staleness",
           status: "pass",
-          summary: "Agent-skills not yet installed.",
+          summary: "Bundled-skills not yet installed.",
           evidence: {
             installedDir,
           },
         };
       }
     }
-    return buildAgentSkillsWarn(
-      "Agent-skills install state could not be inspected.",
+    return buildBundledSkillsWarn(
+      "Bundled-skills install state could not be inspected.",
       error instanceof Error ? error.message : String(error),
       {
         installedDir,
@@ -546,8 +546,8 @@ export async function checkAgentSkillsStaleness(
     installedVersion = (await readFile(versionPath, "utf8")).trim();
   } catch (error) {
     if (!isMissingPathError(error)) {
-      return buildAgentSkillsWarn(
-        "Agent-skills version file could not be read.",
+      return buildBundledSkillsWarn(
+        "Bundled-skills version file could not be read.",
         error instanceof Error ? error.message : String(error),
         {
           installedDir,
@@ -556,9 +556,9 @@ export async function checkAgentSkillsStaleness(
         }
       );
     }
-    return buildAgentSkillsWarn(
-      "Agent-skills version file is missing.",
-      `Expected ${versionPath} to contain the installed agent-skills version.`,
+    return buildBundledSkillsWarn(
+      "Bundled-skills version file is missing.",
+      `Expected ${versionPath} to contain the installed bundled-skills version.`,
       {
         installedDir,
         versionPath,
@@ -568,9 +568,9 @@ export async function checkAgentSkillsStaleness(
   }
 
   if (installedVersion === "") {
-    return buildAgentSkillsWarn(
-      "Agent-skills version file is empty.",
-      `Expected ${versionPath} to contain the installed agent-skills version.`,
+    return buildBundledSkillsWarn(
+      "Bundled-skills version file is empty.",
+      `Expected ${versionPath} to contain the installed bundled-skills version.`,
       {
         installedDir,
         versionPath,
@@ -579,17 +579,17 @@ export async function checkAgentSkillsStaleness(
     );
   }
 
-  const sourceDir = resolvePackagedAgentSkillsSourceDir({
+  const sourceDir = resolvePackagedBundledSkillsSourceDir({
     sourceDir: options.sourceDir,
     env: options.env,
   });
 
   let expectedSkills: string[];
   try {
-    expectedSkills = await listPackagedAgentSkills(sourceDir);
+    expectedSkills = await listPackagedBundledSkills(sourceDir);
   } catch (error) {
-    return buildAgentSkillsWarn(
-      "Packaged agent-skills could not be inspected.",
+    return buildBundledSkillsWarn(
+      "Packaged bundled-skills could not be inspected.",
       error instanceof Error ? error.message : String(error),
       {
         installedDir,
@@ -600,9 +600,9 @@ export async function checkAgentSkillsStaleness(
   }
 
   if (expectedSkills.length === 0) {
-    return buildAgentSkillsWarn(
-      "Packaged agent-skills list is empty.",
-      "Expected at least one packaged agent-skill containing SKILL.md.",
+    return buildBundledSkillsWarn(
+      "Packaged bundled-skills list is empty.",
+      "Expected at least one packaged bundled skill containing SKILL.md.",
       {
         installedDir,
         installedVersion,
@@ -615,8 +615,8 @@ export async function checkAgentSkillsStaleness(
   try {
     missingSkills = await findMissingInstalledAgentSkills(installedDir, expectedSkills);
   } catch (error) {
-    return buildAgentSkillsWarn(
-      "Agent-skills install could not be fully inspected.",
+    return buildBundledSkillsWarn(
+      "Bundled-skills install could not be fully inspected.",
       error instanceof Error ? error.message : String(error),
       {
         installedDir,
@@ -628,9 +628,9 @@ export async function checkAgentSkillsStaleness(
   }
 
   if (missingSkills.length > 0) {
-    return buildAgentSkillsWarn(
-      "Agent-skills install is missing expected packaged skills.",
-      "Re-run the agent-skills installer to restore the packaged first-party skill set.",
+    return buildBundledSkillsWarn(
+      "Bundled-skills install is missing expected packaged skills.",
+      "Re-run the bundled-skills installer to restore the packaged first-party skill set.",
       {
         installedDir,
         installedVersion,
@@ -645,8 +645,8 @@ export async function checkAgentSkillsStaleness(
   try {
     brokenDiscoveryEntries = await findBrokenAgentDiscoveryEntries(installedDir, expectedSkills, options);
   } catch (error) {
-    return buildAgentSkillsWarn(
-      "Agent-skills discovery links could not be inspected.",
+    return buildBundledSkillsWarn(
+      "Bundled-skills discovery links could not be inspected.",
       error instanceof Error ? error.message : String(error),
       {
         installedDir,
@@ -665,8 +665,8 @@ export async function checkAgentSkillsStaleness(
     const detailParts = Object.entries(brokenDiscoveryByDir)
       .map(([dirLabel, entries]) => `${dirLabel}: ${entries.map((entry) => `${entry.skillName} (${entry.issue})`).join(", ")}`);
 
-    return buildAgentSkillsWarn(
-      "Agent-skills discovery links are incomplete or invalid.",
+    return buildBundledSkillsWarn(
+      "Bundled-skills discovery links are incomplete or invalid.",
       `Managed discovery entries are broken in ${affectedDirs.join(" and ")} skill directories. ${detailParts.join("; ")}`,
       {
         installedDir,
@@ -679,9 +679,9 @@ export async function checkAgentSkillsStaleness(
 
   if (installedVersion === cliVersion) {
     return {
-      id: "host.agent-skills.staleness",
+      id: "host.bundled-skills.staleness",
       status: "pass",
-      summary: "Agent-skills are up to date.",
+      summary: "Bundled-skills are up to date.",
       evidence: {
         installedDir,
         installedVersion,
@@ -691,16 +691,16 @@ export async function checkAgentSkillsStaleness(
   }
 
   return {
-    id: "host.agent-skills.staleness",
+    id: "host.bundled-skills.staleness",
     status: "warn",
     code: ERROR_CODES.AGENT_SKILLS_STALE,
-    summary: `Agent-skills (v${installedVersion}) are outdated (CLI is v${cliVersion}).`,
-    detail: "Installed agent-skills should be refreshed to match the current CLI version.",
+    summary: `Bundled-skills (v${installedVersion}) are outdated (CLI is v${cliVersion}).`,
+    detail: "Installed bundled-skills should be refreshed to match the current CLI version.",
     fix: {
-      title: "Update agent-skills",
+      title: "Update bundled-skills",
       platform: "any",
       steps: [
-        { kind: "shell", value: AGENT_SKILLS_UPDATE_COMMAND },
+        { kind: "shell", value: BUNDLED_SKILLS_UPDATE_COMMAND },
       ],
     },
     evidence: {
