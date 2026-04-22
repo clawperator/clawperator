@@ -299,8 +299,8 @@ Notes:
   - Use this when you need to inspect the installed host-agent helpers on this machine
   - 'clawperator-agent-orientation' is the first-run orientation skill for unfamiliar hosts
   - 'clawperator-upgrade' is the whole-product upgrade route through install.sh and doctor
-  - 'skill-author-by-agent-discovery' is the zero-results front door
-  - 'skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'
+  - 'clawperator-skill-author-by-agent-discovery' is the zero-results front door
+  - 'clawperator-skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'
   - Runtime skills still live under 'clawperator skills ...'; agent-skills are separate host-agent helpers
 `;
 
@@ -316,8 +316,8 @@ Notes:
   - --summary overrides the default TODO summary written to skill.json and SKILL.md.
   - --recording-context copies a recording export JSON file into the new skill folder as reference evidence for an external authoring agent or human.
   - Updates the configured registry JSON so the new skill appears in skills list.
-  - This is the low-level manual scaffold. If runtime-skill discovery found no relevant match, inspect 'clawperator agent-skills list' first and start with 'skill-author-by-agent-discovery'.
-  - Use 'skill-author-by-recording' only after discovery returns 'proceed_to_recording', or when the app route is already well understood and you need the proving workflow.
+  - This is the low-level manual scaffold. If runtime-skill discovery found no relevant match, inspect 'clawperator agent-skills list' first and start with 'clawperator-skill-author-by-agent-discovery'.
+  - Use 'clawperator-skill-author-by-recording' only after discovery returns 'proceed_to_recording', or when the app route is already well understood and you need the proving workflow.
 `;
 
 const HELP_RECORDING = `clawperator recording
@@ -2115,8 +2115,8 @@ Notes:
   - Use 'clawperator skills get <skill_id>' before 'clawperator skills run <skill_id>' when discovery already returned an id.
   - If the current host is unfamiliar, inspect 'clawperator agent-skills list' and start with 'clawperator-agent-orientation' before choosing runtime skills, MCP, or raw CLI actions.
   - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator agent-skills list' and use 'clawperator-upgrade' before trying component-level repair commands.
-  - If runtime-skill discovery returns no relevant match and you need guided skill creation help, use 'clawperator agent-skills list' and start with 'skill-author-by-agent-discovery'.
-  - Use 'skill-author-by-recording' after discovery returns 'proceed_to_recording', or when the route is already well understood and you need the proving workflow.
+  - If runtime-skill discovery returns no relevant match and you need guided skill creation help, use 'clawperator agent-skills list' and start with 'clawperator-skill-author-by-agent-discovery'.
+  - Use 'clawperator-skill-author-by-recording' after discovery returns 'proceed_to_recording', or when the route is already well understood and you need the proving workflow.
   - If your host already supports stdio MCP and wants registered tools instead of runtime-skill discovery, use 'clawperator mcp serve'.
   - Post-install orientation: https://docs.clawperator.com/host-agents/
 `,
@@ -2316,8 +2316,8 @@ Notes:
   - Use 'clawperator agent-skills list' to inspect the installed host-agent workflows on this machine.
   - 'clawperator-agent-orientation' is the first-run orientation skill when the current host is unfamiliar.
   - 'clawperator-upgrade' is the packaged whole-product upgrade route through install.sh and doctor.
-  - 'skill-author-by-agent-discovery' is the zero-results front door when runtime-skill discovery found no relevant match.
-  - 'skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'.
+  - 'clawperator-skill-author-by-agent-discovery' is the zero-results front door when runtime-skill discovery found no relevant match.
+  - 'clawperator-skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'.
   - Runtime skills still live under 'clawperator skills ...'; agent-skills are separate host-agent helpers.
   - Post-install authoring guidance: https://docs.clawperator.com/skills/authoring/
 `,
@@ -2760,8 +2760,8 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "  - If the current host is unfamiliar, inspect 'clawperator agent-skills list' and start with 'clawperator-agent-orientation' before choosing runtime skills, MCP, or raw CLI actions.",
     "  - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator agent-skills list' and use 'clawperator-upgrade' before trying component-level repair commands.",
     "  - Start runtime-skill discovery with 'clawperator skills for-app <package_id>' when you know the Android package, or 'clawperator skills search --keyword <text>' when you do not.",
-    "  - If runtime-skill discovery returns no relevant match and you need guided authoring help, use 'clawperator agent-skills list' and start with 'skill-author-by-agent-discovery'.",
-    "  - Use 'skill-author-by-recording' only after discovery returns 'proceed_to_recording', or when the app route is already well understood and you need the proving workflow.",
+    "  - If runtime-skill discovery returns no relevant match and you need guided authoring help, use 'clawperator agent-skills list' and start with 'clawperator-skill-author-by-agent-discovery'.",
+    "  - Use 'clawperator-skill-author-by-recording' only after discovery returns 'proceed_to_recording', or when the app route is already well understood and you need the proving workflow.",
     "  - Use 'clawperator mcp serve' when the host already supports stdio MCP and wants registered Clawperator tools.",
     "  - operator setup is the canonical setup command. operator install remains an alias.",
     "  - recording is the canonical command family; 'record' is a supported short alias.",

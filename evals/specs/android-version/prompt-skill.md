@@ -57,9 +57,9 @@ discovery-to-proving route first:
 
    `clawperator agent-skills list --json`
 
-3. For this benchmark, `skill-author-by-agent-discovery` is the required
+3. For this benchmark, `clawperator-skill-author-by-agent-discovery` is the required
    discovery front door. It should decide whether to hand off to
-   `skill-author-by-recording` to prove a reusable authored skill for this
+   `clawperator-skill-author-by-recording` to prove a reusable authored skill for this
    device family.
 4. Do not bypass discovery by inventing a direct wrapper skill or a universal
    cross-device Settings skill.
@@ -68,7 +68,7 @@ discovery-to-proving route first:
    - runtime-skill discovery command(s)
    - `clawperator agent-skills list --json`
    - the discovery decision and why it blocked or handed off
-6. If `skill-author-by-agent-discovery` is unavailable, incomplete, or cannot
+6. If `clawperator-skill-author-by-agent-discovery` is unavailable, incomplete, or cannot
    truthfully finish the route yet, still return the Android version answer but
    omit the skill markers entirely after recording the blocking reason.
 
@@ -80,8 +80,8 @@ Use this exact evaluation posture:
 - Do not use web search for this benchmark. The local files and CLI surface are
   sufficient.
 - If you need local guidance, open only these files:
-  - `.agents/skills/skill-author-by-agent-discovery/SKILL.md`
-  - `.agents/skills/skill-author-by-recording/SKILL.md`
+  - `apps/node/bundled-skills/clawperator-skill-author-by-agent-discovery/SKILL.md`
+  - `apps/node/bundled-skills/clawperator-skill-author-by-recording/SKILL.md`
   - `apps/node/src/contracts/skillResult.ts`
   - `apps/node/src/test/fixtures/skills/com.test.skill-result/scripts/emit_skill_result.js`
 - Do not run `--help` on commands unless a command actually fails and you are

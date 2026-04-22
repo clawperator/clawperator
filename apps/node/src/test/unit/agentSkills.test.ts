@@ -42,8 +42,8 @@ describe("copyAgentSkills", () => {
     const sourceDir = await createSourceSkills(root, [
       "clawperator-agent-orientation",
       "clawperator-upgrade",
-      "skill-author-by-agent-discovery",
-      "skill-author-by-recording",
+      "clawperator-skill-author-by-agent-discovery",
+      "clawperator-skill-author-by-recording",
     ]);
     const installedDir = join(root, "home", ".clawperator", "agent-skills");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
@@ -63,27 +63,32 @@ describe("copyAgentSkills", () => {
     if (!result.ok) {
       assert.fail("expected successful copyAgentSkills result");
     }
-    assert.deepEqual(result.skills, ["clawperator-agent-orientation", "clawperator-upgrade", "skill-author-by-agent-discovery", "skill-author-by-recording"]);
+    assert.deepEqual(result.skills, [
+      "clawperator-agent-orientation",
+      "clawperator-skill-author-by-agent-discovery",
+      "clawperator-skill-author-by-recording",
+      "clawperator-upgrade",
+    ]);
     assert.equal(await readFile(join(installedDir, "clawperator-agent-orientation", "SKILL.md"), "utf8"), "# clawperator-agent-orientation\n");
     assert.equal(await readFile(join(installedDir, "clawperator-upgrade", "SKILL.md"), "utf8"), "# clawperator-upgrade\n");
-    assert.equal(await readFile(join(installedDir, "skill-author-by-agent-discovery", "SKILL.md"), "utf8"), "# skill-author-by-agent-discovery\n");
-    assert.equal(await readFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "utf8"), "# skill-author-by-recording\n");
+    assert.equal(await readFile(join(installedDir, "clawperator-skill-author-by-agent-discovery", "SKILL.md"), "utf8"), "# clawperator-skill-author-by-agent-discovery\n");
+    assert.equal(await readFile(join(installedDir, "clawperator-skill-author-by-recording", "SKILL.md"), "utf8"), "# clawperator-skill-author-by-recording\n");
     assert.equal(await readFile(join(installedDir, "clawperator-agent-orientation", "agents", "openai.yaml"), "utf8"), "name: demo\n");
     assert.equal(await readFile(join(installedDir, "clawperator-upgrade", "agents", "openai.yaml"), "utf8"), "name: demo\n");
-    assert.equal(await readFile(join(installedDir, "skill-author-by-agent-discovery", "agents", "openai.yaml"), "utf8"), "name: demo\n");
-    assert.equal(await readFile(join(installedDir, "skill-author-by-recording", "agents", "openai.yaml"), "utf8"), "name: demo\n");
+    assert.equal(await readFile(join(installedDir, "clawperator-skill-author-by-agent-discovery", "agents", "openai.yaml"), "utf8"), "name: demo\n");
+    assert.equal(await readFile(join(installedDir, "clawperator-skill-author-by-recording", "agents", "openai.yaml"), "utf8"), "name: demo\n");
     assert.equal(await readlink(join(claudeSkillsDir, "clawperator-agent-orientation")), join(installedDir, "clawperator-agent-orientation"));
     assert.equal(await readlink(join(claudeSkillsDir, "clawperator-upgrade")), join(installedDir, "clawperator-upgrade"));
-    assert.equal(await readlink(join(claudeSkillsDir, "skill-author-by-agent-discovery")), join(installedDir, "skill-author-by-agent-discovery"));
-    assert.equal(await readlink(join(claudeSkillsDir, "skill-author-by-recording")), join(installedDir, "skill-author-by-recording"));
+    assert.equal(await readlink(join(claudeSkillsDir, "clawperator-skill-author-by-agent-discovery")), join(installedDir, "clawperator-skill-author-by-agent-discovery"));
+    assert.equal(await readlink(join(claudeSkillsDir, "clawperator-skill-author-by-recording")), join(installedDir, "clawperator-skill-author-by-recording"));
     assert.equal(await readlink(join(codexSkillsDir, "clawperator-agent-orientation")), join(installedDir, "clawperator-agent-orientation"));
     assert.equal(await readlink(join(codexSkillsDir, "clawperator-upgrade")), join(installedDir, "clawperator-upgrade"));
-    assert.equal(await readlink(join(codexSkillsDir, "skill-author-by-agent-discovery")), join(installedDir, "skill-author-by-agent-discovery"));
-    assert.equal(await readlink(join(codexSkillsDir, "skill-author-by-recording")), join(installedDir, "skill-author-by-recording"));
+    assert.equal(await readlink(join(codexSkillsDir, "clawperator-skill-author-by-agent-discovery")), join(installedDir, "clawperator-skill-author-by-agent-discovery"));
+    assert.equal(await readlink(join(codexSkillsDir, "clawperator-skill-author-by-recording")), join(installedDir, "clawperator-skill-author-by-recording"));
     assert.equal(await readlink(join(agentsSkillsDir, "clawperator-agent-orientation")), join(installedDir, "clawperator-agent-orientation"));
     assert.equal(await readlink(join(agentsSkillsDir, "clawperator-upgrade")), join(installedDir, "clawperator-upgrade"));
-    assert.equal(await readlink(join(agentsSkillsDir, "skill-author-by-agent-discovery")), join(installedDir, "skill-author-by-agent-discovery"));
-    assert.equal(await readlink(join(agentsSkillsDir, "skill-author-by-recording")), join(installedDir, "skill-author-by-recording"));
+    assert.equal(await readlink(join(agentsSkillsDir, "clawperator-skill-author-by-agent-discovery")), join(installedDir, "clawperator-skill-author-by-agent-discovery"));
+    assert.equal(await readlink(join(agentsSkillsDir, "clawperator-skill-author-by-recording")), join(installedDir, "clawperator-skill-author-by-recording"));
   });
 
   it("ignores subdirectories without SKILL.md", async () => {
@@ -113,7 +118,7 @@ describe("copyAgentSkills", () => {
 
   it("writes version.txt with the current CLI version", async () => {
     const root = await makeTempRoot();
-    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
     const installedDir = join(root, "home", ".clawperator", "agent-skills");
 
     const result = await copyAgentSkills({
@@ -130,7 +135,7 @@ describe("copyAgentSkills", () => {
 
   it("creates ~/.claude/skills even when it does not exist", async () => {
     const root = await makeTempRoot();
-    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
 
     const result = await copyAgentSkills({
@@ -148,7 +153,7 @@ describe("copyAgentSkills", () => {
 
   it("creates the Codex skills dir at the default path when it does not exist", async () => {
     const root = await makeTempRoot();
-    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
     const homeDir = join(root, "home");
 
     const result = await copyAgentSkills({
@@ -165,7 +170,7 @@ describe("copyAgentSkills", () => {
 
   it("creates the Codex skills dir when CODEX_HOME is set", async () => {
     const root = await makeTempRoot();
-    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
     const codexHome = join(root, "custom-codex-home");
 
     const result = await copyAgentSkills({
@@ -183,7 +188,7 @@ describe("copyAgentSkills", () => {
 
   it("places a symlink in ~/.claude/skills/<skill-name> pointing to the installed skill dir", async () => {
     const root = await makeTempRoot();
-    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
     const installedDir = join(root, "home", ".clawperator", "agent-skills");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
 
@@ -198,14 +203,14 @@ describe("copyAgentSkills", () => {
 
     assert.equal(result.ok, true);
     assert.equal(
-      await readlink(join(claudeSkillsDir, "skill-author-by-recording")),
-      join(installedDir, "skill-author-by-recording")
+      await readlink(join(claudeSkillsDir, "clawperator-skill-author-by-recording")),
+      join(installedDir, "clawperator-skill-author-by-recording")
     );
   });
 
   it("is idempotent - running twice does not error and result is the same as running once", async () => {
     const root = await makeTempRoot();
-    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
     const options = {
       sourceDir,
       installedDir: join(root, "home", ".clawperator", "agent-skills"),
@@ -219,12 +224,12 @@ describe("copyAgentSkills", () => {
     const second = await copyAgentSkills(options);
 
     assert.deepEqual(second, first);
-    assert.equal(await readFile(join(options.installedDir, "skill-author-by-recording", "SKILL.md"), "utf8"), "# skill-author-by-recording\n");
+    assert.equal(await readFile(join(options.installedDir, "clawperator-skill-author-by-recording", "SKILL.md"), "utf8"), "# clawperator-skill-author-by-recording\n");
   });
 
   it("normalizes relative directory overrides so managed symlinks remain idempotent", async () => {
     const root = await makeTempRoot();
-    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
     const installedDir = join(root, "home", ".clawperator", "agent-skills");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
     const codexSkillsDir = join(root, "home", ".codex", "skills");
@@ -243,7 +248,7 @@ describe("copyAgentSkills", () => {
 
     assert.equal(first.ok, true);
     assert.deepEqual(second, first);
-    assert.equal(await readlink(join(claudeSkillsDir, "skill-author-by-recording")), resolve(installedDir, "skill-author-by-recording"));
+    assert.equal(await readlink(join(claudeSkillsDir, "clawperator-skill-author-by-recording")), resolve(installedDir, "clawperator-skill-author-by-recording"));
   });
 
   it("returns an error result when the npm package source dir does not exist", async () => {
@@ -288,7 +293,7 @@ describe("copyAgentSkills", () => {
 
   it("removes stale installed skills that are no longer present in the packaged source", async () => {
     const root = await makeTempRoot();
-    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
     const installedDir = join(root, "home", ".clawperator", "agent-skills");
     const staleSkillDir = join(installedDir, "old-skill");
     await mkdir(staleSkillDir, { recursive: true });
@@ -307,9 +312,62 @@ describe("copyAgentSkills", () => {
     await assert.rejects(() => stat(staleSkillDir));
   });
 
+  it("removes stale pre-rename skill installs and managed discovery symlinks", async () => {
+    const root = await makeTempRoot();
+    const sourceDir = await createSourceSkills(root, [
+      "clawperator-agent-orientation",
+      "clawperator-upgrade",
+      "clawperator-skill-author-by-agent-discovery",
+      "clawperator-skill-author-by-recording",
+    ]);
+    const installedDir = join(root, "home", ".clawperator", "agent-skills");
+    const claudeSkillsDir = join(root, "home", ".claude", "skills");
+    const codexSkillsDir = join(root, "home", ".codex", "skills");
+    const agentsSkillsDir = join(root, "home", ".agents", "skills");
+    const oldDiscoveryDir = join(installedDir, "skill-author-by-agent-discovery");
+    const oldRecordingDir = join(installedDir, "skill-author-by-recording");
+
+    await mkdir(oldDiscoveryDir, { recursive: true });
+    await mkdir(oldRecordingDir, { recursive: true });
+    await writeFile(join(oldDiscoveryDir, "SKILL.md"), "# skill-author-by-agent-discovery\n", "utf8");
+    await writeFile(join(oldRecordingDir, "SKILL.md"), "# skill-author-by-recording\n", "utf8");
+
+    for (const dir of [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]) {
+      await mkdir(dir, { recursive: true });
+      await symlink(oldDiscoveryDir, join(dir, "skill-author-by-agent-discovery"), directorySymlinkType);
+      await symlink(oldRecordingDir, join(dir, "skill-author-by-recording"), directorySymlinkType);
+    }
+
+    const result = await copyAgentSkills({
+      sourceDir,
+      installedDir,
+      claudeSkillsDir,
+      codexSkillsDir,
+      agentsSkillsDir,
+      cliVersion: "1.2.3",
+    });
+
+    assert.equal(result.ok, true);
+    await assert.rejects(() => stat(oldDiscoveryDir));
+    await assert.rejects(() => stat(oldRecordingDir));
+
+    for (const dir of [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]) {
+      await assert.rejects(() => stat(join(dir, "skill-author-by-agent-discovery")));
+      await assert.rejects(() => stat(join(dir, "skill-author-by-recording")));
+      assert.equal(
+        await readlink(join(dir, "clawperator-skill-author-by-agent-discovery")),
+        join(installedDir, "clawperator-skill-author-by-agent-discovery")
+      );
+      assert.equal(
+        await readlink(join(dir, "clawperator-skill-author-by-recording")),
+        join(installedDir, "clawperator-skill-author-by-recording")
+      );
+    }
+  });
+
   it("does not delete unrelated user-managed symlinks from shared agent skill directories", async () => {
     const root = await makeTempRoot();
-    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
     const codexSkillsDir = join(root, "home", ".codex", "skills");
     const agentsSkillsDir = join(root, "home", ".agents", "skills");
@@ -339,11 +397,11 @@ describe("copyAgentSkills", () => {
 
   it("refuses to overwrite an existing non-Clawperator skill entry with the same basename", async () => {
     const root = await makeTempRoot();
-    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
     const codexSkillsDir = join(root, "home", ".codex", "skills");
     const agentsSkillsDir = join(root, "home", ".agents", "skills");
-    await mkdir(join(claudeSkillsDir, "skill-author-by-recording"), { recursive: true });
+    await mkdir(join(claudeSkillsDir, "clawperator-skill-author-by-recording"), { recursive: true });
     await mkdir(codexSkillsDir, { recursive: true });
     await mkdir(agentsSkillsDir, { recursive: true });
 
@@ -360,26 +418,26 @@ describe("copyAgentSkills", () => {
     assert.deepEqual(result, {
       ok: false,
       code: "AGENT_SKILLS_INSTALL_FAILED",
-      message: `Refusing to overwrite non-Clawperator skill entry: ${join(claudeSkillsDir, "skill-author-by-recording")}`,
+      message: `Refusing to overwrite non-Clawperator skill entry: ${join(claudeSkillsDir, "clawperator-skill-author-by-recording")}`,
     });
-    assert.equal((await stat(join(claudeSkillsDir, "skill-author-by-recording"))).isDirectory(), true);
+    assert.equal((await stat(join(claudeSkillsDir, "clawperator-skill-author-by-recording"))).isDirectory(), true);
   });
 
   it("replaces a broken managed symlink instead of failing with EEXIST", async () => {
     const root = await makeTempRoot();
-    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
     const installedDir = join(root, "home", ".clawperator", "agent-skills");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
     const codexSkillsDir = join(root, "home", ".codex", "skills");
     const agentsSkillsDir = join(root, "home", ".agents", "skills");
-    const targetSkillDir = join(installedDir, "skill-author-by-recording");
+    const targetSkillDir = join(installedDir, "clawperator-skill-author-by-recording");
 
     await mkdir(claudeSkillsDir, { recursive: true });
     await mkdir(codexSkillsDir, { recursive: true });
     await mkdir(agentsSkillsDir, { recursive: true });
-    await symlink(targetSkillDir, join(claudeSkillsDir, "skill-author-by-recording"), directorySymlinkType);
-    await symlink(targetSkillDir, join(codexSkillsDir, "skill-author-by-recording"), directorySymlinkType);
-    await symlink(targetSkillDir, join(agentsSkillsDir, "skill-author-by-recording"), directorySymlinkType);
+    await symlink(targetSkillDir, join(claudeSkillsDir, "clawperator-skill-author-by-recording"), directorySymlinkType);
+    await symlink(targetSkillDir, join(codexSkillsDir, "clawperator-skill-author-by-recording"), directorySymlinkType);
+    await symlink(targetSkillDir, join(agentsSkillsDir, "clawperator-skill-author-by-recording"), directorySymlinkType);
 
     const result = await copyAgentSkills({
       sourceDir,
@@ -391,17 +449,17 @@ describe("copyAgentSkills", () => {
     });
 
     assert.equal(result.ok, true);
-    assert.equal(await readlink(join(claudeSkillsDir, "skill-author-by-recording")), targetSkillDir);
-    assert.equal(await readlink(join(codexSkillsDir, "skill-author-by-recording")), targetSkillDir);
-    assert.equal(await readlink(join(agentsSkillsDir, "skill-author-by-recording")), targetSkillDir);
-    assert.equal(await readFile(join(targetSkillDir, "SKILL.md"), "utf8"), "# skill-author-by-recording\n");
+    assert.equal(await readlink(join(claudeSkillsDir, "clawperator-skill-author-by-recording")), targetSkillDir);
+    assert.equal(await readlink(join(codexSkillsDir, "clawperator-skill-author-by-recording")), targetSkillDir);
+    assert.equal(await readlink(join(agentsSkillsDir, "clawperator-skill-author-by-recording")), targetSkillDir);
+    assert.equal(await readFile(join(targetSkillDir, "SKILL.md"), "utf8"), "# clawperator-skill-author-by-recording\n");
   });
 
   it("preflights discovery conflicts before replacing an already installed skill", async () => {
     const root = await makeTempRoot();
-    const sourceDir = await createSourceSkill(root, "skill-author-by-recording");
+    const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
     const installedDir = join(root, "home", ".clawperator", "agent-skills");
-    const targetSkillDir = join(installedDir, "skill-author-by-recording");
+    const targetSkillDir = join(installedDir, "clawperator-skill-author-by-recording");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
     const codexSkillsDir = join(root, "home", ".codex", "skills");
     const agentsSkillsDir = join(root, "home", ".agents", "skills");
@@ -411,7 +469,7 @@ describe("copyAgentSkills", () => {
     await mkdir(claudeSkillsDir, { recursive: true });
     await mkdir(codexSkillsDir, { recursive: true });
     await mkdir(agentsSkillsDir, { recursive: true });
-    await mkdir(join(codexSkillsDir, "skill-author-by-recording"), { recursive: true });
+    await mkdir(join(codexSkillsDir, "clawperator-skill-author-by-recording"), { recursive: true });
 
     const result = await copyAgentSkills({
       sourceDir,
@@ -425,7 +483,7 @@ describe("copyAgentSkills", () => {
     assert.deepEqual(result, {
       ok: false,
       code: "AGENT_SKILLS_INSTALL_FAILED",
-      message: `Refusing to overwrite non-Clawperator skill entry: ${join(codexSkillsDir, "skill-author-by-recording")}`,
+      message: `Refusing to overwrite non-Clawperator skill entry: ${join(codexSkillsDir, "clawperator-skill-author-by-recording")}`,
     });
     assert.equal(await readFile(join(targetSkillDir, "SKILL.md"), "utf8"), "# existing-installed-version\n");
   });
@@ -437,8 +495,8 @@ describe("cmdAgentSkillsInstall", () => {
     const sourceDir = await createSourceSkills(root, [
       "clawperator-agent-orientation",
       "clawperator-upgrade",
-      "skill-author-by-agent-discovery",
-      "skill-author-by-recording",
+      "clawperator-skill-author-by-agent-discovery",
+      "clawperator-skill-author-by-recording",
     ]);
     const installedDir = join(root, "home", ".clawperator", "agent-skills");
     const claudeSkillsDir = join(root, "home", ".claude", "skills");
@@ -463,7 +521,12 @@ describe("cmdAgentSkillsInstall", () => {
       agentDiscoveryDirs: Array<{ label: string; dir: string }>;
     };
 
-    assert.deepEqual(parsed.skills, ["clawperator-agent-orientation", "clawperator-upgrade", "skill-author-by-agent-discovery", "skill-author-by-recording"]);
+    assert.deepEqual(parsed.skills, [
+      "clawperator-agent-orientation",
+      "clawperator-skill-author-by-agent-discovery",
+      "clawperator-skill-author-by-recording",
+      "clawperator-upgrade",
+    ]);
     assert.equal(parsed.installedDir, installedDir);
     assert.equal(parsed.claudeSkillsDir, claudeSkillsDir);
     assert.equal(parsed.codexSkillsDir, codexSkillsDir);
@@ -487,7 +550,7 @@ describe("cmdAgentSkillsList", () => {
       skills: [],
       count: 0,
       installedDir: join(root, "missing-install-dir"),
-      message: "No installed agent-skills found. Run clawperator agent-skills install to get clawperator-agent-orientation, clawperator-upgrade, skill-author-by-agent-discovery, and skill-author-by-recording.",
+      message: "No installed agent-skills found. Run clawperator agent-skills install to get clawperator-agent-orientation, clawperator-upgrade, clawperator-skill-author-by-agent-discovery, and clawperator-skill-author-by-recording.",
     });
   });
 
@@ -496,16 +559,16 @@ describe("cmdAgentSkillsList", () => {
     const installDir = join(root, "home", ".clawperator", "agent-skills");
     const orientationDir = join(installDir, "clawperator-agent-orientation");
     const upgradeDir = join(installDir, "clawperator-upgrade");
-    const discoveryDir = join(installDir, "skill-author-by-agent-discovery");
-    const skillDir = join(installDir, "skill-author-by-recording");
+    const discoveryDir = join(installDir, "clawperator-skill-author-by-agent-discovery");
+    const skillDir = join(installDir, "clawperator-skill-author-by-recording");
     await mkdir(orientationDir, { recursive: true });
     await mkdir(upgradeDir, { recursive: true });
     await mkdir(discoveryDir, { recursive: true });
     await mkdir(skillDir, { recursive: true });
     await writeFile(join(orientationDir, "SKILL.md"), "# clawperator-agent-orientation\n", "utf8");
     await writeFile(join(upgradeDir, "SKILL.md"), "# clawperator-upgrade\n", "utf8");
-    await writeFile(join(discoveryDir, "SKILL.md"), "# skill-author-by-agent-discovery\n", "utf8");
-    await writeFile(join(skillDir, "SKILL.md"), "# skill-author-by-recording\n", "utf8");
+    await writeFile(join(discoveryDir, "SKILL.md"), "# clawperator-skill-author-by-agent-discovery\n", "utf8");
+    await writeFile(join(skillDir, "SKILL.md"), "# clawperator-skill-author-by-recording\n", "utf8");
 
     const output = await cmdAgentSkillsList({
       format: "json",
@@ -519,16 +582,16 @@ describe("cmdAgentSkillsList", () => {
           skillPath: join(orientationDir, "SKILL.md"),
         },
         {
-          name: "clawperator-upgrade",
-          skillPath: join(upgradeDir, "SKILL.md"),
-        },
-        {
-          name: "skill-author-by-agent-discovery",
+          name: "clawperator-skill-author-by-agent-discovery",
           skillPath: join(discoveryDir, "SKILL.md"),
         },
         {
-          name: "skill-author-by-recording",
+          name: "clawperator-skill-author-by-recording",
           skillPath: join(skillDir, "SKILL.md"),
+        },
+        {
+          name: "clawperator-upgrade",
+          skillPath: join(upgradeDir, "SKILL.md"),
         },
       ],
       count: 4,
@@ -558,6 +621,11 @@ describe("cmdAgentSkillsList", () => {
 describe("listPackagedAgentSkills", () => {
   it("lists all packaged first-party agent-skills from the repo tree", async () => {
     const skills = await listPackagedAgentSkills();
-    assert.deepEqual(skills, ["clawperator-agent-orientation", "clawperator-upgrade", "skill-author-by-agent-discovery", "skill-author-by-recording"]);
+    assert.deepEqual(skills, [
+      "clawperator-agent-orientation",
+      "clawperator-skill-author-by-agent-discovery",
+      "clawperator-skill-author-by-recording",
+      "clawperator-upgrade",
+    ]);
   });
 });

@@ -1,6 +1,6 @@
 ---
 name: clawperator-agent-orientation
-description: First-run orientation for unfamiliar agents. Verifies host readiness, routes to the correct front door (runtime skills, agent-skills, MCP, or raw CLI), and ends with one canonical doc link.
+description: Clawperator first-party bundled skill. First-run orientation for unfamiliar agents. Verifies host readiness, routes to the correct front door (runtime skills, agent-skills, MCP, or raw CLI), and ends with one canonical doc link.
 ---
 
 # Clawperator Agent Orientation
@@ -24,8 +24,8 @@ which canonical docs to trust."
 - do not restate API contracts or action parameters in full
 - do not replace `https://docs.clawperator.com/host-agents/` as the source of truth
 - do not replace runtime-skill discovery with a generic inventory dump
-- do not replace `skill-author-by-agent-discovery`
-- do not replace `skill-author-by-recording`
+- do not replace `clawperator-skill-author-by-agent-discovery`
+- do not replace `clawperator-skill-author-by-recording`
 - do not run an unbounded discovery or authoring workflow inside this skill
 
 ## Workflow
@@ -64,8 +64,8 @@ Use this decision table:
 | Situation | Start here |
 | --- | --- |
 | You are trying to solve a user-facing app workflow and want an installed runtime skill first | `clawperator skills for-app <package_id> --json` or `clawperator skills search --keyword <text> --json` |
-| Runtime-skill discovery found no relevant match and you need the truthful zero-results route | `skill-author-by-agent-discovery` |
-| Discovery returned `proceed_to_recording`, or the app route is already well understood and now needs a proving workflow | `skill-author-by-recording` |
+| Runtime-skill discovery found no relevant match and you need the truthful zero-results route | `clawperator-skill-author-by-agent-discovery` |
+| Discovery returned `proceed_to_recording`, or the app route is already well understood and now needs a proving workflow | `clawperator-skill-author-by-recording` |
 | The host already supports stdio MCP and wants registered tools | `clawperator mcp serve` |
 | You already know the exact direct action or payload you want | raw CLI / local API via quickstart |
 
@@ -73,8 +73,8 @@ Runtime skills and agent-skills are different surfaces:
 
 - `clawperator skills ...` is for installed runtime app workflows
 - `clawperator agent-skills ...` is for host-agent helpers around Clawperator itself
-- `skill-author-by-agent-discovery` is the zero-results route after runtime-skill discovery found no relevant match
-- `skill-author-by-recording` is the proving workflow after discovery says to record, or when the route is already well understood
+- `clawperator-skill-author-by-agent-discovery` is the zero-results route after runtime-skill discovery found no relevant match
+- `clawperator-skill-author-by-recording` is the proving workflow after discovery says to record, or when the route is already well understood
 
 ### 3. Run the smallest truthful first probe for that route
 
@@ -106,8 +106,8 @@ actions, and acts on the device with the smallest truthful command surface.
 Name one command or one URL - not a taxonomy. Examples of good endings:
 
 - "Your next step is `clawperator skills for-app <package_id> --json`."
-- "Runtime-skill discovery returned zero matches. Use `skill-author-by-agent-discovery` next. See `https://docs.clawperator.com/host-agents/`."
-- "The route is already known. Use `skill-author-by-recording` next. See `https://docs.clawperator.com/skills/authoring/`."
+- "Runtime-skill discovery returned zero matches. Use `clawperator-skill-author-by-agent-discovery` next. See `https://docs.clawperator.com/host-agents/`."
+- "The route is already known. Use `clawperator-skill-author-by-recording` next. See `https://docs.clawperator.com/skills/authoring/`."
 - "Your host wants MCP tools. Start `clawperator mcp serve` and use `https://docs.clawperator.com/api/mcp/`."
 - "You are ready for raw actions. See `https://docs.clawperator.com/quickstart/`."
 
@@ -120,7 +120,7 @@ Be concise. Name the chosen front door explicitly and end with one link:
 | Chosen front door | End with this link |
 | --- | --- |
 | `clawperator skills` | `https://docs.clawperator.com/host-agents/` |
-| `skill-author-by-agent-discovery` | `https://docs.clawperator.com/host-agents/` |
-| `skill-author-by-recording` | `https://docs.clawperator.com/skills/authoring/` |
+| `clawperator-skill-author-by-agent-discovery` | `https://docs.clawperator.com/host-agents/` |
+| `clawperator-skill-author-by-recording` | `https://docs.clawperator.com/skills/authoring/` |
 | `clawperator mcp serve` | `https://docs.clawperator.com/api/mcp/` |
 | raw CLI / direct actions | `https://docs.clawperator.com/quickstart/` |

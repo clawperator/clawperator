@@ -12,8 +12,8 @@
     "skill_start_marker": "CLAWPERATOR_SKILL_START",
     "skill_end_marker": "CLAWPERATOR_SKILL_END",
     "replay_timeout_s": 60,
-    "required_authoring_front_door": "skill-author-by-agent-discovery",
-    "required_proving_handoff": "skill-author-by-recording",
+    "required_authoring_front_door": "clawperator-skill-author-by-agent-discovery",
+    "required_proving_handoff": "clawperator-skill-author-by-recording",
     "target_app_package": "com.android.settings",
     "target_skill_scope": "target-specific Settings/About-device authored skill"
   },

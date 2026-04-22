@@ -139,8 +139,8 @@ describe("CLI help", () => {
     assert.match(stdout, /clawperator-upgrade/);
     assert.match(stdout, /skills for-app <package_id>/);
     assert.match(stdout, /agent-skills list/);
-    assert.match(stdout, /skill-author-by-agent-discovery/);
-    assert.match(stdout, /skill-author-by-recording/);
+    assert.match(stdout, /clawperator-skill-author-by-agent-discovery/);
+    assert.match(stdout, /clawperator-skill-author-by-recording/);
     assert.match(stdout, /mcp serve/);
   });
 
@@ -236,8 +236,8 @@ describe("CLI help", () => {
     assert.match(stdout, /clawperator-agent-orientation/);
     assert.match(stdout, /clawperator-upgrade/);
     assert.match(stdout, /agent-skills list/);
-    assert.match(stdout, /skill-author-by-agent-discovery/);
-    assert.match(stdout, /skill-author-by-recording/);
+    assert.match(stdout, /clawperator-skill-author-by-agent-discovery/);
+    assert.match(stdout, /clawperator-skill-author-by-recording/);
     assert.match(stdout, /clawperator mcp serve/);
     assert.match(stdout, /https:\/\/docs\.clawperator\.com\/host-agents\//);
   });
@@ -249,8 +249,8 @@ describe("CLI help", () => {
     assert.match(stdout, /agent-skills list/);
     assert.match(stdout, /clawperator-agent-orientation/);
     assert.match(stdout, /clawperator-upgrade/);
-    assert.match(stdout, /skill-author-by-agent-discovery/);
-    assert.match(stdout, /skill-author-by-recording/);
+    assert.match(stdout, /clawperator-skill-author-by-agent-discovery/);
+    assert.match(stdout, /clawperator-skill-author-by-recording/);
     assert.match(stdout, /Runtime skills still live under 'clawperator skills/);
     assert.match(stdout, /https:\/\/docs\.clawperator\.com\/skills\/authoring\//);
   });
@@ -261,8 +261,8 @@ describe("CLI help", () => {
     assert.match(stdout, /clawperator skills new/);
     assert.match(stdout, /low-level manual scaffold/i);
     assert.match(stdout, /agent-skills list/);
-    assert.match(stdout, /skill-author-by-agent-discovery/);
-    assert.match(stdout, /skill-author-by-recording/);
+    assert.match(stdout, /clawperator-skill-author-by-agent-discovery/);
+    assert.match(stdout, /clawperator-skill-author-by-recording/);
   });
 
   it("inspect ui --help falls back to top-level help", async () => {

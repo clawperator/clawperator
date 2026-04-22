@@ -424,7 +424,7 @@ def _validate_discovery_artifact(
         if isinstance(skill_generation, dict) and isinstance(skill_generation.get("required_proving_handoff"), str)
         else None
     )
-    expected_recording_handoff = required_proving_handoff or "skill-author-by-recording"
+    expected_recording_handoff = required_proving_handoff or "clawperator-skill-author-by-recording"
 
     target_app_package = artifact.get("target_app_package")
     if not isinstance(target_app_package, dict):
@@ -538,9 +538,9 @@ def _validate_discovery_artifact(
 
     recommended_next_step = artifact.get("recommended_next_step")
     handoff_target = artifact.get("handoff_target")
-    if handoff_target not in {"skill-author-by-recording", "raw-clawperator", "human", "none"}:
+    if handoff_target not in {"clawperator-skill-author-by-recording", "raw-clawperator", "human", "none"}:
         errors.append(
-            "discovery artifact handoff_target must be one of `skill-author-by-recording`, `raw-clawperator`, `human`, or `none`"
+            "discovery artifact handoff_target must be one of `clawperator-skill-author-by-recording`, `raw-clawperator`, `human`, or `none`"
         )
     if recommended_next_step not in {
         "use_existing_skill",

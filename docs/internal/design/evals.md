@@ -203,7 +203,7 @@ artifacts are skipped and do not block stdout or stderr answer extraction.
 - For Pack A, the existing `android-version` benchmark is the required red and
   then green proving surface for discovery-authored Settings/About-device
   skills. The benchmark stays on the existing eval id, uses
-  `prompt-skill.md`, and treats `skill-author-by-agent-discovery` as the
+  `prompt-skill.md`, and treats `clawperator-skill-author-by-agent-discovery` as the
   required discovery front door before any skill can be emitted.
 - Pack A confidence requires explicit-device runs on one AOSP emulator and one
   Samsung physical device. Keep the emulator path in `evals-run` and the
