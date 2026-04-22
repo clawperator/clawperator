@@ -623,254 +623,6 @@ setup_bundled_skills_via_cli() {
     return 0
 }
 
-append_runtime_skills_guide() {
-    local AGENT_GUIDE_PATH="$1"
-    local RUNTIME_SKILLS_REGISTRY_PATH=""
-    local RUNTIME_SKILLS_REGISTRY_HINT_PATH=""
-    local RUNTIME_GUIDE_TMP=""
-
-    cat >> "$AGENT_GUIDE_PATH" <<'EOF'
-
-## Runtime Skills
-
-Use the installed runtime-skill registry to discover and run app workflows:
-- `clawperator skills list`
-- `clawperator skills search --keyword "<term>"`
-- `clawperator skills get <id>`
-- `clawperator skills run <id>`
-EOF
-
-    RUNTIME_SKILLS_REGISTRY_PATH="$(resolve_runtime_skills_registry_path)"
-    RUNTIME_SKILLS_REGISTRY_HINT_PATH="$(resolve_runtime_skills_registry_hint_path)"
-
-    if [ ! -r "$RUNTIME_SKILLS_REGISTRY_PATH" ]; then
-        cat >> "$AGENT_GUIDE_PATH" <<EOF
-
-Runtime skills not available on this host right now.
-Expected registry path:
-\`${RUNTIME_SKILLS_REGISTRY_HINT_PATH}\`
-
-Repair or manual bootstrap:
-- run \`clawperator skills install\`
-EOF
-        return 0
-    fi
-
-    RUNTIME_GUIDE_TMP="$(mktemp "${TMPDIR:-/tmp}/clawperator-runtime-skills.XXXXXX")"
-    register_temp_file "$RUNTIME_GUIDE_TMP"
-
-    if node - "$RUNTIME_SKILLS_REGISTRY_PATH" > "$RUNTIME_GUIDE_TMP" 2>/dev/null <<'EOF'
-const fs = require("fs");
-
-const registryPath = process.argv[2];
-const registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
-if (!registry || !Array.isArray(registry.skills)) {
-  throw new Error("skills array required");
-}
-
-const byApplication = new Map();
-for (const skill of registry.skills) {
-  if (!skill || typeof skill !== "object") {
-    continue;
-  }
-
-  const applicationId = typeof skill.applicationId === "string" && skill.applicationId.length > 0
-    ? skill.applicationId
-    : "unknown.application";
-  const skillList = byApplication.get(applicationId) || [];
-  skillList.push(skill);
-  byApplication.set(applicationId, skillList);
-}
-
-const applicationIds = Array.from(byApplication.keys()).sort((a, b) => a.localeCompare(b));
-
-function toCliFlagName(inputName) {
-  return inputName.replace(/_/g, "-");
-}
-
-function normalizeGuideValue(value) {
-  return String(value).replace(/\r\n?/g, "\n");
-}
-
-function printLiteralBlock(value, indent = "") {
-  const normalized = normalizeGuideValue(value);
-  const literalIndent = `${indent}    `;
-  console.log(literalIndent);
-  for (const line of normalized.split("\n")) {
-    console.log(literalIndent + line);
-  }
-}
-
-function buildSkillRunExample(skill) {
-  const id = typeof skill.id === "string" && skill.id.length > 0 ? skill.id : "unknown-skill";
-  const contract = skill && typeof skill.contract === "object" && skill.contract !== null ? skill.contract : null;
-  const inputs = contract && typeof contract.inputs === "object" && contract.inputs !== null
-    ? Object.keys(contract.inputs).sort((left, right) => left.localeCompare(right))
-    : [];
-  const args = inputs.map((inputName) => `--${toCliFlagName(inputName)} <${inputName}>`);
-  return ["clawperator", "skills", "run", id, ...args].join(" ");
-}
-
-console.log("");
-console.log("Registry path:");
-printLiteralBlock(registryPath);
-console.log("");
-console.log("Inspect required inputs before running with `clawperator skills get <id>`.");
-
-if (applicationIds.length === 0) {
-  console.log("");
-  console.log("Runtime skills registry is present, but it does not contain any installed skills.");
-  process.exit(0);
-}
-
-for (const applicationId of applicationIds) {
-  const skills = byApplication.get(applicationId).slice().sort((left, right) => {
-    const leftIntent = typeof left.intent === "string" ? left.intent : "";
-    const rightIntent = typeof right.intent === "string" ? right.intent : "";
-    if (leftIntent !== rightIntent) {
-      return leftIntent.localeCompare(rightIntent);
-    }
-    const leftId = typeof left.id === "string" ? left.id : "";
-    const rightId = typeof right.id === "string" ? right.id : "";
-    return leftId.localeCompare(rightId);
-  });
-
-  console.log("");
-  console.log("### Application");
-  console.log("");
-  console.log("App ID:");
-  printLiteralBlock(applicationId);
-  console.log("");
-
-  for (const skill of skills) {
-    const id = typeof skill.id === "string" && skill.id.length > 0 ? skill.id : "unknown-skill";
-    const intent = typeof skill.intent === "string" && skill.intent.length > 0 ? skill.intent : "unknown";
-    const summary = typeof skill.summary === "string" && skill.summary.length > 0
-      ? skill.summary
-      : "No summary provided.";
-    console.log("- Skill");
-    console.log("  id:");
-    printLiteralBlock(id, "  ");
-    console.log("  intent:");
-    printLiteralBlock(intent, "  ");
-    console.log("  summary:");
-    printLiteralBlock(summary, "  ");
-    console.log("  example:");
-    printLiteralBlock(buildSkillRunExample(skill), "  ");
-  }
-}
-EOF
-    then
-        cat "$RUNTIME_GUIDE_TMP" >> "$AGENT_GUIDE_PATH"
-        rm -f "$RUNTIME_GUIDE_TMP"
-        return 0
-    fi
-
-    rm -f "$RUNTIME_GUIDE_TMP"
-
-    cat >> "$AGENT_GUIDE_PATH" <<EOF
-
-Runtime skills not available on this host right now.
-Expected registry path:
-\`${RUNTIME_SKILLS_REGISTRY_PATH}\`
-
-The registry exists but could not be read.
-Repair or manual bootstrap:
-- run \`clawperator skills install\`
-EOF
-}
-
-trim_shell_value() {
-    printf '%s' "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
-}
-
-resolve_previous_install_state_registry_path() {
-    local INSTALL_STATE_PATH="$HOME/.clawperator/install-state.json"
-
-    if [ ! -r "$INSTALL_STATE_PATH" ]; then
-        printf '%s\n' ""
-        return 0
-    fi
-
-    node - "$INSTALL_STATE_PATH" <<'EOF' 2>/dev/null || true
-const fs = require("fs");
-
-const [installStatePath] = process.argv.slice(2);
-const installState = JSON.parse(fs.readFileSync(installStatePath, "utf8"));
-if (installState && typeof installState.registryPath === "string" && installState.registryPath.length > 0) {
-  console.log(installState.registryPath);
-}
-EOF
-}
-
-resolve_configured_runtime_skills_registry_path() {
-    local CONFIGURED_PATH="${CLAWPERATOR_SKILLS_REGISTRY:-}"
-    local TRIMMED_PATH=""
-
-    if [ -z "${CLAWPERATOR_SKILLS_REGISTRY+x}" ]; then
-        printf '%s\n' ""
-        return 0
-    fi
-
-    TRIMMED_PATH="$(trim_shell_value "$CONFIGURED_PATH")"
-    if [ -z "$TRIMMED_PATH" ]; then
-        if [ "${BLANK_RUNTIME_SKILLS_REGISTRY_WARNED:-0}" -eq 0 ]; then
-            echo -e "${YELLOW}Warning: CLAWPERATOR_SKILLS_REGISTRY is set but blank; ignoring it for onboarding artifacts.${NC}" >&2
-            BLANK_RUNTIME_SKILLS_REGISTRY_WARNED=1
-        fi
-        printf '%s\n' ""
-        return 0
-    fi
-    printf '%s\n' "$TRIMMED_PATH"
-}
-
-resolve_runtime_skills_registry_hint_path() {
-    local DEFAULT_RUNTIME_SKILLS_REGISTRY_PATH="$HOME/.clawperator/skills/skills/skills-registry.json"
-    local CANDIDATE=""
-
-    for CANDIDATE in \
-        "${SKILLS_REGISTRY_PATH:-}" \
-        "$(resolve_configured_runtime_skills_registry_path)" \
-        "$(resolve_previous_install_state_registry_path)" \
-        "$DEFAULT_RUNTIME_SKILLS_REGISTRY_PATH"; do
-        if [ -n "$CANDIDATE" ]; then
-            printf '%s\n' "$CANDIDATE"
-            return 0
-        fi
-    done
-
-    printf '%s\n' "$DEFAULT_RUNTIME_SKILLS_REGISTRY_PATH"
-}
-
-resolve_runtime_skills_registry_path() {
-    local CANDIDATE=""
-
-    for CANDIDATE in \
-        "${SKILLS_REGISTRY_PATH:-}" \
-        "$(resolve_configured_runtime_skills_registry_path)" \
-        "$(resolve_previous_install_state_registry_path)" \
-        "$HOME/.clawperator/skills/skills/skills-registry.json"; do
-        if [ -n "$CANDIDATE" ] && [ -r "$CANDIDATE" ]; then
-            printf '%s\n' "$CANDIDATE"
-            return 0
-        fi
-    done
-
-    printf '%s\n' ""
-}
-
-ensure_private_clawperator_dir() {
-    mkdir -p "$HOME/.clawperator"
-    chmod 700 "$HOME/.clawperator" 2>/dev/null || true
-}
-
-secure_host_artifact_path() {
-    local ARTIFACT_PATH="$1"
-    if [ -f "$ARTIFACT_PATH" ]; then
-        chmod 600 "$ARTIFACT_PATH" 2>/dev/null || true
-    fi
-}
-
 resolve_cli_version() {
     local CLI_VERSION_OUTPUT=""
     local CLI_VERSION_LINE=""
@@ -886,61 +638,7 @@ resolve_cli_version() {
     printf '%s\n' ""
 }
 
-write_install_state() {
-    local INSTALL_STATE_PATH="$HOME/.clawperator/install-state.json"
-    local INSTALLED_AT
-    local CLI_VERSION
-    local REGISTRY_PATH_VALUE=""
-    local APK_VERSION_VALUE="${OPERATOR_VERSION:-}"
-    local LAST_DEVICE_SERIAL_VALUE="${LAST_DEVICE_SERIAL:-}"
-
-    ensure_private_clawperator_dir
-
-    INSTALLED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-    CLI_VERSION="$(resolve_cli_version)"
-    REGISTRY_PATH_VALUE="$(resolve_runtime_skills_registry_path)"
-
-    INSTALL_STATE_INSTALLED_AT="$INSTALLED_AT" \
-    INSTALL_STATE_CLI_VERSION="$CLI_VERSION" \
-    INSTALL_STATE_REGISTRY_PATH="$REGISTRY_PATH_VALUE" \
-    INSTALL_STATE_APK_VERSION="$APK_VERSION_VALUE" \
-    INSTALL_STATE_LAST_DEVICE_SERIAL="$LAST_DEVICE_SERIAL_VALUE" \
-    node - "$INSTALL_STATE_PATH" <<'EOF'
-const fs = require("fs");
-
-const [installStatePath] = process.argv.slice(2);
-
-function requiredEnv(name) {
-  const value = process.env[name];
-  if (typeof value !== "string" || value.length === 0) {
-    throw new Error(`Missing required install-state field: ${name}`);
-  }
-  return value;
-}
-
-function nullableEnv(name) {
-  const value = process.env[name];
-  return typeof value === "string" && value.length > 0 ? value : null;
-}
-
-const installState = {
-  schemaVersion: 1,
-  installedAt: requiredEnv("INSTALL_STATE_INSTALLED_AT"),
-  cliVersion: nullableEnv("INSTALL_STATE_CLI_VERSION"),
-  registryPath: nullableEnv("INSTALL_STATE_REGISTRY_PATH"),
-  apkVersion: nullableEnv("INSTALL_STATE_APK_VERSION"),
-  lastDeviceSerial: nullableEnv("INSTALL_STATE_LAST_DEVICE_SERIAL"),
-};
-
-fs.writeFileSync(installStatePath, JSON.stringify(installState, null, 2) + "\n");
-EOF
-
-    secure_host_artifact_path "$INSTALL_STATE_PATH"
-
-    echo -e "${GREEN}✅ Wrote install state to ${INSTALL_STATE_PATH}.${NC}"
-}
-
-resolve_adb_path_for_mcp() {
+resolve_adb_path_for_host_artifacts() {
     if command -v adb > /dev/null 2>&1; then
         command -v adb
         return 0
@@ -949,407 +647,242 @@ resolve_adb_path_for_mcp() {
     printf '%s\n' ""
 }
 
-# Resolves the absolute path of the installed Clawperator CLI JS entrypoint
-# (e.g. <npm_global_root>/clawperator/dist/cli/index.js). MCP clients like
-# Claude Desktop work best with "node <js>" rather than the npm shell wrapper,
-# per docs/api/mcp.md. Prints an empty string when resolution is not possible.
-# Tests may override by exporting CLAWPERATOR_CLI_JS_PATH before the call.
-resolve_cli_entrypoint_js() {
-    # When CLAWPERATOR_CLI_JS_PATH is explicitly set (even to empty), treat it
-    # as authoritative. Validation harnesses use this to force either the node
-    # form (non-empty path) or the wrapper-fallback path (empty string).
-    if [ -n "${CLAWPERATOR_CLI_JS_PATH+x}" ]; then
-        printf '%s\n' "${CLAWPERATOR_CLI_JS_PATH}"
-        return 0
-    fi
-
-    local NPM_GLOBAL_ROOT=""
-    local RESOLVED=""
-    if command -v npm > /dev/null 2>&1; then
-        NPM_GLOBAL_ROOT="$(npm root -g 2>/dev/null || true)"
-    fi
-
-    if [ -n "$NPM_GLOBAL_ROOT" ]; then
-        RESOLVED="$NPM_GLOBAL_ROOT/clawperator/dist/cli/index.js"
-        if [ ! -f "$RESOLVED" ]; then
-            RESOLVED=""
-        fi
-    fi
-
-    printf '%s\n' "$RESOLVED"
+parse_host_artifact_materialization_result() {
+    node -e '
+let raw = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  raw += chunk;
+});
+process.stdin.on("end", () => {
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.ok === "boolean") {
+      process.stdout.write(`ok=${parsed.ok ? "true" : "false"}\n`);
+    }
+    if (parsed && parsed.summary && typeof parsed.summary === "object") {
+      for (const key of ["written", "updated", "skipped", "failed"]) {
+        const value = parsed.summary[key];
+        if (typeof value === "number") {
+          process.stdout.write(`summary.${key}=${value}\n`);
+        }
+      }
+    }
+    if (parsed && Array.isArray(parsed.artifacts)) {
+      for (const artifact of parsed.artifacts) {
+        if (!artifact || typeof artifact !== "object" || typeof artifact.artifact !== "string") {
+          continue;
+        }
+        const key = artifact.artifact;
+        if (typeof artifact.status === "string") {
+          process.stdout.write(`artifact:${key}:status=${artifact.status}\n`);
+        }
+        if (typeof artifact.path === "string") {
+          process.stdout.write(`artifact:${key}:path=${artifact.path}\n`);
+        }
+        if (typeof artifact.message === "string") {
+          process.stdout.write(`artifact:${key}:message=${artifact.message.replace(/\r\n?/g, " ")}\n`);
+        }
+      }
+    }
+  } catch {}
+});
+' 2>/dev/null || true
 }
 
-write_mcp_config_snippet() {
-    local MCP_CONFIG_SNIPPET_PATH="$HOME/.clawperator/mcp-config-snippet.json"
-    local CLI_WRAPPER_PATH="${CLAWPERATOR_BIN_PATH:-clawperator}"
-    local CLI_JS_PATH
-    local ADB_PATH_VALUE
-    local LOG_DIR="$HOME/.clawperator/logs"
-    local CODEX_CONFIG_PATH="${CODEX_HOME:-$HOME/.codex}/config.toml"
-    local CLAUDE_CONFIG_PATH_MAC="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
-    local CLAUDE_CONFIG_PATH_LINUX="$HOME/.config/Claude/claude_desktop_config.json"
+print_host_artifact_outcome() {
+    local ARTIFACT_LABEL="$1"
+    local ARTIFACT_STATUS="$2"
+    local ARTIFACT_PATH="$3"
+    local ARTIFACT_MESSAGE="${4:-}"
+    local COLOR="$BLUE"
+    local ICON="•"
 
-    ensure_private_clawperator_dir
+    case "$ARTIFACT_STATUS" in
+        written)
+            COLOR="$GREEN"
+            ICON="✅"
+            ;;
+        updated)
+            COLOR="$GREEN"
+            ICON="✅"
+            ;;
+        skipped)
+            COLOR="$BLUE"
+            ICON="•"
+            ;;
+        failed)
+            COLOR="$YELLOW"
+            ICON="⚠️ "
+            ;;
+    esac
 
-    CLI_JS_PATH="$(resolve_cli_entrypoint_js)"
-    ADB_PATH_VALUE="$(resolve_adb_path_for_mcp)"
-
-    node - "$MCP_CONFIG_SNIPPET_PATH" "$CLI_WRAPPER_PATH" "$CLI_JS_PATH" "$ADB_PATH_VALUE" "$DEFAULT_OPERATOR_PACKAGE" "$LOG_DIR" "$CODEX_CONFIG_PATH" "$CLAUDE_CONFIG_PATH_MAC" "$CLAUDE_CONFIG_PATH_LINUX" <<'EOF'
-const fs = require("fs");
-
-const [
-  snippetPath,
-  cliWrapperPath,
-  cliJsPath,
-  adbPath,
-  operatorPackage,
-  logDir,
-  codexConfigPath,
-  claudeMacPath,
-  claudeLinuxPath,
-] = process.argv.slice(2);
-
-const ADB_PLACEHOLDER = "<set ADB_PATH to your adb binary>";
-const adbResolved = adbPath.length > 0;
-const adbValue = adbResolved ? adbPath : ADB_PLACEHOLDER;
-const nodeCommand = process.execPath;
-
-// Prefer "node <js>" per docs/api/mcp.md: MCP desktop clients usually do not
-// inherit the interactive shell PATH and "node <js>" avoids relying on the npm
-// shell wrapper. Fall back to the wrapper only when the JS entrypoint could not
-// be resolved.
-const useNodeForm = cliJsPath.length > 0;
-const command = useNodeForm ? nodeCommand : cliWrapperPath;
-const args = useNodeForm
-  ? [cliJsPath, "mcp", "serve"]
-  : ["mcp", "serve"];
-
-const serverConfig = {
-  command,
-  args,
-  env: {
-    ADB_PATH: adbValue,
-    CLAWPERATOR_OPERATOR_PACKAGE: operatorPackage,
-    CLAWPERATOR_LOG_DIR: logDir,
-    CLAWPERATOR_LOG_LEVEL: "info",
-  },
-};
-
-const notes = [
-  "This snippet is generated for the current host.",
-  "Regenerate it with install.sh if the clawperator binary path or adb path changes.",
-];
-if (!useNodeForm) {
-  notes.push(
-    "Could not resolve the Clawperator CLI JS entrypoint, so this snippet uses the npm shell wrapper. Claude Desktop and other GUI MCP clients usually do not inherit your shell PATH; if launch fails, replace \"command\" with \"node\" and \"args\" with [\"<installed_clawperator_path>/dist/cli/index.js\", \"mcp\", \"serve\"]."
-  );
-}
-if (!adbResolved) {
-  notes.push(
-    `adb was not found on PATH at install time. Replace ADB_PATH (${ADB_PLACEHOLDER}) with the absolute path to your adb binary before using this snippet.`
-  );
+    echo -e "${COLOR}${ICON} ${ARTIFACT_LABEL}: ${ARTIFACT_STATUS}${NC}"
+    if [ -n "$ARTIFACT_PATH" ]; then
+        echo -e "   ${BLUE}${ARTIFACT_PATH}${NC}"
+    fi
+    if [ -n "$ARTIFACT_MESSAGE" ]; then
+        echo -e "   ${YELLOW}${ARTIFACT_MESSAGE}${NC}"
+    fi
 }
 
-const tomlArgs = args.map((value) => JSON.stringify(value)).join(", ");
-const snippet = {
-  notes,
-  claudeDesktop: {
-    configPathHints: [claudeMacPath, claudeLinuxPath],
-    mergeKey: "mcpServers",
-    entry: {
-      clawperator: serverConfig,
-    },
-  },
-  codex: {
-    configPath: codexConfigPath,
-    entryToml: [
-      "[mcp_servers.clawperator]",
-      `command = ${JSON.stringify(command)}`,
-      `args = [${tomlArgs}]`,
-      "[mcp_servers.clawperator.env]",
-      `ADB_PATH = ${JSON.stringify(adbValue)}`,
-      `CLAWPERATOR_OPERATOR_PACKAGE = ${JSON.stringify(operatorPackage)}`,
-      `CLAWPERATOR_LOG_DIR = ${JSON.stringify(logDir)}`,
-      "CLAWPERATOR_LOG_LEVEL = \"info\"",
-      "",
-    ].join("\n"),
-  },
-  genericStdioConsumer: {
-    serverName: "clawperator",
-    server: serverConfig,
-  },
-};
+setup_host_artifacts_via_cli() {
+    local HOST_ARTIFACTS_OUTPUT=""
+    local HOST_ARTIFACTS_STATUS=0
+    local RESOLVED_ADB_PATH=""
+    local RESOLVED_CLI_VERSION=""
+    local PARSED_HOST_ARTIFACTS=""
+    local PARSED_ARTIFACT_COUNT=0
+    local HOST_EXIT_OK=""
+    local HOST_FAILED_COUNT="0"
+    local HOST_INSTALL_STATE_STATUS=""
+    local HOST_INSTALL_STATE_PATH=""
+    local HOST_INSTALL_STATE_MESSAGE=""
+    local HOST_MCP_STATUS=""
+    local HOST_MCP_PATH=""
+    local HOST_MCP_MESSAGE=""
+    local HOST_AGENT_GUIDE_STATUS=""
+    local HOST_AGENT_GUIDE_PATH=""
+    local HOST_AGENT_GUIDE_MESSAGE=""
+    local HOST_SHARED_BRIDGE_STATUS=""
+    local HOST_SHARED_BRIDGE_PATH=""
+    local HOST_SHARED_BRIDGE_MESSAGE=""
+    local CORE_FAILURE=0
+    local ONLY_SHARED_BRIDGE_FAILURE=0
+    local HOST_ARTIFACT_ARGS=()
+    local PARSED_LINE=""
 
-fs.writeFileSync(snippetPath, JSON.stringify(snippet, null, 2) + "\n");
-EOF
+    echo -e "${BLUE}Materializing durable host artifacts via the CLI...${NC}"
 
-    secure_host_artifact_path "$MCP_CONFIG_SNIPPET_PATH"
+    HOST_ARTIFACT_ARGS=(host materialize-artifacts --output json)
 
-    echo -e "${GREEN}✅ Wrote MCP config snippet to ${MCP_CONFIG_SNIPPET_PATH}.${NC}"
-}
-
-write_agent_guide() {
-    local AGENT_GUIDE_PATH="$HOME/.clawperator/AGENTS.md"
-    local BUNDLED_SKILLS_GUIDE_DIR="${BUNDLED_SKILLS_INSTALL_DIR:-$HOME/.clawperator/bundled-skills}"
-    local SKILL_DIR=""
-    local SKILL_NAME=""
-    local HAS_SKILLS=0
-    local HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL=0
-    local HAS_CLAWPERATOR_UPGRADE_SKILL=0
-    local HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL=0
-    local HAS_SKILL_AUTHORSHIP_RECORDING_SKILL=0
-
-    ensure_private_clawperator_dir
-
-    cat > "$AGENT_GUIDE_PATH" <<'EOF'
-# Clawperator
-
-Deterministic Android automation runtime for AI agents.
-
-## Quick start
-
-clawperator doctor --json    # verify readiness
-clawperator snapshot --json  # capture device state
-clawperator click --text "Settings" --json  # tap an element
-
-## Documentation
-
-- LLM guide: https://docs.clawperator.com/llms.txt
-- Full docs: https://docs.clawperator.com/llms-full.txt
-- Setup guide: https://docs.clawperator.com/setup/
-EOF
-
-    append_runtime_skills_guide "$AGENT_GUIDE_PATH"
-
-    # Treat any install tree with at least one SKILL.md as configured, even if
-    # version metadata is missing and the install should be refreshed.
-    if [ -d "$BUNDLED_SKILLS_GUIDE_DIR" ]; then
-        for SKILL_DIR in "$BUNDLED_SKILLS_GUIDE_DIR"/*/; do
-            if [ -f "${SKILL_DIR}SKILL.md" ]; then
-                HAS_SKILLS=1
-                SKILL_NAME="$(basename "$SKILL_DIR")"
-                if [ "$SKILL_NAME" = "clawperator-agent-orientation" ]; then
-                    HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL=1
-                elif [ "$SKILL_NAME" = "clawperator-upgrade" ]; then
-                    HAS_CLAWPERATOR_UPGRADE_SKILL=1
-                elif [ "$SKILL_NAME" = "clawperator-skill-author-by-agent-discovery" ]; then
-                    HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL=1
-                elif [ "$SKILL_NAME" = "clawperator-skill-author-by-recording" ]; then
-                    HAS_SKILL_AUTHORSHIP_RECORDING_SKILL=1
-                fi
-            fi
-        done
+    if [ -n "${CLAWPERATOR_HOST_ARTIFACTS_INSTALLED_AT:-}" ]; then
+        HOST_ARTIFACT_ARGS+=(--installed-at "$CLAWPERATOR_HOST_ARTIFACTS_INSTALLED_AT")
     fi
 
-    if [ "$HAS_SKILLS" -eq 1 ]; then
-        cat >> "$AGENT_GUIDE_PATH" <<EOF
+    RESOLVED_CLI_VERSION="$(resolve_cli_version)"
+    if [ -n "$RESOLVED_CLI_VERSION" ]; then
+        HOST_ARTIFACT_ARGS+=(--cli-version "$RESOLVED_CLI_VERSION")
+    fi
 
-## Bundled Skills
+    if [ -n "${OPERATOR_VERSION:-}" ]; then
+        HOST_ARTIFACT_ARGS+=(--apk-version "$OPERATOR_VERSION")
+    fi
 
-First-party Clawperator bundled skills are installed at:
-${BUNDLED_SKILLS_GUIDE_DIR}
+    if [ -n "${LAST_DEVICE_SERIAL:-}" ]; then
+        HOST_ARTIFACT_ARGS+=(--last-device-serial "$LAST_DEVICE_SERIAL")
+    fi
 
-EOF
-        if [ "$HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL" -eq 1 ]; then
-            cat >> "$AGENT_GUIDE_PATH" <<'EOF'
-- \`clawperator-agent-orientation\`: first-run orientation skill for an
-  unfamiliar host. It checks readiness, chooses the correct Clawperator front
-  door, and points back to the canonical public docs for the chosen path.
-EOF
-        fi
-        if [ "$HAS_CLAWPERATOR_UPGRADE_SKILL" -eq 1 ]; then
-            cat >> "$AGENT_GUIDE_PATH" <<'EOF'
-- \`clawperator-upgrade\`: packaged whole-product upgrade route. It reruns the
-  canonical installer at \`https://clawperator.com/install.sh\`, verifies the
-  result with \`clawperator doctor --json\`, and reports the next blocking
-  repair step when setup is still incomplete.
-EOF
-        fi
-        if [ "$HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL" -eq 1 ]; then
-            cat >> "$AGENT_GUIDE_PATH" <<'EOF'
-- \`clawperator-skill-author-by-agent-discovery\`: zero-results front door when
-  \`clawperator skills for-app <package_id>\` and
-  \`clawperator skills search --keyword "<term>"\` found no relevant runtime
-  skill. Discovery stays bounded, produces one routing artifact, and chooses
-  the next truthful step.
-EOF
-        fi
-        if [ "$HAS_SKILL_AUTHORSHIP_RECORDING_SKILL" -eq 1 ]; then
-            cat >> "$AGENT_GUIDE_PATH" <<'EOF'
-- \`clawperator-skill-author-by-recording\`: proving workflow after discovery returns
-  \`proceed_to_recording\`, or when the app route is already well understood
-  and you need a real-device recording to draft a reusable runtime skill.
-EOF
-        fi
-        cat >> "$AGENT_GUIDE_PATH" <<'EOF'
-
-Installed entries on this host:
-EOF
-        for SKILL_DIR in "$BUNDLED_SKILLS_GUIDE_DIR"/*/; do
-            if [ -f "${SKILL_DIR}SKILL.md" ]; then
-                printf -- '- %s\n' "$(basename "$SKILL_DIR")" >> "$AGENT_GUIDE_PATH"
-            fi
-        done
-        if [ "$HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL" -eq 1 ] && [ "$HAS_CLAWPERATOR_UPGRADE_SKILL" -eq 1 ] && [ "$HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL" -eq 1 ] && [ "$HAS_SKILL_AUTHORSHIP_RECORDING_SKILL" -eq 1 ]; then
-            cat >> "$AGENT_GUIDE_PATH" <<'EOF'
-
-Recommended first-run flow:
-- If the current host is unfamiliar, start with `clawperator-agent-orientation`
-- If this installed Clawperator environment needs a whole-product refresh, use `clawperator-upgrade`
-- Choose one runtime-skill discovery probe: `clawperator skills for-app <package_id>` or `clawperator skills search --keyword "<term>"`
-- If there is no relevant runtime-skill match, inspect `clawperator bundled-skills list --json`
-- Start the guided route with `clawperator-skill-author-by-agent-discovery`
-- Use `clawperator-skill-author-by-recording` only after discovery returns `proceed_to_recording`
-EOF
+    RESOLVED_ADB_PATH="$(resolve_adb_path_for_host_artifacts)"
+    if [ -n "$RESOLVED_ADB_PATH" ] && [ -z "${ADB_PATH:-}" ]; then
+        if HOST_ARTIFACTS_OUTPUT="$(ADB_PATH="$RESOLVED_ADB_PATH" CLAWPERATOR_SKILLS_REGISTRY="$SKILLS_REGISTRY_PATH" "$CLAWPERATOR_BIN_PATH" "${HOST_ARTIFACT_ARGS[@]}" 2>&1)"; then
+            HOST_ARTIFACTS_STATUS=0
         else
-            cat >> "$AGENT_GUIDE_PATH" <<'EOF'
-
-Installed bundled-skill front doors are incomplete on this host.
-
-Repair it with:
-- run `clawperator bundled-skills update`
-EOF
-            if [ "$HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL" -ne 1 ]; then
-                printf -- '- missing `%s`\n' "clawperator-agent-orientation" >> "$AGENT_GUIDE_PATH"
-            fi
-            if [ "$HAS_CLAWPERATOR_UPGRADE_SKILL" -ne 1 ]; then
-                printf -- '- missing `%s`\n' "clawperator-upgrade" >> "$AGENT_GUIDE_PATH"
-            fi
-            if [ "$HAS_SKILL_AUTHORSHIP_DISCOVERY_SKILL" -ne 1 ]; then
-                printf -- '- missing `%s`\n' "clawperator-skill-author-by-agent-discovery" >> "$AGENT_GUIDE_PATH"
-            fi
-            if [ "$HAS_SKILL_AUTHORSHIP_RECORDING_SKILL" -ne 1 ]; then
-                printf -- '- missing `%s`\n' "clawperator-skill-author-by-recording" >> "$AGENT_GUIDE_PATH"
-            fi
-        fi
-        if [ ! -f "$BUNDLED_SKILLS_GUIDE_DIR/version.txt" ] && [ "$HAS_SKILLS" -eq 1 ]; then
-            cat >> "$AGENT_GUIDE_PATH" <<'EOF'
-
-Version metadata is missing for this install.
-Refresh it with:
-- run `clawperator bundled-skills update`
-EOF
+            HOST_ARTIFACTS_STATUS=$?
         fi
     else
-        cat >> "$AGENT_GUIDE_PATH" <<'EOF'
-
-## Bundled Skills
-
-First-party Clawperator bundled skills are not currently configured on this host.
-
-Expected packaged front doors after install:
-- `clawperator-agent-orientation`: first-run orientation for unfamiliar hosts
-- `clawperator-upgrade`: packaged whole-product upgrade route through install.sh and doctor
-- `clawperator-skill-author-by-agent-discovery`: zero-results front door when runtime-skill discovery found no relevant match
-- `clawperator-skill-author-by-recording`: proving workflow after discovery returns `proceed_to_recording`
-
-Repair or manual bootstrap:
-- run `clawperator bundled-skills install`
-EOF
+        if HOST_ARTIFACTS_OUTPUT="$(CLAWPERATOR_SKILLS_REGISTRY="$SKILLS_REGISTRY_PATH" "$CLAWPERATOR_BIN_PATH" "${HOST_ARTIFACT_ARGS[@]}" 2>&1)"; then
+            HOST_ARTIFACTS_STATUS=0
+        else
+            HOST_ARTIFACTS_STATUS=$?
+        fi
     fi
 
-    secure_host_artifact_path "$AGENT_GUIDE_PATH"
+    PARSED_HOST_ARTIFACTS="$(printf '%s' "$HOST_ARTIFACTS_OUTPUT" | parse_host_artifact_materialization_result)"
 
-    echo -e "${GREEN}✅ Wrote agent guide to ${AGENT_GUIDE_PATH}.${NC}"
-}
+    while IFS= read -r PARSED_LINE; do
+        [ -n "$PARSED_LINE" ] || continue
+        case "$PARSED_LINE" in
+            ok=*)
+                HOST_EXIT_OK="${PARSED_LINE#ok=}"
+                ;;
+            summary.failed=*)
+                HOST_FAILED_COUNT="${PARSED_LINE#summary.failed=}"
+                ;;
+            artifact:installState:status=*)
+                HOST_INSTALL_STATE_STATUS="${PARSED_LINE#artifact:installState:status=}"
+                PARSED_ARTIFACT_COUNT=$((PARSED_ARTIFACT_COUNT + 1))
+                ;;
+            artifact:installState:path=*)
+                HOST_INSTALL_STATE_PATH="${PARSED_LINE#artifact:installState:path=}"
+                ;;
+            artifact:installState:message=*)
+                HOST_INSTALL_STATE_MESSAGE="${PARSED_LINE#artifact:installState:message=}"
+                ;;
+            artifact:mcpConfigSnippet:status=*)
+                HOST_MCP_STATUS="${PARSED_LINE#artifact:mcpConfigSnippet:status=}"
+                PARSED_ARTIFACT_COUNT=$((PARSED_ARTIFACT_COUNT + 1))
+                ;;
+            artifact:mcpConfigSnippet:path=*)
+                HOST_MCP_PATH="${PARSED_LINE#artifact:mcpConfigSnippet:path=}"
+                ;;
+            artifact:mcpConfigSnippet:message=*)
+                HOST_MCP_MESSAGE="${PARSED_LINE#artifact:mcpConfigSnippet:message=}"
+                ;;
+            artifact:agentGuide:status=*)
+                HOST_AGENT_GUIDE_STATUS="${PARSED_LINE#artifact:agentGuide:status=}"
+                PARSED_ARTIFACT_COUNT=$((PARSED_ARTIFACT_COUNT + 1))
+                ;;
+            artifact:agentGuide:path=*)
+                HOST_AGENT_GUIDE_PATH="${PARSED_LINE#artifact:agentGuide:path=}"
+                ;;
+            artifact:agentGuide:message=*)
+                HOST_AGENT_GUIDE_MESSAGE="${PARSED_LINE#artifact:agentGuide:message=}"
+                ;;
+            artifact:sharedAgentBridge:status=*)
+                HOST_SHARED_BRIDGE_STATUS="${PARSED_LINE#artifact:sharedAgentBridge:status=}"
+                PARSED_ARTIFACT_COUNT=$((PARSED_ARTIFACT_COUNT + 1))
+                ;;
+            artifact:sharedAgentBridge:path=*)
+                HOST_SHARED_BRIDGE_PATH="${PARSED_LINE#artifact:sharedAgentBridge:path=}"
+                ;;
+            artifact:sharedAgentBridge:message=*)
+                HOST_SHARED_BRIDGE_MESSAGE="${PARSED_LINE#artifact:sharedAgentBridge:message=}"
+                ;;
+        esac
+    done <<< "$PARSED_HOST_ARTIFACTS"
 
-write_shared_agent_bridge() {
-    local SHARED_AGENTS_PATH="$HOME/.agents/AGENTS.md"
-    local LOCAL_AGENT_GUIDE_PATH="$HOME/.clawperator/AGENTS.md"
-    local BRIDGE_ERROR_TMP=""
+    if [ "$PARSED_ARTIFACT_COUNT" -eq 0 ]; then
+        echo -e "${RED}❌ Host artifact materialization via CLI returned no parseable artifact results.${NC}"
+        if [ -n "$HOST_ARTIFACTS_OUTPUT" ]; then
+            echo "$HOST_ARTIFACTS_OUTPUT"
+        fi
+        return 1
+    fi
 
-    if [ ! -f "$SHARED_AGENTS_PATH" ]; then
-        echo -e "${BLUE}Shared agent guide not found at ${SHARED_AGENTS_PATH}; skipping Clawperator bridge.${NC}"
+    print_host_artifact_outcome "Local AGENTS.md" "$HOST_AGENT_GUIDE_STATUS" "$HOST_AGENT_GUIDE_PATH" "$HOST_AGENT_GUIDE_MESSAGE"
+    print_host_artifact_outcome "Install state" "$HOST_INSTALL_STATE_STATUS" "$HOST_INSTALL_STATE_PATH" "$HOST_INSTALL_STATE_MESSAGE"
+    print_host_artifact_outcome "MCP config snippet" "$HOST_MCP_STATUS" "$HOST_MCP_PATH" "$HOST_MCP_MESSAGE"
+    print_host_artifact_outcome "Shared agent bridge" "$HOST_SHARED_BRIDGE_STATUS" "$HOST_SHARED_BRIDGE_PATH" "$HOST_SHARED_BRIDGE_MESSAGE"
+
+    if [ "$HOST_INSTALL_STATE_STATUS" = "failed" ] || \
+       [ "$HOST_MCP_STATUS" = "failed" ] || \
+       [ "$HOST_AGENT_GUIDE_STATUS" = "failed" ]; then
+        CORE_FAILURE=1
+    fi
+
+    if [ "$CORE_FAILURE" -eq 0 ] && [ "$HOST_SHARED_BRIDGE_STATUS" = "failed" ] && [ "$HOST_FAILED_COUNT" = "1" ]; then
+        ONLY_SHARED_BRIDGE_FAILURE=1
+    fi
+
+    if [ "$HOST_ARTIFACTS_STATUS" -eq 0 ] && [ "$HOST_EXIT_OK" = "true" ]; then
+        echo -e "${GREEN}✅ Host artifact materialization complete.${NC}"
         return 0
     fi
 
-    BRIDGE_ERROR_TMP="$(mktemp "${TMPDIR:-/tmp}/clawperator-shared-bridge-error.XXXXXX")"
-    register_temp_file "$BRIDGE_ERROR_TMP"
-
-    # Content between the START/END markers is installer-owned. Any hand edits
-    # inside that block will be overwritten on the next install.sh run. Edits
-    # elsewhere in ~/.agents/AGENTS.md are preserved.
-    if node - "$SHARED_AGENTS_PATH" "$LOCAL_AGENT_GUIDE_PATH" 2>"$BRIDGE_ERROR_TMP" <<'EOF'
-const fs = require("fs");
-const path = require("path");
-
-// Content between startMarker and endMarker is installer-owned and is
-// overwritten in place on every rerun. See the shell caller's comment.
-const [sharedAgentsPath, localAgentGuidePath] = process.argv.slice(2);
-const startMarker = "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:START -->";
-const endMarker = "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:END -->";
-const sharedAgentsStat = fs.lstatSync(sharedAgentsPath);
-
-if (!sharedAgentsStat.isFile()) {
-  throw new Error(`${sharedAgentsPath} must be a regular file`);
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-const bridgeBlock = [
-  startMarker,
-  "## Clawperator",
-  "",
-  "Clawperator runtime skills stay in the `clawperator` CLI surface.",
-  "Do not mirror them into shared agent skill directories.",
-  "",
-  "Start here:",
-  `- \`${localAgentGuidePath}\``,
-  "- if the host is unfamiliar and the local guide lists it, start with `clawperator-agent-orientation`",
-  "- `clawperator skills for-app <package_id>`",
-  "- `clawperator skills search --keyword \"<term>\"`",
-  "- `clawperator skills get <skill_id>`",
-  "- `clawperator bundled-skills list --json`",
-  "",
-  "If runtime-skill discovery finds no relevant match, follow the local guide for the bundled-skill front doors installed on this host.",
-  "Confirm the local guide lists `clawperator-agent-orientation`, `clawperator-upgrade`, `clawperator-skill-author-by-agent-discovery`, and `clawperator-skill-author-by-recording` before starting the discovery-to-proving route.",
-  "Use `clawperator skills run <skill_id>` after you have identified the right runtime skill.",
-  endMarker,
-].join("\n");
-
-let content = fs.readFileSync(sharedAgentsPath, "utf8");
-const bridgePattern = new RegExp(
-  `${escapeRegExp(startMarker)}[\\s\\S]*?${escapeRegExp(endMarker)}`,
-  "g"
-);
-
-content = content.replace(bridgePattern, "");
-
-const separator = content.length === 0
-  ? ""
-  : (content.endsWith("\n\n") ? "" : (content.endsWith("\n") ? "\n" : "\n\n"));
-
-const nextContent = `${content}${separator}${bridgeBlock}`;
-
-const tempPath = path.join(
-  path.dirname(sharedAgentsPath),
-  `.clawperator-shared-agents.${process.pid}.${Date.now()}.tmp`
-);
-const sharedAgentsPermissions = sharedAgentsStat.mode & 0o777;
-
-try {
-  fs.writeFileSync(tempPath, nextContent, { mode: sharedAgentsPermissions });
-  fs.chmodSync(tempPath, sharedAgentsPermissions);
-  fs.renameSync(tempPath, sharedAgentsPath);
-  fs.chmodSync(sharedAgentsPath, sharedAgentsPermissions);
-} finally {
-  if (fs.existsSync(tempPath)) {
-    fs.unlinkSync(tempPath);
-  }
-}
-EOF
-    then
-        echo -e "${GREEN}✅ Updated shared agent guide bridge at ${SHARED_AGENTS_PATH}.${NC}"
+    if [ "$ONLY_SHARED_BRIDGE_FAILURE" -eq 1 ]; then
+        echo -e "${YELLOW}⚠️  Host artifact materialization completed with a shared-agent bridge warning; continuing.${NC}"
+        if [ -n "$HOST_ARTIFACTS_OUTPUT" ]; then
+            echo "$HOST_ARTIFACTS_OUTPUT"
+        fi
         return 0
     fi
 
-    echo -e "${YELLOW}⚠️  Failed to update shared agent bridge at ${SHARED_AGENTS_PATH}; continuing without it.${NC}" >&2
-    if [ -s "$BRIDGE_ERROR_TMP" ]; then
-        cat "$BRIDGE_ERROR_TMP" >&2
+    echo -e "${RED}❌ Host artifact materialization failed via the CLI.${NC}"
+    if [ -n "$HOST_ARTIFACTS_OUTPUT" ]; then
+        echo "$HOST_ARTIFACTS_OUTPUT"
     fi
-    return 0
+    return 1
 }
 
 sha256_file() {
@@ -2173,10 +1706,7 @@ main() {
     # Setup skills via CLI (best-effort)
     setup_skills_via_cli
     setup_bundled_skills_via_cli
-    write_agent_guide
-    write_shared_agent_bridge
-    write_install_state
-    write_mcp_config_snippet
+    setup_host_artifacts_via_cli || exit 1
 
     local ACTIVE_SHELL="${SHELL:-/bin/bash}"
     local DETECTED_SHELL

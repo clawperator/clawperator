@@ -181,7 +181,7 @@ function resolveInstalledAt(options: MaterializeHostArtifactsOptions): string {
   if (typeof options.installedAt === "string" && options.installedAt.length > 0) {
     return options.installedAt;
   }
-  return (options.now ?? (() => new Date()))().toISOString().replace(".000Z", "Z");
+  return (options.now ?? (() => new Date()))().toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
 function toCliFlagName(inputName: string): string {
@@ -321,6 +321,11 @@ function resolveCliJsPath(options: MaterializeHostArtifactsOptions): string {
     return explicitPath;
   }
 
+  const envOverride = options.env?.CLAWPERATOR_CLI_JS_PATH;
+  if (typeof envOverride === "string") {
+    return envOverride;
+  }
+
   const argvPath = process.argv[1];
   if (typeof argvPath === "string" && argvPath.length > 0) {
     return resolve(argvPath);
@@ -336,7 +341,7 @@ function buildMcpConfigSnippetContent(options: MaterializeHostArtifactsOptions, 
   const codexConfigPath = options.codexConfigPath ?? join(options.env?.CODEX_HOME ?? join(homeDir, ".codex"), "config.toml");
   const claudeConfigPathMac = options.claudeConfigPathMac ?? join(homeDir, "Library", "Application Support", "Claude", "claude_desktop_config.json");
   const claudeConfigPathLinux = options.claudeConfigPathLinux ?? join(homeDir, ".config", "Claude", "claude_desktop_config.json");
-  const cliWrapperPath = options.cliWrapperPath ?? "clawperator";
+  const cliWrapperPath = options.cliWrapperPath ?? options.env?.CLAWPERATOR_BIN_PATH ?? "clawperator";
   const cliJsPath = resolveCliJsPath(options);
   const adbPath = nullIfBlank(options.adbPath ?? options.env?.ADB_PATH);
   const adbPlaceholder = "<set ADB_PATH to your adb binary>";
