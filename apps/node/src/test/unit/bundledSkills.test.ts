@@ -455,6 +455,43 @@ describe("copyBundledSkills", () => {
     assert.equal(await readFile(join(targetSkillDir, "SKILL.md"), "utf8"), "# clawperator-skill-author-by-recording\n");
   });
 
+  it("replaces legacy managed symlinks that still point at the old install dir", async () => {
+    const root = await makeTempRoot();
+    const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
+    const installedDir = join(root, "home", ".clawperator", "bundled-skills");
+    const legacyInstalledDir = join(root, "home", ".clawperator", "agent-skills");
+    const claudeSkillsDir = join(root, "home", ".claude", "skills");
+    const codexSkillsDir = join(root, "home", ".codex", "skills");
+    const agentsSkillsDir = join(root, "home", ".agents", "skills");
+    const legacyTargetSkillDir = join(legacyInstalledDir, "clawperator-skill-author-by-recording");
+    const targetSkillDir = join(installedDir, "clawperator-skill-author-by-recording");
+
+    await mkdir(legacyTargetSkillDir, { recursive: true });
+    await writeFile(join(legacyTargetSkillDir, "SKILL.md"), "# old-clawperator-skill-author-by-recording\n", "utf8");
+    await mkdir(claudeSkillsDir, { recursive: true });
+    await mkdir(codexSkillsDir, { recursive: true });
+    await mkdir(agentsSkillsDir, { recursive: true });
+    await symlink(legacyTargetSkillDir, join(claudeSkillsDir, "clawperator-skill-author-by-recording"), directorySymlinkType);
+    await symlink(legacyTargetSkillDir, join(codexSkillsDir, "clawperator-skill-author-by-recording"), directorySymlinkType);
+    await symlink(legacyTargetSkillDir, join(agentsSkillsDir, "clawperator-skill-author-by-recording"), directorySymlinkType);
+
+    const result = await copyBundledSkills({
+      sourceDir,
+      installedDir,
+      claudeSkillsDir,
+      codexSkillsDir,
+      agentsSkillsDir,
+      cliVersion: "1.2.3",
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(await readlink(join(claudeSkillsDir, "clawperator-skill-author-by-recording")), targetSkillDir);
+    assert.equal(await readlink(join(codexSkillsDir, "clawperator-skill-author-by-recording")), targetSkillDir);
+    assert.equal(await readlink(join(agentsSkillsDir, "clawperator-skill-author-by-recording")), targetSkillDir);
+    assert.equal(await readFile(join(targetSkillDir, "SKILL.md"), "utf8"), "# clawperator-skill-author-by-recording\n");
+    assert.equal(await readFile(join(legacyTargetSkillDir, "SKILL.md"), "utf8"), "# old-clawperator-skill-author-by-recording\n");
+  });
+
   it("preflights discovery conflicts before replacing an already installed skill", async () => {
     const root = await makeTempRoot();
     const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");

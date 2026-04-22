@@ -261,6 +261,16 @@ describe("CLI help", () => {
     assert.match(stderr || stdout, /Unknown command: agent-skills/);
   });
 
+  it("rejects the removed agent-skills command surface outside the help path", async () => {
+    const bare = await runCli(["agent-skills"]);
+    assert.notStrictEqual(bare.code, 0);
+    assert.match(bare.stderr || bare.stdout, /Unknown command: agent-skills/);
+
+    const list = await runCli(["agent-skills", "list"]);
+    assert.notStrictEqual(list.code, 0);
+    assert.match(list.stderr || list.stdout, /Unknown command: agent-skills/);
+  });
+
   it("shows manual-scaffold boundary in skills new help", async () => {
     const { stdout, code } = await runCli(["skills", "new", "--help"]);
     assert.strictEqual(code, 0);

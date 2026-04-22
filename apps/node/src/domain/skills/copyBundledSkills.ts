@@ -155,6 +155,15 @@ export function normalizeOwnedSkillTarget(installedDir: string, skillName: strin
   return resolve(installedDir, skillName);
 }
 
+function normalizeLegacyOwnedSkillTarget(installedDir: string, skillName: string): string {
+  return resolve(dirname(installedDir), "agent-skills", skillName);
+}
+
+function legacyOwnedSkillTargets(installedDir: string, skillName: string): string[] {
+  const target = normalizeLegacyOwnedSkillTarget(installedDir, skillName);
+  return target === normalizeOwnedSkillTarget(installedDir, skillName) ? [] : [target];
+}
+
 async function resolveSymlinkTarget(path: string): Promise<string | undefined> {
   try {
     const target = await readlink(path);
@@ -242,10 +251,17 @@ export async function inspectManagedBundledSkillLink(
 
 async function isManagedBundledSkillSymlink(linkPath: string, installedDir: string, skillName: string): Promise<boolean> {
   const inspection = await inspectManagedBundledSkillLink(linkPath, installedDir, skillName);
+  const legacyTargets = new Set(legacyOwnedSkillTargets(installedDir, skillName));
   // A dangling symlink that points at the correct expected target is still considered managed:
   // it means Clawperator previously installed the link but the install dir was subsequently
   // removed. The install/update flow is allowed to recreate it.
   if (!inspection.ok && inspection.status === "broken" && inspection.actualTarget === inspection.expectedTarget) {
+    return true;
+  }
+  // The public rename is a clean break, but rerunning the new install flow
+  // should still be able to replace discovery links that Clawperator itself
+  // previously managed when they still point at the pre-rename install store.
+  if (!inspection.ok && inspection.actualTarget !== undefined && legacyTargets.has(inspection.actualTarget)) {
     return true;
   }
   return inspection.ok;
@@ -298,7 +314,10 @@ async function removeStaleBundledSkillSymlinks(agentDir: string, activeSkills: S
     }
 
     const resolvedTarget = await resolveSymlinkTarget(entryPath);
-    if (resolvedTarget === normalizeOwnedSkillTarget(installedDir, entry)) {
+    if (
+      resolvedTarget === normalizeOwnedSkillTarget(installedDir, entry)
+      || legacyOwnedSkillTargets(installedDir, entry).includes(resolvedTarget ?? "")
+    ) {
       await rm(entryPath, { recursive: true, force: true });
     }
   }

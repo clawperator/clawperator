@@ -57,6 +57,6 @@ describe("bundled skill packaging", () => {
     );
 
     assert.match(discoverySkill, /clawperator bundled-skills list --json/);
-    assert.doesNotMatch(discoverySkill, /authoring-skills list --json/);
+    assert.doesNotMatch(discoverySkill, /clawperator agent-skills list --json/);
   });
 });
