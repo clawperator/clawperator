@@ -901,6 +901,7 @@ assert_contains "$MULTI_STALE_DEV_STDOUT" "Use a matching local debug APK before
 assert_contains "$MULTI_STALE_DEV_STDOUT" "$TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk" "main-multi-stale-dev stdout"
 assert_contains "$MULTI_STALE_DEV_STDOUT" "serial-alpha - setup required with a matching local debug APK at $TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk" "main-multi-stale-dev stdout"
 assert_contains "$MULTI_STALE_DEV_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk --device serial-alpha --operator-package com.clawperator.operator.dev" "main-multi-stale-dev stdout"
+assert_contains "$MULTI_STALE_DEV_STDOUT" "serial-beta - ready" "main-multi-stale-dev stdout"
 assert_not_contains "$MULTI_STALE_DEV_STDOUT" "Mock download_operator_apk" "main-multi-stale-dev stdout"
 assert_not_contains "$MULTI_STALE_DEV_STDOUT" "Mock verify_operator_apk" "main-multi-stale-dev stdout"
 assert_not_contains "$MULTI_STALE_DEV_STDOUT" "https://clawperator.com/operator.apk" "main-multi-stale-dev stdout"

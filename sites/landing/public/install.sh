@@ -41,10 +41,11 @@ DOCTOR_CRITICAL_DEVICE_COUNT=0
 DOCTOR_ADB_UNREADY_DEVICE_COUNT=0
 DOCTOR_SETUP_REQUIRED_COUNT=0
 DOCTOR_PROBE_FAILURE_COUNT=0
-DOCTOR_PROBE_FAILED_DEVICES=()
 MULTI_DEVICE_APK_TARGET_DEVICES=()
 MULTI_DEVICE_APK_PROBE_FAILURE_COUNT=0
 MULTI_DEVICE_APK_PROBE_FAILED_DEVICES=()
+MULTI_DEVICE_APK_CLEAN_DEVICES=()
+MULTI_DEVICE_APK_WARN_DEVICES=()
 
 TEMP_FILES=()
 
@@ -1682,6 +1683,8 @@ reset_multi_device_apk_target_scan() {
     MULTI_DEVICE_APK_TARGET_DEVICES=()
     MULTI_DEVICE_APK_PROBE_FAILURE_COUNT=0
     MULTI_DEVICE_APK_PROBE_FAILED_DEVICES=()
+    MULTI_DEVICE_APK_CLEAN_DEVICES=()
+    MULTI_DEVICE_APK_WARN_DEVICES=()
 }
 
 doctor_device_requires_apk_setup() {
@@ -1721,6 +1724,10 @@ collect_multi_device_apk_setup_targets() {
         fi
         if doctor_device_requires_apk_setup "$doctor_json"; then
             MULTI_DEVICE_APK_TARGET_DEVICES+=("$device_id")
+        elif doctor_report_all_checks_pass "$doctor_json"; then
+            MULTI_DEVICE_APK_CLEAN_DEVICES+=("$device_id")
+        else
+            MULTI_DEVICE_APK_WARN_DEVICES+=("$device_id")
         fi
     done < <(list_detected_android_devices)
 
@@ -1767,7 +1774,7 @@ maybe_install_operator_apk() {
         done < <(list_detected_android_devices)
 
         if [ "${#install_target_devices[@]}" -eq 0 ]; then
-            collect_multi_device_apk_setup_targets || return 1
+            collect_multi_device_apk_setup_targets
             install_target_devices=()
             if [ "${#MULTI_DEVICE_APK_TARGET_DEVICES[@]}" -gt 0 ]; then
                 install_target_devices=("${MULTI_DEVICE_APK_TARGET_DEVICES[@]}")
@@ -1935,7 +1942,6 @@ reset_doctor_each_connected_device_summary() {
     DOCTOR_ADB_UNREADY_DEVICE_COUNT=0
     DOCTOR_SETUP_REQUIRED_COUNT=0
     DOCTOR_PROBE_FAILURE_COUNT=0
-    DOCTOR_PROBE_FAILED_DEVICES=()
 }
 
 doctor_each_connected_device() {
@@ -1951,24 +1957,66 @@ doctor_each_connected_device() {
     reset_doctor_each_connected_device_summary
     echo -e "${BLUE}Checking each connected device with Clawperator Doctor...${NC}"
     local critical_count=0
+    local _f _collect_status
     while IFS=$'\t' read -r device_id device_state; do
         [ -n "$device_id" ] || continue
         device_count=$((device_count + 1))
         if [ "$device_state" = "device" ]; then
-            if doctor_report_connected_device "$device_id" "$DEFAULT_OPERATOR_PACKAGE"; then
-                ready_count=$((ready_count + 1))
-                if [ "${DOCTOR_DEVICE_STATUS:-}" = "critical" ]; then
-                    critical_count=$((critical_count + 1))
-                fi
-            else
-                if [ "${DOCTOR_DEVICE_STATUS:-}" = "probe-failure" ]; then
-                    DOCTOR_PROBE_FAILURE_COUNT=$((DOCTOR_PROBE_FAILURE_COUNT + 1))
-                    DOCTOR_PROBE_FAILED_DEVICES+=("$device_id")
-                else
-                    DOCTOR_SETUP_REQUIRED_COUNT=$((DOCTOR_SETUP_REQUIRED_COUNT + 1))
-                    DOCTOR_PENDING_SETUP_DEVICES+=("$device_id")
-                fi
+            # Reuse the status captured during the collect phase to avoid re-probing
+            # devices whose state has not changed since the per-device scan.
+            _collect_status="unknown"
+            if [ "${#MULTI_DEVICE_APK_PROBE_FAILED_DEVICES[@]}" -gt 0 ]; then
+                for _f in "${MULTI_DEVICE_APK_PROBE_FAILED_DEVICES[@]}"; do
+                    [ "$_f" = "$device_id" ] && { _collect_status="probe-failure"; break; }
+                done
             fi
+            if [ "$_collect_status" = "unknown" ] && [ "${#MULTI_DEVICE_APK_TARGET_DEVICES[@]}" -gt 0 ]; then
+                for _f in "${MULTI_DEVICE_APK_TARGET_DEVICES[@]}"; do
+                    [ "$_f" = "$device_id" ] && { _collect_status="target"; break; }
+                done
+            fi
+            if [ "$_collect_status" = "unknown" ] && [ "${#MULTI_DEVICE_APK_CLEAN_DEVICES[@]}" -gt 0 ]; then
+                for _f in "${MULTI_DEVICE_APK_CLEAN_DEVICES[@]}"; do
+                    [ "$_f" = "$device_id" ] && { _collect_status="pass"; break; }
+                done
+            fi
+            if [ "$_collect_status" = "unknown" ] && [ "${#MULTI_DEVICE_APK_WARN_DEVICES[@]}" -gt 0 ]; then
+                for _f in "${MULTI_DEVICE_APK_WARN_DEVICES[@]}"; do
+                    [ "$_f" = "$device_id" ] && { _collect_status="warn"; break; }
+                done
+            fi
+            case "$_collect_status" in
+                probe-failure)
+                    DOCTOR_DEVICE_STATUS="probe-failure"
+                    DOCTOR_PROBE_FAILURE_COUNT=$((DOCTOR_PROBE_FAILURE_COUNT + 1))
+                    ;;
+                pass)
+                    DOCTOR_DEVICE_STATUS="pass"
+                    ready_count=$((ready_count + 1))
+                    echo -e "${GREEN}  ✅ ${device_id} - ready${NC}"
+                    ;;
+                warn)
+                    DOCTOR_DEVICE_STATUS="critical"
+                    ready_count=$((ready_count + 1))
+                    critical_count=$((critical_count + 1))
+                    echo -e "${YELLOW}  ⚠  ${device_id} - critical checks passed; warnings remain.${NC}"
+                    ;;
+                *)
+                    if doctor_report_connected_device "$device_id" "$DEFAULT_OPERATOR_PACKAGE"; then
+                        ready_count=$((ready_count + 1))
+                        if [ "${DOCTOR_DEVICE_STATUS:-}" = "critical" ]; then
+                            critical_count=$((critical_count + 1))
+                        fi
+                    else
+                        if [ "${DOCTOR_DEVICE_STATUS:-}" = "probe-failure" ]; then
+                            DOCTOR_PROBE_FAILURE_COUNT=$((DOCTOR_PROBE_FAILURE_COUNT + 1))
+                        else
+                            DOCTOR_SETUP_REQUIRED_COUNT=$((DOCTOR_SETUP_REQUIRED_COUNT + 1))
+                            DOCTOR_PENDING_SETUP_DEVICES+=("$device_id")
+                        fi
+                    fi
+                    ;;
+            esac
         else
             echo -e "${YELLOW}  ⚠  ${device_id} - ADB state: ${device_state}. Unlock the device or restart ADB before setup.${NC}"
             DOCTOR_ADB_UNREADY_DEVICE_COUNT=$((DOCTOR_ADB_UNREADY_DEVICE_COUNT + 1))
