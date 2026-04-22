@@ -13,7 +13,7 @@ immediate-opportunity items from `tasks/discovery/findings.md`, then stop.
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | not started |
 | Total PRs | 1 |
 | Total phases | 4 |
 | Completed | none |
@@ -58,9 +58,9 @@ Read these files IN THIS ORDER before writing anything.
 
 ## PR / Phase Plan
 
-| PR | Purpose | Included phases | Agent tier | Merge gate |
-| --- | --- | --- | --- | --- |
-| PR-1 | Ship the four verified discovery immediate opportunities | 1, 2, 3, 4 | thinking, thinking, default, default | none |
+| PR | Purpose | Included phases | Merge gate |
+| --- | --- | --- | --- |
+| PR-1 | Ship the four verified discovery immediate opportunities | 1, 2, 3, 4 | none |
 
 ## Phase 1: Quickstart Selector Callout
 
