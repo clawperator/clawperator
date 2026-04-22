@@ -157,9 +157,10 @@ APK has not been downloaded first.
 1. Change the `readiness.apk.presence` download fix step from `kind: "manual"` to
    `kind: "shell"` using `clawperator operator download` (Phase 2 command).
    This makes `--fix` fully automated for single-device APK install.
-2. Add `kind: "shell"` fix steps to `readiness.handshake` fail case using
-   `clawperator grant-device-permissions --device <id>` for permission recovery.
-   (This command already exists.)
+2. Preserve the existing `kind: "shell"` fix step on `readiness.handshake`
+   using `clawperator grant-device-permissions --device <id>` for permission
+   recovery. This path already exists and should not be duplicated or lost
+   during the refactor.
 
 **Open design question - multi-device:** `doctor` takes a single `--device`.
 The multi-device install loop (~200 lines of the shell logic) has no natural
@@ -168,7 +169,7 @@ home in `doctor --fix` as currently designed. Options:
 - Option A: Keep the per-device loop in install.sh but replace inline Node
   parsing with `clawperator doctor --json --device <id>` calls in a thin shell
   loop. Less CLI migration, but shell stays non-trivial.
-- Option B: Add a new `clawperator install remediate` command that accepts no
+- Option B: Add a new `clawperator operator remediate` command that accepts no
   `--device` and loops over all connected devices internally, running
   `operator download` + `doctor --fix --device <id>` for each. Shell becomes a
   single call.
@@ -284,13 +285,13 @@ Requires Phase 2 to be complete.
    APK download step for `readiness.apk.presence` fail from `kind: "manual"` to
    `kind: "shell"` with value `clawperator operator download [--operator-package <pkg>]`.
    The existing `kind: "shell"` operator setup step is already correct.
-2. In the `readiness.handshake` fail case, add a `kind: "shell"` fix step:
+2. Preserve the existing `readiness.handshake` `kind: "shell"` fix step:
    `clawperator grant-device-permissions --device <id> [--operator-package <pkg>]`.
-   (The command already exists; it just isn't wired as a fix step.)
+   Do not duplicate it while editing adjacent readiness logic.
 
 **Multi-device surface (must be decided before implementation):**
 Choose one option from the design question in the "What Should Move" section.
-The recommendation is Option B: add `clawperator install remediate` that loops
+The recommendation is Option B: add `clawperator operator remediate` that loops
 over connected devices and calls per-device `operator download` + `doctor --fix
 --device <id>`. This collapses `run_doctor_and_fix`,
 `collect_multi_device_apk_setup_targets`, and `doctor_each_connected_device`
@@ -304,7 +305,7 @@ into a single CLI call from the shell.
   grant-device-permissions
 - Integration or emulator test for single-device `--fix` end-to-end (APK
   missing -> fix -> doctor passes)
-- For Option B: unit tests for `install remediate` device enumeration and
+- For Option B: unit tests for `operator remediate` device enumeration and
   per-device result aggregation
 
 **Validation suite migration:** `test_main.sh` and `test_multidevice.sh` stubs
@@ -342,7 +343,7 @@ After all phases, `install.sh` becomes a ~200-line bootstrap stub:
 4. adb / git / curl checks
 5. `npm install -g clawperator@latest`
 6. `clawperator operator download` (fetch latest release APK)
-7. `clawperator install remediate` or `clawperator doctor --fix` (install APK per device, grant permissions)
+7. `clawperator operator remediate` or `clawperator doctor --fix` (install APK per device, grant permissions)
 8. `clawperator skills install`
 9. `clawperator bundled-skills install`
 10. `clawperator host materialize-artifacts`
@@ -408,7 +409,7 @@ upgrade path:
 
 ```bash
 npm install -g clawperator@latest
-clawperator install remediate          # or doctor --fix per device
+clawperator operator remediate         # or doctor --fix per device
 clawperator bundled-skills update
 clawperator skills install
 clawperator host materialize-artifacts
@@ -442,7 +443,7 @@ Do not update the skill to reference commands that do not yet exist.
 
 **After Phase 2 ships** (`operator download`):
 - Add `clawperator operator download` step (or note it is subsumed by
-  `install remediate` / `doctor --fix`)
+  `operator remediate` / `doctor --fix`)
 
 **After Phase 3 ships** (multi-device remediation command + `--fix` expansion):
 - Replace `doctor --fix` step description with the resolved multi-device command
@@ -470,7 +471,7 @@ Which option for replacing the multi-device install loop?
 
 - Option A: Thin shell loop calling `clawperator doctor --json --device <id>`
   per device, keeping loop orchestration in install.sh
-- Option B: New `clawperator install remediate` command that enumerates
+- Option B: New `clawperator operator remediate` command that enumerates
   connected devices and runs per-device `operator download` + `doctor --fix`
   internally (recommended)
 - Option C: `doctor --each-device` flag
@@ -490,6 +491,19 @@ Before deleting the RC mutation, confirm: does any existing user-facing
 documentation or setup flow require `CLAWPERATOR_SKILLS_REGISTRY` to be set?
 Check `docs/setup.md` and `docs/api/`. If yes, update docs to reference the
 installed-home fallback first.
+
+## Execution Notes (2026-04-23)
+
+- `clawperator install` already exists in
+  `apps/node/src/cli/registry.ts` as a top-level invalid-command guidance alias
+  that points users to `clawperator operator setup --apk <path>`. A new
+  multi-device remediation entrypoint must not reuse that noun. The tightened
+  recommendation is `clawperator operator remediate`.
+- `readiness.handshake` in
+  `apps/node/src/domain/doctor/checks/readinessChecks.ts` already exposes a
+  `kind: "shell"` fix step for `clawperator grant-device-permissions`. The task
+  is to preserve that behavior while moving adjacent installer policy, not to
+  add a second grant step.
 
 ---
 

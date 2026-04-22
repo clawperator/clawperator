@@ -335,7 +335,8 @@ Key facts:
   (`operator setup`) but the preceding APK download step is `kind: "manual"`.
   `--fix` runs the setup step but cannot download the APK without the Phase 3
   command existing first.
-- `readiness.handshake` fail currently has no `kind: "shell"` fix step.
+- `readiness.handshake` fail already has a `kind: "shell"` fix step for
+  `clawperator grant-device-permissions`.
 - `doctor` takes a single `--device`. Multi-device looping is not inside doctor
   today and must not be added to `doctor --fix`.
 
@@ -344,8 +345,8 @@ established starting point.
 
 ### Multi-Device Surface Decision
 
-**Use Option B from `findings.md`:** Add a new `clawperator install remediate`
-command (or equivalent under an `install` group) that:
+**Use Option B from `findings.md`, tightened to the real CLI namespace:** Add a
+new `clawperator operator remediate` command that:
 
 1. enumerates all connected ADB devices
 2. for each device needing APK setup: runs `operator download` (if needed) then
@@ -353,15 +354,16 @@ command (or equivalent under an `install` group) that:
 3. emits a structured per-device result and overall summary
 
 Do not extend `doctor --fix` for multi-device. `doctor` is single-device by
-contract. Do not leave this choice to the implementer.
+contract. Do not use top-level `install` for this command: `clawperator
+install` is already reserved in `registry.ts` as invalid-command guidance that
+points users to `operator setup`. Do not leave this choice to the implementer.
 
 ### Files or Surfaces To Change
 
-- new file `apps/node/src/cli/commands/installRemediate.ts` (or equivalent
-  under an `install` CLI group)
+- new file `apps/node/src/cli/commands/operatorRemediate.ts`
 - `apps/node/src/cli/registry.ts` - register the new command
 - `apps/node/src/domain/doctor/checks/readinessChecks.ts` - change APK
-  download fix step kind and add handshake fix step
+  download fix step kind
 - `apps/node/src/domain/doctor/DoctorService.ts` - if any autofix plumbing
   changes are needed
 - `sites/landing/public/install.sh`
@@ -377,11 +379,10 @@ contract. Do not leave this choice to the implementer.
    `kind: "shell"` with value `clawperator operator download [--operator-package
    <pkg>]`. The subsequent `operator setup` step is already `kind: "shell"` and
    is correct. Do not change it.
-2. In `readinessChecks.ts`, add a `kind: "shell"` fix step to the
-   `readiness.handshake` fail case with value
-   `clawperator grant-device-permissions --device <id> [--operator-package <pkg>]`.
-   The `grant-device-permissions` command already exists.
-3. Add a new `clawperator install remediate` command:
+2. Preserve the existing `readiness.handshake` shell fix step for
+   `clawperator grant-device-permissions`. Do not regress or duplicate it while
+   editing adjacent readiness logic.
+3. Add a new `clawperator operator remediate` command:
    - enumerate connected ADB devices
    - for each device where `doctor --json --device <id>` shows APK setup or
      version compatibility fail: run `operator download` (skip if APK already
@@ -389,18 +390,19 @@ contract. Do not leave this choice to the implementer.
    - emit structured output: per-device status map and overall `ok` boolean
    - support `--operator-package <pkg>` and `--output <json|pretty>`
 4. Replace the shell-side policy helpers in `install.sh` that parse doctor
-   JSON and multi-device readiness with a call to `clawperator install
+   JSON and multi-device readiness with a call to `clawperator operator
    remediate`. The installer reads the structured result and renders a summary.
 5. Add tests in the same phase. Required cases:
 
    For `readinessChecks.ts` fix step changes:
    - `readiness.apk.presence` fail fix steps now include a `kind: "shell"` download
      step before the setup step
-   - `readiness.handshake` fail fix steps include a `kind: "shell"` grant step
+   - `readiness.handshake` fail continues to include exactly one `kind: "shell"`
+     grant step
    - `doctor --fix --device <id>` with APK absent and Phase 3 download command
      available: verifies download step runs before setup step in autofix path
 
-   For `clawperator install remediate`:
+   For `clawperator operator remediate`:
    - no connected device → exits 0, reports no devices
    - single device needing APK remediation → remediates, structured result
    - multiple devices with mixed ready, warn, stale, and
@@ -417,7 +419,7 @@ contract. Do not leave this choice to the implementer.
 ### Acceptance Criteria
 
 - `readiness.apk.presence` fail has a `kind: "shell"` download step
-- `readiness.handshake` fail has a `kind: "shell"` grant step
+- `readiness.handshake` fail still has exactly one `kind: "shell"` grant step
 - a new CLI-owned multi-device install remediation surface exists
 - `install.sh` no longer parses internal doctor check ids to make product
   decisions
@@ -443,11 +445,11 @@ bash -n sites/landing/public/install.sh
 ### Expected Commits
 
 ```text
-fix(node): wire operator download and handshake grant as shell fix steps
+fix(node): wire operator download into doctor autofix
 ```
 
 ```text
-feat(node): add install remediate command for multi-device setup policy
+feat(node): add operator remediate command for multi-device setup policy
 ```
 
 ```text
@@ -498,7 +500,7 @@ CLI-first upgrade path with `install.sh` retained as recovery-only fallback.
    2. if reachable, run the full CLI upgrade sequence:
       ```
       npm install -g clawperator@latest
-      clawperator install remediate
+      clawperator operator remediate
       clawperator bundled-skills update
       clawperator skills install
       clawperator host materialize-artifacts
