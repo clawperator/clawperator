@@ -47,7 +47,7 @@ durable onboarding files under `~/.clawperator/`:
 
 | Path | Meaning | When to read it |
 | --- | --- | --- |
-| `~/.clawperator/AGENTS.md` | Local Clawperator guide with runtime-skill discovery commands and current agent-skills status | First stop for a host agent that needs to discover what Clawperator can do on this machine |
+| `~/.clawperator/AGENTS.md` | Local Clawperator guide with runtime-skill discovery commands and current bundled-skills status | First stop for a host agent that needs to discover what Clawperator can do on this machine |
 | `~/.clawperator/install-state.json` | Durable install metadata written by the installer | Use when you need the last known install facts without rerunning `doctor` |
 | `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config for Claude Desktop, Codex, and a generic stdio MCP consumer | Use when the host should connect through `clawperator mcp serve` instead of shelling out to the CLI |
 

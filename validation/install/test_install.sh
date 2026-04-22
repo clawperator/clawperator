@@ -8,7 +8,7 @@ run_node_install_validation() {
         -u CLAWPERATOR_SKILLS_REGISTRY \
         -u CLAWPERATOR_DEFAULT_ANDROID_DEVICE_ID \
         -u CLAWPERATOR_OPERATOR_PACKAGE \
-        -u CLAWPERATOR_AGENT_SKILLS \
+        -u CLAWPERATOR_BUNDLED_SKILLS \
         -u CLAWPERATOR_BIN \
         -u CLAWPERATOR_SKILL_AGENT_CLI \
         -u CLAWPERATOR_LOG_DIR \
@@ -39,7 +39,7 @@ else
     ensure_node_build
 fi
 
-echo "=== Running install-related validation harnesses (including shared-agent bridge coverage) ==="
+echo "=== Running install-related validation harnesses (including shared agent bridge coverage) ==="
 bash validation/test_doctor.sh
 bash validation/install/test_multidevice.sh
 bash validation/install/test_java.sh

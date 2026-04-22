@@ -4,13 +4,13 @@
 
 Choose the correct Clawperator front door after install: runtime-skill discovery
 through `clawperator skills`, installed authoring-workflow discovery through
-`clawperator agent-skills`, long-running tool registration through
+`clawperator bundled-skills`, long-running tool registration through
 `clawperator mcp serve`, or direct action work through the CLI and local API.
 This page also defines the zero-results route: when runtime-skill discovery
 finds no relevant match, start with `clawperator-skill-author-by-agent-discovery` and use
 `clawperator-skill-author-by-recording` only after discovery returns
 `proceed_to_recording`, or when the route is already well understood.
-If packaged first-party agent-skills are installed, `clawperator-agent-orientation`
+If packaged first-party bundled skills are installed, `clawperator-agent-orientation`
 is the first-run packaged front door for this route and should point back to
 this page, while `clawperator-upgrade` is the packaged whole-product upgrade
 route through `install.sh` and `doctor` after explicit upgrade intent is
@@ -47,9 +47,9 @@ later `snapshot`, `skills run`, and direct-action commands.
 Use this order:
 
 1. Read this page.
-2. If packaged first-party agent-skills are installed and you are unfamiliar
+2. If packaged first-party bundled skills are installed and you are unfamiliar
    with this host, start with `clawperator-agent-orientation`. It should verify
-   readiness, separate runtime skills from agent-skills, and end with one
+   readiness, separate runtime skills from bundled skills, and end with one
    concrete next step.
 3. If the user or calling workflow explicitly chose a whole-product refresh,
    use `clawperator-upgrade`.
@@ -67,7 +67,7 @@ Use this order:
 | You only know user-language terms such as app name or intent | `clawperator skills search --keyword <text> --json` | Search is the fallback when you do not have the package id yet. |
 | You already have a skill id and want the exact metadata | `clawperator skills get <skill_id> --json` | Confirms the registry entry before a run. |
 | You want to execute a skill through the wrapper | `clawperator skills run <skill_id> ... --json` | Uses the runtime-skill wrapper and its validation gate. |
-| Runtime-skill discovery returned no relevant match and you need the zero-results authoring route | `clawperator agent-skills list --json` | Agent-skills are separate from runtime skills. Start with `clawperator-skill-author-by-agent-discovery`, then use `clawperator-skill-author-by-recording` only after discovery returns `proceed_to_recording`, or when the route is already well understood. |
+| Runtime-skill discovery returned no relevant match and you need the zero-results authoring route | `clawperator bundled-skills list --json` | Bundled skills are separate from runtime skills. Start with `clawperator-skill-author-by-agent-discovery`, then use `clawperator-skill-author-by-recording` only after discovery returns `proceed_to_recording`, or when the route is already well understood. |
 | Your host already supports stdio MCP and wants registered tools such as `devices`, `snapshot`, `execute`, and `configure` | `clawperator mcp serve` | MCP is the transport surface for long-running tool registration. |
 | You already know the exact action payload you want to send | [Quickstart](quickstart.md) | Quickstart covers the observe / decide / act loop directly. |
 
@@ -91,8 +91,8 @@ Decision rules:
 - Do not start with `skills list` unless the real task is inventory rather than
   app-oriented discovery.
 - If discovery returns zero relevant matches and the next job is skill creation
-  rather than raw execution, inspect installed agent-skills with
-  `clawperator agent-skills list --json`, start with
+  rather than raw execution, inspect installed bundled skills with
+  `clawperator bundled-skills list --json`, start with
   `clawperator-skill-author-by-agent-discovery`, and continue to
   [Authoring](skills/authoring.md).
 
@@ -103,7 +103,7 @@ relevant installed match.
 
 | Situation | Next surface | Expected outcome |
 | --- | --- | --- |
-| No relevant runtime skill match and the next job is choosing the truthful route | `clawperator agent-skills list --json` | Confirm the installed agent-skill front doors on this host. |
+| No relevant runtime skill match and the next job is choosing the truthful route | `clawperator bundled-skills list --json` | Confirm the installed bundled-skill front doors on this host. |
 | You need the bounded zero-results front door | `clawperator-skill-author-by-agent-discovery` | Produce one discovery artifact and choose exactly one next step. |
 | Discovery returns `proceed_to_recording`, or the route is already well understood | `clawperator-skill-author-by-recording` | Run the proving workflow from a fresh recording and one self-test. |
 | You explicitly want the low-level manual scaffold instead of the installed guided workflows | `clawperator skills new <skill_id>` | Create a local scaffold only. |
@@ -162,7 +162,7 @@ clawperator mcp serve
    request, inspect the installed authoring-workflow helpers:
 
 ```bash
-clawperator agent-skills list --json
+clawperator bundled-skills list --json
 ```
 
 Then continue to [Authoring](skills/authoring.md), start with
@@ -180,7 +180,7 @@ These files help a host orient after install:
 | `~/.clawperator/install-state.json` | Durable install metadata | Check `registryPath`, `cliVersion`, and `lastDeviceSerial` without rerunning install. |
 | `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config | Use it when you choose the MCP route. |
 | `~/.clawperator/skills/skills/skills-registry.json` | Installed runtime-skills registry | Verify it exists when `skills list` or `skills for-app` cannot discover skills. |
-| `~/.clawperator/agent-skills/` | Installed first-party agent-skills | Inspect it through `clawperator agent-skills list --json` when runtime discovery returns no relevant match. |
+| `~/.clawperator/bundled-skills/` | Installed first-party bundled skills | Inspect it through `clawperator bundled-skills list --json` when runtime discovery returns no relevant match. |
 
 ## Verification
 
@@ -189,23 +189,23 @@ Use these commands to confirm the intended surface is working:
 ```bash
 clawperator --help
 clawperator skills --help
-clawperator agent-skills --help
+clawperator bundled-skills --help
 clawperator skills for-app com.android.settings --json
 clawperator skills search --keyword settings --json
 clawperator skills get com.android.settings.capture-overview --json
 clawperator skills list --json
-clawperator agent-skills list --json
+clawperator bundled-skills list --json
 ```
 
 Check:
 
-- `clawperator --help` and `clawperator skills --help` name `clawperator-agent-orientation` as the first-run surface for unfamiliar hosts and point zero-match users to `clawperator agent-skills list`
+- `clawperator --help` and `clawperator skills --help` name `clawperator-agent-orientation` as the first-run surface for unfamiliar hosts and point zero-match users to `clawperator bundled-skills list`
 - `clawperator --help` and `clawperator skills --help` name `clawperator-upgrade` as the packaged whole-product refresh route
-- `clawperator agent-skills --help` names `clawperator-agent-orientation` as the first-run orientation skill, `clawperator-upgrade` as the packaged whole-product upgrade route after explicit upgrade intent, `clawperator-skill-author-by-agent-discovery` as the zero-results front door, and `clawperator-skill-author-by-recording` as the proving workflow
+- `clawperator bundled-skills --help` names `clawperator-agent-orientation` as the first-run orientation skill, `clawperator-upgrade` as the packaged whole-product upgrade route after explicit upgrade intent, `clawperator-skill-author-by-agent-discovery` as the zero-results front door, and `clawperator-skill-author-by-recording` as the proving workflow
 - `skills for-app`, `skills search`, and `skills list` return top-level `skills` and `count`
 - `skills get` returns a top-level `skill`
-- `agent-skills list` returns top-level `skills`, `count`, and `installedDir`
-- `agent-skills list` includes `clawperator-agent-orientation`, `clawperator-upgrade`, `clawperator-skill-author-by-agent-discovery`, and `clawperator-skill-author-by-recording` in `skills[].name`
+- `bundled-skills list` returns top-level `skills`, `count`, and `installedDir`
+- `bundled-skills list` includes `clawperator-agent-orientation`, `clawperator-upgrade`, `clawperator-skill-author-by-agent-discovery`, and `clawperator-skill-author-by-recording` in `skills[].name`
 
 For MCP:
 

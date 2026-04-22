@@ -34,8 +34,8 @@ dependencies for you.
   - covers `maybe_install_operator_apk()` behavior when multiple devices are
     connected
 - `test_agent_skills.sh`
-  - covers agent-skills shell glue including parser behavior,
-    `setup_agent_skills_via_cli()`, `write_agent_guide()`, skip behavior,
+  - covers bundled-skills shell glue including parser behavior,
+    `setup_bundled_skills_via_cli()`, `write_agent_guide()`, skip behavior,
     `CODEX_HOME` fallback, and installer metadata parsing
 - `test_main.sh`
   - covers hermetic `main()` smoke paths including success, final-doctor
