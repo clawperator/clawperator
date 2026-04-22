@@ -984,7 +984,7 @@ COMMANDS["host"] = {
   group: "Setup",
   supportedFlags: (rest) => {
     const sub = rest[0];
-    if (sub === "setup" || sub === "materialize-artifacts") {
+    if (sub === "setup") {
       return ["--installed-at", "--cli-version", "--apk-version", "--last-device-serial"];
     }
     return [];
@@ -993,14 +993,13 @@ COMMANDS["host"] = {
   help: HELP_HOST,
   subtopics: {
     setup: HELP_HOST,
-    "materialize-artifacts": HELP_HOST,
   },
   topLevelBlock: `  host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]
                                             Write install-state, MCP snippet, local AGENTS.md, and the shared-agent bridge`,
   handler: async (ctx) => {
     const { rest, format, verbose } = ctx;
     const sub = rest[0];
-    if (sub === "setup" || sub === "materialize-artifacts") {
+    if (sub === "setup") {
       return (await import("./commands/host.js")).cmdHostSetup({
         format,
         verbose,
