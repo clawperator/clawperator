@@ -52,6 +52,10 @@ export interface HostSetupOptions {
   env?: NodeJS.ProcessEnv;
 }
 
+function isNonFatalHostArtifactFailure(result: HostArtifactOutcome): boolean {
+  return result.artifact === "sharedAgentBridge" && result.status === "failed";
+}
+
 interface RuntimeSkillSummary {
   applicationId: string;
   skills: Array<{
@@ -763,7 +767,7 @@ export async function setupHost(
   );
 
   return {
-    ok: summary.failed === 0,
+    ok: results.every((result) => result.status !== "failed" || isNonFatalHostArtifactFailure(result)),
     artifacts: results,
     summary,
   };

@@ -1,6 +1,6 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cmdHostSetup } from "../../cli/commands/host.js";
@@ -217,6 +217,37 @@ describe("setupHost", () => {
       await rm(homeDir, { recursive: true, force: true });
     }
   });
+
+  it("keeps shared-agent bridge failures non-fatal while reporting the failed artifact", async () => {
+    const homeDir = await makeTempHome();
+
+    try {
+      const sharedAgentsPath = join(homeDir, ".agents", "AGENTS.md");
+      await mkdir(join(homeDir, ".agents"), { recursive: true });
+      await writeFile(join(homeDir, ".agents", "real-guide.md"), "# Shared Guide\n", "utf8");
+      await symlink("real-guide.md", sharedAgentsPath);
+
+      const result = await setupHost({
+        env: { HOME: homeDir },
+        installedAt: "2026-04-23T10:11:12Z",
+        cliJsPath: "/opt/clawperator/dist/cli/index.js",
+        processExecPath: "/usr/local/bin/node",
+      });
+
+      const bridge = result.artifacts.find((artifact) => artifact.artifact === "sharedAgentBridge");
+      assert.strictEqual(result.ok, true);
+      assert.deepStrictEqual(result.summary, {
+        written: 3,
+        updated: 0,
+        skipped: 0,
+        failed: 1,
+      });
+      assert.strictEqual(bridge?.status, "failed");
+      assert.match(bridge?.message ?? "", /must be a regular file/);
+    } finally {
+      await rm(homeDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("cmdHostSetup", () => {
@@ -261,6 +292,35 @@ describe("cmdHostSetup", () => {
         failed: 0,
       });
       assert.strictEqual(second.ok, true);
+    } finally {
+      await rm(homeDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not set a failure exit code when only the shared-agent bridge fails", async () => {
+    const homeDir = await makeTempHome();
+
+    try {
+      process.env.HOME = homeDir;
+      delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+      delete process.env.SKILLS_REGISTRY_PATH;
+      delete process.env.ADB_PATH;
+      delete process.env.CODEX_HOME;
+
+      await mkdir(join(homeDir, ".agents"), { recursive: true });
+      await writeFile(join(homeDir, ".agents", "real-guide.md"), "# Shared Guide\n", "utf8");
+      await symlink("real-guide.md", join(homeDir, ".agents", "AGENTS.md"));
+
+      const output = JSON.parse(await cmdHostSetup({
+        format: "json",
+        installedAt: "2026-04-23T10:11:12Z",
+      }));
+
+      const bridge = output.artifacts.find((artifact: { artifact: string }) => artifact.artifact === "sharedAgentBridge");
+      assert.strictEqual(output.ok, true);
+      assert.strictEqual(process.exitCode, undefined);
+      assert.strictEqual(bridge?.status, "failed");
+      assert.match(bridge?.message ?? "", /must be a regular file/);
     } finally {
       await rm(homeDir, { recursive: true, force: true });
     }
