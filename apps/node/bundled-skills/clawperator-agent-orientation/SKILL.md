@@ -12,6 +12,15 @@ This is a first-run orientation and routing skill. It should get the agent from
 "I know Clawperator is installed" to "I know which surface to use next and
 which canonical docs to trust."
 
+## Machine-Readable Docs
+
+The full Clawperator documentation is available in machine-readable form:
+
+- `https://docs.clawperator.com/llms.txt` - docs index with key page links
+- `https://docs.clawperator.com/llms-full.txt` - complete compiled documentation
+
+Use these instead of parsing the HTML docs site.
+
 ## What This Skill Owns
 
 - verify the local host is ready to use Clawperator

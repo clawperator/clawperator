@@ -130,10 +130,12 @@ describe("CLI help", () => {
     assert.match(stdout, /Commands:/);
   });
 
-  it("shows validate-only in top-level exec help", async () => {
+  it("shows top-level discovery notes in help output", async () => {
     const { stdout, code } = await runCli(["--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /exec <json-or-file> \[--validate-only\]/);
+    assert.match(stdout, /https:\/\/docs\.clawperator\.com\/llms\.txt/);
+    assert.match(stdout, /https:\/\/docs\.clawperator\.com\/llms-full\.txt/);
     assert.match(stdout, /https:\/\/docs\.clawperator\.com\/host-agents\//);
     assert.match(stdout, /clawperator-agent-orientation/);
     assert.match(stdout, /clawperator-upgrade/);
@@ -142,6 +144,13 @@ describe("CLI help", () => {
     assert.match(stdout, /clawperator-skill-author-by-agent-discovery/);
     assert.match(stdout, /clawperator-skill-author-by-recording/);
     assert.match(stdout, /mcp serve/);
+  });
+
+  it("exec --help includes the raw-route orientation reminder", async () => {
+    const { stdout, code } = await runCli(["exec", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /bundled-skills list/);
+    assert.match(stdout, /clawperator-agent-orientation/);
   });
 
   it("shows top-level help for help mcp serve", async () => {
@@ -670,6 +679,8 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator snapshot/);
     assert.match(stdout, /--timeout <ms>/);
+    assert.match(stdout, /bundled-skills list/);
+    assert.match(stdout, /clawperator-agent-orientation/);
     assert.doesNotMatch(stdout, /--file/);
   });
 

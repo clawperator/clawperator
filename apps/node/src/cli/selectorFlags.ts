@@ -1,5 +1,5 @@
 /**
- * Phase 3: Selector flag resolution helpers.
+ * Selector flag resolution helpers.
  *
  * Parses simple selector flags (--text, --id, --desc, --role, etc.) and
  * container selector flags (--container-text, --container-id, etc.) from
@@ -384,7 +384,7 @@ const SELECTOR_FLAG_LIST = `Use one of:
   --coordinate <x> <y>    Exact coordinates (pixels)
   --selector <json>       Raw JSON (advanced)`;
 
-/** Build the Phase 3 missing-selector error for a given command (respects output format). */
+/** Build the missing-selector error for a given command (respects output format). */
 export function makeMissingSelectorError(command: string, format: OutputFormat = "json"): string {
   return formatError(
     {

@@ -35,6 +35,32 @@ Verification pattern - preview a composed navigation payload without dispatching
 clawperator exec --dry-run --execution '{"commandId":"settings-nav-1","taskId":"settings-nav-1","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"open","type":"open_app","params":{"applicationId":"com.android.settings"}},{"id":"wait","type":"wait_for_navigation","params":{"expectedPackage":"com.android.settings","timeoutMs":5000}},{"id":"snap","type":"snapshot_ui"}]}'
 ```
 
+## Launcher And Home-Screen Navigation
+
+Treat the launcher as a special-case navigation surface.
+
+Practical rules:
+
+- prefer direct `open_app` for installed apps instead of trying to traverse the
+  home screen first
+- do not assume a paged launcher workspace is a generic scrollable container
+- use `snapshot_ui` to confirm what surface is actually visible before choosing
+  the next action
+
+Why this matters:
+
+- launcher pages may appear in the snapshot XML even when the visible workspace
+  does not expose a container that Clawperator can drive with `scroll`
+- a home-screen attempt that looks swipeable to a human can still fail with a
+  container-level error such as `CONTAINER_NOT_SCROLLABLE`
+- chooser windows, permission prompts, and other overlays can complicate
+  `wait_for_navigation` even when the target package ultimately reaches the
+  foreground
+
+If the app is already installed and you know the package ID, `open_app` plus
+`wait_for_navigation` plus `snapshot_ui` is usually a more deterministic route
+than launcher traversal.
+
 ## `open_app`
 
 `open_app` requires:

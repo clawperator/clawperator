@@ -722,6 +722,11 @@ Observe  ->  Decide  ->  Act
 
 Repeat until the task is done.
 
+**Targeting rule:** do not guess selectors. If the next action needs a target,
+take a fresh `snapshot_ui`, derive the selector from the current hierarchy, and
+then act. A guessed label failing is not a Clawperator bug - it means the
+target was not proven from the current screen state.
+
 ---
 
 ## Step 1: Observe
@@ -2958,6 +2963,33 @@ becomes the matcher:
   "role": "button"
 }
 ```
+
+## Choosing A Stable Selector
+
+Treat selector choice as practical guidance, not as a guaranteed ranking that
+applies to every app.
+
+When more than one selector is available, prefer this order:
+
+1. `resourceId` with a stable Android framework value (e.g., `android:id/title`)
+2. `contentDescEquals`
+3. `textEquals` or `textContains`
+4. `resourceId` with an app-generated or opaque value (last resort)
+
+Why this order is usually safer:
+
+- Android framework `resourceId` values tend to be stable across app versions;
+  app-generated IDs are often tied to a specific build and can change
+- content descriptions work well for icon buttons and other controls where
+  visible text is empty
+- visible text is often the most obvious signal but can be brittle when labels
+  are dynamic or localized
+- app-generated `resourceId` values can work, but they are usually the most
+  version-fragile option
+
+Compose-heavy trees may expose fewer stable IDs and more internal resource
+names. In those cases, `contentDescEquals` and visible text may be the most
+practical stable selectors available.
 
 ## Selector Flags
 
@@ -7263,6 +7295,32 @@ Verification pattern - preview a composed navigation payload without dispatching
 ```bash
 clawperator exec --dry-run --execution '{"commandId":"settings-nav-1","taskId":"settings-nav-1","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"open","type":"open_app","params":{"applicationId":"com.android.settings"}},{"id":"wait","type":"wait_for_navigation","params":{"expectedPackage":"com.android.settings","timeoutMs":5000}},{"id":"snap","type":"snapshot_ui"}]}'
 ```
+
+## Launcher And Home-Screen Navigation
+
+Treat the launcher as a special-case navigation surface.
+
+Practical rules:
+
+- prefer direct `open_app` for installed apps instead of trying to traverse the
+  home screen first
+- do not assume a paged launcher workspace is a generic scrollable container
+- use `snapshot_ui` to confirm what surface is actually visible before choosing
+  the next action
+
+Why this matters:
+
+- launcher pages may appear in the snapshot XML even when the visible workspace
+  does not expose a container that Clawperator can drive with `scroll`
+- a home-screen attempt that looks swipeable to a human can still fail with a
+  container-level error such as `CONTAINER_NOT_SCROLLABLE`
+- chooser windows, permission prompts, and other overlays can complicate
+  `wait_for_navigation` even when the target package ultimately reaches the
+  foreground
+
+If the app is already installed and you know the package ID, `open_app` plus
+`wait_for_navigation` plus `snapshot_ui` is usually a more deterministic route
+than launcher traversal.
 
 ## `open_app`
 
