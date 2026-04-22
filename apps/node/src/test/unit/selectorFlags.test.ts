@@ -387,10 +387,10 @@ describe("makeMissingSelectorError", () => {
 });
 
 // ---------------------------------------------------------------------------
-// CLI-level: MISSING_SELECTOR with Phase 3 help text
+// CLI-level: MISSING_SELECTOR with selector flag help text
 // ---------------------------------------------------------------------------
 
-describe("CLI: missing selector returns Phase 3 help text", () => {
+describe("CLI: missing selector returns selector flag help text", () => {
   it("click with no selector returns MISSING_SELECTOR with flag list", async () => {
     const { stdout, code } = await runCli(["click", "--json"]);
     assert.strictEqual(code, 1);
@@ -472,10 +472,10 @@ describe("CLI: duplicate selector flags return EXECUTION_VALIDATION_FAILED", () 
 });
 
 // ---------------------------------------------------------------------------
-// CLI-level: click --help shows Phase 3 flags
+// CLI-level: click --help shows selector flags
 // ---------------------------------------------------------------------------
 
-describe("CLI: click --help shows Phase 3 selector flags", () => {
+describe("CLI: click --help shows selector flags", () => {
   it("click --help documents --text and --id flags", async () => {
     const { stdout, code } = await runCli(["click", "--help"]);
     assert.strictEqual(code, 0);

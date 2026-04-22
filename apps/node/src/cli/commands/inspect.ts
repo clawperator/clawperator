@@ -1,6 +1,6 @@
 /**
  * inspect.ts - legacy compatibility shim (no longer registered in COMMANDS).
- * inspect ui was removed in the Phase 2 command surface refactor.
+ * inspect ui was removed from the registered command surface.
  * Use 'snapshot' instead.
  */
 import { cmdObserveSnapshot } from "./observe.js";

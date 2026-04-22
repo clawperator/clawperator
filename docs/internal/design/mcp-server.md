@@ -102,7 +102,7 @@ This behavior is intentional. The lock protects concurrent work inside one live 
 
 ## Real Smoke Verification Notes
 
-Phase 5 verification used the standalone terminal script at `validation/test_mcp_stdio_smoke.mjs`.
+The original verification pass used the standalone terminal script at `validation/test_mcp_stdio_smoke.mjs`.
 
 Durable caveats for future contributors:
 
