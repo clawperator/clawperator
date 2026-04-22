@@ -57,7 +57,7 @@ Why this matters:
   `wait_for_navigation` even when the target package ultimately reaches the
   foreground
 
-If the app is already installed and you know the package id, `open_app` plus
+If the app is already installed and you know the package ID, `open_app` plus
 `wait_for_navigation` plus `snapshot_ui` is usually a more deterministic route
 than launcher traversal.
 

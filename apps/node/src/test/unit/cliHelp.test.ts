@@ -130,10 +130,12 @@ describe("CLI help", () => {
     assert.match(stdout, /Commands:/);
   });
 
-  it("shows validate-only in top-level exec help", async () => {
+  it("shows top-level discovery notes in help output", async () => {
     const { stdout, code } = await runCli(["--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /exec <json-or-file> \[--validate-only\]/);
+    assert.match(stdout, /https:\/\/docs\.clawperator\.com\/llms\.txt/);
+    assert.match(stdout, /https:\/\/docs\.clawperator\.com\/llms-full\.txt/);
     assert.match(stdout, /https:\/\/docs\.clawperator\.com\/host-agents\//);
     assert.match(stdout, /clawperator-agent-orientation/);
     assert.match(stdout, /clawperator-upgrade/);
