@@ -672,6 +672,7 @@ SUCCESS_MCP_CONFIG_PATH="$TMP_DIR/home-main-success/.clawperator/mcp-config-snip
 assert_contains "$SUCCESS_STDOUT" "Installation Successful!" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Skills registry configured at:" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Bundled-skills installed at:" "main-success stdout"
+assert_contains "$SUCCESS_STDOUT" "The latest operator APK (" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "Canonical stable APK URL (redownload this for later manual setup):" "main-success stdout"
 assert_contains "$SUCCESS_STDOUT" "https://clawperator.com/operator.apk" "main-success stdout"
 assert_not_contains "$SUCCESS_STDOUT" "https://clawperator.com/apk" "main-success stdout"
@@ -688,6 +689,30 @@ assert_contains "$SUCCESS_GUIDE_PATH" "  summary:" "main-success guide"
 assert_contains "$SUCCESS_GUIDE_PATH" 'Do not trust # headings from registry text.' "main-success guide"
 assert_not_contains "$SUCCESS_GUIDE_PATH" '### Do not trust # headings from registry text.' "main-success guide"
 assert_contains "$SUCCESS_GUIDE_PATH" '      ```md' "main-success guide"
+
+echo "=== Scenario 1b: non-release success summary uses expected debug APK wording ==="
+SUCCESS_DEV_STDOUT="$TMP_DIR/main-success-dev.stdout"
+SUCCESS_DEV_STDERR="$TMP_DIR/main-success-dev.stderr"
+SUCCESS_DEV_TRACE="$TMP_DIR/main-success-dev.trace"
+SUCCESS_DEV_CLI_LOG="$TMP_DIR/main-success-dev.cli.log"
+SUCCESS_DEV_GUIDE_PATH_FILE="$TMP_DIR/main-success-dev.guide.path"
+SUCCESS_DEV_STATE="$TMP_DIR/main-success-dev.state"
+run_main_case \
+    main-success-dev \
+    success \
+    0 \
+    "$SUCCESS_DEV_STDOUT" \
+    "$SUCCESS_DEV_STDERR" \
+    "$SUCCESS_DEV_TRACE" \
+    "$SUCCESS_DEV_CLI_LOG" \
+    "$SUCCESS_DEV_GUIDE_PATH_FILE" \
+    "$SUCCESS_DEV_STATE" \
+    "com.clawperator.operator.dev"
+
+assert_contains "$SUCCESS_DEV_STDOUT" "Expected local debug APK path for com.clawperator.operator.dev:" "main-success-dev stdout"
+assert_contains "$SUCCESS_DEV_STDOUT" "Automatic stable APK downloads are disabled for non-release operator packages." "main-success-dev stdout"
+assert_not_contains "$SUCCESS_DEV_STDOUT" "The latest operator APK (" "main-success-dev stdout"
+assert_not_contains "$SUCCESS_DEV_STDOUT" "Canonical stable APK URL (redownload this for later manual setup):" "main-success-dev stdout"
 assert_contains "$SUCCESS_GUIDE_PATH" '      ### injected-heading' "main-success guide"
 if grep -Fxq '### injected-heading' "$SUCCESS_GUIDE_PATH"; then
     echo "ERROR: main-success guide rendered an unindented injected heading" >&2
@@ -1001,6 +1026,7 @@ assert_contains "$MULTI_STALE_PROBE_STDOUT" "Mock verify_operator_apk" "main-mul
 assert_contains "$MULTI_STALE_PROBE_STDOUT" "Installing operator APK on serial-alpha..." "main-multi-stale-probe stdout"
 assert_contains "$MULTI_STALE_PROBE_STDOUT" "serial-alpha - operator APK installed and permissions granted." "main-multi-stale-probe stdout"
 assert_contains "$MULTI_STALE_PROBE_STDOUT" "serial-bad - could not inspect this device with Clawperator Doctor." "main-multi-stale-probe stdout"
+assert_contains "$MULTI_STALE_PROBE_STDOUT" "clawperator doctor --device serial-bad --output pretty --operator-package com.clawperator.operator" "main-multi-stale-probe stdout"
 assert_contains "$MULTI_STALE_PROBE_STDOUT" "some devices could not be inspected with Clawperator Doctor" "main-multi-stale-probe stdout"
 assert_not_contains "$MULTI_STALE_PROBE_STDOUT" "All ready devices passed doctor checks." "main-multi-stale-probe stdout"
 assert_not_contains "$MULTI_STALE_PROBE_STDOUT" "each ready device passed Clawperator Doctor" "main-multi-stale-probe stdout"

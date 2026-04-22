@@ -1944,7 +1944,7 @@ doctor_report_connected_device() {
 
     if ! doctor_json="$(doctor_device_json "$device_id" "$operator_package")"; then
         DOCTOR_DEVICE_STATUS="probe-failure"
-        echo -e "${RED}  ❌ ${device_id} - Clawperator Doctor could not inspect this device. Resolve the probe failure, then rerun: clawperator doctor --device ${device_id} --output pretty --operator-package ${operator_package}${NC}"
+        echo -e "${RED}  ❌ ${device_id} - Clawperator Doctor could not inspect this device. Resolve the probe failure, then rerun: $(doctor_command_text "$device_id" "$operator_package")${NC}"
         return 1
     fi
     if doctor_report_all_checks_pass "$doctor_json"; then
@@ -2253,14 +2253,15 @@ main() {
     echo -e "Info:"
     echo -e "1. ${YELLOW}Clawperator binary installed at:${NC}"
     echo -e "   ${BLUE}${CLAWPERATOR_BIN_PATH:-clawperator}${NC}"
-    echo -e "2. The latest operator APK (${YELLOW}${OPERATOR_VERSION:-unknown}${NC}) is saved at:"
-    echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
     if operator_package_uses_public_release_apk; then
+        echo -e "2. The latest operator APK (${YELLOW}${OPERATOR_VERSION:-unknown}${NC}) is saved at:"
+        echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
         echo -e "3. Canonical stable APK URL (redownload this for later manual setup):"
         echo -e "   ${BLUE}https://clawperator.com/operator.apk${NC}"
     else
-        echo -e "3. Expected local debug APK path for ${DEFAULT_OPERATOR_PACKAGE}:"
+        echo -e "2. Expected local debug APK path for ${DEFAULT_OPERATOR_PACKAGE}:"
         echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
+        echo -e "3. Automatic stable APK downloads are disabled for non-release operator packages."
     fi
     echo -e "4. Historical releases and artifacts remain at:"
     echo -e "   ${BLUE}https://github.com/clawperator/clawperator/releases${NC}"
