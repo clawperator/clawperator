@@ -14,8 +14,12 @@ curl -fsSL https://clawperator.com/install.sh | bash
 **Canonical device setup:**
 To prepare an Android device, use the one-step setup command which installs the [Clawperator Operator Android app](https://docs.clawperator.com/getting-started/android-operator-apk/) and grants all required device permissions:
 ```bash
-clawperator operator setup --apk <path_to_operator.apk>
+mkdir -p ~/.clawperator/downloads
+curl -fsSL https://clawperator.com/operator.apk -o ~/.clawperator/downloads/operator.apk
+clawperator operator setup --apk ~/.clawperator/downloads/operator.apk
 ```
+
+Stable APK URL: `https://clawperator.com/operator.apk`
 
 Clawperator is an actuator, not an autonomous planner. It focuses on reliable, predictable execution of UI-driven workflows on real **Android devices**.
 

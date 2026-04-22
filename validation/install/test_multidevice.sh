@@ -23,8 +23,21 @@ assert_contains() {
     local file="$1"
     local needle="$2"
     local label="$3"
-    if ! grep -Fq "$needle" "$file"; then
+    if ! grep -Fq -- "$needle" "$file"; then
         echo "ERROR: $label missing expected output: $needle" >&2
+        echo "--- stdout ---" >&2
+        cat "$file" >&2
+        echo "--------------" >&2
+        return 1
+    fi
+}
+
+assert_not_contains() {
+    local file="$1"
+    local needle="$2"
+    local label="$3"
+    if grep -Fq -- "$needle" "$file"; then
+        echo "ERROR: $label unexpectedly contained: $needle" >&2
         echo "--- stdout ---" >&2
         cat "$file" >&2
         echo "--------------" >&2
@@ -89,7 +102,7 @@ fi
 exit 2
 EOF
             ;;
-        critical-warning)
+        warning-only)
             cat > "$mock_dir/adb" <<'EOF'
 #!/usr/bin/env bash
 cat <<'OUT'
@@ -118,21 +131,130 @@ fi
 exit 2
 EOF
             ;;
-        empty-checks)
+        all-unready)
             cat > "$mock_dir/adb" <<'EOF'
 #!/usr/bin/env bash
 cat <<'OUT'
 List of devices attached
-serial-empty	device
+serial-unauthorized	unauthorized
+serial-offline	offline
+OUT
+EOF
+            chmod +x "$mock_dir/adb"
+            cat > "$mock_dir/clawperator" <<'EOF'
+#!/usr/bin/env bash
+exit 2
+EOF
+            ;;
+        stale-one)
+            cat > "$mock_dir/adb" <<'EOF'
+#!/usr/bin/env bash
+cat <<'OUT'
+List of devices attached
+serial-stale	device
 serial-ready	device
 OUT
 EOF
             chmod +x "$mock_dir/adb"
             cat > "$mock_dir/clawperator" <<'EOF'
 #!/usr/bin/env bash
-if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-empty ]; then
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-stale ]; then
     cat <<'JSON'
-{"ok":false,"criticalOk":false,"checks":[]}
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.version.compatibility","status":"fail","code":"VERSION_INCOMPATIBLE"}]}
+JSON
+    exit 1
+fi
+
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-ready ]; then
+    cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+    exit 0
+fi
+
+if [ "$1" = operator ] && [ "$2" = setup ] && [ "$3" = --apk ] && [ "$5" = --device ] && [ "$6" = serial-stale ]; then
+    exit 0
+fi
+
+exit 2
+EOF
+            ;;
+        probe-failure)
+            cat > "$mock_dir/adb" <<'EOF'
+#!/usr/bin/env bash
+cat <<'OUT'
+List of devices attached
+serial-bad	device
+serial-ready	device
+OUT
+EOF
+            chmod +x "$mock_dir/adb"
+            cat > "$mock_dir/clawperator" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-bad ]; then
+    printf '%s\n' 'not-json'
+    exit 1
+fi
+
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-ready ]; then
+    cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+    exit 0
+fi
+
+exit 2
+EOF
+            ;;
+        stale-many)
+            cat > "$mock_dir/adb" <<'EOF'
+#!/usr/bin/env bash
+cat <<'OUT'
+List of devices attached
+serial-alpha	device
+serial-beta	device
+serial-offline	offline
+OUT
+EOF
+            chmod +x "$mock_dir/adb"
+            cat > "$mock_dir/clawperator" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-alpha ]; then
+    cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.apk.presence","status":"fail","code":"OPERATOR_NOT_INSTALLED"}]}
+JSON
+    exit 1
+fi
+
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-beta ]; then
+    cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.version.compatibility","status":"fail","code":"VERSION_INCOMPATIBLE"}]}
+JSON
+    exit 1
+fi
+
+if [ "$1" = operator ] && [ "$2" = setup ] && [ "$3" = --apk ] && [ "$5" = --device ] && { [ "$6" = serial-alpha ] || [ "$6" = serial-beta ]; }; then
+    exit 0
+fi
+
+exit 2
+EOF
+            ;;
+        shell-unavailable)
+            cat > "$mock_dir/adb" <<'EOF'
+#!/usr/bin/env bash
+cat <<'OUT'
+List of devices attached
+serial-bad	device
+serial-ready	device
+OUT
+EOF
+            chmod +x "$mock_dir/adb"
+            cat > "$mock_dir/clawperator" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-bad ]; then
+    cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.apk.presence","status":"fail","code":"DEVICE_SHELL_UNAVAILABLE"}]}
 JSON
     exit 1
 fi
@@ -172,6 +294,7 @@ run_scenario() {
 
     PATH="$mock_dir:$PATH" \
     APK_LOCAL_PATH=/tmp/operator.apk \
+    OPERATOR_VERSION=9.9.9 \
     bash -c '
         source "$1" >/dev/null 2>&1
         trap - ERR
@@ -201,36 +324,133 @@ run_scenario() {
     fi
 }
 
-echo "=== Scenario 1: partial readiness stays in multi-device path ==="
+capture_setup_prompt() {
+    local operator_package="${1:-}"
+    local output_file="$2"
+    local home_dir="$TMP_DIR/prompt home'space"
+    mkdir -p "$home_dir"
+
+    HOME="$home_dir" \
+    CLAWPERATOR_OPERATOR_PACKAGE="$operator_package" \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        print_operator_setup_command "serial check'\''special" "${CLAWPERATOR_OPERATOR_PACKAGE:-}"
+    ' _ "$INSTALL_SCRIPT" >"$output_file"
+}
+
+capture_redownload_hint() {
+    local operator_package="${1:-}"
+    local output_file="$2"
+    local home_dir="$TMP_DIR/prompt home'space"
+    mkdir -p "$home_dir"
+
+    HOME="$home_dir" \
+    CLAWPERATOR_OPERATOR_PACKAGE="$operator_package" \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        print_operator_apk_redownload_hint
+    ' _ "$INSTALL_SCRIPT" >"$output_file"
+}
+
+echo "=== Scenario 1: ready devices stay ready while unauthorized devices are reported ==="
 run_scenario \
     partial \
     0 \
-    "Skipping APK install until every connected device is ready." \
-    "All devices ready. No setup required." \
-    "Installing operator APK on connected device..."
+    "All ready devices already have the required APK." \
+    "Installing operator APK on serial-ready..." \
+    "Complete Android setup on one target device with one of:"
+assert_contains "$TMP_DIR/partial.stdout" "serial-bad - ADB state: unauthorized. Unlock the device or restart ADB before setup." "partial stdout"
 
-echo "=== Scenario 2: all devices ready succeeds ==="
+echo "=== Scenario 2: all ready devices do not reinstall ==="
 run_scenario \
     all-ready \
     0 \
-    "All devices ready. No setup required." \
-    "Skipping APK install until every connected device is ready." \
+    "All connected devices already have the required APK." \
+    "Installing operator APK on serial-ready..." \
     "Installing operator APK on connected device..."
 
-echo "=== Scenario 3: warning-only devices are reported honestly ==="
+echo "=== Scenario 3: warning-only devices are not treated as APK targets ==="
 run_scenario \
-    critical-warning \
+    warning-only \
     0 \
-    "All devices passed critical checks. No setup required." \
-    "All devices ready. No setup required." \
-    "Skipping APK install until every connected device is ready."
+    "All connected devices already have the required APK." \
+    "Installing operator APK on serial-warning..." \
+    "Complete Android setup on one target device with one of:"
 
-echo "=== Scenario 4: empty checks are not treated as ready ==="
+echo "=== Scenario 4: all-unready devices stay in the ADB readiness lane ==="
 run_scenario \
-    empty-checks \
+    all-unready \
     0 \
-    "Skipping APK install until every connected device is ready." \
-    "serial-empty - ready"
-assert_contains "$TMP_DIR/empty-checks.stdout" "serial-empty - setup required: clawperator operator setup --apk $HOME/.clawperator/downloads/operator.apk --device serial-empty" "empty-checks stdout"
+    "No connected device is ready for ADB yet. Skipping APK install until one device is ready." \
+    "All ready devices already have the required APK." \
+    "Complete Android setup on one target device with one of:"
+
+echo "=== Scenario 5: probe failures abort remediation instead of being ignored ==="
+run_scenario \
+    probe-failure \
+    0 \
+    "Some ready devices could not be inspected with Clawperator Doctor. Skipping automatic APK install for those devices until the probe succeeds." \
+    "Installing operator APK on serial-bad..." \
+    "All connected devices already have the required APK."
+assert_contains "$TMP_DIR/probe-failure.stdout" "serial-bad - could not inspect this device with Clawperator Doctor." "probe-failure stdout"
+assert_not_contains "$TMP_DIR/probe-failure.stdout" "All ready devices already have the required APK." "probe-failure stdout"
+
+echo "=== Scenario 6: a stale ready device is upgraded in place ==="
+run_scenario \
+    stale-one \
+    0 \
+    "Installing operator APK on serial-stale..." \
+    "Complete Android setup on one target device with one of:" \
+    "All connected devices already have the required APK."
+assert_contains "$TMP_DIR/stale-one.stdout" "serial-stale - operator APK installed and permissions granted." "stale-one stdout"
+assert_not_contains "$TMP_DIR/stale-one.stdout" "Installing operator APK on serial-ready..." "stale-one stdout"
+
+echo "=== Scenario 7: multiple stale ready devices are upgraded while offline devices are skipped ==="
+run_scenario \
+    stale-many \
+    0 \
+    "Installing operator APK on serial-alpha..." \
+    "Complete Android setup on one target device with one of:" \
+    "All connected devices already have the required APK."
+assert_contains "$TMP_DIR/stale-many.stdout" "Installing operator APK on serial-beta..." "stale-many stdout"
+assert_contains "$TMP_DIR/stale-many.stdout" "serial-offline - ADB state: offline. Unlock the device or restart ADB before setup." "stale-many stdout"
+assert_contains "$TMP_DIR/stale-many.stdout" "Other detected devices were skipped until they are ready for ADB." "stale-many stdout"
+
+echo "=== Scenario 8: manual setup prompt omits the default operator package flag ==="
+DEFAULT_PROMPT_STDOUT="$TMP_DIR/default-prompt.stdout"
+capture_setup_prompt "com.clawperator.operator" "$DEFAULT_PROMPT_STDOUT"
+PROMPT_HOME="$TMP_DIR/prompt home'space"
+EXPECTED_DEFAULT_APK_PATH="$(printf '%q' "$PROMPT_HOME/.clawperator/downloads/operator.apk")"
+EXPECTED_SPECIAL_DEVICE_ID="$(printf '%q' "serial check'special")"
+assert_contains "$DEFAULT_PROMPT_STDOUT" "clawperator operator setup --apk $EXPECTED_DEFAULT_APK_PATH --device $EXPECTED_SPECIAL_DEVICE_ID" "default-prompt stdout"
+assert_not_contains "$DEFAULT_PROMPT_STDOUT" "--operator-package" "default-prompt stdout"
+
+echo "=== Scenario 9: manual setup prompt preserves non-default operator package guidance ==="
+DEV_PROMPT_STDOUT="$TMP_DIR/dev-prompt.stdout"
+capture_setup_prompt "com.clawperator.operator.dev" "$DEV_PROMPT_STDOUT"
+EXPECTED_DEV_APK_PATH="$(printf '%q' "$PROMPT_HOME/.clawperator/downloads/operator-debug.apk")"
+assert_contains "$DEV_PROMPT_STDOUT" "clawperator operator setup --apk $EXPECTED_DEV_APK_PATH --device $EXPECTED_SPECIAL_DEVICE_ID --operator-package com.clawperator.operator.dev" "dev-prompt stdout"
+
+echo "=== Scenario 10: redownload hint shell-quotes the output path ==="
+REDOWNLOAD_HINT_STDOUT="$TMP_DIR/redownload-hint.stdout"
+capture_redownload_hint "com.clawperator.operator" "$REDOWNLOAD_HINT_STDOUT"
+assert_contains "$REDOWNLOAD_HINT_STDOUT" "curl -fsSL https://clawperator.com/operator.apk -o $EXPECTED_DEFAULT_APK_PATH" "redownload-hint stdout"
+
+echo "=== Scenario 11: debug APK hint shell-quotes the local path ==="
+DEBUG_HINT_STDOUT="$TMP_DIR/debug-hint.stdout"
+capture_redownload_hint "com.clawperator.operator.dev" "$DEBUG_HINT_STDOUT"
+assert_contains "$DEBUG_HINT_STDOUT" "$EXPECTED_DEV_APK_PATH" "debug-hint stdout"
+
+echo "=== Scenario 12: DEVICE_SHELL_UNAVAILABLE stays in the ADB recovery lane ==="
+run_scenario \
+    shell-unavailable \
+    0 \
+    "Some ready devices need ADB recovery before setup. Skipping automatic APK install for those devices until ADB shell works." \
+    "Installing operator APK on serial-bad..." \
+    "All connected devices already have the required APK."
+assert_contains "$TMP_DIR/shell-unavailable.stdout" "serial-bad - ADB shell is inaccessible. Resolve ADB connectivity before setup." "shell-unavailable stdout"
+assert_not_contains "$TMP_DIR/shell-unavailable.stdout" "Complete Android setup on one target device with one of:" "shell-unavailable stdout"
 
 echo "=== install.sh multi-device harness passed ==="

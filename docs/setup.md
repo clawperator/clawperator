@@ -26,8 +26,9 @@ curl -fsSL https://clawperator.com/install.sh | bash
 If the installer succeeds, skip to [5. Verify readiness with doctor](#5-verify-readiness-with-doctor).
 
 When more than one adb-visible device is present, the installer reports each
-detected device, runs `doctor` against each ready `adb` device, and then
-falls back to the manual device selection guidance.
+detected device, runs `doctor` against each ready `adb` device, installs the
+current release APK on any ready device that is missing or incompatible, and
+then finishes with explicit `--device <serial>` guidance for later commands.
 
 Alternatively, install the CLI only via npm (Node.js 24+ required):
 
@@ -38,7 +39,7 @@ npm install -g clawperator
 Success conditions:
 
 - `clawperator version` exits `0` and prints a version string.
-- If you used `install.sh`, the installer also downloads the current release APK to `~/.clawperator/downloads/operator.apk`.
+- If you used `install.sh`, the installer also downloads the current release APK to `~/.clawperator/downloads/operator.apk` for that run. For later manual setup or recovery, redownload from `https://clawperator.com/operator.apk`.
 
 ### Durable host-agent artifacts from `install.sh`
 
@@ -134,6 +135,16 @@ adb kill-server && adb start-server
 If more than one target is connected, record the serial you will use and pass `--device <serial>` on every later command.
 
 ## 3. Install the Operator APK
+
+To avoid stale cached copies, always refresh the stable release APK before
+running setup or reinstall:
+
+```bash
+mkdir -p ~/.clawperator/downloads
+curl -fsSL https://clawperator.com/operator.apk -o ~/.clawperator/downloads/operator.apk
+```
+
+Canonical public APK URL: `https://clawperator.com/operator.apk`
 
 ```bash
 clawperator operator setup --apk ~/.clawperator/downloads/operator.apk
