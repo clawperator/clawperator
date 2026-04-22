@@ -1,7 +1,7 @@
 # install.sh Cleanup - Master Findings
 
-Synthesizes `findings-claude.md` and `findings-codex.md`. References
-`validation/install/` coverage where it affects migration decisions.
+References `validation/install/` coverage where it affects migration
+decisions.
 
 ---
 

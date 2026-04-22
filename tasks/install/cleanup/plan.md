@@ -92,9 +92,6 @@ before more install and upgrade work builds on it.
   task pack; preserve existing content as-is. If execution finds a material
   contradiction, append a dated `## Execution Notes` section at the end rather
   than rewriting the findings sections.
-- `tasks/install/cleanup/findings-claude.md` and
-  `tasks/install/cleanup/findings-codex.md`: preserved as source notes; do not
-  rewrite them during implementation.
 - `sites/landing/public/install.sh`: in scope for installer thinning and
   delegation changes only. Preserve the public one-liner bootstrap contract.
 - `validation/install/`: in scope for replacing shell-behavior coverage with
