@@ -113,8 +113,8 @@ Key implications:
      front door
    - `clawperator-upgrade` is the packaged whole-product upgrade route through
      the canonical installer plus `doctor`
-   - `skill-author-by-agent-discovery` is the zero-results front door
-   - `skill-author-by-recording` is the proving workflow after
+   - `clawperator-skill-author-by-agent-discovery` is the zero-results front door
+   - `clawperator-skill-author-by-recording` is the proving workflow after
      `proceed_to_recording`
    - the shared bridge points back to `~/.clawperator/AGENTS.md` plus
      `clawperator skills ...` and `clawperator agent-skills list`

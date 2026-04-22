@@ -1,12 +1,12 @@
 ---
-name: skill-author-by-recording
-description: Create or update a Clawperator skill from a fresh phone recording. Use when a developer wants the proving workflow after discovery has identified recording as the truthful next step, or when the app route is already well understood, and wants one front-door workflow that records a real device flow, derives the skill id from the recording and goal, defaults to replay on the first pass unless orchestrated is explicitly requested or clearly more truthful, and runs one self-test that surfaces the emitted SkillResult.
+name: clawperator-skill-author-by-recording
+description: Clawperator first-party bundled skill. Create or update a Clawperator skill from a fresh phone recording. Use when a developer wants the proving workflow after discovery has identified recording as the truthful next step, or when the app route is already well understood, and wants one front-door workflow that records a real device flow, derives the skill id from the recording and goal, defaults to replay on the first pass unless orchestrated is explicitly requested or clearly more truthful, and runs one self-test that surfaces the emitted SkillResult.
 ---
 
 # Skill Author By Recording
 
-Guide a developer from "I can do this once on my phone" to "I now have a
-truthful authored skill artifact."
+Guide a developer through Clawperator's recording workflow from "I can do this
+once on my phone" to "I now have a truthful authored skill artifact."
 
 This is the proving workflow. Do not split the user across helper skills in
 this phase. The workflow must stay centered on:
@@ -18,7 +18,7 @@ this phase. The workflow must stay centered on:
 
 ## Relationship To Discovery
 
-- `skill-author-by-agent-discovery` is now the zero-results front door when no
+- `clawperator-skill-author-by-agent-discovery` is now the zero-results front door when no
   installed runtime skill clearly matches or the app route is still too
   uncertain to record truthfully.
 - Use this skill after discovery returns `proceed_to_recording`, or when the
@@ -54,7 +54,7 @@ Reuse those contracts. Do not invent a parallel recording, skill, or
 
 ## Non-Negotiable Rules
 
-- Keep one human-facing entrypoint: `skill-author-by-recording`.
+- Keep one human-facing entrypoint: `clawperator-skill-author-by-recording`.
 - Treat this skill as the proving step after discovery, not as the zero-results
   route selector.
 - Treat the recording export as evidence, not as a finished skill or runtime
@@ -107,7 +107,7 @@ Reuse those contracts. Do not invent a parallel recording, skill, or
 Collect or confirm these inputs before recording:
 
 - plain-language goal
-- the discovery artifact when `skill-author-by-agent-discovery` already ran
+- the discovery artifact when `clawperator-skill-author-by-agent-discovery` already ran
 - target app or apps to reset before recording starts
 - whether the user explicitly wants `-replay`, `-orchestrated`, or wants the
   default replay-first path
@@ -212,7 +212,7 @@ For multiple target apps, use one `clawperator exec` with `close_app` actions.
 A typical shape is:
 
 ```bash
-clawperator exec --device <device_serial> --operator-package <operator_package> --execution '{"commandId":"skill-author-reset-<timestamp>","taskId":"skill-author-by-recording","source":"skill-author-by-recording","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"close_target","type":"close_app","params":{"applicationId":"<target_application_id>"}}]}' --json
+clawperator exec --device <device_serial> --operator-package <operator_package> --execution '{"commandId":"skill-author-reset-<timestamp>","taskId":"clawperator-skill-author-by-recording","source":"clawperator-skill-author-by-recording","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"close_target","type":"close_app","params":{"applicationId":"<target_application_id>"}}]}' --json
 ```
 
 If more than one target app matters to the flow, close each of them before you

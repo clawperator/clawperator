@@ -208,8 +208,8 @@ is:
 1. keep the eval id as `android-version`
 2. run with `--mode full-repo`
 3. use `--skill-prompt prompt-skill.md`
-4. treat `skill-author-by-agent-discovery` as the required discovery front door
-5. treat `skill-author-by-recording` as the proving handoff when discovery says
+4. treat `clawperator-skill-author-by-agent-discovery` as the required discovery front door
+5. treat `clawperator-skill-author-by-recording` as the proving handoff when discovery says
    `proceed_to_recording`
 
 Current Pack A device matrix:
@@ -251,7 +251,7 @@ Truth boundary for that red baseline:
   `outcome.status` stays `fail` until the Pack A discovery-to-proving route is
   actually proven
 - `skill_emitted = false` and `replay_status = "skipped"` are still truthful
-  red outcomes before `skill-author-by-agent-discovery` is implemented, but
+  red outcomes before `clawperator-skill-author-by-agent-discovery` is implemented, but
   they now fail the run instead of leaving it green
 - when `skill_generation_passed = false`, the harness applies the skill gate
   to the top-level run outcome and typically records

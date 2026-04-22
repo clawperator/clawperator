@@ -13,8 +13,8 @@ Use this order:
 | Situation | Start here | Stop when |
 | --- | --- | --- |
 | An installed runtime skill already matches the request | `clawperator skills for-app`, `clawperator skills search`, `clawperator skills get` | You have a truthful runtime skill to run. |
-| Runtime-skill discovery returned no relevant match and you need the host-visible zero-results route | `clawperator agent-skills list --json`, then `skill-author-by-agent-discovery` | Discovery emits one artifact and chooses exactly one next step. |
-| Discovery returned `proceed_to_recording`, or the route is already well understood | `skill-author-by-recording` | One recording-derived skill shape is authored and its self-test surfaces a `SkillResult`. |
+| Runtime-skill discovery returned no relevant match and you need the host-visible zero-results route | `clawperator agent-skills list --json`, then `clawperator-skill-author-by-agent-discovery` | Discovery emits one artifact and chooses exactly one next step. |
+| Discovery returned `proceed_to_recording`, or the route is already well understood | `clawperator-skill-author-by-recording` | One recording-derived skill shape is authored and its self-test surfaces a `SkillResult`. |
 | You explicitly want the low-level manual scaffold instead of the installed guided workflows | `clawperator skills new <skill_id>` | The local scaffold exists and the registry entry was added. |
 
 Current route rules:
@@ -24,8 +24,8 @@ Current route rules:
   Clawperator environment itself, use `clawperator-upgrade` before debugging
   component-level skill surfaces.
 - If runtime-skill discovery returns no relevant match, use
-  `skill-author-by-agent-discovery` as the zero-results front door.
-- Use `skill-author-by-recording` only after discovery returns
+  `clawperator-skill-author-by-agent-discovery` as the zero-results front door.
+- Use `clawperator-skill-author-by-recording` only after discovery returns
   `proceed_to_recording`, or when the route is already well understood.
 - Use raw `clawperator skills new <skill_id>` scaffolding only when you
   explicitly want the low-level manual surface instead of the installed guided
@@ -41,8 +41,8 @@ use this order:
 2. If runtime-skill discovery returns no relevant match and you need to inspect
    installed guided authoring workflows on the current host, run
    `clawperator agent-skills list --json`.
-3. Start with `skill-author-by-agent-discovery` as the zero-results front door.
-4. Use `skill-author-by-recording` only after discovery returns
+3. Start with `clawperator-skill-author-by-agent-discovery` as the zero-results front door.
+4. Use `clawperator-skill-author-by-recording` only after discovery returns
    `proceed_to_recording`, or when the route is already well understood.
 5. Use `clawperator skills new <skill_id>` only when you explicitly want the
    low-level manual scaffold instead of an installed authoring workflow.
@@ -61,8 +61,8 @@ Expected signals:
 - each listed agent-skill includes `name` and `skillPath`
 - `skills[].name` includes `clawperator-agent-orientation`
 - `skills[].name` includes `clawperator-upgrade`
-- `skills[].name` includes `skill-author-by-agent-discovery`
-- `skills[].name` includes `skill-author-by-recording`
+- `skills[].name` includes `clawperator-skill-author-by-agent-discovery`
+- `skills[].name` includes `clawperator-skill-author-by-recording`
 
 ## Skills Repo Entry Points
 
@@ -114,8 +114,8 @@ Current packaged first-party agent-skills:
 | --- | --- | --- |
 | `clawperator-agent-orientation` | first-run orientation | Routes an unfamiliar host agent to the correct Clawperator front door and canonical docs without redefining the contracts. |
 | `clawperator-upgrade` | whole-product upgrade route | Re-runs `https://clawperator.com/install.sh`, verifies the result with `clawperator doctor --json`, and stays out of component-level self-update logic. Use it only after explicit upgrade intent is established. |
-| `skill-author-by-agent-discovery` | zero-results front door | Produces one discovery artifact, chooses exactly one next step, and does not author a durable runtime skill directly. |
-| `skill-author-by-recording` | proving workflow | Records a real device flow, authors one skill shape, and runs one self-test that surfaces the emitted `SkillResult`. |
+| `clawperator-skill-author-by-agent-discovery` | zero-results front door | Produces one discovery artifact, chooses exactly one next step, and does not author a durable runtime skill directly. |
+| `clawperator-skill-author-by-recording` | proving workflow | Records a real device flow, authors one skill shape, and runs one self-test that surfaces the emitted `SkillResult`. |
 
 Maintenance and repair commands:
 
@@ -136,7 +136,7 @@ Current command behavior:
   absolute `SKILL.md` path for each installed agent-skill
 - the current packaged install set contains
   `clawperator-agent-orientation`, `clawperator-upgrade`,
-  `skill-author-by-agent-discovery`, and `skill-author-by-recording`
+  `clawperator-skill-author-by-agent-discovery`, and `clawperator-skill-author-by-recording`
 
 Current doctor behavior:
 
@@ -179,7 +179,7 @@ Expected signals:
 
 When you create a skill from a recording, use these current authoring rules:
 
-- use the `skill-author-by-recording` skill as the proving workflow after
+- use the `clawperator-skill-author-by-recording` skill as the proving workflow after
   discovery returned `proceed_to_recording`, or when the route is already well
   understood
 - start from the user's plain-language goal, not from a final prechosen
@@ -194,15 +194,15 @@ When you create a skill from a recording, use these current authoring rules:
   depends on one user's labels, rooms, or device graph
 
 These are the current documented rules for recording-derived authoring. They
-should stay aligned with the `skill-author-by-recording` skill.
+should stay aligned with the `clawperator-skill-author-by-recording` skill.
 
 ## Discovery And Recording Boundary
 
 Keep the two front doors distinct:
 
-- `skill-author-by-agent-discovery` is the agent-driven zero-results route when
+- `clawperator-skill-author-by-agent-discovery` is the agent-driven zero-results route when
   runtime-skill discovery found no clear match
-- `skill-author-by-recording` is the proving workflow where the user performs
+- `clawperator-skill-author-by-recording` is the proving workflow where the user performs
   the recorded phone flow once recording starts
 - discovery may hand off route notes, mutation notes, classification, and
   setup caveats, but it should not silently turn recording into continued
@@ -247,8 +247,8 @@ Use this route when hardening a runtime skill:
 1. Discover installed guided authoring workflows with
    `clawperator agent-skills list --json` when you need a host-visible
    front door and runtime-skill discovery returned no relevant match.
-2. Start with `skill-author-by-agent-discovery`, then move to
-   `skill-author-by-recording` only after discovery returns
+2. Start with `clawperator-skill-author-by-agent-discovery`, then move to
+   `clawperator-skill-author-by-recording` only after discovery returns
    `proceed_to_recording`, or when the route is already well understood.
 3. Scaffold only when you want the low-level manual surface:
    `clawperator skills new <skill_id>`.

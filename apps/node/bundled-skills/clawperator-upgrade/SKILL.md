@@ -1,6 +1,6 @@
 ---
 name: clawperator-upgrade
-description: Whole-product upgrade route for Clawperator. Re-runs the canonical installer, verifies readiness with doctor, and reports the next blocking repair step when setup is still incomplete.
+description: Clawperator first-party bundled skill. Whole-product upgrade route for Clawperator. Re-runs the canonical installer, verifies readiness with doctor, and reports the next blocking repair step when setup is still incomplete.
 ---
 
 # Clawperator Upgrade

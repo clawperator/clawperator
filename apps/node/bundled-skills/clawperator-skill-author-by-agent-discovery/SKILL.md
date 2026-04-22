@@ -1,12 +1,12 @@
 ---
-name: skill-author-by-agent-discovery
-description: "Route a no-match Clawperator request through bounded discovery before choosing one truthful next step: reuse an existing skill, proceed to recording, continue bounded discovery, fulfill one-shot, escalate, or decline."
+name: clawperator-skill-author-by-agent-discovery
+description: "Clawperator first-party bundled skill. Route a no-match Clawperator request through bounded discovery before choosing one truthful next step: reuse an existing skill, proceed to recording, continue bounded discovery, fulfill one-shot, escalate, or decline."
 ---
 
 # Skill Author By Agent Discovery
 
-Guide a host-facing agent from "no installed runtime skill clearly fits" to
-"one truthful next step."
+Guide a host-facing agent through Clawperator's no-match route from "no
+installed runtime skill clearly fits" to "one truthful next step."
 
 This is the zero-results front door. It does not author a durable runtime
 skill. Its job is to inspect the current host and app surface, produce one
@@ -27,7 +27,7 @@ This skill owns bounded discovery and routing only.
 ## What This Skill Does Not Own
 
 - Do not author or patch a durable runtime skill directly inside this skill.
-- Do not replace `skill-author-by-recording`.
+- Do not replace `clawperator-skill-author-by-recording`.
 - Do not turn discovery into an unbounded research loop.
 - Do not use general web research or external product docs as a substitute for
   installed-skill discovery, bounded live probes, prior local evidence, and
@@ -81,7 +81,7 @@ fake discovery. Route the work into a local shell context first.
 - Use only Clawperator commands for live device interaction.
 - Do not author the durable runtime skill inside discovery.
 - When `recommended_next_step = proceed_to_recording`, `handoff_target` must be
-  `skill-author-by-recording`.
+  `clawperator-skill-author-by-recording`.
 - If mutation risk is too high or user intent is underspecified, prefer
   `escalate_to_human` or `decline` over false confidence.
 - Treat `skills new` as the low-level manual scaffold, not as the default
@@ -93,7 +93,7 @@ fake discovery. Route the work into a local shell context first.
   Clawperator cannot truthfully clear alone, such as a hard sign-in screen,
   MFA challenge, CAPTCHA, biometric gate, payment approval, or an approval
   step whose meaning cannot be inferred safely.
-- When routing to `skill-author-by-recording`, pass forward the observed app
+- When routing to `clawperator-skill-author-by-recording`, pass forward the observed app
   route, mutation notes, evidence inventory, classification, and any known
   setup caveats that matter to the recording pass.
 
@@ -129,7 +129,7 @@ the following top-level keys.
 | `evidence_collected` | Object inventorying captured artifacts and failed probes |
 | `discovery_budget_used` | Object recording `snapshots`, `screenshots`, and `elapsed_wall_time_s` |
 | `skill_classification` | Include only when `recommended_next_step = proceed_to_recording`; value must be `shared-general` or `personalized-local` |
-| `handoff_target` | One of `skill-author-by-recording`, `raw-clawperator`, `human`, `none` |
+| `handoff_target` | One of `clawperator-skill-author-by-recording`, `raw-clawperator`, `human`, `none` |
 | `handoff_reasoning` | Short justification for the chosen route |
 
 Required truth rules:
@@ -230,7 +230,7 @@ Apply the route directly:
 - `use_existing_skill`
   - name the skill id and stop
 - `proceed_to_recording`
-  - hand off to `skill-author-by-recording`
+  - hand off to `clawperator-skill-author-by-recording`
   - pass forward the user goal, package id, observed sub-route, mutation notes,
     evidence inventory, `skill_classification`, and any known setup caveats
 - `iterate_discovery`
@@ -320,7 +320,7 @@ If a later bounded pass makes the route clear enough, change exactly one route:
 
 - `recommended_next_step` becomes `proceed_to_recording`
 - add `skill_classification`
-- set `handoff_target` to `skill-author-by-recording`
+- set `handoff_target` to `clawperator-skill-author-by-recording`
 
 ## Done When
 

@@ -10,18 +10,19 @@ Phase 3 (external rename from `agent-skills` to `bundled-skills` as a clean
 breaking change). Phase 1 uses `thinking`, Phase 2 uses `default`, and Phase 3
 uses `thinking`.
 
-Current state is planning. Phase 1 is next. PR-2 has a hard merge gate on PR-1.
+Current state is PR-1 complete locally. PR-2 / Phase 3 is next after PR-1
+merges. PR-2 has a hard merge gate on PR-1.
 
 ## Status
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | PR-1 complete locally |
 | Total PRs | 2 |
 | Total phases | 3 |
-| Completed | none |
-| Remaining | 1, 2, 3 |
-| Current / Next | Phase 1 |
-| Blockers | none |
+| Completed | 1, 2 |
+| Remaining | 3 |
+| Current / Next | PR-2 / Phase 3 after PR-1 merge |
+| Blockers | PR-1 merge gate for PR-2 |
 
 ## Hard Rules
 

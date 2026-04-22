@@ -73,7 +73,7 @@ export async function cmdAgentSkillsList(
         skills: [],
         count: 0,
         installedDir: installDir,
-        message: "No installed agent-skills found. Run clawperator agent-skills install to get clawperator-agent-orientation, clawperator-upgrade, skill-author-by-agent-discovery, and skill-author-by-recording.",
+        message: "No installed agent-skills found. Run clawperator agent-skills install to get clawperator-agent-orientation, clawperator-upgrade, clawperator-skill-author-by-agent-discovery, and clawperator-skill-author-by-recording.",
       }, options);
     }
 

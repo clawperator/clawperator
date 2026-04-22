@@ -1226,8 +1226,8 @@ describe("Doctor: hostChecks", () => {
             const root = await makeTempRoot("clawperator-doctor-agent-skills-unreadable-version-");
             const installedDir = join(root, "agent-skills");
             const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
-            await mkdir(join(installedDir, "skill-author-by-recording"), { recursive: true });
-            await writeFile(join(installedDir, "skill-author-by-recording", "SKILL.md"), "# skill-author-by-recording\n", "utf8");
+            await mkdir(join(installedDir, "clawperator-skill-author-by-recording"), { recursive: true });
+            await writeFile(join(installedDir, "clawperator-skill-author-by-recording", "SKILL.md"), "# clawperator-skill-author-by-recording\n", "utf8");
             await mkdir(join(installedDir, "version.txt"), { recursive: true });
 
             const result = await checkAgentSkillsStaleness(config, { installedDir });

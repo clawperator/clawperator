@@ -430,7 +430,7 @@ def _valid_discovery_artifact_json(
     if handoff_target is None:
         handoff_target = {
             "use_existing_skill": "none",
-            "proceed_to_recording": "skill-author-by-recording",
+            "proceed_to_recording": "clawperator-skill-author-by-recording",
             "iterate_discovery": "none",
             "one_shot_direct_automation": "raw-clawperator",
             "escalate_to_human": "human",
@@ -503,7 +503,7 @@ def test_attach_skill_score_requires_pack_a_route_evidence(monkeypatch, tmp_path
     run_dir.mkdir()
     (run_dir / "transcript.txt").write_text(
         '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator agent-skills list --json"}}\n'
-        "Discovery route: skill-author-by-agent-discovery -> skill-author-by-recording\n"
+        "Discovery route: clawperator-skill-author-by-agent-discovery -> clawperator-skill-author-by-recording\n"
         "CLAWPERATOR_SKILL_START\n"
         + _skill_payload_json()
         + "\n"
@@ -538,8 +538,8 @@ def test_attach_skill_score_requires_pack_a_route_evidence(monkeypatch, tmp_path
         spec={
             "skill_generation": {
                 "replay_timeout_s": 60,
-                "required_authoring_front_door": "skill-author-by-agent-discovery",
-                "required_proving_handoff": "skill-author-by-recording",
+                "required_authoring_front_door": "clawperator-skill-author-by-agent-discovery",
+                "required_proving_handoff": "clawperator-skill-author-by-recording",
             }
         },
         skill_prompt_name="prompt-skill.md",
@@ -560,8 +560,8 @@ def test_attach_skill_score_requires_pack_a_route_evidence(monkeypatch, tmp_path
         updated["skill_score"]["route_requirement_errors"]
         == [
             "missing structured command evidence for runtime-skill discovery (`clawperator skills for-app/search/get --json`)",
-            "missing structured discovery artifact for required_authoring_front_door `skill-author-by-agent-discovery`",
-            "missing structured discovery handoff for required_proving_handoff `skill-author-by-recording`",
+            "missing structured discovery artifact for required_authoring_front_door `clawperator-skill-author-by-agent-discovery`",
+            "missing structured discovery handoff for required_proving_handoff `clawperator-skill-author-by-recording`",
         ]
     )
 
@@ -573,7 +573,7 @@ def test_attach_skill_score_accepts_pack_a_route_evidence(monkeypatch, tmp_path)
         (
             '{"type":"item.completed","item":{"type":"command_execution","command":"node apps/node/dist/cli/index.js skills for-app com.android.settings --json"}}\n'
             '{"type":"item.completed","item":{"type":"command_execution","command":"node apps/node/dist/cli/index.js agent-skills list --format json"}}\n'
-            "Using skill-author-by-agent-discovery for bounded discovery\n"
+            "Using clawperator-skill-author-by-agent-discovery for bounded discovery\n"
             + _valid_discovery_artifact_json(
                 runtime_command="node apps/node/dist/cli/index.js skills for-app com.android.settings --json",
                 authoring_command="node apps/node/dist/cli/index.js agent-skills list --format json",
@@ -614,8 +614,8 @@ def test_attach_skill_score_accepts_pack_a_route_evidence(monkeypatch, tmp_path)
         spec={
             "skill_generation": {
                 "replay_timeout_s": 60,
-                "required_authoring_front_door": "skill-author-by-agent-discovery",
-                "required_proving_handoff": "skill-author-by-recording",
+                "required_authoring_front_door": "clawperator-skill-author-by-agent-discovery",
+                "required_proving_handoff": "clawperator-skill-author-by-recording",
             }
         },
         skill_prompt_name="prompt-skill.md",
@@ -644,7 +644,7 @@ def test_attach_skill_score_accepts_equivalent_registry_launchers(monkeypatch, t
         (
             '{"type":"item.completed","item":{"type":"command_execution","command":"node apps/node/dist/cli/index.js skills for-app com.android.settings --json"}}\n'
             '{"type":"item.completed","item":{"type":"command_execution","command":"node apps/node/dist/cli/index.js agent-skills list --format json"}}\n'
-            "Using skill-author-by-agent-discovery for bounded discovery\n"
+            "Using clawperator-skill-author-by-agent-discovery for bounded discovery\n"
             + _valid_discovery_artifact_json(
                 runtime_command="clawperator skills for-app com.android.settings --json",
                 authoring_command="clawperator agent-skills list --json",
@@ -684,8 +684,8 @@ def test_attach_skill_score_accepts_equivalent_registry_launchers(monkeypatch, t
         spec={
             "skill_generation": {
                 "replay_timeout_s": 60,
-                "required_authoring_front_door": "skill-author-by-agent-discovery",
-                "required_proving_handoff": "skill-author-by-recording",
+                "required_authoring_front_door": "clawperator-skill-author-by-agent-discovery",
+                "required_proving_handoff": "clawperator-skill-author-by-recording",
                 "target_app_package": "com.android.settings",
             }
         },
@@ -740,8 +740,8 @@ def test_attach_skill_score_requires_explicit_front_door_signal(monkeypatch, tmp
         spec={
             "skill_generation": {
                 "replay_timeout_s": 60,
-                "required_authoring_front_door": "skill-author-by-agent-discovery",
-                "required_proving_handoff": "skill-author-by-recording",
+                "required_authoring_front_door": "clawperator-skill-author-by-agent-discovery",
+                "required_proving_handoff": "clawperator-skill-author-by-recording",
                 "target_app_package": "com.android.settings",
             }
         },
@@ -753,7 +753,7 @@ def test_attach_skill_score_requires_explicit_front_door_signal(monkeypatch, tmp
     assert updated["skill_score"]["required_authoring_front_door_seen"] is False
     assert updated["skill_score"]["route_requirements_met"] is False
     assert (
-        "missing explicit transcript signal for required_authoring_front_door `skill-author-by-agent-discovery`"
+        "missing explicit transcript signal for required_authoring_front_door `clawperator-skill-author-by-agent-discovery`"
         in updated["skill_score"]["route_requirement_errors"]
     )
     assert updated["outcome"]["status"] == "fail"
@@ -803,8 +803,8 @@ def test_attach_skill_score_rejects_copied_registry_provenance(monkeypatch, tmp_
         spec={
             "skill_generation": {
                 "replay_timeout_s": 60,
-                "required_authoring_front_door": "skill-author-by-agent-discovery",
-                "required_proving_handoff": "skill-author-by-recording",
+                "required_authoring_front_door": "clawperator-skill-author-by-agent-discovery",
+                "required_proving_handoff": "clawperator-skill-author-by-recording",
                 "target_app_package": "com.android.settings",
             }
         },
@@ -862,8 +862,8 @@ def test_attach_skill_score_rejects_wrong_package_metadata(monkeypatch, tmp_path
         spec={
             "skill_generation": {
                 "replay_timeout_s": 60,
-                "required_authoring_front_door": "skill-author-by-agent-discovery",
-                "required_proving_handoff": "skill-author-by-recording",
+                "required_authoring_front_door": "clawperator-skill-author-by-agent-discovery",
+                "required_proving_handoff": "clawperator-skill-author-by-recording",
                 "target_app_package": "com.android.settings",
             }
         },
@@ -918,8 +918,8 @@ def test_attach_skill_score_requires_skill_classification_for_recording_handoff(
         spec={
             "skill_generation": {
                 "replay_timeout_s": 60,
-                "required_authoring_front_door": "skill-author-by-agent-discovery",
-                "required_proving_handoff": "skill-author-by-recording",
+                "required_authoring_front_door": "clawperator-skill-author-by-agent-discovery",
+                "required_proving_handoff": "clawperator-skill-author-by-recording",
                 "target_app_package": "com.android.settings",
             }
         },
@@ -969,7 +969,7 @@ def test_attach_skill_score_rejects_wrong_handoff_for_non_recording_routes(
         (
             '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator skills for-app com.android.settings --json"}}\n'
             '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator agent-skills list --json"}}\n'
-            "Using skill-author-by-agent-discovery for bounded discovery\n"
+            "Using clawperator-skill-author-by-agent-discovery for bounded discovery\n"
             + _valid_discovery_artifact_json(
                 recommended_next_step=recommended_next_step,
                 handoff_target=handoff_target,
@@ -1008,8 +1008,8 @@ def test_attach_skill_score_rejects_wrong_handoff_for_non_recording_routes(
         spec={
             "skill_generation": {
                 "replay_timeout_s": 60,
-                "required_authoring_front_door": "skill-author-by-agent-discovery",
-                "required_proving_handoff": "skill-author-by-recording",
+                "required_authoring_front_door": "clawperator-skill-author-by-agent-discovery",
+                "required_proving_handoff": "clawperator-skill-author-by-recording",
                 "target_app_package": "com.android.settings",
             }
         },
@@ -1064,8 +1064,8 @@ def test_attach_skill_score_requires_runtime_discovery_before_authoring(monkeypa
         spec={
             "skill_generation": {
                 "replay_timeout_s": 60,
-                "required_authoring_front_door": "skill-author-by-agent-discovery",
-                "required_proving_handoff": "skill-author-by-recording",
+                "required_authoring_front_door": "clawperator-skill-author-by-agent-discovery",
+                "required_proving_handoff": "clawperator-skill-author-by-recording",
                 "target_app_package": "com.android.settings",
             }
         },

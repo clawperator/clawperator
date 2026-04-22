@@ -17,13 +17,13 @@ PR-2 must not start until PR-1 is merged.
 ## Status
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | PR-1 complete locally |
 | Total PRs | 2 |
 | Total phases | 3 |
-| Completed | none |
-| Remaining | 1, 2, 3 |
-| Current / Next | Phase 1 |
-| Blockers | none |
+| Completed | 1, 2 |
+| Remaining | 3 |
+| Current / Next | PR-2 / Phase 3 after PR-1 merge |
+| Blockers | PR-1 merge gate for PR-2 |
 
 ## Goal
 

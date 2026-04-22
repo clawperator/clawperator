@@ -31,9 +31,9 @@ describe("bundled skill packaging", () => {
 
     assert.deepEqual(entries, [
       "clawperator-agent-orientation",
+      "clawperator-skill-author-by-agent-discovery",
+      "clawperator-skill-author-by-recording",
       "clawperator-upgrade",
-      "skill-author-by-agent-discovery",
-      "skill-author-by-recording",
     ]);
 
     for (const entry of entries) {
