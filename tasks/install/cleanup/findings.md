@@ -1,7 +1,7 @@
 # install.sh Cleanup - Master Findings
 
 References `validation/install/` coverage where it affects migration
-decisions.
+decisions. All technical claims below are verified against code.
 
 ---
 
@@ -83,42 +83,25 @@ rest of the codebase.
 
 These belong in a single CLI command, something like
 `clawperator host materialize-artifacts` or as subcommands under a `host`
-group. The command should accept `--output json` and report which artifacts
-were written or skipped.
+group. The command must accept `--output json` and report per-artifact status
+(written/skipped/failed).
 
-The `write_agent_guide` function reads the installed skills registry (a
-Clawperator-owned concept) to produce its output. Moving it into the CLI
-gives it native access to that data without the current
-`node - "$RUNTIME_SKILLS_REGISTRY_PATH"` heredoc indirection.
+The command needs the following inputs at runtime, all of which the CLI can
+resolve natively without shell glue:
+- resolved skills registry path (same logic as `loadRegistry`)
+- bundled-skills install directory (from `bundled-skills install` result)
+- operator package name (from `--operator-package` or env)
+- CLI binary path (for MCP snippet `command` field)
+- `adb` binary path (for MCP snippet `env.ADB_PATH`)
 
-### 2. Doctor-driven APK remediation (second highest leverage)
+The command must be idempotent (always overwrite) so it is safe to re-run
+during upgrades.
 
-The installer hand-codes its own device remediation policy by calling
-`clawperator doctor --format json` and then re-parsing specific check IDs in
-shell:
+The `write_agent_guide` function reads the installed skills registry to
+produce its output. Moving it into the CLI gives it native access to that
+data without the current `node - "$RUNTIME_SKILLS_REGISTRY_PATH"` heredoc.
 
-- `readiness.apk.presence`
-- `readiness.version.compatibility`
-- `device.discovery`
-- `DEVICE_SHELL_UNAVAILABLE` error code
-
-Relevant sections: `install.sh:1664-1727`, `1729-1769`, `1878-1942`,
-`2100-2153`, `2195-2235`.
-
-**Total: ~350 lines of shell + inline Node parsing helpers.**
-
-`DoctorService` already has an autofix concept (`autoFix` execution,
-`check.fix.steps` in `apps/node/src/domain/doctor/DoctorService.ts:194-211`)
-that install.sh bypasses entirely. The right fix is to expand
-`clawperator doctor --fix` to handle multi-device APK remediation and
-permission re-grant recovery, then let the installer call that command
-instead.
-
-The installer should consume a single structured result - host status, per-device
-summary, list of devices needing further action - rather than re-implementing
-policy state machines in shell.
-
-### 3. APK download and checksum verification
+### 2. APK download and checksum verification
 
 This logic is product behavior, not shell bootstrap:
 
@@ -129,19 +112,73 @@ This logic is product behavior, not shell bootstrap:
 **Total: ~105 lines removed.**
 
 The embedded `node` call to parse metadata JSON is a clear sign the shell is
-fighting the problem. This belongs as a CLI subcommand, likely
-`clawperator operator download` or `clawperator operator fetch-apk`.
+fighting the problem. This belongs as a CLI subcommand under the `operator`
+family, likely `clawperator operator download`.
 
-Suggested result contract: local path, operator version, sha256, package
-flavor. That would reduce the installer to:
+The APK is downloaded to `~/.clawperator/downloads/operator.apk` (release) or
+`~/.clawperator/downloads/operator-debug.apk` (dev). This path is already
+canonical: `getOperatorPackageApkPath()` in
+`apps/node/src/domain/version/compatibility.ts:46` returns exactly this path,
+and the existing `readiness.apk.presence` fix step hardcodes it. The new
+download command must write to the same path.
 
-```bash
-clawperator operator download
-clawperator operator setup --apk "$APK_LOCAL_PATH" ...
-```
+Suggested result contract: `{ localPath, operatorVersion, sha256, operatorPackage }`.
 
-This also unlocks reuse outside the first-install path (manual APK refresh,
-upgrade flows).
+This unlocks reuse outside the first-install path (manual APK refresh, upgrade
+flows) and is a prerequisite for Phase 3 working correctly.
+
+### 3. Doctor-driven APK remediation
+
+The installer hand-codes its own device remediation policy by calling
+`clawperator doctor --json` and then re-parsing specific check IDs in shell:
+
+- `readiness.apk.presence` (`apps/node/src/domain/doctor/checks/readinessChecks.ts:33`)
+- `readiness.version.compatibility` (`readinessChecks.ts:157`)
+- `device.discovery` (`apps/node/src/domain/doctor/checks/deviceChecks.ts:13`)
+- `DEVICE_SHELL_UNAVAILABLE` error code (`apps/node/src/contracts/errors.ts:43`)
+
+Relevant sections: `install.sh:1664-1727`, `1729-1769`, `1878-1942`,
+`2100-2153`, `2195-2235`.
+
+**Total: ~350 lines of shell + inline Node parsing helpers.**
+
+**Current state of `doctor --fix`:** The flag exists
+(`apps/node/src/cli/registry.ts:2544`). `DoctorService.finalize()` runs
+`kind: "shell"` fix steps when `autoFix` is true
+(`apps/node/src/domain/doctor/DoctorService.ts:194-209`). For the
+`readiness.apk.presence` fail case, there is already one `kind: "shell"` step:
+`clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device <id>`.
+However, the preceding download step is `kind: "manual"` and is NOT executed by
+`--fix`. This means `--fix` will attempt `operator setup` but will fail if the
+APK has not been downloaded first.
+
+**What "expand `doctor --fix`" means concretely:**
+
+1. Change the `readiness.apk.presence` download fix step from `kind: "manual"` to
+   `kind: "shell"` using `clawperator operator download` (Phase 2 command).
+   This makes `--fix` fully automated for single-device APK install.
+2. Add `kind: "shell"` fix steps to `readiness.handshake` fail case using
+   `clawperator grant-device-permissions --device <id>` for permission recovery.
+   (This command already exists.)
+
+**Open design question - multi-device:** `doctor` takes a single `--device`.
+The multi-device install loop (~200 lines of the shell logic) has no natural
+home in `doctor --fix` as currently designed. Options:
+
+- Option A: Keep the per-device loop in install.sh but replace inline Node
+  parsing with `clawperator doctor --json --device <id>` calls in a thin shell
+  loop. Less CLI migration, but shell stays non-trivial.
+- Option B: Add a new `clawperator install remediate` command that accepts no
+  `--device` and loops over all connected devices internally, running
+  `operator download` + `doctor --fix --device <id>` for each. Shell becomes a
+  single call.
+- Option C: Add `--each-device` to doctor. More complex, but reusable outside
+  install.
+
+**This design choice must be made before implementation.** Option B is the
+cleanest boundary. It separates the "loop over devices" orchestration from
+the per-device fix logic, and it gives the upgrade skill a single command to
+call instead of a loop.
 
 ### 4. Shell RC mutation - likely deletable, not just moveable
 
@@ -149,52 +186,147 @@ After `clawperator skills install`, the script rewrites `~/.zshrc`,
 `~/.bashrc`, and `~/.bash_profile` to export `CLAWPERATOR_SKILLS_REGISTRY`
 (`install.sh:530-556`).
 
-**This is probably unnecessary.** The CLI already falls back to the installed-home
-registry at `~/.clawperator/skills/skills/skills-registry.json` when no env
-var is set (`apps/node/src/adapters/skills-repo/localSkillsRegistry.ts:79-186`).
+**Fallback mechanics (verified):** When `CLAWPERATOR_SKILLS_REGISTRY` is not
+set, `loadRegistry` (`localSkillsRegistry.ts:79`) first tries
+`{process.cwd()}/skills/skills-registry.json` (cwd-relative default). If that
+fails with ENOENT, it tries `~/.clawperator/skills/skills/skills-registry.json`
+(installed-home) as a fallback. For an installed user whose cwd is not the
+repo root, the cwd-relative attempt fails silently and the installed-home path
+succeeds - no warning is emitted when the fallback succeeds.
 
-Recommendation: **remove the RC mutation** rather than move it. Print the
-export command as optional advice for users who need a non-default registry
-path, but stop modifying shell profiles by default. This removes a surprising
-host side-effect and simplifies the installer.
+**Consequence:** For users who run `clawperator` from an arbitrary working
+directory (the common case for installed users), the RC mutation is
+unnecessary. The installed-home fallback works.
+
+**Recommendation:** Remove the RC mutation. Print the export command as
+optional advice for users with non-standard registry paths. Confirm the
+installed-home fallback is documented as the supported default path before
+removing.
+
+**Caveat:** Do not remove the RC mutation until the installed-home fallback
+path is confirmed in `docs/setup.md` as the official default. If docs
+currently say "set CLAWPERATOR_SKILLS_REGISTRY", fix the docs first.
 
 ---
 
 ## Recommended Phasing
 
-### Phase 1 - Add host artifact CLI command
+Phase ordering is constrained by dependencies. Phase 2 (`operator download`)
+must ship before Phase 3 (`doctor --fix` expansion) because `--fix` needs
+`operator download` as the shell step for APK acquisition.
 
-Add `clawperator host materialize-artifacts` (or equivalent) covering
-`write_install_state`, `write_mcp_config_snippet`, `write_agent_guide`, and
-`write_shared_agent_bridge`. Replace the four shell functions with one CLI call.
+### Phase 1 - Add `clawperator host materialize-artifacts`
+
+Add a new `host materialize-artifacts` command covering `write_install_state`,
+`write_mcp_config_snippet`, `write_agent_guide`, and `write_shared_agent_bridge`.
+Replace the four shell functions with one CLI call.
+
+**New files:**
+- `apps/node/src/cli/commands/hostMaterializeArtifacts.ts`
+- Register under a `host` group in `apps/node/src/cli/registry.ts`
+
+**Test requirements:**
+- Unit tests for each artifact writer (install-state schema, MCP snippet
+  structure, AGENTS.md content, shared bridge marker-block insert/update)
+- CLI regression: `--output json` emits valid JSON with per-artifact status;
+  `--output pretty` prints human-readable summary
+- Idempotency test: running twice produces the same output files
+- Edge case: `~/.agents/AGENTS.md` does not exist - must skip bridge without
+  failing
+
+**Validation suite migration:** `test_agent_skills.sh` assertions for artifact
+writers move to Node unit tests. Shell harness must be updated in the same PR
+(not deferred) per CLAUDE.md requirements.
+
+**Docs update required:** `docs/setup.md` - document the new command as the
+canonical way to regenerate host artifacts after a manual CLI upgrade.
 
 **Impact:** ~400 lines removed from install.sh; embedded Node heredocs gone.
-Validation coverage shifts from `test_agent_skills.sh` shell assertions to
-Node unit tests against the new CLI command.
 
-### Phase 2 - Expand `doctor --fix` for multi-device remediation
+### Phase 2 - Add `clawperator operator download`
 
-Move per-device APK presence checking, remediation policy, and permission
-re-grant recovery into `clawperator doctor --fix`. Collapse the
-`run_doctor_and_fix` / `collect_multi_device_apk_setup_targets` /
-`doctor_each_connected_device` / `doctor_check_*` shell logic.
+Move APK metadata fetch, download, and SHA256 verification into a new
+`operator download` subcommand.
 
-**Impact:** ~350 lines removed; inline Node JSON-parsing helpers gone.
-Validation coverage shifts from `test_main.sh` + `test_multidevice.sh`
-shell assertions to CLI integration tests.
+**New surface:** `clawperator operator download [--operator-package <pkg>] [--output <json|pretty>]`
 
-### Phase 3 - Add `clawperator operator download`
+**Behavior:**
+- Fetch metadata from `APK_METADATA_URL` (default: `https://downloads.clawperator.com/operator/latest.json`)
+- Download APK to `getOperatorPackageApkPath(operatorPackage)` (canonical path
+  shared with `readiness.apk.presence` fix step)
+- Verify SHA256 checksum
+- Emit `{ localPath, operatorVersion, sha256, operatorPackage }` on `--output json`
 
-Move APK metadata fetch, download, and checksum verification into a CLI
-subcommand under the `operator` family.
+**Test requirements:**
+- Unit tests: metadata JSON parse (valid, malformed, missing fields), SHA256
+  match and mismatch, download path selection by package variant
+- CLI regression: `--output json` on success; `--output json` on checksum
+  mismatch (non-zero exit, structured error); `--operator-package` with unknown
+  value; network error behavior
+- Exit-code contract: 0 on success, non-zero on download or verification failure
 
-**Impact:** ~105 lines removed; no more embedded Node metadata parser.
-Enables standalone APK refresh outside the full install flow.
+**Validation suite migration:** APK download/verify logic moves from
+`test_main.sh` stubs to Node unit tests. Shell stubs for download in
+`test_main.sh` must be replaced with stubs for `clawperator operator download`
+in the same PR.
+
+**Docs update required:** `docs/api/` - document `operator download` command,
+flags, result contract, and error codes.
+
+**Impact:** ~105 lines removed from install.sh.
+
+### Phase 3 - Expand `doctor --fix` and resolve multi-device design
+
+Requires Phase 2 to be complete.
+
+**Single-device `--fix` expansion:**
+1. In `apps/node/src/domain/doctor/checks/readinessChecks.ts`, change the
+   APK download step for `readiness.apk.presence` fail from `kind: "manual"` to
+   `kind: "shell"` with value `clawperator operator download [--operator-package <pkg>]`.
+   The existing `kind: "shell"` operator setup step is already correct.
+2. In the `readiness.handshake` fail case, add a `kind: "shell"` fix step:
+   `clawperator grant-device-permissions --device <id> [--operator-package <pkg>]`.
+   (The command already exists; it just isn't wired as a fix step.)
+
+**Multi-device surface (must be decided before implementation):**
+Choose one option from the design question in the "What Should Move" section.
+The recommendation is Option B: add `clawperator install remediate` that loops
+over connected devices and calls per-device `operator download` + `doctor --fix
+--device <id>`. This collapses `run_doctor_and_fix`,
+`collect_multi_device_apk_setup_targets`, and `doctor_each_connected_device`
+into a single CLI call from the shell.
+
+**Test requirements:**
+- Unit tests for the new/changed fix steps in `readinessChecks.ts`
+- CLI regression for `doctor --fix` with APK absent: verify it now runs
+  download before setup
+- CLI regression for `doctor --fix` with handshake fail: verify it runs
+  grant-device-permissions
+- Integration or emulator test for single-device `--fix` end-to-end (APK
+  missing -> fix -> doctor passes)
+- For Option B: unit tests for `install remediate` device enumeration and
+  per-device result aggregation
+
+**Validation suite migration:** `test_main.sh` and `test_multidevice.sh` stubs
+for `run_doctor_and_fix` move to CLI integration tests. Shell stubs must be
+updated in the same PR.
+
+**Docs update required:** Update `docs/setup.md` to document `doctor --fix` as
+an automated repair path and the new `--fix` behavior for APK presence and
+handshake failures.
+
+**Impact:** ~350 lines removed from install.sh.
 
 ### Phase 4 - Delete shell RC mutation
 
-Remove or opt-in-gate the `CLAWPERATOR_SKILLS_REGISTRY` shell profile edits.
-Confirm the CLI home-directory fallback is the documented default path.
+Remove the `CLAWPERATOR_SKILLS_REGISTRY` shell profile edits from install.sh.
+
+**Before removing:**
+1. Confirm `docs/setup.md` documents the installed-home fallback
+   (`~/.clawperator/skills/skills/skills-registry.json`) as the supported
+   default path, not the env var.
+2. Confirm no existing test or smoke check asserts that the env var is set after
+   install.
 
 **Impact:** ~40 lines removed; fewer surprising host side-effects.
 
@@ -202,44 +334,42 @@ Confirm the CLI home-directory fallback is the documented default path.
 
 ## End State
 
-After all four phases, `install.sh` becomes a ~200-line bootstrap stub:
+After all phases, `install.sh` becomes a ~200-line bootstrap stub:
 
 1. OS validation
 2. Java install
 3. Node.js install (nvm)
 4. adb / git / curl checks
 5. `npm install -g clawperator@latest`
-6. `clawperator doctor --fix` (handles APK download, install, permission grant, multi-device)
-7. `clawperator skills install`
-8. `clawperator bundled-skills install`
-9. `clawperator host materialize-artifacts`
-10. `clawperator doctor --output pretty` (final status print)
+6. `clawperator operator download` (fetch latest release APK)
+7. `clawperator install remediate` or `clawperator doctor --fix` (install APK per device, grant permissions)
+8. `clawperator skills install`
+9. `clawperator bundled-skills install`
+10. `clawperator host materialize-artifacts`
+11. `clawperator doctor --json` (final structured verification)
 
-No inline Node programs. No embedded product logic. All Clawperator-specific
-behavior lives in the CLI where it can be tested with TypeScript unit tests.
+Step 6 uses `--json` for the final check so install.sh can test `criticalOk`
+and exit non-zero on failure without parsing human-readable output.
 
-A Python rewrite of that 200-line bootstrap stub would be a natural follow-on
-once the shell script is reduced to pure prerequisite provisioning.
+No inline Node programs. No embedded product logic. No re-parsing of CLI JSON
+output. All Clawperator-specific behavior lives in the CLI.
 
 ---
 
 ## Impact On The Validation Suite
 
 The current `validation/install/` harnesses test shell behavior directly and
-will need to migrate as logic moves into the CLI.
+will need to migrate as logic moves into the CLI. Per CLAUDE.md, coverage must
+be maintained in the same PR - removing a shell test without adding CLI test
+coverage is not acceptable.
 
-| Harness | Coverage | Migration path |
-|---------|----------|----------------|
-| `test_agent_skills.sh` (~600 lines) | artifact writers, skills glue, install-state, MCP config, shared bridge | Node unit tests for Phase 1 CLI command |
-| `test_main.sh` (~1167 lines) | main() smoke, APK remediation, multi-device flows, doctor integration | CLI integration tests for Phase 2; thin shell smoke stays |
-| `test_multidevice.sh` (~600 lines) | multi-device APK install, device states, setup prompts | CLI integration tests for Phase 2 |
-| `test_java.sh` (~800 lines) | Java check and provisioning | stays as-is (bootstrap logic remains in shell) |
-| `lib/json_assert.sh` | shared helpers | may be reused or replaced by CLI contract tests |
-
-**Key constraint from CLAUDE.md:** any change to `install.sh` requires
-updating or adding coverage under `validation/install/` in the same change.
-Each phase must maintain parity - when a function moves to the CLI, its shell
-test coverage must be replaced with CLI coverage before the shell test is removed.
+| Harness | Current coverage | Migration path |
+|---------|-----------------|----------------|
+| `test_agent_skills.sh` (~600 lines) | artifact writers, skills glue, install-state, MCP config, shared bridge | Node unit tests in Phase 1 same PR |
+| `test_main.sh` (~1167 lines) | main() smoke, APK remediation, multi-device flows, doctor integration | Split: APK/doctor logic to CLI integration tests (Phase 2-3); thin shell smoke updated in same PR |
+| `test_multidevice.sh` (~600 lines) | multi-device APK install, device states, setup prompts | CLI integration tests for Phase 3; shell harness updated in same PR |
+| `test_java.sh` (~800 lines) | Java check and provisioning | Stays as-is; bootstrap logic remains in shell |
+| `lib/json_assert.sh` | shared JSON assertion helpers | Stays as-is or replaced by CLI contract tests |
 
 ---
 
@@ -248,126 +378,118 @@ test coverage must be replaced with CLI coverage before the shell test is remove
 ### Current behavior
 
 `apps/node/bundled-skills/clawperator-upgrade/SKILL.md` defines one primary
-upgrade action:
+upgrade action: `curl -fsSL https://clawperator.com/install.sh | bash`.
 
-```bash
-curl -fsSL https://clawperator.com/install.sh | bash
-```
+The skill prohibits substituting: `npm install -g clawperator@latest`,
+`clawperator bundled-skills update`, `clawperator skills update`.
 
-The skill explicitly prohibits substituting:
-- `npm install -g clawperator@latest`
-- `clawperator bundled-skills update`
-- `clawperator skills update`
-
-The rationale was sound when written: none of those commands individually covered
-the full install surface (CLI + APK + skills + host artifacts), so using any one
-of them alone would produce an incomplete upgrade.
+That rationale was sound when written: none of those commands alone covered the
+full install surface. After the cleanup, the combined CLI sequence does.
 
 ### Why `install.sh` is the wrong primary path for upgrades
 
-The user's question identifies a real problem: on a machine that already has
-Clawperator, re-running `install.sh` is a poor upgrade path even today, and
-becomes worse after the cleanup.
+On a machine that already has Clawperator, re-running `install.sh` is a poor
+upgrade path:
 
-**Problems with `curl ... | bash` as an upgrade path:**
+1. **Security surface.** `curl ... | bash` is appropriate for first install on
+   a machine with nothing. For upgrade, it introduces remote-execution trust on
+   every run.
+2. **Bootstrap steps are wasted work.** Java, Node, adb, git, curl are already
+   installed. Some checks still invoke package managers even when nothing needs
+   updating.
+3. **Opaque result.** `install.sh` has no structured result contract. The skill
+   can only verify by running `doctor` afterward; individual step failures are
+   invisible.
+4. **After cleanup, install.sh delegates to CLI commands anyway.** Running it
+   for upgrade is a slow network-dependent wrapper around commands the skill
+   could call directly.
 
-1. **Security surface.** Fetching a shell script over the network and executing
-   it immediately is the right pattern for first install (the machine has
-   nothing yet). For upgrade on an already-trusted machine with an already-
-   installed CLI, it introduces unnecessary remote-execution trust on every
-   upgrade run.
-
-2. **Bootstrap steps are wasted work.** On an upgrade, Java, Node, adb, git,
-   and curl are already installed. Those checks are no-ops, but they still
-   run - and on some machines they trigger slow package-manager operations even
-   when nothing needs updating.
-
-3. **Opaque result.** `install.sh` emits human-readable output but has no
-   structured result contract. The upgrade skill treats it as a black box and
-   can only verify the outcome by running `clawperator doctor` afterward. If a
-   specific step fails mid-install the skill cannot identify which one.
-
-4. **After the cleanup, `install.sh` itself delegates to CLI commands.** If
-   the end state is a thin bootstrap stub that calls `clawperator doctor --fix`,
-   `clawperator host materialize-artifacts`, etc., then running `install.sh`
-   for upgrade is just a slow, network-dependent wrapper around commands the
-   skill could call directly.
-
-### What the upgrade path should be after the cleanup
-
-Once the cleanup phases ship, a targeted upgrade sequence via CLI commands
-covers everything install.sh currently handles post-bootstrap:
+### Correct upgrade path after cleanup
 
 ```bash
-npm install -g clawperator@latest       # update CLI package
-clawperator doctor --fix                # update APK, fix device permissions
-clawperator bundled-skills update       # update bundled skills
-clawperator skills install              # refresh runtime skills registry
-clawperator host materialize-artifacts  # regenerate host artifacts (AGENTS.md, MCP snippet, etc.)
-clawperator doctor --json               # verify
+npm install -g clawperator@latest
+clawperator install remediate          # or doctor --fix per device
+clawperator bundled-skills update
+clawperator skills install
+clawperator host materialize-artifacts
+clawperator doctor --json              # verify criticalOk: true per device
 ```
 
-Each step has a structured JSON result. The skill can check each one
-individually rather than treating the whole sequence as a black box.
+Each step has a structured JSON result. The prohibition on
+`npm install -g clawperator@latest` as "the primary path" is replaced by
+"do not use any single command as a substitute for the full upgrade sequence."
 
-The existing prohibition on `npm install -g clawperator@latest` as "the
-primary path" was correct when that alone was insufficient. After the cleanup,
-the prohibition should be replaced with guidance to run the full CLI upgrade
-sequence above. The spirit - do not use a single partial command - is preserved;
-only the implementation changes.
+### When `install.sh` remains appropriate
 
-### When `install.sh` is still appropriate for upgrade
+Only when the host environment is broken: Java or Node missing or incompatible,
+adb not on PATH, corrupted npm global install. In that case CLI commands cannot
+run and `install.sh` is the only recovery path.
 
-One scenario justifies falling back to `install.sh` during an upgrade: when the
-host environment itself is broken - Java or Node missing or incompatible, adb
-not on PATH, corrupted npm global install. In that case, the CLI commands cannot
-run and the shell bootstrapper is the only recovery path.
+**Decision tree for the skill:**
+1. Check: `clawperator --version` succeeds?
+2. Yes: run the CLI upgrade sequence above.
+3. No: fall back to `curl -fsSL https://clawperator.com/install.sh | bash` as
+   environment repair, with explicit note this is a recovery path.
 
-**Recommended upgrade decision tree:**
+### Skill changes required (timed to phase completion)
 
-1. Check whether the CLI is reachable: `clawperator --version`
-2. If reachable, run the targeted CLI upgrade sequence above.
-3. If not reachable (CLI missing, corrupt, or wrong runtime), fall back to
-   `curl -fsSL https://clawperator.com/install.sh | bash` as a full
-   environment repair, with an explicit note that this is a recovery path, not
-   the normal upgrade path.
+Do not update the skill to reference commands that do not yet exist.
 
-### Changes needed in the skill
+**After Phase 1 ships** (`host materialize-artifacts`):
+- Add `clawperator host materialize-artifacts` to the upgrade sequence in SKILL.md
+- Update SKILL.md "What This Skill Does Not Own" to note it is a required
+  upgrade step, not a standalone substitute
 
-**`SKILL.md`** - update in the same PR as Phase 1 or Phase 2 of the cleanup
-(whichever introduces the first CLI command the skill should use):
+**After Phase 2 ships** (`operator download`):
+- Add `clawperator operator download` step (or note it is subsumed by
+  `install remediate` / `doctor --fix`)
 
-- Replace "run `curl -fsSL https://clawperator.com/install.sh | bash`" as the
-  primary action with the CLI upgrade sequence.
-- Replace the prohibition on individual commands with the complete list of
-  commands in order.
-- Add the CLI-reachability check as the branch point for CLI upgrade vs
-  install.sh recovery.
-- Update the "What This Skill Does Not Own" list to include
-  `clawperator doctor --fix` and `clawperator host materialize-artifacts` as
-  things that are components of the upgrade sequence, not standalone replacements
-  for it.
+**After Phase 3 ships** (multi-device remediation command + `--fix` expansion):
+- Replace `doctor --fix` step description with the resolved multi-device command
 
-**`agents/openai.yaml` `default_prompt`** - update the prohibition clause to
-match the new SKILL.md workflow. The current prompt says "Do not replace the
-installer with `npm install -g clawperator@latest` ..."; that clause should
-instead describe the full CLI upgrade sequence.
+**After all phases ship** (final skill update):
+- Replace `curl -fsSL ... | bash` as the primary action with the full CLI
+  upgrade sequence
+- Add the CLI-reachability check as the branch point
+- Update `agents/openai.yaml` `default_prompt` to match
+- Move `install.sh` to the recovery-only path in the skill
 
-### Sequencing with the install.sh cleanup
+**A single coordinated skill update after all phases is preferable** to four
+incremental partial updates, since the skill is consumed by agents in
+production. Partial updates risk agents mixing new and old guidance.
 
-The upgrade skill should not be updated before the CLI commands it needs exist.
-Appropriate timing:
+---
 
-- After Phase 1 ships (`clawperator host materialize-artifacts`): update the
-  artifact-writing step in the skill.
-- After Phase 2 ships (expanded `clawperator doctor --fix`): update the
-  remediation step.
-- After Phase 3 ships (`clawperator operator download`): APK step is now
-  subsumed by `doctor --fix`; no direct skill change needed.
-- After all phases ship: replace the full `install.sh` primary path with the
-  CLI upgrade sequence and move `install.sh` to the recovery-only path.
+## Open Design Questions
 
-Do not update the skill to reference CLI commands that do not yet exist.
+These must be resolved before implementation begins on their respective phases.
+
+**Q1 (Phase 3): Multi-device surface**
+
+Which option for replacing the multi-device install loop?
+
+- Option A: Thin shell loop calling `clawperator doctor --json --device <id>`
+  per device, keeping loop orchestration in install.sh
+- Option B: New `clawperator install remediate` command that enumerates
+  connected devices and runs per-device `operator download` + `doctor --fix`
+  internally (recommended)
+- Option C: `doctor --each-device` flag
+
+Decision affects whether install.sh retains any device-probing logic and what
+the upgrade skill calls.
+
+**Q2 (Phase 1): Command group name**
+
+`clawperator host materialize-artifacts` vs `clawperator setup materialize`
+vs `clawperator artifacts write` vs another shape. Pick one before
+implementation and add to registry.
+
+**Q3 (Phase 4): RC mutation removal prerequisite**
+
+Before deleting the RC mutation, confirm: does any existing user-facing
+documentation or setup flow require `CLAWPERATOR_SKILLS_REGISTRY` to be set?
+Check `docs/setup.md` and `docs/api/`. If yes, update docs to reference the
+installed-home fallback first.
 
 ---
 
@@ -377,19 +499,17 @@ Do not update the skill to reference CLI commands that do not yet exist.
 - Product logic moves into TypeScript where it can be unit tested cleanly
 - Inline Node programs in bash disappear
 - Doctor check IDs are referenced in one place, not two
-- Upgrade skill (`clawperator-upgrade`) simplifies - it can call targeted CLI
-  commands rather than re-running the full shell gauntlet
+- Upgrade skill simplifies - targeted CLI commands instead of install.sh
 - APK download becomes reusable outside the install flow
 
 **Costs**
-- Any new CLI install command becomes part of the product contract; must be
-  maintained and versioned
-- Multi-device remediation logic must be deliberately simplified while moving,
-  not ported verbatim - the current shell state machine has implicit state that
-  is fragile even in bash
-- Each phase requires migrating test coverage before removing the shell
-  equivalent; this is not optional per project guidelines
+- Each new CLI command is part of the product contract and must be maintained
+- Multi-device remediation must be deliberately simplified while moving, not
+  ported verbatim
+- Each phase requires migrating test coverage in the same PR - this is
+  non-negotiable per CLAUDE.md
 
 **Lowest risk entry point:** Phase 1 (host artifact generation) has the
 cleanest boundary, touches no device behavior, and removes the most embedded
-Node code per line of effort.
+Node code per line of effort. It is also independent of the open design
+questions.
