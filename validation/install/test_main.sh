@@ -92,7 +92,7 @@ STATE_FILE="\${MOCK_MAIN_STATE_FILE:?}"
 SCENARIO="\${MOCK_MAIN_SCENARIO:?}"
 
 case "\$*" in
-  doctor\ --format\ json|doctor\ --device\ *\ --format\ json)
+  doctor\ --format\ json*|doctor\ --device\ *\ --format\ json*)
   count=0
   if [ -f "\$STATE_FILE" ]; then
     count="\$(cat "\$STATE_FILE")"
@@ -111,13 +111,13 @@ JSON
       cat <<'JSON'
 {"ok":false,"criticalOk":false,"checks":[{"id":"readiness.handshake","status":"fail","code":"HANDSHAKE_FAILED"}]}
 JSON
-      exit 0
+      exit 1
       ;;
     final-fail:3)
       cat <<'JSON'
 {"ok":false,"criticalOk":false,"checks":[{"id":"readiness.handshake","status":"fail","code":"HANDSHAKE_FAILED"}]}
 JSON
-      exit 0
+      exit 1
       ;;
     multi-device:1|multi-device:2)
       cat <<'JSON'
@@ -137,13 +137,51 @@ JSON
 JSON
       exit 0
       ;;
+    multi-device-warning:1|multi-device-warning:2)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+      exit 0
+      ;;
+    multi-device-warning:3)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[{"id":"device.discovery","status":"warn","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
+JSON
+      exit 0
+      ;;
+    multi-device-warning:4)
+      printf '%s\n' 'sensitive doctor stderr from warning device' >&2
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[{"id":"readiness.handshake","status":"warn","code":"HANDSHAKE_PERMISSION_ADVISORY"}]}
+JSON
+      exit 0
+      ;;
+    multi-device-warning:5)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+      exit 0
+      ;;
     apk-remediation:1)
       cat <<'JSON'
 {"ok":false,"criticalOk":false,"checks":[{"id":"readiness.apk.presence","status":"fail","code":"OPERATOR_NOT_INSTALLED"}]}
 JSON
-      exit 0
+      exit 1
       ;;
     apk-remediation:2|apk-remediation:3)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+      exit 0
+      ;;
+    multi-device-mixed:1|multi-device-mixed:2|multi-device-mixed:3)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[{"id":"device.discovery","status":"warn","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
+JSON
+      exit 0
+      ;;
+    multi-device-mixed:4)
+      printf '%s\n' 'sensitive doctor stderr from mixed-state device' >&2
       cat <<'JSON'
 {"ok":true,"criticalOk":true,"checks":[]}
 JSON
@@ -229,6 +267,21 @@ serial-alpha	device
 serial-beta	device
 OUT
       ;;
+    multi-device-warning)
+      cat <<'OUT'
+List of devices attached
+serial-warning	device
+serial-ready	device
+OUT
+      ;;
+    multi-device-mixed)
+      cat <<'OUT'
+List of devices attached
+serial-ready	device
+serial-unauthorized	unauthorized
+serial-offline	offline
+OUT
+      ;;
     stale-device)
       cat <<'OUT'
 List of devices attached
@@ -262,6 +315,7 @@ run_main_case() {
     local cli_log_file="$7"
     local guide_path_file="$8"
     local state_file="$9"
+    local operator_package="${10:-}"
     local mock_dir="$TMP_DIR/mock-$label"
 
     setup_mock_clawperator "$mock_dir" "$cli_log_file"
@@ -269,67 +323,132 @@ run_main_case() {
     : > "$cli_log_file"
     : > "$trace_file"
 
-    HOME="$TMP_DIR/home-$label" \
-    OS=Linux \
-    PATH="$mock_dir:$SYSTEM_PATH_BASE" \
-    MOCK_MAIN_STATE_FILE="$state_file" \
-    MOCK_MAIN_SCENARIO="$scenario" \
-    bash -c '
-        source "$1" >/dev/null 2>&1
-        trap - ERR
+    if [ -n "$operator_package" ]; then
+        CLAWPERATOR_OPERATOR_PACKAGE="$operator_package" \
+        HOME="$TMP_DIR/home-$label" \
+        OS=Linux \
+        PATH="$mock_dir:$SYSTEM_PATH_BASE" \
+        MOCK_MAIN_STATE_FILE="$state_file" \
+        MOCK_MAIN_SCENARIO="$scenario" \
+        bash -c '
+            source "$1" >/dev/null 2>&1
+            trap - ERR
 
-        trace() {
-            printf "%s\n" "$1" >> "$2"
-        }
+            trace() {
+                printf "%s\n" "$1" >> "$2"
+            }
 
-        validate_os() { trace validate_os "$TRACE_FILE"; return 0; }
-        check_java() { trace check_java "$TRACE_FILE"; return 0; }
-        check_node() { trace check_node "$TRACE_FILE"; return 0; }
-        check_curl() { trace check_curl "$TRACE_FILE"; return 0; }
-        check_adb() { trace check_adb "$TRACE_FILE"; return 0; }
-        check_git() { trace check_git "$TRACE_FILE"; return 0; }
-        install_cli() {
-            trace install_cli "$TRACE_FILE"
-            export CLAWPERATOR_BIN_PATH="$MOCK_CLAWPERATOR_BIN"
-            # Force the node-form MCP snippet path deterministically even on
-            # hosts without a real global clawperator install. The file does
-            # not need to exist; resolve_cli_entrypoint_js only forwards the
-            # path, it does not execute it.
-            export CLAWPERATOR_CLI_JS_PATH="$MOCK_CLAWPERATOR_BIN.cli.js"
-            return 0
-        }
-        download_operator_apk() {
-            trace download_operator_apk "$TRACE_FILE"
-            mkdir -p "$(dirname "$APK_LOCAL_PATH")"
-            printf "mock apk\n" > "$APK_LOCAL_PATH"
-            printf "mock sha\n" > "$APK_SHA_PATH"
-            OPERATOR_VERSION="9.9.9"
-            echo "Mock download_operator_apk"
-            return 0
-        }
-        verify_operator_apk() {
-            trace verify_operator_apk "$TRACE_FILE"
-            echo "Mock verify_operator_apk"
-            return 0
-        }
-        maybe_install_operator_apk() {
-            trace maybe_install_operator_apk "$TRACE_FILE"
-            echo "Mock maybe_install_operator_apk"
-            return 0
-        }
-        show_star_hint() { trace show_star_hint "$TRACE_FILE"; return 0; }
+            validate_os() { trace validate_os "$TRACE_FILE"; return 0; }
+            check_java() { trace check_java "$TRACE_FILE"; return 0; }
+            check_node() { trace check_node "$TRACE_FILE"; return 0; }
+            check_curl() { trace check_curl "$TRACE_FILE"; return 0; }
+            check_adb() { trace check_adb "$TRACE_FILE"; return 0; }
+            check_git() { trace check_git "$TRACE_FILE"; return 0; }
+            install_cli() {
+                trace install_cli "$TRACE_FILE"
+                export CLAWPERATOR_BIN_PATH="$MOCK_CLAWPERATOR_BIN"
+                # Force the node-form MCP snippet path deterministically even on
+                # hosts without a real global clawperator install. The file does
+                # not need to exist; resolve_cli_entrypoint_js only forwards the
+                # path, it does not execute it.
+                export CLAWPERATOR_CLI_JS_PATH="$MOCK_CLAWPERATOR_BIN.cli.js"
+                return 0
+            }
+            download_operator_apk() {
+                trace download_operator_apk "$TRACE_FILE"
+                mkdir -p "$(dirname "$APK_LOCAL_PATH")"
+                printf "mock apk\n" > "$APK_LOCAL_PATH"
+                printf "mock sha\n" > "$APK_SHA_PATH"
+                OPERATOR_VERSION="9.9.9"
+                echo "Mock download_operator_apk"
+                return 0
+            }
+            verify_operator_apk() {
+                trace verify_operator_apk "$TRACE_FILE"
+                echo "Mock verify_operator_apk"
+                return 0
+            }
+            maybe_install_operator_apk() {
+                trace maybe_install_operator_apk "$TRACE_FILE"
+                echo "Mock maybe_install_operator_apk"
+                return 0
+            }
+            show_star_hint() { trace show_star_hint "$TRACE_FILE"; return 0; }
 
-        export TRACE_FILE="$2"
-        export MOCK_CLAWPERATOR_BIN="$3"
+            export TRACE_FILE="$2"
+            export MOCK_CLAWPERATOR_BIN="$3"
 
-        set +e
-        main > "$4" 2> "$5"
-        status="$?"
-        set -e
+            set +e
+            main > "$4" 2> "$5"
+            status="$?"
+            set -e
 
-        printf "%s\n" "$HOME/.clawperator/AGENTS.md" > "$6"
-        printf "%s\n" "$status"
-    ' _ "$INSTALL_SCRIPT" "$trace_file" "$mock_dir/clawperator" "$stdout_file" "$stderr_file" "$guide_path_file" > "$TMP_DIR/$label.status"
+            printf "%s\n" "$HOME/.clawperator/AGENTS.md" > "$6"
+            printf "%s\n" "$status"
+        ' _ "$INSTALL_SCRIPT" "$trace_file" "$mock_dir/clawperator" "$stdout_file" "$stderr_file" "$guide_path_file" > "$TMP_DIR/$label.status"
+    else
+        HOME="$TMP_DIR/home-$label" \
+        OS=Linux \
+        PATH="$mock_dir:$SYSTEM_PATH_BASE" \
+        MOCK_MAIN_STATE_FILE="$state_file" \
+        MOCK_MAIN_SCENARIO="$scenario" \
+        bash -c '
+            source "$1" >/dev/null 2>&1
+            trap - ERR
+
+            trace() {
+                printf "%s\n" "$1" >> "$2"
+            }
+
+            validate_os() { trace validate_os "$TRACE_FILE"; return 0; }
+            check_java() { trace check_java "$TRACE_FILE"; return 0; }
+            check_node() { trace check_node "$TRACE_FILE"; return 0; }
+            check_curl() { trace check_curl "$TRACE_FILE"; return 0; }
+            check_adb() { trace check_adb "$TRACE_FILE"; return 0; }
+            check_git() { trace check_git "$TRACE_FILE"; return 0; }
+            install_cli() {
+                trace install_cli "$TRACE_FILE"
+                export CLAWPERATOR_BIN_PATH="$MOCK_CLAWPERATOR_BIN"
+                # Force the node-form MCP snippet path deterministically even on
+                # hosts without a real global clawperator install. The file does
+                # not need to exist; resolve_cli_entrypoint_js only forwards the
+                # path, it does not execute it.
+                export CLAWPERATOR_CLI_JS_PATH="$MOCK_CLAWPERATOR_BIN.cli.js"
+                return 0
+            }
+            download_operator_apk() {
+                trace download_operator_apk "$TRACE_FILE"
+                mkdir -p "$(dirname "$APK_LOCAL_PATH")"
+                printf "mock apk\n" > "$APK_LOCAL_PATH"
+                printf "mock sha\n" > "$APK_SHA_PATH"
+                OPERATOR_VERSION="9.9.9"
+                echo "Mock download_operator_apk"
+                return 0
+            }
+            verify_operator_apk() {
+                trace verify_operator_apk "$TRACE_FILE"
+                echo "Mock verify_operator_apk"
+                return 0
+            }
+            maybe_install_operator_apk() {
+                trace maybe_install_operator_apk "$TRACE_FILE"
+                echo "Mock maybe_install_operator_apk"
+                return 0
+            }
+            show_star_hint() { trace show_star_hint "$TRACE_FILE"; return 0; }
+
+            export TRACE_FILE="$2"
+            export MOCK_CLAWPERATOR_BIN="$3"
+
+            set +e
+            main > "$4" 2> "$5"
+            status="$?"
+            set -e
+
+            printf "%s\n" "$HOME/.clawperator/AGENTS.md" > "$6"
+            printf "%s\n" "$status"
+        ' _ "$INSTALL_SCRIPT" "$trace_file" "$mock_dir/clawperator" "$stdout_file" "$stderr_file" "$guide_path_file" > "$TMP_DIR/$label.status"
+    fi
 
     local actual_exit
     actual_exit="$(cat "$TMP_DIR/$label.status")"
@@ -512,7 +631,7 @@ assert_contains "$MULTI_STDOUT" "Host install completed, but Android setup is st
 assert_contains "$MULTI_STDOUT" "Checking each connected device with Clawperator Doctor..." "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "serial-alpha - ready" "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "serial-beta - ready" "main-multi stdout"
-assert_contains "$MULTI_STDOUT" "clawperator doctor --device <device_id> --output pretty" "main-multi stdout"
+assert_contains "$MULTI_STDOUT" "clawperator doctor --device <device_id> --output pretty --operator-package com.clawperator.operator" "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi/.clawperator/downloads/operator.apk --device serial-alpha" "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi/.clawperator/downloads/operator.apk --device serial-beta" "main-multi stdout"
 assert_contains "$MULTI_STDOUT" "$TMP_DIR/home-main-multi/.clawperator/AGENTS.md" "main-multi stdout durable guide"
@@ -524,7 +643,65 @@ assert_contains "$MULTI_CLI_LOG" "doctor --device serial-alpha --format json" "m
 assert_contains "$MULTI_CLI_LOG" "doctor --device serial-beta --format json" "main-multi cli log"
 assert_json_field_null "$TMP_DIR/home-main-multi/.clawperator/install-state.json" "lastDeviceSerial" "main-multi install-state lastDeviceSerial"
 
-echo "=== Scenario 4: APK remediation path runs before final success ==="
+echo "=== Scenario 4: final doctor multi-device path reports warnings honestly ==="
+MULTI_WARN_STDOUT="$TMP_DIR/main-multi-warn.stdout"
+MULTI_WARN_STDERR="$TMP_DIR/main-multi-warn.stderr"
+MULTI_WARN_TRACE="$TMP_DIR/main-multi-warn.trace"
+MULTI_WARN_CLI_LOG="$TMP_DIR/main-multi-warn.cli.log"
+MULTI_WARN_GUIDE_PATH_FILE="$TMP_DIR/main-multi-warn.guide.path"
+MULTI_WARN_STATE="$TMP_DIR/main-multi-warn.state"
+run_main_case \
+    main-multi-warn \
+    multi-device-warning \
+    0 \
+    "$MULTI_WARN_STDOUT" \
+    "$MULTI_WARN_STDERR" \
+    "$MULTI_WARN_TRACE" \
+    "$MULTI_WARN_CLI_LOG" \
+    "$MULTI_WARN_GUIDE_PATH_FILE" \
+    "$MULTI_WARN_STATE"
+
+assert_contains "$MULTI_WARN_STDOUT" "Installation Complete (Device Selection Required)" "main-multi-warn stdout"
+assert_contains "$MULTI_WARN_STDOUT" "critical checks passed; warnings remain." "main-multi-warn stdout"
+assert_contains "$MULTI_WARN_STDOUT" "All connected devices passed critical checks." "main-multi-warn stdout"
+assert_contains "$MULTI_WARN_STDOUT" "serial-warning - critical checks passed; warnings remain." "main-multi-warn stdout"
+assert_contains "$MULTI_WARN_STDOUT" "serial-ready - ready" "main-multi-warn stdout"
+assert_not_contains "$MULTI_WARN_STDOUT" "serial-warning - ready" "main-multi-warn stdout"
+assert_contains "$MULTI_WARN_CLI_LOG" "doctor --device serial-warning --format json" "main-multi-warn cli log"
+assert_contains "$MULTI_WARN_CLI_LOG" "doctor --device serial-ready --format json" "main-multi-warn cli log"
+assert_not_contains "$MULTI_WARN_STDERR" "sensitive doctor stderr from warning device" "main-multi-warn stderr"
+
+echo "=== Scenario 5: multi-device path forwards the selected operator package and surfaces adb-state warnings ==="
+MULTI_MIXED_STDOUT="$TMP_DIR/main-multi-mixed.stdout"
+MULTI_MIXED_STDERR="$TMP_DIR/main-multi-mixed.stderr"
+MULTI_MIXED_TRACE="$TMP_DIR/main-multi-mixed.trace"
+MULTI_MIXED_CLI_LOG="$TMP_DIR/main-multi-mixed.cli.log"
+MULTI_MIXED_GUIDE_PATH_FILE="$TMP_DIR/main-multi-mixed.guide.path"
+MULTI_MIXED_STATE="$TMP_DIR/main-multi-mixed.state"
+run_main_case \
+    main-multi-mixed \
+    multi-device-mixed \
+    0 \
+    "$MULTI_MIXED_STDOUT" \
+    "$MULTI_MIXED_STDERR" \
+    "$MULTI_MIXED_TRACE" \
+    "$MULTI_MIXED_CLI_LOG" \
+    "$MULTI_MIXED_GUIDE_PATH_FILE" \
+    "$MULTI_MIXED_STATE" \
+    "com.clawperator.operator.dev"
+
+assert_contains "$MULTI_MIXED_STDOUT" "Installation Complete (Device Selection Required)" "main-multi-mixed stdout"
+assert_contains "$MULTI_MIXED_STDOUT" "serial-unauthorized - ADB state: unauthorized. Unlock the device or restart ADB before setup." "main-multi-mixed stdout"
+assert_contains "$MULTI_MIXED_STDOUT" "serial-offline - ADB state: offline. Unlock the device or restart ADB before setup." "main-multi-mixed stdout"
+assert_contains "$MULTI_MIXED_STDOUT" "serial-ready - ready" "main-multi-mixed stdout"
+assert_contains "$MULTI_MIXED_STDOUT" "Host install completed, but Android setup is still pending because more than one device is connected." "main-multi-mixed stdout"
+assert_contains "$MULTI_MIXED_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi-mixed/.clawperator/downloads/operator.apk --device serial-ready --operator-package com.clawperator.operator.dev" "main-multi-mixed stdout"
+assert_contains "$MULTI_MIXED_STDOUT" "clawperator doctor --device <device_id> --output pretty --operator-package com.clawperator.operator.dev" "main-multi-mixed stdout"
+assert_contains "$MULTI_MIXED_CLI_LOG" "doctor --format json --operator-package com.clawperator.operator.dev" "main-multi-mixed cli log"
+assert_contains "$MULTI_MIXED_CLI_LOG" "doctor --device serial-ready --format json --operator-package com.clawperator.operator.dev" "main-multi-mixed cli log"
+assert_not_contains "$MULTI_MIXED_STDERR" "sensitive doctor stderr from mixed-state device" "main-multi-mixed stderr"
+
+echo "=== Scenario 6: APK remediation path runs before final success ==="
 REMEDIATE_STDOUT="$TMP_DIR/main-remediation.stdout"
 REMEDIATE_STDERR="$TMP_DIR/main-remediation.stderr"
 REMEDIATE_TRACE="$TMP_DIR/main-remediation.trace"
@@ -554,7 +731,7 @@ assert_contains "$REMEDIATE_TRACE" "maybe_install_operator_apk" "main-remediatio
 assert_contains "$REMEDIATE_CLI_LOG" "doctor --format json" "main-remediation cli log"
 assert_contains "$REMEDIATE_CLI_LOG" "doctor --output pretty" "main-remediation cli log"
 
-echo "=== Scenario 5: handshake recovery still targets the single ready device when stale adb entries exist ==="
+echo "=== Scenario 7: handshake recovery still targets the single ready device when stale adb entries exist ==="
 STALE_STDOUT="$TMP_DIR/main-stale.stdout"
 STALE_STDERR="$TMP_DIR/main-stale.stderr"
 STALE_TRACE="$TMP_DIR/main-stale.trace"
@@ -577,7 +754,7 @@ assert_contains "$STALE_STDOUT" "Installation Successful!" "main-stale stdout"
 assert_contains "$STALE_CLI_LOG" "grant-device-permissions --device serial-solo --operator-package com.clawperator.operator" "main-stale cli log"
 assert_json_field_equals "$STALE_INSTALL_STATE_PATH" "lastDeviceSerial" "serial-solo" "main-stale install-state lastDeviceSerial"
 
-echo "=== Scenario 6: stdin entrypoint runs without BASH_SOURCE errors ==="
+echo "=== Scenario 8: stdin entrypoint runs without BASH_SOURCE errors ==="
 STDIN_STDOUT="$TMP_DIR/stdin.stdout"
 STDIN_STDERR="$TMP_DIR/stdin.stderr"
 STDIN_STATUS="$TMP_DIR/stdin.status"
