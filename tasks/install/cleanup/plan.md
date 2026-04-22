@@ -8,23 +8,25 @@ Node CLI. This is cross-surface work spanning the landing-site installer, Node
 CLI commands, doctor behavior, install validation, public docs, and the shipped
 `clawperator-upgrade` bundled skill.
 
-This task ships in **4 PRs across 5 phases**. **PR-1** extracts host artifact
-generation into a CLI-owned surface. **PR-2** moves operator APK acquisition
-and verification into the CLI. **PR-3** moves doctor-driven remediation and
-multi-device install policy into the CLI. **PR-4** finishes the installer
-thinning, updates docs and validations, and changes the upgrade skill so
-`install.sh` becomes a recovery path rather than the normal upgrade path.
+This task ships in **4 PRs across 6 phases**. **PR-1** extracts host artifact
+generation into a CLI-owned surface, switches the installer to it, and then
+renames that surface to the final `clawperator host setup` shape. **PR-2**
+moves operator APK acquisition and verification into the CLI. **PR-3** moves
+doctor-driven remediation and multi-device install policy into the CLI.
+**PR-4** finishes the installer thinning, updates docs and validations, and
+changes the upgrade skill so `install.sh` becomes a recovery path rather than
+the normal upgrade path.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | in progress |
 | Total PRs | 4 |
-| Total phases | 5 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4, 5 |
-| Current / Next | Phase 1 |
+| Total phases | 6 |
+| Completed | 1, 2 |
+| Remaining | 2.5, 3, 4, 5 |
+| Current / Next | Phase 2.5 |
 | Blockers | none |
 
 ## Goal
@@ -58,7 +60,7 @@ before more install and upgrade work builds on it.
 
 ## In Scope
 
-- add a CLI-owned host-artifact materialization surface for:
+- add a CLI-owned host setup surface for:
   - install state
   - MCP config snippet
   - local `~/.clawperator/AGENTS.md`
@@ -101,10 +103,10 @@ before more install and upgrade work builds on it.
 | --- | --- | --- |
 | `sites/landing/public/install.sh` | Thin bootstrapper plus CLI orchestration; removal of embedded artifact writers, APK fetch logic, and doctor-policy parsing | PR-1 / Phase 2, PR-2 / Phase 3, PR-3 / Phase 4, PR-4 / Phase 5 |
 | `validation/install/` | Replace shell-specific coverage with CLI or integration coverage in lockstep with each migration step | PR-1 / Phase 2, PR-2 / Phase 3, PR-3 / Phase 4, PR-4 / Phase 5 |
-| `apps/node/src/cli/` | New host-artifact and operator-download surfaces; expanded install remediation command flow | PR-1 / Phases 1-2, PR-2 / Phase 3, PR-3 / Phase 4 |
+| `apps/node/src/cli/` | New host setup and operator-download surfaces; expanded install remediation command flow | PR-1 / Phases 1-2.5, PR-2 / Phase 3, PR-3 / Phase 4 |
 | `apps/node/src/domain/doctor/` | CLI-owned remediation policy and multi-device handling | PR-3 / Phase 4 |
 | `apps/node/src/domain/device/` | Reuse existing operator setup behavior; only additive helper work if required | PR-2 / Phase 3, PR-3 / Phase 4 |
-| `apps/node/src/test/` | Unit or integration coverage for each new CLI surface | PR-1 / Phases 1-2, PR-2 / Phase 3, PR-3 / Phase 4 |
+| `apps/node/src/test/` | Unit or integration coverage for each new CLI surface | PR-1 / Phases 1-2.5, PR-2 / Phase 3, PR-3 / Phase 4 |
 | `docs/` | Authored docs for install flow and upgrade guidance | PR-4 / Phase 5 |
 | `apps/node/bundled-skills/clawperator-upgrade/` | CLI-first upgrade flow, fallback to `install.sh` only for environment recovery | PR-4 / Phase 5 |
 
@@ -124,6 +126,8 @@ rediscovered unless the code changes underneath the task:
   3. JSON parsing of CLI output in shell that should disappear
   4. host artifact generation implemented as embedded Node inside bash
 - Host artifact generation is the highest-leverage early extraction.
+- The final CLI name for that surface should be `clawperator host setup`, not
+  `clawperator host materialize-artifacts`.
 - APK download and checksum handling belong under the `operator` CLI surface and
   should write to `getOperatorPackageApkPath(operatorPackage)`.
 - `doctor --fix` already runs `kind: "shell"` fix steps through
@@ -170,9 +174,11 @@ rediscovered unless the code changes underneath the task:
   - `npm install -g clawperator@latest`
 - Post-bootstrap product logic moves into the CLI in this order:
   1. host artifact generation
-  2. operator APK download and checksum verification
-  3. doctor-driven remediation and multi-device policy
-  4. shell RC mutation cleanup and upgrade-skill follow-through
+  2. installer switchover to the new host surface
+  3. host-surface rename and internal refactor to `clawperator host setup`
+  4. operator APK download and checksum verification
+  5. doctor-driven remediation and multi-device policy
+  6. shell RC mutation cleanup and upgrade-skill follow-through
 - Each phase that removes shell logic must add the replacement CLI or
   integration coverage in the same phase. Do not defer tests.
 - `clawperator-upgrade` must not switch to a CLI-first path until the CLI
@@ -198,7 +204,8 @@ rediscovered unless the code changes underneath the task:
 
 | Question | Rule |
 | --- | --- |
-| Should host artifact writers move before remediation policy? | Yes. Phase 1 and Phase 2 go first because they are high leverage and lower risk than policy migration. |
+| Should host artifact writers move before remediation policy? | Yes. Phase 1, Phase 2, and Phase 2.5 go first because they are high leverage and lower risk than policy migration. |
+| What is the final host-artifact CLI name? | `clawperator host setup`. Treat `clawperator host materialize-artifacts` as a temporary implementation name that Phase 2.5 removes from the public surface and internal code. |
 | Should APK download move before doctor-policy migration? | Yes. The reusable `operator download` surface must exist before Phase 4 wires it as a `kind: "shell"` fix step. |
 | Should multi-device remediation stay in shell once CLI-owned? | No. Phase 4 moves the policy into the CLI and removes the shell-side second policy engine. |
 | What is the multi-device remediation CLI surface shape? | Add a new `clawperator operator remediate` command that enumerates connected devices and applies per-device remediation using `operator download` + `doctor --fix --device <id>`. Do not extend `doctor --fix` for multi-device; `doctor` is single-device by contract. Do not use top-level `install`, because `clawperator install` already exists as invalid-command guidance in `registry.ts`. |
@@ -228,10 +235,12 @@ rediscovered unless the code changes underneath the task:
 
 After PR-1:
 
-- a CLI-owned host-artifact surface exists
-- `install.sh` delegates artifact generation to the CLI
+- a CLI-owned `clawperator host setup` surface exists
+- `install.sh` delegates artifact generation to that CLI surface
 - artifact-writing logic no longer lives in large embedded Node heredocs inside
   `install.sh`
+- Phase 1 and Phase 2 naming leftovers such as `materializeArtifacts` are
+  removed from the CLI surface and supporting host-domain code
 
 After PR-2:
 
@@ -260,7 +269,7 @@ After PR-4:
 
 ## Idempotency
 
-- re-running the new host-artifact command is safe and updates files in place
+- re-running `clawperator host setup` is safe and updates files in place
   without duplicate marker blocks
 - re-running operator download is safe and leaves a verified local artifact
   state

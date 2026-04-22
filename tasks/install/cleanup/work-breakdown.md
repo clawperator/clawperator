@@ -4,26 +4,26 @@ Parent plan: `tasks/install/cleanup/plan.md`
 
 ## Executive Summary
 
-4 PRs, 5 phases. **PR-1** contains Phase 1 and Phase 2 for the new
-host-artifact CLI surface plus installer delegation. **PR-2** contains Phase 3
-for operator APK download and checksum migration. **PR-3** contains Phase 4
-for doctor-driven remediation and multi-device policy migration. **PR-4**
-contains Phase 5 for final installer thinning, docs, validation realignment,
-and `clawperator-upgrade` follow-through.
+4 PRs, 6 phases. **PR-1** contains Phase 1, Phase 2, and Phase 2.5 for the new
+host setup CLI surface, installer delegation, and the final naming refactor.
+**PR-2** contains Phase 3 for operator APK download and checksum migration.
+**PR-3** contains Phase 4 for doctor-driven remediation and multi-device policy
+migration. **PR-4** contains Phase 5 for final installer thinning, docs,
+validation realignment, and `clawperator-upgrade` follow-through.
 
-This task is currently in planning. No phase should begin out of order because
+This task is currently in progress. No phase should begin out of order because
 later phases depend on earlier CLI surfaces being real and merged.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | in progress |
 | Total PRs | 4 |
-| Total phases | 5 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4, 5 |
-| Current / Next | Phase 1 |
+| Total phases | 6 |
+| Completed | 1, 2 |
+| Remaining | 2.5, 3, 4, 5 |
+| Current / Next | Phase 2.5 |
 | Blockers | none |
 
 ## Hard Rules
@@ -61,7 +61,7 @@ Read these files IN THIS ORDER before writing anything.
 
 | File | Why it matters |
 | --- | --- |
-| `tasks/install/cleanup/plan.md` | Stable contract, sequencing, and scope boundaries |
+| `tasks/install/cleanup/plan.md` | Stable contract, sequencing, naming decisions, and scope boundaries |
 | `sites/landing/public/install.sh` | Current installer behavior and the shell logic being thinned |
 | `validation/install/README.md` | Install validation maintenance rule and existing harness ownership |
 | `apps/node/src/cli/registry.ts` | Existing CLI command structure and help-surface conventions |
@@ -81,7 +81,7 @@ Read these files IN THIS ORDER before writing anything.
 
 | PR | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
-| PR-1 | Create CLI-owned host artifact materialization and remove shell heredoc writers | 1, 2 | thinking, default | none |
+| PR-1 | Create CLI-owned host setup surface, remove shell heredoc writers, and finalize the public naming | 1, 2, 2.5 | thinking, default, default | none |
 | PR-2 | Move operator APK metadata, download, and checksum verification into the CLI | 3 | default | PR-1 merged |
 | PR-3 | Move doctor-driven remediation and multi-device install policy into the CLI | 4 | thinking | PR-2 merged |
 | PR-4 | Final installer thinning, docs, validation cleanup, and upgrade-skill follow-through | 5 | default | PR-3 merged |
@@ -94,22 +94,22 @@ thinking
 
 ### Goal
 
-Create a CLI-owned host-artifact surface that can materialize the durable
+Create a CLI-owned host setup surface that can materialize the durable
 install outputs currently written by large embedded Node snippets in
 `install.sh`.
 
 ### Files or Surfaces To Change
 
 - `apps/node/src/cli/registry.ts`
-- new or existing `apps/node/src/cli/commands/` file for host-artifact work
+- new or existing `apps/node/src/cli/commands/` file for host setup work
 - any justified helper under `apps/node/src/domain/`
 - `apps/node/src/test/` coverage for the new command surface
 
 ### Steps
 
-1. Add a new CLI surface for host-artifact materialization. A grouped command
-   such as `clawperator host materialize-artifacts` is the preferred shape
-   unless the existing CLI structure proves another naming is cleaner.
+1. Add a new CLI surface for host setup work. Phase 1 may land with a temporary
+   name if needed, but the final public name after Phase 2.5 must be
+   `clawperator host setup`.
 2. Move the artifact generation logic for all of the following into TypeScript:
    - install state
    - MCP config snippet
@@ -133,7 +133,7 @@ install outputs currently written by large embedded Node snippets in
 
 ### Acceptance Criteria
 
-- a CLI-owned host-artifact surface exists and can write all four artifact
+- a CLI-owned host setup surface exists and can write all four artifact
   types
 - artifact-writing logic no longer requires embedded Node heredocs for the new
   code path
@@ -180,7 +180,7 @@ embedded shell-side artifact writers.
 ### Steps
 
 1. Replace the shell-side artifact writing path in `install.sh` with a call to
-   the CLI host-artifact surface added in Phase 1.
+   the CLI host surface added in Phase 1.
 2. Remove the embedded Node heredocs and shell helper code for:
    - `write_install_state`
    - `write_mcp_config_snippet`
@@ -222,6 +222,73 @@ bash -n sites/landing/public/install.sh
 
 ```text
 refactor(install): delegate host artifacts to the CLI
+```
+
+## Phase 2.5: Rename Host Surface To `host setup`
+
+### Agent Tier
+
+default
+
+### Goal
+
+Refactor the Phase 1 and Phase 2 implementation so the public CLI surface and
+supporting host-domain code use the final `clawperator host setup` naming
+instead of `materialize-artifacts` / `materializeArtifacts`.
+
+### Files or Surfaces To Change
+
+- `apps/node/src/cli/registry.ts`
+- `apps/node/src/cli/commands/` host command implementation
+- `apps/node/src/domain/host/`
+- `apps/node/src/test/`
+- `sites/landing/public/install.sh`
+- any validation fixture or harness that still calls the old command name
+
+### Steps
+
+1. Rename the public CLI subcommand from `clawperator host materialize-artifacts`
+   to `clawperator host setup`.
+2. Rename supporting implementation identifiers so the steady-state code no
+   longer centers `materializeArtifacts` naming when `host setup` is the public
+   contract. This includes the host-domain file and exported function names
+   unless a specific compatibility reason requires an internal exception.
+3. Update installer usage, help text, examples, validation fixtures, and tests
+   to reference `clawperator host setup`.
+4. Preserve behavior and output shape. This phase is a naming and API-shape
+   refactor, not a semantics change.
+5. If parser compatibility for the old subcommand is temporarily retained, do
+   not document it as the primary path. The task-pack target state is that
+   `host setup` is the canonical surfaced command.
+
+### Acceptance Criteria
+
+- `clawperator host setup` is the canonical CLI surface
+- task-facing code and tests no longer treat `materialize-artifacts` as the
+  primary command name
+- supporting host-domain identifiers reflect the new naming
+- installer and validation references use `clawperator host setup`
+
+Human review checklist:
+
+- the new name reads like a user-facing setup command rather than internal
+  implementation machinery
+- behavior did not change while the naming refactor landed
+- any temporary aliasing is clearly secondary and non-canonical
+
+### Validation
+
+```bash
+npm --prefix apps/node run build
+npm --prefix apps/node run test
+bash -n sites/landing/public/install.sh
+./validation/install/test_install.sh
+```
+
+### Expected Commit
+
+```text
+refactor(node): rename host artifact command to host setup
 ```
 
 ## Phase 3: Operator APK Download and Verification
@@ -502,7 +569,7 @@ CLI-first upgrade path with `install.sh` retained as recovery-only fallback.
       clawperator operator remediate
       clawperator bundled-skills update
       clawperator skills install
-      clawperator host materialize-artifacts
+      clawperator host setup
       clawperator doctor --json
       ```
    3. if not reachable (CLI missing or broken), fall back to
