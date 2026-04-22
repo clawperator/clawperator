@@ -145,7 +145,7 @@ This is a registry.ts help-text addition only.
 
 ## Follow-Up Enhancements
 
-These ideas seem valuable, but they are not the low-hanging-fruit changes for
+These ideas seem valuable, but they are not the immediate-opportunities changes for
 this round.
 
 ### 1. Improve `wait_for_navigation` diagnostics
