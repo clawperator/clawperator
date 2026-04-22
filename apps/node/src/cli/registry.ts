@@ -2768,6 +2768,7 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "  --version                               Show version",
     "",
     "Notes:",
+    "  - Machine-readable docs for agents: https://docs.clawperator.com/llms.txt (index) and https://docs.clawperator.com/llms-full.txt (complete docs).",
     "  - Post-install host-agent orientation: https://docs.clawperator.com/host-agents/",
     "  - If the current host is unfamiliar, inspect 'clawperator bundled-skills list' and start with 'clawperator-agent-orientation' before choosing runtime skills, MCP, or raw CLI actions.",
     "  - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator bundled-skills list' and use 'clawperator-upgrade' before trying component-level repair commands.",
