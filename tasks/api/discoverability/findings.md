@@ -97,8 +97,6 @@ Why deferred:
 
 ## Notes
 
-- This file is intended to survive cleanup of
-  `tasks/docs/discovery-immediate-opportunities/`.
 - It supersedes the temporary findings and task-pack notes that were used to
   ship the immediate-opportunity pass.
 - If either deferred item becomes committed product behavior, migrate the
