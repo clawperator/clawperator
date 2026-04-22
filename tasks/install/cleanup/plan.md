@@ -45,8 +45,7 @@ After this task ships:
 
 ## Why Now
 
-`tasks/install/cleanup/findings.md` already establishes that the installer is
-large because it mixes four responsibilities:
+The installer is large because it mixes four responsibilities:
 
 1. bootstrap prerequisites that belong in shell
 2. product logic that belongs in the CLI
@@ -88,10 +87,6 @@ before more install and upgrade work builds on it.
 
 ## Existing Artifact Scope
 
-- `tasks/install/cleanup/findings.md`: authoritative research input for this
-  task pack; preserve existing content as-is. If execution finds a material
-  contradiction, append a dated `## Execution Notes` section at the end rather
-  than rewriting the findings sections.
 - `sites/landing/public/install.sh`: in scope for installer thinning and
   delegation changes only. Preserve the public one-liner bootstrap contract.
 - `validation/install/`: in scope for replacing shell-behavior coverage with
@@ -113,11 +108,44 @@ before more install and upgrade work builds on it.
 | `docs/` | Authored docs for install flow and upgrade guidance | PR-4 / Phase 5 |
 | `apps/node/bundled-skills/clawperator-upgrade/` | CLI-first upgrade flow, fallback to `install.sh` only for environment recovery | PR-4 / Phase 5 |
 
+## Verified Starting Point
+
+These facts are already resolved for this task pack and should not be
+rediscovered unless the code changes underneath the task:
+
+- `install.sh` should remain the public bootstrap entrypoint; the goal is shell
+  thinning, not replacing the installer.
+- Bootstrap prerequisite logic stays in shell: OS validation, Java and Node
+  provisioning, adb/git/curl checks, and the initial
+  `npm install -g clawperator@latest`.
+- The current installer mixes four responsibilities:
+  1. bootstrap prerequisites that belong in shell
+  2. product logic that belongs in the CLI
+  3. JSON parsing of CLI output in shell that should disappear
+  4. host artifact generation implemented as embedded Node inside bash
+- Host artifact generation is the highest-leverage early extraction.
+- APK download and checksum handling belong under the `operator` CLI surface and
+  should write to `getOperatorPackageApkPath(operatorPackage)`.
+- `doctor --fix` already runs `kind: "shell"` fix steps through
+  `DoctorService.finalize()`, but `readiness.apk.presence` still uses a manual
+  download step today.
+- `readiness.handshake` already exposes a shell fix step for
+  `clawperator grant-device-permissions`; preserve that behavior rather than
+  adding a duplicate grant path.
+- Multi-device remediation should move to a CLI-owned orchestration command:
+  `clawperator operator remediate`.
+- Do not use top-level `install` for that command because `clawperator install`
+  is already reserved in `registry.ts` as invalid-command guidance.
+- Shell RC mutation for `CLAWPERATOR_SKILLS_REGISTRY` is a likely deletion
+  target because installed-home fallback already exists in
+  `localSkillsRegistry.ts`; docs must confirm that fallback as the supported
+  default before removal.
+
 ## Source Of Truth
 
 | Topic | Verify against |
 | --- | --- |
-| Installer findings and migration rationale | `tasks/install/cleanup/findings.md` |
+| Task rationale, sequencing, and settled design decisions | `tasks/install/cleanup/plan.md` |
 | Current installer behavior | `sites/landing/public/install.sh` |
 | Installer validation maintenance rule | `validation/install/README.md` |
 | CLI commands, help text, and aliases | `apps/node/src/cli/registry.ts` |
@@ -179,7 +207,7 @@ before more install and upgrade work builds on it.
 | When should `clawperator-upgrade` change? | Only in Phase 5 after the CLI-first upgrade sequence is real. Do one coordinated update in Phase 5 rather than partial updates after each prior phase, to avoid agents mixing old and new guidance. |
 | What should the upgrade skill do after this task? | Use CLI-first upgrade when the CLI is reachable; fall back to `install.sh` only for environment repair. |
 | How should docs be updated? | Use `.agents/skills/docs-author/SKILL.md` in Phase 5. Do not edit generated docs directly. |
-| What happens if findings and implementation reality diverge? | Append a dated `## Execution Notes` section to `tasks/install/cleanup/findings.md` before the phase commit. |
+| What happens if the plan and implementation reality diverge? | Append a dated `## Execution Notes` section to this file before the phase commit. |
 | Should shell RC mutation for `CLAWPERATOR_SKILLS_REGISTRY` be removed? | Yes, but only after confirming `docs/setup.md` documents the installed-home fallback path (`~/.clawperator/skills/skills/skills-registry.json`) as the supported default. Fix docs first if they still say to set the env var. |
 
 ## Failure Modes To Prevent
@@ -250,3 +278,8 @@ After PR-4:
 | Host artifact generation contract | `apps/node/src/cli/` plus source-owned helpers in `apps/node/src/domain/` |
 | Operator artifact download contract | `apps/node/src/cli/` and related domain helpers |
 | Upgrade path and recovery path | `apps/node/bundled-skills/clawperator-upgrade/SKILL.md`, its `agents/openai.yaml`, and authored install or upgrade docs in `docs/` |
+
+## Execution Notes
+
+Add dated notes here only when implementation uncovers a material mismatch
+between this plan and the code.

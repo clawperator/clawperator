@@ -31,9 +31,9 @@ later phases depend on earlier CLI surfaces being real and merged.
 - Do not start PR-2 until PR-1 is merged.
 - Do not start PR-3 until PR-2 is merged.
 - Do not start PR-4 until PR-3 is merged.
-- Treat `tasks/install/cleanup/findings.md` as authoritative input. Do not
-  rewrite existing sections. If implementation contradicts it, append a dated
-  `## Execution Notes` section before the phase commit.
+- Treat `tasks/install/cleanup/plan.md` as the authoritative task contract. If
+  implementation contradicts it, append a dated `## Execution Notes` section to
+  the plan before the phase commit.
 - Keep `install.sh` as the public bootstrap entrypoint. Do not replace it in
   this task.
 - Do not move bootstrap prerequisite logic out of shell:
@@ -62,7 +62,6 @@ Read these files IN THIS ORDER before writing anything.
 | File | Why it matters |
 | --- | --- |
 | `tasks/install/cleanup/plan.md` | Stable contract, sequencing, and scope boundaries |
-| `tasks/install/cleanup/findings.md` | Authoritative migration rationale, code-verified decisions, and open design constraints |
 | `sites/landing/public/install.sh` | Current installer behavior and the shell logic being thinned |
 | `validation/install/README.md` | Install validation maintenance rule and existing harness ownership |
 | `apps/node/src/cli/registry.ts` | Existing CLI command structure and help-surface conventions |
@@ -345,8 +344,8 @@ established starting point.
 
 ### Multi-Device Surface Decision
 
-**Use Option B from `findings.md`, tightened to the real CLI namespace:** Add a
-new `clawperator operator remediate` command that:
+**Use the settled plan decision:** Add a new `clawperator operator remediate`
+command that:
 
 1. enumerates all connected ADB devices
 2. for each device needing APK setup: runs `operator download` (if needed) then
