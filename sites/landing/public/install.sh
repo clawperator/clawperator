@@ -750,6 +750,7 @@ setup_host_artifacts_via_cli() {
     local CORE_FAILURE=0
     local ONLY_SHARED_BRIDGE_FAILURE=0
     local HOST_ARTIFACT_ARGS=()
+    local HOST_ARTIFACT_ENV=()
     local PARSED_LINE=""
 
     echo -e "${BLUE}Setting up durable host artifacts via the CLI...${NC}"
@@ -775,17 +776,16 @@ setup_host_artifacts_via_cli() {
 
     RESOLVED_ADB_PATH="$(resolve_adb_path_for_host_artifacts)"
     if [ -n "$RESOLVED_ADB_PATH" ] && [ -z "${ADB_PATH:-}" ]; then
-        if HOST_ARTIFACTS_OUTPUT="$(ADB_PATH="$RESOLVED_ADB_PATH" CLAWPERATOR_SKILLS_REGISTRY="$SKILLS_REGISTRY_PATH" "$CLAWPERATOR_BIN_PATH" "${HOST_ARTIFACT_ARGS[@]}" 2>&1)"; then
-            HOST_ARTIFACTS_STATUS=0
-        else
-            HOST_ARTIFACTS_STATUS=$?
-        fi
+        HOST_ARTIFACT_ENV+=(ADB_PATH="$RESOLVED_ADB_PATH")
+    fi
+    if [ -n "${SKILLS_REGISTRY_PATH:-}" ]; then
+        HOST_ARTIFACT_ENV+=(CLAWPERATOR_SKILLS_REGISTRY="$SKILLS_REGISTRY_PATH")
+    fi
+
+    if HOST_ARTIFACTS_OUTPUT="$(env "${HOST_ARTIFACT_ENV[@]}" "$CLAWPERATOR_BIN_PATH" "${HOST_ARTIFACT_ARGS[@]}" 2>&1)"; then
+        HOST_ARTIFACTS_STATUS=0
     else
-        if HOST_ARTIFACTS_OUTPUT="$(CLAWPERATOR_SKILLS_REGISTRY="$SKILLS_REGISTRY_PATH" "$CLAWPERATOR_BIN_PATH" "${HOST_ARTIFACT_ARGS[@]}" 2>&1)"; then
-            HOST_ARTIFACTS_STATUS=0
-        else
-            HOST_ARTIFACTS_STATUS=$?
-        fi
+        HOST_ARTIFACTS_STATUS=$?
     fi
 
     PARSED_HOST_ARTIFACTS="$(printf '%s' "$HOST_ARTIFACTS_OUTPUT" | parse_host_setup_result)"
@@ -865,16 +865,13 @@ setup_host_artifacts_via_cli() {
         ONLY_SHARED_BRIDGE_FAILURE=1
     fi
 
-    if [ "$HOST_ARTIFACTS_STATUS" -eq 0 ] && [ "$HOST_EXIT_OK" = "true" ]; then
-        echo -e "${GREEN}✅ Host setup complete.${NC}"
+    if [ "$ONLY_SHARED_BRIDGE_FAILURE" -eq 1 ]; then
+        echo -e "${YELLOW}⚠️  Host setup completed with a shared-agent bridge warning; continuing.${NC}"
         return 0
     fi
 
-    if [ "$ONLY_SHARED_BRIDGE_FAILURE" -eq 1 ]; then
-        echo -e "${YELLOW}⚠️  Host setup completed with a shared-agent bridge warning; continuing.${NC}"
-        if [ -n "$HOST_ARTIFACTS_OUTPUT" ]; then
-            echo "$HOST_ARTIFACTS_OUTPUT"
-        fi
+    if [ "$HOST_ARTIFACTS_STATUS" -eq 0 ] && [ "$HOST_EXIT_OK" = "true" ]; then
+        echo -e "${GREEN}✅ Host setup complete.${NC}"
         return 0
     fi
 

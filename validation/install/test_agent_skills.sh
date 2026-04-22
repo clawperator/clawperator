@@ -357,6 +357,74 @@ JSON
     ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$mock_dir/clawperator.cli.js" "$registry_path" "$shared_agents_mode" "$output_file" "$status_file" "$guide_path_file" "$install_state_path_file" "$snippet_path_file" "$first_bridge_snapshot" "$shared_agents_path_file"
 }
 
+run_host_artifacts_env_registry_case() {
+    local label="$1"
+    local output_file="$2"
+    local status_file="$3"
+    local cli_log_file="$4"
+    local guide_path_file="$5"
+    local install_state_path_file="$6"
+    local registry_path_file="$7"
+    local mock_dir="$TMP_DIR/mock-host-$label"
+    local env_registry_path="$TMP_DIR/home-host-$label/custom/skills-registry.json"
+
+    setup_mock_clawperator "$mock_dir" "success" "{}" "$cli_log_file"
+    printf '// mock cli entrypoint for installer delegation tests\n' > "$mock_dir/clawperator.cli.js"
+    cat > "$mock_dir/adb" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+exit 0
+EOF
+    chmod +x "$mock_dir/adb"
+
+    HOME="$TMP_DIR/home-host-$label" \
+    OS=Linux \
+    PATH="$mock_dir:$PATH" \
+    EXPECTED_NODE_BIN="$EXPECTED_NODE_BIN" \
+    REAL_NODE_CLI="$REAL_NODE_CLI" \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        export CLAWPERATOR_BIN_PATH="$2"
+        export CLAWPERATOR_CLI_JS_PATH="$3"
+        export CLAWPERATOR_HOST_ARTIFACTS_INSTALLED_AT="2026-04-23T10:11:12Z"
+        export CLAWPERATOR_SKILLS_REGISTRY="$4"
+        unset SKILLS_REGISTRY_PATH
+
+        mkdir -p "${CLAWPERATOR_SKILLS_REGISTRY%/*}"
+        cat > "$CLAWPERATOR_SKILLS_REGISTRY" <<'\''JSON'\''
+{"skills":[
+  {"id":"com.example.weather.check-status","applicationId":"com.example.weather","intent":"check_status","summary":"Checks the current weather status","contract":{"inputs":{"city_name":{"type":"string"}}}}
+]}
+JSON
+
+        BUNDLED_DIR="$HOME/.clawperator/bundled-skills"
+        mkdir -p "$BUNDLED_DIR/clawperator-agent-orientation"
+        mkdir -p "$BUNDLED_DIR/clawperator-upgrade"
+        mkdir -p "$BUNDLED_DIR/clawperator-skill-author-by-agent-discovery"
+        mkdir -p "$BUNDLED_DIR/clawperator-skill-author-by-recording"
+        printf "# clawperator-agent-orientation\n" > "$BUNDLED_DIR/clawperator-agent-orientation/SKILL.md"
+        printf "# clawperator-upgrade\n" > "$BUNDLED_DIR/clawperator-upgrade/SKILL.md"
+        printf "# clawperator-skill-author-by-agent-discovery\n" > "$BUNDLED_DIR/clawperator-skill-author-by-agent-discovery/SKILL.md"
+        printf "# clawperator-skill-author-by-recording\n" > "$BUNDLED_DIR/clawperator-skill-author-by-recording/SKILL.md"
+        printf "1.2.3\n" > "$BUNDLED_DIR/version.txt"
+        export BUNDLED_SKILLS_INSTALL_DIR="$BUNDLED_DIR"
+
+        mkdir -p "$HOME/.agents"
+        printf "# Shared Agent Guide\n\nExisting host guidance.\n" > "$HOME/.agents/AGENTS.md"
+
+        set +e
+        setup_host_artifacts_via_cli > "$5" 2>&1
+        status="$?"
+        set -e
+
+        printf "first=%s\n" "$status" > "$6"
+        printf "%s\n" "$HOME/.clawperator/AGENTS.md" > "$7"
+        printf "%s\n" "$HOME/.clawperator/install-state.json" > "$8"
+        printf "%s\n" "$CLAWPERATOR_SKILLS_REGISTRY" > "$9"
+    ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$mock_dir/clawperator.cli.js" "$env_registry_path" "$output_file" "$status_file" "$guide_path_file" "$install_state_path_file" "$registry_path_file"
+}
+
 EXPECTED_NODE_BIN="$(node -p 'process.execPath')"
 
 echo "=== Scenario 1: parser extracts installed and discovery dirs ==="
@@ -539,7 +607,29 @@ if [ ! -L "$HOST_BRIDGE_FAIL_SHARED_PATH" ]; then
 fi
 assert_equals "$(cat "$HOST_BRIDGE_FAIL_FIRST")" "$(cat "$HOST_BRIDGE_FAIL_SHARED_PATH")" "host-bridge-fail shared guide unchanged"
 
-echo "=== Scenario 10: skip flag suppresses both runtime and bundled-skills setup ==="
+echo "=== Scenario 10: delegated host artifacts preserve env-only registry overrides ==="
+HOST_ENV_REGISTRY_OUT="$TMP_DIR/host-env-registry.out"
+HOST_ENV_REGISTRY_STATUS="$TMP_DIR/host-env-registry.status"
+HOST_ENV_REGISTRY_CLI_LOG="$TMP_DIR/host-env-registry.cli.log"
+HOST_ENV_REGISTRY_GUIDE_FILE="$TMP_DIR/host-env-registry.guide.path"
+HOST_ENV_REGISTRY_STATE_FILE="$TMP_DIR/host-env-registry.state.path"
+HOST_ENV_REGISTRY_PATH_FILE="$TMP_DIR/host-env-registry.registry.path"
+run_host_artifacts_env_registry_case \
+    env-registry \
+    "$HOST_ENV_REGISTRY_OUT" \
+    "$HOST_ENV_REGISTRY_STATUS" \
+    "$HOST_ENV_REGISTRY_CLI_LOG" \
+    "$HOST_ENV_REGISTRY_GUIDE_FILE" \
+    "$HOST_ENV_REGISTRY_STATE_FILE" \
+    "$HOST_ENV_REGISTRY_PATH_FILE"
+HOST_ENV_REGISTRY_GUIDE_PATH="$(cat "$HOST_ENV_REGISTRY_GUIDE_FILE")"
+HOST_ENV_REGISTRY_STATE_PATH="$(cat "$HOST_ENV_REGISTRY_STATE_FILE")"
+HOST_ENV_REGISTRY_PATH="$(cat "$HOST_ENV_REGISTRY_PATH_FILE")"
+assert_contains "$HOST_ENV_REGISTRY_STATUS" "first=0" "host-env-registry status"
+assert_json_field_equals "$HOST_ENV_REGISTRY_STATE_PATH" "registryPath" "$HOST_ENV_REGISTRY_PATH" "host-env-registry install-state registryPath"
+assert_contains "$HOST_ENV_REGISTRY_GUIDE_PATH" "$HOST_ENV_REGISTRY_PATH" "host-env-registry guide"
+
+echo "=== Scenario 11: skip flag suppresses both runtime and bundled-skills setup ==="
 SKIP_SKILLS_OUT="$TMP_DIR/skip-skills.out"
 SKIP_BUNDLED_SKILLS_OUT="$TMP_DIR/skip-bundled-skills.out"
 SKIP_STATUS="$TMP_DIR/skip.status"
@@ -552,7 +642,7 @@ assert_contains "$SKIP_STATUS" "skills=skipped" "skip-status"
 assert_contains "$SKIP_STATUS" "bundled=skipped" "skip-status"
 assert_equals "" "$(cat "$SKIP_LOG")" "skip command log"
 
-echo "=== Scenario 11: durable summary points at local artifacts ==="
+echo "=== Scenario 12: durable summary points at local artifacts ==="
 DURABLE_SUMMARY_OUT="$TMP_DIR/durable-summary.out"
 run_durable_summary_case authoring "$DURABLE_SUMMARY_OUT"
 assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawperator/AGENTS.md" "durable-summary"
