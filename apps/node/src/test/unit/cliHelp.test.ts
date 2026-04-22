@@ -144,6 +144,13 @@ describe("CLI help", () => {
     assert.match(stdout, /mcp serve/);
   });
 
+  it("exec --help includes the raw-route orientation reminder", async () => {
+    const { stdout, code } = await runCli(["exec", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /bundled-skills list/);
+    assert.match(stdout, /clawperator-agent-orientation/);
+  });
+
   it("shows top-level help for help mcp serve", async () => {
     const { stdout, code } = await runCli(["help", "mcp", "serve"]);
     assert.strictEqual(code, 0);
@@ -670,6 +677,8 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator snapshot/);
     assert.match(stdout, /--timeout <ms>/);
+    assert.match(stdout, /bundled-skills list/);
+    assert.match(stdout, /clawperator-agent-orientation/);
     assert.doesNotMatch(stdout, /--file/);
   });
 

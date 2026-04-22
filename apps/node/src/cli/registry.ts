@@ -471,6 +471,9 @@ Options:
 
 Also accepted as: --device-id
 
+Notes:
+  - If the current host is unfamiliar, inspect 'clawperator bundled-skills list' and start with 'clawperator-agent-orientation' before driving the raw CLI directly.
+
 Examples:
   clawperator snapshot
   clawperator snapshot --device <device_serial> --json
@@ -1151,6 +1154,7 @@ Notes:
   - Error precedence: unreadable file path -> invalid JSON content -> missing payload.
   - 'execute' is accepted as a synonym for 'exec'.
   - '--execution', '--input', and '--file' are accepted aliases for '--payload'.
+  - If the current host is unfamiliar, inspect 'clawperator bundled-skills list' and start with 'clawperator-agent-orientation' before driving the raw CLI directly.
 `,
   topLevelBlock: `  exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
                                             Execute a validated command payload or print a dry-run plan
