@@ -1632,9 +1632,10 @@ let d='';
 process.stdin.on('data', c => d += c).on('end', () => {
   try {
     const r = JSON.parse(d);
+    const reportOk = !!(r.criticalOk ?? r.ok);
     const checks = Array.isArray(r.checks) ? r.checks : [];
     const allPass = checks.every((c) => c && c.status === 'pass');
-    process.exitCode = allPass ? 0 : 1;
+    process.exitCode = (reportOk && allPass) ? 0 : 1;
   } catch { process.exitCode = 1; }
 });
 " 2>/dev/null

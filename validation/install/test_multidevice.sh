@@ -118,6 +118,35 @@ fi
 exit 2
 EOF
             ;;
+        empty-checks)
+            cat > "$mock_dir/adb" <<'EOF'
+#!/usr/bin/env bash
+cat <<'OUT'
+List of devices attached
+serial-empty	device
+serial-ready	device
+OUT
+EOF
+            chmod +x "$mock_dir/adb"
+            cat > "$mock_dir/clawperator" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-empty ]; then
+    cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[]}
+JSON
+    exit 1
+fi
+
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-ready ]; then
+    cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
+    exit 0
+fi
+
+exit 2
+EOF
+            ;;
         *)
             echo "ERROR: unknown mock scenario: $scenario" >&2
             return 1
@@ -195,5 +224,13 @@ run_scenario \
     "All devices passed critical checks. No setup required." \
     "All devices ready. No setup required." \
     "Skipping APK install until every connected device is ready."
+
+echo "=== Scenario 4: empty checks are not treated as ready ==="
+run_scenario \
+    empty-checks \
+    0 \
+    "Skipping APK install until every connected device is ready." \
+    "serial-empty - ready"
+assert_contains "$TMP_DIR/empty-checks.stdout" "serial-empty - setup required: clawperator operator setup --apk $HOME/.clawperator/downloads/operator.apk --device serial-empty" "empty-checks stdout"
 
 echo "=== install.sh multi-device harness passed ==="
