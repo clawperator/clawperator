@@ -3,14 +3,7 @@
 Date: 2026-04-22
 Author: Claude (Opus 4.7)
 
-This pass answers the same questions covered in
-[codex-1.md](./codex-1.md) but starts from an independent read of the repo.
-Where my conclusions match Codex's, I say so briefly rather than restate them.
-Where I disagree on facts or recommendations, I make the disagreement explicit.
-
 ## Scope
-
-Same scope as Codex's pass:
 
 - repo-local internal skills under `.agents/skills/`
 - the four packaged public skills:
@@ -28,15 +21,15 @@ Goals:
 
 ## TL;DR
 
-1. Agree with Codex: these four do not belong under `.agents/skills/`, which
-   should be repo-internal maintenance skills only.
-2. Disagree with Codex on one fact: `apps/node/agent-skills/` does not hold
-   duplicate copies. It holds **symlinks** into `.agents/skills/`, flipped to
-   hydrated copies only during `npm pack`. The cleanup is not
-   deduplication - it is choosing where the real files live.
-3. Agree on prefixing both `skill-author-by-*` ids with `clawperator-`.
-4. Agree on tightening the frontmatter so these read unambiguously as
-   first-party Clawperator artifacts.
+1. The four public skills do not belong under `.agents/skills/`, which should
+   be repo-internal maintenance skills only.
+2. `apps/node/agent-skills/` does not hold duplicate copies. It holds
+   **symlinks** into `.agents/skills/`, flipped to hydrated copies only during
+   `npm pack`. The cleanup is not deduplication - it is choosing where the
+   real files live.
+3. Both `skill-author-by-*` ids should be prefixed with `clawperator-`.
+4. The frontmatter on all four should be tightened so these read unambiguously
+   as first-party Clawperator artifacts.
 5. **Decision: rename `agent-skills` to `bundled-skills` everywhere it
    surfaces** (CLI noun, on-disk package dir, install dir, doctor check id,
    docs). `agent-skills` violates three of the Node API design principles.
@@ -82,8 +75,8 @@ The packaging flow compensates:
   both for the published package (where the dir is a real copy) and for
   in-repo runs (where symlinks resolve to `.agents/skills/`)
 
-This is clever, but it is the source of the confusion the user is flagging.
-The symlink-and-swap keeps two narratives alive at once:
+This is clever, but it is the source of the confusion this review is
+addressing. The symlink-and-swap keeps two narratives alive at once:
 
 - "these are .agents/skills entries" (what you see when you browse the repo)
 - "these are Node-package-owned public artifacts" (what actually ships)
@@ -103,20 +96,20 @@ The install contract itself is healthy and unambiguous:
 
 ### Finding 1: The source-of-truth location is the problem, not the count of files
 
-Codex framed this as duplicate files drifting. That is not the current risk.
-The symlinks guarantee the byte content is identical in-repo. The risk is
-taxonomic: the files *look* like they live in the repo-internal skills
-directory, which implies "skills for developing this repo." They are not.
-They are skills that ship to the user.
+The symlinks guarantee the byte content is identical in-repo, so drift
+between the two trees is not the current risk. The risk is taxonomic: the
+files *look* like they live in the repo-internal skills directory, which
+implies "skills for developing this repo." They are not. They are skills
+that ship to the user.
 
 Any contributor opening the repo in an editor today will see the public
 skills under `.agents/skills/` and reasonably assume they are internal dev
 tooling, not shipped product. The cleanup is about correcting that signal.
 
-### Finding 2: Move the source-of-truth to `apps/node/agent-skills/` and delete the symlinks
+### Finding 2: Move the source-of-truth to `apps/node/bundled-skills/` and delete the symlinks
 
-I agree with Codex's recommendation to make `apps/node/agent-skills/` the
-real home, not a packaging staging area. Reasons, ranked:
+`apps/node/` should own these as real directories, not as a packaging
+staging area fed by symlinks. Reasons, ranked:
 
 1. **Packaging already points there.** `copyAgentSkills.ts` already resolves
    from `apps/node/agent-skills/`. Making the files real there eliminates a
@@ -129,21 +122,20 @@ real home, not a packaging staging area. Reasons, ranked:
 4. **`.agents/skills/` regains a clean meaning:** repo-internal maintenance
    workflows, nothing else.
 
-I considered the user's alternative of a top-level `agent-skills/` at repo
-root. It is defensible, but it adds a third skill tree at the repo root
-alongside `.agents/skills/` and the sibling `../clawperator-skills` repo.
-Three skill roots at the same visual level will invite future confusion.
-`apps/node/agent-skills/` has the advantage of being unambiguously owned by
-one package.
+A top-level `agent-skills/` at repo root was considered. It is defensible,
+but it adds a third skill tree at the repo root alongside `.agents/skills/`
+and the sibling `../clawperator-skills` repo. Three skill roots at the same
+visual level will invite future confusion. `apps/node/bundled-skills/` has
+the advantage of being unambiguously owned by one package.
 
-**One concession to the top-level idea:** if the user wants these highly
-visible, add a short README at the repo root that points at
-`apps/node/agent-skills/` and explains the three skill categories. That
+**One concession to the top-level idea:** if these need to be highly visible,
+add a short README at the repo root that points at
+`apps/node/bundled-skills/` and explains the three skill categories. That
 addresses the discoverability concern without adding a third directory.
 
 ### Finding 3: Prefix both `skill-author-by-*` ids with `clawperator-`
 
-Full agreement with Codex here. The asymmetry in the current set -
+The asymmetry in the current set -
 
 - `clawperator-agent-orientation`
 - `clawperator-upgrade`
@@ -204,7 +196,7 @@ Candidate replacement terms, ranked:
 |---|---|---|
 | **bundled skills** | Plain-English; means "ships with the product"; distinct from runtime app skills; pairs with "bundled dependencies" mental model agents already have | Slightly generic on its own |
 | first-party skills | Industry-standard | A bit jargon-y for docs |
-| host-helper skills (Codex) | Matches "host agent" vocabulary | Obscure; "helper" is soft |
+| host-helper skills | Matches "host agent" vocabulary | Obscure; "helper" is soft |
 | host skills | Short | Overloaded with "host agent" / "host OS" |
 | operator skills | Evokes Clawperator | Collides with the operator APK concept |
 
@@ -220,7 +212,7 @@ where the distinction matters. An agent trying to install *anything*
 skill-shaped would land on the right command first try. That is what
 Principle 1 actually points at.
 
-I recommended this in the EM verdict. It has been explicitly deferred because:
+This option was surfaced in the EM verdict and explicitly deferred because:
 
 - `clawperator skills install` today means "install the runtime-skill
   registry from the sibling repo." Folding in bundled changes that semantics
@@ -267,8 +259,7 @@ Currently the four skill frontmatters only set `name` and `description`. That
 is fine for the Claude Code / Codex loaders, but it is not enough to make the
 files self-describing when someone finds one of them on a user's machine.
 
-I agree with Codex's recommendation to add ownership metadata. Minimal
-additions that do not require schema changes:
+Minimal ownership additions that do not require schema changes:
 
 ```yaml
 ---
@@ -283,7 +274,7 @@ loaders surface in skill listings, so it is where attribution pays off most.
 
 Only add new frontmatter keys (`owner`, `surface`, `distribution`) if the
 skill loader either consumes them or demonstrably tolerates them without
-warnings. I would not introduce new keys speculatively.
+warnings. Do not introduce new keys speculatively.
 
 Also fix the body: the first paragraph of each SKILL.md should open with a
 sentence that names Clawperator explicitly. Three of the four already do -
@@ -304,12 +295,11 @@ Pulling the naming questions into one view:
 | Env var | `CLAWPERATOR_AGENT_SKILLS` | `CLAWPERATOR_BUNDLED_SKILLS` (old name honored as fallback) |
 
 Rationale for doing the CLI/install-dir rename in this round instead of
-deferring it: the docs-vs-CLI split I originally proposed would leave the
-docs talking about "bundled skills" while the CLI still prints
-"Agent-skills setup complete." That mismatch is exactly the kind of
-implementation-detail leak Principle 10 warns against, and users would see
-two different names for one thing. Rename the whole surface, with
-backwards-compat aliases.
+deferring it: a docs-only rename would leave the docs talking about
+"bundled skills" while the CLI still prints "Agent-skills setup complete."
+That mismatch is exactly the kind of implementation-detail leak Principle 10
+warns against, and users would see two different names for one thing. Rename
+the whole surface, with backwards-compat aliases.
 
 ## Suggested Migration Order
 
@@ -407,11 +397,10 @@ disagree - which is worse than the current situation.
 
 ## Bottom Line
 
-The user's instinct is correct, and Codex's recommendations are substantially
-correct, with one factual correction: today there are no duplicate files,
-only symlinks. Measured against the Node API design principles,
-`agent-skills` additionally fails guessability, leaks implementation, and
-relies on unfamiliar vocabulary - so the name gets replaced, not preserved.
+Today there are no duplicate files, only symlinks. Measured against the Node
+API design principles, `agent-skills` fails guessability, leaks
+implementation, and relies on unfamiliar vocabulary - so the name gets
+replaced, not preserved.
 
 Committed moves for this round:
 
