@@ -40,7 +40,7 @@ export interface CopyAgentSkillsOptions {
 }
 
 function resolveAgentSkillsSourceDir(): string {
-  return resolve(dirname(fileURLToPath(import.meta.url)), "../../../agent-skills");
+  return resolve(dirname(fileURLToPath(import.meta.url)), "../../../bundled-skills");
 }
 
 export function resolvePackagedAgentSkillsSourceDir(
