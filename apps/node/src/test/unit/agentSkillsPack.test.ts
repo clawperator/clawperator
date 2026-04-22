@@ -44,6 +44,19 @@ describe("bundled skill packaging", () => {
 
       const skillFileStat = await lstat(join(entryPath, "SKILL.md"));
       assert.equal(skillFileStat.isFile(), true);
+
+      const promptMetadataStat = await lstat(join(entryPath, "agents", "openai.yaml"));
+      assert.equal(promptMetadataStat.isFile(), true);
     }
+  });
+
+  it("keeps the bundled discovery skill aligned with the current agent-skills CLI surface", async () => {
+    const discoverySkill = await readFile(
+      join(packageRoot, "bundled-skills", "clawperator-skill-author-by-agent-discovery", "SKILL.md"),
+      "utf8"
+    );
+
+    assert.match(discoverySkill, /clawperator agent-skills list --json/);
+    assert.doesNotMatch(discoverySkill, /authoring-skills list --json/);
   });
 });

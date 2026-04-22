@@ -312,6 +312,59 @@ describe("copyAgentSkills", () => {
     await assert.rejects(() => stat(staleSkillDir));
   });
 
+  it("removes stale pre-rename skill installs and managed discovery symlinks", async () => {
+    const root = await makeTempRoot();
+    const sourceDir = await createSourceSkills(root, [
+      "clawperator-agent-orientation",
+      "clawperator-upgrade",
+      "clawperator-skill-author-by-agent-discovery",
+      "clawperator-skill-author-by-recording",
+    ]);
+    const installedDir = join(root, "home", ".clawperator", "agent-skills");
+    const claudeSkillsDir = join(root, "home", ".claude", "skills");
+    const codexSkillsDir = join(root, "home", ".codex", "skills");
+    const agentsSkillsDir = join(root, "home", ".agents", "skills");
+    const oldDiscoveryDir = join(installedDir, "skill-author-by-agent-discovery");
+    const oldRecordingDir = join(installedDir, "skill-author-by-recording");
+
+    await mkdir(oldDiscoveryDir, { recursive: true });
+    await mkdir(oldRecordingDir, { recursive: true });
+    await writeFile(join(oldDiscoveryDir, "SKILL.md"), "# skill-author-by-agent-discovery\n", "utf8");
+    await writeFile(join(oldRecordingDir, "SKILL.md"), "# skill-author-by-recording\n", "utf8");
+
+    for (const dir of [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]) {
+      await mkdir(dir, { recursive: true });
+      await symlink(oldDiscoveryDir, join(dir, "skill-author-by-agent-discovery"), directorySymlinkType);
+      await symlink(oldRecordingDir, join(dir, "skill-author-by-recording"), directorySymlinkType);
+    }
+
+    const result = await copyAgentSkills({
+      sourceDir,
+      installedDir,
+      claudeSkillsDir,
+      codexSkillsDir,
+      agentsSkillsDir,
+      cliVersion: "1.2.3",
+    });
+
+    assert.equal(result.ok, true);
+    await assert.rejects(() => stat(oldDiscoveryDir));
+    await assert.rejects(() => stat(oldRecordingDir));
+
+    for (const dir of [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]) {
+      await assert.rejects(() => stat(join(dir, "skill-author-by-agent-discovery")));
+      await assert.rejects(() => stat(join(dir, "skill-author-by-recording")));
+      assert.equal(
+        await readlink(join(dir, "clawperator-skill-author-by-agent-discovery")),
+        join(installedDir, "clawperator-skill-author-by-agent-discovery")
+      );
+      assert.equal(
+        await readlink(join(dir, "clawperator-skill-author-by-recording")),
+        join(installedDir, "clawperator-skill-author-by-recording")
+      );
+    }
+  });
+
   it("does not delete unrelated user-managed symlinks from shared agent skill directories", async () => {
     const root = await makeTempRoot();
     const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
