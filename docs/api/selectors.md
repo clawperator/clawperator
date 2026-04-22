@@ -143,20 +143,20 @@ applies to every app.
 
 When more than one selector is available, prefer this order:
 
-1. Android framework `resourceId`
+1. `resourceId` with a stable Android framework value (e.g., `android:id/title`)
 2. `contentDescEquals`
 3. `textEquals` or `textContains`
-4. app-specific opaque numeric resource IDs only as a last resort
+4. `resourceId` with an app-generated or opaque value (last resort)
 
 Why this order is usually safer:
 
-- framework IDs such as `android:id/title` are often more stable across app
-  versions than app-internal generated IDs
+- Android framework `resourceId` values tend to be stable across app versions;
+  app-generated IDs are often tied to a specific build and can change
 - content descriptions work well for icon buttons and other controls where
   visible text is empty
-- visible text is useful and often the most obvious signal, but it can be more
-  brittle when labels are dynamic or localized
-- app-specific opaque numeric IDs can work, but they are often the most
+- visible text is often the most obvious signal but can be brittle when labels
+  are dynamic or localized
+- app-generated `resourceId` values can work, but they are usually the most
   version-fragile option
 
 Compose-heavy trees may expose fewer stable IDs and more internal resource
