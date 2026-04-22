@@ -264,44 +264,44 @@ Notes:
       $HOME/.clawperator/skills/skills/skills-registry.json
 `;
 
-const HELP_AGENT_SKILLS_INSTALL = `clawperator agent-skills install
+const HELP_BUNDLED_SKILLS_INSTALL = `clawperator bundled-skills install
 
 Usage:
-  clawperator agent-skills install [--output <json|pretty>]
+  clawperator bundled-skills install [--output <json|pretty>]
 
 Notes:
-  - Copies packaged first-party agent-skills to ~/.clawperator/agent-skills/
-  - Installs the packaged agent-skill front doors that help host agents operate Clawperator
+  - Copies packaged first-party bundled skills to ~/.clawperator/bundled-skills/
+  - Installs the packaged bundled-skill front doors that help host agents operate Clawperator
   - Creates Claude Code, Codex, and generic agents discovery directories unconditionally
   - Symlinks each installed skill into ~/.claude/skills/, the Codex skills dir, and ~/.agents/skills/
-  - Use 'clawperator agent-skills list' after install to inspect the available host-agent helpers on this machine
+  - Use 'clawperator bundled-skills list' after install to inspect the available host-agent helpers on this machine
 `;
 
-const HELP_AGENT_SKILLS_UPDATE = `clawperator agent-skills update
+const HELP_BUNDLED_SKILLS_UPDATE = `clawperator bundled-skills update
 
 Usage:
-  clawperator agent-skills update [--output <json|pretty>]
+  clawperator bundled-skills update [--output <json|pretty>]
 
 Notes:
-  - Re-copies packaged first-party agent-skills into ~/.clawperator/agent-skills/
+  - Re-copies packaged first-party bundled skills into ~/.clawperator/bundled-skills/
   - Recreates Claude Code, Codex, and generic agents discovery symlinks
   - Safe to run multiple times
 `;
 
-const HELP_AGENT_SKILLS_LIST = `clawperator agent-skills list
+const HELP_BUNDLED_SKILLS_LIST = `clawperator bundled-skills list
 
 Usage:
-  clawperator agent-skills list [--output <json|pretty>]
+  clawperator bundled-skills list [--output <json|pretty>]
 
 Notes:
-  - Lists installed first-party agent-skills from ~/.clawperator/agent-skills/
-  - Shows the absolute SKILL.md path for each installed agent-skill
+  - Lists installed first-party bundled skills from ~/.clawperator/bundled-skills/
+  - Shows the absolute SKILL.md path for each installed bundled skill
   - Use this when you need to inspect the installed host-agent helpers on this machine
   - 'clawperator-agent-orientation' is the first-run orientation skill for unfamiliar hosts
   - 'clawperator-upgrade' is the whole-product upgrade route through install.sh and doctor
   - 'clawperator-skill-author-by-agent-discovery' is the zero-results front door
   - 'clawperator-skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'
-  - Runtime skills still live under 'clawperator skills ...'; agent-skills are separate host-agent helpers
+  - Runtime skills still live under 'clawperator skills ...'; bundled skills are separate host-agent helpers
 `;
 
 const HELP_SKILLS_NEW = `clawperator skills new
@@ -316,7 +316,7 @@ Notes:
   - --summary overrides the default TODO summary written to skill.json and SKILL.md.
   - --recording-context copies a recording export JSON file into the new skill folder as reference evidence for an external authoring agent or human.
   - Updates the configured registry JSON so the new skill appears in skills list.
-  - This is the low-level manual scaffold. If runtime-skill discovery found no relevant match, inspect 'clawperator agent-skills list' first and start with 'clawperator-skill-author-by-agent-discovery'.
+  - This is the low-level manual scaffold. If runtime-skill discovery found no relevant match, inspect 'clawperator bundled-skills list' first and start with 'clawperator-skill-author-by-agent-discovery'.
   - Use 'clawperator-skill-author-by-recording' only after discovery returns 'proceed_to_recording', or when the app route is already well understood and you need the proving workflow.
 `;
 
@@ -2113,9 +2113,9 @@ Notes:
   - Start with 'clawperator skills for-app <package_id>' when you know the Android package id.
   - Use 'clawperator skills search --keyword <text>' when you only have app names or user-language intent terms.
   - Use 'clawperator skills get <skill_id>' before 'clawperator skills run <skill_id>' when discovery already returned an id.
-  - If the current host is unfamiliar, inspect 'clawperator agent-skills list' and start with 'clawperator-agent-orientation' before choosing runtime skills, MCP, or raw CLI actions.
-  - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator agent-skills list' and use 'clawperator-upgrade' before trying component-level repair commands.
-  - If runtime-skill discovery returns no relevant match and you need guided skill creation help, use 'clawperator agent-skills list' and start with 'clawperator-skill-author-by-agent-discovery'.
+  - If the current host is unfamiliar, inspect 'clawperator bundled-skills list' and start with 'clawperator-agent-orientation' before choosing runtime skills, MCP, or raw CLI actions.
+  - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator bundled-skills list' and use 'clawperator-upgrade' before trying component-level repair commands.
+  - If runtime-skill discovery returns no relevant match and you need guided skill creation help, use 'clawperator bundled-skills list' and start with 'clawperator-skill-author-by-agent-discovery'.
   - Use 'clawperator-skill-author-by-recording' after discovery returns 'proceed_to_recording', or when the route is already well understood and you need the proving workflow.
   - If your host already supports stdio MCP and wants registered tools instead of runtime-skill discovery, use 'clawperator mcp serve'.
   - Post-install orientation: https://docs.clawperator.com/host-agents/
@@ -2300,49 +2300,49 @@ Notes:
   },
 };
 
-// agent-skills
-COMMANDS["agent-skills"] = {
-  name: "agent-skills",
+// bundled-skills
+COMMANDS["bundled-skills"] = {
+  name: "bundled-skills",
   group: "Execution",
-  summary: "Manage first-party agent-skills for Claude Code, Codex, and generic agent runtimes",
-  help: `clawperator agent-skills
+  summary: "Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes",
+  help: `clawperator bundled-skills
 
 Usage:
-  clawperator agent-skills list
-  clawperator agent-skills install
-  clawperator agent-skills update
+  clawperator bundled-skills list
+  clawperator bundled-skills install
+  clawperator bundled-skills update
 
 Notes:
-  - Use 'clawperator agent-skills list' to inspect the installed host-agent workflows on this machine.
+  - Use 'clawperator bundled-skills list' to inspect the installed host-agent workflows on this machine.
   - 'clawperator-agent-orientation' is the first-run orientation skill when the current host is unfamiliar.
   - 'clawperator-upgrade' is the packaged whole-product upgrade route through install.sh and doctor.
   - 'clawperator-skill-author-by-agent-discovery' is the zero-results front door when runtime-skill discovery found no relevant match.
   - 'clawperator-skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'.
-  - Runtime skills still live under 'clawperator skills ...'; agent-skills are separate host-agent helpers.
+  - Runtime skills still live under 'clawperator skills ...'; bundled skills are separate host-agent helpers.
   - Post-install authoring guidance: https://docs.clawperator.com/skills/authoring/
 `,
   subtopics: {
-    install: HELP_AGENT_SKILLS_INSTALL,
-    update: HELP_AGENT_SKILLS_UPDATE,
-    list: HELP_AGENT_SKILLS_LIST,
+    install: HELP_BUNDLED_SKILLS_INSTALL,
+    update: HELP_BUNDLED_SKILLS_UPDATE,
+    list: HELP_BUNDLED_SKILLS_LIST,
   },
-  topLevelBlock: `  agent-skills list
-                                            List installed first-party agent-skills
-  agent-skills install
-                                            Copy and wire packaged agent-skills for Claude Code, Codex, and generic agent runtimes
-  agent-skills update
-                                            Refresh installed agent-skills and recreate discovery symlinks`,
+  topLevelBlock: `  bundled-skills list
+                                            List installed first-party bundled skills
+  bundled-skills install
+                                            Copy and wire packaged bundled skills for Claude Code, Codex, and generic agent runtimes
+  bundled-skills update
+                                            Refresh installed bundled skills and recreate discovery symlinks`,
   handler: async (ctx) => {
     const { rest, format } = ctx;
     const out = { format, env: process.env };
     if (rest[0] === "list") {
-      return (await import("./commands/agentSkills.js")).cmdAgentSkillsList(out);
+      return (await import("./commands/bundledSkills.js")).cmdBundledSkillsList(out);
     } else if (rest[0] === "install") {
-      return (await import("./commands/agentSkills.js")).cmdAgentSkillsInstall(out);
+      return (await import("./commands/bundledSkills.js")).cmdBundledSkillsInstall(out);
     } else if (rest[0] === "update") {
-      return (await import("./commands/agentSkills.js")).cmdAgentSkillsUpdate(out);
+      return (await import("./commands/bundledSkills.js")).cmdBundledSkillsUpdate(out);
     } else {
-      return JSON.stringify({ code: "USAGE", message: "agent-skills list|install|update" });
+      return JSON.stringify({ code: "USAGE", message: "bundled-skills list|install|update" });
     }
   },
 };
@@ -2644,6 +2644,14 @@ const REMOVED_COMPOUND_COMMANDS: Record<string, Record<string, string>> = {
   inspect: { ui: "snapshot" },
 };
 
+const REMOVED_TOP_LEVEL_COMMANDS = new Set([
+  "agent-skills",
+]);
+
+export function isRemovedTopLevelCommand(cmd: string): boolean {
+  return REMOVED_TOP_LEVEL_COMMANDS.has(cmd);
+}
+
 export function didYouMean(cmd: string, rest: string[], commands: Record<string, CommandDef>): string {
   // Check removed compound commands first - give precise migration guidance.
   const compoundMap = REMOVED_COMPOUND_COMMANDS[cmd];
@@ -2757,10 +2765,10 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "",
     "Notes:",
     "  - Post-install host-agent orientation: https://docs.clawperator.com/host-agents/",
-    "  - If the current host is unfamiliar, inspect 'clawperator agent-skills list' and start with 'clawperator-agent-orientation' before choosing runtime skills, MCP, or raw CLI actions.",
-    "  - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator agent-skills list' and use 'clawperator-upgrade' before trying component-level repair commands.",
+    "  - If the current host is unfamiliar, inspect 'clawperator bundled-skills list' and start with 'clawperator-agent-orientation' before choosing runtime skills, MCP, or raw CLI actions.",
+    "  - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator bundled-skills list' and use 'clawperator-upgrade' before trying component-level repair commands.",
     "  - Start runtime-skill discovery with 'clawperator skills for-app <package_id>' when you know the Android package, or 'clawperator skills search --keyword <text>' when you do not.",
-    "  - If runtime-skill discovery returns no relevant match and you need guided authoring help, use 'clawperator agent-skills list' and start with 'clawperator-skill-author-by-agent-discovery'.",
+    "  - If runtime-skill discovery returns no relevant match and you need guided authoring help, use 'clawperator bundled-skills list' and start with 'clawperator-skill-author-by-agent-discovery'.",
     "  - Use 'clawperator-skill-author-by-recording' only after discovery returns 'proceed_to_recording', or when the app route is already well understood and you need the proving workflow.",
     "  - Use 'clawperator mcp serve' when the host already supports stdio MCP and wants registered Clawperator tools.",
     "  - operator setup is the canonical setup command. operator install remains an alias.",

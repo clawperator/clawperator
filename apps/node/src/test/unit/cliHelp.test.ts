@@ -138,7 +138,7 @@ describe("CLI help", () => {
     assert.match(stdout, /clawperator-agent-orientation/);
     assert.match(stdout, /clawperator-upgrade/);
     assert.match(stdout, /skills for-app <package_id>/);
-    assert.match(stdout, /agent-skills list/);
+    assert.match(stdout, /bundled-skills list/);
     assert.match(stdout, /clawperator-skill-author-by-agent-discovery/);
     assert.match(stdout, /clawperator-skill-author-by-recording/);
     assert.match(stdout, /mcp serve/);
@@ -235,18 +235,18 @@ describe("CLI help", () => {
     assert.match(stdout, /skills get <skill_id>/);
     assert.match(stdout, /clawperator-agent-orientation/);
     assert.match(stdout, /clawperator-upgrade/);
-    assert.match(stdout, /agent-skills list/);
+    assert.match(stdout, /bundled-skills list/);
     assert.match(stdout, /clawperator-skill-author-by-agent-discovery/);
     assert.match(stdout, /clawperator-skill-author-by-recording/);
     assert.match(stdout, /clawperator mcp serve/);
     assert.match(stdout, /https:\/\/docs\.clawperator\.com\/host-agents\//);
   });
 
-  it("shows agent-skills discovery guidance", async () => {
-    const { stdout, code } = await runCli(["agent-skills", "--help"]);
+  it("shows bundled-skills discovery guidance", async () => {
+    const { stdout, code } = await runCli(["bundled-skills", "--help"]);
     assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator agent-skills/);
-    assert.match(stdout, /agent-skills list/);
+    assert.match(stdout, /clawperator bundled-skills/);
+    assert.match(stdout, /bundled-skills list/);
     assert.match(stdout, /clawperator-agent-orientation/);
     assert.match(stdout, /clawperator-upgrade/);
     assert.match(stdout, /clawperator-skill-author-by-agent-discovery/);
@@ -255,12 +255,28 @@ describe("CLI help", () => {
     assert.match(stdout, /https:\/\/docs\.clawperator\.com\/skills\/authoring\//);
   });
 
+  it("rejects the removed agent-skills command surface", async () => {
+    const { stdout, stderr, code } = await runCli(["agent-skills", "--help"]);
+    assert.notStrictEqual(code, 0);
+    assert.match(stderr || stdout, /Unknown command: agent-skills/);
+  });
+
+  it("rejects the removed agent-skills command surface outside the help path", async () => {
+    const bare = await runCli(["agent-skills"]);
+    assert.notStrictEqual(bare.code, 0);
+    assert.match(bare.stderr || bare.stdout, /Unknown command: agent-skills/);
+
+    const list = await runCli(["agent-skills", "list"]);
+    assert.notStrictEqual(list.code, 0);
+    assert.match(list.stderr || list.stdout, /Unknown command: agent-skills/);
+  });
+
   it("shows manual-scaffold boundary in skills new help", async () => {
     const { stdout, code } = await runCli(["skills", "new", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator skills new/);
     assert.match(stdout, /low-level manual scaffold/i);
-    assert.match(stdout, /agent-skills list/);
+    assert.match(stdout, /bundled-skills list/);
     assert.match(stdout, /clawperator-skill-author-by-agent-discovery/);
     assert.match(stdout, /clawperator-skill-author-by-recording/);
   });

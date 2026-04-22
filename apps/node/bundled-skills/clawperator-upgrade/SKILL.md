@@ -26,7 +26,7 @@ re-implement install logic inside the skill body.
 
 - do not replace `https://clawperator.com/install.sh` with a bespoke upgrade flow
 - do not make `npm install -g clawperator@latest` the primary path
-- do not make `clawperator agent-skills update` or `clawperator skills update`
+- do not make `clawperator bundled-skills update` or `clawperator skills update`
   the primary path
 - do not add or imply a top-level `clawperator upgrade` command
 - do not invent a second upgrade-health checker beyond `clawperator doctor --json`
@@ -65,7 +65,7 @@ curl -fsSL https://clawperator.com/install.sh | bash
 ```
 
 Treat this as the primary action for whole-product upgrade because it owns the
-CLI install, packaged agent-skills, runtime-skills bootstrap guidance, and the
+CLI install, packaged bundled-skills, runtime-skills bootstrap guidance, and the
 Operator APK setup path.
 
 Do not replace this first step with direct npm self-upgrade commands.

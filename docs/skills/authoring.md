@@ -13,7 +13,7 @@ Use this order:
 | Situation | Start here | Stop when |
 | --- | --- | --- |
 | An installed runtime skill already matches the request | `clawperator skills for-app`, `clawperator skills search`, `clawperator skills get` | You have a truthful runtime skill to run. |
-| Runtime-skill discovery returned no relevant match and you need the host-visible zero-results route | `clawperator agent-skills list --json`, then `clawperator-skill-author-by-agent-discovery` | Discovery emits one artifact and chooses exactly one next step. |
+| Runtime-skill discovery returned no relevant match and you need the host-visible zero-results route | `clawperator bundled-skills list --json`, then `clawperator-skill-author-by-agent-discovery` | Discovery emits one artifact and chooses exactly one next step. |
 | Discovery returned `proceed_to_recording`, or the route is already well understood | `clawperator-skill-author-by-recording` | One recording-derived skill shape is authored and its self-test surfaces a `SkillResult`. |
 | You explicitly want the low-level manual scaffold instead of the installed guided workflows | `clawperator skills new <skill_id>` | The local scaffold exists and the registry entry was added. |
 
@@ -40,7 +40,7 @@ use this order:
    `clawperator skills search`.
 2. If runtime-skill discovery returns no relevant match and you need to inspect
    installed guided authoring workflows on the current host, run
-   `clawperator agent-skills list --json`.
+   `clawperator bundled-skills list --json`.
 3. Start with `clawperator-skill-author-by-agent-discovery` as the zero-results front door.
 4. Use `clawperator-skill-author-by-recording` only after discovery returns
    `proceed_to_recording`, or when the route is already well understood.
@@ -50,7 +50,7 @@ use this order:
 Verification pattern:
 
 ```bash
-clawperator agent-skills list --json
+clawperator bundled-skills list --json
 ```
 
 Expected signals:
@@ -96,19 +96,19 @@ installer:
 curl -fsSL https://clawperator.com/install.sh | bash
 ```
 
-already installs first-party agent-skills automatically.
+already installs first-party bundled skills automatically.
 
 Current install model:
 
 | Surface | Path | Role |
 | --- | --- | --- |
-| Canonical agent-skills store | `~/.clawperator/agent-skills/` | copied first-party agent-skills |
+| Canonical bundled-skills store | `~/.clawperator/bundled-skills/` | copied first-party bundled skills |
 | Claude Code discovery dir | `~/.claude/skills/` | symlinks into the canonical store |
 | Codex discovery dir | `$CODEX_HOME/skills/` | symlinks into the canonical store when `CODEX_HOME` is set |
 | Codex default discovery dir | `~/.codex/skills/` | used when `CODEX_HOME` is unset |
 | Generic agents discovery dir | `~/.agents/skills/` | symlinks into the canonical store for generic agent runtimes |
 
-Current packaged first-party agent-skills:
+Current packaged first-party bundled skills:
 
 | Skill | Role | Boundary |
 | --- | --- | --- |
@@ -121,59 +121,59 @@ Maintenance and repair commands:
 
 | Command | Use it when | First-run requirement |
 | --- | --- | --- |
-| `clawperator agent-skills install` | repair a missing install, or manually bootstrap agent-skills without `install.sh` | no |
-| `clawperator agent-skills update` | re-copy and re-wire agent-skills after `npm install -g clawperator@latest` or after local conflicts are resolved | no |
-| `clawperator agent-skills list` | inspect which agent-skills are installed and where their `SKILL.md` files live | no |
+| `clawperator bundled-skills install` | repair a missing install, or manually bootstrap bundled skills without `install.sh` | no |
+| `clawperator bundled-skills update` | re-copy and re-wire bundled skills after `npm install -g clawperator@latest` or after local conflicts are resolved | no |
+| `clawperator bundled-skills list` | inspect which bundled skills are installed and where their `SKILL.md` files live | no |
 
 Current command behavior:
 
-- `clawperator agent-skills install` copies packaged first-party agent-skills
-  into `~/.clawperator/agent-skills/` and recreates discovery
+- `clawperator bundled-skills install` copies packaged first-party bundled skills
+  into `~/.clawperator/bundled-skills/` and recreates discovery
   symlinks for Claude Code, Codex, and the generic agents runtime
-- `clawperator agent-skills update` runs the same copy-and-wire flow but
+- `clawperator bundled-skills update` runs the same copy-and-wire flow but
   reports the result as an update rather than a first install
-- `clawperator agent-skills list` reports installed skill names and the
-  absolute `SKILL.md` path for each installed agent-skill
+- `clawperator bundled-skills list` reports installed skill names and the
+  absolute `SKILL.md` path for each installed bundled skill
 - the current packaged install set contains
   `clawperator-agent-orientation`, `clawperator-upgrade`,
   `clawperator-skill-author-by-agent-discovery`, and `clawperator-skill-author-by-recording`
 
 Current doctor behavior:
 
-- `clawperator doctor` includes `host.agent-skills.staleness`
-- if `~/.clawperator/agent-skills/` does not exist, doctor reports
-  `pass` with `Agent-skills not yet installed.`
-- if the installed agent-skills state exists but is stale, incomplete, or
+- `clawperator doctor` includes `host.bundled-skills.staleness`
+- if `~/.clawperator/bundled-skills/` does not exist, doctor reports
+  `pass` with `Bundled-skills not yet installed.`
+- if the installed bundled-skills state exists but is stale, incomplete, or
   malformed, doctor reports `warn`
 - current warning conditions include:
   - `version.txt` is missing, empty, unreadable, or does not match the current
     CLI version
-  - `~/.clawperator/agent-skills/` exists but is not a directory, or is a
+  - `~/.clawperator/bundled-skills/` exists but is not a directory, or is a
     dangling symlink
-  - one or more packaged first-party agent-skill directories are missing
+  - one or more packaged first-party bundled-skill directories are missing
     from the canonical install store
   - Claude Code, Codex, or generic agents discovery entries are missing, broken,
-    conflicting, or no longer point at `~/.clawperator/agent-skills/<skill_name>`
+    conflicting, or no longer point at `~/.clawperator/bundled-skills/<skill_name>`
 - recommended remediation for those `warn` states is
-  `clawperator agent-skills update`
+  `clawperator bundled-skills update`
 - if the install path itself is malformed and cannot be repaired in place,
   remove or rename the conflicting path and then run
-  `clawperator agent-skills install`
+  `clawperator bundled-skills install`
 
 Verification pattern:
 
 ```bash
-clawperator agent-skills list --json
+clawperator bundled-skills list --json
 clawperator doctor --json
 ```
 
 Expected signals:
 
-- `agent-skills list --json` returns `installedDir` as
-  `~/.clawperator/agent-skills/` or the resolved absolute equivalent on the
+- `bundled-skills list --json` returns `installedDir` as
+  `~/.clawperator/bundled-skills/` or the resolved absolute equivalent on the
   current host
 - `doctor --json` includes a check with
-  `"id": "host.agent-skills.staleness"`
+  `"id": "host.bundled-skills.staleness"`
 
 ## Recording-Driven Workflow Stance
 
@@ -218,7 +218,7 @@ Keep the two front doors distinct:
 - Runtime invocation: `apps/node/src/domain/skills/runSkill.ts`
 - Runtime env resolution: `apps/node/src/domain/skills/skillsConfig.ts`
 - CLI surface: `apps/node/src/cli/commands/skills.ts`
-- Agent-skills CLI discovery: `apps/node/src/cli/registry.ts`, `apps/node/src/cli/commands/agentSkills.ts`
+- Bundled-skills CLI discovery: `apps/node/src/cli/registry.ts`, `apps/node/src/cli/commands/bundledSkills.ts`
 
 ## Validation And Testing Boundary
 
@@ -245,7 +245,7 @@ Current `validateSkill` non-goals:
 Use this route when hardening a runtime skill:
 
 1. Discover installed guided authoring workflows with
-   `clawperator agent-skills list --json` when you need a host-visible
+   `clawperator bundled-skills list --json` when you need a host-visible
    front door and runtime-skill discovery returned no relevant match.
 2. Start with `clawperator-skill-author-by-agent-discovery`, then move to
    `clawperator-skill-author-by-recording` only after discovery returns

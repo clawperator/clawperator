@@ -50,13 +50,13 @@ describe("bundled skill packaging", () => {
     }
   });
 
-  it("keeps the bundled discovery skill aligned with the current agent-skills CLI surface", async () => {
+  it("keeps the bundled discovery skill aligned with the current bundled-skills CLI surface", async () => {
     const discoverySkill = await readFile(
       join(packageRoot, "bundled-skills", "clawperator-skill-author-by-agent-discovery", "SKILL.md"),
       "utf8"
     );
 
-    assert.match(discoverySkill, /clawperator agent-skills list --json/);
-    assert.doesNotMatch(discoverySkill, /authoring-skills list --json/);
+    assert.match(discoverySkill, /clawperator bundled-skills list --json/);
+    assert.doesNotMatch(discoverySkill, /clawperator agent-skills list --json/);
   });
 });

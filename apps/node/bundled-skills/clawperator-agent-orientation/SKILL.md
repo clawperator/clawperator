@@ -1,6 +1,6 @@
 ---
 name: clawperator-agent-orientation
-description: Clawperator first-party bundled skill. First-run orientation for unfamiliar agents. Verifies host readiness, routes to the correct front door (runtime skills, agent-skills, MCP, or raw CLI), and ends with one canonical doc link.
+description: Clawperator first-party bundled skill. First-run orientation for unfamiliar agents. Verifies host readiness, routes to the correct front door (runtime skills, bundled-skills, MCP, or raw CLI), and ends with one canonical doc link.
 ---
 
 # Clawperator Agent Orientation
@@ -15,7 +15,7 @@ which canonical docs to trust."
 ## What This Skill Owns
 
 - verify the local host is ready to use Clawperator
-- distinguish runtime skills, agent-skills, MCP, and raw CLI without blurring their boundaries
+- distinguish runtime skills, bundled-skills, MCP, and raw CLI without blurring their boundaries
 - choose the correct front door for the agent's next step
 - end with one canonical doc link for the chosen route
 
@@ -69,10 +69,10 @@ Use this decision table:
 | The host already supports stdio MCP and wants registered tools | `clawperator mcp serve` |
 | You already know the exact direct action or payload you want | raw CLI / local API via quickstart |
 
-Runtime skills and agent-skills are different surfaces:
+Runtime skills and bundled-skills are different surfaces:
 
 - `clawperator skills ...` is for installed runtime app workflows
-- `clawperator agent-skills ...` is for host-agent helpers around Clawperator itself
+- `clawperator bundled-skills ...` is for host-agent helpers around Clawperator itself
 - `clawperator-skill-author-by-agent-discovery` is the zero-results route after runtime-skill discovery found no relevant match
 - `clawperator-skill-author-by-recording` is the proving workflow after discovery says to record, or when the route is already well understood
 
@@ -84,15 +84,15 @@ Do not run every surface "just to look around". Use one route-specific probe:
 | --- | --- |
 | runtime skills with known package id | `clawperator skills for-app <package_id> --json` |
 | runtime skills with only user-language terms | `clawperator skills search --keyword <text> --json` |
-| zero-results authoring route | `clawperator agent-skills list --json` |
-| proving workflow | `clawperator agent-skills list --json` |
+| zero-results authoring route | `clawperator bundled-skills list --json` |
+| proving workflow | `clawperator bundled-skills list --json` |
 | MCP | `clawperator mcp serve` |
 | raw CLI / direct actions | `clawperator snapshot --json --device <device_serial>` |
 
 Rules:
 
 - do not start runtime-skill discovery with `clawperator skills list --json` unless the real task is inventory
-- do not inspect `clawperator agent-skills list --json` before runtime-skill discovery unless the route is already known to be authoring
+- do not inspect `clawperator bundled-skills list --json` before runtime-skill discovery unless the route is already known to be authoring
 - do not start `clawperator mcp serve` unless the host has already chosen MCP as the transport
 - for the raw CLI route, use `snapshot` as the first observe step before attempting direct actions
 

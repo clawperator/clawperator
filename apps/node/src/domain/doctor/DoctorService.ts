@@ -7,7 +7,7 @@ import {
   checkAdbServer,
   checkDefaultOrchestratedSkillAgentCli,
   checkInstalledOrchestratedSkillAgentCliAvailability,
-  checkAgentSkillsStaleness,
+  checkBundledSkillsStaleness,
 } from "./checks/hostChecks.js";
 import {
   checkDeviceDiscovery,
@@ -45,7 +45,7 @@ export interface DoctorServiceDeps {
 }
 
 type RuntimeConfigWithDoctorOverrides = RuntimeConfig & {
-  agentSkillsDir?: string;
+  bundledSkillsDir?: string;
 };
 
 export class DoctorService {
@@ -71,10 +71,10 @@ export class DoctorService {
     const installedOrchestratedSkillAgentCli = await checkInstalledOrchestratedSkillAgentCliAvailability(config);
     checks.push(installedOrchestratedSkillAgentCli);
 
-    const agentSkillsStaleness = await checkAgentSkillsStaleness(config, {
-      installedDir: (config as RuntimeConfigWithDoctorOverrides).agentSkillsDir,
+    const bundledSkillsStaleness = await checkBundledSkillsStaleness(config, {
+      installedDir: (config as RuntimeConfigWithDoctorOverrides).bundledSkillsDir,
     });
-    checks.push(agentSkillsStaleness);
+    checks.push(bundledSkillsStaleness);
 
     const adbServer = await checkAdbServer(config);
     checks.push(adbServer);

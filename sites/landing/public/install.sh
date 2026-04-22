@@ -21,11 +21,11 @@ DEFAULT_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-com.clawperator.operat
 INSTALL_COMMAND="curl -fsSL https://clawperator.com/install.sh | bash"
 SKILLS_SETUP_STATUS="not-run"
 SKILLS_REGISTRY_PATH=""
-AGENT_SKILLS_SETUP_STATUS="not-run"
-AGENT_SKILLS_INSTALL_DIR=""
-AGENT_SKILLS_CLAUDE_DIR=""
-AGENT_SKILLS_CODEX_DIR=""
-AGENT_SKILLS_AGENTS_DIR=""
+BUNDLED_SKILLS_SETUP_STATUS="not-run"
+BUNDLED_SKILLS_INSTALL_DIR=""
+BUNDLED_SKILLS_CLAUDE_DIR=""
+BUNDLED_SKILLS_CODEX_DIR=""
+BUNDLED_SKILLS_AGENTS_DIR=""
 CLAWPERATOR_BIN_PATH=""
 LAST_DEVICE_SERIAL=""
 BLANK_RUNTIME_SKILLS_REGISTRY_WARNED=0
@@ -443,7 +443,7 @@ process.stdin.on("end", () => {
 ' 2>/dev/null || true
 }
 
-parse_agent_skills_install_result() {
+parse_bundled_skills_install_result() {
     node -e '
 let raw = "";
 process.stdin.setEncoding("utf8");
@@ -541,60 +541,60 @@ setup_skills_via_cli() {
     fi
 }
 
-setup_agent_skills_via_cli() {
-    local DEFAULT_AGENT_SKILLS_INSTALL_DIR="$HOME/.clawperator/agent-skills/"
-    local DEFAULT_AGENT_SKILLS_CLAUDE_DIR="$HOME/.claude/skills/"
-    local DEFAULT_AGENT_SKILLS_CODEX_DIR="${CODEX_HOME:-$HOME/.codex}/skills/"
-    local DEFAULT_AGENT_SKILLS_AGENTS_DIR="$HOME/.agents/skills/"
-    local AGENT_SKILLS_OUTPUT=""
+setup_bundled_skills_via_cli() {
+    local DEFAULT_BUNDLED_SKILLS_INSTALL_DIR="$HOME/.clawperator/bundled-skills/"
+    local DEFAULT_BUNDLED_SKILLS_CLAUDE_DIR="$HOME/.claude/skills/"
+    local DEFAULT_BUNDLED_SKILLS_CODEX_DIR="${CODEX_HOME:-$HOME/.codex}/skills/"
+    local DEFAULT_BUNDLED_SKILLS_AGENTS_DIR="$HOME/.agents/skills/"
+    local BUNDLED_SKILLS_OUTPUT=""
 
-    AGENT_SKILLS_INSTALL_DIR="$DEFAULT_AGENT_SKILLS_INSTALL_DIR"
-    AGENT_SKILLS_CLAUDE_DIR="$DEFAULT_AGENT_SKILLS_CLAUDE_DIR"
-    AGENT_SKILLS_CODEX_DIR="$DEFAULT_AGENT_SKILLS_CODEX_DIR"
-    AGENT_SKILLS_AGENTS_DIR="$DEFAULT_AGENT_SKILLS_AGENTS_DIR"
+    BUNDLED_SKILLS_INSTALL_DIR="$DEFAULT_BUNDLED_SKILLS_INSTALL_DIR"
+    BUNDLED_SKILLS_CLAUDE_DIR="$DEFAULT_BUNDLED_SKILLS_CLAUDE_DIR"
+    BUNDLED_SKILLS_CODEX_DIR="$DEFAULT_BUNDLED_SKILLS_CODEX_DIR"
+    BUNDLED_SKILLS_AGENTS_DIR="$DEFAULT_BUNDLED_SKILLS_AGENTS_DIR"
 
     if [ "${CLAWPERATOR_INSTALL_SKIP_SKILLS:-0}" = "1" ]; then
-        AGENT_SKILLS_SETUP_STATUS="skipped"
-        echo -e "${YELLOW}⚠️  Skipping agent-skills setup because CLAWPERATOR_INSTALL_SKIP_SKILLS=1.${NC}"
+        BUNDLED_SKILLS_SETUP_STATUS="skipped"
+        echo -e "${YELLOW}⚠️  Skipping bundled-skills setup because CLAWPERATOR_INSTALL_SKIP_SKILLS=1.${NC}"
         return 0
     fi
 
-    echo -e "${BLUE}Setting up agent-skills...${NC}"
-    if AGENT_SKILLS_OUTPUT="$("$CLAWPERATOR_BIN_PATH" agent-skills install --output json)"; then
-        local PARSED_AGENT_SKILLS_LINE=""
-        while IFS= read -r PARSED_AGENT_SKILLS_LINE; do
-            case "$PARSED_AGENT_SKILLS_LINE" in
+    echo -e "${BLUE}Setting up bundled-skills...${NC}"
+    if BUNDLED_SKILLS_OUTPUT="$("$CLAWPERATOR_BIN_PATH" bundled-skills install --output json)"; then
+        local PARSED_BUNDLED_SKILLS_LINE=""
+        while IFS= read -r PARSED_BUNDLED_SKILLS_LINE; do
+            case "$PARSED_BUNDLED_SKILLS_LINE" in
                 installedDir=*)
-                    AGENT_SKILLS_INSTALL_DIR="${PARSED_AGENT_SKILLS_LINE#installedDir=}"
+                    BUNDLED_SKILLS_INSTALL_DIR="${PARSED_BUNDLED_SKILLS_LINE#installedDir=}"
                     ;;
                 # agentDiscoveryDir:<label>=<path> entries - matched by label so new agents
                 # (e.g. gemini) can be added to the CLI without breaking this script.
                 agentDiscoveryDir:claude=*)
-                    AGENT_SKILLS_CLAUDE_DIR="${PARSED_AGENT_SKILLS_LINE#agentDiscoveryDir:claude=}"
+                    BUNDLED_SKILLS_CLAUDE_DIR="${PARSED_BUNDLED_SKILLS_LINE#agentDiscoveryDir:claude=}"
                     ;;
                 agentDiscoveryDir:codex=*)
-                    AGENT_SKILLS_CODEX_DIR="${PARSED_AGENT_SKILLS_LINE#agentDiscoveryDir:codex=}"
+                    BUNDLED_SKILLS_CODEX_DIR="${PARSED_BUNDLED_SKILLS_LINE#agentDiscoveryDir:codex=}"
                     ;;
                 agentDiscoveryDir:agents=*)
-                    AGENT_SKILLS_AGENTS_DIR="${PARSED_AGENT_SKILLS_LINE#agentDiscoveryDir:agents=}"
+                    BUNDLED_SKILLS_AGENTS_DIR="${PARSED_BUNDLED_SKILLS_LINE#agentDiscoveryDir:agents=}"
                     ;;
             esac
-        done < <(printf '%s' "$AGENT_SKILLS_OUTPUT" | parse_agent_skills_install_result)
+        done < <(printf '%s' "$BUNDLED_SKILLS_OUTPUT" | parse_bundled_skills_install_result)
 
-        AGENT_SKILLS_SETUP_STATUS="configured"
-        echo -e "${GREEN}✅ Agent-skills setup complete.${NC}"
-        echo -e "${GREEN}   Installed at: ${AGENT_SKILLS_INSTALL_DIR}${NC}"
-        echo -e "${GREEN}   Claude skills dir: ${AGENT_SKILLS_CLAUDE_DIR}${NC}"
-        echo -e "${GREEN}   Codex skills dir: ${AGENT_SKILLS_CODEX_DIR}${NC}"
-        echo -e "${GREEN}   Agents skills dir: ${AGENT_SKILLS_AGENTS_DIR}${NC}"
+        BUNDLED_SKILLS_SETUP_STATUS="configured"
+        echo -e "${GREEN}✅ Bundled-skills setup complete.${NC}"
+        echo -e "${GREEN}   Installed at: ${BUNDLED_SKILLS_INSTALL_DIR}${NC}"
+        echo -e "${GREEN}   Claude skills dir: ${BUNDLED_SKILLS_CLAUDE_DIR}${NC}"
+        echo -e "${GREEN}   Codex skills dir: ${BUNDLED_SKILLS_CODEX_DIR}${NC}"
+        echo -e "${GREEN}   Agents skills dir: ${BUNDLED_SKILLS_AGENTS_DIR}${NC}"
         return 0
     fi
 
-    AGENT_SKILLS_SETUP_STATUS="failed"
-    echo -e "${YELLOW}⚠️  Agent-skills setup failed via CLI. Resolve the issue below, then re-run 'clawperator agent-skills install'.${NC}"
+    BUNDLED_SKILLS_SETUP_STATUS="failed"
+    echo -e "${YELLOW}⚠️  Bundled-skills setup failed via CLI. Resolve the issue below, then re-run 'clawperator bundled-skills install'.${NC}"
     echo -e "${YELLOW}   Re-running after resolving the conflict is safe.${NC}"
-    if [ -n "$AGENT_SKILLS_OUTPUT" ]; then
-        echo "$AGENT_SKILLS_OUTPUT"
+    if [ -n "$BUNDLED_SKILLS_OUTPUT" ]; then
+        echo "$BUNDLED_SKILLS_OUTPUT"
     fi
     return 0
 }
@@ -1066,7 +1066,7 @@ EOF
 
 write_agent_guide() {
     local AGENT_GUIDE_PATH="$HOME/.clawperator/AGENTS.md"
-    local AGENT_SKILLS_GUIDE_DIR="${AGENT_SKILLS_INSTALL_DIR:-$HOME/.clawperator/agent-skills}"
+    local BUNDLED_SKILLS_GUIDE_DIR="${BUNDLED_SKILLS_INSTALL_DIR:-$HOME/.clawperator/bundled-skills}"
     local SKILL_DIR=""
     local SKILL_NAME=""
     local HAS_SKILLS=0
@@ -1099,8 +1099,8 @@ EOF
 
     # Treat any install tree with at least one SKILL.md as configured, even if
     # version metadata is missing and the install should be refreshed.
-    if [ -d "$AGENT_SKILLS_GUIDE_DIR" ]; then
-        for SKILL_DIR in "$AGENT_SKILLS_GUIDE_DIR"/*/; do
+    if [ -d "$BUNDLED_SKILLS_GUIDE_DIR" ]; then
+        for SKILL_DIR in "$BUNDLED_SKILLS_GUIDE_DIR"/*/; do
             if [ -f "${SKILL_DIR}SKILL.md" ]; then
                 HAS_SKILLS=1
                 SKILL_NAME="$(basename "$SKILL_DIR")"
@@ -1120,10 +1120,10 @@ EOF
     if [ "$HAS_SKILLS" -eq 1 ]; then
         cat >> "$AGENT_GUIDE_PATH" <<EOF
 
-## Agent-Skills
+## Bundled Skills
 
-First-party Clawperator agent-skills are installed at:
-${AGENT_SKILLS_GUIDE_DIR}
+First-party Clawperator bundled skills are installed at:
+${BUNDLED_SKILLS_GUIDE_DIR}
 
 EOF
         if [ "$HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL" -eq 1 ]; then
@@ -1161,7 +1161,7 @@ EOF
 
 Installed entries on this host:
 EOF
-        for SKILL_DIR in "$AGENT_SKILLS_GUIDE_DIR"/*/; do
+        for SKILL_DIR in "$BUNDLED_SKILLS_GUIDE_DIR"/*/; do
             if [ -f "${SKILL_DIR}SKILL.md" ]; then
                 printf -- '- %s\n' "$(basename "$SKILL_DIR")" >> "$AGENT_GUIDE_PATH"
             fi
@@ -1173,17 +1173,17 @@ Recommended first-run flow:
 - If the current host is unfamiliar, start with `clawperator-agent-orientation`
 - If this installed Clawperator environment needs a whole-product refresh, use `clawperator-upgrade`
 - Choose one runtime-skill discovery probe: `clawperator skills for-app <package_id>` or `clawperator skills search --keyword "<term>"`
-- If there is no relevant runtime-skill match, inspect `clawperator agent-skills list --json`
+- If there is no relevant runtime-skill match, inspect `clawperator bundled-skills list --json`
 - Start the guided route with `clawperator-skill-author-by-agent-discovery`
 - Use `clawperator-skill-author-by-recording` only after discovery returns `proceed_to_recording`
 EOF
         else
             cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
-Installed agent-skill front doors are incomplete on this host.
+Installed bundled-skill front doors are incomplete on this host.
 
 Repair it with:
-- run `clawperator agent-skills update`
+- run `clawperator bundled-skills update`
 EOF
             if [ "$HAS_CLAWPERATOR_AGENT_ORIENTATION_SKILL" -ne 1 ]; then
                 printf -- '- missing `%s`\n' "clawperator-agent-orientation" >> "$AGENT_GUIDE_PATH"
@@ -1198,20 +1198,20 @@ EOF
                 printf -- '- missing `%s`\n' "clawperator-skill-author-by-recording" >> "$AGENT_GUIDE_PATH"
             fi
         fi
-        if [ ! -f "$AGENT_SKILLS_GUIDE_DIR/version.txt" ] && [ "$HAS_SKILLS" -eq 1 ]; then
+        if [ ! -f "$BUNDLED_SKILLS_GUIDE_DIR/version.txt" ] && [ "$HAS_SKILLS" -eq 1 ]; then
             cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
 Version metadata is missing for this install.
 Refresh it with:
-- run `clawperator agent-skills update`
+- run `clawperator bundled-skills update`
 EOF
         fi
     else
         cat >> "$AGENT_GUIDE_PATH" <<'EOF'
 
-## Agent-Skills
+## Bundled Skills
 
-First-party Clawperator agent-skills are not currently configured on this host.
+First-party Clawperator bundled skills are not currently configured on this host.
 
 Expected packaged front doors after install:
 - `clawperator-agent-orientation`: first-run orientation for unfamiliar hosts
@@ -1220,7 +1220,7 @@ Expected packaged front doors after install:
 - `clawperator-skill-author-by-recording`: proving workflow after discovery returns `proceed_to_recording`
 
 Repair or manual bootstrap:
-- run `clawperator agent-skills install`
+- run `clawperator bundled-skills install`
 EOF
     fi
 
@@ -1277,9 +1277,9 @@ const bridgeBlock = [
   "- `clawperator skills for-app <package_id>`",
   "- `clawperator skills search --keyword \"<term>\"`",
   "- `clawperator skills get <skill_id>`",
-  "- `clawperator agent-skills list --json`",
+  "- `clawperator bundled-skills list --json`",
   "",
-  "If runtime-skill discovery finds no relevant match, follow the local guide for the agent-skill front doors installed on this host.",
+  "If runtime-skill discovery finds no relevant match, follow the local guide for the bundled-skill front doors installed on this host.",
   "Confirm the local guide lists `clawperator-agent-orientation`, `clawperator-upgrade`, `clawperator-skill-author-by-agent-discovery`, and `clawperator-skill-author-by-recording` before starting the discovery-to-proving route.",
   "Use `clawperator skills run <skill_id>` after you have identified the right runtime skill.",
   endMarker,
@@ -1810,7 +1810,7 @@ main() {
     
     # Setup skills via CLI (best-effort)
     setup_skills_via_cli
-    setup_agent_skills_via_cli
+    setup_bundled_skills_via_cli
     write_agent_guide
     write_shared_agent_bridge
     write_install_state
@@ -1884,13 +1884,13 @@ main() {
         echo -e "   ${YELLOW}export CLAWPERATOR_SKILLS_REGISTRY=\"\$HOME/.clawperator/skills/skills/skills-registry.json\"${NC}"
     fi
     echo ""
-    if [ "$AGENT_SKILLS_SETUP_STATUS" = "configured" ]; then
-        echo -e "6. Agent-skills installed at:"
-        echo -e "   ${BLUE}${AGENT_SKILLS_INSTALL_DIR}${NC}"
+    if [ "$BUNDLED_SKILLS_SETUP_STATUS" = "configured" ]; then
+        echo -e "6. Bundled-skills installed at:"
+        echo -e "   ${BLUE}${BUNDLED_SKILLS_INSTALL_DIR}${NC}"
     else
-        echo -e "6. ${YELLOW}Agent-skills were not configured during install.${NC}"
+        echo -e "6. ${YELLOW}Bundled-skills were not configured during install.${NC}"
         echo -e "   To repair this later, run:"
-        echo -e "   ${YELLOW}clawperator agent-skills install${NC}"
+        echo -e "   ${YELLOW}clawperator bundled-skills install${NC}"
     fi
     echo ""
     print_durable_artifact_summary

@@ -12,18 +12,18 @@ docs.
 This task ships in **2 PRs across 3 phases**. **PR-1** handles packaged-source
 relocation plus bundled-skill id normalization. **PR-2** renames the external
 surface from `agent-skills` to `bundled-skills` as a clean breaking rename.
-PR-2 must not start until PR-1 is merged.
+PR-2 is now implemented and validated locally.
 
 ## Status
 | Item | Value |
 | --- | --- |
-| State | PR-1 complete locally |
+| State | PR-2 complete locally |
 | Total PRs | 2 |
 | Total phases | 3 |
-| Completed | 1, 2 |
-| Remaining | 3 |
-| Current / Next | PR-2 / Phase 3 after PR-1 merge |
-| Blockers | PR-1 merge gate for PR-2 |
+| Completed | 1, 2, 3 |
+| Remaining | none |
+| Current / Next | Awaiting review / merge |
+| Blockers | none |
 
 ## Goal
 

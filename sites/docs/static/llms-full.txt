@@ -136,7 +136,7 @@ durable onboarding files under `~/.clawperator/`:
 
 | Path | Meaning | When to read it |
 | --- | --- | --- |
-| `~/.clawperator/AGENTS.md` | Local Clawperator guide with runtime-skill discovery commands and current agent-skills status | First stop for a host agent that needs to discover what Clawperator can do on this machine |
+| `~/.clawperator/AGENTS.md` | Local Clawperator guide with runtime-skill discovery commands and current bundled-skills status | First stop for a host agent that needs to discover what Clawperator can do on this machine |
 | `~/.clawperator/install-state.json` | Durable install metadata written by the installer | Use when you need the last known install facts without rerunning `doctor` |
 | `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config for Claude Desktop, Codex, and a generic stdio MCP consumer | Use when the host should connect through `clawperator mcp serve` instead of shelling out to the CLI |
 
@@ -463,13 +463,13 @@ See [Logging](api/logging.md) for complete documentation.
 
 Choose the correct Clawperator front door after install: runtime-skill discovery
 through `clawperator skills`, installed authoring-workflow discovery through
-`clawperator agent-skills`, long-running tool registration through
+`clawperator bundled-skills`, long-running tool registration through
 `clawperator mcp serve`, or direct action work through the CLI and local API.
 This page also defines the zero-results route: when runtime-skill discovery
 finds no relevant match, start with `clawperator-skill-author-by-agent-discovery` and use
 `clawperator-skill-author-by-recording` only after discovery returns
 `proceed_to_recording`, or when the route is already well understood.
-If packaged first-party agent-skills are installed, `clawperator-agent-orientation`
+If packaged first-party bundled skills are installed, `clawperator-agent-orientation`
 is the first-run packaged front door for this route and should point back to
 this page, while `clawperator-upgrade` is the packaged whole-product upgrade
 route through `install.sh` and `doctor` after explicit upgrade intent is
@@ -506,9 +506,9 @@ later `snapshot`, `skills run`, and direct-action commands.
 Use this order:
 
 1. Read this page.
-2. If packaged first-party agent-skills are installed and you are unfamiliar
+2. If packaged first-party bundled skills are installed and you are unfamiliar
    with this host, start with `clawperator-agent-orientation`. It should verify
-   readiness, separate runtime skills from agent-skills, and end with one
+   readiness, separate runtime skills from bundled skills, and end with one
    concrete next step.
 3. If the user or calling workflow explicitly chose a whole-product refresh,
    use `clawperator-upgrade`.
@@ -526,7 +526,7 @@ Use this order:
 | You only know user-language terms such as app name or intent | `clawperator skills search --keyword <text> --json` | Search is the fallback when you do not have the package id yet. |
 | You already have a skill id and want the exact metadata | `clawperator skills get <skill_id> --json` | Confirms the registry entry before a run. |
 | You want to execute a skill through the wrapper | `clawperator skills run <skill_id> ... --json` | Uses the runtime-skill wrapper and its validation gate. |
-| Runtime-skill discovery returned no relevant match and you need the zero-results authoring route | `clawperator agent-skills list --json` | Agent-skills are separate from runtime skills. Start with `clawperator-skill-author-by-agent-discovery`, then use `clawperator-skill-author-by-recording` only after discovery returns `proceed_to_recording`, or when the route is already well understood. |
+| Runtime-skill discovery returned no relevant match and you need the zero-results authoring route | `clawperator bundled-skills list --json` | Bundled skills are separate from runtime skills. Start with `clawperator-skill-author-by-agent-discovery`, then use `clawperator-skill-author-by-recording` only after discovery returns `proceed_to_recording`, or when the route is already well understood. |
 | Your host already supports stdio MCP and wants registered tools such as `devices`, `snapshot`, `execute`, and `configure` | `clawperator mcp serve` | MCP is the transport surface for long-running tool registration. |
 | You already know the exact action payload you want to send | [Quickstart](quickstart.md) | Quickstart covers the observe / decide / act loop directly. |
 
@@ -550,8 +550,8 @@ Decision rules:
 - Do not start with `skills list` unless the real task is inventory rather than
   app-oriented discovery.
 - If discovery returns zero relevant matches and the next job is skill creation
-  rather than raw execution, inspect installed agent-skills with
-  `clawperator agent-skills list --json`, start with
+  rather than raw execution, inspect installed bundled skills with
+  `clawperator bundled-skills list --json`, start with
   `clawperator-skill-author-by-agent-discovery`, and continue to
   [Authoring](skills/authoring.md).
 
@@ -562,7 +562,7 @@ relevant installed match.
 
 | Situation | Next surface | Expected outcome |
 | --- | --- | --- |
-| No relevant runtime skill match and the next job is choosing the truthful route | `clawperator agent-skills list --json` | Confirm the installed agent-skill front doors on this host. |
+| No relevant runtime skill match and the next job is choosing the truthful route | `clawperator bundled-skills list --json` | Confirm the installed bundled-skill front doors on this host. |
 | You need the bounded zero-results front door | `clawperator-skill-author-by-agent-discovery` | Produce one discovery artifact and choose exactly one next step. |
 | Discovery returns `proceed_to_recording`, or the route is already well understood | `clawperator-skill-author-by-recording` | Run the proving workflow from a fresh recording and one self-test. |
 | You explicitly want the low-level manual scaffold instead of the installed guided workflows | `clawperator skills new <skill_id>` | Create a local scaffold only. |
@@ -621,7 +621,7 @@ clawperator mcp serve
    request, inspect the installed authoring-workflow helpers:
 
 ```bash
-clawperator agent-skills list --json
+clawperator bundled-skills list --json
 ```
 
 Then continue to [Authoring](skills/authoring.md), start with
@@ -639,7 +639,7 @@ These files help a host orient after install:
 | `~/.clawperator/install-state.json` | Durable install metadata | Check `registryPath`, `cliVersion`, and `lastDeviceSerial` without rerunning install. |
 | `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config | Use it when you choose the MCP route. |
 | `~/.clawperator/skills/skills/skills-registry.json` | Installed runtime-skills registry | Verify it exists when `skills list` or `skills for-app` cannot discover skills. |
-| `~/.clawperator/agent-skills/` | Installed first-party agent-skills | Inspect it through `clawperator agent-skills list --json` when runtime discovery returns no relevant match. |
+| `~/.clawperator/bundled-skills/` | Installed first-party bundled skills | Inspect it through `clawperator bundled-skills list --json` when runtime discovery returns no relevant match. |
 
 ## Verification
 
@@ -648,23 +648,23 @@ Use these commands to confirm the intended surface is working:
 ```bash
 clawperator --help
 clawperator skills --help
-clawperator agent-skills --help
+clawperator bundled-skills --help
 clawperator skills for-app com.android.settings --json
 clawperator skills search --keyword settings --json
 clawperator skills get com.android.settings.capture-overview --json
 clawperator skills list --json
-clawperator agent-skills list --json
+clawperator bundled-skills list --json
 ```
 
 Check:
 
-- `clawperator --help` and `clawperator skills --help` name `clawperator-agent-orientation` as the first-run surface for unfamiliar hosts and point zero-match users to `clawperator agent-skills list`
+- `clawperator --help` and `clawperator skills --help` name `clawperator-agent-orientation` as the first-run surface for unfamiliar hosts and point zero-match users to `clawperator bundled-skills list`
 - `clawperator --help` and `clawperator skills --help` name `clawperator-upgrade` as the packaged whole-product refresh route
-- `clawperator agent-skills --help` names `clawperator-agent-orientation` as the first-run orientation skill, `clawperator-upgrade` as the packaged whole-product upgrade route after explicit upgrade intent, `clawperator-skill-author-by-agent-discovery` as the zero-results front door, and `clawperator-skill-author-by-recording` as the proving workflow
+- `clawperator bundled-skills --help` names `clawperator-agent-orientation` as the first-run orientation skill, `clawperator-upgrade` as the packaged whole-product upgrade route after explicit upgrade intent, `clawperator-skill-author-by-agent-discovery` as the zero-results front door, and `clawperator-skill-author-by-recording` as the proving workflow
 - `skills for-app`, `skills search`, and `skills list` return top-level `skills` and `count`
 - `skills get` returns a top-level `skill`
-- `agent-skills list` returns top-level `skills`, `count`, and `installedDir`
-- `agent-skills list` includes `clawperator-agent-orientation`, `clawperator-upgrade`, `clawperator-skill-author-by-agent-discovery`, and `clawperator-skill-author-by-recording` in `skills[].name`
+- `bundled-skills list` returns top-level `skills`, `count`, and `installedDir`
+- `bundled-skills list` includes `clawperator-agent-orientation`, `clawperator-upgrade`, `clawperator-skill-author-by-agent-discovery`, and `clawperator-skill-author-by-recording` in `skills[].name`
 
 For MCP:
 
@@ -1393,7 +1393,7 @@ This page is generated from the Node CLI registry and command sources.
 | `wait-for-nav` | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]` | wait-for-navigation, wait_for_navigation | --app, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --validate-only, --dry-run, --timeout, --device, --operator-package, --json | Wait for app or screen navigation to complete |
 | `read-value` | `read-value --label <text> [--json]` | read-kv, read-key-value-pair, read_key_value_pair | --label, --label-id, --label-desc, --all, --validate-only, --dry-run, --json | Read the value associated with a labeled element |
 | `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills for-app <package_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --json, --output<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
-| `agent-skills` | `agent-skills list`<br>`agent-skills install`<br>`agent-skills update` | - | -<br>Subcommands: install, update, list | Manage first-party agent-skills for Claude Code, Codex, and generic agent runtimes |
+| `bundled-skills` | `bundled-skills list`<br>`bundled-skills install`<br>`bundled-skills update` | - | -<br>Subcommands: install, update, list | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
 | `recording` | `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]`<br>`recording stop`<br>`recording pull`<br>`recording parse --input <file> [--out <file>]`<br>`recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]`<br>`recording compare --baseline <export.json> --result <skills-run.json> [--mode <auto|literal|semantic>]` | record | --session-id, --out, --input, --snapshots, --baseline, --result, --mode, --device, --operator-package<br>Subcommands: compare, export | Manage recording sessions on the Operator app |
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `mcp` | `mcp serve` | - | - | Start the first-party MCP server |
@@ -1501,7 +1501,7 @@ This page is generated from the Node CLI registry and command sources.
 | --- | --- | --- | --- | --- |
 | `exec` | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]`<br>`exec best-effort --goal <text> [--device <id>] [--operator-package <package>]` | execute | --payload, --validate-only, --dry-run, --goal, --device, --operator-package, --execution, --input, --file | Execute a validated command payload |
 | `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills for-app <package_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --json, --output<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
-| `agent-skills` | `agent-skills list`<br>`agent-skills install`<br>`agent-skills update` | - | -<br>Subcommands: install, update, list | Manage first-party agent-skills for Claude Code, Codex, and generic agent runtimes |
+| `bundled-skills` | `bundled-skills list`<br>`bundled-skills install`<br>`bundled-skills update` | - | -<br>Subcommands: install, update, list | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `mcp` | `mcp serve` | - | - | Start the first-party MCP server |
 
@@ -1520,10 +1520,10 @@ This page is generated from the Node CLI registry and command sources.
 - Flags: `--app`, `--intent`, `--keyword`, `--skill-id`, `--artifact`, `--vars`, `--summary`, `--recording-context`, `--all`, `--dry-run`, `--device`, `--device-id`, `--operator-package`, `--receiver-package`, `--timeout`, `--timeout-ms`, `--expect-contains`, `--skip-validate`, `--ref`, `--json`, `--output`
 - Subcommands: `install`, `sync`, `new`, `validate`, `compile-artifact`, `run`
 
-### `agent-skills`
+### `bundled-skills`
 
-- Summary: Manage first-party agent-skills for Claude Code, Codex, and generic agent runtimes
-- Syntax: `agent-skills list`, `agent-skills install`, `agent-skills update`
+- Summary: Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes
+- Syntax: `bundled-skills list`, `bundled-skills install`, `bundled-skills update`
 - Aliases: -
 - Flags: -
 - Subcommands: `install`, `update`, `list`
@@ -4657,7 +4657,7 @@ Doctor runs checks in this order:
 | Order | Check IDs | When they run |
 | --- | --- | --- |
 | 1 | `host.node.version`, `host.adb.presence` | always |
-| 1 (advisory) | `host.skill-agent-cli.default`, `host.skill-agent-cli.skills`, `host.agent-skills.staleness` | after `host.adb.presence` passes; advisory only, never halt on failure |
+| 1 (advisory) | `host.skill-agent-cli.default`, `host.skill-agent-cli.skills`, `host.bundled-skills.staleness` | after `host.adb.presence` passes; advisory only, never halt on failure |
 | 1 | `host.adb.server` | after `host.adb.presence` passes |
 | 2 | `host.java.version`, `build.android.assemble` | only with `--full` |
 | 3 | `device.discovery` | always |
@@ -4770,7 +4770,7 @@ For a failing check, pretty output includes:
 | `host.adb.server` | `pass`, `fail` | `ADB_SERVER_FAILED` | adb server can start |
 | `host.skill-agent-cli.default` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | default orchestrated-skill agent CLI is a valid executable name and exists on PATH |
 | `host.skill-agent-cli.skills` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | all installed orchestrated skills can resolve their configured agent CLI executable |
-| `host.agent-skills.staleness` | `pass`, `warn` | `AGENT_SKILLS_STALE` | when agent-skills are present, the canonical install store is readable, packaged skills are present, and managed Claude/Codex discovery links point at the canonical store |
+| `host.bundled-skills.staleness` | `pass`, `warn` | `AGENT_SKILLS_STALE` | when bundled skills are present, the canonical install store is readable, packaged skills are present, and managed Claude/Codex discovery links point at the canonical store |
 | `host.java.version` | `pass`, `fail` | `HOST_DEPENDENCY_MISSING` or no explicit code | Java 17 or 21 is available for full Android build checks |
 | `build.android.assemble` | `pass`, `fail` | `ANDROID_BUILD_FAILED` | `./gradlew :app:assembleDebug` succeeds |
 | `device.discovery` | `pass`, `warn`, `fail` | `NO_DEVICES`, `DEVICE_UNAUTHORIZED`, `DEVICE_OFFLINE`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`, `DEVICE_NOT_FOUND` | device discovery succeeded and the environment is targetable, or explains why explicit `--device` selection is still required |
@@ -8884,7 +8884,7 @@ Skills are registry-driven. They are not discovered by folder scanning alone. `c
 `clawperator skills` and `skills-registry.json` cover runtime skills only.
 Authoring skills are a separate category of AI agent programs that live in
 `.agents/skills/` in source form and install separately into
-`~/.clawperator/agent-skills/` plus the Claude Code, Codex, and generic
+`~/.clawperator/bundled-skills/` plus the Claude Code, Codex, and generic
 agents (`~/.agents/skills/`) discovery directories.
 
 Installer-facing discovery is deliberately split:
@@ -9613,7 +9613,7 @@ Use this order:
 | Situation | Start here | Stop when |
 | --- | --- | --- |
 | An installed runtime skill already matches the request | `clawperator skills for-app`, `clawperator skills search`, `clawperator skills get` | You have a truthful runtime skill to run. |
-| Runtime-skill discovery returned no relevant match and you need the host-visible zero-results route | `clawperator agent-skills list --json`, then `clawperator-skill-author-by-agent-discovery` | Discovery emits one artifact and chooses exactly one next step. |
+| Runtime-skill discovery returned no relevant match and you need the host-visible zero-results route | `clawperator bundled-skills list --json`, then `clawperator-skill-author-by-agent-discovery` | Discovery emits one artifact and chooses exactly one next step. |
 | Discovery returned `proceed_to_recording`, or the route is already well understood | `clawperator-skill-author-by-recording` | One recording-derived skill shape is authored and its self-test surfaces a `SkillResult`. |
 | You explicitly want the low-level manual scaffold instead of the installed guided workflows | `clawperator skills new <skill_id>` | The local scaffold exists and the registry entry was added. |
 
@@ -9640,7 +9640,7 @@ use this order:
    `clawperator skills search`.
 2. If runtime-skill discovery returns no relevant match and you need to inspect
    installed guided authoring workflows on the current host, run
-   `clawperator agent-skills list --json`.
+   `clawperator bundled-skills list --json`.
 3. Start with `clawperator-skill-author-by-agent-discovery` as the zero-results front door.
 4. Use `clawperator-skill-author-by-recording` only after discovery returns
    `proceed_to_recording`, or when the route is already well understood.
@@ -9650,7 +9650,7 @@ use this order:
 Verification pattern:
 
 ```bash
-clawperator agent-skills list --json
+clawperator bundled-skills list --json
 ```
 
 Expected signals:
@@ -9696,19 +9696,19 @@ installer:
 curl -fsSL https://clawperator.com/install.sh | bash
 ```
 
-already installs first-party agent-skills automatically.
+already installs first-party bundled skills automatically.
 
 Current install model:
 
 | Surface | Path | Role |
 | --- | --- | --- |
-| Canonical agent-skills store | `~/.clawperator/agent-skills/` | copied first-party agent-skills |
+| Canonical bundled-skills store | `~/.clawperator/bundled-skills/` | copied first-party bundled skills |
 | Claude Code discovery dir | `~/.claude/skills/` | symlinks into the canonical store |
 | Codex discovery dir | `$CODEX_HOME/skills/` | symlinks into the canonical store when `CODEX_HOME` is set |
 | Codex default discovery dir | `~/.codex/skills/` | used when `CODEX_HOME` is unset |
 | Generic agents discovery dir | `~/.agents/skills/` | symlinks into the canonical store for generic agent runtimes |
 
-Current packaged first-party agent-skills:
+Current packaged first-party bundled skills:
 
 | Skill | Role | Boundary |
 | --- | --- | --- |
@@ -9721,59 +9721,59 @@ Maintenance and repair commands:
 
 | Command | Use it when | First-run requirement |
 | --- | --- | --- |
-| `clawperator agent-skills install` | repair a missing install, or manually bootstrap agent-skills without `install.sh` | no |
-| `clawperator agent-skills update` | re-copy and re-wire agent-skills after `npm install -g clawperator@latest` or after local conflicts are resolved | no |
-| `clawperator agent-skills list` | inspect which agent-skills are installed and where their `SKILL.md` files live | no |
+| `clawperator bundled-skills install` | repair a missing install, or manually bootstrap bundled skills without `install.sh` | no |
+| `clawperator bundled-skills update` | re-copy and re-wire bundled skills after `npm install -g clawperator@latest` or after local conflicts are resolved | no |
+| `clawperator bundled-skills list` | inspect which bundled skills are installed and where their `SKILL.md` files live | no |
 
 Current command behavior:
 
-- `clawperator agent-skills install` copies packaged first-party agent-skills
-  into `~/.clawperator/agent-skills/` and recreates discovery
+- `clawperator bundled-skills install` copies packaged first-party bundled skills
+  into `~/.clawperator/bundled-skills/` and recreates discovery
   symlinks for Claude Code, Codex, and the generic agents runtime
-- `clawperator agent-skills update` runs the same copy-and-wire flow but
+- `clawperator bundled-skills update` runs the same copy-and-wire flow but
   reports the result as an update rather than a first install
-- `clawperator agent-skills list` reports installed skill names and the
-  absolute `SKILL.md` path for each installed agent-skill
+- `clawperator bundled-skills list` reports installed skill names and the
+  absolute `SKILL.md` path for each installed bundled skill
 - the current packaged install set contains
   `clawperator-agent-orientation`, `clawperator-upgrade`,
   `clawperator-skill-author-by-agent-discovery`, and `clawperator-skill-author-by-recording`
 
 Current doctor behavior:
 
-- `clawperator doctor` includes `host.agent-skills.staleness`
-- if `~/.clawperator/agent-skills/` does not exist, doctor reports
-  `pass` with `Agent-skills not yet installed.`
-- if the installed agent-skills state exists but is stale, incomplete, or
+- `clawperator doctor` includes `host.bundled-skills.staleness`
+- if `~/.clawperator/bundled-skills/` does not exist, doctor reports
+  `pass` with `Bundled-skills not yet installed.`
+- if the installed bundled-skills state exists but is stale, incomplete, or
   malformed, doctor reports `warn`
 - current warning conditions include:
   - `version.txt` is missing, empty, unreadable, or does not match the current
     CLI version
-  - `~/.clawperator/agent-skills/` exists but is not a directory, or is a
+  - `~/.clawperator/bundled-skills/` exists but is not a directory, or is a
     dangling symlink
-  - one or more packaged first-party agent-skill directories are missing
+  - one or more packaged first-party bundled-skill directories are missing
     from the canonical install store
   - Claude Code, Codex, or generic agents discovery entries are missing, broken,
-    conflicting, or no longer point at `~/.clawperator/agent-skills/<skill_name>`
+    conflicting, or no longer point at `~/.clawperator/bundled-skills/<skill_name>`
 - recommended remediation for those `warn` states is
-  `clawperator agent-skills update`
+  `clawperator bundled-skills update`
 - if the install path itself is malformed and cannot be repaired in place,
   remove or rename the conflicting path and then run
-  `clawperator agent-skills install`
+  `clawperator bundled-skills install`
 
 Verification pattern:
 
 ```bash
-clawperator agent-skills list --json
+clawperator bundled-skills list --json
 clawperator doctor --json
 ```
 
 Expected signals:
 
-- `agent-skills list --json` returns `installedDir` as
-  `~/.clawperator/agent-skills/` or the resolved absolute equivalent on the
+- `bundled-skills list --json` returns `installedDir` as
+  `~/.clawperator/bundled-skills/` or the resolved absolute equivalent on the
   current host
 - `doctor --json` includes a check with
-  `"id": "host.agent-skills.staleness"`
+  `"id": "host.bundled-skills.staleness"`
 
 ## Recording-Driven Workflow Stance
 
@@ -9818,7 +9818,7 @@ Keep the two front doors distinct:
 - Runtime invocation: `apps/node/src/domain/skills/runSkill.ts`
 - Runtime env resolution: `apps/node/src/domain/skills/skillsConfig.ts`
 - CLI surface: `apps/node/src/cli/commands/skills.ts`
-- Agent-skills CLI discovery: `apps/node/src/cli/registry.ts`, `apps/node/src/cli/commands/agentSkills.ts`
+- Bundled-skills CLI discovery: `apps/node/src/cli/registry.ts`, `apps/node/src/cli/commands/bundledSkills.ts`
 
 ## Validation And Testing Boundary
 
@@ -9845,7 +9845,7 @@ Current `validateSkill` non-goals:
 Use this route when hardening a runtime skill:
 
 1. Discover installed guided authoring workflows with
-   `clawperator agent-skills list --json` when you need a host-visible
+   `clawperator bundled-skills list --json` when you need a host-visible
    front door and runtime-skill discovery returned no relevant match.
 2. Start with `clawperator-skill-author-by-agent-discovery`, then move to
    `clawperator-skill-author-by-recording` only after discovery returns

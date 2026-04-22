@@ -176,7 +176,7 @@ Use the shortest truthful path:
 clawperator skills for-app <package_id> --json
 clawperator skills search --keyword "<term>" --json
 clawperator skills get <skill_id> --json
-clawperator agent-skills list --json
+clawperator bundled-skills list --json
 ```
 
 Rules:
@@ -185,7 +185,7 @@ Rules:
 - Use `skills search --keyword` when you only know app or intent words.
 - Use `skills get` when you need to inspect a candidate runtime skill before
   deciding whether it is a true match or only a partial match.
-- Use `agent-skills list --json` only after runtime-skill discovery fails
+- Use `bundled-skills list --json` only after runtime-skill discovery fails
   to find a clear match and you need to confirm the installed authoring front
   doors on the host.
 
@@ -272,7 +272,7 @@ probe still leaves the route uncertain, a truthful artifact can look like:
     "status": "none",
     "queried_registry_paths": [
       "clawperator skills search --keyword \"Netflix\" --json",
-      "clawperator agent-skills list --json"
+      "clawperator bundled-skills list --json"
     ]
   },
   "target_app_package": {
