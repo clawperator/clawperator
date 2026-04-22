@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.7.2] - 2026-04-22
+
+This release moves the shipped first-party skills into the bundled Node skill tree and tightens the installer and docs guidance for multi-device setups.
+
+### 🤖 Node API & CLI
+- **Changed:** Renamed the packaged `agent-skills` surface to `bundled-skills`, moved the shipped first-party skills into `apps/node/bundled-skills/`, and prefixed the bundled skill ids with `clawperator-`.
+
+### 📚 Documentation & Website
+- **Changed:** Updated the installer and discovery guidance so `install.sh` now checks each connected device during the final doctor pass and the public docs match the new bundled-skill layout.
+
+Pull requests:
+- [feat: install.sh doctor runs on each connected device](https://github.com/clawperator/clawperator/pull/219)
+- [refactor: bundled skills into `apps/node/bundled-skills` and prefix skill ids](https://github.com/clawperator/clawperator/pull/220)
+- [refactor(node): rename agent-skills surface to bundled-skills](https://github.com/clawperator/clawperator/pull/221)
+- [feat(node, docs): improve docs discovery guidance](https://github.com/clawperator/clawperator/pull/222)
+
 ## [0.7.1] - 2026-04-22
 
 This release keeps the Node runtime focused on deterministic timeout handling for `runExecution`.
