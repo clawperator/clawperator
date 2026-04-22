@@ -117,7 +117,7 @@ install outputs currently written by large embedded Node snippets in
    - shared-agent bridge update
 3. Keep the output structured. The new CLI surface must support JSON output and
    report which artifacts were written, updated, skipped, or failed.
-4. Preserve the current artifact semantics unless the findings already call for
+4. Preserve the current artifact semantics unless the plan already calls for
    changing them. Do not redesign content and file shapes in this phase.
 5. Add tests in the same phase. Required cases:
    - artifact command writes install-state JSON with the expected required and

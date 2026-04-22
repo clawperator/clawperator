@@ -188,7 +188,7 @@ rediscovered unless the code changes underneath the task:
 **Judgment required:**
 
 - Exact CLI nouning for the new surfaces, as long as they remain consistent
-  with the findings and existing CLI structure
+  with this plan and existing CLI structure
 - Whether shell RC mutation is deleted outright or retained behind an explicit
   opt-in flag or env var
 - The smallest authored docs set needed in Phase 5 to keep install and upgrade
