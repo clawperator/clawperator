@@ -31,6 +31,11 @@ Observe  ->  Decide  ->  Act
 
 Repeat until the task is done.
 
+**Targeting rule:** do not guess selectors. If the next action needs a target,
+take a fresh `snapshot_ui`, derive the selector from the current hierarchy, and
+then act. A guessed label failing is not a Clawperator bug - it means the
+target was not proven from the current screen state.
+
 ---
 
 ## Step 1: Observe
