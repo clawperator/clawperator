@@ -21,9 +21,9 @@ later phases depend on earlier CLI surfaces being real and merged.
 | State | in progress |
 | Total PRs | 4 |
 | Total phases | 6 |
-| Completed | 1, 2 |
-| Remaining | 2.5, 3, 4, 5 |
-| Current / Next | Phase 2.5 |
+| Completed | 1, 2, 2.5 |
+| Remaining | 3, 4, 5 |
+| Current / Next | Phase 3 |
 | Blockers | none |
 
 ## Hard Rules
