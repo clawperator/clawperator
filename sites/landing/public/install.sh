@@ -35,7 +35,11 @@ DOCTOR_READY_DEVICE_COUNT=0
 DOCTOR_CRITICAL_DEVICE_COUNT=0
 DOCTOR_ADB_UNREADY_DEVICE_COUNT=0
 DOCTOR_SETUP_REQUIRED_COUNT=0
+DOCTOR_PROBE_FAILURE_COUNT=0
+DOCTOR_PROBE_FAILED_DEVICES=()
 MULTI_DEVICE_APK_TARGET_DEVICES=()
+MULTI_DEVICE_APK_PROBE_FAILURE_COUNT=0
+MULTI_DEVICE_APK_PROBE_FAILED_DEVICES=()
 
 TEMP_FILES=()
 
@@ -1521,21 +1525,38 @@ install_apk_response_is_yes() {
     return 1
 }
 
+print_operator_apk_redownload_hint() {
+    echo -e "${YELLOW}Redownload the latest stable APK before manual setup:${NC}"
+    echo -e "${YELLOW}  curl -fsSL https://clawperator.com/operator.apk -o ${APK_LOCAL_PATH}${NC}"
+}
+
+print_operator_setup_command() {
+    local device_id="${1:-}"
+    local operator_package="${2:-$DEFAULT_OPERATOR_PACKAGE}"
+
+    if [ -n "$device_id" ]; then
+        echo -e "${YELLOW}  clawperator operator setup --apk ${APK_LOCAL_PATH} --device ${device_id} --operator-package ${operator_package}${NC}"
+    else
+        echo -e "${YELLOW}  clawperator operator setup --apk ${APK_LOCAL_PATH} --operator-package ${operator_package}${NC}"
+    fi
+}
+
 print_manual_operator_setup_commands() {
     local device_id=""
 
+    print_operator_apk_redownload_hint
     echo -e "${YELLOW}Complete Android setup on one target device with one of:${NC}"
     if [ "$#" -gt 0 ]; then
         for device_id in "$@"; do
             [ -n "$device_id" ] || continue
-            echo -e "${YELLOW}  clawperator operator setup --apk ${APK_LOCAL_PATH} --device ${device_id} --operator-package ${DEFAULT_OPERATOR_PACKAGE}${NC}"
+            print_operator_setup_command "$device_id" "$DEFAULT_OPERATOR_PACKAGE"
         done
         return 0
     fi
 
     while IFS= read -r device_id; do
         [ -n "$device_id" ] || continue
-        echo -e "${YELLOW}  clawperator operator setup --apk ${APK_LOCAL_PATH} --device ${device_id} --operator-package ${DEFAULT_OPERATOR_PACKAGE}${NC}"
+        print_operator_setup_command "$device_id" "$DEFAULT_OPERATOR_PACKAGE"
     done < <(list_connected_devices)
 }
 
@@ -1567,7 +1588,7 @@ install_operator_apk_on_devices() {
         if "$CLAWPERATOR_BIN_PATH" operator setup --apk "$APK_LOCAL_PATH" --device "$device_id" --operator-package "$DEFAULT_OPERATOR_PACKAGE" > /dev/null 2>&1; then
             echo -e "${GREEN}  ✅ ${device_id} - operator APK installed and permissions granted.${NC}"
         else
-            echo -e "${RED}  ❌ ${device_id} - operator setup failed. Run: clawperator operator setup --apk ${APK_LOCAL_PATH} --device ${device_id} --operator-package ${DEFAULT_OPERATOR_PACKAGE}${NC}"
+            echo -e "${RED}  ❌ ${device_id} - operator setup failed. Redownload https://clawperator.com/operator.apk, then run: clawperator operator setup --apk ${APK_LOCAL_PATH} --device ${device_id} --operator-package ${DEFAULT_OPERATOR_PACKAGE}${NC}"
             failed_installs=$((failed_installs + 1))
         fi
     done
@@ -1582,8 +1603,40 @@ install_operator_apk_on_devices() {
 doctor_device_json() {
     local device_id="$1"
     local operator_package="$2"
+    local doctor_json=""
 
-    "$CLAWPERATOR_BIN_PATH" doctor --device "$device_id" --format json --operator-package "$operator_package" 2>/dev/null || true
+    set +e
+    doctor_json="$("$CLAWPERATOR_BIN_PATH" doctor --device "$device_id" --format json --operator-package "$operator_package" 2>/dev/null)"
+    set -e
+
+    if [ -z "$doctor_json" ]; then
+        return 1
+    fi
+
+    if ! printf '%s' "$doctor_json" | node -e '
+const fs = require("fs");
+const input = fs.readFileSync(0, "utf8").trim();
+if (!input) process.exit(1);
+let parsed;
+try {
+  parsed = JSON.parse(input);
+} catch {
+  process.exit(1);
+}
+if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.checks)) {
+  process.exit(1);
+}
+'; then
+        return 1
+    fi
+
+    printf '%s' "$doctor_json"
+}
+
+reset_multi_device_apk_target_scan() {
+    MULTI_DEVICE_APK_TARGET_DEVICES=()
+    MULTI_DEVICE_APK_PROBE_FAILURE_COUNT=0
+    MULTI_DEVICE_APK_PROBE_FAILED_DEVICES=()
 }
 
 doctor_device_requires_apk_setup() {
@@ -1603,7 +1656,7 @@ collect_multi_device_apk_setup_targets() {
     local device_state=""
     local doctor_json=""
 
-    MULTI_DEVICE_APK_TARGET_DEVICES=()
+    reset_multi_device_apk_target_scan
 
     if [ -z "${CLAWPERATOR_BIN_PATH:-}" ]; then
         return 0
@@ -1615,16 +1668,29 @@ collect_multi_device_apk_setup_targets() {
             continue
         fi
 
-        doctor_json="$(doctor_device_json "$device_id" "$DEFAULT_OPERATOR_PACKAGE")"
+        if ! doctor_json="$(doctor_device_json "$device_id" "$DEFAULT_OPERATOR_PACKAGE")"; then
+            echo -e "${RED}  ❌ ${device_id} - could not inspect this device with Clawperator Doctor. Aborting APK remediation until the probe succeeds.${NC}"
+            MULTI_DEVICE_APK_PROBE_FAILURE_COUNT=$((MULTI_DEVICE_APK_PROBE_FAILURE_COUNT + 1))
+            MULTI_DEVICE_APK_PROBE_FAILED_DEVICES+=("$device_id")
+            continue
+        fi
         if doctor_device_requires_apk_setup "$doctor_json"; then
             MULTI_DEVICE_APK_TARGET_DEVICES+=("$device_id")
         fi
     done < <(list_detected_android_devices)
+
+    if [ "$MULTI_DEVICE_APK_PROBE_FAILURE_COUNT" -gt 0 ]; then
+        echo -e "${RED}❌ Could not inspect every ready device with Clawperator Doctor. Resolve the probe failures above, then rerun install.sh.${NC}"
+        return 1
+    fi
+
+    return 0
 }
 
 maybe_install_operator_apk() {
     local READY_DEVICE_COUNT
     local DETECTED_DEVICE_COUNT
+    local install_target_devices=("$@")
     READY_DEVICE_COUNT="$(count_connected_devices)"
     DETECTED_DEVICE_COUNT="$(count_detected_android_devices)"
 
@@ -1656,9 +1722,17 @@ maybe_install_operator_apk() {
             fi
         done < <(list_detected_android_devices)
 
-        collect_multi_device_apk_setup_targets
-        if [ "${#MULTI_DEVICE_APK_TARGET_DEVICES[@]}" -eq 0 ]; then
-            if [ "$adb_attention_count" -gt 0 ]; then
+        if [ "${#install_target_devices[@]}" -eq 0 ]; then
+            collect_multi_device_apk_setup_targets || return 1
+            install_target_devices=()
+            if [ "${#MULTI_DEVICE_APK_TARGET_DEVICES[@]}" -gt 0 ]; then
+                install_target_devices=("${MULTI_DEVICE_APK_TARGET_DEVICES[@]}")
+            fi
+        fi
+        if [ "${#install_target_devices[@]}" -eq 0 ]; then
+            if [ "$READY_DEVICE_COUNT" -eq 0 ] && [ "$adb_attention_count" -gt 0 ]; then
+                echo -e "${YELLOW}No connected device is ready for ADB yet. Skipping APK install until one device is ready.${NC}"
+            elif [ "$adb_attention_count" -gt 0 ]; then
                 echo -e "${GREEN}All ready devices already have the required APK.${NC}"
             else
                 echo -e "${GREEN}All connected devices already have the required APK.${NC}"
@@ -1666,7 +1740,7 @@ maybe_install_operator_apk() {
             return 0
         fi
 
-        if install_operator_apk_on_devices "${MULTI_DEVICE_APK_TARGET_DEVICES[@]}"; then
+        if install_operator_apk_on_devices "${install_target_devices[@]}"; then
             if [ "$adb_attention_count" -gt 0 ]; then
                 echo -e "${YELLOW}Other detected devices were skipped until they are ready for ADB.${NC}"
             fi
@@ -1699,13 +1773,18 @@ maybe_install_operator_apk() {
             # CLI not available - fall back to direct adb install (no auto-grant).
             if adb install -r "$APK_LOCAL_PATH"; then
                 echo -e "${GREEN}✅ Operator APK installed.${NC}"
-                echo -e "${YELLOW}⚠️  CLI not available for permission grant. Run once CLI is ready: clawperator operator setup --apk ${APK_LOCAL_PATH}${NC}"
+                echo -e "${YELLOW}⚠️  CLI not available for permission grant. When the CLI is ready, redownload the latest stable APK and run:${NC}"
+                print_operator_apk_redownload_hint
+                print_operator_setup_command "" "$DEFAULT_OPERATOR_PACKAGE"
             else
                 echo -e "${RED}❌ Failed to install operator APK via adb.${NC}"
                 return 1
             fi
         else
-            echo -e "${YELLOW}⚠️  Skipped APK installation. Manual command: clawperator operator setup --apk ${APK_LOCAL_PATH} --operator-package ${DEFAULT_OPERATOR_PACKAGE}${NC}"
+            echo -e "${YELLOW}⚠️  Skipped APK installation.${NC}"
+            print_operator_apk_redownload_hint
+            echo -e "${YELLOW}Then run:${NC}"
+            print_operator_setup_command "" "$DEFAULT_OPERATOR_PACKAGE"
         fi
     fi
 }
@@ -1780,7 +1859,11 @@ doctor_report_connected_device() {
     local operator_package="$2"
     local doctor_json
 
-    doctor_json="$(doctor_device_json "$device_id" "$operator_package")"
+    if ! doctor_json="$(doctor_device_json "$device_id" "$operator_package")"; then
+        DOCTOR_DEVICE_STATUS="probe-failure"
+        echo -e "${RED}  ❌ ${device_id} - Clawperator Doctor could not inspect this device. Resolve the probe failure, then rerun: clawperator doctor --device ${device_id} --output pretty --operator-package ${operator_package}${NC}"
+        return 1
+    fi
     if doctor_report_all_checks_pass "$doctor_json"; then
         DOCTOR_DEVICE_STATUS="pass"
         echo -e "${GREEN}  ✅ ${device_id} - ready${NC}"
@@ -1794,7 +1877,7 @@ doctor_report_connected_device() {
     fi
 
     DOCTOR_DEVICE_STATUS="fail"
-    echo -e "${YELLOW}  ⚠  ${device_id} - setup required: clawperator operator setup --apk ${APK_LOCAL_PATH} --device ${device_id} --operator-package ${operator_package}${NC}"
+    echo -e "${YELLOW}  ⚠  ${device_id} - setup required after redownloading https://clawperator.com/operator.apk: clawperator operator setup --apk ${APK_LOCAL_PATH} --device ${device_id} --operator-package ${operator_package}${NC}"
     return 1
 }
 
@@ -1805,6 +1888,8 @@ reset_doctor_each_connected_device_summary() {
     DOCTOR_CRITICAL_DEVICE_COUNT=0
     DOCTOR_ADB_UNREADY_DEVICE_COUNT=0
     DOCTOR_SETUP_REQUIRED_COUNT=0
+    DOCTOR_PROBE_FAILURE_COUNT=0
+    DOCTOR_PROBE_FAILED_DEVICES=()
 }
 
 doctor_each_connected_device() {
@@ -1830,8 +1915,13 @@ doctor_each_connected_device() {
                     critical_count=$((critical_count + 1))
                 fi
             else
-                DOCTOR_SETUP_REQUIRED_COUNT=$((DOCTOR_SETUP_REQUIRED_COUNT + 1))
-                DOCTOR_PENDING_SETUP_DEVICES+=("$device_id")
+                if [ "${DOCTOR_DEVICE_STATUS:-}" = "probe-failure" ]; then
+                    DOCTOR_PROBE_FAILURE_COUNT=$((DOCTOR_PROBE_FAILURE_COUNT + 1))
+                    DOCTOR_PROBE_FAILED_DEVICES+=("$device_id")
+                else
+                    DOCTOR_SETUP_REQUIRED_COUNT=$((DOCTOR_SETUP_REQUIRED_COUNT + 1))
+                    DOCTOR_PENDING_SETUP_DEVICES+=("$device_id")
+                fi
             fi
         else
             echo -e "${YELLOW}  ⚠  ${device_id} - ADB state: ${device_state}. Unlock the device or restart ADB before setup.${NC}"
@@ -1898,11 +1988,11 @@ run_doctor_and_fix() {
     # doctor result can halt at device discovery before surfacing per-device APK
     # presence or version problems.
     if [ "$DETECTED_DEVICE_COUNT" -gt 1 ] && [ -n "${CLAWPERATOR_BIN_PATH:-}" ]; then
-        collect_multi_device_apk_setup_targets
+        collect_multi_device_apk_setup_targets || return 1
         if [ "${#MULTI_DEVICE_APK_TARGET_DEVICES[@]}" -gt 0 ]; then
             download_operator_apk || return 1
             verify_operator_apk || return 1
-            maybe_install_operator_apk || return 1
+            maybe_install_operator_apk "${MULTI_DEVICE_APK_TARGET_DEVICES[@]}" || return 1
         fi
     elif doctor_check_status "$DOCTOR_JSON" "device.discovery" "fail" || \
          doctor_check_status "$DOCTOR_JSON" "readiness.apk.presence" "fail" || \
@@ -1974,12 +2064,16 @@ main() {
     if doctor_check_code "$FINAL_DOCTOR_JSON" "device.discovery" "MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"; then
         doctor_each_connected_device
         echo ""
-        if [ "$DOCTOR_SETUP_REQUIRED_COUNT" -eq 0 ] && [ "$DOCTOR_ADB_UNREADY_DEVICE_COUNT" -eq 0 ]; then
+        if [ "$DOCTOR_PROBE_FAILURE_COUNT" -gt 0 ]; then
+            echo -e "${YELLOW}⚠️  Host install completed. Multiple Android devices are connected, but some devices could not be inspected with Clawperator Doctor. Resolve the probe failures above, then rerun a device-specific doctor command.${NC}"
+        elif [ "$DOCTOR_SETUP_REQUIRED_COUNT" -eq 0 ] && [ "$DOCTOR_ADB_UNREADY_DEVICE_COUNT" -eq 0 ]; then
             if [ "$DOCTOR_CRITICAL_DEVICE_COUNT" -gt 0 ]; then
                 echo -e "${YELLOW}⚠️  Host install completed. Multiple Android devices are connected, and each connected device passed the critical doctor checks. Future commands must target one device explicitly with --device.${NC}"
             else
                 echo -e "${YELLOW}⚠️  Host install completed. Multiple Android devices are connected, and each connected device passed Clawperator Doctor. Future commands must target one device explicitly with --device.${NC}"
             fi
+        elif [ "$DOCTOR_READY_DEVICE_COUNT" -eq 0 ] && [ "$DOCTOR_ADB_UNREADY_DEVICE_COUNT" -gt 0 ] && [ "$DOCTOR_SETUP_REQUIRED_COUNT" -eq 0 ]; then
+            echo -e "${YELLOW}⚠️  Host install completed. Multiple Android devices are connected, but no connected device is ready for ADB yet. Resolve the ADB-state warnings above before setup or future commands.${NC}"
         elif [ "$DOCTOR_SETUP_REQUIRED_COUNT" -eq 0 ]; then
             if [ "$DOCTOR_CRITICAL_DEVICE_COUNT" -gt 0 ]; then
                 echo -e "${YELLOW}⚠️  Host install completed. Multiple Android devices are connected, and each ready device passed the critical doctor checks. Future commands must target one device explicitly with --device.${NC}"

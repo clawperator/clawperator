@@ -187,9 +187,21 @@ JSON
 JSON
       exit 1
       ;;
-    multi-device-stale:3|multi-device-stale:6|multi-device-stale:7)
+    multi-device-stale:3)
+      cat <<'JSON'
+{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.apk.presence","status":"fail","code":"OPERATOR_NOT_INSTALLED"}]}
+JSON
+      exit 1
+      ;;
+    multi-device-stale:6|multi-device-stale:7)
       cat <<'JSON'
 {"ok":true,"criticalOk":true,"checks":[]}
+JSON
+      exit 0
+      ;;
+    multi-device-all-unready:1|multi-device-all-unready:2|multi-device-all-unready:3)
+      cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[{"id":"device.discovery","status":"warn","code":"MULTIPLE_DEVICES_DEVICE_ID_REQUIRED"}]}
 JSON
       exit 0
       ;;
@@ -213,6 +225,9 @@ fi
 if [ "\$1" = "operator" ] && [ "\$2" = "setup" ] && [ "\$3" = "--apk" ]; then
   case "\$SCENARIO:\$6" in
     multi-device-stale:serial-alpha)
+      exit 0
+      ;;
+    multi-device-stale:serial-beta)
       exit 0
       ;;
   esac
@@ -288,23 +303,30 @@ serial-warning	device
 serial-ready	device
 OUT
       ;;
-	    multi-device-mixed)
-	      cat <<'OUT'
+    multi-device-mixed)
+      cat <<'OUT'
 List of devices attached
 serial-ready	device
 serial-unauthorized	unauthorized
 serial-offline	offline
 OUT
-	      ;;
-	    multi-device-stale)
-	      cat <<'OUT'
+      ;;
+    multi-device-stale)
+      cat <<'OUT'
 List of devices attached
 serial-alpha	device
 serial-beta	device
 OUT
-	      ;;
-	    stale-device)
-	      cat <<'OUT'
+      ;;
+    multi-device-all-unready)
+      cat <<'OUT'
+List of devices attached
+serial-unauthorized	unauthorized
+serial-offline	offline
+OUT
+      ;;
+    stale-device)
+      cat <<'OUT'
 List of devices attached
 serial-solo	device
 stale-emulator	offline
@@ -337,6 +359,7 @@ run_main_case() {
     local guide_path_file="$8"
     local state_file="$9"
     local operator_package="${10:-}"
+    local real_install_helper="${11:-no}"
     local mock_dir="$TMP_DIR/mock-$label"
 
     setup_mock_clawperator "$mock_dir" "$cli_log_file"
@@ -389,11 +412,13 @@ run_main_case() {
                 echo "Mock verify_operator_apk"
                 return 0
             }
-            maybe_install_operator_apk() {
-                trace maybe_install_operator_apk "$TRACE_FILE"
-                echo "Mock maybe_install_operator_apk"
-                return 0
-            }
+            if [ "$7" != "yes" ]; then
+                maybe_install_operator_apk() {
+                    trace maybe_install_operator_apk "$TRACE_FILE"
+                    echo "Mock maybe_install_operator_apk"
+                    return 0
+                }
+            fi
             show_star_hint() { trace show_star_hint "$TRACE_FILE"; return 0; }
 
             export TRACE_FILE="$2"
@@ -406,7 +431,7 @@ run_main_case() {
 
             printf "%s\n" "$HOME/.clawperator/AGENTS.md" > "$6"
             printf "%s\n" "$status"
-        ' _ "$INSTALL_SCRIPT" "$trace_file" "$mock_dir/clawperator" "$stdout_file" "$stderr_file" "$guide_path_file" > "$TMP_DIR/$label.status"
+        ' _ "$INSTALL_SCRIPT" "$trace_file" "$mock_dir/clawperator" "$stdout_file" "$stderr_file" "$guide_path_file" "$real_install_helper" > "$TMP_DIR/$label.status"
     else
         HOME="$TMP_DIR/home-$label" \
         OS=Linux \
@@ -451,11 +476,13 @@ run_main_case() {
                 echo "Mock verify_operator_apk"
                 return 0
             }
-            maybe_install_operator_apk() {
-                trace maybe_install_operator_apk "$TRACE_FILE"
-                echo "Mock maybe_install_operator_apk"
-                return 0
-            }
+            if [ "$7" != "yes" ]; then
+                maybe_install_operator_apk() {
+                    trace maybe_install_operator_apk "$TRACE_FILE"
+                    echo "Mock maybe_install_operator_apk"
+                    return 0
+                }
+            fi
             show_star_hint() { trace show_star_hint "$TRACE_FILE"; return 0; }
 
             export TRACE_FILE="$2"
@@ -468,7 +495,7 @@ run_main_case() {
 
             printf "%s\n" "$HOME/.clawperator/AGENTS.md" > "$6"
             printf "%s\n" "$status"
-        ' _ "$INSTALL_SCRIPT" "$trace_file" "$mock_dir/clawperator" "$stdout_file" "$stderr_file" "$guide_path_file" > "$TMP_DIR/$label.status"
+        ' _ "$INSTALL_SCRIPT" "$trace_file" "$mock_dir/clawperator" "$stdout_file" "$stderr_file" "$guide_path_file" "$real_install_helper" > "$TMP_DIR/$label.status"
     fi
 
     local actual_exit
@@ -728,7 +755,30 @@ assert_contains "$MULTI_MIXED_CLI_LOG" "doctor --format json --operator-package 
 assert_contains "$MULTI_MIXED_CLI_LOG" "doctor --device serial-ready --format json --operator-package com.clawperator.operator.dev" "main-multi-mixed cli log"
 assert_not_contains "$MULTI_MIXED_STDERR" "sensitive doctor stderr from mixed-state device" "main-multi-mixed stderr"
 
-echo "=== Scenario 6: multi-device stale APKs are remediated before final device-selection handoff ==="
+echo "=== Scenario 6: all-unready multi-device path stays honest about ADB readiness ==="
+MULTI_UNREADY_STDOUT="$TMP_DIR/main-multi-unready.stdout"
+MULTI_UNREADY_STDERR="$TMP_DIR/main-multi-unready.stderr"
+MULTI_UNREADY_TRACE="$TMP_DIR/main-multi-unready.trace"
+MULTI_UNREADY_CLI_LOG="$TMP_DIR/main-multi-unready.cli.log"
+MULTI_UNREADY_GUIDE_PATH_FILE="$TMP_DIR/main-multi-unready.guide.path"
+MULTI_UNREADY_STATE="$TMP_DIR/main-multi-unready.state"
+run_main_case \
+    main-multi-unready \
+    multi-device-all-unready \
+    0 \
+    "$MULTI_UNREADY_STDOUT" \
+    "$MULTI_UNREADY_STDERR" \
+    "$MULTI_UNREADY_TRACE" \
+    "$MULTI_UNREADY_CLI_LOG" \
+    "$MULTI_UNREADY_GUIDE_PATH_FILE" \
+    "$MULTI_UNREADY_STATE"
+
+assert_contains "$MULTI_UNREADY_STDOUT" "no connected device is ready for ADB yet" "main-multi-unready stdout"
+assert_not_contains "$MULTI_UNREADY_STDOUT" "All ready devices already have the required APK." "main-multi-unready stdout"
+assert_not_contains "$MULTI_UNREADY_STDOUT" "each ready device passed Clawperator Doctor" "main-multi-unready stdout"
+assert_not_contains "$MULTI_UNREADY_STDOUT" "some devices still need setup" "main-multi-unready stdout"
+
+echo "=== Scenario 7: multi-device stale APKs are remediated before final device-selection handoff ==="
 MULTI_STALE_STDOUT="$TMP_DIR/main-multi-stale.stdout"
 MULTI_STALE_STDERR="$TMP_DIR/main-multi-stale.stderr"
 MULTI_STALE_TRACE="$TMP_DIR/main-multi-stale.trace"
@@ -744,20 +794,26 @@ run_main_case \
     "$MULTI_STALE_TRACE" \
     "$MULTI_STALE_CLI_LOG" \
     "$MULTI_STALE_GUIDE_PATH_FILE" \
-    "$MULTI_STALE_STATE"
+    "$MULTI_STALE_STATE" \
+    "" \
+    "yes"
 
 assert_contains "$MULTI_STALE_STDOUT" "Mock download_operator_apk" "main-multi-stale stdout"
 assert_contains "$MULTI_STALE_STDOUT" "Mock verify_operator_apk" "main-multi-stale stdout"
-assert_contains "$MULTI_STALE_STDOUT" "Mock maybe_install_operator_apk" "main-multi-stale stdout"
+assert_contains "$MULTI_STALE_STDOUT" "Installing operator APK on serial-alpha..." "main-multi-stale stdout"
+assert_contains "$MULTI_STALE_STDOUT" "Installing operator APK on serial-beta..." "main-multi-stale stdout"
+assert_contains "$MULTI_STALE_STDOUT" "serial-alpha - operator APK installed and permissions granted." "main-multi-stale stdout"
+assert_contains "$MULTI_STALE_STDOUT" "serial-beta - operator APK installed and permissions granted." "main-multi-stale stdout"
 assert_contains "$MULTI_STALE_STDOUT" "Installation Complete (Device Selection Required)" "main-multi-stale stdout"
 assert_contains "$MULTI_STALE_STDOUT" "serial-alpha - ready" "main-multi-stale stdout"
 assert_contains "$MULTI_STALE_STDOUT" "serial-beta - ready" "main-multi-stale stdout"
 assert_not_contains "$MULTI_STALE_STDOUT" "Host install completed, but Android setup is still pending because more than one device is connected." "main-multi-stale stdout"
 assert_contains "$MULTI_STALE_TRACE" "download_operator_apk" "main-multi-stale trace"
 assert_contains "$MULTI_STALE_TRACE" "verify_operator_apk" "main-multi-stale trace"
-assert_contains "$MULTI_STALE_TRACE" "maybe_install_operator_apk" "main-multi-stale trace"
+assert_contains "$MULTI_STALE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale/.clawperator/downloads/operator.apk --device serial-alpha --operator-package com.clawperator.operator" "main-multi-stale cli log"
+assert_contains "$MULTI_STALE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale/.clawperator/downloads/operator.apk --device serial-beta --operator-package com.clawperator.operator" "main-multi-stale cli log"
 
-echo "=== Scenario 7: APK remediation path runs before final success ==="
+echo "=== Scenario 8: APK remediation path runs before final success ==="
 REMEDIATE_STDOUT="$TMP_DIR/main-remediation.stdout"
 REMEDIATE_STDERR="$TMP_DIR/main-remediation.stderr"
 REMEDIATE_TRACE="$TMP_DIR/main-remediation.trace"

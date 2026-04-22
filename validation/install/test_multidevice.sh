@@ -131,6 +131,21 @@ fi
 exit 2
 EOF
             ;;
+        all-unready)
+            cat > "$mock_dir/adb" <<'EOF'
+#!/usr/bin/env bash
+cat <<'OUT'
+List of devices attached
+serial-unauthorized	unauthorized
+serial-offline	offline
+OUT
+EOF
+            chmod +x "$mock_dir/adb"
+            cat > "$mock_dir/clawperator" <<'EOF'
+#!/usr/bin/env bash
+exit 2
+EOF
+            ;;
         stale-one)
             cat > "$mock_dir/adb" <<'EOF'
 #!/usr/bin/env bash
@@ -158,6 +173,33 @@ JSON
 fi
 
 if [ "$1" = operator ] && [ "$2" = setup ] && [ "$3" = --apk ] && [ "$5" = --device ] && [ "$6" = serial-stale ]; then
+    exit 0
+fi
+
+exit 2
+EOF
+            ;;
+        probe-failure)
+            cat > "$mock_dir/adb" <<'EOF'
+#!/usr/bin/env bash
+cat <<'OUT'
+List of devices attached
+serial-bad	device
+serial-ready	device
+OUT
+EOF
+            chmod +x "$mock_dir/adb"
+            cat > "$mock_dir/clawperator" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-bad ]; then
+    printf '%s\n' 'not-json'
+    exit 1
+fi
+
+if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-ready ]; then
+    cat <<'JSON'
+{"ok":true,"criticalOk":true,"checks":[]}
+JSON
     exit 0
 fi
 
@@ -278,7 +320,23 @@ run_scenario \
     "Installing operator APK on serial-warning..." \
     "Complete Android setup on one target device with one of:"
 
-echo "=== Scenario 4: a stale ready device is upgraded in place ==="
+echo "=== Scenario 4: all-unready devices stay in the ADB readiness lane ==="
+run_scenario \
+    all-unready \
+    0 \
+    "No connected device is ready for ADB yet. Skipping APK install until one device is ready." \
+    "All ready devices already have the required APK." \
+    "Complete Android setup on one target device with one of:"
+
+echo "=== Scenario 5: probe failures abort remediation instead of being ignored ==="
+run_scenario \
+    probe-failure \
+    1 \
+    "Could not inspect every ready device with Clawperator Doctor." \
+    "Installing operator APK on serial-bad..." \
+    "All connected devices already have the required APK."
+
+echo "=== Scenario 6: a stale ready device is upgraded in place ==="
 run_scenario \
     stale-one \
     0 \
@@ -288,7 +346,7 @@ run_scenario \
 assert_contains "$TMP_DIR/stale-one.stdout" "serial-stale - operator APK installed and permissions granted." "stale-one stdout"
 assert_not_contains "$TMP_DIR/stale-one.stdout" "Installing operator APK on serial-ready..." "stale-one stdout"
 
-echo "=== Scenario 5: multiple stale ready devices are upgraded while offline devices are skipped ==="
+echo "=== Scenario 7: multiple stale ready devices are upgraded while offline devices are skipped ==="
 run_scenario \
     stale-many \
     0 \
