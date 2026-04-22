@@ -4,9 +4,8 @@ Created: 2026-04-22
 
 ## Summary
 
-An OpenClaw agent was able to complete a real task through the Clawperator API
-with little handholding, but it took a slower and more brittle path than it
-should have.
+An OpenClaw agent completed a real task through the Clawperator API with little
+handholding, but it took a slower and more brittle path than it should have.
 
 The most important finding is that the main problem was not missing core
 capability. The core primitives were sufficient. The larger gap was:
@@ -41,80 +40,108 @@ In practice:
 - `wait_for_navigation` was useful, but some timeout outcomes were still too
   ambiguous for a blind agent
 
+## Verification Notes
+
+Claims in this document have been checked against the current code and docs.
+Key findings from that check:
+
+- `docs/api/navigation.md` already explicitly says "Neither `open_app` nor
+  `open_uri` proves that the target screen is ready." That statement is present
+  and correct.
+- `docs/quickstart.md` describes the Observe-Decide-Act loop clearly, but
+  lacks a prominent explicit warning against guessing selectors before
+  snapshotting.
+- `docs/host-agents.md` is a comprehensive routing guide and references
+  `clawperator-agent-orientation` extensively.
+- The top-level CLI help, `clawperator skills --help`, and
+  `clawperator bundled-skills --help` all already reference
+  `clawperator-agent-orientation` prominently. The gap is not in those
+  commands; it is in individual raw-route commands (`exec`, `snapshot`,
+  `click`, etc.) which carry no orientation reminder.
+- `docs/api/selectors.md` documents the full `NodeMatcher` contract but
+  provides no guidance on which fields tend to be most stable in practice.
+- No existing doc covers launcher paging behavior, when `scroll` will fail on
+  a home-screen workspace, or how to reliably reach an app when the launcher
+  is the starting surface.
+
 ## Low-Hanging Fruit
 
 These are the changes that appear realistic to ship soon without changing core
-runtime semantics.
+runtime semantics. Each item is a docs or help-text addition only.
 
-### 1. Make the snapshot-driven loop impossible to miss
+### 1. Add a "never guess selectors" callout to quickstart
 
-The docs already contain the right ingredients, but the most important
-operational rule should be much louder:
+`docs/quickstart.md` has the Observe-Decide-Act loop and good examples, but it
+does not contain an explicit warning against guessing selectors.
 
-- `open_app` is a trigger, not proof of stable arrival
-- never guess selectors when a fresh snapshot is available
-- use `act -> snapshot -> derive selector -> act`
+An agent reading the quickstart can still conclude "I'll try a text guess first
+and see what happens." The fix is a short prominent callout - not a new
+section, just a visible rule near the top of the automation loop description:
 
-Priority surfaces:
+- snapshot before every action that needs a target
+- derive selectors only from the current snapshot output
+- guessed labels fail correctly; that is not a Clawperator bug
 
-- `docs/quickstart.md`
-- `docs/api/navigation.md`
-- `docs/host-agents.md`
+`docs/api/navigation.md` already has the strong statement about `open_app` not
+proving app readiness. That page does not need changes for this item.
 
-### 2. Add first-class guidance for launcher and overlay behavior
+### 2. Add launcher and home-screen navigation guidance
 
-The launcher was a repeated source of confusion during the run.
+No existing doc covers the launcher as a special-case surface. The discovery
+run hit this directly:
 
-Clawperator docs should explicitly cover:
+- `scroll` against the Samsung launcher workspace returned `CONTAINER_NOT_SCROLLABLE`
+- launcher pages appear in snapshot XML but do not expose a generic scrollable container
+- direct `open_app` was more reliable than any launcher traversal attempt
 
-- when to prefer direct `open_app`
-- when launcher paging does not map to generic `scroll`
-- how overlays and transitional windows can affect navigation waits and
-  snapshots
+`docs/api/navigation.md` should add a short "Launcher and home-screen
+navigation" section covering:
 
-This is mostly a documentation and examples problem, not a missing-primitive
-problem.
+- when paged launchers do not expose a scrollable container to Clawperator
+- why direct `open_app` is the preferred path for installed apps
+- how overlay windows (choosers, permission prompts) can affect
+  `wait_for_navigation` outcome even when the target package ultimately
+  reaches the foreground
 
-### 3. Add clearer guidance for Compose-heavy app trees
+This is a docs addition only. No runtime changes needed.
 
-The discovery task succeeded in Netflix, but the hierarchy was noisy. The docs
-should more clearly recommend selector preference order for noisy app trees:
+### 3. Add selector stability guidance to selectors.md
 
-1. Android framework `resourceId`
-2. `contentDesc`
-3. visible text
-4. app-specific opaque numeric ids only when necessary
+`docs/api/selectors.md` documents the full `NodeMatcher` contract but gives
+no recommendation on which fields to prefer when multiple options are
+available. Agents currently learn selector stability by trial and error.
 
-This should live in the selector and quickstart guidance so agents do not need
-to learn it by trial and error.
+Add a short "Choosing a stable selector" section to `docs/api/selectors.md`
+with the priority order that emerged from the discovery run:
 
-### 4. Make host-agent orientation easier to discover
+1. Android framework `resourceId` (most stable, not app-version-specific)
+2. `contentDescEquals` (good for icon buttons and labeled controls)
+3. `textEquals` or `textContains` (reliable for visible labels, brittle for
+   localized or dynamically generated text)
+4. App-specific opaque numeric resource IDs (last resort; version-fragile)
 
-The repo already has good orientation material and the
-`clawperator-agent-orientation` bundled skill. The issue exposed here was that
-an unfamiliar agent still did not reliably start there.
+Also note that Compose-heavy app trees often expose fewer stable `resourceId`
+values and more opaque internal IDs, making `contentDesc` and visible text
+more important for those apps.
 
-This points to a discoverability gap more than a missing-content gap.
+### 4. Add orientation reminder to individual raw-route command help
 
-High-value reinforcement points:
+The top-level help, `clawperator skills --help`, and
+`clawperator bundled-skills --help` already mention `clawperator-agent-orientation`
+clearly. The gap is that individual raw-route commands do not carry that
+reminder.
 
-- top-level CLI help
-- `clawperator skills --help`
-- install follow-up guidance
-- raw-route guidance in `docs/host-agents.md`
+An agent that skips `clawperator --help` and goes directly to
+`clawperator exec --help` or `clawperator snapshot --help` gets no pointer to
+orientation or to the observe-first pattern.
 
-### 5. Improve CLI discovery cues for raw-route users
+Low-cost fix: add a short orientation note to the help text for `exec` and
+`snapshot` (the two most likely entry points for an agent going raw). The note
+does not need to be long - one line pointing to
+`clawperator bundled-skills list` and `clawperator-agent-orientation` is
+enough.
 
-For agents that have already chosen the raw CLI route, the CLI should make the
-next truthful move easier to find.
-
-Useful low-cost tweaks include:
-
-- reminding users in help text that unfamiliar hosts should start with
-  `clawperator-agent-orientation`
-- making the raw route point more directly to the observe-first workflow
-- surfacing the distinction between runtime skills, bundled skills, MCP, and
-  raw CLI more consistently in help output
+This is a registry.ts help-text addition only.
 
 ## Enhancements
 
@@ -125,52 +152,47 @@ this round.
 
 The most confusing runtime case from the discovery run was:
 
-- `wait_for_navigation` failed with `NAVIGATION_TIMEOUT`
-- `last_package` suggested the target app had already been reached
-- a follow-up snapshot confirmed the target app was actually foregrounded
+- `wait_for_navigation` returned `NAVIGATION_TIMEOUT`
+- `last_package` in the result already showed the target app
+- a follow-up `snapshot_ui` confirmed the target app was foregrounded
 
-That leaves too much interpretation work to the caller.
+That leaves too much interpretation work to the caller. The public result
+should better explain:
 
-The public result should better explain:
-
-- final foreground package
-- whether the target package was seen during the wait
-- whether the expected node was ever matched
+- final foreground package at timeout
+- whether the target package was seen during the wait window
 - whether an overlay, chooser, or transient window likely interfered
+- whether failure was package mismatch vs. node mismatch vs. readiness timeout
 
-This is a real product improvement, but it is more than a docs-only cleanup.
+This requires changes to the `waitForNav` action result shape and is more
+than a docs-only cleanup.
 
 ### 2. Add a canonical current-device-status surface
 
-It is reasonable to consider a surface that answers the question:
+A compact `clawperator status --json` command (or equivalent MCP tool) that
+returns:
 
 - is the device awake
 - is it locked
 - which app is foregrounded
-- what does the current snapshot show
+- current snapshot (optional, on request)
 
 This would help raw-CLI agents pick a safe first move and reduce blind
 exploration around lock screens, launcher state, and wrong-foreground-app
-assumptions.
+assumptions. A bundled skill alone is not enough here because an agent that
+misses orientation may also miss a helper skill. The canonical command should
+come first; a skill wrapper can follow.
 
-Recommendation:
-
-- if this capability is added, prefer a canonical `clawperator status --json`
-  command or MCP tool first
-- define it as a compact structured diagnostic surface
-- optionally add a bundled skill later as a thin wrapper around that canonical
-  command
-
-A bundled skill alone is probably not enough, because an agent that misses
-`clawperator-agent-orientation` may also miss another helper skill.
+This requires a new CLI command and Android runtime support.
 
 ## Practical Conclusion
 
-For the near term, we should focus on the low-hanging-fruit bucket:
+For the near term, focus on the low-hanging-fruit bucket:
 
-1. make the golden snapshot-driven loop much more prominent
-2. document launcher, overlay, and Compose realities more explicitly
-3. improve CLI and docs discoverability around orientation and skills
+1. add a prominent "never guess selectors" callout to quickstart
+2. document launcher and home-screen navigation patterns in navigation.md
+3. add selector stability priority guidance to selectors.md
+4. add a one-line orientation pointer to exec and snapshot command help
 
-The enhancement ideas are still worthwhile, but they should be treated as
-follow-up product work rather than part of the immediate cleanup pass.
+The enhancement ideas are still worthwhile but belong in a separate product
+planning pass.
