@@ -1,14 +1,14 @@
 import type { OutputOptions } from "../output.js";
 import { formatSuccess } from "../output.js";
-import { materializeHostArtifacts } from "../../domain/host/materializeArtifacts.js";
+import { setupHost } from "../../domain/host/hostSetup.js";
 
-export async function cmdHostMaterializeArtifacts(options: OutputOptions & {
+export async function cmdHostSetup(options: OutputOptions & {
   installedAt?: string;
   cliVersion?: string;
   apkVersion?: string;
   lastDeviceSerial?: string;
 }): Promise<string> {
-  const result = await materializeHostArtifacts({
+  const result = await setupHost({
     installedAt: options.installedAt,
     cliVersion: options.cliVersion,
     apkVersion: options.apkVersion,

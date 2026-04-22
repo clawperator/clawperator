@@ -3,8 +3,8 @@ import assert from "node:assert";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { cmdHostMaterializeArtifacts } from "../../cli/commands/host.js";
-import { materializeHostArtifacts } from "../../domain/host/materializeArtifacts.js";
+import { cmdHostSetup } from "../../cli/commands/host.js";
+import { setupHost } from "../../domain/host/hostSetup.js";
 
 const ENV_KEYS = [
   "HOME",
@@ -30,7 +30,7 @@ afterEach(async () => {
 });
 
 async function makeTempHome(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "clawperator-host-artifacts-"));
+  return mkdtemp(join(tmpdir(), "clawperator-host-setup-"));
 }
 
 async function writeRuntimeRegistry(homeDir: string): Promise<string> {
@@ -68,12 +68,12 @@ async function writeBundledSkill(homeDir: string, skillName: string): Promise<vo
   await writeFile(join(skillDir, "SKILL.md"), `# ${skillName}\n`, "utf8");
 }
 
-describe("materializeHostArtifacts", () => {
+describe("setupHost", () => {
   it("writes install-state JSON with the expected required and nullable fields", async () => {
     const homeDir = await makeTempHome();
 
     try {
-      await materializeHostArtifacts({
+      await setupHost({
         env: { HOME: homeDir },
         installedAt: "2026-04-23T10:11:12Z",
         cliVersion: "1.2.3",
@@ -101,7 +101,7 @@ describe("materializeHostArtifacts", () => {
     const homeDir = await makeTempHome();
 
     try {
-      await materializeHostArtifacts({
+      await setupHost({
         env: { HOME: homeDir, CODEX_HOME: join(homeDir, ".codex") },
         installedAt: "2026-04-23T10:11:12Z",
         adbPath: "/opt/android/platform-tools/adb",
@@ -144,7 +144,7 @@ describe("materializeHostArtifacts", () => {
       await writeBundledSkill(homeDir, "clawperator-skill-author-by-recording");
       await writeFile(join(homeDir, ".clawperator", "bundled-skills", "version.txt"), "0.7.4\n", "utf8");
 
-      await materializeHostArtifacts({
+      await setupHost({
         env: { HOME: homeDir, CLAWPERATOR_SKILLS_REGISTRY: registryPath },
         installedAt: "2026-04-23T10:11:12Z",
         cliJsPath: "/opt/clawperator/dist/cli/index.js",
@@ -189,13 +189,13 @@ describe("materializeHostArtifacts", () => {
         "utf8",
       );
 
-      const first = await materializeHostArtifacts({
+      const first = await setupHost({
         env: { HOME: homeDir },
         installedAt: "2026-04-23T10:11:12Z",
         cliJsPath: "/opt/clawperator/dist/cli/index.js",
         processExecPath: "/usr/local/bin/node",
       });
-      const second = await materializeHostArtifacts({
+      const second = await setupHost({
         env: { HOME: homeDir },
         installedAt: "2026-04-23T10:11:12Z",
         cliJsPath: "/opt/clawperator/dist/cli/index.js",
@@ -219,7 +219,7 @@ describe("materializeHostArtifacts", () => {
   });
 });
 
-describe("cmdHostMaterializeArtifacts", () => {
+describe("cmdHostSetup", () => {
   it("reports deterministic JSON outcomes for reruns", async () => {
     const homeDir = await makeTempHome();
 
@@ -233,11 +233,11 @@ describe("cmdHostMaterializeArtifacts", () => {
       await mkdir(join(homeDir, ".agents"), { recursive: true });
       await writeFile(join(homeDir, ".agents", "AGENTS.md"), "# Shared\n", "utf8");
 
-      const first = JSON.parse(await cmdHostMaterializeArtifacts({
+      const first = JSON.parse(await cmdHostSetup({
         format: "json",
         installedAt: "2026-04-23T10:11:12Z",
       }));
-      const second = JSON.parse(await cmdHostMaterializeArtifacts({
+      const second = JSON.parse(await cmdHostSetup({
         format: "json",
         installedAt: "2026-04-23T10:11:12Z",
       }));

@@ -185,7 +185,7 @@ JSON
     ;;
 esac
 
-if [ "\$1" = "host" ] && [ "\$2" = "materialize-artifacts" ]; then
+if [ "\$1" = "host" ] && [ "\$2" = "setup" ]; then
   exec "$EXPECTED_NODE_BIN" "$REAL_NODE_CLI" "\$@"
 fi
 
@@ -474,14 +474,14 @@ HOST_SNIPPET_PATH="$(cat "$HOST_SNIPPET_PATH_FILE")"
 HOST_SHARED_PATH="$(cat "$HOST_SHARED_PATH_FILE")"
 assert_contains "$HOST_ARTIFACTS_STATUS" "first=0" "host-artifacts status"
 assert_contains "$HOST_ARTIFACTS_STATUS" "second=0" "host-artifacts status"
-assert_contains "$HOST_ARTIFACTS_OUT" "Materializing durable host artifacts via the CLI..." "host-artifacts output"
+assert_contains "$HOST_ARTIFACTS_OUT" "Setting up durable host artifacts via the CLI..." "host-artifacts output"
 assert_contains "$HOST_ARTIFACTS_OUT" "Local AGENTS.md: written" "host-artifacts output"
 assert_contains "$HOST_ARTIFACTS_OUT" "Install state: written" "host-artifacts output"
 assert_contains "$HOST_ARTIFACTS_OUT" "MCP config snippet: written" "host-artifacts output"
 assert_contains "$HOST_ARTIFACTS_OUT" "Shared agent bridge: updated" "host-artifacts output"
-assert_contains "$HOST_ARTIFACTS_OUT" "Host artifact materialization complete." "host-artifacts output"
-assert_contains "$HOST_ARTIFACTS_CLI_LOG" "host materialize-artifacts --output json --installed-at 2026-04-23T10:11:12Z --cli-version 1.2.3 --apk-version 9.9.9 --last-device-serial serial-123" "host-artifacts cli log"
-assert_occurrence_count "$HOST_ARTIFACTS_CLI_LOG" "host materialize-artifacts" "2" "host-artifacts cli invocation count"
+assert_contains "$HOST_ARTIFACTS_OUT" "Host setup complete." "host-artifacts output"
+assert_contains "$HOST_ARTIFACTS_CLI_LOG" "host setup --output json --installed-at 2026-04-23T10:11:12Z --cli-version 1.2.3 --apk-version 9.9.9 --last-device-serial serial-123" "host-artifacts cli log"
+assert_occurrence_count "$HOST_ARTIFACTS_CLI_LOG" "host setup" "2" "host-artifacts cli invocation count"
 assert_contains "$HOST_GUIDE_PATH" "## Runtime Skills" "host-artifacts guide"
 assert_contains "$HOST_GUIDE_PATH" "com.example.weather.check-status" "host-artifacts guide"
 assert_contains "$HOST_GUIDE_PATH" "clawperator-agent-orientation" "host-artifacts guide"
@@ -493,7 +493,7 @@ assert_json_field_equals "$HOST_INSTALL_STATE_PATH" "apkVersion" "9.9.9" "host-a
 assert_json_field_equals "$HOST_INSTALL_STATE_PATH" "lastDeviceSerial" "serial-123" "host-artifacts install-state lastDeviceSerial"
 assert_json_field_equals "$HOST_SNIPPET_PATH" "claudeDesktop.entry.clawperator.args.0" "$TMP_DIR/mock-host-delegated/clawperator.cli.js" "host-artifacts mcp args.0"
 assert_json_field_equals "$HOST_SNIPPET_PATH" "claudeDesktop.entry.clawperator.env.ADB_PATH" "$TMP_DIR/mock-host-delegated/adb" "host-artifacts mcp ADB_PATH"
-assert_json_field_equals "$HOST_SNIPPET_PATH" "notes.1" "Regenerate it with clawperator host materialize-artifacts if the clawperator binary path or adb path changes." "host-artifacts mcp notes.1"
+assert_json_field_equals "$HOST_SNIPPET_PATH" "notes.1" "Regenerate it with clawperator host setup if the clawperator binary path or adb path changes." "host-artifacts mcp notes.1"
 assert_contains "$HOST_SHARED_PATH" "<!-- CLAWPERATOR_SHARED_AGENT_BRIDGE:START -->" "host-artifacts shared guide"
 assert_contains "$HOST_SHARED_PATH" "Existing host guidance." "host-artifacts shared guide"
 assert_mode "$HOST_GUIDE_PATH" "600" "host-artifacts guide mode"
@@ -532,7 +532,7 @@ HOST_BRIDGE_FAIL_SHARED_PATH="$(cat "$HOST_BRIDGE_FAIL_SHARED_FILE")"
 assert_contains "$HOST_BRIDGE_FAIL_STATUS" "first=0" "host-bridge-fail status"
 assert_contains "$HOST_BRIDGE_FAIL_STATUS" "second=0" "host-bridge-fail status"
 assert_contains "$HOST_BRIDGE_FAIL_OUT" "Shared agent bridge: failed" "host-bridge-fail output"
-assert_contains "$HOST_BRIDGE_FAIL_OUT" "Host artifact materialization completed with a shared-agent bridge warning; continuing." "host-bridge-fail output"
+assert_contains "$HOST_BRIDGE_FAIL_OUT" "Host setup completed with a shared-agent bridge warning; continuing." "host-bridge-fail output"
 if [ ! -L "$HOST_BRIDGE_FAIL_SHARED_PATH" ]; then
     echo "ERROR: host-bridge-fail should leave $HOST_BRIDGE_FAIL_SHARED_PATH as a symlink" >&2
     exit 1

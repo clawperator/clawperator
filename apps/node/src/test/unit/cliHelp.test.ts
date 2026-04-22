@@ -290,11 +290,11 @@ describe("CLI help", () => {
     assert.match(stdout, /clawperator-skill-author-by-recording/);
   });
 
-  it("shows host artifact materialization help", async () => {
-    const { stdout, code } = await runCli(["host", "materialize-artifacts", "--help"]);
+  it("shows host setup help", async () => {
+    const { stdout, code } = await runCli(["host", "setup", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator host/);
-    assert.match(stdout, /materialize-artifacts/);
+    assert.match(stdout, /host setup/);
     assert.match(stdout, /install-state JSON/);
     assert.match(stdout, /shared-agent bridge/);
   });

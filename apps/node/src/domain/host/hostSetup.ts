@@ -19,7 +19,7 @@ export interface HostArtifactOutcome {
   message?: string;
 }
 
-export interface HostArtifactMaterializationResult {
+export interface HostSetupResult {
   ok: boolean;
   artifacts: HostArtifactOutcome[];
   summary: {
@@ -30,7 +30,7 @@ export interface HostArtifactMaterializationResult {
   };
 }
 
-export interface MaterializeHostArtifactsOptions {
+export interface HostSetupOptions {
   installedAt?: string;
   cliVersion?: string | null;
   registryPath?: string | null;
@@ -177,7 +177,7 @@ async function writeArtifactFile(path: string, content: string, mode?: number): 
   return existing === undefined ? "written" : "updated";
 }
 
-function resolveInstalledAt(options: MaterializeHostArtifactsOptions): string {
+function resolveInstalledAt(options: HostSetupOptions): string {
   if (typeof options.installedAt === "string" && options.installedAt.length > 0) {
     return options.installedAt;
   }
@@ -212,7 +212,7 @@ function buildSkillRunExample(skill: Record<string, unknown>): string {
 }
 
 async function resolveRuntimeGuideInfo(
-  options: MaterializeHostArtifactsOptions,
+  options: HostSetupOptions,
   clawperatorDir: string,
 ): Promise<RuntimeGuideInfo> {
   const homeDir = getHomeDir(options.env);
@@ -303,7 +303,7 @@ async function resolveRuntimeGuideInfo(
   };
 }
 
-function buildInstallStateContent(options: MaterializeHostArtifactsOptions, resolvedRegistryPath: string | null): string {
+function buildInstallStateContent(options: HostSetupOptions, resolvedRegistryPath: string | null): string {
   const installState = {
     schemaVersion: 1,
     installedAt: resolveInstalledAt(options),
@@ -315,7 +315,7 @@ function buildInstallStateContent(options: MaterializeHostArtifactsOptions, reso
   return `${JSON.stringify(installState, null, 2)}\n`;
 }
 
-function resolveCliJsPath(options: MaterializeHostArtifactsOptions): string {
+function resolveCliJsPath(options: HostSetupOptions): string {
   const explicitPath = options.cliJsPath;
   if (typeof explicitPath === "string") {
     return explicitPath;
@@ -334,7 +334,7 @@ function resolveCliJsPath(options: MaterializeHostArtifactsOptions): string {
   return "";
 }
 
-function buildMcpConfigSnippetContent(options: MaterializeHostArtifactsOptions, clawperatorDir: string): string {
+function buildMcpConfigSnippetContent(options: HostSetupOptions, clawperatorDir: string): string {
   const operatorPackage = options.operatorPackage ?? DEFAULT_OPERATOR_PACKAGE;
   const logDir = options.logDir ?? join(clawperatorDir, "logs");
   const homeDir = getHomeDir(options.env);
@@ -362,7 +362,7 @@ function buildMcpConfigSnippetContent(options: MaterializeHostArtifactsOptions, 
 
   const notes = [
     "This snippet is generated for the current host.",
-    "Regenerate it with clawperator host materialize-artifacts if the clawperator binary path or adb path changes.",
+    "Regenerate it with clawperator host setup if the clawperator binary path or adb path changes.",
   ];
 
   if (!useNodeForm) {
@@ -373,7 +373,7 @@ function buildMcpConfigSnippetContent(options: MaterializeHostArtifactsOptions, 
 
   if (adbPath === null) {
     notes.push(
-      `adb was not found on PATH at materialization time. Replace ADB_PATH (${adbPlaceholder}) with the absolute path to your adb binary before using this snippet.`
+      `adb was not found on PATH at setup time. Replace ADB_PATH (${adbPlaceholder}) with the absolute path to your adb binary before using this snippet.`
     );
   }
 
@@ -438,7 +438,7 @@ async function listInstalledBundledSkillNames(bundledSkillsDir: string): Promise
 }
 
 async function buildAgentGuideContent(
-  options: MaterializeHostArtifactsOptions,
+  options: HostSetupOptions,
   runtimeGuide: RuntimeGuideInfo,
 ): Promise<string> {
   const bundledSkillsDir = options.bundledSkillsDir ?? DEFAULT_BUNDLED_SKILLS_DIR;
@@ -669,9 +669,9 @@ function buildSharedAgentBridgeContent(sharedAgentsContent: string, localAgentGu
   return `${cleaned}${separator}${bridgeBlock}`;
 }
 
-export async function materializeHostArtifacts(
-  options: MaterializeHostArtifactsOptions = {},
-): Promise<HostArtifactMaterializationResult> {
+export async function setupHost(
+  options: HostSetupOptions = {},
+): Promise<HostSetupResult> {
   const homeDir = getHomeDir(options.env);
   const clawperatorDir = options.clawperatorDir ?? join(homeDir, ".clawperator");
   const installStatePath = join(clawperatorDir, "install-state.json");

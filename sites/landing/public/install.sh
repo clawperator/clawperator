@@ -647,7 +647,7 @@ resolve_adb_path_for_host_artifacts() {
     printf '%s\n' ""
 }
 
-parse_host_artifact_materialization_result() {
+parse_host_setup_result() {
     node -e '
 let raw = "";
 process.stdin.setEncoding("utf8");
@@ -752,9 +752,9 @@ setup_host_artifacts_via_cli() {
     local HOST_ARTIFACT_ARGS=()
     local PARSED_LINE=""
 
-    echo -e "${BLUE}Materializing durable host artifacts via the CLI...${NC}"
+    echo -e "${BLUE}Setting up durable host artifacts via the CLI...${NC}"
 
-    HOST_ARTIFACT_ARGS=(host materialize-artifacts --output json)
+    HOST_ARTIFACT_ARGS=(host setup --output json)
 
     if [ -n "${CLAWPERATOR_HOST_ARTIFACTS_INSTALLED_AT:-}" ]; then
         HOST_ARTIFACT_ARGS+=(--installed-at "$CLAWPERATOR_HOST_ARTIFACTS_INSTALLED_AT")
@@ -788,7 +788,7 @@ setup_host_artifacts_via_cli() {
         fi
     fi
 
-    PARSED_HOST_ARTIFACTS="$(printf '%s' "$HOST_ARTIFACTS_OUTPUT" | parse_host_artifact_materialization_result)"
+    PARSED_HOST_ARTIFACTS="$(printf '%s' "$HOST_ARTIFACTS_OUTPUT" | parse_host_setup_result)"
 
     while IFS= read -r PARSED_LINE; do
         [ -n "$PARSED_LINE" ] || continue
@@ -843,7 +843,7 @@ setup_host_artifacts_via_cli() {
     done <<< "$PARSED_HOST_ARTIFACTS"
 
     if [ "$PARSED_ARTIFACT_COUNT" -eq 0 ]; then
-        echo -e "${RED}❌ Host artifact materialization via CLI returned no parseable artifact results.${NC}"
+        echo -e "${RED}❌ Host setup via CLI returned no parseable artifact results.${NC}"
         if [ -n "$HOST_ARTIFACTS_OUTPUT" ]; then
             echo "$HOST_ARTIFACTS_OUTPUT"
         fi
@@ -866,19 +866,19 @@ setup_host_artifacts_via_cli() {
     fi
 
     if [ "$HOST_ARTIFACTS_STATUS" -eq 0 ] && [ "$HOST_EXIT_OK" = "true" ]; then
-        echo -e "${GREEN}✅ Host artifact materialization complete.${NC}"
+        echo -e "${GREEN}✅ Host setup complete.${NC}"
         return 0
     fi
 
     if [ "$ONLY_SHARED_BRIDGE_FAILURE" -eq 1 ]; then
-        echo -e "${YELLOW}⚠️  Host artifact materialization completed with a shared-agent bridge warning; continuing.${NC}"
+        echo -e "${YELLOW}⚠️  Host setup completed with a shared-agent bridge warning; continuing.${NC}"
         if [ -n "$HOST_ARTIFACTS_OUTPUT" ]; then
             echo "$HOST_ARTIFACTS_OUTPUT"
         fi
         return 0
     fi
 
-    echo -e "${RED}❌ Host artifact materialization failed via the CLI.${NC}"
+    echo -e "${RED}❌ Host setup failed via the CLI.${NC}"
     if [ -n "$HOST_ARTIFACTS_OUTPUT" ]; then
         echo "$HOST_ARTIFACTS_OUTPUT"
     fi

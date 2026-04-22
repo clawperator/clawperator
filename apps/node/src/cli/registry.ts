@@ -307,15 +307,15 @@ Notes:
 const HELP_HOST = `clawperator host
 
 Usage:
-  clawperator host materialize-artifacts [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>] [--output <json|pretty>]
+  clawperator host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>] [--output <json|pretty>]
 
 Notes:
-  - Materializes CLI-owned durable host artifacts under ~/.clawperator/.
+  - Sets up CLI-owned durable host artifacts under ~/.clawperator/.
   - Writes install-state JSON, MCP config snippet JSON, local AGENTS.md, and the shared-agent bridge when ~/.agents/AGENTS.md exists.
   - Reports per-artifact outcomes as written, updated, skipped, or failed.
   - Safe to rerun. Unchanged artifacts are reported as skipped.
   - Use --installed-at to pin install-state output deterministically for tests or installer orchestration.
-  - Use --cli-version when an installer wrapper needs the materialized install-state to reflect the wrapper-reported CLI version exactly.
+  - Use --cli-version when an installer wrapper needs the setup install-state to reflect the wrapper-reported CLI version exactly.
 `;
 
 const HELP_SKILLS_NEW = `clawperator skills new
@@ -984,23 +984,24 @@ COMMANDS["host"] = {
   group: "Setup",
   supportedFlags: (rest) => {
     const sub = rest[0];
-    if (sub === "materialize-artifacts") {
+    if (sub === "setup" || sub === "materialize-artifacts") {
       return ["--installed-at", "--cli-version", "--apk-version", "--last-device-serial"];
     }
     return [];
   },
-  summary: "Materialize durable host artifacts owned by the CLI",
+  summary: "Set up durable host artifacts owned by the CLI",
   help: HELP_HOST,
   subtopics: {
+    setup: HELP_HOST,
     "materialize-artifacts": HELP_HOST,
   },
-  topLevelBlock: `  host materialize-artifacts [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]
+  topLevelBlock: `  host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]
                                             Write install-state, MCP snippet, local AGENTS.md, and the shared-agent bridge`,
   handler: async (ctx) => {
     const { rest, format, verbose } = ctx;
     const sub = rest[0];
-    if (sub === "materialize-artifacts") {
-      return (await import("./commands/host.js")).cmdHostMaterializeArtifacts({
+    if (sub === "setup" || sub === "materialize-artifacts") {
+      return (await import("./commands/host.js")).cmdHostSetup({
         format,
         verbose,
         installedAt: getStringOptStrict(rest, "--installed-at", ["--installed-at", "--cli-version", "--apk-version", "--last-device-serial"]),
@@ -1013,8 +1014,8 @@ COMMANDS["host"] = {
     return JSON.stringify({
       code: "USAGE",
       message: sub
-        ? `Unknown host subcommand '${sub}'. Use: clawperator host materialize-artifacts`
-        : "Use: clawperator host materialize-artifacts",
+        ? `Unknown host subcommand '${sub}'. Use: clawperator host setup`
+        : "Use: clawperator host setup",
     });
   },
 };
