@@ -32,11 +32,21 @@ Goals:
    as first-party Clawperator artifacts.
 5. **Decision: rename `agent-skills` to `bundled-skills` everywhere it
    surfaces** (CLI noun, on-disk package dir, install dir, doctor check id,
-   docs). `agent-skills` violates three of the Node API design principles.
-   Full reasoning in
+   env var, docs), as a **clean break with no backwards-compat layer**.
+   `agent-skills` violates three of the Node API design principles. Full
+   reasoning in
    [Finding 4](#finding-4-agent-skills-is-the-wrong-external-name-rename-to-bundled-skills).
    A stronger option (fold under `clawperator skills`) was considered and
    deferred because the scope is too invasive for the current round.
+6. **No aliases, env-var fallbacks, or dual install-path support.** The
+   pre-alpha stage of the project is the right moment to take a clean-break
+   rename, because there is no installed-user footprint worth dragging
+   forward. Preserving synonyms forever re-creates the two-names problem we
+   are fixing, and one-release transitions are not worth the mechanism cost
+   when we can land the rename in one sweep. The only stable surface kept
+   unchanged is `ERROR_CODES.AGENT_SKILLS_STALE`, because that error code is
+   a documented contract field whose downstream consumers pattern-match on
+   the literal value.
 
 Preferred end state for the on-disk layout:
 
@@ -239,19 +249,32 @@ Rename everywhere the external surface uses the term:
 - doctor check id: `host.agent-skills.staleness` -> `host.bundled-skills.staleness`
 - env var: `CLAWPERATOR_AGENT_SKILLS` -> `CLAWPERATOR_BUNDLED_SKILLS`
 - docs vocabulary: "agent-skills" -> "bundled skills"
+- user-facing CLI strings: the `Agent-skills installed.` / `Agent-skills
+  updated.` messages in the JSON envelope and the plain-text fallback flip
+  to `Bundled-skills installed.` / `Bundled-skills updated.`
+- ad-hoc error-code strings returned by the install or list commands
+  (`AGENT_SKILLS_SOURCE_NOT_FOUND`, `AGENT_SKILLS_SOURCE_EMPTY`,
+  `AGENT_SKILLS_INSTALL_FAILED`, `AGENT_SKILLS_LIST_FAILED`) rename to their
+  `BUNDLED_SKILLS_*` counterparts - they are not registered in the
+  `ERROR_CODES` stable contract and they are tied to the renamed surface
 
-Backwards compatibility during the rename:
+No backwards-compatibility layer is added. The task is a clean break:
 
-- accept `clawperator agent-skills` as a silent parser alias for at least one
-  release (Principle 4: "Accept Synonyms")
-- `CLAWPERATOR_AGENT_SKILLS` env var stays honored as a fallback
-- the old doctor check id emits a one-time redirect message, not a hard
-  break, for at least one release
+- the CLI does not register `agent-skills` as an alias
+- no env-var fallback is honored for `CLAWPERATOR_AGENT_SKILLS`
+- there is no migration that accepts the old install dir and moves it
+- the old doctor check id is removed, not soft-deprecated
 
-Internal names are lower stakes and can trail: `copyAgentSkills.ts`,
-`AGENT_SKILLS_INSTALL_DIR` in install.sh, test filenames, etc. Rename them
-in the same PR if cheap, otherwise as follow-up. Do not, however, let new
-code land that parrots `agent-skills` after this change.
+The stable exception is `ERROR_CODES.AGENT_SKILLS_STALE`. That literal is a
+documented contract field downstream consumers match on, so it stays
+unchanged even while the doctor check id and the user-facing fix text flip
+to the new vocabulary.
+
+Internal names move in the same PR: `copyAgentSkills.ts` -> `bundledSkills.ts`
+(or equivalent), `AGENT_SKILLS_INSTALL_DIR` and friends in `install.sh` ->
+`BUNDLED_SKILLS_*`, test filenames, exported symbol names. Leaving the
+internal names saying `agent-skills` after the rename would re-introduce the
+two-names problem on the inside of the repo.
 
 ### Finding 5: Frontmatter should declare first-party ownership
 
@@ -289,17 +312,25 @@ Pulling the naming questions into one view:
 | Where do the 4 real files live? | `.agents/skills/` (symlinked into `apps/node/agent-skills/`) | `apps/node/bundled-skills/` only; remove symlinks |
 | Skill ids | two have `clawperator-` prefix, two do not | all four prefixed with `clawperator-` |
 | Product category label (in docs) | "agent-skills" | "bundled skills" |
-| CLI noun | `clawperator agent-skills` | `clawperator bundled-skills` (accept `agent-skills` as silent alias for one release) |
-| Install directory | `~/.clawperator/agent-skills/` | `~/.clawperator/bundled-skills/` |
-| Doctor check id | `host.agent-skills.staleness` | `host.bundled-skills.staleness` |
-| Env var | `CLAWPERATOR_AGENT_SKILLS` | `CLAWPERATOR_BUNDLED_SKILLS` (old name honored as fallback) |
+| CLI noun | `clawperator agent-skills` | `clawperator bundled-skills` (no alias) |
+| Install directory | `~/.clawperator/agent-skills/` | `~/.clawperator/bundled-skills/` (no migration shim) |
+| Doctor check id | `host.agent-skills.staleness` | `host.bundled-skills.staleness` (old id removed) |
+| Env var | `CLAWPERATOR_AGENT_SKILLS` | `CLAWPERATOR_BUNDLED_SKILLS` (no fallback) |
+| Stable error code | `ERROR_CODES.AGENT_SKILLS_STALE` | unchanged - the literal is a documented contract |
 
 Rationale for doing the CLI/install-dir rename in this round instead of
 deferring it: a docs-only rename would leave the docs talking about
 "bundled skills" while the CLI still prints "Agent-skills setup complete."
 That mismatch is exactly the kind of implementation-detail leak Principle 10
 warns against, and users would see two different names for one thing. Rename
-the whole surface, with backwards-compat aliases.
+the whole surface in one pass and drop the old noun cleanly.
+
+Rationale for doing the rename without aliases or fallbacks: Clawperator is
+still pre-alpha. The installed-user footprint is small enough that a clean
+break costs less than the alias code and the docs caveats a transition
+period would require. Accepting `agent-skills` as a silent synonym for one
+release also invites it to stay forever, which re-creates the two-names
+problem we are fixing.
 
 ## Suggested Migration Order
 
@@ -339,27 +370,38 @@ Phase 2 - skill id prefixes and frontmatter:
 Phase 3 - external surface rename `agent-skills` -> `bundled-skills`:
 
 1. Rename the CLI command group. The new primary name is
-   `clawperator bundled-skills`. Register `agent-skills` as a silent alias
-   in the CLI parser (Principle 4).
+   `clawperator bundled-skills`. Do not register `agent-skills` as an alias
+   in the CLI parser. `clawperator agent-skills --help` should exit with
+   the standard unknown-command error, not a deprecation hint.
 2. Rename the install directory target:
    `~/.clawperator/agent-skills/` -> `~/.clawperator/bundled-skills/`.
-   Keep a one-release transition that accepts the old path when it already
-   exists, migrates it, and emits a one-line notice.
+   Do not add migration or fallback code that inspects the old path.
 3. Rename the env var `CLAWPERATOR_AGENT_SKILLS` ->
-   `CLAWPERATOR_BUNDLED_SKILLS`. Honor the old name as a silent fallback.
+   `CLAWPERATOR_BUNDLED_SKILLS`. Do not honor the old name as a fallback.
 4. Rename the doctor check id
-   `host.agent-skills.staleness` -> `host.bundled-skills.staleness`.
-   Emit a one-time "renamed to" hint on the old id for at least one release.
-5. Update CLI help text, JSON output field names (where agent-facing), and
-   every docs page to use "bundled skills" as the category label.
-6. Internal code rename (best-effort in the same PR):
+   `host.agent-skills.staleness` -> `host.bundled-skills.staleness` and
+   update the fix text to use the new command noun. Keep the stable error
+   code `ERROR_CODES.AGENT_SKILLS_STALE` unchanged.
+5. Update CLI help text, user-facing result-envelope message strings (the
+   `Agent-skills installed.` / `Agent-skills updated.` lines), the ad-hoc
+   `AGENT_SKILLS_*` error-code string literals returned by install or list,
+   and every docs page to use `bundled skills` as the category label. Keep
+   existing JSON envelope keys (`skills`, `count`, `installedDir`,
+   `agentDiscoveryDirs`) unchanged.
+6. Internal code rename in the same PR:
    - `apps/node/src/domain/skills/copyAgentSkills.ts` file and exported
-     symbols
-   - `install.sh` variables (`AGENT_SKILLS_*` -> `BUNDLED_SKILLS_*`)
-   - test file names under `apps/node/src/test/unit/`
+     symbols (`copyAgentSkills`, `DEFAULT_AGENT_SKILLS_DIR`,
+     `AGENT_SKILLS_SOURCE_ENV_VAR`, `listInstalledAgentSkills`)
+   - `apps/node/src/cli/commands/agentSkills.ts` file and exported command
+     entry points
+   - `install.sh` variables (`AGENT_SKILLS_*` -> `BUNDLED_SKILLS_*`) and
+     the helper function `parse_agent_skills_install_result`
+   - test file names under `apps/node/src/test/unit/` and the Node-side
+     test fixtures that exercise these paths
 7. Run the full validation suite:
    `./validation/install/test_install.sh`,
-   `npm --prefix apps/node test`, doctor run on a clean host.
+   `npm --prefix apps/node test`, doctor run on a clean host, and
+   `./scripts/docs_build.sh`.
 
 All three phases should land together or in tight succession. Splitting them
 across releases creates a window where external names and internal state
@@ -384,16 +426,21 @@ disagree - which is worse than the current situation.
 5. **Evals and validation scripts.** `evals/specs/android-version/prompt-skill.md`
    and `validation/install/README.md` both reference the agent-skills term.
    They should follow the same terminology as the docs.
-6. **Alias lifetime.** `agent-skills` as a silent CLI alias should be kept
-   through one release and then removed in a clearly-called-out breaking
-   change. Accepting it forever re-creates the two-names problem we are
-   fixing.
-7. **External tooling pinning to the old install path.** If any downstream
-   script or agent guide pins `~/.clawperator/agent-skills/` directly, it
-   will need to move with the rename. The Phase 3 migration step that
-   accepts the old path for one release should cover most cases, but worth
-   scanning `clawperator-skills` and any private user configs before
-   merging.
+6. **No backwards-compat safety net.** Because this task does not keep
+   aliases, env-var fallbacks, or install-dir migration logic, any user
+   still on an older CLI that points at `~/.clawperator/agent-skills/` will
+   need to re-run the new `bundled-skills install` flow. That is an
+   accepted cost of pre-alpha status. Release notes should call the break
+   out explicitly so agents and users do not silently sit on stale
+   `agent-skills` trees after upgrading.
+7. **External tooling pinning to the old install path.** Scan
+   `../clawperator-skills`, `clawperator.com` install materials, and any
+   Codex or Claude skill registries before merging Phase 3, so the rename
+   lands coherently on the first release that ships it.
+8. **Docs API reference page.** `docs/api/doctor.md` references both
+   `host.agent-skills.staleness` and `AGENT_SKILLS_STALE` in its tables.
+   The doctor check id reference must move to the new id in Phase 3; the
+   error code reference stays unchanged.
 
 ## Bottom Line
 
@@ -410,8 +457,10 @@ Committed moves for this round:
 3. Rewrite the four descriptions to open with
    "Clawperator first-party bundled skill."
 4. Rename the external surface from `agent-skills` to `bundled-skills`
-   everywhere it shows up (CLI, install dir, env var, doctor check, docs),
-   with `agent-skills` accepted as a silent alias for one release.
+   everywhere it shows up (CLI, install dir, env var, doctor check, user
+   messages, docs) as a clean break with no alias, env-var fallback, or
+   install-dir migration shim. Keep `ERROR_CODES.AGENT_SKILLS_STALE`
+   unchanged as the single intentional exception.
 
 Deferred for a future, scoped round:
 

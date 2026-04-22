@@ -32,7 +32,10 @@ Current state is planning. Phase 1 is next. PR-2 has a hard merge gate on PR-1.
   different prefix or shorter names.
 - Do not rename JSON envelope keys such as `skills`, `count`, `installedDir`,
   or `agentDiscoveryDirs`.
-- Do not rename `ERROR_CODES.AGENT_SKILLS_STALE` in this task.
+- Do not rename `ERROR_CODES.AGENT_SKILLS_STALE` in this task. Do rename the
+  four ad-hoc `AGENT_SKILLS_*` error-code string literals returned by install
+  or list (`SOURCE_NOT_FOUND`, `SOURCE_EMPTY`, `INSTALL_FAILED`,
+  `LIST_FAILED`) to their `BUNDLED_SKILLS_*` counterparts in PR-2 / Phase 3.
 - Do not edit generated docs directly. Use
   `.agents/skills/docs-author/SKILL.md`
   for authored docs work, then validate with `./scripts/docs_build.sh`.
@@ -64,6 +67,7 @@ Read these files IN THIS ORDER before writing anything.
 | `apps/node/src/test/unit/doctor/hostChecks.test.ts` | Doctor regression patterns |
 | `validation/install/README.md` | Canonical installer validation entrypoint and maintenance rule |
 | `sites/landing/public/install.sh` | Current installer text and agent-guide generation |
+| `docs/api/doctor.md` | Public doctor-check reference page carrying the id that must flip in Phase 3 |
 | `docs/host-agents.md` | Main public docs page for the host-agent front doors |
 | `.agents/skills/docs-author/SKILL.md` | Required workflow for authored public docs touched in Phases 2 and 3 |
 
@@ -278,11 +282,14 @@ eval expectations, with no backwards-compatibility layer for the old surface.
 - `apps/node/src/test/unit/cliHelp.test.ts`
 - `apps/node/src/test/unit/doctor/hostChecks.test.ts`
 - `sites/landing/public/install.sh`
-- `validation/install/`
+- `validation/install/test_agent_skills.sh`
+- `validation/install/test_main.sh`
+- `validation/install/README.md`
 - `docs/host-agents.md`
 - `docs/skills/authoring.md`
 - `docs/skills/overview.md`
 - `docs/setup.md`
+- `docs/api/doctor.md`
 - `docs/internal/design/agent-host-integration.md`
 - `evals/harness/runner.py`
 - `evals/harness/test_run_eval.py`
@@ -292,37 +299,69 @@ eval expectations, with no backwards-compatibility layer for the old surface.
 ### Steps
 
 1. Rename the primary command surface to `clawperator bundled-skills`. Register
-   no alias for `agent-skills`. Keep the existing JSON envelope keys unchanged.
+   no alias for `agent-skills`. Keep the existing JSON envelope keys
+   (`skills`, `count`, `installedDir`, `agentDiscoveryDirs`) unchanged.
 2. Rename the primary install dir to `~/.clawperator/bundled-skills/` and the
    primary packaged-source env var to `CLAWPERATOR_BUNDLED_SKILLS`. Do not keep
    `CLAWPERATOR_AGENT_SKILLS` fallback logic or old install-dir fallback logic.
 3. Rename the primary doctor check id to `host.bundled-skills.staleness` and
-   update fix text to use the new command noun. Keep the stable error code
-   `AGENT_SKILLS_STALE` unchanged in this task.
-4. Best-effort internal cleanup belongs in this phase:
-   - rename module or helper file names and exported symbols to `bundledSkills`
-     where it reduces confusion
-   - rename install.sh variable names from `AGENT_SKILLS_*` to
-     `BUNDLED_SKILLS_*`
-   - rename test file names if that keeps the code clearer
+   update fix text to use the new command noun. Keep the stable registered
+   error code `ERROR_CODES.AGENT_SKILLS_STALE` unchanged in this task.
+4. Rename the ad-hoc error-code string literals returned from install or list
+   in the same commit that moves the surface:
+   - `AGENT_SKILLS_SOURCE_NOT_FOUND` -> `BUNDLED_SKILLS_SOURCE_NOT_FOUND`
+   - `AGENT_SKILLS_SOURCE_EMPTY` -> `BUNDLED_SKILLS_SOURCE_EMPTY`
+   - `AGENT_SKILLS_INSTALL_FAILED` -> `BUNDLED_SKILLS_INSTALL_FAILED`
+   - `AGENT_SKILLS_LIST_FAILED` -> `BUNDLED_SKILLS_LIST_FAILED`
+   These are not registered in `ERROR_CODES` and not documented contract
+   fields; they flip with the rest of the surface.
+5. Rename user-facing message strings and installer banners. Required cases:
+   - the `Agent-skills installed.` / `Agent-skills updated.` envelope
+     messages emitted by `cmdAgentSkillsInstall` and `cmdAgentSkillsUpdate`
+   - the `Setting up agent-skills...` and `Agent-skills setup complete.`
+     banners in `install.sh`
+   - the `No installed agent-skills found.` empty-list helper text
+   - any remaining `agent-skills` strings in CLI help or registry guidance
+6. Internal cleanup in this phase:
+   - rename file paths: `agentSkills.ts` -> `bundledSkills.ts`,
+     `copyAgentSkills.ts` -> `copyBundledSkills.ts` (or an equivalent final
+     name), matching test-file renames
+   - rename exported symbols (`copyAgentSkills`, `DEFAULT_AGENT_SKILLS_DIR`,
+     `AGENT_SKILLS_SOURCE_ENV_VAR`, `listInstalledAgentSkills`, command
+     entry points) to their `bundledSkills` counterparts
+   - rename `install.sh` variable names from `AGENT_SKILLS_*` to
+     `BUNDLED_SKILLS_*` and the helper `parse_agent_skills_install_result`
    Do not leave new user-facing strings saying `agent-skills`.
-5. Use `.agents/skills/docs-author/SKILL.md`
+7. Update `docs/api/doctor.md` so the doctor-check id column reflects
+   `host.bundled-skills.staleness` and the surrounding prose reads
+   `bundled-skills`. Keep the `AGENT_SKILLS_STALE` code column unchanged.
+8. Use `.agents/skills/docs-author/SKILL.md`
    for authored docs updates. Public docs should teach `bundled-skills` as the
    primary term and remove `agent-skills` from live product guidance.
-6. Update tests in the same phase. Required cases:
+9. Update tests in the same phase. Required cases:
    - `clawperator bundled-skills --help` works
+   - `clawperator agent-skills --help` fails with the standard unknown-command
+     exit code (no alias registered)
    - the new install dir is the primary resolved dir
    - `CLAWPERATOR_BUNDLED_SKILLS` overrides the source dir
-   - doctor results use `host.bundled-skills.staleness`
+   - `CLAWPERATOR_AGENT_SKILLS` is not honored
+   - install and list commands emit the renamed `BUNDLED_SKILLS_*` error
+     codes on the failure paths
+   - doctor results use `host.bundled-skills.staleness` with the
+     unchanged `ERROR_CODES.AGENT_SKILLS_STALE`
    - installer harnesses and eval expectations accept the new command noun
-7. Run the Phase 3 validation commands before committing.
+10. Run the Phase 3 validation commands before committing.
 
 ### Acceptance Criteria
 
 - `clawperator bundled-skills` is the documented and tested primary command
+- `clawperator agent-skills` returns the standard unknown-command error
 - the primary install dir is `~/.clawperator/bundled-skills/`
-- the primary env var is `CLAWPERATOR_BUNDLED_SKILLS`
-- doctor results use `host.bundled-skills.staleness`
+- the primary env var is `CLAWPERATOR_BUNDLED_SKILLS` with no fallback
+- doctor results use `host.bundled-skills.staleness` while keeping
+  `ERROR_CODES.AGENT_SKILLS_STALE`
+- the ad-hoc install and list error-code strings use `BUNDLED_SKILLS_*`
+- `docs/api/doctor.md` shows the new check id and unchanged error code
 - public docs use `bundled skills` as the primary term
 
 Human review checklist:
@@ -331,7 +370,8 @@ Human review checklist:
   hidden behind synonyms
 - remaining `agent-skills` references are only historical context in task notes
   or findings, not live product behavior
-- no public docs or installer summaries teach the old noun as the primary name
+- no public docs, installer summaries, or CLI messages teach the old noun as
+  the primary name
 
 ### Validation
 
@@ -342,12 +382,16 @@ npm --prefix apps/node run test
 ./scripts/docs_build.sh
 uv --project evals run pytest evals/harness/test_run_eval.py evals/harness/test_rescore.py
 node apps/node/dist/cli/index.js bundled-skills --help
-rg -n "host\\.agent-skills\\.staleness|CLAWPERATOR_AGENT_SKILLS|~/.clawperator/agent-skills|clawperator agent-skills" apps/node docs sites/landing/public validation evals .agents/skills
+node apps/node/dist/cli/index.js agent-skills --help ; [ $? -ne 0 ]
+rg -n "host\\.agent-skills\\.staleness|CLAWPERATOR_AGENT_SKILLS|~/.clawperator/agent-skills|clawperator agent-skills|Agent-skills |Setting up agent-skills|AGENT_SKILLS_SOURCE_NOT_FOUND|AGENT_SKILLS_SOURCE_EMPTY|AGENT_SKILLS_INSTALL_FAILED|AGENT_SKILLS_LIST_FAILED" apps/node docs sites/landing/public validation evals .agents/skills
 ```
 
 Review the final `rg` output manually. Any remaining matches must be deliberate
 historical context in task notes or findings only. If a match is still part of
-live product behavior, fix it before committing.
+live product behavior, fix it before committing. The one intentional exception
+is `ERROR_CODES.AGENT_SKILLS_STALE` in
+`apps/node/src/contracts/errors.ts`, `apps/node/src/domain/doctor/checks/hostChecks.ts`,
+and `docs/api/doctor.md`.
 
 ### Expected Commit
 

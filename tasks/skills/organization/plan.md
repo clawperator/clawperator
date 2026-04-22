@@ -78,10 +78,11 @@ wrong mental model.
 ## Existing Artifact Scope
 
 - `tasks/skills/organization/findings.md`:
-  preserve the current findings and decision text as-is. It is an input to this
-  task pack, not a draft to be rewritten. If execution discovers a material
-  contradiction, append a dated `## Execution Notes` section at the end instead
-  of editing the existing findings.
+  treat as authoritative input for the naming decisions, migration rationale,
+  and scope boundaries. It has already been updated to match the clean-break
+  policy in this plan. If execution discovers a material contradiction,
+  append a dated `## Execution Notes` section at the end instead of rewriting
+  the existing sections.
 - `apps/node/src/domain/skills/copyAgentSkills.ts`,
   `apps/node/src/cli/commands/agentSkills.ts`,
   `apps/node/src/domain/skills/skillsConfig.ts`,
@@ -109,7 +110,7 @@ wrong mental model.
 | `apps/node/src/domain/doctor/checks/hostChecks.ts` | Doctor id and fix text rename | PR-2 / Phase 3 |
 | `sites/landing/public/install.sh` | Bundled-skills install path and guide text | PR-1 / Phase 2, PR-2 / Phase 3 |
 | `validation/install/` | Installer regression expectations | PR-1 / Phase 2, PR-2 / Phase 3 |
-| `docs/host-agents.md`, `docs/skills/authoring.md`, `docs/skills/overview.md`, `docs/setup.md`, `docs/internal/design/agent-host-integration.md` | Public and internal docs updates | PR-1 / Phase 2, PR-2 / Phase 3 |
+| `docs/host-agents.md`, `docs/skills/authoring.md`, `docs/skills/overview.md`, `docs/setup.md`, `docs/api/doctor.md`, `docs/internal/design/agent-host-integration.md` | Public and internal docs updates | PR-1 / Phase 2, PR-2 / Phase 3 |
 | `evals/harness/`, `evals/specs/` | Authoring-front-door command expectations and strings | PR-1 / Phase 2, PR-2 / Phase 3 |
 
 ## Source Of Truth
@@ -120,7 +121,8 @@ wrong mental model.
 | Naming principles for the external noun | `docs/internal/design/node-api-design-guiding-principles.md` |
 | Current command surface and help text | `apps/node/src/cli/registry.ts`, `apps/node/src/cli/commands/agentSkills.ts` |
 | Packaged-skill install behavior | `apps/node/src/domain/skills/copyAgentSkills.ts`, `apps/node/src/domain/skills/skillsConfig.ts` |
-| Doctor behavior | `apps/node/src/domain/doctor/checks/hostChecks.ts`, `apps/node/src/contracts/errors.ts` |
+| Doctor behavior | `apps/node/src/domain/doctor/checks/hostChecks.ts`, `apps/node/src/contracts/errors.ts`, `docs/api/doctor.md` |
+| Ad-hoc error-code string literals on the install or list paths | `apps/node/src/domain/skills/copyAgentSkills.ts`, `apps/node/src/cli/commands/agentSkills.ts` |
 | Installer behavior and guide text | `sites/landing/public/install.sh`, `validation/install/README.md` |
 | Existing Node-side regression patterns | `apps/node/src/test/unit/agentSkills.test.ts`, `apps/node/src/test/unit/cliHelp.test.ts`, `apps/node/src/test/unit/doctor/hostChecks.test.ts` |
 | Existing packaging test coverage | `apps/node/src/test/unit/agentSkillsPack.test.ts` |
@@ -148,8 +150,21 @@ wrong mental model.
   `installedDir`, and `agentDiscoveryDirs`. Do not invent `bundledSkills`,
   `bundledSkillCount`, or other schema churn that the findings did not call for.
 - Do not rename `ERROR_CODES.AGENT_SKILLS_STALE` in this task. Rename the doctor
-  check id and human-facing text, but keep the stable error-code contract
-  unchanged to avoid unnecessary breaking JSON churn.
+  check id and human-facing fix text, but keep that one stable registered
+  error code unchanged to avoid breaking a documented JSON contract that
+  downstream consumers pattern-match on.
+- The four ad-hoc error-code string literals returned from install or list
+  (`AGENT_SKILLS_SOURCE_NOT_FOUND`, `AGENT_SKILLS_SOURCE_EMPTY`,
+  `AGENT_SKILLS_INSTALL_FAILED`, `AGENT_SKILLS_LIST_FAILED`) are not
+  registered in `ERROR_CODES` and are not documented contract fields. Rename
+  them to their `BUNDLED_SKILLS_*` counterparts in PR-2 / Phase 3 along with
+  the rest of the surface, and update their regression coverage in the same
+  commit.
+- User-facing message strings also renamed in PR-2 / Phase 3: the
+  `Agent-skills installed.` and `Agent-skills updated.` envelope fields, the
+  `Setting up agent-skills...` installer banner, and the
+  `Agent-skills setup complete.` summary lines all flip to `bundled-skills`
+  (or `Bundled-skills`) wording.
 - Do not edit generated docs directly. Authored doc changes belong in `docs/`,
   and docs validation belongs in `./scripts/docs_build.sh`.
 
@@ -173,7 +188,7 @@ wrong mental model.
 | What happens to the old install dir? | The primary and only supported install dir becomes `~/.clawperator/bundled-skills/`. Do not add migration or fallback logic for `~/.clawperator/agent-skills/` in this task. |
 | What happens to the doctor id? | Use `host.bundled-skills.staleness` as the only durable id after Phase 3. |
 | How should docs be authored? | Use `.agents/skills/docs-author/SKILL.md` for public docs touched in Phases 2 and 3. Do not hand-edit `sites/docs/.build/` or `sites/docs/site/`. |
-| How should `findings.md` be handled during execution? | Treat it as authoritative input. Do not rewrite the findings. Append `## Execution Notes` only if implementation uncovers a material deviation that later reviewers must see. |
+| How should `findings.md` be handled during execution? | Treat it as authoritative input. It has already been aligned with the clean-break policy in this plan. Append `## Execution Notes` at the end only if implementation uncovers a material deviation later reviewers must see. |
 
 ## Failure Modes To Prevent
 
