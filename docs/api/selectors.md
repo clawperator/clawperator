@@ -136,6 +136,33 @@ becomes the matcher:
 }
 ```
 
+## Choosing A Stable Selector
+
+Treat selector choice as practical guidance, not as a guaranteed ranking that
+applies to every app.
+
+When more than one selector is available, prefer this order:
+
+1. Android framework `resourceId`
+2. `contentDescEquals`
+3. `textEquals` or `textContains`
+4. app-specific opaque numeric resource IDs only as a last resort
+
+Why this order is usually safer:
+
+- framework IDs such as `android:id/title` are often more stable across app
+  versions than app-internal generated IDs
+- content descriptions work well for icon buttons and other controls where
+  visible text is empty
+- visible text is useful and often the most obvious signal, but it can be more
+  brittle when labels are dynamic or localized
+- app-specific opaque numeric IDs can work, but they are often the most
+  version-fragile option
+
+Compose-heavy trees may expose fewer stable IDs and more internal resource
+names. In those cases, `contentDescEquals` and visible text may be the most
+practical stable selectors available.
+
 ## Selector Flags
 
 <!-- CODE-DERIVED: selector-flags -->
