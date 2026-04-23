@@ -153,6 +153,47 @@ describe("operator download", () => {
     }
   });
 
+  it("treats a blank CLAWPERATOR_OPERATOR_PACKAGE env var as unset", async () => {
+    const homeDir = await makeTempHome();
+    const apkContents = "apk-blank-operator-package-env";
+    const checksum = sha256Hex(apkContents);
+
+    try {
+      process.env.HOME = homeDir;
+      process.env.CLAWPERATOR_OPERATOR_PACKAGE = "";
+
+      await withHttpServer((req, res) => {
+        if (req.url === "/latest.json") {
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({
+            version: "0.7.4",
+            apk_url: `${serverBase(req)}/operator.apk`,
+            sha256_url: `${serverBase(req)}/operator.apk.sha256`,
+            sha256: checksum,
+          }));
+          return;
+        }
+        if (req.url === "/operator.apk") {
+          res.writeHead(200, { "content-type": "application/vnd.android.package-archive" });
+          res.end(apkContents);
+          return;
+        }
+
+        res.writeHead(404);
+        res.end();
+      }, async (baseUrl) => {
+        process.env.CLAWPERATOR_APK_METADATA_URL = `${baseUrl}/latest.json`;
+        const result = await downloadOperatorApk();
+
+        assert.strictEqual(result.operatorPackage, "com.clawperator.operator");
+        assert.strictEqual(result.localPath, join(homeDir, ".clawperator", "downloads", "operator.apk"));
+        assert.strictEqual(await readFile(result.localPath, "utf8"), apkContents);
+      });
+    } finally {
+      await rm(homeDir, { recursive: true, force: true });
+    }
+  });
+
   it("fails when required metadata fields are missing", async () => {
     await withHttpServer((req, res) => {
       if (req.url === "/latest.json") {

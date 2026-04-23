@@ -36,7 +36,16 @@ export interface OperatorDownloadResult {
 }
 
 function getResolvedOperatorPackage(operatorPackage?: string): string {
-  return operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE ?? RELEASE_OPERATOR_PACKAGE;
+  if (typeof operatorPackage === "string" && operatorPackage.trim().length > 0) {
+    return operatorPackage;
+  }
+
+  const envOperatorPackage = process.env.CLAWPERATOR_OPERATOR_PACKAGE;
+  if (typeof envOperatorPackage === "string" && envOperatorPackage.trim().length > 0) {
+    return envOperatorPackage;
+  }
+
+  return RELEASE_OPERATOR_PACKAGE;
 }
 
 function buildDownloadError(
