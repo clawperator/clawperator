@@ -17,14 +17,44 @@ import type { InternalInteractiveState, InteractiveStateProbeResult } from "./de
 import {
   getAlternateOperatorVariant,
   getCliVersion,
-  getOperatorApkDownloadUrl,
-  getOperatorApkSha256Url,
   getOperatorPackageApkPath,
   hasListedPackage,
   probeVersionCompatibility,
 } from "../../version/compatibility.js";
+import { DEFAULT_OPERATOR_PACKAGE } from "../../config/resolveOperatorPackage.js";
 import { buildResultEnvelopeTimeoutHint } from "../../executions/timeoutGuidance.js";
 import { DOCTOR_DOCS_URLS } from "../docsUrls.js";
+
+function buildMissingApkFixSteps(config: RuntimeConfig): Array<{ kind: "shell" | "manual"; value: string }> {
+  if (config.operatorPackage === DEFAULT_OPERATOR_PACKAGE) {
+    return [
+      {
+        kind: "shell",
+        value: "clawperator operator download",
+      },
+      {
+        kind: "shell",
+        value: `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device ${config.deviceId}`,
+      },
+    ];
+  }
+
+  const matchingApkLabel = config.operatorPackage.endsWith(".dev") ? "matching local debug APK" : "matching local APK";
+  const buildGuidance = config.operatorPackage.endsWith(".dev")
+    ? "rebuild the debug app from the same checkout"
+    : `build or obtain the APK for ${config.operatorPackage} from the same checkout`;
+
+  return [
+    {
+      kind: "manual",
+      value: `If you do not already have a ${matchingApkLabel} at ${getOperatorPackageApkPath(config.operatorPackage)}, ${buildGuidance} before rerunning setup.`,
+    },
+    {
+      kind: "shell",
+      value: `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device ${config.deviceId} --operator-package ${config.operatorPackage}`,
+    },
+  ];
+}
 
 export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorCheckResult> {
   const packageList = await runAdb(config, ["shell", "pm", "list", "packages", config.operatorPackage]);
@@ -93,18 +123,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
       fix: {
         title: "Install Operator APK",
         platform: "any",
-        steps: [
-          config.operatorPackage.endsWith(".dev")
-            ? { kind: "manual", value: "If you do not already have a local debug APK copy, rebuild the debug app from the same checkout before rerunning setup." }
-            : {
-                kind: "manual",
-                value: `Download the exact release APK from ${getOperatorApkDownloadUrl(getCliVersion())} and the checksum from ${getOperatorApkSha256Url(getCliVersion())}.`,
-              },
-          {
-            kind: "shell",
-            value: `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device ${config.deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`,
-          },
-        ],
+        steps: buildMissingApkFixSteps(config),
         docsUrl: DOCTOR_DOCS_URLS.setup,
       },
     };

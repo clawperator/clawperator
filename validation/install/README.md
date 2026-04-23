@@ -31,8 +31,9 @@ dependencies for you.
 - `test_java.sh`
   - covers `check_java()` detection and provisioning branches
 - `test_multidevice.sh`
-  - covers `maybe_install_operator_apk()` behavior when multiple devices are
-    connected
+  - covers `parse_operator_remediate_result()` plus
+    `run_operator_remediation_via_cli()` summary handling for multi-device,
+    no-device, and failure results
 - `test_agent_skills.sh`
   - covers bundled-skills shell glue plus installer-side CLI result parsers,
     `setup_bundled_skills_via_cli()`, `write_agent_guide()`, skip behavior,

@@ -6,12 +6,12 @@ import { ERROR_CODES } from "../../../contracts/errors.js";
 import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
 
 describe("checkApkPresence", () => {
-    it("fails when the requested package is missing", async () => {
+    it("uses operator download before setup when the release package is missing", async () => {
         const runner = new FakeProcessRunner();
         const config = getDefaultRuntimeConfig({
             runner,
             deviceId: "test-device",
-            operatorPackage: "com.test.operator",
+            operatorPackage: "com.clawperator.operator",
         });
 
         runner.queueResult({ code: 0, stdout: "", stderr: "" });
@@ -21,8 +21,66 @@ describe("checkApkPresence", () => {
 
         assert.strictEqual(result.status, "fail");
         assert.strictEqual(result.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
-        assert.match(result.detail ?? "", /Package com\.test\.operator was not found/);
+        assert.match(result.detail ?? "", /Package com\.clawperator\.operator was not found/);
         assert.strictEqual(result.fix?.docsUrl, "https://docs.clawperator.com/setup/");
+        assert.deepStrictEqual(result.fix?.steps, [
+            { kind: "shell", value: "clawperator operator download" },
+            { kind: "shell", value: "clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device test-device" },
+        ]);
+    });
+
+    it("keeps debug-package remediation on the local APK path when the debug package is missing", async () => {
+        const runner = new FakeProcessRunner();
+        const config = getDefaultRuntimeConfig({
+            runner,
+            deviceId: "test-device",
+            operatorPackage: "com.clawperator.operator.dev",
+        });
+
+        runner.queueResult({ code: 0, stdout: "", stderr: "" });
+        runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+        const result = await checkApkPresence(config);
+
+        assert.strictEqual(result.status, "fail");
+        assert.strictEqual(result.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
+        assert.deepStrictEqual(result.fix?.steps, [
+            {
+                kind: "manual",
+                value: "If you do not already have a matching local debug APK at ~/.clawperator/downloads/operator-debug.apk, rebuild the debug app from the same checkout before rerunning setup.",
+            },
+            {
+                kind: "shell",
+                value: "clawperator operator setup --apk ~/.clawperator/downloads/operator-debug.apk --device test-device --operator-package com.clawperator.operator.dev",
+            },
+        ]);
+    });
+
+    it("uses generic local APK guidance for non-debug custom operator packages", async () => {
+        const runner = new FakeProcessRunner();
+        const config = getDefaultRuntimeConfig({
+            runner,
+            deviceId: "test-device",
+            operatorPackage: "com.clawperator.operator.staging",
+        });
+
+        runner.queueResult({ code: 0, stdout: "", stderr: "" });
+        runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+        const result = await checkApkPresence(config);
+
+        assert.strictEqual(result.status, "fail");
+        assert.strictEqual(result.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
+        assert.deepStrictEqual(result.fix?.steps, [
+            {
+                kind: "manual",
+                value: "If you do not already have a matching local APK at ~/.clawperator/downloads/operator.apk, build or obtain the APK for com.clawperator.operator.staging from the same checkout before rerunning setup.",
+            },
+            {
+                kind: "shell",
+                value: "clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device test-device --operator-package com.clawperator.operator.staging",
+            },
+        ]);
     });
 
     it("fails when package queries cannot run", async () => {
@@ -105,6 +163,10 @@ describe("runHandshake", () => {
         assert.strictEqual(result.status, "fail");
         assert.strictEqual(result.code, ERROR_CODES.DEVICE_ACCESSIBILITY_NOT_RUNNING);
         assert.match(result.detail!, /Boom/);
+        assert.deepStrictEqual(
+            result.fix?.steps.filter((step) => step.kind === "shell"),
+            [{ kind: "shell", value: "clawperator grant-device-permissions --device test-device --operator-package com.test.operator" }],
+        );
     });
 
     it("returns fail on timeout", async () => {

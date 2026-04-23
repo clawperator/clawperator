@@ -41,6 +41,15 @@ describe("CLI help", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator operator setup/);
     assert.match(stdout, /--apk <path>/);
+    assert.match(stdout, /clawperator operator remediate/);
+  });
+
+  it("shows operator remediate help for operator remediate --help", async () => {
+    const { stdout, code } = await runCli(["operator", "remediate", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator operator remediate/);
+    assert.match(stdout, /doctor single-device by contract/);
+    assert.match(stdout, /adb-unready devices are still reported/);
   });
 
   it("shows operator setup guidance for setup --help", async () => {
