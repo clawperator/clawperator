@@ -134,7 +134,7 @@ clawperator install
 Success conditions:
 
 - `clawperator version` exits `0` and prints a version string.
-- If you used `install.sh`, the installer also downloads the current release APK to `~/.clawperator/downloads/operator.apk` for that run. For later manual setup or recovery, redownload from `https://clawperator.com/operator.apk`.
+- If you used `install.sh`, the delegated install flow downloads the current release APK when remediation needs setup and no reusable local copy is already in place. For later manual setup or recovery, redownload from `https://clawperator.com/operator.apk` or use `clawperator operator download`.
 
 ### Durable host-agent artifacts from `clawperator install`
 
@@ -149,8 +149,10 @@ these durable onboarding files under `~/.clawperator/`:
 | `~/.clawperator/install-state.json` | Durable install metadata written by `clawperator host setup` during install | Use when you need the last known install facts without rerunning `doctor` |
 | `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config for Claude Desktop, Codex, and a generic stdio MCP consumer | Use when the host should connect through `clawperator mcp serve` instead of shelling out to the CLI |
 
-Early prerequisite failures and early doctor failures exit before these files
-are written.
+Shell prerequisite failures exit before these files are written. After
+`install.sh` delegates to `clawperator install`, later remediation or device
+readiness failures can still leave these files behind because host setup runs
+before the CLI returns its final install status.
 
 The runtime-skills registry is discovered automatically from
 `~/.clawperator/skills/skills/skills-registry.json` after `clawperator skills install`, so
