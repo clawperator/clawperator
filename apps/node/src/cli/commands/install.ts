@@ -256,6 +256,38 @@ function renderInstallPrettyOutput(result: InstallCommandResult | InstallCommand
     lines.push("Some visible devices still need ADB recovery before they can be targeted.");
   }
 
+  const followUp: string[] = [];
+
+  if (!result.ok) {
+    if (result.summary.connectedDevices === 0) {
+      followUp.push(`Connect and authorize a device, then rerun: clawperator install --operator-package ${result.operatorPackage}`);
+    } else if (!result.steps.operatorRemediation.ok) {
+      followUp.push(`Rerun remediation after resolving device issues: clawperator operator remediate --operator-package ${result.operatorPackage}`);
+    } else if (!result.steps.hostSetup.ok) {
+      followUp.push("Retry host artifact setup after resolving the failure: clawperator host setup");
+    }
+  } else {
+    if (result.deviceSelectionRequired) {
+      followUp.push(`Verify one device explicitly with: clawperator doctor --device <device_id> --output pretty --operator-package ${result.operatorPackage}`);
+    }
+    if (!result.steps.skillsInstall.ok) {
+      followUp.push("Install runtime skills later with: clawperator skills install");
+    }
+    if (!result.steps.bundledSkillsInstall.ok) {
+      followUp.push("Repair bundled-skills later with: clawperator bundled-skills install");
+    }
+    if (result.steps.hostSetup.status === "warn") {
+      followUp.push("Rerun host artifact setup after resolving the warning if needed: clawperator host setup");
+    }
+  }
+
+  if (followUp.length > 0) {
+    lines.push("", "Follow-up:");
+    for (const step of followUp) {
+      lines.push(`- ${step}`);
+    }
+  }
+
   return lines.join("\n");
 }
 

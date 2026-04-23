@@ -36,46 +36,8 @@ APK_FILE_BASENAME="operator.apk"
 if [ "$DEFAULT_OPERATOR_PACKAGE" != "$RELEASE_OPERATOR_PACKAGE" ]; then
     APK_FILE_BASENAME="operator-debug.apk"
 fi
-APK_LOCAL_PATH="${HOME}/.clawperator/downloads/${APK_FILE_BASENAME}"
 INSTALL_COMMAND="curl -fsSL https://clawperator.com/install.sh | bash"
-SKILLS_SETUP_STATUS="not-run"
-SKILLS_REGISTRY_PATH=""
-BUNDLED_SKILLS_SETUP_STATUS="not-run"
-BUNDLED_SKILLS_INSTALL_DIR=""
-BUNDLED_SKILLS_CLAUDE_DIR=""
-BUNDLED_SKILLS_CODEX_DIR=""
-BUNDLED_SKILLS_AGENTS_DIR=""
 CLAWPERATOR_BIN_PATH=""
-LAST_DEVICE_SERIAL=""
-BLANK_RUNTIME_SKILLS_REGISTRY_WARNED=0
-OPERATOR_REMEDIATE_OK=""
-OPERATOR_REMEDIATE_COMMAND_STATUS=0
-OPERATOR_REMEDIATE_TOTAL_DEVICES=0
-OPERATOR_REMEDIATE_CONNECTED_DEVICE_COUNT=0
-OPERATOR_REMEDIATE_READY_COUNT=0
-OPERATOR_REMEDIATE_WARN_COUNT=0
-OPERATOR_REMEDIATE_REMEDIATED_COUNT=0
-OPERATOR_REMEDIATE_ADB_UNREADY_COUNT=0
-OPERATOR_REMEDIATE_FAILED_COUNT=0
-OPERATOR_REMEDIATE_MESSAGE=""
-OPERATOR_REMEDIATE_DEVICE_IDS=()
-OPERATOR_REMEDIATE_DEVICE_STATES=()
-OPERATOR_REMEDIATE_DEVICE_STATUSES=()
-OPERATOR_REMEDIATE_DEVICE_MESSAGES=()
-
-TEMP_FILES=()
-
-register_temp_file() {
-    TEMP_FILES+=("$1")
-}
-
-cleanup_temp_files() {
-    for file in "${TEMP_FILES[@]:-}"; do
-        if [ -n "$file" ] && [ -f "$file" ]; then
-            rm -f "$file"
-        fi
-    done
-}
 
 on_error() {
     local line_number="$1"
@@ -84,7 +46,6 @@ on_error() {
     echo -e "${YELLOW}${INSTALL_COMMAND}${NC}"
 }
 
-trap cleanup_temp_files EXIT
 trap 'on_error $LINENO' ERR
 
 # 1. OS Detection
@@ -450,6 +411,7 @@ install_cli() {
         else
             CLAWPERATOR_BIN_PATH="$(command -v clawperator || true)"
         fi
+        export CLAWPERATOR_BIN_PATH
         if [ -z "$CLAWPERATOR_BIN_PATH" ]; then
             echo -e "${RED}❌ Clawperator CLI installed but the binary could not be found on PATH.${NC}"
             echo -e "${YELLOW}Refresh your shell PATH and re-run:${NC}"
@@ -462,644 +424,56 @@ install_cli() {
     fi
 }
 
-# 7. Setup Skills (via CLI)
-parse_skills_registry_path() {
-    node -e '
-let raw = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => {
-  raw += chunk;
-});
-process.stdin.on("end", () => {
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.registryPath === "string") {
-      process.stdout.write(parsed.registryPath);
-    }
-  } catch {}
-});
-' 2>/dev/null || true
-}
-
-parse_bundled_skills_install_result() {
-    node -e '
-let raw = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => {
-  raw += chunk;
-});
-process.stdin.on("end", () => {
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.installedDir === "string") {
-      process.stdout.write(`installedDir=${parsed.installedDir}\n`);
-    }
-    if (parsed && Array.isArray(parsed.agentDiscoveryDirs)) {
-      for (const entry of parsed.agentDiscoveryDirs) {
-        if (typeof entry.label === "string" && typeof entry.dir === "string") {
-          process.stdout.write(`agentDiscoveryDir:${entry.label}=${entry.dir}\n`);
-        }
-      }
-    }
-  } catch {}
-});
-' 2>/dev/null || true
-}
-
-setup_skills_via_cli() {
-    if [ "${CLAWPERATOR_INSTALL_SKIP_SKILLS:-0}" = "1" ]; then
-        SKILLS_SETUP_STATUS="skipped"
-        echo -e "${YELLOW}⚠️  Skipping skills setup because CLAWPERATOR_INSTALL_SKIP_SKILLS=1.${NC}"
-        return 0
-    fi
-
-    echo -e "${BLUE}Setting up Clawperator Skills...${NC}"
-    local SKILLS_OUTPUT=""
-    local DEFAULT_SKILLS_REGISTRY_PATH="$HOME/.clawperator/skills/skills/skills-registry.json"
-    if SKILLS_OUTPUT="$("$CLAWPERATOR_BIN_PATH" skills install --output json 2>&1)"; then
-        echo -e "${GREEN}✅ Skills setup complete.${NC}"
-        SKILLS_SETUP_STATUS="configured"
-        SKILLS_REGISTRY_PATH="$(printf '%s' "$SKILLS_OUTPUT" | parse_skills_registry_path)"
-        if [ -z "$SKILLS_REGISTRY_PATH" ]; then
-            SKILLS_REGISTRY_PATH="$DEFAULT_SKILLS_REGISTRY_PATH"
-        fi
-        return 0
-    else
-        SKILLS_SETUP_STATUS="failed"
-        echo -e "${YELLOW}⚠️  Skills setup failed via CLI. You can set them up later with 'clawperator skills install'.${NC}"
-        if [ -n "$SKILLS_OUTPUT" ]; then
-            echo "$SKILLS_OUTPUT"
-        fi
-        return 0
-    fi
-}
-
-setup_bundled_skills_via_cli() {
-    local DEFAULT_BUNDLED_SKILLS_INSTALL_DIR="$HOME/.clawperator/bundled-skills/"
-    local DEFAULT_BUNDLED_SKILLS_CLAUDE_DIR="$HOME/.claude/skills/"
-    local DEFAULT_BUNDLED_SKILLS_CODEX_DIR="${CODEX_HOME:-$HOME/.codex}/skills/"
-    local DEFAULT_BUNDLED_SKILLS_AGENTS_DIR="$HOME/.agents/skills/"
-    local BUNDLED_SKILLS_OUTPUT=""
-
-    BUNDLED_SKILLS_INSTALL_DIR="$DEFAULT_BUNDLED_SKILLS_INSTALL_DIR"
-    BUNDLED_SKILLS_CLAUDE_DIR="$DEFAULT_BUNDLED_SKILLS_CLAUDE_DIR"
-    BUNDLED_SKILLS_CODEX_DIR="$DEFAULT_BUNDLED_SKILLS_CODEX_DIR"
-    BUNDLED_SKILLS_AGENTS_DIR="$DEFAULT_BUNDLED_SKILLS_AGENTS_DIR"
-
-    if [ "${CLAWPERATOR_INSTALL_SKIP_SKILLS:-0}" = "1" ]; then
-        BUNDLED_SKILLS_SETUP_STATUS="skipped"
-        echo -e "${YELLOW}⚠️  Skipping bundled-skills setup because CLAWPERATOR_INSTALL_SKIP_SKILLS=1.${NC}"
-        return 0
-    fi
-
-    echo -e "${BLUE}Setting up bundled-skills...${NC}"
-    if BUNDLED_SKILLS_OUTPUT="$("$CLAWPERATOR_BIN_PATH" bundled-skills install --output json)"; then
-        local PARSED_BUNDLED_SKILLS_LINE=""
-        while IFS= read -r PARSED_BUNDLED_SKILLS_LINE; do
-            case "$PARSED_BUNDLED_SKILLS_LINE" in
-                installedDir=*)
-                    BUNDLED_SKILLS_INSTALL_DIR="${PARSED_BUNDLED_SKILLS_LINE#installedDir=}"
-                    ;;
-                # agentDiscoveryDir:<label>=<path> entries - matched by label so new agents
-                # (e.g. gemini) can be added to the CLI without breaking this script.
-                agentDiscoveryDir:claude=*)
-                    BUNDLED_SKILLS_CLAUDE_DIR="${PARSED_BUNDLED_SKILLS_LINE#agentDiscoveryDir:claude=}"
-                    ;;
-                agentDiscoveryDir:codex=*)
-                    BUNDLED_SKILLS_CODEX_DIR="${PARSED_BUNDLED_SKILLS_LINE#agentDiscoveryDir:codex=}"
-                    ;;
-                agentDiscoveryDir:agents=*)
-                    BUNDLED_SKILLS_AGENTS_DIR="${PARSED_BUNDLED_SKILLS_LINE#agentDiscoveryDir:agents=}"
-                    ;;
-            esac
-        done < <(printf '%s' "$BUNDLED_SKILLS_OUTPUT" | parse_bundled_skills_install_result)
-
-        BUNDLED_SKILLS_SETUP_STATUS="configured"
-        echo -e "${GREEN}✅ Bundled-skills setup complete.${NC}"
-        echo -e "${GREEN}   Installed at: ${BUNDLED_SKILLS_INSTALL_DIR}${NC}"
-        echo -e "${GREEN}   Claude skills dir: ${BUNDLED_SKILLS_CLAUDE_DIR}${NC}"
-        echo -e "${GREEN}   Codex skills dir: ${BUNDLED_SKILLS_CODEX_DIR}${NC}"
-        echo -e "${GREEN}   Agents skills dir: ${BUNDLED_SKILLS_AGENTS_DIR}${NC}"
-        return 0
-    fi
-
-    BUNDLED_SKILLS_SETUP_STATUS="failed"
-    echo -e "${YELLOW}⚠️  Bundled-skills setup failed via CLI. Resolve the issue below, then re-run 'clawperator bundled-skills install'.${NC}"
-    echo -e "${YELLOW}   Re-running after resolving the conflict is safe.${NC}"
-    if [ -n "$BUNDLED_SKILLS_OUTPUT" ]; then
-        echo "$BUNDLED_SKILLS_OUTPUT"
-    fi
-    return 0
-}
-
-resolve_cli_version() {
-    local CLI_VERSION_OUTPUT=""
-    local CLI_VERSION_LINE=""
-
-    if [ -n "${CLAWPERATOR_BIN_PATH:-}" ] && CLI_VERSION_OUTPUT="$("$CLAWPERATOR_BIN_PATH" --version 2>/dev/null | tr -d '\r')"; then
-        CLI_VERSION_LINE="$(printf '%s\n' "$CLI_VERSION_OUTPUT" | awk 'NF { line = $0 } END { print line }')"
-        if [ -n "$CLI_VERSION_LINE" ]; then
-            printf '%s\n' "$CLI_VERSION_LINE"
-            return 0
-        fi
-    fi
-
-    printf '%s\n' ""
-}
-
-resolve_adb_path_for_host_artifacts() {
-    if command -v adb > /dev/null 2>&1; then
-        command -v adb
-        return 0
-    fi
-
-    printf '%s\n' ""
-}
-
-parse_host_setup_result() {
-    node -e '
-let raw = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => {
-  raw += chunk;
-});
-process.stdin.on("end", () => {
-  try {
-    const sanitize = (value) => value.replace(/[\r\n]+/g, " ");
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.ok === "boolean") {
-      process.stdout.write(`ok=${parsed.ok ? "true" : "false"}\n`);
-    }
-    if (parsed && typeof parsed.message === "string") {
-      process.stdout.write(`message=${sanitize(parsed.message)}\n`);
-    }
-    if (parsed && parsed.summary && typeof parsed.summary === "object") {
-      for (const key of ["written", "updated", "skipped", "failed"]) {
-        const value = parsed.summary[key];
-        if (typeof value === "number") {
-          process.stdout.write(`summary.${key}=${value}\n`);
-        }
-      }
-    }
-    if (parsed && Array.isArray(parsed.artifacts)) {
-      for (const artifact of parsed.artifacts) {
-        if (!artifact || typeof artifact !== "object" || typeof artifact.artifact !== "string") {
-          continue;
-        }
-        const key = artifact.artifact;
-        if (typeof artifact.status === "string") {
-          process.stdout.write(`artifact:${key}:status=${artifact.status}\n`);
-        }
-        if (typeof artifact.path === "string") {
-          process.stdout.write(`artifact:${key}:path=${artifact.path}\n`);
-        }
-        if (typeof artifact.message === "string") {
-          process.stdout.write(`artifact:${key}:message=${artifact.message.replace(/[\r\n]+/g, " ")}\n`);
-        }
-      }
-    }
-  } catch {}
-});
-' 2>/dev/null || true
-}
-
-parse_operator_remediate_result() {
-    node -e '
-let raw = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => {
-  raw += chunk;
-});
-process.stdin.on("end", () => {
-  try {
-    const sanitize = (value) => value.replace(/[\r\n]+/g, " ");
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.ok === "boolean") {
-      process.stdout.write(`ok=${parsed.ok ? "true" : "false"}\n`);
-    }
-    if (parsed && typeof parsed.message === "string") {
-      process.stdout.write(`message=${sanitize(parsed.message)}\n`);
-    }
-    if (parsed && parsed.summary && typeof parsed.summary === "object") {
-      for (const key of ["totalDevices", "connectedDevices", "ready", "warn", "remediated", "adbUnready", "failed"]) {
-        const value = parsed.summary[key];
-        if (typeof value === "number") {
-          process.stdout.write(`summary.${key}=${value}\n`);
-        }
-      }
-    }
-    if (parsed && Array.isArray(parsed.devices)) {
-      parsed.devices.forEach((device, index) => {
-        if (!device || typeof device !== "object") {
-          return;
-        }
-        if (typeof device.deviceId === "string") {
-          process.stdout.write(`device:${index}:id=${sanitize(device.deviceId)}\n`);
-        }
-        if (typeof device.adbState === "string") {
-          process.stdout.write(`device:${index}:state=${sanitize(device.adbState)}\n`);
-        }
-        if (typeof device.status === "string") {
-          process.stdout.write(`device:${index}:status=${sanitize(device.status)}\n`);
-        }
-        if (typeof device.message === "string") {
-          process.stdout.write(`device:${index}:message=${sanitize(device.message)}\n`);
-        }
-      });
-    }
-  } catch {}
-});
-' 2>/dev/null || true
-}
-
-print_host_artifact_outcome() {
-    local ARTIFACT_LABEL="$1"
-    local ARTIFACT_STATUS="$2"
-    local ARTIFACT_PATH="$3"
-    local ARTIFACT_MESSAGE="${4:-}"
-    local COLOR="$BLUE"
-    local ICON="•"
-
-    case "$ARTIFACT_STATUS" in
-        written)
-            COLOR="$GREEN"
-            ICON="✅"
-            ;;
-        updated)
-            COLOR="$GREEN"
-            ICON="✅"
-            ;;
-        skipped)
-            COLOR="$BLUE"
-            ICON="•"
-            ;;
-        failed)
-            COLOR="$YELLOW"
-            ICON="⚠️ "
-            ;;
-    esac
-
-    echo -e "${COLOR}${ICON} ${ARTIFACT_LABEL}: ${ARTIFACT_STATUS}${NC}"
-    if [ -n "$ARTIFACT_PATH" ]; then
-        echo -e "   ${BLUE}${ARTIFACT_PATH}${NC}"
-    fi
-    if [ -n "$ARTIFACT_MESSAGE" ]; then
-        echo -e "   ${YELLOW}${ARTIFACT_MESSAGE}${NC}"
-    fi
-}
-
-setup_host_artifacts_via_cli() {
-    local HOST_ARTIFACTS_OUTPUT=""
-    local HOST_ARTIFACTS_STATUS=0
-    local RESOLVED_ADB_PATH=""
-    local RESOLVED_CLI_VERSION=""
-    local PARSED_HOST_ARTIFACTS=""
-    local PARSED_ARTIFACT_COUNT=0
-    local HOST_EXIT_OK=""
-    local HOST_MESSAGE=""
-    local HOST_INSTALL_STATE_STATUS=""
-    local HOST_INSTALL_STATE_PATH=""
-    local HOST_INSTALL_STATE_MESSAGE=""
-    local HOST_MCP_STATUS=""
-    local HOST_MCP_PATH=""
-    local HOST_MCP_MESSAGE=""
-    local HOST_AGENT_GUIDE_STATUS=""
-    local HOST_AGENT_GUIDE_PATH=""
-    local HOST_AGENT_GUIDE_MESSAGE=""
-    local HOST_SHARED_BRIDGE_STATUS=""
-    local HOST_SHARED_BRIDGE_PATH=""
-    local HOST_SHARED_BRIDGE_MESSAGE=""
-    local HOST_ARTIFACT_ARGS=()
-    local HOST_ARTIFACT_ENV=()
-    local PARSED_LINE=""
-
-    echo -e "${BLUE}Setting up durable host artifacts via the CLI...${NC}"
-
-    HOST_ARTIFACT_ARGS=(host setup --output json)
-
-    if [ -n "${CLAWPERATOR_HOST_ARTIFACTS_INSTALLED_AT:-}" ]; then
-        HOST_ARTIFACT_ARGS+=(--installed-at "$CLAWPERATOR_HOST_ARTIFACTS_INSTALLED_AT")
-    fi
-
-    RESOLVED_CLI_VERSION="$(resolve_cli_version)"
-    if [ -n "$RESOLVED_CLI_VERSION" ]; then
-        HOST_ARTIFACT_ARGS+=(--cli-version "$RESOLVED_CLI_VERSION")
-    fi
-
-    if [ -n "${LAST_DEVICE_SERIAL:-}" ]; then
-        HOST_ARTIFACT_ARGS+=(--last-device-serial "$LAST_DEVICE_SERIAL")
-    fi
-
-    RESOLVED_ADB_PATH="$(resolve_adb_path_for_host_artifacts)"
-    if [ -n "$RESOLVED_ADB_PATH" ] && [ -z "${ADB_PATH:-}" ]; then
-        HOST_ARTIFACT_ENV+=(ADB_PATH="$RESOLVED_ADB_PATH")
-    fi
-    if [ -n "${SKILLS_REGISTRY_PATH:-}" ]; then
-        HOST_ARTIFACT_ENV+=(CLAWPERATOR_SKILLS_REGISTRY="$SKILLS_REGISTRY_PATH")
-    fi
-
-    if HOST_ARTIFACTS_OUTPUT="$(env "${HOST_ARTIFACT_ENV[@]}" "$CLAWPERATOR_BIN_PATH" "${HOST_ARTIFACT_ARGS[@]}" 2>&1)"; then
-        HOST_ARTIFACTS_STATUS=0
-    else
-        HOST_ARTIFACTS_STATUS=$?
-    fi
-
-    PARSED_HOST_ARTIFACTS="$(printf '%s' "$HOST_ARTIFACTS_OUTPUT" | parse_host_setup_result)"
-
-    while IFS= read -r PARSED_LINE; do
-        [ -n "$PARSED_LINE" ] || continue
-        case "$PARSED_LINE" in
-            ok=*)
-                HOST_EXIT_OK="${PARSED_LINE#ok=}"
-                ;;
-            message=*)
-                HOST_MESSAGE="${PARSED_LINE#message=}"
-                ;;
-            artifact:installState:status=*)
-                HOST_INSTALL_STATE_STATUS="${PARSED_LINE#artifact:installState:status=}"
-                PARSED_ARTIFACT_COUNT=$((PARSED_ARTIFACT_COUNT + 1))
-                ;;
-            artifact:installState:path=*)
-                HOST_INSTALL_STATE_PATH="${PARSED_LINE#artifact:installState:path=}"
-                ;;
-            artifact:installState:message=*)
-                HOST_INSTALL_STATE_MESSAGE="${PARSED_LINE#artifact:installState:message=}"
-                ;;
-            artifact:mcpConfigSnippet:status=*)
-                HOST_MCP_STATUS="${PARSED_LINE#artifact:mcpConfigSnippet:status=}"
-                PARSED_ARTIFACT_COUNT=$((PARSED_ARTIFACT_COUNT + 1))
-                ;;
-            artifact:mcpConfigSnippet:path=*)
-                HOST_MCP_PATH="${PARSED_LINE#artifact:mcpConfigSnippet:path=}"
-                ;;
-            artifact:mcpConfigSnippet:message=*)
-                HOST_MCP_MESSAGE="${PARSED_LINE#artifact:mcpConfigSnippet:message=}"
-                ;;
-            artifact:agentGuide:status=*)
-                HOST_AGENT_GUIDE_STATUS="${PARSED_LINE#artifact:agentGuide:status=}"
-                PARSED_ARTIFACT_COUNT=$((PARSED_ARTIFACT_COUNT + 1))
-                ;;
-            artifact:agentGuide:path=*)
-                HOST_AGENT_GUIDE_PATH="${PARSED_LINE#artifact:agentGuide:path=}"
-                ;;
-            artifact:agentGuide:message=*)
-                HOST_AGENT_GUIDE_MESSAGE="${PARSED_LINE#artifact:agentGuide:message=}"
-                ;;
-            artifact:sharedAgentBridge:status=*)
-                HOST_SHARED_BRIDGE_STATUS="${PARSED_LINE#artifact:sharedAgentBridge:status=}"
-                PARSED_ARTIFACT_COUNT=$((PARSED_ARTIFACT_COUNT + 1))
-                ;;
-            artifact:sharedAgentBridge:path=*)
-                HOST_SHARED_BRIDGE_PATH="${PARSED_LINE#artifact:sharedAgentBridge:path=}"
-                ;;
-            artifact:sharedAgentBridge:message=*)
-                HOST_SHARED_BRIDGE_MESSAGE="${PARSED_LINE#artifact:sharedAgentBridge:message=}"
-                ;;
-        esac
-    done <<< "$PARSED_HOST_ARTIFACTS"
-
-    if [ "$PARSED_ARTIFACT_COUNT" -eq 0 ]; then
-        echo -e "${RED}❌ Host setup via CLI returned no parseable artifact results.${NC}"
-        if [ -n "$HOST_ARTIFACTS_OUTPUT" ]; then
-            echo "$HOST_ARTIFACTS_OUTPUT"
-        fi
-        return 1
-    fi
-
-    if [ -z "$HOST_INSTALL_STATE_STATUS" ] || \
-       [ -z "$HOST_MCP_STATUS" ] || \
-       [ -z "$HOST_AGENT_GUIDE_STATUS" ] || \
-       [ -z "$HOST_SHARED_BRIDGE_STATUS" ]; then
-        echo -e "${RED}❌ Host setup via CLI returned incomplete artifact results.${NC}"
-        if [ -n "$HOST_ARTIFACTS_OUTPUT" ]; then
-            echo "$HOST_ARTIFACTS_OUTPUT"
-        fi
-        return 1
-    fi
-
-    print_host_artifact_outcome "Local AGENTS.md" "$HOST_AGENT_GUIDE_STATUS" "$HOST_AGENT_GUIDE_PATH" "$HOST_AGENT_GUIDE_MESSAGE"
-    print_host_artifact_outcome "Install state" "$HOST_INSTALL_STATE_STATUS" "$HOST_INSTALL_STATE_PATH" "$HOST_INSTALL_STATE_MESSAGE"
-    print_host_artifact_outcome "MCP config snippet" "$HOST_MCP_STATUS" "$HOST_MCP_PATH" "$HOST_MCP_MESSAGE"
-    print_host_artifact_outcome "Shared agent bridge" "$HOST_SHARED_BRIDGE_STATUS" "$HOST_SHARED_BRIDGE_PATH" "$HOST_SHARED_BRIDGE_MESSAGE"
-
-    if [ "$HOST_ARTIFACTS_STATUS" -eq 0 ] && [ "$HOST_EXIT_OK" = "true" ]; then
-        if [ -n "$HOST_MESSAGE" ]; then
-            echo -e "${GREEN}✅ ${HOST_MESSAGE}${NC}"
-        else
-            echo -e "${GREEN}✅ Host setup complete.${NC}"
-        fi
-        return 0
-    fi
-
-    echo -e "${RED}❌ Host setup failed via the CLI.${NC}"
-    if [ -n "$HOST_ARTIFACTS_OUTPUT" ]; then
-        echo "$HOST_ARTIFACTS_OUTPUT"
-    fi
-    return 1
-}
-
-reset_operator_remediation_summary() {
-    OPERATOR_REMEDIATE_OK=""
-    OPERATOR_REMEDIATE_COMMAND_STATUS=0
-    OPERATOR_REMEDIATE_TOTAL_DEVICES=0
-    OPERATOR_REMEDIATE_CONNECTED_DEVICE_COUNT=0
-    OPERATOR_REMEDIATE_READY_COUNT=0
-    OPERATOR_REMEDIATE_WARN_COUNT=0
-    OPERATOR_REMEDIATE_REMEDIATED_COUNT=0
-    OPERATOR_REMEDIATE_ADB_UNREADY_COUNT=0
-    OPERATOR_REMEDIATE_FAILED_COUNT=0
-    OPERATOR_REMEDIATE_MESSAGE=""
-    OPERATOR_REMEDIATE_DEVICE_IDS=()
-    OPERATOR_REMEDIATE_DEVICE_STATES=()
-    OPERATOR_REMEDIATE_DEVICE_STATUSES=()
-    OPERATOR_REMEDIATE_DEVICE_MESSAGES=()
-}
-
-parsed_operator_remediation_device_index() {
-    local parsed_line="$1"
-    local current_index="${parsed_line#device:}"
-    current_index="${current_index%%:*}"
-    case "$current_index" in
-        ''|*[!0-9]*)
-            return 1
-            ;;
-    esac
-    printf '%s\n' "$current_index"
-}
-
-print_operator_remediation_result() {
-    local index=0
-    local device_id=""
-    local device_state=""
-    local device_status=""
-    local device_message=""
-
-    echo -e "${BLUE}Device remediation summary from the CLI:${NC}"
-    for index in "${!OPERATOR_REMEDIATE_DEVICE_IDS[@]}"; do
-        device_id="${OPERATOR_REMEDIATE_DEVICE_IDS[$index]}"
-        device_state="${OPERATOR_REMEDIATE_DEVICE_STATES[$index]:-unknown}"
-        device_status="${OPERATOR_REMEDIATE_DEVICE_STATUSES[$index]:-unknown}"
-        device_message="${OPERATOR_REMEDIATE_DEVICE_MESSAGES[$index]:-}"
-        case "$device_status" in
-            ready)
-                echo -e "${GREEN}  ✅ ${device_id} - ready${NC}"
-                ;;
-            remediated)
-                echo -e "${GREEN}  ✅ ${device_id} - remediated${NC}"
-                ;;
-            warn)
-                echo -e "${YELLOW}  ⚠  ${device_id} - ${device_message:-warnings remain}${NC}"
-                ;;
-            adb-unready)
-                echo -e "${YELLOW}  ⚠  ${device_id} - ${device_message:-ADB state: ${device_state}}${NC}"
-                ;;
-            failed)
-                echo -e "${RED}  ❌ ${device_id} - ${device_message:-remediation failed}${NC}"
-                ;;
-            *)
-                echo -e "${YELLOW}  ⚠  ${device_id} - ${device_message:-status ${device_status}}${NC}"
-                ;;
-        esac
-    done
-
-    if [ -n "$OPERATOR_REMEDIATE_MESSAGE" ]; then
-        echo -e "${BLUE}${OPERATOR_REMEDIATE_MESSAGE}${NC}"
-    fi
-}
-
-run_operator_remediation_via_cli() {
-    local OPERATOR_REMEDIATE_OUTPUT=""
-    local OPERATOR_REMEDIATE_STDERR=""
-    local OPERATOR_REMEDIATE_STDOUT_FILE=""
-    local OPERATOR_REMEDIATE_STDERR_FILE=""
-    local PARSED_REMEDIATION_OUTPUT=""
-    local PARSED_LINE=""
-    local CURRENT_DEVICE_INDEX=""
-    local CURRENT_DEVICE_ID=""
-    local CURRENT_DEVICE_STATE=""
-    local CURRENT_DEVICE_STATUS=""
-    local CURRENT_DEVICE_MESSAGE=""
-
-    reset_operator_remediation_summary
+run_post_bootstrap_install() {
+    local install_status=0
 
     if [ -z "${CLAWPERATOR_BIN_PATH:-}" ]; then
-        echo -e "${RED}❌ Clawperator CLI is required before device remediation can run.${NC}"
+        echo -e "${RED}❌ Clawperator CLI is required before post-bootstrap install can run.${NC}"
         return 1
     fi
 
-    echo -e "${BLUE}Running CLI-owned device remediation...${NC}"
-    OPERATOR_REMEDIATE_STDOUT_FILE="$(mktemp)"
-    register_temp_file "$OPERATOR_REMEDIATE_STDOUT_FILE"
-    OPERATOR_REMEDIATE_STDERR_FILE="$(mktemp)"
-    register_temp_file "$OPERATOR_REMEDIATE_STDERR_FILE"
-    if "$CLAWPERATOR_BIN_PATH" operator remediate --output json --operator-package "$DEFAULT_OPERATOR_PACKAGE" >"$OPERATOR_REMEDIATE_STDOUT_FILE" 2>"$OPERATOR_REMEDIATE_STDERR_FILE"; then
-        OPERATOR_REMEDIATE_COMMAND_STATUS=0
+    echo -e "${BLUE}Delegating post-bootstrap setup to 'clawperator install'...${NC}"
+    if "$CLAWPERATOR_BIN_PATH" install --output pretty --operator-package "$DEFAULT_OPERATOR_PACKAGE"; then
+        return 0
     else
-        OPERATOR_REMEDIATE_COMMAND_STATUS=$?
-    fi
-    OPERATOR_REMEDIATE_OUTPUT="$(cat "$OPERATOR_REMEDIATE_STDOUT_FILE")"
-    if [ -s "$OPERATOR_REMEDIATE_STDERR_FILE" ]; then
-        OPERATOR_REMEDIATE_STDERR="$(cat "$OPERATOR_REMEDIATE_STDERR_FILE")"
-    fi
-    rm -f "$OPERATOR_REMEDIATE_STDOUT_FILE" "$OPERATOR_REMEDIATE_STDERR_FILE"
-
-    PARSED_REMEDIATION_OUTPUT="$(printf '%s' "$OPERATOR_REMEDIATE_OUTPUT" | parse_operator_remediate_result)"
-    while IFS= read -r PARSED_LINE; do
-        [ -n "$PARSED_LINE" ] || continue
-        case "$PARSED_LINE" in
-            ok=*)
-                OPERATOR_REMEDIATE_OK="${PARSED_LINE#ok=}"
-                ;;
-            message=*)
-                OPERATOR_REMEDIATE_MESSAGE="${PARSED_LINE#message=}"
-                ;;
-            summary.totalDevices=*)
-                OPERATOR_REMEDIATE_TOTAL_DEVICES="${PARSED_LINE#summary.totalDevices=}"
-                ;;
-            summary.connectedDevices=*)
-                OPERATOR_REMEDIATE_CONNECTED_DEVICE_COUNT="${PARSED_LINE#summary.connectedDevices=}"
-                ;;
-            summary.ready=*)
-                OPERATOR_REMEDIATE_READY_COUNT="${PARSED_LINE#summary.ready=}"
-                ;;
-            summary.warn=*)
-                OPERATOR_REMEDIATE_WARN_COUNT="${PARSED_LINE#summary.warn=}"
-                ;;
-            summary.remediated=*)
-                OPERATOR_REMEDIATE_REMEDIATED_COUNT="${PARSED_LINE#summary.remediated=}"
-                ;;
-            summary.adbUnready=*)
-                OPERATOR_REMEDIATE_ADB_UNREADY_COUNT="${PARSED_LINE#summary.adbUnready=}"
-                ;;
-            summary.failed=*)
-                OPERATOR_REMEDIATE_FAILED_COUNT="${PARSED_LINE#summary.failed=}"
-                ;;
-            device:*:id=*)
-                CURRENT_DEVICE_INDEX="$(parsed_operator_remediation_device_index "$PARSED_LINE")" || continue
-                CURRENT_DEVICE_ID="${PARSED_LINE#*=}"
-                OPERATOR_REMEDIATE_DEVICE_IDS[$CURRENT_DEVICE_INDEX]="$CURRENT_DEVICE_ID"
-                : "${OPERATOR_REMEDIATE_DEVICE_STATES[$CURRENT_DEVICE_INDEX]:=""}"
-                : "${OPERATOR_REMEDIATE_DEVICE_STATUSES[$CURRENT_DEVICE_INDEX]:=""}"
-                : "${OPERATOR_REMEDIATE_DEVICE_MESSAGES[$CURRENT_DEVICE_INDEX]:=""}"
-                ;;
-            device:*:state=*)
-                CURRENT_DEVICE_INDEX="$(parsed_operator_remediation_device_index "$PARSED_LINE")" || continue
-                CURRENT_DEVICE_STATE="${PARSED_LINE#*=}"
-                OPERATOR_REMEDIATE_DEVICE_STATES[$CURRENT_DEVICE_INDEX]="$CURRENT_DEVICE_STATE"
-                ;;
-            device:*:status=*)
-                CURRENT_DEVICE_INDEX="$(parsed_operator_remediation_device_index "$PARSED_LINE")" || continue
-                CURRENT_DEVICE_STATUS="${PARSED_LINE#*=}"
-                OPERATOR_REMEDIATE_DEVICE_STATUSES[$CURRENT_DEVICE_INDEX]="$CURRENT_DEVICE_STATUS"
-                ;;
-            device:*:message=*)
-                CURRENT_DEVICE_INDEX="$(parsed_operator_remediation_device_index "$PARSED_LINE")" || continue
-                CURRENT_DEVICE_MESSAGE="${PARSED_LINE#*=}"
-                OPERATOR_REMEDIATE_DEVICE_MESSAGES[$CURRENT_DEVICE_INDEX]="$CURRENT_DEVICE_MESSAGE"
-                ;;
-        esac
-    done <<< "$PARSED_REMEDIATION_OUTPUT"
-
-    if [ -z "$OPERATOR_REMEDIATE_OK" ]; then
-        echo -e "${RED}❌ operator remediate returned no parseable result.${NC}"
-        if [ -n "$OPERATOR_REMEDIATE_OUTPUT" ]; then
-            echo "$OPERATOR_REMEDIATE_OUTPUT"
-        fi
-        if [ -n "$OPERATOR_REMEDIATE_STDERR" ]; then
-            echo "$OPERATOR_REMEDIATE_STDERR" >&2
-        fi
-        return 1
+        install_status=$?
     fi
 
-    if [ "$OPERATOR_REMEDIATE_CONNECTED_DEVICE_COUNT" -eq 1 ]; then
-        local INDEX=0
-        for INDEX in "${!OPERATOR_REMEDIATE_DEVICE_IDS[@]}"; do
-            if [ "${OPERATOR_REMEDIATE_DEVICE_STATES[$INDEX]:-}" = "device" ]; then
-                record_selected_device_serial "${OPERATOR_REMEDIATE_DEVICE_IDS[$INDEX]}"
-                break
+    return "$install_status"
+}
+
+resolve_source_command() {
+    local ACTIVE_SHELL="${SHELL:-/bin/bash}"
+    local DETECTED_SHELL
+    DETECTED_SHELL="$(basename "$ACTIVE_SHELL")"
+
+    case "$DETECTED_SHELL" in
+        zsh)
+            printf '%s\n' "source ~/.zshrc"
+            ;;
+        bash)
+            if [ -f "$HOME/.bashrc" ]; then
+                printf '%s\n' "source ~/.bashrc"
+            else
+                printf '%s\n' "source ~/.bash_profile"
             fi
-        done
-    fi
-
-    print_operator_remediation_result
-    return 0
+            ;;
+        *)
+            printf '%s\n' "source ~/.$(basename "$ACTIVE_SHELL")rc"
+            ;;
+    esac
 }
 
-record_selected_device_serial() {
-    local device_serial="$1"
-    LAST_DEVICE_SERIAL="$device_serial"
-}
+print_shell_activation_hint() {
+    local SOURCE_CMD
+    SOURCE_CMD="$(resolve_source_command)"
 
-operator_package_uses_public_release_apk() {
-    [ "$DEFAULT_OPERATOR_PACKAGE" = "$RELEASE_OPERATOR_PACKAGE" ]
-}
-
-print_durable_artifact_summary() {
-    echo -e "Durable host-agent artifacts:"
-    echo -e "   ${BLUE}$HOME/.clawperator/AGENTS.md${NC}"
-    echo -e "   ${BLUE}$HOME/.clawperator/install-state.json${NC}"
-    echo -e "   ${BLUE}$HOME/.clawperator/mcp-config-snippet.json${NC}"
-    echo -e "   AI agents should start with the local guide, then use the install state and MCP snippet as needed."
+    echo ""
+    echo -e "${YELLOW}Activate Clawperator in your current terminal:${NC}"
+    echo -e "${YELLOW}  ${SOURCE_CMD}${NC}"
+    echo ""
+    echo -e "Docs: ${BLUE}https://docs.clawperator.com${NC}"
+    echo -e "LLM guide: ${BLUE}https://docs.clawperator.com/llms.txt${NC}"
 }
 
 show_star_hint() {
@@ -1122,6 +496,8 @@ EOF
 
 # Main
 main() {
+    local install_status=0
+
     echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
     echo -e "${BLUE}  Clawperator Installation Script${NC}"
     echo -e "${BLUE}════════════════════════════════════════════════════════════════${NC}"
@@ -1134,127 +510,15 @@ main() {
     check_git || exit 1
     
     install_cli || exit 1
-    
-    # Use the CLI-owned remediation surface instead of shell-side doctor policy.
-    run_operator_remediation_via_cli || exit 1
-    
-    # Setup skills via CLI (best-effort)
-    setup_skills_via_cli
-    setup_bundled_skills_via_cli
-    setup_host_artifacts_via_cli || exit 1
 
-    local ACTIVE_SHELL="${SHELL:-/bin/bash}"
-    local DETECTED_SHELL
-    DETECTED_SHELL="$(basename "$ACTIVE_SHELL")"
-    local SOURCE_CMD=""
-    case "$DETECTED_SHELL" in
-        zsh) SOURCE_CMD="source ~/.zshrc" ;;
-        bash) [ -f "$HOME/.bashrc" ] && SOURCE_CMD="source ~/.bashrc" || SOURCE_CMD="source ~/.bash_profile" ;;
-        *) SOURCE_CMD="source ~/.$(basename "$ACTIVE_SHELL")rc" ;;
-    esac
-
-    echo ""
-    if [ "$OPERATOR_REMEDIATE_TOTAL_DEVICES" -gt 1 ]; then
-        if [ "$OPERATOR_REMEDIATE_FAILED_COUNT" -gt 0 ]; then
-            echo -e "${YELLOW}⚠️  Host install completed, but some connected devices still need remediation. Use the CLI-owned per-device results above, then rerun:${NC}"
-            echo -e "${YELLOW}  clawperator operator remediate --operator-package ${DEFAULT_OPERATOR_PACKAGE}${NC}"
-        elif [ "$OPERATOR_REMEDIATE_CONNECTED_DEVICE_COUNT" -eq 0 ] && [ "$OPERATOR_REMEDIATE_ADB_UNREADY_COUNT" -gt 0 ]; then
-            echo -e "${YELLOW}⚠️  Host install completed. Multiple Android devices are visible, but no connected device is ready for ADB yet.${NC}"
-        elif [ "$OPERATOR_REMEDIATE_ADB_UNREADY_COUNT" -gt 0 ]; then
-            echo -e "${YELLOW}⚠️  Host install completed. Multiple Android devices are connected, but some devices still need ADB recovery before they can be targeted.${NC}"
-        elif [ "$OPERATOR_REMEDIATE_WARN_COUNT" -gt 0 ]; then
-            echo -e "${YELLOW}⚠️  Host install completed. Multiple Android devices are connected, and each ready device passed the critical checks. Future commands must target one device explicitly with --device.${NC}"
-        else
-            echo -e "${YELLOW}⚠️  Host install completed. Multiple Android devices are connected. Future commands must target one device explicitly with --device.${NC}"
-        fi
-        echo ""
-        echo -e "${YELLOW}After setup, verify one device explicitly with:${NC}"
-        echo -e "${YELLOW}  clawperator doctor --device <device_id> --output pretty --operator-package ${DEFAULT_OPERATOR_PACKAGE}${NC}"
-        echo ""
-        echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
-        echo -e "${GREEN}  Installation Complete (Device Selection Required)${NC}"
-        echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
-        print_durable_artifact_summary
-        if [ "$OPERATOR_REMEDIATE_OK" != "true" ]; then
-            return 1
-        fi
-        return 0
-    fi
-
-    echo -e "${BLUE}Final Doctor Check...${NC}"
-    "$CLAWPERATOR_BIN_PATH" doctor --output pretty --operator-package "$DEFAULT_OPERATOR_PACKAGE" 2>/dev/null || true
-
-    if [ "$OPERATOR_REMEDIATE_TOTAL_DEVICES" -eq 0 ]; then
-        echo -e "${RED}❌ Final setup check failed. No connected Android device was available for remediation.${NC}"
-        print_durable_artifact_summary
-        return 1
-    fi
-
-    if [ "$OPERATOR_REMEDIATE_CONNECTED_DEVICE_COUNT" -eq 0 ]; then
-        echo -e "${RED}❌ Final setup check failed. The detected Android device is not ready for ADB yet.${NC}"
-        print_durable_artifact_summary
-        return 1
-    fi
-
-    if [ "$OPERATOR_REMEDIATE_FAILED_COUNT" -gt 0 ]; then
-        echo -e "${RED}❌ Final setup check failed.${NC}"
-        print_durable_artifact_summary
-        return 1
-    fi
-
-    echo ""
-    echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
-    echo -e "${GREEN}  Installation Successful!${NC}"
-    echo -e "${GREEN}════════════════════════════════════════════════════════════════${NC}"
-    echo ""
-    echo -e "${YELLOW}⚠  Activate Clawperator in your current terminal — run now:${NC}"
-    echo -e "${YELLOW}────────────────────────────────────────────────────────────────${NC}"
-    echo -e "   ${SOURCE_CMD}"
-    echo -e "${YELLOW}────────────────────────────────────────────────────────────────${NC}"
-    echo ""
-    echo -e "Info:"
-    echo -e "1. ${YELLOW}Clawperator binary installed at:${NC}"
-    echo -e "   ${BLUE}${CLAWPERATOR_BIN_PATH:-clawperator}${NC}"
-    if operator_package_uses_public_release_apk; then
-        echo -e "2. Canonical local Operator APK path:"
-        echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
-        echo -e "3. Canonical stable APK URL (redownload this for later manual setup):"
-        echo -e "   ${BLUE}https://clawperator.com/operator.apk${NC}"
+    if run_post_bootstrap_install; then
+        :
     else
-        echo -e "2. Expected local debug APK path for ${DEFAULT_OPERATOR_PACKAGE}:"
-        echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
-        echo -e "3. Automatic stable APK downloads are disabled for non-release operator packages."
+        install_status=$?
+        return "$install_status"
     fi
-    echo -e "4. Historical releases and artifacts remain at:"
-    echo -e "   ${BLUE}https://github.com/clawperator/clawperator/releases${NC}"
-    echo ""
 
-    if [ "$SKILLS_SETUP_STATUS" = "configured" ]; then
-        echo -e "5. Skills registry configured at:"
-        echo -e "   ${BLUE}${SKILLS_REGISTRY_PATH}${NC}"
-    else
-        echo -e "5. ${YELLOW}Skills were not configured during install.${NC}"
-        echo -e "   To set up skills later, run:"
-        echo -e "   ${YELLOW}clawperator skills install${NC}"
-        echo -e "   Fresh shells discover ${BLUE}\$HOME/.clawperator/skills/skills/skills-registry.json${NC} automatically."
-        echo -e "   No shell profile export is required unless you intentionally use a custom registry path."
-    fi
-    echo ""
-    if [ "$BUNDLED_SKILLS_SETUP_STATUS" = "configured" ]; then
-        echo -e "6. Bundled-skills installed at:"
-        echo -e "   ${BLUE}${BUNDLED_SKILLS_INSTALL_DIR}${NC}"
-    else
-        echo -e "6. ${YELLOW}Bundled-skills were not configured during install.${NC}"
-        echo -e "   To repair this later, run:"
-        echo -e "   ${YELLOW}clawperator bundled-skills install${NC}"
-    fi
-    echo ""
-    print_durable_artifact_summary
-    echo ""
-    echo -e "For more info, visit: ${BLUE}https://docs.clawperator.com${NC}"
-    echo -e "LLM guide: ${BLUE}https://docs.clawperator.com/llms.txt${NC}"
-    echo ""
-
+    print_shell_activation_hint
     show_star_hint
 }
 
