@@ -625,9 +625,13 @@ process.stdin.on("data", (chunk) => {
 });
 process.stdin.on("end", () => {
   try {
+    const sanitize = (value) => value.replace(/[\r\n]+/g, " ");
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed.ok === "boolean") {
       process.stdout.write(`ok=${parsed.ok ? "true" : "false"}\n`);
+    }
+    if (parsed && typeof parsed.message === "string") {
+      process.stdout.write(`message=${sanitize(parsed.message)}\n`);
     }
     if (parsed && parsed.summary && typeof parsed.summary === "object") {
       for (const key of ["written", "updated", "skipped", "failed"]) {
@@ -752,7 +756,7 @@ setup_host_artifacts_via_cli() {
     local PARSED_HOST_ARTIFACTS=""
     local PARSED_ARTIFACT_COUNT=0
     local HOST_EXIT_OK=""
-    local HOST_FAILED_COUNT="0"
+    local HOST_MESSAGE=""
     local HOST_INSTALL_STATE_STATUS=""
     local HOST_INSTALL_STATE_PATH=""
     local HOST_INSTALL_STATE_MESSAGE=""
@@ -765,8 +769,6 @@ setup_host_artifacts_via_cli() {
     local HOST_SHARED_BRIDGE_STATUS=""
     local HOST_SHARED_BRIDGE_PATH=""
     local HOST_SHARED_BRIDGE_MESSAGE=""
-    local CORE_FAILURE=0
-    local ONLY_SHARED_BRIDGE_FAILURE=0
     local HOST_ARTIFACT_ARGS=()
     local HOST_ARTIFACT_ENV=()
     local PARSED_LINE=""
@@ -810,8 +812,8 @@ setup_host_artifacts_via_cli() {
             ok=*)
                 HOST_EXIT_OK="${PARSED_LINE#ok=}"
                 ;;
-            summary.failed=*)
-                HOST_FAILED_COUNT="${PARSED_LINE#summary.failed=}"
+            message=*)
+                HOST_MESSAGE="${PARSED_LINE#message=}"
                 ;;
             artifact:installState:status=*)
                 HOST_INSTALL_STATE_STATUS="${PARSED_LINE#artifact:installState:status=}"
@@ -880,23 +882,12 @@ setup_host_artifacts_via_cli() {
     print_host_artifact_outcome "MCP config snippet" "$HOST_MCP_STATUS" "$HOST_MCP_PATH" "$HOST_MCP_MESSAGE"
     print_host_artifact_outcome "Shared agent bridge" "$HOST_SHARED_BRIDGE_STATUS" "$HOST_SHARED_BRIDGE_PATH" "$HOST_SHARED_BRIDGE_MESSAGE"
 
-    if [ "$HOST_INSTALL_STATE_STATUS" = "failed" ] || \
-       [ "$HOST_MCP_STATUS" = "failed" ] || \
-       [ "$HOST_AGENT_GUIDE_STATUS" = "failed" ]; then
-        CORE_FAILURE=1
-    fi
-
-    if [ "$CORE_FAILURE" -eq 0 ] && [ "$HOST_SHARED_BRIDGE_STATUS" = "failed" ] && [ "$HOST_FAILED_COUNT" = "1" ]; then
-        ONLY_SHARED_BRIDGE_FAILURE=1
-    fi
-
-    if [ "$ONLY_SHARED_BRIDGE_FAILURE" -eq 1 ]; then
-        echo -e "${YELLOW}⚠️  Host setup completed with a shared-agent bridge warning; continuing.${NC}"
-        return 0
-    fi
-
     if [ "$HOST_ARTIFACTS_STATUS" -eq 0 ] && [ "$HOST_EXIT_OK" = "true" ]; then
-        echo -e "${GREEN}✅ Host setup complete.${NC}"
+        if [ -n "$HOST_MESSAGE" ]; then
+            echo -e "${GREEN}✅ ${HOST_MESSAGE}${NC}"
+        else
+            echo -e "${GREEN}✅ Host setup complete.${NC}"
+        fi
         return 0
     fi
 
