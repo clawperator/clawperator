@@ -1,6 +1,6 @@
 ---
 name: clawperator-upgrade
-description: Clawperator first-party bundled skill. Whole-product upgrade route for Clawperator. Checks CLI reachability, uses the CLI-first upgrade sequence when possible, and falls back to install.sh only for recovery when the CLI is not reachable.
+description: Clawperator first-party bundled skill. Whole-product upgrade route for Clawperator. Checks CLI reachability and host prerequisites, uses the CLI-first upgrade sequence when the host is already viable, and falls back to install.sh when the CLI is not reachable or the bootstrap prerequisites need repair.
 ---
 
 # Clawperator Upgrade
@@ -15,15 +15,17 @@ logic inside the skill body.
 ## What This Skill Owns
 
 - check `clawperator --version` before mutating the host
-- run the CLI-first upgrade sequence when the CLI is reachable:
+- check the host prerequisites that the installer owns before choosing the CLI-first path:
+  - `node -v` must report Node 24 or newer
+  - `java -version` must report Java 17 or 21
+- run the CLI-first upgrade sequence when the CLI is reachable and the host prerequisites are already viable:
   - `npm install -g clawperator@latest`
   - `clawperator operator remediate`
   - `clawperator bundled-skills update`
   - `clawperator skills install`
   - `clawperator host setup`
   - `clawperator doctor --json`
-- use `curl -fsSL https://clawperator.com/install.sh | bash` only as recovery
-  when `clawperator --version` is not reachable
+- use `curl -fsSL https://clawperator.com/install.sh | bash` as recovery when `clawperator --version` is not reachable or the bootstrap prerequisites are not already satisfied
 - verify the resulting install with `clawperator doctor --json`
 - report whether the host is ready, or which existing repair route is still
   blocking readiness
@@ -34,6 +36,7 @@ logic inside the skill body.
 
 - do not make `install.sh` the primary path
 - do not skip the `clawperator --version` reachability check
+- do not use the CLI-first upgrade sequence when Node or Java still needs to be repaired by the installer
 - do not invent a second upgrade-health checker beyond `clawperator doctor --json`
 - do not add or imply a top-level `clawperator upgrade` command
 - do not restate all setup or repair docs from memory
@@ -71,8 +74,6 @@ Run:
 clawperator --version
 ```
 
-If this succeeds, use the CLI-first upgrade sequence in step 3.
-
 If this fails, run the recovery installer:
 
 ```bash
@@ -82,9 +83,19 @@ curl -fsSL https://clawperator.com/install.sh | bash
 After recovery, re-run `clawperator --version`. If the CLI is still not
 reachable, stop and report the recovery failure.
 
+If `clawperator --version` succeeds, verify the host prerequisites the installer owns:
+
+```bash
+node -v
+java -version
+```
+
+Continue only when Node is 24 or newer and Java is 17 or 21. If either check
+fails, use the recovery installer instead of the CLI-first path.
+
 ### 3. Run the CLI-first upgrade sequence
 
-When `clawperator --version` succeeds, run these commands in order:
+When `clawperator --version` succeeds and the host prerequisites are already viable, run these commands in order:
 
 ```bash
 npm install -g clawperator@latest
@@ -102,6 +113,7 @@ Rules:
 - use the structured CLI results rather than guessing about state
 - let `clawperator host setup` write the durable host artifacts
 - keep `clawperator doctor --json` as the readiness check after the sequence
+- if `npm install -g clawperator@latest` fails, fall back to the recovery installer and re-check reachability before continuing
 
 ### 4. Decide between ready and blocked
 
@@ -148,19 +160,21 @@ After a blocked upgrade:
 Finish with:
 
 - the CLI reachability result in one sentence
+- whether the installer-owned prerequisites were already satisfied in one sentence
 - the upgrade result in one sentence
 - one explicit next command or one canonical doc URL
 
 Examples:
 
 - "Clawperator was reachable, the CLI-first upgrade sequence completed, and `clawperator doctor --json` reports `criticalOk: true`. Your next step is `clawperator-agent-orientation`."
+- "Clawperator was reachable, but Node or Java was not yet healthy enough for the CLI-first path, so I used `install.sh` as recovery only. Follow the setup guidance at `https://docs.clawperator.com/setup/` and then rerun this skill."
 - "Clawperator was not reachable, so I used `install.sh` as recovery only. The CLI is still not ready, so follow the recovery guidance or finish setup at `https://docs.clawperator.com/setup/`."
 - "Upgrade intent is not explicit yet, so I stopped before running any host mutations."
 
 ## Output Style
 
-Be concise. Treat `clawperator --version` as the reachability gate, the
-CLI-first sequence as the normal path, and `install.sh` as recovery only. End
-with one explicit next step. Name the upgrade-intent gate explicitly when you
-decline to run the installer. Never ask the user to choose the next repair step
-after doctor has already named it.
+Be concise. Treat `clawperator --version` as the reachability gate, host
+prerequisites as the CLI-first viability gate, and `install.sh` as recovery
+when either gate fails. End with one explicit next step. Name the
+upgrade-intent gate explicitly when you decline to run the installer. Never
+ask the user to choose the next repair step after doctor has already named it.
