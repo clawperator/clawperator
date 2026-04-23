@@ -345,7 +345,7 @@ async function remediateConnectedDevice(
       result: {
         deviceId: device.serial,
         adbState: device.state,
-        status: needsSetup || doctorFixAttempted ? "remediated" : "warn",
+        status: "warn",
         needsSetup,
         initialCriticalOk: isCriticalOk(initialReport),
         finalCriticalOk: true,

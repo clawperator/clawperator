@@ -199,6 +199,84 @@ describe("operator remediate", () => {
     assert.strictEqual(setupCount, 1);
   });
 
+  it("keeps remediated devices in warn state when warnings remain after setup", async () => {
+    const reports = [
+      buildReport({
+        ok: false,
+        criticalOk: false,
+        checks: [
+          {
+            id: "readiness.version.compatibility",
+            status: "fail",
+            code: ERROR_CODES.VERSION_INCOMPATIBLE,
+            summary: "CLI and installed APK versions are not compatible.",
+          },
+        ],
+      }),
+      buildReport({
+        ok: true,
+        criticalOk: true,
+        checks: [
+          {
+            id: "readiness.settings.dev_options",
+            status: "warn",
+            summary: "Developer options are disabled.",
+          },
+        ],
+      }),
+    ];
+    let setupCount = 0;
+
+    const output = await cmdOperatorRemediate(
+      { format: "json" },
+      {
+        listDevicesImpl: async () => [{ serial: "device-1", state: "device" }],
+        doctorServiceFactory: () => ({
+          run: async () => {
+            const next = reports.shift();
+            if (!next) {
+              throw new Error("Unexpected doctor call");
+            }
+            return next;
+          },
+        }),
+        downloadOperatorApkImpl: async () => ({
+          localPath: "/tmp/operator.apk",
+          operatorVersion: "0.7.4",
+          sha256: "e".repeat(64),
+          operatorPackage: "com.clawperator.operator",
+          checksumSource: "inline",
+          metadataUrl: "https://downloads.example.com/latest.json",
+          apkUrl: "https://downloads.example.com/operator.apk",
+          sha256Url: "https://downloads.example.com/operator.apk.sha256",
+        }),
+        setupOperatorImpl: async () => {
+          setupCount += 1;
+          return {
+            operatorPackage: "com.clawperator.operator",
+            install: { ok: true },
+            permissions: {
+              operatorPackage: "com.clawperator.operator",
+              accessibility: { ok: true, alreadyEnabled: false },
+              notification: { ok: true, skipped: false },
+              notificationListener: { ok: true, alreadyEnabled: false },
+            },
+            verification: { ok: true, packageInstalled: true },
+          };
+        },
+      },
+    );
+
+    const parsed = JSON.parse(output);
+    assert.strictEqual(parsed.ok, true);
+    assert.strictEqual(parsed.summary.remediated, 0);
+    assert.strictEqual(parsed.summary.warn, 1);
+    assert.strictEqual(parsed.devices[0].status, "warn");
+    assert.strictEqual(parsed.devices[0].setupAttempted, true);
+    assert.strictEqual(parsed.message, "All connected devices passed critical checks. 1 device still has warnings.");
+    assert.strictEqual(setupCount, 1);
+  });
+
   it("marks downloadAttempted only for the device that triggered the shared release download", async () => {
     const perDeviceReports = new Map<string, DoctorReport[]>([
       ["device-alpha", [
