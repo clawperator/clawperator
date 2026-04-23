@@ -290,6 +290,36 @@ describe("CLI help", () => {
     assert.match(stdout, /clawperator-skill-author-by-recording/);
   });
 
+  it("shows host setup help", async () => {
+    const { stdout, code } = await runCli(["host", "setup", "--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /clawperator host/);
+    assert.match(stdout, /host setup/);
+    assert.match(stdout, /install-state JSON/);
+    assert.match(stdout, /shared-agent bridge/);
+  });
+
+  it("returns USAGE for the removed host materialize-artifacts alias", async () => {
+    const { stdout } = await runCli(["host", "materialize-artifacts"]);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /clawperator host setup/);
+  });
+
+  it("returns USAGE when host setup --installed-at is missing its value", async () => {
+    const { stdout, code } = await runCli(["host", "setup", "--installed-at"]);
+    assert.strictEqual(code, 1);
+    assert.match(stdout, /"code":"USAGE"/);
+    assert.match(stdout, /--installed-at requires a value/);
+  });
+
+  it("returns USAGE when host setup --cli-version is followed by another host flag", async () => {
+    const { stdout, code } = await runCli(["host", "setup", "--cli-version", "--apk-version", "1.2.3"]);
+    assert.strictEqual(code, 1);
+    assert.match(stdout, /"code":"USAGE"/);
+    assert.match(stdout, /--cli-version requires a value/);
+  });
+
   it("inspect ui --help falls back to top-level help", async () => {
     // inspect ui is removed; --help with an unknown command falls back to top-level help.
     const { stdout, code } = await runCli(["inspect", "ui", "--help"]);

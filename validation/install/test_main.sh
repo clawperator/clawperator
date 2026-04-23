@@ -81,6 +81,7 @@ source "$REPO_ROOT/validation/install/lib/json_assert.sh"
 setup_mock_clawperator() {
     local mock_dir="$1"
     local log_file="$2"
+    local real_cli_path="$REPO_ROOT/apps/node/dist/cli/index.js"
 
     mkdir -p "$mock_dir"
     cat > "$mock_dir/clawperator" <<EOF
@@ -375,6 +376,10 @@ if [ "\$1" = "bundled-skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output"
 {"installedDir":"\$BUNDLED_SKILLS_DIR","agentDiscoveryDirs":[{"label":"claude","dir":"\$HOME_DIR/.claude/skills"},{"label":"codex","dir":"\$HOME_DIR/.codex/skills"},{"label":"agents","dir":"\$HOME_DIR/.agents/skills"}]}
 JSON
   exit 0
+fi
+
+if [ "\$1" = "host" ] && [ "\$2" = "setup" ]; then
+  exec "$EXPECTED_NODE_BIN" "$real_cli_path" "\$@"
 fi
 
 printf '%s\n' "unexpected mock clawperator invocation: \$*" >&2
@@ -752,7 +757,7 @@ assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawper
 assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.1" "mcp" "main-success mcp claude args.1"
 assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.args.2" "serve" "main-success mcp claude args.2"
 assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "claudeDesktop.entry.clawperator.env.ADB_PATH" "$TMP_DIR/mock-main-success/adb" "main-success mcp claude env.ADB_PATH"
-assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "notes.1" "Regenerate it with install.sh if the clawperator binary path or adb path changes." "main-success mcp notes.1"
+assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "notes.1" "Regenerate it with clawperator host setup if the clawperator binary path or adb path changes." "main-success mcp notes.1"
 assert_equals "mcp" "$(json_field_value "$SUCCESS_MCP_CONFIG_PATH" "genericStdioConsumer.server.args.1")" "main-success mcp helper direct call"
 assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "genericStdioConsumer.server.args.2" "serve" "main-success mcp generic args.2"
 assert_json_field_equals "$SUCCESS_MCP_CONFIG_PATH" "genericStdioConsumer.server.command" "$EXPECTED_NODE_BIN" "main-success mcp generic command"
@@ -778,6 +783,7 @@ assert_contains "$SUCCESS_TRACE" "show_star_hint" "main-success trace"
 assert_contains "$SUCCESS_CLI_LOG" "doctor --format json" "main-success cli log"
 assert_contains "$SUCCESS_CLI_LOG" "skills install --output json" "main-success cli log"
 assert_contains "$SUCCESS_CLI_LOG" "bundled-skills install --output json" "main-success cli log"
+assert_contains "$SUCCESS_CLI_LOG" "host setup --output json --cli-version 1.2.3 --last-device-serial serial-solo" "main-success cli log"
 assert_contains "$SUCCESS_CLI_LOG" "doctor --output pretty" "main-success cli log"
 
 echo "=== Scenario 2: final doctor failure aborts after setup ==="
@@ -818,6 +824,7 @@ assert_json_field_equals "$FAIL_INSTALL_STATE_PATH" "registryPath" "$TMP_DIR/hom
 assert_json_field_equals "$FAIL_INSTALL_STATE_PATH" "lastDeviceSerial" "serial-solo" "main-fail install-state lastDeviceSerial"
 assert_contains "$FAIL_CLI_LOG" "skills install --output json" "main-fail cli log"
 assert_contains "$FAIL_CLI_LOG" "bundled-skills install --output json" "main-fail cli log"
+assert_contains "$FAIL_CLI_LOG" "host setup --output json --cli-version 1.2.3 --last-device-serial serial-solo" "main-fail cli log"
 assert_contains "$FAIL_CLI_LOG" "doctor --output pretty" "main-fail cli log"
 
 echo "=== Scenario 3: final doctor multi-device path reports ready devices without fake pending setup ==="
