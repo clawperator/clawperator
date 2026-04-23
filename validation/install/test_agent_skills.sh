@@ -300,7 +300,7 @@ JSON
       exit 0
     fi
     if [ "\$1" = "skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
-      printf '%s\n' '{"synced":true,"message":"Skills synced to /tmp/skills (ref: main)","registryPath":"/tmp/skills-registry.json"}'
+      printf '%s\n' '{"synced":true,"message":"Skills synced to '"\$HOME"'/.clawperator/skills (ref: main)","registryPath":"'"\$HOME"'/.clawperator/skills/skills/skills-registry.json"}'
       exit 0
     fi
     ;;
@@ -310,7 +310,7 @@ JSON
       exit 0
     fi
     if [ "\$1" = "skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
-      printf '%s\n' '{"synced":true,"message":"Skills synced to /tmp/skills-fallback (ref: main)","registryPath":"/tmp/skills-registry.json"}'
+      printf '%s\n' '{"synced":true,"message":"Skills synced to '"\$HOME"'/.clawperator/skills (ref: main)","registryPath":"'"\$HOME"'/.clawperator/skills/skills/skills-registry.json"}'
       exit 0
     fi
     ;;
