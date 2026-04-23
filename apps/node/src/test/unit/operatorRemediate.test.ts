@@ -175,6 +175,86 @@ describe("operator remediate", () => {
     assert.strictEqual(setupCount, 1);
   });
 
+  it("marks downloadAttempted only for the device that triggered the shared release download", async () => {
+    const perDeviceReports = new Map<string, DoctorReport[]>([
+      ["device-alpha", [
+        buildReport({
+          ok: false,
+          criticalOk: false,
+          checks: [{ id: "readiness.version.compatibility", status: "fail", code: ERROR_CODES.VERSION_INCOMPATIBLE, summary: "Version mismatch." }],
+        }),
+        buildReport({
+          checks: [{ id: "readiness.handshake", status: "pass", summary: "Handshake successful." }],
+        }),
+      ]],
+      ["device-beta", [
+        buildReport({
+          ok: false,
+          criticalOk: false,
+          checks: [{ id: "readiness.version.compatibility", status: "fail", code: ERROR_CODES.VERSION_INCOMPATIBLE, summary: "Version mismatch." }],
+        }),
+        buildReport({
+          checks: [{ id: "readiness.handshake", status: "pass", summary: "Handshake successful." }],
+        }),
+      ]],
+    ]);
+    let downloadCount = 0;
+    let setupCount = 0;
+
+    const output = await cmdOperatorRemediate(
+      { format: "json" },
+      {
+        listDevicesImpl: async () => [
+          { serial: "device-alpha", state: "device" },
+          { serial: "device-beta", state: "device" },
+        ],
+        doctorServiceFactory: () => ({
+          run: async ({ config }) => {
+            const queue = perDeviceReports.get(config.deviceId ?? "");
+            const next = queue?.shift();
+            if (!next) {
+              throw new Error(`Unexpected doctor call for ${config.deviceId}`);
+            }
+            return next;
+          },
+        }),
+        downloadOperatorApkImpl: async () => {
+          downloadCount += 1;
+          return {
+            localPath: "/tmp/operator.apk",
+            operatorVersion: "0.7.4",
+            sha256: "d".repeat(64),
+            operatorPackage: "com.clawperator.operator",
+            checksumSource: "inline",
+            metadataUrl: "https://downloads.example.com/latest.json",
+            apkUrl: "https://downloads.example.com/operator.apk",
+            sha256Url: "https://downloads.example.com/operator.apk.sha256",
+          };
+        },
+        setupOperatorImpl: async () => {
+          setupCount += 1;
+          return {
+            operatorPackage: "com.clawperator.operator",
+            install: { ok: true },
+            permissions: {
+              operatorPackage: "com.clawperator.operator",
+              accessibility: { ok: true, alreadyEnabled: false },
+              notification: { ok: true, skipped: false },
+              notificationListener: { ok: true, alreadyEnabled: false },
+            },
+            verification: { ok: true, packageInstalled: true },
+          };
+        },
+      },
+    );
+
+    const parsed = JSON.parse(output);
+    assert.strictEqual(downloadCount, 1);
+    assert.strictEqual(setupCount, 2);
+    assert.strictEqual(parsed.devices[0].downloadAttempted, true);
+    assert.strictEqual(parsed.devices[1].downloadAttempted, false);
+  });
+
   it("reports mixed multi-device states and retries doctor --fix for handshake recovery", async () => {
     const perDeviceReports = new Map<string, DoctorReport[]>([
       ["device-ready", [buildReport({ checks: [{ id: "readiness.handshake", status: "pass", summary: "Handshake successful." }] })]],
@@ -276,5 +356,29 @@ describe("operator remediate", () => {
     assert.strictEqual(setupCount, 1);
     assert.strictEqual(doctorFixCount, 1);
     assert.strictEqual(parsed.devices.find((device: { deviceId: string }) => device.deviceId === "device-shell").status, "failed");
+  });
+
+  it("keeps ok=true when only adb-unready devices remain and reports that in the summary message", async () => {
+    const output = await cmdOperatorRemediate(
+      { format: "json" },
+      {
+        listDevicesImpl: async () => [
+          { serial: "device-ready", state: "device" },
+          { serial: "device-offline", state: "offline" },
+        ],
+        doctorServiceFactory: () => ({
+          run: async () => buildReport({
+            checks: [{ id: "readiness.handshake", status: "pass", summary: "Handshake successful." }],
+          }),
+        }),
+      },
+    );
+
+    const parsed = JSON.parse(output);
+    assert.strictEqual(parsed.ok, true);
+    assert.strictEqual(parsed.summary.failed, 0);
+    assert.strictEqual(parsed.summary.adbUnready, 1);
+    assert.strictEqual(parsed.message, "All connected devices are ready. 1 visible device still needs ADB recovery.");
+    assert.strictEqual(process.exitCode, undefined);
   });
 });

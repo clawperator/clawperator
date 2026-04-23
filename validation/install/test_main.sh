@@ -127,7 +127,7 @@ JSON
         ;;
       multi-device-mixed)
         cat <<'JSON'
-{"ok":true,"summary":{"totalDevices":3,"connectedDevices":1,"ready":1,"warn":0,"remediated":0,"adbUnready":2,"failed":0},"devices":[{"deviceId":"serial-ready","adbState":"device","status":"ready","message":"Device is ready."},{"deviceId":"serial-unauthorized","adbState":"unauthorized","status":"adb-unready","message":"ADB reports state 'unauthorized'. Resolve device connectivity before remediation."},{"deviceId":"serial-offline","adbState":"offline","status":"adb-unready","message":"ADB reports state 'offline'. Resolve device connectivity before remediation."}],"message":"Remediation still required for 2 devices."}
+{"ok":true,"summary":{"totalDevices":3,"connectedDevices":1,"ready":1,"warn":0,"remediated":0,"adbUnready":2,"failed":0},"devices":[{"deviceId":"serial-ready","adbState":"device","status":"ready","message":"Device is ready."},{"deviceId":"serial-unauthorized","adbState":"unauthorized","status":"adb-unready","message":"ADB reports state 'unauthorized'. Resolve device connectivity before remediation."},{"deviceId":"serial-offline","adbState":"offline","status":"adb-unready","message":"ADB reports state 'offline'. Resolve device connectivity before remediation."}],"message":"All connected devices are ready. 2 visible devices still need ADB recovery."}
 JSON
         exit 0
         ;;
@@ -157,7 +157,7 @@ JSON
         ;;
       multi-device-all-unready)
         cat <<'JSON'
-{"ok":true,"summary":{"totalDevices":2,"connectedDevices":0,"ready":0,"warn":0,"remediated":0,"adbUnready":2,"failed":0},"devices":[{"deviceId":"serial-unauthorized","adbState":"unauthorized","status":"adb-unready","message":"ADB reports state 'unauthorized'. Resolve device connectivity before remediation."},{"deviceId":"serial-offline","adbState":"offline","status":"adb-unready","message":"ADB reports state 'offline'. Resolve device connectivity before remediation."}],"message":"Remediation still required for 2 devices."}
+{"ok":true,"summary":{"totalDevices":2,"connectedDevices":0,"ready":0,"warn":0,"remediated":0,"adbUnready":2,"failed":0},"devices":[{"deviceId":"serial-unauthorized","adbState":"unauthorized","status":"adb-unready","message":"ADB reports state 'unauthorized'. Resolve device connectivity before remediation."},{"deviceId":"serial-offline","adbState":"offline","status":"adb-unready","message":"ADB reports state 'offline'. Resolve device connectivity before remediation."}],"message":"No connected device is ready for ADB yet. 2 visible devices still need ADB recovery."}
 JSON
         exit 0
         ;;

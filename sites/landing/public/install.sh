@@ -1118,6 +1118,18 @@ reset_operator_remediation_summary() {
     OPERATOR_REMEDIATE_DEVICE_MESSAGES=()
 }
 
+parsed_operator_remediation_device_index() {
+    local parsed_line="$1"
+    local current_index="${parsed_line#device:}"
+    current_index="${current_index%%:*}"
+    case "$current_index" in
+        ''|*[!0-9]*)
+            return 1
+            ;;
+    esac
+    printf '%s\n' "$current_index"
+}
+
 print_operator_remediation_result() {
     local index=0
     local device_id=""
@@ -1162,6 +1174,7 @@ run_operator_remediation_via_cli() {
     local OPERATOR_REMEDIATE_OUTPUT=""
     local PARSED_REMEDIATION_OUTPUT=""
     local PARSED_LINE=""
+    local CURRENT_DEVICE_INDEX=""
     local CURRENT_DEVICE_ID=""
     local CURRENT_DEVICE_STATE=""
     local CURRENT_DEVICE_STATUS=""
@@ -1213,23 +1226,27 @@ run_operator_remediation_via_cli() {
                 OPERATOR_REMEDIATE_FAILED_COUNT="${PARSED_LINE#summary.failed=}"
                 ;;
             device:*:id=*)
+                CURRENT_DEVICE_INDEX="$(parsed_operator_remediation_device_index "$PARSED_LINE")" || continue
                 CURRENT_DEVICE_ID="${PARSED_LINE#*=}"
-                OPERATOR_REMEDIATE_DEVICE_IDS+=("$CURRENT_DEVICE_ID")
-                OPERATOR_REMEDIATE_DEVICE_STATES+=("")
-                OPERATOR_REMEDIATE_DEVICE_STATUSES+=("")
-                OPERATOR_REMEDIATE_DEVICE_MESSAGES+=("")
+                OPERATOR_REMEDIATE_DEVICE_IDS[$CURRENT_DEVICE_INDEX]="$CURRENT_DEVICE_ID"
+                : "${OPERATOR_REMEDIATE_DEVICE_STATES[$CURRENT_DEVICE_INDEX]:=""}"
+                : "${OPERATOR_REMEDIATE_DEVICE_STATUSES[$CURRENT_DEVICE_INDEX]:=""}"
+                : "${OPERATOR_REMEDIATE_DEVICE_MESSAGES[$CURRENT_DEVICE_INDEX]:=""}"
                 ;;
             device:*:state=*)
+                CURRENT_DEVICE_INDEX="$(parsed_operator_remediation_device_index "$PARSED_LINE")" || continue
                 CURRENT_DEVICE_STATE="${PARSED_LINE#*=}"
-                OPERATOR_REMEDIATE_DEVICE_STATES[$((${#OPERATOR_REMEDIATE_DEVICE_STATES[@]} - 1))]="$CURRENT_DEVICE_STATE"
+                OPERATOR_REMEDIATE_DEVICE_STATES[$CURRENT_DEVICE_INDEX]="$CURRENT_DEVICE_STATE"
                 ;;
             device:*:status=*)
+                CURRENT_DEVICE_INDEX="$(parsed_operator_remediation_device_index "$PARSED_LINE")" || continue
                 CURRENT_DEVICE_STATUS="${PARSED_LINE#*=}"
-                OPERATOR_REMEDIATE_DEVICE_STATUSES[$((${#OPERATOR_REMEDIATE_DEVICE_STATUSES[@]} - 1))]="$CURRENT_DEVICE_STATUS"
+                OPERATOR_REMEDIATE_DEVICE_STATUSES[$CURRENT_DEVICE_INDEX]="$CURRENT_DEVICE_STATUS"
                 ;;
             device:*:message=*)
+                CURRENT_DEVICE_INDEX="$(parsed_operator_remediation_device_index "$PARSED_LINE")" || continue
                 CURRENT_DEVICE_MESSAGE="${PARSED_LINE#*=}"
-                OPERATOR_REMEDIATE_DEVICE_MESSAGES[$((${#OPERATOR_REMEDIATE_DEVICE_MESSAGES[@]} - 1))]="$CURRENT_DEVICE_MESSAGE"
+                OPERATOR_REMEDIATE_DEVICE_MESSAGES[$CURRENT_DEVICE_INDEX]="$CURRENT_DEVICE_MESSAGE"
                 ;;
         esac
     done <<< "$PARSED_REMEDIATION_OUTPUT"

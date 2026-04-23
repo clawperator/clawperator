@@ -241,12 +241,13 @@ async function remediateConnectedDevice(
   let doctorFixAttempted = false;
 
   if (needsSetup) {
+    const hadCachedDownload = currentCache !== undefined;
     const setupApk = await ensureSetupApkPath(operatorPackage, currentCache, {
       downloadOperatorApkImpl: deps.downloadOperatorApkImpl,
       apkExistsImpl: deps.apkExistsImpl,
     });
     currentCache = setupApk.cache ?? currentCache;
-    downloadAttempted = operatorPackage === DEFAULT_OPERATOR_PACKAGE;
+    downloadAttempted = operatorPackage === DEFAULT_OPERATOR_PACKAGE && !hadCachedDownload;
 
     if (!setupApk.localPath) {
       return {
@@ -414,6 +415,19 @@ function buildSummaryMessage(summary: OperatorRemediateResult["summary"]): strin
       return `All connected devices passed critical checks. ${summary.warn} device${summary.warn === 1 ? "" : "s"} still have warnings.`;
     }
     return "All connected devices are ready.";
+  }
+  if (summary.failed === 0) {
+    const adbRecoverySummary = `${summary.adbUnready} visible device${summary.adbUnready === 1 ? "" : "s"} still need${summary.adbUnready === 1 ? "s" : ""} ADB recovery.`;
+    if (summary.remediated > 0) {
+      return `Remediated ${summary.remediated} device${summary.remediated === 1 ? "" : "s"}. ${adbRecoverySummary}`;
+    }
+    if (summary.warn > 0) {
+      return `All connected devices passed critical checks. ${adbRecoverySummary}`;
+    }
+    if (summary.connectedDevices > 0) {
+      return `All connected devices are ready. ${adbRecoverySummary}`;
+    }
+    return `No connected device is ready for ADB yet. ${adbRecoverySummary}`;
   }
   return `Remediation still required for ${summary.failed + summary.adbUnready} device${summary.failed + summary.adbUnready === 1 ? "" : "s"}.`;
 }

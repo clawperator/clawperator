@@ -82,13 +82,19 @@ printf '%s\n' "\$*" >> "$log_file"
 case "$scenario" in
   success)
     cat <<'JSON'
-{"ok":true,"summary":{"totalDevices":3,"connectedDevices":2,"ready":1,"warn":1,"remediated":1,"adbUnready":1,"failed":0},"devices":[{"deviceId":"serial-remediated","adbState":"device","status":"remediated","message":"Device was remediated and is now ready."},{"deviceId":"serial-warning","adbState":"device","status":"warn","message":"Critical checks passed with warnings: readiness.handshake"},{"deviceId":"serial-offline","adbState":"offline","status":"adb-unready","message":"ADB reports state 'offline'. Resolve device connectivity before remediation."}],"message":"Remediated 1 device."}
+{"ok":true,"summary":{"totalDevices":3,"connectedDevices":2,"ready":1,"warn":1,"remediated":1,"adbUnready":1,"failed":0},"devices":[{"deviceId":"serial-remediated","adbState":"device","status":"remediated","message":"Device was remediated and is now ready."},{"deviceId":"serial-warning","adbState":"device","status":"warn","message":"Critical checks passed with warnings: readiness.handshake"},{"deviceId":"serial-offline","adbState":"offline","status":"adb-unready","message":"ADB reports state 'offline'. Resolve device connectivity before remediation."}],"message":"Remediated 1 device. 1 visible device still needs ADB recovery."}
 JSON
     exit 0
     ;;
   single-connected)
     cat <<'JSON'
-{"ok":true,"summary":{"totalDevices":2,"connectedDevices":1,"ready":1,"warn":0,"remediated":0,"adbUnready":1,"failed":0},"devices":[{"deviceId":"serial-solo","adbState":"device","status":"ready","message":"Device is ready."},{"deviceId":"serial-offline","adbState":"offline","status":"adb-unready","message":"ADB reports state 'offline'. Resolve device connectivity before remediation."}],"message":"Remediation still required for 1 device."}
+{"ok":true,"summary":{"totalDevices":2,"connectedDevices":1,"ready":1,"warn":0,"remediated":0,"adbUnready":1,"failed":0},"devices":[{"deviceId":"serial-solo","adbState":"device","status":"ready","message":"Device is ready."},{"deviceId":"serial-offline","adbState":"offline","status":"adb-unready","message":"ADB reports state 'offline'. Resolve device connectivity before remediation."}],"message":"All connected devices are ready. 1 visible device still needs ADB recovery."}
+JSON
+    exit 0
+    ;;
+  missing-id)
+    cat <<'JSON'
+{"ok":true,"summary":{"totalDevices":2,"connectedDevices":1,"ready":1,"warn":0,"remediated":0,"adbUnready":1,"failed":0},"devices":[{"adbState":"device","status":"ready","message":"Device is ready."},{"deviceId":"serial-offline","adbState":"offline","status":"adb-unready","message":"ADB reports state 'offline'. Resolve device connectivity before remediation."}],"message":"All connected devices are ready. 1 visible device still needs ADB recovery."}
 JSON
     exit 0
     ;;
@@ -100,7 +106,7 @@ JSON
     ;;
   empty)
     cat <<'JSON'
-{"ok":true,"summary":{"totalDevices":0,"connectedDevices":0,"ready":0,"warn":0,"remediated":0,"adbUnready":0,"failed":0},"devices":[],"message":"No Android devices detected."}
+{"ok":true,"summary":{"totalDevices":0,"connectedDevices":0,"ready":0,"warn":0,"remediated":0,"adbUnready":0,"failed":0},"devices":[],"message":"No connected Android devices found."}
 JSON
     exit 0
     ;;
@@ -190,7 +196,7 @@ assert_contains "$SUCCESS_STDOUT" "Device remediation summary from the CLI:" "su
 assert_contains "$SUCCESS_STDOUT" "serial-remediated - remediated" "success stdout"
 assert_contains "$SUCCESS_STDOUT" "serial-warning - Critical checks passed with warnings: readiness.handshake" "success stdout"
 assert_contains "$SUCCESS_STDOUT" "serial-offline - ADB reports state 'offline'." "success stdout"
-assert_contains "$SUCCESS_STDOUT" "Remediated 1 device." "success stdout"
+assert_contains "$SUCCESS_STDOUT" "Remediated 1 device. 1 visible device still needs ADB recovery." "success stdout"
 assert_contains "$SUCCESS_VALUES" "ok=true" "success values"
 assert_contains "$SUCCESS_VALUES" "command_status=0" "success values"
 assert_contains "$SUCCESS_VALUES" "total=3" "success values"
@@ -218,7 +224,20 @@ assert_contains "$SINGLE_VALUES" "last_device=serial-solo" "single-connected val
 assert_contains "$SINGLE_VALUES" "device0_status=ready" "single-connected values"
 assert_contains "$SINGLE_VALUES" "device1_status=adb-unready" "single-connected values"
 
-echo "=== Scenario 4: CLI delegation preserves failure details without rebuilding policy in shell ==="
+echo "=== Scenario 4: parser tolerates device entries that omit deviceId without crashing ==="
+MISSING_ID_STDOUT="$TMP_DIR/missing-id.stdout"
+MISSING_ID_STATUS="$TMP_DIR/missing-id.status"
+MISSING_ID_VALUES="$TMP_DIR/missing-id.values"
+MISSING_ID_LOG="$TMP_DIR/missing-id.log"
+run_cli_case missing-id missing-id "$MISSING_ID_STDOUT" "$MISSING_ID_STATUS" "$MISSING_ID_VALUES" "$MISSING_ID_LOG"
+assert_exit_code "$(cat "$MISSING_ID_STATUS")" 0 "missing-id"
+assert_contains "$MISSING_ID_VALUES" "ok=true" "missing-id values"
+assert_contains "$MISSING_ID_VALUES" "connected=1" "missing-id values"
+assert_contains "$MISSING_ID_VALUES" "device0=" "missing-id values"
+assert_contains "$MISSING_ID_VALUES" "device1=serial-offline" "missing-id values"
+assert_contains "$MISSING_ID_STDOUT" "All connected devices are ready. 1 visible device still needs ADB recovery." "missing-id stdout"
+
+echo "=== Scenario 5: CLI delegation preserves failure details without rebuilding policy in shell ==="
 FAIL_STDOUT="$TMP_DIR/fail.stdout"
 FAIL_STATUS="$TMP_DIR/fail.status"
 FAIL_VALUES="$TMP_DIR/fail.values"
@@ -235,20 +254,20 @@ assert_contains "$FAIL_VALUES" "failed=1" "failure values"
 assert_contains "$FAIL_LOG" "operator remediate --output json --operator-package com.clawperator.operator" "failure log"
 assert_not_contains "$FAIL_STDOUT" "operator setup --apk" "failure stdout"
 
-echo "=== Scenario 5: no-device results stay parseable and keep remediation in the CLI lane ==="
+echo "=== Scenario 6: no-device results stay parseable and keep remediation in the CLI lane ==="
 EMPTY_STDOUT="$TMP_DIR/empty.stdout"
 EMPTY_STATUS="$TMP_DIR/empty.status"
 EMPTY_VALUES="$TMP_DIR/empty.values"
 EMPTY_LOG="$TMP_DIR/empty.log"
 run_cli_case empty empty "$EMPTY_STDOUT" "$EMPTY_STATUS" "$EMPTY_VALUES" "$EMPTY_LOG"
 assert_exit_code "$(cat "$EMPTY_STATUS")" 0 "empty"
-assert_contains "$EMPTY_STDOUT" "No Android devices detected." "empty stdout"
+assert_contains "$EMPTY_STDOUT" "No connected Android devices found." "empty stdout"
 assert_contains "$EMPTY_VALUES" "ok=true" "empty values"
 assert_contains "$EMPTY_VALUES" "total=0" "empty values"
 assert_contains "$EMPTY_VALUES" "connected=0" "empty values"
 assert_contains "$EMPTY_VALUES" "last_device=" "empty values"
 
-echo "=== Scenario 6: invalid CLI output fails fast instead of guessing remediation policy ==="
+echo "=== Scenario 7: invalid CLI output fails fast instead of guessing remediation policy ==="
 INVALID_STDOUT="$TMP_DIR/invalid.stdout"
 INVALID_STATUS="$TMP_DIR/invalid.status"
 INVALID_VALUES="$TMP_DIR/invalid.values"

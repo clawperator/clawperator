@@ -269,7 +269,8 @@ Notes:
   - Keeps doctor single-device by contract; remediation loops live here, not inside doctor.
   - Uses doctor reports to classify devices as ready, warning-only, remediated, adb-unready, or failed.
   - Reuses operator download/setup for APK remediation and doctor --fix only for single-device recovery such as handshake permission re-grants.
-  - Exit code 0 means no connected device needed and failed remediation.
+  - Exit code 0 means no connected device failed remediation.
+  - adb-unready devices are still reported in the structured result, but they do not change the exit code by themselves.
   - Exit code 1 means at least one connected device still failed remediation.
 `;
 

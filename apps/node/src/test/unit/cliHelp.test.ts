@@ -49,6 +49,7 @@ describe("CLI help", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator operator remediate/);
     assert.match(stdout, /doctor single-device by contract/);
+    assert.match(stdout, /adb-unready devices are still reported/);
   });
 
   it("shows operator setup guidance for setup --help", async () => {
