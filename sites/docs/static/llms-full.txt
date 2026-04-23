@@ -106,7 +106,7 @@ Get from an empty host to a first successful `clawperator snapshot --json` with 
 
 ## 1. Install the CLI
 
-Recommended - the installer handles Node, Java 17, adb, CLI, APK download, and device setup in one step:
+Recommended - the installer handles Node, Java 17, adb, CLI, APK download, device setup, and CLI-owned host artifacts in one step:
 
 ```bash
 curl -fsSL https://clawperator.com/install.sh | bash
@@ -130,19 +130,22 @@ Success conditions:
 - `clawperator version` exits `0` and prints a version string.
 - If you used `install.sh`, the installer also downloads the current release APK to `~/.clawperator/downloads/operator.apk` for that run. For later manual setup or recovery, redownload from `https://clawperator.com/operator.apk`.
 
-### Durable host-agent artifacts from `install.sh`
+### Durable host-agent artifacts from the CLI bootstrap
 
-If `install.sh` reaches its post-doctor onboarding phase, it also writes these
-durable onboarding files under `~/.clawperator/`:
+If `install.sh` reaches its post-bootstrap onboarding phase, it calls `clawperator host setup` and writes these durable onboarding files under `~/.clawperator/`:
 
 | Path | Meaning | When to read it |
 | --- | --- | --- |
 | `~/.clawperator/AGENTS.md` | Local Clawperator guide with runtime-skill discovery commands and current bundled-skills status | First stop for a host agent that needs to discover what Clawperator can do on this machine |
-| `~/.clawperator/install-state.json` | Durable install metadata written by the installer | Use when you need the last known install facts without rerunning `doctor` |
+| `~/.clawperator/install-state.json` | Durable install metadata written by `clawperator host setup` during install | Use when you need the last known install facts without rerunning `doctor` |
 | `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config for Claude Desktop, Codex, and a generic stdio MCP consumer | Use when the host should connect through `clawperator mcp serve` instead of shelling out to the CLI |
 
 Early prerequisite failures and early doctor failures exit before these files
 are written.
+
+The runtime-skills registry is discovered automatically from
+`~/.clawperator/skills/skills/skills-registry.json` after `clawperator skills install`, so
+`install.sh` no longer writes `CLAWPERATOR_SKILLS_REGISTRY` into shell RC files.
 
 Canonical public next step after install:
 
@@ -172,7 +175,7 @@ Field rules:
 
 Shared-agent bridge behavior is intentionally bounded:
 
-- if `~/.agents/AGENTS.md` already exists, the installer appends one Clawperator-owned bridge block there
+- if `~/.agents/AGENTS.md` already exists, `clawperator host setup` appends one Clawperator-owned bridge block there
 - that bridge points back to `~/.clawperator/AGENTS.md` plus the `clawperator skills` discovery commands
 - if `~/.agents/AGENTS.md` does not exist, the installer does not create it
 - the installer does not copy runtime skills into shared agent skill directories
@@ -181,12 +184,14 @@ Verification:
 
 ```bash
 ls ~/.clawperator/AGENTS.md ~/.clawperator/install-state.json ~/.clawperator/mcp-config-snippet.json
+clawperator skills list --json
 test ! -f ~/.agents/AGENTS.md || grep -F "CLAWPERATOR_SHARED_AGENT_BRIDGE:START" ~/.agents/AGENTS.md
 ```
 
 When choosing the host-facing surface:
 
 - use `clawperator skills` when you want to discover or run installed runtime skills by app, keyword, or id
+- no shell profile export is required for the default runtime-skills registry path
 - use MCP when your host already supports stdio MCP and wants registered tools such as `devices`, `snapshot`, and `execute`
 
 See [Host Agent Orientation](host-agents.md) for the post-install decision flow
@@ -483,8 +488,9 @@ finds no relevant match, start with `clawperator-skill-author-by-agent-discovery
 If packaged first-party bundled skills are installed, `clawperator-agent-orientation`
 is the first-run packaged front door for this route and should point back to
 this page, while `clawperator-upgrade` is the packaged whole-product upgrade
-route through `install.sh` and `doctor` after explicit upgrade intent is
-already established.
+route. It checks `clawperator --version`, uses the CLI-first upgrade sequence
+when the CLI is reachable, and falls back to `install.sh` only as recovery
+when the CLI is not reachable.
 
 ## When To Read This Page
 
@@ -532,7 +538,7 @@ Use this order:
 | Situation | Start here | Why |
 | --- | --- | --- |
 | You are unfamiliar with this host and want the packaged first-run orientation surface | `clawperator-agent-orientation` | Thin packaged router that points back to this page and the canonical docs. |
-| The user or calling workflow explicitly chose a whole-product refresh before you trust any downstream route | `clawperator-upgrade` | Re-runs the canonical installer at `https://clawperator.com/install.sh`, then verifies readiness with `clawperator doctor --json`. Do not use it for passive diagnosis. |
+| The user or calling workflow explicitly chose a whole-product refresh before you trust any downstream route | `clawperator-upgrade` | Checks `clawperator --version`, then uses `npm install -g clawperator@latest`, `clawperator operator remediate`, `clawperator bundled-skills update`, `clawperator skills install`, `clawperator host setup`, and `clawperator doctor --json`. Uses `install.sh` only when the CLI is not reachable. |
 | You know the Android package id and want the fastest answer to "what can this host do for this app?" | `clawperator skills for-app <package_id> --json` | `skills for-app` is the primary app-oriented discovery surface. |
 | You only know user-language terms such as app name or intent | `clawperator skills search --keyword <text> --json` | Search is the fallback when you do not have the package id yet. |
 | You already have a skill id and want the exact metadata | `clawperator skills get <skill_id> --json` | Confirms the registry entry before a run. |
@@ -646,9 +652,9 @@ These files help a host orient after install:
 
 | Path | Meaning | Next step |
 | --- | --- | --- |
-| `~/.clawperator/AGENTS.md` | Local Clawperator guide written by `install.sh` | Use it as machine-local context after you read this public route. |
-| `~/.clawperator/install-state.json` | Durable install metadata | Check `registryPath`, `cliVersion`, and `lastDeviceSerial` without rerunning install. |
-| `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config | Use it when you choose the MCP route. |
+| `~/.clawperator/AGENTS.md` | Local Clawperator guide written by `clawperator host setup` during install | Use it as machine-local context after you read this public route. |
+| `~/.clawperator/install-state.json` | Durable install metadata written by `clawperator host setup` | Check `registryPath`, `cliVersion`, and `lastDeviceSerial` without rerunning install. |
+| `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config written by `clawperator host setup` | Use it when you choose the MCP route. |
 | `~/.clawperator/skills/skills/skills-registry.json` | Installed runtime-skills registry | Verify it exists when `skills list` or `skills for-app` cannot discover skills. |
 | `~/.clawperator/bundled-skills/` | Installed first-party bundled skills | Inspect it through `clawperator bundled-skills list --json` when runtime discovery returns no relevant match. |
 
@@ -1384,7 +1390,7 @@ This page is generated from the Node CLI registry and command sources.
 
 | Command | Syntax | Aliases | Flags | Summary |
 | --- | --- | --- | --- | --- |
-| `operator` | `operator setup --apk <path> [--device <id>] [--operator-package <package>]`<br>`operator download [--operator-package <package>]` | - | --apk, --device, --operator-package, --help<br>Subcommands: setup, install, download | Install the Operator APK and configure the device |
+| `operator` | `operator setup --apk <path> [--device <id>] [--operator-package <package>]`<br>`operator download [--operator-package <package>]`<br>`operator remediate [--operator-package <package>]` | - | --apk, --device, --operator-package, --help<br>Subcommands: setup, install, download, remediate | Install the Operator APK and configure the device |
 | `host` | `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]` | - | --installed-at, --cli-version, --apk-version, --last-device-serial<br>Subcommands: setup | Set up durable host artifacts owned by the CLI |
 | `setup` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
 | `install` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
@@ -1409,8 +1415,8 @@ This page is generated from the Node CLI registry and command sources.
 | `scroll-and-click` | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>] [--json]` | scroll_and_click | --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --click, --device, --operator-package, --json | Scroll until target is visible, then click it (alias for scroll-until --click) |
 | `wait-for-nav` | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]` | wait-for-navigation, wait_for_navigation | --app, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --validate-only, --dry-run, --timeout, --device, --operator-package, --json | Wait for app or screen navigation to complete |
 | `read-value` | `read-value --label <text> [--json]` | read-kv, read-key-value-pair, read_key_value_pair | --label, --label-id, --label-desc, --all, --validate-only, --dry-run, --json | Read the value associated with a labeled element |
-| `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills for-app <package_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --json, --output<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
-| `bundled-skills` | `bundled-skills list`<br>`bundled-skills install`<br>`bundled-skills update` | - | -<br>Subcommands: install, update, list | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
+| `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills for-app <package_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --json, --output, --version<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
+| `bundled-skills` | `bundled-skills list`<br>`bundled-skills install`<br>`bundled-skills update` | - | --version, --json<br>Subcommands: install, update, list | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
 | `recording` | `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]`<br>`recording stop`<br>`recording pull`<br>`recording parse --input <file> [--out <file>]`<br>`recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]`<br>`recording compare --baseline <export.json> --result <skills-run.json> [--mode <auto|literal|semantic>]` | record | --session-id, --out, --input, --snapshots, --baseline, --result, --mode, --device, --operator-package<br>Subcommands: compare, export | Manage recording sessions on the Operator app |
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `mcp` | `mcp serve` | - | - | Start the first-party MCP server |
@@ -1423,7 +1429,7 @@ This page is generated from the Node CLI registry and command sources.
 
 | Command | Syntax | Aliases | Flags | Summary |
 | --- | --- | --- | --- | --- |
-| `operator` | `operator setup --apk <path> [--device <id>] [--operator-package <package>]`<br>`operator download [--operator-package <package>]` | - | --apk, --device, --operator-package, --help<br>Subcommands: setup, install, download | Install the Operator APK and configure the device |
+| `operator` | `operator setup --apk <path> [--device <id>] [--operator-package <package>]`<br>`operator download [--operator-package <package>]`<br>`operator remediate [--operator-package <package>]` | - | --apk, --device, --operator-package, --help<br>Subcommands: setup, install, download, remediate | Install the Operator APK and configure the device |
 | `host` | `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]` | - | --installed-at, --cli-version, --apk-version, --last-device-serial<br>Subcommands: setup | Set up durable host artifacts owned by the CLI |
 | `setup` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
 | `install` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
@@ -1434,10 +1440,10 @@ This page is generated from the Node CLI registry and command sources.
 ### `operator`
 
 - Summary: Install the Operator APK and configure the device
-- Syntax: `operator setup --apk <path> [--device <id>] [--operator-package <package>]`, `operator download [--operator-package <package>]`
+- Syntax: `operator setup --apk <path> [--device <id>] [--operator-package <package>]`, `operator download [--operator-package <package>]`, `operator remediate [--operator-package <package>]`
 - Aliases: -
 - Flags: `--apk`, `--device`, `--operator-package`, `--help`
-- Subcommands: `setup`, `install`, `download`
+- Subcommands: `setup`, `install`, `download`, `remediate`
 
 ### `host`
 
@@ -1526,8 +1532,8 @@ This page is generated from the Node CLI registry and command sources.
 | Command | Syntax | Aliases | Flags | Summary |
 | --- | --- | --- | --- | --- |
 | `exec` | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]`<br>`exec best-effort --goal <text> [--device <id>] [--operator-package <package>]` | execute | --payload, --validate-only, --dry-run, --goal, --device, --operator-package, --execution, --input, --file | Execute a validated command payload |
-| `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills for-app <package_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --json, --output<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
-| `bundled-skills` | `bundled-skills list`<br>`bundled-skills install`<br>`bundled-skills update` | - | -<br>Subcommands: install, update, list | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
+| `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills for-app <package_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --json, --output, --version<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
+| `bundled-skills` | `bundled-skills list`<br>`bundled-skills install`<br>`bundled-skills update` | - | --version, --json<br>Subcommands: install, update, list | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `mcp` | `mcp serve` | - | - | Start the first-party MCP server |
 
@@ -1543,7 +1549,7 @@ This page is generated from the Node CLI registry and command sources.
 - Summary: Manage and run automation skills
 - Syntax: `skills list`, `skills get <skill_id>`, `skills for-app <package_id>`, `skills search --app <package_id> [--intent <intent>] [--keyword <text>]`, `skills search <keyword>`, `skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`, `skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`, `skills new <skill_id> [--summary <text>] [--recording-context <file>]`, `skills validate <skill_id> [--dry-run]`, `skills validate --all [--dry-run]`, `skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]`, `skills install`, `skills update [--ref <git-ref>]`, `skills sync --ref <git-ref>`
 - Aliases: -
-- Flags: `--app`, `--intent`, `--keyword`, `--skill-id`, `--artifact`, `--vars`, `--summary`, `--recording-context`, `--all`, `--dry-run`, `--device`, `--device-id`, `--operator-package`, `--receiver-package`, `--timeout`, `--timeout-ms`, `--expect-contains`, `--skip-validate`, `--ref`, `--json`, `--output`
+- Flags: `--app`, `--intent`, `--keyword`, `--skill-id`, `--artifact`, `--vars`, `--summary`, `--recording-context`, `--all`, `--dry-run`, `--device`, `--device-id`, `--operator-package`, `--receiver-package`, `--timeout`, `--timeout-ms`, `--expect-contains`, `--skip-validate`, `--ref`, `--json`, `--output`, `--version`
 - Subcommands: `install`, `sync`, `new`, `validate`, `compile-artifact`, `run`
 
 ### `bundled-skills`
@@ -1551,7 +1557,7 @@ This page is generated from the Node CLI registry and command sources.
 - Summary: Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes
 - Syntax: `bundled-skills list`, `bundled-skills install`, `bundled-skills update`
 - Aliases: -
-- Flags: -
+- Flags: `--version`, `--json`
 - Subcommands: `install`, `update`, `list`
 
 ### `serve`

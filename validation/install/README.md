@@ -35,12 +35,14 @@ dependencies for you.
     `run_operator_remediation_via_cli()` summary handling for multi-device,
     no-device, and failure results
 - `test_agent_skills.sh`
-  - covers bundled-skills shell glue plus installer-side CLI result parsers,
-    `setup_bundled_skills_via_cli()`, `write_agent_guide()`, skip behavior,
-    and `CODEX_HOME` fallback
+  - covers bundled-skills shell glue, installer-side CLI result parsers,
+    `setup_bundled_skills_via_cli()`, `setup_skills_via_cli()` registry-path
+    fallback without shell RC mutation, skip behavior, and `CODEX_HOME`
+    fallback
 - `test_main.sh`
   - covers hermetic `main()` smoke paths including success, final-doctor
-    failure, and multi-device completion-with-guidance flow
+    failure, multi-device completion-with-guidance flow, and the CLI-owned
+    host setup orchestration path
 
 ## Maintenance Rule
 
@@ -56,6 +58,8 @@ Common examples:
   - add a shell harness case that proves success, fallback, and failure
 - new `main()` branch or summary outcome
   - extend `test_main.sh`
+- installer RC or environment cleanup
+  - add a shell harness case that proves the old shell-side mutation is gone
 
 Keep install-specific validation in `validation/install/` and wire any new
 harness into `test_install.sh` so the suite remains the single obvious
