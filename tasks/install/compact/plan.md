@@ -111,11 +111,11 @@ post-bootstrap install behavior.
 | --- | --- | --- |
 | `sites/landing/public/install.sh` | Remove dead post-bootstrap code in PR-1 / Phase 1; collapse to bootstrap + `clawperator install` delegation in PR-2 / Phase 3 | Cross-surface task, shell wrapper |
 | `validation/install/` | Remove parser- and glue-focused shell harnesses; keep only bootstrap/delegation proof | PR-1 / Phase 1, PR-2 / Phase 3, PR-2 / Phase 4 |
-| `apps/node/src/cli/registry.ts` | Replace `install` tombstone with real CLI surface | PR-1 / Phase 2 |
+| `apps/node/src/cli/registry.ts` | Replace `install` tombstone with real CLI surface and update stale help text that still teaches the old upgrade flow | PR-1 / Phase 2, PR-2 / Phase 4 |
 | `apps/node/src/cli/commands/` | Add new post-bootstrap install command and supporting output contract | PR-1 / Phase 2 |
 | `apps/node/src/domain/host/` | Move remaining shared-bridge warning semantics fully into Node-owned output | PR-1 / Phase 1, PR-1 / Phase 2 |
 | `apps/node/src/test/` | Add unit or integration coverage for new install surface and moved summary logic | PR-1 / Phase 1, PR-1 / Phase 2, PR-2 / Phase 3 |
-| `docs/` | Update authored install and host-agent guidance for `clawperator install` | PR-2 / Phase 4 |
+| `docs/` | Update authored install, host-agent, and upgrade-skill guidance for `clawperator install` | PR-2 / Phase 4 |
 | `apps/node/bundled-skills/clawperator-upgrade/` | Update canonical upgrade sequence to call `clawperator install` | PR-2 / Phase 4 |
 
 ## Source Of Truth
@@ -126,10 +126,12 @@ post-bootstrap install behavior.
 | Current installer behavior | `sites/landing/public/install.sh` |
 | Install validation maintenance rule | `validation/install/README.md` |
 | Current CLI command structure and the `install` tombstone | `apps/node/src/cli/registry.ts` |
+| Current CLI help and upgrade guidance text | `apps/node/src/cli/registry.ts` |
 | Current host-setup behavior and non-fatal artifact semantics | `apps/node/src/domain/host/hostSetup.ts`, `apps/node/src/cli/commands/host.ts` |
 | Current operator remediation flow | `apps/node/src/cli/commands/operatorRemediate.ts` |
 | Current skills and bundled-skills install contracts | `apps/node/src/cli/commands/skills.ts`, `apps/node/src/cli/commands/bundledSkills.ts` |
 | Current upgrade skill | `apps/node/bundled-skills/clawperator-upgrade/SKILL.md`, `apps/node/bundled-skills/clawperator-upgrade/agents/openai.yaml` |
+| Authored docs that already describe the upgrade route | `docs/setup.md`, `docs/host-agents.md`, `docs/skills/authoring.md` |
 | Docs authoring workflow | `.agents/skills/docs-author/SKILL.md` |
 
 ## Deterministic Versus Judgment
@@ -183,11 +185,17 @@ post-bootstrap install behavior.
   orchestrator
 - keeping shell-side JSON parsers after the new install surface exists
 - leaving dead operator-download shell code and tests in place
+- shipping `clawperator install` while `registry.ts` help text still points
+  users at the old tombstone or the old multi-command upgrade sequence
 - moving bootstrap prerequisite logic into Node
 - keeping both Node-owned and shell-owned versions of the shared-bridge warning
   policy
 - shrinking `install.sh` but leaving shell tests large because they still prove
   removed parser/glue behavior
+- updating only part of the authored docs surface while
+  `docs/skills/authoring.md` or another published page still describes
+  `clawperator-upgrade` as an `install.sh` rerun or spells out the superseded
+  post-bootstrap sequence
 - updating docs or `clawperator-upgrade` before `clawperator install` is the
   truthful canonical route
 - landing this task with `install.sh` still materially above the stated shell
@@ -231,5 +239,5 @@ After PR-2:
 | --- | --- |
 | Canonical post-bootstrap install route | `apps/node/src/cli/registry.ts`, installer command implementation, `docs/setup.md` |
 | Compact shell bootstrap expectations | `sites/landing/public/install.sh`, `validation/install/README.md` |
-| Upgrade path and recovery path | `apps/node/bundled-skills/clawperator-upgrade/SKILL.md`, its `agents/openai.yaml`, and authored install docs in `docs/` |
+| Upgrade path and recovery path | `apps/node/src/cli/registry.ts`, `apps/node/bundled-skills/clawperator-upgrade/SKILL.md`, its `agents/openai.yaml`, and authored install docs in `docs/` including `docs/skills/authoring.md` |
 | Host-setup non-fatal artifact semantics | `apps/node/src/domain/host/hostSetup.ts` and adjacent Node tests |

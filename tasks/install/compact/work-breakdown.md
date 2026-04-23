@@ -66,11 +66,13 @@ Read these files IN THIS ORDER before writing anything.
 | `validation/install/test_agent_skills.sh` | Current parser- and glue-heavy shell coverage, including dead operator-download tests |
 | `validation/install/test_multidevice.sh` | Current parser-heavy remediation shell coverage |
 | `apps/node/src/cli/registry.ts` | Existing CLI structure and the current `install` tombstone to repurpose |
+| `apps/node/src/cli/registry.ts` help blocks near `clawperator-upgrade` | Existing top-level and bundled-skills help text that will become stale if the upgrade route changes |
 | `apps/node/src/domain/host/hostSetup.ts` | Current non-fatal shared-agent-bridge semantics already owned in Node |
 | `apps/node/src/cli/commands/operatorRemediate.ts` | Current CLI-owned remediation flow that the new install command will orchestrate |
 | `apps/node/src/cli/commands/skills.ts` | Current skills-install contract and output shape |
 | `apps/node/src/cli/commands/bundledSkills.ts` | Current bundled-skills contract and output shape |
 | `apps/node/bundled-skills/clawperator-upgrade/SKILL.md` | Current upgrade workflow that will change after the new install surface is real |
+| `docs/host-agents.md` and `docs/skills/authoring.md` | Existing authored docs that already describe the whole-product upgrade route |
 | `.agents/skills/docs-author/SKILL.md` | Required workflow for authored docs updates in Phase 4 |
 
 ## PR / Phase Plan
@@ -180,37 +182,44 @@ installer-facing result output.
 
 1. Replace the current `COMMANDS["install"]` tombstone in `registry.ts` with
    the real post-bootstrap install command.
-2. Implement a CLI-owned flow that internally sequences:
+2. Update the nearby CLI help and guidance text in `registry.ts` that
+   currently describes the old upgrade sequence so it stays truthful once
+   `clawperator install` exists.
+3. Implement a CLI-owned flow that internally sequences:
    - `operator remediate`
    - `skills install`
    - `bundled-skills install`
    - `host setup`
-3. Thread installer state internally in Node rather than exposing data-threading
+4. Thread installer state internally in Node rather than exposing data-threading
    seams to the shell. At minimum, absorb:
    - `LAST_DEVICE_SERIAL` forwarding into host setup
    - default skills-registry discovery for host setup
    - final installer-ready summary state
-4. Keep underlying commands (`operator remediate`, `skills install`,
+5. Keep underlying commands (`operator remediate`, `skills install`,
    `bundled-skills install`, `host setup`) as real reusable surfaces. The new
    command is an orchestrator, not a replacement for their direct use.
-5. Define one installer-facing result contract that supports:
+6. Define one installer-facing result contract that supports:
    - stable JSON output for automation and tests
    - pretty output for installer pass-through
    - partial-failure semantics such as non-fatal shared bridge warnings and
      best-effort skills or bundled-skills handling
-6. Add focused Node tests proving required cases:
+7. Add focused Node tests proving required cases:
    - single-device success path
    - multi-device warn path
    - no-device or remediation-failure path
    - shared-agent-bridge warning remains non-fatal
    - skills or bundled-skills partial-failure semantics match the intended
      installer behavior
-7. Stop after the command and tests are real. Do not rewrite `install.sh` in
+   - CLI help text and `clawperator install --help` stay truthful after the
+     tombstone replacement
+8. Stop after the command and tests are real. Do not rewrite `install.sh` in
    this phase beyond any minimal plumbing required for testability.
 
 ### Acceptance Criteria
 
 - top-level `clawperator install` exists and replaces the old tombstone
+- `registry.ts` no longer contains stale upgrade or help guidance that assumes
+  the old multi-command post-bootstrap route is canonical
 - post-bootstrap sequencing is owned in Node rather than shell
 - the command returns a stable installer-facing JSON result and truthful pretty
   output
@@ -333,7 +342,11 @@ canonical post-bootstrap route.
 - `docs/setup.md`
 - `docs/host-agents.md` and any other authored install or host-agent page that
   still references the old multi-command post-bootstrap path
+- `docs/skills/authoring.md` and any other authored page that still describes
+  `clawperator-upgrade` as an `install.sh` rerun or spells out the old
+  multi-command upgrade sequence
 - `validation/install/README.md`
+- `apps/node/src/cli/registry.ts`
 - `apps/node/bundled-skills/clawperator-upgrade/SKILL.md`
 - `apps/node/bundled-skills/clawperator-upgrade/agents/openai.yaml`
 
@@ -345,22 +358,32 @@ canonical post-bootstrap route.
    - `clawperator install` owns post-bootstrap install behavior
    - direct lower-level commands remain available but are no longer the normal
      installer route
-3. Update `validation/install/README.md` so it describes the reduced shell
+3. Update authored bundled-skill docs that name `clawperator-upgrade`
+   explicitly, including `docs/skills/authoring.md`, so they match the new
+   CLI-first upgrade route.
+4. Update `validation/install/README.md` so it describes the reduced shell
    harness role accurately.
-4. Update `clawperator-upgrade/SKILL.md` so the normal upgrade route uses:
+5. Update `apps/node/src/cli/registry.ts` help blocks so `clawperator --help`
+   and bundled-skills help name the new canonical upgrade/install route
+   truthfully.
+6. Update `clawperator-upgrade/SKILL.md` so the normal upgrade route uses:
    1. `clawperator --version` reachability check
    2. `npm install -g clawperator@latest`
    3. `clawperator install`
    4. `clawperator doctor --json`
    with `install.sh` retained as recovery-only fallback when the CLI is not
    reachable or bootstrap prerequisites are broken.
-5. Update `agents/openai.yaml` in the same commit so the prompt metadata stays
+7. Update `agents/openai.yaml` in the same commit so the prompt metadata stays
    aligned with the skill text.
 
 ### Acceptance Criteria
 
 - authored docs describe `clawperator install` as the canonical post-bootstrap
   route truthfully
+- authored docs no longer describe `clawperator-upgrade` as a raw `install.sh`
+  rerun or spell out the superseded multi-command upgrade sequence
+- CLI help surfaces in `registry.ts` align with the shipped `clawperator install`
+  and upgrade route
 - validation README matches the reduced shell-harness ownership model
 - `clawperator-upgrade` and its `agents/openai.yaml` align on the new flow
 
