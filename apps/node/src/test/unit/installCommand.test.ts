@@ -163,6 +163,7 @@ describe("cmdInstall", () => {
     assert.match(output, /Clawperator install: WARN/);
     assert.match(output, /Future commands must target one device explicitly with --device\./);
     assert.match(output, /serial-alpha - ready: Device is ready\./);
+    assert.match(output, /Verify one device explicitly with: clawperator doctor --device <device_id> --output pretty --operator-package com\.clawperator\.operator\.dev/);
     assert.strictEqual(process.exitCode, undefined);
   });
 
@@ -204,6 +205,46 @@ describe("cmdInstall", () => {
     assert.strictEqual(parsed.ok, false);
     assert.strictEqual(parsed.status, "failed");
     assert.match(parsed.message, /no connected Android devices were found/i);
+    assert.strictEqual(process.exitCode, 1);
+  });
+
+  it("includes reconnect guidance in pretty output when no connected Android devices are available", async () => {
+    const output = await cmdInstall(
+      { format: "pretty", operatorPackage: "com.clawperator.operator.dev" },
+      {
+        runOperatorRemediateImpl: async () => makeOperatorRemediationResult({
+          operatorPackage: "com.clawperator.operator.dev",
+          summary: {
+            totalDevices: 0,
+            connectedDevices: 0,
+            ready: 0,
+            warn: 0,
+            remediated: 0,
+            adbUnready: 0,
+            failed: 0,
+          },
+          devices: [],
+          message: "No connected Android devices found.",
+        }),
+        syncSkillsImpl: async () => ({
+          ok: true,
+          synced: true,
+          skillsDir: "/tmp/skills",
+          registryPath: "/tmp/skills/skills/skills-registry.json",
+          message: "Skills synced to /tmp/skills (ref: main)",
+        }),
+        copyBundledSkillsImpl: async () => ({
+          ok: true,
+          skills: ["clawperator-agent-orientation"],
+          installedDir: "/tmp/bundled-skills",
+          agentDiscoveryDirs: [{ label: "codex", dir: "/tmp/codex/skills" }],
+        }),
+        setupHostImpl: async () => makeHostSetupResult(),
+      },
+    );
+
+    assert.match(output, /Clawperator install: FAILED/);
+    assert.match(output, /Connect and authorize a device, then rerun: clawperator install --operator-package com\.clawperator\.operator\.dev/);
     assert.strictEqual(process.exitCode, 1);
   });
 
@@ -274,6 +315,72 @@ describe("cmdInstall", () => {
     assert.strictEqual(process.exitCode, 1);
   });
 
+  it("includes remediation follow-up guidance in pretty output when connected devices still fail", async () => {
+    const output = await cmdInstall(
+      { format: "pretty", operatorPackage: "com.clawperator.operator.dev" },
+      {
+        runOperatorRemediateImpl: async () => makeOperatorRemediationResult({
+          ok: false,
+          operatorPackage: "com.clawperator.operator.dev",
+          summary: {
+            totalDevices: 2,
+            connectedDevices: 2,
+            ready: 1,
+            warn: 0,
+            remediated: 0,
+            adbUnready: 0,
+            failed: 1,
+          },
+          devices: [
+            {
+              deviceId: "serial-alpha",
+              adbState: "device",
+              status: "failed",
+              needsSetup: true,
+              initialCriticalOk: false,
+              finalCriticalOk: false,
+              downloadAttempted: true,
+              setupAttempted: true,
+              doctorFixAttempted: false,
+              message: "Critical checks still failing: readiness.version.compatibility",
+            },
+            {
+              deviceId: "serial-beta",
+              adbState: "device",
+              status: "ready",
+              needsSetup: false,
+              initialCriticalOk: true,
+              finalCriticalOk: true,
+              downloadAttempted: false,
+              setupAttempted: false,
+              doctorFixAttempted: false,
+              message: "Device is ready.",
+            },
+          ],
+          message: "Remediation still required for 1 device.",
+        }),
+        syncSkillsImpl: async () => ({
+          ok: true,
+          synced: true,
+          skillsDir: "/tmp/skills",
+          registryPath: "/tmp/skills/skills/skills-registry.json",
+          message: "Skills synced to /tmp/skills (ref: main)",
+        }),
+        copyBundledSkillsImpl: async () => ({
+          ok: true,
+          skills: ["clawperator-agent-orientation"],
+          installedDir: "/tmp/bundled-skills",
+          agentDiscoveryDirs: [{ label: "codex", dir: "/tmp/codex/skills" }],
+        }),
+        setupHostImpl: async () => makeHostSetupResult(),
+      },
+    );
+
+    assert.match(output, /Clawperator install: FAILED/);
+    assert.match(output, /Rerun remediation after resolving device issues: clawperator operator remediate --operator-package com\.clawperator\.operator\.dev/);
+    assert.strictEqual(process.exitCode, 1);
+  });
+
   it("keeps shared-agent-bridge host warnings non-fatal at the install level", async () => {
     const output = await cmdInstall(
       { format: "json" },
@@ -307,6 +414,82 @@ describe("cmdInstall", () => {
     assert.strictEqual(process.exitCode, undefined);
   });
 
+  it("includes host-setup retry guidance in pretty output when host setup fails", async () => {
+    const output = await cmdInstall(
+      { format: "pretty" },
+      {
+        runOperatorRemediateImpl: async () => makeOperatorRemediationResult(),
+        syncSkillsImpl: async () => ({
+          ok: true,
+          synced: true,
+          skillsDir: "/tmp/skills",
+          registryPath: "/tmp/skills/skills/skills-registry.json",
+          message: "Skills synced to /tmp/skills (ref: main)",
+        }),
+        copyBundledSkillsImpl: async () => ({
+          ok: true,
+          skills: ["clawperator-agent-orientation"],
+          installedDir: "/tmp/bundled-skills",
+          agentDiscoveryDirs: [{ label: "codex", dir: "/tmp/codex/skills" }],
+        }),
+        setupHostImpl: async () => makeHostSetupResult({
+          ok: false,
+          status: "failed",
+          message: "Host setup failed: permission denied",
+        }),
+      },
+    );
+
+    assert.match(output, /Clawperator install: FAILED/);
+    assert.match(output, /Retry host artifact setup after resolving the failure: clawperator host setup/);
+    assert.strictEqual(process.exitCode, 1);
+  });
+
+  it("prioritizes host-setup retry guidance over no-device guidance on mixed failures", async () => {
+    const output = await cmdInstall(
+      { format: "pretty", operatorPackage: "com.clawperator.operator.dev" },
+      {
+        runOperatorRemediateImpl: async () => makeOperatorRemediationResult({
+          operatorPackage: "com.clawperator.operator.dev",
+          summary: {
+            totalDevices: 0,
+            connectedDevices: 0,
+            ready: 0,
+            warn: 0,
+            remediated: 0,
+            adbUnready: 0,
+            failed: 0,
+          },
+          devices: [],
+          message: "No connected Android devices found.",
+        }),
+        syncSkillsImpl: async () => ({
+          ok: true,
+          synced: true,
+          skillsDir: "/tmp/skills",
+          registryPath: "/tmp/skills/skills/skills-registry.json",
+          message: "Skills synced to /tmp/skills (ref: main)",
+        }),
+        copyBundledSkillsImpl: async () => ({
+          ok: true,
+          skills: ["clawperator-agent-orientation"],
+          installedDir: "/tmp/bundled-skills",
+          agentDiscoveryDirs: [{ label: "codex", dir: "/tmp/codex/skills" }],
+        }),
+        setupHostImpl: async () => makeHostSetupResult({
+          ok: false,
+          status: "failed",
+          message: "Host setup failed: permission denied",
+        }),
+      },
+    );
+
+    assert.match(output, /Clawperator install: FAILED/);
+    assert.match(output, /Retry host artifact setup after resolving the failure: clawperator host setup/);
+    assert.doesNotMatch(output, /Connect and authorize a device, then rerun:/);
+    assert.strictEqual(process.exitCode, 1);
+  });
+
   it("treats skills and bundled-skills failures as warnings while preserving a usable install", async () => {
     const output = await cmdInstall(
       { format: "json" },
@@ -335,6 +518,35 @@ describe("cmdInstall", () => {
     assert.strictEqual(parsed.steps.bundledSkillsInstall.status, "warn");
     assert.match(parsed.message, /runtime skills install needs attention/i);
     assert.match(parsed.message, /bundled-skills install needs attention/i);
+    assert.strictEqual(process.exitCode, undefined);
+  });
+
+  it("includes best-effort repair guidance in pretty output when skills-related steps warn", async () => {
+    const output = await cmdInstall(
+      { format: "pretty" },
+      {
+        runOperatorRemediateImpl: async () => makeOperatorRemediationResult(),
+        syncSkillsImpl: async () => ({
+          ok: false,
+          code: "SKILLS_SYNC_FAILED",
+          message: "Skills sync failed: auth required",
+        }),
+        copyBundledSkillsImpl: async () => ({
+          ok: false,
+          code: "BUNDLED_SKILLS_COPY_FAILED",
+          message: "Bundled-skills copy failed: permission denied",
+        }),
+        setupHostImpl: async () => makeHostSetupResult({
+          status: "warn",
+          message: "Host setup completed with a shared-agent bridge warning; continuing.",
+        }),
+      },
+    );
+
+    assert.match(output, /Clawperator install: WARN/);
+    assert.match(output, /Install runtime skills later with: clawperator skills install/);
+    assert.match(output, /Repair bundled-skills later with: clawperator bundled-skills install/);
+    assert.match(output, /Rerun host artifact setup after resolving the warning if needed: clawperator host setup/);
     assert.strictEqual(process.exitCode, undefined);
   });
 });

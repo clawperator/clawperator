@@ -590,10 +590,12 @@ async function buildAgentGuideContent(
     }
     if (hasUpgrade) {
       lines.push(
-        "- `clawperator-upgrade`: packaged whole-product upgrade route. It reruns the",
-        "  canonical installer at `https://clawperator.com/install.sh`, verifies the",
-        "  result with `clawperator doctor --json`, and reports the next blocking",
-        "  repair step when setup is still incomplete.",
+        "- `clawperator-upgrade`: packaged whole-product upgrade route. It checks",
+        "  `clawperator --version`, verifies the installer-owned Node and Java",
+        "  prerequisites, then runs `npm install -g clawperator@latest`,",
+        "  `clawperator install`, and `clawperator doctor --json` when the CLI is",
+        "  already reachable. It keeps `install.sh` as recovery-only fallback when",
+        "  the CLI or bootstrap prerequisites still need repair.",
       );
     }
     if (hasDiscovery) {
@@ -668,7 +670,7 @@ async function buildAgentGuideContent(
       "",
       "Expected packaged front doors after install:",
       "- `clawperator-agent-orientation`: first-run orientation for unfamiliar hosts",
-      "- `clawperator-upgrade`: packaged whole-product upgrade route through install.sh and doctor",
+      "- `clawperator-upgrade`: packaged whole-product upgrade route through `clawperator install` and `clawperator doctor --json`, with `install.sh` retained as recovery-only fallback",
       "- `clawperator-skill-author-by-agent-discovery`: zero-results front door when runtime-skill discovery found no relevant match",
       "- `clawperator-skill-author-by-recording`: proving workflow after discovery returns `proceed_to_recording`",
       "",

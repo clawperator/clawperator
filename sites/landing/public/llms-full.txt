@@ -106,7 +106,7 @@ Get from an empty host to a first successful `clawperator snapshot --json` with 
 
 ## 1. Install the CLI
 
-Recommended - the installer handles Node, Java 17, adb, CLI, APK download, device setup, and CLI-owned host artifacts in one step:
+Recommended - the installer handles Node, Java 17, adb, CLI bootstrap, and the delegated `clawperator install` flow in one step:
 
 ```bash
 curl -fsSL https://clawperator.com/install.sh | bash
@@ -125,14 +125,23 @@ Alternatively, install the CLI only via npm (Node.js 24+ required):
 npm install -g clawperator
 ```
 
+Then run the canonical post-bootstrap install flow:
+
+```bash
+clawperator install
+```
+
 Success conditions:
 
 - `clawperator version` exits `0` and prints a version string.
-- If you used `install.sh`, the installer also downloads the current release APK to `~/.clawperator/downloads/operator.apk` for that run. For later manual setup or recovery, redownload from `https://clawperator.com/operator.apk`.
+- If you used `install.sh`, the delegated install flow downloads the current release APK when remediation needs setup and no reusable local copy is already in place. For later manual setup or recovery, redownload from `https://clawperator.com/operator.apk` or use `clawperator operator download`.
 
-### Durable host-agent artifacts from the CLI bootstrap
+### Durable host-agent artifacts from `clawperator install`
 
-If `install.sh` reaches its post-bootstrap onboarding phase, it calls `clawperator host setup` and writes these durable onboarding files under `~/.clawperator/`:
+After shell bootstrap succeeds, `install.sh` delegates to `clawperator install`.
+That CLI-owned post-bootstrap flow runs operator remediation, runtime-skills
+install, bundled-skills install, and `clawperator host setup`, then writes
+these durable onboarding files under `~/.clawperator/`:
 
 | Path | Meaning | When to read it |
 | --- | --- | --- |
@@ -140,8 +149,10 @@ If `install.sh` reaches its post-bootstrap onboarding phase, it calls `clawperat
 | `~/.clawperator/install-state.json` | Durable install metadata written by `clawperator host setup` during install | Use when you need the last known install facts without rerunning `doctor` |
 | `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config for Claude Desktop, Codex, and a generic stdio MCP consumer | Use when the host should connect through `clawperator mcp serve` instead of shelling out to the CLI |
 
-Early prerequisite failures and early doctor failures exit before these files
-are written.
+Shell prerequisite failures exit before these files are written. After
+`install.sh` delegates to `clawperator install`, later remediation or device
+readiness failures can still leave these files behind because host setup runs
+before the CLI returns its final install status.
 
 The runtime-skills registry is discovered automatically from
 `~/.clawperator/skills/skills/skills-registry.json` after `clawperator skills install`, so
@@ -540,7 +551,7 @@ Use this order:
 | Situation | Start here | Why |
 | --- | --- | --- |
 | You are unfamiliar with this host and want the packaged first-run orientation surface | `clawperator-agent-orientation` | Thin packaged router that points back to this page and the canonical docs. |
-| The user or calling workflow explicitly chose a whole-product refresh before you trust any downstream route | `clawperator-upgrade` | Checks `clawperator --version`, verifies Node 24+ and Java 17/21, then uses `npm install -g clawperator@latest`, `clawperator operator remediate`, `clawperator bundled-skills update`, `clawperator skills install`, `clawperator host setup`, and `clawperator doctor --json`. Uses `install.sh` only when the CLI is not reachable or the bootstrap prerequisites need repair. |
+| The user or calling workflow explicitly chose a whole-product refresh before you trust any downstream route | `clawperator-upgrade` | Checks `clawperator --version`, verifies Node 24+ and Java 17/21, then uses `npm install -g clawperator@latest`, `clawperator install`, and `clawperator doctor --json`. Uses `install.sh` only when the CLI is not reachable or the bootstrap prerequisites need repair. |
 | You know the Android package id and want the fastest answer to "what can this host do for this app?" | `clawperator skills for-app <package_id> --json` | `skills for-app` is the primary app-oriented discovery surface. |
 | You only know user-language terms such as app name or intent | `clawperator skills search --keyword <text> --json` | Search is the fallback when you do not have the package id yet. |
 | You already have a skill id and want the exact metadata | `clawperator skills get <skill_id> --json` | Confirms the registry entry before a run. |
@@ -1395,7 +1406,7 @@ This page is generated from the Node CLI registry and command sources.
 | `operator` | `operator setup --apk <path> [--device <id>] [--operator-package <package>]`<br>`operator download [--operator-package <package>]`<br>`operator remediate [--operator-package <package>]` | - | --apk, --device, --operator-package, --help<br>Subcommands: setup, install, download, remediate | Install the Operator APK and configure the device |
 | `host` | `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]` | - | --installed-at, --cli-version, --apk-version, --last-device-serial<br>Subcommands: setup | Set up durable host artifacts owned by the CLI |
 | `setup` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
-| `install` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
+| `install` | `install [--operator-package <package>]` | - | --operator-package | Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup |
 | `devices` | `devices` | - | - | List connected Android devices |
 | `emulator` | `emulator list`<br>`emulator inspect <name>`<br>`emulator create [--name <name>]`<br>`emulator start <name>`<br>`emulator stop <name>`<br>`emulator delete <name>`<br>`emulator status`<br>`emulator provision` | - | --name<br>Subcommands: list, inspect, create, start, stop, delete, status, provision | Manage Android emulators (AVDs) |
 | `provision` | - | - | -<br>Subcommands: emulator | Provision an Android emulator |
@@ -1434,7 +1445,7 @@ This page is generated from the Node CLI registry and command sources.
 | `operator` | `operator setup --apk <path> [--device <id>] [--operator-package <package>]`<br>`operator download [--operator-package <package>]`<br>`operator remediate [--operator-package <package>]` | - | --apk, --device, --operator-package, --help<br>Subcommands: setup, install, download, remediate | Install the Operator APK and configure the device |
 | `host` | `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]` | - | --installed-at, --cli-version, --apk-version, --last-device-serial<br>Subcommands: setup | Set up durable host artifacts owned by the CLI |
 | `setup` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
-| `install` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
+| `install` | `install [--operator-package <package>]` | - | --operator-package | Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup |
 | `doctor` | `doctor [--json]`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --json, --format, --output | Run environment and runtime checks |
 | `grant-device-permissions` | `grant-device-permissions [--device <id>] [--operator-package <package>]` | - | --device, --operator-package | Re-grant accessibility and notification permissions |
 | `version` | `version`<br>`version --check-compat [--device <id>] [--operator-package <package>]` | - | --check-compat, --device, --operator-package | Show the CLI version |
@@ -1464,10 +1475,10 @@ This page is generated from the Node CLI registry and command sources.
 
 ### `install`
 
-- Summary: Alias guidance - use operator setup instead
-- Syntax: -
+- Summary: Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup
+- Syntax: `install [--operator-package <package>]`
 - Aliases: -
-- Flags: `--apk`, `--device`, `--operator-package`
+- Flags: `--operator-package`
 
 ### `doctor`
 
@@ -9791,6 +9802,9 @@ curl -fsSL https://clawperator.com/install.sh | bash
 
 already installs first-party bundled skills automatically.
 
+If you bootstrap the CLI with `npm install -g clawperator` instead, run
+`clawperator install` to perform the same post-bootstrap install flow.
+
 Current install model:
 
 | Surface | Path | Role |
@@ -9806,7 +9820,7 @@ Current packaged first-party bundled skills:
 | Skill | Role | Boundary |
 | --- | --- | --- |
 | `clawperator-agent-orientation` | first-run orientation | Routes an unfamiliar host agent to the correct Clawperator front door and canonical docs without redefining the contracts. |
-| `clawperator-upgrade` | whole-product upgrade route | Re-runs `https://clawperator.com/install.sh`, verifies the result with `clawperator doctor --json`, and stays out of component-level self-update logic. Use it only after explicit upgrade intent is established. |
+| `clawperator-upgrade` | whole-product upgrade route | Checks `clawperator --version`, verifies Node 24+ and Java 17/21, then uses `npm install -g clawperator@latest`, `clawperator install`, and `clawperator doctor --json`. Uses `install.sh` only as recovery when the CLI is not reachable or the bootstrap prerequisites need repair. |
 | `clawperator-skill-author-by-agent-discovery` | zero-results front door | Produces one discovery artifact, chooses exactly one next step, and does not author a durable runtime skill directly. |
 | `clawperator-skill-author-by-recording` | proving workflow | Records a real device flow, authors one skill shape, and runs one self-test that surfaces the emitted `SkillResult`. |
 

@@ -17,7 +17,7 @@ Get from an empty host to a first successful `clawperator snapshot --json` with 
 
 ## 1. Install the CLI
 
-Recommended - the installer handles Node, Java 17, adb, CLI, APK download, device setup, and CLI-owned host artifacts in one step:
+Recommended - the installer handles Node, Java 17, adb, CLI bootstrap, and the delegated `clawperator install` flow in one step:
 
 ```bash
 curl -fsSL https://clawperator.com/install.sh | bash
@@ -36,14 +36,23 @@ Alternatively, install the CLI only via npm (Node.js 24+ required):
 npm install -g clawperator
 ```
 
+Then run the canonical post-bootstrap install flow:
+
+```bash
+clawperator install
+```
+
 Success conditions:
 
 - `clawperator version` exits `0` and prints a version string.
-- If you used `install.sh`, the installer also downloads the current release APK to `~/.clawperator/downloads/operator.apk` for that run. For later manual setup or recovery, redownload from `https://clawperator.com/operator.apk`.
+- If you used `install.sh`, the delegated install flow downloads the current release APK when remediation needs setup and no reusable local copy is already in place. For later manual setup or recovery, redownload from `https://clawperator.com/operator.apk` or use `clawperator operator download`.
 
-### Durable host-agent artifacts from the CLI bootstrap
+### Durable host-agent artifacts from `clawperator install`
 
-If `install.sh` reaches its post-bootstrap onboarding phase, it calls `clawperator host setup` and writes these durable onboarding files under `~/.clawperator/`:
+After shell bootstrap succeeds, `install.sh` delegates to `clawperator install`.
+That CLI-owned post-bootstrap flow runs operator remediation, runtime-skills
+install, bundled-skills install, and `clawperator host setup`, then writes
+these durable onboarding files under `~/.clawperator/`:
 
 | Path | Meaning | When to read it |
 | --- | --- | --- |
@@ -51,8 +60,10 @@ If `install.sh` reaches its post-bootstrap onboarding phase, it calls `clawperat
 | `~/.clawperator/install-state.json` | Durable install metadata written by `clawperator host setup` during install | Use when you need the last known install facts without rerunning `doctor` |
 | `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config for Claude Desktop, Codex, and a generic stdio MCP consumer | Use when the host should connect through `clawperator mcp serve` instead of shelling out to the CLI |
 
-Early prerequisite failures and early doctor failures exit before these files
-are written.
+Shell prerequisite failures exit before these files are written. After
+`install.sh` delegates to `clawperator install`, later remediation or device
+readiness failures can still leave these files behind because host setup runs
+before the CLI returns its final install status.
 
 The runtime-skills registry is discovered automatically from
 `~/.clawperator/skills/skills/skills-registry.json` after `clawperator skills install`, so

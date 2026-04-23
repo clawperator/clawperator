@@ -61,6 +61,10 @@ def parse_string_list(raw: str) -> list[str]:
 
 
 def parse_supported_flags(body: str) -> list[str]:
+    documented_flags_match = re.search(r"documentedFlags:\s*\[([^\]]*)\]", body, re.S)
+    if documented_flags_match:
+        return parse_string_list(documented_flags_match.group(1))
+
     collected = re.findall(r"--[A-Za-z0-9][A-Za-z0-9-]*", body)
     return list(dict.fromkeys(collected))
 
