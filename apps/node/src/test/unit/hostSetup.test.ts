@@ -160,6 +160,9 @@ describe("setupHost", () => {
       assert.match(guide, /com\.example\.weather/);
       assert.match(guide, /com\.example\.weather\.check-status/);
       assert.match(guide, /clawperator skills run com\.example\.weather\.check-status --city-name <city_name>/);
+      assert.match(guide, /npm install -g clawperator@latest/);
+      assert.match(guide, /clawperator install/);
+      assert.match(guide, /install\.sh` as recovery-only fallback/);
       assert.match(guide, /Recommended first-run flow:/);
     } finally {
       await rm(homeDir, { recursive: true, force: true });
