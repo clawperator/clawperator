@@ -59,11 +59,20 @@ describe("CLI help", () => {
     assert.match(stdout, /--apk <path>/);
   });
 
-  it("shows operator setup guidance for install --help", async () => {
+  it("shows installer help for install --help", async () => {
     const { stdout, code } = await runCli(["install", "--help"]);
     assert.strictEqual(code, 0);
-    assert.match(stdout, /clawperator operator setup/);
-    assert.match(stdout, /--apk <path>/);
+    assert.match(stdout, /clawperator install/);
+    assert.match(stdout, /canonical post-bootstrap install route/);
+    assert.match(stdout, /operator remediate, skills install, bundled-skills install, and host setup/);
+  });
+
+  it("rejects --device for install because remediation enumerates devices itself", async () => {
+    const { stdout, code } = await runCli(["install", "--device", "serial-123"]);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(code, 1);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /install does not accept --device/i);
   });
 
   it("shows operator setup help for operator install --help alias", async () => {
@@ -79,16 +88,6 @@ describe("CLI help", () => {
     assert.match(stdout, /Clawperator CLI/);
     assert.match(stdout, /Commands:/);
     assert.doesNotMatch(stdout, /^clawperator operator setup$/m);
-  });
-
-  it("returns structured guidance for bare clawperator install", async () => {
-    // USAGE from switch cases exits 0 per CLI convention (not a runtime error).
-    const { stdout } = await runCli(["install"]);
-    const obj = JSON.parse(stdout);
-    assert.strictEqual(obj.code, "USAGE");
-    assert.match(obj.message, /clawperator operator setup/);
-    assert.ok(obj.canonical);
-    assert.match(obj.canonical, /operator setup/);
   });
 
   it("returns structured guidance for bare clawperator setup", async () => {

@@ -21,6 +21,8 @@ export interface HostArtifactOutcome {
 
 export interface HostSetupResult {
   ok: boolean;
+  status: "ok" | "warn" | "failed";
+  message: string;
   artifacts: HostArtifactOutcome[];
   summary: {
     written: number;
@@ -54,6 +56,38 @@ export interface HostSetupOptions {
 
 function isNonFatalHostArtifactFailure(result: HostArtifactOutcome): boolean {
   return result.artifact === "sharedAgentBridge" && result.status === "failed";
+}
+
+function classifyHostSetupResult(results: HostArtifactOutcome[]): {
+  ok: boolean;
+  status: "ok" | "warn" | "failed";
+  message: string;
+} {
+  const failedArtifacts = results.filter((result) => result.status === "failed");
+  const onlyNonFatalFailures = failedArtifacts.length > 0
+    && failedArtifacts.every((result) => isNonFatalHostArtifactFailure(result));
+
+  if (failedArtifacts.length === 0) {
+    return {
+      ok: true,
+      status: "ok",
+      message: "Host setup complete.",
+    };
+  }
+
+  if (onlyNonFatalFailures) {
+    return {
+      ok: true,
+      status: "warn",
+      message: "Host setup completed with a shared-agent bridge warning; continuing.",
+    };
+  }
+
+  return {
+    ok: false,
+    status: "failed",
+    message: "Host setup failed.",
+  };
 }
 
 function resolveBundledSkillsDir(options: HostSetupOptions): string {
@@ -775,9 +809,11 @@ export async function setupHost(
     },
     { written: 0, updated: 0, skipped: 0, failed: 0 },
   );
-
+  const classified = classifyHostSetupResult(results);
   return {
-    ok: results.every((result) => result.status !== "failed" || isNonFatalHostArtifactFailure(result)),
+    ok: classified.ok,
+    status: classified.status,
+    message: classified.message,
     artifacts: results,
     summary,
   };

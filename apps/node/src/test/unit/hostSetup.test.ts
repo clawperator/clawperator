@@ -261,6 +261,8 @@ describe("setupHost", () => {
 
       const bridge = result.artifacts.find((artifact) => artifact.artifact === "sharedAgentBridge");
       assert.strictEqual(result.ok, true);
+      assert.strictEqual(result.status, "warn");
+      assert.strictEqual(result.message, "Host setup completed with a shared-agent bridge warning; continuing.");
       assert.deepStrictEqual(result.summary, {
         written: 3,
         updated: 0,
@@ -343,9 +345,35 @@ describe("cmdHostSetup", () => {
 
       const bridge = output.artifacts.find((artifact: { artifact: string }) => artifact.artifact === "sharedAgentBridge");
       assert.strictEqual(output.ok, true);
+      assert.strictEqual(output.status, "warn");
+      assert.strictEqual(output.message, "Host setup completed with a shared-agent bridge warning; continuing.");
       assert.strictEqual(process.exitCode, undefined);
       assert.strictEqual(bridge?.status, "failed");
       assert.match(bridge?.message ?? "", /must be a regular file/);
+    } finally {
+      await rm(homeDir, { recursive: true, force: true });
+    }
+  });
+
+  it("reports a success message when all host artifacts succeed", async () => {
+    const homeDir = await makeTempHome();
+
+    try {
+      process.env.HOME = homeDir;
+      delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
+      delete process.env.SKILLS_REGISTRY_PATH;
+      delete process.env.ADB_PATH;
+      delete process.env.CODEX_HOME;
+
+      const output = JSON.parse(await cmdHostSetup({
+        format: "json",
+        installedAt: "2026-04-23T10:11:12Z",
+      }));
+
+      assert.strictEqual(output.ok, true);
+      assert.strictEqual(output.status, "ok");
+      assert.strictEqual(output.message, "Host setup complete.");
+      assert.strictEqual(process.exitCode, undefined);
     } finally {
       await rm(homeDir, { recursive: true, force: true });
     }
