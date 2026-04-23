@@ -110,7 +110,7 @@ run_host_setup_parser_case() {
     bash -c '
         source "$1" >/dev/null 2>&1
         trap - ERR
-        printf "%s" "$2" | parse_host_setup_result > "$3"
+        parse_host_setup_result > "$3" <<< "$2"
     ' _ "$INSTALL_SCRIPT" "$input_json" "$output_file"
 }
 
