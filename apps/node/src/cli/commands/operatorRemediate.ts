@@ -172,6 +172,8 @@ async function remediateConnectedDevice(
 ): Promise<{ result: OperatorRemediateDeviceResult; cache?: DownloadCache }> {
   const doctorService = deps.doctorServiceFactory();
   const initialReport = await runDoctorReport(doctorService, operatorPackage, device.serial, logger, false);
+  const needsSetup = reportNeedsSetup(initialReport);
+  const needsGrantRecovery = reportNeedsGrantRecovery(initialReport);
 
   if (allChecksPass(initialReport)) {
     return {
@@ -193,7 +195,7 @@ async function remediateConnectedDevice(
     };
   }
 
-  if (isCriticalOk(initialReport) && !reportNeedsGrantRecovery(initialReport)) {
+  if (isCriticalOk(initialReport) && !needsSetup && !needsGrantRecovery) {
     return {
       result: {
         deviceId: device.serial,
@@ -214,8 +216,7 @@ async function remediateConnectedDevice(
   }
 
   let currentCache = downloadCache;
-  const needsSetup = reportNeedsSetup(initialReport);
-  if (!needsSetup && !reportNeedsGrantRecovery(initialReport) && !isCriticalOk(initialReport)) {
+  if (!needsSetup && !needsGrantRecovery && !isCriticalOk(initialReport)) {
     return {
       result: {
         deviceId: device.serial,

@@ -104,6 +104,77 @@ describe("operator remediate", () => {
     assert.strictEqual(setupCount, 1);
   });
 
+  it("remediates a wrong installed operator variant instead of reporting warning-only success", async () => {
+    const reports = [
+      buildReport({
+        checks: [
+          {
+            id: "readiness.apk.presence",
+            status: "warn",
+            code: ERROR_CODES.OPERATOR_VARIANT_MISMATCH,
+            summary: "Wrong Operator variant installed.",
+          },
+        ],
+      }),
+      buildReport({
+        checks: [{ id: "readiness.handshake", status: "pass", summary: "Handshake successful." }],
+      }),
+    ];
+    let downloadCount = 0;
+    let setupCount = 0;
+
+    const output = await cmdOperatorRemediate(
+      { format: "json" },
+      {
+        listDevicesImpl: async () => [{ serial: "device-1", state: "device" }],
+        doctorServiceFactory: () => ({
+          run: async () => {
+            const next = reports.shift();
+            if (!next) {
+              throw new Error("Unexpected doctor call");
+            }
+            return next;
+          },
+        }),
+        downloadOperatorApkImpl: async () => {
+          downloadCount += 1;
+          return {
+            localPath: "/tmp/operator.apk",
+            operatorVersion: "0.7.4",
+            sha256: "c".repeat(64),
+            operatorPackage: "com.clawperator.operator",
+            checksumSource: "inline",
+            metadataUrl: "https://downloads.example.com/latest.json",
+            apkUrl: "https://downloads.example.com/operator.apk",
+            sha256Url: "https://downloads.example.com/operator.apk.sha256",
+          };
+        },
+        setupOperatorImpl: async () => {
+          setupCount += 1;
+          return {
+            operatorPackage: "com.clawperator.operator",
+            install: { ok: true },
+            permissions: {
+              operatorPackage: "com.clawperator.operator",
+              accessibility: { ok: true, alreadyEnabled: false },
+              notification: { ok: true, skipped: false },
+              notificationListener: { ok: true, alreadyEnabled: false },
+            },
+            verification: { ok: true, packageInstalled: true },
+          };
+        },
+      },
+    );
+
+    const parsed = JSON.parse(output);
+    assert.strictEqual(parsed.ok, true);
+    assert.strictEqual(parsed.summary.remediated, 1);
+    assert.strictEqual(parsed.summary.warn, 0);
+    assert.strictEqual(parsed.devices[0].status, "remediated");
+    assert.strictEqual(downloadCount, 1);
+    assert.strictEqual(setupCount, 1);
+  });
+
   it("reports mixed multi-device states and retries doctor --fix for handshake recovery", async () => {
     const perDeviceReports = new Map<string, DoctorReport[]>([
       ["device-ready", [buildReport({ checks: [{ id: "readiness.handshake", status: "pass", summary: "Handshake successful." }] })]],

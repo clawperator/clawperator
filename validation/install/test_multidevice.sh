@@ -82,7 +82,13 @@ printf '%s\n' "\$*" >> "$log_file"
 case "$scenario" in
   success)
     cat <<'JSON'
-{"ok":true,"summary":{"totalDevices":3,"connectedDevices":1,"ready":1,"warn":1,"remediated":1,"adbUnready":1,"failed":0},"devices":[{"deviceId":"serial-remediated","adbState":"device","status":"remediated","message":"Device was remediated and is now ready."},{"deviceId":"serial-warning","adbState":"device","status":"warn","message":"Critical checks passed with warnings: readiness.handshake"},{"deviceId":"serial-offline","adbState":"offline","status":"adb-unready","message":"ADB reports state 'offline'. Resolve device connectivity before remediation."}],"message":"Remediated 1 device."}
+{"ok":true,"summary":{"totalDevices":3,"connectedDevices":2,"ready":1,"warn":1,"remediated":1,"adbUnready":1,"failed":0},"devices":[{"deviceId":"serial-remediated","adbState":"device","status":"remediated","message":"Device was remediated and is now ready."},{"deviceId":"serial-warning","adbState":"device","status":"warn","message":"Critical checks passed with warnings: readiness.handshake"},{"deviceId":"serial-offline","adbState":"offline","status":"adb-unready","message":"ADB reports state 'offline'. Resolve device connectivity before remediation."}],"message":"Remediated 1 device."}
+JSON
+    exit 0
+    ;;
+  single-connected)
+    cat <<'JSON'
+{"ok":true,"summary":{"totalDevices":2,"connectedDevices":1,"ready":1,"warn":0,"remediated":0,"adbUnready":1,"failed":0},"devices":[{"deviceId":"serial-solo","adbState":"device","status":"ready","message":"Device is ready."},{"deviceId":"serial-offline","adbState":"offline","status":"adb-unready","message":"ADB reports state 'offline'. Resolve device connectivity before remediation."}],"message":"Remediation still required for 1 device."}
 JSON
     exit 0
     ;;
@@ -172,7 +178,7 @@ assert_contains "$PARSER_OUTPUT" "device:0:id=serial-alpha" "parser output"
 assert_contains "$PARSER_OUTPUT" "device:1:status=failed" "parser output"
 assert_contains "$PARSER_OUTPUT" "message=Remediation still required for 1 device." "parser output"
 
-echo "=== Scenario 2: CLI delegation records summary data and single connected device metadata ==="
+echo "=== Scenario 2: CLI delegation records summary data for mixed multi-device remediation ==="
 SUCCESS_STDOUT="$TMP_DIR/success.stdout"
 SUCCESS_STATUS="$TMP_DIR/success.status"
 SUCCESS_VALUES="$TMP_DIR/success.values"
@@ -188,19 +194,31 @@ assert_contains "$SUCCESS_STDOUT" "Remediated 1 device." "success stdout"
 assert_contains "$SUCCESS_VALUES" "ok=true" "success values"
 assert_contains "$SUCCESS_VALUES" "command_status=0" "success values"
 assert_contains "$SUCCESS_VALUES" "total=3" "success values"
-assert_contains "$SUCCESS_VALUES" "connected=1" "success values"
+assert_contains "$SUCCESS_VALUES" "connected=2" "success values"
 assert_contains "$SUCCESS_VALUES" "ready=1" "success values"
 assert_contains "$SUCCESS_VALUES" "warn=1" "success values"
 assert_contains "$SUCCESS_VALUES" "remediated=1" "success values"
 assert_contains "$SUCCESS_VALUES" "adb_unready=1" "success values"
 assert_contains "$SUCCESS_VALUES" "failed=0" "success values"
-assert_contains "$SUCCESS_VALUES" "last_device=serial-remediated" "success values"
+assert_contains "$SUCCESS_VALUES" "last_device=" "success values"
 assert_contains "$SUCCESS_VALUES" "device0_status=remediated" "success values"
 assert_contains "$SUCCESS_VALUES" "device1_status=warn" "success values"
 assert_contains "$SUCCESS_VALUES" "device2_status=adb-unready" "success values"
 assert_contains "$SUCCESS_LOG" "operator remediate --output json --operator-package com.clawperator.operator" "success log"
 
-echo "=== Scenario 3: CLI delegation preserves failure details without rebuilding policy in shell ==="
+echo "=== Scenario 3: exactly one connected device records last-device metadata ==="
+SINGLE_STDOUT="$TMP_DIR/single.stdout"
+SINGLE_STATUS="$TMP_DIR/single.status"
+SINGLE_VALUES="$TMP_DIR/single.values"
+SINGLE_LOG="$TMP_DIR/single.log"
+run_cli_case single-connected single-connected "$SINGLE_STDOUT" "$SINGLE_STATUS" "$SINGLE_VALUES" "$SINGLE_LOG"
+assert_exit_code "$(cat "$SINGLE_STATUS")" 0 "single-connected"
+assert_contains "$SINGLE_VALUES" "connected=1" "single-connected values"
+assert_contains "$SINGLE_VALUES" "last_device=serial-solo" "single-connected values"
+assert_contains "$SINGLE_VALUES" "device0_status=ready" "single-connected values"
+assert_contains "$SINGLE_VALUES" "device1_status=adb-unready" "single-connected values"
+
+echo "=== Scenario 4: CLI delegation preserves failure details without rebuilding policy in shell ==="
 FAIL_STDOUT="$TMP_DIR/fail.stdout"
 FAIL_STATUS="$TMP_DIR/fail.status"
 FAIL_VALUES="$TMP_DIR/fail.values"
@@ -217,7 +235,7 @@ assert_contains "$FAIL_VALUES" "failed=1" "failure values"
 assert_contains "$FAIL_LOG" "operator remediate --output json --operator-package com.clawperator.operator" "failure log"
 assert_not_contains "$FAIL_STDOUT" "operator setup --apk" "failure stdout"
 
-echo "=== Scenario 4: no-device results stay parseable and keep remediation in the CLI lane ==="
+echo "=== Scenario 5: no-device results stay parseable and keep remediation in the CLI lane ==="
 EMPTY_STDOUT="$TMP_DIR/empty.stdout"
 EMPTY_STATUS="$TMP_DIR/empty.status"
 EMPTY_VALUES="$TMP_DIR/empty.values"
@@ -230,7 +248,7 @@ assert_contains "$EMPTY_VALUES" "total=0" "empty values"
 assert_contains "$EMPTY_VALUES" "connected=0" "empty values"
 assert_contains "$EMPTY_VALUES" "last_device=" "empty values"
 
-echo "=== Scenario 5: invalid CLI output fails fast instead of guessing remediation policy ==="
+echo "=== Scenario 6: invalid CLI output fails fast instead of guessing remediation policy ==="
 INVALID_STDOUT="$TMP_DIR/invalid.stdout"
 INVALID_STATUS="$TMP_DIR/invalid.status"
 INVALID_VALUES="$TMP_DIR/invalid.values"
