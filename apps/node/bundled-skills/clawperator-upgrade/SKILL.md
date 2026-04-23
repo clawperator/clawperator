@@ -1,6 +1,6 @@
 ---
 name: clawperator-upgrade
-description: Clawperator first-party bundled skill. Whole-product upgrade route for Clawperator. Re-runs the canonical installer, verifies readiness with doctor, and reports the next blocking repair step when setup is still incomplete.
+description: Clawperator first-party bundled skill. Whole-product upgrade route for Clawperator. Checks CLI reachability, uses the CLI-first upgrade sequence when possible, and falls back to install.sh only for recovery when the CLI is not reachable.
 ---
 
 # Clawperator Upgrade
@@ -9,13 +9,21 @@ Use this skill only when the current machine already has Clawperator and the
 user or calling workflow has explicitly chosen a whole-product upgrade.
 
 This is a thin packaged host-agent skill. It should route through the canonical
-installer and readiness checks that Clawperator already ships. It must not
-re-implement install logic inside the skill body.
+CLI surfaces that Clawperator already ships. It must not re-implement install
+logic inside the skill body.
 
 ## What This Skill Owns
 
-- run the canonical whole-product installer:
-  `curl -fsSL https://clawperator.com/install.sh | bash`
+- check `clawperator --version` before mutating the host
+- run the CLI-first upgrade sequence when the CLI is reachable:
+  - `npm install -g clawperator@latest`
+  - `clawperator operator remediate`
+  - `clawperator bundled-skills update`
+  - `clawperator skills install`
+  - `clawperator host setup`
+  - `clawperator doctor --json`
+- use `curl -fsSL https://clawperator.com/install.sh | bash` only as recovery
+  when `clawperator --version` is not reachable
 - verify the resulting install with `clawperator doctor --json`
 - report whether the host is ready, or which existing repair route is still
   blocking readiness
@@ -24,14 +32,13 @@ re-implement install logic inside the skill body.
 
 ## What This Skill Does Not Own
 
-- do not replace `https://clawperator.com/install.sh` with a bespoke upgrade flow
-- do not make `npm install -g clawperator@latest` the primary path
-- do not make `clawperator bundled-skills update` or `clawperator skills update`
-  the primary path
-- do not add or imply a top-level `clawperator upgrade` command
+- do not make `install.sh` the primary path
+- do not skip the `clawperator --version` reachability check
 - do not invent a second upgrade-health checker beyond `clawperator doctor --json`
+- do not add or imply a top-level `clawperator upgrade` command
 - do not restate all setup or repair docs from memory
 - do not turn passive diagnosis into an implicit upgrade
+- do not keep using `install.sh` after the CLI-first path is reachable
 
 ## Workflow
 
@@ -47,7 +54,7 @@ Valid triggers:
 - the calling workflow explicitly selected `clawperator-upgrade`
   as an opt-in route
 
-Stop and do not run the installer yet when:
+Stop and do not run any host mutations yet when:
 
 - you are still diagnosing a problem
 - you are only checking readiness or inventory
@@ -56,33 +63,45 @@ Stop and do not run the installer yet when:
 If explicit upgrade intent is missing, stop and say that upgrade is an opt-in
 host mutation.
 
-### 2. Run the canonical installer first
+### 2. Check CLI reachability first
 
 Run:
+
+```bash
+clawperator --version
+```
+
+If this succeeds, use the CLI-first upgrade sequence in step 3.
+
+If this fails, run the recovery installer:
 
 ```bash
 curl -fsSL https://clawperator.com/install.sh | bash
 ```
 
-Treat this as the primary action for whole-product upgrade because it owns the
-CLI install, packaged bundled-skills, runtime-skills bootstrap guidance, and the
-Operator APK setup path.
+After recovery, re-run `clawperator --version`. If the CLI is still not
+reachable, stop and report the recovery failure.
 
-Do not replace this first step with direct npm self-upgrade commands.
+### 3. Run the CLI-first upgrade sequence
 
-### 3. Verify readiness with doctor
-
-After the installer finishes, run `clawperator devices` and then run:
+When `clawperator --version` succeeds, run these commands in order:
 
 ```bash
+npm install -g clawperator@latest
+clawperator operator remediate
+clawperator bundled-skills update
+clawperator skills install
+clawperator host setup
 clawperator doctor --json
 ```
 
-Prefer the structured JSON result. If more than one device is connected, run
-`clawperator doctor --device <device_id> --json` once for each connected
-device, and only report the upgrade ready when every connected device reports
-`criticalOk: true`. Continue from the doctor output instead of guessing whether
-the upgrade "probably worked."
+Rules:
+
+- use `clawperator operator remediate` as the device policy front door
+- do not re-implement multi-device policy inside the skill
+- use the structured CLI results rather than guessing about state
+- let `clawperator host setup` write the durable host artifacts
+- keep `clawperator doctor --json` as the readiness check after the sequence
 
 ### 4. Decide between ready and blocked
 
@@ -101,6 +120,7 @@ Rules:
   and every connected device reports `criticalOk: true`
 - if doctor indicates setup is incomplete, keep the next step grounded in the
   real failing surface
+- if recovery was needed, report the recovery outcome before the doctor result
 - do not ask the user whether to proceed with the doctor-reported repair path
   or the next command; pick the explicit next action from doctor or the setup
   docs and state it directly
@@ -127,19 +147,20 @@ After a blocked upgrade:
 
 Finish with:
 
-- the installer result in one sentence
-- the doctor readiness result in one sentence
+- the CLI reachability result in one sentence
+- the upgrade result in one sentence
 - one explicit next command or one canonical doc URL
 
 Examples:
 
-- "Upgrade was explicitly requested, the canonical installer completed, and `clawperator doctor --json` reports `criticalOk: true`. Your next step is `clawperator-agent-orientation`."
-- "The installer completed, but doctor still reports blocking setup failures. Follow the doctor-reported repair path or finish setup at `https://docs.clawperator.com/setup/`."
-- "Upgrade intent is not explicit yet, so I stopped before running `install.sh`."
+- "Clawperator was reachable, the CLI-first upgrade sequence completed, and `clawperator doctor --json` reports `criticalOk: true`. Your next step is `clawperator-agent-orientation`."
+- "Clawperator was not reachable, so I used `install.sh` as recovery only. The CLI is still not ready, so follow the recovery guidance or finish setup at `https://docs.clawperator.com/setup/`."
+- "Upgrade intent is not explicit yet, so I stopped before running any host mutations."
 
 ## Output Style
 
-Be concise. Treat `install.sh` as the upgrade authority, `doctor --json` as the
-readiness authority, and end with one explicit next step. Name the
-upgrade-intent gate explicitly when you decline to run the installer. Never
-ask the user to choose the next repair step after doctor has already named it.
+Be concise. Treat `clawperator --version` as the reachability gate, the
+CLI-first sequence as the normal path, and `install.sh` as recovery only. End
+with one explicit next step. Name the upgrade-intent gate explicitly when you
+decline to run the installer. Never ask the user to choose the next repair step
+after doctor has already named it.

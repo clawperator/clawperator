@@ -545,34 +545,6 @@ setup_skills_via_cli() {
         if [ -z "$SKILLS_REGISTRY_PATH" ]; then
             SKILLS_REGISTRY_PATH="$DEFAULT_SKILLS_REGISTRY_PATH"
         fi
-
-        # Set Env Var in Shell RCs
-        local EXPORT_LINE="export CLAWPERATOR_SKILLS_REGISTRY=\"$SKILLS_REGISTRY_PATH\""
-
-        update_rc() {
-            local RC_FILE=$1
-            if [ -f "$RC_FILE" ]; then
-                if grep -q "CLAWPERATOR_SKILLS_REGISTRY" "$RC_FILE"; then
-                    local TMP_FILE
-                    TMP_FILE="$(mktemp "${RC_FILE}.XXXXXX")"
-                    register_temp_file "$TMP_FILE"
-                    grep -v "CLAWPERATOR_SKILLS_REGISTRY" "$RC_FILE" > "$TMP_FILE" || true
-                    printf "\n# Clawperator Skills Registry\n%s\n" "$EXPORT_LINE" >> "$TMP_FILE"
-                    copy_file_mode "$RC_FILE" "$TMP_FILE"
-                    mv "$TMP_FILE" "$RC_FILE"
-                    echo -e "${BLUE}Updated CLAWPERATOR_SKILLS_REGISTRY in $RC_FILE${NC}"
-                else
-                    echo -e "${BLUE}Adding CLAWPERATOR_SKILLS_REGISTRY to $RC_FILE${NC}"
-                    echo "" >> "$RC_FILE"
-                    echo "# Clawperator Skills Registry" >> "$RC_FILE"
-                    echo "$EXPORT_LINE" >> "$RC_FILE"
-                fi
-            fi
-        }
-
-        update_rc "$HOME/.zshrc"
-        update_rc "$HOME/.bashrc"
-        update_rc "$HOME/.bash_profile"
         return 0
     else
         SKILLS_SETUP_STATUS="failed"
@@ -1451,8 +1423,8 @@ main() {
         echo -e "5. ${YELLOW}Skills were not configured during install.${NC}"
         echo -e "   To set up skills later, run:"
         echo -e "   ${YELLOW}clawperator skills install${NC}"
-        echo -e "   Then add to your shell profile (~/.zshrc or ~/.bashrc):"
-        echo -e "   ${YELLOW}export CLAWPERATOR_SKILLS_REGISTRY=\"\$HOME/.clawperator/skills/skills/skills-registry.json\"${NC}"
+        echo -e "   Fresh shells discover ${BLUE}\$HOME/.clawperator/skills/skills/skills-registry.json${NC} automatically."
+        echo -e "   No shell profile export is required unless you intentionally use a custom registry path."
     fi
     echo ""
     if [ "$BUNDLED_SKILLS_SETUP_STATUS" = "configured" ]; then
