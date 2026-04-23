@@ -1,5 +1,6 @@
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { setupOperator } from "../../domain/device/setupOperator.js";
+import { resolveOperatorPackageForRequest } from "../../domain/config/resolveOperatorPackage.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import type { OutputOptions } from "../output.js";
 import { formatSuccess, formatError } from "../output.js";
@@ -25,8 +26,7 @@ export async function cmdOperatorSetup(options: {
   operatorPackage?: string;
   logger?: Logger;
 }): Promise<string> {
-  const operatorPackage =
-    options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE;
+  const operatorPackage = resolveOperatorPackageForRequest(options.operatorPackage);
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
     operatorPackage,

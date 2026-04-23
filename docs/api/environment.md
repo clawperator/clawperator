@@ -43,6 +43,8 @@ There is no configuration file layer between the environment variable and the de
 
 Controls which Operator APK package name the runtime targets when `--operator-package` is not passed.
 
+Blank or whitespace-only values are normalized to unset before the runtime resolves the package, so the default package is used instead of treating an empty string as a real package id.
+
 Read by every device-targeting CLI command (`snapshot`, `click`, `read`, `wait`, `scroll`, `doctor`, `record start`, `record stop`, `record pull`, `operator setup`, `grant-device-permissions`, `version --check-compat`, `exec`, `serve`), plus `runExecution()` and `resolveOperatorPackage()` in the skills runtime.
 
 Default: `com.clawperator.operator`

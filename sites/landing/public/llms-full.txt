@@ -1384,7 +1384,8 @@ This page is generated from the Node CLI registry and command sources.
 
 | Command | Syntax | Aliases | Flags | Summary |
 | --- | --- | --- | --- | --- |
-| `operator` | `operator setup --apk <path> [--device <id>] [--operator-package <package>]` | - | --apk, --device, --operator-package, --help<br>Subcommands: setup, install | Install the Operator APK and configure the device |
+| `operator` | `operator setup --apk <path> [--device <id>] [--operator-package <package>]`<br>`operator download [--operator-package <package>]` | - | --apk, --device, --operator-package, --help<br>Subcommands: setup, install, download | Install the Operator APK and configure the device |
+| `host` | `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]` | - | --installed-at, --cli-version, --apk-version, --last-device-serial<br>Subcommands: setup | Set up durable host artifacts owned by the CLI |
 | `setup` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
 | `install` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
 | `devices` | `devices` | - | - | List connected Android devices |
@@ -1422,7 +1423,8 @@ This page is generated from the Node CLI registry and command sources.
 
 | Command | Syntax | Aliases | Flags | Summary |
 | --- | --- | --- | --- | --- |
-| `operator` | `operator setup --apk <path> [--device <id>] [--operator-package <package>]` | - | --apk, --device, --operator-package, --help<br>Subcommands: setup, install | Install the Operator APK and configure the device |
+| `operator` | `operator setup --apk <path> [--device <id>] [--operator-package <package>]`<br>`operator download [--operator-package <package>]` | - | --apk, --device, --operator-package, --help<br>Subcommands: setup, install, download | Install the Operator APK and configure the device |
+| `host` | `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]` | - | --installed-at, --cli-version, --apk-version, --last-device-serial<br>Subcommands: setup | Set up durable host artifacts owned by the CLI |
 | `setup` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
 | `install` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
 | `doctor` | `doctor [--json]`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --json, --format, --output | Run environment and runtime checks |
@@ -1432,10 +1434,18 @@ This page is generated from the Node CLI registry and command sources.
 ### `operator`
 
 - Summary: Install the Operator APK and configure the device
-- Syntax: `operator setup --apk <path> [--device <id>] [--operator-package <package>]`
+- Syntax: `operator setup --apk <path> [--device <id>] [--operator-package <package>]`, `operator download [--operator-package <package>]`
 - Aliases: -
 - Flags: `--apk`, `--device`, `--operator-package`, `--help`
-- Subcommands: `setup`, `install`
+- Subcommands: `setup`, `install`, `download`
+
+### `host`
+
+- Summary: Set up durable host artifacts owned by the CLI
+- Syntax: `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]`
+- Aliases: -
+- Flags: `--installed-at`, `--cli-version`, `--apk-version`, `--last-device-serial`
+- Subcommands: `setup`
 
 ### `setup`
 
@@ -3898,7 +3908,11 @@ Only the codes defined in `apps/node/src/contracts/errors.ts` are part of the pu
 | `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | Android system image install failed | - |
 | `ANDROID_AVD_CREATE_FAILED` | Android avd create failed | - |
 | `AGENT_SKILLS_STALE` | Agent skills stale | - |
-| `OPERATOR_APK_NOT_FOUND` | Operator apk not found | Operator install |
+| `OPERATOR_DOWNLOAD_UNSUPPORTED` | Operator download unsupported | Operator install |
+| `OPERATOR_METADATA_INVALID` | Operator metadata invalid | - |
+| `OPERATOR_DOWNLOAD_FAILED` | Operator download failed | - |
+| `OPERATOR_CHECKSUM_FAILED` | Operator checksum failed | - |
+| `OPERATOR_APK_NOT_FOUND` | Operator apk not found | - |
 | `OPERATOR_INSTALL_FAILED` | Operator install failed | - |
 | `OPERATOR_GRANT_FAILED` | Operator grant failed | - |
 | `OPERATOR_VERIFY_FAILED` | Operator verify failed | - |
@@ -4451,7 +4465,7 @@ Flags:
 
 Defaults:
 
-- without `--operator-package`, doctor uses `process.env.CLAWPERATOR_OPERATOR_PACKAGE` if set, otherwise the runtime default package
+- without `--operator-package`, doctor uses `process.env.CLAWPERATOR_OPERATOR_PACKAGE` when it is non-blank, otherwise the runtime default package
 - without `--device`, doctor tries discovery first and may auto-resolve one connected device
 - without `--full`, doctor skips Java/build/install/launch/smoke checks
 - without `--fix`, doctor reports remediation steps but does not run them
@@ -5513,6 +5527,8 @@ There is no configuration file layer between the environment variable and the de
 
 Controls which Operator APK package name the runtime targets when `--operator-package` is not passed.
 
+Blank or whitespace-only values are normalized to unset before the runtime resolves the package, so the default package is used instead of treating an empty string as a real package id.
+
 Read by every device-targeting CLI command (`snapshot`, `click`, `read`, `wait`, `scroll`, `doctor`, `record start`, `record stop`, `record pull`, `operator setup`, `grant-device-permissions`, `version --check-compat`, `exec`, `serve`), plus `runExecution()` and `resolveOperatorPackage()` in the skills runtime.
 
 Default: `com.clawperator.operator`
@@ -6015,7 +6031,7 @@ Valid body rules enforced by the route:
 Operator package resolution:
 
 - if `operatorPackage` is present in the request, the server uses it verbatim
-- otherwise it falls back to `process.env.CLAWPERATOR_OPERATOR_PACKAGE` when that env var is non-empty
+- otherwise it falls back to `process.env.CLAWPERATOR_OPERATOR_PACKAGE` when that env var is non-blank
 - otherwise it uses `com.clawperator.operator`
 
 Then `runExecution()` applies full execution validation. See [Actions](actions.md), [Selectors](selectors.md), and [API Overview](overview.md).

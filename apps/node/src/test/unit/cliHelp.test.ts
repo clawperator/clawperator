@@ -664,6 +664,15 @@ describe("operator setup CLI output", () => {
     assert.strictEqual(obj.operatorPackage, "com.clawperator.operator.dev");
   });
 
+  it("treats blank CLAWPERATOR_OPERATOR_PACKAGE as unset for operator setup", async () => {
+    const { stdout } = await runCli(
+      ["operator", "setup", "--apk", NONEXISTENT_APK],
+      { CLAWPERATOR_OPERATOR_PACKAGE: "   " }
+    );
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.operatorPackage, "com.clawperator.operator");
+  });
+
   it("operator install alias still returns OPERATOR_APK_NOT_FOUND", async () => {
     const { stdout, code } = await runCli(["operator", "install", "--apk", NONEXISTENT_APK]);
     assert.notStrictEqual(code, 0);

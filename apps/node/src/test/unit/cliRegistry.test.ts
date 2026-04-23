@@ -152,6 +152,21 @@ describe("flag aliases - --json sets output to json", () => {
   });
 });
 
+describe("operator download registry", () => {
+  it("dispatches operator download and preserves structured errors", async () => {
+    const { stdout, code } = await runCli([
+      "operator",
+      "download",
+      "--operator-package",
+      "com.clawperator.operator.dev",
+    ]);
+    assert.notStrictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "OPERATOR_DOWNLOAD_UNSUPPORTED");
+    assert.match(obj.message, /Automatic operator download is only available/);
+  });
+});
+
 describe("missing command after global flags", () => {
   it("returns USAGE instead of crashing when only global flags are supplied", async () => {
     const { stdout, code } = await runCli(["--json"]);

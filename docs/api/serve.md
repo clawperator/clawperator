@@ -194,7 +194,7 @@ Valid body rules enforced by the route:
 Operator package resolution:
 
 - if `operatorPackage` is present in the request, the server uses it verbatim
-- otherwise it falls back to `process.env.CLAWPERATOR_OPERATOR_PACKAGE` when that env var is non-empty
+- otherwise it falls back to `process.env.CLAWPERATOR_OPERATOR_PACKAGE` when that env var is non-blank
 - otherwise it uses `com.clawperator.operator`
 
 Then `runExecution()` applies full execution validation. See [Actions](actions.md), [Selectors](selectors.md), and [API Overview](overview.md).

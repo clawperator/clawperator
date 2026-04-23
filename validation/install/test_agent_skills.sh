@@ -110,19 +110,16 @@ run_host_setup_parser_case() {
     bash -c '
         source "$1" >/dev/null 2>&1
         trap - ERR
-        printf "%s" "$2" | parse_host_setup_result > "$3"
+        parse_host_setup_result > "$3" <<< "$2"
     ' _ "$INSTALL_SCRIPT" "$input_json" "$output_file"
 }
 
-run_operator_metadata_case() {
+run_operator_download_parser_case() {
     local label="$1"
-    local metadata_content="$2"
+    local input_json="$2"
     local output_file="$3"
     local status_file="$4"
     local values_file="$5"
-    local metadata_file="$TMP_DIR/$label-metadata.json"
-
-    printf '%s' "$metadata_content" > "$metadata_file"
 
     HOME="$TMP_DIR/home-$label" \
     OS=Linux \
@@ -130,17 +127,134 @@ run_operator_metadata_case() {
         source "$1" >/dev/null 2>&1
         trap - ERR
         set +e
-        parse_operator_metadata "$2" > "$3" 2>&1
+        parse_operator_download_result > "$3" <<< "$2"
         status="$?"
         set -e
         printf "%s\n" "$status" > "$4"
         {
-          printf "version=%s\n" "${OPERATOR_VERSION:-}"
-          printf "apk=%s\n" "${OPERATOR_APK_URL:-}"
-          printf "sha_url=%s\n" "${OPERATOR_SHA_URL:-}"
-          printf "sha256=%s\n" "${OPERATOR_EXPECTED_SHA256:-}"
+          cat "$3"
         } > "$5"
-    ' _ "$INSTALL_SCRIPT" "$metadata_file" "$output_file" "$status_file" "$values_file"
+    ' _ "$INSTALL_SCRIPT" "$input_json" "$output_file" "$status_file" "$values_file"
+}
+
+run_operator_download_via_cli_case() {
+    local label="$1"
+    local cli_json="$2"
+    local file_mode="$3"
+    local output_file="$4"
+    local status_file="$5"
+    local values_file="$6"
+    local mock_dir="$TMP_DIR/mock-download-$label"
+    local local_path=""
+
+    mkdir -p "$mock_dir"
+    cat > "$mock_dir/clawperator" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+if [ "\$1" = "operator" ] && [ "\$2" = "download" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
+  printf '%s\n' '${cli_json}'
+  exit 0
+fi
+exit 99
+EOF
+    chmod +x "$mock_dir/clawperator"
+
+    if [ "$file_mode" = "create-file" ]; then
+        local_path="$(node -e 'const parsed = JSON.parse(process.argv[1]); if (typeof parsed.localPath === "string") { process.stdout.write(parsed.localPath); }' "$cli_json")"
+        if [ -n "$local_path" ]; then
+            mkdir -p "${local_path%/*}"
+            printf '%s\n' 'mock apk' > "$local_path"
+        fi
+    fi
+
+    HOME="$TMP_DIR/home-$label" \
+    OS=Linux \
+    PATH="$mock_dir:$PATH" \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        export CLAWPERATOR_BIN_PATH="$2"
+
+        set +e
+        download_operator_apk_via_cli > "$3" 2>&1
+        status="$?"
+        set -e
+
+        printf "%s\n" "$status" > "$4"
+        {
+          printf "apk=%s\n" "${APK_LOCAL_PATH:-}"
+          printf "version=%s\n" "${OPERATOR_VERSION:-}"
+          printf "downloaded=%s\n" "${OPERATOR_APK_DOWNLOADED_THIS_RUN:-0}"
+        } > "$5"
+    ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$output_file" "$status_file" "$values_file"
+}
+
+run_install_cli_resolution_case() {
+    local label="$1"
+    local output_file="$2"
+    local status_file="$3"
+    local values_file="$4"
+    local stale_dir="$TMP_DIR/stale-bin-$label"
+    local npm_prefix="$TMP_DIR/npm-prefix-$label"
+
+    mkdir -p "$stale_dir" "$npm_prefix/bin"
+
+    cat > "$stale_dir/clawperator" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [ "${1:-}" = "--version" ]; then
+  printf '%s\n' '0.6.0'
+  exit 0
+fi
+exit 99
+EOF
+    chmod +x "$stale_dir/clawperator"
+
+    cat > "$npm_prefix/bin/clawperator" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [ "${1:-}" = "--version" ]; then
+  printf '%s\n' '0.7.4'
+  exit 0
+fi
+exit 0
+EOF
+    chmod +x "$npm_prefix/bin/clawperator"
+
+    HOME="$TMP_DIR/home-$label" \
+    OS=Linux \
+    PATH="$stale_dir:$PATH" \
+    MOCK_NPM_PREFIX="$npm_prefix" \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+
+        npm() {
+            if [ "$1" = "install" ] && [ "$2" = "-g" ] && [ "$3" = "clawperator@latest" ]; then
+                return 0
+            fi
+            if [ "$1" = "config" ] && [ "$2" = "get" ] && [ "$3" = "prefix" ]; then
+                printf "%s\n" "$MOCK_NPM_PREFIX"
+                return 0
+            fi
+            printf "unexpected npm invocation: %s\n" "$*" >&2
+            return 99
+        }
+
+        hash() {
+            return 0
+        }
+
+        set +e
+        install_cli > "$2"
+        status="$?"
+        set -e
+
+        printf "%s\n" "$status" > "$3"
+        {
+            printf "bin=%s\n" "$CLAWPERATOR_BIN_PATH"
+        } > "$4"
+    ' _ "$INSTALL_SCRIPT" "$output_file" "$status_file" "$values_file"
 }
 
 setup_mock_clawperator() {
@@ -726,61 +840,136 @@ assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawper
 assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawperator/mcp-config-snippet.json" "durable-summary"
 assert_contains "$DURABLE_SUMMARY_OUT" "AI agents should start with the local guide" "durable-summary"
 
-echo "=== Scenario 12: operator metadata parser extracts all expected fields ==="
-METADATA_SUCCESS_OUT="$TMP_DIR/metadata-success.out"
-METADATA_SUCCESS_STATUS="$TMP_DIR/metadata-success.status"
-METADATA_SUCCESS_VALUES="$TMP_DIR/metadata-success.values"
-run_operator_metadata_case \
-    metadata-success \
-    '{"version":"0.6.1","apk_url":"https://example.com/operator.apk","sha256_url":"https://example.com/operator.apk.sha256","sha256":"deadbeef"}' \
-    "$METADATA_SUCCESS_OUT" \
-    "$METADATA_SUCCESS_STATUS" \
-    "$METADATA_SUCCESS_VALUES"
-assert_equals "0" "$(cat "$METADATA_SUCCESS_STATUS")" "metadata-success status"
-assert_contains "$METADATA_SUCCESS_VALUES" "version=0.6.1" "metadata-success values"
-assert_contains "$METADATA_SUCCESS_VALUES" "apk=https://example.com/operator.apk" "metadata-success values"
-assert_contains "$METADATA_SUCCESS_VALUES" "sha_url=https://example.com/operator.apk.sha256" "metadata-success values"
-assert_contains "$METADATA_SUCCESS_VALUES" "sha256=deadbeef" "metadata-success values"
-assert_file_empty "$METADATA_SUCCESS_OUT" "metadata-success output"
+echo "=== Scenario 14: operator download result parser extracts installer-consumable fields ==="
+DOWNLOAD_RESULT_OUT="$TMP_DIR/download-result.out"
+DOWNLOAD_RESULT_STATUS="$TMP_DIR/download-result.status"
+DOWNLOAD_RESULT_VALUES="$TMP_DIR/download-result.values"
+run_operator_download_parser_case \
+    download-result \
+    '{"localPath":"/tmp/operator.apk","operatorVersion":"0.6.1","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","operatorPackage":"com.clawperator.operator"}' \
+    "$DOWNLOAD_RESULT_OUT" \
+    "$DOWNLOAD_RESULT_STATUS" \
+    "$DOWNLOAD_RESULT_VALUES"
+assert_equals "0" "$(cat "$DOWNLOAD_RESULT_STATUS")" "download-result status"
+assert_contains "$DOWNLOAD_RESULT_VALUES" "localPath=/tmp/operator.apk" "download-result values"
+assert_contains "$DOWNLOAD_RESULT_VALUES" "operatorVersion=0.6.1" "download-result values"
+assert_contains "$DOWNLOAD_RESULT_VALUES" "sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" "download-result values"
+assert_contains "$DOWNLOAD_RESULT_VALUES" "operatorPackage=com.clawperator.operator" "download-result values"
 
-echo "=== Scenario 13: operator metadata parser allows missing inline checksum ==="
-METADATA_NO_SHA_OUT="$TMP_DIR/metadata-no-sha.out"
-METADATA_NO_SHA_STATUS="$TMP_DIR/metadata-no-sha.status"
-METADATA_NO_SHA_VALUES="$TMP_DIR/metadata-no-sha.values"
-run_operator_metadata_case \
-    metadata-no-sha \
-    '{"version":"0.6.1","apk_url":"https://example.com/operator.apk","sha256_url":"https://example.com/operator.apk.sha256"}' \
-    "$METADATA_NO_SHA_OUT" \
-    "$METADATA_NO_SHA_STATUS" \
-    "$METADATA_NO_SHA_VALUES"
-assert_equals "0" "$(cat "$METADATA_NO_SHA_STATUS")" "metadata-no-sha status"
-assert_contains "$METADATA_NO_SHA_VALUES" "sha256=" "metadata-no-sha values"
-assert_file_empty "$METADATA_NO_SHA_OUT" "metadata-no-sha output"
+echo "=== Scenario 15: operator download result parser extracts structured CLI errors ==="
+DOWNLOAD_ERROR_OUT="$TMP_DIR/download-error.out"
+DOWNLOAD_ERROR_STATUS="$TMP_DIR/download-error.status"
+DOWNLOAD_ERROR_VALUES="$TMP_DIR/download-error.values"
+run_operator_download_parser_case \
+    download-error \
+    '{"code":"OPERATOR_METADATA_INVALID","message":"missing sha256_url"}' \
+    "$DOWNLOAD_ERROR_OUT" \
+    "$DOWNLOAD_ERROR_STATUS" \
+    "$DOWNLOAD_ERROR_VALUES"
+assert_equals "0" "$(cat "$DOWNLOAD_ERROR_STATUS")" "download-error status"
+assert_contains "$DOWNLOAD_ERROR_VALUES" "code=OPERATOR_METADATA_INVALID" "download-error values"
+assert_contains "$DOWNLOAD_ERROR_VALUES" "message=missing sha256_url" "download-error values"
 
-echo "=== Scenario 14: operator metadata parser rejects missing required fields ==="
-METADATA_MISSING_OUT="$TMP_DIR/metadata-missing.out"
-METADATA_MISSING_STATUS="$TMP_DIR/metadata-missing.status"
-METADATA_MISSING_VALUES="$TMP_DIR/metadata-missing.values"
-run_operator_metadata_case \
-    metadata-missing \
-    '{"version":"0.6.1","apk_url":"https://example.com/operator.apk"}' \
-    "$METADATA_MISSING_OUT" \
-    "$METADATA_MISSING_STATUS" \
-    "$METADATA_MISSING_VALUES"
-assert_equals "1" "$(cat "$METADATA_MISSING_STATUS")" "metadata-missing status"
-assert_contains "$METADATA_MISSING_OUT" "Failed to parse APK metadata" "metadata-missing output"
+echo "=== Scenario 15b: operator download parser sanitizes newline-bearing fields ==="
+DOWNLOAD_SANITIZE_OUT="$TMP_DIR/download-sanitize.out"
+DOWNLOAD_SANITIZE_STATUS="$TMP_DIR/download-sanitize.status"
+DOWNLOAD_SANITIZE_VALUES="$TMP_DIR/download-sanitize.values"
+run_operator_download_parser_case \
+    download-sanitize \
+    '{"localPath":"/tmp/operator.apk\nevil=INJECTED","operatorVersion":"0.6.1\r\nextra","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\nmessage=bad","operatorPackage":"com.clawperator.operator\r\noperatorPackage=bad","code":"OPERATOR_METADATA_INVALID\r\nbogus=INJECTED","message":"line one\nline two"}' \
+    "$DOWNLOAD_SANITIZE_OUT" \
+    "$DOWNLOAD_SANITIZE_STATUS" \
+    "$DOWNLOAD_SANITIZE_VALUES"
+assert_equals "0" "$(cat "$DOWNLOAD_SANITIZE_STATUS")" "download-sanitize status"
+assert_contains "$DOWNLOAD_SANITIZE_VALUES" "localPath=/tmp/operator.apk evil=INJECTED" "download-sanitize values"
+assert_contains "$DOWNLOAD_SANITIZE_VALUES" "operatorVersion=0.6.1 extra" "download-sanitize values"
+assert_contains "$DOWNLOAD_SANITIZE_VALUES" "sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef message=bad" "download-sanitize values"
+assert_contains "$DOWNLOAD_SANITIZE_VALUES" "operatorPackage=com.clawperator.operator operatorPackage=bad" "download-sanitize values"
+assert_contains "$DOWNLOAD_SANITIZE_VALUES" "code=OPERATOR_METADATA_INVALID bogus=INJECTED" "download-sanitize values"
+assert_contains "$DOWNLOAD_SANITIZE_VALUES" "message=line one line two" "download-sanitize values"
+assert_occurrence_count "$DOWNLOAD_SANITIZE_VALUES" "code=" "1" "download-sanitize code count"
+assert_occurrence_count "$DOWNLOAD_SANITIZE_VALUES" "operatorPackage=" "1" "download-sanitize package count"
 
-echo "=== Scenario 15: operator metadata parser rejects malformed JSON ==="
-METADATA_BAD_OUT="$TMP_DIR/metadata-bad.out"
-METADATA_BAD_STATUS="$TMP_DIR/metadata-bad.status"
-METADATA_BAD_VALUES="$TMP_DIR/metadata-bad.values"
-run_operator_metadata_case \
-    metadata-bad \
-    '{"version":' \
-    "$METADATA_BAD_OUT" \
-    "$METADATA_BAD_STATUS" \
-    "$METADATA_BAD_VALUES"
-assert_equals "1" "$(cat "$METADATA_BAD_STATUS")" "metadata-bad status"
-assert_contains "$METADATA_BAD_OUT" "Failed to parse APK metadata" "metadata-bad output"
+echo "=== Scenario 15c: delegated operator download rejects mismatched operator packages ==="
+DOWNLOAD_MISMATCH_OUT="$TMP_DIR/download-mismatch.out"
+DOWNLOAD_MISMATCH_STATUS="$TMP_DIR/download-mismatch.status"
+DOWNLOAD_MISMATCH_VALUES="$TMP_DIR/download-mismatch.values"
+run_operator_download_via_cli_case \
+    download-mismatch \
+    '{"localPath":"/tmp/operator.apk","operatorVersion":"0.6.1","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","operatorPackage":"com.clawperator.operator.dev"}' \
+    none \
+    "$DOWNLOAD_MISMATCH_OUT" \
+    "$DOWNLOAD_MISMATCH_STATUS" \
+    "$DOWNLOAD_MISMATCH_VALUES"
+assert_equals "1" "$(cat "$DOWNLOAD_MISMATCH_STATUS")" "download-mismatch status"
+assert_contains "$DOWNLOAD_MISMATCH_OUT" "OPERATOR_DOWNLOAD_INVALID_RESULT" "download-mismatch output"
+assert_contains "$DOWNLOAD_MISMATCH_OUT" "installer expected com.clawperator.operator" "download-mismatch output"
+assert_contains "$DOWNLOAD_MISMATCH_VALUES" "downloaded=0" "download-mismatch values"
+assert_contains "$DOWNLOAD_MISMATCH_VALUES" "apk=$TMP_DIR/home-download-mismatch/.clawperator/downloads/operator.apk" "download-mismatch values"
+
+echo "=== Scenario 15d: delegated operator download rejects invalid sha256 values ==="
+DOWNLOAD_BAD_SHA_OUT="$TMP_DIR/download-bad-sha.out"
+DOWNLOAD_BAD_SHA_STATUS="$TMP_DIR/download-bad-sha.status"
+DOWNLOAD_BAD_SHA_VALUES="$TMP_DIR/download-bad-sha.values"
+run_operator_download_via_cli_case \
+    download-bad-sha \
+    '{"localPath":"/tmp/operator.apk","operatorVersion":"0.6.1","sha256":"not-a-sha256","operatorPackage":"com.clawperator.operator"}' \
+    none \
+    "$DOWNLOAD_BAD_SHA_OUT" \
+    "$DOWNLOAD_BAD_SHA_STATUS" \
+    "$DOWNLOAD_BAD_SHA_VALUES"
+assert_equals "1" "$(cat "$DOWNLOAD_BAD_SHA_STATUS")" "download-bad-sha status"
+assert_contains "$DOWNLOAD_BAD_SHA_OUT" "OPERATOR_DOWNLOAD_INVALID_RESULT" "download-bad-sha output"
+assert_contains "$DOWNLOAD_BAD_SHA_OUT" "invalid SHA-256" "download-bad-sha output"
+assert_contains "$DOWNLOAD_BAD_SHA_VALUES" "downloaded=0" "download-bad-sha values"
+assert_contains "$DOWNLOAD_BAD_SHA_VALUES" "apk=$TMP_DIR/home-download-bad-sha/.clawperator/downloads/operator.apk" "download-bad-sha values"
+
+echo "=== Scenario 15e: delegated operator download rejects non-canonical local paths ==="
+DOWNLOAD_BAD_PATH_OUT="$TMP_DIR/download-bad-path.out"
+DOWNLOAD_BAD_PATH_STATUS="$TMP_DIR/download-bad-path.status"
+DOWNLOAD_BAD_PATH_VALUES="$TMP_DIR/download-bad-path.values"
+run_operator_download_via_cli_case \
+    download-bad-path \
+    "{\"localPath\":\"$TMP_DIR/rogue/operator.apk\",\"operatorVersion\":\"0.6.1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operatorPackage\":\"com.clawperator.operator\"}" \
+    create-file \
+    "$DOWNLOAD_BAD_PATH_OUT" \
+    "$DOWNLOAD_BAD_PATH_STATUS" \
+    "$DOWNLOAD_BAD_PATH_VALUES"
+assert_equals "1" "$(cat "$DOWNLOAD_BAD_PATH_STATUS")" "download-bad-path status"
+assert_contains "$DOWNLOAD_BAD_PATH_OUT" "OPERATOR_DOWNLOAD_INVALID_RESULT" "download-bad-path output"
+assert_contains "$DOWNLOAD_BAD_PATH_OUT" "installer expected $TMP_DIR/home-download-bad-path/.clawperator/downloads/operator.apk" "download-bad-path output"
+assert_contains "$DOWNLOAD_BAD_PATH_VALUES" "downloaded=0" "download-bad-path values"
+assert_contains "$DOWNLOAD_BAD_PATH_VALUES" "apk=$TMP_DIR/home-download-bad-path/.clawperator/downloads/operator.apk" "download-bad-path values"
+
+echo "=== Scenario 15f: delegated operator download rejects missing canonical files ==="
+DOWNLOAD_MISSING_FILE_OUT="$TMP_DIR/download-missing-file.out"
+DOWNLOAD_MISSING_FILE_STATUS="$TMP_DIR/download-missing-file.status"
+DOWNLOAD_MISSING_FILE_VALUES="$TMP_DIR/download-missing-file.values"
+run_operator_download_via_cli_case \
+    download-missing-file \
+    "{\"localPath\":\"$TMP_DIR/home-download-missing-file/.clawperator/downloads/operator.apk\",\"operatorVersion\":\"0.6.1\",\"sha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"operatorPackage\":\"com.clawperator.operator\"}" \
+    none \
+    "$DOWNLOAD_MISSING_FILE_OUT" \
+    "$DOWNLOAD_MISSING_FILE_STATUS" \
+    "$DOWNLOAD_MISSING_FILE_VALUES"
+assert_equals "1" "$(cat "$DOWNLOAD_MISSING_FILE_STATUS")" "download-missing-file status"
+assert_contains "$DOWNLOAD_MISSING_FILE_OUT" "OPERATOR_DOWNLOAD_INVALID_RESULT" "download-missing-file output"
+assert_contains "$DOWNLOAD_MISSING_FILE_OUT" "did not create a regular file" "download-missing-file output"
+assert_contains "$DOWNLOAD_MISSING_FILE_VALUES" "downloaded=0" "download-missing-file values"
+assert_contains "$DOWNLOAD_MISSING_FILE_VALUES" "apk=$TMP_DIR/home-download-missing-file/.clawperator/downloads/operator.apk" "download-missing-file values"
+
+echo "=== Scenario 16: install_cli prefers the freshly installed npm binary over a stale PATH entry ==="
+CLI_RESOLUTION_OUT="$TMP_DIR/cli-resolution.out"
+CLI_RESOLUTION_STATUS="$TMP_DIR/cli-resolution.status"
+CLI_RESOLUTION_VALUES="$TMP_DIR/cli-resolution.values"
+run_install_cli_resolution_case \
+    cli-resolution \
+    "$CLI_RESOLUTION_OUT" \
+    "$CLI_RESOLUTION_STATUS" \
+    "$CLI_RESOLUTION_VALUES"
+assert_equals "0" "$(cat "$CLI_RESOLUTION_STATUS")" "cli-resolution status"
+assert_contains "$CLI_RESOLUTION_OUT" "Clawperator CLI installed." "cli-resolution output"
+assert_contains "$CLI_RESOLUTION_VALUES" "bin=$TMP_DIR/npm-prefix-cli-resolution/bin/clawperator" "cli-resolution values"
+assert_not_contains "$CLI_RESOLUTION_VALUES" "$TMP_DIR/stale-bin-cli-resolution/clawperator" "cli-resolution values"
 
 echo "=== install.sh bundled-skills and host-artifact harness passed ==="

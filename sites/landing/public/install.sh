@@ -13,16 +13,30 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-APK_METADATA_URL="${CLAWPERATOR_APK_METADATA_URL:-https://downloads.clawperator.com/operator/latest.json}"
-APK_DOWNLOAD_DIR="${HOME}/.clawperator/downloads"
 RELEASE_OPERATOR_PACKAGE="com.clawperator.operator"
-DEFAULT_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-$RELEASE_OPERATOR_PACKAGE}"
+trim_whitespace() {
+    local value="$1"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf '%s' "$value"
+}
+
+resolve_operator_package() {
+    local candidate="${CLAWPERATOR_OPERATOR_PACKAGE:-}"
+    candidate="$(trim_whitespace "$candidate")"
+    if [ -n "$candidate" ]; then
+        printf '%s' "$candidate"
+    else
+        printf '%s' "$RELEASE_OPERATOR_PACKAGE"
+    fi
+}
+
+DEFAULT_OPERATOR_PACKAGE="$(resolve_operator_package)"
 APK_FILE_BASENAME="operator.apk"
 if [ "$DEFAULT_OPERATOR_PACKAGE" != "$RELEASE_OPERATOR_PACKAGE" ]; then
     APK_FILE_BASENAME="operator-debug.apk"
 fi
-APK_LOCAL_PATH="${APK_DOWNLOAD_DIR}/${APK_FILE_BASENAME}"
-APK_SHA_PATH="${APK_LOCAL_PATH}.sha256"
+APK_LOCAL_PATH="${HOME}/.clawperator/downloads/${APK_FILE_BASENAME}"
 INSTALL_COMMAND="curl -fsSL https://clawperator.com/install.sh | bash"
 SKILLS_SETUP_STATUS="not-run"
 SKILLS_REGISTRY_PATH=""
@@ -410,7 +424,7 @@ check_curl() {
         return 0
     fi
 
-    echo -e "${RED}❌ curl is required to download the Clawperator operator metadata, APK, and checksum files.${NC}"
+    echo -e "${RED}❌ curl is required for the Clawperator installer bootstrap and recovery download hints.${NC}"
     return 1
 }
 
@@ -427,14 +441,19 @@ install_cli() {
 
         hash -r
 
-        # Discover the binary path for immediate use
-        CLAWPERATOR_BIN_PATH="$(command -v clawperator || true)"
-        if [ -z "$CLAWPERATOR_BIN_PATH" ]; then
-            local NPM_PREFIX
-            NPM_PREFIX="$(npm config get prefix)"
-            if [ -f "$NPM_PREFIX/bin/clawperator" ]; then
-                CLAWPERATOR_BIN_PATH="$NPM_PREFIX/bin/clawperator"
-            fi
+        # Discover the freshly installed binary path for immediate use. Prefer
+        # the npm prefix over any older clawperator that may still appear
+        # earlier on PATH in the current shell.
+        local NPM_PREFIX
+        local NPM_CLAWPERATOR_BIN=""
+        NPM_PREFIX="$(npm config get prefix 2>/dev/null || true)"
+        if [ -n "$NPM_PREFIX" ] && [ -x "$NPM_PREFIX/bin/clawperator" ]; then
+            NPM_CLAWPERATOR_BIN="$NPM_PREFIX/bin/clawperator"
+        fi
+        if [ -n "$NPM_CLAWPERATOR_BIN" ]; then
+            CLAWPERATOR_BIN_PATH="$NPM_CLAWPERATOR_BIN"
+        else
+            CLAWPERATOR_BIN_PATH="$(command -v clawperator || true)"
         fi
         if [ -z "$CLAWPERATOR_BIN_PATH" ]; then
             echo -e "${RED}❌ Clawperator CLI installed but the binary could not be found on PATH.${NC}"
@@ -690,6 +709,50 @@ process.stdin.on("end", () => {
 ' 2>/dev/null || true
 }
 
+parse_operator_download_result() {
+    node -e '
+let raw = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  raw += chunk;
+});
+process.stdin.on("end", () => {
+  try {
+    const sanitize = (value) => value.replace(/[\r\n]+/g, " ");
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.localPath === "string") {
+      process.stdout.write(`localPath=${sanitize(parsed.localPath)}\n`);
+    }
+    if (parsed && typeof parsed.operatorVersion === "string") {
+      process.stdout.write(`operatorVersion=${sanitize(parsed.operatorVersion)}\n`);
+    }
+    if (parsed && typeof parsed.sha256 === "string") {
+      process.stdout.write(`sha256=${sanitize(parsed.sha256)}\n`);
+    }
+    if (parsed && typeof parsed.operatorPackage === "string") {
+      process.stdout.write(`operatorPackage=${sanitize(parsed.operatorPackage)}\n`);
+    }
+    if (parsed && typeof parsed.code === "string") {
+      process.stdout.write(`code=${sanitize(parsed.code)}\n`);
+    }
+    if (parsed && typeof parsed.message === "string") {
+      process.stdout.write(`message=${sanitize(parsed.message)}\n`);
+    }
+  } catch {}
+});
+' 2>/dev/null || true
+}
+
+is_valid_sha256_hex() {
+    local VALUE="$1"
+    [[ "$VALUE" =~ ^[a-fA-F0-9]{64}$ ]]
+}
+
+is_valid_operator_download_path() {
+    local VALUE="$1"
+    [ "$VALUE" = "$APK_LOCAL_PATH" ]
+}
+
 print_host_artifact_outcome() {
     local ARTIFACT_LABEL="$1"
     local ARTIFACT_STATUS="$2"
@@ -893,127 +956,100 @@ setup_host_artifacts_via_cli() {
     return 1
 }
 
-sha256_file() {
-    local FILE_PATH=$1
-
-    if command -v sha256sum &> /dev/null; then
-        sha256sum "$FILE_PATH" | awk '{ print $1 }'
-        return 0
-    fi
-
-    if command -v shasum &> /dev/null; then
-        shasum -a 256 "$FILE_PATH" | awk '{ print $1 }'
-        return 0
-    fi
-
-    return 1
-}
-
-parse_operator_metadata() {
-    local METADATA_PATH=$1
-    local metadata_version=""
-    local metadata_apk_url=""
-    local metadata_sha_url=""
-    local metadata_sha256=""
-
-    while IFS= read -r metadata_line; do
-        if [ -z "$metadata_version" ]; then
-            metadata_version="$metadata_line"
-        elif [ -z "$metadata_apk_url" ]; then
-            metadata_apk_url="$metadata_line"
-        elif [ -z "$metadata_sha_url" ]; then
-            metadata_sha_url="$metadata_line"
-        elif [ -z "$metadata_sha256" ]; then
-            metadata_sha256="$metadata_line"
-        else
-            echo -e "${RED}❌ APK metadata contained unexpected extra lines.${NC}"
-            return 1
-        fi
-    done < <(node - "$METADATA_PATH" <<'EOF'
-const fs = require("fs");
-
-const metadataPath = process.argv[2];
-const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8"));
-
-for (const key of ["version", "apk_url", "sha256_url"]) {
-  if (!metadata[key] || typeof metadata[key] !== "string") {
-    throw new Error(`Missing ${key} in ${metadataPath}`);
-  }
-}
-
-console.log(metadata.version);
-console.log(metadata.apk_url);
-console.log(metadata.sha256_url);
-console.log(metadata.sha256 || "");
-EOF
-    )
-
-    if [ -z "$metadata_version" ] || [ -z "$metadata_apk_url" ] || [ -z "$metadata_sha_url" ]; then
-        echo -e "${RED}❌ Failed to parse APK metadata from ${METADATA_PATH}.${NC}"
-        return 1
-    fi
-
-    OPERATOR_VERSION="$metadata_version"
-    OPERATOR_APK_URL="$metadata_apk_url"
-    OPERATOR_SHA_URL="$metadata_sha_url"
-    OPERATOR_EXPECTED_SHA256="$metadata_sha256"
-}
-
-download_operator_apk() {
+download_operator_apk_via_cli() {
     if ! operator_package_uses_public_release_apk; then
         echo -e "${YELLOW}Automatic APK download is only available for the stable release package.${NC}"
         print_operator_apk_redownload_hint
         return 1
     fi
 
-    local METADATA_PATH
-    METADATA_PATH="$(mktemp)"
-    register_temp_file "$METADATA_PATH"
+    if [ -z "${CLAWPERATOR_BIN_PATH:-}" ]; then
+        echo -e "${RED}❌ Clawperator CLI is required before operator download can run.${NC}"
+        return 1
+    fi
 
-    mkdir -p "$APK_DOWNLOAD_DIR"
+    local OPERATOR_DOWNLOAD_OUTPUT=""
+    local OPERATOR_DOWNLOAD_STATUS=0
+    local PARSED_DOWNLOAD_OUTPUT=""
+    local DOWNLOADED_LOCAL_PATH=""
+    local DOWNLOADED_OPERATOR_VERSION=""
+    local DOWNLOADED_SHA256=""
+    local DOWNLOADED_OPERATOR_PACKAGE=""
+    local DOWNLOAD_ERROR_CODE=""
+    local DOWNLOAD_ERROR_MESSAGE=""
+    local PARSED_LINE=""
 
-    echo -e "${BLUE}Fetching latest operator metadata...${NC}"
-    curl -fsSL "$APK_METADATA_URL" -o "$METADATA_PATH"
-    parse_operator_metadata "$METADATA_PATH" || return 1
-
-    echo -e "${BLUE}Downloading operator APK ${OPERATOR_VERSION}...${NC}"
-    curl -fsSL "$OPERATOR_APK_URL" -o "$APK_LOCAL_PATH"
-    OPERATOR_APK_DOWNLOADED_THIS_RUN=1
-
-    if [ -n "$OPERATOR_EXPECTED_SHA256" ]; then
-        echo "$OPERATOR_EXPECTED_SHA256" > "$APK_SHA_PATH"
+    echo -e "${BLUE}Downloading the verified Operator APK via the CLI...${NC}"
+    if OPERATOR_DOWNLOAD_OUTPUT="$("$CLAWPERATOR_BIN_PATH" operator download --output json --operator-package "$DEFAULT_OPERATOR_PACKAGE" 2>&1)"; then
+        OPERATOR_DOWNLOAD_STATUS=0
     else
-        echo -e "${YELLOW}⚠️  Metadata did not contain inline checksum. Downloading separate file...${NC}"
-        curl -fsSL "$OPERATOR_SHA_URL" -o "$APK_SHA_PATH"
-    fi
-}
-
-verify_operator_apk() {
-    if ! command -v sha256sum &> /dev/null && ! command -v shasum &> /dev/null; then
-        echo -e "${RED}❌ No SHA-256 tool found. Install shasum or sha256sum.${NC}"
-        return 1
+        OPERATOR_DOWNLOAD_STATUS=$?
     fi
 
-    local EXPECTED_HASH
-    EXPECTED_HASH="$(awk '{ print $1 }' "$APK_SHA_PATH")"
-    if [ -z "$EXPECTED_HASH" ]; then
-        echo -e "${RED}❌ Checksum file did not contain a SHA-256 hash.${NC}"
-        return 1
+    PARSED_DOWNLOAD_OUTPUT="$(printf '%s' "$OPERATOR_DOWNLOAD_OUTPUT" | parse_operator_download_result)"
+    while IFS= read -r PARSED_LINE; do
+        [ -n "$PARSED_LINE" ] || continue
+        case "$PARSED_LINE" in
+            localPath=*)
+                DOWNLOADED_LOCAL_PATH="${PARSED_LINE#localPath=}"
+                ;;
+            operatorVersion=*)
+                DOWNLOADED_OPERATOR_VERSION="${PARSED_LINE#operatorVersion=}"
+                ;;
+            sha256=*)
+                DOWNLOADED_SHA256="${PARSED_LINE#sha256=}"
+                ;;
+            operatorPackage=*)
+                DOWNLOADED_OPERATOR_PACKAGE="${PARSED_LINE#operatorPackage=}"
+                ;;
+            code=*)
+                DOWNLOAD_ERROR_CODE="${PARSED_LINE#code=}"
+                ;;
+            message=*)
+                DOWNLOAD_ERROR_MESSAGE="${PARSED_LINE#message=}"
+                ;;
+        esac
+    done <<< "$PARSED_DOWNLOAD_OUTPUT"
+
+    if [ "$OPERATOR_DOWNLOAD_STATUS" -eq 0 ] && \
+       [ -n "$DOWNLOADED_LOCAL_PATH" ] && \
+       [ -n "$DOWNLOADED_OPERATOR_VERSION" ] && \
+       [ -n "$DOWNLOADED_SHA256" ] && \
+       [ -n "$DOWNLOADED_OPERATOR_PACKAGE" ]; then
+        if [ "$DOWNLOADED_OPERATOR_PACKAGE" != "$DEFAULT_OPERATOR_PACKAGE" ]; then
+            DOWNLOAD_ERROR_CODE="OPERATOR_DOWNLOAD_INVALID_RESULT"
+            DOWNLOAD_ERROR_MESSAGE="CLI returned operatorPackage $DOWNLOADED_OPERATOR_PACKAGE but installer expected $DEFAULT_OPERATOR_PACKAGE."
+        elif ! is_valid_sha256_hex "$DOWNLOADED_SHA256"; then
+            DOWNLOAD_ERROR_CODE="OPERATOR_DOWNLOAD_INVALID_RESULT"
+            DOWNLOAD_ERROR_MESSAGE="CLI returned an invalid SHA-256 for the downloaded Operator APK."
+        elif ! is_valid_operator_download_path "$DOWNLOADED_LOCAL_PATH"; then
+            DOWNLOAD_ERROR_CODE="OPERATOR_DOWNLOAD_INVALID_RESULT"
+            DOWNLOAD_ERROR_MESSAGE="CLI returned localPath $DOWNLOADED_LOCAL_PATH but installer expected $APK_LOCAL_PATH."
+        elif [ ! -f "$DOWNLOADED_LOCAL_PATH" ]; then
+            DOWNLOAD_ERROR_CODE="OPERATOR_DOWNLOAD_INVALID_RESULT"
+            DOWNLOAD_ERROR_MESSAGE="CLI did not create a regular file at $DOWNLOADED_LOCAL_PATH."
+        elif [ ! -r "$DOWNLOADED_LOCAL_PATH" ]; then
+            DOWNLOAD_ERROR_CODE="OPERATOR_DOWNLOAD_INVALID_RESULT"
+            DOWNLOAD_ERROR_MESSAGE="CLI created Operator APK at $DOWNLOADED_LOCAL_PATH but it is not readable."
+        else
+            APK_LOCAL_PATH="$DOWNLOADED_LOCAL_PATH"
+            OPERATOR_VERSION="$DOWNLOADED_OPERATOR_VERSION"
+            OPERATOR_APK_DOWNLOADED_THIS_RUN=1
+            echo -e "${GREEN}✅ Downloaded and verified Operator APK ${OPERATOR_VERSION}.${NC}"
+            echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
+            return 0
+        fi
     fi
 
-    local ACTUAL_HASH
-    ACTUAL_HASH="$(sha256_file "$APK_LOCAL_PATH")"
-
-    if [ "$EXPECTED_HASH" != "$ACTUAL_HASH" ]; then
-        echo -e "${RED}❌ APK checksum mismatch.${NC}"
-        echo -e "${RED}Expected: ${EXPECTED_HASH}${NC}"
-        echo -e "${RED}Actual:   ${ACTUAL_HASH}${NC}"
-        echo -e "${YELLOW}Delete ${APK_LOCAL_PATH} and ${APK_SHA_PATH}, then re-run:${NC}"
-        echo -e "${YELLOW}${INSTALL_COMMAND}${NC}"
-        return 1
+    echo -e "${RED}❌ Operator download failed via the CLI.${NC}"
+    if [ -n "$DOWNLOAD_ERROR_CODE" ]; then
+        echo -e "${YELLOW}${DOWNLOAD_ERROR_CODE}: ${DOWNLOAD_ERROR_MESSAGE:-unknown error}${NC}"
+    elif [ -n "$OPERATOR_DOWNLOAD_OUTPUT" ]; then
+        echo "$OPERATOR_DOWNLOAD_OUTPUT"
     fi
-
-    echo -e "${GREEN}✅ Verified APK checksum.${NC}"
+    echo -e "${YELLOW}Manual recovery:${NC}"
+    print_operator_apk_redownload_hint
+    return 1
 }
 
 count_connected_devices() {
@@ -1659,8 +1695,7 @@ run_doctor_and_fix() {
         collect_multi_device_apk_setup_targets
         if [ "${#MULTI_DEVICE_APK_TARGET_DEVICES[@]}" -gt 0 ]; then
             if operator_package_uses_public_release_apk; then
-                download_operator_apk || return 1
-                verify_operator_apk || return 1
+                download_operator_apk_via_cli || return 1
             fi
             maybe_install_operator_apk "${MULTI_DEVICE_APK_TARGET_DEVICES[@]}" || MULTI_DEVICE_APK_INSTALL_FAILURES=1
         fi
@@ -1669,8 +1704,7 @@ run_doctor_and_fix() {
          doctor_check_status "$DOCTOR_JSON" "readiness.apk.presence" "warn" || \
          doctor_check_status "$DOCTOR_JSON" "readiness.version.compatibility" "fail"; then
         if operator_package_uses_public_release_apk; then
-            download_operator_apk || return 1
-            verify_operator_apk || return 1
+            download_operator_apk_via_cli || return 1
         fi
         maybe_install_operator_apk || return 1
     fi
