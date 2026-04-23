@@ -326,7 +326,7 @@ if [ "\$1" = "operator" ] && [ "\$2" = "download" ] && [ "\$3" = "--output" ] &&
   if [ "\$OPERATOR_PACKAGE" != "com.clawperator.operator" ]; then
     APK_NAME="operator-debug.apk"
   fi
-  LOCAL_PATH="\$HOME/.clawperator/downloads/\$APK_NAME"
+  LOCAL_PATH="\$HOME/mock-cli-downloads/\$APK_NAME"
   mkdir -p "\${LOCAL_PATH%/*}"
   printf '%s\n' 'mock apk' > "\$LOCAL_PATH"
   cat <<JSON
@@ -962,8 +962,8 @@ assert_contains "$MULTI_STALE_STDOUT" "serial-alpha - ready" "main-multi-stale s
 assert_contains "$MULTI_STALE_STDOUT" "serial-beta - ready" "main-multi-stale stdout"
 assert_not_contains "$MULTI_STALE_STDOUT" "Host install completed, but Android setup is still pending because more than one device is connected." "main-multi-stale stdout"
 assert_contains "$MULTI_STALE_CLI_LOG" "operator download --output json --operator-package com.clawperator.operator" "main-multi-stale cli log"
-assert_contains "$MULTI_STALE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale/.clawperator/downloads/operator.apk --device serial-alpha --operator-package com.clawperator.operator" "main-multi-stale cli log"
-assert_contains "$MULTI_STALE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale/.clawperator/downloads/operator.apk --device serial-beta --operator-package com.clawperator.operator" "main-multi-stale cli log"
+assert_contains "$MULTI_STALE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale/mock-cli-downloads/operator.apk --device serial-alpha --operator-package com.clawperator.operator" "main-multi-stale cli log"
+assert_contains "$MULTI_STALE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale/mock-cli-downloads/operator.apk --device serial-beta --operator-package com.clawperator.operator" "main-multi-stale cli log"
 
 echo "=== Scenario 8: dev-package stale devices stay on package-aware manual guidance ==="
 MULTI_STALE_DEV_STDOUT="$TMP_DIR/main-multi-stale-dev.stdout"
@@ -1023,8 +1023,8 @@ assert_contains "$MULTI_STALE_PROBE_STDOUT" "some devices could not be inspected
 assert_not_contains "$MULTI_STALE_PROBE_STDOUT" "All ready devices passed doctor checks." "main-multi-stale-probe stdout"
 assert_not_contains "$MULTI_STALE_PROBE_STDOUT" "each ready device passed Clawperator Doctor" "main-multi-stale-probe stdout"
 assert_contains "$MULTI_STALE_PROBE_CLI_LOG" "operator download --output json --operator-package com.clawperator.operator" "main-multi-stale-probe cli log"
-assert_contains "$MULTI_STALE_PROBE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale-probe/.clawperator/downloads/operator.apk --device serial-alpha --operator-package com.clawperator.operator" "main-multi-stale-probe cli log"
-assert_not_contains "$MULTI_STALE_PROBE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale-probe/.clawperator/downloads/operator.apk --device serial-bad --operator-package com.clawperator.operator" "main-multi-stale-probe cli log"
+assert_contains "$MULTI_STALE_PROBE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale-probe/mock-cli-downloads/operator.apk --device serial-alpha --operator-package com.clawperator.operator" "main-multi-stale-probe cli log"
+assert_not_contains "$MULTI_STALE_PROBE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale-probe/mock-cli-downloads/operator.apk --device serial-bad --operator-package com.clawperator.operator" "main-multi-stale-probe cli log"
 
 echo "=== Scenario 10: APK remediation path runs before final success ==="
 REMEDIATE_STDOUT="$TMP_DIR/main-remediation.stdout"

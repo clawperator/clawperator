@@ -204,8 +204,22 @@ export async function downloadOperatorApk(
   }
 
   const localPath = resolve(expandHomePath(getOperatorPackageApkPath(operatorPackage)));
-  await mkdir(dirname(localPath), { recursive: true });
-  await writeFile(localPath, apkBytes);
+  try {
+    await mkdir(dirname(localPath), { recursive: true });
+    await writeFile(localPath, apkBytes);
+  } catch (error) {
+    throw buildDownloadError(
+      ERROR_CODES.OPERATOR_DOWNLOAD_FAILED,
+      `Failed to write Operator APK to ${localPath}.`,
+      {
+        operatorPackage,
+        operatorVersion: metadata.version,
+        localPath,
+        cause: String(error),
+      },
+      "Ensure the download directory is writable, then re-run clawperator operator download.",
+    );
+  }
 
   return {
     localPath,

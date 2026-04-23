@@ -1,7 +1,7 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -235,6 +235,57 @@ describe("operator download", () => {
         },
       );
     });
+  });
+
+  it("emits a structured download error when the canonical APK path is not writable", async () => {
+    const homeDir = await makeTempHome();
+    const apkContents = "apk-write-failure";
+    const checksum = sha256Hex(apkContents);
+
+    try {
+      process.env.HOME = homeDir;
+      await writeFile(join(homeDir, ".clawperator"), "not-a-directory");
+
+      await withHttpServer((req, res) => {
+        if (req.url === "/latest.json") {
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({
+            version: "0.7.4",
+            apk_url: `${serverBase(req)}/operator.apk`,
+            sha256_url: `${serverBase(req)}/operator.apk.sha256`,
+            sha256: checksum,
+          }));
+          return;
+        }
+        if (req.url === "/operator.apk") {
+          res.writeHead(200, { "content-type": "application/vnd.android.package-archive" });
+          res.end(apkContents);
+          return;
+        }
+
+        res.writeHead(404);
+        res.end();
+      }, async (baseUrl) => {
+        process.env.CLAWPERATOR_APK_METADATA_URL = `${baseUrl}/latest.json`;
+        const output = await cmdOperatorDownload({ format: "json" });
+        const parsed = JSON.parse(output) as {
+          code: string;
+          message: string;
+          hint?: string;
+          details?: {
+            localPath?: string;
+          };
+        };
+
+        assert.strictEqual(parsed.code, ERROR_CODES.OPERATOR_DOWNLOAD_FAILED);
+        assert.match(parsed.message, /failed to write operator apk/i);
+        assert.match(parsed.hint ?? "", /download directory is writable/i);
+        assert.strictEqual(parsed.details?.localPath, join(homeDir, ".clawperator", "downloads", "operator.apk"));
+        assert.strictEqual(process.exitCode, 1);
+      });
+    } finally {
+      await rm(homeDir, { recursive: true, force: true });
+    }
   });
 
   it("emits installer-consumable JSON fields on success", async () => {
