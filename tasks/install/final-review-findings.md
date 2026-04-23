@@ -1,4 +1,4 @@
-# Install Compaction Final Review Findings 1
+# Install Compaction Final Review Findings
 
 Review date: 2026-04-24
 
@@ -35,6 +35,29 @@ Validation run during review:
 
 Result: passed. This included the Node build, full Node test suite, and the
 reduced install shell harnesses.
+
+Live validation after release:
+
+```bash
+npm install -g clawperator@latest
+clawperator install
+clawperator doctor --json
+clawperator doctor --json --device <physical_device>
+clawperator doctor --json --device emulator-5554
+npm uninstall -g clawperator
+curl -fsSL https://clawperator.com/install.sh | bash
+clawperator doctor --json
+clawperator doctor --json --device <physical_device>
+clawperator doctor --json --device emulator-5554
+```
+
+Result: passed. The global bundled `clawperator-upgrade` route upgraded a
+`0.7.3` host to `0.7.4`, remediated both connected release-package Operator
+APKs to `0.7.4`, refreshed bundled skills, and left both devices doctor-ready.
+After global uninstall, the live public `install.sh` installed `0.7.4`,
+delegated to `clawperator install`, preserved existing `~/.clawperator` state,
+and left both devices doctor-ready. Both phases produced the expected
+multi-device warning that future device commands must pass `--device`.
 
 ## Work Done Well
 
@@ -83,30 +106,11 @@ LLM surfaces, and `clawperator-upgrade` now consistently describe
 
 ## Gaps And Residual Risks
 
-No blocking defect was found in the final review, and the install validation
-suite passed. The remaining gaps are mostly proof and follow-through.
+No blocking defect was found in the final review, the install validation suite
+passed, and the follow-up live validation passed. The remaining gaps are not
+release blockers, but they are still useful tightening work.
 
-### 1. Live install proof is still the biggest missing confidence signal
-
-The validation suite is strong for contracts and wrapper behavior, but it is
-still mostly unit and mocked integration coverage. The changed behavior affects
-real install reliability, adb device enumeration, APK remediation, permission
-grant, host artifact writing, runtime skills, and bundled-skill discovery.
-
-Before treating this as release-ready, run one real install or upgrade smoke on
-a physical device or emulator using the branch-local Node build path. The smoke
-should verify:
-
-- `install.sh` delegates to the freshly installed CLI binary, not a stale PATH
-  entry
-- `clawperator install` reaches a real device
-- operator remediation installs or verifies the expected package
-- `~/.clawperator/install-state.json`, `mcp-config-snippet.json`, and
-  `AGENTS.md` are written
-- runtime skills and bundled skills are discoverable after install
-- `clawperator doctor --json` reports the expected readiness state
-
-### 2. `apkVersion` remains unthreaded through the canonical install path
+### 1. `apkVersion` remains unthreaded through the canonical install path
 
 The compact task recommendations already called out that the old dead
 `download_operator_apk_via_cli` path was the only place shell ever learned an
@@ -119,7 +123,7 @@ blocker. It is still a useful follow-up because install-state diagnostics would
 be stronger if `operator remediate` exposed the downloaded or verified operator
 version and `cmdInstall` passed it into host setup.
 
-### 3. `clawperator-upgrade` has a multi-device verification ambiguity
+### 2. `clawperator-upgrade` has a multi-device verification ambiguity
 
 The updated bundled skill correctly routes through `npm install -g
 clawperator@latest`, `clawperator install`, and `clawperator doctor --json`.
@@ -134,7 +138,7 @@ the skill should eventually spell out the multi-device follow-up: when multiple
 ready devices are present, run doctor per selected device or consume the
 install result's device list before declaring the whole host ready.
 
-### 4. The install validation runner is broad and may become expensive
+### 3. The install validation runner is broad and may become expensive
 
 `validation/install/test_install.sh` builds `apps/node` and runs the full Node
 test suite before the install shell harnesses. This is safe and currently
@@ -149,27 +153,26 @@ validation.
    npm bootstrap into the Node CLI unless the project later ships a
    self-contained launcher that can run before Node is installed.
 
-2. Add a real-device or emulator smoke before merge or release. The important
-   proof is not just that `clawperator install` returns a good JSON shape, but
-   that the compact shell wrapper plus freshly installed CLI can complete a
-   real post-bootstrap flow.
-
-3. Add a follow-up task to thread operator version into install state. The
+2. Add a follow-up task to thread operator version into install state. The
    likely shape is to extend `operator remediate` with the effective downloaded
    or verified APK version, then pass that through `cmdInstall` to `setupHost`.
 
-4. Tighten `clawperator-upgrade` multi-device wording. It should explicitly
+3. Tighten `clawperator-upgrade` multi-device wording. It should explicitly
    handle `deviceSelectionRequired` or multiple connected devices before
    claiming every device was verified by doctor.
+
+4. Keep an install-focused Node test slice in mind if the full Node suite
+   becomes too expensive for installer-only validation. The current full-suite
+   runner is acceptable while it remains fast enough.
 
 ## Bottom Line
 
 The install compaction work achieved the intended architecture. The shell is
 now a bootstrap wrapper, `clawperator install` is the canonical post-bootstrap
-surface, and the detailed behavior moved to Node with meaningful tests.
+surface, and the detailed behavior moved to Node with meaningful tests. The
+released `0.7.4` public install and upgrade paths both passed live validation.
 
 The remaining work is not another large refactor. It is a short follow-up pass:
-prove the flow on a real device or emulator, improve install-state version
-metadata, tighten multi-device upgrade verification guidance, and consider a
-stable install-focused Node test slice if the full Node suite becomes too
-expensive for installer-only validation.
+improve install-state version metadata, tighten multi-device upgrade
+verification guidance, and consider a stable install-focused Node test slice if
+the full Node suite becomes too expensive for installer-only validation.
