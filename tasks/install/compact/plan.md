@@ -20,13 +20,35 @@ compact installer model.
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | PR-1 complete, PR-2 pending |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4 |
-| Current / Next | Phase 1 |
+| Completed | PR-1 / Phases 1-2 |
+| Remaining | PR-2 / Phases 3-4 |
+| Current / Next | Phase 3 |
 | Blockers | none |
+
+## Current Branch Snapshot
+
+Current branch status for PR-1:
+
+- Phase 1 complete:
+  - dead `download_operator_apk_via_cli` shell residue removed
+  - shared-agent-bridge warning semantics moved fully into Node-owned host setup output
+- Phase 2 complete:
+  - top-level `clawperator install` command added
+  - post-bootstrap sequencing moved into Node
+  - installer-facing help and focused Node tests updated
+- Follow-up review pass complete:
+  - install command contract tightened so `--device` is rejected
+  - host setup now preserves normal CLI version recording when called through `clawperator install`
+
+PR-1 commits currently on the branch:
+
+- `04005da` `refactor(install): remove dead operator download shell path`
+- `0ed75cb` `fix(node): own shared bridge warning semantics in host setup output`
+- `714e48a` `feat(node): add post-bootstrap install command`
+- `f4097e3` `fix(node): tighten install command contract`
 
 ## Goal
 

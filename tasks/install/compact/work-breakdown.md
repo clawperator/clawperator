@@ -12,20 +12,43 @@ semantics fully into Node, and add the CLI-owned post-bootstrap
 parsers and shell state machine, shrink shell validation to bootstrap and
 delegation proof, then update docs and `clawperator-upgrade`.
 
-This task is currently in planning. No phase should begin out of order because
-the shell collapse in PR-2 depends on the CLI surface introduced in PR-1.
+PR-1 is complete on the current branch. PR-2 remains next, and no phase should
+begin out of order because the shell collapse in PR-2 depends on the CLI
+surface introduced in PR-1.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | PR-1 complete, PR-2 pending |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4 |
-| Current / Next | Phase 1 |
+| Completed | PR-1 / Phases 1-2 |
+| Remaining | PR-2 / Phases 3-4 |
+| Current / Next | Phase 3 |
 | Blockers | none |
+
+## Current Status
+
+PR-1 is complete on the current branch.
+
+- Phase 1 completed with:
+  - removal of the dead operator-download shell path and matching shell-only test coverage
+  - Node-owned host setup warning output for the shared-agent-bridge non-fatal case
+- Phase 2 completed with:
+  - a real top-level `clawperator install` command in `registry.ts`
+  - Node-owned post-bootstrap sequencing for operator remediation, runtime skills, bundled skills, and host setup
+  - focused Node coverage for success, warning, failure, and help-path behavior
+- PR-1 follow-up fix completed after review:
+  - `clawperator install` now rejects `--device`
+  - host setup no longer suppresses normal CLI version recording when invoked from `clawperator install`
+
+PR-1 branch commits:
+
+- `04005da` `refactor(install): remove dead operator download shell path`
+- `0ed75cb` `fix(node): own shared bridge warning semantics in host setup output`
+- `714e48a` `feat(node): add post-bootstrap install command`
+- `f4097e3` `fix(node): tighten install command contract`
 
 ## Hard Rules
 
