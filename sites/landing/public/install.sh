@@ -511,23 +511,6 @@ process.stdin.on("end", () => {
 ' 2>/dev/null || true
 }
 
-copy_file_mode() {
-    local SOURCE_PATH=$1
-    local TARGET_PATH=$2
-    local FILE_MODE=""
-
-    if FILE_MODE="$(stat -f '%Lp' "$SOURCE_PATH" 2>/dev/null)"; then
-        chmod "$FILE_MODE" "$TARGET_PATH"
-        return 0
-    fi
-
-    if FILE_MODE="$(stat -c '%a' "$SOURCE_PATH" 2>/dev/null)"; then
-        chmod "$FILE_MODE" "$TARGET_PATH"
-        return 0
-    fi
-
-    return 0
-}
 setup_skills_via_cli() {
     if [ "${CLAWPERATOR_INSTALL_SKIP_SKILLS:-0}" = "1" ]; then
         SKILLS_SETUP_STATUS="skipped"

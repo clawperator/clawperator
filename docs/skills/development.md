@@ -483,8 +483,7 @@ Exact success shapes:
 {
   "synced": true,
   "message": "Skills synced to /Users/<local_user>/.clawperator/skills (ref: main)",
-  "registryPath": "/Users/<local_user>/.clawperator/skills/skills/skills-registry.json",
-  "envInstruction": "export CLAWPERATOR_SKILLS_REGISTRY=\"/Users/<local_user>/.clawperator/skills/skills/skills-registry.json\""
+  "registryPath": "/Users/<local_user>/.clawperator/skills/skills/skills-registry.json"
 }
 ```
 
@@ -509,7 +508,8 @@ Check:
 
 - `synced` is `true`
 - `registryPath` from `skills install` ends with `~/.clawperator/skills/skills/skills-registry.json`
-- after install, exporting `envInstruction` makes `skills list --json` succeed in a fresh shell
+- after install, `clawperator skills list --json` succeeds in a fresh shell without exporting `CLAWPERATOR_SKILLS_REGISTRY`
+- set `CLAWPERATOR_SKILLS_REGISTRY` only when pointing at a non-standard registry path
 
 Common sync failures:
 
