@@ -1172,6 +1172,9 @@ print_operator_remediation_result() {
 
 run_operator_remediation_via_cli() {
     local OPERATOR_REMEDIATE_OUTPUT=""
+    local OPERATOR_REMEDIATE_STDERR=""
+    local OPERATOR_REMEDIATE_STDOUT_FILE=""
+    local OPERATOR_REMEDIATE_STDERR_FILE=""
     local PARSED_REMEDIATION_OUTPUT=""
     local PARSED_LINE=""
     local CURRENT_DEVICE_INDEX=""
@@ -1188,11 +1191,18 @@ run_operator_remediation_via_cli() {
     fi
 
     echo -e "${BLUE}Running CLI-owned device remediation...${NC}"
-    if OPERATOR_REMEDIATE_OUTPUT="$("$CLAWPERATOR_BIN_PATH" operator remediate --output json --operator-package "$DEFAULT_OPERATOR_PACKAGE" 2>&1)"; then
+    OPERATOR_REMEDIATE_STDOUT_FILE="$(mktemp)"
+    OPERATOR_REMEDIATE_STDERR_FILE="$(mktemp)"
+    if "$CLAWPERATOR_BIN_PATH" operator remediate --output json --operator-package "$DEFAULT_OPERATOR_PACKAGE" >"$OPERATOR_REMEDIATE_STDOUT_FILE" 2>"$OPERATOR_REMEDIATE_STDERR_FILE"; then
         OPERATOR_REMEDIATE_COMMAND_STATUS=0
     else
         OPERATOR_REMEDIATE_COMMAND_STATUS=$?
     fi
+    OPERATOR_REMEDIATE_OUTPUT="$(cat "$OPERATOR_REMEDIATE_STDOUT_FILE")"
+    if [ -s "$OPERATOR_REMEDIATE_STDERR_FILE" ]; then
+        OPERATOR_REMEDIATE_STDERR="$(cat "$OPERATOR_REMEDIATE_STDERR_FILE")"
+    fi
+    rm -f "$OPERATOR_REMEDIATE_STDOUT_FILE" "$OPERATOR_REMEDIATE_STDERR_FILE"
 
     PARSED_REMEDIATION_OUTPUT="$(printf '%s' "$OPERATOR_REMEDIATE_OUTPUT" | parse_operator_remediate_result)"
     while IFS= read -r PARSED_LINE; do
@@ -1255,6 +1265,9 @@ run_operator_remediation_via_cli() {
         echo -e "${RED}❌ operator remediate returned no parseable result.${NC}"
         if [ -n "$OPERATOR_REMEDIATE_OUTPUT" ]; then
             echo "$OPERATOR_REMEDIATE_OUTPUT"
+        fi
+        if [ -n "$OPERATOR_REMEDIATE_STDERR" ]; then
+            echo "$OPERATOR_REMEDIATE_STDERR" >&2
         fi
         return 1
     fi

@@ -352,6 +352,7 @@ describe("operator remediate", () => {
     assert.strictEqual(parsed.summary.remediated, 1);
     assert.strictEqual(parsed.summary.adbUnready, 1);
     assert.strictEqual(parsed.summary.failed, 1);
+    assert.strictEqual(parsed.message, "Remediation still required for 1 device. 1 visible device still needs ADB recovery.");
     assert.strictEqual(downloadCount, 1);
     assert.strictEqual(setupCount, 1);
     assert.strictEqual(doctorFixCount, 1);
@@ -380,5 +381,44 @@ describe("operator remediate", () => {
     assert.strictEqual(parsed.summary.adbUnready, 1);
     assert.strictEqual(parsed.message, "All connected devices are ready. 1 visible device still needs ADB recovery.");
     assert.strictEqual(process.exitCode, undefined);
+  });
+
+  it("keeps user-facing debug APK remediation paths in canonical tilde form", async () => {
+    const output = await cmdOperatorRemediate(
+      { format: "json", operatorPackage: "com.clawperator.operator.dev" },
+      {
+        listDevicesImpl: async () => [{ serial: "device-debug", state: "device" }],
+        doctorServiceFactory: () => ({
+          run: async () => buildReport({
+            ok: false,
+            criticalOk: false,
+            checks: [{ id: "readiness.version.compatibility", status: "fail", code: ERROR_CODES.VERSION_INCOMPATIBLE, summary: "Version mismatch." }],
+          }),
+        }),
+        apkExistsImpl: async () => false,
+      },
+    );
+
+    const parsed = JSON.parse(output);
+    assert.strictEqual(parsed.ok, false);
+    assert.strictEqual(parsed.devices[0].message, "Automatic APK download is only available for com.clawperator.operator. Provide a matching local APK at ~/.clawperator/downloads/operator-debug.apk for com.clawperator.operator.dev.");
+  });
+
+  it("uses grammatically correct warning summaries for a single warning device", async () => {
+    const output = await cmdOperatorRemediate(
+      { format: "json" },
+      {
+        listDevicesImpl: async () => [{ serial: "device-warn", state: "device" }],
+        doctorServiceFactory: () => ({
+          run: async () => buildReport({
+            checks: [{ id: "readiness.settings.dev_options", status: "warn", summary: "Developer options are disabled." }],
+          }),
+        }),
+      },
+    );
+
+    const parsed = JSON.parse(output);
+    assert.strictEqual(parsed.ok, true);
+    assert.strictEqual(parsed.message, "All connected devices passed critical checks. 1 device still has warnings.");
   });
 });

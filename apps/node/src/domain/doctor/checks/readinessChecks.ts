@@ -21,11 +21,12 @@ import {
   hasListedPackage,
   probeVersionCompatibility,
 } from "../../version/compatibility.js";
+import { DEFAULT_OPERATOR_PACKAGE } from "../../config/resolveOperatorPackage.js";
 import { buildResultEnvelopeTimeoutHint } from "../../executions/timeoutGuidance.js";
 import { DOCTOR_DOCS_URLS } from "../docsUrls.js";
 
 function buildMissingApkFixSteps(config: RuntimeConfig): Array<{ kind: "shell" | "manual"; value: string }> {
-  if (config.operatorPackage === "com.clawperator.operator") {
+  if (config.operatorPackage === DEFAULT_OPERATOR_PACKAGE) {
     return [
       {
         kind: "shell",

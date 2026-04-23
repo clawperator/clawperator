@@ -6,6 +6,7 @@ import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeCo
 import { listDevices, type DeviceInfo } from "../../domain/devices/listDevices.js";
 import { DoctorService } from "../../domain/doctor/DoctorService.js";
 import type { DoctorReport, DoctorCheckResult } from "../../contracts/doctor.js";
+import { ERROR_CODES } from "../../contracts/errors.js";
 import { resolveOperatorPackageForRequest, DEFAULT_OPERATOR_PACKAGE } from "../../domain/config/resolveOperatorPackage.js";
 import { downloadOperatorApk } from "../../domain/version/operatorDownload.js";
 import { setupOperator } from "../../domain/device/setupOperator.js";
@@ -79,7 +80,7 @@ function reportNeedsSetup(report: DoctorReport): boolean {
   if (
     apkPresence
     && (apkPresence.status === "fail" || apkPresence.status === "warn")
-    && apkPresence.code !== "DEVICE_SHELL_UNAVAILABLE"
+    && apkPresence.code !== ERROR_CODES.DEVICE_SHELL_UNAVAILABLE
   ) {
     return true;
   }
@@ -153,13 +154,14 @@ async function ensureSetupApkPath(
     };
   }
 
-  const localPath = expandHomePath(getOperatorPackageApkPath(operatorPackage));
+  const displayPath = getOperatorPackageApkPath(operatorPackage);
+  const localPath = expandHomePath(displayPath);
   if (await deps.apkExistsImpl(localPath)) {
     return { localPath, cache: { localPath } };
   }
 
   return {
-    message: `Automatic APK download is only available for ${DEFAULT_OPERATOR_PACKAGE}. Provide a matching local APK at ${localPath} for ${operatorPackage}.`,
+    message: `Automatic APK download is only available for ${DEFAULT_OPERATOR_PACKAGE}. Provide a matching local APK at ${displayPath} for ${operatorPackage}.`,
   };
 }
 
@@ -412,7 +414,7 @@ function buildSummaryMessage(summary: OperatorRemediateResult["summary"]): strin
       return `Remediated ${summary.remediated} device${summary.remediated === 1 ? "" : "s"}.`;
     }
     if (summary.warn > 0) {
-      return `All connected devices passed critical checks. ${summary.warn} device${summary.warn === 1 ? "" : "s"} still have warnings.`;
+      return `All connected devices passed critical checks. ${summary.warn} device${summary.warn === 1 ? "" : "s"} still ${summary.warn === 1 ? "has" : "have"} warnings.`;
     }
     return "All connected devices are ready.";
   }
@@ -429,7 +431,12 @@ function buildSummaryMessage(summary: OperatorRemediateResult["summary"]): strin
     }
     return `No connected device is ready for ADB yet. ${adbRecoverySummary}`;
   }
-  return `Remediation still required for ${summary.failed + summary.adbUnready} device${summary.failed + summary.adbUnready === 1 ? "" : "s"}.`;
+  const remediationSummary = `Remediation still required for ${summary.failed} device${summary.failed === 1 ? "" : "s"}.`;
+  if (summary.adbUnready > 0) {
+    const adbRecoverySummary = `${summary.adbUnready} visible device${summary.adbUnready === 1 ? "" : "s"} still need${summary.adbUnready === 1 ? "s" : ""} ADB recovery.`;
+    return `${remediationSummary} ${adbRecoverySummary}`;
+  }
+  return remediationSummary;
 }
 
 export async function cmdOperatorRemediate(

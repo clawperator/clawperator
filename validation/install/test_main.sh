@@ -115,7 +115,7 @@ JSON
         ;;
       multi-device-warning)
         cat <<'JSON'
-{"ok":true,"summary":{"totalDevices":2,"connectedDevices":2,"ready":1,"warn":1,"remediated":0,"adbUnready":0,"failed":0},"devices":[{"deviceId":"serial-warning","adbState":"device","status":"warn","message":"Critical checks passed with warnings: readiness.handshake"},{"deviceId":"serial-ready","adbState":"device","status":"ready","message":"Device is ready."}],"message":"All connected devices passed critical checks. 1 device still have warnings."}
+{"ok":true,"summary":{"totalDevices":2,"connectedDevices":2,"ready":1,"warn":1,"remediated":0,"adbUnready":0,"failed":0},"devices":[{"deviceId":"serial-warning","adbState":"device","status":"warn","message":"Critical checks passed with warnings: readiness.handshake"},{"deviceId":"serial-ready","adbState":"device","status":"ready","message":"Device is ready."}],"message":"All connected devices passed critical checks. 1 device still has warnings."}
 JSON
         exit 0
         ;;

@@ -86,6 +86,13 @@ case "$scenario" in
 JSON
     exit 0
     ;;
+  success-stderr)
+    printf '%s\n' 'transient remediation warning on stderr' >&2
+    cat <<'JSON'
+{"ok":true,"summary":{"totalDevices":2,"connectedDevices":1,"ready":1,"warn":0,"remediated":0,"adbUnready":1,"failed":0},"devices":[{"deviceId":"serial-ready","adbState":"device","status":"ready","message":"Device is ready."},{"deviceId":"serial-offline","adbState":"offline","status":"adb-unready","message":"ADB reports state 'offline'. Resolve device connectivity before remediation."}],"message":"All connected devices are ready. 1 visible device still needs ADB recovery."}
+JSON
+    exit 0
+    ;;
   single-connected)
     cat <<'JSON'
 {"ok":true,"summary":{"totalDevices":2,"connectedDevices":1,"ready":1,"warn":0,"remediated":0,"adbUnready":1,"failed":0},"devices":[{"deviceId":"serial-solo","adbState":"device","status":"ready","message":"Device is ready."},{"deviceId":"serial-offline","adbState":"offline","status":"adb-unready","message":"ADB reports state 'offline'. Resolve device connectivity before remediation."}],"message":"All connected devices are ready. 1 visible device still needs ADB recovery."}
@@ -224,7 +231,19 @@ assert_contains "$SINGLE_VALUES" "last_device=serial-solo" "single-connected val
 assert_contains "$SINGLE_VALUES" "device0_status=ready" "single-connected values"
 assert_contains "$SINGLE_VALUES" "device1_status=adb-unready" "single-connected values"
 
-echo "=== Scenario 4: parser tolerates device entries that omit deviceId without crashing ==="
+echo "=== Scenario 4: stderr noise does not break CLI-owned remediation parsing ==="
+STDERR_STDOUT="$TMP_DIR/stderr.stdout"
+STDERR_STATUS="$TMP_DIR/stderr.status"
+STDERR_VALUES="$TMP_DIR/stderr.values"
+STDERR_LOG="$TMP_DIR/stderr.log"
+run_cli_case success-stderr success-stderr "$STDERR_STDOUT" "$STDERR_STATUS" "$STDERR_VALUES" "$STDERR_LOG"
+assert_exit_code "$(cat "$STDERR_STATUS")" 0 "success-stderr"
+assert_contains "$STDERR_VALUES" "ok=true" "success-stderr values"
+assert_contains "$STDERR_STDOUT" "All connected devices are ready. 1 visible device still needs ADB recovery." "success-stderr stdout"
+assert_not_contains "$STDERR_STDOUT" "operator remediate returned no parseable result." "success-stderr stdout"
+assert_not_contains "$STDERR_STDOUT" "transient remediation warning on stderr" "success-stderr stdout"
+
+echo "=== Scenario 5: parser tolerates device entries that omit deviceId without crashing ==="
 MISSING_ID_STDOUT="$TMP_DIR/missing-id.stdout"
 MISSING_ID_STATUS="$TMP_DIR/missing-id.status"
 MISSING_ID_VALUES="$TMP_DIR/missing-id.values"
@@ -237,7 +256,7 @@ assert_contains "$MISSING_ID_VALUES" "device0=" "missing-id values"
 assert_contains "$MISSING_ID_VALUES" "device1=serial-offline" "missing-id values"
 assert_contains "$MISSING_ID_STDOUT" "All connected devices are ready. 1 visible device still needs ADB recovery." "missing-id stdout"
 
-echo "=== Scenario 5: CLI delegation preserves failure details without rebuilding policy in shell ==="
+echo "=== Scenario 6: CLI delegation preserves failure details without rebuilding policy in shell ==="
 FAIL_STDOUT="$TMP_DIR/fail.stdout"
 FAIL_STATUS="$TMP_DIR/fail.status"
 FAIL_VALUES="$TMP_DIR/fail.values"
@@ -254,7 +273,7 @@ assert_contains "$FAIL_VALUES" "failed=1" "failure values"
 assert_contains "$FAIL_LOG" "operator remediate --output json --operator-package com.clawperator.operator" "failure log"
 assert_not_contains "$FAIL_STDOUT" "operator setup --apk" "failure stdout"
 
-echo "=== Scenario 6: no-device results stay parseable and keep remediation in the CLI lane ==="
+echo "=== Scenario 7: no-device results stay parseable and keep remediation in the CLI lane ==="
 EMPTY_STDOUT="$TMP_DIR/empty.stdout"
 EMPTY_STATUS="$TMP_DIR/empty.status"
 EMPTY_VALUES="$TMP_DIR/empty.values"
@@ -267,7 +286,7 @@ assert_contains "$EMPTY_VALUES" "total=0" "empty values"
 assert_contains "$EMPTY_VALUES" "connected=0" "empty values"
 assert_contains "$EMPTY_VALUES" "last_device=" "empty values"
 
-echo "=== Scenario 7: invalid CLI output fails fast instead of guessing remediation policy ==="
+echo "=== Scenario 8: invalid CLI output fails fast instead of guessing remediation policy ==="
 INVALID_STDOUT="$TMP_DIR/invalid.stdout"
 INVALID_STATUS="$TMP_DIR/invalid.status"
 INVALID_VALUES="$TMP_DIR/invalid.values"
