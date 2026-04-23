@@ -317,6 +317,24 @@ if [ "\$1" = "doctor" ] && [ "\$2" = "--output" ] && [ "\$3" = "pretty" ]; then
   exit 0
 fi
 
+if [ "\$1" = "operator" ] && [ "\$2" = "download" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
+  OPERATOR_PACKAGE="com.clawperator.operator"
+  if [ "\${5:-}" = "--operator-package" ] && [ -n "\${6:-}" ]; then
+    OPERATOR_PACKAGE="\$6"
+  fi
+  APK_NAME="operator.apk"
+  if [ "\$OPERATOR_PACKAGE" != "com.clawperator.operator" ]; then
+    APK_NAME="operator-debug.apk"
+  fi
+  LOCAL_PATH="\$HOME/.clawperator/downloads/\$APK_NAME"
+  mkdir -p "\${LOCAL_PATH%/*}"
+  printf '%s\n' 'mock apk' > "\$LOCAL_PATH"
+  cat <<JSON
+{"localPath":"\$LOCAL_PATH","operatorVersion":"9.9.9","sha256":"mock-sha256","operatorPackage":"\$OPERATOR_PACKAGE","message":"Downloaded and verified Operator APK 9.9.9."}
+JSON
+  exit 0
+fi
+
 if [ "\$1" = "operator" ] && [ "\$2" = "setup" ] && [ "\$3" = "--apk" ]; then
   case "\$SCENARIO:\$6" in
     multi-device-stale:serial-alpha)
@@ -535,21 +553,6 @@ run_main_case() {
                 export CLAWPERATOR_CLI_JS_PATH="$MOCK_CLAWPERATOR_BIN.cli.js"
                 return 0
             }
-            download_operator_apk() {
-                trace download_operator_apk "$TRACE_FILE"
-                mkdir -p "$(dirname "$APK_LOCAL_PATH")"
-                printf "mock apk\n" > "$APK_LOCAL_PATH"
-                printf "mock sha\n" > "$APK_SHA_PATH"
-                OPERATOR_VERSION="9.9.9"
-                OPERATOR_APK_DOWNLOADED_THIS_RUN=1
-                echo "Mock download_operator_apk"
-                return 0
-            }
-            verify_operator_apk() {
-                trace verify_operator_apk "$TRACE_FILE"
-                echo "Mock verify_operator_apk"
-                return 0
-            }
             if [ "$7" != "yes" ]; then
                 maybe_install_operator_apk() {
                     trace maybe_install_operator_apk "$TRACE_FILE"
@@ -598,21 +601,6 @@ run_main_case() {
                 # not need to exist; resolve_cli_entrypoint_js only forwards the
                 # path, it does not execute it.
                 export CLAWPERATOR_CLI_JS_PATH="$MOCK_CLAWPERATOR_BIN.cli.js"
-                return 0
-            }
-            download_operator_apk() {
-                trace download_operator_apk "$TRACE_FILE"
-                mkdir -p "$(dirname "$APK_LOCAL_PATH")"
-                printf "mock apk\n" > "$APK_LOCAL_PATH"
-                printf "mock sha\n" > "$APK_SHA_PATH"
-                OPERATOR_VERSION="9.9.9"
-                OPERATOR_APK_DOWNLOADED_THIS_RUN=1
-                echo "Mock download_operator_apk"
-                return 0
-            }
-            verify_operator_apk() {
-                trace verify_operator_apk "$TRACE_FILE"
-                echo "Mock verify_operator_apk"
                 return 0
             }
             if [ "$7" != "yes" ]; then
@@ -965,8 +953,6 @@ run_main_case \
     "" \
     "yes"
 
-assert_contains "$MULTI_STALE_STDOUT" "Mock download_operator_apk" "main-multi-stale stdout"
-assert_contains "$MULTI_STALE_STDOUT" "Mock verify_operator_apk" "main-multi-stale stdout"
 assert_contains "$MULTI_STALE_STDOUT" "Installing operator APK on serial-alpha..." "main-multi-stale stdout"
 assert_contains "$MULTI_STALE_STDOUT" "Installing operator APK on serial-beta..." "main-multi-stale stdout"
 assert_contains "$MULTI_STALE_STDOUT" "serial-alpha - operator APK installed and permissions granted." "main-multi-stale stdout"
@@ -975,8 +961,7 @@ assert_contains "$MULTI_STALE_STDOUT" "Installation Complete (Device Selection R
 assert_contains "$MULTI_STALE_STDOUT" "serial-alpha - ready" "main-multi-stale stdout"
 assert_contains "$MULTI_STALE_STDOUT" "serial-beta - ready" "main-multi-stale stdout"
 assert_not_contains "$MULTI_STALE_STDOUT" "Host install completed, but Android setup is still pending because more than one device is connected." "main-multi-stale stdout"
-assert_contains "$MULTI_STALE_TRACE" "download_operator_apk" "main-multi-stale trace"
-assert_contains "$MULTI_STALE_TRACE" "verify_operator_apk" "main-multi-stale trace"
+assert_contains "$MULTI_STALE_CLI_LOG" "operator download --output json --operator-package com.clawperator.operator" "main-multi-stale cli log"
 assert_contains "$MULTI_STALE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale/.clawperator/downloads/operator.apk --device serial-alpha --operator-package com.clawperator.operator" "main-multi-stale cli log"
 assert_contains "$MULTI_STALE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale/.clawperator/downloads/operator.apk --device serial-beta --operator-package com.clawperator.operator" "main-multi-stale cli log"
 
@@ -1006,8 +991,7 @@ assert_contains "$MULTI_STALE_DEV_STDOUT" "$TMP_DIR/home-main-multi-stale-dev/.c
 assert_contains "$MULTI_STALE_DEV_STDOUT" "serial-alpha - setup required with a matching local debug APK at $TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk" "main-multi-stale-dev stdout"
 assert_contains "$MULTI_STALE_DEV_STDOUT" "clawperator operator setup --apk $TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk --device serial-alpha --operator-package com.clawperator.operator.dev" "main-multi-stale-dev stdout"
 assert_contains "$MULTI_STALE_DEV_STDOUT" "serial-beta - ready" "main-multi-stale-dev stdout"
-assert_not_contains "$MULTI_STALE_DEV_STDOUT" "Mock download_operator_apk" "main-multi-stale-dev stdout"
-assert_not_contains "$MULTI_STALE_DEV_STDOUT" "Mock verify_operator_apk" "main-multi-stale-dev stdout"
+assert_not_contains "$MULTI_STALE_DEV_CLI_LOG" "operator download --output json --operator-package com.clawperator.operator.dev" "main-multi-stale-dev cli log"
 assert_not_contains "$MULTI_STALE_DEV_STDOUT" "https://clawperator.com/operator.apk" "main-multi-stale-dev stdout"
 assert_not_contains "$MULTI_STALE_DEV_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale-dev/.clawperator/downloads/operator-debug.apk --device serial-alpha --operator-package com.clawperator.operator.dev" "main-multi-stale-dev cli log"
 
@@ -1031,8 +1015,6 @@ run_main_case \
     "" \
     "yes"
 
-assert_contains "$MULTI_STALE_PROBE_STDOUT" "Mock download_operator_apk" "main-multi-stale-probe stdout"
-assert_contains "$MULTI_STALE_PROBE_STDOUT" "Mock verify_operator_apk" "main-multi-stale-probe stdout"
 assert_contains "$MULTI_STALE_PROBE_STDOUT" "Installing operator APK on serial-alpha..." "main-multi-stale-probe stdout"
 assert_contains "$MULTI_STALE_PROBE_STDOUT" "serial-alpha - operator APK installed and permissions granted." "main-multi-stale-probe stdout"
 assert_contains "$MULTI_STALE_PROBE_STDOUT" "serial-bad - could not inspect this device with Clawperator Doctor." "main-multi-stale-probe stdout"
@@ -1040,8 +1022,7 @@ assert_contains "$MULTI_STALE_PROBE_STDOUT" "clawperator doctor --device serial-
 assert_contains "$MULTI_STALE_PROBE_STDOUT" "some devices could not be inspected with Clawperator Doctor" "main-multi-stale-probe stdout"
 assert_not_contains "$MULTI_STALE_PROBE_STDOUT" "All ready devices passed doctor checks." "main-multi-stale-probe stdout"
 assert_not_contains "$MULTI_STALE_PROBE_STDOUT" "each ready device passed Clawperator Doctor" "main-multi-stale-probe stdout"
-assert_contains "$MULTI_STALE_PROBE_TRACE" "download_operator_apk" "main-multi-stale-probe trace"
-assert_contains "$MULTI_STALE_PROBE_TRACE" "verify_operator_apk" "main-multi-stale-probe trace"
+assert_contains "$MULTI_STALE_PROBE_CLI_LOG" "operator download --output json --operator-package com.clawperator.operator" "main-multi-stale-probe cli log"
 assert_contains "$MULTI_STALE_PROBE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale-probe/.clawperator/downloads/operator.apk --device serial-alpha --operator-package com.clawperator.operator" "main-multi-stale-probe cli log"
 assert_not_contains "$MULTI_STALE_PROBE_CLI_LOG" "operator setup --apk $TMP_DIR/home-main-multi-stale-probe/.clawperator/downloads/operator.apk --device serial-bad --operator-package com.clawperator.operator" "main-multi-stale-probe cli log"
 
@@ -1064,15 +1045,12 @@ run_main_case \
     "$REMEDIATE_STATE"
 
 REMEDIATE_INSTALL_STATE_PATH="$TMP_DIR/home-main-remediation/.clawperator/install-state.json"
-assert_contains "$REMEDIATE_STDOUT" "Mock download_operator_apk" "main-remediation stdout"
-assert_contains "$REMEDIATE_STDOUT" "Mock verify_operator_apk" "main-remediation stdout"
 assert_contains "$REMEDIATE_STDOUT" "Mock maybe_install_operator_apk" "main-remediation stdout"
 assert_contains "$REMEDIATE_STDOUT" "Installation Successful!" "main-remediation stdout"
 assert_contains "$REMEDIATE_STDOUT" "APK download path (downloaded this run) for operator version" "main-remediation stdout"
 assert_contains "$REMEDIATE_STDOUT" "Canonical stable APK URL (redownload this for later manual setup):" "main-remediation stdout"
 assert_json_field_equals "$REMEDIATE_INSTALL_STATE_PATH" "apkVersion" "9.9.9" "main-remediation install-state apkVersion"
-assert_contains "$REMEDIATE_TRACE" "download_operator_apk" "main-remediation trace"
-assert_contains "$REMEDIATE_TRACE" "verify_operator_apk" "main-remediation trace"
+assert_contains "$REMEDIATE_CLI_LOG" "operator download --output json --operator-package com.clawperator.operator" "main-remediation cli log"
 assert_contains "$REMEDIATE_TRACE" "maybe_install_operator_apk" "main-remediation trace"
 assert_contains "$REMEDIATE_CLI_LOG" "doctor --format json" "main-remediation cli log"
 assert_contains "$REMEDIATE_CLI_LOG" "doctor --output pretty" "main-remediation cli log"
@@ -1133,13 +1111,12 @@ run_main_case \
     "" \
     "yes"
 
-assert_contains "$PARTIAL_FAIL_STDOUT" "Mock download_operator_apk" "main-partial-fail stdout"
-assert_contains "$PARTIAL_FAIL_STDOUT" "Mock verify_operator_apk" "main-partial-fail stdout"
 assert_contains "$PARTIAL_FAIL_STDOUT" "Installing operator APK on serial-alpha..." "main-partial-fail stdout"
 assert_contains "$PARTIAL_FAIL_STDOUT" "Installing operator APK on serial-beta..." "main-partial-fail stdout"
 assert_contains "$PARTIAL_FAIL_STDOUT" "serial-alpha - ready" "main-partial-fail stdout"
 assert_contains "$PARTIAL_FAIL_STDOUT" "Installation Complete (Device Selection Required)" "main-partial-fail stdout"
 assert_not_contains "$PARTIAL_FAIL_STDOUT" "Installation Successful!" "main-partial-fail stdout"
+assert_contains "$PARTIAL_FAIL_CLI_LOG" "operator download --output json --operator-package com.clawperator.operator" "main-partial-fail cli log"
 
 echo "=== Scenario 13: shell-unavailable devices do not fall back to manual APK setup commands ==="
 SHELL_UNAVAILABLE_STDOUT="$TMP_DIR/main-shell-unavailable.stdout"

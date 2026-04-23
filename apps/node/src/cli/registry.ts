@@ -239,6 +239,34 @@ Notes:
   - Use clawperator grant-device-permissions only after the Operator APK crashes and Android revokes permissions.
 `;
 
+const HELP_OPERATOR_DOWNLOAD = `clawperator operator download
+
+Usage:
+  clawperator operator download [--operator-package <package>] [--output <json|pretty>]
+
+Optional:
+  --operator-package <pkg>  Operator package identifier. Automatic download currently supports com.clawperator.operator only.
+
+Notes:
+  - This is the canonical surface for Operator APK metadata fetch, download, and checksum verification.
+  - Writes the verified APK to ~/.clawperator/downloads/operator.apk via getOperatorPackageApkPath(operatorPackage).
+  - Returns structured JSON including localPath, operatorVersion, sha256, and operatorPackage.
+  - The metadata source defaults to https://downloads.clawperator.com/operator/latest.json.
+  - Override the metadata source for testing with CLAWPERATOR_APK_METADATA_URL.
+  - Non-release packages such as com.clawperator.operator.dev must use a matching local debug APK instead of public download.
+`;
+
+const HELP_OPERATOR = `clawperator operator
+
+Usage:
+  clawperator operator setup --apk <path> [--device <id>] [--operator-package <package>] [--output <json|pretty>]
+  clawperator operator download [--operator-package <package>] [--output <json|pretty>]
+
+Subcommands:
+  setup     Install the Operator APK, grant required permissions, and verify readiness
+  download  Fetch Operator APK metadata, download the release APK, and verify its checksum
+`;
+
 
 const HELP_SKILLS_INSTALL = `clawperator skills install
 
@@ -944,13 +972,17 @@ COMMANDS["operator"] = {
     return [];
   },
   summary: "Install the Operator APK and configure the device",
-  help: HELP_OPERATOR_SETUP,
+  help: HELP_OPERATOR,
   subtopics: {
     setup: HELP_OPERATOR_SETUP,
     install: HELP_OPERATOR_SETUP,
+    download: HELP_OPERATOR_DOWNLOAD,
   },
   topLevelBlock: `  operator setup --apk <path> [--device <id>] [--operator-package <package>]
-                                            Install the Operator APK, grant required permissions, and verify readiness`,
+                                            Install the Operator APK, grant required permissions, and verify readiness
+
+  operator download [--operator-package <package>]
+                                            Download and verify the release Operator APK to the canonical local path`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
@@ -967,12 +999,17 @@ COMMANDS["operator"] = {
           operatorPackage,
         });
       }
+    } else if (sub === "download") {
+      return (await import("./commands/operatorDownload.js")).cmdOperatorDownload({
+        ...out,
+        operatorPackage,
+      });
     } else {
       return JSON.stringify({
         code: "USAGE",
         message: sub
-          ? `Unknown operator subcommand '${sub}'. Use: clawperator operator setup --apk <path>`
-          : "Use: clawperator operator setup --apk <path>",
+          ? `Unknown operator subcommand '${sub}'. Use: clawperator operator setup --apk <path> or clawperator operator download`
+          : "Use: clawperator operator setup --apk <path> or clawperator operator download",
       });
     }
   },

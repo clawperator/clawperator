@@ -114,15 +114,12 @@ run_host_setup_parser_case() {
     ' _ "$INSTALL_SCRIPT" "$input_json" "$output_file"
 }
 
-run_operator_metadata_case() {
+run_operator_download_parser_case() {
     local label="$1"
-    local metadata_content="$2"
+    local input_json="$2"
     local output_file="$3"
     local status_file="$4"
     local values_file="$5"
-    local metadata_file="$TMP_DIR/$label-metadata.json"
-
-    printf '%s' "$metadata_content" > "$metadata_file"
 
     HOME="$TMP_DIR/home-$label" \
     OS=Linux \
@@ -130,17 +127,14 @@ run_operator_metadata_case() {
         source "$1" >/dev/null 2>&1
         trap - ERR
         set +e
-        parse_operator_metadata "$2" > "$3" 2>&1
+        parse_operator_download_result > "$3" <<< "$2"
         status="$?"
         set -e
         printf "%s\n" "$status" > "$4"
         {
-          printf "version=%s\n" "${OPERATOR_VERSION:-}"
-          printf "apk=%s\n" "${OPERATOR_APK_URL:-}"
-          printf "sha_url=%s\n" "${OPERATOR_SHA_URL:-}"
-          printf "sha256=%s\n" "${OPERATOR_EXPECTED_SHA256:-}"
+          cat "$3"
         } > "$5"
-    ' _ "$INSTALL_SCRIPT" "$metadata_file" "$output_file" "$status_file" "$values_file"
+    ' _ "$INSTALL_SCRIPT" "$input_json" "$output_file" "$status_file" "$values_file"
 }
 
 setup_mock_clawperator() {
@@ -726,61 +720,34 @@ assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawper
 assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawperator/mcp-config-snippet.json" "durable-summary"
 assert_contains "$DURABLE_SUMMARY_OUT" "AI agents should start with the local guide" "durable-summary"
 
-echo "=== Scenario 12: operator metadata parser extracts all expected fields ==="
-METADATA_SUCCESS_OUT="$TMP_DIR/metadata-success.out"
-METADATA_SUCCESS_STATUS="$TMP_DIR/metadata-success.status"
-METADATA_SUCCESS_VALUES="$TMP_DIR/metadata-success.values"
-run_operator_metadata_case \
-    metadata-success \
-    '{"version":"0.6.1","apk_url":"https://example.com/operator.apk","sha256_url":"https://example.com/operator.apk.sha256","sha256":"deadbeef"}' \
-    "$METADATA_SUCCESS_OUT" \
-    "$METADATA_SUCCESS_STATUS" \
-    "$METADATA_SUCCESS_VALUES"
-assert_equals "0" "$(cat "$METADATA_SUCCESS_STATUS")" "metadata-success status"
-assert_contains "$METADATA_SUCCESS_VALUES" "version=0.6.1" "metadata-success values"
-assert_contains "$METADATA_SUCCESS_VALUES" "apk=https://example.com/operator.apk" "metadata-success values"
-assert_contains "$METADATA_SUCCESS_VALUES" "sha_url=https://example.com/operator.apk.sha256" "metadata-success values"
-assert_contains "$METADATA_SUCCESS_VALUES" "sha256=deadbeef" "metadata-success values"
-assert_file_empty "$METADATA_SUCCESS_OUT" "metadata-success output"
+echo "=== Scenario 14: operator download result parser extracts installer-consumable fields ==="
+DOWNLOAD_RESULT_OUT="$TMP_DIR/download-result.out"
+DOWNLOAD_RESULT_STATUS="$TMP_DIR/download-result.status"
+DOWNLOAD_RESULT_VALUES="$TMP_DIR/download-result.values"
+run_operator_download_parser_case \
+    download-result \
+    '{"localPath":"/tmp/operator.apk","operatorVersion":"0.6.1","sha256":"deadbeef","operatorPackage":"com.clawperator.operator"}' \
+    "$DOWNLOAD_RESULT_OUT" \
+    "$DOWNLOAD_RESULT_STATUS" \
+    "$DOWNLOAD_RESULT_VALUES"
+assert_equals "0" "$(cat "$DOWNLOAD_RESULT_STATUS")" "download-result status"
+assert_contains "$DOWNLOAD_RESULT_VALUES" "localPath=/tmp/operator.apk" "download-result values"
+assert_contains "$DOWNLOAD_RESULT_VALUES" "operatorVersion=0.6.1" "download-result values"
+assert_contains "$DOWNLOAD_RESULT_VALUES" "sha256=deadbeef" "download-result values"
+assert_contains "$DOWNLOAD_RESULT_VALUES" "operatorPackage=com.clawperator.operator" "download-result values"
 
-echo "=== Scenario 13: operator metadata parser allows missing inline checksum ==="
-METADATA_NO_SHA_OUT="$TMP_DIR/metadata-no-sha.out"
-METADATA_NO_SHA_STATUS="$TMP_DIR/metadata-no-sha.status"
-METADATA_NO_SHA_VALUES="$TMP_DIR/metadata-no-sha.values"
-run_operator_metadata_case \
-    metadata-no-sha \
-    '{"version":"0.6.1","apk_url":"https://example.com/operator.apk","sha256_url":"https://example.com/operator.apk.sha256"}' \
-    "$METADATA_NO_SHA_OUT" \
-    "$METADATA_NO_SHA_STATUS" \
-    "$METADATA_NO_SHA_VALUES"
-assert_equals "0" "$(cat "$METADATA_NO_SHA_STATUS")" "metadata-no-sha status"
-assert_contains "$METADATA_NO_SHA_VALUES" "sha256=" "metadata-no-sha values"
-assert_file_empty "$METADATA_NO_SHA_OUT" "metadata-no-sha output"
-
-echo "=== Scenario 14: operator metadata parser rejects missing required fields ==="
-METADATA_MISSING_OUT="$TMP_DIR/metadata-missing.out"
-METADATA_MISSING_STATUS="$TMP_DIR/metadata-missing.status"
-METADATA_MISSING_VALUES="$TMP_DIR/metadata-missing.values"
-run_operator_metadata_case \
-    metadata-missing \
-    '{"version":"0.6.1","apk_url":"https://example.com/operator.apk"}' \
-    "$METADATA_MISSING_OUT" \
-    "$METADATA_MISSING_STATUS" \
-    "$METADATA_MISSING_VALUES"
-assert_equals "1" "$(cat "$METADATA_MISSING_STATUS")" "metadata-missing status"
-assert_contains "$METADATA_MISSING_OUT" "Failed to parse APK metadata" "metadata-missing output"
-
-echo "=== Scenario 15: operator metadata parser rejects malformed JSON ==="
-METADATA_BAD_OUT="$TMP_DIR/metadata-bad.out"
-METADATA_BAD_STATUS="$TMP_DIR/metadata-bad.status"
-METADATA_BAD_VALUES="$TMP_DIR/metadata-bad.values"
-run_operator_metadata_case \
-    metadata-bad \
-    '{"version":' \
-    "$METADATA_BAD_OUT" \
-    "$METADATA_BAD_STATUS" \
-    "$METADATA_BAD_VALUES"
-assert_equals "1" "$(cat "$METADATA_BAD_STATUS")" "metadata-bad status"
-assert_contains "$METADATA_BAD_OUT" "Failed to parse APK metadata" "metadata-bad output"
+echo "=== Scenario 15: operator download result parser extracts structured CLI errors ==="
+DOWNLOAD_ERROR_OUT="$TMP_DIR/download-error.out"
+DOWNLOAD_ERROR_STATUS="$TMP_DIR/download-error.status"
+DOWNLOAD_ERROR_VALUES="$TMP_DIR/download-error.values"
+run_operator_download_parser_case \
+    download-error \
+    '{"code":"OPERATOR_METADATA_INVALID","message":"missing sha256_url"}' \
+    "$DOWNLOAD_ERROR_OUT" \
+    "$DOWNLOAD_ERROR_STATUS" \
+    "$DOWNLOAD_ERROR_VALUES"
+assert_equals "0" "$(cat "$DOWNLOAD_ERROR_STATUS")" "download-error status"
+assert_contains "$DOWNLOAD_ERROR_VALUES" "code=OPERATOR_METADATA_INVALID" "download-error values"
+assert_contains "$DOWNLOAD_ERROR_VALUES" "message=missing sha256_url" "download-error values"
 
 echo "=== install.sh bundled-skills and host-artifact harness passed ==="
