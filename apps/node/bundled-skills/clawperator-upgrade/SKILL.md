@@ -20,10 +20,7 @@ logic inside the skill body.
   - `java -version` must report Java 17 or 21
 - run the CLI-first upgrade sequence when the CLI is reachable and the host prerequisites are already viable:
   - `npm install -g clawperator@latest`
-  - `clawperator operator remediate`
-  - `clawperator bundled-skills update`
-  - `clawperator skills install`
-  - `clawperator host setup`
+  - `clawperator install`
   - `clawperator doctor --json`
 - use `curl -fsSL https://clawperator.com/install.sh | bash` as recovery when `clawperator --version` is not reachable or the bootstrap prerequisites are not already satisfied
 - verify the resulting install with `clawperator doctor --json`
@@ -99,19 +96,15 @@ When `clawperator --version` succeeds and the host prerequisites are already via
 
 ```bash
 npm install -g clawperator@latest
-clawperator operator remediate
-clawperator bundled-skills update
-clawperator skills install
-clawperator host setup
+clawperator install
 clawperator doctor --json
 ```
 
 Rules:
 
-- use `clawperator operator remediate` as the device policy front door
-- do not re-implement multi-device policy inside the skill
+- use `clawperator install` as the CLI-owned post-bootstrap route
+- do not re-implement multi-device policy, runtime-skills install, bundled-skills install, or host-artifact sequencing inside the skill
 - use the structured CLI results rather than guessing about state
-- let `clawperator host setup` write the durable host artifacts
 - keep `clawperator doctor --json` as the readiness check after the sequence
 - if `npm install -g clawperator@latest` fails, fall back to the recovery installer and re-check reachability before continuing
 
