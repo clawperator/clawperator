@@ -2,193 +2,245 @@
 
 ## Goal
 
-The next refinement round should make `sites/landing/public/install.sh` and the
-shell-heavy install validation harness as small, linear, and easy to maintain
-as possible by moving the remaining post-bootstrap install behavior into the
-Node CLI.
+Make `sites/landing/public/install.sh` and the shell-heavy install validation
+harness as small, linear, and easy to maintain as possible by moving the
+remaining post-bootstrap install behavior into the Node CLI.
 
-This is the central recommendations document to use as the canonical input for
-the next task pack.
+This is the canonical recommendations document for the next task pack.
 
-## What The First Wave Already Achieved
+---
+
+## What the First Wave Already Achieved
 
 The initial installer-cleanup work that landed on `main` successfully moved the
 largest ownership domains into the CLI:
 
 - `clawperator host setup` now owns durable host artifact generation
-- `clawperator operator download` now owns APK metadata fetch, checksum
+  (install-state.json, mcp-config-snippet.json, AGENTS.md, shared agent bridge)
+- `clawperator operator download` now owns APK metadata fetch, SHA-256
   verification, and canonical placement
-- `clawperator operator remediate` now owns multi-device remediation policy
+- `clawperator operator remediate` now owns multi-device remediation policy,
+  per-device doctor runs, APK download, operator install, and doctor-fix
 - `clawperator-upgrade` now uses a CLI-first upgrade path, with `install.sh`
-  retained as a recovery entrypoint
+  as recovery only
 
-That work was real and valuable. The current issue is not that the CLI
-migration failed. It is that `install.sh` is still too large because it remains
-a shell-side middleware layer after the CLI migration.
+That ownership migration was genuine. The current issue is not that the CLI
+migration failed. It is that `install.sh` is still a significant shell-side
+middleware layer after the migration.
 
-## Current Problem
+---
 
-Even after the initial five phases landed, the residual shell surface is still
-large:
+## Current State
 
-- `sites/landing/public/install.sh`: about `1431` lines
-- `validation/install/test_agent_skills.sh`: about `1054` lines
-- `validation/install/test_main.sh`: about `942` lines
-- `validation/install/test_multidevice.sh`: about `301` lines
+After the initial phases landed, the residual shell surface is still large:
 
-The remaining size is no longer dominated by the old artifact writers or the
-old doctor policy engine. It is now concentrated in shell-side parsing,
-state-threading, orchestration glue, and installer summary formatting.
+- `sites/landing/public/install.sh`: 1431 lines
+- `validation/install/test_agent_skills.sh`: 1054 lines
+- `validation/install/test_main.sh`: 942 lines
+- `validation/install/test_multidevice.sh`: 301 lines
+
+The remaining bulk is no longer dominated by artifact writers or doctor policy.
+It is now concentrated in shell-side JSON parsing, state threading, orchestration
+glue, and installer summary formatting - none of which belongs in bash.
+
+---
 
 ## Key Findings
 
-### 1. `install.sh` still contains five inline JSON parsers
+### 1. Five inline `node -e` JSON parsers still live in `install.sh`
 
-The installer still uses `node -e` helpers to parse JSON returned by the CLI:
+The installer spawns Node a second time after each CLI call to decode its JSON
+output back into shell variables:
 
-- `parse_skills_registry_path`
-- `parse_bundled_skills_install_result`
-- `parse_host_setup_result`
-- `parse_operator_download_result`
-- `parse_operator_remediate_result`
+| Parser | Extracts |
+|---|---|
+| `parse_skills_registry_path` (lines 471-487) | `registryPath` string |
+| `parse_bundled_skills_install_result` (lines 489-511) | `installedDir`, `agentDiscoveryDirs[].{label,dir}` |
+| `parse_host_setup_result` (lines 624-665) | `ok`, `summary.*`, per-artifact `status/path/message` |
+| `parse_operator_download_result` (lines 667-699) | `localPath`, `operatorVersion`, `sha256`, `operatorPackage`, error fields |
+| `parse_operator_remediate_result` (lines 701-748) | `ok`, `summary.*`, per-device `deviceId/adbState/status/message` |
 
-This is the clearest signal that shell is still doing work the CLI should own.
-The installer should not need five parser helpers to consume the product’s own
-CLI.
+These parsers exist because values extracted from one CLI call must be threaded
+forward as flags or env vars into a subsequent CLI call. That data threading is
+the root cause, not the parsers themselves. The three active data threads are:
 
-### 2. `setup_host_artifacts_via_cli` is still a substantial orchestration layer
+- `operator remediate` output (`LAST_DEVICE_SERIAL`) forwarded to
+  `host setup --last-device-serial`
+- `skills install` output (`SKILLS_REGISTRY_PATH`) forwarded as
+  `CLAWPERATOR_SKILLS_REGISTRY=` to `host setup`
+- formerly: `operator download` output (`OPERATOR_VERSION`) forwarded to
+  `host setup --apk-version` (this path is now dead; see finding 4)
 
-The host-setup shell wrapper still:
+If a higher-level CLI surface owned the sequencing, it would thread state
+internally and the parsers would have no purpose.
 
-- builds arguments for `clawperator host setup`
-- passes through `CLAWPERATOR_SKILLS_REGISTRY`
-- parses per-artifact results
-- hardcodes artifact names in bash
-- decides whether a shared-agent-bridge failure is non-fatal
+### 2. `setup_host_artifacts_via_cli` is still a ~165-line orchestration layer
 
-That means the shell still owns part of the host-artifact policy even though
-host setup itself moved into Node.
+`setup_host_artifacts_via_cli` (lines 796-961):
 
-### 3. `run_operator_remediation_via_cli` still builds a shell-side state model
+- builds args for `clawperator host setup` from state variables collected
+  throughout the install run
+- injects `CLAWPERATOR_SKILLS_REGISTRY=` env based on extracted registry path
+- calls `host setup --output json`
+- parses with `parse_host_setup_result`
+- iterates four artifacts by hardcoded name (`installState`,
+  `mcpConfigSnippet`, `agentGuide`, `sharedAgentBridge`)
+- validates all four are present by name
+- implements the "shared bridge failure is non-fatal" policy in bash
+  (the `ONLY_SHARED_BRIDGE_FAILURE` branch at lines 942-949)
 
-The remediation wrapper still:
+The last point is the sharpest mismatch: `hostSetup.ts` already defines
+`isNonFatalHostArtifactFailure()` and the concept lives in Node, but the
+decision to continue rather than fail lives in the shell at lines 942-949. The
+shell overrides the CLI's exit code for this case. The CLI should own this
+policy end-to-end. The artifact hardcoding in bash is a separate maintenance
+liability: if an artifact is added or renamed in the CLI, the bash name list
+breaks silently.
 
-- parses CLI JSON into shell arrays and counters
-- stores per-device ids, states, statuses, and messages
-- reinterprets that state later when printing installer summaries
-- forwards derived state such as `LAST_DEVICE_SERIAL` into later steps
+### 3. `run_operator_remediation_via_cli` builds a shell-side state model (~120 lines)
 
-This is effectively a second installer-state model in bash.
+`run_operator_remediation_via_cli` (lines 1128-1244) parses CLI JSON into
+parallel shell arrays: `OPERATOR_REMEDIATE_DEVICE_IDS[]`, `STATES[]`,
+`STATUSES[]`, `MESSAGES[]`, plus nine scalar counters. This is the most
+database-like use of shell variables in the entire script. The extracted
+`LAST_DEVICE_SERIAL` (when exactly one connected device is found) gets forwarded
+to `host setup --last-device-serial`. The counters drive the final summary
+decision tree in `main()` (lines 1327-1431, ~105 lines of bash conditional
+logic producing the completion message).
 
-### 4. `download_operator_apk_via_cli` is dead install-flow code
+### 4. `download_operator_apk_via_cli` is dead code in `main()`
 
-There is still shell code for `download_operator_apk_via_cli` and its parser,
-but that function is no longer called by `main()`. The actual install flow now
-downloads through `operator remediate`.
+`download_operator_apk_via_cli` (lines 963-1057) and `parse_operator_download_result`
+(lines 667-699) exist in `install.sh` and are tested by `test_agent_skills.sh`
+scenarios 15-15f, but there is no code path from `main()` to this function.
+`operator remediate` handles APK download internally. The function has no
+callers in the install flow.
 
-This is high-confidence cleanup work because it removes dead code and dead test
-coverage without changing the real install path.
+This accounts for approximately 200 lines of `install.sh` and about 100 lines
+of `test_agent_skills.sh` (the `run_operator_download_via_cli_case` and
+`run_operator_download_parser_case` helpers plus scenarios 15c-15f) that are
+dead with respect to the actual install execution. This is pure cleanup with no
+behavior change.
 
-### 5. The final installer summary is still a large bash decision tree
+### 5. The final installer summary is a ~105-line bash decision tree
 
-The installer still interprets many status counters to decide which success,
-warning, or follow-up guidance to show. This is product presentation logic that
-should live in the CLI, not in bash.
+`main()` lines 1327-1431 interpret `OPERATOR_REMEDIATE_TOTAL_DEVICES`,
+`OPERATOR_REMEDIATE_FAILED_COUNT`, `OPERATOR_REMEDIATE_CONNECTED_DEVICE_COUNT`,
+`OPERATOR_REMEDIATE_ADB_UNREADY_COUNT`, and `OPERATOR_REMEDIATE_WARN_COUNT` to
+produce multi-device, single-device, failure, and warning completion messages.
+This is pure product presentation logic that belongs in the CLI, not in bash
+conditionals.
 
 ### 6. Some shell output extraction is only used for printing
 
-Examples:
+`setup_bundled_skills_via_cli` extracts `BUNDLED_SKILLS_INSTALL_DIR`,
+`BUNDLED_SKILLS_CLAUDE_DIR`, `BUNDLED_SKILLS_CODEX_DIR`, and
+`BUNDLED_SKILLS_AGENTS_DIR` from the `bundled-skills install` JSON. These values
+are used only at lines 584-588 to echo them to stdout. They are never forwarded
+to another CLI call. If the CLI printed its own success summary for bundled-skills,
+the shell would not need to extract or reformat them.
 
-- bundled-skills install result parsing is mainly used to re-print directory
-  paths
-- some installer summaries exist only because the shell wants to restate
-  already structured CLI results in a custom format
-
-This is low-value shell complexity.
+Similarly, `CLAWPERATOR_SKILLS_REGISTRY` threading is unnecessary for the default
+install path. The extracted registry path is always
+`~/.clawperator/skills/skills/skills-registry.json` for a default installation.
+`host setup` already reads `CLAWPERATOR_SKILLS_REGISTRY` from the calling
+environment. The shell-side extraction and re-injection serves only non-default
+registry configurations.
 
 ### 7. The shell validation harness still proves parser and glue behavior
 
-Large parts of `validation/install/test*` still test:
+Large sections of `validation/install/test*` test shell-owned translation code
+rather than install outcomes:
 
-- parser helpers
-- shell-side translation logic
-- shell-owned summary branching
+- `test_agent_skills.sh` scenarios 1-2 and 2b test `parse_bundled_skills_install_result`
+  and `parse_host_setup_result` as unit tests
+- `test_agent_skills.sh` scenarios 15-15f test `parse_operator_download_result`
+  and `download_operator_apk_via_cli` (dead code)
+- `test_multidevice.sh` scenarios 1 and 5 test `parse_operator_remediate_result`
+  directly
+- `test_main.sh` contains a mock clawperator binary dispatching on at least six
+  command surfaces with state-file-tracked call counts (lines 182-394) that
+  simulate a multi-doctor-invocation flow - this complexity reflects the old
+  multi-step shell-driven architecture and would simplify substantially if a
+  `clawperator install` command replaced the multi-step sequence
 
-That means the validation surface is still paying for shell behavior that the
-architecture no longer wants to keep.
+That validation surface pays maintenance cost for shell behavior the architecture
+no longer wants to keep.
+
+---
 
 ## Recommendations
 
-## 1. Delete dead installer code first
+### 1. Delete dead installer code first
 
-The safest compaction step is to remove:
+Remove from `install.sh`:
+- `download_operator_apk_via_cli` (lines 963-1057)
+- `parse_operator_download_result` (lines 667-699)
 
-- `download_operator_apk_via_cli`
-- `parse_operator_download_result`
-- any shell tests that only exist to cover that dead path
+Remove from `test_agent_skills.sh`:
+- `run_operator_download_parser_case` helper (lines 117-138)
+- `run_operator_download_via_cli_case` helper (lines 140-190)
+- scenarios 15-15f (approximately lines 922-1038)
 
-This should be done before deeper refactors because it reduces noise and lowers
-the amount of shell surface under consideration with no behavior change to the
-real install flow.
+This is the safest compaction step: pure removal of dead code and dead test
+coverage with no behavior change to the real install flow. Do this before any
+deeper refactor to reduce the surface under consideration.
 
-## 2. Move non-fatal host-artifact policy fully into Node
+### 2. Move the non-fatal shared-bridge policy fully into Node
 
-The host setup domain already knows what counts as a non-fatal host-artifact
-failure. The shell should not be the layer that converts that knowledge into
-"continue anyway" behavior.
+`hostSetup.ts` already has `isNonFatalHostArtifactFailure()` that identifies
+the shared bridge as the non-fatal artifact. The policy decision - "continue
+rather than fail" - currently lives in the shell at lines 942-949.
 
-Specifically:
+The fix is straightforward: make `setupHost` in `hostSetup.ts` return `ok = true`
+when a shared-bridge failure is the only failure, so `cmdHostSetup` exits 0 in
+that case. The "warning; continuing" message should come from the CLI's own
+output rather than from a bash branch overriding the exit code.
 
-- make `host setup` own the shared-agent-bridge non-fatal policy completely
-- let the CLI return the correct `ok` / exit behavior for that case
-- stop requiring bash to count failed artifacts and implement the exception
+Once this lands, the `ONLY_SHARED_BRIDGE_FAILURE` branch and the
+`HOST_FAILED_COUNT` counter disappear from `setup_host_artifacts_via_cli`, and
+the shell can simply check the CLI exit code.
 
-Once this is done, `setup_host_artifacts_via_cli` can shrink materially.
-
-## 3. Add a higher-level post-bootstrap installer CLI surface
+### 3. Add a higher-level post-bootstrap installer CLI surface
 
 This is the most important recommendation.
 
 The remaining shell complexity is mostly caused by shell-to-CLI data threading:
+the shell extracts state from one CLI call and forwards it to the next. The
+cleanest fix is to add a CLI-owned post-bootstrap install surface - provisionally
+named `clawperator install` - that:
 
-- skills install returns a registry path that the shell forwards to host setup
-- operator remediate returns device information that the shell forwards and
-  later reinterprets
-- multiple CLI calls are sequenced in bash, with bash responsible for the
-  overall installer meaning
-
-The best next step is to add a higher-level CLI-owned post-bootstrap installer
-surface that:
-
-- runs the post-bootstrap steps in the correct order
-- threads state internally in Node
-- owns partial-failure semantics
-- owns final installer summary semantics
+- accepts `--operator-package` (for non-release APKs)
+- internally sequences: operator remediate, skills install, bundled-skills
+  install, host setup
+- threads state between those steps internally in Node (no shell extraction
+  needed)
+- owns partial-failure semantics (shared bridge non-fatal, skills best-effort)
+- owns final installer summary semantics (single-device, multi-device, failure,
+  warning paths)
 - returns one stable installer-facing result contract
 
-Whether this surface is named `clawperator install`, `clawperator host install`,
-or another equivalent is less important than the ownership boundary:
+With this command, the post-bootstrap section of `main()` reduces to:
 
-**after `npm install -g clawperator@latest`, the shell should ideally call one
-primary CLI-owned install flow rather than assemble the workflow itself.**
+```bash
+install_cli || exit 1
+clawperator install --operator-package "$DEFAULT_OPERATOR_PACKAGE"
+```
 
-## 4. Remove shell-side JSON parsing entirely where practical
+The five JSON parsers, the parallel device arrays, `setup_host_artifacts_via_cli`,
+`run_operator_remediation_via_cli`, the bundled-skills extraction loop, the
+registry path threading, and the ~105-line final summary tree in `main()` all
+disappear from shell. The test mock in `test_main.sh` simplifies from a
+multi-surface dispatcher with call-count state to a single-command mock.
 
-The target should be to delete all or nearly all inline `node -e` parser
-helpers from `install.sh`.
+### 4. Remove shell-side JSON parsing entirely
 
-There are two valid ways to achieve that:
+Once the higher-level install surface exists and the shared-bridge policy is
+fixed, all five `node -e` parsers in `install.sh` should be deletable. This is
+a consequence, not a separate effort. Do not attempt to remove them piecemeal
+before the upstream data-threading seams are closed.
 
-- have the CLI return installer-facing pretty output that the shell can relay
-  directly, plus JSON for automation when needed
-- have the new higher-level install surface return the one structured contract
-  the shell needs, instead of many small contracts that bash must stitch
-  together
-
-Either approach is acceptable. The important thing is that shell stops being a
-JSON interpreter.
-
-## 5. Move installer summary formatting into the CLI
+### 5. Move installer summary formatting into the CLI
 
 The CLI should own:
 
@@ -199,107 +251,88 @@ The CLI should own:
 
 The shell should not need to decide which message to print based on multiple
 arrays and counters. It should mostly pass through CLI output and propagate exit
-status.
+status. This is a consequence of recommendation 3 if the higher-level install
+surface owns its own pretty output.
 
-## 6. Simplify command contracts for install-adjacent CLI surfaces
+### 6. Reduce shell validation by moving behavioral proof into Node tests
 
-Audit and tighten the install-adjacent command contracts for:
+Explicitly shrink `validation/install/test*` as shell code is removed. Move
+proof of these behaviors into Node tests:
 
-- `skills install`
-- `bundled-skills install`
-- `host setup`
-- `operator remediate`
-
-The current contracts are useful, but they still require shell normalization.
-The next refinement round should prefer output shapes and exit behavior that are
-directly consumable by an installer caller without custom parsing logic.
-
-This includes:
-
-- explicit top-level fields for installer-relevant outcomes
-- consistent exit behavior
-- consistent treatment of warnings vs hard failures
-- reduced need for bash to infer meaning from nested result details
-
-## 7. Let `host setup` and installer-side registry discovery own more of the default path
-
-The shell still extracts the skills registry path from `skills install` output
-and re-injects it into `host setup`. For the default install path, that round
-trip is unnecessary complexity.
-
-Recommendation:
-
-- make the default registry discovery path fully CLI-owned
-- only require shell involvement for genuinely non-default or explicit override
-  cases
-
-This helps remove another data-threading seam from the installer.
-
-## 8. Reduce shell validation by moving behavioral proof into Node tests
-
-The follow-on effort should explicitly shrink `validation/install/test*`.
-
-Move proof of these behaviors into Node tests wherever possible:
-
-- parser behavior
-- result-shape interpretation
-- host-artifact non-fatal policy
-- remediation summary assembly
-- post-bootstrap sequencing logic
+- parser behavior (move as parsers are deleted)
+- host-artifact non-fatal policy (move when recommendation 2 lands)
+- remediation summary assembly (move when recommendation 3 lands)
+- post-bootstrap sequencing logic (move when recommendation 3 lands)
 
 Keep shell tests focused on the irreducible shell responsibilities:
 
-- bootstrap checks and failure paths
-- CLI delegation
-- environment propagation when truly required
+- bootstrap checks (Java, Node, adb, git, curl) and their failure paths
+- CLI delegation (the shell calls the right CLI surface with the right args)
 - top-level exit-code propagation
 
-The shell harness should validate "the bootstrap wrapper calls the right CLI
-surface and handles its result sanely," not re-prove Node-owned business logic.
+The shell harness should prove "the bootstrap wrapper invokes the CLI-owned
+install flow and propagates its result sanely," not re-prove Node-owned business
+logic. The test mock complexity in `test_main.sh` (multi-surface dispatch, call
+counts for doctor invocations) is a direct symptom of shell owning too much; it
+should shrink as shell responsibility shrinks.
 
-## 9. Preserve the irreducible shell core and cut everything else aggressively
+### 7. Preserve the irreducible shell core; cut everything else aggressively
 
 The shell should continue to own:
 
-- OS validation
-- Java / Node / adb / git / curl checks or provisioning
-- global CLI installation via `npm install -g clawperator@latest`
-- minimal wrapper logic needed to invoke the CLI-owned post-bootstrap flow
-- shell-specific advice like the final `source ~/.zshrc` hint
+- OS validation (`validate_os`)
+- Java detection and multi-platform provisioning (`check_java` and helpers,
+  ~170 lines; this must precede any Node runtime)
+- Node.js detection and nvm provisioning (`check_node`, `load_nvm`,
+  `install_or_upgrade_node_with_nvm`, ~57 lines; must precede npm)
+- adb, git, curl check and install (~80 lines combined)
+- `npm install -g clawperator@latest` plus binary path resolution
+  (`install_cli`, ~37 lines; the fresh-binary discovery at lines 449-462 is
+  necessary because the new binary may not yet be on PATH)
+- error trapping, temp file cleanup, `on_error`
+- the final `source ~/.zshrc` hint (only shell knows the active shell)
 
-Almost everything after the CLI install should now be treated as suspect unless
-there is a strong reason it cannot move to Node.
+This irreducible bootstrap core is approximately lines 1-468 of the current
+`install.sh` - roughly 450-500 lines. The current 1431-line script should
+realistically reach that target once all post-bootstrap orchestration moves to
+the CLI.
+
+Almost everything after `install_cli || exit 1` should be treated as suspect
+unless there is a strong reason it cannot move into Node.
+
+---
 
 ## Recommended End State
 
-The desired steady state is:
+1. Shell performs prerequisite checks and installs the CLI (~450-500 lines)
+2. Shell invokes one primary CLI-owned post-bootstrap install flow
+3. Shell relays the resulting success, warning, or failure output
+4. Shell exits
 
-1. shell performs prerequisite checks and installs the CLI
-2. shell invokes one primary CLI-owned post-bootstrap install flow
-3. shell relays a CLI-owned success, warning, or failure summary
-4. shell exits
+In that state `install.sh` becomes shorter, easier to reason about, and easier
+to maintain. `validation/install/test*` becomes much smaller. Future install
+behavior changes happen in typed Node code with unit test coverage, not in bash
+conditionals.
 
-In that state:
-
-- `install.sh` becomes much shorter
-- the installer becomes easier to reason about
-- `validation/install/test*` becomes much smaller
-- future install behavior changes happen in typed Node code, not in bash glue
+---
 
 ## Bottom Line
 
-The next refinement round should not be framed as “move a few more helpers.”
-It should be framed as **removing the shell’s remaining role as an orchestrator
-and JSON interpreter**.
+The next refinement round should not be framed as "move a few more helpers." It
+should be framed as **removing the shell's remaining role as an orchestrator and
+JSON interpreter**.
 
-The most valuable concrete moves are:
+The most valuable concrete moves, in priority order:
 
-1. delete the dead operator-download shell path
-2. move shared-bridge non-fatal policy fully into `host setup`
-3. add a higher-level CLI-owned post-bootstrap installer surface
-4. delete the remaining shell JSON parsers
-5. shrink shell validation to bootstrap-only concerns
+1. Delete the dead operator-download shell path and its test coverage (~300 lines,
+   zero behavior change)
+2. Move shared-bridge non-fatal policy fully into `hostSetup.ts` (closes the
+   clearest policy mismatch between Node and shell)
+3. Add a `clawperator install` post-bootstrap surface (closes the data-threading
+   root cause; everything else follows from this)
+4. Delete the remaining shell JSON parsers (consequence of 3)
+5. Shrink shell validation to bootstrap-only concerns (consequence of 3 and 4)
 
 If that work is done well, `install.sh` will stop behaving like a second
-application and become the small bootstrap entrypoint it was always supposed to
-be.
+application and become the small bootstrap entrypoint it was always supposed
+to be.
