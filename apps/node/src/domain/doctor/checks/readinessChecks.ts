@@ -24,6 +24,32 @@ import {
 import { buildResultEnvelopeTimeoutHint } from "../../executions/timeoutGuidance.js";
 import { DOCTOR_DOCS_URLS } from "../docsUrls.js";
 
+function buildMissingApkFixSteps(config: RuntimeConfig): Array<{ kind: "shell" | "manual"; value: string }> {
+  if (config.operatorPackage === "com.clawperator.operator") {
+    return [
+      {
+        kind: "shell",
+        value: "clawperator operator download",
+      },
+      {
+        kind: "shell",
+        value: `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device ${config.deviceId}`,
+      },
+    ];
+  }
+
+  return [
+    {
+      kind: "manual",
+      value: `If you do not already have a matching local debug APK at ${getOperatorPackageApkPath(config.operatorPackage)}, rebuild the debug app from the same checkout before rerunning setup.`,
+    },
+    {
+      kind: "shell",
+      value: `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device ${config.deviceId} --operator-package ${config.operatorPackage}`,
+    },
+  ];
+}
+
 export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorCheckResult> {
   const packageList = await runAdb(config, ["shell", "pm", "list", "packages", config.operatorPackage]);
   if (packageList.code !== 0) {
@@ -91,16 +117,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
       fix: {
         title: "Install Operator APK",
         platform: "any",
-        steps: [
-          {
-            kind: "shell",
-            value: `clawperator operator download${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`,
-          },
-          {
-            kind: "shell",
-            value: `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device ${config.deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`,
-          },
-        ],
+        steps: buildMissingApkFixSteps(config),
         docsUrl: DOCTOR_DOCS_URLS.setup,
       },
     };

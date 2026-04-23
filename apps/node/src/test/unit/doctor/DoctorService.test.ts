@@ -83,7 +83,7 @@ describe("DoctorService", () => {
 
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
     assert.deepStrictEqual(report.nextActions, [
-      "clawperator operator download --operator-package com.clawperator.operator.dev",
+      "If you do not already have a matching local debug APK at ~/.clawperator/downloads/operator-debug.apk, rebuild the debug app from the same checkout before rerunning setup.",
       "clawperator operator setup --apk ~/.clawperator/downloads/operator-debug.apk --device test-device-1 --operator-package com.clawperator.operator.dev",
     ]);
   });
