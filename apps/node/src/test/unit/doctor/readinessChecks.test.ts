@@ -23,6 +23,10 @@ describe("checkApkPresence", () => {
         assert.strictEqual(result.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
         assert.match(result.detail ?? "", /Package com\.test\.operator was not found/);
         assert.strictEqual(result.fix?.docsUrl, "https://docs.clawperator.com/setup/");
+        assert.deepStrictEqual(result.fix?.steps, [
+            { kind: "shell", value: "clawperator operator download --operator-package com.test.operator" },
+            { kind: "shell", value: "clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device test-device --operator-package com.test.operator" },
+        ]);
     });
 
     it("fails when package queries cannot run", async () => {
@@ -105,6 +109,10 @@ describe("runHandshake", () => {
         assert.strictEqual(result.status, "fail");
         assert.strictEqual(result.code, ERROR_CODES.DEVICE_ACCESSIBILITY_NOT_RUNNING);
         assert.match(result.detail!, /Boom/);
+        assert.deepStrictEqual(
+            result.fix?.steps.filter((step) => step.kind === "shell"),
+            [{ kind: "shell", value: "clawperator grant-device-permissions --device test-device --operator-package com.test.operator" }],
+        );
     });
 
     it("returns fail on timeout", async () => {

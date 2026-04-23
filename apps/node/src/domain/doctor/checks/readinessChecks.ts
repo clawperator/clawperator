@@ -17,8 +17,6 @@ import type { InternalInteractiveState, InteractiveStateProbeResult } from "./de
 import {
   getAlternateOperatorVariant,
   getCliVersion,
-  getOperatorApkDownloadUrl,
-  getOperatorApkSha256Url,
   getOperatorPackageApkPath,
   hasListedPackage,
   probeVersionCompatibility,
@@ -94,12 +92,10 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
         title: "Install Operator APK",
         platform: "any",
         steps: [
-          config.operatorPackage.endsWith(".dev")
-            ? { kind: "manual", value: "If you do not already have a local debug APK copy, rebuild the debug app from the same checkout before rerunning setup." }
-            : {
-                kind: "manual",
-                value: `Download the exact release APK from ${getOperatorApkDownloadUrl(getCliVersion())} and the checksum from ${getOperatorApkSha256Url(getCliVersion())}.`,
-              },
+          {
+            kind: "shell",
+            value: `clawperator operator download${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`,
+          },
           {
             kind: "shell",
             value: `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device ${config.deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`,

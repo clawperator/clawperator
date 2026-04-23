@@ -8,11 +8,7 @@ import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtim
 import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { createClawperatorLogger } from "../../../adapters/logger.js";
-import {
-  getCliVersion,
-  getOperatorApkDownloadUrl,
-  getOperatorApkSha256Url,
-} from "../../../domain/version/compatibility.js";
+import { getCliVersion } from "../../../domain/version/compatibility.js";
 
 function withTempBundledSkillsDir<T>(config: T, baseDir: string): T {
   (config as T & { bundledSkillsDir?: string }).bundledSkillsDir = join(baseDir, "bundled-skills");
@@ -87,7 +83,7 @@ describe("DoctorService", () => {
 
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
     assert.deepStrictEqual(report.nextActions, [
-      "If you do not already have a local debug APK copy, rebuild the debug app from the same checkout before rerunning setup.",
+      "clawperator operator download --operator-package com.clawperator.operator.dev",
       "clawperator operator setup --apk ~/.clawperator/downloads/operator-debug.apk --device test-device-1 --operator-package com.clawperator.operator.dev",
     ]);
   });
@@ -276,7 +272,7 @@ describe("DoctorService", () => {
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
   });
 
-  it("lists the release download instructions before the install command", async () => {
+  it("lists the shell download step before the setup command", async () => {
     const runner = new FakeProcessRunner();
     const config = withTempBundledSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator" }), fakeRegistryDir);
 
@@ -297,9 +293,36 @@ describe("DoctorService", () => {
 
     const apkPresence = report.checks.find(check => check.id === "readiness.apk.presence");
     assert.ok(apkPresence);
-    const cliVersion = getCliVersion();
     assert.deepStrictEqual(apkPresence.fix?.steps.map(step => step.value), [
-      `Download the exact release APK from ${getOperatorApkDownloadUrl(cliVersion)} and the checksum from ${getOperatorApkSha256Url(cliVersion)}.`,
+      "clawperator operator download",
+      "clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device test-device-1",
+    ]);
+  });
+
+  it("runs operator download before operator setup during doctor autofix", async () => {
+    const runner = new FakeProcessRunner();
+    const config = withTempBundledSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator" }), fakeRegistryDir);
+
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Android Debug Bridge version 1.0.41", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "33\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Physical size: 1080x2400\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Physical density: 420\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+    await new DoctorService().run({ config, fix: true });
+
+    const shellCalls = runner.calls.filter(call => call.command === "bash").map(call => call.args[1]);
+    assert.deepStrictEqual(shellCalls, [
+      "clawperator operator download",
       "clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device test-device-1",
     ]);
   });
