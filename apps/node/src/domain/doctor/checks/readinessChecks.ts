@@ -39,10 +39,15 @@ function buildMissingApkFixSteps(config: RuntimeConfig): Array<{ kind: "shell" |
     ];
   }
 
+  const matchingApkLabel = config.operatorPackage.endsWith(".dev") ? "matching local debug APK" : "matching local APK";
+  const buildGuidance = config.operatorPackage.endsWith(".dev")
+    ? "rebuild the debug app from the same checkout"
+    : `build or obtain the APK for ${config.operatorPackage} from the same checkout`;
+
   return [
     {
       kind: "manual",
-      value: `If you do not already have a matching local debug APK at ${getOperatorPackageApkPath(config.operatorPackage)}, rebuild the debug app from the same checkout before rerunning setup.`,
+      value: `If you do not already have a ${matchingApkLabel} at ${getOperatorPackageApkPath(config.operatorPackage)}, ${buildGuidance} before rerunning setup.`,
     },
     {
       kind: "shell",

@@ -23,6 +23,11 @@ describe("operator remediate", () => {
       { format: "json" },
       {
         listDevicesImpl: async () => [],
+        deviceEnumerationCheckImpl: async () => ({
+          code: 0,
+          stdout: "List of devices attached\n\n",
+          stderr: "",
+        }),
       },
     );
 
@@ -30,6 +35,25 @@ describe("operator remediate", () => {
     assert.strictEqual(parsed.ok, true);
     assert.strictEqual(parsed.summary.totalDevices, 0);
     assert.deepStrictEqual(parsed.devices, []);
+  });
+
+  it("returns an adb error instead of a no-device success when enumeration fails", async () => {
+    const output = await cmdOperatorRemediate(
+      { format: "json" },
+      {
+        listDevicesImpl: async () => [],
+        deviceEnumerationCheckImpl: async () => ({
+          code: 127,
+          stdout: "",
+          stderr: "ADB command not found at path: adb",
+        }),
+      },
+    );
+
+    const parsed = JSON.parse(output);
+    assert.strictEqual(parsed.code, ERROR_CODES.ADB_NOT_FOUND);
+    assert.match(parsed.message, /adb is not available/);
+    assert.strictEqual(process.exitCode, 1);
   });
 
   it("remediates a single stale device with one download and setup pass", async () => {

@@ -1,8 +1,9 @@
 import { access } from "node:fs/promises";
 import { homedir } from "node:os";
 import type { OutputOptions } from "../output.js";
-import { formatSuccess } from "../output.js";
-import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
+import { formatError, formatSuccess } from "../output.js";
+import { runAdb, type AdbResult } from "../../adapters/android-bridge/adbClient.js";
+import { getDefaultRuntimeConfig, type RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { listDevices, type DeviceInfo } from "../../domain/devices/listDevices.js";
 import { DoctorService } from "../../domain/doctor/DoctorService.js";
 import type { DoctorReport, DoctorCheckResult } from "../../contracts/doctor.js";
@@ -53,6 +54,7 @@ export interface OperatorRemediateResult {
 
 interface OperatorRemediateDeps {
   listDevicesImpl?: typeof listDevices;
+  deviceEnumerationCheckImpl?: (config: RuntimeConfig) => Promise<AdbResult>;
   doctorServiceFactory?: () => Pick<DoctorService, "run">;
   downloadOperatorApkImpl?: typeof downloadOperatorApk;
   setupOperatorImpl?: typeof setupOperator;
@@ -169,7 +171,7 @@ async function remediateConnectedDevice(
   device: DeviceInfo,
   operatorPackage: string,
   logger: Logger | undefined,
-  deps: Required<OperatorRemediateDeps>,
+  deps: Required<Omit<OperatorRemediateDeps, "deviceEnumerationCheckImpl">>,
   downloadCache: DownloadCache | undefined,
 ): Promise<{ result: OperatorRemediateDeviceResult; cache?: DownloadCache }> {
   const doctorService = deps.doctorServiceFactory();
@@ -439,6 +441,36 @@ function buildSummaryMessage(summary: OperatorRemediateResult["summary"]): strin
   return remediationSummary;
 }
 
+async function checkEmptyDeviceListError(
+  config: RuntimeConfig,
+  deviceEnumerationCheckImpl: NonNullable<OperatorRemediateDeps["deviceEnumerationCheckImpl"]>,
+): Promise<{ code: string; message: string; details: Record<string, unknown> } | undefined> {
+  const result = await deviceEnumerationCheckImpl(config);
+  if (result.code === 0) {
+    return undefined;
+  }
+
+  if (result.code === 127) {
+    return {
+      code: ERROR_CODES.ADB_NOT_FOUND,
+      message: `adb is not available at path: ${config.adbPath}`,
+      details: {
+        exitCode: result.code,
+        stderr: result.stderr || undefined,
+      },
+    };
+  }
+
+  return {
+    code: ERROR_CODES.ADB_SERVER_FAILED,
+    message: "adb failed while enumerating connected devices.",
+    details: {
+      exitCode: result.code ?? undefined,
+      stderr: result.stderr || undefined,
+    },
+  };
+}
+
 export async function cmdOperatorRemediate(
   options: OutputOptions & {
     operatorPackage?: string;
@@ -454,6 +486,8 @@ export async function cmdOperatorRemediate(
   });
 
   const listDevicesImpl = deps.listDevicesImpl ?? listDevices;
+  const deviceEnumerationCheckImpl = deps.deviceEnumerationCheckImpl
+    ?? (async (runtimeConfig) => runAdb(runtimeConfig, ["devices"], { logOutput: false }));
   const doctorServiceFactory = deps.doctorServiceFactory ?? (() => new DoctorService());
   const downloadOperatorApkImpl = deps.downloadOperatorApkImpl ?? downloadOperatorApk;
   const setupOperatorImpl = deps.setupOperatorImpl ?? setupOperator;
@@ -461,6 +495,12 @@ export async function cmdOperatorRemediate(
   const devices = await listDevicesImpl(config);
 
   if (devices.length === 0) {
+    const deviceEnumerationError = await checkEmptyDeviceListError(config, deviceEnumerationCheckImpl);
+    if (deviceEnumerationError) {
+      process.exitCode = 1;
+      return formatError(deviceEnumerationError, options);
+    }
+
     return formatSuccess({
       ok: true,
       operatorPackage,

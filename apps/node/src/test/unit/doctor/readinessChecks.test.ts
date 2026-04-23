@@ -56,6 +56,33 @@ describe("checkApkPresence", () => {
         ]);
     });
 
+    it("uses generic local APK guidance for non-debug custom operator packages", async () => {
+        const runner = new FakeProcessRunner();
+        const config = getDefaultRuntimeConfig({
+            runner,
+            deviceId: "test-device",
+            operatorPackage: "com.clawperator.operator.staging",
+        });
+
+        runner.queueResult({ code: 0, stdout: "", stderr: "" });
+        runner.queueResult({ code: 0, stdout: "", stderr: "" });
+
+        const result = await checkApkPresence(config);
+
+        assert.strictEqual(result.status, "fail");
+        assert.strictEqual(result.code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
+        assert.deepStrictEqual(result.fix?.steps, [
+            {
+                kind: "manual",
+                value: "If you do not already have a matching local APK at ~/.clawperator/downloads/operator.apk, build or obtain the APK for com.clawperator.operator.staging from the same checkout before rerunning setup.",
+            },
+            {
+                kind: "shell",
+                value: "clawperator operator setup --apk ~/.clawperator/downloads/operator.apk --device test-device --operator-package com.clawperator.operator.staging",
+            },
+        ]);
+    });
+
     it("fails when package queries cannot run", async () => {
         const runner = new FakeProcessRunner();
         const config = getDefaultRuntimeConfig({

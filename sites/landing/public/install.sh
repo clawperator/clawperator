@@ -1192,7 +1192,9 @@ run_operator_remediation_via_cli() {
 
     echo -e "${BLUE}Running CLI-owned device remediation...${NC}"
     OPERATOR_REMEDIATE_STDOUT_FILE="$(mktemp)"
+    register_temp_file "$OPERATOR_REMEDIATE_STDOUT_FILE"
     OPERATOR_REMEDIATE_STDERR_FILE="$(mktemp)"
+    register_temp_file "$OPERATOR_REMEDIATE_STDERR_FILE"
     if "$CLAWPERATOR_BIN_PATH" operator remediate --output json --operator-package "$DEFAULT_OPERATOR_PACKAGE" >"$OPERATOR_REMEDIATE_STDOUT_FILE" 2>"$OPERATOR_REMEDIATE_STDERR_FILE"; then
         OPERATOR_REMEDIATE_COMMAND_STATUS=0
     else
