@@ -90,13 +90,21 @@ These are not the same model and should not be treated as interchangeable.
 
 ## Current Clawperator Install Model
 
-Today `sites/landing/public/install.sh` does these host-relevant things:
+The installer follows the boundary in
+[Installer Architecture](installer-architecture.md): `install.sh` bootstraps
+host prerequisites and installs the CLI, then delegates post-bootstrap behavior
+to `clawperator install`.
 
-1. installs `clawperator`
+The CLI-owned post-bootstrap flow does these host-relevant things:
+
+1. remediates connected Android devices through `operator remediate`
 2. installs runtime skills under `~/.clawperator/skills`
-3. appends `CLAWPERATOR_SKILLS_REGISTRY` to shell rc files
-4. installs bundled skills into shared agent skill directories
-5. writes `~/.clawperator/AGENTS.md`
+3. installs bundled skills into host-agent discovery directories
+4. writes `~/.clawperator/AGENTS.md`
+5. writes `~/.clawperator/install-state.json`
+6. writes `~/.clawperator/mcp-config-snippet.json`
+7. appends the Clawperator bridge to `~/.agents/AGENTS.md` when that file
+   already exists
 
 Key implications:
 
@@ -105,8 +113,8 @@ Key implications:
 2. bundled skills are exposed through host-agent discovery conventions
 3. the generated guide lives under `~/.clawperator/AGENTS.md`, not the places a
    host agent is most likely to inspect first
-4. the runtime-skills registry depends on shell-session propagation unless the
-   CLI itself falls back to the installed home-directory path
+4. the runtime-skills registry is discovered from the installed home-directory
+   path when no explicit `CLAWPERATOR_SKILLS_REGISTRY` override is set
 5. the local guide and shared-agent bridge now explicitly advertise the
    first-run and discovery-to-proving route:
    - `clawperator-agent-orientation` is the packaged first-run orientation
@@ -123,8 +131,11 @@ Key implications:
 Refs:
 
 - `sites/landing/public/install.sh`
+- `apps/node/src/cli/commands/install.ts`
+- `apps/node/src/domain/host/hostSetup.ts`
 - `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`
 - `apps/node/src/domain/skills/syncSkills.ts`
+- `docs/internal/design/installer-architecture.md`
 - `docs/internal/design/mcp-server.md`
 
 ## Durable Design Rules
@@ -236,6 +247,7 @@ Update this file when changing any of the following:
 
 ## Related Docs
 
+- `docs/internal/design/installer-architecture.md`
 - `docs/internal/openclaw-reference.md`
 - `docs/internal/design/mcp-server.md`
 - `docs/internal/design/operator-llm-playbook.md`

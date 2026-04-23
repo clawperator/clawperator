@@ -77,7 +77,9 @@ Expected public structure:
 Expected stable UX:
 
 - `https://clawperator.com/operator.apk` redirects to the current stable immutable APK
-- `https://clawperator.com/install.sh` installs from `latest.json` and should not point users at GitHub Releases for the primary install path
+- `https://clawperator.com/install.sh` bootstraps host prerequisites, installs the CLI, and delegates post-bootstrap behavior to `clawperator install`
+- `clawperator install` uses release metadata from `latest.json` when operator remediation needs the current stable APK
+- Public install guidance should not point users at GitHub Releases for the primary install path
 
 ## Release Checklist
 
@@ -110,7 +112,8 @@ After the workflows finish, verify:
 - stable metadata file exists at `https://downloads.clawperator.com/operator/latest.json`
 - APK URL in metadata resolves
 - checksum file matches the APK
-- `curl -fsSL https://clawperator.com/install.sh | bash` downloads the current stable APK, verifies the checksum, and installs it on a single connected device
+- `curl -fsSL https://clawperator.com/install.sh | bash` bootstraps the CLI and reaches the delegated `clawperator install` flow
+- `clawperator install` downloads and verifies the current stable APK when operator remediation needs setup
 
 ## Rollback
 
