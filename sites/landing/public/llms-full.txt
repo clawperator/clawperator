@@ -1406,7 +1406,7 @@ This page is generated from the Node CLI registry and command sources.
 | `operator` | `operator setup --apk <path> [--device <id>] [--operator-package <package>]`<br>`operator download [--operator-package <package>]`<br>`operator remediate [--operator-package <package>]` | - | --apk, --device, --operator-package, --help<br>Subcommands: setup, install, download, remediate | Install the Operator APK and configure the device |
 | `host` | `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]` | - | --installed-at, --cli-version, --apk-version, --last-device-serial<br>Subcommands: setup | Set up durable host artifacts owned by the CLI |
 | `setup` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
-| `install` | `install [--operator-package <package>]` | - | --operator-package, --device | Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup |
+| `install` | `install [--operator-package <package>]` | - | --operator-package | Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup |
 | `devices` | `devices` | - | - | List connected Android devices |
 | `emulator` | `emulator list`<br>`emulator inspect <name>`<br>`emulator create [--name <name>]`<br>`emulator start <name>`<br>`emulator stop <name>`<br>`emulator delete <name>`<br>`emulator status`<br>`emulator provision` | - | --name<br>Subcommands: list, inspect, create, start, stop, delete, status, provision | Manage Android emulators (AVDs) |
 | `provision` | - | - | -<br>Subcommands: emulator | Provision an Android emulator |
@@ -1445,7 +1445,7 @@ This page is generated from the Node CLI registry and command sources.
 | `operator` | `operator setup --apk <path> [--device <id>] [--operator-package <package>]`<br>`operator download [--operator-package <package>]`<br>`operator remediate [--operator-package <package>]` | - | --apk, --device, --operator-package, --help<br>Subcommands: setup, install, download, remediate | Install the Operator APK and configure the device |
 | `host` | `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]` | - | --installed-at, --cli-version, --apk-version, --last-device-serial<br>Subcommands: setup | Set up durable host artifacts owned by the CLI |
 | `setup` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
-| `install` | `install [--operator-package <package>]` | - | --operator-package, --device | Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup |
+| `install` | `install [--operator-package <package>]` | - | --operator-package | Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup |
 | `doctor` | `doctor [--json]`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --json, --format, --output | Run environment and runtime checks |
 | `grant-device-permissions` | `grant-device-permissions [--device <id>] [--operator-package <package>]` | - | --device, --operator-package | Re-grant accessibility and notification permissions |
 | `version` | `version`<br>`version --check-compat [--device <id>] [--operator-package <package>]` | - | --check-compat, --device, --operator-package | Show the CLI version |
@@ -1478,7 +1478,7 @@ This page is generated from the Node CLI registry and command sources.
 - Summary: Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup
 - Syntax: `install [--operator-package <package>]`
 - Aliases: -
-- Flags: `--operator-package`, `--device`
+- Flags: `--operator-package`
 
 ### `doctor`
 

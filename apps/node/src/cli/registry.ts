@@ -204,6 +204,7 @@ export interface CommandDef {
   subtopics?: Record<string, string>;
   topLevelBlock?: string;
   group: string;
+  documentedFlags?: string[];
   supportedFlags?: string[] | ((rest: string[]) => string[]);
   flagAliases?: readonly CliFlagAliasSpec[] | ((rest: string[]) => readonly CliFlagAliasSpec[]);
   handler: (ctx: HandlerContext) => Promise<string | void>;
@@ -1132,6 +1133,7 @@ COMMANDS["install"] = {
   help: HELP_INSTALL,
   topLevelBlock: `  install [--operator-package <package>]
                                             Run the CLI-owned post-bootstrap remediation, skills install, bundled-skills install, and host setup`,
+  documentedFlags: ["--operator-package"],
   handler: async (ctx) => {
     const { format, deviceId, operatorPackage, logger } = ctx;
     if (deviceId) {
