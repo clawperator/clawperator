@@ -36,13 +36,12 @@ export interface OperatorDownloadResult {
 }
 
 function getResolvedOperatorPackage(operatorPackage?: string): string {
-  if (typeof operatorPackage === "string" && operatorPackage.trim().length > 0) {
-    return operatorPackage;
-  }
-
-  const envOperatorPackage = process.env.CLAWPERATOR_OPERATOR_PACKAGE;
-  if (typeof envOperatorPackage === "string" && envOperatorPackage.trim().length > 0) {
-    return envOperatorPackage;
+  const candidate = operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE;
+  if (typeof candidate === "string") {
+    const trimmed = candidate.trim();
+    if (trimmed.length > 0) {
+      return trimmed;
+    }
   }
 
   return RELEASE_OPERATOR_PACKAGE;
@@ -269,6 +268,8 @@ export async function downloadOperatorApk(
     }
 
     try {
+      // Windows cannot rename over an existing destination, so clear any stale path first.
+      await rm(localPath, { force: true, recursive: true });
       await rename(tempPath, localPath);
     } catch (error) {
       throw buildDownloadError(

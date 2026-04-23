@@ -44,10 +44,26 @@ function resolveDefaultSdkToolPath(
   return fallback;
 }
 
+function resolveOperatorPackageValue(
+  provided: string | undefined,
+  envValue: string | undefined,
+): string {
+  const candidate = provided ?? envValue;
+  if (typeof candidate === "string") {
+    const trimmed = candidate.trim();
+    if (trimmed.length > 0) {
+      return trimmed;
+    }
+  }
+
+  return "com.clawperator.operator";
+}
+
 export function getDefaultRuntimeConfig(overrides?: Partial<RuntimeConfig>): RuntimeConfig {
   const definedOverrides = Object.fromEntries(
     Object.entries(overrides ?? {}).filter(([, value]) => value !== undefined)
   ) as Partial<RuntimeConfig>;
+  const { operatorPackage: overrideOperatorPackage, ...restOverrides } = definedOverrides;
 
   const __dirname = dirname(fileURLToPath(import.meta.url));
   const defaultProjectRoot = join(__dirname, "../../../../..");
@@ -71,10 +87,13 @@ export function getDefaultRuntimeConfig(overrides?: Partial<RuntimeConfig>): Run
     emulatorPath: defaultEmulatorPath,
     sdkmanagerPath: defaultSdkmanagerPath,
     avdmanagerPath: defaultAvdmanagerPath,
-    operatorPackage: "com.clawperator.operator",
+    operatorPackage: resolveOperatorPackageValue(
+      overrideOperatorPackage,
+      process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+    ),
     actionAgentCommand: DEFAULT_ACTION_AGENT_COMMAND,
     payloadExtraKey: EXTRA_AGENT_PAYLOAD,
     runner: new NodeProcessRunner(),
-    ...definedOverrides,
+    ...restOverrides,
   };
 }

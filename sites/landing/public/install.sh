@@ -14,7 +14,24 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 RELEASE_OPERATOR_PACKAGE="com.clawperator.operator"
-DEFAULT_OPERATOR_PACKAGE="${CLAWPERATOR_OPERATOR_PACKAGE:-$RELEASE_OPERATOR_PACKAGE}"
+trim_whitespace() {
+    local value="$1"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    printf '%s' "$value"
+}
+
+resolve_operator_package() {
+    local candidate="${CLAWPERATOR_OPERATOR_PACKAGE:-}"
+    candidate="$(trim_whitespace "$candidate")"
+    if [ -n "$candidate" ]; then
+        printf '%s' "$candidate"
+    else
+        printf '%s' "$RELEASE_OPERATOR_PACKAGE"
+    fi
+}
+
+DEFAULT_OPERATOR_PACKAGE="$(resolve_operator_package)"
 APK_FILE_BASENAME="operator.apk"
 if [ "$DEFAULT_OPERATOR_PACKAGE" != "$RELEASE_OPERATOR_PACKAGE" ]; then
     APK_FILE_BASENAME="operator-debug.apk"

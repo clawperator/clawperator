@@ -31,6 +31,25 @@ describe("getDefaultRuntimeConfig", () => {
     assert.strictEqual(config.operatorPackage, "custom.receiver");
   });
 
+  it("treats blank or whitespace operator package inputs as unset", () => {
+    const originalOperatorPackage = process.env.CLAWPERATOR_OPERATOR_PACKAGE;
+    try {
+      process.env.CLAWPERATOR_OPERATOR_PACKAGE = "   ";
+
+      const envConfig = getDefaultRuntimeConfig();
+      assert.strictEqual(envConfig.operatorPackage, "com.clawperator.operator");
+
+      const overrideConfig = getDefaultRuntimeConfig({ operatorPackage: "  " });
+      assert.strictEqual(overrideConfig.operatorPackage, "com.clawperator.operator");
+    } finally {
+      if (originalOperatorPackage !== undefined) {
+        process.env.CLAWPERATOR_OPERATOR_PACKAGE = originalOperatorPackage;
+      } else {
+        delete process.env.CLAWPERATOR_OPERATOR_PACKAGE;
+      }
+    }
+  });
+
   it("falls back to bare tool names (PATH-based) when ANDROID_HOME and ANDROID_SDK_ROOT are not set", () => {
     const originalAndroidHome = process.env.ANDROID_HOME;
     const originalAndroidSdkRoot = process.env.ANDROID_SDK_ROOT;

@@ -31,7 +31,7 @@ Flags:
 
 Defaults:
 
-- without `--operator-package`, doctor uses `process.env.CLAWPERATOR_OPERATOR_PACKAGE` if set, otherwise the runtime default package
+- without `--operator-package`, doctor uses `process.env.CLAWPERATOR_OPERATOR_PACKAGE` when it is non-blank, otherwise the runtime default package
 - without `--device`, doctor tries discovery first and may auto-resolve one connected device
 - without `--full`, doctor skips Java/build/install/launch/smoke checks
 - without `--fix`, doctor reports remediation steps but does not run them

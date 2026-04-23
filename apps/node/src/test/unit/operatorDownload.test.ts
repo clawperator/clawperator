@@ -1,7 +1,7 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -187,6 +187,47 @@ describe("operator download", () => {
 
         assert.strictEqual(result.operatorPackage, "com.clawperator.operator");
         assert.strictEqual(result.localPath, join(homeDir, ".clawperator", "downloads", "operator.apk"));
+        assert.strictEqual(await readFile(result.localPath, "utf8"), apkContents);
+      });
+    } finally {
+      await rm(homeDir, { recursive: true, force: true });
+    }
+  });
+
+  it("replaces a pre-existing destination path before writing the APK", async () => {
+    const homeDir = await makeTempHome();
+    const apkContents = "apk-existing-destination";
+    const checksum = sha256Hex(apkContents);
+    const existingDestination = join(homeDir, ".clawperator", "downloads", "operator.apk");
+
+    try {
+      process.env.HOME = homeDir;
+      await mkdir(existingDestination, { recursive: true });
+
+      await withHttpServer((req, res) => {
+        if (req.url === "/latest.json") {
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({
+            version: "0.7.4",
+            apk_url: `${serverBase(req)}/operator.apk`,
+            sha256_url: `${serverBase(req)}/operator.apk.sha256`,
+            sha256: checksum,
+          }));
+          return;
+        }
+        if (req.url === "/operator.apk") {
+          res.writeHead(200, { "content-type": "application/vnd.android.package-archive" });
+          res.end(apkContents);
+          return;
+        }
+
+        res.writeHead(404);
+        res.end();
+      }, async (baseUrl) => {
+        process.env.CLAWPERATOR_APK_METADATA_URL = `${baseUrl}/latest.json`;
+        const result = await downloadOperatorApk();
+
+        assert.strictEqual(result.localPath, existingDestination);
         assert.strictEqual(await readFile(result.localPath, "utf8"), apkContents);
       });
     } finally {

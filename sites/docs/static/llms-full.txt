@@ -4465,7 +4465,7 @@ Flags:
 
 Defaults:
 
-- without `--operator-package`, doctor uses `process.env.CLAWPERATOR_OPERATOR_PACKAGE` if set, otherwise the runtime default package
+- without `--operator-package`, doctor uses `process.env.CLAWPERATOR_OPERATOR_PACKAGE` when it is non-blank, otherwise the runtime default package
 - without `--device`, doctor tries discovery first and may auto-resolve one connected device
 - without `--full`, doctor skips Java/build/install/launch/smoke checks
 - without `--fix`, doctor reports remediation steps but does not run them
@@ -5527,7 +5527,7 @@ There is no configuration file layer between the environment variable and the de
 
 Controls which Operator APK package name the runtime targets when `--operator-package` is not passed.
 
-Blank or whitespace-only values are treated as unset, so the runtime falls back to the default package instead of treating an empty string as a real package id.
+Blank or whitespace-only values are normalized to unset before the runtime resolves the package, so the default package is used instead of treating an empty string as a real package id.
 
 Read by every device-targeting CLI command (`snapshot`, `click`, `read`, `wait`, `scroll`, `doctor`, `record start`, `record stop`, `record pull`, `operator setup`, `grant-device-permissions`, `version --check-compat`, `exec`, `serve`), plus `runExecution()` and `resolveOperatorPackage()` in the skills runtime.
 
@@ -6031,7 +6031,7 @@ Valid body rules enforced by the route:
 Operator package resolution:
 
 - if `operatorPackage` is present in the request, the server uses it verbatim
-- otherwise it falls back to `process.env.CLAWPERATOR_OPERATOR_PACKAGE` when that env var is non-empty
+- otherwise it falls back to `process.env.CLAWPERATOR_OPERATOR_PACKAGE` when that env var is non-blank
 - otherwise it uses `com.clawperator.operator`
 
 Then `runExecution()` applies full execution validation. See [Actions](actions.md), [Selectors](selectors.md), and [API Overview](overview.md).
