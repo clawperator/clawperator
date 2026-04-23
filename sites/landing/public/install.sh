@@ -701,28 +701,34 @@ process.stdin.on("data", (chunk) => {
 });
 process.stdin.on("end", () => {
   try {
+    const sanitize = (value) => value.replace(/[\r\n]+/g, " ");
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed.localPath === "string") {
-      process.stdout.write(`localPath=${parsed.localPath}\n`);
+      process.stdout.write(`localPath=${sanitize(parsed.localPath)}\n`);
     }
     if (parsed && typeof parsed.operatorVersion === "string") {
-      process.stdout.write(`operatorVersion=${parsed.operatorVersion}\n`);
+      process.stdout.write(`operatorVersion=${sanitize(parsed.operatorVersion)}\n`);
     }
     if (parsed && typeof parsed.sha256 === "string") {
-      process.stdout.write(`sha256=${parsed.sha256}\n`);
+      process.stdout.write(`sha256=${sanitize(parsed.sha256)}\n`);
     }
     if (parsed && typeof parsed.operatorPackage === "string") {
-      process.stdout.write(`operatorPackage=${parsed.operatorPackage}\n`);
+      process.stdout.write(`operatorPackage=${sanitize(parsed.operatorPackage)}\n`);
     }
     if (parsed && typeof parsed.code === "string") {
       process.stdout.write(`code=${parsed.code}\n`);
     }
     if (parsed && typeof parsed.message === "string") {
-      process.stdout.write(`message=${parsed.message.replace(/[\r\n]+/g, " ")}\n`);
+      process.stdout.write(`message=${sanitize(parsed.message)}\n`);
     }
   } catch {}
 });
 ' 2>/dev/null || true
+}
+
+is_valid_sha256_hex() {
+    local VALUE="$1"
+    [[ "$VALUE" =~ ^[a-fA-F0-9]{64}$ ]]
 }
 
 print_host_artifact_outcome() {
@@ -988,12 +994,20 @@ download_operator_apk_via_cli() {
        [ -n "$DOWNLOADED_OPERATOR_VERSION" ] && \
        [ -n "$DOWNLOADED_SHA256" ] && \
        [ -n "$DOWNLOADED_OPERATOR_PACKAGE" ]; then
-        APK_LOCAL_PATH="$DOWNLOADED_LOCAL_PATH"
-        OPERATOR_VERSION="$DOWNLOADED_OPERATOR_VERSION"
-        OPERATOR_APK_DOWNLOADED_THIS_RUN=1
-        echo -e "${GREEN}✅ Downloaded and verified Operator APK ${OPERATOR_VERSION}.${NC}"
-        echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
-        return 0
+        if [ "$DOWNLOADED_OPERATOR_PACKAGE" != "$DEFAULT_OPERATOR_PACKAGE" ]; then
+            DOWNLOAD_ERROR_CODE="OPERATOR_DOWNLOAD_INVALID_RESULT"
+            DOWNLOAD_ERROR_MESSAGE="CLI returned operatorPackage $DOWNLOADED_OPERATOR_PACKAGE but installer expected $DEFAULT_OPERATOR_PACKAGE."
+        elif ! is_valid_sha256_hex "$DOWNLOADED_SHA256"; then
+            DOWNLOAD_ERROR_CODE="OPERATOR_DOWNLOAD_INVALID_RESULT"
+            DOWNLOAD_ERROR_MESSAGE="CLI returned an invalid SHA-256 for the downloaded Operator APK."
+        else
+            APK_LOCAL_PATH="$DOWNLOADED_LOCAL_PATH"
+            OPERATOR_VERSION="$DOWNLOADED_OPERATOR_VERSION"
+            OPERATOR_APK_DOWNLOADED_THIS_RUN=1
+            echo -e "${GREEN}✅ Downloaded and verified Operator APK ${OPERATOR_VERSION}.${NC}"
+            echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
+            return 0
+        fi
     fi
 
     echo -e "${RED}❌ Operator download failed via the CLI.${NC}"

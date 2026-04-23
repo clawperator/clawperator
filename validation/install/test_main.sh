@@ -330,7 +330,7 @@ if [ "\$1" = "operator" ] && [ "\$2" = "download" ] && [ "\$3" = "--output" ] &&
   mkdir -p "\${LOCAL_PATH%/*}"
   printf '%s\n' 'mock apk' > "\$LOCAL_PATH"
   cat <<JSON
-{"localPath":"\$LOCAL_PATH","operatorVersion":"9.9.9","sha256":"mock-sha256","operatorPackage":"\$OPERATOR_PACKAGE","message":"Downloaded and verified Operator APK 9.9.9."}
+{"localPath":"\$LOCAL_PATH","operatorVersion":"9.9.9","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","operatorPackage":"\$OPERATOR_PACKAGE","message":"Downloaded and verified Operator APK 9.9.9."}
 JSON
   exit 0
 fi
