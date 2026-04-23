@@ -1,7 +1,7 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -203,38 +203,48 @@ describe("operator download", () => {
   });
 
   it("fails when the downloaded APK checksum does not match", async () => {
+    const homeDir = await makeTempHome();
     const apkContents = "apk-checksum-mismatch";
 
-    await withHttpServer((req, res) => {
-      if (req.url === "/latest.json") {
-        res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({
-          version: "0.7.4",
-          apk_url: `${serverBase(req)}/operator.apk`,
-          sha256_url: `${serverBase(req)}/operator.apk.sha256`,
-          sha256: sha256Hex("different-apk"),
-        }));
-        return;
-      }
-      if (req.url === "/operator.apk") {
-        res.writeHead(200, { "content-type": "application/vnd.android.package-archive" });
-        res.end(apkContents);
-        return;
-      }
+    try {
+      process.env.HOME = homeDir;
 
-      res.writeHead(404);
-      res.end();
-    }, async (baseUrl) => {
-      process.env.CLAWPERATOR_APK_METADATA_URL = `${baseUrl}/latest.json`;
-      await assert.rejects(
-        () => downloadOperatorApk(),
-        (error: unknown) => {
-          const typed = error as { code?: string; message?: string };
-          return typed.code === ERROR_CODES.OPERATOR_CHECKSUM_FAILED
-            && /checksum did not match/i.test(typed.message ?? "");
-        },
-      );
-    });
+      await withHttpServer((req, res) => {
+        if (req.url === "/latest.json") {
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({
+            version: "0.7.4",
+            apk_url: `${serverBase(req)}/operator.apk`,
+            sha256_url: `${serverBase(req)}/operator.apk.sha256`,
+            sha256: sha256Hex("different-apk"),
+          }));
+          return;
+        }
+        if (req.url === "/operator.apk") {
+          res.writeHead(200, { "content-type": "application/vnd.android.package-archive" });
+          res.end(apkContents);
+          return;
+        }
+
+        res.writeHead(404);
+        res.end();
+      }, async (baseUrl) => {
+        process.env.CLAWPERATOR_APK_METADATA_URL = `${baseUrl}/latest.json`;
+        await assert.rejects(
+          () => downloadOperatorApk(),
+          (error: unknown) => {
+            const typed = error as { code?: string; message?: string };
+            return typed.code === ERROR_CODES.OPERATOR_CHECKSUM_FAILED
+              && /checksum did not match/i.test(typed.message ?? "");
+          },
+        );
+
+        const downloadsDir = join(homeDir, ".clawperator", "downloads");
+        assert.deepStrictEqual(await readdir(downloadsDir), []);
+      });
+    } finally {
+      await rm(homeDir, { recursive: true, force: true });
+    }
   });
 
   it("emits a structured download error when the canonical APK path is not writable", async () => {

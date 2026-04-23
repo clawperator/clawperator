@@ -424,14 +424,19 @@ install_cli() {
 
         hash -r
 
-        # Discover the binary path for immediate use
-        CLAWPERATOR_BIN_PATH="$(command -v clawperator || true)"
-        if [ -z "$CLAWPERATOR_BIN_PATH" ]; then
-            local NPM_PREFIX
-            NPM_PREFIX="$(npm config get prefix)"
-            if [ -f "$NPM_PREFIX/bin/clawperator" ]; then
-                CLAWPERATOR_BIN_PATH="$NPM_PREFIX/bin/clawperator"
-            fi
+        # Discover the freshly installed binary path for immediate use. Prefer
+        # the npm prefix over any older clawperator that may still appear
+        # earlier on PATH in the current shell.
+        local NPM_PREFIX
+        local NPM_CLAWPERATOR_BIN=""
+        NPM_PREFIX="$(npm config get prefix 2>/dev/null || true)"
+        if [ -n "$NPM_PREFIX" ] && [ -x "$NPM_PREFIX/bin/clawperator" ]; then
+            NPM_CLAWPERATOR_BIN="$NPM_PREFIX/bin/clawperator"
+        fi
+        if [ -n "$NPM_CLAWPERATOR_BIN" ]; then
+            CLAWPERATOR_BIN_PATH="$NPM_CLAWPERATOR_BIN"
+        else
+            CLAWPERATOR_BIN_PATH="$(command -v clawperator || true)"
         fi
         if [ -z "$CLAWPERATOR_BIN_PATH" ]; then
             echo -e "${RED}❌ Clawperator CLI installed but the binary could not be found on PATH.${NC}"

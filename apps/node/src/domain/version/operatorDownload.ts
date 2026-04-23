@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { createWriteStream } from "node:fs";
+import { mkdir, rename, rm } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { Readable, Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import { expandHomePath } from "../../contracts/logging.js";
 import { ERROR_CODES, type ClawperatorError } from "../../contracts/errors.js";
 import { getOperatorPackageApkPath } from "./compatibility.js";
@@ -73,7 +76,7 @@ async function fetchText(url: string): Promise<string> {
   return response.text();
 }
 
-async function fetchBytes(url: string): Promise<Uint8Array> {
+async function downloadApkToTempFile(url: string, tempPath: string): Promise<string> {
   let response: Response;
   try {
     response = await fetch(url);
@@ -93,7 +96,41 @@ async function fetchBytes(url: string): Promise<Uint8Array> {
     );
   }
 
-  return new Uint8Array(await response.arrayBuffer());
+  if (!response.body) {
+    throw buildDownloadError(
+      ERROR_CODES.OPERATOR_DOWNLOAD_FAILED,
+      `Failed to download ${url}: response body was empty.`,
+      { url },
+    );
+  }
+
+  const hash = createHash("sha256");
+  const hashingStream = new Transform({
+    transform(chunk, _encoding, callback) {
+      try {
+        hash.update(chunk as Uint8Array);
+        callback(null, chunk);
+      } catch (error) {
+        callback(error as Error);
+      }
+    },
+  });
+
+  try {
+    await pipeline(
+      Readable.fromWeb(response.body),
+      hashingStream,
+      createWriteStream(tempPath),
+    );
+  } catch (error) {
+    throw buildDownloadError(
+      ERROR_CODES.OPERATOR_DOWNLOAD_FAILED,
+      `Failed to download ${url}.`,
+      { url, tempPath, cause: String(error) },
+    );
+  }
+
+  return hash.digest("hex");
 }
 
 function parseMetadata(raw: string, metadataUrl: string): OperatorApkMetadata {
@@ -184,29 +221,10 @@ export async function downloadOperatorApk(
   const expectedSha256 = checksumSource === "inline"
     ? parseExpectedSha256(metadata.sha256 ?? "", metadataUrl)
     : parseExpectedSha256(await fetchText(metadata.sha256_url), metadata.sha256_url);
-  const apkBytes = await fetchBytes(metadata.apk_url);
-  const actualSha256 = createHash("sha256").update(apkBytes).digest("hex");
-
-  if (expectedSha256 !== actualSha256) {
-    throw buildDownloadError(
-      ERROR_CODES.OPERATOR_CHECKSUM_FAILED,
-      "Downloaded Operator APK checksum did not match the expected SHA-256 hash.",
-      {
-        operatorPackage,
-        operatorVersion: metadata.version,
-        expectedSha256,
-        actualSha256,
-        apkUrl: metadata.apk_url,
-        sha256Url: metadata.sha256_url,
-      },
-      "Re-run clawperator operator download to fetch a fresh verified copy.",
-    );
-  }
-
   const localPath = resolve(expandHomePath(getOperatorPackageApkPath(operatorPackage)));
+  const tempPath = join(dirname(localPath), `.clawperator-operator-download.${process.pid}.${Date.now()}.tmp`);
   try {
     await mkdir(dirname(localPath), { recursive: true });
-    await writeFile(localPath, apkBytes);
   } catch (error) {
     throw buildDownloadError(
       ERROR_CODES.OPERATOR_DOWNLOAD_FAILED,
@@ -219,6 +237,45 @@ export async function downloadOperatorApk(
       },
       "Ensure the download directory is writable, then re-run clawperator operator download.",
     );
+  }
+
+  let actualSha256 = "";
+  try {
+    actualSha256 = await downloadApkToTempFile(metadata.apk_url, tempPath);
+
+    if (expectedSha256 !== actualSha256) {
+      throw buildDownloadError(
+        ERROR_CODES.OPERATOR_CHECKSUM_FAILED,
+        "Downloaded Operator APK checksum did not match the expected SHA-256 hash.",
+        {
+          operatorPackage,
+          operatorVersion: metadata.version,
+          expectedSha256,
+          actualSha256,
+          apkUrl: metadata.apk_url,
+          sha256Url: metadata.sha256_url,
+        },
+        "Re-run clawperator operator download to fetch a fresh verified copy.",
+      );
+    }
+
+    try {
+      await rename(tempPath, localPath);
+    } catch (error) {
+      throw buildDownloadError(
+        ERROR_CODES.OPERATOR_DOWNLOAD_FAILED,
+        `Failed to write Operator APK to ${localPath}.`,
+        {
+          operatorPackage,
+          operatorVersion: metadata.version,
+          localPath,
+          cause: String(error),
+        },
+        "Ensure the download directory is writable, then re-run clawperator operator download.",
+      );
+    }
+  } finally {
+    await rm(tempPath, { force: true }).catch(() => undefined);
   }
 
   return {
