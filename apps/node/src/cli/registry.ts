@@ -256,15 +256,34 @@ Notes:
   - Non-release packages such as com.clawperator.operator.dev must use a matching local debug APK instead of public download.
 `;
 
+const HELP_OPERATOR_REMEDIATE = `clawperator operator remediate
+
+Usage:
+  clawperator operator remediate [--operator-package <package>] [--output <json|pretty>]
+
+Optional:
+  --operator-package <pkg>  Operator package identifier to inspect and remediate across connected devices
+
+Notes:
+  - Enumerates all adb-visible devices and returns a structured per-device result.
+  - Keeps doctor single-device by contract; remediation loops live here, not inside doctor.
+  - Uses doctor reports to classify devices as ready, warning-only, remediated, adb-unready, or failed.
+  - Reuses operator download/setup for APK remediation and doctor --fix only for single-device recovery such as handshake permission re-grants.
+  - Exit code 0 means no connected device needed and failed remediation.
+  - Exit code 1 means at least one connected device still failed remediation.
+`;
+
 const HELP_OPERATOR = `clawperator operator
 
 Usage:
   clawperator operator setup --apk <path> [--device <id>] [--operator-package <package>] [--output <json|pretty>]
   clawperator operator download [--operator-package <package>] [--output <json|pretty>]
+  clawperator operator remediate [--operator-package <package>] [--output <json|pretty>]
 
 Subcommands:
   setup     Install the Operator APK, grant required permissions, and verify readiness
   download  Fetch Operator APK metadata, download the release APK, and verify its checksum
+  remediate Inspect connected devices and apply remediation policy
 `;
 
 
@@ -977,12 +996,16 @@ COMMANDS["operator"] = {
     setup: HELP_OPERATOR_SETUP,
     install: HELP_OPERATOR_SETUP,
     download: HELP_OPERATOR_DOWNLOAD,
+    remediate: HELP_OPERATOR_REMEDIATE,
   },
   topLevelBlock: `  operator setup --apk <path> [--device <id>] [--operator-package <package>]
                                             Install the Operator APK, grant required permissions, and verify readiness
 
   operator download [--operator-package <package>]
-                                            Download and verify the release Operator APK to the canonical local path`,
+                                            Download and verify the release Operator APK to the canonical local path
+
+  operator remediate [--operator-package <package>]
+                                            Inspect connected devices and apply remediation policy`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };
@@ -1004,12 +1027,21 @@ COMMANDS["operator"] = {
         ...out,
         operatorPackage,
       });
+    } else if (sub === "remediate") {
+      if (deviceId) {
+        throw new UsageError("operator remediate does not accept --device. It enumerates connected devices itself.");
+      }
+      return (await import("./commands/operatorRemediate.js")).cmdOperatorRemediate({
+        ...out,
+        operatorPackage,
+        logger,
+      });
     } else {
       return JSON.stringify({
         code: "USAGE",
         message: sub
-          ? `Unknown operator subcommand '${sub}'. Use: clawperator operator setup --apk <path> or clawperator operator download`
-          : "Use: clawperator operator setup --apk <path> or clawperator operator download",
+          ? `Unknown operator subcommand '${sub}'. Use: clawperator operator setup --apk <path>, clawperator operator download, or clawperator operator remediate`
+          : "Use: clawperator operator setup --apk <path>, clawperator operator download, or clawperator operator remediate",
       });
     }
   },
