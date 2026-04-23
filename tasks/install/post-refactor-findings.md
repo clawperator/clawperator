@@ -2,10 +2,7 @@
 
 Review date: 2026-04-24
 
-Reviewed range: `0c3ce93b9cac5d48635677f77f50b431d4231eca^..HEAD`, so the
-`0c3ce93` commit itself is included.
-
-Current branch reviewed: `install/compact-phases-3-and-4`
+Reviewed range: `0c3ce93b9cac5d48635677f77f50b431d4231eca^..1f1943b75dda84273be4707f2b65d7ba2a6b7a98`.
 
 ## Scope Reviewed
 
