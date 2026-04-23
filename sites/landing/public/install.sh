@@ -48,7 +48,6 @@ BUNDLED_SKILLS_AGENTS_DIR=""
 CLAWPERATOR_BIN_PATH=""
 LAST_DEVICE_SERIAL=""
 BLANK_RUNTIME_SKILLS_REGISTRY_WARNED=0
-OPERATOR_APK_DOWNLOADED_THIS_RUN=0
 OPERATOR_REMEDIATE_OK=""
 OPERATOR_REMEDIATE_COMMAND_STATUS=0
 OPERATOR_REMEDIATE_TOTAL_DEVICES=0
@@ -76,10 +75,6 @@ cleanup_temp_files() {
             rm -f "$file"
         fi
     done
-}
-
-shell_quote() {
-    printf '%q' "$1"
 }
 
 on_error() {
@@ -664,40 +659,6 @@ process.stdin.on("end", () => {
 ' 2>/dev/null || true
 }
 
-parse_operator_download_result() {
-    node -e '
-let raw = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => {
-  raw += chunk;
-});
-process.stdin.on("end", () => {
-  try {
-    const sanitize = (value) => value.replace(/[\r\n]+/g, " ");
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed.localPath === "string") {
-      process.stdout.write(`localPath=${sanitize(parsed.localPath)}\n`);
-    }
-    if (parsed && typeof parsed.operatorVersion === "string") {
-      process.stdout.write(`operatorVersion=${sanitize(parsed.operatorVersion)}\n`);
-    }
-    if (parsed && typeof parsed.sha256 === "string") {
-      process.stdout.write(`sha256=${sanitize(parsed.sha256)}\n`);
-    }
-    if (parsed && typeof parsed.operatorPackage === "string") {
-      process.stdout.write(`operatorPackage=${sanitize(parsed.operatorPackage)}\n`);
-    }
-    if (parsed && typeof parsed.code === "string") {
-      process.stdout.write(`code=${sanitize(parsed.code)}\n`);
-    }
-    if (parsed && typeof parsed.message === "string") {
-      process.stdout.write(`message=${sanitize(parsed.message)}\n`);
-    }
-  } catch {}
-});
-' 2>/dev/null || true
-}
-
 parse_operator_remediate_result() {
     node -e '
 let raw = "";
@@ -745,16 +706,6 @@ process.stdin.on("end", () => {
   } catch {}
 });
 ' 2>/dev/null || true
-}
-
-is_valid_sha256_hex() {
-    local VALUE="$1"
-    [[ "$VALUE" =~ ^[a-fA-F0-9]{64}$ ]]
-}
-
-is_valid_operator_download_path() {
-    local VALUE="$1"
-    [ "$VALUE" = "$APK_LOCAL_PATH" ]
 }
 
 print_host_artifact_outcome() {
@@ -831,10 +782,6 @@ setup_host_artifacts_via_cli() {
     RESOLVED_CLI_VERSION="$(resolve_cli_version)"
     if [ -n "$RESOLVED_CLI_VERSION" ]; then
         HOST_ARTIFACT_ARGS+=(--cli-version "$RESOLVED_CLI_VERSION")
-    fi
-
-    if [ -n "${OPERATOR_VERSION:-}" ]; then
-        HOST_ARTIFACT_ARGS+=(--apk-version "$OPERATOR_VERSION")
     fi
 
     if [ -n "${LAST_DEVICE_SERIAL:-}" ]; then
@@ -957,102 +904,6 @@ setup_host_artifacts_via_cli() {
     if [ -n "$HOST_ARTIFACTS_OUTPUT" ]; then
         echo "$HOST_ARTIFACTS_OUTPUT"
     fi
-    return 1
-}
-
-download_operator_apk_via_cli() {
-    if ! operator_package_uses_public_release_apk; then
-        echo -e "${YELLOW}Automatic APK download is only available for the stable release package.${NC}"
-        print_operator_apk_redownload_hint
-        return 1
-    fi
-
-    if [ -z "${CLAWPERATOR_BIN_PATH:-}" ]; then
-        echo -e "${RED}❌ Clawperator CLI is required before operator download can run.${NC}"
-        return 1
-    fi
-
-    local OPERATOR_DOWNLOAD_OUTPUT=""
-    local OPERATOR_DOWNLOAD_STATUS=0
-    local PARSED_DOWNLOAD_OUTPUT=""
-    local DOWNLOADED_LOCAL_PATH=""
-    local DOWNLOADED_OPERATOR_VERSION=""
-    local DOWNLOADED_SHA256=""
-    local DOWNLOADED_OPERATOR_PACKAGE=""
-    local DOWNLOAD_ERROR_CODE=""
-    local DOWNLOAD_ERROR_MESSAGE=""
-    local PARSED_LINE=""
-
-    echo -e "${BLUE}Downloading the verified Operator APK via the CLI...${NC}"
-    if OPERATOR_DOWNLOAD_OUTPUT="$("$CLAWPERATOR_BIN_PATH" operator download --output json --operator-package "$DEFAULT_OPERATOR_PACKAGE" 2>&1)"; then
-        OPERATOR_DOWNLOAD_STATUS=0
-    else
-        OPERATOR_DOWNLOAD_STATUS=$?
-    fi
-
-    PARSED_DOWNLOAD_OUTPUT="$(printf '%s' "$OPERATOR_DOWNLOAD_OUTPUT" | parse_operator_download_result)"
-    while IFS= read -r PARSED_LINE; do
-        [ -n "$PARSED_LINE" ] || continue
-        case "$PARSED_LINE" in
-            localPath=*)
-                DOWNLOADED_LOCAL_PATH="${PARSED_LINE#localPath=}"
-                ;;
-            operatorVersion=*)
-                DOWNLOADED_OPERATOR_VERSION="${PARSED_LINE#operatorVersion=}"
-                ;;
-            sha256=*)
-                DOWNLOADED_SHA256="${PARSED_LINE#sha256=}"
-                ;;
-            operatorPackage=*)
-                DOWNLOADED_OPERATOR_PACKAGE="${PARSED_LINE#operatorPackage=}"
-                ;;
-            code=*)
-                DOWNLOAD_ERROR_CODE="${PARSED_LINE#code=}"
-                ;;
-            message=*)
-                DOWNLOAD_ERROR_MESSAGE="${PARSED_LINE#message=}"
-                ;;
-        esac
-    done <<< "$PARSED_DOWNLOAD_OUTPUT"
-
-    if [ "$OPERATOR_DOWNLOAD_STATUS" -eq 0 ] && \
-       [ -n "$DOWNLOADED_LOCAL_PATH" ] && \
-       [ -n "$DOWNLOADED_OPERATOR_VERSION" ] && \
-       [ -n "$DOWNLOADED_SHA256" ] && \
-       [ -n "$DOWNLOADED_OPERATOR_PACKAGE" ]; then
-        if [ "$DOWNLOADED_OPERATOR_PACKAGE" != "$DEFAULT_OPERATOR_PACKAGE" ]; then
-            DOWNLOAD_ERROR_CODE="OPERATOR_DOWNLOAD_INVALID_RESULT"
-            DOWNLOAD_ERROR_MESSAGE="CLI returned operatorPackage $DOWNLOADED_OPERATOR_PACKAGE but installer expected $DEFAULT_OPERATOR_PACKAGE."
-        elif ! is_valid_sha256_hex "$DOWNLOADED_SHA256"; then
-            DOWNLOAD_ERROR_CODE="OPERATOR_DOWNLOAD_INVALID_RESULT"
-            DOWNLOAD_ERROR_MESSAGE="CLI returned an invalid SHA-256 for the downloaded Operator APK."
-        elif ! is_valid_operator_download_path "$DOWNLOADED_LOCAL_PATH"; then
-            DOWNLOAD_ERROR_CODE="OPERATOR_DOWNLOAD_INVALID_RESULT"
-            DOWNLOAD_ERROR_MESSAGE="CLI returned localPath $DOWNLOADED_LOCAL_PATH but installer expected $APK_LOCAL_PATH."
-        elif [ ! -f "$DOWNLOADED_LOCAL_PATH" ]; then
-            DOWNLOAD_ERROR_CODE="OPERATOR_DOWNLOAD_INVALID_RESULT"
-            DOWNLOAD_ERROR_MESSAGE="CLI did not create a regular file at $DOWNLOADED_LOCAL_PATH."
-        elif [ ! -r "$DOWNLOADED_LOCAL_PATH" ]; then
-            DOWNLOAD_ERROR_CODE="OPERATOR_DOWNLOAD_INVALID_RESULT"
-            DOWNLOAD_ERROR_MESSAGE="CLI created Operator APK at $DOWNLOADED_LOCAL_PATH but it is not readable."
-        else
-            APK_LOCAL_PATH="$DOWNLOADED_LOCAL_PATH"
-            OPERATOR_VERSION="$DOWNLOADED_OPERATOR_VERSION"
-            OPERATOR_APK_DOWNLOADED_THIS_RUN=1
-            echo -e "${GREEN}✅ Downloaded and verified Operator APK ${OPERATOR_VERSION}.${NC}"
-            echo -e "   ${BLUE}${APK_LOCAL_PATH}${NC}"
-            return 0
-        fi
-    fi
-
-    echo -e "${RED}❌ Operator download failed via the CLI.${NC}"
-    if [ -n "$DOWNLOAD_ERROR_CODE" ]; then
-        echo -e "${YELLOW}${DOWNLOAD_ERROR_CODE}: ${DOWNLOAD_ERROR_MESSAGE:-unknown error}${NC}"
-    elif [ -n "$OPERATOR_DOWNLOAD_OUTPUT" ]; then
-        echo "$OPERATOR_DOWNLOAD_OUTPUT"
-    fi
-    echo -e "${YELLOW}Manual recovery:${NC}"
-    print_operator_apk_redownload_hint
     return 1
 }
 
@@ -1250,18 +1101,6 @@ record_selected_device_serial() {
 
 operator_package_uses_public_release_apk() {
     [ "$DEFAULT_OPERATOR_PACKAGE" = "$RELEASE_OPERATOR_PACKAGE" ]
-}
-
-print_operator_apk_redownload_hint() {
-    if operator_package_uses_public_release_apk; then
-        echo -e "${YELLOW}Redownload the latest stable APK before manual setup:${NC}"
-        echo -e "${YELLOW}  curl -fsSL https://clawperator.com/operator.apk -o $(shell_quote "$APK_LOCAL_PATH")${NC}"
-        return 0
-    fi
-
-    echo -e "${YELLOW}Use a matching local debug APK before manual setup:${NC}"
-    echo -e "${YELLOW}  $(shell_quote "$APK_LOCAL_PATH")${NC}"
-    echo -e "${YELLOW}  If you do not already have one, rebuild the debug APK from the same checkout before rerunning setup.${NC}"
 }
 
 print_durable_artifact_summary() {
