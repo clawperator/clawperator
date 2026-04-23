@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.7.4] - 2026-04-24
+
+This release centralizes installer and operator download handling in the Node CLI while aligning the public install guidance with the CLI-first bootstrap flow.
+
+### 🤖 Node API & CLI
+- **Changed:** Moved host setup ownership into the Node CLI, added the canonical operator download flow, delegated remediation policy to the CLI, added a compact `clawperator install` post-bootstrap sequence, and compacted the shell installer around `clawperator install`.
+
+### 📚 Documentation & Website
+- **Changed:** Updated the installer and host docs to match the CLI-based bootstrap, delegation, and recovery flow.
+
+Pull requests:
+- [refactor(install): move host setup ownership into the CLI](https://github.com/clawperator/clawperator/pull/224)
+- [feat(node): add canonical operator download CLI flow](https://github.com/clawperator/clawperator/pull/225)
+- [refactor(install): delegate remediation policy to the CLI](https://github.com/clawperator/clawperator/pull/226)
+- [docs(install): update for cli-based installer](https://github.com/clawperator/clawperator/pull/227)
+- [feat(install): add compact post-bootstrap install flow](https://github.com/clawperator/clawperator/pull/228)
+- [refactor(install): compact shell installer around clawperator install](https://github.com/clawperator/clawperator/pull/229)
+
 ## [0.7.3] - 2026-04-22
 
 This release improves the installer handoff for multi-device setups and standardizes the public APK recovery guidance.
