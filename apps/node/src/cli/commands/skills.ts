@@ -357,7 +357,6 @@ export async function cmdSkillsInstall(
       synced: result.synced,
       message: result.message,
       registryPath: result.registryPath,
-      envInstruction: `export CLAWPERATOR_SKILLS_REGISTRY="${result.registryPath}"`,
     }, options);
   }
   return formatError({ code: result.code, message: result.message }, options);

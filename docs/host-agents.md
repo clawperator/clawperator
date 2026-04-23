@@ -13,8 +13,11 @@ finds no relevant match, start with `clawperator-skill-author-by-agent-discovery
 If packaged first-party bundled skills are installed, `clawperator-agent-orientation`
 is the first-run packaged front door for this route and should point back to
 this page, while `clawperator-upgrade` is the packaged whole-product upgrade
-route through `install.sh` and `doctor` after explicit upgrade intent is
-already established.
+route. It checks `clawperator --version`, verifies the installer-owned Node and
+Java prerequisites before choosing the CLI-first path, uses the CLI-first
+upgrade sequence when the host is already viable, and falls back to
+`install.sh` only as recovery when the CLI is not reachable or the bootstrap
+prerequisites still need repair.
 
 ## When To Read This Page
 
@@ -62,7 +65,7 @@ Use this order:
 | Situation | Start here | Why |
 | --- | --- | --- |
 | You are unfamiliar with this host and want the packaged first-run orientation surface | `clawperator-agent-orientation` | Thin packaged router that points back to this page and the canonical docs. |
-| The user or calling workflow explicitly chose a whole-product refresh before you trust any downstream route | `clawperator-upgrade` | Re-runs the canonical installer at `https://clawperator.com/install.sh`, then verifies readiness with `clawperator doctor --json`. Do not use it for passive diagnosis. |
+| The user or calling workflow explicitly chose a whole-product refresh before you trust any downstream route | `clawperator-upgrade` | Checks `clawperator --version`, verifies Node 24+ and Java 17/21, then uses `npm install -g clawperator@latest`, `clawperator operator remediate`, `clawperator bundled-skills update`, `clawperator skills install`, `clawperator host setup`, and `clawperator doctor --json`. Uses `install.sh` only when the CLI is not reachable or the bootstrap prerequisites need repair. |
 | You know the Android package id and want the fastest answer to "what can this host do for this app?" | `clawperator skills for-app <package_id> --json` | `skills for-app` is the primary app-oriented discovery surface. |
 | You only know user-language terms such as app name or intent | `clawperator skills search --keyword <text> --json` | Search is the fallback when you do not have the package id yet. |
 | You already have a skill id and want the exact metadata | `clawperator skills get <skill_id> --json` | Confirms the registry entry before a run. |
@@ -176,9 +179,9 @@ These files help a host orient after install:
 
 | Path | Meaning | Next step |
 | --- | --- | --- |
-| `~/.clawperator/AGENTS.md` | Local Clawperator guide written by `install.sh` | Use it as machine-local context after you read this public route. |
-| `~/.clawperator/install-state.json` | Durable install metadata | Check `registryPath`, `cliVersion`, and `lastDeviceSerial` without rerunning install. |
-| `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config | Use it when you choose the MCP route. |
+| `~/.clawperator/AGENTS.md` | Local Clawperator guide written by `clawperator host setup` during install | Use it as machine-local context after you read this public route. |
+| `~/.clawperator/install-state.json` | Durable install metadata written by `clawperator host setup` | Check `registryPath`, `cliVersion`, and `lastDeviceSerial` without rerunning install. |
+| `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config written by `clawperator host setup` | Use it when you choose the MCP route. |
 | `~/.clawperator/skills/skills/skills-registry.json` | Installed runtime-skills registry | Verify it exists when `skills list` or `skills for-app` cannot discover skills. |
 | `~/.clawperator/bundled-skills/` | Installed first-party bundled skills | Inspect it through `clawperator bundled-skills list --json` when runtime discovery returns no relevant match. |
 
@@ -200,8 +203,8 @@ clawperator bundled-skills list --json
 Check:
 
 - `clawperator --help` and `clawperator skills --help` name `clawperator-agent-orientation` as the first-run surface for unfamiliar hosts and point zero-match users to `clawperator bundled-skills list`
-- `clawperator --help` and `clawperator skills --help` name `clawperator-upgrade` as the packaged whole-product refresh route
-- `clawperator bundled-skills --help` names `clawperator-agent-orientation` as the first-run orientation skill, `clawperator-upgrade` as the packaged whole-product upgrade route after explicit upgrade intent, `clawperator-skill-author-by-agent-discovery` as the zero-results front door, and `clawperator-skill-author-by-recording` as the proving workflow
+- `clawperator --help` and `clawperator skills --help` name `clawperator-upgrade` as the packaged whole-product refresh route and note the Node/Java prerequisite gate
+- `clawperator bundled-skills --help` names `clawperator-agent-orientation` as the first-run orientation skill, `clawperator-upgrade` as the packaged whole-product upgrade route after explicit upgrade intent and prerequisite viability, `clawperator-skill-author-by-agent-discovery` as the zero-results front door, and `clawperator-skill-author-by-recording` as the proving workflow
 - `skills for-app`, `skills search`, and `skills list` return top-level `skills` and `count`
 - `skills get` returns a top-level `skill`
 - `bundled-skills list` returns top-level `skills`, `count`, and `installedDir`

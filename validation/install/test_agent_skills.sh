@@ -300,7 +300,17 @@ JSON
       exit 0
     fi
     if [ "\$1" = "skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
-      printf '%s\n' '{"registryPath":"/tmp/skills-registry.json"}'
+      printf '%s\n' '{"synced":true,"message":"Skills synced to '"\$HOME"'/.clawperator/skills (ref: main)","registryPath":"'"\$HOME"'/.clawperator/skills/skills/skills-registry.json"}'
+      exit 0
+    fi
+    ;;
+  skills-fallback)
+    if [ "\$1" = "--version" ]; then
+      printf '%s\n' '1.2.3'
+      exit 0
+    fi
+    if [ "\$1" = "skills" ] && [ "\$2" = "install" ] && [ "\$3" = "--output" ] && [ "\$4" = "json" ]; then
+      printf '%s\n' '{"synced":true,"message":"Skills synced to '"\$HOME"'/.clawperator/skills (ref: main)","registryPath":"'"\$HOME"'/.clawperator/skills/skills/skills-registry.json"}'
       exit 0
     fi
     ;;
@@ -387,6 +397,48 @@ run_skip_case() {
           printf "bundled=%s\n" "$BUNDLED_SKILLS_SETUP_STATUS"
         } > "$5"
     ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$output_skills" "$output_agent_skills" "$status_file"
+}
+
+run_setup_skills_rc_case() {
+    local label="$1"
+    local output_file="$2"
+    local status_file="$3"
+    local values_file="$4"
+    local zsh_snapshot_file="$5"
+    local bash_snapshot_file="$6"
+    local bash_profile_snapshot_file="$7"
+    local mock_dir="$TMP_DIR/mock-rc-$label"
+
+    setup_mock_clawperator "$mock_dir" "skills-fallback" ""
+
+    HOME="$TMP_DIR/home-rc-$label" \
+    OS=Linux \
+    PATH="$mock_dir:$PATH" \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        export CLAWPERATOR_BIN_PATH="$2"
+
+        mkdir -p "$HOME"
+        printf "%s\n" "# zshrc sentinel" "export PATH=/usr/bin" > "$HOME/.zshrc"
+        printf "%s\n" "# bashrc sentinel" "export PATH=/usr/bin" > "$HOME/.bashrc"
+        printf "%s\n" "# bash_profile sentinel" "export PATH=/usr/bin" > "$HOME/.bash_profile"
+
+        cp "$HOME/.zshrc" "$3"
+        cp "$HOME/.bashrc" "$4"
+        cp "$HOME/.bash_profile" "$5"
+
+        set +e
+        setup_skills_via_cli > "$6" 2>&1
+        status="$?"
+        set -e
+
+        printf "%s\n" "$status" > "$7"
+        {
+          printf "skills=%s\n" "$SKILLS_SETUP_STATUS"
+          printf "registry=%s\n" "$SKILLS_REGISTRY_PATH"
+        } > "$8"
+    ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$zsh_snapshot_file" "$bash_snapshot_file" "$bash_profile_snapshot_file" "$output_file" "$status_file" "$values_file"
 }
 
 run_durable_summary_case() {
@@ -644,7 +696,34 @@ assert_contains "$BUNDLED_SKILLS_SUCCESS_VALUES" "claude=/custom/claude" "bundle
 assert_contains "$BUNDLED_SKILLS_SUCCESS_VALUES" "codex=/custom/codex" "bundled-skills-success values"
 assert_contains "$BUNDLED_SKILLS_SUCCESS_VALUES" "agents=/custom/agents" "bundled-skills-success values"
 
-echo "=== Scenario 4: partial bundled-skills JSON falls back to defaults ==="
+echo "=== Scenario 4: skills setup keeps shell RC files untouched and falls back to the installed registry path ==="
+SKILLS_RC_OUT="$TMP_DIR/skills-rc.out"
+SKILLS_RC_STATUS="$TMP_DIR/skills-rc.status"
+SKILLS_RC_VALUES="$TMP_DIR/skills-rc.values"
+SKILLS_RC_ZSH_SNAPSHOT="$TMP_DIR/skills-rc.zsh.snapshot"
+SKILLS_RC_BASH_SNAPSHOT="$TMP_DIR/skills-rc.bash.snapshot"
+SKILLS_RC_BASH_PROFILE_SNAPSHOT="$TMP_DIR/skills-rc.bash_profile.snapshot"
+run_setup_skills_rc_case \
+    rc-cleanup \
+    "$SKILLS_RC_OUT" \
+    "$SKILLS_RC_STATUS" \
+    "$SKILLS_RC_VALUES" \
+    "$SKILLS_RC_ZSH_SNAPSHOT" \
+    "$SKILLS_RC_BASH_SNAPSHOT" \
+    "$SKILLS_RC_BASH_PROFILE_SNAPSHOT"
+assert_equals "0" "$(cat "$SKILLS_RC_STATUS")" "skills-rc status"
+assert_contains "$SKILLS_RC_OUT" "Skills setup complete." "skills-rc output"
+assert_contains "$SKILLS_RC_VALUES" "skills=configured" "skills-rc values"
+assert_contains "$SKILLS_RC_VALUES" "registry=$TMP_DIR/home-rc-rc-cleanup/.clawperator/skills/skills/skills-registry.json" "skills-rc registry fallback"
+assert_equals "$(cat "$SKILLS_RC_ZSH_SNAPSHOT")" "$(cat "$TMP_DIR/home-rc-rc-cleanup/.zshrc")" "skills-rc zshrc unchanged"
+assert_equals "$(cat "$SKILLS_RC_BASH_SNAPSHOT")" "$(cat "$TMP_DIR/home-rc-rc-cleanup/.bashrc")" "skills-rc bashrc unchanged"
+assert_equals "$(cat "$SKILLS_RC_BASH_PROFILE_SNAPSHOT")" "$(cat "$TMP_DIR/home-rc-rc-cleanup/.bash_profile")" "skills-rc bash_profile unchanged"
+assert_not_contains "$SKILLS_RC_OUT" "shell profile export" "skills-rc output"
+assert_not_contains "$TMP_DIR/home-rc-rc-cleanup/.zshrc" "CLAWPERATOR_SKILLS_REGISTRY" "skills-rc zshrc env mutation"
+assert_not_contains "$TMP_DIR/home-rc-rc-cleanup/.bashrc" "CLAWPERATOR_SKILLS_REGISTRY" "skills-rc bashrc env mutation"
+assert_not_contains "$TMP_DIR/home-rc-rc-cleanup/.bash_profile" "CLAWPERATOR_SKILLS_REGISTRY" "skills-rc bash_profile env mutation"
+
+echo "=== Scenario 5: partial bundled-skills JSON falls back to defaults ==="
 BUNDLED_SKILLS_PARTIAL_OUT="$TMP_DIR/bundled-skills-partial.out"
 BUNDLED_SKILLS_PARTIAL_STATUS="$TMP_DIR/bundled-skills-partial.status"
 BUNDLED_SKILLS_PARTIAL_VALUES="$TMP_DIR/bundled-skills-partial.values"
@@ -661,7 +740,7 @@ assert_contains "$BUNDLED_SKILLS_PARTIAL_VALUES" "claude=/partial/claude" "bundl
 assert_contains "$BUNDLED_SKILLS_PARTIAL_VALUES" "codex=$TMP_DIR/home-bundled-skills-partial/.codex/skills/" "bundled-skills-partial values"
 assert_contains "$BUNDLED_SKILLS_PARTIAL_VALUES" "agents=$TMP_DIR/home-bundled-skills-partial/.agents/skills/" "bundled-skills-partial values"
 
-echo "=== Scenario 5: CODEX_HOME fallback is used when codex dir is omitted ==="
+echo "=== Scenario 6: CODEX_HOME fallback is used when codex dir is omitted ==="
 BUNDLED_SKILLS_CODEX_HOME_OUT="$TMP_DIR/bundled-skills-codex-home.out"
 BUNDLED_SKILLS_CODEX_HOME_STATUS="$TMP_DIR/bundled-skills-codex-home.status"
 BUNDLED_SKILLS_CODEX_HOME_VALUES="$TMP_DIR/bundled-skills-codex-home.values"
@@ -678,7 +757,7 @@ assert_equals "configured" "$(cat "$BUNDLED_SKILLS_CODEX_HOME_STATUS")" "bundled
 assert_contains "$BUNDLED_SKILLS_CODEX_HOME_VALUES" "codex=$EXPECTED_CODEX_HOME_DIR" "bundled-skills-codex-home values"
 assert_contains "$BUNDLED_SKILLS_CODEX_HOME_VALUES" "agents=$TMP_DIR/home-bundled-skills-codex-home/.agents/skills/" "bundled-skills-codex-home values"
 
-echo "=== Scenario 6: bundled-skills setup failure is non-fatal ==="
+echo "=== Scenario 7: bundled-skills setup failure is non-fatal ==="
 BUNDLED_SKILLS_FAILURE_OUT="$TMP_DIR/bundled-skills-failure.out"
 BUNDLED_SKILLS_FAILURE_STATUS="$TMP_DIR/bundled-skills-failure.status"
 BUNDLED_SKILLS_FAILURE_VALUES="$TMP_DIR/bundled-skills-failure.values"
@@ -694,7 +773,7 @@ assert_contains "$BUNDLED_SKILLS_FAILURE_OUT" "Bundled-skills setup failed via C
 assert_contains "$BUNDLED_SKILLS_FAILURE_OUT" "authoring install conflict" "bundled-skills-failure"
 assert_contains "$BUNDLED_SKILLS_FAILURE_VALUES" "install=$TMP_DIR/home-bundled-skills-failure/.clawperator/bundled-skills/" "bundled-skills-failure values"
 
-echo "=== Scenario 7: delegated host artifacts invoke the CLI and materialize files ==="
+echo "=== Scenario 8: delegated host artifacts invoke the CLI and materialize files ==="
 HOST_ARTIFACTS_OUT="$TMP_DIR/host-artifacts.out"
 HOST_ARTIFACTS_STATUS="$TMP_DIR/host-artifacts.status"
 HOST_ARTIFACTS_CLI_LOG="$TMP_DIR/host-artifacts.cli.log"
@@ -747,14 +826,14 @@ assert_mode "$HOST_INSTALL_STATE_PATH" "600" "host-artifacts install-state mode"
 assert_mode "$HOST_SNIPPET_PATH" "600" "host-artifacts mcp mode"
 assert_mode "$TMP_DIR/home-host-delegated/.clawperator" "700" "host-artifacts clawperator dir mode"
 
-echo "=== Scenario 8: delegated host artifacts stay idempotent on rerun ==="
+echo "=== Scenario 9: delegated host artifacts stay idempotent on rerun ==="
 assert_occurrence_count "$HOST_ARTIFACTS_OUT" "Local AGENTS.md: skipped" "1" "host-artifacts rerun guide skipped"
 assert_occurrence_count "$HOST_ARTIFACTS_OUT" "Install state: skipped" "1" "host-artifacts rerun install-state skipped"
 assert_occurrence_count "$HOST_ARTIFACTS_OUT" "MCP config snippet: skipped" "1" "host-artifacts rerun mcp skipped"
 assert_occurrence_count "$HOST_ARTIFACTS_OUT" "Shared agent bridge: skipped" "1" "host-artifacts rerun bridge skipped"
 assert_equals "$(cat "$HOST_FIRST_BRIDGE")" "$(cat "$HOST_SHARED_PATH")" "host-artifacts rerun bridge content"
 
-echo "=== Scenario 9: delegated host artifacts preserve non-fatal shared bridge failure semantics ==="
+echo "=== Scenario 10: delegated host artifacts preserve non-fatal shared bridge failure semantics ==="
 HOST_BRIDGE_FAIL_OUT="$TMP_DIR/host-bridge-fail.out"
 HOST_BRIDGE_FAIL_STATUS="$TMP_DIR/host-bridge-fail.status"
 HOST_BRIDGE_FAIL_CLI_LOG="$TMP_DIR/host-bridge-fail.cli.log"
@@ -785,7 +864,7 @@ if [ ! -L "$HOST_BRIDGE_FAIL_SHARED_PATH" ]; then
 fi
 assert_equals "$(cat "$HOST_BRIDGE_FAIL_FIRST")" "$(cat "$HOST_BRIDGE_FAIL_SHARED_PATH")" "host-bridge-fail shared guide unchanged"
 
-echo "=== Scenario 10: delegated host artifacts preserve env-only registry overrides ==="
+echo "=== Scenario 11: delegated host artifacts preserve env-only registry overrides ==="
 HOST_ENV_REGISTRY_OUT="$TMP_DIR/host-env-registry.out"
 HOST_ENV_REGISTRY_STATUS="$TMP_DIR/host-env-registry.status"
 HOST_ENV_REGISTRY_CLI_LOG="$TMP_DIR/host-env-registry.cli.log"
@@ -807,7 +886,7 @@ assert_contains "$HOST_ENV_REGISTRY_STATUS" "first=0" "host-env-registry status"
 assert_json_field_equals "$HOST_ENV_REGISTRY_STATE_PATH" "registryPath" "$HOST_ENV_REGISTRY_PATH" "host-env-registry install-state registryPath"
 assert_contains "$HOST_ENV_REGISTRY_GUIDE_PATH" "$HOST_ENV_REGISTRY_PATH" "host-env-registry guide"
 
-echo "=== Scenario 11: delegated host artifacts reject incomplete parsed results ==="
+echo "=== Scenario 12: delegated host artifacts reject incomplete parsed results ==="
 HOST_INCOMPLETE_OUT="$TMP_DIR/host-incomplete.out"
 HOST_INCOMPLETE_STATUS="$TMP_DIR/host-incomplete.status"
 HOST_INCOMPLETE_CLI_LOG="$TMP_DIR/host-incomplete.cli.log"
@@ -819,7 +898,7 @@ run_host_artifacts_incomplete_case \
 assert_contains "$HOST_INCOMPLETE_STATUS" "first=1" "host-incomplete status"
 assert_contains "$HOST_INCOMPLETE_OUT" "Host setup via CLI returned incomplete artifact results." "host-incomplete output"
 
-echo "=== Scenario 12: skip flag suppresses both runtime and bundled-skills setup ==="
+echo "=== Scenario 13: skip flag suppresses both runtime and bundled-skills setup ==="
 SKIP_SKILLS_OUT="$TMP_DIR/skip-skills.out"
 SKIP_BUNDLED_SKILLS_OUT="$TMP_DIR/skip-bundled-skills.out"
 SKIP_STATUS="$TMP_DIR/skip.status"
@@ -832,7 +911,7 @@ assert_contains "$SKIP_STATUS" "skills=skipped" "skip-status"
 assert_contains "$SKIP_STATUS" "bundled=skipped" "skip-status"
 assert_equals "" "$(cat "$SKIP_LOG")" "skip command log"
 
-echo "=== Scenario 13: durable summary points at local artifacts ==="
+echo "=== Scenario 14: durable summary points at local artifacts ==="
 DURABLE_SUMMARY_OUT="$TMP_DIR/durable-summary.out"
 run_durable_summary_case authoring "$DURABLE_SUMMARY_OUT"
 assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawperator/AGENTS.md" "durable-summary"
@@ -840,7 +919,7 @@ assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawper
 assert_contains "$DURABLE_SUMMARY_OUT" "$TMP_DIR/home-summary-authoring/.clawperator/mcp-config-snippet.json" "durable-summary"
 assert_contains "$DURABLE_SUMMARY_OUT" "AI agents should start with the local guide" "durable-summary"
 
-echo "=== Scenario 14: operator download result parser extracts installer-consumable fields ==="
+echo "=== Scenario 15: operator download result parser extracts installer-consumable fields ==="
 DOWNLOAD_RESULT_OUT="$TMP_DIR/download-result.out"
 DOWNLOAD_RESULT_STATUS="$TMP_DIR/download-result.status"
 DOWNLOAD_RESULT_VALUES="$TMP_DIR/download-result.values"
@@ -856,7 +935,7 @@ assert_contains "$DOWNLOAD_RESULT_VALUES" "operatorVersion=0.6.1" "download-resu
 assert_contains "$DOWNLOAD_RESULT_VALUES" "sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" "download-result values"
 assert_contains "$DOWNLOAD_RESULT_VALUES" "operatorPackage=com.clawperator.operator" "download-result values"
 
-echo "=== Scenario 15: operator download result parser extracts structured CLI errors ==="
+echo "=== Scenario 16: operator download result parser extracts structured CLI errors ==="
 DOWNLOAD_ERROR_OUT="$TMP_DIR/download-error.out"
 DOWNLOAD_ERROR_STATUS="$TMP_DIR/download-error.status"
 DOWNLOAD_ERROR_VALUES="$TMP_DIR/download-error.values"

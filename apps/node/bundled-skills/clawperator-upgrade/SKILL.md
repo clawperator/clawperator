@@ -1,6 +1,6 @@
 ---
 name: clawperator-upgrade
-description: Clawperator first-party bundled skill. Whole-product upgrade route for Clawperator. Re-runs the canonical installer, verifies readiness with doctor, and reports the next blocking repair step when setup is still incomplete.
+description: Clawperator first-party bundled skill. Whole-product upgrade route for Clawperator. Checks CLI reachability and host prerequisites, uses the CLI-first upgrade sequence when the host is already viable, and falls back to install.sh when the CLI is not reachable or the bootstrap prerequisites need repair.
 ---
 
 # Clawperator Upgrade
@@ -9,13 +9,23 @@ Use this skill only when the current machine already has Clawperator and the
 user or calling workflow has explicitly chosen a whole-product upgrade.
 
 This is a thin packaged host-agent skill. It should route through the canonical
-installer and readiness checks that Clawperator already ships. It must not
-re-implement install logic inside the skill body.
+CLI surfaces that Clawperator already ships. It must not re-implement install
+logic inside the skill body.
 
 ## What This Skill Owns
 
-- run the canonical whole-product installer:
-  `curl -fsSL https://clawperator.com/install.sh | bash`
+- check `clawperator --version` before mutating the host
+- check the host prerequisites that the installer owns before choosing the CLI-first path:
+  - `node -v` must report Node 24 or newer
+  - `java -version` must report Java 17 or 21
+- run the CLI-first upgrade sequence when the CLI is reachable and the host prerequisites are already viable:
+  - `npm install -g clawperator@latest`
+  - `clawperator operator remediate`
+  - `clawperator bundled-skills update`
+  - `clawperator skills install`
+  - `clawperator host setup`
+  - `clawperator doctor --json`
+- use `curl -fsSL https://clawperator.com/install.sh | bash` as recovery when `clawperator --version` is not reachable or the bootstrap prerequisites are not already satisfied
 - verify the resulting install with `clawperator doctor --json`
 - report whether the host is ready, or which existing repair route is still
   blocking readiness
@@ -24,14 +34,14 @@ re-implement install logic inside the skill body.
 
 ## What This Skill Does Not Own
 
-- do not replace `https://clawperator.com/install.sh` with a bespoke upgrade flow
-- do not make `npm install -g clawperator@latest` the primary path
-- do not make `clawperator bundled-skills update` or `clawperator skills update`
-  the primary path
-- do not add or imply a top-level `clawperator upgrade` command
+- do not make `install.sh` the primary path
+- do not skip the `clawperator --version` reachability check
+- do not use the CLI-first upgrade sequence when Node or Java still needs to be repaired by the installer
 - do not invent a second upgrade-health checker beyond `clawperator doctor --json`
+- do not add or imply a top-level `clawperator upgrade` command
 - do not restate all setup or repair docs from memory
 - do not turn passive diagnosis into an implicit upgrade
+- do not keep using `install.sh` after the CLI-first path is reachable
 
 ## Workflow
 
@@ -47,7 +57,7 @@ Valid triggers:
 - the calling workflow explicitly selected `clawperator-upgrade`
   as an opt-in route
 
-Stop and do not run the installer yet when:
+Stop and do not run any host mutations yet when:
 
 - you are still diagnosing a problem
 - you are only checking readiness or inventory
@@ -56,33 +66,54 @@ Stop and do not run the installer yet when:
 If explicit upgrade intent is missing, stop and say that upgrade is an opt-in
 host mutation.
 
-### 2. Run the canonical installer first
+### 2. Check CLI reachability first
 
 Run:
+
+```bash
+clawperator --version
+```
+
+If this fails, run the recovery installer:
 
 ```bash
 curl -fsSL https://clawperator.com/install.sh | bash
 ```
 
-Treat this as the primary action for whole-product upgrade because it owns the
-CLI install, packaged bundled-skills, runtime-skills bootstrap guidance, and the
-Operator APK setup path.
+After recovery, re-run `clawperator --version`. If the CLI is still not
+reachable, stop and report the recovery failure.
 
-Do not replace this first step with direct npm self-upgrade commands.
-
-### 3. Verify readiness with doctor
-
-After the installer finishes, run `clawperator devices` and then run:
+If `clawperator --version` succeeds, verify the host prerequisites the installer owns:
 
 ```bash
+node -v
+java -version
+```
+
+Continue only when Node is 24 or newer and Java is 17 or 21. If either check
+fails, use the recovery installer instead of the CLI-first path.
+
+### 3. Run the CLI-first upgrade sequence
+
+When `clawperator --version` succeeds and the host prerequisites are already viable, run these commands in order:
+
+```bash
+npm install -g clawperator@latest
+clawperator operator remediate
+clawperator bundled-skills update
+clawperator skills install
+clawperator host setup
 clawperator doctor --json
 ```
 
-Prefer the structured JSON result. If more than one device is connected, run
-`clawperator doctor --device <device_id> --json` once for each connected
-device, and only report the upgrade ready when every connected device reports
-`criticalOk: true`. Continue from the doctor output instead of guessing whether
-the upgrade "probably worked."
+Rules:
+
+- use `clawperator operator remediate` as the device policy front door
+- do not re-implement multi-device policy inside the skill
+- use the structured CLI results rather than guessing about state
+- let `clawperator host setup` write the durable host artifacts
+- keep `clawperator doctor --json` as the readiness check after the sequence
+- if `npm install -g clawperator@latest` fails, fall back to the recovery installer and re-check reachability before continuing
 
 ### 4. Decide between ready and blocked
 
@@ -101,6 +132,7 @@ Rules:
   and every connected device reports `criticalOk: true`
 - if doctor indicates setup is incomplete, keep the next step grounded in the
   real failing surface
+- if recovery was needed, report the recovery outcome before the doctor result
 - do not ask the user whether to proceed with the doctor-reported repair path
   or the next command; pick the explicit next action from doctor or the setup
   docs and state it directly
@@ -127,19 +159,22 @@ After a blocked upgrade:
 
 Finish with:
 
-- the installer result in one sentence
-- the doctor readiness result in one sentence
+- the CLI reachability result in one sentence
+- whether the installer-owned prerequisites were already satisfied in one sentence
+- the upgrade result in one sentence
 - one explicit next command or one canonical doc URL
 
 Examples:
 
-- "Upgrade was explicitly requested, the canonical installer completed, and `clawperator doctor --json` reports `criticalOk: true`. Your next step is `clawperator-agent-orientation`."
-- "The installer completed, but doctor still reports blocking setup failures. Follow the doctor-reported repair path or finish setup at `https://docs.clawperator.com/setup/`."
-- "Upgrade intent is not explicit yet, so I stopped before running `install.sh`."
+- "Clawperator was reachable, the CLI-first upgrade sequence completed, and `clawperator doctor --json` reports `criticalOk: true`. Your next step is `clawperator-agent-orientation`."
+- "Clawperator was reachable, but Node or Java was not yet healthy enough for the CLI-first path, so I used `install.sh` as recovery only. Follow the setup guidance at `https://docs.clawperator.com/setup/` and then rerun this skill."
+- "Clawperator was not reachable, so I used `install.sh` as recovery only. The CLI is still not ready, so follow the recovery guidance or finish setup at `https://docs.clawperator.com/setup/`."
+- "Upgrade intent is not explicit yet, so I stopped before running any host mutations."
 
 ## Output Style
 
-Be concise. Treat `install.sh` as the upgrade authority, `doctor --json` as the
-readiness authority, and end with one explicit next step. Name the
+Be concise. Treat `clawperator --version` as the reachability gate, host
+prerequisites as the CLI-first viability gate, and `install.sh` as recovery
+when either gate fails. End with one explicit next step. Name the
 upgrade-intent gate explicitly when you decline to run the installer. Never
 ask the user to choose the next repair step after doctor has already named it.

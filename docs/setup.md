@@ -17,7 +17,7 @@ Get from an empty host to a first successful `clawperator snapshot --json` with 
 
 ## 1. Install the CLI
 
-Recommended - the installer handles Node, Java 17, adb, CLI, APK download, and device setup in one step:
+Recommended - the installer handles Node, Java 17, adb, CLI, APK download, device setup, and CLI-owned host artifacts in one step:
 
 ```bash
 curl -fsSL https://clawperator.com/install.sh | bash
@@ -41,19 +41,22 @@ Success conditions:
 - `clawperator version` exits `0` and prints a version string.
 - If you used `install.sh`, the installer also downloads the current release APK to `~/.clawperator/downloads/operator.apk` for that run. For later manual setup or recovery, redownload from `https://clawperator.com/operator.apk`.
 
-### Durable host-agent artifacts from `install.sh`
+### Durable host-agent artifacts from the CLI bootstrap
 
-If `install.sh` reaches its post-doctor onboarding phase, it also writes these
-durable onboarding files under `~/.clawperator/`:
+If `install.sh` reaches its post-bootstrap onboarding phase, it calls `clawperator host setup` and writes these durable onboarding files under `~/.clawperator/`:
 
 | Path | Meaning | When to read it |
 | --- | --- | --- |
 | `~/.clawperator/AGENTS.md` | Local Clawperator guide with runtime-skill discovery commands and current bundled-skills status | First stop for a host agent that needs to discover what Clawperator can do on this machine |
-| `~/.clawperator/install-state.json` | Durable install metadata written by the installer | Use when you need the last known install facts without rerunning `doctor` |
+| `~/.clawperator/install-state.json` | Durable install metadata written by `clawperator host setup` during install | Use when you need the last known install facts without rerunning `doctor` |
 | `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config for Claude Desktop, Codex, and a generic stdio MCP consumer | Use when the host should connect through `clawperator mcp serve` instead of shelling out to the CLI |
 
 Early prerequisite failures and early doctor failures exit before these files
 are written.
+
+The runtime-skills registry is discovered automatically from
+`~/.clawperator/skills/skills/skills-registry.json` after `clawperator skills install`, so
+`install.sh` no longer writes `CLAWPERATOR_SKILLS_REGISTRY` into shell RC files.
 
 Canonical public next step after install:
 
@@ -83,7 +86,7 @@ Field rules:
 
 Shared-agent bridge behavior is intentionally bounded:
 
-- if `~/.agents/AGENTS.md` already exists, the installer appends one Clawperator-owned bridge block there
+- if `~/.agents/AGENTS.md` already exists, `clawperator host setup` appends one Clawperator-owned bridge block there
 - that bridge points back to `~/.clawperator/AGENTS.md` plus the `clawperator skills` discovery commands
 - if `~/.agents/AGENTS.md` does not exist, the installer does not create it
 - the installer does not copy runtime skills into shared agent skill directories
@@ -92,12 +95,14 @@ Verification:
 
 ```bash
 ls ~/.clawperator/AGENTS.md ~/.clawperator/install-state.json ~/.clawperator/mcp-config-snippet.json
+clawperator skills list --json
 test ! -f ~/.agents/AGENTS.md || grep -F "CLAWPERATOR_SHARED_AGENT_BRIDGE:START" ~/.agents/AGENTS.md
 ```
 
 When choosing the host-facing surface:
 
 - use `clawperator skills` when you want to discover or run installed runtime skills by app, keyword, or id
+- no shell profile export is required for the default runtime-skills registry path
 - use MCP when your host already supports stdio MCP and wants registered tools such as `devices`, `snapshot`, and `execute`
 
 See [Host Agent Orientation](host-agents.md) for the post-install decision flow
