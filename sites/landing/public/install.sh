@@ -515,6 +515,7 @@ main() {
         :
     else
         install_status=$?
+        trap - ERR
         return "$install_status"
     fi
 

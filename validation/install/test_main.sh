@@ -111,6 +111,7 @@ run_main_case() {
     local operator_package="${8:-}"
     local failing_check="${9:-}"
     local install_cli_status="${10:-0}"
+    local keep_err_trap="${11:-0}"
     local mock_dir="$TMP_DIR/mock-$label"
 
     setup_mock_clawperator "$mock_dir" "$scenario" "$cli_log_file"
@@ -129,7 +130,9 @@ run_main_case() {
     PATH="$mock_dir:$SYSTEM_PATH_BASE" \
     bash -c '
         source "$1" >/dev/null 2>&1
-        trap - ERR
+        if [ "$8" != "1" ]; then
+            trap - ERR
+        fi
 
         trace() {
             printf "%s\n" "$1" >> "$2"
@@ -169,7 +172,7 @@ run_main_case() {
         set -e
 
         printf "%s\n" "$status"
-    ' _ "$INSTALL_SCRIPT" "$trace_file" "$mock_dir/clawperator" "$failing_check" "$install_cli_status" "$stdout_file" "$stderr_file" > "$TMP_DIR/$label.status"
+    ' _ "$INSTALL_SCRIPT" "$trace_file" "$mock_dir/clawperator" "$failing_check" "$install_cli_status" "$stdout_file" "$stderr_file" "$keep_err_trap" > "$TMP_DIR/$label.status"
 
     local actual_exit
     actual_exit="$(cat "$TMP_DIR/$label.status")"
@@ -248,11 +251,17 @@ run_main_case \
     "$FAIL_STDOUT" \
     "$FAIL_STDERR" \
     "$FAIL_TRACE" \
-    "$FAIL_CLI_LOG"
+    "$FAIL_CLI_LOG" \
+    "" \
+    "" \
+    0 \
+    1
 
 assert_contains "$FAIL_STDOUT" "Clawperator install: FAILED" "main-fail stdout"
 assert_contains "$FAIL_STDOUT" "Rerun remediation after resolving device issues: clawperator operator remediate --operator-package com.clawperator.operator" "main-fail stdout"
 assert_not_contains "$FAIL_STDOUT" "Activate Clawperator in your current terminal:" "main-fail stdout"
+assert_not_contains "$FAIL_STDOUT" "Installation failed" "main-fail stdout"
+assert_not_contains "$FAIL_STDOUT" "https://clawperator.com/install.sh" "main-fail stdout"
 assert_contains "$FAIL_CLI_LOG" "install --output pretty --operator-package com.clawperator.operator" "main-fail cli log"
 assert_equals "" "$(cat "$FAIL_STDERR")" "main-fail stderr"
 
