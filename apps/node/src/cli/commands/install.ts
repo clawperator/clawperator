@@ -312,7 +312,6 @@ export async function cmdInstall(
   );
   const lastDeviceSerial = deriveLastDeviceSerial(operatorRemediationResult);
   const hostSetup = await setupHostImpl({
-    cliVersion: null,
     registryPath: skillsInstall.ok ? skillsInstall.registryPath ?? null : null,
     lastDeviceSerial,
     operatorPackage: operatorRemediationResult.operatorPackage,

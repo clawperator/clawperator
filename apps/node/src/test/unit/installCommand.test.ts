@@ -98,7 +98,7 @@ describe("cmdInstall", () => {
     assert.strictEqual(setupHostCalls[0].registryPath, "/tmp/skills/skills/skills-registry.json");
     assert.strictEqual(setupHostCalls[0].lastDeviceSerial, "serial-solo");
     assert.strictEqual(setupHostCalls[0].operatorPackage, "com.clawperator.operator");
-    assert.strictEqual(setupHostCalls[0].cliVersion, null);
+    assert.strictEqual(setupHostCalls[0].cliVersion, undefined);
   });
 
   it("returns a warning when multiple connected devices require explicit selection", async () => {

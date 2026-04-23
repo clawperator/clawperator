@@ -67,6 +67,14 @@ describe("CLI help", () => {
     assert.match(stdout, /operator remediate, skills install, bundled-skills install, and host setup/);
   });
 
+  it("rejects --device for install because remediation enumerates devices itself", async () => {
+    const { stdout, code } = await runCli(["install", "--device", "serial-123"]);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(code, 1);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /install does not accept --device/i);
+  });
+
   it("shows operator setup help for operator install --help alias", async () => {
     const { stdout, code } = await runCli(["operator", "install", "--help"]);
     assert.strictEqual(code, 0);

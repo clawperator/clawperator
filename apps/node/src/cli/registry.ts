@@ -1132,7 +1132,10 @@ COMMANDS["install"] = {
   topLevelBlock: `  install [--operator-package <package>]
                                             Run post-bootstrap remediation, skills install, bundled-skills install, and host setup`,
   handler: async (ctx) => {
-    const { format, operatorPackage, logger } = ctx;
+    const { format, deviceId, operatorPackage, logger } = ctx;
+    if (deviceId) {
+      throw new UsageError("install does not accept --device. It remediates connected devices itself and records the last ready device automatically.");
+    }
     return (await import("./commands/install.js")).cmdInstall({ format, operatorPackage, logger });
   },
 };
