@@ -30,10 +30,10 @@ dependencies for you.
     shell harnesses in this directory plus `validation/test_doctor.sh`
 - `test_java.sh`
   - covers `check_java()` detection and provisioning branches
-- `test_agent_skills.sh`
-  - covers shell-owned `install_cli()` npm-prefix resolution and bootstrap-time
-    skill-install entry assumptions that still belong in the wrapper
-- `test_main.sh`
+- `test_cli_bootstrap.sh`
+  - covers shell-owned `install_cli()` npm-prefix resolution and freshly
+    installed CLI binary selection
+- `test_main_delegation.sh`
   - covers hermetic `main()` smoke paths for bootstrap gating, delegation to
     `clawperator install`, and top-level exit-code/message propagation
 
@@ -46,13 +46,13 @@ existing harnesses as generic coverage for new install branches.
 Common examples:
 
 - new bootstrap prerequisite branch
-  - extend `test_java.sh` or `test_main.sh`
+  - extend `test_java.sh` or `test_main_delegation.sh`
 - new install delegation behavior or passthrough messaging
-  - extend `test_main.sh`
+  - extend `test_main_delegation.sh`
 - changes to bootstrap-time CLI resolution
-  - extend `test_agent_skills.sh`
+  - extend `test_cli_bootstrap.sh`
 - new `main()` branch or shell-owned summary outcome
-  - extend `test_main.sh`
+  - extend `test_main_delegation.sh`
 - installer RC or environment cleanup
   - add a shell harness case that proves the old shell-side mutation is gone
 

@@ -134,13 +134,19 @@ the skill should eventually spell out the multi-device follow-up: when multiple
 ready devices are present, run doctor per selected device or consume the
 install result's device list before declaring the whole host ready.
 
-### 4. Remaining shell validation names are slightly stale
+### 4. Remaining shell validation names were slightly stale
 
-`validation/install/test_agent_skills.sh` now primarily validates CLI bootstrap
-binary resolution. That is good coverage, but the filename no longer describes
-the test's main purpose. This is not harmful because `test_install.sh` remains
-the single entrypoint, but renaming it later would make the reduced validation
-surface easier for future agents to understand.
+At final review time, `validation/install/test_agent_skills.sh` primarily
+validated CLI bootstrap binary resolution, and `validation/install/test_main.sh`
+validated wrapper delegation. That was good coverage, but the filenames no
+longer described their main purpose.
+
+Follow-up completed after this review:
+
+- `test_agent_skills.sh` was renamed to `test_cli_bootstrap.sh`
+- `test_main.sh` was renamed to `test_main_delegation.sh`
+- `test_install.sh` and `validation/install/README.md` now use the clearer
+  names
 
 ### 5. The install validation runner is broad and may become expensive
 
@@ -170,10 +176,9 @@ validation.
    handle `deviceSelectionRequired` or multiple connected devices before
    claiming every device was verified by doctor.
 
-5. Rename or consolidate the reduced shell harnesses when convenient. Suggested
-   names:
-   - `test_cli_bootstrap.sh` for the current `test_agent_skills.sh`
-   - `test_main_delegation.sh` for the current `test_main.sh`
+5. Completed after review: rename the reduced shell harnesses to
+   `test_cli_bootstrap.sh` and `test_main_delegation.sh`, and keep
+   `test_install.sh` as the single entrypoint.
 
 6. Keep `validation/install/README.md` as the source of truth for what belongs
    in shell validation. The current README is directionally right: shell tests
@@ -189,4 +194,5 @@ surface, and the detailed behavior moved to Node with meaningful tests.
 The remaining work is not another large refactor. It is a short follow-up pass:
 prove the flow on a real device or emulator, improve install-state version
 metadata, tighten multi-device upgrade verification guidance, and polish the
-names of the reduced shell harnesses.
+names of the reduced shell harnesses. The harness naming polish was completed
+after this review.

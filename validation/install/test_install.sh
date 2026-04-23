@@ -43,7 +43,7 @@ echo "=== Running install-related validation harnesses (including shared agent b
 bash validation/install/test_operator_package_env.sh
 bash validation/test_doctor.sh
 bash validation/install/test_java.sh
-bash validation/install/test_agent_skills.sh
-bash validation/install/test_main.sh
+bash validation/install/test_cli_bootstrap.sh
+bash validation/install/test_main_delegation.sh
 
 echo "=== install-related test suite passed ==="
