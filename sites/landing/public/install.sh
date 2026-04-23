@@ -681,7 +681,7 @@ process.stdin.on("end", () => {
           process.stdout.write(`artifact:${key}:path=${artifact.path}\n`);
         }
         if (typeof artifact.message === "string") {
-          process.stdout.write(`artifact:${key}:message=${artifact.message.replace(/\r\n?/g, " ")}\n`);
+          process.stdout.write(`artifact:${key}:message=${artifact.message.replace(/[\r\n]+/g, " ")}\n`);
         }
       }
     }

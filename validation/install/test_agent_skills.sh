@@ -100,6 +100,20 @@ run_parser_case() {
     ' _ "$INSTALL_SCRIPT" "$input_json" "$output_file"
 }
 
+run_host_setup_parser_case() {
+    local label="$1"
+    local input_json="$2"
+    local output_file="$3"
+
+    HOME="$TMP_DIR/home-$label" \
+    OS=Linux \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        printf "%s" "$2" | parse_host_setup_result > "$3"
+    ' _ "$INSTALL_SCRIPT" "$input_json" "$output_file"
+}
+
 run_operator_metadata_case() {
     local label="$1"
     local metadata_content="$2"
@@ -488,6 +502,15 @@ if [ -s "$PARSE_BAD_OUT" ]; then
     cat "$PARSE_BAD_OUT" >&2
     exit 1
 fi
+
+echo "=== Scenario 2b: host setup parser normalizes multiline artifact messages ==="
+HOST_PARSE_MULTILINE_OUT="$TMP_DIR/host-parse-multiline.out"
+run_host_setup_parser_case \
+    host-parse-multiline \
+    '{"ok":false,"summary":{"written":0,"updated":0,"skipped":0,"failed":1},"artifacts":[{"artifact":"sharedAgentBridge","status":"failed","path":"/tmp/shared","message":"line one\nline two\r\nline three"}]}' \
+    "$HOST_PARSE_MULTILINE_OUT"
+assert_contains "$HOST_PARSE_MULTILINE_OUT" "artifact:sharedAgentBridge:message=line one line two line three" "host-parse-multiline"
+assert_occurrence_count "$HOST_PARSE_MULTILINE_OUT" "artifact:sharedAgentBridge:message=" "1" "host-parse-multiline message count"
 
 echo "=== Scenario 3: bundled-skills setup succeeds with explicit discovery dirs ==="
 BUNDLED_SKILLS_SUCCESS_OUT="$TMP_DIR/bundled-skills-success.out"
