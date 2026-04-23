@@ -84,7 +84,7 @@ LLM surfaces, and `clawperator-upgrade` now consistently describe
 ## Gaps And Residual Risks
 
 No blocking defect was found in the final review, and the install validation
-suite passed. The remaining gaps are mostly proof, polish, and follow-through.
+suite passed. The remaining gaps are mostly proof and follow-through.
 
 ### 1. Live install proof is still the biggest missing confidence signal
 
@@ -134,21 +134,7 @@ the skill should eventually spell out the multi-device follow-up: when multiple
 ready devices are present, run doctor per selected device or consume the
 install result's device list before declaring the whole host ready.
 
-### 4. Remaining shell validation names were slightly stale
-
-At final review time, `validation/install/test_agent_skills.sh` primarily
-validated CLI bootstrap binary resolution, and `validation/install/test_main.sh`
-validated wrapper delegation. That was good coverage, but the filenames no
-longer described their main purpose.
-
-Follow-up completed after this review:
-
-- `test_agent_skills.sh` was renamed to `test_cli_bootstrap.sh`
-- `test_main.sh` was renamed to `test_main_delegation.sh`
-- `test_install.sh` and `validation/install/README.md` now use the clearer
-  names
-
-### 5. The install validation runner is broad and may become expensive
+### 4. The install validation runner is broad and may become expensive
 
 `validation/install/test_install.sh` builds `apps/node` and runs the full Node
 test suite before the install shell harnesses. This is safe and currently
@@ -176,15 +162,6 @@ validation.
    handle `deviceSelectionRequired` or multiple connected devices before
    claiming every device was verified by doctor.
 
-5. Completed after review: rename the reduced shell harnesses to
-   `test_cli_bootstrap.sh` and `test_main_delegation.sh`, and keep
-   `test_install.sh` as the single entrypoint.
-
-6. Keep `validation/install/README.md` as the source of truth for what belongs
-   in shell validation. The current README is directionally right: shell tests
-   should prove bootstrap and delegation, while Node tests own post-bootstrap
-   behavior.
-
 ## Bottom Line
 
 The install compaction work achieved the intended architecture. The shell is
@@ -193,6 +170,6 @@ surface, and the detailed behavior moved to Node with meaningful tests.
 
 The remaining work is not another large refactor. It is a short follow-up pass:
 prove the flow on a real device or emulator, improve install-state version
-metadata, tighten multi-device upgrade verification guidance, and polish the
-names of the reduced shell harnesses. The harness naming polish was completed
-after this review.
+metadata, tighten multi-device upgrade verification guidance, and consider a
+stable install-focused Node test slice if the full Node suite becomes too
+expensive for installer-only validation.
