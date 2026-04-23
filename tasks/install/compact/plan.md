@@ -96,10 +96,6 @@ post-bootstrap install behavior.
   uncovers a material contradiction, append a dated `## Execution Notes`
   section to that file before the phase commit rather than rewriting its main
   sections.
-- `tasks/install/compact/problem-summary.md`,
-  `tasks/install/compact/findings-claude.md`, and
-  `tasks/install/compact/recommendations-codex.md`: background research only.
-  Preserve as-is unless a factual correction is unavoidable.
 - `sites/landing/public/install.sh`: in scope for post-bootstrap collapse only.
   Preserve the public bootstrap contract and irreducible prerequisite logic.
 - `validation/install/`: in scope for deleting parser- and glue-focused shell
