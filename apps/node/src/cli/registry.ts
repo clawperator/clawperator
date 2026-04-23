@@ -2434,6 +2434,7 @@ COMMANDS["bundled-skills"] = {
   name: "bundled-skills",
   group: "Execution",
   summary: "Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes",
+  supportedFlags: ["--version", "--json", "--output", "--format", "--help"],
   help: `clawperator bundled-skills
 
 Usage:
