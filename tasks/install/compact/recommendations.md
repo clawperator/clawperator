@@ -89,13 +89,16 @@ internally and the parsers would have no purpose.
 - implements the "shared bridge failure is non-fatal" policy in bash
   (the `ONLY_SHARED_BRIDGE_FAILURE` branch at lines 942-949)
 
-The last point is the sharpest mismatch: `hostSetup.ts` already defines
-`isNonFatalHostArtifactFailure()` and the concept lives in Node, but the
-decision to continue rather than fail lives in the shell at lines 942-949. The
-shell overrides the CLI's exit code for this case. The CLI should own this
-policy end-to-end. The artifact hardcoding in bash is a separate maintenance
-liability: if an artifact is added or renamed in the CLI, the bash name list
-breaks silently.
+The last point requires precision: `hostSetup.ts` already returns `ok: true`
+and exits 0 when `sharedAgentBridge` is the only failing artifact (line 780,
+using `isNonFatalHostArtifactFailure()`). The shell's `ONLY_SHARED_BRIDGE_FAILURE`
+branch at lines 942-949 does not override the CLI's exit code - both branches
+return 0. Its only effect is to print "⚠️  Host setup completed with a shared-agent
+bridge warning; continuing." instead of "✅ Host setup complete." The shell
+maintains 25 lines of redundant policy logic purely for a message distinction
+that could instead be emitted directly by the CLI's pretty output. The artifact
+hardcoding in bash is a separate maintenance liability: if an artifact is added
+or renamed in the CLI, the bash name list breaks silently.
 
 ### 3. `run_operator_remediation_via_cli` builds a shell-side state model (~120 lines)
 
@@ -121,6 +124,14 @@ of `test_agent_skills.sh` (the `run_operator_download_via_cli_case` and
 `run_operator_download_parser_case` helpers plus scenarios 15c-15f) that are
 dead with respect to the actual install execution. This is pure cleanup with no
 behavior change.
+
+A consequence: `OPERATOR_VERSION` is only ever set inside `download_operator_apk_via_cli`,
+so the `--apk-version` flag is never forwarded to `host setup` in the live
+install flow. The `apkVersion` field in `install-state.json` is always `null`
+after a standard install. If tracking the downloaded APK version in install-state
+is a requirement, the fix belongs in `operator remediate`'s result contract
+(expose the downloaded version) and `host setup` consumption - not in the dead
+download function.
 
 ### 5. The final installer summary is a ~105-line bash decision tree
 
@@ -186,20 +197,18 @@ This is the safest compaction step: pure removal of dead code and dead test
 coverage with no behavior change to the real install flow. Do this before any
 deeper refactor to reduce the surface under consideration.
 
-### 2. Move the non-fatal shared-bridge policy fully into Node
+### 2. Simplify the shell's shared-bridge handling to trust the CLI
 
-`hostSetup.ts` already has `isNonFatalHostArtifactFailure()` that identifies
-the shared bridge as the non-fatal artifact. The policy decision - "continue
-rather than fail" - currently lives in the shell at lines 942-949.
+`hostSetup.ts` already returns `ok: true` and exits 0 when `sharedAgentBridge`
+is the only failing artifact. The shell does not need to re-detect this case.
+The `ONLY_SHARED_BRIDGE_FAILURE` branch at lines 942-949 exists only to emit a
+warning-flavored message instead of a success message.
 
-The fix is straightforward: make `setupHost` in `hostSetup.ts` return `ok = true`
-when a shared-bridge failure is the only failure, so `cmdHostSetup` exits 0 in
-that case. The "warning; continuing" message should come from the CLI's own
-output rather than from a bash branch overriding the exit code.
-
-Once this lands, the `ONLY_SHARED_BRIDGE_FAILURE` branch and the
-`HOST_FAILED_COUNT` counter disappear from `setup_host_artifacts_via_cli`, and
-the shell can simply check the CLI exit code.
+The fix is to let the CLI's pretty output carry that warning text, then collapse
+`setup_host_artifacts_via_cli` to: call CLI, check exit code, print output.
+The `ONLY_SHARED_BRIDGE_FAILURE` branch, the `HOST_FAILED_COUNT` counter, the
+`CORE_FAILURE` counter, and the per-artifact status variables all disappear from
+shell once the shell trusts the exit code the CLI already sets correctly.
 
 ### 3. Add a higher-level post-bootstrap installer CLI surface
 
@@ -208,17 +217,25 @@ This is the most important recommendation.
 The remaining shell complexity is mostly caused by shell-to-CLI data threading:
 the shell extracts state from one CLI call and forwards it to the next. The
 cleanest fix is to add a CLI-owned post-bootstrap install surface - provisionally
-named `clawperator install` - that:
+named `clawperator install`.
 
-- accepts `--operator-package` (for non-release APKs)
-- internally sequences: operator remediate, skills install, bundled-skills
+Implementation note: `COMMANDS["install"]` in `registry.ts` is already a
+tombstone that rejects the command with "clawperator install is not a valid
+command. Use: clawperator operator setup --apk <path>." Adding the real
+post-bootstrap install surface requires deliberately repurposing this tombstone,
+not just adding a new command entry.
+
+The surface should:
+
+- accept `--operator-package` (for non-release APKs)
+- internally sequence: operator remediate, skills install, bundled-skills
   install, host setup
-- threads state between those steps internally in Node (no shell extraction
+- thread state between those steps internally in Node (no shell extraction
   needed)
-- owns partial-failure semantics (shared bridge non-fatal, skills best-effort)
-- owns final installer summary semantics (single-device, multi-device, failure,
+- own partial-failure semantics (shared bridge non-fatal, skills best-effort)
+- own final installer summary semantics (single-device, multi-device, failure,
   warning paths)
-- returns one stable installer-facing result contract
+- return one stable installer-facing result contract
 
 With this command, the post-bootstrap section of `main()` reduces to:
 
@@ -326,8 +343,9 @@ The most valuable concrete moves, in priority order:
 
 1. Delete the dead operator-download shell path and its test coverage (~300 lines,
    zero behavior change)
-2. Move shared-bridge non-fatal policy fully into `hostSetup.ts` (closes the
-   clearest policy mismatch between Node and shell)
+2. Simplify the shell's shared-bridge handling to trust the CLI exit code
+   (`hostSetup.ts` already returns the correct `ok` value; the shell just needs
+   to stop re-detecting it and emit the warning from CLI pretty output instead)
 3. Add a `clawperator install` post-bootstrap surface (closes the data-threading
    root cause; everything else follows from this)
 4. Delete the remaining shell JSON parsers (consequence of 3)
