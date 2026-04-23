@@ -25,9 +25,9 @@ the normal upgrade path.
 | State | in progress |
 | Total PRs | 4 |
 | Total phases | 6 |
-| Completed | 1, 2, 2.5 |
-| Remaining | 3, 4, 5 |
-| Current / Next | Phase 3 |
+| Completed | 1, 2, 2.5, 3 |
+| Remaining | 4, 5 |
+| Current / Next | Phase 4 |
 | Blockers | none |
 
 ## Goal
@@ -299,5 +299,20 @@ After PR-4:
 
 ## Execution Notes
 
-Add dated notes here only when implementation uncovers a material mismatch
-between this plan and the code.
+### 2026-04-23
+
+Phase 3 is complete on `install/cleanup-phase-3`.
+
+- The canonical operator acquisition surface is now `clawperator operator download`.
+- `sites/landing/public/install.sh` delegates release APK metadata fetch,
+  download, and checksum verification to that CLI command instead of owning the
+  logic in shell.
+- Phase 3 landed as `feat(node): add operator download and verification command`
+  (`e9d6406`) and was followed by contract-hardening fixes in:
+  - `c39dbbf`
+  - `14f0d8a`
+  - `fbc414c`
+  - `1952086`
+  - `6f0a9f5`
+
+Phase 4 is the next active phase.

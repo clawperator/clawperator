@@ -21,9 +21,9 @@ later phases depend on earlier CLI surfaces being real and merged.
 | State | in progress |
 | Total PRs | 4 |
 | Total phases | 6 |
-| Completed | 1, 2, 2.5 |
-| Remaining | 3, 4, 5 |
-| Current / Next | Phase 3 |
+| Completed | 1, 2, 2.5, 3 |
+| Remaining | 4, 5 |
+| Current / Next | Phase 4 |
 | Blockers | none |
 
 ## Hard Rules
@@ -294,7 +294,7 @@ bash -n sites/landing/public/install.sh
 refactor(node): rename host artifact command to host setup
 ```
 
-## Phase 3: Operator APK Download and Verification
+## Phase 3 [DONE]: Operator APK Download and Verification
 
 ### Agent Tier
 
