@@ -259,6 +259,34 @@ before the upstream data-threading seams are closed.
 
 ### 5. Move installer summary formatting into the CLI
 
+## Execution Notes (2026-04-24)
+
+Execution followed the recommendations without requiring a contradiction note.
+
+- Phase 1 and Phase 2 landed on `main` as PR-1.
+- Phase 3 and Phase 4 are complete on the current branch.
+- `sites/landing/public/install.sh` now delegates post-bootstrap behavior
+  through `clawperator install`, and the remaining post-bootstrap shell JSON
+  parsers and summary tree are gone.
+- Final shell budget outcome:
+  - `sites/landing/public/install.sh` is 525 lines, below the 700-line target.
+- Shell validation outcome:
+  - `validation/install/test_multidevice.sh` was deleted.
+  - `validation/install/test_main.sh` now proves bootstrap gating, delegation,
+    and top-level message or exit propagation instead of the removed shell state
+    machine.
+  - `validation/install/test_agent_skills.sh` now covers only the shell-owned
+    CLI bootstrap seam that remains in the wrapper.
+- Docs and upgrade alignment outcome:
+  - authored docs, scoped CLI help text, `validation/install/README.md`,
+    bundled `clawperator-upgrade`, and its prompt metadata now align on the
+    CLI-first `clawperator install` route.
+  - the generated local host guide written by `clawperator host setup` now
+    matches the same upgrade contract.
+- Review outcome:
+  - the requested `review-swarm-loop` completed after three fix passes.
+  - the final read-only swarm pass reported no material findings in scope.
+
 The CLI should own:
 
 - ready vs warn vs failure semantics

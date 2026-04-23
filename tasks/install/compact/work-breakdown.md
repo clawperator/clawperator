@@ -12,25 +12,25 @@ semantics fully into Node, and add the CLI-owned post-bootstrap
 parsers and shell state machine, shrink shell validation to bootstrap and
 delegation proof, then update docs and `clawperator-upgrade`.
 
-PR-1 is complete on the current branch. PR-2 remains next, and no phase should
-begin out of order because the shell collapse in PR-2 depends on the CLI
-surface introduced in PR-1.
+PR-1 landed on `main`, and PR-2 is now complete on the current branch. The
+phase ordering remained intact: PR-2 used the CLI surface introduced in PR-1
+to collapse the shell wrapper and then align docs and upgrade guidance.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | PR-1 complete, PR-2 pending |
+| State | complete |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | PR-1 / Phases 1-2 |
-| Remaining | PR-2 / Phases 3-4 |
-| Current / Next | Phase 3 |
+| Completed | PR-1 / Phases 1-2, PR-2 / Phases 3-4 |
+| Remaining | none |
+| Current / Next | task complete |
 | Blockers | none |
 
 ## Current Status
 
-PR-1 is complete on the current branch.
+The full task is complete.
 
 - Phase 1 completed with:
   - removal of the dead operator-download shell path and matching shell-only test coverage
@@ -42,13 +42,31 @@ PR-1 is complete on the current branch.
 - PR-1 follow-up fix completed after review:
   - `clawperator install` now rejects `--device`
   - host setup no longer suppresses normal CLI version recording when invoked from `clawperator install`
+- Phase 3 completed with:
+  - `sites/landing/public/install.sh` collapsed to bootstrap plus delegated `clawperator install`
+  - remaining post-bootstrap shell parsers, orchestration helpers, state arrays, and summary logic removed
+  - shell validation rewritten to prove bootstrap gating, delegation, and exit-code or message propagation
+  - final `install.sh` line count reduced to 525, below the 700-line target
+- Phase 4 completed with:
+  - authored docs updated through the repo docs-author workflow
+  - `validation/install/README.md`, scoped CLI help text, and bundled `clawperator-upgrade` guidance aligned to the CLI-first install route
+  - generated local host guidance written by `clawperator host setup` aligned to the same upgrade contract
+- Review-swarm-loop completed with:
+  - fixes for delegated install follow-up guidance, pretty-output precedence, and local host-guide alignment
+  - final clean review on the requested persisted scope
 
-PR-1 branch commits:
+PR-1 landed on `main` as:
 
-- `04005da` `refactor(install): remove dead operator download shell path`
-- `0ed75cb` `fix(node): own shared bridge warning semantics in host setup output`
-- `714e48a` `feat(node): add post-bootstrap install command`
-- `f4097e3` `fix(node): tighten install command contract`
+- `b40e01d` `feat(install): add compact post-bootstrap install flow`
+
+PR-2 branch commits:
+
+- `1c76b41` `refactor(install): delegate post-bootstrap flow to clawperator install`
+- `7c52fa5` `docs(install): align compact installer guidance`
+- `ea6f2c7` `feat(skills): update clawperator-upgrade for clawperator install`
+- `05dea24` `fix(install): align delegated install follow-up guidance`
+- `92fb466` `fix(install): prioritize host setup follow-up guidance`
+- `e7d621c` `fix(host): align local upgrade guide with install route`
 
 ## Hard Rules
 
@@ -271,6 +289,8 @@ feat(node): add post-bootstrap install command
 
 ## Phase 3: Collapse `install.sh` to Bootstrap and Delegate
 
+Status: complete
+
 ### Agent Tier
 
 thinking
@@ -349,7 +369,13 @@ bash -n sites/landing/public/install.sh
 refactor(install): delegate post-bootstrap flow to clawperator install
 ```
 
+Completed by:
+
+- `1c76b41` `refactor(install): delegate post-bootstrap flow to clawperator install`
+
 ## Phase 4: Docs and Upgrade Alignment
+
+Status: complete
 
 ### Agent Tier
 
@@ -441,3 +467,11 @@ docs(install): align compact installer guidance
 ```text
 feat(skills): update clawperator-upgrade for clawperator install
 ```
+
+Completed by:
+
+- `7c52fa5` `docs(install): align compact installer guidance`
+- `ea6f2c7` `feat(skills): update clawperator-upgrade for clawperator install`
+- `05dea24` `fix(install): align delegated install follow-up guidance`
+- `92fb466` `fix(install): prioritize host setup follow-up guidance`
+- `e7d621c` `fix(host): align local upgrade guide with install route`

@@ -20,35 +20,38 @@ compact installer model.
 
 | Item | Value |
 | --- | --- |
-| State | PR-1 complete, PR-2 pending |
+| State | complete |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | PR-1 / Phases 1-2 |
-| Remaining | PR-2 / Phases 3-4 |
-| Current / Next | Phase 3 |
+| Completed | PR-1 / Phases 1-2, PR-2 / Phases 3-4 |
+| Remaining | none |
+| Current / Next | task complete |
 | Blockers | none |
 
 ## Current Branch Snapshot
 
-Current branch status for PR-1:
+Current branch status for the full task:
 
-- Phase 1 complete:
-  - dead `download_operator_apk_via_cli` shell residue removed
-  - shared-agent-bridge warning semantics moved fully into Node-owned host setup output
-- Phase 2 complete:
-  - top-level `clawperator install` command added
-  - post-bootstrap sequencing moved into Node
-  - installer-facing help and focused Node tests updated
-- Follow-up review pass complete:
-  - install command contract tightened so `--device` is rejected
-  - host setup now preserves normal CLI version recording when called through `clawperator install`
+- PR-1 landed on `main` at `b40e01d` (`feat(install): add compact post-bootstrap install flow`)
+- Phase 3 complete:
+  - `install.sh` now delegates post-bootstrap behavior through `clawperator install`
+  - remaining shell-side post-bootstrap JSON parsers, state arrays, and summary tree were removed
+  - shell validation shrank to bootstrap and delegation proof
+- Phase 4 complete:
+  - authored docs, validation guidance, CLI help, bundled upgrade skill text, and agent prompt metadata now align on the CLI-first `clawperator install` route
+  - generated local host guidance written by `clawperator host setup` now matches the same upgrade contract
+- Review-swarm-loop complete:
+  - review findings around delegated install docs and pretty-output precedence were fixed
+  - the final swarm pass reported no material findings in scope
 
-PR-1 commits currently on the branch:
+PR-2 commits currently on the branch:
 
-- `04005da` `refactor(install): remove dead operator download shell path`
-- `0ed75cb` `fix(node): own shared bridge warning semantics in host setup output`
-- `714e48a` `feat(node): add post-bootstrap install command`
-- `f4097e3` `fix(node): tighten install command contract`
+- `1c76b41` `refactor(install): delegate post-bootstrap flow to clawperator install`
+- `7c52fa5` `docs(install): align compact installer guidance`
+- `ea6f2c7` `feat(skills): update clawperator-upgrade for clawperator install`
+- `05dea24` `fix(install): align delegated install follow-up guidance`
+- `92fb466` `fix(install): prioritize host setup follow-up guidance`
+- `e7d621c` `fix(host): align local upgrade guide with install route`
 
 ## Goal
 
