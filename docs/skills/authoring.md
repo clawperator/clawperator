@@ -98,6 +98,9 @@ curl -fsSL https://clawperator.com/install.sh | bash
 
 already installs first-party bundled skills automatically.
 
+If you bootstrap the CLI with `npm install -g clawperator` instead, run
+`clawperator install` to perform the same post-bootstrap install flow.
+
 Current install model:
 
 | Surface | Path | Role |
@@ -113,7 +116,7 @@ Current packaged first-party bundled skills:
 | Skill | Role | Boundary |
 | --- | --- | --- |
 | `clawperator-agent-orientation` | first-run orientation | Routes an unfamiliar host agent to the correct Clawperator front door and canonical docs without redefining the contracts. |
-| `clawperator-upgrade` | whole-product upgrade route | Re-runs `https://clawperator.com/install.sh`, verifies the result with `clawperator doctor --json`, and stays out of component-level self-update logic. Use it only after explicit upgrade intent is established. |
+| `clawperator-upgrade` | whole-product upgrade route | Checks `clawperator --version`, verifies Node 24+ and Java 17/21, then uses `npm install -g clawperator@latest`, `clawperator install`, and `clawperator doctor --json`. Uses `install.sh` only as recovery when the CLI is not reachable or the bootstrap prerequisites need repair. |
 | `clawperator-skill-author-by-agent-discovery` | zero-results front door | Produces one discovery artifact, chooses exactly one next step, and does not author a durable runtime skill directly. |
 | `clawperator-skill-author-by-recording` | proving workflow | Records a real device flow, authors one skill shape, and runs one self-test that surfaces the emitted `SkillResult`. |
 

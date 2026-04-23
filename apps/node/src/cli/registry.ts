@@ -297,6 +297,7 @@ Optional:
 
 Notes:
   - This is the canonical post-bootstrap install route after the CLI is installed.
+  - install.sh delegates here after it finishes shell-owned prerequisite bootstrap.
   - Internally sequences: operator remediate, skills install, bundled-skills install, and host setup.
   - Returns stable JSON for automation and installer tests.
   - Pretty output is intended for installer pass-through and human review.
@@ -1127,10 +1128,10 @@ COMMANDS["setup"] = {
 COMMANDS["install"] = {
   name: "install",
   group: "Setup",
-  summary: "Run the post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup",
+  summary: "Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup",
   help: HELP_INSTALL,
   topLevelBlock: `  install [--operator-package <package>]
-                                            Run post-bootstrap remediation, skills install, bundled-skills install, and host setup`,
+                                            Run the CLI-owned post-bootstrap remediation, skills install, bundled-skills install, and host setup`,
   handler: async (ctx) => {
     const { format, deviceId, operatorPackage, logger } = ctx;
     if (deviceId) {

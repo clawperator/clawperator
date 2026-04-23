@@ -1,7 +1,7 @@
 # Install Validation
 
-This directory contains the install-specific validation harnesses for
-`sites/landing/public/install.sh`.
+This directory contains the install-specific validation harnesses for the
+shell bootstrap wrapper in `sites/landing/public/install.sh`.
 
 ## Entry Point
 
@@ -30,19 +30,12 @@ dependencies for you.
     shell harnesses in this directory plus `validation/test_doctor.sh`
 - `test_java.sh`
   - covers `check_java()` detection and provisioning branches
-- `test_multidevice.sh`
-  - covers `parse_operator_remediate_result()` plus
-    `run_operator_remediation_via_cli()` summary handling for multi-device,
-    no-device, and failure results
 - `test_agent_skills.sh`
-  - covers bundled-skills shell glue, installer-side CLI result parsers,
-    `setup_bundled_skills_via_cli()`, `setup_skills_via_cli()` registry-path
-    fallback without shell RC mutation, skip behavior, and `CODEX_HOME`
-    fallback
+  - covers shell-owned `install_cli()` npm-prefix resolution and bootstrap-time
+    skill-install entry assumptions that still belong in the wrapper
 - `test_main.sh`
-  - covers hermetic `main()` smoke paths including success, final-doctor
-    failure, multi-device completion-with-guidance flow, and the CLI-owned
-    host setup orchestration path
+  - covers hermetic `main()` smoke paths for bootstrap gating, delegation to
+    `clawperator install`, and top-level exit-code/message propagation
 
 ## Maintenance Rule
 
@@ -52,11 +45,13 @@ existing harnesses as generic coverage for new install branches.
 
 Common examples:
 
-- new parser or output-contract logic
-  - add or extend a focused parser assertion
-- new best-effort CLI setup step
-  - add a shell harness case that proves success, fallback, and failure
-- new `main()` branch or summary outcome
+- new bootstrap prerequisite branch
+  - extend `test_java.sh` or `test_main.sh`
+- new install delegation behavior or passthrough messaging
+  - extend `test_main.sh`
+- changes to bootstrap-time CLI resolution
+  - extend `test_agent_skills.sh`
+- new `main()` branch or shell-owned summary outcome
   - extend `test_main.sh`
 - installer RC or environment cleanup
   - add a shell harness case that proves the old shell-side mutation is gone

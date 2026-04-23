@@ -65,7 +65,7 @@ Use this order:
 | Situation | Start here | Why |
 | --- | --- | --- |
 | You are unfamiliar with this host and want the packaged first-run orientation surface | `clawperator-agent-orientation` | Thin packaged router that points back to this page and the canonical docs. |
-| The user or calling workflow explicitly chose a whole-product refresh before you trust any downstream route | `clawperator-upgrade` | Checks `clawperator --version`, verifies Node 24+ and Java 17/21, then uses `npm install -g clawperator@latest`, `clawperator operator remediate`, `clawperator bundled-skills update`, `clawperator skills install`, `clawperator host setup`, and `clawperator doctor --json`. Uses `install.sh` only when the CLI is not reachable or the bootstrap prerequisites need repair. |
+| The user or calling workflow explicitly chose a whole-product refresh before you trust any downstream route | `clawperator-upgrade` | Checks `clawperator --version`, verifies Node 24+ and Java 17/21, then uses `npm install -g clawperator@latest`, `clawperator install`, and `clawperator doctor --json`. Uses `install.sh` only when the CLI is not reachable or the bootstrap prerequisites need repair. |
 | You know the Android package id and want the fastest answer to "what can this host do for this app?" | `clawperator skills for-app <package_id> --json` | `skills for-app` is the primary app-oriented discovery surface. |
 | You only know user-language terms such as app name or intent | `clawperator skills search --keyword <text> --json` | Search is the fallback when you do not have the package id yet. |
 | You already have a skill id and want the exact metadata | `clawperator skills get <skill_id> --json` | Confirms the registry entry before a run. |

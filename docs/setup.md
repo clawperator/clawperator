@@ -17,7 +17,7 @@ Get from an empty host to a first successful `clawperator snapshot --json` with 
 
 ## 1. Install the CLI
 
-Recommended - the installer handles Node, Java 17, adb, CLI, APK download, device setup, and CLI-owned host artifacts in one step:
+Recommended - the installer handles Node, Java 17, adb, CLI bootstrap, and the delegated `clawperator install` flow in one step:
 
 ```bash
 curl -fsSL https://clawperator.com/install.sh | bash
@@ -36,14 +36,23 @@ Alternatively, install the CLI only via npm (Node.js 24+ required):
 npm install -g clawperator
 ```
 
+Then run the canonical post-bootstrap install flow:
+
+```bash
+clawperator install
+```
+
 Success conditions:
 
 - `clawperator version` exits `0` and prints a version string.
 - If you used `install.sh`, the installer also downloads the current release APK to `~/.clawperator/downloads/operator.apk` for that run. For later manual setup or recovery, redownload from `https://clawperator.com/operator.apk`.
 
-### Durable host-agent artifacts from the CLI bootstrap
+### Durable host-agent artifacts from `clawperator install`
 
-If `install.sh` reaches its post-bootstrap onboarding phase, it calls `clawperator host setup` and writes these durable onboarding files under `~/.clawperator/`:
+After shell bootstrap succeeds, `install.sh` delegates to `clawperator install`.
+That CLI-owned post-bootstrap flow runs operator remediation, runtime-skills
+install, bundled-skills install, and `clawperator host setup`, then writes
+these durable onboarding files under `~/.clawperator/`:
 
 | Path | Meaning | When to read it |
 | --- | --- | --- |
