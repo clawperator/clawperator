@@ -716,7 +716,7 @@ process.stdin.on("end", () => {
       process.stdout.write(`operatorPackage=${sanitize(parsed.operatorPackage)}\n`);
     }
     if (parsed && typeof parsed.code === "string") {
-      process.stdout.write(`code=${parsed.code}\n`);
+      process.stdout.write(`code=${sanitize(parsed.code)}\n`);
     }
     if (parsed && typeof parsed.message === "string") {
       process.stdout.write(`message=${sanitize(parsed.message)}\n`);
@@ -729,6 +729,11 @@ process.stdin.on("end", () => {
 is_valid_sha256_hex() {
     local VALUE="$1"
     [[ "$VALUE" =~ ^[a-fA-F0-9]{64}$ ]]
+}
+
+is_valid_operator_download_path() {
+    local VALUE="$1"
+    [ "$VALUE" = "$APK_LOCAL_PATH" ]
 }
 
 print_host_artifact_outcome() {
@@ -1000,6 +1005,15 @@ download_operator_apk_via_cli() {
         elif ! is_valid_sha256_hex "$DOWNLOADED_SHA256"; then
             DOWNLOAD_ERROR_CODE="OPERATOR_DOWNLOAD_INVALID_RESULT"
             DOWNLOAD_ERROR_MESSAGE="CLI returned an invalid SHA-256 for the downloaded Operator APK."
+        elif ! is_valid_operator_download_path "$DOWNLOADED_LOCAL_PATH"; then
+            DOWNLOAD_ERROR_CODE="OPERATOR_DOWNLOAD_INVALID_RESULT"
+            DOWNLOAD_ERROR_MESSAGE="CLI returned localPath $DOWNLOADED_LOCAL_PATH but installer expected $APK_LOCAL_PATH."
+        elif [ ! -f "$DOWNLOADED_LOCAL_PATH" ]; then
+            DOWNLOAD_ERROR_CODE="OPERATOR_DOWNLOAD_INVALID_RESULT"
+            DOWNLOAD_ERROR_MESSAGE="CLI did not create a regular file at $DOWNLOADED_LOCAL_PATH."
+        elif [ ! -r "$DOWNLOADED_LOCAL_PATH" ]; then
+            DOWNLOAD_ERROR_CODE="OPERATOR_DOWNLOAD_INVALID_RESULT"
+            DOWNLOAD_ERROR_MESSAGE="CLI created Operator APK at $DOWNLOADED_LOCAL_PATH but it is not readable."
         else
             APK_LOCAL_PATH="$DOWNLOADED_LOCAL_PATH"
             OPERATOR_VERSION="$DOWNLOADED_OPERATOR_VERSION"
