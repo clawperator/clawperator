@@ -4,10 +4,9 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 REPO_ROOT="$(pwd)"
+INSTALL_SCRIPT="$REPO_ROOT/sites/landing/public/install.sh"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
-
-INSTALL_SCRIPT="$REPO_ROOT/sites/landing/public/install.sh"
 
 assert_exit_code() {
     local actual="$1"
@@ -25,9 +24,9 @@ assert_contains() {
     local label="$3"
     if ! grep -Fq -- "$needle" "$file"; then
         echo "ERROR: $label missing expected output: $needle" >&2
-        echo "--- stdout ---" >&2
+        echo "--- $file ---" >&2
         cat "$file" >&2
-        echo "--------------" >&2
+        echo "-------------" >&2
         return 1
     fi
 }
@@ -38,419 +37,209 @@ assert_not_contains() {
     local label="$3"
     if grep -Fq -- "$needle" "$file"; then
         echo "ERROR: $label unexpectedly contained: $needle" >&2
-        echo "--- stdout ---" >&2
+        echo "--- $file ---" >&2
         cat "$file" >&2
-        echo "--------------" >&2
+        echo "-------------" >&2
         return 1
     fi
 }
 
-setup_mock_tools() {
-    local scenario="$1"
-    local mock_dir="$TMP_DIR/mock-$scenario"
+assert_equals() {
+    local expected="$1"
+    local actual="$2"
+    local label="$3"
+    if [ "$expected" != "$actual" ]; then
+        echo "ERROR: $label expected '$expected' but got '$actual'" >&2
+        return 1
+    fi
+}
+
+run_parser_case() {
+    local label="$1"
+    local input_json="$2"
+    local output_file="$3"
+
+    HOME="$TMP_DIR/home-parser-$label" \
+    OS=Linux \
+    bash -c '
+        source "$1" >/dev/null 2>&1
+        trap - ERR
+        printf "%s" "$2" | parse_operator_remediate_result > "$3"
+    ' _ "$INSTALL_SCRIPT" "$input_json" "$output_file"
+}
+
+setup_mock_clawperator() {
+    local mock_dir="$1"
+    local scenario="$2"
+    local log_file="$3"
+
     mkdir -p "$mock_dir"
+    cat > "$mock_dir/clawperator" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "\$*" >> "$log_file"
 
-    case "$scenario" in
-        partial)
-            cat > "$mock_dir/adb" <<'EOF'
-#!/usr/bin/env bash
-cat <<'OUT'
-List of devices attached
-serial-ready	device
-serial-bad	unauthorized
-OUT
-EOF
-            chmod +x "$mock_dir/adb"
-cat > "$mock_dir/clawperator" <<'EOF'
-#!/usr/bin/env bash
-if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-ready ]; then
+case "$scenario" in
+  success)
     cat <<'JSON'
-{"ok":true,"criticalOk":true,"checks":[]}
+{"ok":true,"summary":{"totalDevices":3,"connectedDevices":1,"ready":1,"warn":1,"remediated":1,"adbUnready":1,"failed":0},"devices":[{"deviceId":"serial-remediated","adbState":"device","status":"remediated","message":"Device was remediated and is now ready."},{"deviceId":"serial-warning","adbState":"device","status":"warn","message":"Critical checks passed with warnings: readiness.handshake"},{"deviceId":"serial-offline","adbState":"offline","status":"adb-unready","message":"ADB reports state 'offline'. Resolve device connectivity before remediation."}],"message":"Remediated 1 device."}
 JSON
     exit 0
-fi
-
-if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-bad ]; then
+    ;;
+  failure)
     cat <<'JSON'
-{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.handshake","status":"fail","code":"HANDSHAKE_FAILED"}]}
+{"ok":false,"summary":{"totalDevices":2,"connectedDevices":2,"ready":0,"warn":0,"remediated":1,"adbUnready":0,"failed":1},"devices":[{"deviceId":"serial-alpha","adbState":"device","status":"remediated","message":"Device was remediated and is now ready."},{"deviceId":"serial-beta","adbState":"device","status":"failed","message":"Critical checks still failing: readiness.version.compatibility"}],"message":"Remediation still required for 1 device."}
 JSON
     exit 1
-fi
-
-exit 2
-EOF
-            ;;
-        all-ready)
-            cat > "$mock_dir/adb" <<'EOF'
-#!/usr/bin/env bash
-cat <<'OUT'
-List of devices attached
-serial-ready	device
-serial-bad	device
-OUT
-EOF
-            chmod +x "$mock_dir/adb"
-            cat > "$mock_dir/clawperator" <<'EOF'
-#!/usr/bin/env bash
-if [ "$1" = doctor ] && [ "$2" = --device ]; then
+    ;;
+  empty)
     cat <<'JSON'
-{"ok":true,"criticalOk":true,"checks":[]}
+{"ok":true,"summary":{"totalDevices":0,"connectedDevices":0,"ready":0,"warn":0,"remediated":0,"adbUnready":0,"failed":0},"devices":[],"message":"No Android devices detected."}
 JSON
     exit 0
-fi
-
-exit 2
-EOF
-            ;;
-        warning-only)
-            cat > "$mock_dir/adb" <<'EOF'
-#!/usr/bin/env bash
-cat <<'OUT'
-List of devices attached
-serial-warning	device
-serial-ready	device
-OUT
-EOF
-            chmod +x "$mock_dir/adb"
-            cat > "$mock_dir/clawperator" <<'EOF'
-#!/usr/bin/env bash
-if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-warning ]; then
-    cat <<'JSON'
-{"ok":true,"criticalOk":true,"checks":[{"id":"readiness.handshake","status":"warn","code":"HANDSHAKE_PERMISSION_ADVISORY"}]}
-JSON
-    exit 0
-fi
-
-if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-ready ]; then
-    cat <<'JSON'
-{"ok":true,"criticalOk":true,"checks":[]}
-JSON
-    exit 0
-fi
-
-exit 2
-EOF
-            ;;
-        all-unready)
-            cat > "$mock_dir/adb" <<'EOF'
-#!/usr/bin/env bash
-cat <<'OUT'
-List of devices attached
-serial-unauthorized	unauthorized
-serial-offline	offline
-OUT
-EOF
-            chmod +x "$mock_dir/adb"
-            cat > "$mock_dir/clawperator" <<'EOF'
-#!/usr/bin/env bash
-exit 2
-EOF
-            ;;
-        stale-one)
-            cat > "$mock_dir/adb" <<'EOF'
-#!/usr/bin/env bash
-cat <<'OUT'
-List of devices attached
-serial-stale	device
-serial-ready	device
-OUT
-EOF
-            chmod +x "$mock_dir/adb"
-            cat > "$mock_dir/clawperator" <<'EOF'
-#!/usr/bin/env bash
-if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-stale ]; then
-    cat <<'JSON'
-{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.version.compatibility","status":"fail","code":"VERSION_INCOMPATIBLE"}]}
-JSON
-    exit 1
-fi
-
-if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-ready ]; then
-    cat <<'JSON'
-{"ok":true,"criticalOk":true,"checks":[]}
-JSON
-    exit 0
-fi
-
-if [ "$1" = operator ] && [ "$2" = setup ] && [ "$3" = --apk ] && [ "$5" = --device ] && [ "$6" = serial-stale ]; then
-    exit 0
-fi
-
-exit 2
-EOF
-            ;;
-        probe-failure)
-            cat > "$mock_dir/adb" <<'EOF'
-#!/usr/bin/env bash
-cat <<'OUT'
-List of devices attached
-serial-bad	device
-serial-ready	device
-OUT
-EOF
-            chmod +x "$mock_dir/adb"
-            cat > "$mock_dir/clawperator" <<'EOF'
-#!/usr/bin/env bash
-if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-bad ]; then
+    ;;
+  invalid)
     printf '%s\n' 'not-json'
     exit 1
-fi
-
-if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-ready ]; then
-    cat <<'JSON'
-{"ok":true,"criticalOk":true,"checks":[]}
-JSON
-    exit 0
-fi
-
-exit 2
+    ;;
+  *)
+    printf '%s\n' "unexpected scenario: $scenario" >&2
+    exit 99
+    ;;
+esac
 EOF
-            ;;
-        stale-many)
-            cat > "$mock_dir/adb" <<'EOF'
-#!/usr/bin/env bash
-cat <<'OUT'
-List of devices attached
-serial-alpha	device
-serial-beta	device
-serial-offline	offline
-OUT
-EOF
-            chmod +x "$mock_dir/adb"
-            cat > "$mock_dir/clawperator" <<'EOF'
-#!/usr/bin/env bash
-if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-alpha ]; then
-    cat <<'JSON'
-{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.apk.presence","status":"fail","code":"OPERATOR_NOT_INSTALLED"}]}
-JSON
-    exit 1
-fi
-
-if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-beta ]; then
-    cat <<'JSON'
-{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.version.compatibility","status":"fail","code":"VERSION_INCOMPATIBLE"}]}
-JSON
-    exit 1
-fi
-
-if [ "$1" = operator ] && [ "$2" = setup ] && [ "$3" = --apk ] && [ "$5" = --device ] && { [ "$6" = serial-alpha ] || [ "$6" = serial-beta ]; }; then
-    exit 0
-fi
-
-exit 2
-EOF
-            ;;
-        shell-unavailable)
-            cat > "$mock_dir/adb" <<'EOF'
-#!/usr/bin/env bash
-cat <<'OUT'
-List of devices attached
-serial-bad	device
-serial-ready	device
-OUT
-EOF
-            chmod +x "$mock_dir/adb"
-            cat > "$mock_dir/clawperator" <<'EOF'
-#!/usr/bin/env bash
-if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-bad ]; then
-    cat <<'JSON'
-{"ok":false,"criticalOk":false,"checks":[{"id":"readiness.apk.presence","status":"fail","code":"DEVICE_SHELL_UNAVAILABLE"}]}
-JSON
-    exit 1
-fi
-
-if [ "$1" = doctor ] && [ "$2" = --device ] && [ "$3" = serial-ready ]; then
-    cat <<'JSON'
-{"ok":true,"criticalOk":true,"checks":[]}
-JSON
-    exit 0
-fi
-
-exit 2
-EOF
-            ;;
-        *)
-            echo "ERROR: unknown mock scenario: $scenario" >&2
-            return 1
-            ;;
-    esac
     chmod +x "$mock_dir/clawperator"
-
-    printf '%s\n' "$mock_dir"
 }
 
-run_scenario() {
-    local scenario="$1"
-    local expected_exit="$2"
-    local expected_message="$3"
-    local unexpected_message="${4:-}"
-    local unexpected_message_2="${5:-}"
-    local mock_dir
-    mock_dir="$(setup_mock_tools "$scenario")"
+run_cli_case() {
+    local label="$1"
+    local scenario="$2"
+    local output_file="$3"
+    local status_file="$4"
+    local values_file="$5"
+    local log_file="$6"
+    local mock_dir="$TMP_DIR/mock-$label"
 
-    local stdout_file="$TMP_DIR/$scenario.stdout"
-    local stderr_file="$TMP_DIR/$scenario.stderr"
-    local status_file="$TMP_DIR/$scenario.status"
+    setup_mock_clawperator "$mock_dir" "$scenario" "$log_file"
 
+    HOME="$TMP_DIR/home-$label" \
+    OS=Linux \
     PATH="$mock_dir:$PATH" \
-    APK_LOCAL_PATH=/tmp/operator.apk \
-    OPERATOR_VERSION=9.9.9 \
     bash -c '
         source "$1" >/dev/null 2>&1
         trap - ERR
-        CLAWPERATOR_BIN_PATH="$5"
+        export CLAWPERATOR_BIN_PATH="$2"
+
         set +e
-        maybe_install_operator_apk >"$2" 2>"$3"
-        printf "%s" "$?" >"$4"
-    ' _ "$INSTALL_SCRIPT" "$stdout_file" "$stderr_file" "$status_file" "$mock_dir/clawperator"
+        run_operator_remediation_via_cli > "$3" 2>&1
+        status="$?"
+        set -e
 
-    local actual_exit
-    actual_exit="$(cat "$status_file")"
-    assert_exit_code "$actual_exit" "$expected_exit" "$scenario"
-    assert_contains "$stdout_file" "$expected_message" "$scenario"
-    if [ -n "$unexpected_message" ] && grep -Fq "$unexpected_message" "$stdout_file"; then
-        echo "ERROR: $scenario unexpectedly printed: $unexpected_message" >&2
-        echo "--- stdout ---" >&2
-        cat "$stdout_file" >&2
-        echo "--------------" >&2
-        return 1
-    fi
-    if [ -n "$unexpected_message_2" ] && grep -Fq "$unexpected_message_2" "$stdout_file"; then
-        echo "ERROR: $scenario unexpectedly printed: $unexpected_message_2" >&2
-        echo "--- stdout ---" >&2
-        cat "$stdout_file" >&2
-        echo "--------------" >&2
-        return 1
-    fi
+        printf "%s\n" "$status" > "$4"
+        {
+          printf "ok=%s\n" "${OPERATOR_REMEDIATE_OK:-}"
+          printf "command_status=%s\n" "${OPERATOR_REMEDIATE_COMMAND_STATUS:-}"
+          printf "total=%s\n" "${OPERATOR_REMEDIATE_TOTAL_DEVICES:-}"
+          printf "connected=%s\n" "${OPERATOR_REMEDIATE_CONNECTED_DEVICE_COUNT:-}"
+          printf "ready=%s\n" "${OPERATOR_REMEDIATE_READY_COUNT:-}"
+          printf "warn=%s\n" "${OPERATOR_REMEDIATE_WARN_COUNT:-}"
+          printf "remediated=%s\n" "${OPERATOR_REMEDIATE_REMEDIATED_COUNT:-}"
+          printf "adb_unready=%s\n" "${OPERATOR_REMEDIATE_ADB_UNREADY_COUNT:-}"
+          printf "failed=%s\n" "${OPERATOR_REMEDIATE_FAILED_COUNT:-}"
+          printf "message=%s\n" "${OPERATOR_REMEDIATE_MESSAGE:-}"
+          printf "last_device=%s\n" "${LAST_DEVICE_SERIAL:-}"
+          printf "device0=%s\n" "${OPERATOR_REMEDIATE_DEVICE_IDS[0]:-}"
+          printf "device0_status=%s\n" "${OPERATOR_REMEDIATE_DEVICE_STATUSES[0]:-}"
+          printf "device1=%s\n" "${OPERATOR_REMEDIATE_DEVICE_IDS[1]:-}"
+          printf "device1_status=%s\n" "${OPERATOR_REMEDIATE_DEVICE_STATUSES[1]:-}"
+          printf "device2=%s\n" "${OPERATOR_REMEDIATE_DEVICE_IDS[2]:-}"
+          printf "device2_status=%s\n" "${OPERATOR_REMEDIATE_DEVICE_STATUSES[2]:-}"
+        } > "$5"
+    ' _ "$INSTALL_SCRIPT" "$mock_dir/clawperator" "$output_file" "$status_file" "$values_file"
 }
 
-capture_setup_prompt() {
-    local operator_package="${1:-}"
-    local output_file="$2"
-    local home_dir="$TMP_DIR/prompt home'space"
-    mkdir -p "$home_dir"
+echo "=== Scenario 1: parser emits stable remediation summary and per-device fields ==="
+PARSER_OUTPUT="$TMP_DIR/parser.out"
+run_parser_case \
+    mixed \
+    '{"ok":false,"summary":{"totalDevices":3,"connectedDevices":2,"ready":1,"warn":0,"remediated":1,"adbUnready":0,"failed":1},"devices":[{"deviceId":"serial-alpha","adbState":"device","status":"remediated","message":"Device was remediated and is now ready."},{"deviceId":"serial-beta","adbState":"device","status":"failed","message":"Critical checks still failing: readiness.version.compatibility"}],"message":"Remediation still required for 1 device."}' \
+    "$PARSER_OUTPUT"
+assert_contains "$PARSER_OUTPUT" "ok=false" "parser output"
+assert_contains "$PARSER_OUTPUT" "summary.totalDevices=3" "parser output"
+assert_contains "$PARSER_OUTPUT" "summary.remediated=1" "parser output"
+assert_contains "$PARSER_OUTPUT" "summary.failed=1" "parser output"
+assert_contains "$PARSER_OUTPUT" "device:0:id=serial-alpha" "parser output"
+assert_contains "$PARSER_OUTPUT" "device:1:status=failed" "parser output"
+assert_contains "$PARSER_OUTPUT" "message=Remediation still required for 1 device." "parser output"
 
-    HOME="$home_dir" \
-    CLAWPERATOR_OPERATOR_PACKAGE="$operator_package" \
-    bash -c '
-        source "$1" >/dev/null 2>&1
-        trap - ERR
-        print_operator_setup_command "serial check'\''special" "${CLAWPERATOR_OPERATOR_PACKAGE:-}"
-    ' _ "$INSTALL_SCRIPT" >"$output_file"
-}
+echo "=== Scenario 2: CLI delegation records summary data and single connected device metadata ==="
+SUCCESS_STDOUT="$TMP_DIR/success.stdout"
+SUCCESS_STATUS="$TMP_DIR/success.status"
+SUCCESS_VALUES="$TMP_DIR/success.values"
+SUCCESS_LOG="$TMP_DIR/success.log"
+run_cli_case success success "$SUCCESS_STDOUT" "$SUCCESS_STATUS" "$SUCCESS_VALUES" "$SUCCESS_LOG"
+assert_exit_code "$(cat "$SUCCESS_STATUS")" 0 "success"
+assert_contains "$SUCCESS_STDOUT" "Running CLI-owned device remediation..." "success stdout"
+assert_contains "$SUCCESS_STDOUT" "Device remediation summary from the CLI:" "success stdout"
+assert_contains "$SUCCESS_STDOUT" "serial-remediated - remediated" "success stdout"
+assert_contains "$SUCCESS_STDOUT" "serial-warning - Critical checks passed with warnings: readiness.handshake" "success stdout"
+assert_contains "$SUCCESS_STDOUT" "serial-offline - ADB reports state 'offline'." "success stdout"
+assert_contains "$SUCCESS_STDOUT" "Remediated 1 device." "success stdout"
+assert_contains "$SUCCESS_VALUES" "ok=true" "success values"
+assert_contains "$SUCCESS_VALUES" "command_status=0" "success values"
+assert_contains "$SUCCESS_VALUES" "total=3" "success values"
+assert_contains "$SUCCESS_VALUES" "connected=1" "success values"
+assert_contains "$SUCCESS_VALUES" "ready=1" "success values"
+assert_contains "$SUCCESS_VALUES" "warn=1" "success values"
+assert_contains "$SUCCESS_VALUES" "remediated=1" "success values"
+assert_contains "$SUCCESS_VALUES" "adb_unready=1" "success values"
+assert_contains "$SUCCESS_VALUES" "failed=0" "success values"
+assert_contains "$SUCCESS_VALUES" "last_device=serial-remediated" "success values"
+assert_contains "$SUCCESS_VALUES" "device0_status=remediated" "success values"
+assert_contains "$SUCCESS_VALUES" "device1_status=warn" "success values"
+assert_contains "$SUCCESS_VALUES" "device2_status=adb-unready" "success values"
+assert_contains "$SUCCESS_LOG" "operator remediate --output json --operator-package com.clawperator.operator" "success log"
 
-capture_redownload_hint() {
-    local operator_package="${1:-}"
-    local output_file="$2"
-    local home_dir="$TMP_DIR/prompt home'space"
-    mkdir -p "$home_dir"
+echo "=== Scenario 3: CLI delegation preserves failure details without rebuilding policy in shell ==="
+FAIL_STDOUT="$TMP_DIR/fail.stdout"
+FAIL_STATUS="$TMP_DIR/fail.status"
+FAIL_VALUES="$TMP_DIR/fail.values"
+FAIL_LOG="$TMP_DIR/fail.log"
+run_cli_case failure failure "$FAIL_STDOUT" "$FAIL_STATUS" "$FAIL_VALUES" "$FAIL_LOG"
+assert_exit_code "$(cat "$FAIL_STATUS")" 0 "failure"
+assert_contains "$FAIL_STDOUT" "serial-alpha - remediated" "failure stdout"
+assert_contains "$FAIL_STDOUT" "serial-beta - Critical checks still failing: readiness.version.compatibility" "failure stdout"
+assert_contains "$FAIL_STDOUT" "Remediation still required for 1 device." "failure stdout"
+assert_contains "$FAIL_VALUES" "ok=false" "failure values"
+assert_contains "$FAIL_VALUES" "command_status=1" "failure values"
+assert_contains "$FAIL_VALUES" "remediated=1" "failure values"
+assert_contains "$FAIL_VALUES" "failed=1" "failure values"
+assert_contains "$FAIL_LOG" "operator remediate --output json --operator-package com.clawperator.operator" "failure log"
+assert_not_contains "$FAIL_STDOUT" "operator setup --apk" "failure stdout"
 
-    HOME="$home_dir" \
-    CLAWPERATOR_OPERATOR_PACKAGE="$operator_package" \
-    bash -c '
-        source "$1" >/dev/null 2>&1
-        trap - ERR
-        print_operator_apk_redownload_hint
-    ' _ "$INSTALL_SCRIPT" >"$output_file"
-}
+echo "=== Scenario 4: no-device results stay parseable and keep remediation in the CLI lane ==="
+EMPTY_STDOUT="$TMP_DIR/empty.stdout"
+EMPTY_STATUS="$TMP_DIR/empty.status"
+EMPTY_VALUES="$TMP_DIR/empty.values"
+EMPTY_LOG="$TMP_DIR/empty.log"
+run_cli_case empty empty "$EMPTY_STDOUT" "$EMPTY_STATUS" "$EMPTY_VALUES" "$EMPTY_LOG"
+assert_exit_code "$(cat "$EMPTY_STATUS")" 0 "empty"
+assert_contains "$EMPTY_STDOUT" "No Android devices detected." "empty stdout"
+assert_contains "$EMPTY_VALUES" "ok=true" "empty values"
+assert_contains "$EMPTY_VALUES" "total=0" "empty values"
+assert_contains "$EMPTY_VALUES" "connected=0" "empty values"
+assert_contains "$EMPTY_VALUES" "last_device=" "empty values"
 
-echo "=== Scenario 1: ready devices stay ready while unauthorized devices are reported ==="
-run_scenario \
-    partial \
-    0 \
-    "All ready devices already have the required APK." \
-    "Installing operator APK on serial-ready..." \
-    "Complete Android setup on one target device with one of:"
-assert_contains "$TMP_DIR/partial.stdout" "serial-bad - ADB state: unauthorized. Unlock the device or restart ADB before setup." "partial stdout"
+echo "=== Scenario 5: invalid CLI output fails fast instead of guessing remediation policy ==="
+INVALID_STDOUT="$TMP_DIR/invalid.stdout"
+INVALID_STATUS="$TMP_DIR/invalid.status"
+INVALID_VALUES="$TMP_DIR/invalid.values"
+INVALID_LOG="$TMP_DIR/invalid.log"
+run_cli_case invalid invalid "$INVALID_STDOUT" "$INVALID_STATUS" "$INVALID_VALUES" "$INVALID_LOG"
+assert_exit_code "$(cat "$INVALID_STATUS")" 1 "invalid"
+assert_contains "$INVALID_STDOUT" "operator remediate returned no parseable result." "invalid stdout"
+assert_contains "$INVALID_STDOUT" "not-json" "invalid stdout"
+assert_contains "$INVALID_VALUES" "ok=" "invalid values"
+assert_contains "$INVALID_LOG" "operator remediate --output json --operator-package com.clawperator.operator" "invalid log"
 
-echo "=== Scenario 2: all ready devices do not reinstall ==="
-run_scenario \
-    all-ready \
-    0 \
-    "All connected devices already have the required APK." \
-    "Installing operator APK on serial-ready..." \
-    "Installing operator APK on connected device..."
-
-echo "=== Scenario 3: warning-only devices are not treated as APK targets ==="
-run_scenario \
-    warning-only \
-    0 \
-    "All connected devices already have the required APK." \
-    "Installing operator APK on serial-warning..." \
-    "Complete Android setup on one target device with one of:"
-
-echo "=== Scenario 4: all-unready devices stay in the ADB readiness lane ==="
-run_scenario \
-    all-unready \
-    0 \
-    "No connected device is ready for ADB yet. Skipping APK install until one device is ready." \
-    "All ready devices already have the required APK." \
-    "Complete Android setup on one target device with one of:"
-
-echo "=== Scenario 5: probe failures abort remediation instead of being ignored ==="
-run_scenario \
-    probe-failure \
-    0 \
-    "Some ready devices could not be inspected with Clawperator Doctor. Skipping automatic APK install for those devices until the probe succeeds." \
-    "Installing operator APK on serial-bad..." \
-    "All connected devices already have the required APK."
-assert_contains "$TMP_DIR/probe-failure.stdout" "serial-bad - could not inspect this device with Clawperator Doctor." "probe-failure stdout"
-assert_not_contains "$TMP_DIR/probe-failure.stdout" "All ready devices already have the required APK." "probe-failure stdout"
-
-echo "=== Scenario 6: a stale ready device is upgraded in place ==="
-run_scenario \
-    stale-one \
-    0 \
-    "Installing operator APK on serial-stale..." \
-    "Complete Android setup on one target device with one of:" \
-    "All connected devices already have the required APK."
-assert_contains "$TMP_DIR/stale-one.stdout" "serial-stale - operator APK installed and permissions granted." "stale-one stdout"
-assert_not_contains "$TMP_DIR/stale-one.stdout" "Installing operator APK on serial-ready..." "stale-one stdout"
-
-echo "=== Scenario 7: multiple stale ready devices are upgraded while offline devices are skipped ==="
-run_scenario \
-    stale-many \
-    0 \
-    "Installing operator APK on serial-alpha..." \
-    "Complete Android setup on one target device with one of:" \
-    "All connected devices already have the required APK."
-assert_contains "$TMP_DIR/stale-many.stdout" "Installing operator APK on serial-beta..." "stale-many stdout"
-assert_contains "$TMP_DIR/stale-many.stdout" "serial-offline - ADB state: offline. Unlock the device or restart ADB before setup." "stale-many stdout"
-assert_contains "$TMP_DIR/stale-many.stdout" "Other detected devices were skipped until they are ready for ADB." "stale-many stdout"
-
-echo "=== Scenario 8: manual setup prompt omits the default operator package flag ==="
-DEFAULT_PROMPT_STDOUT="$TMP_DIR/default-prompt.stdout"
-capture_setup_prompt "com.clawperator.operator" "$DEFAULT_PROMPT_STDOUT"
-PROMPT_HOME="$TMP_DIR/prompt home'space"
-EXPECTED_DEFAULT_APK_PATH="$(printf '%q' "$PROMPT_HOME/.clawperator/downloads/operator.apk")"
-EXPECTED_SPECIAL_DEVICE_ID="$(printf '%q' "serial check'special")"
-assert_contains "$DEFAULT_PROMPT_STDOUT" "clawperator operator setup --apk $EXPECTED_DEFAULT_APK_PATH --device $EXPECTED_SPECIAL_DEVICE_ID" "default-prompt stdout"
-assert_not_contains "$DEFAULT_PROMPT_STDOUT" "--operator-package" "default-prompt stdout"
-
-echo "=== Scenario 9: manual setup prompt preserves non-default operator package guidance ==="
-DEV_PROMPT_STDOUT="$TMP_DIR/dev-prompt.stdout"
-capture_setup_prompt "com.clawperator.operator.dev" "$DEV_PROMPT_STDOUT"
-EXPECTED_DEV_APK_PATH="$(printf '%q' "$PROMPT_HOME/.clawperator/downloads/operator-debug.apk")"
-assert_contains "$DEV_PROMPT_STDOUT" "clawperator operator setup --apk $EXPECTED_DEV_APK_PATH --device $EXPECTED_SPECIAL_DEVICE_ID --operator-package com.clawperator.operator.dev" "dev-prompt stdout"
-
-echo "=== Scenario 10: redownload hint shell-quotes the output path ==="
-REDOWNLOAD_HINT_STDOUT="$TMP_DIR/redownload-hint.stdout"
-capture_redownload_hint "com.clawperator.operator" "$REDOWNLOAD_HINT_STDOUT"
-assert_contains "$REDOWNLOAD_HINT_STDOUT" "curl -fsSL https://clawperator.com/operator.apk -o $EXPECTED_DEFAULT_APK_PATH" "redownload-hint stdout"
-
-echo "=== Scenario 11: debug APK hint shell-quotes the local path ==="
-DEBUG_HINT_STDOUT="$TMP_DIR/debug-hint.stdout"
-capture_redownload_hint "com.clawperator.operator.dev" "$DEBUG_HINT_STDOUT"
-assert_contains "$DEBUG_HINT_STDOUT" "$EXPECTED_DEV_APK_PATH" "debug-hint stdout"
-
-echo "=== Scenario 12: DEVICE_SHELL_UNAVAILABLE stays in the ADB recovery lane ==="
-run_scenario \
-    shell-unavailable \
-    0 \
-    "Some ready devices need ADB recovery before setup. Skipping automatic APK install for those devices until ADB shell works." \
-    "Installing operator APK on serial-bad..." \
-    "All connected devices already have the required APK."
-assert_contains "$TMP_DIR/shell-unavailable.stdout" "serial-bad - ADB shell is inaccessible. Resolve ADB connectivity before setup." "shell-unavailable stdout"
-assert_not_contains "$TMP_DIR/shell-unavailable.stdout" "Complete Android setup on one target device with one of:" "shell-unavailable stdout"
-
-echo "=== install.sh multi-device harness passed ==="
+echo "=== install.sh remediation parser harness passed ==="
