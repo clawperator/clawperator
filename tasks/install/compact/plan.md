@@ -111,11 +111,11 @@ post-bootstrap install behavior.
 | --- | --- | --- |
 | `sites/landing/public/install.sh` | Remove dead post-bootstrap code in PR-1 / Phase 1; collapse to bootstrap + `clawperator install` delegation in PR-2 / Phase 3 | Cross-surface task, shell wrapper |
 | `validation/install/` | Remove parser- and glue-focused shell harnesses; keep only bootstrap/delegation proof | PR-1 / Phase 1, PR-2 / Phase 3, PR-2 / Phase 4 |
-| `apps/node/src/cli/registry.ts` | Replace `install` tombstone with real CLI surface and update stale help text that still teaches the old upgrade flow | PR-1 / Phase 2, PR-2 / Phase 4 |
+| `apps/node/src/cli/registry.ts` | Replace `install` tombstone with real CLI surface and update only the help or guidance text that becomes stale because of the new `clawperator install` route | PR-1 / Phase 2, PR-2 / Phase 4 |
 | `apps/node/src/cli/commands/` | Add new post-bootstrap install command and supporting output contract | PR-1 / Phase 2 |
 | `apps/node/src/domain/host/` | Move remaining shared-bridge warning semantics fully into Node-owned output | PR-1 / Phase 1, PR-1 / Phase 2 |
 | `apps/node/src/test/` | Add unit or integration coverage for new install surface and moved summary logic | PR-1 / Phase 1, PR-1 / Phase 2, PR-2 / Phase 3 |
-| `docs/` | Update authored install, host-agent, and upgrade-skill guidance for `clawperator install` | PR-2 / Phase 4 |
+| `docs/` | Update only the authored install, host-agent, and upgrade-skill pages that still encode the superseded post-bootstrap or upgrade route once `clawperator install` lands | PR-2 / Phase 4 |
 | `apps/node/bundled-skills/clawperator-upgrade/` | Update canonical upgrade sequence to call `clawperator install` | PR-2 / Phase 4 |
 
 ## Source Of Truth
@@ -171,6 +171,7 @@ post-bootstrap install behavior.
 | --- | --- |
 | What is the canonical post-bootstrap command after this task? | `clawperator install`. Shell should call this after `install_cli` instead of sequencing `operator remediate`, `skills install`, `bundled-skills install`, and `host setup` itself. |
 | What should happen to `COMMANDS["install"]` in `registry.ts`? | Repurpose it from the current tombstone into the real post-bootstrap install command. Do not leave the tombstone in place and add a parallel command elsewhere. |
+| What CLI help text is in scope to update? | Only help and guidance text in `registry.ts` that becomes stale because `clawperator install` replaces the old tombstone or old canonical post-bootstrap or upgrade route. Do not broaden this into unrelated CLI-help rewrites. |
 | What should happen to the dead operator-download shell path? | Delete it in PR-1 / Phase 1 along with its parser helper and shell-only test coverage. |
 | Where does shared-agent-bridge non-fatal policy live after this task? | In Node-owned host-setup output semantics. The shell should trust the CLI's exit status and pretty output rather than re-detecting the case. |
 | What remains in shell permanently? | Bootstrap checks and provisioning, npm global install, minimal wrapper logic, top-level error handling, and shell-specific source hinting. |
@@ -178,6 +179,7 @@ post-bootstrap install behavior.
 | What is the target final shell budget? | `install.sh` should end the task close to the irreducible bootstrap core and should land at or below **700 lines**. If implementation cannot get below that threshold without leaving meaningful post-bootstrap logic in shell, stop and append an Execution Note before proceeding. |
 | What is the target shell-heavy validation budget? | `validation/install/test_agent_skills.sh`, `test_main.sh`, and `test_multidevice.sh` should collectively shrink well below their current combined size and should no longer unit-test parser helpers or removed shell glue. |
 | When do docs and upgrade skill change? | Only in PR-2 / Phase 4 after `clawperator install` exists and `install.sh` delegates to it. |
+| What authored docs are in scope to update? | Only authored pages that, at execution time, still teach `install.sh` rerun, the old multi-command post-bootstrap route, or the superseded upgrade sequence. Start with `docs/setup.md`, `docs/host-agents.md`, and `docs/skills/authoring.md`, then include additional authored pages only if they actually encode that stale guidance. |
 
 ## Failure Modes To Prevent
 

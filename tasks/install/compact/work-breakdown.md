@@ -182,9 +182,10 @@ installer-facing result output.
 
 1. Replace the current `COMMANDS["install"]` tombstone in `registry.ts` with
    the real post-bootstrap install command.
-2. Update the nearby CLI help and guidance text in `registry.ts` that
-   currently describes the old upgrade sequence so it stays truthful once
-   `clawperator install` exists.
+2. Update only the nearby CLI help and guidance text in `registry.ts` that
+   becomes stale because `clawperator install` replaces the old tombstone or
+   old canonical post-bootstrap or upgrade route. Do not broaden this into an
+   unrelated CLI-help cleanup pass.
 3. Implement a CLI-owned flow that internally sequences:
    - `operator remediate`
    - `skills install`
@@ -340,11 +341,10 @@ canonical post-bootstrap route.
 ### Files or Surfaces To Change
 
 - `docs/setup.md`
-- `docs/host-agents.md` and any other authored install or host-agent page that
-  still references the old multi-command post-bootstrap path
-- `docs/skills/authoring.md` and any other authored page that still describes
-  `clawperator-upgrade` as an `install.sh` rerun or spells out the old
-  multi-command upgrade sequence
+- `docs/host-agents.md`
+- `docs/skills/authoring.md`
+- any additional authored page only if it still encodes the superseded
+  post-bootstrap or upgrade route at execution time
 - `validation/install/README.md`
 - `apps/node/src/cli/registry.ts`
 - `apps/node/bundled-skills/clawperator-upgrade/SKILL.md`
@@ -353,7 +353,8 @@ canonical post-bootstrap route.
 ### Steps
 
 1. Use `.agents/skills/docs-author/SKILL.md` for the authored docs changes.
-2. Update public install and host-agent docs to reflect the compact model:
+2. Update public install and host-agent docs that still encode the old route to
+   reflect the compact model:
    - shell bootstrap first
    - `clawperator install` owns post-bootstrap install behavior
    - direct lower-level commands remain available but are no longer the normal
@@ -363,9 +364,9 @@ canonical post-bootstrap route.
    CLI-first upgrade route.
 4. Update `validation/install/README.md` so it describes the reduced shell
    harness role accurately.
-5. Update `apps/node/src/cli/registry.ts` help blocks so `clawperator --help`
-   and bundled-skills help name the new canonical upgrade/install route
-   truthfully.
+5. Update only the `apps/node/src/cli/registry.ts` help blocks that still name
+   the superseded upgrade or post-bootstrap route, so `clawperator --help` and
+   related install-oriented help stay truthful without broad CLI-help churn.
 6. Update `clawperator-upgrade/SKILL.md` so the normal upgrade route uses:
    1. `clawperator --version` reachability check
    2. `npm install -g clawperator@latest`
@@ -375,15 +376,19 @@ canonical post-bootstrap route.
    reachable or bootstrap prerequisites are broken.
 7. Update `agents/openai.yaml` in the same commit so the prompt metadata stays
    aligned with the skill text.
+8. Keep the docs pass scoped. Do not broaden it into unrelated wording cleanup
+   once the stale install or upgrade guidance is removed.
 
 ### Acceptance Criteria
 
 - authored docs describe `clawperator install` as the canonical post-bootstrap
   route truthfully
-- authored docs no longer describe `clawperator-upgrade` as a raw `install.sh`
-  rerun or spell out the superseded multi-command upgrade sequence
-- CLI help surfaces in `registry.ts` align with the shipped `clawperator install`
-  and upgrade route
+- authored docs that previously encoded the old route no longer describe
+  `clawperator-upgrade` as a raw `install.sh` rerun or spell out the superseded
+  multi-command upgrade sequence
+- only the CLI help surfaces in `registry.ts` that actually became stale are
+  updated, and they align with the shipped `clawperator install` and upgrade
+  route
 - validation README matches the reduced shell-harness ownership model
 - `clawperator-upgrade` and its `agents/openai.yaml` align on the new flow
 
