@@ -445,6 +445,51 @@ describe("cmdInstall", () => {
     assert.strictEqual(process.exitCode, 1);
   });
 
+  it("prioritizes host-setup retry guidance over no-device guidance on mixed failures", async () => {
+    const output = await cmdInstall(
+      { format: "pretty", operatorPackage: "com.clawperator.operator.dev" },
+      {
+        runOperatorRemediateImpl: async () => makeOperatorRemediationResult({
+          operatorPackage: "com.clawperator.operator.dev",
+          summary: {
+            totalDevices: 0,
+            connectedDevices: 0,
+            ready: 0,
+            warn: 0,
+            remediated: 0,
+            adbUnready: 0,
+            failed: 0,
+          },
+          devices: [],
+          message: "No connected Android devices found.",
+        }),
+        syncSkillsImpl: async () => ({
+          ok: true,
+          synced: true,
+          skillsDir: "/tmp/skills",
+          registryPath: "/tmp/skills/skills/skills-registry.json",
+          message: "Skills synced to /tmp/skills (ref: main)",
+        }),
+        copyBundledSkillsImpl: async () => ({
+          ok: true,
+          skills: ["clawperator-agent-orientation"],
+          installedDir: "/tmp/bundled-skills",
+          agentDiscoveryDirs: [{ label: "codex", dir: "/tmp/codex/skills" }],
+        }),
+        setupHostImpl: async () => makeHostSetupResult({
+          ok: false,
+          status: "failed",
+          message: "Host setup failed: permission denied",
+        }),
+      },
+    );
+
+    assert.match(output, /Clawperator install: FAILED/);
+    assert.match(output, /Retry host artifact setup after resolving the failure: clawperator host setup/);
+    assert.doesNotMatch(output, /Connect and authorize a device, then rerun:/);
+    assert.strictEqual(process.exitCode, 1);
+  });
+
   it("treats skills and bundled-skills failures as warnings while preserving a usable install", async () => {
     const output = await cmdInstall(
       { format: "json" },

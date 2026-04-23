@@ -259,12 +259,12 @@ function renderInstallPrettyOutput(result: InstallCommandResult | InstallCommand
   const followUp: string[] = [];
 
   if (!result.ok) {
-    if (result.summary.connectedDevices === 0) {
+    if (!result.steps.hostSetup.ok) {
+      followUp.push("Retry host artifact setup after resolving the failure: clawperator host setup");
+    } else if (result.summary.connectedDevices === 0) {
       followUp.push(`Connect and authorize a device, then rerun: clawperator install --operator-package ${result.operatorPackage}`);
     } else if (!result.steps.operatorRemediation.ok) {
       followUp.push(`Rerun remediation after resolving device issues: clawperator operator remediate --operator-package ${result.operatorPackage}`);
-    } else if (!result.steps.hostSetup.ok) {
-      followUp.push("Retry host artifact setup after resolving the failure: clawperator host setup");
     }
   } else {
     if (result.deviceSelectionRequired) {
