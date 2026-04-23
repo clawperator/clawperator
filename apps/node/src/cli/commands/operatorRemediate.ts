@@ -52,6 +52,12 @@ export interface OperatorRemediateResult {
   message: string;
 }
 
+export interface OperatorRemediateCommandError {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
 interface OperatorRemediateDeps {
   listDevicesImpl?: typeof listDevices;
   deviceEnumerationCheckImpl?: (config: RuntimeConfig) => Promise<AdbResult>;
@@ -471,13 +477,13 @@ async function checkEmptyDeviceListError(
   };
 }
 
-export async function cmdOperatorRemediate(
+export async function runOperatorRemediate(
   options: OutputOptions & {
     operatorPackage?: string;
     logger?: Logger;
   },
   deps: OperatorRemediateDeps = {},
-): Promise<string> {
+): Promise<OperatorRemediateResult | OperatorRemediateCommandError> {
   const operatorPackage = resolveOperatorPackageForRequest(options.operatorPackage);
   const config = getDefaultRuntimeConfig({
     operatorPackage,
@@ -497,11 +503,10 @@ export async function cmdOperatorRemediate(
   if (devices.length === 0) {
     const deviceEnumerationError = await checkEmptyDeviceListError(config, deviceEnumerationCheckImpl);
     if (deviceEnumerationError) {
-      process.exitCode = 1;
-      return formatError(deviceEnumerationError, options);
+      return deviceEnumerationError;
     }
 
-    return formatSuccess({
+    return {
       ok: true,
       operatorPackage,
       summary: {
@@ -515,7 +520,7 @@ export async function cmdOperatorRemediate(
       },
       devices: [],
       message: "No connected Android devices found.",
-    } satisfies OperatorRemediateResult, options);
+    } satisfies OperatorRemediateResult;
   }
 
   let downloadCache: DownloadCache | undefined;
@@ -555,16 +560,31 @@ export async function cmdOperatorRemediate(
   }
 
   const summary = summarize(results);
-  const ok = summary.failed === 0;
-  if (!ok) {
-    process.exitCode = 1;
-  }
-
-  return formatSuccess({
-    ok,
+  return {
+    ok: summary.failed === 0,
     operatorPackage,
     summary,
     devices: results,
     message: buildSummaryMessage(summary),
-  } satisfies OperatorRemediateResult, options);
+  } satisfies OperatorRemediateResult;
+}
+
+export async function cmdOperatorRemediate(
+  options: OutputOptions & {
+    operatorPackage?: string;
+    logger?: Logger;
+  },
+  deps: OperatorRemediateDeps = {},
+): Promise<string> {
+  const result = await runOperatorRemediate(options, deps);
+  if ("code" in result) {
+    process.exitCode = 1;
+    return formatError(result, options);
+  }
+
+  if (!result.ok) {
+    process.exitCode = 1;
+  }
+
+  return formatSuccess(result, options);
 }

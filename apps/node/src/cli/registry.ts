@@ -287,6 +287,25 @@ Subcommands:
   remediate Inspect connected devices and apply remediation policy
 `;
 
+const HELP_INSTALL = `clawperator install
+
+Usage:
+  clawperator install [--operator-package <package>] [--output <json|pretty>]
+
+Optional:
+  --operator-package <pkg>  Operator package identifier to remediate and record in host artifacts
+
+Notes:
+  - This is the canonical post-bootstrap install route after the CLI is installed.
+  - Internally sequences: operator remediate, skills install, bundled-skills install, and host setup.
+  - Returns stable JSON for automation and installer tests.
+  - Pretty output is intended for installer pass-through and human review.
+  - Exit code 1 means no connected device is ready, remediation still failed, or host setup failed.
+  - Skills install, bundled-skills install, and the shared-agent bridge remain best-effort warnings when the core install is otherwise usable.
+  - If multiple connected devices are ready, future commands must target one device explicitly with --device.
+  - Use 'clawperator operator setup --apk <path>' when you only need direct APK install, permission grant, and verification.
+`;
+
 
 const HELP_SKILLS_INSTALL = `clawperator skills install
 
@@ -346,7 +365,7 @@ Notes:
   - Shows the absolute SKILL.md path for each installed bundled skill
   - Use this when you need to inspect the installed host-agent helpers on this machine
   - 'clawperator-agent-orientation' is the first-run orientation skill for unfamiliar hosts
-  - 'clawperator-upgrade' is the whole-product upgrade route that checks clawperator --version, verifies Node 24+ and Java 17/21, then uses the CLI-first upgrade sequence when the host is already viable, and falls back to install.sh when the CLI is not reachable or the bootstrap prerequisites need repair
+  - 'clawperator-upgrade' is the whole-product upgrade route that checks clawperator --version, verifies Node 24+ and Java 17/21, then uses npm install -g clawperator@latest, clawperator install, and clawperator doctor --json when the CLI is already viable
   - 'clawperator-skill-author-by-agent-discovery' is the zero-results front door
   - 'clawperator-skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'
   - Runtime skills still live under 'clawperator skills ...'; bundled skills are separate host-agent helpers
@@ -1108,14 +1127,13 @@ COMMANDS["setup"] = {
 COMMANDS["install"] = {
   name: "install",
   group: "Setup",
-  summary: "Alias guidance - use operator setup instead",
-  help: HELP_OPERATOR_SETUP,
-  handler: async (_ctx) => {
-    return JSON.stringify({
-      code: "USAGE",
-      message: "clawperator install is not a valid command. Use: clawperator operator setup --apk <path>",
-      canonical: "clawperator operator setup --apk <path> [--device <id>] [--operator-package <package>]",
-    });
+  summary: "Run the post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup",
+  help: HELP_INSTALL,
+  topLevelBlock: `  install [--operator-package <package>]
+                                            Run post-bootstrap remediation, skills install, bundled-skills install, and host setup`,
+  handler: async (ctx) => {
+    const { format, operatorPackage, logger } = ctx;
+    return (await import("./commands/install.js")).cmdInstall({ format, operatorPackage, logger });
   },
 };
 
@@ -2243,7 +2261,7 @@ Notes:
   - Use 'clawperator skills search --keyword <text>' when you only have app names or user-language intent terms.
   - Use 'clawperator skills get <skill_id>' before 'clawperator skills run <skill_id>' when discovery already returned an id.
   - If the current host is unfamiliar, inspect 'clawperator bundled-skills list' and start with 'clawperator-agent-orientation' before choosing runtime skills, MCP, or raw CLI actions.
-  - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator bundled-skills list' and use 'clawperator-upgrade' before trying component-level repair commands. clawperator-upgrade checks clawperator --version, verifies Node 24+ and Java 17/21, then uses the CLI-first upgrade sequence when the host is already viable, and falls back to install.sh when the CLI is not reachable or the bootstrap prerequisites need repair.
+  - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator bundled-skills list' and use 'clawperator-upgrade' before trying component-level repair commands. clawperator-upgrade checks clawperator --version, verifies Node 24+ and Java 17/21, then uses npm install -g clawperator@latest, clawperator install, and clawperator doctor --json when the CLI is already viable.
   - If runtime-skill discovery returns no relevant match and you need guided skill creation help, use 'clawperator bundled-skills list' and start with 'clawperator-skill-author-by-agent-discovery'.
   - Use 'clawperator-skill-author-by-recording' after discovery returns 'proceed_to_recording', or when the route is already well understood and you need the proving workflow.
   - If your host already supports stdio MCP and wants registered tools instead of runtime-skill discovery, use 'clawperator mcp serve'.
@@ -2445,7 +2463,7 @@ Usage:
 Notes:
   - Use 'clawperator bundled-skills list' to inspect the installed host-agent workflows on this machine.
   - 'clawperator-agent-orientation' is the first-run orientation skill when the current host is unfamiliar.
-  - 'clawperator-upgrade' is the packaged whole-product upgrade route: check clawperator --version, verify Node 24+ and Java 17/21, then use npm install -g clawperator@latest, clawperator operator remediate, clawperator bundled-skills update, clawperator skills install, clawperator host setup, and clawperator doctor --json. Use install.sh only when the CLI is not reachable or the bootstrap prerequisites need repair.
+  - 'clawperator-upgrade' is the packaged whole-product upgrade route: check clawperator --version, verify Node 24+ and Java 17/21, then use npm install -g clawperator@latest, clawperator install, and clawperator doctor --json. Use install.sh only when the CLI is not reachable or the bootstrap prerequisites need repair.
   - 'clawperator-skill-author-by-agent-discovery' is the zero-results front door when runtime-skill discovery found no relevant match.
   - 'clawperator-skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'.
   - Runtime skills still live under 'clawperator skills ...'; bundled skills are separate host-agent helpers.
@@ -2897,12 +2915,12 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "  - Machine-readable docs for agents: https://docs.clawperator.com/llms.txt (index) and https://docs.clawperator.com/llms-full.txt (complete docs).",
     "  - Post-install host-agent orientation: https://docs.clawperator.com/host-agents/",
     "  - If the current host is unfamiliar, inspect 'clawperator bundled-skills list' and start with 'clawperator-agent-orientation' before choosing runtime skills, MCP, or raw CLI actions.",
-    "  - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator bundled-skills list' and use 'clawperator-upgrade' before trying component-level repair commands. clawperator-upgrade checks clawperator --version, verifies Node 24+ and Java 17/21, then uses the CLI-first upgrade sequence when the host is already viable, and falls back to install.sh when the CLI is not reachable or the bootstrap prerequisites need repair.",
+    "  - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator bundled-skills list' and use 'clawperator-upgrade' before trying component-level repair commands. clawperator-upgrade checks clawperator --version, verifies Node 24+ and Java 17/21, then uses npm install -g clawperator@latest, clawperator install, and clawperator doctor --json when the CLI is already viable.",
     "  - Start runtime-skill discovery with 'clawperator skills for-app <package_id>' when you know the Android package, or 'clawperator skills search --keyword <text>' when you do not.",
     "  - If runtime-skill discovery returns no relevant match and you need guided authoring help, use 'clawperator bundled-skills list' and start with 'clawperator-skill-author-by-agent-discovery'.",
     "  - Use 'clawperator-skill-author-by-recording' only after discovery returns 'proceed_to_recording', or when the app route is already well understood and you need the proving workflow.",
     "  - Use 'clawperator mcp serve' when the host already supports stdio MCP and wants registered Clawperator tools.",
-    "  - operator setup is the canonical setup command. operator install remains an alias.",
+    "  - install is the canonical post-bootstrap route. operator setup remains the APK-specific setup command, and operator install remains its alias.",
     "  - recording is the canonical command family; 'record' is a supported short alias.",
     "  - exec is the canonical command for execution payloads; 'execute' is a supported synonym.",
     "  - Flat commands (snapshot, click, open, type, read, wait, press, back, scroll) are the canonical device interaction surface.",
