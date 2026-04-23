@@ -14,6 +14,7 @@ describe("CLI exec logging integration", () => {
   let executionPath: string;
   let logcatCommandPath: string;
   let logcatModePath: string;
+  let logcatStagePath: string;
 
   before(async () => {
     tempRoot = await mkdtemp(join(tmpdir(), "clawperator-exec-log-"));
@@ -21,11 +22,13 @@ describe("CLI exec logging integration", () => {
     executionPath = join(tempRoot, "execution.json");
     logcatCommandPath = join(tempRoot, "logcat-command-id");
     logcatModePath = join(tempRoot, "logcat-mode");
+    logcatStagePath = join(tempRoot, "logcat-stage");
 
     const commandId = "cmd-cli-log";
     const taskId = "task-cli-log";
     await writeFile(logcatCommandPath, "", "utf8");
     await writeFile(logcatModePath, "execution\n", "utf8");
+    await writeFile(logcatStagePath, "", "utf8");
 
     await writeFile(
       adbPath,
@@ -33,6 +36,7 @@ describe("CLI exec logging integration", () => {
         "#!/bin/sh",
         `LOGCAT_COMMAND_FILE=${JSON.stringify(logcatCommandPath)}`,
         `LOGCAT_MODE_FILE=${JSON.stringify(logcatModePath)}`,
+        `LOGCAT_STAGE_FILE=${JSON.stringify(logcatStagePath)}`,
         "if [ \"$1\" = \"-s\" ]; then",
         "  shift 2",
         "fi",
@@ -48,15 +52,20 @@ describe("CLI exec logging integration", () => {
         "  exit 0",
         "fi",
         "if [ \"$1\" = \"logcat\" ]; then",
-        "  sleep 0.4",
-        "  command_id=$(cat \"$LOGCAT_COMMAND_FILE\" 2>/dev/null)",
-        "  mode=$(cat \"$LOGCAT_MODE_FILE\" 2>/dev/null)",
-        "  if [ \"$mode\" = \"doctor_ping\" ]; then",
-        "    printf '[Clawperator-Result] {\"commandId\":\"%s\",\"taskId\":\"doctor-handshake\",\"status\":\"success\",\"stepResults\":[{\"id\":\"h1\",\"actionType\":\"doctor_ping\",\"success\":true,\"data\":{\"developer_options_enabled\":\"true\",\"usb_debugging_enabled\":\"true\",\"screen_on\":\"true\",\"device_locked\":\"false\",\"user_unlocked\":\"true\"}}],\"error\":null}\\n' \"$command_id\"",
-        "    exit 0",
-        "  fi",
-        `  printf '[Clawperator-Result] {"commandId":"%s","taskId":"${taskId}","status":"success","stepResults":[{"id":"a1","actionType":"enter_text","success":true,"data":{}}],"error":null}\\n' "$command_id"`,
-        "  exit 0",
+        "  while :; do",
+        "    command_id=$(cat \"$LOGCAT_COMMAND_FILE\" 2>/dev/null)",
+        "    mode=$(cat \"$LOGCAT_MODE_FILE\" 2>/dev/null)",
+        "    stage=$(cat \"$LOGCAT_STAGE_FILE\" 2>/dev/null)",
+        "    if [ \"$mode\" = \"doctor_ping\" ] && [ \"$stage\" != \"doctor_done\" ] && [ -n \"$command_id\" ]; then",
+        "      printf '%s\\n' \"[Clawperator-Result] {\\\"commandId\\\":\\\"$command_id\\\",\\\"taskId\\\":\\\"doctor-handshake\\\",\\\"status\\\":\\\"success\\\",\\\"stepResults\\\":[{\\\"id\\\":\\\"h1\\\",\\\"actionType\\\":\\\"doctor_ping\\\",\\\"success\\\":true,\\\"data\\\":{\\\"developer_options_enabled\\\":\\\"true\\\",\\\"usb_debugging_enabled\\\":\\\"true\\\",\\\"screen_on\\\":\\\"true\\\",\\\"device_locked\\\":\\\"false\\\",\\\"user_unlocked\\\":\\\"true\\\"}}],\\\"error\\\":null}\"",
+        "      printf 'doctor_done\\n' > \"$LOGCAT_STAGE_FILE\"",
+        "    fi",
+        "    if [ \"$mode\" = \"execution\" ] && [ \"$stage\" = \"doctor_done\" ] && [ \"$command_id\" = \"cmd-cli-log\" ]; then",
+        `      printf '%s\\n' '[Clawperator-Result] {"commandId":"cmd-cli-log","taskId":"${taskId}","status":"success","stepResults":[{"id":"a1","actionType":"enter_text","success":true,"data":{}}],"error":null}'`,
+        "      exit 0",
+        "    fi",
+        "    sleep 0.05",
+        "  done",
         "fi",
         "if [ \"$1\" = \"shell\" ]; then",
         "  command_id=$(printf '%s' \"$2\" | sed -n 's/.*\"commandId\":\"\\([^\"]*\\)\".*/\\1/p')",
