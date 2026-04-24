@@ -44,7 +44,7 @@ If preflight fails before the agent starts, the harness still writes
 `config.json` and `result.json`. Those artifacts keep the generic
 `outcome.failure_reason` such as `doctor_preflight_failed`, and they also add a
 `preflight` block with structured doctor diagnostics when the failing step was
-`clawperator doctor --json`. Public-surface runs keep only the minimal
+`clawperator doctor`. Public-surface runs keep only the minimal
 `doctor_failure.code` and `doctor_failure.summary` in that block. Full-repo
 runs also keep the raw `doctor_report` so engineers can inspect the full doctor
 payload when the repo surface is already exposed.
@@ -143,7 +143,7 @@ Replay semantics:
 4. Validate the extracted skill structurally.
 5. Materialize the skill into a temp directory.
 6. Run `clawperator skills run <skill_id> --device <serial> --operator-package
-   <package> --skip-validate --json`.
+   <package> --skip-validate`.
 7. Score the replay against the original ground truth.
 8. Delete the temp materialization after replay.
 

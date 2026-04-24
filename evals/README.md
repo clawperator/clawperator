@@ -79,7 +79,7 @@ This eval encodes the cold-start proving policy in code. For every run it:
 4. opens SolaX and probes the current persisted discharge row
 5. force-stops SolaX again and re-proves outside-app state before the skill run
 6. chooses a configured target percent that differs from the observed value
-7. runs `clawperator skills run ... --output json`
+7. runs `clawperator skills run ...`
 8. classifies the run as cold-start proof, outside-app proof failure, skill timeout, or a
    specific failure mode
 

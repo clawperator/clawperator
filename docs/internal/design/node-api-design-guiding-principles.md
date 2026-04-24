@@ -85,7 +85,7 @@ Anti-pattern (removed - do not use): deprecated nested command families are not 
 Good (current):
 ```
 clawperator open com.android.settings
-clawperator snapshot --json
+clawperator snapshot
 clawperator click --text "Wi-Fi"
 ```
 
@@ -141,7 +141,8 @@ This avoids decision paralysis in docs while remaining forgiving in practice.
 - Document: `type`. Accept: `fill`.
 - Document: `press`. Accept: `press-key`.
 - Document: `--device`. Accept: `--device-id`.
-- Document: `--json`. Accept: `--output json`.
+- Document: JSON output as the default. Prefer `--output json` when explicit
+  JSON selection is needed. Accept `--format json` and `--json` as aliases.
 
 When adding a new command, choose the primary name by asking: which name would
 an agent try first? That is the primary. Any other reasonable name is a synonym.
@@ -178,7 +179,7 @@ Agents guess short, generic flags based on training data from other tools. Use
 the shortest unambiguous name.
 
 - `--device` not `--device-id`
-- `--json` not `--output json`
+- default JSON output first; `--output json` is the preferred explicit spelling
 - use the canonical timeout flag form only
 - `--operator-package` not `--operator-package` ("receiver" is an Android
   implementation detail; "operator" is Clawperator's own terminology)
@@ -251,13 +252,15 @@ the human-readable (pretty) and machine-readable (JSON) output formats are API
 surfaces.
 
 **Rules:**
-- `--json` output must be parseable by `JSON.parse()` with no surrounding text
-- `--json` output schema must be stable - adding fields is fine, removing or
-  renaming fields is a breaking change
+- Default output must be parseable by `JSON.parse()` with no surrounding text
+- Default JSON output schema must be stable - adding fields is fine, removing
+  or renaming fields is a breaking change
 - Pretty output should be scannable but is not a contract - agents should use
-  `--json` for programmatic consumption
-- Error output in `--json` mode must also be valid JSON with a consistent
+  default JSON for programmatic consumption
+- Error output in default JSON mode must also be valid JSON with a consistent
   error schema
+- `--output json` is the preferred explicit JSON form; `--format json` and
+  `--json` remain accepted aliases
 
 ### 10. Implementation Details Are Not API
 
@@ -293,7 +296,8 @@ Before merging any CLI or API change, verify:
       options, and an example?
 - [ ] **"Did you mean?":** if this command replaces or renames an old one, does
       the old name produce a helpful redirect error?
-- [ ] **JSON output:** is `--json` output valid JSON with a stable schema?
+- [ ] **JSON output:** is default output valid JSON with a stable schema, and
+      do `--output json`, `--format json`, and `--json` still work?
 - [ ] **No implementation leaks:** do all external names make sense to an agent
       that has never read the source?
 - [ ] **Deterministic:** does the command behave identically given identical

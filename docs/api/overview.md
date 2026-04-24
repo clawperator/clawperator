@@ -15,6 +15,22 @@ This page is intentionally narrow:
 - Use [Errors](errors.md) for exact error codes and recovery
 - Use [Devices](devices.md) for target selection rules
 
+## CLI Output Format
+
+CLI commands return JSON by default. Agents should parse stdout directly with
+`JSON.parse()` unless they intentionally requested `--output pretty` for a
+human-readable rendering.
+
+Accepted output-format forms:
+
+| Form | Behavior |
+| --- | --- |
+| no output flag | JSON output |
+| `--output json` | preferred explicit JSON output |
+| `--format json` | alias for `--output json` |
+| `--json` | alias for `--output json` |
+| `--output pretty` | pretty-printed human-readable output |
+
 ## Readiness Gate
 
 Before treating a target as ready for interactive automation, use
@@ -102,7 +118,7 @@ For action-type aliases and parameter aliases such as `package` -> `applicationI
 Verification pattern:
 
 ```bash
-clawperator exec --validate-only --payload '{"command_id":"cmd-001","task_id":"task-001","source":"docs","expected_format":"android-ui-automator","timeout_ms":30000,"actions":[{"id":"snap-1","type":"snapshot"}]}' --json
+clawperator exec --validate-only --payload '{"command_id":"cmd-001","task_id":"task-001","source":"docs","expected_format":"android-ui-automator","timeout_ms":30000,"actions":[{"id":"snap-1","type":"snapshot"}]}'
 ```
 
 Success condition:
@@ -298,7 +314,7 @@ Exact machine-checkable success condition for most CLI device commands:
 Command:
 
 ```bash
-clawperator snapshot --json --device <device_serial>
+clawperator snapshot --device <device_serial>
 ```
 
 Success output shape:

@@ -173,10 +173,10 @@ Start with the runtime-skill registry before touching the device.
 Use the shortest truthful path:
 
 ```bash
-clawperator skills for-app <package_id> --json
-clawperator skills search --keyword "<term>" --json
-clawperator skills get <skill_id> --json
-clawperator bundled-skills list --json
+clawperator skills for-app <package_id>
+clawperator skills search --keyword "<term>"
+clawperator skills get <skill_id>
+clawperator bundled-skills list
 ```
 
 Rules:
@@ -185,7 +185,7 @@ Rules:
 - Use `skills search --keyword` when you only know app or intent words.
 - Use `skills get` when you need to inspect a candidate runtime skill before
   deciding whether it is a true match or only a partial match.
-- Use `bundled-skills list --json` only after runtime-skill discovery fails
+- Use `bundled-skills list` only after runtime-skill discovery fails
   to find a clear match and you need to confirm the installed authoring front
   doors on the host.
 
@@ -197,12 +197,12 @@ request truthfully.
 Prefer this live-probe order:
 
 ```bash
-clawperator open <package_id> --device <device_serial> --operator-package <operator_package> --json
-clawperator snapshot --device <device_serial> --operator-package <operator_package> --json
-clawperator read --text "<visible label>" --device <device_serial> --operator-package <operator_package> --json
-clawperator read-value --label "<visible label>" --device <device_serial> --operator-package <operator_package> --json
-clawperator scroll-until --text "<target>" --device <device_serial> --operator-package <operator_package> --json
-clawperator screenshot --device <device_serial> --operator-package <operator_package> --path <file> --json
+clawperator open <package_id> --device <device_serial> --operator-package <operator_package>
+clawperator snapshot --device <device_serial> --operator-package <operator_package>
+clawperator read --text "<visible label>" --device <device_serial> --operator-package <operator_package>
+clawperator read-value --label "<visible label>" --device <device_serial> --operator-package <operator_package>
+clawperator scroll-until --text "<target>" --device <device_serial> --operator-package <operator_package>
+clawperator screenshot --device <device_serial> --operator-package <operator_package> --path <file>
 ```
 
 Use snapshots as the primary probe. Add screenshots only when a visual affordance,
@@ -271,8 +271,8 @@ probe still leaves the route uncertain, a truthful artifact can look like:
   "existing_skill_verdict": {
     "status": "none",
     "queried_registry_paths": [
-      "clawperator skills search --keyword \"Netflix\" --json",
-      "clawperator bundled-skills list --json"
+      "clawperator skills search --keyword \"Netflix\"",
+      "clawperator bundled-skills list"
     ]
   },
   "target_app_package": {

@@ -21,7 +21,7 @@ What this page does mean:
 
 - there is no currently maintained, code-backed list of known issues in `apps/node/src/`
 - common operational failures are documented under exact error-code pages such as [Operator App](operator.md) and [Version Compatibility](compatibility.md)
-- agents should use live checks like `doctor --json`, `version --check-compat --json`, and command-specific error payloads instead of assuming a hidden issue catalog exists
+- agents should use live checks like `doctor`, `version --check-compat`, and command-specific error payloads instead of assuming a hidden issue catalog exists
 
 What this page does not mean:
 
@@ -34,9 +34,9 @@ What this page does not mean:
 When you suspect a current issue, verify it with a reproducible command and its exact JSON output:
 
 ```bash
-clawperator doctor --json --device <device_serial> --operator-package <package>
-clawperator version --check-compat --json --device <device_serial> --operator-package <package>
-clawperator snapshot --json --device <device_serial> --operator-package <package>
+clawperator doctor --device <device_serial> --operator-package <package>
+clawperator version --check-compat --device <device_serial> --operator-package <package>
+clawperator snapshot --device <device_serial> --operator-package <package>
 ```
 
 Use those outputs to decide where the issue belongs:
@@ -68,12 +68,12 @@ When investigating issues:
 1. **Check versions first** - Many issues are version mismatches:
    ```bash
    clawperator version
-   clawperator version --check-compat --json --device <device_serial> --operator-package <package>
+   clawperator version --check-compat --device <device_serial> --operator-package <package>
    ```
 
 2. **Run doctor** for a comprehensive health check:
    ```bash
-   clawperator doctor --json --device <device_serial> --operator-package <package>
+   clawperator doctor --device <device_serial> --operator-package <package>
    ```
 
 3. **Stream logs** to see what is happening in real time:

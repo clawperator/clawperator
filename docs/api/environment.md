@@ -60,7 +60,7 @@ Example:
 
 ```bash
 export CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev
-clawperator snapshot --json --device emulator-5554
+clawperator snapshot --device emulator-5554
 ```
 
 That snapshot runs against the debug Operator package. No `--operator-package` flag needed.
@@ -68,7 +68,7 @@ That snapshot runs against the debug Operator package. No `--operator-package` f
 Verification - confirm the env var took effect:
 
 ```bash
-clawperator doctor --json --device emulator-5554
+clawperator doctor --device emulator-5554
 ```
 
 Check `report.operatorPackage` in the JSON output:
@@ -88,7 +88,7 @@ If `operatorPackage` shows the value you set, the env var is active.
 Error case:
 
 - if the env var names a package that is not installed, device-targeting commands fail with `OPERATOR_NOT_INSTALLED`
-- if only the alternate known Operator variant is installed, `clawperator doctor --json` reports `OPERATOR_VARIANT_MISMATCH` as a readiness warning
+- if only the alternate known Operator variant is installed, `clawperator doctor` reports `OPERATOR_VARIANT_MISMATCH` as a readiness warning
 
 Note: the CLI also accepts `--receiver-package` as a legacy alias for `--operator-package`. Both override the same env var. Do not use `--receiver-package` in new code.
 
@@ -119,7 +119,7 @@ Example:
 
 ```bash
 export CLAWPERATOR_LOG_DIR=/tmp/clawperator-logs
-clawperator snapshot --json
+clawperator snapshot
 # logs written to /tmp/clawperator-logs/clawperator-2026-03-25.log
 ```
 
@@ -140,7 +140,7 @@ If set to an unrecognized value (e.g., `trace`, `verbose`, or an empty string), 
 ```bash
 # env var sets warn, but flag overrides to debug
 export CLAWPERATOR_LOG_LEVEL=warn
-clawperator snapshot --json --log-level debug
+clawperator snapshot --log-level debug
 # logger threshold is debug for this command
 ```
 
@@ -170,7 +170,7 @@ Fallback behavior after that initial choice:
 After `clawperator skills install` or `clawperator skills sync`, the registry lives at `~/.clawperator/skills/skills/skills-registry.json`. That path is automatically discovered as a fallback when `CLAWPERATOR_SKILLS_REGISTRY` is not set, so no env var change is needed after a normal install:
 
 ```bash
-clawperator skills list --json
+clawperator skills list
 ```
 
 Set `CLAWPERATOR_SKILLS_REGISTRY` only when pointing at a non-standard registry path, such as a development checkout outside the installed home. For the normal post-install flow, start with [Host Agent Orientation](../host-agents.md).
@@ -245,7 +245,7 @@ Verification:
 CLAWPERATOR_SKILLS_REGISTRY=/abs/path/to/skills/skills-registry.json \
 node apps/node/dist/cli/index.js skills run com.test.agent-skill-result \
   --device emulator-5554 \
-  --json -- valid
+  -- valid
 ```
 
 Check the parsed `skillResult.source` and the successful JSON envelope. The
@@ -284,7 +284,7 @@ Example:
 
 ```bash
 export ADB_PATH=/opt/android/platform-tools/adb
-clawperator devices --json
+clawperator devices
 ```
 
 Error case: if the path does not point to a working adb binary, `clawperator doctor` reports `ADB_NOT_FOUND` for the `host.adb.presence` check.
@@ -292,7 +292,7 @@ Error case: if the path does not point to a working adb binary, `clawperator doc
 Verification:
 
 ```bash
-clawperator doctor --json
+clawperator doctor
 ```
 
 If `host.adb.presence` passes, the configured adb binary is usable.
@@ -331,8 +331,8 @@ export ADB_PATH=/usr/local/bin/adb
 Then every command uses consistent defaults:
 
 ```bash
-clawperator doctor --json --device emulator-5554
-clawperator snapshot --json --device emulator-5554
+clawperator doctor --device emulator-5554
+clawperator snapshot --device emulator-5554
 clawperator skills run com.test.echo --device emulator-5554
 ```
 

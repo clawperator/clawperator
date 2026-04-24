@@ -987,7 +987,7 @@ describe("buildTimeoutError", () => {
 
     assert.match(error.hint ?? "", /No correlated Android log lines were captured/);
     assert.match(error.hint ?? "", /APK\/CLI version mismatch/);
-    assert.match(error.hint ?? "", /clawperator doctor --json --device emulator-5554 --operator-package com\.clawperator\.operator\.dev/);
+    assert.match(error.hint ?? "", /clawperator doctor --device emulator-5554 --operator-package com\.clawperator\.operator\.dev/);
   });
 
   it("does not add a version hint when broadcast dispatch failed", () => {
@@ -1023,7 +1023,7 @@ describe("buildTimeoutError", () => {
 
     assert.strictEqual(
       hint,
-      "No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --json' to diagnose."
+      "No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor' to diagnose."
     );
   });
 
@@ -1082,7 +1082,7 @@ describe("buildTimeoutError", () => {
     }
     assert.strictEqual(event.deviceId, "device-123");
     assert.match(event.envelope.hint ?? "", /No correlated Android log lines were captured/);
-    assert.match(event.envelope.hint ?? "", /clawperator doctor --json --device device-123 --operator-package com\.test\.operator\.dev/);
+    assert.match(event.envelope.hint ?? "", /clawperator doctor --device device-123 --operator-package com\.test\.operator\.dev/);
   });
 
   it("does not emit the timeout hint when correlated log lines were captured", async () => {

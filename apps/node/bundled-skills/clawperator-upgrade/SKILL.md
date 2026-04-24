@@ -21,11 +21,11 @@ logic inside the skill body.
 - run the CLI-first upgrade sequence when the CLI is reachable and the host prerequisites are already viable:
   - `npm install -g clawperator@latest`
   - `clawperator install`
-  - `clawperator doctor --json`
+  - `clawperator doctor`
 - use `curl -fsSL https://clawperator.com/install.sh | bash` as recovery when `clawperator --version` is not reachable or the bootstrap prerequisites are not already satisfied
-- verify the resulting install with `clawperator doctor --json`
+- verify the resulting install with `clawperator doctor`
 - when multiple devices are connected, verify each connected device with
-  `clawperator doctor --json --device <device_id>` before claiming the whole
+  `clawperator doctor --device <device_id>` before claiming the whole
   host is ready
 - report whether the host is ready, or which existing repair route is still
   blocking readiness
@@ -37,7 +37,7 @@ logic inside the skill body.
 - do not make `install.sh` the primary path
 - do not skip the `clawperator --version` reachability check
 - do not use the CLI-first upgrade sequence when Node or Java still needs to be repaired by the installer
-- do not invent a second upgrade-health checker beyond `clawperator doctor --json`
+- do not invent a second upgrade-health checker beyond `clawperator doctor`
 - do not add or imply a top-level `clawperator upgrade` command
 - do not restate all setup or repair docs from memory
 - do not turn passive diagnosis into an implicit upgrade
@@ -100,7 +100,7 @@ When `clawperator --version` succeeds and the host prerequisites are already via
 ```bash
 npm install -g clawperator@latest
 clawperator install
-clawperator doctor --json
+clawperator doctor
 ```
 
 Rules:
@@ -108,13 +108,13 @@ Rules:
 - use `clawperator install` as the CLI-owned post-bootstrap route
 - do not re-implement multi-device policy, runtime-skills install, bundled-skills install, or host-artifact sequencing inside the skill
 - use the structured CLI results rather than guessing about state
-- keep `clawperator doctor --json` as the readiness check after the sequence
+- keep `clawperator doctor` as the readiness check after the sequence
 - if the install result has `deviceSelectionRequired: true`, collect the
   connected `deviceId` values from `steps.operatorRemediation.devices` and run
-  `clawperator doctor --json --device <device_id>` for each connected device
-- if `clawperator doctor --json` returns `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`,
+  `clawperator doctor --device <device_id>` for each connected device
+- if `clawperator doctor` returns `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`,
   run `clawperator devices` or use the install result's device list, then run
-  `clawperator doctor --json --device <device_id>` for each connected device
+  `clawperator doctor --device <device_id>` for each connected device
 - treat a warning-only multi-device doctor result as ready only after every
   per-device doctor check exits `0` and reports `criticalOk: true`
 - if `npm install -g clawperator@latest` fails, fall back to the recovery installer and re-check reachability before continuing
@@ -151,8 +151,8 @@ After a successful upgrade:
 
 - if the host is unfamiliar, suggest `clawperator-agent-orientation`
 - if the goal is runtime-skill discovery, suggest
-  `clawperator skills for-app <package_id> --json` or
-  `clawperator skills search --keyword <text> --json`
+  `clawperator skills for-app <package_id>` or
+  `clawperator skills search --keyword <text>`
 - if the user explicitly needs repair after doctor failure, point at the
   existing setup or repair guidance instead of widening scope
 

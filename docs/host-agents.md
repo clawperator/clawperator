@@ -26,7 +26,7 @@ Read this page after [Setup](setup.md) succeeds.
 Machine-checkable prerequisite:
 
 ```bash
-clawperator doctor --json
+clawperator doctor
 ```
 
 Continue only when:
@@ -65,12 +65,12 @@ Use this order:
 | Situation | Start here | Why |
 | --- | --- | --- |
 | You are unfamiliar with this host and want the packaged first-run orientation surface | `clawperator-agent-orientation` | Thin packaged router that points back to this page and the canonical docs. |
-| The user or calling workflow explicitly chose a whole-product refresh before you trust any downstream route | `clawperator-upgrade` | Checks `clawperator --version`, verifies Node 24+ and Java 17/21, then uses `npm install -g clawperator@latest`, `clawperator install`, and `clawperator doctor --json`. Uses `install.sh` only when the CLI is not reachable or the bootstrap prerequisites need repair. |
-| You know the Android package id and want the fastest answer to "what can this host do for this app?" | `clawperator skills for-app <package_id> --json` | `skills for-app` is the primary app-oriented discovery surface. |
-| You only know user-language terms such as app name or intent | `clawperator skills search --keyword <text> --json` | Search is the fallback when you do not have the package id yet. |
-| You already have a skill id and want the exact metadata | `clawperator skills get <skill_id> --json` | Confirms the registry entry before a run. |
-| You want to execute a skill through the wrapper | `clawperator skills run <skill_id> ... --json` | Uses the runtime-skill wrapper and its validation gate. |
-| Runtime-skill discovery returned no relevant match and you need the zero-results authoring route | `clawperator bundled-skills list --json` | Bundled skills are separate from runtime skills. Start with `clawperator-skill-author-by-agent-discovery`, then use `clawperator-skill-author-by-recording` only after discovery returns `proceed_to_recording`, or when the route is already well understood. |
+| The user or calling workflow explicitly chose a whole-product refresh before you trust any downstream route | `clawperator-upgrade` | Checks `clawperator --version`, verifies Node 24+ and Java 17/21, then uses `npm install -g clawperator@latest`, `clawperator install`, and `clawperator doctor`. Uses `install.sh` only when the CLI is not reachable or the bootstrap prerequisites need repair. |
+| You know the Android package id and want the fastest answer to "what can this host do for this app?" | `clawperator skills for-app <package_id>` | `skills for-app` is the primary app-oriented discovery surface. |
+| You only know user-language terms such as app name or intent | `clawperator skills search --keyword <text>` | Search is the fallback when you do not have the package id yet. |
+| You already have a skill id and want the exact metadata | `clawperator skills get <skill_id>` | Confirms the registry entry before a run. |
+| You want to execute a skill through the wrapper | `clawperator skills run <skill_id> ...` | Uses the runtime-skill wrapper and its validation gate. |
+| Runtime-skill discovery returned no relevant match and you need the zero-results authoring route | `clawperator bundled-skills list` | Bundled skills are separate from runtime skills. Start with `clawperator-skill-author-by-agent-discovery`, then use `clawperator-skill-author-by-recording` only after discovery returns `proceed_to_recording`, or when the route is already well understood. |
 | Your host already supports stdio MCP and wants registered tools such as `devices`, `snapshot`, `execute`, and `configure` | `clawperator mcp serve` | MCP is the transport surface for long-running tool registration. |
 | You already know the exact action payload you want to send | [Quickstart](quickstart.md) | Quickstart covers the observe / decide / act loop directly. |
 
@@ -79,10 +79,10 @@ Use this order:
 Use the shortest successful path first:
 
 ```bash
-clawperator skills for-app <package_id> --json
-clawperator skills search --keyword <text> --json
-clawperator skills get <skill_id> --json
-clawperator skills run <skill_id> --json
+clawperator skills for-app <package_id>
+clawperator skills search --keyword <text>
+clawperator skills get <skill_id>
+clawperator skills run <skill_id>
 ```
 
 Decision rules:
@@ -95,7 +95,7 @@ Decision rules:
   app-oriented discovery.
 - If discovery returns zero relevant matches and the next job is skill creation
   rather than raw execution, inspect installed bundled skills with
-  `clawperator bundled-skills list --json`, start with
+  `clawperator bundled-skills list`, start with
   `clawperator-skill-author-by-agent-discovery`, and continue to
   [Authoring](skills/authoring.md).
 
@@ -106,7 +106,7 @@ relevant installed match.
 
 | Situation | Next surface | Expected outcome |
 | --- | --- | --- |
-| No relevant runtime skill match and the next job is choosing the truthful route | `clawperator bundled-skills list --json` | Confirm the installed bundled-skill front doors on this host. |
+| No relevant runtime skill match and the next job is choosing the truthful route | `clawperator bundled-skills list` | Confirm the installed bundled-skill front doors on this host. |
 | You need the bounded zero-results front door | `clawperator-skill-author-by-agent-discovery` | Produce one discovery artifact and choose exactly one next step. |
 | Discovery returns `proceed_to_recording`, or the route is already well understood | `clawperator-skill-author-by-recording` | Run the proving workflow from a fresh recording and one self-test. |
 | You explicitly want the low-level manual scaffold instead of the installed guided workflows | `clawperator skills new <skill_id>` | Create a local scaffold only. |
@@ -137,7 +137,7 @@ Use this sequence:
 1. Confirm the registry is readable:
 
 ```bash
-clawperator skills list --json
+clawperator skills list
 ```
 
 2. If registry discovery still fails, check the installed home path written by
@@ -165,7 +165,7 @@ clawperator mcp serve
    request, inspect the installed authoring-workflow helpers:
 
 ```bash
-clawperator bundled-skills list --json
+clawperator bundled-skills list
 ```
 
 Then continue to [Authoring](skills/authoring.md), start with
@@ -183,7 +183,7 @@ These files help a host orient after install:
 | `~/.clawperator/install-state.json` | Durable install metadata written by `clawperator host setup` | Check `registryPath`, `cliVersion`, and `lastDeviceSerial` without rerunning install. |
 | `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config written by `clawperator host setup` | Use it when you choose the MCP route. |
 | `~/.clawperator/skills/skills/skills-registry.json` | Installed runtime-skills registry | Verify it exists when `skills list` or `skills for-app` cannot discover skills. |
-| `~/.clawperator/bundled-skills/` | Installed first-party bundled skills | Inspect it through `clawperator bundled-skills list --json` when runtime discovery returns no relevant match. |
+| `~/.clawperator/bundled-skills/` | Installed first-party bundled skills | Inspect it through `clawperator bundled-skills list` when runtime discovery returns no relevant match. |
 
 ## Verification
 
@@ -193,11 +193,11 @@ Use these commands to confirm the intended surface is working:
 clawperator --help
 clawperator skills --help
 clawperator bundled-skills --help
-clawperator skills for-app com.android.settings --json
-clawperator skills search --keyword settings --json
-clawperator skills get com.android.settings.capture-overview --json
-clawperator skills list --json
-clawperator bundled-skills list --json
+clawperator skills for-app com.android.settings
+clawperator skills search --keyword settings
+clawperator skills get com.android.settings.capture-overview
+clawperator skills list
+clawperator bundled-skills list
 ```
 
 Check:

@@ -63,7 +63,7 @@ run_action() {
     --device "$DEVICE_ID" \
     --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" \
     --execution "$payload" \
-    --output json 2>&1
+    2>&1
 }
 
 # ---------------------------------------------------------------------------

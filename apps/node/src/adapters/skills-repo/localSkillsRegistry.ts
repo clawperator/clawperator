@@ -121,7 +121,7 @@ export async function loadRegistry(registryPath?: string): Promise<LoadRegistryR
       throw new Error(
         `Registry not found at configured path: ${path}. ` +
         `The installed registry normally lives at ${installedHomeRegistryPath}. ` +
-        "Fix CLAWPERATOR_SKILLS_REGISTRY, unset it to use the installed copy, then rerun clawperator skills list --json, or run clawperator skills install."
+        "Fix CLAWPERATOR_SKILLS_REGISTRY, unset it to use the installed copy, then rerun clawperator skills list, or run clawperator skills install."
       );
     }
 
@@ -155,12 +155,12 @@ export async function loadRegistry(registryPath?: string): Promise<LoadRegistryR
         process.stderr.write(
           "Warning: CLAWPERATOR_SKILLS_REGISTRY is not set. " +
           `Clawperator also checked the installed registry at ${installedHomeRegistryPath}. ` +
-          "Verify that file, then rerun 'clawperator skills list --json', or run 'clawperator skills install'.\n"
+          "Verify that file, then rerun 'clawperator skills list', or run 'clawperator skills install'.\n"
         );
         throw new Error(
           `Registry not found. Checked: ${[path, ...candidates].join(", ")}. ` +
           `The installed registry normally lives at ${installedHomeRegistryPath}. ` +
-          "Verify that path, then rerun clawperator skills list --json, or run clawperator skills install."
+          "Verify that path, then rerun clawperator skills list, or run clawperator skills install."
         );
       }
 
@@ -168,14 +168,14 @@ export async function loadRegistry(registryPath?: string): Promise<LoadRegistryR
         throw new Error(
           `Registry not found. Checked: ${[path, ...candidates].join(", ")}. ` +
           `The installed registry normally lives at ${installedHomeRegistryPath}. ` +
-          "Verify that path, then rerun clawperator skills list --json, or run clawperator skills install."
+          "Verify that path, then rerun clawperator skills list, or run clawperator skills install."
         );
       }
 
       throw new Error(
         `Registry not found: ${path}. ` +
         `The installed registry normally lives at ${installedHomeRegistryPath}. ` +
-        "Verify that path, then rerun clawperator skills list --json, or run clawperator skills install."
+        "Verify that path, then rerun clawperator skills list, or run clawperator skills install."
       );
     }
   }

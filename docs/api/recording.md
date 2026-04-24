@@ -82,14 +82,14 @@ Notes:
 - `recording compare` defaults to `--mode auto`
 - if `recording export --input` points at a file and `--out` is omitted, the output path is `<input without .ndjson>.export.json` when the input ends with `.ndjson`, otherwise `<input>.export.json`
 - if `recording export --input` points at a directory, the command picks the newest `*.ndjson` file in that directory and derives the default export path from that resolved file
-- `recording compare` reads a saved `clawperator skills run --json` wrapper file and extracts its top-level `skillResult`
+- `recording compare` reads a saved `clawperator skills run` JSON wrapper file and extracts its top-level `skillResult`
 - for authored skills, the durable retained baseline for compare should live under a reference-style path such as `skills/<skill_id>/references/compare-baseline.export.json`
 - that retained baseline is authoring and maintenance evidence, not a runtime artifact consumed by `skills run`
 - a common authoring workflow is:
   1. `recording stop`
   2. `recording pull --out <dir>`
   3. `recording export --input <same dir>`
-  4. `skills run <skill_id> --json > <run>.skills-run.json`
+  4. `skills run <skill_id> > <run>.skills-run.json`
   5. copy the retained export to `skills/<skill_id>/references/compare-baseline.export.json`
   6. `recording compare --baseline skills/<skill_id>/references/compare-baseline.export.json --result <run>.skills-run.json`
 
@@ -100,7 +100,7 @@ Recommended pre-recording reset:
 - do not rely on the user manually swiping apps away unless the workflow makes
   that explicit
 - for a single app reset, prefer the flat CLI:
-  `clawperator close --app <application_id> --device <device_id> --operator-package <operator_package> --json`
+  `clawperator close --app <application_id> --device <device_id> --operator-package <operator_package>`
 - for multiple app resets, use a small `clawperator exec` with one or more
   `close_app` actions before you start recording
 - the underlying API action is `close_app`, which Node executes as an adb
@@ -155,7 +155,7 @@ Exact builder literals:
 Verification:
 
 ```bash
-clawperator record start --session-id demo-session --device <device_serial> --json
+clawperator record start --session-id demo-session --device <device_serial>
 ```
 
 Expected success wrapper shape:
@@ -218,7 +218,7 @@ Exact builder literals:
 Verification:
 
 ```bash
-clawperator record stop --session-id demo-session --device <device_serial> --json
+clawperator record stop --session-id demo-session --device <device_serial>
 ```
 
 Expected success wrapper shape:
@@ -265,7 +265,7 @@ Exact default:
 Verification:
 
 ```bash
-clawperator record pull --session-id demo-session --device <device_serial> --json
+clawperator record pull --session-id demo-session --device <device_serial>
 ```
 
 Check:
@@ -301,7 +301,7 @@ Exact default output-file rule from `cmdRecordParse()`:
 Verification:
 
 ```bash
-clawperator record parse --input ./recordings/demo-session.ndjson --json
+clawperator record parse --input ./recordings/demo-session.ndjson
 ```
 
 Check:
@@ -364,7 +364,7 @@ Success wrapper shape:
 Verification:
 
 ```bash
-clawperator recording export --input ./recordings/export-demo.ndjson --json
+clawperator recording export --input ./recordings/export-demo.ndjson
 ```
 
 Check:
@@ -445,7 +445,7 @@ clawperator record compare --baseline <export.json> --result <skills-run.json> [
 What the command does:
 
 - reads a recording export artifact from `--baseline`
-- reads a saved `clawperator skills run --json` wrapper from `--result`
+- reads a saved `clawperator skills run` JSON wrapper from `--result`
 - extracts the wrapper's top-level `skillResult`
 - normalizes the export into a checkpoint baseline
 - compares that baseline against `skillResult.checkpoints` plus `skillResult.terminalVerification`
@@ -515,7 +515,7 @@ Exit-code contract:
 
 Result-wrapper requirement:
 
-- `--result` must be a saved `skills run --json` wrapper object
+- `--result` must be a saved `skills run` JSON wrapper object
 - v1 compare does not accept a bare `SkillResult` document
 - the wrapper must contain a top-level non-null `skillResult`
 - when you want durable compare evidence, save the full wrapper and keep it as the compare input rather than copying only the embedded `skillResult`
@@ -593,8 +593,7 @@ Verification:
 ```bash
 clawperator recording compare \
   --baseline ./skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/references/compare-baseline.export.json \
-  --result ./runs/demo.skills-run.json \
-  --json
+  --result ./runs/demo.skills-run.json
 ```
 
 Check:
@@ -824,7 +823,7 @@ Current normalization rules in `parseRecording.ts`:
 Verification:
 
 ```bash
-clawperator record parse --input ./recordings/demo-session.ndjson --json
+clawperator record parse --input ./recordings/demo-session.ndjson
 ```
 
 Then open the written `.steps.json` file and confirm:
@@ -932,13 +931,13 @@ Typical failure shape:
   "message": "Recording is already in progress",
   "sessionId": "record-123",
   "filePath": "/storage/emulated/0/Android/data/com.clawperator.operator.dev/files/recordings/record-123.ndjson",
-  "hint": "Run 'clawperator recording stop --session-id record-123 --device <device_serial> --operator-package <package> --json' before starting a new recording."
+  "hint": "Run 'clawperator recording stop --session-id record-123 --device <device_serial> --operator-package <package>' before starting a new recording."
 }
 ```
 
 Recovery:
 
-- run `clawperator recording stop --session-id <active_session_id> --device <device_serial> --operator-package <package> --json`
+- run `clawperator recording stop --session-id <active_session_id> --device <device_serial> --operator-package <package>`
 - then pull or parse the finished session before starting a new one
 - if your workflow uses explicit session ids, reuse the active session id instead of starting a second overlapping recording
 - use the `sessionId` and `filePath` fields in the error payload to target the exact session that is still active
@@ -947,8 +946,8 @@ Recovery:
 Verification pattern:
 
 ```bash
-clawperator record stop --device <device_serial> --json
-clawperator record pull --device <device_serial> --json
+clawperator record stop --device <device_serial>
+clawperator record pull --device <device_serial>
 ```
 
 ### `RECORDING_NOT_IN_PROGRESS`
@@ -974,8 +973,8 @@ Recovery:
 Verification pattern:
 
 ```bash
-clawperator record start --session-id demo-session --device <device_serial> --json
-clawperator record stop --session-id demo-session --device <device_serial> --json
+clawperator record start --session-id demo-session --device <device_serial>
+clawperator record stop --session-id demo-session --device <device_serial>
 ```
 
 ### `RECORDING_PULL_FAILED`
@@ -997,7 +996,7 @@ Typical failure shape:
 
 Recovery:
 
-- confirm the device is still visible in `clawperator devices --json`
+- confirm the device is still visible in `clawperator devices`
 - rerun `clawperator record stop --session-id <id>` if the session may still be open
 - retry `record pull` with the exact `--session-id` you just stopped
 - if adb itself is failing, fix the transport problem before retrying
@@ -1005,8 +1004,8 @@ Recovery:
 Verification pattern:
 
 ```bash
-clawperator devices --json
-clawperator record pull --session-id demo-session --device <device_serial> --json
+clawperator devices
+clawperator record pull --session-id demo-session --device <device_serial>
 ```
 
 ## Runtime Step Errors Outside The Public Node Error Enum

@@ -367,7 +367,7 @@ Notes:
   - Shows the absolute SKILL.md path for each installed bundled skill
   - Use this when you need to inspect the installed host-agent helpers on this machine
   - 'clawperator-agent-orientation' is the first-run orientation skill for unfamiliar hosts
-  - 'clawperator-upgrade' is the whole-product upgrade route that checks clawperator --version, verifies Node 24+ and Java 17/21, then uses npm install -g clawperator@latest, clawperator install, and clawperator doctor --json when the CLI is already viable
+  - 'clawperator-upgrade' is the whole-product upgrade route that checks clawperator --version, verifies Node 24+ and Java 17/21, then uses npm install -g clawperator@latest, clawperator install, and clawperator doctor when the CLI is already viable
   - 'clawperator-skill-author-by-agent-discovery' is the zero-results front door
   - 'clawperator-skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'
   - Runtime skills still live under 'clawperator skills ...'; bundled skills are separate host-agent helpers
@@ -435,7 +435,7 @@ Usage:
 
 Options:
   --baseline <export.json>       Recording export JSON used as the compare baseline
-  --result <skills-run.json>     Saved clawperator skills run --json wrapper file
+  --result <skills-run.json>     Saved clawperator skills run JSON wrapper file
   --mode <auto|literal|semantic> Compare mode override (default: auto)
 
 Notes:
@@ -482,7 +482,7 @@ Notes:
 const HELP_SKILLS_RUN = `clawperator skills run
 
 Usage:
-  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]
+  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [skill_args...]
 
 Notes:
   - Prefer 'clawperator skills for-app', 'clawperator skills search', and 'clawperator skills get' before 'clawperator skills run' when you are still discovering the correct skill.
@@ -490,7 +490,7 @@ Notes:
   - Use --device explicitly when more than one Android device is connected.
   - --operator-package sets the Operator package for this skill run (default: com.clawperator.operator).
     Use com.clawperator.operator.dev for local debug APKs. --receiver-package is a legacy alias (see global options).
-  - --json is canonical for JSON output here too (--output json and --format json are accepted; see global options).
+  - Output defaults to JSON. Use --output json when you want to request JSON explicitly. --format json is also accepted.
   - --timeout overrides the wrapper timeout for this run only (--timeout-ms is accepted as an alias).
   - --expect-contains turns the run into a lightweight output assertion.
   - If the assertion text is missing, the wrapper fails with SKILL_OUTPUT_ASSERTION_FAILED.
@@ -546,11 +546,11 @@ Notes:
 const HELP_SNAPSHOT = `clawperator snapshot — Get current Android UI hierarchy as XML
 
 Usage:
-  clawperator snapshot [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator snapshot [--device <id>] [--operator-package <pkg>]
 
 Options:
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait for snapshot (default: 30000ms)
-  --json                 Output as JSON
 
 Also accepted as: --device-id
 
@@ -559,24 +559,24 @@ Notes:
 
 Examples:
   clawperator snapshot
-  clawperator snapshot --device <device_serial> --json
+  clawperator snapshot --device <device_serial>
 `;
 
 const HELP_SCREENSHOT = `clawperator screenshot — Capture device screen
 
 Usage:
-  clawperator screenshot [--path <file>] [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator screenshot [--path <file>] [--device <id>] [--operator-package <pkg>]
 
 Options:
   --path <file>          Save PNG to file path (if omitted, output is base64)
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait (default: 30000ms)
-  --json                 Output as JSON
 
 Also accepted as: --device-id, --file
 
 Examples:
   clawperator screenshot --path /tmp/screen.png
-  clawperator screenshot --device <device_serial> --json
+  clawperator screenshot --device <device_serial>
 `;
 
 const HELP_CLICK = `clawperator click — Tap a UI element by selector or coordinates
@@ -595,8 +595,8 @@ Selector flags (choose one):
   --selector <json>      Click using advanced NodeMatcher JSON
 
 Options:
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait for element (default: 10000)
-  --json                 Output as JSON
   --long                 Perform a long press (clickType: long_click)
   --focus                Set input focus without clicking (clickType: focus)
 
@@ -619,8 +619,8 @@ Target types:
 
 Options:
   --app <target>         Alternative to positional target argument
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait
-  --json                 Output as JSON
 
 Also accepted as: --device-id, open-app, open_app, open-uri, open-url, open_uri, open_url, --package, --package-id, --application-id, --app-id, --url, --uri
 
@@ -645,10 +645,10 @@ Selector flags (choose one):
   --selector <json>      Raw NodeMatcher JSON
 
 Options:
+  --output <json|pretty> Output format (default: json)
   --submit               Press Enter after typing
   --clear                Clear existing text before typing
   --timeout <ms>         Max time to wait for element
-  --json                 Output as JSON
 
 Also accepted as: --device-id, fill, enter-text, enter_text, --resource-id, --content-desc, --content-desc-contains
 
@@ -660,8 +660,8 @@ Examples:
 const HELP_READ_VALUE = `clawperator read-value — Read value associated with a labeled element
 
 Usage:
-  clawperator read-value --label "Battery" [--json]
-  clawperator read-value --label-id "battery_label" [--json]
+  clawperator read-value --label "Battery"
+  clawperator read-value --label-id "battery_label"
 
 Label selector flags (choose one):
   --label <string>       Match label by exact visible text
@@ -669,15 +669,15 @@ Label selector flags (choose one):
   --label-desc <string>  Match label by exact content description
 
 Options:
-  --all                  Return all matches as a JSON array (JSON output mode only)
+  --all                  Return all matches as a JSON array (not compatible with --output pretty)
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait
-  --json                 Output as JSON
 
 Also accepted as: --device-id, read-kv, read-key-value-pair, read_key_value_pair, --text, --label-text, --id, --resource-id, --desc, --content-desc
 
 Examples:
-  clawperator read-value --label "Battery" --json
-  clawperator read-value --label "Wi-Fi" --all --json
+  clawperator read-value --label "Battery"
+  clawperator read-value --label "Wi-Fi" --all
 `;
 
 const HELP_READ = `clawperator read — Read text content from a UI element
@@ -694,9 +694,9 @@ Selector flags (choose one):
   --selector <json>      Match using advanced NodeMatcher JSON
 
 Options:
-  --all                  Return all matches as a JSON array (JSON output mode only)
+  --all                  Return all matches as a JSON array (not compatible with --output pretty)
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait for element
-  --json                 Output as JSON
 
 Container selector flags (all optional):
   --container-text <text>           Container with exact visible text
@@ -712,17 +712,17 @@ Also accepted as: --device-id, read-text, read_text, --resource-id, --content-de
 Examples:
   clawperator read --id "com.example:id/battery_level"
   clawperator read --text "Battery"
-  clawperator read --text "Price" --all --json
+  clawperator read --text "Price" --all
 `;
 
 const HELP_WAIT = `clawperator wait
 
 Usage:
-  clawperator wait --text <text> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator wait --id <resource-id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator wait --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator wait --desc <text> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator wait --selector '<json>' [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator wait --text <text> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
+  clawperator wait --id <resource-id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
+  clawperator wait --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
+  clawperator wait --desc <text> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
+  clawperator wait --selector '<json>' [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
 
 Selector flags (at least one required; combine for AND matching):
   --text <text>           Exact visible text
@@ -764,8 +764,8 @@ Required (choose one or both):
   ... (and other selector flags like --desc, --role)
 
 Options:
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Required. Maximum time to wait (1-30000ms)
-  --json                 Output as JSON
 
 Also accepted as: --device-id, wait-for-navigation, wait_for_navigation, --package, --package-id, --application-id, --app-id, --resource-id, --content-desc, --content-desc-contains
 
@@ -786,8 +786,8 @@ Valid keys:
 
 Options:
   --key <name>           System key to press (alias for positional arg)
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait
-  --json                 Output as JSON
 
 Also accepted as: --device-id, press-key, press_key, --button
 
@@ -799,11 +799,11 @@ Examples:
 const HELP_BACK = `clawperator back — Navigate to the previous screen
 
 Usage:
-  clawperator back [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator back [--device <id>] [--operator-package <pkg>]
 
 Options:
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait
-  --json                 Output as JSON
 
 Also accepted as: --device-id
 
@@ -814,8 +814,8 @@ Examples:
 const HELP_CLOSE = `clawperator close
 
 Usage:
-  clawperator close <package> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator close --app <package> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator close <package> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
+  clawperator close --app <package> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
 
 Required:
   <package>             Android application package ID (e.g., com.android.settings)
@@ -834,14 +834,14 @@ Also accepted as:
 
 Examples:
   clawperator close com.android.settings
-  clawperator close com.google.android.apps.chromecast.app --json
+  clawperator close com.google.android.apps.chromecast.app
   clawperator close-app com.android.settings
 `;
 
 const HELP_SLEEP = `clawperator sleep
 
 Usage:
-  clawperator sleep <ms> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator sleep <ms> [--device <id>] [--operator-package <pkg>]
 
 Required:
   <ms>                    Duration in milliseconds (non-negative)
@@ -854,14 +854,14 @@ Notes:
 
 Examples:
   clawperator sleep 2000
-  clawperator sleep 500 --json
+  clawperator sleep 500
   clawperator sleep 0
 `;
 
 const HELP_SCROLL = `clawperator scroll — Scroll the screen in a given direction
 
 Usage:
-  clawperator scroll down [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator scroll down [--device <id>] [--operator-package <pkg>]
   clawperator scroll up --container-id "list" [--device <id>] [--operator-package <pkg>]
 
 Valid directions:
@@ -874,8 +874,8 @@ Container selector flags (optional, restrict scroll to specific container):
 
 Options:
   --direction <dir>      Direction to scroll (alias for positional arg)
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait (default: 30000ms)
-  --json                 Output as JSON
 
 Also accepted as: --device-id, --container-resource-id, --container-content-desc, --container-content-desc-contains
 
@@ -887,8 +887,8 @@ Examples:
 const HELP_SCROLL_UNTIL = `clawperator scroll-until
 
 Usage:
-  clawperator scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator scroll-until [<direction>] --id <resource-id> [--click] [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
+  clawperator scroll-until [<direction>] --id <resource-id> [--click] [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
 
 Valid directions:
   down, up, left, right (default: down)
@@ -920,7 +920,7 @@ Notes:
   - Without --click, the action type is scroll_until (scroll until element is visible).
   - With --click, the action type is scroll_and_click (scroll until visible, then click).
   - scroll_and_click uses different defaults than raw scroll_until (see agent guide); use exec JSON if you need scroll_until + clickAfter.
-  - If a selector is provided but the target never appears, the step fails (data.error TARGET_NOT_FOUND) and --json exits non-zero.
+  - If a selector is provided but the target never appears, the step fails (data.error TARGET_NOT_FOUND) and JSON output exits non-zero.
   - Tuning parameters (maxScrolls, maxDurationMs, etc.) are not exposed as CLI flags.
     Use 'clawperator exec' with raw JSON for advanced tuning.
 
@@ -1368,7 +1368,7 @@ COMMANDS["snapshot"] = {
   supportedFlags: [],
   summary: "Get current Android UI hierarchy as XML",
   help: HELP_SNAPSHOT,
-  topLevelBlock: `  snapshot [--device <id>] [--operator-package <pkg>] [--json]            Get current Android UI hierarchy as XML`,
+  topLevelBlock: `  snapshot [--device <id>] [--operator-package <pkg>]                     Get current Android UI hierarchy as XML`,
   handler: async (ctx) => {
     const { format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
@@ -1391,7 +1391,7 @@ COMMANDS["screenshot"] = {
   supportedFlags: ["--path"],
   summary: "Capture a screenshot from the device",
   help: HELP_SCREENSHOT,
-  topLevelBlock: `  screenshot [--device <id>] [--operator-package <pkg>] [--path <file>] [--json]
+  topLevelBlock: `  screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]
                                             Capture a screenshot from the device`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
@@ -1417,7 +1417,7 @@ COMMANDS["click"] = {
   supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--coordinate", "--long", "--focus"],
   summary: "Tap the first matching UI element",
   help: HELP_CLICK,
-  topLevelBlock: `  click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]
                                             Tap the first matching UI element`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
@@ -1517,7 +1517,7 @@ COMMANDS["open"] = {
   supportedFlags: ["--app"],
   summary: "Open an app, URL, or URI on the device",
   help: HELP_OPEN,
-  topLevelBlock: `  open <package-id|url|uri> [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]
                                             Open an app, URL, or URI on the device`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
@@ -1568,7 +1568,7 @@ COMMANDS["type"] = {
   supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--submit", "--clear"],
   summary: "Type text into the first matching UI element",
   help: HELP_TYPE,
-  topLevelBlock: `  type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]
                                             Type text into the first matching UI element`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
@@ -1630,7 +1630,7 @@ COMMANDS["read"] = {
   supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--all", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Read text from the first matching UI element",
   help: HELP_READ,
-  topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]
                                             Read text from the first matching UI element`,
   handler: async (ctx) => {
     const { rest, format, explicitJsonOutput, logger, deviceId, operatorPackage } = ctx;
@@ -1671,7 +1671,7 @@ COMMANDS["wait"] = {
   supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector"],
   summary: "Wait until a matching UI element appears",
   help: HELP_WAIT,
-  topLevelBlock: `  wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  topLevelBlock: `  wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
                                             Wait until a matching UI element appears`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
@@ -1713,7 +1713,7 @@ COMMANDS["press"] = {
   supportedFlags: ["--key"],
   summary: "Press a hardware key on the device",
   help: HELP_PRESS,
-  topLevelBlock: `  press <back|home|recents> [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  press <back|home|recents> [--device <id>] [--operator-package <pkg>]
                                             Press a hardware key on the device`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
@@ -1752,7 +1752,7 @@ COMMANDS["back"] = {
   supportedFlags: [],
   summary: "Press the Android back key",
   help: HELP_BACK,
-  topLevelBlock: `  back [--device <id>] [--operator-package <pkg>] [--json]               Press the Android back key`,
+  topLevelBlock: `  back [--device <id>] [--operator-package <pkg>]                        Press the Android back key`,
   handler: async (ctx) => {
     const { format, logger, deviceId, operatorPackage } = ctx;
     return (await import("./commands/action.js")).cmdActionPressKey({
@@ -1787,7 +1787,7 @@ const closeHandler = async (ctx: HandlerContext): Promise<string | void> => {
     return JSON.stringify({
       code: "MISSING_ARGUMENT",
       message:
-        "close requires a package name.\n\nUsage:\n  clawperator close <package>\n  clawperator close --app <package>\n\nExamples:\n  clawperator close com.android.settings\n  clawperator close com.google.android.apps.chromecast.app --json",
+        "close requires a package name.\n\nUsage:\n  clawperator close <package>\n  clawperator close --app <package>\n\nExamples:\n  clawperator close com.android.settings\n  clawperator close com.google.android.apps.chromecast.app",
     });
   }
   return (await import("./commands/action.js")).cmdCloseApp({
@@ -1808,7 +1808,7 @@ COMMANDS["close"] = {
   supportedFlags: ["--app"],
   summary: "Force-stop an Android application",
   help: HELP_CLOSE,
-  topLevelBlock: `  close <package> [--device <id>] [--operator-package <pkg>] [--json]    Force-stop an Android application`,
+  topLevelBlock: `  close <package> [--device <id>] [--operator-package <pkg>]             Force-stop an Android application`,
   handler: async (ctx) => closeHandler(ctx),
 };
 
@@ -1818,7 +1818,7 @@ COMMANDS["sleep"] = {
   supportedFlags: [],
   summary: "Pause execution for a duration",
   help: HELP_SLEEP,
-  topLevelBlock: `  sleep <ms> [--device <id>] [--operator-package <pkg>] [--json]         Pause execution for a duration`,
+  topLevelBlock: `  sleep <ms> [--device <id>] [--operator-package <pkg>]                  Pause execution for a duration`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
 
@@ -1879,7 +1879,7 @@ COMMANDS["scroll"] = {
   supportedFlags: ["--direction", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Scroll the screen in a direction",
   help: HELP_SCROLL,
-  topLevelBlock: `  scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]
                                             Scroll the screen in a direction`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
@@ -2009,7 +2009,7 @@ COMMANDS["scroll-until"] = {
   supportedFlags: ["--click", "--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Scroll until a target element is visible",
   help: HELP_SCROLL_UNTIL,
-  topLevelBlock: `  scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]
                                             Scroll until a target element is visible (optionally click it)`,
   handler: async (ctx) => scrollUntilHandler(ctx, false),
 };
@@ -2022,7 +2022,7 @@ COMMANDS["scroll-and-click"] = {
   supportedFlags: ["--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Scroll until target is visible, then click it (alias for scroll-until --click)",
   help: HELP_SCROLL_UNTIL,
-  topLevelBlock: `  scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]
                                             Scroll until target is visible, then click it`,
   handler: async (ctx) => scrollUntilHandler(ctx, true),
 };
@@ -2036,7 +2036,7 @@ COMMANDS["wait-for-nav"] = {
   supportedFlags: ["--app", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--validate-only", "--dry-run"],
   summary: "Wait for app or screen navigation to complete",
   help: HELP_WAIT_FOR_NAV,
-  topLevelBlock: `  wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]
                                             Wait for app or screen navigation to complete`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs: navTimeoutMs } = ctx;
@@ -2140,7 +2140,7 @@ COMMANDS["read-value"] = {
   supportedFlags: ["--label", "--label-id", "--label-desc", "--all", "--validate-only", "--dry-run"],
   summary: "Read the value associated with a labeled element",
   help: HELP_READ_VALUE,
-  topLevelBlock: `  read-value --label <text> [--json]         Read the value associated with a labeled element`,
+  topLevelBlock: `  read-value --label <text>                  Read the value associated with a labeled element`,
   handler: async (ctx) => {
     const { rest, format, explicitJsonOutput, logger, deviceId, operatorPackage, timeoutMs } = ctx;
 
@@ -2198,7 +2198,7 @@ COMMANDS["read-value"] = {
       return formatError(
         {
           code: ERROR_CODES.MISSING_ARGUMENT,
-          message: "read-value requires a label selector.\n\nUsage:\n  clawperator read-value --label <text> --json\n\nExample:\n  clawperator read-value --label \"Battery\" --json",
+          message: "read-value requires a label selector.\n\nUsage:\n  clawperator read-value --label <text>\n\nExample:\n  clawperator read-value --label \"Battery\"",
         },
         { format },
       );
@@ -2257,7 +2257,7 @@ Usage:
   clawperator skills new <skill_id> [--summary <text>] [--recording-context <file>]
   clawperator skills validate <skill_id> [--dry-run]
   clawperator skills validate --all [--dry-run]
-  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]
+  clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [skill_args...]
   clawperator skills install
   clawperator skills update [--ref <git-ref>]
   clawperator skills sync --ref <git-ref>
@@ -2267,7 +2267,7 @@ Notes:
   - Use 'clawperator skills search --keyword <text>' when you only have app names or user-language intent terms.
   - Use 'clawperator skills get <skill_id>' before 'clawperator skills run <skill_id>' when discovery already returned an id.
   - If the current host is unfamiliar, inspect 'clawperator bundled-skills list' and start with 'clawperator-agent-orientation' before choosing runtime skills, MCP, or raw CLI actions.
-  - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator bundled-skills list' and use 'clawperator-upgrade' before trying component-level repair commands. clawperator-upgrade checks clawperator --version, verifies Node 24+ and Java 17/21, then uses npm install -g clawperator@latest, clawperator install, and clawperator doctor --json when the CLI is already viable.
+  - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator bundled-skills list' and use 'clawperator-upgrade' before trying component-level repair commands. clawperator-upgrade checks clawperator --version, verifies Node 24+ and Java 17/21, then uses npm install -g clawperator@latest, clawperator install, and clawperator doctor when the CLI is already viable.
   - If runtime-skill discovery returns no relevant match and you need guided skill creation help, use 'clawperator bundled-skills list' and start with 'clawperator-skill-author-by-agent-discovery'.
   - Use 'clawperator-skill-author-by-recording' after discovery returns 'proceed_to_recording', or when the route is already well understood and you need the proving workflow.
   - If your host already supports stdio MCP and wants registered tools instead of runtime-skill discovery, use 'clawperator mcp serve'.
@@ -2298,7 +2298,7 @@ Notes:
   skills validate <skill_id> [--dry-run]
   skills validate --all [--dry-run]
                                             Validate one local skill or the entire configured registry
-  skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]
+  skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [skill_args...]
                                             Run a discovered skill through the local wrapper
   skills install
                                             Clone skills repository to ~/.clawperator/skills/
@@ -2372,7 +2372,7 @@ Notes:
         return JSON.stringify({
           code: "USAGE",
           message:
-            "skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]",
+            "skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [skill_args...]",
         });
       } else {
         const scriptArgs: string[] = [];
@@ -2458,7 +2458,7 @@ COMMANDS["bundled-skills"] = {
   name: "bundled-skills",
   group: "Execution",
   summary: "Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes",
-  supportedFlags: ["--version", "--json", "--output", "--format", "--help"],
+  supportedFlags: ["--version", "--output", "--format", "--json", "--help"],
   help: `clawperator bundled-skills
 
 Usage:
@@ -2469,7 +2469,7 @@ Usage:
 Notes:
   - Use 'clawperator bundled-skills list' to inspect the installed host-agent workflows on this machine.
   - 'clawperator-agent-orientation' is the first-run orientation skill when the current host is unfamiliar.
-  - 'clawperator-upgrade' is the packaged whole-product upgrade route: check clawperator --version, verify Node 24+ and Java 17/21, then use npm install -g clawperator@latest, clawperator install, and clawperator doctor --json. Use install.sh only when the CLI is not reachable or the bootstrap prerequisites need repair.
+  - 'clawperator-upgrade' is the packaged whole-product upgrade route: check clawperator --version, verify Node 24+ and Java 17/21, then use npm install -g clawperator@latest, clawperator install, and clawperator doctor. Use install.sh only when the CLI is not reachable or the bootstrap prerequisites need repair.
   - 'clawperator-skill-author-by-agent-discovery' is the zero-results front door when runtime-skill discovery found no relevant match.
   - 'clawperator-skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'.
   - Runtime skills still live under 'clawperator skills ...'; bundled skills are separate host-agent helpers.
@@ -2694,8 +2694,8 @@ COMMANDS["doctor"] = {
   supportedFlags: ["--fix", "--full", "--check-only"],
   summary: "Run environment and runtime checks",
   help: HELP_DOCTOR,
-  topLevelBlock: `  doctor [--json]
-                                            Run environment and runtime checks (Stage 3). --json/--format json is alias for --output json.
+  topLevelBlock: `  doctor
+                                            Run environment and runtime checks (Stage 3). Use --output json for explicit JSON; --format json is also accepted.
   doctor --fix
                                             Attempt non-destructive host fixes (Stage 3)
   doctor --full
@@ -2909,8 +2909,8 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "Global options:",
     "  --device <id>                           Target Android device serial (Also accepted as: --device-id)",
     "  --operator-package <package>            Target Operator package for broadcast dispatch (Also accepted as: --receiver-package)",
-    "  --json                                  JSON output shorthand (same as --output json)",
     "  --output <json|pretty>                  Output format (default: json)",
+    "  --json                                  Alias for --output json",
     "  --log-level <debug|info|warn|error>     Persistent log level (default: info)",
     "  --timeout <n>                           Override execution timeout (Also accepted as: --timeout-ms)",
     "  --verbose                               Include debug diagnostics in output",
@@ -2921,7 +2921,7 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "  - Machine-readable docs for agents: https://docs.clawperator.com/llms.txt (index) and https://docs.clawperator.com/llms-full.txt (complete docs).",
     "  - Post-install host-agent orientation: https://docs.clawperator.com/host-agents/",
     "  - If the current host is unfamiliar, inspect 'clawperator bundled-skills list' and start with 'clawperator-agent-orientation' before choosing runtime skills, MCP, or raw CLI actions.",
-    "  - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator bundled-skills list' and use 'clawperator-upgrade' before trying component-level repair commands. clawperator-upgrade checks clawperator --version, verifies Node 24+ and Java 17/21, then uses npm install -g clawperator@latest, clawperator install, and clawperator doctor --json when the CLI is already viable.",
+    "  - If this installed Clawperator environment needs a whole-product refresh, inspect 'clawperator bundled-skills list' and use 'clawperator-upgrade' before trying component-level repair commands. clawperator-upgrade checks clawperator --version, verifies Node 24+ and Java 17/21, then uses npm install -g clawperator@latest, clawperator install, and clawperator doctor when the CLI is already viable.",
     "  - Start runtime-skill discovery with 'clawperator skills for-app <package_id>' when you know the Android package, or 'clawperator skills search --keyword <text>' when you do not.",
     "  - If runtime-skill discovery returns no relevant match and you need guided authoring help, use 'clawperator bundled-skills list' and start with 'clawperator-skill-author-by-agent-discovery'.",
     "  - Use 'clawperator-skill-author-by-recording' only after discovery returns 'proceed_to_recording', or when the app route is already well understood and you need the proving workflow.",

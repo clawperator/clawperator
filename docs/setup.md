@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Get from an empty host to a first successful `clawperator snapshot --json` with one deterministic path and machine-checkable success conditions.
+Get from an empty host to a first successful `clawperator snapshot` with one deterministic path and machine-checkable success conditions.
 
 ## Prerequisites
 
@@ -106,7 +106,7 @@ Verification:
 
 ```bash
 ls ~/.clawperator/AGENTS.md ~/.clawperator/install-state.json ~/.clawperator/mcp-config-snippet.json
-clawperator skills list --json
+clawperator skills list
 test ! -f ~/.agents/AGENTS.md || grep -F "CLAWPERATOR_SHARED_AGENT_BRIDGE:START" ~/.agents/AGENTS.md
 ```
 
@@ -197,7 +197,7 @@ Behavior:
 Success condition:
 
 - Command exits without a structured error object.
-- A follow-up `clawperator doctor --json` no longer reports `OPERATOR_NOT_INSTALLED` for `readiness.apk.presence`.
+- A follow-up `clawperator doctor` no longer reports `OPERATOR_NOT_INSTALLED` for `readiness.apk.presence`.
 
 Do not use raw `adb install` for setup. The CLI setup command is the only path that performs install, permission grant, and verification as one operation.
 
@@ -211,18 +211,18 @@ Use this only after the Operator APK crashes or Android revokes accessibility / 
 
 If you force-stop the Operator package during debugging and the next handshake
 or snapshot stops working, use this same recovery step before trusting the
-runtime again, then re-run `clawperator doctor --json`.
+runtime again, then re-run `clawperator doctor`.
 
 ## 5. Verify readiness with doctor
 
 ```bash
-clawperator doctor --json
+clawperator doctor
 ```
 
 With explicit targeting:
 
 ```bash
-clawperator doctor --json --device <device_serial>
+clawperator doctor --device <device_serial>
 ```
 
 ### Doctor checks
@@ -297,13 +297,13 @@ See [Doctor](api/doctor.md) for the full report contract and [Errors](api/errors
 ## 6. Run the first command
 
 ```bash
-clawperator snapshot --json
+clawperator snapshot
 ```
 
 With explicit targeting:
 
 ```bash
-clawperator snapshot --json --device <device_serial>
+clawperator snapshot --device <device_serial>
 ```
 
 Success conditions:
@@ -324,17 +324,17 @@ Clawperator is the hand. The agent is the brain. The agent decides what to do, t
 
 ### Programmatic first-run sequence
 
-1. Run `clawperator doctor --json [--device <serial>] [--operator-package <pkg>]`.
+1. Run `clawperator doctor [--device <serial>] [--operator-package <pkg>]`.
 2. If `readiness.apk.presence` fails, run `clawperator operator setup --apk <path> ...`.
 3. If `readiness.handshake` fails after a known-good install, run `clawperator grant-device-permissions ...`.
-4. For multiple failures, `clawperator doctor --json --fix ...` auto-executes shell remediation steps.
-5. Re-run `clawperator doctor --json ...` and require `criticalOk: true`.
-6. Run `clawperator snapshot --json ...`.
+4. For multiple failures, `clawperator doctor --fix ...` auto-executes shell remediation steps.
+5. Re-run `clawperator doctor ...` and require `criticalOk: true`.
+6. Run `clawperator snapshot ...`.
 7. Branch only on structured fields: `criticalOk`, `checks[].code`, `envelope.status`, `envelope.errorCode`, `stepResults[].success`.
 
 ### How to confirm success without a human
 
-- Treat `doctor --json` as ready only when `criticalOk` is `true`.
+- Treat `doctor` as ready only when `criticalOk` is `true`.
 - Treat a device command as successful only when `envelope.status` is `"success"` and every `stepResults[].success` is `true`.
 - Prefer exact codes over message matching. Examples: `NO_DEVICES`, `OPERATOR_NOT_INSTALLED`, `RESULT_ENVELOPE_TIMEOUT`.
 
@@ -368,7 +368,7 @@ If setup fails, use `clawperator logs` to inspect what happened:
 clawperator logs
 
 # Run the failing command in another terminal
-clawperator doctor --json --device <device_serial> --operator-package <package>
+clawperator doctor --device <device_serial> --operator-package <package>
 ```
 
 Log file location: `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`

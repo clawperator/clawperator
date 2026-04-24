@@ -129,11 +129,11 @@ Notes:
 | Family | Typical codes | What to do next |
 | --- | --- | --- |
 | Device targeting | `NO_DEVICES`, `DEVICE_NOT_FOUND`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Run `clawperator devices`, pick one device, and retry with `--device <serial>` |
-| Interactive readiness | `DEVICE_NOT_INTERACTIVE` | Wake or unlock the target, rerun `clawperator doctor --json`, and confirm the interactive-state check passes |
+| Interactive readiness | `DEVICE_NOT_INTERACTIVE` | Wake or unlock the target, rerun `clawperator doctor`, and confirm the interactive-state check passes |
 | Operator setup | `OPERATOR_NOT_INSTALLED`, `OPERATOR_VARIANT_MISMATCH`, `OPERATOR_INSTALL_FAILED`, `OPERATOR_GRANT_FAILED`, `OPERATOR_VERIFY_FAILED` | Install or repair the expected Operator APK, then rerun the command |
 | Host tooling | `ADB_NOT_FOUND`, `ADB_SERVER_FAILED`, `HOST_DEPENDENCY_MISSING`, `ANDROID_SDK_TOOL_MISSING`, `SCRCPY_NOT_FOUND` | Repair the host environment before retrying |
 | Payload or flag validation | `MISSING_ARGUMENT`, `EXECUTION_VALIDATION_FAILED`, `EXECUTION_ACTION_UNSUPPORTED`, `PAYLOAD_TOO_LARGE` | Change the command or payload. Do not retry unchanged |
-| Dispatch or service availability | `RESULT_ENVELOPE_TIMEOUT`, `RESULT_ENVELOPE_MALFORMED`, `BROADCAST_FAILED`, `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `DEVICE_SHELL_UNAVAILABLE` | Run `clawperator doctor --json`, repair the reported issue, then retry |
+| Dispatch or service availability | `RESULT_ENVELOPE_TIMEOUT`, `RESULT_ENVELOPE_MALFORMED`, `BROADCAST_FAILED`, `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `DEVICE_SHELL_UNAVAILABLE` | Run `clawperator doctor`, repair the reported issue, then retry |
 | UI lookup or gesture | `NODE_NOT_FOUND`, `NODE_NOT_CLICKABLE`, `CONTAINER_NOT_FOUND`, `CONTAINER_NOT_SCROLLABLE`, `GESTURE_FAILED`, `SECURITY_BLOCK_DETECTED` | Refresh state with `snapshot`, wait for UI readiness, or adjust selectors and scroll strategy |
 | Recording state | `RECORDING_ALREADY_IN_PROGRESS`, `RECORDING_NOT_IN_PROGRESS`, `RECORDING_SESSION_NOT_FOUND`, `RECORDING_PULL_FAILED`, `RECORDING_PARSE_FAILED`, `RECORDING_SCHEMA_VERSION_UNSUPPORTED` | Repair recording state or use the right session before retrying |
 
@@ -213,13 +213,13 @@ Typical fields:
     "elapsedMs": 30000,
     "timeoutMs": 30000
   },
-  "hint": "No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --json --device emulator-5554 --operator-package com.clawperator.operator.dev' to diagnose."
+  "hint": "No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --device emulator-5554 --operator-package com.clawperator.operator.dev' to diagnose."
 }
 ```
 
 Recovery:
 
-- run `clawperator doctor --json`
+- run `clawperator doctor`
 - if `hint` mentions no correlated Android log lines, treat it as a compatibility or accessibility diagnostic path rather than a generic retry
 - confirm the accessibility service and operator package are healthy
 - increase timeout only if the action legitimately needs more wall-clock time
@@ -276,7 +276,7 @@ Typical recovery:
 - wake the device if `screenOn == false`
 - unlock the device if `deviceLocked == true`
 - complete the post-boot unlock if `userUnlocked == false`
-- rerun `clawperator doctor --json` and require
+- rerun `clawperator doctor` and require
   `readiness.device.interactive.status == "pass"`
 
 ### `NODE_NOT_FOUND`
@@ -292,7 +292,7 @@ Common triggers:
 
 Recovery:
 
-- run `snapshot` or `read --json` to inspect current UI state
+- run `snapshot` or `read` to inspect current UI state
 - add `wait` or `sleep` before the failing action when appropriate
 - tighten or loosen the selector based on what the snapshot actually shows
 - add a container selector or a scroll step if the target is off-screen

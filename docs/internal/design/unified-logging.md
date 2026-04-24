@@ -277,7 +277,7 @@ The unified logging system has comprehensive unit tests covering:
 
 1. **Level gating**: Events filtered by threshold
 2. **Routing rules**: Correct destinations for each event category
-3. **JSON mode cleanliness**: No terminal output when `--json` is active
+3. **JSON mode cleanliness**: No terminal output when JSON output mode is active
 4. **Fail-open behavior**: Single warning, then disabled logging
 5. **Child loggers**: Context inheritance and isolation
 6. **File rotation**: Daily path changes at midnight boundary

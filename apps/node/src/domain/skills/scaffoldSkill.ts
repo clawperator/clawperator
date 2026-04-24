@@ -270,7 +270,6 @@ try {
       operatorPackage,
       "--execution",
       JSON.stringify(execution),
-      "--json",
     ],
     {
       encoding: "utf8",

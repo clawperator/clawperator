@@ -205,14 +205,14 @@ Use Clawperator to close each target app explicitly.
 For one target app, prefer the flat CLI:
 
 ```bash
-clawperator close --app <target_application_id> --device <device_serial> --operator-package <operator_package> --json
+clawperator close --app <target_application_id> --device <device_serial> --operator-package <operator_package>
 ```
 
 For multiple target apps, use one `clawperator exec` with `close_app` actions.
 A typical shape is:
 
 ```bash
-clawperator exec --device <device_serial> --operator-package <operator_package> --execution '{"commandId":"skill-author-reset-<timestamp>","taskId":"clawperator-skill-author-by-recording","source":"clawperator-skill-author-by-recording","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"close_target","type":"close_app","params":{"applicationId":"<target_application_id>"}}]}' --json
+clawperator exec --device <device_serial> --operator-package <operator_package> --execution '{"commandId":"skill-author-reset-<timestamp>","taskId":"clawperator-skill-author-by-recording","source":"clawperator-skill-author-by-recording","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"close_target","type":"close_app","params":{"applicationId":"<target_application_id>"}}]}'
 ```
 
 If more than one target app matters to the flow, close each of them before you
@@ -235,7 +235,7 @@ Use the selected device and operator package explicitly. Show the concrete
 command before or while running it.
 
 ```bash
-clawperator recording start --session-id <session_id> --device <device_serial> --operator-package <operator_package> --json
+clawperator recording start --session-id <session_id> --device <device_serial> --operator-package <operator_package>
 ```
 
 Then tell the human clearly that recording is active and it is their turn to
@@ -251,10 +251,10 @@ happened. When they say the flow is complete, continue.
 Run the full recording lifecycle in order and surface the resulting paths:
 
 ```bash
-clawperator recording stop --session-id <session_id> --device <device_serial> --operator-package <operator_package> --json
+clawperator recording stop --session-id <session_id> --device <device_serial> --operator-package <operator_package>
 mkdir -p ~/.clawperator/recordings/<session_id>
-clawperator recording pull --session-id <session_id> --device <device_serial> --operator-package <operator_package> --out ~/.clawperator/recordings/<session_id> --json
-clawperator recording export --input ~/.clawperator/recordings/<session_id> --out ~/.clawperator/recordings/<session_id>/<session_id>.export.json --snapshots omit --json
+clawperator recording pull --session-id <session_id> --device <device_serial> --operator-package <operator_package> --out ~/.clawperator/recordings/<session_id>
+clawperator recording export --input ~/.clawperator/recordings/<session_id> --out ~/.clawperator/recordings/<session_id>/<session_id>.export.json --snapshots omit
 ```
 
 Retain the pulled NDJSON as the raw capture.
@@ -367,7 +367,7 @@ Create the runtime skill in the skills repo with recording context copied from
 the export artifact:
 
 ```bash
-clawperator skills new <skill_id> --recording-context <export_json> --json
+clawperator skills new <skill_id> --recording-context <export_json>
 ```
 
 This copies the export to `skills/<skill_id>/recording-context.json`.
@@ -424,7 +424,7 @@ For orchestrated:
   - `agent-stderr.log`
   - `run-metadata.json` with device id, operator package, forwarded args, and
     output paths
-- save the outer `clawperator skills run --json` wrapper and stderr capture
+- save the outer `clawperator skills run` wrapper and stderr capture
   alongside that harness bundle under `~/.clawperator/recordings/<session_id>/`
 - do not bury app-specific navigation or verification policy in the harness
 - on the first repair pass, harden the runtime prompt against the failure class
@@ -473,7 +473,7 @@ Run exactly one first self-test invocation of the authored skill and save the
 full JSON wrapper plus stderr:
 
 ```bash
-clawperator skills run <skill_id> --device <device_serial> --operator-package <operator_package> --json > ~/.clawperator/recordings/<session_id>/<skill_id>.skills-run.json 2> ~/.clawperator/recordings/<session_id>/<skill_id>.skills-run.stderr.log
+clawperator skills run <skill_id> --device <device_serial> --operator-package <operator_package> > ~/.clawperator/recordings/<session_id>/<skill_id>.skills-run.json 2> ~/.clawperator/recordings/<session_id>/<skill_id>.skills-run.stderr.log
 ```
 
 If the skill takes inputs, pass the minimum truthful input set required for one
@@ -518,7 +518,7 @@ Do not:
 If the authored shape is orchestrated, require the self-test run to preserve
 the per-run debug bundle from the harness. At minimum retain:
 
-- the saved `skills run --json` wrapper
+- the saved `skills run` wrapper
 - the saved `skills run` stderr log
 - `prompt.txt`
 - `agent-stdout.log`
@@ -546,12 +546,12 @@ If the run fails or ends in an unexpected UI state, capture one immediate
 device snapshot for post-mortem inspection and surface its path:
 
 ```bash
-clawperator snapshot --device <device_serial> --operator-package <operator_package> --json
+clawperator snapshot --device <device_serial> --operator-package <operator_package>
 ```
 
 ### 14. Surface The `SkillResult`
 
-Inspect the saved `skills run --json` wrapper and surface the top-level
+Inspect the saved `skills run` wrapper and surface the top-level
 `skillResult`.
 
 Call out at least:
@@ -625,7 +625,7 @@ A complete pass should leave the developer with:
 
 - one authored runtime skill shape
 - one retained compare baseline
-- one saved `skills run --json` wrapper from the self-test
+- one saved `skills run` wrapper from the self-test
 - one saved `skills run` stderr log from the self-test
 - for orchestrated runs, one local debug bundle with prompt, agent stdout,
   agent stderr, and metadata

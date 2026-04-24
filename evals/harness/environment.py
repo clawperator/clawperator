@@ -266,7 +266,10 @@ def preflight(
         raise EnvironmentError("adb_not_found")
 
     doctor_env = _minimal_env(device_serial=inputs.device_serial, operator_package=inputs.operator_package)
-    doctor_result = _run([*inputs.clawperator_cmd, "doctor", "--json", "--device", inputs.device_serial], env=doctor_env)
+    doctor_result = _run(
+        [*inputs.clawperator_cmd, "doctor", "--device", inputs.device_serial],
+        env=doctor_env,
+    )
     if doctor_result.returncode != 0:
         _raise_environment_error(
             "doctor_preflight_failed",

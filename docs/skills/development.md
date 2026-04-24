@@ -66,8 +66,8 @@ Success response:
 Verification pattern:
 
 ```bash
-clawperator skills new com.example.app.do-thing --summary "Do one deterministic workflow" --json
-clawperator skills get com.example.app.do-thing --json
+clawperator skills new com.example.app.do-thing --summary "Do one deterministic workflow"
+clawperator skills get com.example.app.do-thing
 ```
 
 Confirm:
@@ -192,8 +192,8 @@ All-skills success response:
 Verification pattern:
 
 ```bash
-clawperator skills validate com.example.app.do-thing --dry-run --json
-clawperator skills validate --all --dry-run --json
+clawperator skills validate com.example.app.do-thing --dry-run
+clawperator skills validate --all --dry-run
 ```
 
 Check:
@@ -249,7 +249,7 @@ Common validation failures:
 Use explicit device targeting when more than one device is connected:
 
 ```bash
-clawperator skills run com.example.app.do-thing --device <device_serial> --operator-package com.clawperator.operator.dev --timeout 90000 --json
+clawperator skills run com.example.app.do-thing --device <device_serial> --operator-package com.clawperator.operator.dev --timeout 90000
 ```
 
 Argument rules:
@@ -275,7 +275,7 @@ Exact wrapper rules to keep in mind:
 Verification pattern:
 
 ```bash
-clawperator skills run com.example.app.do-thing --device <device_serial> --operator-package com.clawperator.operator.dev --timeout 90000 --json
+clawperator skills run com.example.app.do-thing --device <device_serial> --operator-package com.clawperator.operator.dev --timeout 90000
 ```
 
 First-time agent pitfall:
@@ -368,7 +368,7 @@ Assertion failure shape:
 Verification pattern:
 
 ```bash
-clawperator skills run com.example.app.do-thing --device <device_serial> --expect-contains RESULT --json
+clawperator skills run com.example.app.do-thing --device <device_serial> --expect-contains RESULT
 ```
 
 Check that:
@@ -477,7 +477,7 @@ Behavior:
 
 Exact success shapes:
 
-`skills install --json`:
+`skills install`:
 
 ```json
 {
@@ -487,7 +487,7 @@ Exact success shapes:
 }
 ```
 
-`skills update --json` and `skills sync --ref <git-ref> --json`:
+`skills update` and `skills sync --ref <git-ref>`:
 
 ```json
 {
@@ -499,16 +499,16 @@ Exact success shapes:
 Verification pattern:
 
 ```bash
-clawperator skills install --json
-clawperator skills update --json
-clawperator skills sync --ref main --json
+clawperator skills install
+clawperator skills update
+clawperator skills sync --ref main
 ```
 
 Check:
 
 - `synced` is `true`
 - `registryPath` from `skills install` ends with `~/.clawperator/skills/skills/skills-registry.json`
-- after install, `clawperator skills list --json` succeeds in a fresh shell without exporting `CLAWPERATOR_SKILLS_REGISTRY`
+- after install, `clawperator skills list` succeeds in a fresh shell without exporting `CLAWPERATOR_SKILLS_REGISTRY`
 - set `CLAWPERATOR_SKILLS_REGISTRY` only when pointing at a non-standard registry path
 
 Common sync failures:
@@ -618,8 +618,8 @@ Fix:
 ```bash
 clawperator skills new com.example.app.do-thing --summary "Describe it"
 clawperator skills validate com.example.app.do-thing --dry-run
-clawperator skills run com.example.app.do-thing --device <device_serial> --operator-package com.clawperator.operator.dev --json
-clawperator skills run com.example.app.do-thing --device <device_serial> --expect-contains RESULT --json
+clawperator skills run com.example.app.do-thing --device <device_serial> --operator-package com.clawperator.operator.dev
+clawperator skills run com.example.app.do-thing --device <device_serial> --expect-contains RESULT
 ```
 
 Repeat until:

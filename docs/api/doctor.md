@@ -15,7 +15,7 @@ Define the `clawperator doctor` report contract, the exact check sequence, criti
 ## Command
 
 ```bash
-clawperator doctor [--json] [--device <serial>] [--operator-package <pkg>] [--fix] [--full] [--check-only]
+clawperator doctor [--device <serial>] [--operator-package <pkg>] [--fix] [--full] [--check-only]
 ```
 
 Flags:
@@ -27,7 +27,8 @@ Flags:
 | `--fix` | flag | executes shell-type remediation steps during finalization |
 | `--full` | flag | adds Java/build/install/launch/smoke checks |
 | `--check-only` | flag | forces exit code `0` regardless of failures |
-| `--json` | flag | returns the full `DoctorReport` JSON object |
+| `--output` | `json`, `pretty` | selects the output renderer; use `--output json` when you want to request JSON explicitly |
+| `--format` | `json`, `pretty` | alias for `--output` |
 
 Defaults:
 
@@ -35,6 +36,8 @@ Defaults:
 - without `--device`, doctor tries discovery first and may auto-resolve one connected device
 - without `--full`, doctor skips Java/build/install/launch/smoke checks
 - without `--fix`, doctor reports remediation steps but does not run them
+- output defaults to the full `DoctorReport` JSON object
+- use `--output json` when you want to request JSON explicitly
 
 ## `DoctorReport` Contract
 
@@ -361,7 +364,7 @@ Machine-checkable success gate:
 Use `--fix` when:
 
 - you want unattended recovery loops for shell-based remediations
-- you still plan to rerun `doctor --json` afterward to verify `criticalOk == true`
+- you still plan to rerun `doctor` afterward to verify `criticalOk == true`
 
 Do not treat `--fix` alone as success. The success gate remains the follow-up report.
 
@@ -420,7 +423,7 @@ Recovery:
 
 - connect a device or boot an emulator
 - rerun `clawperator devices`
-- rerun `clawperator doctor --json`
+- rerun `clawperator doctor`
 
 ### `DEVICE_UNAUTHORIZED`
 
@@ -512,7 +515,7 @@ Recovery:
 - wake the device if `screenOn == false`
 - unlock the device if `deviceLocked == true`
 - complete the post-boot unlock if `userUnlocked == false`
-- rerun `clawperator doctor --json` and require:
+- rerun `clawperator doctor` and require:
   - exit code `0`
   - `criticalOk == true`
   - `readiness.device.interactive.status == "pass"`
@@ -521,12 +524,12 @@ Recovery:
 
 Recommended doctor loop:
 
-1. Run `clawperator doctor --json [--device <serial>] [--operator-package <pkg>]`.
+1. Run `clawperator doctor [--device <serial>] [--operator-package <pkg>]`.
 2. Require exit code `0` and `criticalOk == true` before treating the environment as ready.
 3. If `criticalOk == false`, iterate through `checks[]` in order and branch on the first critical `fail`.
 4. If `fix.steps[].kind == "shell"` and you trust the environment, either execute them yourself or rerun doctor with `--fix`.
 5. If `deviceGuidance` is present, surface `deviceGuidance.screen` and `deviceGuidance.steps[]` to the human operator.
-6. Rerun `doctor --json` after remediation and require `criticalOk == true`.
+6. Rerun `doctor` after remediation and require `criticalOk == true`.
 7. Only then move on to device commands such as `snapshot`.
 
 ## Related Pages

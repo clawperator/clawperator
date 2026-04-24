@@ -42,7 +42,7 @@ env -u CLAWPERATOR_SKILL_AGENT_ALLOW_BYPASS \
     com.solaxcloud.starter.set-discharge-to-limit-orchestrated \
     --device <device_serial> \
     --operator-package com.clawperator.operator.dev \
-    --output json -- 40
+    -- 40
 ```
 
 Each attempt was preceded by:
@@ -51,8 +51,7 @@ Each attempt was preceded by:
 node /<local_user>/src/clawperator/apps/node/dist/cli/index.js close \
   --app com.solaxcloud.starter \
   --device <device_serial> \
-  --operator-package com.clawperator.operator.dev \
-  --json
+  --operator-package com.clawperator.operator.dev
 ```
 
 ## Timing

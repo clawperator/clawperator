@@ -91,7 +91,7 @@ Clawperator is open source. If these docs help, see the [project on GitHub](http
 
 ## Purpose
 
-Get from an empty host to a first successful `clawperator snapshot --json` with one deterministic path and machine-checkable success conditions.
+Get from an empty host to a first successful `clawperator snapshot` with one deterministic path and machine-checkable success conditions.
 
 ## Prerequisites
 
@@ -195,7 +195,7 @@ Verification:
 
 ```bash
 ls ~/.clawperator/AGENTS.md ~/.clawperator/install-state.json ~/.clawperator/mcp-config-snippet.json
-clawperator skills list --json
+clawperator skills list
 test ! -f ~/.agents/AGENTS.md || grep -F "CLAWPERATOR_SHARED_AGENT_BRIDGE:START" ~/.agents/AGENTS.md
 ```
 
@@ -286,7 +286,7 @@ Behavior:
 Success condition:
 
 - Command exits without a structured error object.
-- A follow-up `clawperator doctor --json` no longer reports `OPERATOR_NOT_INSTALLED` for `readiness.apk.presence`.
+- A follow-up `clawperator doctor` no longer reports `OPERATOR_NOT_INSTALLED` for `readiness.apk.presence`.
 
 Do not use raw `adb install` for setup. The CLI setup command is the only path that performs install, permission grant, and verification as one operation.
 
@@ -300,18 +300,18 @@ Use this only after the Operator APK crashes or Android revokes accessibility / 
 
 If you force-stop the Operator package during debugging and the next handshake
 or snapshot stops working, use this same recovery step before trusting the
-runtime again, then re-run `clawperator doctor --json`.
+runtime again, then re-run `clawperator doctor`.
 
 ## 5. Verify readiness with doctor
 
 ```bash
-clawperator doctor --json
+clawperator doctor
 ```
 
 With explicit targeting:
 
 ```bash
-clawperator doctor --json --device <device_serial>
+clawperator doctor --device <device_serial>
 ```
 
 ### Doctor checks
@@ -386,13 +386,13 @@ See [Doctor](api/doctor.md) for the full report contract and [Errors](api/errors
 ## 6. Run the first command
 
 ```bash
-clawperator snapshot --json
+clawperator snapshot
 ```
 
 With explicit targeting:
 
 ```bash
-clawperator snapshot --json --device <device_serial>
+clawperator snapshot --device <device_serial>
 ```
 
 Success conditions:
@@ -413,17 +413,17 @@ Clawperator is the hand. The agent is the brain. The agent decides what to do, t
 
 ### Programmatic first-run sequence
 
-1. Run `clawperator doctor --json [--device <serial>] [--operator-package <pkg>]`.
+1. Run `clawperator doctor [--device <serial>] [--operator-package <pkg>]`.
 2. If `readiness.apk.presence` fails, run `clawperator operator setup --apk <path> ...`.
 3. If `readiness.handshake` fails after a known-good install, run `clawperator grant-device-permissions ...`.
-4. For multiple failures, `clawperator doctor --json --fix ...` auto-executes shell remediation steps.
-5. Re-run `clawperator doctor --json ...` and require `criticalOk: true`.
-6. Run `clawperator snapshot --json ...`.
+4. For multiple failures, `clawperator doctor --fix ...` auto-executes shell remediation steps.
+5. Re-run `clawperator doctor ...` and require `criticalOk: true`.
+6. Run `clawperator snapshot ...`.
 7. Branch only on structured fields: `criticalOk`, `checks[].code`, `envelope.status`, `envelope.errorCode`, `stepResults[].success`.
 
 ### How to confirm success without a human
 
-- Treat `doctor --json` as ready only when `criticalOk` is `true`.
+- Treat `doctor` as ready only when `criticalOk` is `true`.
 - Treat a device command as successful only when `envelope.status` is `"success"` and every `stepResults[].success` is `true`.
 - Prefer exact codes over message matching. Examples: `NO_DEVICES`, `OPERATOR_NOT_INSTALLED`, `RESULT_ENVELOPE_TIMEOUT`.
 
@@ -457,7 +457,7 @@ If setup fails, use `clawperator logs` to inspect what happened:
 clawperator logs
 
 # Run the failing command in another terminal
-clawperator doctor --json --device <device_serial> --operator-package <package>
+clawperator doctor --device <device_serial> --operator-package <package>
 ```
 
 Log file location: `~/.clawperator/logs/clawperator-YYYY-MM-DD.log`
@@ -512,7 +512,7 @@ Read this page after [Setup](setup.md) succeeds.
 Machine-checkable prerequisite:
 
 ```bash
-clawperator doctor --json
+clawperator doctor
 ```
 
 Continue only when:
@@ -551,12 +551,12 @@ Use this order:
 | Situation | Start here | Why |
 | --- | --- | --- |
 | You are unfamiliar with this host and want the packaged first-run orientation surface | `clawperator-agent-orientation` | Thin packaged router that points back to this page and the canonical docs. |
-| The user or calling workflow explicitly chose a whole-product refresh before you trust any downstream route | `clawperator-upgrade` | Checks `clawperator --version`, verifies Node 24+ and Java 17/21, then uses `npm install -g clawperator@latest`, `clawperator install`, and `clawperator doctor --json`. Uses `install.sh` only when the CLI is not reachable or the bootstrap prerequisites need repair. |
-| You know the Android package id and want the fastest answer to "what can this host do for this app?" | `clawperator skills for-app <package_id> --json` | `skills for-app` is the primary app-oriented discovery surface. |
-| You only know user-language terms such as app name or intent | `clawperator skills search --keyword <text> --json` | Search is the fallback when you do not have the package id yet. |
-| You already have a skill id and want the exact metadata | `clawperator skills get <skill_id> --json` | Confirms the registry entry before a run. |
-| You want to execute a skill through the wrapper | `clawperator skills run <skill_id> ... --json` | Uses the runtime-skill wrapper and its validation gate. |
-| Runtime-skill discovery returned no relevant match and you need the zero-results authoring route | `clawperator bundled-skills list --json` | Bundled skills are separate from runtime skills. Start with `clawperator-skill-author-by-agent-discovery`, then use `clawperator-skill-author-by-recording` only after discovery returns `proceed_to_recording`, or when the route is already well understood. |
+| The user or calling workflow explicitly chose a whole-product refresh before you trust any downstream route | `clawperator-upgrade` | Checks `clawperator --version`, verifies Node 24+ and Java 17/21, then uses `npm install -g clawperator@latest`, `clawperator install`, and `clawperator doctor`. Uses `install.sh` only when the CLI is not reachable or the bootstrap prerequisites need repair. |
+| You know the Android package id and want the fastest answer to "what can this host do for this app?" | `clawperator skills for-app <package_id>` | `skills for-app` is the primary app-oriented discovery surface. |
+| You only know user-language terms such as app name or intent | `clawperator skills search --keyword <text>` | Search is the fallback when you do not have the package id yet. |
+| You already have a skill id and want the exact metadata | `clawperator skills get <skill_id>` | Confirms the registry entry before a run. |
+| You want to execute a skill through the wrapper | `clawperator skills run <skill_id> ...` | Uses the runtime-skill wrapper and its validation gate. |
+| Runtime-skill discovery returned no relevant match and you need the zero-results authoring route | `clawperator bundled-skills list` | Bundled skills are separate from runtime skills. Start with `clawperator-skill-author-by-agent-discovery`, then use `clawperator-skill-author-by-recording` only after discovery returns `proceed_to_recording`, or when the route is already well understood. |
 | Your host already supports stdio MCP and wants registered tools such as `devices`, `snapshot`, `execute`, and `configure` | `clawperator mcp serve` | MCP is the transport surface for long-running tool registration. |
 | You already know the exact action payload you want to send | [Quickstart](quickstart.md) | Quickstart covers the observe / decide / act loop directly. |
 
@@ -565,10 +565,10 @@ Use this order:
 Use the shortest successful path first:
 
 ```bash
-clawperator skills for-app <package_id> --json
-clawperator skills search --keyword <text> --json
-clawperator skills get <skill_id> --json
-clawperator skills run <skill_id> --json
+clawperator skills for-app <package_id>
+clawperator skills search --keyword <text>
+clawperator skills get <skill_id>
+clawperator skills run <skill_id>
 ```
 
 Decision rules:
@@ -581,7 +581,7 @@ Decision rules:
   app-oriented discovery.
 - If discovery returns zero relevant matches and the next job is skill creation
   rather than raw execution, inspect installed bundled skills with
-  `clawperator bundled-skills list --json`, start with
+  `clawperator bundled-skills list`, start with
   `clawperator-skill-author-by-agent-discovery`, and continue to
   [Authoring](skills/authoring.md).
 
@@ -592,7 +592,7 @@ relevant installed match.
 
 | Situation | Next surface | Expected outcome |
 | --- | --- | --- |
-| No relevant runtime skill match and the next job is choosing the truthful route | `clawperator bundled-skills list --json` | Confirm the installed bundled-skill front doors on this host. |
+| No relevant runtime skill match and the next job is choosing the truthful route | `clawperator bundled-skills list` | Confirm the installed bundled-skill front doors on this host. |
 | You need the bounded zero-results front door | `clawperator-skill-author-by-agent-discovery` | Produce one discovery artifact and choose exactly one next step. |
 | Discovery returns `proceed_to_recording`, or the route is already well understood | `clawperator-skill-author-by-recording` | Run the proving workflow from a fresh recording and one self-test. |
 | You explicitly want the low-level manual scaffold instead of the installed guided workflows | `clawperator skills new <skill_id>` | Create a local scaffold only. |
@@ -623,7 +623,7 @@ Use this sequence:
 1. Confirm the registry is readable:
 
 ```bash
-clawperator skills list --json
+clawperator skills list
 ```
 
 2. If registry discovery still fails, check the installed home path written by
@@ -651,7 +651,7 @@ clawperator mcp serve
    request, inspect the installed authoring-workflow helpers:
 
 ```bash
-clawperator bundled-skills list --json
+clawperator bundled-skills list
 ```
 
 Then continue to [Authoring](skills/authoring.md), start with
@@ -669,7 +669,7 @@ These files help a host orient after install:
 | `~/.clawperator/install-state.json` | Durable install metadata written by `clawperator host setup` | Check `registryPath`, `cliVersion`, and `lastDeviceSerial` without rerunning install. |
 | `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config written by `clawperator host setup` | Use it when you choose the MCP route. |
 | `~/.clawperator/skills/skills/skills-registry.json` | Installed runtime-skills registry | Verify it exists when `skills list` or `skills for-app` cannot discover skills. |
-| `~/.clawperator/bundled-skills/` | Installed first-party bundled skills | Inspect it through `clawperator bundled-skills list --json` when runtime discovery returns no relevant match. |
+| `~/.clawperator/bundled-skills/` | Installed first-party bundled skills | Inspect it through `clawperator bundled-skills list` when runtime discovery returns no relevant match. |
 
 ## Verification
 
@@ -679,11 +679,11 @@ Use these commands to confirm the intended surface is working:
 clawperator --help
 clawperator skills --help
 clawperator bundled-skills --help
-clawperator skills for-app com.android.settings --json
-clawperator skills search --keyword settings --json
-clawperator skills get com.android.settings.capture-overview --json
-clawperator skills list --json
-clawperator bundled-skills list --json
+clawperator skills for-app com.android.settings
+clawperator skills search --keyword settings
+clawperator skills get com.android.settings.capture-overview
+clawperator skills list
+clawperator bundled-skills list
 ```
 
 Check:
@@ -724,7 +724,7 @@ Check:
 ## Before You Start
 
 This page assumes a working Clawperator installation: CLI installed, device
-connected, Operator APK installed, and `clawperator doctor --json` returning
+connected, Operator APK installed, and `clawperator doctor` returning
 `"criticalOk": true`.
 
 If you have not reached that state yet, complete [Setup](setup.md) first.
@@ -765,7 +765,7 @@ The canonical observation action is `snapshot_ui`. Run it with the built-in
 `snapshot` command:
 
 ```bash
-clawperator snapshot --json --device <device_serial>
+clawperator snapshot --device <device_serial>
 ```
 
 On success, the result envelope contains the XML hierarchy in
@@ -859,7 +859,7 @@ See [Selectors](api/selectors.md) for the full `NodeMatcher` contract.
 
 ## Step 3: Act
 
-Send an execution payload via `clawperator exec --json`. The payload lists one
+Send an execution payload via `clawperator exec`. The payload lists one
 or more actions in sequence. Clawperator dispatches them in order and returns a
 single result envelope.
 
@@ -903,7 +903,7 @@ Example - click the "Connections" row, wait for navigation, then take a snapshot
 Save this as `payload.json` and run:
 
 ```bash
-clawperator exec --json --device <device_serial> < payload.json
+clawperator exec --device <device_serial> payload.json
 ```
 
 Success conditions:
@@ -925,7 +925,7 @@ A complete agent sequence for reading the Android version:
 ### 1. Pre-flight
 
 ```bash
-clawperator doctor --json --device <device_serial>
+clawperator doctor --device <device_serial>
 # Require: "criticalOk": true
 ```
 
@@ -1064,6 +1064,22 @@ This page is intentionally narrow:
 - Use [Errors](errors.md) for exact error codes and recovery
 - Use [Devices](devices.md) for target selection rules
 
+## CLI Output Format
+
+CLI commands return JSON by default. Agents should parse stdout directly with
+`JSON.parse()` unless they intentionally requested `--output pretty` for a
+human-readable rendering.
+
+Accepted output-format forms:
+
+| Form | Behavior |
+| --- | --- |
+| no output flag | JSON output |
+| `--output json` | preferred explicit JSON output |
+| `--format json` | alias for `--output json` |
+| `--json` | alias for `--output json` |
+| `--output pretty` | pretty-printed human-readable output |
+
 ## Readiness Gate
 
 Before treating a target as ready for interactive automation, use
@@ -1151,7 +1167,7 @@ For action-type aliases and parameter aliases such as `package` -> `applicationI
 Verification pattern:
 
 ```bash
-clawperator exec --validate-only --payload '{"command_id":"cmd-001","task_id":"task-001","source":"docs","expected_format":"android-ui-automator","timeout_ms":30000,"actions":[{"id":"snap-1","type":"snapshot"}]}' --json
+clawperator exec --validate-only --payload '{"command_id":"cmd-001","task_id":"task-001","source":"docs","expected_format":"android-ui-automator","timeout_ms":30000,"actions":[{"id":"snap-1","type":"snapshot"}]}'
 ```
 
 Success condition:
@@ -1347,7 +1363,7 @@ Exact machine-checkable success condition for most CLI device commands:
 Command:
 
 ```bash
-clawperator snapshot --json --device <device_serial>
+clawperator snapshot --device <device_serial>
 ```
 
 Success output shape:
@@ -1412,29 +1428,29 @@ This page is generated from the Node CLI registry and command sources.
 | `provision` | - | - | -<br>Subcommands: emulator | Provision an Android emulator |
 | `packages` | `packages list [--device <id>] [--operator-package <pkg>] [--third-party]` | - | --third-party, --device, --operator-package | List installed packages on a device |
 | `exec` | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]`<br>`exec best-effort --goal <text> [--device <id>] [--operator-package <package>]` | execute | --payload, --validate-only, --dry-run, --goal, --device, --operator-package, --execution, --input, --file | Execute a validated command payload |
-| `snapshot` | `snapshot [--device <id>] [--operator-package <pkg>] [--json]` | snapshot-ui, snapshot_ui | --device, --operator-package, --json | Get current Android UI hierarchy as XML |
-| `screenshot` | `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>] [--json]` | take-screenshot, take_screenshot, capture-screenshot | --path, --device, --operator-package, --json | Capture a screenshot from the device |
-| `click` | `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]` | tap | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --coordinate, --long, --focus, --device, --operator-package, --json | Tap the first matching UI element |
-| `open` | `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>] [--json]` | open-app, open_app, open-uri, open-url, open_uri, open_url | --app, --device, --operator-package, --json, --help | Open an app, URL, or URI on the device |
-| `type` | `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>] [--json]` | fill, enter-text, enter_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --submit, --clear, --device, --operator-package, --json, --help | Type text into the first matching UI element |
-| `read` | `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]` | read-text, read_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --all, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --json | Read text from the first matching UI element |
-| `wait` | `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]` | wait-for, wait_for, wait-for-node, wait_for_node, find, find-node, find_node | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --device, --operator-package, --timeout, --json | Wait until a matching UI element appears |
-| `press` | `press <back|home|recents> [--device <id>] [--operator-package <pkg>] [--json]` | press-key, press_key | --key, --device, --operator-package, --json, --help | Press a hardware key on the device |
-| `back` | `back [--device <id>] [--operator-package <pkg>] [--json]` | - | --device, --operator-package, --json | Press the Android back key |
-| `close` | `close <package> [--device <id>] [--operator-package <pkg>] [--json]` | close-app, close_app | --app, --device, --operator-package, --json | Force-stop an Android application |
-| `sleep` | `sleep <ms> [--device <id>] [--operator-package <pkg>] [--json]` | - | --device, --operator-package, --json | Pause execution for a duration |
-| `scroll` | `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>] [--json]` | - | --direction, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --json, --help | Scroll the screen in a direction |
-| `scroll-until` | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--json]` | scroll_until | --click, --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --json | Scroll until a target element is visible |
-| `scroll-and-click` | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>] [--json]` | scroll_and_click | --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --click, --device, --operator-package, --json | Scroll until target is visible, then click it (alias for scroll-until --click) |
-| `wait-for-nav` | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]` | wait-for-navigation, wait_for_navigation | --app, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --validate-only, --dry-run, --timeout, --device, --operator-package, --json | Wait for app or screen navigation to complete |
-| `read-value` | `read-value --label <text> [--json]` | read-kv, read-key-value-pair, read_key_value_pair | --label, --label-id, --label-desc, --all, --validate-only, --dry-run, --json | Read the value associated with a labeled element |
-| `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills for-app <package_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --json, --output, --version<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
-| `bundled-skills` | `bundled-skills list`<br>`bundled-skills install`<br>`bundled-skills update` | - | --version, --json, --output, --format, --help<br>Subcommands: install, update, list | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
+| `snapshot` | `snapshot [--device <id>] [--operator-package <pkg>]` | snapshot-ui, snapshot_ui | --device, --operator-package | Get current Android UI hierarchy as XML |
+| `screenshot` | `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]` | take-screenshot, take_screenshot, capture-screenshot | --path, --device, --operator-package | Capture a screenshot from the device |
+| `click` | `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]` | tap | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --coordinate, --long, --focus, --device, --operator-package | Tap the first matching UI element |
+| `open` | `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]` | open-app, open_app, open-uri, open-url, open_uri, open_url | --app, --device, --operator-package, --help | Open an app, URL, or URI on the device |
+| `type` | `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]` | fill, enter-text, enter_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --submit, --clear, --device, --operator-package, --help | Type text into the first matching UI element |
+| `read` | `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]` | read-text, read_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --all, --validate-only, --dry-run, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package | Read text from the first matching UI element |
+| `wait` | `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]` | wait-for, wait_for, wait-for-node, wait_for_node, find, find-node, find_node | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --device, --operator-package, --timeout | Wait until a matching UI element appears |
+| `press` | `press <back|home|recents> [--device <id>] [--operator-package <pkg>]` | press-key, press_key | --key, --device, --operator-package, --help | Press a hardware key on the device |
+| `back` | `back [--device <id>] [--operator-package <pkg>]` | - | --device, --operator-package | Press the Android back key |
+| `close` | `close <package> [--device <id>] [--operator-package <pkg>]` | close-app, close_app | --app, --device, --operator-package | Force-stop an Android application |
+| `sleep` | `sleep <ms> [--device <id>] [--operator-package <pkg>]` | - | --device, --operator-package | Pause execution for a duration |
+| `scroll` | `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]` | - | --direction, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --help | Scroll the screen in a direction |
+| `scroll-until` | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]` | scroll_until | --click, --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package | Scroll until a target element is visible |
+| `scroll-and-click` | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]` | scroll_and_click | --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --click, --device, --operator-package | Scroll until target is visible, then click it (alias for scroll-until --click) |
+| `wait-for-nav` | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]` | wait-for-navigation, wait_for_navigation | --app, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --validate-only, --dry-run, --timeout, --device, --operator-package | Wait for app or screen navigation to complete |
+| `read-value` | `read-value --label <text>` | read-kv, read-key-value-pair, read_key_value_pair | --label, --label-id, --label-desc, --all, --validate-only, --dry-run | Read the value associated with a labeled element |
+| `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills for-app <package_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --output, --version<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
+| `bundled-skills` | `bundled-skills list`<br>`bundled-skills install`<br>`bundled-skills update` | - | --version, --output, --format, --json, --help<br>Subcommands: install, update, list | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
 | `recording` | `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]`<br>`recording stop`<br>`recording pull`<br>`recording parse --input <file> [--out <file>]`<br>`recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]`<br>`recording compare --baseline <export.json> --result <skills-run.json> [--mode <auto|literal|semantic>]` | record | --session-id, --out, --input, --snapshots, --baseline, --result, --mode, --device, --operator-package<br>Subcommands: compare, export | Manage recording sessions on the Operator app |
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `mcp` | `mcp serve` | - | - | Start the first-party MCP server |
 | `logs` | `logs` | - | - | Tail the Clawperator log file |
-| `doctor` | `doctor [--json]`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --json, --format, --output | Run environment and runtime checks |
+| `doctor` | `doctor`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --output, --format, --json | Run environment and runtime checks |
 | `grant-device-permissions` | `grant-device-permissions [--device <id>] [--operator-package <package>]` | - | --device, --operator-package | Re-grant accessibility and notification permissions |
 | `version` | `version`<br>`version --check-compat [--device <id>] [--operator-package <package>]` | - | --check-compat, --device, --operator-package | Show the CLI version |
 
@@ -1446,7 +1462,7 @@ This page is generated from the Node CLI registry and command sources.
 | `host` | `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]` | - | --installed-at, --cli-version, --apk-version, --last-device-serial<br>Subcommands: setup | Set up durable host artifacts owned by the CLI |
 | `setup` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
 | `install` | `install [--operator-package <package>]` | - | --operator-package | Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup |
-| `doctor` | `doctor [--json]`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --json, --format, --output | Run environment and runtime checks |
+| `doctor` | `doctor`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --output, --format, --json | Run environment and runtime checks |
 | `grant-device-permissions` | `grant-device-permissions [--device <id>] [--operator-package <package>]` | - | --device, --operator-package | Re-grant accessibility and notification permissions |
 | `version` | `version`<br>`version --check-compat [--device <id>] [--operator-package <package>]` | - | --check-compat, --device, --operator-package | Show the CLI version |
 
@@ -1483,9 +1499,9 @@ This page is generated from the Node CLI registry and command sources.
 ### `doctor`
 
 - Summary: Run environment and runtime checks
-- Syntax: `doctor [--json]`, `doctor --fix`, `doctor --full`, `doctor --check-only`
+- Syntax: `doctor`, `doctor --fix`, `doctor --full`, `doctor --check-only`
 - Aliases: -
-- Flags: `--fix`, `--full`, `--check-only`, `--json`, `--format`, `--output`
+- Flags: `--fix`, `--full`, `--check-only`, `--output`, `--format`, `--json`
 
 ### `grant-device-permissions`
 
@@ -1545,8 +1561,8 @@ This page is generated from the Node CLI registry and command sources.
 | Command | Syntax | Aliases | Flags | Summary |
 | --- | --- | --- | --- | --- |
 | `exec` | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]`<br>`exec best-effort --goal <text> [--device <id>] [--operator-package <package>]` | execute | --payload, --validate-only, --dry-run, --goal, --device, --operator-package, --execution, --input, --file | Execute a validated command payload |
-| `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills for-app <package_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --json, --output, --version<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
-| `bundled-skills` | `bundled-skills list`<br>`bundled-skills install`<br>`bundled-skills update` | - | --version, --json, --output, --format, --help<br>Subcommands: install, update, list | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
+| `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills for-app <package_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --output, --version<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
+| `bundled-skills` | `bundled-skills list`<br>`bundled-skills install`<br>`bundled-skills update` | - | --version, --output, --format, --json, --help<br>Subcommands: install, update, list | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `mcp` | `mcp serve` | - | - | Start the first-party MCP server |
 
@@ -1560,9 +1576,9 @@ This page is generated from the Node CLI registry and command sources.
 ### `skills`
 
 - Summary: Manage and run automation skills
-- Syntax: `skills list`, `skills get <skill_id>`, `skills for-app <package_id>`, `skills search --app <package_id> [--intent <intent>] [--keyword <text>]`, `skills search <keyword>`, `skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`, `skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`, `skills new <skill_id> [--summary <text>] [--recording-context <file>]`, `skills validate <skill_id> [--dry-run]`, `skills validate --all [--dry-run]`, `skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--json] [--output <json|pretty>] [skill_args...]`, `skills install`, `skills update [--ref <git-ref>]`, `skills sync --ref <git-ref>`
+- Syntax: `skills list`, `skills get <skill_id>`, `skills for-app <package_id>`, `skills search --app <package_id> [--intent <intent>] [--keyword <text>]`, `skills search <keyword>`, `skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`, `skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`, `skills new <skill_id> [--summary <text>] [--recording-context <file>]`, `skills validate <skill_id> [--dry-run]`, `skills validate --all [--dry-run]`, `skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [skill_args...]`, `skills install`, `skills update [--ref <git-ref>]`, `skills sync --ref <git-ref>`
 - Aliases: -
-- Flags: `--app`, `--intent`, `--keyword`, `--skill-id`, `--artifact`, `--vars`, `--summary`, `--recording-context`, `--all`, `--dry-run`, `--device`, `--device-id`, `--operator-package`, `--receiver-package`, `--timeout`, `--timeout-ms`, `--expect-contains`, `--skip-validate`, `--ref`, `--json`, `--output`, `--version`
+- Flags: `--app`, `--intent`, `--keyword`, `--skill-id`, `--artifact`, `--vars`, `--summary`, `--recording-context`, `--all`, `--dry-run`, `--device`, `--device-id`, `--operator-package`, `--receiver-package`, `--timeout`, `--timeout-ms`, `--expect-contains`, `--skip-validate`, `--ref`, `--output`, `--version`
 - Subcommands: `install`, `sync`, `new`, `validate`, `compile-artifact`, `run`
 
 ### `bundled-skills`
@@ -1570,7 +1586,7 @@ This page is generated from the Node CLI registry and command sources.
 - Summary: Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes
 - Syntax: `bundled-skills list`, `bundled-skills install`, `bundled-skills update`
 - Aliases: -
-- Flags: `--version`, `--json`, `--output`, `--format`, `--help`
+- Flags: `--version`, `--output`, `--format`, `--json`, `--help`
 - Subcommands: `install`, `update`, `list`
 
 ### `serve`
@@ -1591,134 +1607,134 @@ This page is generated from the Node CLI registry and command sources.
 
 | Command | Syntax | Aliases | Flags | Summary |
 | --- | --- | --- | --- | --- |
-| `snapshot` | `snapshot [--device <id>] [--operator-package <pkg>] [--json]` | snapshot-ui, snapshot_ui | --device, --operator-package, --json | Get current Android UI hierarchy as XML |
-| `screenshot` | `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>] [--json]` | take-screenshot, take_screenshot, capture-screenshot | --path, --device, --operator-package, --json | Capture a screenshot from the device |
-| `click` | `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]` | tap | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --coordinate, --long, --focus, --device, --operator-package, --json | Tap the first matching UI element |
-| `open` | `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>] [--json]` | open-app, open_app, open-uri, open-url, open_uri, open_url | --app, --device, --operator-package, --json, --help | Open an app, URL, or URI on the device |
-| `type` | `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>] [--json]` | fill, enter-text, enter_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --submit, --clear, --device, --operator-package, --json, --help | Type text into the first matching UI element |
-| `read` | `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]` | read-text, read_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --all, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --json | Read text from the first matching UI element |
-| `wait` | `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]` | wait-for, wait_for, wait-for-node, wait_for_node, find, find-node, find_node | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --device, --operator-package, --timeout, --json | Wait until a matching UI element appears |
-| `press` | `press <back|home|recents> [--device <id>] [--operator-package <pkg>] [--json]` | press-key, press_key | --key, --device, --operator-package, --json, --help | Press a hardware key on the device |
-| `back` | `back [--device <id>] [--operator-package <pkg>] [--json]` | - | --device, --operator-package, --json | Press the Android back key |
-| `close` | `close <package> [--device <id>] [--operator-package <pkg>] [--json]` | close-app, close_app | --app, --device, --operator-package, --json | Force-stop an Android application |
-| `sleep` | `sleep <ms> [--device <id>] [--operator-package <pkg>] [--json]` | - | --device, --operator-package, --json | Pause execution for a duration |
-| `scroll` | `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>] [--json]` | - | --direction, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --json, --help | Scroll the screen in a direction |
-| `scroll-until` | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--json]` | scroll_until | --click, --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --json | Scroll until a target element is visible |
-| `scroll-and-click` | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>] [--json]` | scroll_and_click | --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --click, --device, --operator-package, --json | Scroll until target is visible, then click it (alias for scroll-until --click) |
-| `wait-for-nav` | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]` | wait-for-navigation, wait_for_navigation | --app, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --validate-only, --dry-run, --timeout, --device, --operator-package, --json | Wait for app or screen navigation to complete |
-| `read-value` | `read-value --label <text> [--json]` | read-kv, read-key-value-pair, read_key_value_pair | --label, --label-id, --label-desc, --all, --validate-only, --dry-run, --json | Read the value associated with a labeled element |
+| `snapshot` | `snapshot [--device <id>] [--operator-package <pkg>]` | snapshot-ui, snapshot_ui | --device, --operator-package | Get current Android UI hierarchy as XML |
+| `screenshot` | `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]` | take-screenshot, take_screenshot, capture-screenshot | --path, --device, --operator-package | Capture a screenshot from the device |
+| `click` | `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]` | tap | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --coordinate, --long, --focus, --device, --operator-package | Tap the first matching UI element |
+| `open` | `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]` | open-app, open_app, open-uri, open-url, open_uri, open_url | --app, --device, --operator-package, --help | Open an app, URL, or URI on the device |
+| `type` | `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]` | fill, enter-text, enter_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --submit, --clear, --device, --operator-package, --help | Type text into the first matching UI element |
+| `read` | `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]` | read-text, read_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --all, --validate-only, --dry-run, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package | Read text from the first matching UI element |
+| `wait` | `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]` | wait-for, wait_for, wait-for-node, wait_for_node, find, find-node, find_node | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --device, --operator-package, --timeout | Wait until a matching UI element appears |
+| `press` | `press <back|home|recents> [--device <id>] [--operator-package <pkg>]` | press-key, press_key | --key, --device, --operator-package, --help | Press a hardware key on the device |
+| `back` | `back [--device <id>] [--operator-package <pkg>]` | - | --device, --operator-package | Press the Android back key |
+| `close` | `close <package> [--device <id>] [--operator-package <pkg>]` | close-app, close_app | --app, --device, --operator-package | Force-stop an Android application |
+| `sleep` | `sleep <ms> [--device <id>] [--operator-package <pkg>]` | - | --device, --operator-package | Pause execution for a duration |
+| `scroll` | `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]` | - | --direction, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --help | Scroll the screen in a direction |
+| `scroll-until` | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]` | scroll_until | --click, --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package | Scroll until a target element is visible |
+| `scroll-and-click` | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]` | scroll_and_click | --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --click, --device, --operator-package | Scroll until target is visible, then click it (alias for scroll-until --click) |
+| `wait-for-nav` | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]` | wait-for-navigation, wait_for_navigation | --app, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --validate-only, --dry-run, --timeout, --device, --operator-package | Wait for app or screen navigation to complete |
+| `read-value` | `read-value --label <text>` | read-kv, read-key-value-pair, read_key_value_pair | --label, --label-id, --label-desc, --all, --validate-only, --dry-run | Read the value associated with a labeled element |
 
 ### `snapshot`
 
 - Summary: Get current Android UI hierarchy as XML
-- Syntax: `snapshot [--device <id>] [--operator-package <pkg>] [--json]`
+- Syntax: `snapshot [--device <id>] [--operator-package <pkg>]`
 - Aliases: `snapshot-ui`, `snapshot_ui`
-- Flags: `--device`, `--operator-package`, `--json`
+- Flags: `--device`, `--operator-package`
 
 ### `screenshot`
 
 - Summary: Capture a screenshot from the device
-- Syntax: `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>] [--json]`
+- Syntax: `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]`
 - Aliases: `take-screenshot`, `take_screenshot`, `capture-screenshot`
-- Flags: `--path`, `--device`, `--operator-package`, `--json`
+- Flags: `--path`, `--device`, `--operator-package`
 
 ### `click`
 
 - Summary: Tap the first matching UI element
-- Syntax: `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]`
+- Syntax: `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `tap`
-- Flags: `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--coordinate`, `--long`, `--focus`, `--device`, `--operator-package`, `--json`
+- Flags: `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--coordinate`, `--long`, `--focus`, `--device`, `--operator-package`
 
 ### `open`
 
 - Summary: Open an app, URL, or URI on the device
-- Syntax: `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>] [--json]`
+- Syntax: `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `open-app`, `open_app`, `open-uri`, `open-url`, `open_uri`, `open_url`
-- Flags: `--app`, `--device`, `--operator-package`, `--json`, `--help`
+- Flags: `--app`, `--device`, `--operator-package`, `--help`
 
 ### `type`
 
 - Summary: Type text into the first matching UI element
-- Syntax: `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>] [--json]`
+- Syntax: `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `fill`, `enter-text`, `enter_text`
-- Flags: `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--submit`, `--clear`, `--device`, `--operator-package`, `--json`, `--help`
+- Flags: `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--submit`, `--clear`, `--device`, `--operator-package`, `--help`
 
 ### `read`
 
 - Summary: Read text from the first matching UI element
-- Syntax: `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]`
+- Syntax: `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `read-text`, `read_text`
-- Flags: `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--all`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--device`, `--operator-package`, `--json`
+- Flags: `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--all`, `--validate-only`, `--dry-run`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--device`, `--operator-package`
 
 ### `wait`
 
 - Summary: Wait until a matching UI element appears
-- Syntax: `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]`
+- Syntax: `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]`
 - Aliases: `wait-for`, `wait_for`, `wait-for-node`, `wait_for_node`, `find`, `find-node`, `find_node`
-- Flags: `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--device`, `--operator-package`, `--timeout`, `--json`
+- Flags: `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--device`, `--operator-package`, `--timeout`
 
 ### `press`
 
 - Summary: Press a hardware key on the device
-- Syntax: `press <back|home|recents> [--device <id>] [--operator-package <pkg>] [--json]`
+- Syntax: `press <back|home|recents> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `press-key`, `press_key`
-- Flags: `--key`, `--device`, `--operator-package`, `--json`, `--help`
+- Flags: `--key`, `--device`, `--operator-package`, `--help`
 
 ### `back`
 
 - Summary: Press the Android back key
-- Syntax: `back [--device <id>] [--operator-package <pkg>] [--json]`
+- Syntax: `back [--device <id>] [--operator-package <pkg>]`
 - Aliases: -
-- Flags: `--device`, `--operator-package`, `--json`
+- Flags: `--device`, `--operator-package`
 
 ### `close`
 
 - Summary: Force-stop an Android application
-- Syntax: `close <package> [--device <id>] [--operator-package <pkg>] [--json]`
+- Syntax: `close <package> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `close-app`, `close_app`
-- Flags: `--app`, `--device`, `--operator-package`, `--json`
+- Flags: `--app`, `--device`, `--operator-package`
 
 ### `sleep`
 
 - Summary: Pause execution for a duration
-- Syntax: `sleep <ms> [--device <id>] [--operator-package <pkg>] [--json]`
+- Syntax: `sleep <ms> [--device <id>] [--operator-package <pkg>]`
 - Aliases: -
-- Flags: `--device`, `--operator-package`, `--json`
+- Flags: `--device`, `--operator-package`
 
 ### `scroll`
 
 - Summary: Scroll the screen in a direction
-- Syntax: `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>] [--json]`
+- Syntax: `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]`
 - Aliases: -
-- Flags: `--direction`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--device`, `--operator-package`, `--json`, `--help`
+- Flags: `--direction`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--device`, `--operator-package`, `--help`
 
 ### `scroll-until`
 
 - Summary: Scroll until a target element is visible
-- Syntax: `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--json]`
+- Syntax: `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]`
 - Aliases: `scroll_until`
-- Flags: `--click`, `--direction`, `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--device`, `--operator-package`, `--json`
+- Flags: `--click`, `--direction`, `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--device`, `--operator-package`
 
 ### `scroll-and-click`
 
 - Summary: Scroll until target is visible, then click it (alias for scroll-until --click)
-- Syntax: `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>] [--json]`
+- Syntax: `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `scroll_and_click`
-- Flags: `--direction`, `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--click`, `--device`, `--operator-package`, `--json`
+- Flags: `--direction`, `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--click`, `--device`, `--operator-package`
 
 ### `wait-for-nav`
 
 - Summary: Wait for app or screen navigation to complete
-- Syntax: `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]`
+- Syntax: `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `wait-for-navigation`, `wait_for_navigation`
-- Flags: `--app`, `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--validate-only`, `--dry-run`, `--timeout`, `--device`, `--operator-package`, `--json`
+- Flags: `--app`, `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--validate-only`, `--dry-run`, `--timeout`, `--device`, `--operator-package`
 
 ### `read-value`
 
 - Summary: Read the value associated with a labeled element
-- Syntax: `read-value --label <text> [--json]`
+- Syntax: `read-value --label <text>`
 - Aliases: `read-kv`, `read-key-value-pair`, `read_key_value_pair`
-- Flags: `--label`, `--label-id`, `--label-desc`, `--all`, `--validate-only`, `--dry-run`, `--json`
+- Flags: `--label`, `--label-id`, `--label-desc`, `--all`, `--validate-only`, `--dry-run`
 
 ## Recording
 
@@ -1953,7 +1969,7 @@ See [Environment Variables](environment.md) for complete details on:
 
 ## JSON Mode Cleanliness
 
-When `--json` output mode is active, the unified logger never writes to stdout. Log events go only to the file. This ensures the JSON output stream remains parseable without interleaved log lines.
+When JSON output mode is active, the unified logger never writes to stdout. Log events go only to the file. This ensures the JSON output stream remains parseable without interleaved log lines.
 
 ---
 
@@ -3076,7 +3092,7 @@ Validation examples:
 Valid:
 
 ```bash
-clawperator read --text "Price" --container-id "android:id/list" --json
+clawperator read --text "Price" --container-id "android:id/list"
 ```
 
 Invalid:
@@ -3234,11 +3250,11 @@ clawperator click --text "Wi-Fi"
 ```
 
 ```bash
-clawperator read --selector '{"resourceId":"android:id/title"}' --json
+clawperator read --selector '{"resourceId":"android:id/title"}'
 ```
 
 ```bash
-clawperator wait --text-contains "Done" --timeout 10000 --json
+clawperator wait --text-contains "Done" --timeout 10000
 ```
 
 ```bash
@@ -3246,7 +3262,7 @@ clawperator scroll-until --text "About phone" --container-id "android:id/list"
 ```
 
 ```bash
-clawperator read-value --label "Battery" --json
+clawperator read-value --label "Battery"
 ```
 
 ## Related Pages
@@ -3285,7 +3301,7 @@ The built-in `clawperator snapshot` command constructs a one-step execution with
 - `commandId` is generated as `snapshot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 - `taskId` equals the generated `commandId`
 
-For CLI `snapshot --json`, machine-checkable success means:
+For CLI `snapshot`, machine-checkable success means:
 
 - exit code `0`
 - top-level JSON has `envelope`
@@ -3370,7 +3386,7 @@ Successful `snapshot_ui` data lives inside the step result, not in a separate to
 Verification pattern - confirm the snapshot contract is active:
 
 ```bash
-clawperator snapshot --json --device <device_serial>
+clawperator snapshot --device <device_serial>
 ```
 
 Check these exact fields:
@@ -3454,7 +3470,7 @@ Current runtime note:
 
 ## Annotated Live-Device Example
 
-Full `clawperator snapshot --json` output from an Android emulator running
+Full `clawperator snapshot` output from an Android emulator running
 Android 15 (API 35) with the Settings app open. This example uses the emulator
 because it produces reproducible results that any device can create and run.
 
@@ -3675,13 +3691,13 @@ This is not just a warning. It changes the step to `success: false`, and later e
 Typical recovery:
 
 1. Run `clawperator version --check-compat`.
-2. Run `clawperator doctor --json`.
+2. Run `clawperator doctor`.
 3. Re-run the snapshot with `--verbose` if you need to inspect log correlation and the `[TaskScope] UI Hierarchy:` marker.
 
 Verification pattern - confirm extraction failure handling:
 
 ```bash
-clawperator snapshot --json --device <device_serial>
+clawperator snapshot --device <device_serial>
 ```
 
 If extraction failed, branch on:
@@ -3977,11 +3993,11 @@ Notes:
 | Family | Typical codes | What to do next |
 | --- | --- | --- |
 | Device targeting | `NO_DEVICES`, `DEVICE_NOT_FOUND`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Run `clawperator devices`, pick one device, and retry with `--device <serial>` |
-| Interactive readiness | `DEVICE_NOT_INTERACTIVE` | Wake or unlock the target, rerun `clawperator doctor --json`, and confirm the interactive-state check passes |
+| Interactive readiness | `DEVICE_NOT_INTERACTIVE` | Wake or unlock the target, rerun `clawperator doctor`, and confirm the interactive-state check passes |
 | Operator setup | `OPERATOR_NOT_INSTALLED`, `OPERATOR_VARIANT_MISMATCH`, `OPERATOR_INSTALL_FAILED`, `OPERATOR_GRANT_FAILED`, `OPERATOR_VERIFY_FAILED` | Install or repair the expected Operator APK, then rerun the command |
 | Host tooling | `ADB_NOT_FOUND`, `ADB_SERVER_FAILED`, `HOST_DEPENDENCY_MISSING`, `ANDROID_SDK_TOOL_MISSING`, `SCRCPY_NOT_FOUND` | Repair the host environment before retrying |
 | Payload or flag validation | `MISSING_ARGUMENT`, `EXECUTION_VALIDATION_FAILED`, `EXECUTION_ACTION_UNSUPPORTED`, `PAYLOAD_TOO_LARGE` | Change the command or payload. Do not retry unchanged |
-| Dispatch or service availability | `RESULT_ENVELOPE_TIMEOUT`, `RESULT_ENVELOPE_MALFORMED`, `BROADCAST_FAILED`, `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `DEVICE_SHELL_UNAVAILABLE` | Run `clawperator doctor --json`, repair the reported issue, then retry |
+| Dispatch or service availability | `RESULT_ENVELOPE_TIMEOUT`, `RESULT_ENVELOPE_MALFORMED`, `BROADCAST_FAILED`, `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `DEVICE_SHELL_UNAVAILABLE` | Run `clawperator doctor`, repair the reported issue, then retry |
 | UI lookup or gesture | `NODE_NOT_FOUND`, `NODE_NOT_CLICKABLE`, `CONTAINER_NOT_FOUND`, `CONTAINER_NOT_SCROLLABLE`, `GESTURE_FAILED`, `SECURITY_BLOCK_DETECTED` | Refresh state with `snapshot`, wait for UI readiness, or adjust selectors and scroll strategy |
 | Recording state | `RECORDING_ALREADY_IN_PROGRESS`, `RECORDING_NOT_IN_PROGRESS`, `RECORDING_SESSION_NOT_FOUND`, `RECORDING_PULL_FAILED`, `RECORDING_PARSE_FAILED`, `RECORDING_SCHEMA_VERSION_UNSUPPORTED` | Repair recording state or use the right session before retrying |
 
@@ -4061,13 +4077,13 @@ Typical fields:
     "elapsedMs": 30000,
     "timeoutMs": 30000
   },
-  "hint": "No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --json --device emulator-5554 --operator-package com.clawperator.operator.dev' to diagnose."
+  "hint": "No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --device emulator-5554 --operator-package com.clawperator.operator.dev' to diagnose."
 }
 ```
 
 Recovery:
 
-- run `clawperator doctor --json`
+- run `clawperator doctor`
 - if `hint` mentions no correlated Android log lines, treat it as a compatibility or accessibility diagnostic path rather than a generic retry
 - confirm the accessibility service and operator package are healthy
 - increase timeout only if the action legitimately needs more wall-clock time
@@ -4124,7 +4140,7 @@ Typical recovery:
 - wake the device if `screenOn == false`
 - unlock the device if `deviceLocked == true`
 - complete the post-boot unlock if `userUnlocked == false`
-- rerun `clawperator doctor --json` and require
+- rerun `clawperator doctor` and require
   `readiness.device.interactive.status == "pass"`
 
 ### `NODE_NOT_FOUND`
@@ -4140,7 +4156,7 @@ Common triggers:
 
 Recovery:
 
-- run `snapshot` or `read --json` to inspect current UI state
+- run `snapshot` or `read` to inspect current UI state
 - add `wait` or `sleep` before the failing action when appropriate
 - tighten or loosen the selector based on what the snapshot actually shows
 - add a container selector or a scroll step if the target is off-screen
@@ -4348,7 +4364,7 @@ For automation, prefer this pattern even when only one device is currently conne
 Example:
 
 ```bash
-clawperator snapshot --json --device emulator-5554
+clawperator snapshot --device emulator-5554
 ```
 
 Success condition:
@@ -4381,7 +4397,7 @@ Use `--operator-package com.clawperator.operator.dev` when:
 Recommended deterministic pairing:
 
 ```bash
-clawperator snapshot --json --device emulator-5554 --operator-package com.clawperator.operator.dev
+clawperator snapshot --device emulator-5554 --operator-package com.clawperator.operator.dev
 ```
 
 ## Common Failure Modes
@@ -4427,13 +4443,13 @@ clawperator devices
 Doctor on one target:
 
 ```bash
-clawperator doctor --json --device <device_serial>
+clawperator doctor --device <device_serial>
 ```
 
 Snapshot against the debug Operator package:
 
 ```bash
-clawperator snapshot --json --device <device_serial> --operator-package com.clawperator.operator.dev
+clawperator snapshot --device <device_serial> --operator-package com.clawperator.operator.dev
 ```
 
 Execute a payload on one target:
@@ -4468,7 +4484,7 @@ Define the `clawperator doctor` report contract, the exact check sequence, criti
 ## Command
 
 ```bash
-clawperator doctor [--json] [--device <serial>] [--operator-package <pkg>] [--fix] [--full] [--check-only]
+clawperator doctor [--device <serial>] [--operator-package <pkg>] [--fix] [--full] [--check-only]
 ```
 
 Flags:
@@ -4480,7 +4496,8 @@ Flags:
 | `--fix` | flag | executes shell-type remediation steps during finalization |
 | `--full` | flag | adds Java/build/install/launch/smoke checks |
 | `--check-only` | flag | forces exit code `0` regardless of failures |
-| `--json` | flag | returns the full `DoctorReport` JSON object |
+| `--output` | `json`, `pretty` | selects the output renderer; use `--output json` when you want to request JSON explicitly |
+| `--format` | `json`, `pretty` | alias for `--output` |
 
 Defaults:
 
@@ -4488,6 +4505,8 @@ Defaults:
 - without `--device`, doctor tries discovery first and may auto-resolve one connected device
 - without `--full`, doctor skips Java/build/install/launch/smoke checks
 - without `--fix`, doctor reports remediation steps but does not run them
+- output defaults to the full `DoctorReport` JSON object
+- use `--output json` when you want to request JSON explicitly
 
 ## `DoctorReport` Contract
 
@@ -4814,7 +4833,7 @@ Machine-checkable success gate:
 Use `--fix` when:
 
 - you want unattended recovery loops for shell-based remediations
-- you still plan to rerun `doctor --json` afterward to verify `criticalOk == true`
+- you still plan to rerun `doctor` afterward to verify `criticalOk == true`
 
 Do not treat `--fix` alone as success. The success gate remains the follow-up report.
 
@@ -4873,7 +4892,7 @@ Recovery:
 
 - connect a device or boot an emulator
 - rerun `clawperator devices`
-- rerun `clawperator doctor --json`
+- rerun `clawperator doctor`
 
 ### `DEVICE_UNAUTHORIZED`
 
@@ -4965,7 +4984,7 @@ Recovery:
 - wake the device if `screenOn == false`
 - unlock the device if `deviceLocked == true`
 - complete the post-boot unlock if `userUnlocked == false`
-- rerun `clawperator doctor --json` and require:
+- rerun `clawperator doctor` and require:
   - exit code `0`
   - `criticalOk == true`
   - `readiness.device.interactive.status == "pass"`
@@ -4974,12 +4993,12 @@ Recovery:
 
 Recommended doctor loop:
 
-1. Run `clawperator doctor --json [--device <serial>] [--operator-package <pkg>]`.
+1. Run `clawperator doctor [--device <serial>] [--operator-package <pkg>]`.
 2. Require exit code `0` and `criticalOk == true` before treating the environment as ready.
 3. If `criticalOk == false`, iterate through `checks[]` in order and branch on the first critical `fail`.
 4. If `fix.steps[].kind == "shell"` and you trust the environment, either execute them yourself or rerun doctor with `--fix`.
 5. If `deviceGuidance` is present, surface `deviceGuidance.screen` and `deviceGuidance.steps[]` to the human operator.
-6. Rerun `doctor --json` after remediation and require `criticalOk == true`.
+6. Rerun `doctor` after remediation and require `criticalOk == true`.
 7. Only then move on to device commands such as `snapshot`.
 
 ## Related Pages
@@ -5447,7 +5466,7 @@ Expected success shape:
 If a live run returns `RESULT_ENVELOPE_MALFORMED`, treat it as a transport-contract failure rather than a normal action timeout. Recovery:
 
 - rerun once to rule out transient logcat noise
-- if it repeats, check CLI and APK compatibility with `clawperator version --check-compat --json`
+- if it repeats, check CLI and APK compatibility with `clawperator version --check-compat`
 - rerun the failing command with `--verbose` and inspect Android-side logs
 
 ## Common Mistakes
@@ -5563,7 +5582,7 @@ Example:
 
 ```bash
 export CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev
-clawperator snapshot --json --device emulator-5554
+clawperator snapshot --device emulator-5554
 ```
 
 That snapshot runs against the debug Operator package. No `--operator-package` flag needed.
@@ -5571,7 +5590,7 @@ That snapshot runs against the debug Operator package. No `--operator-package` f
 Verification - confirm the env var took effect:
 
 ```bash
-clawperator doctor --json --device emulator-5554
+clawperator doctor --device emulator-5554
 ```
 
 Check `report.operatorPackage` in the JSON output:
@@ -5591,7 +5610,7 @@ If `operatorPackage` shows the value you set, the env var is active.
 Error case:
 
 - if the env var names a package that is not installed, device-targeting commands fail with `OPERATOR_NOT_INSTALLED`
-- if only the alternate known Operator variant is installed, `clawperator doctor --json` reports `OPERATOR_VARIANT_MISMATCH` as a readiness warning
+- if only the alternate known Operator variant is installed, `clawperator doctor` reports `OPERATOR_VARIANT_MISMATCH` as a readiness warning
 
 Note: the CLI also accepts `--receiver-package` as a legacy alias for `--operator-package`. Both override the same env var. Do not use `--receiver-package` in new code.
 
@@ -5622,7 +5641,7 @@ Example:
 
 ```bash
 export CLAWPERATOR_LOG_DIR=/tmp/clawperator-logs
-clawperator snapshot --json
+clawperator snapshot
 # logs written to /tmp/clawperator-logs/clawperator-2026-03-25.log
 ```
 
@@ -5643,7 +5662,7 @@ If set to an unrecognized value (e.g., `trace`, `verbose`, or an empty string), 
 ```bash
 # env var sets warn, but flag overrides to debug
 export CLAWPERATOR_LOG_LEVEL=warn
-clawperator snapshot --json --log-level debug
+clawperator snapshot --log-level debug
 # logger threshold is debug for this command
 ```
 
@@ -5673,7 +5692,7 @@ Fallback behavior after that initial choice:
 After `clawperator skills install` or `clawperator skills sync`, the registry lives at `~/.clawperator/skills/skills/skills-registry.json`. That path is automatically discovered as a fallback when `CLAWPERATOR_SKILLS_REGISTRY` is not set, so no env var change is needed after a normal install:
 
 ```bash
-clawperator skills list --json
+clawperator skills list
 ```
 
 Set `CLAWPERATOR_SKILLS_REGISTRY` only when pointing at a non-standard registry path, such as a development checkout outside the installed home. For the normal post-install flow, start with [Host Agent Orientation](../host-agents.md).
@@ -5748,7 +5767,7 @@ Verification:
 CLAWPERATOR_SKILLS_REGISTRY=/abs/path/to/skills/skills-registry.json \
 node apps/node/dist/cli/index.js skills run com.test.agent-skill-result \
   --device emulator-5554 \
-  --json -- valid
+  -- valid
 ```
 
 Check the parsed `skillResult.source` and the successful JSON envelope. The
@@ -5787,7 +5806,7 @@ Example:
 
 ```bash
 export ADB_PATH=/opt/android/platform-tools/adb
-clawperator devices --json
+clawperator devices
 ```
 
 Error case: if the path does not point to a working adb binary, `clawperator doctor` reports `ADB_NOT_FOUND` for the `host.adb.presence` check.
@@ -5795,7 +5814,7 @@ Error case: if the path does not point to a working adb binary, `clawperator doc
 Verification:
 
 ```bash
-clawperator doctor --json
+clawperator doctor
 ```
 
 If `host.adb.presence` passes, the configured adb binary is usable.
@@ -5834,8 +5853,8 @@ export ADB_PATH=/usr/local/bin/adb
 Then every command uses consistent defaults:
 
 ```bash
-clawperator doctor --json --device emulator-5554
-clawperator snapshot --json --device emulator-5554
+clawperator doctor --device emulator-5554
+clawperator snapshot --device emulator-5554
 clawperator skills run com.test.echo --device emulator-5554
 ```
 
@@ -7438,7 +7457,7 @@ Exact classification rule from `isOpenCliUriTarget()`:
 Verification:
 
 ```bash
-clawperator open com.android.settings --json
+clawperator open com.android.settings
 ```
 
 Expected live success shape:
@@ -7534,7 +7553,7 @@ Accepted CLI aliases for the same intent:
 Verification:
 
 ```bash
-clawperator open https://clawperator.com --json
+clawperator open https://clawperator.com
 ```
 
 Expected live success shape:
@@ -7729,7 +7748,7 @@ Machine-checkable success conditions:
 Verification command:
 
 ```bash
-clawperator exec --execution '{"commandId":"settings-nav-1","taskId":"settings-nav-1","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"open","type":"open_app","params":{"applicationId":"com.android.settings"}},{"id":"wait","type":"wait_for_navigation","params":{"expectedPackage":"com.android.settings","timeoutMs":5000}},{"id":"snap","type":"snapshot_ui"}]}' --device <device_serial> --json
+clawperator exec --execution '{"commandId":"settings-nav-1","taskId":"settings-nav-1","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"open","type":"open_app","params":{"applicationId":"com.android.settings"}},{"id":"wait","type":"wait_for_navigation","params":{"expectedPackage":"com.android.settings","timeoutMs":5000}},{"id":"snap","type":"snapshot_ui"}]}' --device <device_serial>
 ```
 
 ## Complete JSON Example
@@ -7947,14 +7966,14 @@ Notes:
 - `recording compare` defaults to `--mode auto`
 - if `recording export --input` points at a file and `--out` is omitted, the output path is `<input without .ndjson>.export.json` when the input ends with `.ndjson`, otherwise `<input>.export.json`
 - if `recording export --input` points at a directory, the command picks the newest `*.ndjson` file in that directory and derives the default export path from that resolved file
-- `recording compare` reads a saved `clawperator skills run --json` wrapper file and extracts its top-level `skillResult`
+- `recording compare` reads a saved `clawperator skills run` JSON wrapper file and extracts its top-level `skillResult`
 - for authored skills, the durable retained baseline for compare should live under a reference-style path such as `skills/<skill_id>/references/compare-baseline.export.json`
 - that retained baseline is authoring and maintenance evidence, not a runtime artifact consumed by `skills run`
 - a common authoring workflow is:
   1. `recording stop`
   2. `recording pull --out <dir>`
   3. `recording export --input <same dir>`
-  4. `skills run <skill_id> --json > <run>.skills-run.json`
+  4. `skills run <skill_id> > <run>.skills-run.json`
   5. copy the retained export to `skills/<skill_id>/references/compare-baseline.export.json`
   6. `recording compare --baseline skills/<skill_id>/references/compare-baseline.export.json --result <run>.skills-run.json`
 
@@ -7965,7 +7984,7 @@ Recommended pre-recording reset:
 - do not rely on the user manually swiping apps away unless the workflow makes
   that explicit
 - for a single app reset, prefer the flat CLI:
-  `clawperator close --app <application_id> --device <device_id> --operator-package <operator_package> --json`
+  `clawperator close --app <application_id> --device <device_id> --operator-package <operator_package>`
 - for multiple app resets, use a small `clawperator exec` with one or more
   `close_app` actions before you start recording
 - the underlying API action is `close_app`, which Node executes as an adb
@@ -8020,7 +8039,7 @@ Exact builder literals:
 Verification:
 
 ```bash
-clawperator record start --session-id demo-session --device <device_serial> --json
+clawperator record start --session-id demo-session --device <device_serial>
 ```
 
 Expected success wrapper shape:
@@ -8083,7 +8102,7 @@ Exact builder literals:
 Verification:
 
 ```bash
-clawperator record stop --session-id demo-session --device <device_serial> --json
+clawperator record stop --session-id demo-session --device <device_serial>
 ```
 
 Expected success wrapper shape:
@@ -8130,7 +8149,7 @@ Exact default:
 Verification:
 
 ```bash
-clawperator record pull --session-id demo-session --device <device_serial> --json
+clawperator record pull --session-id demo-session --device <device_serial>
 ```
 
 Check:
@@ -8166,7 +8185,7 @@ Exact default output-file rule from `cmdRecordParse()`:
 Verification:
 
 ```bash
-clawperator record parse --input ./recordings/demo-session.ndjson --json
+clawperator record parse --input ./recordings/demo-session.ndjson
 ```
 
 Check:
@@ -8229,7 +8248,7 @@ Success wrapper shape:
 Verification:
 
 ```bash
-clawperator recording export --input ./recordings/export-demo.ndjson --json
+clawperator recording export --input ./recordings/export-demo.ndjson
 ```
 
 Check:
@@ -8310,7 +8329,7 @@ clawperator record compare --baseline <export.json> --result <skills-run.json> [
 What the command does:
 
 - reads a recording export artifact from `--baseline`
-- reads a saved `clawperator skills run --json` wrapper from `--result`
+- reads a saved `clawperator skills run` JSON wrapper from `--result`
 - extracts the wrapper's top-level `skillResult`
 - normalizes the export into a checkpoint baseline
 - compares that baseline against `skillResult.checkpoints` plus `skillResult.terminalVerification`
@@ -8380,7 +8399,7 @@ Exit-code contract:
 
 Result-wrapper requirement:
 
-- `--result` must be a saved `skills run --json` wrapper object
+- `--result` must be a saved `skills run` JSON wrapper object
 - v1 compare does not accept a bare `SkillResult` document
 - the wrapper must contain a top-level non-null `skillResult`
 - when you want durable compare evidence, save the full wrapper and keep it as the compare input rather than copying only the embedded `skillResult`
@@ -8458,8 +8477,7 @@ Verification:
 ```bash
 clawperator recording compare \
   --baseline ./skills/com.solaxcloud.starter.set-discharge-to-limit-orchestrated/references/compare-baseline.export.json \
-  --result ./runs/demo.skills-run.json \
-  --json
+  --result ./runs/demo.skills-run.json
 ```
 
 Check:
@@ -8689,7 +8707,7 @@ Current normalization rules in `parseRecording.ts`:
 Verification:
 
 ```bash
-clawperator record parse --input ./recordings/demo-session.ndjson --json
+clawperator record parse --input ./recordings/demo-session.ndjson
 ```
 
 Then open the written `.steps.json` file and confirm:
@@ -8797,13 +8815,13 @@ Typical failure shape:
   "message": "Recording is already in progress",
   "sessionId": "record-123",
   "filePath": "/storage/emulated/0/Android/data/com.clawperator.operator.dev/files/recordings/record-123.ndjson",
-  "hint": "Run 'clawperator recording stop --session-id record-123 --device <device_serial> --operator-package <package> --json' before starting a new recording."
+  "hint": "Run 'clawperator recording stop --session-id record-123 --device <device_serial> --operator-package <package>' before starting a new recording."
 }
 ```
 
 Recovery:
 
-- run `clawperator recording stop --session-id <active_session_id> --device <device_serial> --operator-package <package> --json`
+- run `clawperator recording stop --session-id <active_session_id> --device <device_serial> --operator-package <package>`
 - then pull or parse the finished session before starting a new one
 - if your workflow uses explicit session ids, reuse the active session id instead of starting a second overlapping recording
 - use the `sessionId` and `filePath` fields in the error payload to target the exact session that is still active
@@ -8812,8 +8830,8 @@ Recovery:
 Verification pattern:
 
 ```bash
-clawperator record stop --device <device_serial> --json
-clawperator record pull --device <device_serial> --json
+clawperator record stop --device <device_serial>
+clawperator record pull --device <device_serial>
 ```
 
 ### `RECORDING_NOT_IN_PROGRESS`
@@ -8839,8 +8857,8 @@ Recovery:
 Verification pattern:
 
 ```bash
-clawperator record start --session-id demo-session --device <device_serial> --json
-clawperator record stop --session-id demo-session --device <device_serial> --json
+clawperator record start --session-id demo-session --device <device_serial>
+clawperator record stop --session-id demo-session --device <device_serial>
 ```
 
 ### `RECORDING_PULL_FAILED`
@@ -8862,7 +8880,7 @@ Typical failure shape:
 
 Recovery:
 
-- confirm the device is still visible in `clawperator devices --json`
+- confirm the device is still visible in `clawperator devices`
 - rerun `clawperator record stop --session-id <id>` if the session may still be open
 - retry `record pull` with the exact `--session-id` you just stopped
 - if adb itself is failing, fix the transport problem before retrying
@@ -8870,8 +8888,8 @@ Recovery:
 Verification pattern:
 
 ```bash
-clawperator devices --json
-clawperator record pull --session-id demo-session --device <device_serial> --json
+clawperator devices
+clawperator record pull --session-id demo-session --device <device_serial>
 ```
 
 ## Runtime Step Errors Outside The Public Node Error Enum
@@ -9148,12 +9166,12 @@ That path is assembled from these literals in `apps/node/src/domain/skills/skill
 
 ## Registry Verification
 
-Use `skills list --json` to confirm that the registry path in your current shell is readable:
+Use `skills list` to confirm that the registry path in your current shell is readable:
 
 - after `install.sh`, this works in a fresh non-login shell because `loadRegistry()` falls back to `~/.clawperator/skills/skills/skills-registry.json` when no explicit registry path or env var is active
 
 ```bash
-clawperator skills list --json
+clawperator skills list
 ```
 
 Success means the registry was loaded and the `skills` array was parsed:
@@ -9190,7 +9208,7 @@ If the registry cannot be read, every discovery command fails with `REGISTRY_REA
 Recovery depends on how the path was chosen:
 
 - when `CLAWPERATOR_SKILLS_REGISTRY` points at a missing file, update the env var or run `clawperator skills install`
-- when no env var is set and neither the current working directory nor `~/.clawperator/skills/skills/skills-registry.json` contains the registry, verify `~/.clawperator/skills/skills/skills-registry.json`, run `clawperator skills list --json`, then run `clawperator skills install` or set `CLAWPERATOR_SKILLS_REGISTRY`
+- when no env var is set and neither the current working directory nor `~/.clawperator/skills/skills/skills-registry.json` contains the registry, verify `~/.clawperator/skills/skills/skills-registry.json`, run `clawperator skills list`, then run `clawperator skills install` or set `CLAWPERATOR_SKILLS_REGISTRY`
 - when the registry file exists but does not contain a `skills` array, fix the JSON because `loadRegistry()` rejects that shape with `Invalid registry: skills array required`
 
 Wrapper failure fields like `stdout` and `stderr` are optional. `runSkill.ts` includes them only when the child process actually emitted non-empty data on those streams.
@@ -9200,10 +9218,10 @@ Wrapper failure fields like `stdout` and `stderr` are optional. `runSkill.ts` in
 If you are starting from a fresh install, the shortest discovery flow is:
 
 ```bash
-clawperator skills for-app <package_id> --json
-clawperator skills search --keyword <text> --json
-clawperator skills get <skill_id> --json
-clawperator skills run <skill_id> --json
+clawperator skills for-app <package_id>
+clawperator skills search --keyword <text>
+clawperator skills get <skill_id>
+clawperator skills run <skill_id>
 ```
 
 Start with `skills for-app` when you know the Android package id. Use
@@ -9292,17 +9310,17 @@ Use `skills for-app` when you already know the Android package id and want the s
 Example:
 
 ```bash
-clawperator skills for-app com.android.settings --json
+clawperator skills for-app com.android.settings
 ```
 
-It returns the same response shape as `skills search --app ... --json`.
+It returns the same response shape as `skills search --app ...`.
 
 ### `skills get`
 
 `cmdSkillsGet()` wraps a single registry entry under `skill`:
 
 ```bash
-clawperator skills get com.android.settings.capture-overview --json
+clawperator skills get com.android.settings.capture-overview
 ```
 
 ```json
@@ -9327,10 +9345,10 @@ clawperator skills get com.android.settings.capture-overview --json
 Use these commands to verify the three core discovery paths:
 
 ```bash
-clawperator skills list --json
-clawperator skills for-app com.android.settings --json
-clawperator skills search --app com.android.settings --json
-clawperator skills get com.android.settings.capture-overview --json
+clawperator skills list
+clawperator skills for-app com.android.settings
+clawperator skills search --app com.android.settings
+clawperator skills get com.android.settings.capture-overview
 ```
 
 Check these exact fields:
@@ -9372,7 +9390,7 @@ Top-level usage and lookup failures are exact:
 Current execution command:
 
 ```bash
-clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--timeout-ms <ms>] [--expect-contains <text>] [--skip-validate] [--json] [skill_args...]
+clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--timeout-ms <ms>] [--expect-contains <text>] [--skip-validate] [skill_args...]
 ```
 
 What the wrapper does:
@@ -9410,7 +9428,7 @@ Default execution values are exact:
 Use a JSON run first so you can verify the wrapper envelope separately from the skill's own stdout contract:
 
 ```bash
-clawperator skills run com.android.settings.capture-overview --timeout 3210 --json
+clawperator skills run com.android.settings.capture-overview --timeout 3210
 ```
 
 Success response:
@@ -9437,7 +9455,7 @@ Check these exact fields:
 To verify the wrapper-side readiness gate, run against a sleeping or locked device:
 
 ```bash
-clawperator skills run com.android.settings.capture-overview --device <device_serial> --json
+clawperator skills run com.android.settings.capture-overview --device <device_serial>
 ```
 
 Expected pre-spawn failure shape:
@@ -9452,7 +9470,7 @@ Expected pre-spawn failure shape:
 To verify wrapper-side output assertions, run:
 
 ```bash
-clawperator skills run com.android.settings.capture-overview --expect-contains RESULT --json
+clawperator skills run com.android.settings.capture-overview --expect-contains RESULT
 ```
 
 If the expected text is present, the success payload echoes the assertion:
@@ -9487,7 +9505,7 @@ Important:
 - the top-level wrapper `status` is `success`, `failed`, or `indeterminate`
 - when a declared verification contract is not proved, the wrapper returns `status: "indeterminate"` without rewriting the emitted `skillResult`
 - progress lines written by the skill to stdout remain inside `output` in JSON mode
-- pretty mode writes a banner before streaming live skill output, so use `--json` when another agent needs machine-readable output
+- pretty mode writes a banner before streaming live skill output, so use default JSON output when another agent needs machine-readable output
 - in JSON mode, the wrapper returns one JSON object and does not stream live child stdout separately
 - `timeoutMs` is present only when the caller passed `--timeout` or `--timeout-ms`
 - `expectedSubstring` is present only when the caller passed `--expect-contains`
@@ -9635,7 +9653,7 @@ For script-only skills, dry-run payload validation is skipped on purpose. The su
 Recovery depends on the error code:
 
 - `REGISTRY_READ_FAILED`: fix `CLAWPERATOR_SKILLS_REGISTRY`, run from the correct working directory, or reinstall the skills repo
-- `SKILL_NOT_FOUND`: confirm the exact `id` with `skills list --json` or `skills search --json`
+- `SKILL_NOT_FOUND`: confirm the exact `id` with `skills list` or `skills search`
 - `SKILL_VALIDATION_FAILED`: repair missing files, mismatched `skill.json` metadata, or invalid artifact payloads before rerunning
 - `SKILL_SCRIPT_NOT_FOUND`: fix the registry entry or restore the script on disk
 - `SKILL_EXECUTION_FAILED`: inspect `stdout`, `stderr`, and the skill script's exit code
@@ -9717,7 +9735,7 @@ Use this order:
 | Situation | Start here | Stop when |
 | --- | --- | --- |
 | An installed runtime skill already matches the request | `clawperator skills for-app`, `clawperator skills search`, `clawperator skills get` | You have a truthful runtime skill to run. |
-| Runtime-skill discovery returned no relevant match and you need the host-visible zero-results route | `clawperator bundled-skills list --json`, then `clawperator-skill-author-by-agent-discovery` | Discovery emits one artifact and chooses exactly one next step. |
+| Runtime-skill discovery returned no relevant match and you need the host-visible zero-results route | `clawperator bundled-skills list`, then `clawperator-skill-author-by-agent-discovery` | Discovery emits one artifact and chooses exactly one next step. |
 | Discovery returned `proceed_to_recording`, or the route is already well understood | `clawperator-skill-author-by-recording` | One recording-derived skill shape is authored and its self-test surfaces a `SkillResult`. |
 | You explicitly want the low-level manual scaffold instead of the installed guided workflows | `clawperator skills new <skill_id>` | The local scaffold exists and the registry entry was added. |
 
@@ -9744,7 +9762,7 @@ use this order:
    `clawperator skills search`.
 2. If runtime-skill discovery returns no relevant match and you need to inspect
    installed guided authoring workflows on the current host, run
-   `clawperator bundled-skills list --json`.
+   `clawperator bundled-skills list`.
 3. Start with `clawperator-skill-author-by-agent-discovery` as the zero-results front door.
 4. Use `clawperator-skill-author-by-recording` only after discovery returns
    `proceed_to_recording`, or when the route is already well understood.
@@ -9754,7 +9772,7 @@ use this order:
 Verification pattern:
 
 ```bash
-clawperator bundled-skills list --json
+clawperator bundled-skills list
 ```
 
 Expected signals:
@@ -9820,7 +9838,7 @@ Current packaged first-party bundled skills:
 | Skill | Role | Boundary |
 | --- | --- | --- |
 | `clawperator-agent-orientation` | first-run orientation | Routes an unfamiliar host agent to the correct Clawperator front door and canonical docs without redefining the contracts. |
-| `clawperator-upgrade` | whole-product upgrade route | Checks `clawperator --version`, verifies Node 24+ and Java 17/21, then uses `npm install -g clawperator@latest`, `clawperator install`, and `clawperator doctor --json`. Uses `install.sh` only as recovery when the CLI is not reachable or the bootstrap prerequisites need repair. |
+| `clawperator-upgrade` | whole-product upgrade route | Checks `clawperator --version`, verifies Node 24+ and Java 17/21, then uses `npm install -g clawperator@latest`, `clawperator install`, and `clawperator doctor`. Uses `install.sh` only as recovery when the CLI is not reachable or the bootstrap prerequisites need repair. |
 | `clawperator-skill-author-by-agent-discovery` | zero-results front door | Produces one discovery artifact, chooses exactly one next step, and does not author a durable runtime skill directly. |
 | `clawperator-skill-author-by-recording` | proving workflow | Records a real device flow, authors one skill shape, and runs one self-test that surfaces the emitted `SkillResult`. |
 
@@ -9870,16 +9888,16 @@ Current doctor behavior:
 Verification pattern:
 
 ```bash
-clawperator bundled-skills list --json
-clawperator doctor --json
+clawperator bundled-skills list
+clawperator doctor
 ```
 
 Expected signals:
 
-- `bundled-skills list --json` returns `installedDir` as
+- `bundled-skills list` returns `installedDir` as
   `~/.clawperator/bundled-skills/` or the resolved absolute equivalent on the
   current host
-- `doctor --json` includes a check with
+- `doctor` includes a check with
   `"id": "host.bundled-skills.staleness"`
 
 ## Recording-Driven Workflow Stance
@@ -9952,7 +9970,7 @@ Current `validateSkill` non-goals:
 Use this route when hardening a runtime skill:
 
 1. Discover installed guided authoring workflows with
-   `clawperator bundled-skills list --json` when you need a host-visible
+   `clawperator bundled-skills list` when you need a host-visible
    front door and runtime-skill discovery returned no relevant match.
 2. Start with `clawperator-skill-author-by-agent-discovery`, then move to
    `clawperator-skill-author-by-recording` only after discovery returns
@@ -10078,7 +10096,7 @@ Recommended source:
 - recording-derived selectors and path hints are starting evidence only; the
   authored skill still needs explicit control flow and truthful terminal
   verification
-- the saved `clawperator skills run --json` wrapper is the v1 compare input for `clawperator recording compare --result <file>`
+- the saved `clawperator skills run` JSON wrapper is the v1 compare input for `clawperator recording compare --result <file>`
 - the recording export baseline is reference evidence for compare and authoring, not a runtime input passed to the skill
 
 Recording-derived authoring truthfulness:
@@ -10185,7 +10203,7 @@ Success output with recording context adds the copied path:
 Verification:
 
 ```bash
-clawperator skills new com.example.recording.export-demo --recording-context ./recordings/export-demo.export.json --json
+clawperator skills new com.example.recording.export-demo --recording-context ./recordings/export-demo.export.json
 ```
 
 Check:
@@ -10373,13 +10391,13 @@ For `node_text_matches`, the runtime currently requires:
 This keeps `skill.json` claims tied to the shipped `SkillResult` contract instead
 of inventing a second result channel.
 
-Use `clawperator skills validate <skill_id> --json` to verify the file paths
+Use `clawperator skills validate <skill_id>` to verify the file paths
 and metadata match. After rerunning generated indexes in repos that own them,
-use `clawperator skills validate --all --json` for the repo-wide freshness
+use `clawperator skills validate --all` for the repo-wide freshness
 check:
 
 ```bash
-clawperator skills validate com.example.demo.capture-state --json
+clawperator skills validate com.example.demo.capture-state
 ```
 
 Success response:
@@ -10487,7 +10505,7 @@ agent is reading one definition while the wrapper is enforcing another.
 When an orchestrated skill misbehaves, start with the minimum durable evidence
 set before you rewrite the skill:
 
-1. The saved `clawperator skills run --json` wrapper result for that exact run.
+1. The saved `clawperator skills run` JSON wrapper result for that exact run.
 2. The forwarded agent stderr stream from that run.
 3. The emitted `SkillResult.checkpoints`.
 4. Compare output against the retained baseline, if the skill keeps
@@ -10522,7 +10540,7 @@ Recommended current debugging support for orchestrated harnesses:
 - keep a small `run-metadata.json` file describing device id, operator
   package, forwarded args, and output paths
 - keep the saved wrapper JSON or an equivalent stderr/stdout capture for the
-  exact `clawperator skills run --json` invocation you are debugging
+  exact `clawperator skills run` invocation you are debugging
 
 This matters because many orchestrated failures are not pure route failures.
 Common failure shapes include:
@@ -10756,7 +10774,7 @@ Current authoring rule for new non-trivial skills:
 - use `skillResult: null` only for legacy skills that have not yet been
   upgraded
 - if the skill is authored from a retained recording baseline, save a
-  `skills run --json` wrapper for the run you want to compare and feed that
+  `skills run` wrapper for the run you want to compare and feed that
   wrapper directly to `clawperator recording compare`
 
 Current compare contract for authored skills:
@@ -10770,7 +10788,7 @@ Current compare contract for authored skills:
 - compare classifies `diagnostics.runtimeState == "unavailable"` as
   `runtime_unavailable`
 - compare expects the baseline input to be a recording export artifact such as `references/compare-baseline.export.json`, not a parsed `recording parse` step log
-- compare accepts the full `skills run --json` wrapper as the durable `--result` input, not a hand-edited bare `SkillResult`
+- compare accepts the full `skills run` JSON wrapper as the durable `--result` input, not a hand-edited bare `SkillResult`
 - replay-style runs can succeed as `literal_match`
 - agent-driven runs can succeed as either `semantic_match` or `outcome_matches_path_differs`
 - v1 compare trust is enforced by fixture-backed Solax regression coverage, not by a generic per-skill compare contract
@@ -10785,8 +10803,8 @@ Version handling:
 Validate the registry entry first, then run the scaffolded skill through the wrapper:
 
 ```bash
-clawperator skills validate com.example.demo.capture-state --dry-run --json
-clawperator skills run com.example.demo.capture-state --device <device_serial> --json
+clawperator skills validate com.example.demo.capture-state --dry-run
+clawperator skills run com.example.demo.capture-state --device <device_serial>
 ```
 
 For the run result, verify:
@@ -10902,7 +10920,7 @@ So `climate-status` and `climate-status.recipe.json` produce the same default `c
 Run the compiler with JSON output, then validate the result as a normal execution payload:
 
 ```bash
-clawperator skills compile-artifact com.google.android.apps.chromecast.app.get-climate --artifact climate-status --vars '{"CLIMATE_TILE_NAME":"Master"}' --json
+clawperator skills compile-artifact com.google.android.apps.chromecast.app.get-climate --artifact climate-status --vars '{"CLIMATE_TILE_NAME":"Master"}'
 ```
 
 Success shape:
@@ -11057,9 +11075,9 @@ If an artifact-backed skill compiles to an invalid execution shape, `skills vali
 Use:
 
 ```bash
-clawperator skills validate com.example.demo.capture-state --json
-clawperator skills validate com.example.demo.capture-state --dry-run --json
-clawperator skills validate --all --dry-run --json
+clawperator skills validate com.example.demo.capture-state
+clawperator skills validate com.example.demo.capture-state --dry-run
+clawperator skills validate --all --dry-run
 ```
 
 Check:
@@ -11134,11 +11152,11 @@ Registry write or filesystem write failures surface as `SKILLS_SCAFFOLD_FAILED`.
 Run:
 
 ```bash
-clawperator skills new com.example.app.do-thing --summary "Do one deterministic workflow" --json
-clawperator skills get com.example.app.do-thing --json
-clawperator skills validate com.example.app.do-thing --json
+clawperator skills new com.example.app.do-thing --summary "Do one deterministic workflow"
+clawperator skills get com.example.app.do-thing
+clawperator skills validate com.example.app.do-thing
 ./scripts/generate_skill_indexes.sh
-clawperator skills validate --all --json
+clawperator skills validate --all
 ```
 
 Confirm:
@@ -11171,7 +11189,7 @@ So for authoring:
 
 - keep `skill.json` and the registry in sync
 - let `skills validate --dry-run` prove skill-local artifact payloads
-- use `skills new --json`, then verify with `skills get --json` and `skills validate --json`; if the repo owns generated indexes, rerun the generator and finish with `skills validate --all --json`
+- use `skills new`, then verify with `skills get` and `skills validate`; if the repo owns generated indexes, rerun the generator and finish with `skills validate --all`
 - use `skills compile-artifact` when a workflow should compile into deterministic execution JSON
 - treat `SKILL.md` as required documentation, but do not overstate its current machine enforcement
 
@@ -11253,8 +11271,8 @@ Success response:
 Verification pattern:
 
 ```bash
-clawperator skills new com.example.app.do-thing --summary "Do one deterministic workflow" --json
-clawperator skills get com.example.app.do-thing --json
+clawperator skills new com.example.app.do-thing --summary "Do one deterministic workflow"
+clawperator skills get com.example.app.do-thing
 ```
 
 Confirm:
@@ -11379,8 +11397,8 @@ All-skills success response:
 Verification pattern:
 
 ```bash
-clawperator skills validate com.example.app.do-thing --dry-run --json
-clawperator skills validate --all --dry-run --json
+clawperator skills validate com.example.app.do-thing --dry-run
+clawperator skills validate --all --dry-run
 ```
 
 Check:
@@ -11436,7 +11454,7 @@ Common validation failures:
 Use explicit device targeting when more than one device is connected:
 
 ```bash
-clawperator skills run com.example.app.do-thing --device <device_serial> --operator-package com.clawperator.operator.dev --timeout 90000 --json
+clawperator skills run com.example.app.do-thing --device <device_serial> --operator-package com.clawperator.operator.dev --timeout 90000
 ```
 
 Argument rules:
@@ -11462,7 +11480,7 @@ Exact wrapper rules to keep in mind:
 Verification pattern:
 
 ```bash
-clawperator skills run com.example.app.do-thing --device <device_serial> --operator-package com.clawperator.operator.dev --timeout 90000 --json
+clawperator skills run com.example.app.do-thing --device <device_serial> --operator-package com.clawperator.operator.dev --timeout 90000
 ```
 
 First-time agent pitfall:
@@ -11555,7 +11573,7 @@ Assertion failure shape:
 Verification pattern:
 
 ```bash
-clawperator skills run com.example.app.do-thing --device <device_serial> --expect-contains RESULT --json
+clawperator skills run com.example.app.do-thing --device <device_serial> --expect-contains RESULT
 ```
 
 Check that:
@@ -11664,7 +11682,7 @@ Behavior:
 
 Exact success shapes:
 
-`skills install --json`:
+`skills install`:
 
 ```json
 {
@@ -11674,7 +11692,7 @@ Exact success shapes:
 }
 ```
 
-`skills update --json` and `skills sync --ref <git-ref> --json`:
+`skills update` and `skills sync --ref <git-ref>`:
 
 ```json
 {
@@ -11686,16 +11704,16 @@ Exact success shapes:
 Verification pattern:
 
 ```bash
-clawperator skills install --json
-clawperator skills update --json
-clawperator skills sync --ref main --json
+clawperator skills install
+clawperator skills update
+clawperator skills sync --ref main
 ```
 
 Check:
 
 - `synced` is `true`
 - `registryPath` from `skills install` ends with `~/.clawperator/skills/skills/skills-registry.json`
-- after install, `clawperator skills list --json` succeeds in a fresh shell without exporting `CLAWPERATOR_SKILLS_REGISTRY`
+- after install, `clawperator skills list` succeeds in a fresh shell without exporting `CLAWPERATOR_SKILLS_REGISTRY`
 - set `CLAWPERATOR_SKILLS_REGISTRY` only when pointing at a non-standard registry path
 
 Common sync failures:
@@ -11805,8 +11823,8 @@ Fix:
 ```bash
 clawperator skills new com.example.app.do-thing --summary "Describe it"
 clawperator skills validate com.example.app.do-thing --dry-run
-clawperator skills run com.example.app.do-thing --device <device_serial> --operator-package com.clawperator.operator.dev --json
-clawperator skills run com.example.app.do-thing --device <device_serial> --expect-contains RESULT --json
+clawperator skills run com.example.app.do-thing --device <device_serial> --operator-package com.clawperator.operator.dev
+clawperator skills run com.example.app.do-thing --device <device_serial> --expect-contains RESULT
 ```
 
 Repeat until:
@@ -11851,7 +11869,7 @@ Before `clawperator skills run`, the target should already satisfy the normal Cl
 Recommended verification:
 
 ```bash
-clawperator doctor --json --device <device_serial>
+clawperator doctor --device <device_serial>
 ```
 
 Treat the device as ready only when:
@@ -11862,7 +11880,7 @@ Treat the device as ready only when:
 
 Verification pattern:
 
-- run `clawperator doctor --json --device <device_serial> --operator-package <package>`
+- run `clawperator doctor --device <device_serial> --operator-package <package>`
 - confirm `report.operatorPackage` matches the package you plan to use inside the skill
 - confirm the doctor report is for the same `deviceId` you plan to pass to `skills run`
 
@@ -11889,7 +11907,7 @@ Wrapper-level non-interactive failure shape:
 }
 ```
 
-Use `clawperator doctor --json` when you need the structured evidence fields
+Use `clawperator doctor` when you need the structured evidence fields
 (`screenOn`, `deviceLocked`, `userUnlocked`) that explain why the device is not
 ready.
 
@@ -11928,10 +11946,10 @@ Verification pattern:
 
 ```bash
 CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
-clawperator skills run com.android.settings.capture-overview --json
+clawperator skills run com.android.settings.capture-overview
 
 CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
-clawperator skills run com.android.settings.capture-overview --operator-package com.clawperator.operator --json
+clawperator skills run com.android.settings.capture-overview --operator-package com.clawperator.operator
 ```
 
 Then verify the skill's internal `clawperator` calls behave against the intended package. When you need stronger confirmation, add a deliberate internal probe inside the skill script and inspect the raw `output`.
@@ -11959,7 +11977,7 @@ when they are run through the wrapper with explicit device targeting.
 Verification pattern:
 
 ```bash
-clawperator skills run com.example.app.do-thing --device <device_serial> --json -- --mode smoke
+clawperator skills run com.example.app.do-thing --device <device_serial> -- --mode smoke
 ```
 
 Confirm that your script receives:
@@ -12007,7 +12025,7 @@ Top-level timeout parsing failures happen before the skill starts:
 Verification pattern:
 
 ```bash
-clawperator skills run com.android.settings.capture-overview --timeout 3210 --json
+clawperator skills run com.android.settings.capture-overview --timeout 3210
 ```
 
 Check:
@@ -12089,7 +12107,7 @@ The pretty banner contains these exact components:
 
 Verification pattern:
 
-- use `--json` when another tool needs parseable output
+- use the default JSON output when another tool needs parseable output
 - use pretty mode when a human operator wants the banner plus streamed skill output
 - if pretty mode shows an APK warning or failure, fix the package/device setup before assuming the skill logic is wrong
 
@@ -12159,7 +12177,7 @@ Another common failure is a bad registry or missing script:
 ```json
 {
   "code": "REGISTRY_READ_FAILED",
-  "message": "Registry not found at configured path: /tmp/missing-registry.json. The installed registry normally lives at ~/.clawperator/skills/skills/skills-registry.json. Fix CLAWPERATOR_SKILLS_REGISTRY, unset it to use the installed copy, then rerun clawperator skills list --json, or run clawperator skills install."
+  "message": "Registry not found at configured path: /tmp/missing-registry.json. The installed registry normally lives at ~/.clawperator/skills/skills/skills-registry.json. Fix CLAWPERATOR_SKILLS_REGISTRY, unset it to use the installed copy, then rerun clawperator skills list, or run clawperator skills install."
 }
 ```
 
@@ -12182,7 +12200,7 @@ Another common failure is a bad registry or missing script:
 Recovery patterns:
 
 - `REGISTRY_READ_FAILED`: run `clawperator skills install` to restore the registry at the installed home path (`~/.clawperator/skills/skills/skills-registry.json`); if `CLAWPERATOR_SKILLS_REGISTRY` is set to a custom path, fix or unset that variable
-- `SKILL_NOT_FOUND`: confirm the exact registry `id` with `clawperator skills list --json`
+- `SKILL_NOT_FOUND`: confirm the exact registry `id` with `clawperator skills list`
 - `SKILL_SCRIPT_NOT_FOUND`: repair the registry entry or restore the script file on disk
 - `SKILL_EXECUTION_FAILED`: inspect `exitCode`, `stdout`, and `stderr`
 - `SKILL_EXECUTION_TIMEOUT`: inspect partial `stdout` and only then consider increasing `--timeout`
@@ -12193,7 +12211,7 @@ Recovery patterns:
 - gate device readiness with `doctor` before blaming the skill
 - pass `--device` explicitly in multi-device environments
 - pass `--operator-package com.clawperator.operator.dev` for local debug APK workflows
-- prefer `--json` for machine-consumed skill runs so the pretty banner does not pollute stdout
+- prefer default JSON output for machine-consumed skill runs so the pretty banner does not pollute stdout
 - inspect partial stdout and stderr on failures before rerunning blindly
 
 ## Related Pages
@@ -12271,9 +12289,9 @@ Successful setup returns all three phase objects plus a follow-up message:
 Verification pattern after any repair:
 
 ```bash
-clawperator operator setup --apk <path> --device <device_serial> --operator-package <package> --json
-clawperator doctor --json --device <device_serial> --operator-package <package>
-clawperator snapshot --json --device <device_serial> --operator-package <package>
+clawperator operator setup --apk <path> --device <device_serial> --operator-package <package>
+clawperator doctor --device <device_serial> --operator-package <package>
+clawperator snapshot --device <device_serial> --operator-package <package>
 ```
 
 Treat the repair as complete only when:
@@ -12281,7 +12299,7 @@ Treat the repair as complete only when:
 - `operator setup` returns `install.ok: true`, successful permission objects, and `verification.ok: true`
 - doctor reports `criticalOk: true`
 - `readiness.apk.presence` and `readiness.handshake` are both passing checks
-- `snapshot --json` returns a success envelope
+- `snapshot` returns a success envelope
 
 ## Installation Failures
 
@@ -12421,7 +12439,7 @@ Recovery:
 
 ```bash
 clawperator grant-device-permissions --device <device_serial> --operator-package <package>
-clawperator doctor --json --device <device_serial> --operator-package <package>
+clawperator doctor --device <device_serial> --operator-package <package>
 ```
 
 Check the doctor response for:
@@ -12451,7 +12469,7 @@ Typical cases:
 | `com.clawperator.operator` | `com.clawperator.operator.dev` | pass `--operator-package com.clawperator.operator.dev` or reinstall release |
 | `com.clawperator.operator.dev` | `com.clawperator.operator` | pass `--operator-package com.clawperator.operator` or reinstall debug |
 
-Use `clawperator doctor --json` to confirm which variant the readiness check found.
+Use `clawperator doctor` to confirm which variant the readiness check found.
 
 The readiness check emits a warning, not a hard setup failure:
 
@@ -12489,7 +12507,7 @@ Exact doctor failure shape:
   "status": "fail",
   "code": "RESULT_ENVELOPE_TIMEOUT",
   "summary": "Handshake timed out.",
-  "detail": "No [Clawperator-Result] envelope received within 7000ms. Broadcast dispatch: sent. Operator package: com.clawperator.operator.dev. Device: <device_serial>. No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --json --device <device_serial> --operator-package <package>' to diagnose."
+  "detail": "No [Clawperator-Result] envelope received within 7000ms. Broadcast dispatch: sent. Operator package: com.clawperator.operator.dev. Device: <device_serial>. No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --device <device_serial> --operator-package <package>' to diagnose."
 }
 ```
 
@@ -12500,7 +12518,7 @@ Recommended recovery:
 ```bash
 clawperator grant-device-permissions --device <device_serial> --operator-package <package>
 clawperator snapshot --device <device_serial> --operator-package <package> --timeout 5000 --verbose
-clawperator doctor --json --device <device_serial> --operator-package <package>
+clawperator doctor --device <device_serial> --operator-package <package>
 ```
 
 ### `BROADCAST_FAILED`
@@ -12533,7 +12551,7 @@ Typical failure shape:
 Recovery pattern:
 
 - if the package is missing, reinstall with `clawperator operator setup --apk <path> ...`
-- if the package is present, rerun `doctor --json --verbose` and inspect the handshake detail plus `adb logcat`
+- if the package is present, rerun `doctor --verbose` and inspect the handshake detail plus `adb logcat`
 
 ## Crash Recovery
 
@@ -12545,11 +12563,11 @@ There is no dedicated "operator crashed" error code in the Node API. In practice
 
 Recovery sequence:
 
-1. rerun `clawperator doctor --json --device <serial> --operator-package <pkg>`
+1. rerun `clawperator doctor --device <serial> --operator-package <pkg>`
 2. if accessibility is down, run `clawperator grant-device-permissions ...`
 3. if package presence is wrong or missing, rerun `clawperator operator setup --apk <path> ...`
 4. rerun `doctor`
-5. confirm with `clawperator snapshot --json ...`
+5. confirm with `clawperator snapshot ...`
 
 The runtime hint generated by execution failures also points here. When accessibility is down, `runExecution.ts` adds a hint like:
 
@@ -12593,17 +12611,17 @@ Verification pattern:
 Use this order for a broken Operator state:
 
 1. verify device connectivity with `clawperator devices`
-2. run `clawperator doctor --json --device <serial> --operator-package <pkg>`
+2. run `clawperator doctor --device <serial> --operator-package <pkg>`
 3. fix permissions with `clawperator grant-device-permissions ...` if accessibility is the problem
 4. rerun `clawperator operator setup --apk <path> ...` if install or variant state is wrong
 5. rerun `doctor`
-6. confirm with `clawperator snapshot --json ...`
+6. confirm with `clawperator snapshot ...`
 
 ## What Success Looks Like
 
 Treat the Operator as recovered only when:
 
-- `doctor --json` returns `criticalOk: true`
+- `doctor` returns `criticalOk: true`
 - `checks` includes a passing `readiness.apk.presence`
 - `checks` includes a passing `readiness.handshake`
 - a follow-up `snapshot` returns `envelope.status == "success"`
@@ -12673,7 +12691,7 @@ What this page does mean:
 
 - there is no currently maintained, code-backed list of known issues in `apps/node/src/`
 - common operational failures are documented under exact error-code pages such as [Operator App](operator.md) and [Version Compatibility](compatibility.md)
-- agents should use live checks like `doctor --json`, `version --check-compat --json`, and command-specific error payloads instead of assuming a hidden issue catalog exists
+- agents should use live checks like `doctor`, `version --check-compat`, and command-specific error payloads instead of assuming a hidden issue catalog exists
 
 What this page does not mean:
 
@@ -12686,9 +12704,9 @@ What this page does not mean:
 When you suspect a current issue, verify it with a reproducible command and its exact JSON output:
 
 ```bash
-clawperator doctor --json --device <device_serial> --operator-package <package>
-clawperator version --check-compat --json --device <device_serial> --operator-package <package>
-clawperator snapshot --json --device <device_serial> --operator-package <package>
+clawperator doctor --device <device_serial> --operator-package <package>
+clawperator version --check-compat --device <device_serial> --operator-package <package>
+clawperator snapshot --device <device_serial> --operator-package <package>
 ```
 
 Use those outputs to decide where the issue belongs:
@@ -12720,12 +12738,12 @@ When investigating issues:
 1. **Check versions first** - Many issues are version mismatches:
    ```bash
    clawperator version
-   clawperator version --check-compat --json --device <device_serial> --operator-package <package>
+   clawperator version --check-compat --device <device_serial> --operator-package <package>
    ```
 
 2. **Run doctor** for a comprehensive health check:
    ```bash
-   clawperator doctor --json --device <device_serial> --operator-package <package>
+   clawperator doctor --device <device_serial> --operator-package <package>
    ```
 
 3. **Stream logs** to see what is happening in real time:
@@ -12834,10 +12852,10 @@ Failing doctor example:
 }
 ```
 
-Direct CLI compatibility checks use `clawperator version --check-compat --json` and return a top-level probe result:
+Direct CLI compatibility checks use `clawperator version --check-compat` and return a top-level probe result:
 
 ```bash
-clawperator version --check-compat --json --device <device_serial> --operator-package com.clawperator.operator.dev
+clawperator version --check-compat --device <device_serial> --operator-package com.clawperator.operator.dev
 ```
 
 Compatible response:
@@ -12898,8 +12916,8 @@ Important consequences:
 Use both surfaces when diagnosing version state:
 
 ```bash
-clawperator version --check-compat --json --device <device_serial> --operator-package <package>
-clawperator doctor --json --device <device_serial> --operator-package <package>
+clawperator version --check-compat --device <device_serial> --operator-package <package>
+clawperator doctor --device <device_serial> --operator-package <package>
 ```
 
 Check:
@@ -13007,7 +13025,7 @@ Concrete failure shapes:
 If `APK_VERSION_UNREADABLE` or `APK_VERSION_INVALID` occurs:
 
 - reinstall the Operator APK
-- rerun `clawperator doctor --json`
+- rerun `clawperator doctor`
 
 Concrete failure shapes:
 
@@ -13029,9 +13047,9 @@ Concrete failure shapes:
 
 If `DEVICE_SHELL_UNAVAILABLE` occurs:
 
-- verify the device is still connected and authorized in `clawperator devices --json`
+- verify the device is still connected and authorized in `clawperator devices`
 - confirm adb shell works directly with `adb -s <device_serial> shell true`
-- rerun `clawperator doctor --json --device <device_serial> --operator-package <package>`
+- rerun `clawperator doctor --device <device_serial> --operator-package <package>`
 
 This code blocks compatibility probing before version metadata can be read from the device.
 
@@ -13040,7 +13058,7 @@ This code blocks compatibility probing before version metadata can be read from 
 Treat compatibility as healthy only when:
 
 - `readiness.version.compatibility.status == "pass"`
-- or `clawperator version --check-compat --json` shows `compatible: true`
+- or `clawperator version --check-compat` shows `compatible: true`
 
 Do not infer compatibility from app presence alone.
 

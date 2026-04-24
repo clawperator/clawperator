@@ -366,7 +366,7 @@ describe("CLI help", () => {
     assert.strictEqual(pretty.message, "timeoutMs must be a finite number");
   });
 
-  it("lists --json under Global options in top-level help", async () => {
+  it("lists --json as an alias under Global options in top-level help", async () => {
     const { stdout, code } = await runCli(["--help"]);
     assert.strictEqual(code, 0);
     const globalIdx = stdout.indexOf("Global options:\n");
@@ -376,9 +376,23 @@ describe("CLI help", () => {
       notesIdx === -1 ? stdout.slice(globalIdx) : stdout.slice(globalIdx, notesIdx);
     assert.match(
       globalBlock,
-      /\n  --json\s+/,
-      "expected --json as an indented global option line",
+      /\n  --json\s+Alias for --output json/,
+      "expected --json as an indented alias line",
     );
+    assert.match(globalBlock, /--output <json\|pretty>\s+Output format \(default: json\)/);
+    assert.ok(
+      globalBlock.indexOf("--output <json|pretty>") < globalBlock.indexOf("--json"),
+      "expected preferred --output form to appear before the alias",
+    );
+  });
+
+  it("shows common device actions without requiring --json in top-level help", async () => {
+    const { stdout, code } = await runCli(["--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /snapshot \[--device <id>\] \[--operator-package <pkg>\]/);
+    assert.match(stdout, /read --text <text> \| --id <id> \| --role <role> \[--device <id>\] \[--operator-package <pkg>\]/);
+    assert.doesNotMatch(stdout, /snapshot .*--json/);
+    assert.doesNotMatch(stdout, /read --text .*--json/);
   });
 
   it("shows recording as canonical command in top-level help", async () => {
@@ -725,9 +739,11 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     const { stdout, code } = await runCli(["snapshot", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator snapshot/);
+    assert.match(stdout, /--output <json\|pretty>\s+Output format \(default: json\)/);
     assert.match(stdout, /--timeout <ms>/);
     assert.match(stdout, /bundled-skills list/);
     assert.match(stdout, /clawperator-agent-orientation/);
+    assert.doesNotMatch(stdout, /--json\s+JSON output/);
     assert.doesNotMatch(stdout, /--file/);
   });
 
@@ -744,6 +760,8 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator click/);
     assert.match(stdout, /--selector/);
+    assert.match(stdout, /--output <json\|pretty>\s+Output format \(default: json\)/);
+    assert.doesNotMatch(stdout, /--json\s+JSON output/);
   });
 
   it("click with no selector returns MISSING_SELECTOR with exit code 1", async () => {

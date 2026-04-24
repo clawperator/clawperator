@@ -453,7 +453,7 @@ Expected success shape:
 If a live run returns `RESULT_ENVELOPE_MALFORMED`, treat it as a transport-contract failure rather than a normal action timeout. Recovery:
 
 - rerun once to rule out transient logcat noise
-- if it repeats, check CLI and APK compatibility with `clawperator version --check-compat --json`
+- if it repeats, check CLI and APK compatibility with `clawperator version --check-compat`
 - rerun the failing command with `--verbose` and inspect Android-side logs
 
 ## Common Mistakes

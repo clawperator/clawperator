@@ -187,7 +187,7 @@ def test_rescore_preserves_skill_generation_gate(tmp_path):
         },
     )
     (run_dir / "transcript.txt").write_text(
-        '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator bundled-skills list --json"}}\n'
+        '{"type":"item.completed","item":{"type":"command_execution","command":"clawperator bundled-skills list"}}\n'
         "CLAWPERATOR_EVAL_ANSWER: 15\n",
         encoding="utf-8",
     )

@@ -44,7 +44,7 @@ Use these instead of parsing the HTML docs site.
 Run:
 
 ```bash
-clawperator doctor --json
+clawperator doctor
 ```
 
 Continue only when:
@@ -72,7 +72,7 @@ Use this decision table:
 
 | Situation | Start here |
 | --- | --- |
-| You are trying to solve a user-facing app workflow and want an installed runtime skill first | `clawperator skills for-app <package_id> --json` or `clawperator skills search --keyword <text> --json` |
+| You are trying to solve a user-facing app workflow and want an installed runtime skill first | `clawperator skills for-app <package_id>` or `clawperator skills search --keyword <text>` |
 | Runtime-skill discovery found no relevant match and you need the truthful zero-results route | `clawperator-skill-author-by-agent-discovery` |
 | Discovery returned `proceed_to_recording`, or the app route is already well understood and now needs a proving workflow | `clawperator-skill-author-by-recording` |
 | The host already supports stdio MCP and wants registered tools | `clawperator mcp serve` |
@@ -91,17 +91,17 @@ Do not run every surface "just to look around". Use one route-specific probe:
 
 | Chosen route | First probe |
 | --- | --- |
-| runtime skills with known package id | `clawperator skills for-app <package_id> --json` |
-| runtime skills with only user-language terms | `clawperator skills search --keyword <text> --json` |
-| zero-results authoring route | `clawperator bundled-skills list --json` |
-| proving workflow | `clawperator bundled-skills list --json` |
+| runtime skills with known package id | `clawperator skills for-app <package_id>` |
+| runtime skills with only user-language terms | `clawperator skills search --keyword <text>` |
+| zero-results authoring route | `clawperator bundled-skills list` |
+| proving workflow | `clawperator bundled-skills list` |
 | MCP | `clawperator mcp serve` |
-| raw CLI / direct actions | `clawperator snapshot --json --device <device_serial>` |
+| raw CLI / direct actions | `clawperator snapshot --device <device_serial>` |
 
 Rules:
 
-- do not start runtime-skill discovery with `clawperator skills list --json` unless the real task is inventory
-- do not inspect `clawperator bundled-skills list --json` before runtime-skill discovery unless the route is already known to be authoring
+- do not start runtime-skill discovery with `clawperator skills list` unless the real task is inventory
+- do not inspect `clawperator bundled-skills list` before runtime-skill discovery unless the route is already known to be authoring
 - do not start `clawperator mcp serve` unless the host has already chosen MCP as the transport
 - for the raw CLI route, use `snapshot` as the first observe step before attempting direct actions
 
@@ -114,7 +114,7 @@ actions, and acts on the device with the smallest truthful command surface.
 
 Name one command or one URL - not a taxonomy. Examples of good endings:
 
-- "Your next step is `clawperator skills for-app <package_id> --json`."
+- "Your next step is `clawperator skills for-app <package_id>`."
 - "Runtime-skill discovery returned zero matches. Use `clawperator-skill-author-by-agent-discovery` next. See `https://docs.clawperator.com/host-agents/`."
 - "The route is already known. Use `clawperator-skill-author-by-recording` next. See `https://docs.clawperator.com/skills/authoring/`."
 - "Your host wants MCP tools. Start `clawperator mcp serve` and use `https://docs.clawperator.com/api/mcp/`."

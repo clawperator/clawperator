@@ -24,7 +24,7 @@ Before `clawperator skills run`, the target should already satisfy the normal Cl
 Recommended verification:
 
 ```bash
-clawperator doctor --json --device <device_serial>
+clawperator doctor --device <device_serial>
 ```
 
 Treat the device as ready only when:
@@ -35,7 +35,7 @@ Treat the device as ready only when:
 
 Verification pattern:
 
-- run `clawperator doctor --json --device <device_serial> --operator-package <package>`
+- run `clawperator doctor --device <device_serial> --operator-package <package>`
 - confirm `report.operatorPackage` matches the package you plan to use inside the skill
 - confirm the doctor report is for the same `deviceId` you plan to pass to `skills run`
 
@@ -62,7 +62,7 @@ Wrapper-level non-interactive failure shape:
 }
 ```
 
-Use `clawperator doctor --json` when you need the structured evidence fields
+Use `clawperator doctor` when you need the structured evidence fields
 (`screenOn`, `deviceLocked`, `userUnlocked`) that explain why the device is not
 ready.
 
@@ -101,10 +101,10 @@ Verification pattern:
 
 ```bash
 CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
-clawperator skills run com.android.settings.capture-overview --json
+clawperator skills run com.android.settings.capture-overview
 
 CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev \
-clawperator skills run com.android.settings.capture-overview --operator-package com.clawperator.operator --json
+clawperator skills run com.android.settings.capture-overview --operator-package com.clawperator.operator
 ```
 
 Then verify the skill's internal `clawperator` calls behave against the intended package. When you need stronger confirmation, add a deliberate internal probe inside the skill script and inspect the raw `output`.
@@ -132,7 +132,7 @@ when they are run through the wrapper with explicit device targeting.
 Verification pattern:
 
 ```bash
-clawperator skills run com.example.app.do-thing --device <device_serial> --json -- --mode smoke
+clawperator skills run com.example.app.do-thing --device <device_serial> -- --mode smoke
 ```
 
 Confirm that your script receives:
@@ -180,7 +180,7 @@ Top-level timeout parsing failures happen before the skill starts:
 Verification pattern:
 
 ```bash
-clawperator skills run com.android.settings.capture-overview --timeout 3210 --json
+clawperator skills run com.android.settings.capture-overview --timeout 3210
 ```
 
 Check:
@@ -262,7 +262,7 @@ The pretty banner contains these exact components:
 
 Verification pattern:
 
-- use `--json` when another tool needs parseable output
+- use the default JSON output when another tool needs parseable output
 - use pretty mode when a human operator wants the banner plus streamed skill output
 - if pretty mode shows an APK warning or failure, fix the package/device setup before assuming the skill logic is wrong
 
@@ -332,7 +332,7 @@ Another common failure is a bad registry or missing script:
 ```json
 {
   "code": "REGISTRY_READ_FAILED",
-  "message": "Registry not found at configured path: /tmp/missing-registry.json. The installed registry normally lives at ~/.clawperator/skills/skills/skills-registry.json. Fix CLAWPERATOR_SKILLS_REGISTRY, unset it to use the installed copy, then rerun clawperator skills list --json, or run clawperator skills install."
+  "message": "Registry not found at configured path: /tmp/missing-registry.json. The installed registry normally lives at ~/.clawperator/skills/skills/skills-registry.json. Fix CLAWPERATOR_SKILLS_REGISTRY, unset it to use the installed copy, then rerun clawperator skills list, or run clawperator skills install."
 }
 ```
 
@@ -355,7 +355,7 @@ Another common failure is a bad registry or missing script:
 Recovery patterns:
 
 - `REGISTRY_READ_FAILED`: run `clawperator skills install` to restore the registry at the installed home path (`~/.clawperator/skills/skills/skills-registry.json`); if `CLAWPERATOR_SKILLS_REGISTRY` is set to a custom path, fix or unset that variable
-- `SKILL_NOT_FOUND`: confirm the exact registry `id` with `clawperator skills list --json`
+- `SKILL_NOT_FOUND`: confirm the exact registry `id` with `clawperator skills list`
 - `SKILL_SCRIPT_NOT_FOUND`: repair the registry entry or restore the script file on disk
 - `SKILL_EXECUTION_FAILED`: inspect `exitCode`, `stdout`, and `stderr`
 - `SKILL_EXECUTION_TIMEOUT`: inspect partial `stdout` and only then consider increasing `--timeout`
@@ -366,7 +366,7 @@ Recovery patterns:
 - gate device readiness with `doctor` before blaming the skill
 - pass `--device` explicitly in multi-device environments
 - pass `--operator-package com.clawperator.operator.dev` for local debug APK workflows
-- prefer `--json` for machine-consumed skill runs so the pretty banner does not pollute stdout
+- prefer default JSON output for machine-consumed skill runs so the pretty banner does not pollute stdout
 - inspect partial stdout and stderr on failures before rerunning blindly
 
 ## Related Pages
