@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.7.7] - 2026-04-25
+
+This release advances the code version to 0.7.7 and tightens release publishing checks so future releases fail closed when the changelog entry is missing.
+
+Pull requests:
+- [fix(release): gate npm publish on changelog entry](https://github.com/clawperator/clawperator/pull/235)
+
 ## [0.7.6] - 2026-04-25
 
 This release hardens snapshot extraction so interleaved Android logcat noise no longer contaminates captured hierarchy XML.
