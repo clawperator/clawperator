@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.7.6] - 2026-04-25
+
+This release hardens snapshot extraction so interleaved Android logcat noise no longer contaminates captured hierarchy XML.
+
+### 🤖 Node API & CLI
+- **Fixed:** Preserved the parsed logcat tag while assembling snapshot blocks so `snapshot_ui` output no longer absorbs unrelated system lines like `Updating configuration...` into `data.text`.
+
+Pull requests:
+- [fix(node): prevent snapshot XML contamination](https://github.com/clawperator/clawperator/pull/234)
+
 ## [0.7.5] - 2026-04-24
 
 This release formalizes the JSON-by-default CLI contract across command help, docs, bundled skills, and read workflows so agent integrations can rely on structured output without extra selectors.
