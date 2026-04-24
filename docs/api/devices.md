@@ -170,7 +170,7 @@ For automation, prefer this pattern even when only one device is currently conne
 Example:
 
 ```bash
-clawperator snapshot --json --device emulator-5554
+clawperator snapshot --device emulator-5554
 ```
 
 Success condition:
@@ -203,7 +203,7 @@ Use `--operator-package com.clawperator.operator.dev` when:
 Recommended deterministic pairing:
 
 ```bash
-clawperator snapshot --json --device emulator-5554 --operator-package com.clawperator.operator.dev
+clawperator snapshot --device emulator-5554 --operator-package com.clawperator.operator.dev
 ```
 
 ## Common Failure Modes
@@ -249,13 +249,13 @@ clawperator devices
 Doctor on one target:
 
 ```bash
-clawperator doctor --json --device <device_serial>
+clawperator doctor --device <device_serial>
 ```
 
 Snapshot against the debug Operator package:
 
 ```bash
-clawperator snapshot --json --device <device_serial> --operator-package com.clawperator.operator.dev
+clawperator snapshot --device <device_serial> --operator-package com.clawperator.operator.dev
 ```
 
 Execute a payload on one target:

@@ -759,7 +759,7 @@ describe("loadRegistry", () => {
         `Expected message to include installed registry path, got: ${parsed.message}`
       );
       assert.ok(
-        parsed.message?.includes("clawperator skills list --json"),
+        parsed.message?.includes("clawperator skills list"),
         `Expected message to include next-step command, got: ${parsed.message}`
       );
       assert.ok(
@@ -771,7 +771,7 @@ describe("loadRegistry", () => {
         `Expected stderr to include installed registry path, got: ${child.stderr}`
       );
       assert.ok(
-        child.stderr.includes("clawperator skills list --json"),
+        child.stderr.includes("clawperator skills list"),
         `Expected stderr to include next-step command, got: ${child.stderr}`
       );
     } finally {
@@ -821,7 +821,7 @@ describe("loadRegistry", () => {
         `Expected message to include installed registry path, got: ${parsed.message}`
       );
       assert.ok(
-        parsed.message?.includes("clawperator skills list --json"),
+        parsed.message?.includes("clawperator skills list"),
         `Expected message to include next-step command, got: ${parsed.message}`
       );
       assert.ok(

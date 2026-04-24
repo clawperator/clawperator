@@ -82,10 +82,10 @@ Failing doctor example:
 }
 ```
 
-Direct CLI compatibility checks use `clawperator version --check-compat --json` and return a top-level probe result:
+Direct CLI compatibility checks use `clawperator version --check-compat` and return a top-level probe result:
 
 ```bash
-clawperator version --check-compat --json --device <device_serial> --operator-package com.clawperator.operator.dev
+clawperator version --check-compat --device <device_serial> --operator-package com.clawperator.operator.dev
 ```
 
 Compatible response:
@@ -146,8 +146,8 @@ Important consequences:
 Use both surfaces when diagnosing version state:
 
 ```bash
-clawperator version --check-compat --json --device <device_serial> --operator-package <package>
-clawperator doctor --json --device <device_serial> --operator-package <package>
+clawperator version --check-compat --device <device_serial> --operator-package <package>
+clawperator doctor --device <device_serial> --operator-package <package>
 ```
 
 Check:
@@ -255,7 +255,7 @@ Concrete failure shapes:
 If `APK_VERSION_UNREADABLE` or `APK_VERSION_INVALID` occurs:
 
 - reinstall the Operator APK
-- rerun `clawperator doctor --json`
+- rerun `clawperator doctor`
 
 Concrete failure shapes:
 
@@ -277,9 +277,9 @@ Concrete failure shapes:
 
 If `DEVICE_SHELL_UNAVAILABLE` occurs:
 
-- verify the device is still connected and authorized in `clawperator devices --json`
+- verify the device is still connected and authorized in `clawperator devices`
 - confirm adb shell works directly with `adb -s <device_serial> shell true`
-- rerun `clawperator doctor --json --device <device_serial> --operator-package <package>`
+- rerun `clawperator doctor --device <device_serial> --operator-package <package>`
 
 This code blocks compatibility probing before version metadata can be read from the device.
 
@@ -288,7 +288,7 @@ This code blocks compatibility probing before version metadata can be read from 
 Treat compatibility as healthy only when:
 
 - `readiness.version.compatibility.status == "pass"`
-- or `clawperator version --check-compat --json` shows `compatible: true`
+- or `clawperator version --check-compat` shows `compatible: true`
 
 Do not infer compatibility from app presence alone.
 

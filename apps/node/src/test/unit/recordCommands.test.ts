@@ -53,8 +53,10 @@ describe("cmdRecordStart", () => {
       };
     };
 
-    assert.match(parsed.envelope?.hint ?? "", /recording stop --session-id record-123 --device emulator-5554 --operator-package com\.clawperator\.operator\.dev --json/);
-    assert.match(parsed.envelope?.stepResults?.[0]?.data?.hint ?? "", /recording stop --session-id record-123 --device emulator-5554 --operator-package com\.clawperator\.operator\.dev --json/);
+    assert.match(parsed.envelope?.hint ?? "", /recording stop --session-id record-123 --device emulator-5554 --operator-package com\.clawperator\.operator\.dev/);
+    assert.doesNotMatch(parsed.envelope?.hint ?? "", /--json/);
+    assert.match(parsed.envelope?.stepResults?.[0]?.data?.hint ?? "", /recording stop --session-id record-123 --device emulator-5554 --operator-package com\.clawperator\.operator\.dev/);
+    assert.doesNotMatch(parsed.envelope?.stepResults?.[0]?.data?.hint ?? "", /--json/);
     assert.strictEqual(parsed.envelope?.stepResults?.[0]?.data?.sessionId, "record-123");
     assert.strictEqual(
       parsed.envelope?.stepResults?.[0]?.data?.filePath,
@@ -108,7 +110,9 @@ describe("cmdRecordStart", () => {
       };
     };
 
-    assert.match(parsed.envelope?.hint ?? "", /recording stop --session-id record-123 --device emulator-5554 --operator-package com\.clawperator\.operator\.dev --json/);
-    assert.match(parsed.envelope?.stepResults?.[0]?.data?.hint ?? "", /recording stop --session-id record-123 --device emulator-5554 --operator-package com\.clawperator\.operator\.dev --json/);
+    assert.match(parsed.envelope?.hint ?? "", /recording stop --session-id record-123 --device emulator-5554 --operator-package com\.clawperator\.operator\.dev/);
+    assert.doesNotMatch(parsed.envelope?.hint ?? "", /--json/);
+    assert.match(parsed.envelope?.stepResults?.[0]?.data?.hint ?? "", /recording stop --session-id record-123 --device emulator-5554 --operator-package com\.clawperator\.operator\.dev/);
+    assert.doesNotMatch(parsed.envelope?.stepResults?.[0]?.data?.hint ?? "", /--json/);
   });
 });

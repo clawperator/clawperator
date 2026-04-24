@@ -194,12 +194,12 @@ That path is assembled from these literals in `apps/node/src/domain/skills/skill
 
 ## Registry Verification
 
-Use `skills list --json` to confirm that the registry path in your current shell is readable:
+Use `skills list` to confirm that the registry path in your current shell is readable:
 
 - after `install.sh`, this works in a fresh non-login shell because `loadRegistry()` falls back to `~/.clawperator/skills/skills/skills-registry.json` when no explicit registry path or env var is active
 
 ```bash
-clawperator skills list --json
+clawperator skills list
 ```
 
 Success means the registry was loaded and the `skills` array was parsed:
@@ -236,7 +236,7 @@ If the registry cannot be read, every discovery command fails with `REGISTRY_REA
 Recovery depends on how the path was chosen:
 
 - when `CLAWPERATOR_SKILLS_REGISTRY` points at a missing file, update the env var or run `clawperator skills install`
-- when no env var is set and neither the current working directory nor `~/.clawperator/skills/skills/skills-registry.json` contains the registry, verify `~/.clawperator/skills/skills/skills-registry.json`, run `clawperator skills list --json`, then run `clawperator skills install` or set `CLAWPERATOR_SKILLS_REGISTRY`
+- when no env var is set and neither the current working directory nor `~/.clawperator/skills/skills/skills-registry.json` contains the registry, verify `~/.clawperator/skills/skills/skills-registry.json`, run `clawperator skills list`, then run `clawperator skills install` or set `CLAWPERATOR_SKILLS_REGISTRY`
 - when the registry file exists but does not contain a `skills` array, fix the JSON because `loadRegistry()` rejects that shape with `Invalid registry: skills array required`
 
 Wrapper failure fields like `stdout` and `stderr` are optional. `runSkill.ts` includes them only when the child process actually emitted non-empty data on those streams.
@@ -246,10 +246,10 @@ Wrapper failure fields like `stdout` and `stderr` are optional. `runSkill.ts` in
 If you are starting from a fresh install, the shortest discovery flow is:
 
 ```bash
-clawperator skills for-app <package_id> --json
-clawperator skills search --keyword <text> --json
-clawperator skills get <skill_id> --json
-clawperator skills run <skill_id> --json
+clawperator skills for-app <package_id>
+clawperator skills search --keyword <text>
+clawperator skills get <skill_id>
+clawperator skills run <skill_id>
 ```
 
 Start with `skills for-app` when you know the Android package id. Use
@@ -338,17 +338,17 @@ Use `skills for-app` when you already know the Android package id and want the s
 Example:
 
 ```bash
-clawperator skills for-app com.android.settings --json
+clawperator skills for-app com.android.settings
 ```
 
-It returns the same response shape as `skills search --app ... --json`.
+It returns the same response shape as `skills search --app ...`.
 
 ### `skills get`
 
 `cmdSkillsGet()` wraps a single registry entry under `skill`:
 
 ```bash
-clawperator skills get com.android.settings.capture-overview --json
+clawperator skills get com.android.settings.capture-overview
 ```
 
 ```json
@@ -373,10 +373,10 @@ clawperator skills get com.android.settings.capture-overview --json
 Use these commands to verify the three core discovery paths:
 
 ```bash
-clawperator skills list --json
-clawperator skills for-app com.android.settings --json
-clawperator skills search --app com.android.settings --json
-clawperator skills get com.android.settings.capture-overview --json
+clawperator skills list
+clawperator skills for-app com.android.settings
+clawperator skills search --app com.android.settings
+clawperator skills get com.android.settings.capture-overview
 ```
 
 Check these exact fields:
@@ -418,7 +418,7 @@ Top-level usage and lookup failures are exact:
 Current execution command:
 
 ```bash
-clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--timeout-ms <ms>] [--expect-contains <text>] [--skip-validate] [--json] [skill_args...]
+clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--timeout-ms <ms>] [--expect-contains <text>] [--skip-validate] [skill_args...]
 ```
 
 What the wrapper does:
@@ -456,7 +456,7 @@ Default execution values are exact:
 Use a JSON run first so you can verify the wrapper envelope separately from the skill's own stdout contract:
 
 ```bash
-clawperator skills run com.android.settings.capture-overview --timeout 3210 --json
+clawperator skills run com.android.settings.capture-overview --timeout 3210
 ```
 
 Success response:
@@ -483,7 +483,7 @@ Check these exact fields:
 To verify the wrapper-side readiness gate, run against a sleeping or locked device:
 
 ```bash
-clawperator skills run com.android.settings.capture-overview --device <device_serial> --json
+clawperator skills run com.android.settings.capture-overview --device <device_serial>
 ```
 
 Expected pre-spawn failure shape:
@@ -498,7 +498,7 @@ Expected pre-spawn failure shape:
 To verify wrapper-side output assertions, run:
 
 ```bash
-clawperator skills run com.android.settings.capture-overview --expect-contains RESULT --json
+clawperator skills run com.android.settings.capture-overview --expect-contains RESULT
 ```
 
 If the expected text is present, the success payload echoes the assertion:
@@ -533,7 +533,7 @@ Important:
 - the top-level wrapper `status` is `success`, `failed`, or `indeterminate`
 - when a declared verification contract is not proved, the wrapper returns `status: "indeterminate"` without rewriting the emitted `skillResult`
 - progress lines written by the skill to stdout remain inside `output` in JSON mode
-- pretty mode writes a banner before streaming live skill output, so use `--json` when another agent needs machine-readable output
+- pretty mode writes a banner before streaming live skill output, so use default JSON output when another agent needs machine-readable output
 - in JSON mode, the wrapper returns one JSON object and does not stream live child stdout separately
 - `timeoutMs` is present only when the caller passed `--timeout` or `--timeout-ms`
 - `expectedSubstring` is present only when the caller passed `--expect-contains`
@@ -681,7 +681,7 @@ For script-only skills, dry-run payload validation is skipped on purpose. The su
 Recovery depends on the error code:
 
 - `REGISTRY_READ_FAILED`: fix `CLAWPERATOR_SKILLS_REGISTRY`, run from the correct working directory, or reinstall the skills repo
-- `SKILL_NOT_FOUND`: confirm the exact `id` with `skills list --json` or `skills search --json`
+- `SKILL_NOT_FOUND`: confirm the exact `id` with `skills list` or `skills search`
 - `SKILL_VALIDATION_FAILED`: repair missing files, mismatched `skill.json` metadata, or invalid artifact payloads before rerunning
 - `SKILL_SCRIPT_NOT_FOUND`: fix the registry entry or restore the script on disk
 - `SKILL_EXECUTION_FAILED`: inspect `stdout`, `stderr`, and the skill script's exit code

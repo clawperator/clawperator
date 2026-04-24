@@ -13,7 +13,7 @@ Use this order:
 | Situation | Start here | Stop when |
 | --- | --- | --- |
 | An installed runtime skill already matches the request | `clawperator skills for-app`, `clawperator skills search`, `clawperator skills get` | You have a truthful runtime skill to run. |
-| Runtime-skill discovery returned no relevant match and you need the host-visible zero-results route | `clawperator bundled-skills list --json`, then `clawperator-skill-author-by-agent-discovery` | Discovery emits one artifact and chooses exactly one next step. |
+| Runtime-skill discovery returned no relevant match and you need the host-visible zero-results route | `clawperator bundled-skills list`, then `clawperator-skill-author-by-agent-discovery` | Discovery emits one artifact and chooses exactly one next step. |
 | Discovery returned `proceed_to_recording`, or the route is already well understood | `clawperator-skill-author-by-recording` | One recording-derived skill shape is authored and its self-test surfaces a `SkillResult`. |
 | You explicitly want the low-level manual scaffold instead of the installed guided workflows | `clawperator skills new <skill_id>` | The local scaffold exists and the registry entry was added. |
 
@@ -40,7 +40,7 @@ use this order:
    `clawperator skills search`.
 2. If runtime-skill discovery returns no relevant match and you need to inspect
    installed guided authoring workflows on the current host, run
-   `clawperator bundled-skills list --json`.
+   `clawperator bundled-skills list`.
 3. Start with `clawperator-skill-author-by-agent-discovery` as the zero-results front door.
 4. Use `clawperator-skill-author-by-recording` only after discovery returns
    `proceed_to_recording`, or when the route is already well understood.
@@ -50,7 +50,7 @@ use this order:
 Verification pattern:
 
 ```bash
-clawperator bundled-skills list --json
+clawperator bundled-skills list
 ```
 
 Expected signals:
@@ -116,7 +116,7 @@ Current packaged first-party bundled skills:
 | Skill | Role | Boundary |
 | --- | --- | --- |
 | `clawperator-agent-orientation` | first-run orientation | Routes an unfamiliar host agent to the correct Clawperator front door and canonical docs without redefining the contracts. |
-| `clawperator-upgrade` | whole-product upgrade route | Checks `clawperator --version`, verifies Node 24+ and Java 17/21, then uses `npm install -g clawperator@latest`, `clawperator install`, and `clawperator doctor --json`. Uses `install.sh` only as recovery when the CLI is not reachable or the bootstrap prerequisites need repair. |
+| `clawperator-upgrade` | whole-product upgrade route | Checks `clawperator --version`, verifies Node 24+ and Java 17/21, then uses `npm install -g clawperator@latest`, `clawperator install`, and `clawperator doctor`. Uses `install.sh` only as recovery when the CLI is not reachable or the bootstrap prerequisites need repair. |
 | `clawperator-skill-author-by-agent-discovery` | zero-results front door | Produces one discovery artifact, chooses exactly one next step, and does not author a durable runtime skill directly. |
 | `clawperator-skill-author-by-recording` | proving workflow | Records a real device flow, authors one skill shape, and runs one self-test that surfaces the emitted `SkillResult`. |
 
@@ -166,16 +166,16 @@ Current doctor behavior:
 Verification pattern:
 
 ```bash
-clawperator bundled-skills list --json
-clawperator doctor --json
+clawperator bundled-skills list
+clawperator doctor
 ```
 
 Expected signals:
 
-- `bundled-skills list --json` returns `installedDir` as
+- `bundled-skills list` returns `installedDir` as
   `~/.clawperator/bundled-skills/` or the resolved absolute equivalent on the
   current host
-- `doctor --json` includes a check with
+- `doctor` includes a check with
   `"id": "host.bundled-skills.staleness"`
 
 ## Recording-Driven Workflow Stance
@@ -248,7 +248,7 @@ Current `validateSkill` non-goals:
 Use this route when hardening a runtime skill:
 
 1. Discover installed guided authoring workflows with
-   `clawperator bundled-skills list --json` when you need a host-visible
+   `clawperator bundled-skills list` when you need a host-visible
    front door and runtime-skill discovery returned no relevant match.
 2. Start with `clawperator-skill-author-by-agent-discovery`, then move to
    `clawperator-skill-author-by-recording` only after discovery returns
@@ -481,7 +481,7 @@ Success output with recording context adds the copied path:
 Verification:
 
 ```bash
-clawperator skills new com.example.recording.export-demo --recording-context ./recordings/export-demo.export.json --json
+clawperator skills new com.example.recording.export-demo --recording-context ./recordings/export-demo.export.json
 ```
 
 Check:
@@ -669,13 +669,13 @@ For `node_text_matches`, the runtime currently requires:
 This keeps `skill.json` claims tied to the shipped `SkillResult` contract instead
 of inventing a second result channel.
 
-Use `clawperator skills validate <skill_id> --json` to verify the file paths
+Use `clawperator skills validate <skill_id>` to verify the file paths
 and metadata match. After rerunning generated indexes in repos that own them,
-use `clawperator skills validate --all --json` for the repo-wide freshness
+use `clawperator skills validate --all` for the repo-wide freshness
 check:
 
 ```bash
-clawperator skills validate com.example.demo.capture-state --json
+clawperator skills validate com.example.demo.capture-state
 ```
 
 Success response:
@@ -818,7 +818,7 @@ Recommended current debugging support for orchestrated harnesses:
 - keep a small `run-metadata.json` file describing device id, operator
   package, forwarded args, and output paths
 - keep the saved wrapper JSON or an equivalent stderr/stdout capture for the
-  exact `clawperator skills run --json` invocation you are debugging
+  exact `clawperator skills run` invocation you are debugging
 
 This matters because many orchestrated failures are not pure route failures.
 Common failure shapes include:
@@ -1081,8 +1081,8 @@ Version handling:
 Validate the registry entry first, then run the scaffolded skill through the wrapper:
 
 ```bash
-clawperator skills validate com.example.demo.capture-state --dry-run --json
-clawperator skills run com.example.demo.capture-state --device <device_serial> --json
+clawperator skills validate com.example.demo.capture-state --dry-run
+clawperator skills run com.example.demo.capture-state --device <device_serial>
 ```
 
 For the run result, verify:
@@ -1198,7 +1198,7 @@ So `climate-status` and `climate-status.recipe.json` produce the same default `c
 Run the compiler with JSON output, then validate the result as a normal execution payload:
 
 ```bash
-clawperator skills compile-artifact com.google.android.apps.chromecast.app.get-climate --artifact climate-status --vars '{"CLIMATE_TILE_NAME":"Master"}' --json
+clawperator skills compile-artifact com.google.android.apps.chromecast.app.get-climate --artifact climate-status --vars '{"CLIMATE_TILE_NAME":"Master"}'
 ```
 
 Success shape:
@@ -1353,9 +1353,9 @@ If an artifact-backed skill compiles to an invalid execution shape, `skills vali
 Use:
 
 ```bash
-clawperator skills validate com.example.demo.capture-state --json
-clawperator skills validate com.example.demo.capture-state --dry-run --json
-clawperator skills validate --all --dry-run --json
+clawperator skills validate com.example.demo.capture-state
+clawperator skills validate com.example.demo.capture-state --dry-run
+clawperator skills validate --all --dry-run
 ```
 
 Check:
@@ -1430,11 +1430,11 @@ Registry write or filesystem write failures surface as `SKILLS_SCAFFOLD_FAILED`.
 Run:
 
 ```bash
-clawperator skills new com.example.app.do-thing --summary "Do one deterministic workflow" --json
-clawperator skills get com.example.app.do-thing --json
-clawperator skills validate com.example.app.do-thing --json
+clawperator skills new com.example.app.do-thing --summary "Do one deterministic workflow"
+clawperator skills get com.example.app.do-thing
+clawperator skills validate com.example.app.do-thing
 ./scripts/generate_skill_indexes.sh
-clawperator skills validate --all --json
+clawperator skills validate --all
 ```
 
 Confirm:
@@ -1467,7 +1467,7 @@ So for authoring:
 
 - keep `skill.json` and the registry in sync
 - let `skills validate --dry-run` prove skill-local artifact payloads
-- use `skills new --json`, then verify with `skills get --json` and `skills validate --json`; if the repo owns generated indexes, rerun the generator and finish with `skills validate --all --json`
+- use `skills new`, then verify with `skills get` and `skills validate`; if the repo owns generated indexes, rerun the generator and finish with `skills validate --all`
 - use `skills compile-artifact` when a workflow should compile into deterministic execution JSON
 - treat `SKILL.md` as required documentation, but do not overstate its current machine enforcement
 

@@ -131,9 +131,9 @@ Every page must include at least one machine-checkable way for an agent to confi
 A verification pattern is a command an agent can run whose output proves the setting, state, or contract is in effect.
 
 **Examples:**
-- Environment variable: run `clawperator doctor --json`, check `report.operatorPackage` matches the env var value
-- Device connection: run `clawperator devices --json`, check the array contains the expected serial
-- Setup complete: run `clawperator doctor --json`, check `report.ok` is `true`
+- Environment variable: run `clawperator doctor`, check `report.operatorPackage` matches the env var value
+- Device connection: run `clawperator devices`, check the array contains the expected serial
+- Setup complete: run `clawperator doctor`, check `report.ok` is `true`
 
 If a page documents a setting, flag, or state, and there is no way to verify it took effect, that is a gap. Either add a verification command or note that the setting is not externally observable.
 

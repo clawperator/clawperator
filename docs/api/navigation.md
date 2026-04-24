@@ -131,7 +131,7 @@ Exact classification rule from `isOpenCliUriTarget()`:
 Verification:
 
 ```bash
-clawperator open com.android.settings --json
+clawperator open com.android.settings
 ```
 
 Expected live success shape:
@@ -227,7 +227,7 @@ Accepted CLI aliases for the same intent:
 Verification:
 
 ```bash
-clawperator open https://clawperator.com --json
+clawperator open https://clawperator.com
 ```
 
 Expected live success shape:
@@ -422,7 +422,7 @@ Machine-checkable success conditions:
 Verification command:
 
 ```bash
-clawperator exec --execution '{"commandId":"settings-nav-1","taskId":"settings-nav-1","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"open","type":"open_app","params":{"applicationId":"com.android.settings"}},{"id":"wait","type":"wait_for_navigation","params":{"expectedPackage":"com.android.settings","timeoutMs":5000}},{"id":"snap","type":"snapshot_ui"}]}' --device <device_serial> --json
+clawperator exec --execution '{"commandId":"settings-nav-1","taskId":"settings-nav-1","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"open","type":"open_app","params":{"applicationId":"com.android.settings"}},{"id":"wait","type":"wait_for_navigation","params":{"expectedPackage":"com.android.settings","timeoutMs":5000}},{"id":"snap","type":"snapshot_ui"}]}' --device <device_serial>
 ```
 
 ## Complete JSON Example

@@ -26,7 +26,7 @@ The built-in `clawperator snapshot` command constructs a one-step execution with
 - `commandId` is generated as `snapshot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 - `taskId` equals the generated `commandId`
 
-For CLI `snapshot --json`, machine-checkable success means:
+For CLI `snapshot`, machine-checkable success means:
 
 - exit code `0`
 - top-level JSON has `envelope`
@@ -111,7 +111,7 @@ Successful `snapshot_ui` data lives inside the step result, not in a separate to
 Verification pattern - confirm the snapshot contract is active:
 
 ```bash
-clawperator snapshot --json --device <device_serial>
+clawperator snapshot --device <device_serial>
 ```
 
 Check these exact fields:
@@ -195,7 +195,7 @@ Current runtime note:
 
 ## Annotated Live-Device Example
 
-Full `clawperator snapshot --json` output from an Android emulator running
+Full `clawperator snapshot` output from an Android emulator running
 Android 15 (API 35) with the Settings app open. This example uses the emulator
 because it produces reproducible results that any device can create and run.
 
@@ -416,13 +416,13 @@ This is not just a warning. It changes the step to `success: false`, and later e
 Typical recovery:
 
 1. Run `clawperator version --check-compat`.
-2. Run `clawperator doctor --json`.
+2. Run `clawperator doctor`.
 3. Re-run the snapshot with `--verbose` if you need to inspect log correlation and the `[TaskScope] UI Hierarchy:` marker.
 
 Verification pattern - confirm extraction failure handling:
 
 ```bash
-clawperator snapshot --json --device <device_serial>
+clawperator snapshot --device <device_serial>
 ```
 
 If extraction failed, branch on:

@@ -29,7 +29,7 @@ function buildRecordingAlreadyInProgressHint(options: {
   const deviceArg = options.deviceId ?? "<device_serial>";
   const operatorPackageArg = options.operatorPackage ?? "<package>";
   const sessionIdArg = options.sessionId ?? "<session_id>";
-  return `Run 'clawperator recording stop --session-id ${sessionIdArg} --device ${deviceArg} --operator-package ${operatorPackageArg} --json' before starting a new recording.`;
+  return `Run 'clawperator recording stop --session-id ${sessionIdArg} --device ${deviceArg} --operator-package ${operatorPackageArg}' before starting a new recording.`;
 }
 
 function addRecordingAlreadyInProgressHintToEnvelope(

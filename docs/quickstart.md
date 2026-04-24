@@ -3,7 +3,7 @@
 ## Before You Start
 
 This page assumes a working Clawperator installation: CLI installed, device
-connected, Operator APK installed, and `clawperator doctor --json` returning
+connected, Operator APK installed, and `clawperator doctor` returning
 `"criticalOk": true`.
 
 If you have not reached that state yet, complete [Setup](setup.md) first.
@@ -44,7 +44,7 @@ The canonical observation action is `snapshot_ui`. Run it with the built-in
 `snapshot` command:
 
 ```bash
-clawperator snapshot --json --device <device_serial>
+clawperator snapshot --device <device_serial>
 ```
 
 On success, the result envelope contains the XML hierarchy in
@@ -138,7 +138,7 @@ See [Selectors](api/selectors.md) for the full `NodeMatcher` contract.
 
 ## Step 3: Act
 
-Send an execution payload via `clawperator exec --json`. The payload lists one
+Send an execution payload via `clawperator exec`. The payload lists one
 or more actions in sequence. Clawperator dispatches them in order and returns a
 single result envelope.
 
@@ -182,7 +182,7 @@ Example - click the "Connections" row, wait for navigation, then take a snapshot
 Save this as `payload.json` and run:
 
 ```bash
-clawperator exec --json --device <device_serial> < payload.json
+clawperator exec --device <device_serial> < payload.json
 ```
 
 Success conditions:
@@ -204,7 +204,7 @@ A complete agent sequence for reading the Android version:
 ### 1. Pre-flight
 
 ```bash
-clawperator doctor --json --device <device_serial>
+clawperator doctor --device <device_serial>
 # Require: "criticalOk": true
 ```
 

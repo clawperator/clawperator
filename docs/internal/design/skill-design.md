@@ -139,7 +139,7 @@ repository content. Durable docs should preserve the method, the thresholds,
 and the synthesized conclusions. Raw per-run transcripts are scratch evidence
 unless a specific sanitized excerpt is needed to support a durable claim.
 
-When building local reliability runners around `clawperator skills run --json`,
+When building local reliability runners around `clawperator skills run`,
 parse the actual result from `skillResult`. The top-level JSON wrapper can
 carry controller metadata, so checking only a top-level `.status` field can
 misclassify a successful run as empty or failed.

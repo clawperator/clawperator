@@ -193,7 +193,7 @@ Validation examples:
 Valid:
 
 ```bash
-clawperator read --text "Price" --container-id "android:id/list" --json
+clawperator read --text "Price" --container-id "android:id/list"
 ```
 
 Invalid:
@@ -351,11 +351,11 @@ clawperator click --text "Wi-Fi"
 ```
 
 ```bash
-clawperator read --selector '{"resourceId":"android:id/title"}' --json
+clawperator read --selector '{"resourceId":"android:id/title"}'
 ```
 
 ```bash
-clawperator wait --text-contains "Done" --timeout 10000 --json
+clawperator wait --text-contains "Done" --timeout 10000
 ```
 
 ```bash
@@ -363,7 +363,7 @@ clawperator scroll-until --text "About phone" --container-id "android:id/list"
 ```
 
 ```bash
-clawperator read-value --label "Battery" --json
+clawperator read-value --label "Battery"
 ```
 
 ## Related Pages
