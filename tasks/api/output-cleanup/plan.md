@@ -7,20 +7,39 @@ remove the remaining places that teach or require `--json` as the normal API
 path. This is two PRs across four phases. PR-1 updates the main repo: Node CLI
 behavior and help cleanup, authored docs and scaffold cleanup, then validation
 and generated-doc rebuild. PR-2 updates the sibling `../clawperator-skills`
-reference-facing examples and any safe shared helpers. The current state is
-planned, with findings already captured in `tasks/api/output-cleanup/findings.md`.
+reference-facing examples and any safe shared helpers. PR-1 implementation
+phases are complete in the main repo, with findings captured in
+`tasks/api/output-cleanup/findings.md`.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | PR-1 implementation complete; fresh review-swarm-loop pass pending |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4 |
-| Current / Next | Phase 1 |
+| Completed | 1, 2, 3 |
+| Remaining | PR-1 review-swarm-loop re-run, then Phase 4 / PR-2 |
+| Current / Next | Re-run review-swarm-loop on current `HEAD` for PR-1 scope |
 | Blockers | none |
+
+## Current Execution Notes
+
+- PR-1 Phase 1 is implemented and committed. Default JSON now satisfies
+  `read --all` and `read-value --all`; `--output pretty` remains rejected for
+  those multi-result machine-read paths.
+- PR-1 Phase 2 is implemented and committed. Main-repo docs, help, generated
+  skill scaffolds, host guidance, runtime hints, and matching tests now teach
+  JSON as the default path.
+- PR-1 Phase 3 is implemented and committed. Docs outputs were regenerated
+  through the repo docs workflow and Node validation passed.
+- Follow-up feedback commits restored proper `--output <json|pretty>` help
+  entries, clarified `--output json` as the preferred explicit selector, and
+  removed optional JSON flags from default guidance examples.
+- `../clawperator-skills` has not been touched. That remains Phase 4 / PR-2.
+- Because follow-up commits landed after the prior review loop, PR-1 still
+  needs a fresh `$review-swarm-loop` pass against the current branch `HEAD`
+  before being treated as review-clean.
 
 ## Goal
 

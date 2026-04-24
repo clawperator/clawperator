@@ -90,3 +90,19 @@ spelling would create unnecessary vocabulary without removing friction.
   convenience, because agents are the primary consumer.
 - Generated docs must be rebuilt through the docs workflow after authored docs
   change.
+
+## Execution Notes
+
+- PR-1 Phase 1, Phase 2, and Phase 3 have been implemented and committed in the
+  main repo.
+- The implementation preserved `--json`, `--output json`, and `--format json`,
+  and did not add `--result-format`.
+- The only intended Node behavior change was made: default JSON satisfies
+  `read --all` and `read-value --all`; `--output pretty` remains rejected for
+  those multi-result paths.
+- Follow-up feedback commits clarified that normal examples should rely on the
+  default output, while `--output json` remains the preferred explicit selector
+  when documentation is specifically about output selection.
+- `../clawperator-skills` was not touched and remains Phase 4 / PR-2.
+- A fresh `$review-swarm-loop` pass is still required for PR-1 because the
+  branch received follow-up commits after the earlier review loop.

@@ -16,13 +16,36 @@ uses `default`, Phase 3 uses `fast`, and Phase 4 uses `default`.
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | PR-1 implementation complete; fresh review-swarm-loop pass pending |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4 |
-| Current / Next | Phase 1 |
+| Completed | 1, 2, 3 |
+| Remaining | PR-1 review-swarm-loop re-run, then Phase 4 / PR-2 |
+| Current / Next | Re-run review-swarm-loop on current `HEAD` for PR-1 scope |
 | Blockers | none |
+
+## Current Execution Notes
+
+- Phase 1 is implemented and committed on `node/output-argument`.
+  - `read --all` and `read-value --all` work with default JSON output.
+  - `--output pretty` remains rejected for those multi-result paths.
+  - `--json`, `--output json`, and `--format json` remain accepted.
+- Phase 2 is implemented and committed in the main repo.
+  - Authored docs, CLI help, generated skill scaffolds, host guidance,
+    runtime hints, and related tests teach the default JSON command shape.
+  - Remaining `--json` references are intended alias, parser, fixture,
+    historical artifact, or task-pack references.
+- Phase 3 is implemented and committed.
+  - Docs outputs were regenerated through the official docs build workflow.
+  - Node build and tests passed after the generated docs changes.
+- Follow-up user feedback has also been applied and committed.
+  - `--output <json|pretty>` help entries were restored where appropriate.
+  - `--output json` is documented as the preferred explicit JSON selector.
+  - Default guidance examples no longer include optional JSON flags.
+- Do not touch `../clawperator-skills` in PR-1. Phase 4 / PR-2 remains open.
+- Since the latest feedback commits landed after the earlier review loop, the
+  remaining PR-1 gate is a fresh `$review-swarm-loop` pass against the current
+  branch `HEAD` using the original main-repo review scope.
 
 ## Hard Rules
 
