@@ -262,3 +262,64 @@ Date: 2026-04-25
   recorded marker tag. Drop different-tag and untagged lines, including
   `V/Configuration` noise, without changing result-envelope shape or CLI output
   modes.
+
+## Phase 3 Validation Notes
+
+Date: 2026-04-25
+
+### Device target
+
+- Connected devices were checked with both branch-local CLI and `adb devices`.
+- A physical device was available alongside `emulator-5554`, so live validation
+  targeted the physical device explicitly as `<device_serial>`.
+- All live commands used `--operator-package com.clawperator.operator.dev`.
+
+### Commands run
+
+```bash
+npm --prefix apps/node run build
+adb devices
+node apps/node/dist/cli/index.js devices --output pretty
+node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output pretty --timeout 10000
+node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json --timeout 10000 > /tmp/<snapshot-json-check>.json
+node -e '<parse snapshot JSON, require <hierarchy, reject Updating configuration>'
+node apps/node/dist/cli/index.js exec --device <device_serial> --operator-package com.clawperator.operator.dev --output json --timeout 10000 --payload /tmp/<exec-payload>.json > /tmp/<exec-json-check>.json
+node -e '<parse exec JSON, require <hierarchy, reject Updating configuration>'
+node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json --timeout 10000 | node -e '<parse stdin as JSON>'
+node apps/node/dist/cli/index.js serve --host 127.0.0.1 --port <local_port> --output json
+curl -sS -X POST http://127.0.0.1:<local_port>/snapshot -H 'Content-Type: application/json' -d '{"deviceId":"<device_serial>","operatorPackage":"com.clawperator.operator.dev"}' > /tmp/<serve-json-check>.json
+node -e '<parse serve JSON, require <hierarchy, reject Updating configuration>'
+npm --prefix apps/node run test
+```
+
+### Results
+
+- Direct `snapshot --output pretty` returned `envelope.status: "success"` with a
+  successful `snapshot_ui` step, preserved snapshot metadata, and attached
+  `data.text` containing `<hierarchy`.
+- Direct `snapshot --output json` parsed cleanly as JSON and passed the
+  contamination check: `data.text` contained `<hierarchy` and did not contain
+  `Updating configuration`.
+- `exec` with a one-step `snapshot_ui` payload parsed cleanly as JSON and passed
+  the same contamination check.
+- JSON stdout cleanliness was verified by piping `snapshot --output json`
+  directly into `JSON.parse`.
+- Shared surface validation used branch-local `serve` `POST /snapshot`; the
+  response parsed cleanly and passed the same contamination check.
+- `npm --prefix apps/node run test` passed during Phase 3 validation.
+
+### Docs decision
+
+- `docs/api/snapshot.md` was inspected for snapshot extraction claims. It
+  already describes the public contract and extraction flow at the right level:
+  logcat marker, `data.text` attachment, metadata placement, extraction failure,
+  and JSON/envelope shape. The implementation only hardens parser internals, so
+  no authored docs update was needed.
+
+### Residual risk
+
+- Live validation did not force Android to emit a fresh `V/Configuration` line
+  during the checked commands. The synthetic unit and `runExecution()` tests
+  cover the reproduced interleaving pattern exactly, and live validation proved
+  the branch-local shared surfaces still return parseable, clean snapshot XML on
+  a physical target.
