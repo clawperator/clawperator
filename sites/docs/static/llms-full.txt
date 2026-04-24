@@ -1077,7 +1077,7 @@ Accepted output-format forms:
 | no output flag | JSON output |
 | `--output json` | preferred explicit JSON output |
 | `--format json` | alias for `--output json` |
-| `--json` | compatibility shorthand for JSON output |
+| `--json` | alias for `--output json` |
 | `--output pretty` | pretty-printed human-readable output |
 
 ## Readiness Gate
@@ -1445,12 +1445,12 @@ This page is generated from the Node CLI registry and command sources.
 | `wait-for-nav` | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]` | wait-for-navigation, wait_for_navigation | --app, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --validate-only, --dry-run, --timeout, --device, --operator-package | Wait for app or screen navigation to complete |
 | `read-value` | `read-value --label <text>` | read-kv, read-key-value-pair, read_key_value_pair | --label, --label-id, --label-desc, --all, --validate-only, --dry-run | Read the value associated with a labeled element |
 | `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills for-app <package_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --output, --version<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
-| `bundled-skills` | `bundled-skills list`<br>`bundled-skills install`<br>`bundled-skills update` | - | --version, --json, --output, --format, --help<br>Subcommands: install, update, list | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
+| `bundled-skills` | `bundled-skills list`<br>`bundled-skills install`<br>`bundled-skills update` | - | --version, --output, --format, --json, --help<br>Subcommands: install, update, list | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
 | `recording` | `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]`<br>`recording stop`<br>`recording pull`<br>`recording parse --input <file> [--out <file>]`<br>`recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]`<br>`recording compare --baseline <export.json> --result <skills-run.json> [--mode <auto|literal|semantic>]` | record | --session-id, --out, --input, --snapshots, --baseline, --result, --mode, --device, --operator-package<br>Subcommands: compare, export | Manage recording sessions on the Operator app |
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `mcp` | `mcp serve` | - | - | Start the first-party MCP server |
 | `logs` | `logs` | - | - | Tail the Clawperator log file |
-| `doctor` | `doctor`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --output, --json, --format | Run environment and runtime checks |
+| `doctor` | `doctor`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --output, --format, --json | Run environment and runtime checks |
 | `grant-device-permissions` | `grant-device-permissions [--device <id>] [--operator-package <package>]` | - | --device, --operator-package | Re-grant accessibility and notification permissions |
 | `version` | `version`<br>`version --check-compat [--device <id>] [--operator-package <package>]` | - | --check-compat, --device, --operator-package | Show the CLI version |
 
@@ -1462,7 +1462,7 @@ This page is generated from the Node CLI registry and command sources.
 | `host` | `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]` | - | --installed-at, --cli-version, --apk-version, --last-device-serial<br>Subcommands: setup | Set up durable host artifacts owned by the CLI |
 | `setup` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
 | `install` | `install [--operator-package <package>]` | - | --operator-package | Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup |
-| `doctor` | `doctor`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --output, --json, --format | Run environment and runtime checks |
+| `doctor` | `doctor`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --output, --format, --json | Run environment and runtime checks |
 | `grant-device-permissions` | `grant-device-permissions [--device <id>] [--operator-package <package>]` | - | --device, --operator-package | Re-grant accessibility and notification permissions |
 | `version` | `version`<br>`version --check-compat [--device <id>] [--operator-package <package>]` | - | --check-compat, --device, --operator-package | Show the CLI version |
 
@@ -1501,7 +1501,7 @@ This page is generated from the Node CLI registry and command sources.
 - Summary: Run environment and runtime checks
 - Syntax: `doctor`, `doctor --fix`, `doctor --full`, `doctor --check-only`
 - Aliases: -
-- Flags: `--fix`, `--full`, `--check-only`, `--output`, `--json`, `--format`
+- Flags: `--fix`, `--full`, `--check-only`, `--output`, `--format`, `--json`
 
 ### `grant-device-permissions`
 
@@ -1562,7 +1562,7 @@ This page is generated from the Node CLI registry and command sources.
 | --- | --- | --- | --- | --- |
 | `exec` | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]`<br>`exec best-effort --goal <text> [--device <id>] [--operator-package <package>]` | execute | --payload, --validate-only, --dry-run, --goal, --device, --operator-package, --execution, --input, --file | Execute a validated command payload |
 | `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills for-app <package_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --output, --version<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
-| `bundled-skills` | `bundled-skills list`<br>`bundled-skills install`<br>`bundled-skills update` | - | --version, --json, --output, --format, --help<br>Subcommands: install, update, list | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
+| `bundled-skills` | `bundled-skills list`<br>`bundled-skills install`<br>`bundled-skills update` | - | --version, --output, --format, --json, --help<br>Subcommands: install, update, list | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `mcp` | `mcp serve` | - | - | Start the first-party MCP server |
 
@@ -1586,7 +1586,7 @@ This page is generated from the Node CLI registry and command sources.
 - Summary: Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes
 - Syntax: `bundled-skills list`, `bundled-skills install`, `bundled-skills update`
 - Aliases: -
-- Flags: `--version`, `--json`, `--output`, `--format`, `--help`
+- Flags: `--version`, `--output`, `--format`, `--json`, `--help`
 - Subcommands: `install`, `update`, `list`
 
 ### `serve`
@@ -4498,7 +4498,6 @@ Flags:
 | `--check-only` | flag | forces exit code `0` regardless of failures |
 | `--output` | `json`, `pretty` | selects the output renderer; use `--output json` when you want to request JSON explicitly |
 | `--format` | `json`, `pretty` | alias for `--output` |
-| `--json` | flag | compatibility shorthand for JSON output |
 
 Defaults:
 
@@ -4507,7 +4506,7 @@ Defaults:
 - without `--full`, doctor skips Java/build/install/launch/smoke checks
 - without `--fix`, doctor reports remediation steps but does not run them
 - output defaults to the full `DoctorReport` JSON object
-- the preferred explicit JSON argument is `--output json`; `--json` remains supported for compatibility
+- use `--output json` when you want to request JSON explicitly
 
 ## `DoctorReport` Contract
 

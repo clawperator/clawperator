@@ -52,7 +52,7 @@ node /<local_user>/src/clawperator/apps/node/dist/cli/index.js close \
   --app com.solaxcloud.starter \
   --device <device_serial> \
   --operator-package com.clawperator.operator.dev \
-  --json
+  --output json
 ```
 
 ## Timing

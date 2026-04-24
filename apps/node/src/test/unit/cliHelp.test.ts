@@ -366,7 +366,7 @@ describe("CLI help", () => {
     assert.strictEqual(pretty.message, "timeoutMs must be a finite number");
   });
 
-  it("lists --json under Global options in top-level help", async () => {
+  it("lists --json as an alias under Global options in top-level help", async () => {
     const { stdout, code } = await runCli(["--help"]);
     assert.strictEqual(code, 0);
     const globalIdx = stdout.indexOf("Global options:\n");
@@ -376,10 +376,14 @@ describe("CLI help", () => {
       notesIdx === -1 ? stdout.slice(globalIdx) : stdout.slice(globalIdx, notesIdx);
     assert.match(
       globalBlock,
-      /\n  --json\s+JSON output compatibility shorthand \(prefer --output json for explicit JSON\)/,
-      "expected --json as an indented compatibility shorthand line",
+      /\n  --json\s+Alias for --output json/,
+      "expected --json as an indented alias line",
     );
     assert.match(globalBlock, /--output <json\|pretty>\s+Output format \(default: json\)/);
+    assert.ok(
+      globalBlock.indexOf("--output <json|pretty>") < globalBlock.indexOf("--json"),
+      "expected preferred --output form to appear before the alias",
+    );
   });
 
   it("shows common device actions without requiring --json in top-level help", async () => {

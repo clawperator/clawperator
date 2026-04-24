@@ -28,7 +28,7 @@ Accepted output-format forms:
 | no output flag | JSON output |
 | `--output json` | preferred explicit JSON output |
 | `--format json` | alias for `--output json` |
-| `--json` | compatibility shorthand for JSON output |
+| `--json` | alias for `--output json` |
 | `--output pretty` | pretty-printed human-readable output |
 
 ## Readiness Gate
