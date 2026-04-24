@@ -144,22 +144,35 @@ export function getInvalidTimeoutResult(timeoutMs: number | undefined, options: 
 }
 
 /**
- * `read --all` and `read-value --all` need machine-readable stdout. JSON is the default output
- * format, so only explicit non-JSON output is rejected for these multi-result paths.
+ * `read --all` and `read-value --all` need machine-readable stdout; require JSON output and an
+ * explicit `--json` or `--output json` / `--format json` (implicit default json is not enough).
  */
-export function readAllRequiresJsonOutputError(options: {
+export function readAllRequiresExplicitJsonError(options: {
   command: "read" | "read-value";
   format: "json" | "pretty";
+  explicitJsonOutput: boolean;
 }): string | undefined {
-  const { command, format } = options;
+  const { command, format, explicitJsonOutput } = options;
   if (format !== "json") {
     return formatError(
       {
         code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
         message:
           command === "read"
-            ? 'read --all requires JSON output. The default output is JSON; do not use --output pretty for multi-result reads.\n\nExample:\n  clawperator read --text "Price" --all'
-            : 'read-value --all requires JSON output. The default output is JSON; do not use --output pretty for multi-result reads.\n\nExample:\n  clawperator read-value --label "Battery" --all',
+            ? 'read --all requires JSON output. Use --json or --output json (not --output pretty).\n\nExample:\n  clawperator read --text "Price" --all --json'
+            : "read-value --all requires JSON output. Use --json or --output json (not --output pretty).",
+      },
+      { format },
+    );
+  }
+  if (!explicitJsonOutput) {
+    return formatError(
+      {
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message:
+          command === "read"
+            ? 'read --all requires explicit JSON output. Pass --json, --output json, or --format json.\n\nExample:\n  clawperator read --text "Price" --all --json'
+            : 'read-value --all requires explicit JSON output. Pass --json, --output json, or --format json.\n\nExample:\n  clawperator read-value --label "Battery" --all --json',
       },
       { format },
     );
@@ -1614,13 +1627,13 @@ COMMANDS["read"] = {
   synonyms: ["read-text", "read_text"],
   group: "Device Interaction",
   flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
-  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--all", "--validate-only", "--dry-run", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--all", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Read text from the first matching UI element",
   help: HELP_READ,
   topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]
                                             Read text from the first matching UI element`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage } = ctx;
+    const { rest, format, explicitJsonOutput, logger, deviceId, operatorPackage } = ctx;
     if (!hasElementSelectorFlag(rest)) {
       return makeMissingSelectorError("read", format);
     }
@@ -1630,7 +1643,7 @@ COMMANDS["read"] = {
     }
     const readAll = hasFlag(rest, "--all");
     if (readAll) {
-      const err = readAllRequiresJsonOutputError({ command: "read", format });
+      const err = readAllRequiresExplicitJsonError({ command: "read", format, explicitJsonOutput });
       if (err) return err;
     }
     // Resolve container matcher (optional)
@@ -1645,8 +1658,6 @@ COMMANDS["read"] = {
       container: containerResult.container,
       deviceId,
       operatorPackage,
-      validateOnly: hasFlag(rest, "--validate-only"),
-      dryRun: hasFlag(rest, "--dry-run"),
       logger,
     });
   },
@@ -2131,11 +2142,11 @@ COMMANDS["read-value"] = {
   help: HELP_READ_VALUE,
   topLevelBlock: `  read-value --label <text>                  Read the value associated with a labeled element`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const { rest, format, explicitJsonOutput, logger, deviceId, operatorPackage, timeoutMs } = ctx;
 
     const readAll = hasFlag(rest, "--all");
     if (readAll) {
-      const err = readAllRequiresJsonOutputError({ command: "read-value", format });
+      const err = readAllRequiresExplicitJsonError({ command: "read-value", format, explicitJsonOutput });
       if (err) return err;
     }
 
