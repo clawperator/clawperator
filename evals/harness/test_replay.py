@@ -80,8 +80,8 @@ def test_run_replay_passes_with_materialized_skill(monkeypatch, tmp_path):
 
     def fake_run(cmd, check, capture_output, text, env, timeout, cwd):
         assert cmd[:3] == ["clawperator", "skills", "run"]
-        assert "--output" in cmd
-        assert "json" in cmd
+        assert "--output" not in cmd
+        assert "--json" not in cmd
         assert "SECRET_TOKEN" not in env
         assert env["CLAWPERATOR_SKILLS_REGISTRY"].endswith("skills/skills-registry.json")
         payload = {

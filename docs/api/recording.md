@@ -89,7 +89,7 @@ Notes:
   1. `recording stop`
   2. `recording pull --out <dir>`
   3. `recording export --input <same dir>`
-  4. `skills run <skill_id> --output json > <run>.skills-run.json`
+  4. `skills run <skill_id> > <run>.skills-run.json`
   5. copy the retained export to `skills/<skill_id>/references/compare-baseline.export.json`
   6. `recording compare --baseline skills/<skill_id>/references/compare-baseline.export.json --result <run>.skills-run.json`
 

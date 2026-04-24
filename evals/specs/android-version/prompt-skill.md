@@ -55,7 +55,7 @@ discovery-to-proving route first:
 2. If runtime-skill discovery returns no relevant match, inspect the installed
    authoring-workflow front doors with:
 
-   `clawperator bundled-skills list --output json`
+   `clawperator bundled-skills list`
 
 3. For this benchmark, `clawperator-skill-author-by-agent-discovery` is the required
    discovery front door. It should decide whether to hand off to
@@ -66,7 +66,7 @@ discovery-to-proving route first:
 5. Before you omit the skill markers, you must show the route attempt in the
    transcript:
    - runtime-skill discovery command(s)
-   - `clawperator bundled-skills list --output json`
+   - `clawperator bundled-skills list`
    - the discovery decision and why it blocked or handed off
 6. If `clawperator-skill-author-by-agent-discovery` is unavailable, incomplete, or cannot
    truthfully finish the route yet, still return the Android version answer but
@@ -89,7 +89,7 @@ Use this exact evaluation posture:
 - Do not print or inspect full snapshot XML, full recording exports, or full
   scaffold files when a targeted command or direct overwrite will do.
 - When you need snapshot evidence, use a filtered command shape such as:
-  `$CLAWPERATOR_CMD snapshot --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE --output json | jq -r '.envelope.stepResults[0].data.text' | rg ...`
+  `$CLAWPERATOR_CMD snapshot --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE | jq -r '.envelope.stepResults[0].data.text' | rg ...`
   so the transcript only includes the relevant rows.
 - After `open com.android.settings`, wait briefly before the first snapshot.
   A short `sleep` is cheaper than recovering from a launcher snapshot.
@@ -105,10 +105,10 @@ Use this exact evaluation posture:
 - Use a device-family-specific skill id:
   - emulator / AOSP: `com.android.settings.read-android-version-aosp-replay`
   - Samsung: `com.android.settings.read-android-version-samsung-replay`
-- After recording export, use `clawperator skills new <skill_id> --recording-context <export_json> --output json`,
+- After recording export, use `clawperator skills new <skill_id> --recording-context <export_json>`,
   patch the scaffold into a truthful Settings/About-device replay skill, run
-  `clawperator skills validate <skill_id> --output json`, then run one
-  `clawperator skills run <skill_id> --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE --output json`
+  `clawperator skills validate <skill_id>`, then run one
+  `clawperator skills run <skill_id> --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE`
   self-test.
 - After `skills new`, overwrite the scaffold directly instead of reading it
   line by line.
@@ -283,8 +283,6 @@ Use this exact evaluation posture:
       deviceId,
       "--operator-package",
       operatorPackage,
-      "--output",
-      "json",
     ]);
 
     runClawperatorJson([
@@ -294,8 +292,6 @@ Use this exact evaluation posture:
       deviceId,
       "--operator-package",
       operatorPackage,
-      "--output",
-      "json",
     ]);
 
     await sleep(2000);
@@ -308,8 +304,6 @@ Use this exact evaluation posture:
       deviceId,
       "--operator-package",
       operatorPackage,
-      "--output",
-      "json",
     ], { allowFailure: true });
 
     runClawperatorJson([
@@ -321,8 +315,6 @@ Use this exact evaluation posture:
       deviceId,
       "--operator-package",
       operatorPackage,
-      "--output",
-      "json",
     ]);
 
     runClawperatorJson([
@@ -334,8 +326,6 @@ Use this exact evaluation posture:
       deviceId,
       "--operator-package",
       operatorPackage,
-      "--output",
-      "json",
     ]);
 
     await sleep(1500);
@@ -346,8 +336,6 @@ Use this exact evaluation posture:
       deviceId,
       "--operator-package",
       operatorPackage,
-      "--output",
-      "json",
     ]);
     let version = extractAndroidVersion(snapshotTextFromResponse(snapshotResponse));
 
@@ -359,8 +347,6 @@ Use this exact evaluation posture:
         deviceId,
         "--operator-package",
         operatorPackage,
-        "--output",
-        "json",
       ]);
       version = extractAndroidVersion(snapshotTextFromResponse(snapshotResponse));
     }
@@ -431,20 +417,20 @@ Use this exact evaluation posture:
 - Do not inspect `recording-context.json` after scaffolding. The recorded
   export already served its purpose once the scaffold exists.
 - For the AOSP emulator route, use this fixed proving path:
-  - `$CLAWPERATOR_CMD close --app com.android.settings --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE --output json`
-  - `$CLAWPERATOR_CMD open com.android.settings --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE --output json`
+  - `$CLAWPERATOR_CMD close --app com.android.settings --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE`
+  - `$CLAWPERATOR_CMD open com.android.settings --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE`
   - `sleep 2`
-  - `$CLAWPERATOR_CMD click --text "Search settings" --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE --output json`
-  - `$CLAWPERATOR_CMD type "About emulated device" --role textfield --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE --output json`
-  - `$CLAWPERATOR_CMD click --coordinate 300 420 --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE --output json`
+  - `$CLAWPERATOR_CMD click --text "Search settings" --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE`
+  - `$CLAWPERATOR_CMD type "About emulated device" --role textfield --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE`
+  - `$CLAWPERATOR_CMD click --coordinate 300 420 --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE`
   - extract the version from a filtered fresh snapshot on the About screen
 - For the Samsung route, use this fixed proving path:
-  - `$CLAWPERATOR_CMD close --app com.android.settings --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE --output json`
-  - `$CLAWPERATOR_CMD open com.android.settings --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE --output json`
+  - `$CLAWPERATOR_CMD close --app com.android.settings --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE`
+  - `$CLAWPERATOR_CMD open com.android.settings --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE`
   - `sleep 2`
-  - `$CLAWPERATOR_CMD click --text "Search settings" --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE --output json`
-  - `$CLAWPERATOR_CMD type "Android version" --role textfield --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE --output json`
-  - `$CLAWPERATOR_CMD click --coordinate 300 690 --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE --output json`
+  - `$CLAWPERATOR_CMD click --text "Search settings" --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE`
+  - `$CLAWPERATOR_CMD type "Android version" --role textfield --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE`
+  - `$CLAWPERATOR_CMD click --coordinate 300 690 --device $DEVICE_SERIAL --operator-package $CLAWPERATOR_OPERATOR_PACKAGE`
   - click the known result row under `Software information`
   - extract the version from a filtered fresh snapshot on the Software
     information screen

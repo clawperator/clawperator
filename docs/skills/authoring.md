@@ -1052,7 +1052,7 @@ Current authoring rule for new non-trivial skills:
 - use `skillResult: null` only for legacy skills that have not yet been
   upgraded
 - if the skill is authored from a retained recording baseline, save a
-  `skills run --output json` wrapper for the run you want to compare and feed that
+  `skills run` wrapper for the run you want to compare and feed that
   wrapper directly to `clawperator recording compare`
 
 Current compare contract for authored skills:

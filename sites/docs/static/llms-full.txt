@@ -7973,7 +7973,7 @@ Notes:
   1. `recording stop`
   2. `recording pull --out <dir>`
   3. `recording export --input <same dir>`
-  4. `skills run <skill_id> --output json > <run>.skills-run.json`
+  4. `skills run <skill_id> > <run>.skills-run.json`
   5. copy the retained export to `skills/<skill_id>/references/compare-baseline.export.json`
   6. `recording compare --baseline skills/<skill_id>/references/compare-baseline.export.json --result <run>.skills-run.json`
 
@@ -10774,7 +10774,7 @@ Current authoring rule for new non-trivial skills:
 - use `skillResult: null` only for legacy skills that have not yet been
   upgraded
 - if the skill is authored from a retained recording baseline, save a
-  `skills run --output json` wrapper for the run you want to compare and feed that
+  `skills run` wrapper for the run you want to compare and feed that
   wrapper directly to `clawperator recording compare`
 
 Current compare contract for authored skills:

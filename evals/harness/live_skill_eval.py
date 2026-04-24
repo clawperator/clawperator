@@ -300,8 +300,6 @@ def _normalization_sequence(
             device_serial,
             "--operator-package",
             operator_package,
-            "--output",
-            "json",
         ],
     )
     run_json(
@@ -313,8 +311,6 @@ def _normalization_sequence(
             device_serial,
             "--operator-package",
             operator_package,
-            "--output",
-            "json",
         ],
     )
     foreground_package, evidence_line, raw_foreground = _foreground_package(device_serial)
@@ -373,8 +369,6 @@ def _probe_observed_value(
             device_serial,
             "--operator-package",
             operator_package,
-            "--output",
-            "json",
         ],
     )
     run_json(
@@ -386,8 +380,6 @@ def _probe_observed_value(
             device_serial,
             "--operator-package",
             operator_package,
-            "--output",
-            "json",
         ],
     )
     probe_payload = run_json(
@@ -400,8 +392,6 @@ def _probe_observed_value(
             device_serial,
             "--operator-package",
             operator_package,
-            "--output",
-            "json",
         ],
     )
     observed_text = _extract_step_text(probe_payload)
@@ -704,8 +694,6 @@ def run_solax_orchestrated_cold_start_eval(
                     inputs.device_serial,
                     "--operator-package",
                     inputs.operator_package,
-                    "--output",
-                    "json",
                     "--",
                     str(target_percent),
                 ],

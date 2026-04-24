@@ -653,7 +653,7 @@ export default function Home() {
 clawperator click --text "Climate"
 clawperator scroll-and-click --text-contains "Living room"
 
-clawperator read --text-contains "Heating" --output json
+clawperator read --text-contains "Heating"
 # { "text": "Off" }
 
 # agent reads "Off", turns it on:
