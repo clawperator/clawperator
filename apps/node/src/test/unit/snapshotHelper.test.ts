@@ -44,6 +44,114 @@ describe("extractSnapshotFromLogs", () => {
     );
   });
 
+  it("drops interleaved Configuration log lines from full TaskScopeDefault snapshots", () => {
+    const lines = [
+      "D/TaskScopeDefault: [TaskScope] UI Hierarchy:",
+      "D/TaskScopeDefault: <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
+      "D/TaskScopeDefault: <hierarchy rotation=\"0\">",
+      "V/Configuration: Updating configuration, locales updated from [] to [en_US]",
+      "D/TaskScopeDefault:   <node index=\"0\" text=\"Settings\" />",
+      "D/TaskScopeDefault: </hierarchy>",
+    ];
+
+    assert.strictEqual(
+      extractSnapshotFromLogs(lines),
+      [
+        "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
+        "<hierarchy rotation=\"0\">",
+        "  <node index=\"0\" text=\"Settings\" />",
+        "</hierarchy>",
+      ].join("\n"),
+    );
+  });
+
+  it("drops multiple interleaved Configuration log lines at different depths", () => {
+    const lines = [
+      "D/TaskScopeDefault: [TaskScope] UI Hierarchy:",
+      "D/TaskScopeDefault: <hierarchy rotation=\"0\">",
+      "V/Configuration: Updating configuration, locales updated from [] to [en_US]",
+      "D/TaskScopeDefault:   <node index=\"0\" text=\"Root\">",
+      "V/Configuration: Updating configuration, locales updated from [en_US] to [en_US]",
+      "D/TaskScopeDefault:     <node index=\"0\" text=\"Child\" />",
+      "D/TaskScopeDefault:   </node>",
+      "D/TaskScopeDefault: </hierarchy>",
+    ];
+
+    const result = extractSnapshotFromLogs(lines);
+    assert.ok(result !== null, "snapshot must not be null");
+    assert.ok(!result.includes("Updating configuration"), "configuration logs must not enter XML");
+    assert.strictEqual(
+      result,
+      [
+        "<hierarchy rotation=\"0\">",
+        "  <node index=\"0\" text=\"Root\">",
+        "    <node index=\"0\" text=\"Child\" />",
+        "  </node>",
+        "</hierarchy>",
+      ].join("\n"),
+    );
+  });
+
+  it("ignores non-snapshot log lines before the hierarchy marker", () => {
+    const lines = [
+      "V/Configuration: Updating configuration before snapshot",
+      "D/TaskScopeDefault: [TaskScope] UI Hierarchy:",
+      "D/TaskScopeDefault: <hierarchy rotation=\"0\">",
+      "D/TaskScopeDefault:   <node index=\"0\" text=\"Settings\" />",
+      "D/TaskScopeDefault: </hierarchy>",
+    ];
+
+    assert.strictEqual(
+      extractSnapshotFromLogs(lines),
+      [
+        "<hierarchy rotation=\"0\">",
+        "  <node index=\"0\" text=\"Settings\" />",
+        "</hierarchy>",
+      ].join("\n"),
+    );
+  });
+
+  it("ignores non-snapshot log lines after the hierarchy closes", () => {
+    const lines = [
+      "D/TaskScopeDefault: [TaskScope] UI Hierarchy:",
+      "D/TaskScopeDefault: <hierarchy rotation=\"0\">",
+      "D/TaskScopeDefault:   <node index=\"0\" text=\"Settings\" />",
+      "D/TaskScopeDefault: </hierarchy>",
+      "V/Configuration: Updating configuration after snapshot",
+    ];
+
+    assert.strictEqual(
+      extractSnapshotFromLogs(lines),
+      [
+        "<hierarchy rotation=\"0\">",
+        "  <node index=\"0\" text=\"Settings\" />",
+        "</hierarchy>",
+      ].join("\n"),
+    );
+  });
+
+  it("drops untagged lines while a snapshot block is open", () => {
+    const lines = [
+      "D/TaskScopeDefault: [TaskScope] UI Hierarchy:",
+      "D/TaskScopeDefault: <hierarchy rotation=\"0\">",
+      "Updating configuration, locales updated from [] to [en_US]",
+      "D/TaskScopeDefault:   <node index=\"0\" text=\"Settings\" />",
+      "D/TaskScopeDefault: </hierarchy>",
+    ];
+
+    const result = extractSnapshotFromLogs(lines);
+    assert.ok(result !== null, "snapshot must not be null");
+    assert.ok(!result.includes("Updating configuration"), "untagged noise must not enter XML");
+    assert.strictEqual(
+      result,
+      [
+        "<hierarchy rotation=\"0\">",
+        "  <node index=\"0\" text=\"Settings\" />",
+        "</hierarchy>",
+      ].join("\n"),
+    );
+  });
+
   it("returns null when no hierarchy marker is present", () => {
     const lines = [
       "D/w       : [TaskRunnerManager] Task execution started",
