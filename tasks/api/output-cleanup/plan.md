@@ -4,20 +4,21 @@
 
 Make the existing JSON-by-default behavior the formal agent-facing contract and
 remove the remaining places that teach or require `--json` as the normal API
-path. This is one PR across three phases: Node CLI behavior and help cleanup,
-authored docs and scaffold cleanup, then validation and generated-doc rebuild.
-The current state is planned, with findings already captured in
-`tasks/api/output-cleanup/findings.md`.
+path. This is two PRs across four phases. PR-1 updates the main repo: Node CLI
+behavior and help cleanup, authored docs and scaffold cleanup, then validation
+and generated-doc rebuild. PR-2 updates the sibling `../clawperator-skills`
+reference-facing examples and any safe shared helpers. The current state is
+planned, with findings already captured in `tasks/api/output-cleanup/findings.md`.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
 | State | not started |
-| Total PRs | 1 |
-| Total phases | 3 |
+| Total PRs | 2 |
+| Total phases | 4 |
 | Completed | none |
-| Remaining | 1, 2, 3 |
+| Remaining | 1, 2, 3, 4 |
 | Current / Next | Phase 1 |
 | Blockers | none |
 
@@ -46,6 +47,11 @@ command shape.
 - Update authored docs under `docs/` to present the simpler common path.
 - Update scaffolded skill examples and runtime hints that unnecessarily append
   `--json`.
+- Update user-facing reference examples in the sibling `../clawperator-skills`
+  repo in a dedicated PR.
+- Audit sibling repo runtime script internals and shared helpers for `--json`
+  usage, changing only cases that are safe under the supported Clawperator
+  version contract.
 - Add focused regression coverage proving JSON output without `--json`.
 - Regenerate docs outputs through the repo docs workflow after authored docs
   change.
@@ -58,6 +64,9 @@ command shape.
 - Changing Android runtime behavior.
 - Rewriting unrelated API examples beyond output-format cleanup.
 - Changing generated docs by hand.
+- Broadly removing `--json` from sibling runtime scripts without checking
+  whether the explicit flag is needed for compatibility, parsing, debug mode,
+  or saved artifact semantics.
 
 ## Existing Artifact Scope
 
@@ -82,6 +91,10 @@ Do not use this task to broadly rewrite page structure or unrelated API prose.
 | `apps/node/src/test/unit/` | Regression coverage for output defaults, all-read behavior, aliases, errors, and help | Phases 1 and 2 |
 | `docs/` | Authored public docs updated through docs-author workflow | Phase 2 |
 | `sites/docs/.build/`, `sites/docs/site/` | Generated only through docs build, never hand-edited | Phase 3 |
+| `../clawperator-skills/skills/**/SKILL.md` | User-facing skill examples and reference guidance updated in a dedicated sibling PR | Phase 4 |
+| `../clawperator-skills/skills/**/*.js` | Runtime script internals audited and changed only when safe | Phase 4 |
+| `../clawperator-skills/skills/utils/` | Shared helpers audited for whether explicit JSON remains intentional | Phase 4 |
+| `../clawperator-skills/scripts/test_all.sh` | Sibling repo validation gate for pure JS changes | Phase 4 |
 | `tasks/api/output-cleanup/findings.md` | Append execution notes only if implementation changes the plan | Any phase |
 
 ## Source Of Truth
@@ -98,6 +111,8 @@ Do not use this task to broadly rewrite page structure or unrelated API prose.
 | Existing CLI tests | `apps/node/src/test/unit/cliRegistry.test.ts`, `apps/node/src/test/unit/cliHelp.test.ts`, `apps/node/src/test/unit/executeCommand.test.ts`, `apps/node/src/test/unit/readAllJsonOutput.test.ts` |
 | Authored docs | `docs/` |
 | Docs generation boundaries | `sites/docs/source-map.yaml`, `sites/docs/mkdocs.yml` |
+| Sibling runtime-skill references | `../clawperator-skills/README.md`, `../clawperator-skills/AGENTS.md`, `../clawperator-skills/skills/**/SKILL.md` |
+| Sibling skill runtime code | `../clawperator-skills/skills/**/*.js`, especially `../clawperator-skills/skills/utils/common.js` and colocated tests |
 
 ## Deterministic Versus Judgment
 
@@ -113,6 +128,10 @@ Deterministic - do not re-derive:
 - `read --all` and `read-value --all` must work with the default JSON output.
 - Generated docs must be produced by the docs build workflow, not edited by
   hand.
+- Sibling repo user-facing examples should follow the same default-JSON contract
+  once PR-1 has established it in main-repo docs and help.
+- Sibling repo runtime code must be classified before editing. Do not assume a
+  script-internal `--json` is merely documentation.
 
 Judgment required:
 
@@ -122,6 +141,8 @@ Judgment required:
 - Whether any runtime hint should keep `--json` for copy-paste compatibility
   with older installed Clawperator versions. If kept, record the reason in the
   phase notes or commit message.
+- In the sibling skills repo, whether a script-internal `--json` is safe to
+  remove or should remain as an explicit compatibility guard.
 
 ## Decision Rules
 
@@ -135,6 +156,8 @@ Judgment required:
 | Should `read --all` require explicit JSON? | No. The default JSON output is sufficient. |
 | Should pretty mode be allowed for `read --all`? | No, unless implementation proves a stable pretty shape already exists and tests cover it. Prefer teaching `--output pretty` users to switch to JSON for multi-result reads. |
 | Where do docs changes belong? | Authored changes go under `docs/`; generated docs are rebuilt through scripts. |
+| Should sibling repo updates be in the same PR as main repo updates? | No. Use a dedicated `../clawperator-skills` PR after or alongside the main repo PR. Keep cross-repo review boundaries clear. |
+| Which sibling repo `--json` references should change? | User-facing examples and reference guidance should usually drop `--json`. Runtime script internals change only after classifying compatibility and parsing impact. |
 
 ## Failure Modes To Prevent
 
@@ -147,6 +170,10 @@ Judgment required:
 - Updating help but leaving generated skill scaffolds to cargo-cult `--json`.
 - Hand-editing `sites/docs/.build/` or `sites/docs/site/`.
 - Letting tests assert old example strings without proving the new behavior.
+- Leaving `../clawperator-skills` reference examples teaching the old pattern
+  after the main repo says JSON is default.
+- Removing `--json` from sibling skill internals and breaking compatibility
+  with currently supported installed Clawperator versions.
 
 ## Output Contract
 
@@ -161,6 +188,14 @@ After this task:
 - `clawperator <command> --output pretty` remains the explicit pretty mode.
 - CLI help and primary docs examples teach commands without `--json`.
 - Docs explain `--json` as compatibility shorthand, not as a required API flag.
+
+After PR-2:
+
+- Sibling skill `SKILL.md` examples use the default-JSON command shape unless a
+  specific compatibility or artifact reason requires `--json`.
+- Sibling runtime scripts either omit unnecessary `--json` or retain it with a
+  deliberate reason documented in the PR.
+- `../clawperator-skills/scripts/test_all.sh` passes.
 
 ## Idempotency
 

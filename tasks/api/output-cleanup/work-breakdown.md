@@ -4,20 +4,23 @@ Parent plan: `tasks/api/output-cleanup/plan.md`
 
 ## Executive Summary
 
-1 PR, 3 phases. Phase 1 updates Node CLI behavior, help, errors, and tests.
-Phase 2 updates authored docs, generated skill scaffolding, host guidance, and
-matching tests. Phase 3 runs docs regeneration and final validation. Phase 1
-uses `default`, Phase 2 uses `default`, and Phase 3 uses `fast`.
+2 PRs, 4 phases. PR-1 lives in the main repo: Phase 1 updates Node CLI
+behavior, help, errors, and tests; Phase 2 updates authored docs, generated
+skill scaffolding, host guidance, and matching tests; Phase 3 runs docs
+regeneration and final validation. PR-2 lives in the sibling
+`../clawperator-skills` repo: Phase 4 updates reference-facing skill examples
+and safely classified runtime helper usage. Phase 1 uses `default`, Phase 2
+uses `default`, Phase 3 uses `fast`, and Phase 4 uses `default`.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
 | State | planning |
-| Total PRs | 1 |
-| Total phases | 3 |
+| Total PRs | 2 |
+| Total phases | 4 |
 | Completed | none |
-| Remaining | 1, 2, 3 |
+| Remaining | 1, 2, 3, 4 |
 | Current / Next | Phase 1 |
 | Blockers | none |
 
@@ -35,6 +38,12 @@ uses `default`, Phase 2 uses `default`, and Phase 3 uses `fast`.
 - Use `.agents/skills/docs-author/SKILL.md` for authored public docs edits.
 - A phase that changes behavior must include tests for that behavior in the same
   phase and commit.
+- Do the sibling `../clawperator-skills` updates in a dedicated PR. Do not mix
+  sibling repo content changes into the main repo PR.
+- In the sibling repo, classify `--json` references before editing. User-facing
+  examples and reference guidance are expected to move to the default-JSON
+  shape. Runtime script internals may keep `--json` when it is an intentional
+  compatibility or parsing guard.
 - If implementation contradicts `tasks/api/output-cleanup/findings.md`, append
   an `## Execution Notes` section there before committing.
 
@@ -58,12 +67,18 @@ Read these files IN THIS ORDER before writing anything.
 | `apps/node/src/domain/skills/scaffoldSkill.ts` | Generated skill command examples |
 | `apps/node/src/domain/host/hostSetup.ts` | Host setup guidance that currently teaches `--json` examples |
 | `.agents/skills/docs-author/SKILL.md` | Required workflow for public docs edits in Phase 2 |
+| `../clawperator-skills/AGENTS.md` | Sibling repo rules for runtime skills |
+| `../clawperator-skills/README.md` | Sibling repo reference surface |
+| `../clawperator-skills/skills/utils/common.js` | Shared helper path for many skill scripts |
+| `../clawperator-skills/skills/utils/common.test.js` | Shared helper regression patterns |
+| `../clawperator-skills/scripts/test_all.sh` | Sibling repo validation gate |
 
 ## PR / Phase Plan
 
 | PR | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
-| PR-1 | Formalize JSON-default API output and clean up examples | 1, 2, 3 | default, default, fast | none |
+| PR-1 | Formalize JSON-default API output in the main repo | 1, 2, 3 | default, default, fast | none |
+| PR-2 | Align sibling skills repo references with JSON default | 4 | default | PR-1 merged or accepted as the source-of-truth direction |
 
 ## Phase 1: Node CLI Behavior, Help, and Tests
 
@@ -326,4 +341,95 @@ git diff --stat
 
 ```text
 chore(docs): regenerate output docs for json default
+```
+
+## Phase 4: Sibling Skills Repo Reference Cleanup
+
+### Agent Tier
+
+default
+
+### Goal
+
+Update `../clawperator-skills` so skills used as references teach the same
+default-JSON command shape, while preserving explicit `--json` in runtime
+internals when it is intentionally needed.
+
+### Files or Surfaces To Change
+
+- `../clawperator-skills/README.md`
+- `../clawperator-skills/AGENTS.md`
+- `../clawperator-skills/skills/**/SKILL.md`
+- `../clawperator-skills/skills/**/*.js`
+- `../clawperator-skills/skills/**/*.test.js`
+- `../clawperator-skills/skills/utils/common.js`
+- `../clawperator-skills/skills/utils/common.test.js`
+
+### Steps
+
+1. Work in the sibling `../clawperator-skills` repo on a dedicated branch and
+   PR. Do not commit these changes to the main `clawperator` repo.
+2. Read `../clawperator-skills/AGENTS.md` before editing.
+3. Run:
+   ```bash
+   rg -n -- "--json|clawperator snapshot|clawperator click|clawperator exec|clawperator skills run" \
+     ../clawperator-skills/README.md \
+     ../clawperator-skills/AGENTS.md \
+     ../clawperator-skills/skills
+   ```
+4. Classify every match into one of these buckets:
+   - user-facing reference example
+   - skill `SKILL.md` usage example
+   - runtime script command that parses CLI JSON output
+   - debug-only command string shown to a nested agent
+   - fixture or test data
+   - historical artifact description
+5. Update user-facing reference examples and skill usage examples to omit
+   unnecessary `--json`.
+6. Audit runtime script internals separately. Remove `--json` only when all of
+   these are true:
+   - the supported Clawperator version for the skill already defaults to JSON
+   - tests can prove the helper still parses the returned shape
+   - the flag is not part of a saved artifact name, debug instruction, or
+     compatibility path
+7. Prefer central helper changes where safe. If a shared helper like
+   `runJsonCommand()` or a local `runClawperator()` wrapper intentionally means
+   "force machine-readable output", it may keep passing `--json` and should be
+   treated as an internal compatibility guard rather than a public example.
+8. Update colocated tests for any changed script or helper behavior in the same
+   commit.
+9. Regenerate skill indexes only if manifest or registry-facing content changed.
+   Do not regenerate indexes for script-only or prose-only edits unless the
+   sibling repo's generator proves they are affected.
+
+### Acceptance Criteria
+
+- Sibling repo user-facing examples no longer imply `--json` is required for
+  normal API calls.
+- Any remaining `--json` in sibling runtime code is intentional and explainable
+  in the PR description.
+- Runtime helpers still parse Clawperator command output correctly.
+- Sibling repo tests pass.
+- The dedicated sibling PR is reviewable independently from the main repo PR.
+
+Human review checklist:
+
+- Reference skills now model the default-JSON API story.
+- Runtime safety was not sacrificed for cosmetic cleanup.
+- Remaining explicit JSON flags are classified, not accidental leftovers.
+
+### Validation
+
+```bash
+(cd ../clawperator-skills && ./scripts/test_all.sh)
+(cd ../clawperator-skills && rg -n -- "--json" README.md AGENTS.md skills)
+```
+
+The final `rg` is an inspection aid, not a zero-match gate. Review each
+remaining match and describe why it remains in the PR.
+
+### Expected Commit
+
+```text
+docs(skills): align examples with json-default cli output
 ```
