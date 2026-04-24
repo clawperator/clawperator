@@ -4,6 +4,12 @@ Use this as the working context for Clawperator API design and review. It is
 self-contained so API reviewers and review-swarm agents can apply the agent UX
 principles without chasing another file first.
 
+When the API tradeoff is unclear, the change is broad, or the review needs the
+full reinforcement behind these principles, read
+`docs/internal/design/node-api-design-guiding-principles.md` as additional
+context. Do not replace this working frame with that document during routine
+reviews. Use it to deepen the same agent-UX lens.
+
 ## Core Principle
 
 Clawperator is an actuator. Its value is mediated through the CLI and Node API

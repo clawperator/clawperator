@@ -25,6 +25,11 @@ That reference is self-contained. It includes the working guidance for:
 - `## Principles`
 - `## Checklist for New Commands and Flags`
 
+For API design work where the tradeoff is unclear, the change is broad, or the
+review needs stronger reinforcement, also read:
+
+`docs/internal/design/node-api-design-guiding-principles.md`
+
 ## Workflow
 
 1. Identify the API surface under review.
@@ -47,6 +52,9 @@ That reference is self-contained. It includes the working guidance for:
      Playwright, adb, GitHub CLI, and general CLI conventions.
    - Treat repeated agent mistakes as API design evidence, not as a docs
      problem.
+   - If the answer is ambiguous, load
+     `docs/internal/design/node-api-design-guiding-principles.md` for the full
+     design context before deciding.
 4. Recommend or implement the smallest API adjustment that reduces friction.
    - Prefer one canonical name in docs and help text.
    - Accept reasonable synonyms silently in parsing when they preserve a stable
