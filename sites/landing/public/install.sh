@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# install.sh (v0.7.5)
+# install.sh (v0.7.7)
 # One-command installation for Clawperator CLI and environment.
 # Target: macOS and Linux (Ubuntu/Debian/Arch).
 
