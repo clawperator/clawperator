@@ -24,6 +24,9 @@ logic inside the skill body.
   - `clawperator doctor --json`
 - use `curl -fsSL https://clawperator.com/install.sh | bash` as recovery when `clawperator --version` is not reachable or the bootstrap prerequisites are not already satisfied
 - verify the resulting install with `clawperator doctor --json`
+- when multiple devices are connected, verify each connected device with
+  `clawperator doctor --json --device <device_id>` before claiming the whole
+  host is ready
 - report whether the host is ready, or which existing repair route is still
   blocking readiness
 - keep upgrade guidance aligned with the installed first-party host-agent docs
@@ -106,6 +109,14 @@ Rules:
 - do not re-implement multi-device policy, runtime-skills install, bundled-skills install, or host-artifact sequencing inside the skill
 - use the structured CLI results rather than guessing about state
 - keep `clawperator doctor --json` as the readiness check after the sequence
+- if the install result has `deviceSelectionRequired: true`, collect the
+  connected `deviceId` values from `steps.operatorRemediation.devices` and run
+  `clawperator doctor --json --device <device_id>` for each connected device
+- if `clawperator doctor --json` returns `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`,
+  run `clawperator devices` or use the install result's device list, then run
+  `clawperator doctor --json --device <device_id>` for each connected device
+- treat a warning-only multi-device doctor result as ready only after every
+  per-device doctor check exits `0` and reports `criticalOk: true`
 - if `npm install -g clawperator@latest` fails, fall back to the recovery installer and re-check reachability before continuing
 
 ### 4. Decide between ready and blocked
@@ -114,7 +125,8 @@ Use this decision table:
 
 | Doctor result | Outcome |
 | --- | --- |
-| exit code `0` and `criticalOk: true` for every connected device | Report that Clawperator is ready and name the next truthful front door for the user’s task. |
+| single-device doctor exits `0` and reports `criticalOk: true` | Report that Clawperator is ready and name the next truthful front door for the user’s task. |
+| top-level doctor exits `0` with `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`, and every per-device doctor check exits `0` with `criticalOk: true` | Report that Clawperator is ready and mention that future device commands need `--device`. |
 | non-zero exit code or `criticalOk: false` | Summarize the failing checks and point to the existing repair route already named by doctor or the setup docs. |
 
 Rules:
@@ -123,6 +135,9 @@ Rules:
 - do not claim success when doctor still reports blocking issues
 - do not claim success until every connected device has been checked with doctor
   and every connected device reports `criticalOk: true`
+- do not treat `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` as a blocker when the
+  per-device doctor checks all pass; report it as the expected follow-up rule
+  for future device commands
 - if doctor indicates setup is incomplete, keep the next step grounded in the
   real failing surface
 - if recovery was needed, report the recovery outcome before the doctor result
@@ -159,7 +174,7 @@ Finish with:
 
 Examples:
 
-- "Clawperator was reachable, the CLI-first upgrade sequence completed, and `clawperator doctor --json` reports `criticalOk: true`. Your next step is `clawperator-agent-orientation`."
+- "Clawperator was reachable, the CLI-first upgrade sequence completed, and doctor reports `criticalOk: true` for every connected device. Future device commands need `--device`; your next step is `clawperator-agent-orientation`."
 - "Clawperator was reachable, but Node or Java was not yet healthy enough for the CLI-first path, so I used `install.sh` as recovery only. Follow the setup guidance at `https://docs.clawperator.com/setup/` and then rerun this skill."
 - "Clawperator was not reachable, so I used `install.sh` as recovery only. The CLI is still not ready, so follow the recovery guidance or finish setup at `https://docs.clawperator.com/setup/`."
 - "Upgrade intent is not explicit yet, so I stopped before running any host mutations."
