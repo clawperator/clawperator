@@ -24,8 +24,8 @@ command that does not parse. An alias, a renamed flag, or a teaching error can.
 
 This is not optional background. The design note contains the argument for why
 agent UX requires deliberate design, the ten principles, and the checklist for
-new commands and flags. The checklist at the end is directly actionable. Read it
-now if this context is not already fresh.
+new commands and flags. The checklist at the end is directly actionable. Read or
+reread it now before proceeding, even if the content feels familiar.
 
 Sections to read closely:
 
@@ -68,10 +68,13 @@ Do not judge the API from docs or commit messages alone. Read the code:
 Ask: what would a capable agent type first after reading only "CLI tool for
 automating Android devices"?
 
-Compare that against what Clawperator currently accepts. The gap is the finding.
-When a gap exists, the fix is an API change - a synonym, a flag alias, a
-friendlier error - not a documentation edit that explains why the intuitive form
-does not work.
+Compare that against what Clawperator currently accepts. A gap is a candidate
+finding when the intuitive form maps cleanly to the same deterministic behavior -
+that is, accepting it would not weaken the contract or introduce ambiguity. For
+those cases, a docs-only fix is insufficient: the API boundary itself must change
+(a synonym, a flag alias, a teaching error). Familiarity is a signal, not a
+mandate - do not report a gap as a finding when accepting the familiar form would
+require guessing at runtime or compromising deterministic behavior.
 
 Agents transfer expectations from adjacent tools. The likely guesses are:
 
