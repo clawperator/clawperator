@@ -50,7 +50,7 @@ Make the formal agent-facing contract:
 > Clawperator CLI commands return JSON by default. Use `--output pretty` only
 > when a human-readable rendering is desired.
 
-Keep `--json` as a permanent compatibility alias. It is familiar from adjacent
+Keep `--json` as a permanent alias. It is familiar from adjacent
 tools and should continue to work, but it should no longer be taught as required
 in primary examples.
 
@@ -64,15 +64,14 @@ spelling would create unnecessary vocabulary without removing friction.
    commands.
 2. Keep global help explicit that:
    - output defaults to JSON
-   - `--json` is a compatibility shorthand for JSON output
+   - `--json` is an alias for JSON output
    - `--output pretty` selects human-readable output
 3. Remove the explicit-JSON requirement for `read --all` and `read-value --all`.
    Default JSON should satisfy the machine-readability requirement.
 4. Update authored docs under `docs/` so the common path omits `--json`.
 5. Update generated skill scaffolding and runtime hints so new examples do not
    reinforce the old habit.
-6. Preserve `--json`, `--output json`, and `--format json` behavior for backward
-   compatibility.
+6. Preserve `--json`, `--output json`, and `--format json` behavior.
 7. Add focused regression coverage showing representative commands return
    parseable JSON without `--json`, including:
    - `snapshot`
@@ -85,7 +84,7 @@ spelling would create unnecessary vocabulary without removing friction.
 
 - This should not be a breaking runtime change because JSON is already the
   default.
-- The main compatibility risk is documentation churn and tests that assert old
+- The main alias risk is documentation churn and tests that assert old
   example strings.
 - Pretty output should remain opt-in. Do not flip the default for human
   convenience, because agents are the primary consumer.

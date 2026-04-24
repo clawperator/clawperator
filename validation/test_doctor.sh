@@ -28,7 +28,7 @@ export PATH="$TMP_BIN"
 export HOME="/tmp"
 
 set +e
-node "$REPO_ROOT/apps/node/dist/cli/index.js" doctor --json > "$TMP_DIR/out1.json"
+node "$REPO_ROOT/apps/node/dist/cli/index.js" doctor --output json > "$TMP_DIR/out1.json"
 EXIT_CODE=$?
 set -e
 
@@ -62,7 +62,7 @@ export PATH="$TMP_BIN2:$PATH"
 export FAKE_ADB_SCENARIO="NO_DEVICE"
 
 set +e
-node "$REPO_ROOT/apps/node/dist/cli/index.js" doctor --json > "$TMP_DIR/out2.json"
+node "$REPO_ROOT/apps/node/dist/cli/index.js" doctor --output json > "$TMP_DIR/out2.json"
 EXIT_CODE=$?
 set -e
 
@@ -83,7 +83,7 @@ echo "=== Scenario 3: NO_APK (Fake ADB) ==="
 export FAKE_ADB_SCENARIO="NO_APK"
 
 set +e
-node "$REPO_ROOT/apps/node/dist/cli/index.js" doctor --json > "$TMP_DIR/out3.json"
+node "$REPO_ROOT/apps/node/dist/cli/index.js" doctor --output json > "$TMP_DIR/out3.json"
 EXIT_CODE=$?
 set -e
 
@@ -120,7 +120,7 @@ echo "=== Scenario 4: CHECK_ONLY (Fake ADB) ==="
 export FAKE_ADB_SCENARIO="NO_DEVICE"
 
 set +e
-node "$REPO_ROOT/apps/node/dist/cli/index.js" doctor --json --check-only > "$TMP_DIR/out4.json"
+node "$REPO_ROOT/apps/node/dist/cli/index.js" doctor --output json --check-only > "$TMP_DIR/out4.json"
 EXIT_CODE=$?
 set -e
 
@@ -141,7 +141,7 @@ echo "=== Scenario 5: VERSION_MISMATCH (Fake ADB) ==="
 export FAKE_ADB_SCENARIO="VERSION_MISMATCH"
 
 set +e
-node "$REPO_ROOT/apps/node/dist/cli/index.js" doctor --json > "$TMP_DIR/out5.json"
+node "$REPO_ROOT/apps/node/dist/cli/index.js" doctor --output json > "$TMP_DIR/out5.json"
 EXIT_CODE=$?
 set -e
 

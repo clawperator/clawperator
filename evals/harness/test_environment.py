@@ -222,7 +222,7 @@ def test_preflight_attaches_doctor_failure_details(monkeypatch):
                 },
             }
         ],
-        "nextActions": ["Reinstall the matching debug APK and rerun doctor --json."],
+        "nextActions": ["Reinstall the matching debug APK and rerun doctor --output json."],
     }
 
     def fake_run(cmd: list[str], env: dict[str, str], cwd: Path | None = None):
@@ -275,7 +275,7 @@ def test_preflight_prefers_first_fail_over_earlier_warning(monkeypatch):
                 },
             },
         ],
-        "nextActions": ["Reinstall the matching debug APK and rerun doctor --json."],
+        "nextActions": ["Reinstall the matching debug APK and rerun doctor --output json."],
     }
 
     def fake_run(cmd: list[str], env: dict[str, str], cwd: Path | None = None):

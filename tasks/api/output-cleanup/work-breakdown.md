@@ -29,8 +29,7 @@ uses `default`, Phase 3 uses `fast`, and Phase 4 uses `default`.
 - Preserve JSON as the default output format.
 - Keep `--json`, `--output json`, and `--format json` working.
 - Do not add `--result-format` or any new output-format spelling.
-- Do not remove or warn on `--json`; it remains a silent compatibility
-  shorthand.
+- Do not remove or warn on `--json`; it remains a silent alias.
 - Make `read --all` and `read-value --all` work with default JSON output.
 - Do not hand-edit `sites/docs/.build/` or `sites/docs/site/`.
 - Use `.agents/skills/api-agent-ux/SKILL.md` for API naming and output-contract
@@ -43,7 +42,7 @@ uses `default`, Phase 3 uses `fast`, and Phase 4 uses `default`.
 - In the sibling repo, classify `--json` references before editing. User-facing
   examples and reference guidance are expected to move to the default-JSON
   shape. Runtime script internals may keep `--json` when it is an intentional
-  compatibility or parsing guard.
+  alias or parsing guard.
 - If implementation contradicts `tasks/api/output-cleanup/findings.md`, append
   an `## Execution Notes` section there before committing.
 
@@ -111,9 +110,8 @@ preserving all existing explicit JSON aliases.
    explain `--output pretty` is not valid for multi-result machine reads and
    show examples without `--json`.
 4. Update primary help blocks in `registry.ts` so common action examples omit
-   `--json`. Keep global help discoverability for `--json` as a compatibility
-   shorthand and `--output pretty` as human-readable output.
-5. Keep parser compatibility unchanged for:
+   `--json`. Keep global help discoverability for `--json` as an alias and `--output pretty` as human-readable output.
+5. Keep parser alias behavior unchanged for:
    - `--json`
    - `--output json`
    - `--format json`
@@ -134,8 +132,8 @@ Required test cases:
 - `--json`, `--output json`, and `--format json` still select JSON output.
 - At least one representative command returns parseable JSON without `--json`
   on an error path that does not require a device.
-- CLI help says output defaults to JSON and presents `--json` as shorthand or
-  compatibility, not as required.
+- CLI help says output defaults to JSON and presents `--json` as an alias, not
+  as required.
 
 ### Acceptance Criteria
 
@@ -150,7 +148,7 @@ Required test cases:
 Human review checklist:
 
 - Output-format vocabulary is simpler than before.
-- Compatibility aliases remain discoverable but secondary.
+- Output aliases remain discoverable but secondary.
 - Error messages teach the next valid command without over-explaining.
 
 ### Validation
@@ -214,7 +212,7 @@ actual affected files, then apply the decision rules from the parent plan.
 3. Classify each match with the parent plan's decision rules.
 4. Update primary API examples to omit `--json`.
 5. Keep or rewrite `--json` references only when they are explicitly about:
-   - compatibility shorthand
+   - alias
    - output-format aliases
    - saved historical artifacts that literally contain `--json`
    - a copy-paste hint that must remain compatible with older installed
@@ -222,7 +220,7 @@ actual affected files, then apply the decision rules from the parent plan.
      notes
 6. Update the node API design note so its principles no longer claim `--json`
    is preferred over `--output json`. The new primary should be default JSON,
-   with `--json` as an accepted shorthand.
+   with `--json` as an accepted alias.
 7. Update generated skill scaffolding examples in `scaffoldSkill.ts` to omit
    unnecessary `--json`.
 8. Update host setup guidance and runtime hints so normal examples omit
@@ -246,7 +244,7 @@ Remaining `--json` references are allowed only in these categories:
 
 - Primary docs examples for observe, decide, act commands omit `--json`.
 - Docs clearly state that CLI output defaults to JSON.
-- `--json` is still documented as accepted shorthand, not removed.
+- `--json` is still documented as accepted alias, not removed.
 - Generated skill scaffolds stop teaching unnecessary `--json`.
 - Runtime hints and error suggestions no longer overuse `--json`.
 - Tests that assert generated guidance strings are updated in the same phase.
@@ -311,7 +309,7 @@ rg -n -- "requires explicit JSON|requires JSON output|Pass --json|Use --json|--j
 ```
 
 This command is an inspection aid. Some matches may remain valid, especially in
-compatibility documentation, logging docs, or historical artifact descriptions.
+alias documentation, logging docs, or historical artifact descriptions.
 Each remaining match must be intentionally kept.
 
 ### Acceptance Criteria
@@ -391,11 +389,11 @@ internals when it is intentionally needed.
    - the supported Clawperator version for the skill already defaults to JSON
    - tests can prove the helper still parses the returned shape
    - the flag is not part of a saved artifact name, debug instruction, or
-     compatibility path
+     alias path
 7. Prefer central helper changes where safe. If a shared helper like
    `runJsonCommand()` or a local `runClawperator()` wrapper intentionally means
    "force machine-readable output", it may keep passing `--json` and should be
-   treated as an internal compatibility guard rather than a public example.
+   treated as an internal alias guard rather than a public example.
 8. Update colocated tests for any changed script or helper behavior in the same
    commit.
 9. Regenerate skill indexes only if manifest or registry-facing content changed.

@@ -57,8 +57,8 @@ npm install -g clawperator
 
 ```bash
 clawperator doctor                              # Verify setup
-clawperator devices --json                      # List connected devices
-clawperator snapshot --device <device_id> --json   # Capture UI tree
+clawperator devices --output json                      # List connected devices
+clawperator snapshot --device <device_id> --output json   # Capture UI tree
 clawperator exec payload.json --device <device_id>   # Run an execution (`execute` synonym; `--payload` / `--execution` optional)
 ```
 

@@ -342,7 +342,7 @@ def _canonicalize_registry_command_tokens(tokens: list[str]) -> str | None:
         canonical_tokens.append(token)
         cursor += 1
     if json_requested:
-        canonical_tokens.append("--json")
+        canonical_tokens.extend(["--output", "json"])
     return " ".join(canonical_tokens)
 
 
@@ -471,7 +471,7 @@ def _validate_discovery_artifact(
                 )
             if authoring_probe_signatures and artifact_registry_signatures.isdisjoint(authoring_probe_signatures):
                 errors.append(
-                    "discovery artifact existing_skill_verdict commands must include `bundled-skills list --json` evidence seen in the transcript"
+                    "discovery artifact existing_skill_verdict commands must include `bundled-skills list --output json` evidence seen in the transcript"
                 )
 
     route_confidence = artifact.get("route_confidence")
@@ -691,7 +691,7 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
         )
         if bundled_skills_list_line_numbers and discovery_artifact_line_number <= min(bundled_skills_list_line_numbers):
             discovery_artifact_errors.append(
-                "structured discovery artifact must appear after `clawperator bundled-skills list --json`"
+                "structured discovery artifact must appear after `clawperator bundled-skills list --output json`"
             )
     elif discovery_artifact_count > 1:
         discovery_artifact_errors.append("expected exactly one structured discovery artifact before skill emission")
@@ -727,15 +727,15 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
     if required_authoring_front_door is not None or required_proving_handoff is not None:
         if not runtime_skill_discovery_seen:
             route_requirement_errors.append(
-                "missing structured command evidence for runtime-skill discovery (`clawperator skills for-app/search/get --json`)"
+                "missing structured command evidence for runtime-skill discovery (`clawperator skills for-app/search/get --output json`)"
             )
         elif not runtime_skill_discovery_before_authoring:
             route_requirement_errors.append(
-                "runtime-skill discovery must appear before `clawperator bundled-skills list --json`"
+                "runtime-skill discovery must appear before `clawperator bundled-skills list --output json`"
             )
         if not bundled_skills_list_seen:
             route_requirement_errors.append(
-                "missing structured command evidence for `clawperator bundled-skills list --json`"
+                "missing structured command evidence for `clawperator bundled-skills list --output json`"
             )
     route_requirement_errors.extend(discovery_artifact_errors)
     if required_authoring_front_door is not None and not required_authoring_front_door_explicitly_seen:
@@ -744,7 +744,7 @@ def _evaluate_skill_route_requirements(transcript: str, skill_generation: Any) -
         )
     elif required_authoring_front_door is not None and not required_authoring_front_door_after_authoring:
         route_requirement_errors.append(
-            f"required_authoring_front_door `{required_authoring_front_door}` must appear after `clawperator bundled-skills list --json`"
+            f"required_authoring_front_door `{required_authoring_front_door}` must appear after `clawperator bundled-skills list --output json`"
         )
     if required_authoring_front_door is not None and not required_authoring_front_door_seen:
         route_requirement_errors.append(

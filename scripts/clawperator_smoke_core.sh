@@ -60,7 +60,7 @@ resolve_device_id
 echo "=== devices ==="
 "${CLI[@]}" devices
 echo "=== packages list (third-party) ==="
-PACKAGES_JSON="$("${CLI[@]}" packages list --device "$DEVICE_ID" --third-party --json)"
+PACKAGES_JSON="$("${CLI[@]}" packages list --device "$DEVICE_ID" --third-party --output json)"
 echo "$PACKAGES_JSON" | node -e 'const d=JSON.parse(require("fs").readFileSync(0,"utf8")); console.log(JSON.stringify(d, null, 2));'
 
 if ! echo "$PACKAGES_JSON" | grep -q "\"$CLAWPERATOR_OPERATOR_PACKAGE\""; then
@@ -69,7 +69,7 @@ if ! echo "$PACKAGES_JSON" | grep -q "\"$CLAWPERATOR_OPERATOR_PACKAGE\""; then
 fi
 # Baseline may be system app (e.g. com.android.settings); check full list if not in third-party
 if ! echo "$PACKAGES_JSON" | grep -q "\"$BASELINE_APP_PACKAGE\""; then
-  PACKAGES_ALL="$("${CLI[@]}" packages list --device "$DEVICE_ID" --json 2>/dev/null)" || true
+  PACKAGES_ALL="$("${CLI[@]}" packages list --device "$DEVICE_ID" --output json 2>/dev/null)" || true
   if ! echo "${PACKAGES_ALL:-}" | grep -q "\"$BASELINE_APP_PACKAGE\""; then
     echo "ERROR: baseline app package not found: $BASELINE_APP_PACKAGE" >&2
     exit 1
@@ -97,7 +97,7 @@ JSON
 
 echo "=== exec (minimal) ==="
 if [ -n "$SMOKE_SUMMARY" ]; then
-  EXEC_JSON="$("${CLI[@]}" exec --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution "$SMOKE_JSON" --json 2>&1)" || true
+  EXEC_JSON="$("${CLI[@]}" exec --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --execution "$SMOKE_JSON" --output json 2>&1)" || true
   echo "$EXEC_JSON" | node -e 'const d=require("fs").readFileSync(0,"utf8"); try { const j=JSON.parse(d); console.log(JSON.stringify({ step: "exec", result: j.terminalSource ? "ok" : (j.code === "RESULT_ENVELOPE_TIMEOUT" ? "timeout" : "error"), terminalSource: j.terminalSource || undefined, timeoutDiagnostics: j.code === "RESULT_ENVELOPE_TIMEOUT" ? j : undefined })); } catch(e) { console.log(JSON.stringify({ step: "exec", result: "error" })); }' >> "$OUTCOMES_FILE"
   echo "$EXEC_JSON" | node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(0,"utf8")),null,2))'
 else
@@ -120,7 +120,7 @@ fi
 # 6) Snapshot check
 echo "=== snapshot ==="
 if [ -n "$SMOKE_SUMMARY" ]; then
-  SNAP_JSON="$("${CLI[@]}" snapshot --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --json 2>&1)" || true
+  SNAP_JSON="$("${CLI[@]}" snapshot --device "$DEVICE_ID" --operator-package "$CLAWPERATOR_OPERATOR_PACKAGE" --output json 2>&1)" || true
   echo "$SNAP_JSON" | node -e 'const d=require("fs").readFileSync(0,"utf8"); try { const j=JSON.parse(d); console.log(JSON.stringify({ step: "snapshot", result: j.terminalSource ? "ok" : (j.code === "RESULT_ENVELOPE_TIMEOUT" ? "timeout" : "error"), terminalSource: j.terminalSource || undefined, timeoutDiagnostics: j.code === "RESULT_ENVELOPE_TIMEOUT" ? j : undefined })); } catch(e) { console.log(JSON.stringify({ step: "snapshot", result: "error" })); }' >> "$OUTCOMES_FILE"
   echo "$SNAP_JSON" | node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(0,"utf8")),null,2))'
   SNAP_OUT="$SNAP_JSON"

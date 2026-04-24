@@ -345,7 +345,8 @@ def run_replay(
             "--operator-package",
             operator_package,
             "--skip-validate",
-            "--json",
+            "--output",
+            "json",
         ]
 
         skill_score["replay_attempted"] = True

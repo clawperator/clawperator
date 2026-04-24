@@ -26,7 +26,7 @@ planned, with findings already captured in `tasks/api/output-cleanup/findings.md
 
 After this task ships, Clawperator's agent-facing CLI examples and behavior
 should communicate a simple contract: commands return parseable JSON by default;
-`--json` remains a supported compatibility shorthand; `--output pretty` is the
+`--json` remains a supported alias; `--output pretty` is the
 explicit human-readable mode.
 
 ## Why Now
@@ -65,7 +65,7 @@ command shape.
 - Rewriting unrelated API examples beyond output-format cleanup.
 - Changing generated docs by hand.
 - Broadly removing `--json` from sibling runtime scripts without checking
-  whether the explicit flag is needed for compatibility, parsing, debug mode,
+  whether the explicit flag is needed for alias behavior, parsing, debug mode,
   or saved artifact semantics.
 
 ## Existing Artifact Scope
@@ -119,12 +119,12 @@ Do not use this task to broadly rewrite page structure or unrelated API prose.
 Deterministic - do not re-derive:
 
 - The default output format remains JSON.
-- `--json` remains accepted as a compatibility shorthand.
+- `--json` remains accepted as an alias.
 - `--output json` and `--format json` remain accepted.
 - `--output pretty` remains the human-readable opt-in.
 - Do not add `--result-format`.
 - Primary API examples should omit `--json` unless the sentence is explicitly
-  documenting output-format aliases or compatibility.
+  documenting output-format aliases.
 - `read --all` and `read-value --all` must work with the default JSON output.
 - Generated docs must be produced by the docs build workflow, not edited by
   hand.
@@ -136,34 +136,34 @@ Deterministic - do not re-derive:
 Judgment required:
 
 - Which historical or troubleshooting examples should keep `--json` because
-  they are explicitly documenting compatibility or quoting existing output.
+  they are explicitly documenting alias or quoting existing output.
 - How much CLI help text to shorten while still making `--json` discoverable.
-- Whether any runtime hint should keep `--json` for copy-paste compatibility
+- Whether any runtime hint should keep `--json` for explicit alias coverage
   with older installed Clawperator versions. If kept, record the reason in the
   phase notes or commit message.
 - In the sibling skills repo, whether a script-internal `--json` is safe to
-  remove or should remain as an explicit compatibility guard.
+  remove or should remain as an explicit alias guard.
 
 ## Decision Rules
 
 | Question | Rule |
 | --- | --- |
-| Should an example include `--json`? | No, unless the surrounding text is specifically about output-format aliases, backwards compatibility, or a saved historical artifact. |
+| Should an example include `--json`? | No, unless the surrounding text is specifically about output-format aliases, output-format alias coverage, or a saved historical artifact. |
 | What is the documented primary machine-readable path? | Run the command with no output-format flag. |
 | How should humans request readable output? | Use `--output pretty`. |
-| What happens to `--json`? | Keep accepting it forever as a compatibility shorthand. Do not remove it or make it noisy. |
+| What happens to `--json`? | Keep accepting it forever as an alias. Do not remove it or make it noisy. |
 | Should `--format json` stay? | Yes. It is already an alias for `--output json`. |
 | Should `read --all` require explicit JSON? | No. The default JSON output is sufficient. |
 | Should pretty mode be allowed for `read --all`? | No, unless implementation proves a stable pretty shape already exists and tests cover it. Prefer teaching `--output pretty` users to switch to JSON for multi-result reads. |
 | Where do docs changes belong? | Authored changes go under `docs/`; generated docs are rebuilt through scripts. |
 | Should sibling repo updates be in the same PR as main repo updates? | No. Use a dedicated `../clawperator-skills` PR after or alongside the main repo PR. Keep cross-repo review boundaries clear. |
-| Which sibling repo `--json` references should change? | User-facing examples and reference guidance should usually drop `--json`. Runtime script internals change only after classifying compatibility and parsing impact. |
+| Which sibling repo `--json` references should change? | User-facing examples and reference guidance should usually drop `--json`. Runtime script internals change only after classifying alias and parsing impact. |
 
 ## Failure Modes To Prevent
 
 - Shipping docs that say JSON is default while `read --all` still rejects the
   default output path.
-- Removing or breaking `--json` compatibility.
+- Removing or breaking `--json` alias behavior.
 - Adding a new output-format flag and increasing vocabulary instead of reducing
   friction.
 - Updating docs but leaving CLI help and errors teaching the old pattern.
@@ -172,7 +172,7 @@ Judgment required:
 - Letting tests assert old example strings without proving the new behavior.
 - Leaving `../clawperator-skills` reference examples teaching the old pattern
   after the main repo says JSON is default.
-- Removing `--json` from sibling skill internals and breaking compatibility
+- Removing `--json` from sibling skill internals and breaking alias behavior
   with currently supported installed Clawperator versions.
 
 ## Output Contract
@@ -187,12 +187,12 @@ After this task:
 - `clawperator <command> --output json` and `--format json` still work.
 - `clawperator <command> --output pretty` remains the explicit pretty mode.
 - CLI help and primary docs examples teach commands without `--json`.
-- Docs explain `--json` as compatibility shorthand, not as a required API flag.
+- Docs explain `--json` as an alias, not as a required API flag.
 
 After PR-2:
 
 - Sibling skill `SKILL.md` examples use the default-JSON command shape unless a
-  specific compatibility or artifact reason requires `--json`.
+  specific alias or artifact reason requires `--json`.
 - Sibling runtime scripts either omit unnecessary `--json` or retain it with a
   deliberate reason documented in the PR.
 - `../clawperator-skills/scripts/test_all.sh` passes.
@@ -211,6 +211,6 @@ After PR-2:
 | Knowledge | Permanent home |
 | --- | --- |
 | JSON-default API contract | `docs/api/overview.md`, `docs/quickstart.md`, and CLI help in `apps/node/src/cli/registry.ts` |
-| Output-format compatibility aliases | `docs/internal/design/node-api-design-guiding-principles.md` and CLI help |
+| Output-format aliases | `docs/internal/design/node-api-design-guiding-principles.md` and CLI help |
 | Result envelope shape | `apps/node/src/contracts/result.ts` and `docs/api/overview.md` |
 | Agent-UX rationale | `docs/internal/design/node-api-design-guiding-principles.md` |
