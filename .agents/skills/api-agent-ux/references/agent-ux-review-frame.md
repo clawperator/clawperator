@@ -1,12 +1,8 @@
 # Agent UX Review Frame
 
-Use this as the working context for Clawperator API design and review. It
-contains the relevant guidance from
-`docs/internal/design/node-api-design-guiding-principles.md`, especially
-`## Why Agent UX Requires Deliberate Design`.
-
-For substantial API redesign, updates to this skill, or disputes about the
-guidance, read the source design document directly.
+Use this as the working context for Clawperator API design and review. It is
+self-contained so API reviewers and review-swarm agents can apply the agent UX
+principles without chasing another file first.
 
 ## Core Principle
 
@@ -26,15 +22,17 @@ them.
 
 ## Why Agent UX Requires Deliberate Design
 
-Agents tend to reach for familiar tools and familiar argument shapes. If an
-agent has used GitHub CLI, Playwright, adb, or common Unix-style CLIs, it will
-often transfer those expectations into Clawperator. That transfer is not a
-mistake to scold with documentation. It is a design signal.
+Agents tend to reach for familiar tools and familiar argument shapes. A model
+that has learned GitHub CLI, Playwright, adb, or common Unix-style CLIs will
+often transfer those expectations into Clawperator. It may try `--body` because
+another issue tool uses that name, `fill` because Playwright uses that verb, or
+`--json` because GitHub CLI makes that the obvious machine-readable output flag.
+That transfer is not a mistake to scold with documentation. It is a design
+signal.
 
-The design note's Agent UX section makes one operational point: when agents keep
-trying a familiar shape from another tool and Clawperator rejects it, consider
-changing Clawperator's API. Better docs are not enough if the first intuitive
-command fails.
+The operational point is: when agents keep trying a familiar shape from another
+tool and Clawperator rejects it, consider changing Clawperator's API. Better
+docs are not enough if the first intuitive command fails.
 
 The lesson is not "add every alias." The lesson is: the command an agent tries
 first, based on intuition from other tools, should work when it maps cleanly to

@@ -18,17 +18,12 @@ Before making or reviewing API-facing changes, read:
 
 `references/agent-ux-review-frame.md`
 
-That reference carries the working guidance from:
+That reference is self-contained. It includes the working guidance for:
 
 - `## The API Is the Product`
 - `## Why Agent UX Requires Deliberate Design`
 - `## Principles`
 - `## Checklist for New Commands and Flags`
-
-For substantial API redesign, updates to this skill, or disputes about the
-guidance, also read the canonical source:
-
-`docs/internal/design/node-api-design-guiding-principles.md`
 
 ## Workflow
 
