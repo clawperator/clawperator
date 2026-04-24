@@ -7,21 +7,24 @@ export function extractSnapshotFromLogs(lines: string[]): string | null {
 }
 
 export function extractSnapshotsFromLogs(lines: string[]): string[] {
-  const messages = lines
-    .map(extractLogMessage)
-    .filter((message): message is string => Boolean(message));
+  const parsedLines = lines
+    .map(parseLogLine)
+    .filter((line): line is ParsedLogLine => line !== null);
 
   const snapshots: string[] = [];
   let currentSnapshotLines: string[] | null = null;
+  let currentSnapshotTag: string | null = null;
 
-  for (const message of messages) {
-    if (message.includes("[TaskScope] UI Hierarchy:")) {
+  for (const line of parsedLines) {
+    const { tag, message } = line;
+    if (tag !== null && message.includes("[TaskScope] UI Hierarchy:")) {
       const currentSnapshot = currentSnapshotLines?.join("\n").trim();
       if (currentSnapshot) {
         snapshots.push(currentSnapshot);
       }
 
       currentSnapshotLines = [];
+      currentSnapshotTag = tag;
       const firstLineRemainder = message.split("[TaskScope] UI Hierarchy:")[1]?.trim();
       if (firstLineRemainder) {
         currentSnapshotLines.push(firstLineRemainder);
@@ -33,6 +36,10 @@ export function extractSnapshotsFromLogs(lines: string[]): string[] {
       continue;
     }
 
+    if (tag !== currentSnapshotTag) {
+      continue;
+    }
+
     const trimmed = message.trim();
     if (trimmed.startsWith("[") && !trimmed.startsWith("<?xml") && !trimmed.startsWith("<")) {
       const currentSnapshot = currentSnapshotLines.join("\n").trim();
@@ -40,6 +47,7 @@ export function extractSnapshotsFromLogs(lines: string[]): string[] {
         snapshots.push(currentSnapshot);
       }
       currentSnapshotLines = null;
+      currentSnapshotTag = null;
       continue;
     }
 
@@ -50,6 +58,7 @@ export function extractSnapshotsFromLogs(lines: string[]): string[] {
         snapshots.push(currentSnapshot);
       }
       currentSnapshotLines = null;
+      currentSnapshotTag = null;
     }
   }
 
@@ -61,15 +70,24 @@ export function extractSnapshotsFromLogs(lines: string[]): string[] {
   return snapshots;
 }
 
-function extractLogMessage(line: string): string | null {
+interface ParsedLogLine {
+  tag: string | null;
+  message: string;
+}
+
+function parseLogLine(line: string): ParsedLogLine | null {
   if (/^[A-Z]\//.test(line)) {
     const delimiterIndex = line.indexOf(":");
     if (delimiterIndex !== -1) {
+      const tag = line.slice(2, delimiterIndex).trim();
       const message = line.slice(delimiterIndex + 1);
-      return message.startsWith(" ") ? message.slice(1) : message;
+      return {
+        tag,
+        message: message.startsWith(" ") ? message.slice(1) : message,
+      };
     }
   }
 
   const trimmed = line.trim();
-  return trimmed.length > 0 ? trimmed : null;
+  return trimmed.length > 0 ? { tag: null, message: trimmed } : null;
 }
