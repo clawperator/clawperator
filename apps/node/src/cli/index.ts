@@ -185,10 +185,17 @@ function getGlobalOpts(argv: string[]): {
       // json is explicit
       output = "json";
       explicitJsonOutput = true;
-    } else if (argv[i] === "--output" && argv[i + 1]) {
-      const next = argv[++i];
-      output = next === "pretty" ? "pretty" : "json";
-      if (next === "json") {
+    } else if (argv[i] === "--output") {
+      const next = argv[i + 1];
+      if (next === undefined || next.trim().length === 0 || next.startsWith("-")) {
+        throw new UsageError("--output requires a value: json or pretty");
+      }
+      if (next !== "json" && next !== "pretty") {
+        throw new UsageError("--output must be one of: json, pretty");
+      }
+      i++;
+      output = next;
+      if (output === "json") {
         explicitJsonOutput = true;
       }
     } else if (argv[i] === "--timeout") {

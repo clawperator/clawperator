@@ -152,6 +152,39 @@ describe("flag aliases - --json sets output to json", () => {
   });
 });
 
+describe("flag aliases - --output selects output format", () => {
+  it("--output json is consumed without error and output remains json", async () => {
+    const { stdout, code } = await runCli(["doctor", "--output", "json", "--check-only"]);
+    assert.strictEqual(code, 0, stdout);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(typeof obj.criticalOk, "boolean");
+  });
+
+  it("--output with an invalid value produces USAGE error with exit code 1", async () => {
+    const { stdout, code } = await runCli(["doctor", "--output", "xml"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /--output must be one of: json, pretty/);
+  });
+
+  it("--output without a value produces USAGE error with exit code 1", async () => {
+    const { stdout, code } = await runCli(["doctor", "--output"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /--output requires a value: json or pretty/);
+  });
+
+  it("--format with an invalid value produces the same USAGE error as --output", async () => {
+    const { stdout, code } = await runCli(["doctor", "--format", "xml"]);
+    assert.strictEqual(code, 1, stdout);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "USAGE");
+    assert.match(obj.message, /--output must be one of: json, pretty/);
+  });
+});
+
 describe("operator download registry", () => {
   it("dispatches operator download and preserves structured errors", async () => {
     const { stdout, code } = await runCli([
