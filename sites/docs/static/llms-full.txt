@@ -903,7 +903,7 @@ Example - click the "Connections" row, wait for navigation, then take a snapshot
 Save this as `payload.json` and run:
 
 ```bash
-clawperator exec --device <device_serial> < payload.json
+clawperator exec --device <device_serial> payload.json
 ```
 
 Success conditions:
