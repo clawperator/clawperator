@@ -144,7 +144,7 @@ bare system message as hierarchy content.
 | Should a non-TaskScope line inside an open snapshot be included? | No. It must not appear in `data.text`. |
 | Should different-tag noise fail the snapshot? | No by default. Ignore different-tag lines and continue collecting same-tag XML until `</hierarchy>`, unless a test proves this creates false positives. |
 | Should bracketed Clawperator markers still terminate a snapshot? | Yes when they come from the same snapshot-producing tag and appear before `</hierarchy>`. Preserve existing malformed or partial block handling unless tests prove a safer behavior. |
-| Which tag should start a snapshot? | Start only from a line whose message includes `[TaskScope] UI Hierarchy:`. Preserve source identity from that line and use it for subsequent lines. |
+| Which tag should start a snapshot? | Start only from a line whose message includes `[TaskScope] UI Hierarchy:`. Record the exact trimmed tag from that line (the segment between `/` and the first `:`, whitespace-trimmed). Accept subsequent lines to the open snapshot only when their exact trimmed tag matches the recorded snapshot tag. Do not use prefix, substring, or fuzzy matching. |
 | Should abbreviated historical fixtures keep working? | Yes, unless implementation discovers they cannot be represented safely. If changed, document why in `findings.md` and update tests intentionally. |
 | Should this task alter unified logging? | No. Unified logger NDJSON routing, terminal cleanliness, and EventEmitter/SSE separation are protected boundaries. |
 | What if a live device is unavailable? | Unit tests remain the primary gate. Record the device limitation in `findings.md`, but do not skip the required synthetic contamination regression. |
@@ -156,6 +156,9 @@ bare system message as hierarchy content.
   paths vulnerable through shared `runExecution()`.
 - Filtering too broadly and dropping legitimate XML lines or colons inside XML
   attributes.
+- Using prefix, substring, or fuzzy tag matching instead of exact-trimmed-tag
+  equality, which would allow tags that share a prefix with the snapshot tag to
+  contaminate or incorrectly close a snapshot block.
 - Breaking older or abbreviated logcat line formats already covered by tests.
 - Polluting JSON stdout with diagnostics or logger output.
 - Changing SSE/EventEmitter behavior while working near `runExecution()`.

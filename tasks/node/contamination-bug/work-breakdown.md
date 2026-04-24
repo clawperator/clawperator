@@ -94,9 +94,11 @@ logging, JSON cleanliness, or SSE separation.
 
 1. Read all required files in order.
 2. Inspect `snapshotHelper.ts` and identify every current accepted input shape:
-   - `D/E       : ...`
-   - `D/TaskScopeDefault: ...`
-   - raw untagged message lines from tests or callers
+   - `D/E       : ...` (abbreviated `-v tag` format, seen in all existing test fixtures)
+   - `D/TaskScopeDefault: ...` (full tag format, seen in live-device findings.md evidence)
+   - whether any test fixture or caller passes raw untagged lines (lines not
+     matching `^[A-Z]/`); record the answer - do not assume untagged lines are
+     an intended input shape unless the code or a test confirms it
    - rejected historical `TaskScopeDefault:` marker payloads
 3. Inspect `runExecution.ts` and confirm whether snapshot extraction still
    happens only after a successful result envelope with at least one
@@ -161,12 +163,20 @@ Fix the extractor so interleaved non-snapshot logcat lines cannot contaminate
 
 ### Steps
 
-1. Refactor `snapshotHelper.ts` to preserve logcat source identity. Prefer a
-   small internal parsed-line shape such as `{ raw, level, tag, message }`.
+1. Refactor `snapshotHelper.ts` to preserve logcat source identity. Use a
+   minimal internal parsed-line shape: `{ tag: string | null, message: string }`
+   where `tag` is the segment between `/` and the first `:` in the line,
+   whitespace-trimmed (or `null` for lines that do not match `^[A-Z]/`).
+   `raw`, `level`, and other fields are not needed for the fix.
 2. Start a snapshot only from a parsed line whose message contains
    `[TaskScope] UI Hierarchy:`.
-3. Store the source identity from the marker line and append subsequent snapshot
-   lines only when they come from the same compatible source.
+3. Record the exact trimmed tag from the marker line. Append subsequent logcat
+   lines to the open snapshot only when their exact trimmed tag matches the
+   recorded snapshot tag. Do not use prefix, substring, or fuzzy tag matching.
+   Note: the fix must store whatever tag the marker line actually carries, not
+   hardcode `TaskScopeDefault`. This ensures both the `D/E` abbreviated fixture
+   (tag=`E`) and the `D/TaskScopeDefault` live-device format (tag=`TaskScopeDefault`)
+   work without special-casing either.
 4. Ignore different-tag logcat lines while a snapshot block is open. Do not
    append their messages to `currentSnapshotLines`.
 5. Continue to terminate a snapshot when `</hierarchy>` is seen from the active
@@ -193,6 +203,12 @@ Required test cases:
   `extractSnapshotFromLogs()` still returns the latest snapshot.
 - Historical `TaskScopeDefault:` payload marker remains rejected unless Phase 1
   documented a deliberate contract change.
+- A line that does not match the `^[A-Z]/` logcat format (untagged, `tag=null`)
+  while a snapshot block is open is not appended to snapshot content. This covers
+  the pre-fix fallthrough path in `extractLogMessage` that returned raw trimmed
+  strings for untagged input. If Phase 1 finds no test fixture uses untagged
+  lines, note this in findings.md and confirm the behavior is consistent with
+  dropping untagged lines.
 
 8. Add a `runExecution.test.ts` case only if needed to prove attachment behavior
    from noisy logcat dumps to successful `snapshot_ui` steps. Use the existing
