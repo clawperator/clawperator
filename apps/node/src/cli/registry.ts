@@ -536,6 +536,7 @@ Usage:
   clawperator snapshot [--device <id>] [--operator-package <pkg>]
 
 Options:
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait for snapshot (default: 30000ms)
 
 Also accepted as: --device-id
@@ -555,6 +556,7 @@ Usage:
 
 Options:
   --path <file>          Save PNG to file path (if omitted, output is base64)
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait (default: 30000ms)
 
 Also accepted as: --device-id, --file
@@ -580,6 +582,7 @@ Selector flags (choose one):
   --selector <json>      Click using advanced NodeMatcher JSON
 
 Options:
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait for element (default: 10000)
   --long                 Perform a long press (clickType: long_click)
   --focus                Set input focus without clicking (clickType: focus)
@@ -603,6 +606,7 @@ Target types:
 
 Options:
   --app <target>         Alternative to positional target argument
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait
 
 Also accepted as: --device-id, open-app, open_app, open-uri, open-url, open_uri, open_url, --package, --package-id, --application-id, --app-id, --url, --uri
@@ -628,6 +632,7 @@ Selector flags (choose one):
   --selector <json>      Raw NodeMatcher JSON
 
 Options:
+  --output <json|pretty> Output format (default: json)
   --submit               Press Enter after typing
   --clear                Clear existing text before typing
   --timeout <ms>         Max time to wait for element
@@ -652,6 +657,7 @@ Label selector flags (choose one):
 
 Options:
   --all                  Return all matches as a JSON array (not compatible with --output pretty)
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait
 
 Also accepted as: --device-id, read-kv, read-key-value-pair, read_key_value_pair, --text, --label-text, --id, --resource-id, --desc, --content-desc
@@ -676,6 +682,7 @@ Selector flags (choose one):
 
 Options:
   --all                  Return all matches as a JSON array (not compatible with --output pretty)
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait for element
 
 Container selector flags (all optional):
@@ -744,6 +751,7 @@ Required (choose one or both):
   ... (and other selector flags like --desc, --role)
 
 Options:
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Required. Maximum time to wait (1-30000ms)
 
 Also accepted as: --device-id, wait-for-navigation, wait_for_navigation, --package, --package-id, --application-id, --app-id, --resource-id, --content-desc, --content-desc-contains
@@ -765,6 +773,7 @@ Valid keys:
 
 Options:
   --key <name>           System key to press (alias for positional arg)
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait
 
 Also accepted as: --device-id, press-key, press_key, --button
@@ -780,6 +789,7 @@ Usage:
   clawperator back [--device <id>] [--operator-package <pkg>]
 
 Options:
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait
 
 Also accepted as: --device-id
@@ -851,6 +861,7 @@ Container selector flags (optional, restrict scroll to specific container):
 
 Options:
   --direction <dir>      Direction to scroll (alias for positional arg)
+  --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait (default: 30000ms)
 
 Also accepted as: --device-id, --container-resource-id, --container-content-desc, --container-content-desc-contains

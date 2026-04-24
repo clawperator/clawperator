@@ -739,9 +739,11 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     const { stdout, code } = await runCli(["snapshot", "--help"]);
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator snapshot/);
+    assert.match(stdout, /--output <json\|pretty>\s+Output format \(default: json\)/);
     assert.match(stdout, /--timeout <ms>/);
     assert.match(stdout, /bundled-skills list/);
     assert.match(stdout, /clawperator-agent-orientation/);
+    assert.doesNotMatch(stdout, /--json\s+JSON output/);
     assert.doesNotMatch(stdout, /--file/);
   });
 
@@ -758,6 +760,8 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator click/);
     assert.match(stdout, /--selector/);
+    assert.match(stdout, /--output <json\|pretty>\s+Output format \(default: json\)/);
+    assert.doesNotMatch(stdout, /--json\s+JSON output/);
   });
 
   it("click with no selector returns MISSING_SELECTOR with exit code 1", async () => {
