@@ -190,3 +190,75 @@ root cause is loss of logcat source identity.
   still needed because the same code should remain robust to raw dumps and test
   fixtures.
 
+## Phase 1 Audit Notes
+
+Date: 2026-04-25
+
+### Accepted logcat input shapes
+
+- `D/E       : ...` abbreviated `-v tag` lines are an explicitly covered input
+  shape in `apps/node/src/test/unit/snapshotHelper.test.ts`. Existing tests use
+  this form for marker lines, XML declaration lines, hierarchy lines, XML
+  attributes containing colons, and multiple snapshot ordering.
+- `D/TaskScopeDefault: ...` full tag lines are present in the live reproduction
+  evidence above. The current parser accepts them because it strips everything
+  before the first colon for any line matching `^[A-Z]/`.
+- Current code accepts raw untagged lines by trimming and returning them from
+  `extractLogMessage()`, but the existing snapshot helper tests do not use
+  untagged lines as an intended fixture shape. For Phase 2, untagged lines while
+  a snapshot is open should be dropped because they have no source tag to match
+  the marker line.
+- Historical `TaskScopeDefault:` marker payloads remain intentionally rejected
+  by the existing test named "rejects TaskScopeDefault: marker". The new parser
+  should keep starting only from messages containing `[TaskScope] UI Hierarchy:`.
+
+### Extraction and attachment boundary
+
+- `runExecution()` clears logcat with `adb logcat -c` before dispatch, waits for
+  the canonical `[Clawperator-Result]` envelope, and only after a successful
+  result dumps logcat with `adb logcat -d -v tag` when the envelope contains at
+  least one `snapshot_ui` step.
+- Snapshot XML is attached by `attachSnapshotsToStepResults()`, which preserves
+  the existing `stepResults[].data` object and adds `text` to successful
+  `snapshot_ui` steps. It walks backward through snapshot steps and extracted
+  snapshots so multiple snapshots continue to align with the latest matching
+  steps.
+- Android `TaskScopeDefault.logUiTree()` emits the hierarchy marker and XML to
+  logcat with `Log.d("$TAG UI Hierarchy:\n$hierarchyDump")`, where `TAG` is
+  `[TaskScope]`. `UiActionEngine.executeSnapshotUi()` returns metadata such as
+  `actual_format`, `foreground_package`, `has_overlay`, `overlay_package`, and
+  `window_count`; Node attaches `data.text` later.
+
+### Protected logging and event boundaries
+
+- `docs/internal/design/unified-logging.md`, `apps/node/src/contracts/logging.ts`,
+  and `apps/node/src/adapters/logger.ts` define separate NDJSON/file/stderr
+  routing from the snapshot extraction path. JSON mode remains terminal-clean by
+  suppressing terminal logging for `cli.*` events in JSON output mode and by
+  making most events file-only.
+- `apps/node/src/domain/observe/events.ts` keeps the EventEmitter/SSE transport
+  separate from the unified logger. This task should not change logger routing,
+  `clawperator logs`, terminal routing, or EventEmitter/SSE behavior unless a
+  later phase uncovers evidence outside the current bug.
+
+### Shared surfaces inheriting the fix
+
+- Direct CLI `snapshot` and `exec` calls share `runExecution()` snapshot
+  post-processing.
+- `serve.ts` builds `/snapshot` as a one-step `snapshot_ui` execution and
+  `/execute` forwards caller executions through `runExecution()`, so both inherit
+  a parser-local fix.
+- `mcp/tools/core.ts` uses `runExecutionTool()`, which calls `runExecution()`,
+  for both MCP `snapshot` and MCP `execute`; MCP-specific truncation happens
+  after `data.text` is already attached.
+
+### Phase 2 implementation constraints
+
+- The fix can remain parser-local in `snapshotHelper.ts`.
+- The marker line must supply the active snapshot tag. Do not hardcode
+  `TaskScopeDefault`; preserve both `D/E       :` and `D/TaskScopeDefault:`
+  forms by recording the exact trimmed tag parsed from the marker line.
+- While a snapshot is open, append only lines whose exact trimmed tag matches the
+  recorded marker tag. Drop different-tag and untagged lines, including
+  `V/Configuration` noise, without changing result-envelope shape or CLI output
+  modes.
