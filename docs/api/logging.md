@@ -202,4 +202,4 @@ See [Environment Variables](environment.md) for complete details on:
 
 ## JSON Mode Cleanliness
 
-When `--json` output mode is active, the unified logger never writes to stdout. Log events go only to the file. This ensures the JSON output stream remains parseable without interleaved log lines.
+When JSON output mode is active, the unified logger never writes to stdout. Log events go only to the file. This ensures the JSON output stream remains parseable without interleaved log lines.

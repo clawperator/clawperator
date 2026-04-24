@@ -27,7 +27,9 @@ Flags:
 | `--fix` | flag | executes shell-type remediation steps during finalization |
 | `--full` | flag | adds Java/build/install/launch/smoke checks |
 | `--check-only` | flag | forces exit code `0` regardless of failures |
-| `--json` | flag | compatibility shorthand for the default JSON output |
+| `--output` | `json`, `pretty` | selects the output renderer; use `--output json` when you want to request JSON explicitly |
+| `--format` | `json`, `pretty` | alias for `--output` |
+| `--json` | flag | compatibility shorthand for JSON output |
 
 Defaults:
 
@@ -36,6 +38,7 @@ Defaults:
 - without `--full`, doctor skips Java/build/install/launch/smoke checks
 - without `--fix`, doctor reports remediation steps but does not run them
 - output defaults to the full `DoctorReport` JSON object
+- the preferred explicit JSON argument is `--output json`; `--json` remains supported for compatibility
 
 ## `DoctorReport` Contract
 

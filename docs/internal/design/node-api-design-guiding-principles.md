@@ -141,8 +141,9 @@ This avoids decision paralysis in docs while remaining forgiving in practice.
 - Document: `type`. Accept: `fill`.
 - Document: `press`. Accept: `press-key`.
 - Document: `--device`. Accept: `--device-id`.
-- Document: JSON output as the default. Accept: `--json`, `--output json`, and
-  `--format json` as explicit compatibility forms.
+- Document: JSON output as the default. Prefer `--output json` when explicit
+  JSON selection is needed. Accept `--json` as a compatibility shorthand and
+  `--format json` as an alias.
 
 When adding a new command, choose the primary name by asking: which name would
 an agent try first? That is the primary. Any other reasonable name is a synonym.
@@ -179,7 +180,8 @@ Agents guess short, generic flags based on training data from other tools. Use
 the shortest unambiguous name.
 
 - `--device` not `--device-id`
-- default JSON output first; `--json` remains a short compatibility shorthand
+- default JSON output first; `--output json` is the preferred explicit spelling,
+  and `--json` remains a short compatibility shorthand
 - use the canonical timeout flag form only
 - `--operator-package` not `--operator-package` ("receiver" is an Android
   implementation detail; "operator" is Clawperator's own terminology)
@@ -259,8 +261,8 @@ surfaces.
   default JSON for programmatic consumption
 - Error output in default JSON mode must also be valid JSON with a consistent
   error schema
-- `--json`, `--output json`, and `--format json` remain accepted explicit forms
-  for compatibility and discoverability
+- `--output json` is the preferred explicit JSON form; `--json` and
+  `--format json` remain accepted aliases for compatibility and discoverability
 
 ### 10. Implementation Details Are Not API
 

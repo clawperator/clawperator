@@ -422,7 +422,7 @@ Usage:
 
 Options:
   --baseline <export.json>       Recording export JSON used as the compare baseline
-  --result <skills-run.json>     Saved clawperator skills run --json wrapper file
+  --result <skills-run.json>     Saved clawperator skills run JSON wrapper file
   --mode <auto|literal|semantic> Compare mode override (default: auto)
 
 Notes:
@@ -477,7 +477,7 @@ Notes:
   - Use --device explicitly when more than one Android device is connected.
   - --operator-package sets the Operator package for this skill run (default: com.clawperator.operator).
     Use com.clawperator.operator.dev for local debug APKs. --receiver-package is a legacy alias (see global options).
-  - Output defaults to JSON. --json remains an accepted compatibility shorthand; --output json and --format json are also accepted.
+  - Output defaults to JSON. Use --output json when you want to request JSON explicitly. --json remains an accepted compatibility shorthand; --format json is also accepted.
   - --timeout overrides the wrapper timeout for this run only (--timeout-ms is accepted as an alias).
   - --expect-contains turns the run into a lightweight output assertion.
   - If the assertion text is missing, the wrapper fails with SKILL_OUTPUT_ASSERTION_FAILED.
@@ -537,7 +537,7 @@ Usage:
 
 Options:
   --timeout <ms>         Max time to wait for snapshot (default: 30000ms)
-  --json                 JSON output compatibility shorthand (output defaults to JSON)
+  --json                 JSON output compatibility shorthand; prefer --output json when explicit output selection is needed
 
 Also accepted as: --device-id
 
@@ -557,7 +557,7 @@ Usage:
 Options:
   --path <file>          Save PNG to file path (if omitted, output is base64)
   --timeout <ms>         Max time to wait (default: 30000ms)
-  --json                 JSON output compatibility shorthand (output defaults to JSON)
+  --json                 JSON output compatibility shorthand; prefer --output json when explicit output selection is needed
 
 Also accepted as: --device-id, --file
 
@@ -583,7 +583,7 @@ Selector flags (choose one):
 
 Options:
   --timeout <ms>         Max time to wait for element (default: 10000)
-  --json                 JSON output compatibility shorthand (output defaults to JSON)
+  --json                 JSON output compatibility shorthand; prefer --output json when explicit output selection is needed
   --long                 Perform a long press (clickType: long_click)
   --focus                Set input focus without clicking (clickType: focus)
 
@@ -607,7 +607,7 @@ Target types:
 Options:
   --app <target>         Alternative to positional target argument
   --timeout <ms>         Max time to wait
-  --json                 JSON output compatibility shorthand (output defaults to JSON)
+  --json                 JSON output compatibility shorthand; prefer --output json when explicit output selection is needed
 
 Also accepted as: --device-id, open-app, open_app, open-uri, open-url, open_uri, open_url, --package, --package-id, --application-id, --app-id, --url, --uri
 
@@ -635,7 +635,7 @@ Options:
   --submit               Press Enter after typing
   --clear                Clear existing text before typing
   --timeout <ms>         Max time to wait for element
-  --json                 JSON output compatibility shorthand (output defaults to JSON)
+  --json                 JSON output compatibility shorthand; prefer --output json when explicit output selection is needed
 
 Also accepted as: --device-id, fill, enter-text, enter_text, --resource-id, --content-desc, --content-desc-contains
 
@@ -658,7 +658,7 @@ Label selector flags (choose one):
 Options:
   --all                  Return all matches as a JSON array (not compatible with --output pretty)
   --timeout <ms>         Max time to wait
-  --json                 JSON output compatibility shorthand (output defaults to JSON)
+  --json                 JSON output compatibility shorthand; prefer --output json when explicit output selection is needed
 
 Also accepted as: --device-id, read-kv, read-key-value-pair, read_key_value_pair, --text, --label-text, --id, --resource-id, --desc, --content-desc
 
@@ -683,7 +683,7 @@ Selector flags (choose one):
 Options:
   --all                  Return all matches as a JSON array (not compatible with --output pretty)
   --timeout <ms>         Max time to wait for element
-  --json                 JSON output compatibility shorthand (output defaults to JSON)
+  --json                 JSON output compatibility shorthand; prefer --output json when explicit output selection is needed
 
 Container selector flags (all optional):
   --container-text <text>           Container with exact visible text
@@ -752,7 +752,7 @@ Required (choose one or both):
 
 Options:
   --timeout <ms>         Required. Maximum time to wait (1-30000ms)
-  --json                 JSON output compatibility shorthand (output defaults to JSON)
+  --json                 JSON output compatibility shorthand; prefer --output json when explicit output selection is needed
 
 Also accepted as: --device-id, wait-for-navigation, wait_for_navigation, --package, --package-id, --application-id, --app-id, --resource-id, --content-desc, --content-desc-contains
 
@@ -774,7 +774,7 @@ Valid keys:
 Options:
   --key <name>           System key to press (alias for positional arg)
   --timeout <ms>         Max time to wait
-  --json                 JSON output compatibility shorthand (output defaults to JSON)
+  --json                 JSON output compatibility shorthand; prefer --output json when explicit output selection is needed
 
 Also accepted as: --device-id, press-key, press_key, --button
 
@@ -790,7 +790,7 @@ Usage:
 
 Options:
   --timeout <ms>         Max time to wait
-  --json                 JSON output compatibility shorthand (output defaults to JSON)
+  --json                 JSON output compatibility shorthand; prefer --output json when explicit output selection is needed
 
 Also accepted as: --device-id
 
@@ -862,7 +862,7 @@ Container selector flags (optional, restrict scroll to specific container):
 Options:
   --direction <dir>      Direction to scroll (alias for positional arg)
   --timeout <ms>         Max time to wait (default: 30000ms)
-  --json                 JSON output compatibility shorthand (output defaults to JSON)
+  --json                 JSON output compatibility shorthand; prefer --output json when explicit output selection is needed
 
 Also accepted as: --device-id, --container-resource-id, --container-content-desc, --container-content-desc-contains
 
@@ -2684,7 +2684,7 @@ COMMANDS["doctor"] = {
   summary: "Run environment and runtime checks",
   help: HELP_DOCTOR,
   topLevelBlock: `  doctor
-                                            Run environment and runtime checks (Stage 3). --json/--format json is alias for --output json.
+                                            Run environment and runtime checks (Stage 3). Use --output json for explicit JSON; --json and --format json remain aliases.
   doctor --fix
                                             Attempt non-destructive host fixes (Stage 3)
   doctor --full
@@ -2898,7 +2898,7 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "Global options:",
     "  --device <id>                           Target Android device serial (Also accepted as: --device-id)",
     "  --operator-package <package>            Target Operator package for broadcast dispatch (Also accepted as: --receiver-package)",
-    "  --json                                  JSON output shorthand (same as --output json)",
+    "  --json                                  JSON output compatibility shorthand (prefer --output json for explicit JSON)",
     "  --output <json|pretty>                  Output format (default: json)",
     "  --log-level <debug|info|warn|error>     Persistent log level (default: info)",
     "  --timeout <n>                           Override execution timeout (Also accepted as: --timeout-ms)",

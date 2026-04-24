@@ -374,7 +374,7 @@ Recommended source:
 - recording-derived selectors and path hints are starting evidence only; the
   authored skill still needs explicit control flow and truthful terminal
   verification
-- the saved `clawperator skills run --json` wrapper is the v1 compare input for `clawperator recording compare --result <file>`
+- the saved `clawperator skills run` JSON wrapper is the v1 compare input for `clawperator recording compare --result <file>`
 - the recording export baseline is reference evidence for compare and authoring, not a runtime input passed to the skill
 
 Recording-derived authoring truthfulness:
@@ -783,7 +783,7 @@ agent is reading one definition while the wrapper is enforcing another.
 When an orchestrated skill misbehaves, start with the minimum durable evidence
 set before you rewrite the skill:
 
-1. The saved `clawperator skills run --json` wrapper result for that exact run.
+1. The saved `clawperator skills run` JSON wrapper result for that exact run.
 2. The forwarded agent stderr stream from that run.
 3. The emitted `SkillResult.checkpoints`.
 4. Compare output against the retained baseline, if the skill keeps
@@ -1052,7 +1052,7 @@ Current authoring rule for new non-trivial skills:
 - use `skillResult: null` only for legacy skills that have not yet been
   upgraded
 - if the skill is authored from a retained recording baseline, save a
-  `skills run --json` wrapper for the run you want to compare and feed that
+  `skills run --output json` wrapper for the run you want to compare and feed that
   wrapper directly to `clawperator recording compare`
 
 Current compare contract for authored skills:
@@ -1066,7 +1066,7 @@ Current compare contract for authored skills:
 - compare classifies `diagnostics.runtimeState == "unavailable"` as
   `runtime_unavailable`
 - compare expects the baseline input to be a recording export artifact such as `references/compare-baseline.export.json`, not a parsed `recording parse` step log
-- compare accepts the full `skills run --json` wrapper as the durable `--result` input, not a hand-edited bare `SkillResult`
+- compare accepts the full `skills run` JSON wrapper as the durable `--result` input, not a hand-edited bare `SkillResult`
 - replay-style runs can succeed as `literal_match`
 - agent-driven runs can succeed as either `semantic_match` or `outcome_matches_path_differs`
 - v1 compare trust is enforced by fixture-backed Solax regression coverage, not by a generic per-skill compare contract

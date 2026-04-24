@@ -1075,9 +1075,9 @@ Accepted output-format forms:
 | Form | Behavior |
 | --- | --- |
 | no output flag | JSON output |
-| `--json` | compatibility shorthand for JSON output |
-| `--output json` | explicit JSON output |
+| `--output json` | preferred explicit JSON output |
 | `--format json` | alias for `--output json` |
+| `--json` | compatibility shorthand for JSON output |
 | `--output pretty` | pretty-printed human-readable output |
 
 ## Readiness Gate
@@ -1450,7 +1450,7 @@ This page is generated from the Node CLI registry and command sources.
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `mcp` | `mcp serve` | - | - | Start the first-party MCP server |
 | `logs` | `logs` | - | - | Tail the Clawperator log file |
-| `doctor` | `doctor`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --json, --format, --output | Run environment and runtime checks |
+| `doctor` | `doctor`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --output, --json, --format | Run environment and runtime checks |
 | `grant-device-permissions` | `grant-device-permissions [--device <id>] [--operator-package <package>]` | - | --device, --operator-package | Re-grant accessibility and notification permissions |
 | `version` | `version`<br>`version --check-compat [--device <id>] [--operator-package <package>]` | - | --check-compat, --device, --operator-package | Show the CLI version |
 
@@ -1462,7 +1462,7 @@ This page is generated from the Node CLI registry and command sources.
 | `host` | `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]` | - | --installed-at, --cli-version, --apk-version, --last-device-serial<br>Subcommands: setup | Set up durable host artifacts owned by the CLI |
 | `setup` | - | - | --apk, --device, --operator-package | Alias guidance - use operator setup instead |
 | `install` | `install [--operator-package <package>]` | - | --operator-package | Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup |
-| `doctor` | `doctor`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --json, --format, --output | Run environment and runtime checks |
+| `doctor` | `doctor`<br>`doctor --fix`<br>`doctor --full`<br>`doctor --check-only` | - | --fix, --full, --check-only, --output, --json, --format | Run environment and runtime checks |
 | `grant-device-permissions` | `grant-device-permissions [--device <id>] [--operator-package <package>]` | - | --device, --operator-package | Re-grant accessibility and notification permissions |
 | `version` | `version`<br>`version --check-compat [--device <id>] [--operator-package <package>]` | - | --check-compat, --device, --operator-package | Show the CLI version |
 
@@ -1501,7 +1501,7 @@ This page is generated from the Node CLI registry and command sources.
 - Summary: Run environment and runtime checks
 - Syntax: `doctor`, `doctor --fix`, `doctor --full`, `doctor --check-only`
 - Aliases: -
-- Flags: `--fix`, `--full`, `--check-only`, `--json`, `--format`, `--output`
+- Flags: `--fix`, `--full`, `--check-only`, `--output`, `--json`, `--format`
 
 ### `grant-device-permissions`
 
@@ -1969,7 +1969,7 @@ See [Environment Variables](environment.md) for complete details on:
 
 ## JSON Mode Cleanliness
 
-When `--json` output mode is active, the unified logger never writes to stdout. Log events go only to the file. This ensures the JSON output stream remains parseable without interleaved log lines.
+When JSON output mode is active, the unified logger never writes to stdout. Log events go only to the file. This ensures the JSON output stream remains parseable without interleaved log lines.
 
 ---
 
@@ -4496,7 +4496,9 @@ Flags:
 | `--fix` | flag | executes shell-type remediation steps during finalization |
 | `--full` | flag | adds Java/build/install/launch/smoke checks |
 | `--check-only` | flag | forces exit code `0` regardless of failures |
-| `--json` | flag | compatibility shorthand for the default JSON output |
+| `--output` | `json`, `pretty` | selects the output renderer; use `--output json` when you want to request JSON explicitly |
+| `--format` | `json`, `pretty` | alias for `--output` |
+| `--json` | flag | compatibility shorthand for JSON output |
 
 Defaults:
 
@@ -4505,6 +4507,7 @@ Defaults:
 - without `--full`, doctor skips Java/build/install/launch/smoke checks
 - without `--fix`, doctor reports remediation steps but does not run them
 - output defaults to the full `DoctorReport` JSON object
+- the preferred explicit JSON argument is `--output json`; `--json` remains supported for compatibility
 
 ## `DoctorReport` Contract
 
@@ -7964,14 +7967,14 @@ Notes:
 - `recording compare` defaults to `--mode auto`
 - if `recording export --input` points at a file and `--out` is omitted, the output path is `<input without .ndjson>.export.json` when the input ends with `.ndjson`, otherwise `<input>.export.json`
 - if `recording export --input` points at a directory, the command picks the newest `*.ndjson` file in that directory and derives the default export path from that resolved file
-- `recording compare` reads a saved `clawperator skills run --json` wrapper file and extracts its top-level `skillResult`
+- `recording compare` reads a saved `clawperator skills run` JSON wrapper file and extracts its top-level `skillResult`
 - for authored skills, the durable retained baseline for compare should live under a reference-style path such as `skills/<skill_id>/references/compare-baseline.export.json`
 - that retained baseline is authoring and maintenance evidence, not a runtime artifact consumed by `skills run`
 - a common authoring workflow is:
   1. `recording stop`
   2. `recording pull --out <dir>`
   3. `recording export --input <same dir>`
-  4. `skills run <skill_id> --json > <run>.skills-run.json`
+  4. `skills run <skill_id> --output json > <run>.skills-run.json`
   5. copy the retained export to `skills/<skill_id>/references/compare-baseline.export.json`
   6. `recording compare --baseline skills/<skill_id>/references/compare-baseline.export.json --result <run>.skills-run.json`
 
@@ -8327,7 +8330,7 @@ clawperator record compare --baseline <export.json> --result <skills-run.json> [
 What the command does:
 
 - reads a recording export artifact from `--baseline`
-- reads a saved `clawperator skills run --json` wrapper from `--result`
+- reads a saved `clawperator skills run` JSON wrapper from `--result`
 - extracts the wrapper's top-level `skillResult`
 - normalizes the export into a checkpoint baseline
 - compares that baseline against `skillResult.checkpoints` plus `skillResult.terminalVerification`
@@ -8397,7 +8400,7 @@ Exit-code contract:
 
 Result-wrapper requirement:
 
-- `--result` must be a saved `skills run --json` wrapper object
+- `--result` must be a saved `skills run` JSON wrapper object
 - v1 compare does not accept a bare `SkillResult` document
 - the wrapper must contain a top-level non-null `skillResult`
 - when you want durable compare evidence, save the full wrapper and keep it as the compare input rather than copying only the embedded `skillResult`
@@ -10094,7 +10097,7 @@ Recommended source:
 - recording-derived selectors and path hints are starting evidence only; the
   authored skill still needs explicit control flow and truthful terminal
   verification
-- the saved `clawperator skills run --json` wrapper is the v1 compare input for `clawperator recording compare --result <file>`
+- the saved `clawperator skills run` JSON wrapper is the v1 compare input for `clawperator recording compare --result <file>`
 - the recording export baseline is reference evidence for compare and authoring, not a runtime input passed to the skill
 
 Recording-derived authoring truthfulness:
@@ -10503,7 +10506,7 @@ agent is reading one definition while the wrapper is enforcing another.
 When an orchestrated skill misbehaves, start with the minimum durable evidence
 set before you rewrite the skill:
 
-1. The saved `clawperator skills run --json` wrapper result for that exact run.
+1. The saved `clawperator skills run` JSON wrapper result for that exact run.
 2. The forwarded agent stderr stream from that run.
 3. The emitted `SkillResult.checkpoints`.
 4. Compare output against the retained baseline, if the skill keeps
@@ -10772,7 +10775,7 @@ Current authoring rule for new non-trivial skills:
 - use `skillResult: null` only for legacy skills that have not yet been
   upgraded
 - if the skill is authored from a retained recording baseline, save a
-  `skills run --json` wrapper for the run you want to compare and feed that
+  `skills run --output json` wrapper for the run you want to compare and feed that
   wrapper directly to `clawperator recording compare`
 
 Current compare contract for authored skills:
@@ -10786,7 +10789,7 @@ Current compare contract for authored skills:
 - compare classifies `diagnostics.runtimeState == "unavailable"` as
   `runtime_unavailable`
 - compare expects the baseline input to be a recording export artifact such as `references/compare-baseline.export.json`, not a parsed `recording parse` step log
-- compare accepts the full `skills run --json` wrapper as the durable `--result` input, not a hand-edited bare `SkillResult`
+- compare accepts the full `skills run` JSON wrapper as the durable `--result` input, not a hand-edited bare `SkillResult`
 - replay-style runs can succeed as `literal_match`
 - agent-driven runs can succeed as either `semantic_match` or `outcome_matches_path_differs`
 - v1 compare trust is enforced by fixture-backed Solax regression coverage, not by a generic per-skill compare contract

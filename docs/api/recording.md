@@ -82,14 +82,14 @@ Notes:
 - `recording compare` defaults to `--mode auto`
 - if `recording export --input` points at a file and `--out` is omitted, the output path is `<input without .ndjson>.export.json` when the input ends with `.ndjson`, otherwise `<input>.export.json`
 - if `recording export --input` points at a directory, the command picks the newest `*.ndjson` file in that directory and derives the default export path from that resolved file
-- `recording compare` reads a saved `clawperator skills run --json` wrapper file and extracts its top-level `skillResult`
+- `recording compare` reads a saved `clawperator skills run` JSON wrapper file and extracts its top-level `skillResult`
 - for authored skills, the durable retained baseline for compare should live under a reference-style path such as `skills/<skill_id>/references/compare-baseline.export.json`
 - that retained baseline is authoring and maintenance evidence, not a runtime artifact consumed by `skills run`
 - a common authoring workflow is:
   1. `recording stop`
   2. `recording pull --out <dir>`
   3. `recording export --input <same dir>`
-  4. `skills run <skill_id> --json > <run>.skills-run.json`
+  4. `skills run <skill_id> --output json > <run>.skills-run.json`
   5. copy the retained export to `skills/<skill_id>/references/compare-baseline.export.json`
   6. `recording compare --baseline skills/<skill_id>/references/compare-baseline.export.json --result <run>.skills-run.json`
 
@@ -445,7 +445,7 @@ clawperator record compare --baseline <export.json> --result <skills-run.json> [
 What the command does:
 
 - reads a recording export artifact from `--baseline`
-- reads a saved `clawperator skills run --json` wrapper from `--result`
+- reads a saved `clawperator skills run` JSON wrapper from `--result`
 - extracts the wrapper's top-level `skillResult`
 - normalizes the export into a checkpoint baseline
 - compares that baseline against `skillResult.checkpoints` plus `skillResult.terminalVerification`
@@ -515,7 +515,7 @@ Exit-code contract:
 
 Result-wrapper requirement:
 
-- `--result` must be a saved `skills run --json` wrapper object
+- `--result` must be a saved `skills run` JSON wrapper object
 - v1 compare does not accept a bare `SkillResult` document
 - the wrapper must contain a top-level non-null `skillResult`
 - when you want durable compare evidence, save the full wrapper and keep it as the compare input rather than copying only the embedded `skillResult`

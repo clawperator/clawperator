@@ -376,8 +376,8 @@ describe("CLI help", () => {
       notesIdx === -1 ? stdout.slice(globalIdx) : stdout.slice(globalIdx, notesIdx);
     assert.match(
       globalBlock,
-      /\n  --json\s+JSON output shorthand/,
-      "expected --json as an indented global option shorthand line",
+      /\n  --json\s+JSON output compatibility shorthand \(prefer --output json for explicit JSON\)/,
+      "expected --json as an indented compatibility shorthand line",
     );
     assert.match(globalBlock, /--output <json\|pretty>\s+Output format \(default: json\)/);
   });
