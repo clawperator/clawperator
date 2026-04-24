@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.7.5] - 2026-04-24
+
+This release formalizes the JSON-by-default CLI contract across command help, docs, bundled skills, and read workflows so agent integrations can rely on structured output without extra selectors.
+
+### 🤖 Node API & CLI
+- **Added:** Allowed `read --all` and `read-value --all` to use the default JSON output mode without requiring `--json`, `--output json`, or `--format json`, while continuing to reject pretty output for multi-result machine-read paths.
+- **Changed:** Aligned the main repo with the JSON-by-default CLI/API contract, keeping explicit JSON selectors available while treating `--output json` as the preferred documented selector.
+- **Changed:** Updated bundled skill guidance and scaffolding so packaged agent flows assume default structured output and handle multi-device doctor requirements accurately.
+
+### 📚 Documentation & Website
+- **Changed:** Refreshed public API, setup, host-agent, troubleshooting, quickstart, skills, and landing-site guidance so examples and command references no longer require optional JSON flags for default structured output.
+
+Pull requests:
+- [docs(install): note install status and upgrade multi-device verification](https://github.com/clawperator/clawperator/pull/230)
+- [feat(skills): add API agent UX skill for Node API reviews](https://github.com/clawperator/clawperator/pull/231)
+- [feat(node, docs): formalize JSON-default CLI output argument](https://github.com/clawperator/clawperator/pull/232)
+- [feat(node): all-read commands to use default JSON output](https://github.com/clawperator/clawperator/pull/233)
+
 ## [0.7.4] - 2026-04-24
 
 This release centralizes installer and operator download handling in the Node CLI while aligning the public install guidance with the CLI-first bootstrap flow.
