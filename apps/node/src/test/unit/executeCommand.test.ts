@@ -438,6 +438,21 @@ describe("clawperator read CLI", () => {
     assert.deepStrictEqual(action.params.matcher, { textEquals: "Price" });
   });
 
+  it("applies global --timeout during read validate-only checks", async () => {
+    const { stdout, code } = await runCli([
+      "--timeout",
+      "5000",
+      "read",
+      "--text",
+      "Price",
+      "--validate-only",
+    ]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.execution.timeoutMs, 5000);
+  });
+
   it("returns a read_text dry-run plan without requiring a device", async () => {
     const { stdout, code } = await runCli([
       "read",

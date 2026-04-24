@@ -150,6 +150,7 @@ export async function cmdActionRead(options: {
   container?: NodeMatcher;
   deviceId?: string;
   operatorPackage?: string;
+  timeoutMs?: number;
   validateOnly?: boolean;
   dryRun?: boolean;
   logger?: Logger;
@@ -163,6 +164,7 @@ export async function cmdActionRead(options: {
         execution: JSON.stringify(execution),
         deviceId: options.deviceId,
         operatorPackage: options.operatorPackage,
+        timeoutMs: options.timeoutMs,
         validateOnly: options.validateOnly,
         dryRun: options.dryRun,
         logger: options.logger,

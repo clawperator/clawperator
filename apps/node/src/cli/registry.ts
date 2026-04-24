@@ -1620,7 +1620,7 @@ COMMANDS["read"] = {
   topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]
                                             Read text from the first matching UI element`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     if (!hasElementSelectorFlag(rest)) {
       return makeMissingSelectorError("read", format);
     }
@@ -1645,6 +1645,7 @@ COMMANDS["read"] = {
       container: containerResult.container,
       deviceId,
       operatorPackage,
+      timeoutMs,
       validateOnly: hasFlag(rest, "--validate-only"),
       dryRun: hasFlag(rest, "--dry-run"),
       logger,
