@@ -157,6 +157,7 @@ export async function cmdActionRead(options: {
   try {
     const execution = buildReadExecution(options.matcher, options.readAll, options.container);
     if (options.validateOnly || options.dryRun) {
+      // Reuse exec's contract-only paths so read validation never dispatches to a device.
       return (await import("./execute.js")).cmdExecute({
         format: options.format,
         execution: JSON.stringify(execution),

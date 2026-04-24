@@ -422,6 +422,38 @@ describe("clawperator read-value CLI", () => {
 });
 
 describe("clawperator read CLI", () => {
+  it("builds read_text with --validate-only without requiring a device", async () => {
+    const { stdout, code } = await runCli([
+      "read",
+      "--text",
+      "Price",
+      "--validate-only",
+    ]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.validated, true);
+    const action = result.execution.actions[0];
+    assert.strictEqual(action.type, "read_text");
+    assert.deepStrictEqual(action.params.matcher, { textEquals: "Price" });
+  });
+
+  it("returns a read_text dry-run plan without requiring a device", async () => {
+    const { stdout, code } = await runCli([
+      "read",
+      "--text",
+      "Price",
+      "--dry-run",
+    ]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(result.dryRun, true);
+    assert.strictEqual(result.plan.actionCount, 1);
+    assert.strictEqual(result.plan.actions[0].type, "read_text");
+    assert.deepStrictEqual(result.plan.actions[0].params.matcher, { textEquals: "Price" });
+  });
+
   it("sets all:true when --all without explicit output flags", async () => {
     const { stdout, code } = await runCli([
       "read",
