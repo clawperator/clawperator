@@ -1,14 +1,10 @@
 # Agent UX Review Frame
 
-Use this as the working context for Clawperator API design and review. It is
-self-contained so API reviewers and review-swarm agents can apply the agent UX
-principles without chasing another file first.
-
-When the API tradeoff is unclear, the change is broad, or the review needs the
-full reinforcement behind these principles, read
-`docs/internal/design/node-api-design-guiding-principles.md` as additional
-context. Do not replace this working frame with that document during routine
-reviews. Use it to deepen the same agent-UX lens.
+Use this as the compact working frame after reading
+`docs/internal/design/node-api-design-guiding-principles.md`. The source design
+note is mandatory context for this skill. This reference exists to keep the
+review questions close at hand after the agent has ingested the full design
+argument.
 
 ## Core Principle
 

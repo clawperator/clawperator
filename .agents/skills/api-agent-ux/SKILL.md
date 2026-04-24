@@ -14,21 +14,27 @@ runtime contracts.
 
 ## Required Context
 
-Before making or reviewing API-facing changes, read:
+Before making or reviewing API-facing changes, read this document first:
 
-`references/agent-ux-review-frame.md`
+`docs/internal/design/node-api-design-guiding-principles.md`
 
-That reference is self-contained. It includes the working guidance for:
+This is mandatory context for the skill. Do not treat it as optional
+background. The purpose of this skill is to ingest that design note, especially
+the Agent UX argument, before judging Clawperator API work.
+
+At minimum, read these sections closely:
 
 - `## The API Is the Product`
 - `## Why Agent UX Requires Deliberate Design`
 - `## Principles`
 - `## Checklist for New Commands and Flags`
 
-For API design work where the tradeoff is unclear, the change is broad, or the
-review needs stronger reinforcement, also read:
+Then read:
 
-`docs/internal/design/node-api-design-guiding-principles.md`
+`references/agent-ux-review-frame.md`
+
+Use the reference as the compact review frame after the source design note is in
+context. It is not a substitute for the source document.
 
 ## Workflow
 
@@ -52,9 +58,6 @@ review needs stronger reinforcement, also read:
      Playwright, adb, GitHub CLI, and general CLI conventions.
    - Treat repeated agent mistakes as API design evidence, not as a docs
      problem.
-   - If the answer is ambiguous, load
-     `docs/internal/design/node-api-design-guiding-principles.md` for the full
-     design context before deciding.
 4. Recommend or implement the smallest API adjustment that reduces friction.
    - Prefer one canonical name in docs and help text.
    - Accept reasonable synonyms silently in parsing when they preserve a stable
