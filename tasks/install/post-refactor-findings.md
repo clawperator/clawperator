@@ -101,6 +101,11 @@ LLM surfaces, and `clawperator-upgrade` now consistently describe
 `clawperator install` as the canonical post-bootstrap path and keep
 `install.sh` as bootstrap or recovery.
 
+The `clawperator-upgrade` bundled skill now explicitly handles multi-device
+verification. When `clawperator install` reports `deviceSelectionRequired` or
+top-level doctor reports `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`, the skill tells
+agents to run per-device doctor checks before claiming the host is ready.
+
 ## Gaps And Residual Risks
 
 No blocking defect was found in the final review, the install validation suite
@@ -120,22 +125,7 @@ blocker. It is still a useful follow-up because install-state diagnostics would
 be stronger if `operator remediate` exposed the downloaded or verified operator
 version and `cmdInstall` passed it into host setup.
 
-### 2. `clawperator-upgrade` has a multi-device verification ambiguity
-
-The updated bundled skill correctly routes through `npm install -g
-clawperator@latest`, `clawperator install`, and `clawperator doctor --json`.
-It also says not to claim success until every connected device has been checked
-with doctor and reports `criticalOk: true`.
-
-That creates a small ambiguity on multi-device hosts. A single
-`clawperator doctor --json` without `--device` may not prove every connected
-device in the way the skill text requires. Since `clawperator install` already
-returns per-device remediation output and a `deviceSelectionRequired` signal,
-the skill should eventually spell out the multi-device follow-up: when multiple
-ready devices are present, run doctor per selected device or consume the
-install result's device list before declaring the whole host ready.
-
-### 3. The install validation runner is broad and may become expensive
+### 2. The install validation runner is broad and may become expensive
 
 `validation/install/test_install.sh` builds `apps/node` and runs the full Node
 test suite before the install shell harnesses. This is safe and currently
@@ -154,11 +144,7 @@ validation.
    likely shape is to extend `operator remediate` with the effective downloaded
    or verified APK version, then pass that through `cmdInstall` to `setupHost`.
 
-3. Tighten `clawperator-upgrade` multi-device wording. It should explicitly
-   handle `deviceSelectionRequired` or multiple connected devices before
-   claiming every device was verified by doctor.
-
-4. Keep an install-focused Node test slice in mind if the full Node suite
+3. Keep an install-focused Node test slice in mind if the full Node suite
    becomes too expensive for installer-only validation. The current full-suite
    runner is acceptable while it remains fast enough.
 
@@ -170,6 +156,6 @@ surface, and the detailed behavior moved to Node with meaningful tests. The
 released `0.7.4` public install and upgrade paths both passed live validation.
 
 The remaining work is not another large refactor. It is a short follow-up pass:
-improve install-state version metadata, tighten multi-device upgrade
-verification guidance, and consider a stable install-focused Node test slice if
-the full Node suite becomes too expensive for installer-only validation.
+improve install-state version metadata and consider a stable install-focused
+Node test slice if the full Node suite becomes too expensive for installer-only
+validation.
