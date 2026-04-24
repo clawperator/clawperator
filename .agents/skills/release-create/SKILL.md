@@ -7,15 +7,16 @@ Use this skill after the release code version has already been committed to the 
 
 This skill creates a release by:
 1. Verifying the requested version matches both `apps/node/package.json` and `apps/node/package-lock.json`.
-2. Refusing to proceed if the version is already published on npm, if the tag already exists, or if a GitHub Release already exists.
-3. Running the same local Node checks used by `.github/workflows/publish-npm.yml`:
+2. Refusing to proceed unless `CHANGELOG.md` already contains exactly one release block for the requested version.
+3. Refusing to proceed if the version is already published on npm, if the tag already exists, or if a GitHub Release already exists.
+4. Running the same local Node checks used by `.github/workflows/publish-npm.yml`:
    - `npm --prefix apps/node ci`
    - `npm --prefix apps/node run build`
    - `npm --prefix apps/node run test`
-4. Creating an annotated `v<version>` tag at the requested SHA.
-5. Pushing only that tag.
-6. Inspecting the resulting `Publish npm Package` and `Release APK` workflow runs with `gh`.
-7. Attempting `.agents/skills/release-update-published-version/` after the workflows succeed, retrying briefly for npm/GitHub propagation and creating a follow-up local commit for public docs and website content when the release is discoverable.
+5. Creating an annotated `v<version>` tag at the requested SHA.
+6. Pushing only that tag.
+7. Inspecting the resulting `Publish npm Package` and `Release APK` workflow runs with `gh`.
+8. Attempting `.agents/skills/release-update-published-version/` after the workflows succeed, retrying briefly for npm/GitHub propagation and creating a follow-up local commit for public docs and website content when the release is discoverable.
 
 Run:
 
@@ -36,6 +37,7 @@ If `sha` is omitted, the script tags `HEAD`.
 
 - The target release commit must already exist locally.
 - `apps/node/package.json` and `apps/node/package-lock.json` must already contain the target version.
+- `CHANGELOG.md` must already contain exactly one `## [<version>]` block for the target release.
 - Public release-facing docs do not need to be pre-bumped. This skill will try to prepare the published-version follow-up after the release succeeds.
 - `git`, `npm`, and `gh` must be installed and authenticated.
 

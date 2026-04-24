@@ -84,7 +84,7 @@ Expected stable UX:
 ## Release Checklist
 
 1. Confirm `apps/node/package.json` has the intended release version.
-2. Confirm changelog and release notes are ready.
+2. Confirm `CHANGELOG.md` already has exactly one release block for the intended version. The release helper and `Publish npm Package` workflow both gate on that block before publishing.
 3. Confirm signing and Cloudflare secrets are present in GitHub.
 4. Confirm the branch is ready to release.
 5. Create and push the tag.

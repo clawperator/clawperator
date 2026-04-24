@@ -42,6 +42,38 @@ jobs:
             exit 1
           fi
 
+      - name: Validate release changelog
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="${GITHUB_REF_NAME#v}"
+          python3 - "$version" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          version = sys.argv[1]
+          if not re.match(r"^\d+\.\d+\.\d+$", version):
+              print(f"Error: version '{version}' is not in 0.0.0 format; cannot match CHANGELOG entry.", file=sys.stderr)
+              sys.exit(1)
+
+          try:
+              content = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          except FileNotFoundError:
+              print("Error: CHANGELOG.md not found. Run release-notes-author before tagging.", file=sys.stderr)
+              sys.exit(1)
+
+          pattern = rf'(##\s*\[{re.escape(version)}\][ \t].*?)(?=\n##\s|\Z)'
+          matches = re.findall(pattern, content, re.DOTALL | re.MULTILINE)
+          if len(matches) == 0:
+              print(f"Error: No CHANGELOG entry found for {version}. Run release-notes-author before tagging.", file=sys.stderr)
+              sys.exit(1)
+          if len(matches) > 1:
+              print(f"Error: Duplicate CHANGELOG entries found for {version}. Fix CHANGELOG.md before tagging.", file=sys.stderr)
+              sys.exit(1)
+          PY
+
       - name: Install dependencies
         run: npm --prefix apps/node ci
 
