@@ -27,6 +27,37 @@ cleanup_worktree() {
   fi
 }
 
+validate_changelog_entry() {
+  local version="$1"
+
+  python3 - "$version" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+version = sys.argv[1]
+if not re.match(r"^\d+\.\d+\.\d+$", version):
+    print(f"Error: version '{version}' is not in 0.0.0 format; cannot match CHANGELOG entry.", file=sys.stderr)
+    sys.exit(1)
+
+changelog_path = Path("CHANGELOG.md")
+try:
+    content = changelog_path.read_text(encoding="utf-8")
+except FileNotFoundError:
+    print("Error: CHANGELOG.md not found. Run release-notes-author before tagging.", file=sys.stderr)
+    sys.exit(1)
+
+pattern = rf'(##\s*\[{re.escape(version)}\][ \t].*?)(?=\n##\s|\Z)'
+matches = re.findall(pattern, content, re.DOTALL | re.MULTILINE)
+if len(matches) == 0:
+    print(f"Error: No CHANGELOG entry found for {version}. Run release-notes-author before tagging.", file=sys.stderr)
+    sys.exit(1)
+if len(matches) > 1:
+    print(f"Error: Duplicate CHANGELOG entries found for {version}. Fix CHANGELOG.md before tagging.", file=sys.stderr)
+    sys.exit(1)
+PY
+}
+
 json_version_field() {
   node -e 'const data = JSON.parse(process.argv[1]); const value = data.version; if (typeof value !== "string" || value.length === 0) process.exit(2); console.log(value);' "$1"
 }
@@ -181,6 +212,8 @@ main() {
   local lock_version
   lock_version="$(json_version_field "$(git show "${target_sha}:apps/node/package-lock.json")")"
   [[ "$lock_version" == "$version" ]] || die "apps/node/package-lock.json is $lock_version, expected $version"
+
+  validate_changelog_entry "$version"
 
   local npm_view_output
   if npm_view_output="$(npm view "clawperator@${version}" version 2>&1)"; then
