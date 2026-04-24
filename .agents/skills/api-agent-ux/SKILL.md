@@ -12,21 +12,23 @@ goal is to make the first command an agent guesses from prior CLI, Playwright,
 adb, and GitHub CLI experience actually work, while preserving deterministic
 runtime contracts.
 
-## Required Reading
+## Required Context
 
-Before making or reviewing API-facing changes, read the relevant parts of:
+Before making or reviewing API-facing changes, read:
 
-`docs/internal/design/node-api-design-guiding-principles.md`
+`references/agent-ux-review-frame.md`
 
-At minimum, load these sections:
+That reference carries the working guidance from:
 
 - `## The API Is the Product`
 - `## Why Agent UX Requires Deliberate Design`
 - `## Principles`
 - `## Checklist for New Commands and Flags`
 
-Also read `references/agent-ux-review-frame.md` in this skill for the condensed
-review lens.
+For substantial API redesign, updates to this skill, or disputes about the
+guidance, also read the canonical source:
+
+`docs/internal/design/node-api-design-guiding-principles.md`
 
 ## Workflow
 
