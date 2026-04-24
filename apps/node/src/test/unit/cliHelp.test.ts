@@ -376,9 +376,19 @@ describe("CLI help", () => {
       notesIdx === -1 ? stdout.slice(globalIdx) : stdout.slice(globalIdx, notesIdx);
     assert.match(
       globalBlock,
-      /\n  --json\s+/,
-      "expected --json as an indented global option line",
+      /\n  --json\s+JSON output shorthand/,
+      "expected --json as an indented global option shorthand line",
     );
+    assert.match(globalBlock, /--output <json\|pretty>\s+Output format \(default: json\)/);
+  });
+
+  it("shows common device actions without requiring --json in top-level help", async () => {
+    const { stdout, code } = await runCli(["--help"]);
+    assert.strictEqual(code, 0);
+    assert.match(stdout, /snapshot \[--device <id>\] \[--operator-package <pkg>\]/);
+    assert.match(stdout, /read --text <text> \| --id <id> \| --role <role> \[--device <id>\] \[--operator-package <pkg>\]/);
+    assert.doesNotMatch(stdout, /snapshot .*--json/);
+    assert.doesNotMatch(stdout, /read --text .*--json/);
   });
 
   it("shows recording as canonical command in top-level help", async () => {

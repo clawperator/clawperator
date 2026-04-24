@@ -150,10 +150,23 @@ export async function cmdActionRead(options: {
   container?: NodeMatcher;
   deviceId?: string;
   operatorPackage?: string;
+  validateOnly?: boolean;
+  dryRun?: boolean;
   logger?: Logger;
 }): Promise<string> {
   try {
     const execution = buildReadExecution(options.matcher, options.readAll, options.container);
+    if (options.validateOnly || options.dryRun) {
+      return (await import("./execute.js")).cmdExecute({
+        format: options.format,
+        execution: JSON.stringify(execution),
+        deviceId: options.deviceId,
+        operatorPackage: options.operatorPackage,
+        validateOnly: options.validateOnly,
+        dryRun: options.dryRun,
+        logger: options.logger,
+      });
+    }
     const result = await runExecution(execution, {
       deviceId: options.deviceId,
       operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,

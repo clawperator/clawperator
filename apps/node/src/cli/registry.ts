@@ -144,35 +144,22 @@ export function getInvalidTimeoutResult(timeoutMs: number | undefined, options: 
 }
 
 /**
- * `read --all` and `read-value --all` need machine-readable stdout; require JSON output and an
- * explicit `--json` or `--output json` / `--format json` (implicit default json is not enough).
+ * `read --all` and `read-value --all` need machine-readable stdout. JSON is the default output
+ * format, so only explicit non-JSON output is rejected for these multi-result paths.
  */
-export function readAllRequiresExplicitJsonError(options: {
+export function readAllRequiresJsonOutputError(options: {
   command: "read" | "read-value";
   format: "json" | "pretty";
-  explicitJsonOutput: boolean;
 }): string | undefined {
-  const { command, format, explicitJsonOutput } = options;
+  const { command, format } = options;
   if (format !== "json") {
     return formatError(
       {
         code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
         message:
           command === "read"
-            ? 'read --all requires JSON output. Use --json or --output json (not --output pretty).\n\nExample:\n  clawperator read --text "Price" --all --json'
-            : "read-value --all requires JSON output. Use --json or --output json (not --output pretty).",
-      },
-      { format },
-    );
-  }
-  if (!explicitJsonOutput) {
-    return formatError(
-      {
-        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
-        message:
-          command === "read"
-            ? 'read --all requires explicit JSON output. Pass --json, --output json, or --format json.\n\nExample:\n  clawperator read --text "Price" --all --json'
-            : 'read-value --all requires explicit JSON output. Pass --json, --output json, or --format json.\n\nExample:\n  clawperator read-value --label "Battery" --all --json',
+            ? 'read --all requires JSON output. The default output is JSON; do not use --output pretty for multi-result reads.\n\nExample:\n  clawperator read --text "Price" --all'
+            : 'read-value --all requires JSON output. The default output is JSON; do not use --output pretty for multi-result reads.\n\nExample:\n  clawperator read-value --label "Battery" --all',
       },
       { format },
     );
@@ -546,11 +533,11 @@ Notes:
 const HELP_SNAPSHOT = `clawperator snapshot — Get current Android UI hierarchy as XML
 
 Usage:
-  clawperator snapshot [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator snapshot [--device <id>] [--operator-package <pkg>]
 
 Options:
   --timeout <ms>         Max time to wait for snapshot (default: 30000ms)
-  --json                 Output as JSON
+  --json                 JSON output compatibility shorthand (output defaults to JSON)
 
 Also accepted as: --device-id
 
@@ -559,24 +546,24 @@ Notes:
 
 Examples:
   clawperator snapshot
-  clawperator snapshot --device <device_serial> --json
+  clawperator snapshot --device <device_serial>
 `;
 
 const HELP_SCREENSHOT = `clawperator screenshot — Capture device screen
 
 Usage:
-  clawperator screenshot [--path <file>] [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator screenshot [--path <file>] [--device <id>] [--operator-package <pkg>]
 
 Options:
   --path <file>          Save PNG to file path (if omitted, output is base64)
   --timeout <ms>         Max time to wait (default: 30000ms)
-  --json                 Output as JSON
+  --json                 JSON output compatibility shorthand (output defaults to JSON)
 
 Also accepted as: --device-id, --file
 
 Examples:
   clawperator screenshot --path /tmp/screen.png
-  clawperator screenshot --device <device_serial> --json
+  clawperator screenshot --device <device_serial>
 `;
 
 const HELP_CLICK = `clawperator click — Tap a UI element by selector or coordinates
@@ -596,7 +583,7 @@ Selector flags (choose one):
 
 Options:
   --timeout <ms>         Max time to wait for element (default: 10000)
-  --json                 Output as JSON
+  --json                 JSON output compatibility shorthand (output defaults to JSON)
   --long                 Perform a long press (clickType: long_click)
   --focus                Set input focus without clicking (clickType: focus)
 
@@ -620,7 +607,7 @@ Target types:
 Options:
   --app <target>         Alternative to positional target argument
   --timeout <ms>         Max time to wait
-  --json                 Output as JSON
+  --json                 JSON output compatibility shorthand (output defaults to JSON)
 
 Also accepted as: --device-id, open-app, open_app, open-uri, open-url, open_uri, open_url, --package, --package-id, --application-id, --app-id, --url, --uri
 
@@ -648,7 +635,7 @@ Options:
   --submit               Press Enter after typing
   --clear                Clear existing text before typing
   --timeout <ms>         Max time to wait for element
-  --json                 Output as JSON
+  --json                 JSON output compatibility shorthand (output defaults to JSON)
 
 Also accepted as: --device-id, fill, enter-text, enter_text, --resource-id, --content-desc, --content-desc-contains
 
@@ -660,8 +647,8 @@ Examples:
 const HELP_READ_VALUE = `clawperator read-value — Read value associated with a labeled element
 
 Usage:
-  clawperator read-value --label "Battery" [--json]
-  clawperator read-value --label-id "battery_label" [--json]
+  clawperator read-value --label "Battery"
+  clawperator read-value --label-id "battery_label"
 
 Label selector flags (choose one):
   --label <string>       Match label by exact visible text
@@ -669,15 +656,15 @@ Label selector flags (choose one):
   --label-desc <string>  Match label by exact content description
 
 Options:
-  --all                  Return all matches as a JSON array (JSON output mode only)
+  --all                  Return all matches as a JSON array (not compatible with --output pretty)
   --timeout <ms>         Max time to wait
-  --json                 Output as JSON
+  --json                 JSON output compatibility shorthand (output defaults to JSON)
 
 Also accepted as: --device-id, read-kv, read-key-value-pair, read_key_value_pair, --text, --label-text, --id, --resource-id, --desc, --content-desc
 
 Examples:
-  clawperator read-value --label "Battery" --json
-  clawperator read-value --label "Wi-Fi" --all --json
+  clawperator read-value --label "Battery"
+  clawperator read-value --label "Wi-Fi" --all
 `;
 
 const HELP_READ = `clawperator read — Read text content from a UI element
@@ -694,9 +681,9 @@ Selector flags (choose one):
   --selector <json>      Match using advanced NodeMatcher JSON
 
 Options:
-  --all                  Return all matches as a JSON array (JSON output mode only)
+  --all                  Return all matches as a JSON array (not compatible with --output pretty)
   --timeout <ms>         Max time to wait for element
-  --json                 Output as JSON
+  --json                 JSON output compatibility shorthand (output defaults to JSON)
 
 Container selector flags (all optional):
   --container-text <text>           Container with exact visible text
@@ -712,17 +699,17 @@ Also accepted as: --device-id, read-text, read_text, --resource-id, --content-de
 Examples:
   clawperator read --id "com.example:id/battery_level"
   clawperator read --text "Battery"
-  clawperator read --text "Price" --all --json
+  clawperator read --text "Price" --all
 `;
 
 const HELP_WAIT = `clawperator wait
 
 Usage:
-  clawperator wait --text <text> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator wait --id <resource-id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator wait --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator wait --desc <text> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator wait --selector '<json>' [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator wait --text <text> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
+  clawperator wait --id <resource-id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
+  clawperator wait --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
+  clawperator wait --desc <text> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
+  clawperator wait --selector '<json>' [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
 
 Selector flags (at least one required; combine for AND matching):
   --text <text>           Exact visible text
@@ -765,7 +752,7 @@ Required (choose one or both):
 
 Options:
   --timeout <ms>         Required. Maximum time to wait (1-30000ms)
-  --json                 Output as JSON
+  --json                 JSON output compatibility shorthand (output defaults to JSON)
 
 Also accepted as: --device-id, wait-for-navigation, wait_for_navigation, --package, --package-id, --application-id, --app-id, --resource-id, --content-desc, --content-desc-contains
 
@@ -787,7 +774,7 @@ Valid keys:
 Options:
   --key <name>           System key to press (alias for positional arg)
   --timeout <ms>         Max time to wait
-  --json                 Output as JSON
+  --json                 JSON output compatibility shorthand (output defaults to JSON)
 
 Also accepted as: --device-id, press-key, press_key, --button
 
@@ -799,11 +786,11 @@ Examples:
 const HELP_BACK = `clawperator back — Navigate to the previous screen
 
 Usage:
-  clawperator back [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator back [--device <id>] [--operator-package <pkg>]
 
 Options:
   --timeout <ms>         Max time to wait
-  --json                 Output as JSON
+  --json                 JSON output compatibility shorthand (output defaults to JSON)
 
 Also accepted as: --device-id
 
@@ -814,8 +801,8 @@ Examples:
 const HELP_CLOSE = `clawperator close
 
 Usage:
-  clawperator close <package> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator close --app <package> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator close <package> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
+  clawperator close --app <package> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
 
 Required:
   <package>             Android application package ID (e.g., com.android.settings)
@@ -834,14 +821,14 @@ Also accepted as:
 
 Examples:
   clawperator close com.android.settings
-  clawperator close com.google.android.apps.chromecast.app --json
+  clawperator close com.google.android.apps.chromecast.app
   clawperator close-app com.android.settings
 `;
 
 const HELP_SLEEP = `clawperator sleep
 
 Usage:
-  clawperator sleep <ms> [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator sleep <ms> [--device <id>] [--operator-package <pkg>]
 
 Required:
   <ms>                    Duration in milliseconds (non-negative)
@@ -854,14 +841,14 @@ Notes:
 
 Examples:
   clawperator sleep 2000
-  clawperator sleep 500 --json
+  clawperator sleep 500
   clawperator sleep 0
 `;
 
 const HELP_SCROLL = `clawperator scroll — Scroll the screen in a given direction
 
 Usage:
-  clawperator scroll down [--device <id>] [--operator-package <pkg>] [--json]
+  clawperator scroll down [--device <id>] [--operator-package <pkg>]
   clawperator scroll up --container-id "list" [--device <id>] [--operator-package <pkg>]
 
 Valid directions:
@@ -875,7 +862,7 @@ Container selector flags (optional, restrict scroll to specific container):
 Options:
   --direction <dir>      Direction to scroll (alias for positional arg)
   --timeout <ms>         Max time to wait (default: 30000ms)
-  --json                 Output as JSON
+  --json                 JSON output compatibility shorthand (output defaults to JSON)
 
 Also accepted as: --device-id, --container-resource-id, --container-content-desc, --container-content-desc-contains
 
@@ -887,8 +874,8 @@ Examples:
 const HELP_SCROLL_UNTIL = `clawperator scroll-until
 
 Usage:
-  clawperator scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
-  clawperator scroll-until [<direction>] --id <resource-id> [--click] [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  clawperator scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
+  clawperator scroll-until [<direction>] --id <resource-id> [--click] [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
 
 Valid directions:
   down, up, left, right (default: down)
@@ -920,7 +907,7 @@ Notes:
   - Without --click, the action type is scroll_until (scroll until element is visible).
   - With --click, the action type is scroll_and_click (scroll until visible, then click).
   - scroll_and_click uses different defaults than raw scroll_until (see agent guide); use exec JSON if you need scroll_until + clickAfter.
-  - If a selector is provided but the target never appears, the step fails (data.error TARGET_NOT_FOUND) and --json exits non-zero.
+  - If a selector is provided but the target never appears, the step fails (data.error TARGET_NOT_FOUND) and JSON output exits non-zero.
   - Tuning parameters (maxScrolls, maxDurationMs, etc.) are not exposed as CLI flags.
     Use 'clawperator exec' with raw JSON for advanced tuning.
 
@@ -1368,7 +1355,7 @@ COMMANDS["snapshot"] = {
   supportedFlags: [],
   summary: "Get current Android UI hierarchy as XML",
   help: HELP_SNAPSHOT,
-  topLevelBlock: `  snapshot [--device <id>] [--operator-package <pkg>] [--json]            Get current Android UI hierarchy as XML`,
+  topLevelBlock: `  snapshot [--device <id>] [--operator-package <pkg>]                     Get current Android UI hierarchy as XML`,
   handler: async (ctx) => {
     const { format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
     const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
@@ -1391,7 +1378,7 @@ COMMANDS["screenshot"] = {
   supportedFlags: ["--path"],
   summary: "Capture a screenshot from the device",
   help: HELP_SCREENSHOT,
-  topLevelBlock: `  screenshot [--device <id>] [--operator-package <pkg>] [--path <file>] [--json]
+  topLevelBlock: `  screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]
                                             Capture a screenshot from the device`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
@@ -1417,7 +1404,7 @@ COMMANDS["click"] = {
   supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--coordinate", "--long", "--focus"],
   summary: "Tap the first matching UI element",
   help: HELP_CLICK,
-  topLevelBlock: `  click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]
                                             Tap the first matching UI element`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
@@ -1517,7 +1504,7 @@ COMMANDS["open"] = {
   supportedFlags: ["--app"],
   summary: "Open an app, URL, or URI on the device",
   help: HELP_OPEN,
-  topLevelBlock: `  open <package-id|url|uri> [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]
                                             Open an app, URL, or URI on the device`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
@@ -1568,7 +1555,7 @@ COMMANDS["type"] = {
   supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--submit", "--clear"],
   summary: "Type text into the first matching UI element",
   help: HELP_TYPE,
-  topLevelBlock: `  type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]
                                             Type text into the first matching UI element`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
@@ -1627,13 +1614,13 @@ COMMANDS["read"] = {
   synonyms: ["read-text", "read_text"],
   group: "Device Interaction",
   flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
-  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--all", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--all", "--validate-only", "--dry-run", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Read text from the first matching UI element",
   help: HELP_READ,
-  topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]
                                             Read text from the first matching UI element`,
   handler: async (ctx) => {
-    const { rest, format, explicitJsonOutput, logger, deviceId, operatorPackage } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage } = ctx;
     if (!hasElementSelectorFlag(rest)) {
       return makeMissingSelectorError("read", format);
     }
@@ -1643,7 +1630,7 @@ COMMANDS["read"] = {
     }
     const readAll = hasFlag(rest, "--all");
     if (readAll) {
-      const err = readAllRequiresExplicitJsonError({ command: "read", format, explicitJsonOutput });
+      const err = readAllRequiresJsonOutputError({ command: "read", format });
       if (err) return err;
     }
     // Resolve container matcher (optional)
@@ -1658,6 +1645,8 @@ COMMANDS["read"] = {
       container: containerResult.container,
       deviceId,
       operatorPackage,
+      validateOnly: hasFlag(rest, "--validate-only"),
+      dryRun: hasFlag(rest, "--dry-run"),
       logger,
     });
   },
@@ -1671,7 +1660,7 @@ COMMANDS["wait"] = {
   supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector"],
   summary: "Wait until a matching UI element appears",
   help: HELP_WAIT,
-  topLevelBlock: `  wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--json]
+  topLevelBlock: `  wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
                                             Wait until a matching UI element appears`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
@@ -1713,7 +1702,7 @@ COMMANDS["press"] = {
   supportedFlags: ["--key"],
   summary: "Press a hardware key on the device",
   help: HELP_PRESS,
-  topLevelBlock: `  press <back|home|recents> [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  press <back|home|recents> [--device <id>] [--operator-package <pkg>]
                                             Press a hardware key on the device`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage } = ctx;
@@ -1752,7 +1741,7 @@ COMMANDS["back"] = {
   supportedFlags: [],
   summary: "Press the Android back key",
   help: HELP_BACK,
-  topLevelBlock: `  back [--device <id>] [--operator-package <pkg>] [--json]               Press the Android back key`,
+  topLevelBlock: `  back [--device <id>] [--operator-package <pkg>]                        Press the Android back key`,
   handler: async (ctx) => {
     const { format, logger, deviceId, operatorPackage } = ctx;
     return (await import("./commands/action.js")).cmdActionPressKey({
@@ -1808,7 +1797,7 @@ COMMANDS["close"] = {
   supportedFlags: ["--app"],
   summary: "Force-stop an Android application",
   help: HELP_CLOSE,
-  topLevelBlock: `  close <package> [--device <id>] [--operator-package <pkg>] [--json]    Force-stop an Android application`,
+  topLevelBlock: `  close <package> [--device <id>] [--operator-package <pkg>]             Force-stop an Android application`,
   handler: async (ctx) => closeHandler(ctx),
 };
 
@@ -1818,7 +1807,7 @@ COMMANDS["sleep"] = {
   supportedFlags: [],
   summary: "Pause execution for a duration",
   help: HELP_SLEEP,
-  topLevelBlock: `  sleep <ms> [--device <id>] [--operator-package <pkg>] [--json]         Pause execution for a duration`,
+  topLevelBlock: `  sleep <ms> [--device <id>] [--operator-package <pkg>]                  Pause execution for a duration`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
 
@@ -1879,7 +1868,7 @@ COMMANDS["scroll"] = {
   supportedFlags: ["--direction", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Scroll the screen in a direction",
   help: HELP_SCROLL,
-  topLevelBlock: `  scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]
                                             Scroll the screen in a direction`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
@@ -2009,7 +1998,7 @@ COMMANDS["scroll-until"] = {
   supportedFlags: ["--click", "--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Scroll until a target element is visible",
   help: HELP_SCROLL_UNTIL,
-  topLevelBlock: `  scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]
                                             Scroll until a target element is visible (optionally click it)`,
   handler: async (ctx) => scrollUntilHandler(ctx, false),
 };
@@ -2022,7 +2011,7 @@ COMMANDS["scroll-and-click"] = {
   supportedFlags: ["--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
   summary: "Scroll until target is visible, then click it (alias for scroll-until --click)",
   help: HELP_SCROLL_UNTIL,
-  topLevelBlock: `  scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]
                                             Scroll until target is visible, then click it`,
   handler: async (ctx) => scrollUntilHandler(ctx, true),
 };
@@ -2036,7 +2025,7 @@ COMMANDS["wait-for-nav"] = {
   supportedFlags: ["--app", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--validate-only", "--dry-run"],
   summary: "Wait for app or screen navigation to complete",
   help: HELP_WAIT_FOR_NAV,
-  topLevelBlock: `  wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>] [--json]
+  topLevelBlock: `  wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]
                                             Wait for app or screen navigation to complete`,
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs: navTimeoutMs } = ctx;
@@ -2140,13 +2129,13 @@ COMMANDS["read-value"] = {
   supportedFlags: ["--label", "--label-id", "--label-desc", "--all", "--validate-only", "--dry-run"],
   summary: "Read the value associated with a labeled element",
   help: HELP_READ_VALUE,
-  topLevelBlock: `  read-value --label <text> [--json]         Read the value associated with a labeled element`,
+  topLevelBlock: `  read-value --label <text>                  Read the value associated with a labeled element`,
   handler: async (ctx) => {
-    const { rest, format, explicitJsonOutput, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
 
     const readAll = hasFlag(rest, "--all");
     if (readAll) {
-      const err = readAllRequiresExplicitJsonError({ command: "read-value", format, explicitJsonOutput });
+      const err = readAllRequiresJsonOutputError({ command: "read-value", format });
       if (err) return err;
     }
 
@@ -2198,7 +2187,7 @@ COMMANDS["read-value"] = {
       return formatError(
         {
           code: ERROR_CODES.MISSING_ARGUMENT,
-          message: "read-value requires a label selector.\n\nUsage:\n  clawperator read-value --label <text> --json\n\nExample:\n  clawperator read-value --label \"Battery\" --json",
+          message: "read-value requires a label selector.\n\nUsage:\n  clawperator read-value --label <text>\n\nExample:\n  clawperator read-value --label \"Battery\"",
         },
         { format },
       );

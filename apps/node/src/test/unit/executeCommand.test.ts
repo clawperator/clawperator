@@ -323,6 +323,19 @@ describe("clawperator read-value CLI", () => {
     assert.strictEqual(result.execution.actions[0].type, "read_key_value_pair");
   });
 
+  it("sets all:true when --all without explicit output flags", async () => {
+    const { stdout, code } = await runCli([
+      "read-value",
+      "--label",
+      "Battery",
+      "--all",
+      "--validate-only",
+    ]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.execution.actions[0].params.all, true);
+  });
+
   it("sets all:true when --all and --json", async () => {
     const { stdout, code } = await runCli([
       "read-value",
@@ -352,6 +365,21 @@ describe("clawperator read-value CLI", () => {
     assert.strictEqual(result.execution.actions[0].params.all, true);
   });
 
+  it("sets all:true when --all with command-local --format json", async () => {
+    const { stdout, code } = await runCli([
+      "read-value",
+      "--label",
+      "X",
+      "--all",
+      "--format",
+      "json",
+      "--validate-only",
+    ]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.execution.actions[0].params.all, true);
+  });
+
   it("errors when --all is used with pretty output", async () => {
     const { stdout, code } = await runCli([
       "--output",
@@ -364,21 +392,8 @@ describe("clawperator read-value CLI", () => {
     assert.notStrictEqual(code, 0);
     const result = JSON.parse(stdout);
     assert.strictEqual(result.code, "EXECUTION_VALIDATION_FAILED");
-    assert.match(result.message, /--json|JSON output/i);
-  });
-
-  it("errors when --all is used without explicit json (implicit default json)", async () => {
-    const { stdout, code } = await runCli([
-      "read-value",
-      "--label",
-      "X",
-      "--all",
-      "--validate-only",
-    ]);
-    assert.notStrictEqual(code, 0);
-    const result = JSON.parse(stdout);
-    assert.strictEqual(result.code, "EXECUTION_VALIDATION_FAILED");
-    assert.match(result.message, /explicit JSON output/i);
+    assert.match(result.message, /JSON output/i);
+    assert.match(result.message, /clawperator read-value --label "Battery" --all/);
   });
 
   it("returns MISSING_ARGUMENT when no label flags", async () => {
@@ -403,5 +418,37 @@ describe("clawperator read-value CLI", () => {
     assert.strictEqual(result.ok, true);
     // read-value respects --timeout override, just like exec and snapshot do
     assert.strictEqual(result.execution.timeoutMs, 5000);
+  });
+});
+
+describe("clawperator read CLI", () => {
+  it("sets all:true when --all without explicit output flags", async () => {
+    const { stdout, code } = await runCli([
+      "read",
+      "--text",
+      "Price",
+      "--all",
+      "--validate-only",
+    ]);
+    assert.strictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.execution.actions[0].params.all, true);
+  });
+
+  it("errors when --all is used with command-local pretty output", async () => {
+    const { stdout, code } = await runCli([
+      "read",
+      "--text",
+      "Price",
+      "--all",
+      "--output",
+      "pretty",
+      "--validate-only",
+    ]);
+    assert.notStrictEqual(code, 0);
+    const result = JSON.parse(stdout);
+    assert.strictEqual(result.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(result.message, /JSON output/i);
+    assert.match(result.message, /clawperator read --text "Price" --all/);
   });
 });

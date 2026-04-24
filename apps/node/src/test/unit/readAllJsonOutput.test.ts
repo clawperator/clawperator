@@ -1,33 +1,24 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { readAllRequiresExplicitJsonError } from "../../cli/registry.js";
+import { readAllRequiresJsonOutputError } from "../../cli/registry.js";
 
-describe("readAllRequiresExplicitJsonError", () => {
-  it("returns undefined when explicit json was requested via --json", () => {
+describe("readAllRequiresJsonOutputError", () => {
+  it("returns undefined for default json output", () => {
     assert.strictEqual(
-      readAllRequiresExplicitJsonError({ command: "read", format: "json", explicitJsonOutput: true }),
+      readAllRequiresJsonOutputError({ command: "read", format: "json" }),
       undefined,
     );
   });
 
-  it("errors when format is json but output was implicit default", () => {
-    const out = readAllRequiresExplicitJsonError({
-      command: "read-value",
-      format: "json",
-      explicitJsonOutput: false,
-    });
-    assert.ok(out);
-    assert.match(out, /explicit JSON output/i);
-    assert.match(out, /read-value/);
-  });
-
   it("errors when format is pretty", () => {
-    const out = readAllRequiresExplicitJsonError({
+    const out = readAllRequiresJsonOutputError({
       command: "read",
       format: "pretty",
-      explicitJsonOutput: false,
     });
     assert.ok(out);
     assert.match(out, /read --all requires JSON output/i);
+    assert.match(out, /do not use --output pretty/i);
+    const parsed = JSON.parse(out) as { message: string };
+    assert.match(parsed.message, /clawperator read --text "Price" --all/);
   });
 });
