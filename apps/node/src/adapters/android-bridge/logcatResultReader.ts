@@ -26,19 +26,20 @@ function isSnapshotLogLine(line: string): boolean {
 }
 
 /**
- * Start logcat stream, then invoke onBroadcast (after a short delay so logcat is attached).
+ * Start logcat stream, then invoke onBroadcast once stdout proves the stream is attached
+ * or the fallback delay elapses.
  * Wait for one terminal envelope or timeout. Kills logcat on envelope or timeout.
  */
 export async function waitForResultEnvelope(
   config: RuntimeConfig,
   options: LogcatResultOptions,
-  onBroadcast: () => Promise<{ success: boolean; stdout?: string; stderr?: string }>
+  onBroadcast: (beginSnapshotCapture: () => void) => Promise<{ success: boolean; stdout?: string; stderr?: string }>
 ): Promise<LogcatResult> {
   const {
     commandId,
     timeoutMs: rawTimeoutMs,
     lastCorrelatedLines = 20,
-    broadcastDelayMs: rawBroadcastDelayMs = 300,
+    broadcastDelayMs: rawBroadcastDelayMs = 100,
   } = options;
   const timeoutMs = Number.isFinite(rawTimeoutMs) && rawTimeoutMs >= 0 ? rawTimeoutMs : 0;
   const broadcastDelayMs =
@@ -56,6 +57,8 @@ export async function waitForResultEnvelope(
     let settled = false;
     let stderrBuffer = "";
     let timeoutId: NodeJS.Timeout;
+    let broadcastStartTimer: NodeJS.Timeout | undefined;
+    let broadcastStarted = false;
 
     config.logger?.emit({
       ts: new Date().toISOString(),
@@ -71,6 +74,9 @@ export async function waitForResultEnvelope(
       if (settled) return;
       settled = true;
       clearTimeout(timeoutId);
+      if (broadcastStartTimer !== undefined) {
+        clearTimeout(broadcastStartTimer);
+      }
       resolve(result);
     };
 
@@ -80,6 +86,57 @@ export async function waitForResultEnvelope(
       } catch {
         // ignore
       }
+    };
+
+    const beginSnapshotCapture = () => {
+      captureSnapshotLines = true;
+    };
+
+    const startBroadcast = () => {
+      if (settled || broadcastStarted) {
+        return;
+      }
+      broadcastStarted = true;
+      if (broadcastStartTimer !== undefined) {
+        clearTimeout(broadcastStartTimer);
+      }
+      (async () => {
+        try {
+          const result = await onBroadcast(beginSnapshotCapture);
+          if (!result.success) {
+            const combined = (result.stderr ?? result.stdout ?? "unknown").trim();
+            const isMissingPackage = combined.includes("Target package not found") || combined.includes("does not exist");
+            const code = isMissingPackage ? ERROR_CODES.OPERATOR_NOT_INSTALLED : ERROR_CODES.BROADCAST_FAILED;
+
+            broadcastStatus = `failed: ${combined}`;
+            const diagnostics: BroadcastDiagnostics = {
+              code,
+              message: `Broadcast dispatch failed${combined ? `: ${combined}` : ""}`,
+              lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
+              broadcastDispatchStatus: broadcastStatus,
+              deviceId: config.deviceId,
+              operatorPackage: config.operatorPackage,
+            };
+            flush();
+            finalize({ ok: false, broadcastFailed: true, diagnostics });
+            return;
+          }
+          broadcastStatus = "sent";
+        } catch (e) {
+          const err = String(e).trim();
+          broadcastStatus = `error: ${err}`;
+          const diagnostics: BroadcastDiagnostics = {
+            code: ERROR_CODES.BROADCAST_FAILED,
+            message: `Broadcast dispatch threw${err ? `: ${err}` : ""}`,
+            lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
+            broadcastDispatchStatus: broadcastStatus,
+            deviceId: config.deviceId,
+            operatorPackage: config.operatorPackage,
+          };
+          flush();
+          finalize({ ok: false, broadcastFailed: true, diagnostics });
+        }
+      })();
     };
 
     timeoutId = setTimeout(() => {
@@ -103,6 +160,7 @@ export async function waitForResultEnvelope(
     }, timeoutMs);
 
     proc.stdout?.on("data", (chunk: Buffer) => {
+      startBroadcast();
       pending += chunk.toString();
       const lines = pending.split("\n");
       pending = lines.pop() ?? "";
@@ -183,45 +241,6 @@ export async function waitForResultEnvelope(
       finalize({ ok: false, error: stderr ? `${base}: ${stderr}` : base });
     });
 
-    // Start broadcast after logcat is attached (short delay)
-    (async () => {
-      await new Promise((r) => setTimeout(r, broadcastDelayMs));
-      try {
-        captureSnapshotLines = true;
-        const result = await onBroadcast();
-        if (!result.success) {
-          const combined = (result.stderr ?? result.stdout ?? "unknown").trim();
-          const isMissingPackage = combined.includes("Target package not found") || combined.includes("does not exist");
-          const code = isMissingPackage ? ERROR_CODES.OPERATOR_NOT_INSTALLED : ERROR_CODES.BROADCAST_FAILED;
-
-          broadcastStatus = `failed: ${combined}`;
-          const diagnostics: BroadcastDiagnostics = {
-            code,
-            message: `Broadcast dispatch failed${combined ? `: ${combined}` : ""}`,
-            lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
-            broadcastDispatchStatus: broadcastStatus,
-            deviceId: config.deviceId,
-            operatorPackage: config.operatorPackage,
-          };
-          flush();
-          finalize({ ok: false, broadcastFailed: true, diagnostics });
-          return;
-        }
-        broadcastStatus = "sent";
-      } catch (e) {
-        const err = String(e).trim();
-        broadcastStatus = `error: ${err}`;
-        const diagnostics: BroadcastDiagnostics = {
-          code: ERROR_CODES.BROADCAST_FAILED,
-          message: `Broadcast dispatch threw${err ? `: ${err}` : ""}`,
-          lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
-          broadcastDispatchStatus: broadcastStatus,
-          deviceId: config.deviceId,
-          operatorPackage: config.operatorPackage,
-        };
-        flush();
-        finalize({ ok: false, broadcastFailed: true, diagnostics });
-      }
-    })();
+    broadcastStartTimer = setTimeout(startBroadcast, broadcastDelayMs);
   });
 }

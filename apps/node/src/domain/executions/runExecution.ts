@@ -48,6 +48,45 @@ interface PerformExecutionResult {
 
 const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
+type BroadcastResult = { success: boolean; stdout?: string; stderr?: string };
+type BroadcastFn = (beginSnapshotCapture: () => void) => Promise<BroadcastResult>;
+
+function createDeferredBroadcast(): {
+  wait: BroadcastFn;
+  release: (fn: BroadcastFn) => void;
+  cancel: () => void;
+} {
+  let released = false;
+  let resolveGate!: (fn: BroadcastFn) => void;
+  const gate = new Promise<BroadcastFn>(resolve => {
+    resolveGate = resolve;
+  });
+
+  return {
+    wait: async (beginSnapshotCapture) => {
+      const fn = await gate;
+      return fn(beginSnapshotCapture);
+    },
+    release: (fn) => {
+      if (released) {
+        return;
+      }
+      released = true;
+      resolveGate(fn);
+    },
+    cancel: () => {
+      if (released) {
+        return;
+      }
+      released = true;
+      resolveGate(async () => ({
+        success: false,
+        stderr: "preflight canceled before broadcast",
+      }));
+    },
+  };
+}
+
 function validateNonNegativeFiniteNumber(
   value: unknown,
   fieldName: string
@@ -410,17 +449,51 @@ async function performExecution(
     return { execution, result: { ok: false, error: e as { code: string; message: string; [k: string]: unknown } } };
   }
 
+  const payload = JSON.stringify(execution);
+  const hasExplicitDevice = config.deviceId !== undefined;
+  const deferredBroadcast = hasExplicitDevice ? createDeferredBroadcast() : undefined;
+  const earlyResultWaiter = deferredBroadcast !== undefined
+    ? waitForResultEnvelope(
+        config,
+        {
+          commandId: execution.commandId,
+          timeoutMs: options.resultEnvelopeTimeoutMs ?? (execution.timeoutMs + 5000),
+          broadcastDelayMs: options.logcatBroadcastDelayMs,
+          lastCorrelatedLines: 30,
+        },
+        deferredBroadcast.wait
+      )
+    : undefined;
+  earlyResultWaiter?.catch(() => undefined);
+
+  const cancelEarlyResultWaiter = () => {
+    deferredBroadcast?.cancel();
+  };
+
   let deviceId: string;
+  let apkCheck: Awaited<ReturnType<typeof checkApkPresence>>;
   try {
-    const resolved = await resolveDevice(config);
-    deviceId = resolved.deviceId;
-    config.deviceId = deviceId;
+    if (hasExplicitDevice) {
+      const [resolved, explicitApkCheck] = await Promise.all([
+        resolveDevice(config),
+        checkApkPresence(config),
+      ]);
+      deviceId = resolved.deviceId;
+      config.deviceId = deviceId;
+      apkCheck = explicitApkCheck;
+    } else {
+      const resolved = await resolveDevice(config);
+      deviceId = resolved.deviceId;
+      config.deviceId = deviceId;
+      apkCheck = await checkApkPresence(config);
+    }
   } catch (e) {
+    cancelEarlyResultWaiter();
     return { execution, result: { ok: false, error: e as { code: string; message: string; [k: string]: unknown } } };
   }
 
-  const apkCheck = await checkApkPresence(config);
   if (apkCheck.status === "fail") {
+    cancelEarlyResultWaiter();
     options.logger?.emit({
       ts: new Date().toISOString(),
       level: "error",
@@ -469,6 +542,7 @@ async function performExecution(
   }
 
   if (!tryAcquire(deviceId, execution.commandId)) {
+    cancelEarlyResultWaiter();
     return { execution, result: { ok: false, error: getConflictError(deviceId, execution.commandId), deviceId } };
   }
 
@@ -476,10 +550,12 @@ async function performExecution(
     // Host-side close_app preflight is safe even when the device is not yet interactive.
     const closeAppPreflight = await runCloseAppPreflight(execution, config);
     if (!closeAppPreflight.ok) {
+      cancelEarlyResultWaiter();
       return { execution, result: { ok: false, error: closeAppPreflight.error, deviceId } };
     }
 
     if (isCloseAppOnlyExecution(execution)) {
+      cancelEarlyResultWaiter();
       const envelope = buildCloseAppOnlySuccessEnvelope(execution);
       emitResult(deviceId, envelope);
       return {
@@ -498,6 +574,7 @@ async function performExecution(
       probeInteractiveStateFn: options.probeInteractiveStateFn,
     });
     if (!interactiveState.ok) {
+      cancelEarlyResultWaiter();
       const publicError = interactiveState.error.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE
         ? toPublicInteractiveAutomationError(interactiveState.error)
         : interactiveState.error;
@@ -511,32 +588,39 @@ async function performExecution(
       };
     }
 
-    const payload = JSON.stringify(execution);
-    const dispatchStart = Date.now();
-    const result = await waitForResultEnvelope(
-      config,
-      {
-        commandId: execution.commandId,
-        timeoutMs: options.resultEnvelopeTimeoutMs ?? (execution.timeoutMs + 5000), // buffer for envelope write
-        broadcastDelayMs: options.logcatBroadcastDelayMs,
-        lastCorrelatedLines: 30,
-      },
-      async () => {
-        const broadcast = await broadcastAgentCommand(config, payload);
-        if (broadcast.success) {
-          options.logger?.emit({
-            ts: new Date().toISOString(),
-            level: "info",
-            event: "broadcast.dispatched",
-            commandId: execution.commandId,
-            taskId: execution.taskId,
-            deviceId,
-            message: `Broadcast dispatched to ${deviceId} for ${config.operatorPackage}`,
-          });
-        }
-        return { success: broadcast.success, stdout: broadcast.stdout, stderr: broadcast.stderr };
+    let dispatchStart = Date.now();
+    const runBroadcast: BroadcastFn = async (beginSnapshotCapture) => {
+      beginSnapshotCapture();
+      const broadcast = await broadcastAgentCommand(config, payload);
+      if (broadcast.success) {
+        options.logger?.emit({
+          ts: new Date().toISOString(),
+          level: "info",
+          event: "broadcast.dispatched",
+          commandId: execution.commandId,
+          taskId: execution.taskId,
+          deviceId,
+          message: `Broadcast dispatched to ${deviceId} for ${config.operatorPackage}`,
+        });
       }
-    );
+      return { success: broadcast.success, stdout: broadcast.stdout, stderr: broadcast.stderr };
+    };
+    const result = earlyResultWaiter !== undefined && deferredBroadcast !== undefined
+      ? await (async () => {
+          dispatchStart = Date.now();
+          deferredBroadcast.release(runBroadcast);
+          return earlyResultWaiter;
+        })()
+      : await waitForResultEnvelope(
+          config,
+          {
+            commandId: execution.commandId,
+            timeoutMs: options.resultEnvelopeTimeoutMs ?? (execution.timeoutMs + 5000), // buffer for envelope write
+            broadcastDelayMs: options.logcatBroadcastDelayMs,
+            lastCorrelatedLines: 30,
+          },
+          runBroadcast
+        );
 
     if (result.ok) {
       options.logger?.emit({

@@ -20,6 +20,7 @@ import type { Execution } from "../../contracts/execution.js";
 import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
+import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
 import { createClawperatorLogger } from "../../adapters/logger.js";
 import { clawperatorEvents, CLAWPERATOR_EVENT_TYPES } from "../../domain/observe/events.js";
 import { isAbsolute, join } from "node:path";
@@ -583,6 +584,7 @@ describe("runExecution", () => {
     assert.deepStrictEqual(
       runner.calls.map(call => call.args.join(" ")),
       [
+        "-s test-device-1 logcat -v time -T 1",
         "-s test-device-1 devices",
         "-s test-device-1 shell pm list packages com.test.operator.dev",
         "-s test-device-1 shell pm list packages com.test.operator",
@@ -635,6 +637,7 @@ describe("runExecution", () => {
     assert.deepStrictEqual(
       runner.calls.map(call => call.args.join(" ")),
       [
+        "-s test-device-1 logcat -v time -T 1",
         "-s test-device-1 devices",
         "-s test-device-1 shell pm list packages com.test.operator.dev",
       ]
@@ -748,7 +751,8 @@ describe("runExecution", () => {
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" });
-    runner.spawn = (() => {
+    runner.spawn = ((command, args, options) => {
+      runner.calls.push({ command, args, options });
       const proc = new EventEmitter() as EventEmitter & {
         stdout?: EventEmitter;
         stderr?: EventEmitter;
@@ -805,7 +809,8 @@ describe("runExecution", () => {
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" });
-    runner.spawn = (() => {
+    runner.spawn = ((command, args, options) => {
+      runner.calls.push({ command, args, options });
       const proc = new EventEmitter() as EventEmitter & {
         stdout?: EventEmitter;
         stderr?: EventEmitter;
@@ -983,6 +988,182 @@ describe("runExecution", () => {
         data: { application_id: "com.example.app" },
       },
     ]);
+  });
+
+  it("starts logcat before explicit-device preflight and checks apk while resolving the device", async () => {
+    const runner = new FakeProcessRunner();
+    const execution: Execution = {
+      commandId: "cmd-explicit-fast-path",
+      taskId: "task-explicit-fast-path",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "sleep-1", type: "sleep", params: { durationMs: 0 } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" });
+    runner.spawn = ((command, args, options) => {
+      runner.calls.push({ command, args, options });
+      const proc = new EventEmitter() as EventEmitter & {
+        stdout?: EventEmitter;
+        stderr?: EventEmitter;
+        kill: () => void;
+      };
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      setTimeout(() => {
+        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+          commandId: "cmd-explicit-fast-path",
+          taskId: "task-explicit-fast-path",
+          status: "success",
+          stepResults: [{ id: "sleep-1", actionType: "sleep", success: true, data: {} }],
+          error: null,
+        })}\n`));
+        proc.emit("close", 0, null);
+      }, 5);
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+
+    const result = await runExecution(execution, {
+      deviceId: "test-device-1",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+      logcatBroadcastDelayMs: 0,
+      ensureInteractiveAutomationReadyFn: async () => ({
+        ok: true,
+        state: {
+          screenOn: true,
+          interactive: true,
+          deviceLocked: false,
+          userUnlocked: true,
+        },
+      }),
+    });
+
+    assert.strictEqual(result.ok, true);
+    const calls = runner.calls.map(call => call.args.join(" "));
+    assert.strictEqual(calls[0], "-s test-device-1 logcat -v time -T 1");
+    assert.strictEqual(calls[1], "-s test-device-1 devices");
+    assert.strictEqual(calls[2], "-s test-device-1 shell pm list packages com.test.operator.dev");
+    assert.match(calls[3], /shell am broadcast/);
+  });
+
+  it("keeps auto-resolve preflight sequential before starting logcat", async () => {
+    const runner = new FakeProcessRunner();
+    const execution: Execution = {
+      commandId: "cmd-auto-sequential",
+      taskId: "task-auto-sequential",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "sleep-1", type: "sleep", params: { durationMs: 0 } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" });
+    runner.spawn = ((command, args, options) => {
+      runner.calls.push({ command, args, options });
+      const proc = new EventEmitter() as EventEmitter & {
+        stdout?: EventEmitter;
+        stderr?: EventEmitter;
+        kill: () => void;
+      };
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      setTimeout(() => {
+        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+          commandId: "cmd-auto-sequential",
+          taskId: "task-auto-sequential",
+          status: "success",
+          stepResults: [{ id: "sleep-1", actionType: "sleep", success: true, data: {} }],
+          error: null,
+        })}\n`));
+        proc.emit("close", 0, null);
+      }, 5);
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+
+    const result = await runExecution(execution, {
+      operatorPackage: "com.test.operator.dev",
+      runner,
+      logcatBroadcastDelayMs: 0,
+      ensureInteractiveAutomationReadyFn: async () => ({
+        ok: true,
+        state: {
+          screenOn: true,
+          interactive: true,
+          deviceLocked: false,
+          userUnlocked: true,
+        },
+      }),
+    });
+
+    assert.strictEqual(result.ok, true);
+    const calls = runner.calls.map(call => call.args.join(" "));
+    assert.strictEqual(calls[0], "devices");
+    assert.strictEqual(calls[1], "-s test-device-1 shell pm list packages com.test.operator.dev");
+    assert.strictEqual(calls[2], "-s test-device-1 logcat -v time -T 1");
+    assert.match(calls[3], /shell am broadcast/);
+  });
+});
+
+describe("waitForResultEnvelope", () => {
+  it("dispatches when the live logcat stream emits stdout before the fallback delay", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from("04-25 20:14:52.453 D/TaskScopeDefault(29817): ready\n"));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+    const startedAt = Date.now();
+    let broadcastStartedAt = 0;
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-signal-dispatch",
+        timeoutMs: 1000,
+        broadcastDelayMs: 10_000,
+      },
+      async () => {
+        broadcastStartedAt = Date.now();
+        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+          commandId: "cmd-signal-dispatch",
+          taskId: "task-signal-dispatch",
+          status: "success",
+          stepResults: [],
+          error: null,
+        })}\n`));
+        return { success: true, stdout: "", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    assert.ok(broadcastStartedAt - startedAt < 1000, "broadcast should not wait for the fallback timer");
   });
 });
 

@@ -10,12 +10,12 @@ Parent plan: `tasks/node/io-optimizations/plan.md`
 
 | Item | Value |
 | --- | --- |
-| State | in progress |
+| State | PR-1 complete |
 | Total PRs | 1 |
 | Total phases | 2 |
-| Completed | 1 |
-| Remaining | 2 |
-| Current / Next | Phase 2 |
+| Completed | 1, 2 |
+| Remaining | none |
+| Current / Next | review-swarm-loop |
 | Blockers | none |
 
 ## Hard Rules
@@ -118,6 +118,15 @@ fix(node): extract snapshots from live logcat stream
 ```
 
 ## Phase 2: Dispatch And Preflight Overhead Cleanup
+
+Status: completed on 2026-04-25.
+
+Phase notes:
+- Replaced the fixed 300 ms broadcast delay with first-stdout dispatch and a 100 ms fallback timer.
+- Started the result logcat waiter early for explicit-device executions and kept auto-resolve executions sequential.
+- Ran explicit-device `resolveDevice` and `checkApkPresence` in parallel.
+- Updated the CLI logging integration fake so parallel logcat readers behave like real logcat and do not consume each other's lines.
+- Required build and targeted regression validation passed. The full `npm --prefix apps/node run test` command was run and still failed in unrelated skills CLI cases because two real devices were connected and those tests resolved real adb device selection.
 
 ### Goal
 
@@ -224,28 +233,32 @@ perf(node): reduce snapshot dispatch overhead
 
 | Run | Baseline (ms) | Optimized (ms) |
 | --- | --- | --- |
-| 1 | | |
-| 2 | | |
-| 3 | | |
-| Median | | |
+| 1 | 18430 | 15897 |
+| 2 | 20584 | 20246 |
+| 3 | 20587 | 15809 |
+| Median | 20584 | 15897 |
 
 ### com.google.android.apps.chromecast.app.get-climate-replay
 
-Unit name used: `<fill in>`
+Unit name used: `Panasonic`
 
 | Run | Baseline (ms) | Optimized (ms) |
 | --- | --- | --- |
-| 1 | | |
-| 2 | | |
-| 3 | | |
-| Median | | |
+| 1 | 23957 | 15478 |
+| 2 | 41883 | 15181 |
+| 3 | 16195 | 15365 |
+| Median | 23957 | 15365 |
 
 ### Summary
 
 | Metric | Baseline | Optimized | Delta |
 | --- | --- | --- | --- |
-| solax median | | | |
-| chromecast median | | | |
+| solax median | 20584ms | 15897ms | -4687ms |
+| chromecast median | 23957ms | 15365ms | -8592ms |
 | Expected from findings (~1260ms CLI) | ~1771ms | ~1260ms | ~511ms |
 
-Notes: *(record any anomalies, device state, or variance observations here)*
+Notes:
+- Baseline used global `clawperator` 0.7.7. Optimized used branch-local `node apps/node/dist/cli/index.js` 0.7.8 with `--operator-package com.clawperator.operator.dev`.
+- Physical device serial redacted as `<device_serial>`.
+- An initial Solax optimized sample set was discarded from the table because run 1 spiked to 65202ms after switching app context; the rerun above was taken back-to-back with the baseline and is the stable comparison set.
+- Skill timings include app navigation, skill script work, and remote app state variance, so the deltas are larger and noisier than the isolated snapshot transport estimate.

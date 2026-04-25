@@ -8,12 +8,12 @@ This task pack covers the immediate non-handshake Node-side snapshot I/O cleanup
 
 | Item | Value |
 | --- | --- |
-| State | in progress |
+| State | PR-1 complete |
 | Total PRs | 1 |
 | Total phases | 2 |
-| Completed | 1 |
-| Remaining | 2 |
-| Current / Next | Phase 2 |
+| Completed | 1, 2 |
+| Remaining | none |
+| Current / Next | review-swarm-loop |
 | Blockers | none |
 
 ## Goal
@@ -156,3 +156,20 @@ Validation:
 - `node --test apps/node/dist/test/unit/snapshotHelper.test.js apps/node/dist/test/unit/runExecution.test.js` passed.
 - `npm --prefix apps/node run test` was run; unrelated skills CLI tests failed because the local host had both `<device_serial>` and `emulator-5554` connected and those tests reached real device selection instead of their fake adb path.
 - Live smoke passed with `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json`; `envelope.stepResults[0].data.text` contained a well-formed `<hierarchy>` XML document.
+
+### Phase 2 - Dispatch And Preflight Overhead Cleanup
+
+Status: completed on 2026-04-25.
+
+Acceptance:
+- `waitForResultEnvelope` now dispatches on first live stdout from logcat with a 100 ms fallback timer instead of the old 300 ms fixed delay.
+- Explicit-device execution starts the main logcat waiter before `resolveDevice` and `checkApkPresence`, and those two checks run in parallel.
+- Auto-resolve execution remains sequential before logcat starts, preserving device targeting behavior.
+- Tests cover signal dispatch, timeout diagnostics, explicit-device fast path behavior, and auto-resolve sequencing.
+- Measurements were captured in `work-breakdown.md`.
+
+Validation:
+- `npm --prefix apps/node run build` passed.
+- `node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
+- `npm --prefix apps/node run test` was run; unrelated skills CLI tests still failed because two real devices were connected and those tests reached real adb device selection.
+- Live skill timing comparison was run with global `0.7.7` and local `0.7.8`.
