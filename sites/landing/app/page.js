@@ -649,15 +649,32 @@ export default function Home() {
               for the full API)
             </p>
             <pre>
-              <code>{`clawperator open --app com.google.android.apps.chromecast.app  # Google Home
+              <code>{`##
+## Runtime skill path:
+##
+
+clawperator skills run <hvac-app>.set-power -- --climate-state on --unit-name "Living room"
+
+##
+## Or, agent-driven control path:
+##
+
+clawperator open --app <hvac-app>
+
+clawperator snapshot    # Get the current UI state as structured JSON.
+# { "ui_tree": [...] }
+
+# 🧠 agent: Inspect the snapshot, determine commands to run next.
+
 clawperator click --text "Climate"
 clawperator scroll-and-click --text-contains "Living room"
 
-clawperator read --text-contains "Heating"
+clawperator read --id ":id/power_state"
 # { "text": "Off" }
 
-# agent reads "Off", turns it on:
-clawperator click --text "Turn On"`}</code>
+# 🧠 agent: Power is off; target climate state is on.
+
+clawperator click --id ":id/power_button"`}</code>
             </pre>
           </div>
         </div>
