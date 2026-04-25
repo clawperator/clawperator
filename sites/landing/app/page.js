@@ -664,7 +664,7 @@ clawperator scroll-and-click --text-contains "Living room"
 clawperator read --text-contains "Heating"
 # { "text": "Off" }
 
-# agent: Heating is off, so ask Clawperator to turn it on.
+# agent: Heating is off, so tell Clawperator to turn it on.
 clawperator click --text "Turn On"
 
 # agent: Verify the result before finishing.
