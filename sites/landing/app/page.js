@@ -650,25 +650,25 @@ export default function Home() {
             </p>
             <pre>
               <code>{`## Runtime skill path
-clawperator skills run <google-home-application-id>.set-power -- --climate-state on --unit-name "Living room"
+clawperator skills run <my-hvac-app-id>.set-power -- --climate-state on --unit-name "Living room"
 
 ## Agent-driven control path
-clawperator open --app <google-home-application-id>
+clawperator open --app <my-hvac-app-id>
 
 clawperator snapshot    # Get the current UI state as structured JSON.
-# { "app": "Google Home", "nodes": [...] }
+# { "app": "My HVAC", "nodes": [...] }
 
 # agent: Inspect the snapshot, determine commands to run next.
 
 clawperator click --text "Climate"
 clawperator scroll-and-click --text-contains "Living room"
 
-clawperator read --id "<google-home-application-id>:id/power_state"
+clawperator read --id "<my-hvac-app-id>:id/power_state"
 # { "text": "Off" }
 
 # agent: Power is off; target climate state is on.
 
-clawperator click --id "<google-home-application-id>:id/power_button"`}</code>
+clawperator click --id "<my-hvac-app-id>:id/power_button"`}</code>
             </pre>
           </div>
         </div>
