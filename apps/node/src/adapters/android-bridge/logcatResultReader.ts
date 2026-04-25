@@ -144,6 +144,7 @@ export async function waitForResultEnvelope(
       if (dispatchCaptureStarted) {
         return;
       }
+      pending = "";
       dispatchCaptureStarted = true;
       captureSnapshotLines = true;
       broadcastStatus = "sent";

@@ -450,7 +450,7 @@ async function performExecution(
   }
 
   const payload = JSON.stringify(execution);
-  const hasExplicitDevice = config.deviceId !== undefined;
+  const hasExplicitDevice = typeof config.deviceId === "string" && config.deviceId.trim().length > 0;
   const deferredBroadcast = hasExplicitDevice ? createDeferredBroadcast() : undefined;
   const earlyResultAbortController = hasExplicitDevice ? new AbortController() : undefined;
   const earlyResultWaiter = deferredBroadcast !== undefined

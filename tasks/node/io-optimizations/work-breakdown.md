@@ -316,3 +316,11 @@ Pass 7:
 - Added regression coverage for a throwing readiness preflight.
 - Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
 - Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.
+
+Pass 8:
+- Review found a partial pre-dispatch log line could complete after dispatch and stale capture/parsing could cross the boundary, and blank `deviceId` could take the explicit-device fast path.
+- Cleared pending partial logcat content when dispatch capture starts.
+- Changed explicit-device fast-path detection to require a nonblank device ID.
+- Added regression tests for partial replay completion after dispatch and blank `deviceId` fast-path avoidance.
+- Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
+- Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.

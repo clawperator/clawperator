@@ -21,6 +21,7 @@ import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
+import { extractSnapshotsFromLogs } from "../../domain/executions/snapshotHelper.js";
 import { createClawperatorLogger } from "../../adapters/logger.js";
 import { clawperatorEvents, CLAWPERATOR_EVENT_TYPES } from "../../domain/observe/events.js";
 import { isAbsolute, join } from "node:path";
@@ -612,6 +613,35 @@ describe("runExecution", () => {
         "-s test-device-1 shell pm list packages com.test.operator",
       ]
     );
+  });
+
+  it("does not take the explicit-device early logcat path for blank deviceId", async () => {
+    const runner = new FakeProcessRunner();
+    const execution: Execution = {
+      commandId: "cmd-blank-device",
+      taskId: "task-blank-device",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "sleep-1", type: "sleep", params: { durationMs: 0 } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\nemulator-5554\tdevice\n", stderr: "" });
+
+    const result = await runExecution(execution, {
+      deviceId: "",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.MULTIPLE_DEVICES_DEVICE_ID_REQUIRED);
+    }
+    assert.ok(!runner.calls.some(call => call.args.join(" ") === "logcat -v time -T 1"));
+    assert.ok(!runner.calls.some(call => call.args.join(" ") === "shell pm list packages com.test.operator.dev"));
   });
 
   it("fails before dispatch when the resolved device is not interactive", async () => {
@@ -1737,6 +1767,84 @@ describe("waitForResultEnvelope", () => {
     if (result.ok) {
       assert.ok(result.snapshotLogLines?.some(line => line.includes("fresh")));
       assert.ok(!result.snapshotLogLines?.some(line => line.includes("stale")));
+    }
+  });
+
+  it("drops partial replayed log lines that complete after dispatch starts", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+          commandId: "cmd-partial-replay",
+          taskId: "old-task",
+          status: "success",
+          stepResults: [{ id: "old", actionType: "sleep", success: true, data: {} }],
+          error: null,
+        }).slice(0, 48)}`));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-partial-replay",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        proc.stdout?.emit("data", Buffer.from([
+          `${JSON.stringify({
+            commandId: "cmd-partial-replay",
+            taskId: "old-task",
+            status: "success",
+          stepResults: [{ id: "old", actionType: "sleep", success: true, data: {} }],
+          error: null,
+        }).slice(48)}`,
+          "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+          "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node text=\"stale-partial\" />",
+          "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+        ].join("\n") + "\n"));
+        setTimeout(() => {
+          const freshPrefix = formatLogcatTime(new Date());
+          proc.stdout?.emit("data", Buffer.from([
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
+            `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
+            `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
+            `[Clawperator-Result] ${JSON.stringify({
+              commandId: "cmd-partial-replay",
+              taskId: "task-partial-replay",
+              status: "success",
+              stepResults: [],
+              error: null,
+            })}`,
+          ].join("\n") + "\n"));
+        });
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.envelope.taskId, "task-partial-replay");
+      assert.ok(result.snapshotLogLines?.some(line => line.includes("fresh")));
+      assert.ok(!extractSnapshotsFromLogs(result.snapshotLogLines ?? []).some(snapshot => snapshot.includes("stale-partial")));
     }
   });
 });
