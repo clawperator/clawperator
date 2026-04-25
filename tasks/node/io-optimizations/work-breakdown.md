@@ -296,3 +296,9 @@ Pass 4:
 - Added regression tests for no-stdout cancellation and multi-chunk replay before dispatch.
 - Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
 - Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.
+
+Pass 5:
+- Review found live `logcat -v time` parsing did not cover the PID/TID column shape (`pid tid D Tag:`), so some valid TaskScopeDefault lines could be missed now that `logcat -d` is gone.
+- Added parser support and a regression test for PID/TID `-v time` snapshot lines.
+- Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
+- Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.

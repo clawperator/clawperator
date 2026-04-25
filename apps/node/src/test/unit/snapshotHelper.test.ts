@@ -207,6 +207,27 @@ describe("extractSnapshotFromLogs", () => {
     );
   });
 
+  it("extracts hierarchy xml from live logcat time-format PID/TID lines", () => {
+    const lines = [
+      "04-25 20:14:52.453 29817 29817 D TaskScopeDefault: [TaskScope] UI Hierarchy:",
+      "04-25 20:14:52.454 29817 29817 D TaskScopeDefault: <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
+      "04-25 20:14:52.455 29817 29817 D TaskScopeDefault: <hierarchy rotation=\"0\">",
+      "04-25 20:14:52.456 29817 29817 V Configuration: Updating configuration, locales updated from [] to [en_US]",
+      "04-25 20:14:52.457 29817 29817 D TaskScopeDefault:   <node index=\"0\" text=\"Settings\" />",
+      "04-25 20:14:52.458 29817 29817 D TaskScopeDefault: </hierarchy>",
+    ];
+
+    assert.strictEqual(
+      extractSnapshotFromLogs(lines),
+      [
+        "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
+        "<hierarchy rotation=\"0\">",
+        "  <node index=\"0\" text=\"Settings\" />",
+        "</hierarchy>",
+      ].join("\n"),
+    );
+  });
+
   it("returns the latest snapshot and preserves all snapshots in order", () => {
     const lines = [
       "D/E       : [TaskScope] UI Hierarchy:",
