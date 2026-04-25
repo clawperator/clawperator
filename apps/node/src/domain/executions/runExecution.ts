@@ -639,7 +639,7 @@ async function performExecution(
       });
       finalizeSuccessfulCloseAppSteps(result.envelope.stepResults, execution, closeAppPreflight.successfulCloseActionIds);
 
-      // Post-process to retrieve snapshot text from logcat
+      // Reconstruct snapshot XML from the live result logcat stream.
       const hasSnapshot = result.envelope.stepResults.some(s => s.actionType === "snapshot_ui");
       if (hasSnapshot) {
         const snapshots = extractSnapshotsFromLogs(result.snapshotLogLines ?? []);
