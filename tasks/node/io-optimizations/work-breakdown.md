@@ -346,3 +346,10 @@ Pass 9:
 - Captured warm CLI and serve-mode snapshot measurements in `## Measurements`.
 - Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
 - Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.
+
+Pass 10:
+- Review found stale malformed result-looking replay lines for older commands could fail the fresh command after replay-drain dispatch.
+- Prefiltered result-envelope parsing to lines that reference the current command ID before treating malformed JSON as fatal.
+- Added regression coverage for stale malformed replay followed by the current command envelope.
+- Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
+- Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.

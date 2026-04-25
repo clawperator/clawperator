@@ -29,6 +29,10 @@ function isSnapshotLogLine(line: string): boolean {
 const SIGNAL_BROADCAST_REPLAY_DRAIN_MS = 25;
 const SIGNAL_BROADCAST_MAX_DRAIN_MS = 100;
 
+function envelopeLineReferencesCommand(line: string, commandId: string): boolean {
+  return line.includes(JSON.stringify(commandId));
+}
+
 /**
  * Start logcat stream, then invoke onBroadcast once stdout proves the stream is attached
  * or the fallback delay elapses.
@@ -223,7 +227,11 @@ export async function waitForResultEnvelope(
             snapshotLogLines.push(line);
           }
         }
-        if (broadcastStatus !== "sent" || !line.includes(RESULT_ENVELOPE_PREFIX)) continue;
+        if (
+          broadcastStatus !== "sent"
+          || !line.includes(RESULT_ENVELOPE_PREFIX)
+          || !envelopeLineReferencesCommand(line, commandId)
+        ) continue;
 
         const parsed = parseTerminalEnvelope(line, commandId);
         if (parsed === "malformed") {

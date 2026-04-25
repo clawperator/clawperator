@@ -1764,6 +1764,58 @@ describe("waitForResultEnvelope", () => {
     assert.ok(broadcastStartedAt - startedAt < 500, "broadcast should be bounded by the max drain timer");
   });
 
+  it("ignores stale malformed replayed envelopes for other commands after dispatch starts", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from("04-25 20:14:52.453 D/TaskScopeDefault(29817): ready\n"));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-current-malformed-filter",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        proc.stdout?.emit("data", Buffer.from("[Clawperator-Result] {\"commandId\":\"old-command\",\n"));
+        setTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-current-malformed-filter",
+            taskId: "task-current-malformed-filter",
+            status: "success",
+            stepResults: [],
+            error: null,
+          })}\n`));
+        });
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.envelope.taskId, "task-current-malformed-filter");
+    }
+  });
+
   it("does not capture split replayed snapshot lines before dispatch completes", async () => {
     const runner = new FakeProcessRunner();
     let proc: EventEmitter & {
