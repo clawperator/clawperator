@@ -664,7 +664,7 @@ clawperator open --app <hvac-app>
 clawperator snapshot    # Get the current UI state as structured JSON.
 # { "app": "HVAC App", "ui_tree": [...] }
 
-# agent: Inspect the snapshot, determine commands to run next.
+# 🧠 agent: Inspect the snapshot, determine commands to run next.
 
 clawperator click --text "Climate"
 clawperator scroll-and-click --text-contains "Living room"
@@ -672,7 +672,7 @@ clawperator scroll-and-click --text-contains "Living room"
 clawperator read --id ":id/power_state"
 # { "text": "Off" }
 
-# agent: Power is off; target climate state is on.
+# 🧠 agent: Power is off; target climate state is on.
 
 clawperator click --id ":id/power_button"`}</code>
             </pre>
