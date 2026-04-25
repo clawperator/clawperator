@@ -8,12 +8,12 @@ This task pack covers the immediate non-handshake Node-side snapshot I/O cleanup
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | in progress |
 | Total PRs | 1 |
 | Total phases | 2 |
-| Completed | none |
-| Remaining | 1, 2 |
-| Current / Next | Phase 1 |
+| Completed | 1 |
+| Remaining | 2 |
+| Current / Next | Phase 2 |
 | Blockers | none |
 
 ## Goal
@@ -138,3 +138,21 @@ After this task ships:
 | Handshake redesign questions and gates | `tasks/node/handshaking/findings.md` until that pack is authored |
 | Deferred Android/transport backlog | `tasks/node/io-optimizations/findings-deferred.md` until later task authorship |
 | Any user-visible serve-mode guidance added by this work | Public docs or CLI help only if the implementation actually changes a user-facing surface |
+
+## Implementation Status
+
+### Phase 1 - Live Stream Snapshot Extraction
+
+Status: completed on 2026-04-25.
+
+Acceptance:
+- `snapshotHelper` parses both tag-format and live `-v time` TaskScopeDefault snapshot lines.
+- `waitForResultEnvelope` returns snapshot lines captured from the live stream between dispatch start and the matching result envelope.
+- `runExecution` attaches snapshot XML from captured live lines.
+- The old per-command `logcat -c` clear and post-success `logcat -d -v tag` recovery call sites were deleted.
+
+Validation:
+- `npm --prefix apps/node run build` passed.
+- `node --test apps/node/dist/test/unit/snapshotHelper.test.js apps/node/dist/test/unit/runExecution.test.js` passed.
+- `npm --prefix apps/node run test` was run; unrelated skills CLI tests failed because the local host had both `<device_serial>` and `emulator-5554` connected and those tests reached real device selection instead of their fake adb path.
+- Live smoke passed with `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json`; `envelope.stepResults[0].data.text` contained a well-formed `<hierarchy>` XML document.

@@ -10,12 +10,12 @@ Parent plan: `tasks/node/io-optimizations/plan.md`
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | in progress |
 | Total PRs | 1 |
 | Total phases | 2 |
-| Completed | none |
-| Remaining | 1, 2 |
-| Current / Next | Phase 1 |
+| Completed | 1 |
+| Remaining | 2 |
+| Current / Next | Phase 2 |
 | Blockers | none |
 
 ## Hard Rules
@@ -56,6 +56,14 @@ Read these files IN THIS ORDER before writing anything.
 | PR-1 | Immediate non-handshake Node snapshot I/O cleanup | 1, 2 | none |
 
 ## Phase 1: Live Stream Snapshot Extraction
+
+Status: completed on 2026-04-25.
+
+Phase notes:
+- Implemented live TaskScopeDefault line capture in `waitForResultEnvelope` and attached snapshot XML from those captured lines in `runExecution`.
+- Extended snapshot parsing for live `logcat -v time` lines while preserving tag-format parsing.
+- Deleted the superseded `logcat -c` and `logcat -d -v tag` call sites instead of hiding them behind compatibility branches.
+- Required validation passed for build, targeted unit coverage, and live snapshot smoke. The full `npm --prefix apps/node run test` command was run and failed in unrelated skills CLI cases because two real devices were connected and those tests resolved real adb device selection.
 
 ### Goal
 

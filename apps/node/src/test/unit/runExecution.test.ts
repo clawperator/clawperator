@@ -747,7 +747,6 @@ describe("runExecution", () => {
 
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" });
     runner.spawn = (() => {
       const proc = new EventEmitter() as EventEmitter & {
@@ -787,10 +786,10 @@ describe("runExecution", () => {
     });
 
     assert.strictEqual(result.ok, true);
-    assert.ok(runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -c"));
+    assert.ok(!runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -c"));
   });
 
-  it("attaches clean snapshot text from noisy logcat dumps", async () => {
+  it("attaches clean snapshot text from noisy live logcat lines", async () => {
     const runner = new FakeProcessRunner();
     const execution: Execution = {
       commandId: "cmd-noisy-snapshot",
@@ -805,20 +804,7 @@ describe("runExecution", () => {
 
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" });
-    runner.queueResult({
-      code: 0,
-      stdout: [
-        "D/TaskScopeDefault: [TaskScope] UI Hierarchy:",
-        "D/TaskScopeDefault: <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
-        "D/TaskScopeDefault: <hierarchy rotation=\"0\">",
-        "V/Configuration: Updating configuration, locales updated from [] to [en_US]",
-        "D/TaskScopeDefault:   <node index=\"0\" text=\"Settings\" />",
-        "D/TaskScopeDefault: </hierarchy>",
-      ].join("\n"),
-      stderr: "",
-    });
     runner.spawn = (() => {
       const proc = new EventEmitter() as EventEmitter & {
         stdout?: EventEmitter;
@@ -829,7 +815,14 @@ describe("runExecution", () => {
       proc.stderr = new EventEmitter();
       proc.kill = () => undefined;
       setTimeout(() => {
-        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.454 D/TaskScopeDefault(29817): <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
+          "04-25 20:14:52.455 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+          "04-25 20:14:52.456 V/Configuration(29817): Updating configuration, locales updated from [] to [en_US]",
+          "04-25 20:14:52.457 D/TaskScopeDefault(29817):   <node index=\"0\" text=\"Settings\" />",
+          "04-25 20:14:52.458 D/TaskScopeDefault(29817): </hierarchy>",
+          `[Clawperator-Result] ${JSON.stringify({
           commandId: "cmd-noisy-snapshot",
           taskId: "task-noisy-snapshot",
           status: "success",
@@ -845,7 +838,8 @@ describe("runExecution", () => {
             },
           }],
           error: null,
-        })}\n`));
+        })}`,
+        ].join("\n") + "\n"));
         proc.emit("close", 0, null);
       }, 5);
       return proc;
@@ -888,7 +882,8 @@ describe("runExecution", () => {
     }
     assert.strictEqual(event.deviceId, "test-device-1");
     assert.strictEqual(event.envelope.stepResults[0].data.text, result.ok ? result.envelope.stepResults[0].data.text : undefined);
-    assert.ok(runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -d -v tag"));
+    assert.ok(!runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -d -v tag"));
+    assert.ok(!runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -c"));
   });
 
   it("allows close_app-only executions to succeed without the interactive gate", async () => {
@@ -1145,7 +1140,6 @@ describe("buildTimeoutError", () => {
     runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
     const resultEvent = once(clawperatorEvents, CLAWPERATOR_EVENT_TYPES.RESULT);
     const result = await runExecution(
@@ -1207,7 +1201,6 @@ describe("buildTimeoutError", () => {
 
     runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "", stderr: "" }); // logcat -c
     runner.queueResult({ code: 0, stdout: "", stderr: "" }); // broadcast
 
     const resultEvent = once(clawperatorEvents, CLAWPERATOR_EVENT_TYPES.RESULT);
@@ -1415,7 +1408,6 @@ describe("runExecution logging", () => {
     runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
     const result = await runExecution(
       {
@@ -1481,7 +1473,6 @@ describe("runExecution logging", () => {
 
     runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
     const result = await runExecution(

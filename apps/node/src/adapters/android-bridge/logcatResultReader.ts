@@ -16,10 +16,14 @@ export interface LogcatResultOptions {
 }
 
 export type LogcatResult =
-  | { ok: true; envelope: ResultEnvelope; terminalSource: TerminalSource }
+  | { ok: true; envelope: ResultEnvelope; terminalSource: TerminalSource; snapshotLogLines?: string[] }
   | { ok: false; timeout: true; diagnostics: TimeoutDiagnostics }
   | { ok: false; broadcastFailed: true; diagnostics: BroadcastDiagnostics }
   | { ok: false; error: string; code?: string };
+
+function isSnapshotLogLine(line: string): boolean {
+  return line.includes("TaskScopeDefault");
+}
 
 /**
  * Start logcat stream, then invoke onBroadcast (after a short delay so logcat is attached).
@@ -45,7 +49,9 @@ export async function waitForResultEnvelope(
 
   return new Promise((resolve) => {
     const correlatedLines: string[] = [];
+    const snapshotLogLines: string[] = [];
     let broadcastStatus = "not_sent";
+    let captureSnapshotLines = false;
     let pending = "";
     let settled = false;
     let stderrBuffer = "";
@@ -101,8 +107,11 @@ export async function waitForResultEnvelope(
       const lines = pending.split("\n");
       pending = lines.pop() ?? "";
       for (const line of lines) {
-        if (line.includes("TaskScopeDefault:")) {
+        if (isSnapshotLogLine(line)) {
           correlatedLines.push(line);
+          if (captureSnapshotLines) {
+            snapshotLogLines.push(line);
+          }
         }
         if (!line.includes(RESULT_ENVELOPE_PREFIX)) continue;
 
@@ -123,6 +132,7 @@ export async function waitForResultEnvelope(
             ok: true,
             envelope: parsed.envelope,
             terminalSource: parsed.terminalSource,
+            snapshotLogLines,
           });
           return;
         }
@@ -177,6 +187,7 @@ export async function waitForResultEnvelope(
     (async () => {
       await new Promise((r) => setTimeout(r, broadcastDelayMs));
       try {
+        captureSnapshotLines = true;
         const result = await onBroadcast();
         if (!result.success) {
           const combined = (result.stderr ?? result.stdout ?? "unknown").trim();

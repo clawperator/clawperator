@@ -511,9 +511,6 @@ async function performExecution(
       };
     }
 
-    // 2. Clear logcat so we only see this command's output
-    await runAdb(config, ["logcat", "-c"]);
-
     const payload = JSON.stringify(execution);
     const dispatchStart = Date.now();
     const result = await waitForResultEnvelope(
@@ -556,8 +553,7 @@ async function performExecution(
       // Post-process to retrieve snapshot text from logcat
       const hasSnapshot = result.envelope.stepResults.some(s => s.actionType === "snapshot_ui");
       if (hasSnapshot) {
-        const dump = await runAdb(config, ["logcat", "-d", "-v", "tag"], { logOutput: false });
-        const snapshots = extractSnapshotsFromLogs(dump.stdout.split("\n"));
+        const snapshots = extractSnapshotsFromLogs(result.snapshotLogLines ?? []);
         attachSnapshotsToStepResults(result.envelope.stepResults, snapshots);
         markExtractionFailedSnapshotSteps(result.envelope.stepResults, options.warn);
         // Attach data.warn to any snapshot_ui immediately following a click with no sleep.
