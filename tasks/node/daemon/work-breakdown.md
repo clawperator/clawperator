@@ -248,9 +248,6 @@ The auto-start spawner in Phase 3 (`daemonProxy.ts`) spawns `daemon run` directl
    export function getDaemonLogPath(rawDeviceId: string | undefined): string
    // `${getDaemonDir()}/daemon-${sanitizeDaemonKey(rawDeviceId)}.log`
 
-   export function getDaemonLockPath(rawDeviceId: string | undefined): string
-   // `${getDaemonDir()}/daemon-${sanitizeDaemonKey(rawDeviceId)}.lock`
-
    export async function isDaemonRunning(rawDeviceId: string | undefined): Promise<boolean>
    // Returns true if PID file exists and process is alive (kill(pid, 0) returns 0).
 
@@ -260,9 +257,11 @@ The auto-start spawner in Phase 3 (`daemonProxy.ts`) spawns `daemon run` directl
 
    export function spawnDaemonRun(rawDeviceId: string | undefined): void
    // Spawns `node <dist>/cli/index.js daemon run [--device <id>]` as a detached child.
-   // Redirects stdout/stderr to the log file. Writes child PID to the PID file.
-   // Unrefs the child.
+   // stdio MUST be: ['ignore', logFd, logFd] - stdin explicitly ignored, stdout and
+   // stderr redirected to the open log file descriptor. Do NOT inherit parent stdin.
+   // Set detached: true. Unref the child so the parent process exits cleanly.
    // Uses process.argv[1] (the current binary path) to find the CLI entry point.
+   // Does NOT write the PID file - cmdDaemonRun writes its own PID on startup.
    ```
 
    Use `os.homedir()` from `node:os`. Never hardcode a home path.
@@ -271,11 +270,12 @@ The auto-start spawner in Phase 3 (`daemonProxy.ts`) spawns `daemon run` directl
 
    - `cmdDaemonRun(options: { deviceId?: string; operatorPackage?: string; verbose?: boolean }): Promise<void>`
      - THE FOREGROUND SERVER. Calls `startServer({ socketPath, verbose, logger })`.
-     - Writes `process.pid` to the PID file before starting the server.
-     - Never returns (long-running). Handles SIGTERM: stop server, delete PID/socket files,
-       exit 0.
-     - This function should NOT print a "daemon started" message to stdout (stdout is
-       redirected to the log file by the spawner).
+     - On startup: write a metadata file (or extend the PID file) containing:
+       `{ pid: process.pid, startedAt: Date.now() }` (JSON). This is what
+       `daemon status` reads to compute PID and uptime. Write BEFORE starting the server.
+     - Never returns (long-running). Handles SIGTERM: stop server, delete PID/socket/
+       metadata files, exit 0.
+     - stdout is redirected to the log file by the spawner - do not print to stdout.
 
    - `cmdDaemonStart(options: { deviceId?: string }): Promise<string>`
      - If socket is already alive (GET /ping succeeds), returns "Daemon already running."
@@ -286,8 +286,10 @@ The auto-start spawner in Phase 3 (`daemonProxy.ts`) spawns `daemon run` directl
      - Calls `stopDaemon(deviceId)`. Returns status message.
 
    - `cmdDaemonStatus(options: { deviceId?: string }): Promise<string>`
-     - Checks socket liveness via GET /ping. On alive: returns version and socket path.
-       On not alive: returns "Daemon not running at <socketPath>."
+     - Checks socket liveness via GET /ping. On alive: reads PID metadata file, calls
+       GET /version, computes uptime from `Date.now() - startedAt`. Prints:
+       `Daemon running: pid=<pid> version=<ver> uptime=<s>s socket=<path>`
+     - On not alive: prints "Daemon not running at <socketPath>."
 
    - `cmdDaemonRestart(options: { deviceId?: string }): Promise<string>`
      - Calls `cmdDaemonStop` then `cmdDaemonStart` in sequence.
@@ -325,7 +327,7 @@ The auto-start spawner in Phase 3 (`daemonProxy.ts`) spawns `daemon run` directl
 - `npm --prefix apps/node run build && npm --prefix apps/node run test` passes.
 - All new unit tests in `lifecycle.test.ts` pass.
 - `clawperator daemon start --device <id>` returns "Daemon started" and exits.
-- `clawperator daemon status --device <id>` shows version and socket path when running.
+- `clawperator daemon status --device <id>` shows PID, version, uptime, and socket path when running.
 - `clawperator daemon stop --device <id>` cleans up PID and socket files.
 - `clawperator daemon restart --device <id>` stops then restarts the daemon.
 - `clawperator daemon start` when already running prints "already running" and exits 0.
@@ -365,10 +367,11 @@ thinking
 ### Goal
 Add a proxy layer that transparently routes `exec`, `snapshot`, and `screenshot`
 through the background daemon. Introduce the shared CLI result formatter. Wire in
-auto-start, version check, stale socket cleanup, fallback safety, and atomic locking.
+auto-start, version check, stale socket cleanup, and fallback safety.
 Update `docs/api/daemon.md` to document the proxy behavior.
 
 ### Files to Change
+- `apps/node/src/contracts/errors.ts` (add `DAEMON_PROXY_ERROR`)
 - `apps/node/src/cli/daemonProxy.ts` (new)
 - `apps/node/src/cli/output.ts` (add `formatRunExecutionResultForCli`)
 - `apps/node/src/cli/commands/execute.ts` (modify)
@@ -409,12 +412,19 @@ that proxy and direct paths use exactly the same code.
 
 ### Steps
 
-1. Add `formatRunExecutionResultForCli` to `output.ts` as specified above.
+1. Add `DAEMON_PROXY_ERROR` to `apps/node/src/contracts/errors.ts`:
+   ```typescript
+   DAEMON_PROXY_ERROR: "DAEMON_PROXY_ERROR",
+   ```
+   This code is returned when a request was dispatched to the daemon but the response
+   was lost. It must be a registered error code, not a hardcoded string.
 
-2. Refactor existing direct-path callers in `execute.ts` and `observe.ts` to use
+2. Add `formatRunExecutionResultForCli` to `output.ts` as specified above.
+
+3. Refactor existing direct-path callers in `execute.ts` and `observe.ts` to use
    `formatRunExecutionResultForCli`. Confirm output is identical before proceeding.
 
-3. Create `apps/node/src/cli/daemonProxy.ts`. Read `tasks/node/daemon/plan.md`
+4. Create `apps/node/src/cli/daemonProxy.ts`. Read `tasks/node/daemon/plan.md`
    sections "Decision Rules" and "Failure Modes" before writing.
 
    **Device ID usage**: the proxy takes the raw `--device` option string as-is. Do NOT
@@ -462,22 +472,23 @@ that proxy and direct paths use exactly the same code.
    b. If platform is Windows: return null (pre-dispatch).
    c. Get socket path via `getDaemonSocketPath(options.rawDeviceId)`.
    d. Check liveness: try GET /ping on the socket.
-      - ENOENT: auto-start (see below). If auto-start fails: return null.
-      - ECONNREFUSED: delete socket file; auto-start. If auto-start fails: return null.
-      - Alive: check version. If mismatch: stop + auto-start. If auto-start fails: return null.
-      - Pre-dispatch at this point.
-   e. Acquire start lock (try `fs.openSync(lockPath, 'wx')`). If lock exists: poll socket
-      instead of spawning (another process is starting the daemon). Give up after 3s.
-   f. Spawn `daemon run` via `spawnDaemonRun(rawDeviceId)`. Poll socket at 100ms up to
-      3000ms. Release lock when socket connectable. If timeout: release lock; return null.
-   g. **Dispatch boundary.** POST to socket `/execute` with
+      - ENOENT: go to auto-start (step e).
+      - ECONNREFUSED (stale socket): delete socket file; go to auto-start (step e).
+      - Alive: check version. If mismatch: call `stopDaemon`; go to auto-start (step e).
+      - Version matches: proceed to step (f).
+      - All of the above are pre-dispatch.
+   e. Auto-start: call `spawnDaemonRun(rawDeviceId)`. Poll socket at 100ms intervals up
+      to 3000ms. Unix socket bind is exclusive - if two CLIs spawn simultaneously, the
+      second `daemon run` exits on EADDRINUSE; both CLIs poll until the first one is
+      connectable. No lock file needed. If timeout: print stderr diagnostic; return null.
+   f. **Dispatch boundary.** POST to socket `/execute` with
       `{ execution, deviceId: rawDeviceId, operatorPackage }`. After sending the request
       body, the operation is post-dispatch.
-   h. Parse JSON response into `RunExecutionResult`.
-   i. Return the parsed result.
-   j. On response error after dispatch: return `{ ok: false, error: { code:
-      'DAEMON_PROXY_ERROR', message: 'Daemon response lost; action may have executed' } }`.
-      Do NOT fall back to direct.
+   g. Parse JSON response into `RunExecutionResult`.
+   h. Return the parsed result.
+   i. On response error after dispatch: return `{ ok: false, error: { code:
+      ERROR_CODES.DAEMON_PROXY_ERROR, message: 'Daemon response lost; action may have
+      executed' } }`. Use `ERROR_CODES` from `errors.ts`. Do NOT fall back to direct.
 
 4. Modify `execute.ts`. Replace the `runExecution` call with:
    ```typescript
@@ -511,9 +522,11 @@ that proxy and direct paths use exactly the same code.
    - Stops old daemon and restarts when version mismatches (mock stop, spawn, HTTP)
    - Deletes stale socket file and restarts when ECONNREFUSED
    - Returns null for `snapshot` on network error after dispatch (idempotent fallback)
-   - Returns `DAEMON_PROXY_ERROR` for `exec` on network error after dispatch (non-idempotent)
-   - Two concurrent calls acquire lock; second waits rather than spawning a second daemon
-     (mock: first holds lock, second polls, socket becomes alive during poll)
+   - Returns result with `ERROR_CODES.DAEMON_PROXY_ERROR` for `exec` on response loss
+     after dispatch (verify the code matches `errors.ts`)
+   - Two concurrent auto-starts: both spawn `daemon run`, socket becomes connectable once,
+     both callers receive a result (mock: second spawn exits immediately on EADDRINUSE,
+     both poll succeed)
    - `formatRunExecutionResultForCli` on a successful proxied result produces identical
      string to `formatRunExecutionResultForCli` on a direct result for the same fixture
 
@@ -654,8 +667,11 @@ CLI calls and for a simulated skill loop. Record findings.
 
 ### Prerequisites
 - A physical device connected and accessible via `adb`.
-- `clawperator daemon start --device <device_id>` running.
 - Branch-local build available at `apps/node/dist/cli/index.js`.
+- Note on expected wins: daemon alone eliminates Node startup (~100-200ms per call).
+  The ~410ms handshake reduction requires `tasks/node/handshaking/` PR-1 (readiness
+  cache) to also be merged. Run Phase 5 after that PR lands if possible; if not, label
+  measurements as "daemon only" and record expected additional improvement separately.
 
 ### Steps
 
@@ -711,15 +727,19 @@ CLI calls and for a simulated skill loop. Record findings.
    ```
 
 3. Record findings in these sections of `findings.md`:
+   - Whether `tasks/node/handshaking/` PR-1 (readiness cache) is merged: yes/no
    - Raw measurement table (A, B cold, B warm, C, D direct, D daemon)
    - Per-call average for direct path
    - Per-call average for daemon warm path
    - First-call overhead for daemon auto-start
+   - Breakdown: how much improvement is from startup elimination vs handshake cache
    - Assessment: is the improvement significant enough to confirm the daemon approach?
    - Any anomalies observed
 
-4. If the `tasks/node/handshaking/` PR-1 readiness cache has also merged, re-run
-   Measurements B and C with the cache active and note the difference.
+4. If `tasks/node/handshaking/` PR-1 readiness cache has merged: re-run Measurements
+   B and C with it active. Label these rows "daemon + cache" in the table. The handshake
+   elimination is the primary latency win; measurements without the cache should not be
+   presented as the full expected improvement.
 
 5. Commit `findings.md` once measurements are recorded.
 

@@ -95,9 +95,12 @@ in-process cache, eliminating the per-call handshake overhead.
 - A shared `formatRunExecutionResultForCli(result, options)` helper used by both direct
   and proxied command paths, eliminating output divergence.
 - A daemon proxy layer (`daemonProxy.ts`) for CLI commands with auto-start, liveness
-  check, version verification, atomic start locking, and direct-mode fallback.
+  check, version verification, and direct-mode fallback.
 - Proxy support for `exec`, `snapshot`, `screenshot`, and all flat action commands.
 - `--no-daemon` command-local flag and `CLAWPERATOR_NO_DAEMON=1` env opt-out.
+- `DAEMON_PROXY_ERROR` added to `apps/node/src/contracts/errors.ts` (new error code for
+  post-dispatch proxy failures where the action may have executed but the response was
+  lost).
 - Brief public docs for `clawperator daemon` landing in the same PR as the command
   (PR-2), using `.agents/skills/docs-author/SKILL.md`.
 - Unit tests for all new code, with test glob updated to cover nested test directories.
@@ -168,11 +171,14 @@ the daemon is absent or opted out.
 - Socket path formula: `~/.clawperator/daemon-<sanitizedKey>.sock`
 - PID path formula: `~/.clawperator/daemon-<sanitizedKey>.pid`
 - Log path formula: `~/.clawperator/daemon-<sanitizedKey>.log`
-- Lock path formula: `~/.clawperator/daemon-<sanitizedKey>.lock` (auto-start lock)
 - Directory creation mode: `0700` (owner-only read/write/execute)
 - Auto-start timeout: 3000ms (3 seconds)
 - Version check endpoint: `GET /version` returns `{ version: string }`
 - Liveness check endpoint: `GET /ping` returns `{ ok: true }`
+- `daemon status` output (when running): PID, version, uptime in seconds, socket path.
+  The PID file stores the daemon PID; the start timestamp is written alongside it so
+  uptime can be computed without an additional IPC call. Required for debugging stuck
+  agent loops.
 - Version mismatch action: kill old daemon, start fresh, wait up to 3s
 - Stale socket action: socket file exists, connection refused - delete + restart
 - Fallback condition (pre-connect): daemon unreachable after auto-start timeout -
@@ -241,21 +247,17 @@ file written by `daemon run`.
 The auto-start spawner in `daemonProxy.ts` spawns `daemon run` directly (not
 `daemon start`), to avoid a spawn-polling-spawn chain.
 
-### Daemon auto-start locking
-
-Two simultaneous CLI calls must not spawn two daemon processes. Locking mechanism:
-before spawning, acquire an exclusive lock file (`daemon-<key>.lock`) using
-`fs.openSync` with `wx` flag (exclusive create). If the lock exists, wait for the
-socket to become available instead of spawning. Release the lock once the socket is
-connectable. If locking fails after the timeout, fall back to direct.
-
 ### Daemon auto-start flow
 
-1. Acquire start lock (exclusive, fail-fast).
-2. Spawn `clawperator daemon run --device <id>` as detached child process.
-3. Poll socket at 100ms intervals up to 3000ms.
-4. If socket is connectable and version matches: release lock, proxy request.
-5. If timeout: release lock, print stderr diagnostic, run direct.
+Unix domain sockets have exclusive bind semantics. If two CLI processes both try to
+spawn `daemon run` at the same moment, the second bind fails with `EADDRINUSE` and that
+process exits. Both CLI processes poll and connect to the first one. No lock file is
+needed. The socket bind is the natural lock.
+
+1. Spawn `clawperator daemon run --device <id>` as detached child process.
+2. Poll socket at 100ms intervals up to 3000ms.
+3. If socket is connectable and version matches: proxy request.
+4. If timeout: print stderr diagnostic, run direct.
 
 ### Contract preservation during proxy
 
