@@ -652,13 +652,13 @@ export default function Home() {
               <code>{`## Runtime skill path
 clawperator skills run <google-home-application-id>.control-hvac -- --action climate_state --value On --unit-name "Living room"
 
-## Direct device-control path by an agent
+## Agent-driven control path
 clawperator open --app <google-home-application-id>
 
 clawperator snapshot    # Get the current UI state as structured JSON.
 # { "app": "Google Home", "nodes": [...] }
 
-# agent: inspect the snapshot, find the right path to the "Climate" control, and click it.
+# agent: Inspect the snapshot, determine commands to run next.
 
 clawperator click --text "Climate"
 clawperator scroll-and-click --text-contains "Living room"
