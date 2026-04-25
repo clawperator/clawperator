@@ -17,6 +17,7 @@ logic inside the skill body.
 - check `clawperator --version` before mutating the host
 - check the host prerequisites that the installer owns before choosing the CLI-first path:
   - `node -v` must report Node 24 or newer
+  - `npm -v` must be reachable
   - `java -version` must report Java 17 or 21
 - run the CLI-first upgrade sequence when the CLI is reachable and the host prerequisites are already viable:
   - `npm install -g clawperator@latest`
@@ -36,7 +37,7 @@ logic inside the skill body.
 
 - do not make `install.sh` the primary path
 - do not skip the `clawperator --version` reachability check
-- do not use the CLI-first upgrade sequence when Node or Java still needs to be repaired by the installer
+- do not use the CLI-first upgrade sequence when Node, npm, or Java still needs to be repaired by the installer
 - do not invent a second upgrade-health checker beyond `clawperator doctor`
 - do not add or imply a top-level `clawperator upgrade` command
 - do not restate all setup or repair docs from memory
@@ -74,7 +75,43 @@ Run:
 clawperator --version
 ```
 
-If this fails, run the recovery installer:
+If this succeeds, skip to the host prerequisite checks below and continue.
+
+If this fails, run the PATH discovery gate before routing to `install.sh`.
+Exit code `127` means the command was not found in the current shell; it is
+not proof the tool is absent from the machine. Capture the shell resolution
+context first:
+
+```bash
+printf 'PATH=%s\n' "$PATH"
+command -v clawperator || true
+command -v node || true
+command -v npm || true
+command -v java || true
+command -v adb || true
+command -v brew || true
+```
+
+On macOS, probe the common Homebrew locations before concluding Homebrew is
+absent:
+
+```bash
+/opt/homebrew/bin/brew --version
+/usr/local/bin/brew --version
+```
+
+If a Homebrew binary is found outside `PATH`, activate its environment for
+the current command sequence before retrying bare commands:
+
+```bash
+eval "$(/opt/homebrew/bin/brew shellenv)"
+```
+
+Use `/usr/local/bin/brew shellenv` instead when that is the discovered path.
+
+Retry the bare commands after any PATH repair. If `clawperator` becomes
+reachable, continue with the repaired environment. Only route to `install.sh`
+when the tool is still not reachable after PATH classification:
 
 ```bash
 curl -fsSL https://clawperator.com/install.sh | bash
@@ -83,19 +120,22 @@ curl -fsSL https://clawperator.com/install.sh | bash
 After recovery, re-run `clawperator --version`. If the CLI is still not
 reachable, stop and report the recovery failure.
 
-If `clawperator --version` succeeds, verify the host prerequisites the installer owns:
+If `clawperator --version` succeeds (original or after PATH repair), verify
+the host prerequisites the installer owns:
 
 ```bash
 node -v
+npm -v
 java -version
 ```
 
-Continue only when Node is 24 or newer and Java is 17 or 21. If either check
-fails, use the recovery installer instead of the CLI-first path.
+Continue only when Node is 24 or newer, `npm` is reachable, and Java is 17
+or 21. If any check fails, run the same PATH discovery gate for that tool
+before deciding whether to use the recovery installer.
 
 ### 3. Run the CLI-first upgrade sequence
 
-When `clawperator --version` succeeds and the host prerequisites are already viable, run these commands in order:
+When `clawperator --version` succeeds and the host prerequisites (Node, npm, Java) are already viable, run these commands in order:
 
 ```bash
 npm install -g clawperator@latest
@@ -175,7 +215,7 @@ Finish with:
 Examples:
 
 - "Clawperator was reachable, the CLI-first upgrade sequence completed, and doctor reports `criticalOk: true` for every connected device. Future device commands need `--device`; your next step is `clawperator-agent-orientation`."
-- "Clawperator was reachable, but Node or Java was not yet healthy enough for the CLI-first path, so I used `install.sh` as recovery only. Follow the setup guidance at `https://docs.clawperator.com/setup/` and then rerun this skill."
+- "Clawperator was reachable, but Node, npm, or Java was not yet healthy enough for the CLI-first path, so I used `install.sh` as recovery only. Follow the setup guidance at `https://docs.clawperator.com/setup/` and then rerun this skill."
 - "Clawperator was not reachable, so I used `install.sh` as recovery only. The CLI is still not ready, so follow the recovery guidance or finish setup at `https://docs.clawperator.com/setup/`."
 - "Upgrade intent is not explicit yet, so I stopped before running any host mutations."
 
@@ -186,3 +226,5 @@ prerequisites as the CLI-first viability gate, and `install.sh` as recovery
 when either gate fails. End with one explicit next step. Name the
 upgrade-intent gate explicitly when you decline to run the installer. Never
 ask the user to choose the next repair step after doctor has already named it.
+JSON is already the CLI default; do not add `--output json` to command
+snippets.
