@@ -85,8 +85,11 @@ CLI-first viability gate.
 
 ### Steps
 
-1. Add a new PATH-discovery step before the current CLI reachability recovery
-   rule. The step must tell agents to capture the current `PATH` and run:
+1. Add a new PATH-discovery step within SKILL.md section 2 ("Check CLI
+   reachability first"), between the `clawperator --version` failure and
+   the routing to `install.sh`. Do not insert it as a new top-level section
+   before section 2. The step must tell agents to capture the current `PATH`
+   and run:
 
    ```bash
    printf 'PATH=%s\n' "$PATH"
@@ -117,16 +120,24 @@ CLI-first viability gate.
    Homebrew path.
 
 4. Add `npm -v` to the CLI-first prerequisite checks beside `node -v` and
-   `java -version`.
+   `java -version`. Also update the "What This Skill Owns" bullet list near
+   the top of SKILL.md -- which currently enumerates `node -v` and
+   `java -version` explicitly -- to also enumerate `npm -v`.
 5. State explicitly that exit code `127` means command-not-found in the current
    shell and must be classified before reporting that the host lacks the tool.
 6. Keep the current multi-device doctor rules. Do not loosen the ready/blocking
    decision table.
-7. Add an explicit note that `--output json` is not required for the examples
-   because JSON is the CLI default. Do not add redundant JSON flags to the
-   command snippets.
-8. Update `agents/openai.yaml` so the default prompt includes the PATH
-   classification and `npm` gate in compact form.
+7. In the "Output Style" section of SKILL.md, add one sentence stating that
+   JSON is already the CLI default and that `--output json` must not be added
+   to command snippets. Do not add this note elsewhere in the file or
+   duplicate it.
+8. Update `agents/openai.yaml` so the `default_prompt` adds one sentence
+   covering the PATH classification rule (exit code 127 means shell-only
+   mismatch; probe `PATH` and macOS Homebrew absolute paths before declaring
+   a tool absent) and one sentence covering the `npm` gate (include `npm -v`
+   in prereq checks; classify via the PATH gate if it fails). Do not copy
+   the full PATH probe shell block from SKILL.md into the YAML string. Keep
+   the total prompt under 12 sentences and the value on a single YAML line.
 9. Reread both changed files and verify the YAML still uses a single valid
    string for `default_prompt`.
 

@@ -103,7 +103,7 @@ Deterministic - do not re-derive:
   for routing purposes, not proof the tool is absent from the machine.
 - The skill must probe `PATH` and common macOS Homebrew paths before reporting
   `brew`, `npm`, `adb`, or `clawperator` as unavailable.
-- The CLI-first viability gate includes `node`, `npm`, and `java`.
+- After this task, the CLI-first viability gate must include `node`, `npm`, and `java`. Currently only `node` and `java` are listed in the skill; `npm` must be added.
 - `install.sh` remains recovery only when the CLI is unreachable after PATH
   classification or when bootstrap prerequisites genuinely need repair.
 - Do not add `--output json` to examples as a required parsing mechanism. JSON
