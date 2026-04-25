@@ -49,15 +49,11 @@ Read these files IN THIS ORDER before writing anything.
 
 ## PR / Phase Plan
 
-| PR | Purpose | Included phases | Agent tier | Merge gate |
-| --- | --- | --- | --- | --- |
-| PR-1 | Immediate non-handshake Node snapshot I/O cleanup | 1, 2 | default, default | none |
+| PR | Purpose | Included phases | Merge gate |
+| --- | --- | --- | --- |
+| PR-1 | Immediate non-handshake Node snapshot I/O cleanup | 1, 2 | none |
 
 ## Phase 1: Live Stream Snapshot Extraction
-
-### Agent Tier
-
-default
 
 ### Goal
 
@@ -80,7 +76,6 @@ Make the existing live logcat stream authoritative for snapshot extraction so th
 5. Keep `logcat -d` only as a temporary fallback until live extraction is proven by tests.
 6. Once tests prove live extraction, remove the post-success `logcat -d` path.
 7. Remove `logcat -c` only after the live path is in place and verified.
-8. Ensure snapshot attachment remains bounded to the dispatch-to-envelope interval and does not rely on a globally cleared log buffer.
 
 ### Acceptance Criteria
 
@@ -88,6 +83,7 @@ Make the existing live logcat stream authoritative for snapshot extraction so th
 - Snapshot extraction uses live stream lines rather than requiring `logcat -d`.
 - The post-success `logcat -d` path is removed.
 - The pre-command `logcat -c` path is removed.
+- Snapshot attachment is bounded to the dispatch-to-envelope interval for a given commandId and does not rely on a globally cleared log buffer.
 - Tests prove the new parsing and extraction path.
 
 ### Validation
@@ -105,10 +101,6 @@ fix(node): extract snapshots from live logcat stream
 
 ## Phase 2: Dispatch And Preflight Overhead Cleanup
 
-### Agent Tier
-
-default
-
 ### Goal
 
 Reduce avoidable host-side idle time in the immediate snapshot path without crossing into handshake redesign.
@@ -118,21 +110,18 @@ Reduce avoidable host-side idle time in the immediate snapshot path without cros
 - `apps/node/src/adapters/android-bridge/logcatResultReader.ts`
 - `apps/node/src/domain/executions/runExecution.ts`
 - `apps/node/src/test/unit/runExecution.test.ts`
-- task execution notes or findings append if measurement details need recording during execution
 
 ### Steps
 
-1. Reduce or replace the fixed 300 ms `broadcastDelayMs` behavior.
-2. Prefer signal-based dispatch if it is testable and stable; otherwise land a smaller constant with clear regression coverage.
-3. Start the logcat stream early enough that attach delay overlaps safe remaining preflight work.
-4. Parallelize `resolveDevice` and `checkApkPresence` only when `config.deviceId` is already explicit.
+1. Reduce or replace the fixed 300 ms `broadcastDelayMs` in `logcatResultReader.ts`. Preferred approach: fire the broadcast once logcat emits its first stdout line (signal-based), with a 100 ms fallback timer if no output arrives. If signal-based is not stable, land a 50 ms constant instead and add a measurement follow-up note in this file. See `tasks/node/io-optimizations/findings.md` I1 for the full rationale.
+2. Start the logcat stream earlier so the attach delay overlaps remaining safe preflight work. **Prerequisite: Phase 1 must be complete** - logcat -c must already be removed before the stream can be started earlier, since clearing the buffer after the stream is open would drop lines. "Safe preflight work" in this context means `resolveDevice` and `checkApkPresence`, which run after the stream is started and before broadcast fires.
+3. Parallelize `resolveDevice` and `checkApkPresence` only when `config.deviceId` is already explicit.
 5. Add or extend regression tests for:
    - successful envelope receipt with the new dispatch timing
    - timeout diagnostics still being correct
    - explicit-device fast path behavior
    - auto-resolve behavior staying sequential
-6. Re-measure warm CLI and serve-mode snapshot latency after the changes.
-7. Record the new measured outcomes in execution notes before calling the pack complete.
+4. Re-measure warm CLI and serve-mode snapshot latency after the changes. Run at least 5 consecutive warm calls and record the median. Expected target based on findings: ~1260ms CLI / ~1180ms serve (from ~1771ms baseline). Record actual numbers in a `## Measurements` section appended to this file before closing the pack.
 
 ### Acceptance Criteria
 
@@ -140,7 +129,7 @@ Reduce avoidable host-side idle time in the immediate snapshot path without cros
 - Explicit-device preflight can use the safe parallel fast path.
 - Auto-resolve flows retain correct behavior.
 - Tests cover the new timing and preflight behavior.
-- Warm CLI and serve-mode measurements are captured after implementation.
+- Warm CLI median latency is captured and recorded in this file. Target: ~1260ms or better.
 
 ### Validation
 

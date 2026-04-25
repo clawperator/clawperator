@@ -59,7 +59,7 @@ The current snapshot path is too slow for tight agent loops, and the branch find
 | `apps/node/src/adapters/android-bridge/logcatResultReader.ts` | Capture live stream lines and reduce/replace fixed dispatch delay | PR-1 / Phase 1 and 2 |
 | `apps/node/src/domain/executions/snapshotHelper.ts` | Support time-format parsing in addition to tag-format parsing | PR-1 / Phase 1 |
 | `apps/node/src/test/unit/` | Regression coverage for parsing, capture, fallback removal, and dispatch timing behavior | PR-1 / Phase 1 and 2 |
-| `apps/node/src/cli/commands/serve.ts` or nearby docs/help surfaces only if needed | Mention serve-mode operational guidance only if the implementation exposes a user-facing note that belongs with the code change | PR-1 / Phase 2 if justified |
+| `apps/node/src/cli/commands/serve.ts` | No code changes expected; serve-mode is an operational note for docs, not a code surface in this pack | — |
 
 ## Source Of Truth
 
@@ -88,9 +88,9 @@ The current snapshot path is too slow for tight agent loops, and the branch find
 
 **Judgment required:**
 
-- Whether signal-based dispatch is safe enough to ship immediately or whether a reduced constant should be the first landing step
-- How much temporary fallback logic to keep during the transition from dump-based recovery to live-stream recovery
-- Whether any serve-mode guidance belongs in code-adjacent docs/help output versus remaining an operational note
+- Broadcast delay approach: the findings recommend signal-based dispatch (fire once logcat emits its first stdout line, 100ms fallback timer) as the preferred landing. If signal-based is not stable enough on first attempt, the fallback is a reduced constant of 50ms with a measurement follow-up in the same PR. Do not default to 50ms without first attempting the signal-based path.
+- How much temporary fallback logic to keep during the transition from dump-based recovery to live-stream recovery - the minimum needed to keep the tests green until the post-dump path is fully removed.
+- Whether any serve-mode guidance belongs in code-adjacent help output - default is no; only add if the implementation actually changes a user-facing surface.
 
 ## Decision Rules
 
@@ -126,15 +126,13 @@ After this task ships:
 
 ## Idempotency
 
-- Re-running snapshot on the same screen still returns the same logical snapshot result shape, with any variance limited to live UI state and log ordering outside the bounded command window.
-- Re-running the tests should produce stable pass/fail outcomes independent of prior logcat buffer state.
-- Re-running the measurement step may vary by device state, but the measurement procedure itself should remain stable and documented in the task execution notes.
+- Snapshot capture is bounded by the dispatch-to-envelope interval for a given commandId, not by global logcat buffer state. Removing `logcat -c` must not change this: a re-run of the same snapshot command must not pick up lines from a previous command's window.
+- Tests must produce stable pass/fail outcomes independent of prior logcat buffer state, because `logcat -c` will no longer be used to establish a clean baseline.
 
 ## Durable Follow-Up
 
 | Knowledge | Permanent home |
 | --- | --- |
-| Immediate Node snapshot transport cleanup | Code and tests under `apps/node/src/` |
 | Handshake redesign questions and gates | `tasks/node/handshaking/findings.md` until that pack is authored |
 | Deferred Android/transport backlog | `tasks/node/io-optimizations/findings-deferred.md` until later task authorship |
 | Any user-visible serve-mode guidance added by this work | Public docs or CLI help only if the implementation actually changes a user-facing surface |
