@@ -649,15 +649,27 @@ export default function Home() {
               for the full API)
             </p>
             <pre>
-              <code>{`clawperator open --app com.google.android.apps.chromecast.app  # Google Home
+              <code>{`# agent: Open Google Home before observing its UI.
+clawperator open --app com.google.android.apps.chromecast.app
+
+# agent: Inspect Google Home before deciding where to tap.
+clawperator snapshot
+# { "app": "Google Home", "nodes": [...] }
+
+# agent: Navigate to the climate controls.
 clawperator click --text "Climate"
 clawperator scroll-and-click --text-contains "Living room"
 
+# agent: Read the current device state.
 clawperator read --text-contains "Heating"
 # { "text": "Off" }
 
-# agent reads "Off", turns it on:
-clawperator click --text "Turn On"`}</code>
+# agent: Heating is off, so ask Clawperator to turn it on.
+clawperator click --text "Turn On"
+
+# agent: Verify the result before finishing.
+clawperator snapshot
+# { "text": "Heating", "state": "On" }`}</code>
             </pre>
           </div>
         </div>
