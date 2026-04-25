@@ -273,3 +273,10 @@ Pass 1:
 - Fixed snapshot capture boundaries by processing the first stdout chunk before signal-based broadcast starts capture.
 - Added regression tests for both findings.
 - Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
+
+Pass 2:
+- Review found three remaining dispatch-boundary issues: the deferred explicit-device waiter could still time out before dispatch, a replayed matching envelope could complete the command before dispatch, and split replayed snapshot lines could still enter capture.
+- Fixed dispatch gating so the result timeout, result-envelope parsing, and snapshot capture start only after broadcast dispatch succeeds.
+- Added regression tests proving replayed matching envelopes are ignored before dispatch and split replayed snapshot lines do not enter snapshot capture.
+- Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
+- Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed and returned hierarchy XML.

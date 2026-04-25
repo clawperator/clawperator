@@ -589,8 +589,7 @@ async function performExecution(
     }
 
     let dispatchStart = Date.now();
-    const runBroadcast: BroadcastFn = async (beginSnapshotCapture) => {
-      beginSnapshotCapture();
+    const runBroadcast: BroadcastFn = async () => {
       const broadcast = await broadcastAgentCommand(config, payload);
       if (broadcast.success) {
         options.logger?.emit({

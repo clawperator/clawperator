@@ -183,3 +183,10 @@ Pass 1:
 - Fixed first-chunk logcat replay capture so snapshot capture begins only after the attachment/prologue chunk has been processed and broadcast dispatch starts.
 - Added focused regression coverage for both boundaries.
 - Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
+
+Pass 2:
+- Review found the deferred explicit-device waiter could still time out during preflight, and replayed matching envelopes or split replayed snapshot chunks could still be accepted before dispatch.
+- Fixed result-envelope handling so timeout, envelope parsing, and snapshot capture begin only after broadcast dispatch succeeds.
+- Added regression tests for ignored pre-dispatch envelopes and split replayed snapshot chunks.
+- Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
+- Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed and returned hierarchy XML.

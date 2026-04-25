@@ -612,6 +612,7 @@ describe("runExecution", () => {
       deviceId: "test-device-1",
       operatorPackage: "com.test.operator.dev",
       runner,
+      logcatBroadcastDelayMs: 0,
       ensureInteractiveAutomationReadyFn: async () => ({
         ok: false,
         error: {
@@ -664,6 +665,7 @@ describe("runExecution", () => {
       deviceId: "test-device-1",
       operatorPackage: "com.test.operator.dev",
       runner,
+      logcatBroadcastDelayMs: 0,
       ensureInteractiveAutomationReadyFn: async () => ({
         ok: false,
         error: {
@@ -778,6 +780,7 @@ describe("runExecution", () => {
       deviceId: "test-device-1",
       operatorPackage: "com.test.operator.dev",
       runner,
+      logcatBroadcastDelayMs: 0,
       ensureInteractiveAutomationReadyFn: async () => ({
         ok: true,
         state: {
@@ -1151,13 +1154,15 @@ describe("waitForResultEnvelope", () => {
       },
       async () => {
         broadcastStartedAt = Date.now();
-        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
-          commandId: "cmd-signal-dispatch",
-          taskId: "task-signal-dispatch",
-          status: "success",
-          stepResults: [],
-          error: null,
-        })}\n`));
+        setTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-signal-dispatch",
+            taskId: "task-signal-dispatch",
+            status: "success",
+            stepResults: [],
+            error: null,
+          })}\n`));
+        });
         return { success: true, stdout: "", stderr: "" };
       }
     );
@@ -1194,13 +1199,15 @@ describe("waitForResultEnvelope", () => {
         broadcastDelayMs: 25,
       },
       async () => {
-        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
-          commandId: "cmd-timeout-after-dispatch",
-          taskId: "task-timeout-after-dispatch",
-          status: "success",
-          stepResults: [],
-          error: null,
-        })}\n`));
+        setTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-timeout-after-dispatch",
+            taskId: "task-timeout-after-dispatch",
+            status: "success",
+            stepResults: [],
+            error: null,
+          })}\n`));
+        });
         return { success: true, stdout: "", stderr: "" };
       }
     );
@@ -1243,21 +1250,142 @@ describe("waitForResultEnvelope", () => {
         timeoutMs: 1000,
         broadcastDelayMs: 1000,
       },
-      async (beginSnapshotCapture) => {
-        beginSnapshotCapture();
-        proc.stdout?.emit("data", Buffer.from([
-          "04-25 20:14:53.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
-          "04-25 20:14:53.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
-          "04-25 20:14:53.455 D/TaskScopeDefault(29817):   <node text=\"fresh\" />",
-          "04-25 20:14:53.456 D/TaskScopeDefault(29817): </hierarchy>",
-          `[Clawperator-Result] ${JSON.stringify({
-            commandId: "cmd-capture-boundary",
-            taskId: "task-capture-boundary",
+      async () => {
+        setTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from([
+            "04-25 20:14:53.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+            "04-25 20:14:53.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+            "04-25 20:14:53.455 D/TaskScopeDefault(29817):   <node text=\"fresh\" />",
+            "04-25 20:14:53.456 D/TaskScopeDefault(29817): </hierarchy>",
+            `[Clawperator-Result] ${JSON.stringify({
+              commandId: "cmd-capture-boundary",
+              taskId: "task-capture-boundary",
+              status: "success",
+              stepResults: [],
+              error: null,
+            })}`,
+          ].join("\n") + "\n"));
+        });
+        return { success: true, stdout: "", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.ok(result.snapshotLogLines?.some(line => line.includes("fresh")));
+      assert.ok(!result.snapshotLogLines?.some(line => line.includes("stale")));
+    }
+  });
+
+  it("ignores replayed matching envelopes before dispatch", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+          commandId: "cmd-replayed-envelope",
+          taskId: "old-task",
+          status: "success",
+          stepResults: [{ id: "old", actionType: "sleep", success: true, data: {} }],
+          error: null,
+        })}\n`));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-replayed-envelope",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async () => {
+        setTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-replayed-envelope",
+            taskId: "new-task",
             status: "success",
-            stepResults: [],
+            stepResults: [{ id: "new", actionType: "sleep", success: true, data: {} }],
             error: null,
-          })}`,
+          })}\n`));
+        });
+        return { success: true, stdout: "", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.envelope.taskId, "new-task");
+    }
+  });
+
+  it("does not capture split replayed snapshot lines before dispatch completes", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
         ].join("\n") + "\n"));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-split-replay",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async () => {
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node text=\"stale\" />",
+          "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+        ].join("\n") + "\n"));
+        setTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from([
+            "04-25 20:14:53.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+            "04-25 20:14:53.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+            "04-25 20:14:53.455 D/TaskScopeDefault(29817):   <node text=\"fresh\" />",
+            "04-25 20:14:53.456 D/TaskScopeDefault(29817): </hierarchy>",
+            `[Clawperator-Result] ${JSON.stringify({
+              commandId: "cmd-split-replay",
+              taskId: "task-split-replay",
+              status: "success",
+              stepResults: [],
+              error: null,
+            })}`,
+          ].join("\n") + "\n"));
+        });
         return { success: true, stdout: "", stderr: "" };
       }
     );

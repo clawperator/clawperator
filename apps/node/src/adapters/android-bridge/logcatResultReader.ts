@@ -125,7 +125,6 @@ export async function waitForResultEnvelope(
       if (broadcastStartTimer !== undefined) {
         clearTimeout(broadcastStartTimer);
       }
-      startTimeout();
       (async () => {
         try {
           const result = await onBroadcast(beginSnapshotCapture);
@@ -147,7 +146,9 @@ export async function waitForResultEnvelope(
             finalize({ ok: false, broadcastFailed: true, diagnostics });
             return;
           }
+          beginSnapshotCapture();
           broadcastStatus = "sent";
+          startTimeout();
         } catch (e) {
           const err = String(e).trim();
           broadcastStatus = `error: ${err}`;
@@ -176,7 +177,7 @@ export async function waitForResultEnvelope(
             snapshotLogLines.push(line);
           }
         }
-        if (!line.includes(RESULT_ENVELOPE_PREFIX)) continue;
+        if (broadcastStatus !== "sent" || !line.includes(RESULT_ENVELOPE_PREFIX)) continue;
 
         const parsed = parseTerminalEnvelope(line, commandId);
         if (parsed === "malformed") {
