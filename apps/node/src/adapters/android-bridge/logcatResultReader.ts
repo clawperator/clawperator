@@ -69,8 +69,10 @@ export async function waitForResultEnvelope(
     let broadcastStartTimer: NodeJS.Timeout | undefined;
     let signalBroadcastStartTimer: NodeJS.Timeout | undefined;
     let signalBroadcastMaxTimer: NodeJS.Timeout | undefined;
+    let snapshotCaptureStartTimer: NodeJS.Timeout | undefined;
     let broadcastStarted = false;
     let dispatchCaptureStarted = false;
+    let forcedReplayDrainDispatch = false;
     let stdoutObserved = false;
 
     config.logger?.emit({
@@ -97,6 +99,9 @@ export async function waitForResultEnvelope(
       }
       if (signalBroadcastMaxTimer !== undefined) {
         clearTimeout(signalBroadcastMaxTimer);
+      }
+      if (snapshotCaptureStartTimer !== undefined) {
+        clearTimeout(snapshotCaptureStartTimer);
       }
       cancelSignal?.removeEventListener("abort", abortHandler);
       resolve(result);
@@ -156,7 +161,13 @@ export async function waitForResultEnvelope(
       }
       pending = "";
       dispatchCaptureStarted = true;
-      captureSnapshotLines = true;
+      if (forcedReplayDrainDispatch) {
+        snapshotCaptureStartTimer = setTimeout(() => {
+          captureSnapshotLines = true;
+        }, SIGNAL_BROADCAST_REPLAY_DRAIN_MS);
+      } else {
+        captureSnapshotLines = true;
+      }
       broadcastStatus = "sent";
       startTimeout();
     };
@@ -258,7 +269,10 @@ export async function waitForResultEnvelope(
       if (!broadcastStarted) {
         if (!stdoutObserved) {
           stdoutObserved = true;
-          signalBroadcastMaxTimer = setTimeout(startBroadcast, SIGNAL_BROADCAST_MAX_DRAIN_MS);
+          signalBroadcastMaxTimer = setTimeout(() => {
+            forcedReplayDrainDispatch = true;
+            startBroadcast();
+          }, SIGNAL_BROADCAST_MAX_DRAIN_MS);
         }
         if (broadcastStartTimer !== undefined) {
           clearTimeout(broadcastStartTimer);
@@ -267,7 +281,10 @@ export async function waitForResultEnvelope(
         if (signalBroadcastStartTimer !== undefined) {
           clearTimeout(signalBroadcastStartTimer);
         }
-        signalBroadcastStartTimer = setTimeout(startBroadcast, SIGNAL_BROADCAST_REPLAY_DRAIN_MS);
+        signalBroadcastStartTimer = setTimeout(() => {
+          forcedReplayDrainDispatch = false;
+          startBroadcast();
+        }, SIGNAL_BROADCAST_REPLAY_DRAIN_MS);
       }
     });
 

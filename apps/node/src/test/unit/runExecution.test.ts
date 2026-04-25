@@ -1764,6 +1764,79 @@ describe("waitForResultEnvelope", () => {
     assert.ok(broadcastStartedAt - startedAt < 500, "broadcast should be bounded by the max drain timer");
   });
 
+  it("does not capture stale snapshot lines after forced replay-drain dispatch", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    const logTimers: NodeJS.Timeout[] = [];
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => {
+        for (const timer of logTimers) {
+          clearTimeout(timer);
+        }
+      };
+      for (let i = 0; i < 12; i += 1) {
+        logTimers.push(setTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from(`04-25 20:14:52.${String(500 + i).padStart(3, "0")} D/TaskScopeDefault(29817): noisy replay ${i}\n`));
+        }, i * 15));
+      }
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-forced-replay-snapshot",
+        timeoutMs: 1000,
+        broadcastDelayMs: 10_000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.700 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.701 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+          "04-25 20:14:52.702 D/TaskScopeDefault(29817):   <node text=\"stale-forced\" />",
+          "04-25 20:14:52.703 D/TaskScopeDefault(29817): </hierarchy>",
+        ].join("\n") + "\n"));
+        setTimeout(() => {
+          const freshPrefix = formatLogcatTime(new Date());
+          proc.stdout?.emit("data", Buffer.from([
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
+            `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh-forced" />`,
+            `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
+            `[Clawperator-Result] ${JSON.stringify({
+              commandId: "cmd-forced-replay-snapshot",
+              taskId: "task-forced-replay-snapshot",
+              status: "success",
+              stepResults: [],
+              error: null,
+            })}`,
+          ].join("\n") + "\n"));
+        }, 35);
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      const snapshots = extractSnapshotsFromLogs(result.snapshotLogLines ?? []);
+      assert.ok(snapshots.some(snapshot => snapshot.includes("fresh-forced")));
+      assert.ok(!snapshots.some(snapshot => snapshot.includes("stale-forced")));
+    }
+  });
+
   it("ignores stale malformed replayed envelopes for other commands after dispatch starts", async () => {
     const runner = new FakeProcessRunner();
     let proc: EventEmitter & {

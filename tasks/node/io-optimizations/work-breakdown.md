@@ -353,3 +353,10 @@ Pass 10:
 - Added regression coverage for stale malformed replay followed by the current command envelope.
 - Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
 - Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.
+
+Pass 11:
+- Review found the absolute max replay-drain cap could still start dispatch while old snapshot replay lines were arriving, allowing stale snapshots to enter the capture window.
+- Added a short snapshot-capture quarantine when dispatch is forced by the max replay-drain cap, while keeping envelope parsing and timeout accounting tied to dispatch start.
+- Added regression coverage for stale snapshot blocks emitted immediately after forced dispatch followed by fresh snapshot lines.
+- Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
+- Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.
