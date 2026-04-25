@@ -56,7 +56,7 @@ export async function waitForResultEnvelope(
     let pending = "";
     let settled = false;
     let stderrBuffer = "";
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: NodeJS.Timeout | undefined;
     let broadcastStartTimer: NodeJS.Timeout | undefined;
     let broadcastStarted = false;
 
@@ -74,6 +74,9 @@ export async function waitForResultEnvelope(
       if (settled) return;
       settled = true;
       clearTimeout(timeoutId);
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
       if (broadcastStartTimer !== undefined) {
         clearTimeout(broadcastStartTimer);
       }
@@ -92,6 +95,28 @@ export async function waitForResultEnvelope(
       captureSnapshotLines = true;
     };
 
+    const startTimeout = () => {
+      timeoutId = setTimeout(() => {
+        flush();
+        const diagnostics: TimeoutDiagnostics = {
+          code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
+          message: `No [Clawperator-Result] envelope within ${timeoutMs}ms`,
+          lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
+          broadcastDispatchStatus: broadcastStatus,
+          deviceId: config.deviceId,
+          operatorPackage: config.operatorPackage,
+        };
+        config.logger?.emit({
+          ts: new Date().toISOString(),
+          level: "debug",
+          event: "adb.complete",
+          deviceId: config.deviceId,
+          message: `${commandLine} timeoutMs=${timeoutMs} stdout=[redacted] stderr=[redacted]`,
+        });
+        finalize({ ok: false, timeout: true, diagnostics });
+      }, timeoutMs);
+    };
+
     const startBroadcast = () => {
       if (settled || broadcastStarted) {
         return;
@@ -100,6 +125,7 @@ export async function waitForResultEnvelope(
       if (broadcastStartTimer !== undefined) {
         clearTimeout(broadcastStartTimer);
       }
+      startTimeout();
       (async () => {
         try {
           const result = await onBroadcast(beginSnapshotCapture);
@@ -139,28 +165,7 @@ export async function waitForResultEnvelope(
       })();
     };
 
-    timeoutId = setTimeout(() => {
-      flush();
-      const diagnostics: TimeoutDiagnostics = {
-        code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
-        message: `No [Clawperator-Result] envelope within ${timeoutMs}ms`,
-        lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
-        broadcastDispatchStatus: broadcastStatus,
-        deviceId: config.deviceId,
-        operatorPackage: config.operatorPackage,
-      };
-      config.logger?.emit({
-        ts: new Date().toISOString(),
-        level: "debug",
-        event: "adb.complete",
-        deviceId: config.deviceId,
-        message: `${commandLine} timeoutMs=${timeoutMs} stdout=[redacted] stderr=[redacted]`,
-      });
-      finalize({ ok: false, timeout: true, diagnostics });
-    }, timeoutMs);
-
     proc.stdout?.on("data", (chunk: Buffer) => {
-      startBroadcast();
       pending += chunk.toString();
       const lines = pending.split("\n");
       pending = lines.pop() ?? "";
@@ -195,6 +200,7 @@ export async function waitForResultEnvelope(
           return;
         }
       }
+      startBroadcast();
     });
 
     proc.stderr?.on("data", (chunk: Buffer) => {

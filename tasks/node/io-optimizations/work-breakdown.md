@@ -262,3 +262,14 @@ Notes:
 - Physical device serial redacted as `<device_serial>`.
 - An initial Solax optimized sample set was discarded from the table because run 1 spiked to 65202ms after switching app context; the rerun above was taken back-to-back with the baseline and is the stable comparison set.
 - Skill timings include app navigation, skill script work, and remote app state variance, so the deltas are larger and noisier than the isolated snapshot transport estimate.
+
+## Review Swarm Loop
+
+Status: in progress on 2026-04-25.
+
+Pass 1:
+- Review found two P1 issues in the Phase 2 implementation: the early explicit-device waiter counted preflight time against the result timeout, and first-chunk logcat replay lines could enter snapshot capture.
+- Fixed timeout accounting by starting the result timer when broadcast starts.
+- Fixed snapshot capture boundaries by processing the first stdout chunk before signal-based broadcast starts capture.
+- Added regression tests for both findings.
+- Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.

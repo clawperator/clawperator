@@ -173,3 +173,13 @@ Validation:
 - `node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
 - `npm --prefix apps/node run test` was run; unrelated skills CLI tests still failed because two real devices were connected and those tests reached real adb device selection.
 - Live skill timing comparison was run with global `0.7.7` and local `0.7.8`.
+
+### Review Swarm Loop
+
+Status: in progress on 2026-04-25.
+
+Pass 1:
+- Fixed early explicit-device waiter timeout accounting so the result timeout starts at broadcast dispatch rather than logcat spawn.
+- Fixed first-chunk logcat replay capture so snapshot capture begins only after the attachment/prologue chunk has been processed and broadcast dispatch starts.
+- Added focused regression coverage for both boundaries.
+- Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
