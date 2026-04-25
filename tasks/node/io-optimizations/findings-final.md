@@ -77,7 +77,7 @@ Lower-risk interim: Reduce to 50ms with a documented comment explaining it is a 
 Teach `parseLogLine` to handle time-format lines from the live stream, accumulate matching lines in `waitForResultEnvelope`, and return them alongside the envelope. Remove the pre-command `logcat -c` and the post-command `logcat -d -v tag` pass.
 
 **Why it matters:**
-The snapshot XML lines already arrive in the live logcat stream that `waitForResultEnvelope` is reading. They are re-fetched via a second `logcat -d` pass because `parseLogLine` in `snapshotHelper.ts` only handles the tag format (`D/TaskScopeDefault: ...`), while the live stream produces time format (`04-25 20:14:52.453 D/TaskScopeDefault(29817): ...`). Combined cost of `logcat -c` plus `logcat -d`: **~197-250ms**. Additionally, the logcat-clear approach creates fragility: extraction depends on a clean global buffer rather than being bounded by the command window.
+The snapshot XML is not carried inside the initial result envelope. Android logs the hierarchy as sequential `TaskScopeDefault` lines, and Node currently reconstructs the snapshot with a second `logcat -d` pass because `parseLogLine` in `snapshotHelper.ts` only handles the tag format (`D/TaskScopeDefault: ...`), while the live stream produces time format (`04-25 20:14:52.453 D/TaskScopeDefault(29817): ...`). Combined cost of `logcat -c` plus `logcat -d`: **~197-250ms**. Additionally, the logcat-clear approach creates fragility: extraction depends on a clean global buffer rather than being bounded by the command window.
 
 **Where it applies:**
 - `apps/node/src/adapters/android-bridge/snapshotHelper.ts` - `parseLogLine`, extend regex to handle time format: `/^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3} [A-Z]\//`
@@ -88,6 +88,9 @@ The snapshot XML lines already arrive in the live logcat stream that `waitForRes
 Snapshot XML lines do not carry `commandId`. Bound collection to the dispatch-to-matching-envelope interval. The per-device execution lock (already present) prevents concurrent command interleaving. Add tests for time-format parsing before removing the `logcat -d` fallback. Remove `logcat -c` only after live extraction is verified across multiple runs.
 
 **Estimated impact:** ~197-250ms saved per snapshot call; eliminates shared-log fragility.
+
+**Transport note:**
+Recordings are a separate path. They are written on-device and pulled with `adb pull`, so they should not be used as evidence for snapshot transport behavior.
 
 ---
 
