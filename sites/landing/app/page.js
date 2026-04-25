@@ -650,7 +650,7 @@ export default function Home() {
             </p>
             <pre>
               <code>{`## Runtime skill path
-clawperator skills run <google-home-application-id>.control-hvac -- --action climate_state --value On --unit-name "Living room"
+clawperator skills run <google-home-application-id>.set-power -- --climate-state on --unit-name "Living room"
 
 ## Agent-driven control path
 clawperator open --app <google-home-application-id>
@@ -666,7 +666,7 @@ clawperator scroll-and-click --text-contains "Living room"
 clawperator read --text-contains "Heating"
 # { "text": "Off" }
 
-# agent: climate_state is "Off"; target value is "On".
+# agent: Heating is off; target climate state is on.
 
 clawperator click --text "Turn On"`}</code>
             </pre>
