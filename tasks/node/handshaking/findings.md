@@ -1,8 +1,8 @@
 # Handshaking Findings
 
-**Status: NOT READY FOR $task-author. Decisions below must be locked before this becomes a task pack.**
+**Status: DECISIONS LOCKED. Task pack authored in `plan.md` and `work-breakdown.md`.**
 
-Date: 2026-04-25
+Date: 2026-04-25 (findings); 2026-04-26 (decisions locked)
 Surface: Node snapshot execution preflight and readiness checks
 
 ## Scope Note
