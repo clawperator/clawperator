@@ -662,7 +662,7 @@ clawperator skills run <hvac-app>.set-power -- --climate-state on --unit-name "L
 clawperator open --app <hvac-app>
 
 clawperator snapshot    # Get the current UI state as structured JSON.
-# { "app": "HVAC App", "nodes": [...] }
+# { "app": "HVAC App", "ui_tree": [...] }
 
 # agent: Inspect the snapshot, determine commands to run next.
 
