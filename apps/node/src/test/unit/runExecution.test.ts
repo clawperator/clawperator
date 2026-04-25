@@ -1556,6 +1556,76 @@ describe("waitForResultEnvelope", () => {
     }
   });
 
+  it("does not let the no-output fallback interrupt replay draining after stdout", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    let broadcastStarted = false;
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from("04-25 20:14:52.453 D/TaskScopeDefault(29817): ready\n"));
+      });
+      setTimeout(() => {
+        assert.strictEqual(broadcastStarted, false, "fallback must not dispatch while replay chunks are still draining");
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.454 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.455 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+          "04-25 20:14:52.456 D/TaskScopeDefault(29817):   <node text=\"stale-after-fallback\" />",
+          "04-25 20:14:52.457 D/TaskScopeDefault(29817): </hierarchy>",
+        ].join("\n") + "\n"));
+      }, 15);
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-fallback-replay-drain",
+        timeoutMs: 1000,
+        broadcastDelayMs: 10,
+      },
+      async (beginDispatchCapture) => {
+        broadcastStarted = true;
+        beginDispatchCapture();
+        setTimeout(() => {
+          const freshPrefix = formatLogcatTime(new Date());
+          proc.stdout?.emit("data", Buffer.from([
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
+            `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
+            `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
+            `[Clawperator-Result] ${JSON.stringify({
+              commandId: "cmd-fallback-replay-drain",
+              taskId: "task-fallback-replay-drain",
+              status: "success",
+              stepResults: [],
+              error: null,
+            })}`,
+          ].join("\n") + "\n"));
+        });
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.ok(result.snapshotLogLines?.some(line => line.includes("fresh")));
+      assert.ok(!result.snapshotLogLines?.some(line => line.includes("stale-after-fallback")));
+    }
+  });
+
   it("does not capture split replayed snapshot lines before dispatch completes", async () => {
     const runner = new FakeProcessRunner();
     let proc: EventEmitter & {

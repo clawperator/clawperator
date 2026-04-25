@@ -302,3 +302,10 @@ Pass 5:
 - Added parser support and a regression test for PID/TID `-v time` snapshot lines.
 - Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
 - Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.
+
+Pass 6:
+- Review found the original no-output fallback timer stayed armed after stdout proved logcat attachment and could cut off replay draining.
+- Cleared the fallback timer once stdout is observed, so fallback still handles no-output attachment cases while signal replay-drain controls stdout-attached dispatch.
+- Added regression coverage where replay chunks continue beyond the old fallback window.
+- Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
+- Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.

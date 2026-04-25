@@ -238,6 +238,10 @@ export async function waitForResultEnvelope(
         }
       }
       if (!broadcastStarted) {
+        if (broadcastStartTimer !== undefined) {
+          clearTimeout(broadcastStartTimer);
+          broadcastStartTimer = undefined;
+        }
         if (signalBroadcastStartTimer !== undefined) {
           clearTimeout(signalBroadcastStartTimer);
         }
