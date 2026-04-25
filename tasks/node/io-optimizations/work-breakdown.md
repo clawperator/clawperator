@@ -15,7 +15,7 @@ Parent plan: `tasks/node/io-optimizations/plan.md`
 | Total phases | 2 |
 | Completed | 1, 2 |
 | Remaining | none |
-| Current / Next | review-swarm-loop |
+| Current / Next | complete |
 | Blockers | none |
 
 ## Hard Rules
@@ -279,7 +279,7 @@ Notes:
 
 ## Review Swarm Loop
 
-Status: in progress on 2026-04-25.
+Status: completed clean on 2026-04-25.
 
 Pass 1:
 - Review found two P1 issues in the Phase 2 implementation: the early explicit-device waiter counted preflight time against the result timeout, and first-chunk logcat replay lines could enter snapshot capture.
@@ -360,3 +360,6 @@ Pass 11:
 - Added regression coverage for stale snapshot blocks emitted immediately after forced dispatch followed by fresh snapshot lines.
 - Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
 - Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.
+
+Final pass:
+- Review swarm returned no material findings against the persisted PR-1 scope on current branch `HEAD`.
