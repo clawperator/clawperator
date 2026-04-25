@@ -27,6 +27,7 @@ function isSnapshotLogLine(line: string): boolean {
 }
 
 const SIGNAL_BROADCAST_REPLAY_DRAIN_MS = 25;
+const SIGNAL_BROADCAST_MAX_DRAIN_MS = 100;
 
 /**
  * Start logcat stream, then invoke onBroadcast once stdout proves the stream is attached
@@ -63,8 +64,10 @@ export async function waitForResultEnvelope(
     let timeoutId: NodeJS.Timeout | undefined;
     let broadcastStartTimer: NodeJS.Timeout | undefined;
     let signalBroadcastStartTimer: NodeJS.Timeout | undefined;
+    let signalBroadcastMaxTimer: NodeJS.Timeout | undefined;
     let broadcastStarted = false;
     let dispatchCaptureStarted = false;
+    let stdoutObserved = false;
 
     config.logger?.emit({
       ts: new Date().toISOString(),
@@ -87,6 +90,9 @@ export async function waitForResultEnvelope(
       }
       if (signalBroadcastStartTimer !== undefined) {
         clearTimeout(signalBroadcastStartTimer);
+      }
+      if (signalBroadcastMaxTimer !== undefined) {
+        clearTimeout(signalBroadcastMaxTimer);
       }
       cancelSignal?.removeEventListener("abort", abortHandler);
       resolve(result);
@@ -161,6 +167,9 @@ export async function waitForResultEnvelope(
       }
       if (signalBroadcastStartTimer !== undefined) {
         clearTimeout(signalBroadcastStartTimer);
+      }
+      if (signalBroadcastMaxTimer !== undefined) {
+        clearTimeout(signalBroadcastMaxTimer);
       }
       (async () => {
         try {
@@ -239,6 +248,10 @@ export async function waitForResultEnvelope(
         }
       }
       if (!broadcastStarted) {
+        if (!stdoutObserved) {
+          stdoutObserved = true;
+          signalBroadcastMaxTimer = setTimeout(startBroadcast, SIGNAL_BROADCAST_MAX_DRAIN_MS);
+        }
         if (broadcastStartTimer !== undefined) {
           clearTimeout(broadcastStartTimer);
           broadcastStartTimer = undefined;

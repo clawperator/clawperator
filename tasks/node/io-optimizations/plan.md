@@ -234,3 +234,11 @@ Pass 8:
 - Added regression coverage for partial replay completion after dispatch and blank `deviceId` fast-path avoidance.
 - Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
 - Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.
+
+Pass 9:
+- Review found continuous stdout could reset replay-drain dispatch indefinitely, and the task pack still needed warm CLI / serve-mode snapshot latency measurements.
+- Added an absolute max replay-drain cap after first stdout so noisy logcat cannot block dispatch forever.
+- Added regression coverage for continuous logcat output before dispatch.
+- Captured warm CLI and serve-mode snapshot measurements in `work-breakdown.md`.
+- Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
+- Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.

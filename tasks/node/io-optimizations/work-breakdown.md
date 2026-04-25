@@ -218,8 +218,6 @@ perf(node): reduce snapshot dispatch overhead
 
 ## Measurements
 
-*To be filled in by the implementing agent during Phase 2, step 5. Do not close the pack without completing this section.*
-
 ### Device
 
 | Field | Value |
@@ -228,6 +226,17 @@ perf(node): reduce snapshot dispatch overhead
 | Serial | `<device_serial>` |
 | Baseline CLI version | 0.7.7 (global install) |
 | Optimized build version | 0.7.8 (local dist) |
+
+### Warm snapshot latency
+
+Local branch build, repeated against the same foreground app state.
+
+| Run | Warm CLI snapshot (ms) | Serve-mode snapshot (ms) |
+| --- | --- | --- |
+| 1 | 2226 | 2237 |
+| 2 | 2219 | 1750 |
+| 3 | 1756 | 1722 |
+| Median | 2219 | 1750 |
 
 ### com.solaxcloud.starter.get-battery
 
@@ -255,6 +264,8 @@ Unit name used: `Panasonic`
 | --- | --- | --- | --- |
 | solax median | 20584ms | 15897ms | -4687ms |
 | chromecast median | 23957ms | 15365ms | -8592ms |
+| warm CLI snapshot median | ~1771ms expected pre-optimization | 2219ms measured | +448ms vs estimate |
+| serve-mode snapshot median | ~1180ms expected post-optimization | 1750ms measured | +570ms vs estimate |
 | Expected from findings (~1260ms CLI) | ~1771ms | ~1260ms | ~511ms |
 
 Notes:
@@ -262,6 +273,9 @@ Notes:
 - Physical device serial redacted as `<device_serial>`.
 - An initial Solax optimized sample set was discarded from the table because run 1 spiked to 65202ms after switching app context; the rerun above was taken back-to-back with the baseline and is the stable comparison set.
 - Skill timings include app navigation, skill script work, and remote app state variance, so the deltas are larger and noisier than the isolated snapshot transport estimate.
+- Warm CLI snapshot timing used `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json`.
+- Serve-mode snapshot timing used `node apps/node/dist/cli/index.js serve --host 127.0.0.1 --port 43123` and `POST /snapshot` with the same device and operator package.
+- The warm snapshot measurements remained above the estimates in `findings.md`; next latency gates remain handshake redesign and Android-side filtering, both out of scope for PR-1.
 
 ## Review Swarm Loop
 
@@ -322,5 +336,13 @@ Pass 8:
 - Cleared pending partial logcat content when dispatch capture starts.
 - Changed explicit-device fast-path detection to require a nonblank device ID.
 - Added regression tests for partial replay completion after dispatch and blank `deviceId` fast-path avoidance.
+- Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
+- Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.
+
+Pass 9:
+- Review found continuous stdout could reset replay-drain dispatch indefinitely, and the task pack was missing warm CLI / serve-mode snapshot latency measurements.
+- Added an absolute max replay-drain cap after first stdout so noisy logcat cannot block dispatch forever.
+- Added regression coverage for continuous logcat output before dispatch.
+- Captured warm CLI and serve-mode snapshot measurements in `## Measurements`.
 - Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
 - Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.

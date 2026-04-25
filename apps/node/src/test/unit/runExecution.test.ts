@@ -1704,6 +1704,66 @@ describe("waitForResultEnvelope", () => {
     }
   });
 
+  it("dispatches even when continuous logcat output keeps resetting the drain timer", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    const logTimers: NodeJS.Timeout[] = [];
+    let broadcastStartedAt = 0;
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => {
+        for (const timer of logTimers) {
+          clearTimeout(timer);
+        }
+      };
+      for (let i = 0; i < 12; i += 1) {
+        logTimers.push(setTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from(`04-25 20:14:52.${String(500 + i).padStart(3, "0")} D/TaskScopeDefault(29817): noisy replay ${i}\n`));
+        }, i * 15));
+      }
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const startedAt = Date.now();
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-noisy-drain",
+        timeoutMs: 1000,
+        broadcastDelayMs: 10_000,
+      },
+      async (beginDispatchCapture) => {
+        broadcastStartedAt = Date.now();
+        beginDispatchCapture();
+        setTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-noisy-drain",
+            taskId: "task-noisy-drain",
+            status: "success",
+            stepResults: [],
+            error: null,
+          })}\n`));
+        });
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    assert.ok(broadcastStartedAt > 0, "broadcast must start despite continuous stdout");
+    assert.ok(broadcastStartedAt - startedAt < 500, "broadcast should be bounded by the max drain timer");
+  });
+
   it("does not capture split replayed snapshot lines before dispatch completes", async () => {
     const runner = new FakeProcessRunner();
     let proc: EventEmitter & {
