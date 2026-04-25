@@ -21,11 +21,11 @@ running serve process - makes the serve optimization available to all callers wi
 changing skill implementations.
 
 **Expected benefit split:**
-- Daemon alone (this task pack): saves Node startup and module loading (~100-200ms per
+- Daemon alone (Phases 1-3): saves Node startup and module loading (~100-200ms per
   call) for all proxied commands. Minimal improvement on the `doctor_ping` handshake.
-- Daemon + readiness cache (requires `tasks/node/handshaking/` PR-1 to also merge):
-  saves the full ~410ms handshake on warm calls. The cache only works when callers share
-  a process; the daemon makes the cache effective for ALL callers, including subprocesses.
+- Daemon + readiness cache (Phase 4 of this task pack adds the cache): saves the full
+  ~410ms handshake on warm calls. The cache only works when callers share a process;
+  the daemon makes the cache effective for ALL callers, including subprocesses.
   This is the primary latency win the daemon enables.
 
 The key insight is that `apps/node/src/cli/commands/serve.ts` is already the daemon. It
@@ -43,7 +43,7 @@ and a thin proxy layer in the CLI commands.
 | PR-1 | Extract app creation; add Unix socket transport and health endpoints to serve.ts | Phase 1 |
 | PR-2 | `clawperator daemon start|stop|status|restart` lifecycle commands | Phase 2 |
 | PR-3 | Proxy layer for `exec`, `snapshot`, `screenshot` with auto-start and opt-out | Phase 3 |
-| PR-4 | Expand proxy to all flat action commands | Phase 4 |
+| PR-4 | Expand proxy to all flat action commands; add readiness cache | Phase 4 |
 | PR-5 | Benchmark measurement and findings | Phase 5 |
 
 Each PR must be merged before the next begins. PRs 1-2 are non-breaking infrastructure.
@@ -67,16 +67,16 @@ PR-5 is measurement only.
 Make sequential `clawperator` CLI calls - including those made by skills via
 `execFileSync` - benefit from warm process state by transparently proxying commands
 through a background daemon built on the existing `clawperator serve` Express server.
-Once the handshaking readiness cache is also in place, all callers share the daemon's
+Once the Phase 4 readiness cache is also in place, all callers share the daemon's
 in-process cache, eliminating the per-call handshake overhead.
 
 ## Why Now
 
 - Commit 698e7edc (Node I/O optimization) landed the fast logcat path. The remaining
   ~410ms per-command cost is the `doctor_ping` handshake.
-- `tasks/node/handshaking/` plans an in-process readiness cache that reduces this to
-  near-zero on warm hits - but only for callers sharing a process. Skills are subprocess
-  chains and cannot benefit from an in-process cache without a daemon.
+- Phase 4 of this task pack adds an in-process readiness cache that reduces the
+  per-call handshake to near-zero on warm hits - but only for callers sharing a process.
+  Skills are subprocess chains and cannot benefit from an in-process cache without a daemon.
 - The daemon is the natural completion of the serve infrastructure already in the repo.
   `serve.ts` exists and is production-grade; this task adds the missing connective tissue.
 
@@ -87,6 +87,15 @@ in-process cache, eliminating the per-call handshake overhead.
 - Adding Unix domain socket support to `startServer()` (`socketPath` option alongside
   existing `port`/`host`).
 - Adding `GET /ping` and `GET /version` health endpoints to the Express app.
+- An in-process readiness cache in `deviceInteractivity.ts` with TTL=8s, keyed on
+  `${resolvedDeviceId}:${operatorPackage}`, with 7 explicit invalidation triggers:
+  TTL expiry, `DEVICE_NOT_INTERACTIVE`, `DEVICE_ACCESSIBILITY_NOT_RUNNING`,
+  `DEVICE_SHELL_UNAVAILABLE`, `BROADCAST_FAILED`, `RESULT_ENVELOPE_TIMEOUT`,
+  `SERVICE_UNAVAILABLE`. New exports: `ensureInteractiveAutomationReadyCached`,
+  `invalidateReadinessCache`, `clearReadinessCacheForTesting`, `buildReadinessCacheKey`.
+- Call site wiring in `runExecution.ts`: replace `ensureInteractiveAutomationReady`
+  with `ensureInteractiveAutomationReadyCached`. The `skills.ts` pre-spawn readiness
+  check stays uncached (no change to `resolveInteractiveSkillTarget`).
 - `clawperator daemon start|stop|status|restart` lifecycle commands.
 - A hidden `clawperator daemon run` command that is the actual foreground server process
   (see Decision Rules - Daemon lifecycle model).
@@ -113,9 +122,8 @@ in-process cache, eliminating the per-call handshake overhead.
 - Android-side changes.
 - Changes to the `clawperator serve` TCP/HTTP behavior or public API shape.
 - Changes to skill package files in `../clawperator-skills`.
-- The `skills.ts` pre-spawn readiness check (stays uncached per the handshaking plan).
-- The in-process readiness cache itself (owned by `tasks/node/handshaking/plan.md`).
-  That PR should land before or alongside Phase 4 to maximize daemon benefit.
+- The `skills.ts` pre-spawn readiness check (stays uncached - `resolveInteractiveSkillTarget`
+  is not modified).
 - `clawperator doctor` command behavior.
 - Streaming/SSE proxy through the daemon socket.
 - Multi-device concurrent daemon management beyond one-daemon-per-device.
@@ -143,6 +151,8 @@ the daemon is absent or opted out.
 | Proxy layer | `apps/node/src/cli/daemonProxy.ts` (new) | PR-3 |
 | Execution commands | `apps/node/src/cli/commands/execute.ts`, `observe.ts` | PR-3 |
 | Action commands | `apps/node/src/cli/commands/action.ts` | PR-4 |
+| Readiness cache | `apps/node/src/domain/doctor/checks/deviceInteractivity.ts` (modify) | PR-4 |
+| Readiness call site | `apps/node/src/domain/executions/runExecution.ts` (modify) | PR-4 |
 | CLI registry | `apps/node/src/cli/registry.ts` | PR-2, PR-3, PR-4 |
 | Measurement findings | `tasks/node/daemon/findings.md` | PR-5 |
 
@@ -342,6 +352,14 @@ the direct path for the same inputs. This is the primary verification target for
   daemon process is killed mid-operation. Stale file cleanup on next `start` or
   `auto-start` is the recovery path.
 
+Note: an atomic lock file (`fs.openSync(lockPath, 'wx')`) was considered for
+concurrent auto-start serialization and was intentionally not used for MVP. Unix
+domain socket bind is naturally exclusive - if two CLI processes both spawn `daemon
+run` simultaneously, the second bind fails with `EADDRINUSE` and that process exits
+cleanly. Both callers poll and connect to the first. The socket bind is the natural
+lock with no stale-file risk. If concurrent spawn issues arise in practice, a lock
+file can be layered on top without changing the rest of the protocol.
+
 ## Durable Follow-Up
 
 PR-2 must include a first draft of `docs/api/daemon.md` covering the `daemon`
@@ -367,7 +385,8 @@ When this task pack is complete and all PRs are merged:
    update `tasks/node/io-optimizations/findings.md` to note that subprocess skill
    latency is now reduced via daemon proxy.
 
-5. Coordinate with `tasks/node/handshaking/plan.md`: the in-process readiness cache
-   that plan describes becomes maximally effective once the daemon is in place (all
-   callers share the daemon's in-process state). Confirm the handshaking PR-1 has
-   merged before or alongside Phase 4.
+5. The in-process readiness cache (implemented in Phase 4) is maximally effective in
+   combination with the daemon proxy - all callers, including subprocess skills, share
+   the daemon's in-process state. Confirm Phase 4 is complete and the cache is active
+   before recording final Phase 5 measurements. Label Phase 5 measurements as "daemon
+   only" (Phases 1-3) vs "daemon + cache" (Phase 4 merged) to distinguish the two wins.

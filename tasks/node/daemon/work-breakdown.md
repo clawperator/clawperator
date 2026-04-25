@@ -13,7 +13,7 @@ change. Phase 4 is mechanical rollout. Phase 5 is measurement.
 | PR-1 | Server extraction + Unix socket transport | Phase 1 | default | none |
 | PR-2 | Daemon lifecycle commands | Phase 2 | default | PR-1 merged |
 | PR-3 | Proxy layer for exec / snapshot / screenshot | Phase 3 | thinking | PR-2 merged |
-| PR-4 | Expand proxy to all flat action commands | Phase 4 | fast | PR-3 merged |
+| PR-4 | Expand proxy to all flat action commands; add readiness cache | Phase 4 | default | PR-3 merged |
 | PR-5 | Latency measurement and findings | Phase 5 | fast | PR-4 merged |
 
 Current state: planning. Phase 1 is the next step.
@@ -47,7 +47,8 @@ Current state: planning. Phase 1 is the next step.
   separate commands. `daemon run` is the foreground server; `serve` continues to
   bind a TCP port.
 - Do NOT change the `resolveInteractiveSkillTarget` pre-spawn readiness check in
-  `skills.ts`. It stays uncached per `tasks/node/handshaking/plan.md`.
+  `skills.ts`. It stays uncached. Only `ensureInteractiveAutomationReady` in the main
+  execution path is replaced with the cached variant in Phase 4.
 - Do NOT modify any Android-side code.
 - Do NOT use port-based TCP transport for the daemon socket. Unix domain socket only
   (macOS/Linux). Windows is out of scope for this task pack.
@@ -74,7 +75,8 @@ Read these files IN THIS ORDER before writing anything.
 | `apps/node/src/cli/stdoutExitCode.ts` | Exit code determination logic - proxy output must pass this unchanged |
 | `apps/node/src/domain/version/compatibility.ts` | `getCliVersion()` - used by `/version` endpoint and daemon client |
 | `apps/node/src/cli/registry.ts` | Where to register `daemon` command and `--no-daemon` flags |
-| `tasks/node/handshaking/plan.md` | The in-process readiness cache that becomes maximally effective once the daemon exists |
+| `apps/node/src/domain/doctor/checks/deviceInteractivity.ts` | Phase 4 target for readiness cache - understand current `ensureInteractiveAutomationReady` and `probeInteractiveState` before modifying |
+| `apps/node/src/domain/executions/runExecution.ts` | Phase 4 call site - where `ensureInteractiveAutomationReady` is called today |
 
 ## PR / Phase Plan
 
@@ -83,7 +85,7 @@ Read these files IN THIS ORDER before writing anything.
 | PR-1 | Server extraction + Unix socket | Phase 1 | default | none |
 | PR-2 | Daemon lifecycle commands | Phase 2 | default | PR-1 merged |
 | PR-3 | Proxy layer - core commands | Phase 3 | thinking | PR-2 merged |
-| PR-4 | Proxy expansion - action commands | Phase 4 | fast | PR-3 merged |
+| PR-4 | Proxy expansion - action commands + readiness cache | Phase 4 | default | PR-3 merged |
 | PR-5 | Measurement | Phase 5 | fast | PR-4 merged |
 
 ---
@@ -572,31 +574,30 @@ feat(node): proxy exec, snapshot, screenshot through background daemon (#<n>)
 
 ---
 
-## Phase 4: Expand Proxy to All Flat Action Commands
+## Phase 4: Expand Proxy to All Flat Action Commands + Readiness Cache
 
 ### Agent Tier
-fast
+default
 
 ### Goal
 Apply the same proxy-before-direct pattern from Phase 3 to all flat action commands in
-`action.ts`.
+`action.ts`. Also implement the in-process readiness cache in `deviceInteractivity.ts`
+so the daemon's warm process state eliminates the per-call handshake overhead for all
+callers. Both halves of this phase must land in the same PR - the proxy expansion
+and the cache work together.
 
 ### Files to Change
 - `apps/node/src/cli/commands/action.ts`
 - `apps/node/src/cli/registry.ts` (add `--no-daemon` to action command supported flags)
+- `apps/node/src/domain/doctor/checks/deviceInteractivity.ts` (add cache)
+- `apps/node/src/domain/executions/runExecution.ts` (wire cached call)
 - `apps/node/src/test/unit/daemon/actionProxy.test.ts` (new or extend existing)
+- `apps/node/src/test/unit/domain/readiness/deviceInteractivity.test.ts` (new)
 
-### Context Note
-Before starting this phase, confirm that `tasks/node/handshaking/plan.md` PR-1 (the
-in-process readiness cache) has been merged. If it has, the daemon now holds a warm
-readiness cache for all callers. If it has not yet merged, note this in the commit
-message but proceed - the proxy is valuable regardless. `tasks/node/handshaking/plan.md`
-remains the authority on the readiness cache. That file still exists; do not re-author it.
-
-### Steps
+### Part A: Proxy Expansion
 
 1. Read `apps/node/src/cli/commands/action.ts` in full. Identify all exported `cmd*`
-   functions that call `runExecution`. List them explicitly.
+   functions that call `runExecution`. List them explicitly before writing any changes.
 
 2. For each `cmd*` function, apply the same proxy-before-direct pattern used in
    Phase 3. The pattern is always:
@@ -618,7 +619,7 @@ remains the authority on the readiness cache. That file still exists; do not re-
 4. In `registry.ts`, add `"--no-daemon"` to `supportedFlags` for each action command
    (open, close, click, type, read, wait, press, back, scroll, etc.).
 
-5. Write or extend unit tests:
+5. Write unit tests in `actionProxy.test.ts`:
    - One representative action command (e.g., `cmdActionClick`) proxies to daemon when
      available (mock `tryDaemonExecution`).
    - Same command falls back to direct when `tryDaemonExecution` returns null (mock).
@@ -626,29 +627,117 @@ remains the authority on the readiness cache. That file still exists; do not re-
    These tests prove the wiring pattern. The proxy behavior itself is already covered by
    `daemonProxy.test.ts` from Phase 3.
 
+### Part B: Readiness Cache
+
+The in-process cache eliminates the ~410ms `doctor_ping` handshake on warm daemon calls.
+Combined with the daemon, all callers (including subprocess skills) share this warm state.
+
+All decisions below are locked. Do not re-derive them.
+
+**Cache constants (add to `deviceInteractivity.ts`):**
+```typescript
+const READINESS_CACHE_TTL_MS = 8000; // 8 seconds
+```
+
+**Cache key formula:**
+```typescript
+export function buildReadinessCacheKey(resolvedDeviceId: string, operatorPackage: string): string {
+  return `${resolvedDeviceId}:${operatorPackage}`;
+}
+```
+Both inputs are post-resolution values. The resolved device ID is used (not the raw
+`--device` option string) so network ADB serials like `192.168.1.1:5555` resolve to
+a stable key without needing extra sanitization here.
+
+**Cache store (module-level, in `deviceInteractivity.ts`):**
+```typescript
+const readinessCache = new Map<string, number>(); // key -> timestamp of last success
+```
+
+**New exports from `deviceInteractivity.ts`:**
+
+```typescript
+export function buildReadinessCacheKey(resolvedDeviceId: string, operatorPackage: string): string
+
+export async function ensureInteractiveAutomationReadyCached(
+  deviceId: string,
+  operatorPackage: string,
+  // ... same additional params as ensureInteractiveAutomationReady
+): Promise<void>
+// On cache hit within TTL: return immediately without calling the real probe.
+// On cache miss: call ensureInteractiveAutomationReady. On success: store timestamp.
+// On any error: invalidate the key (if present) and rethrow the error.
+
+export function invalidateReadinessCache(resolvedDeviceId: string, operatorPackage: string): void
+// Deletes the cache entry for this key. Idempotent - no-op if key not present.
+
+export function clearReadinessCacheForTesting(): void
+// Clears the entire cache map. For use in tests only.
+```
+
+6. Implement the four exports above in `deviceInteractivity.ts`. Call
+   `ensureInteractiveAutomationReady` (the existing function) as the cache miss path
+   inside `ensureInteractiveAutomationReadyCached`. Do NOT modify `ensureInteractiveAutomationReady`
+   itself.
+
+**Invalidation triggers (7, deterministic - do not add others without explicit
+decision):**
+On any of these error codes returned from `ensureInteractiveAutomationReady`, delete
+the cache key immediately (the error is still rethrown after invalidation):
+1. `DEVICE_NOT_INTERACTIVE`
+2. `DEVICE_ACCESSIBILITY_NOT_RUNNING`
+3. `DEVICE_SHELL_UNAVAILABLE`
+4. `BROADCAST_FAILED`
+5. `RESULT_ENVELOPE_TIMEOUT`
+6. `SERVICE_UNAVAILABLE`
+7. TTL expiry (implicit - the timestamp comparison handles this on the next cache read)
+
+These are checked against `ErrorCodes` from `apps/node/src/contracts/errors.ts`.
+
+7. In `runExecution.ts`: find the call to `ensureInteractiveAutomationReady` and
+   replace it with `ensureInteractiveAutomationReadyCached`. Pass the resolved device ID
+   and operator package. The `resolveInteractiveSkillTarget` pre-spawn path in `skills.ts`
+   is NOT modified - that check stays uncached.
+
+8. Write unit tests in `apps/node/src/test/unit/domain/readiness/deviceInteractivity.test.ts`:
+   - Cache hit: second call within TTL skips the real probe (verify probe not called)
+   - Cache miss: first call invokes the real probe
+   - Cache expiry: call after TTL has elapsed invokes the real probe again
+   - Each of the 7 error codes: verify cache entry is deleted on the matching error
+   - `invalidateReadinessCache` removes the entry for a specific key only
+   - `clearReadinessCacheForTesting` empties the map completely
+   - `buildReadinessCacheKey` produces `${deviceId}:${operatorPackage}`
+
 ### Acceptance Criteria
 - `npm --prefix apps/node run build && npm --prefix apps/node run test` passes.
 - All `cmd*` functions in `action.ts` use the proxy-before-direct pattern.
 - `--no-daemon` flag is listed in `--help` for action commands.
+- All readiness cache unit tests pass.
 - With daemon running, action commands are visible in the daemon log.
 - With daemon stopped, action commands run direct (no regression).
+- Second consecutive proxied snapshot call (within 8s) does not trigger a `doctor_ping`
+  broadcast (verify via daemon log).
 
 ### Validation
 ```bash
 npm --prefix apps/node run build && npm --prefix apps/node run test
 
-# With daemon running, verify an action command proxies
+# Proxy expansion check
 node apps/node/dist/cli/index.js daemon start --device <device_id>
 node apps/node/dist/cli/index.js open-app com.android.settings --device <device_id>
-# Check daemon log shows the request:
 tail -n 20 ~/.clawperator/daemon-<device_id>.log
+
+# Cache effectiveness check: two consecutive snapshots; second should show no doctor_ping
+node apps/node/dist/cli/index.js snapshot --device <device_id> > /dev/null
+node apps/node/dist/cli/index.js snapshot --device <device_id> > /dev/null
+tail -n 40 ~/.clawperator/daemon-<device_id>.log
 
 node apps/node/dist/cli/index.js daemon stop --device <device_id>
 ```
 
 ### Expected Commit
 ```text
-feat(node): expand daemon proxy to all flat action commands (#<n>)
+feat(node): expand daemon proxy to action commands and add readiness cache (#<n>)
 ```
 
 ---
@@ -668,10 +757,10 @@ CLI calls and for a simulated skill loop. Record findings.
 ### Prerequisites
 - A physical device connected and accessible via `adb`.
 - Branch-local build available at `apps/node/dist/cli/index.js`.
-- Note on expected wins: daemon alone eliminates Node startup (~100-200ms per call).
-  The ~410ms handshake reduction requires `tasks/node/handshaking/` PR-1 (readiness
-  cache) to also be merged. Run Phase 5 after that PR lands if possible; if not, label
-  measurements as "daemon only" and record expected additional improvement separately.
+- Note on expected wins: daemon alone (Phases 1-3) eliminates Node startup (~100-200ms
+  per call). The ~410ms handshake reduction requires Phase 4 (readiness cache) to also
+  be merged. Run Phase 5 after Phase 4 lands if possible; if not, label measurements
+  as "daemon only" and record expected additional improvement separately.
 
 ### Steps
 
@@ -727,7 +816,7 @@ CLI calls and for a simulated skill loop. Record findings.
    ```
 
 3. Record findings in these sections of `findings.md`:
-   - Whether `tasks/node/handshaking/` PR-1 (readiness cache) is merged: yes/no
+   - Whether Phase 4 (readiness cache) is merged: yes/no
    - Raw measurement table (A, B cold, B warm, C, D direct, D daemon)
    - Per-call average for direct path
    - Per-call average for daemon warm path
@@ -736,10 +825,10 @@ CLI calls and for a simulated skill loop. Record findings.
    - Assessment: is the improvement significant enough to confirm the daemon approach?
    - Any anomalies observed
 
-4. If `tasks/node/handshaking/` PR-1 readiness cache has merged: re-run Measurements
-   B and C with it active. Label these rows "daemon + cache" in the table. The handshake
-   elimination is the primary latency win; measurements without the cache should not be
-   presented as the full expected improvement.
+4. If Phase 4 (readiness cache) has merged: re-run Measurements B and C with it active.
+   Label these rows "daemon + cache" in the table. The handshake elimination is the
+   primary latency win; measurements without the cache should not be presented as the
+   full expected improvement.
 
 5. Commit `findings.md` once measurements are recorded.
 
