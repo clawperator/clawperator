@@ -32,7 +32,10 @@ Full breakdown:
 ### What Is Realistically Achievable
 
 **Node-only changes (this phase):**
-Applying all immediate optimizations reduces warm CLI to approximately **~860ms**, serve mode to **~780ms**. The Android traversal floor (~600ms) blocks the 500ms target from Node side alone.
+Applying the immediate non-handshake optimizations in this brief should reduce warm CLI latency materially, but not below 1s by themselves. The Android traversal floor (~600ms) and the current handshake path still block the 500ms target from Node side alone.
+
+**Handshake planning (split out):**
+Handshake optimization is still important, but it has enough contract and diagnostic unknowns that it should be handled as a dedicated planning and implementation step. See `tasks/node/handshaking/findings.md`.
 
 **Android-side changes (deferred):**
 Filtering the UI tree or returning a reduced attribute set could reduce Android traversal time to under 300ms on typical screens, making ~500ms achievable.
@@ -48,36 +51,13 @@ All items in this section: Node-side only, no Android changes, no transport rede
 
 ---
 
-### I1 - Skip or cache doctor_ping preflight
-
-**What changes:**
-Remove or cache the `ensureInteractiveAutomationReady` -> `probeInteractiveState` -> `runDoctorPingCommand` -> `waitForResultEnvelope` chain in `runExecution`.
-
-**Why it matters:**
-On every call, regardless of device state, the current code executes a complete broadcast-logcat round trip with its own 300ms settle delay and full Android operator invocation. On the happy path (device already awake and interactive), this returns only a boolean `ok:true` and the result is discarded. Measured cost: **~410ms per call**.
-
-**Where it applies:**
-- `apps/node/src/domain/executions/runExecution.ts:497` - call site
-- `apps/node/src/domain/doctor/checks/deviceInteractivity.ts:123` - `probeInteractiveState`
-
-**Recommended implementation:**
-Preferred: Add a short-TTL (5-10s) in-process readiness cache keyed on `(deviceId, operatorPackage)`. Cache only successful ready states. Invalidate on: readiness-related failures, envelope timeout, broadcast failure, device mismatch, or operator package change. This preserves error quality on cold calls while eliminating the repeated happy-path cost in serve mode.
-
-Alternative for faster first-pass: Replace the broadcast-based probe with `adb shell dumpsys power | grep mWakefulness` (~30-50ms) for the warm check only. Reserve the full broadcast probe for cold-state recovery.
-
-Do not remove the probe entirely in the first pass - it provides actionable errors for locked screen, screen-off, and missing accessibility service.
-
-**Estimated impact:** ~410ms saved on every warm in-process call after the first.
-
----
-
-### I2 - Reduce the 300ms logcat broadcast delay
+### I1 - Reduce the 300ms logcat broadcast delay
 
 **What changes:**
 Reduce `broadcastDelayMs` from 300ms to ~50ms, or make dispatch signal-based (fire once logcat emits its first stdout line).
 
 **Why it matters:**
-`waitForResultEnvelope` waits 300ms unconditionally after spawning the logcat process before sending the broadcast. The adb server is already running and the logcat socket attaches in well under 300ms. This 300ms fires twice per snapshot call today (once inside doctor_ping, once for the main command). After I1 removes doctor_ping, it fires once, but 300ms of unconditional waiting remains.
+`waitForResultEnvelope` waits 300ms unconditionally after spawning the logcat process before sending the broadcast. The adb server is already running and the logcat socket attaches in well under 300ms. This 300ms fires twice per snapshot call today (once inside doctor_ping, once for the main command). Even before handshake work is redesigned, the main-command delay is still avoidable overhead.
 
 **Where it applies:**
 - `apps/node/src/adapters/android-bridge/logcatResultReader.ts:38` - `broadcastDelayMs: rawBroadcastDelayMs = 300`
@@ -91,7 +71,7 @@ Lower-risk interim: Reduce to 50ms with a documented comment explaining it is a 
 
 ---
 
-### I3 - Extract snapshot XML from the live logcat stream; eliminate `logcat -c` and `logcat -d`
+### I2 - Extract snapshot XML from the live logcat stream; eliminate `logcat -c` and `logcat -d`
 
 **What changes:**
 Teach `parseLogLine` to handle time-format lines from the live stream, accumulate matching lines in `waitForResultEnvelope`, and return them alongside the envelope. Remove the pre-command `logcat -c` and the post-command `logcat -d -v tag` pass.
@@ -111,25 +91,25 @@ Snapshot XML lines do not carry `commandId`. Bound collection to the dispatch-to
 
 ---
 
-### I4 - Overlap logcat startup with preflight
+### I3 - Overlap logcat startup with preflight
 
 **What changes:**
 Spawn the logcat stream at the beginning of execution (during or before preflight checks) rather than after preflight completes. Once preflight finishes, logcat is already attached and the broadcast fires immediately.
 
 **Why it matters:**
-Currently, the 300ms settle delay begins only after the full preflight chain completes. Preflight (`resolveDevice` + `checkApkPresence`) takes ~90ms. If logcat is spawned at the same time as preflight, the settle "pays for itself" during preflight. Combined with I2 (signal-based attach), the effective settle cost drops to near zero.
+Currently, the 300ms settle delay begins only after the full preflight chain completes. Preflight (`resolveDevice` + `checkApkPresence`) takes ~90ms. If logcat is spawned at the same time as preflight, the settle "pays for itself" during preflight. Combined with I1 (signal-based attach), the effective settle cost drops to near zero.
 
 **Where it applies:**
 - `apps/node/src/domain/executions/runExecution.ts` - restructure startup sequence to begin logcat stream during preflight
 
 **Prerequisites:**
-I3 must be implemented first (logcat -c must be eliminated before starting logcat earlier, since clearing the buffer after the stream is open would be destructive).
+I2 must be implemented first (logcat -c must be eliminated before starting logcat earlier, since clearing the buffer after the stream is open would be destructive).
 
-**Estimated impact:** ~50-90ms of additional savings after I2 and I3 are in place; the primary value is ensuring the 50ms fallback delay in I2 is fully covered by real preflight work rather than idle waiting.
+**Estimated impact:** ~50-90ms of additional savings after I1 and I2 are in place; the primary value is ensuring the 50ms fallback delay in I1 is fully covered by real preflight work rather than idle waiting.
 
 ---
 
-### I5 - Parallelize `resolveDevice` and `checkApkPresence`
+### I4 - Parallelize `resolveDevice` and `checkApkPresence`
 
 **What changes:**
 Wrap both calls in `Promise.all` when `config.deviceId` is already explicit.
@@ -147,13 +127,13 @@ Only safe when `config.deviceId` is already set. If `deviceId` is omitted and `r
 
 ---
 
-### I6 - Use serve mode for repeated agent calls
+### I5 - Use serve mode for repeated agent calls
 
 **What changes:**
 No code changes needed. Use `clawperator serve` (HTTP API) for agent loops instead of invoking the CLI binary per command.
 
 **Why it matters:**
-Each CLI invocation spends ~80ms on Node.js process startup and V8 module loading. Serve mode reuses the process and eliminates this cost on every call after the first. Serve mode also enables the short-TTL readiness cache from I1 to work across calls.
+Each CLI invocation spends ~80ms on Node.js process startup and V8 module loading. Serve mode reuses the process and eliminates this cost on every call after the first.
 
 **Where it applies:**
 - `apps/node/src/cli/commands/serve.ts` - existing command, no changes needed
@@ -162,23 +142,23 @@ Each CLI invocation spends ~80ms on Node.js process startup and V8 module loadin
 
 ---
 
-### Combined Impact (All Immediate Items)
+### Combined Impact (Immediate Non-Handshake Items)
 
 | Segment | Before | After (CLI) | After (serve) |
 |---------|--------|-------------|---------------|
 | Node.js startup | 80ms | 80ms | 0ms |
 | resolveDevice | 11ms | ~0ms (parallel + overlapped) | ~0ms |
 | checkApkPresence | 83ms | ~83ms | ~83ms |
-| doctor_ping | 410ms | 0ms (cached) | 0ms (cached) |
+| doctor_ping | 410ms | 410ms | 410ms |
 | logcat -c | ~145ms | 0ms | 0ms |
 | logcat settle | 300ms | ~0ms (overlapped + signal) | ~0ms |
 | broadcast | ~80ms | ~80ms | ~80ms |
 | Android snapshot_ui | ~600ms | ~600ms | ~600ms |
 | logcat -d | ~52ms | 0ms | 0ms |
 | Parse + format | ~10ms | ~10ms | ~10ms |
-| **Total** | **~1771ms** | **~853ms** | **~773ms** |
+| **Total** | **~1771ms** | **~1263ms** | **~1183ms** |
 
-Getting below 500ms requires Android-side work, a lighter snapshot mode, or a different transport model.
+Getting below 500ms requires handshake redesign plus Android-side work, a lighter snapshot mode, or a different transport model.
 
 ---
 
@@ -255,6 +235,7 @@ Sub-100ms round trips (excluding Android computation), multi-Hz snapshot loops, 
 - **No change to `[Clawperator-Result]` envelope contract.** The envelope remains the canonical terminal signal. Changing its shape requires explicit versioning.
 - **No embedding full snapshot XML in the result envelope.** Logcat has a per-line limit (~4096 bytes); 87KB XML far exceeds it. The codex suggestion to embed XML directly in the envelope is not viable without a transport redesign. The correct path is live-stream extraction (I3), not envelope embedding.
 - **No Android-side refactoring** in the immediate phase. Android traversal remains unchanged.
+- **No handshake redesign in this immediate phase.** Handshake planning and implementation now live in `tasks/node/handshaking/findings.md`.
 - **No concurrency model changes** (no worker threads, no native adb multiplexing).
 - **No changes to recording transport.** Recordings use `adb pull` from on-device storage - a separate path not relevant to snapshot latency.
 - **No new snapshot action types** or API surface changes in this phase.
