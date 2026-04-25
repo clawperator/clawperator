@@ -1,7 +1,13 @@
 # Handshaking Findings
 
+**Status: NOT READY FOR $task-author. Decisions below must be locked before this becomes a task pack.**
+
 Date: 2026-04-25
 Surface: Node snapshot execution preflight and readiness checks
+
+## Scope Note
+
+This file owns the readiness-cache work and the broader handshake redesign. The immediate I/O pack (`tasks/node/io-optimizations/findings-final.md`) explicitly excludes the short-TTL `probeInteractiveState` cache because cache invalidation rules and diagnostic-preservation decisions must be locked here first. Do not implement the cache as part of the immediate pack.
 
 ## Summary
 
@@ -153,3 +159,28 @@ The handshake does not need to stay deferred forever, but it does need one plann
 - what live validation proves the change is safe
 
 That makes this a good candidate for a dedicated planning-and-implementation task rather than an opportunistic optimization bundled into the immediate snapshot I/O cleanup.
+
+## Proposed Implementation (Blocked On Decisions Above)
+
+Once the decisions in "Decisions To Lock" are resolved, the primary implementation item for this pack is:
+
+---
+
+**Add short-TTL readiness cache to `probeInteractiveState`**
+
+Add an in-process cache (Map keyed on `deviceId + operatorPackage`) for successful `probeInteractiveState` results. On a cache hit within the TTL, skip the full broadcast-plus-logcat probe and proceed directly to the main command. Keep the full probe for cold calls and for explicit diagnostics paths (e.g., `clawperator doctor`).
+
+**Measured impact:** ~410ms saved per warm in-process call after the first. This is meaningful in serve mode and in CLI loops. It has near-zero benefit for isolated one-shot CLI calls.
+
+**Files:**
+- `apps/node/src/domain/doctor/checks/deviceInteractivity.ts` - cache store, TTL logic, invalidation
+- `apps/node/src/domain/executions/runExecution.ts` - call site wiring
+
+**What the task pack must specify before implementation:**
+- TTL value (proposed: 5-10s, but must be decided)
+- Full list of cache invalidation triggers (see unknowns section above)
+- Whether caching applies in CLI mode, serve mode, or both
+- Which failure codes must invalidate the cache immediately
+- Required live-device validation states (at minimum: screen on+unlocked+healthy, accessibility disabled)
+
+This item must not be implemented until those inputs are provided. An implementing agent left to fill in these decisions will produce code that is either too aggressive (stale cache causing missed failures) or too conservative (cache that never actually hits).

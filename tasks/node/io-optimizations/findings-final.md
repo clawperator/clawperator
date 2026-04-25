@@ -173,8 +173,9 @@ Deferred structural and higher-cost items have been moved to `tasks/node/io-opti
 
 ## 4. Non-Goals / Explicitly Out of Scope (This Phase)
 
+- **No readiness cache.** The short-TTL `probeInteractiveState` cache is owned by `tasks/node/handshaking/findings.md`, not this pack. Cache invalidation rules and diagnostic-preservation decisions must be locked there before implementation. Doctor_ping savings (~410ms) are not reflected in the combined impact table above for this reason.
 - **No change to `[Clawperator-Result]` envelope contract.** The envelope remains the canonical terminal signal. Changing its shape requires explicit versioning.
-- **No embedding full snapshot XML in the result envelope.** Logcat has a per-line limit (~4096 bytes); 87KB XML far exceeds it. The codex suggestion to embed XML directly in the envelope is not viable without a transport redesign. The correct path is live-stream extraction (I3), not envelope embedding.
+- **No embedding full snapshot XML in the result envelope.** Logcat has a per-line limit (~4096 bytes); 87KB XML far exceeds it. The correct path is live-stream extraction (I2), not envelope embedding.
 - **No Android-side refactoring** in the immediate phase. Android traversal remains unchanged.
 - **No handshake redesign in this immediate phase.** Handshake planning and implementation now live in `tasks/node/handshaking/findings.md`.
 - **No concurrency model changes** (no worker threads, no native adb multiplexing).
@@ -187,7 +188,7 @@ Deferred structural and higher-cost items have been moved to `tasks/node/io-opti
 
 Steps are ordered by ROI, with dependencies noted. Each step is independently committable.
 
-**Step 1: Extend `parseLogLine` to handle time-format lines (I3, part A)**
+**Step 1: Extend `parseLogLine` to handle time-format lines (I2, part A)**
 
 Prerequisite for everything else. Add the time-format regex to `snapshotHelper.parseLogLine`. Add unit tests covering both tag format and time format. This is a pure additive change with no behavior impact yet.
 
@@ -195,7 +196,7 @@ Files: `apps/node/src/adapters/android-bridge/snapshotHelper.ts`, test file
 
 ---
 
-**Step 2: Accumulate stream lines in `waitForResultEnvelope` and return them (I3, part B)**
+**Step 2: Accumulate stream lines in `waitForResultEnvelope` and return them (I2, part B)**
 
 Extend `waitForResultEnvelope` to accumulate `TaskScopeDefault` lines from the live stream. Return them alongside the parsed envelope. Wire `runExecution` to use accumulated lines for snapshot attachment instead of the `logcat -d` pass. Keep `logcat -d` as a fallback for this step. Verify end-to-end snapshot output is identical.
 
@@ -203,7 +204,7 @@ Files: `apps/node/src/adapters/android-bridge/logcatResultReader.ts`, `apps/node
 
 ---
 
-**Step 3: Remove `logcat -d` post-dump (I3, part C)**
+**Step 3: Remove `logcat -d` post-dump (I2, part C)**
 
 Once live-stream extraction is verified over multiple runs, remove the post-command `adb logcat -d -v tag` call and fallback path. Saves ~52-69ms per snapshot call.
 
@@ -211,7 +212,7 @@ Files: `apps/node/src/domain/executions/runExecution.ts:559`
 
 ---
 
-**Step 4: Remove `logcat -c` pre-command clear (I3, part D)**
+**Step 4: Remove `logcat -c` pre-command clear (I2, part D)**
 
 With live-stream extraction in place, the pre-command buffer clear is no longer needed for correctness. Remove the `logcat -c` call. Saves ~145-182ms per call. Verify that snapshot content is still correctly bounded (dispatch-to-envelope interval).
 
@@ -219,7 +220,7 @@ Files: `apps/node/src/domain/executions/runExecution.ts:515`
 
 ---
 
-**Step 5: Reduce or replace the 300ms broadcast delay (I2)**
+**Step 5: Reduce or replace the 300ms broadcast delay (I1)**
 
 Implement signal-based dispatch in `waitForResultEnvelope`: fire the broadcast once logcat emits its first stdout line. Keep a 100ms fallback timer. If signal-based is too risky for initial shipping, reduce the constant to 50ms as an interim step. Saves ~250ms per envelope wait.
 
@@ -227,15 +228,7 @@ Files: `apps/node/src/adapters/android-bridge/logcatResultReader.ts:38`
 
 ---
 
-**Step 6: Add short-TTL readiness cache (I1)**
-
-Add an in-process cache (Map keyed on `deviceId + operatorPackage`) for successful `probeInteractiveState` results with a 5-10s TTL. Invalidate on failures. Keep the full probe for cold calls and explicit diagnostics. Saves ~410ms on every warm in-process call after the first.
-
-Files: `apps/node/src/domain/doctor/checks/deviceInteractivity.ts`, `apps/node/src/domain/executions/runExecution.ts`
-
----
-
-**Step 7: Overlap logcat startup with preflight (I4)**
+**Step 6: Overlap logcat startup with preflight (I3)**
 
 After Steps 3-4 are complete (no logcat -c), restructure `runExecution` to spawn the logcat stream at the same time as preflight checks. With signal-based attach (Step 5), the settle cost is fully absorbed by preflight work (~83ms). Saves ~50-90ms of additional idle time.
 
@@ -243,7 +236,7 @@ Files: `apps/node/src/domain/executions/runExecution.ts`
 
 ---
 
-**Step 8: Parallelize `resolveDevice` and `checkApkPresence` (I5)**
+**Step 7: Parallelize `resolveDevice` and `checkApkPresence` (I4)**
 
 When `config.deviceId` is explicit, run both checks with `Promise.all`. Add a branch for auto-resolve to keep sequential behavior. Saves ~11ms. Small gain, but completes the preflight cleanup.
 
@@ -251,12 +244,12 @@ Files: `apps/node/src/domain/executions/runExecution.ts:415,422`
 
 ---
 
-**Step 9: Re-measure and decide on Android phase**
+**Step 8: Re-measure and decide on Android phase**
 
-After Steps 1-8, measure warm CLI and serve-mode latency against the 500ms target. If result is ~850ms CLI / ~770ms serve, and the target still matters, proceed with D1 (Android-side filtering) as the next project.
+After Steps 1-7, measure warm CLI and serve-mode latency against the 500ms target. If result is ~1260ms CLI / ~1180ms serve, and the target still matters, the next gates are: handshake redesign (see `tasks/node/handshaking/findings.md`) and Android-side filtering (D1 in `tasks/node/io-optimizations/findings-deferred.md`).
 
 ---
 
-**Step 10: Serve mode (I6) - operational, not a code change**
+**Step 9: Serve mode (I5) - operational, not a code change**
 
 Document and communicate to agent authors that repeated command loops should use `clawperator serve` (HTTP API) instead of per-call CLI invocations. Update relevant agent-facing docs.
