@@ -1,13 +1,13 @@
 # Snapshot I/O Optimization: Deferred Findings
 
 Date: 2026-04-25
-Scope: Structural and higher-cost work intentionally deferred from the immediate Node-side I/O optimization phase
+Scope: Structural and higher-cost work intentionally deferred from the completed Node-side I/O optimization cleanup
 
 ## Summary
 
-These items remain important for long-term snapshot performance, but they are intentionally out of scope for the immediate low-hanging-fruit Node work in `tasks/node/io-optimizations/findings.md`.
+These items remain important for long-term snapshot performance, but they were intentionally out of scope for the completed Node-side I/O cleanup summarized in `tasks/node/io-optimizations/findings.md`.
 
-They are deferred because they require Android contract changes, transport redesign, or broader architectural planning than is appropriate for the immediate phase.
+They are deferred because they require Android contract changes, transport redesign, or broader architectural planning. Convert the relevant finding into a dedicated task pack before implementation.
 
 ## Deferred Implementation (Structural / High Cost)
 
@@ -69,13 +69,12 @@ Sub-100ms round trips (excluding Android computation), multi-Hz snapshot loops, 
 
 ## Relationship To Immediate Work
 
-The immediate execution brief should remain focused on:
+The completed Node-side I/O cleanup already handled:
 
 - reducing broadcast delay
 - extracting snapshot payload from the live logcat stream
 - removing redundant `logcat -c` and `logcat -d`
 - overlapping startup work where safe
 - parallelizing cheap preflight steps
-- using `serve` mode where caller context allows it
 
-It should not absorb the Android contract changes or transport redesign work above.
+Future work should not reopen those completed Node-only items unless a regression is found. The remaining findings above own Android contract changes and transport redesign work.

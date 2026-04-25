@@ -7,11 +7,11 @@ Surface: Node snapshot execution preflight and readiness checks
 
 ## Scope Note
 
-This file owns the readiness-cache work and the broader handshake redesign. The immediate I/O pack (`tasks/node/io-optimizations/findings.md`) explicitly excludes the short-TTL `probeInteractiveState` cache because cache invalidation rules and diagnostic-preservation decisions must be locked here first. Do not implement the cache as part of the immediate pack.
+This file owns the readiness-cache work and the broader handshake redesign. The completed Node-side I/O cleanup summarized in `tasks/node/io-optimizations/findings.md` explicitly excluded the short-TTL `probeInteractiveState` cache because cache invalidation rules and diagnostic-preservation decisions must be locked here first.
 
 ## Summary
 
-Handshake optimization is still in scope for snapshot latency work, but it should not be the first implementation step. The current handshake path is expensive and likely worth redesigning, but there are still enough product, contract, and diagnostic questions that this work should proceed as a dedicated planning and implementation effort rather than being folded into the immediate low-hanging-fruit I/O changes.
+Handshake optimization is still in scope for snapshot latency work. The current handshake path is expensive and likely worth redesigning, but there are still enough product, contract, and diagnostic questions that this work should proceed as a dedicated planning and implementation effort rather than being folded into unrelated I/O cleanup.
 
 This file captures the main unknowns and planning questions that should be answered before writing a task pack for handshake implementation.
 
