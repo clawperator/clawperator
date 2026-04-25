@@ -1152,8 +1152,9 @@ describe("waitForResultEnvelope", () => {
         timeoutMs: 1000,
         broadcastDelayMs: 10_000,
       },
-      async () => {
+      async (beginDispatchCapture) => {
         broadcastStartedAt = Date.now();
+        beginDispatchCapture();
         setTimeout(() => {
           proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
             commandId: "cmd-signal-dispatch",
@@ -1198,7 +1199,8 @@ describe("waitForResultEnvelope", () => {
         timeoutMs: 5,
         broadcastDelayMs: 25,
       },
-      async () => {
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
         setTimeout(() => {
           proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
             commandId: "cmd-timeout-after-dispatch",
@@ -1250,7 +1252,8 @@ describe("waitForResultEnvelope", () => {
         timeoutMs: 1000,
         broadcastDelayMs: 1000,
       },
-      async () => {
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
         setTimeout(() => {
           proc.stdout?.emit("data", Buffer.from([
             "04-25 20:14:53.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
@@ -1313,7 +1316,8 @@ describe("waitForResultEnvelope", () => {
         timeoutMs: 1000,
         broadcastDelayMs: 1000,
       },
-      async () => {
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
         setTimeout(() => {
           proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
             commandId: "cmd-replayed-envelope",
@@ -1330,6 +1334,125 @@ describe("waitForResultEnvelope", () => {
     assert.strictEqual(result.ok, true);
     if (result.ok) {
       assert.strictEqual(result.envelope.taskId, "new-task");
+    }
+  });
+
+  it("accepts matching envelopes emitted before broadcast command completion", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+          commandId: "cmd-sync-envelope",
+          taskId: "old-task",
+          status: "success",
+          stepResults: [{ id: "old", actionType: "sleep", success: true, data: {} }],
+          error: null,
+        })}\n`));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-sync-envelope",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+          commandId: "cmd-sync-envelope",
+          taskId: "new-task",
+          status: "failed",
+          stepResults: [],
+          error: "service unavailable",
+          errorCode: "SERVICE_UNAVAILABLE",
+        })}\n`));
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.envelope.taskId, "new-task");
+      assert.strictEqual(result.envelope.status, "failed");
+      assert.strictEqual(result.envelope.errorCode, "SERVICE_UNAVAILABLE");
+    }
+  });
+
+  it("captures fresh snapshot lines emitted before broadcast command completion", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+          "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node text=\"stale\" />",
+          "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+        ].join("\n") + "\n"));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-sync-snapshot",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:53.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:53.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+          "04-25 20:14:53.455 D/TaskScopeDefault(29817):   <node text=\"fresh\" />",
+          "04-25 20:14:53.456 D/TaskScopeDefault(29817): </hierarchy>",
+          `[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-sync-snapshot",
+            taskId: "task-sync-snapshot",
+            status: "success",
+            stepResults: [],
+            error: null,
+          })}`,
+        ].join("\n") + "\n"));
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.ok(result.snapshotLogLines?.some(line => line.includes("fresh")));
+      assert.ok(!result.snapshotLogLines?.some(line => line.includes("stale")));
     }
   });
 
@@ -1366,11 +1489,12 @@ describe("waitForResultEnvelope", () => {
         timeoutMs: 1000,
         broadcastDelayMs: 1000,
       },
-      async () => {
+      async (beginDispatchCapture) => {
         proc.stdout?.emit("data", Buffer.from([
           "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node text=\"stale\" />",
           "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
         ].join("\n") + "\n"));
+        beginDispatchCapture();
         setTimeout(() => {
           proc.stdout?.emit("data", Buffer.from([
             "04-25 20:14:53.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",

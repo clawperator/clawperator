@@ -49,7 +49,7 @@ interface PerformExecutionResult {
 const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 type BroadcastResult = { success: boolean; stdout?: string; stderr?: string };
-type BroadcastFn = (beginSnapshotCapture: () => void) => Promise<BroadcastResult>;
+type BroadcastFn = (beginDispatchCapture: () => void) => Promise<BroadcastResult>;
 
 function createDeferredBroadcast(): {
   wait: BroadcastFn;
@@ -63,9 +63,9 @@ function createDeferredBroadcast(): {
   });
 
   return {
-    wait: async (beginSnapshotCapture) => {
+    wait: async (beginDispatchCapture) => {
       const fn = await gate;
-      return fn(beginSnapshotCapture);
+      return fn(beginDispatchCapture);
     },
     release: (fn) => {
       if (released) {
@@ -589,7 +589,8 @@ async function performExecution(
     }
 
     let dispatchStart = Date.now();
-    const runBroadcast: BroadcastFn = async () => {
+    const runBroadcast: BroadcastFn = async (beginDispatchCapture) => {
+      beginDispatchCapture();
       const broadcast = await broadcastAgentCommand(config, payload);
       if (broadcast.success) {
         options.logger?.emit({

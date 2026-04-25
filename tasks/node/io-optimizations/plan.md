@@ -190,3 +190,11 @@ Pass 2:
 - Added regression tests for ignored pre-dispatch envelopes and split replayed snapshot chunks.
 - Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
 - Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed and returned hierarchy XML.
+
+Pass 3:
+- Review found the Pass 2 gate started too late, after `am broadcast` completed, which could drop Android envelopes or snapshot lines emitted during receiver execution.
+- Fixed the dispatch boundary so timeout, envelope parsing, and snapshot capture start when the actual broadcast dispatch begins, while deferred preflight and pre-dispatch replay remain excluded.
+- Updated direct callers of `waitForResultEnvelope` to mark dispatch start explicitly.
+- Added regression tests for synchronous failure envelopes and snapshot lines emitted before broadcast command completion.
+- Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
+- Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.

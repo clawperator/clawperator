@@ -33,7 +33,7 @@ function isSnapshotLogLine(line: string): boolean {
 export async function waitForResultEnvelope(
   config: RuntimeConfig,
   options: LogcatResultOptions,
-  onBroadcast: (beginSnapshotCapture: () => void) => Promise<{ success: boolean; stdout?: string; stderr?: string }>
+  onBroadcast: (beginDispatchCapture: () => void) => Promise<{ success: boolean; stdout?: string; stderr?: string }>
 ): Promise<LogcatResult> {
   const {
     commandId,
@@ -59,6 +59,7 @@ export async function waitForResultEnvelope(
     let timeoutId: NodeJS.Timeout | undefined;
     let broadcastStartTimer: NodeJS.Timeout | undefined;
     let broadcastStarted = false;
+    let dispatchCaptureStarted = false;
 
     config.logger?.emit({
       ts: new Date().toISOString(),
@@ -91,11 +92,10 @@ export async function waitForResultEnvelope(
       }
     };
 
-    const beginSnapshotCapture = () => {
-      captureSnapshotLines = true;
-    };
-
     const startTimeout = () => {
+      if (timeoutId !== undefined) {
+        return;
+      }
       timeoutId = setTimeout(() => {
         flush();
         const diagnostics: TimeoutDiagnostics = {
@@ -117,6 +117,16 @@ export async function waitForResultEnvelope(
       }, timeoutMs);
     };
 
+    const beginDispatchCapture = () => {
+      if (dispatchCaptureStarted) {
+        return;
+      }
+      dispatchCaptureStarted = true;
+      captureSnapshotLines = true;
+      broadcastStatus = "sent";
+      startTimeout();
+    };
+
     const startBroadcast = () => {
       if (settled || broadcastStarted) {
         return;
@@ -127,7 +137,7 @@ export async function waitForResultEnvelope(
       }
       (async () => {
         try {
-          const result = await onBroadcast(beginSnapshotCapture);
+          const result = await onBroadcast(beginDispatchCapture);
           if (!result.success) {
             const combined = (result.stderr ?? result.stdout ?? "unknown").trim();
             const isMissingPackage = combined.includes("Target package not found") || combined.includes("does not exist");
@@ -146,9 +156,9 @@ export async function waitForResultEnvelope(
             finalize({ ok: false, broadcastFailed: true, diagnostics });
             return;
           }
-          beginSnapshotCapture();
-          broadcastStatus = "sent";
-          startTimeout();
+          if (!dispatchCaptureStarted) {
+            beginDispatchCapture();
+          }
         } catch (e) {
           const err = String(e).trim();
           broadcastStatus = `error: ${err}`;
