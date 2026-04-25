@@ -198,3 +198,11 @@ Pass 3:
 - Added regression tests for synchronous failure envelopes and snapshot lines emitted before broadcast command completion.
 - Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
 - Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.
+
+Pass 4:
+- Review found explicit-device preflight cancellation could leave the early logcat waiter alive until stdout or fallback dispatch, and later replay chunks could still arrive before capture was fully bounded.
+- Added an abort signal to the early result waiter so preflight cancellation settles and kills logcat immediately.
+- Replaced host/device timestamp comparison with a short signal-triggered replay-drain window before broadcast dispatch, keeping replay chunks outside capture without relying on synchronized clocks.
+- Added regression coverage for no-stdout cancellation and multi-chunk replay before dispatch.
+- Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
+- Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.

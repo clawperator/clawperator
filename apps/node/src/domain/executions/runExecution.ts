@@ -452,6 +452,7 @@ async function performExecution(
   const payload = JSON.stringify(execution);
   const hasExplicitDevice = config.deviceId !== undefined;
   const deferredBroadcast = hasExplicitDevice ? createDeferredBroadcast() : undefined;
+  const earlyResultAbortController = hasExplicitDevice ? new AbortController() : undefined;
   const earlyResultWaiter = deferredBroadcast !== undefined
     ? waitForResultEnvelope(
         config,
@@ -460,6 +461,7 @@ async function performExecution(
           timeoutMs: options.resultEnvelopeTimeoutMs ?? (execution.timeoutMs + 5000),
           broadcastDelayMs: options.logcatBroadcastDelayMs,
           lastCorrelatedLines: 30,
+          cancelSignal: earlyResultAbortController?.signal,
         },
         deferredBroadcast.wait
       )
@@ -467,6 +469,7 @@ async function performExecution(
   earlyResultWaiter?.catch(() => undefined);
 
   const cancelEarlyResultWaiter = () => {
+    earlyResultAbortController?.abort();
     deferredBroadcast?.cancel();
   };
 

@@ -11,6 +11,7 @@ export interface LogcatResultOptions {
   commandId: string;
   timeoutMs: number;
   broadcastDelayMs?: number;
+  cancelSignal?: AbortSignal;
   /** Last N lines to include in timeout diagnostics */
   lastCorrelatedLines?: number;
 }
@@ -24,6 +25,8 @@ export type LogcatResult =
 function isSnapshotLogLine(line: string): boolean {
   return line.includes("TaskScopeDefault");
 }
+
+const SIGNAL_BROADCAST_REPLAY_DRAIN_MS = 25;
 
 /**
  * Start logcat stream, then invoke onBroadcast once stdout proves the stream is attached
@@ -40,6 +43,7 @@ export async function waitForResultEnvelope(
     timeoutMs: rawTimeoutMs,
     lastCorrelatedLines = 20,
     broadcastDelayMs: rawBroadcastDelayMs = 100,
+    cancelSignal,
   } = options;
   const timeoutMs = Number.isFinite(rawTimeoutMs) && rawTimeoutMs >= 0 ? rawTimeoutMs : 0;
   const broadcastDelayMs =
@@ -58,6 +62,7 @@ export async function waitForResultEnvelope(
     let stderrBuffer = "";
     let timeoutId: NodeJS.Timeout | undefined;
     let broadcastStartTimer: NodeJS.Timeout | undefined;
+    let signalBroadcastStartTimer: NodeJS.Timeout | undefined;
     let broadcastStarted = false;
     let dispatchCaptureStarted = false;
 
@@ -74,13 +79,16 @@ export async function waitForResultEnvelope(
     const finalize = (result: LogcatResult) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timeoutId);
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId);
       }
       if (broadcastStartTimer !== undefined) {
         clearTimeout(broadcastStartTimer);
       }
+      if (signalBroadcastStartTimer !== undefined) {
+        clearTimeout(signalBroadcastStartTimer);
+      }
+      cancelSignal?.removeEventListener("abort", abortHandler);
       resolve(result);
     };
 
@@ -91,6 +99,21 @@ export async function waitForResultEnvelope(
         // ignore
       }
     };
+
+    const abortHandler = () => {
+      flush();
+      finalize({
+        ok: false,
+        error: "logcat result wait canceled before broadcast dispatch",
+        code: ERROR_CODES.BROADCAST_FAILED,
+      });
+    };
+
+    if (cancelSignal?.aborted) {
+      abortHandler();
+      return;
+    }
+    cancelSignal?.addEventListener("abort", abortHandler, { once: true });
 
     const startTimeout = () => {
       if (timeoutId !== undefined) {
@@ -134,6 +157,9 @@ export async function waitForResultEnvelope(
       broadcastStarted = true;
       if (broadcastStartTimer !== undefined) {
         clearTimeout(broadcastStartTimer);
+      }
+      if (signalBroadcastStartTimer !== undefined) {
+        clearTimeout(signalBroadcastStartTimer);
       }
       (async () => {
         try {
@@ -211,7 +237,12 @@ export async function waitForResultEnvelope(
           return;
         }
       }
-      startBroadcast();
+      if (!broadcastStarted) {
+        if (signalBroadcastStartTimer !== undefined) {
+          clearTimeout(signalBroadcastStartTimer);
+        }
+        signalBroadcastStartTimer = setTimeout(startBroadcast, SIGNAL_BROADCAST_REPLAY_DRAIN_MS);
+      }
     });
 
     proc.stderr?.on("data", (chunk: Buffer) => {

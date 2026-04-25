@@ -27,6 +27,11 @@ import { isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
 import { FakeProcessRunner } from "./fakes/FakeProcessRunner.js";
 
+function formatLogcatTime(date: Date): string {
+  const pad = (value: number, width = 2) => String(value).padStart(width, "0");
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`;
+}
+
 describe("attachSnapshotsToStepResults", () => {
   it("aligns fewer snapshots to the last snapshot_ui steps", () => {
     const stepResults: StepResult[] = [
@@ -550,6 +555,7 @@ describe("runExecution", () => {
   it("fails fast when the Operator APK is missing and never broadcasts", async () => {
     const runner = new FakeProcessRunner();
     const warnings: string[] = [];
+    let logcatKilled = false;
     const execution: Execution = {
       commandId: "cmd-preflight",
       taskId: "task-preflight",
@@ -564,12 +570,27 @@ describe("runExecution", () => {
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.spawn = ((command, args, options) => {
+      runner.calls.push({ command, args, options });
+      const proc = new EventEmitter() as EventEmitter & {
+        stdout?: EventEmitter;
+        stderr?: EventEmitter;
+        kill: () => void;
+      };
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => {
+        logcatKilled = true;
+      };
+      return proc;
+    }) as FakeProcessRunner["spawn"];
 
     const result = await runExecution(execution, {
       deviceId: "test-device-1",
       operatorPackage: "com.test.operator.dev",
       runner,
       warn: message => warnings.push(message),
+      logcatBroadcastDelayMs: 10_000,
     });
 
     assert.strictEqual(result.ok, false);
@@ -581,6 +602,7 @@ describe("runExecution", () => {
       assert.match(result.error.message, /operator-debug\.apk/);
     }
     assert.strictEqual(warnings.length, 0);
+    assert.strictEqual(logcatKilled, true);
     assert.deepStrictEqual(
       runner.calls.map(call => call.args.join(" ")),
       [
@@ -823,13 +845,14 @@ describe("runExecution", () => {
       proc.stderr = new EventEmitter();
       proc.kill = () => undefined;
       setTimeout(() => {
+        const prefix = formatLogcatTime(new Date());
         proc.stdout?.emit("data", Buffer.from([
-          "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
-          "04-25 20:14:52.454 D/TaskScopeDefault(29817): <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
-          "04-25 20:14:52.455 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
-          "04-25 20:14:52.456 V/Configuration(29817): Updating configuration, locales updated from [] to [en_US]",
-          "04-25 20:14:52.457 D/TaskScopeDefault(29817):   <node index=\"0\" text=\"Settings\" />",
-          "04-25 20:14:52.458 D/TaskScopeDefault(29817): </hierarchy>",
+          `${prefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+          `${prefix} D/TaskScopeDefault(29817): <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>`,
+          `${prefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
+          `${prefix} V/Configuration(29817): Updating configuration, locales updated from [] to [en_US]`,
+          `${prefix} D/TaskScopeDefault(29817):   <node index="0" text="Settings" />`,
+          `${prefix} D/TaskScopeDefault(29817): </hierarchy>`,
           `[Clawperator-Result] ${JSON.stringify({
           commandId: "cmd-noisy-snapshot",
           taskId: "task-noisy-snapshot",
@@ -1255,11 +1278,12 @@ describe("waitForResultEnvelope", () => {
       async (beginDispatchCapture) => {
         beginDispatchCapture();
         setTimeout(() => {
+          const freshPrefix = formatLogcatTime(new Date());
           proc.stdout?.emit("data", Buffer.from([
-            "04-25 20:14:53.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
-            "04-25 20:14:53.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
-            "04-25 20:14:53.455 D/TaskScopeDefault(29817):   <node text=\"fresh\" />",
-            "04-25 20:14:53.456 D/TaskScopeDefault(29817): </hierarchy>",
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
+            `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
+            `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
             `[Clawperator-Result] ${JSON.stringify({
               commandId: "cmd-capture-boundary",
               taskId: "task-capture-boundary",
@@ -1432,11 +1456,12 @@ describe("waitForResultEnvelope", () => {
       },
       async (beginDispatchCapture) => {
         beginDispatchCapture();
+        const freshPrefix = formatLogcatTime(new Date());
         proc.stdout?.emit("data", Buffer.from([
-          "04-25 20:14:53.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
-          "04-25 20:14:53.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
-          "04-25 20:14:53.455 D/TaskScopeDefault(29817):   <node text=\"fresh\" />",
-          "04-25 20:14:53.456 D/TaskScopeDefault(29817): </hierarchy>",
+          `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+          `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
+          `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
+          `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
           `[Clawperator-Result] ${JSON.stringify({
             commandId: "cmd-sync-snapshot",
             taskId: "task-sync-snapshot",
@@ -1451,6 +1476,81 @@ describe("waitForResultEnvelope", () => {
 
     assert.strictEqual(result.ok, true);
     if (result.ok) {
+      assert.ok(result.snapshotLogLines?.some(line => line.includes("fresh")));
+      assert.ok(!result.snapshotLogLines?.some(line => line.includes("stale")));
+    }
+  });
+
+  it("drains replayed snapshot lines that arrive in later chunks before dispatch starts", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from("04-25 20:14:52.453 D/TaskScopeDefault(29817): ready\n"));
+      });
+      setTimeout(() => {
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.454 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.455 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+          "04-25 20:14:52.456 D/TaskScopeDefault(29817):   <node text=\"stale\" />",
+          "04-25 20:14:52.457 D/TaskScopeDefault(29817): </hierarchy>",
+          `[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-late-replay",
+            taskId: "old-task",
+            status: "success",
+            stepResults: [{ id: "old", actionType: "sleep", success: true, data: {} }],
+            error: null,
+          })}`,
+        ].join("\n") + "\n"));
+      }, 5);
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-late-replay",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        setTimeout(() => {
+          const freshPrefix = formatLogcatTime(new Date());
+          proc.stdout?.emit("data", Buffer.from([
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
+            `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
+            `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
+            `[Clawperator-Result] ${JSON.stringify({
+              commandId: "cmd-late-replay",
+              taskId: "task-late-replay",
+              status: "success",
+              stepResults: [],
+              error: null,
+            })}`,
+          ].join("\n") + "\n"));
+        });
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.envelope.taskId, "task-late-replay");
       assert.ok(result.snapshotLogLines?.some(line => line.includes("fresh")));
       assert.ok(!result.snapshotLogLines?.some(line => line.includes("stale")));
     }
@@ -1496,11 +1596,12 @@ describe("waitForResultEnvelope", () => {
         ].join("\n") + "\n"));
         beginDispatchCapture();
         setTimeout(() => {
+          const freshPrefix = formatLogcatTime(new Date());
           proc.stdout?.emit("data", Buffer.from([
-            "04-25 20:14:53.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
-            "04-25 20:14:53.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
-            "04-25 20:14:53.455 D/TaskScopeDefault(29817):   <node text=\"fresh\" />",
-            "04-25 20:14:53.456 D/TaskScopeDefault(29817): </hierarchy>",
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
+            `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
+            `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
             `[Clawperator-Result] ${JSON.stringify({
               commandId: "cmd-split-replay",
               taskId: "task-split-replay",
