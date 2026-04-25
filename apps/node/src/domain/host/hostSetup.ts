@@ -591,7 +591,7 @@ async function buildAgentGuideContent(
     if (hasUpgrade) {
       lines.push(
         "- `clawperator-upgrade`: packaged whole-product upgrade route. It checks",
-        "  `clawperator --version`, verifies the installer-owned Node and Java",
+        "  `clawperator --version`, verifies the installer-owned Node, npm, and Java",
         "  prerequisites, then runs `npm install -g clawperator@latest`,",
         "  `clawperator install`, and `clawperator doctor` when the CLI is",
         "  already reachable. It keeps `install.sh` as recovery-only fallback when",
