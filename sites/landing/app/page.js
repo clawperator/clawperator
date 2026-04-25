@@ -649,10 +649,10 @@ export default function Home() {
               for the full API)
             </p>
             <pre>
-              <code>{`# Runtime skill path:
+              <code>{`## Runtime skill path
 clawperator skills run <google-home-application-id>.control-hvac -- --action climate_state --value On --unit-name "Living room"
 
-# Direct device-control path:
+## Direct device-control path
 # agent: Open Google Home.
 clawperator open --app <google-home-application-id>
 
