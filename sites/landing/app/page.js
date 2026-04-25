@@ -649,10 +649,16 @@ export default function Home() {
               for the full API)
             </p>
             <pre>
-              <code>{`## Runtime skill path
+              <code>{`##
+## Runtime skill path:
+##
+
 clawperator skills run <hvac-app>.set-power -- --climate-state on --unit-name "Living room"
 
-## Agent-driven control path
+##
+## Or, agent-driven control path:
+##
+
 clawperator open --app <hvac-app>
 
 clawperator snapshot    # Get the current UI state as structured JSON.
