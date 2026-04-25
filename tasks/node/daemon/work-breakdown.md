@@ -33,16 +33,19 @@ Current state: planning. Phase 1 is the next step.
 ## Hard Rules
 
 - Do NOT start a phase until the previous PR is merged.
-- Do NOT bypass or skip the fallback path. Every daemon interaction must have a
-  working direct-mode fallback. A CLI command must never fail solely because the
-  daemon is unavailable.
+- Do NOT bypass or skip the fallback path for pre-connect failures. A CLI command
+  must never fail solely because the daemon is unavailable before dispatch.
+- Do NOT fall back to direct after the HTTP request to the daemon has been dispatched.
+  A lost response to a mutating action (`click`, `type`, `open-app`, `exec`) must
+  surface as an error, not silently retry. Pre-dispatch failures may fall back; post-
+  dispatch failures must not.
 - Do NOT change the stdout JSON shape, pretty-print behavior, exit codes, or
-  `[Clawperator-Result]` semantics of any proxied command. Use `formatSuccess` and
-  `formatError` from `apps/node/src/cli/output.ts` on the proxied response body.
-  Do NOT pass raw HTTP response bodies to stdout.
+  `[Clawperator-Result]` semantics of any proxied command. Use
+  `formatRunExecutionResultForCli(result, options)` (new shared helper) for both
+  direct and proxied paths. Do NOT pass raw HTTP response bodies to stdout.
 - Do NOT add daemon logic to `clawperator serve`. The daemon and serve remain
-  separate commands. The daemon start command spawns the serve process on a Unix
-  socket; the `serve` command continues to bind a TCP port.
+  separate commands. `daemon run` is the foreground server; `serve` continues to
+  bind a TCP port.
 - Do NOT change the `resolveInteractiveSkillTarget` pre-spawn readiness check in
   `skills.ts`. It stays uncached per `tasks/node/handshaking/plan.md`.
 - Do NOT modify any Android-side code.
@@ -67,7 +70,7 @@ Read these files IN THIS ORDER before writing anything.
 | `apps/node/src/cli/commands/execute.ts` | Primary proxy target; shows how `runExecution` is called and formatted |
 | `apps/node/src/cli/commands/observe.ts` | Proxy target for snapshot and screenshot |
 | `apps/node/src/cli/commands/action.ts` | Phase 4 target; shows all flat action command patterns |
-| `apps/node/src/cli/output.ts` | `formatSuccess` and `formatError` - the proxy must use these |
+| `apps/node/src/cli/output.ts` | `formatSuccess` and `formatError` - basis for the shared `formatRunExecutionResultForCli` helper added in Phase 3 |
 | `apps/node/src/cli/stdoutExitCode.ts` | Exit code determination logic - proxy output must pass this unchanged |
 | `apps/node/src/domain/version/compatibility.ts` | `getCliVersion()` - used by `/version` endpoint and daemon client |
 | `apps/node/src/cli/registry.ts` | Where to register `daemon` command and `--no-daemon` flags |
@@ -96,7 +99,8 @@ binding. Add Unix socket support and health endpoints. No CLI behavior change.
 
 ### Files to Change
 - `apps/node/src/cli/commands/serve.ts`
-- `apps/node/src/test/unit/serve/` (new test file or extend existing)
+- `apps/node/package.json` (update test glob)
+- `apps/node/src/test/unit/serve/serve.test.ts` (new)
 
 ### Steps
 
@@ -137,7 +141,12 @@ binding. Add Unix socket support and health endpoints. No CLI behavior change.
 5. Ensure `cmdServe` continues to pass `{ port, host }` to `startServer`. No behavior
    change for the `serve` CLI command.
 
-6. Write unit tests covering:
+6. Update the `test` script in `apps/node/package.json` to match nested test directories.
+   The current glob only matches `dist/test/unit/*.test.js`. Change it to include
+   `dist/test/unit/**/*.test.js` so the daemon and serve test subdirectories are
+   automatically picked up. Verify the existing tests still run after the change.
+
+7. Write unit tests covering:
    - `createServeApp()` returns an Express app with `GET /ping` returning `{ ok: true }`
    - `createServeApp()` returns an Express app with `GET /version` returning the
      expected version string
@@ -177,122 +186,173 @@ refactor(node): extract createServeApp and add Unix socket transport (#<n>)
 default
 
 ### Goal
-Add `clawperator daemon start|stop|status|restart` commands with PID, socket, and log
-file lifecycle management.
+Add `clawperator daemon start|stop|status|restart` user-facing commands and a hidden
+`daemon run` foreground server process. Define PID, socket, and log file lifecycle.
+Ship a first draft of `docs/api/daemon.md` in the same PR.
 
 ### Files to Change
 - `apps/node/src/domain/daemon/lifecycle.ts` (new)
 - `apps/node/src/cli/commands/daemon.ts` (new)
 - `apps/node/src/cli/registry.ts` (register daemon command)
 - `apps/node/src/test/unit/daemon/lifecycle.test.ts` (new)
+- `docs/api/daemon.md` (new - initial draft)
+- `docs/api/overview.md` (add daemon link)
+
+### Daemon Model (Critical - Read Before Writing)
+
+There are two distinct behaviors under `clawperator daemon`:
+
+**`daemon run` (internal foreground server):**
+- The actual daemon process. Not advertised in `--help` top-level block.
+- Calls `startServer({ socketPath, verbose, logger })` from `serve.ts`.
+- Writes its own PID to the PID file on startup.
+- Runs until killed (SIGTERM or SIGKILL).
+- This process IS the daemon. It never exits on its own.
+
+**`daemon start` (user-facing launcher):**
+- Spawns `daemon run --device <id>` as a detached child process.
+- Redirects child stdout/stderr to the log file.
+- Unrefs the child so the parent process can exit.
+- Polls the socket at 100ms intervals up to 3000ms.
+- Exits with "Daemon started at <socketPath>" when socket is connectable.
+- Exits with an error message if the socket never becomes connectable.
+- `daemon start` does NOT itself call `startServer`. It is only a spawner and poller.
+
+`daemon stop`, `daemon status`, `daemon restart` operate on the socket and PID file
+written by `daemon run`. They do NOT interact with `daemon start`.
+
+The auto-start spawner in Phase 3 (`daemonProxy.ts`) spawns `daemon run` directly, not
+`daemon start`, to avoid a spawn-then-polling-spawn chain.
 
 ### Steps
 
-1. Create `apps/node/src/domain/daemon/lifecycle.ts`. This file owns the canonical path
-   formulas and low-level lifecycle operations. It must export:
+1. Create `apps/node/src/domain/daemon/lifecycle.ts`. This file owns path formulas and
+   low-level operations. All path functions must use the sanitized key formula from
+   `plan.md` (colons and slashes replaced with hyphens; empty/undefined becomes
+   "default"). Required exports:
 
    ```typescript
+   export function sanitizeDaemonKey(rawDeviceId: string | undefined): string
+   // Replaces ':' with '-', removes '/' and whitespace. Empty/undefined -> 'default'.
+
    export function getDaemonDir(): string
-   // Returns: `${os.homedir()}/.clawperator`
-   // Creates the directory if it does not exist.
+   // Returns `${os.homedir()}/.clawperator`
+   // Creates the directory with mode 0o700 if it does not exist (mkdirSync, recursive).
 
-   export function getDaemonSocketPath(deviceId: string): string
-   // Returns: `${getDaemonDir()}/daemon-${deviceId}.sock`
+   export function getDaemonSocketPath(rawDeviceId: string | undefined): string
+   // `${getDaemonDir()}/daemon-${sanitizeDaemonKey(rawDeviceId)}.sock`
 
-   export function getDaemonPidPath(deviceId: string): string
-   // Returns: `${getDaemonDir()}/daemon-${deviceId}.pid`
+   export function getDaemonPidPath(rawDeviceId: string | undefined): string
+   // `${getDaemonDir()}/daemon-${sanitizeDaemonKey(rawDeviceId)}.pid`
 
-   export function getDaemonLogPath(deviceId: string): string
-   // Returns: `${getDaemonDir()}/daemon-${deviceId}.log`
+   export function getDaemonLogPath(rawDeviceId: string | undefined): string
+   // `${getDaemonDir()}/daemon-${sanitizeDaemonKey(rawDeviceId)}.log`
 
-   export async function isDaemonRunning(deviceId: string): Promise<boolean>
-   // Returns true if the PID file exists and the process is alive (kill(pid, 0)).
+   export function getDaemonLockPath(rawDeviceId: string | undefined): string
+   // `${getDaemonDir()}/daemon-${sanitizeDaemonKey(rawDeviceId)}.lock`
 
-   export async function stopDaemon(deviceId: string): Promise<'stopped' | 'not_running'>
-   // Reads PID file, sends SIGTERM, waits up to 2s for process exit, removes PID
-   // and socket files. Returns 'not_running' if PID file does not exist.
+   export async function isDaemonRunning(rawDeviceId: string | undefined): Promise<boolean>
+   // Returns true if PID file exists and process is alive (kill(pid, 0) returns 0).
 
-   export async function startDaemonProcess(deviceId: string): Promise<void>
-   // Spawns `node dist/cli/index.js daemon start --device <deviceId>` (or equivalent)
-   // as a detached background process. Redirects stdout/stderr to the log file.
-   // Writes the child PID to the PID file. Unref the child so the parent exits.
+   export async function stopDaemon(rawDeviceId: string | undefined): Promise<'stopped' | 'not_running'>
+   // Reads PID file, sends SIGTERM, waits up to 2s for process exit.
+   // Removes PID and socket files. Returns 'not_running' if PID file does not exist.
+
+   export function spawnDaemonRun(rawDeviceId: string | undefined): void
+   // Spawns `node <dist>/cli/index.js daemon run [--device <id>]` as a detached child.
+   // Redirects stdout/stderr to the log file. Writes child PID to the PID file.
+   // Unrefs the child.
+   // Uses process.argv[1] (the current binary path) to find the CLI entry point.
    ```
 
-   Path formula is deterministic. Use `os.homedir()` from Node `node:os`. Never
-   hardcode a user home path.
+   Use `os.homedir()` from `node:os`. Never hardcode a home path.
 
-2. Create `apps/node/src/cli/commands/daemon.ts` with four exported functions:
+2. Create `apps/node/src/cli/commands/daemon.ts` with five exported functions:
 
-   - `cmdDaemonStart(options: { deviceId?: string; operatorPackage?: string }): Promise<string>`
-     - Resolves `deviceId`. If daemon is already running (socket alive), prints
-       "Daemon already running for device <id>." and exits.
-     - Starts the Express app from `createServeApp()` on the Unix socket path for the
-       resolved device ID.
-     - Writes the PID file.
-     - Prints "Daemon started for device <id> at <socketPath>." to stdout.
+   - `cmdDaemonRun(options: { deviceId?: string; operatorPackage?: string; verbose?: boolean }): Promise<void>`
+     - THE FOREGROUND SERVER. Calls `startServer({ socketPath, verbose, logger })`.
+     - Writes `process.pid` to the PID file before starting the server.
+     - Never returns (long-running). Handles SIGTERM: stop server, delete PID/socket files,
+       exit 0.
+     - This function should NOT print a "daemon started" message to stdout (stdout is
+       redirected to the log file by the spawner).
+
+   - `cmdDaemonStart(options: { deviceId?: string }): Promise<string>`
+     - If socket is already alive (GET /ping succeeds), returns "Daemon already running."
+     - Calls `spawnDaemonRun(deviceId)`. Polls socket at 100ms up to 3s.
+     - Returns "Daemon started at <socketPath>." on success or error message on timeout.
 
    - `cmdDaemonStop(options: { deviceId?: string }): Promise<string>`
-     - Resolves `deviceId`. Calls `stopDaemon`. Prints result.
+     - Calls `stopDaemon(deviceId)`. Returns status message.
 
    - `cmdDaemonStatus(options: { deviceId?: string }): Promise<string>`
-     - Resolves `deviceId`. Checks socket liveness via `GET /ping`. Prints running/not
-       running, version, and socket path.
+     - Checks socket liveness via GET /ping. On alive: returns version and socket path.
+       On not alive: returns "Daemon not running at <socketPath>."
 
-   - `cmdDaemonRestart(options: { deviceId?: string; operatorPackage?: string }): Promise<string>`
-     - Calls stop then start in sequence.
+   - `cmdDaemonRestart(options: { deviceId?: string }): Promise<string>`
+     - Calls `cmdDaemonStop` then `cmdDaemonStart` in sequence.
 
-   Note: `cmdDaemonStart` is the process that *is* the daemon (it runs the Express app
-   in the foreground of a background process). It is distinct from the auto-start
-   spawner in Phase 3. The lifecycle.ts `startDaemonProcess()` is the spawner; this
-   command is the server entry point.
-
-3. Register in `registry.ts`:
-   ```
-   COMMANDS["daemon"] = {
-     name: "daemon",
-     group: "Server",
-     supportedFlags: [],
-     summary: "Manage the background daemon process",
-     ...
-   }
-   ```
-   Subcommands: `start`, `stop`, `status`, `restart`. Use the existing subcommand
+3. Register in `registry.ts`. The `daemon` command must have subcommands `start`, `stop`,
+   `status`, `restart`. The `run` subcommand must be registered and functional but must
+   NOT appear in the `topLevelBlock` or in `--help` output. Use the existing subcommand
    dispatch pattern (see how `recording` subcommands are handled).
 
-4. Write unit tests in `apps/node/src/test/unit/daemon/lifecycle.test.ts`:
+4. Write `docs/api/daemon.md` (initial draft) covering:
+   - What the daemon is and why it exists
+   - `daemon start|stop|status|restart` command reference
+   - Socket path formula (mention sanitization)
+   - `--no-daemon` and `CLAWPERATOR_NO_DAEMON=1` opt-out
+   - Version policy (CLI version wins; mismatch triggers restart)
+   - Known limitation: proxy is not yet active (coming in PR-3)
+   Use `.agents/skills/docs-author/SKILL.md` for this step.
+
+5. Add a link to `daemon.md` in `docs/api/overview.md`.
+
+6. Run `./scripts/docs_build.sh` and confirm it succeeds.
+
+7. Write unit tests in `apps/node/src/test/unit/daemon/lifecycle.test.ts`:
+   - `sanitizeDaemonKey` converts `'192.168.1.1:5555'` to `'192.168.1.1-5555'`
+   - `sanitizeDaemonKey` returns `'default'` for empty string and undefined
    - `getDaemonSocketPath` returns the correct path formula
    - `getDaemonPidPath` returns the correct path formula
    - `getDaemonLogPath` returns the correct path formula
    - `isDaemonRunning` returns false when PID file does not exist
-   - `isDaemonRunning` returns false when PID file exists but process is dead
-   - `stopDaemon` returns `not_running` when PID file does not exist
+   - `isDaemonRunning` returns false when PID file exists but process is not alive
+   - `stopDaemon` returns `'not_running'` when PID file does not exist
    - `stopDaemon` sends SIGTERM and removes files when daemon is running (mock process)
 
 ### Acceptance Criteria
 - `npm --prefix apps/node run build && npm --prefix apps/node run test` passes.
-- `clawperator daemon start --device <id>` starts a background server on the socket.
-- `clawperator daemon status --device <id>` prints version and socket path when running.
-- `clawperator daemon stop --device <id>` stops the server and cleans up PID/socket files.
-- `clawperator daemon restart` is `stop + start` and leaves a running daemon.
+- All new unit tests in `lifecycle.test.ts` pass.
+- `clawperator daemon start --device <id>` returns "Daemon started" and exits.
+- `clawperator daemon status --device <id>` shows version and socket path when running.
+- `clawperator daemon stop --device <id>` cleans up PID and socket files.
+- `clawperator daemon restart --device <id>` stops then restarts the daemon.
 - `clawperator daemon start` when already running prints "already running" and exits 0.
 - `clawperator daemon stop` when not running prints "not running" and exits 0.
-- All unit tests pass.
+- `clawperator daemon run` does not appear in `clawperator --help` output.
+- `docs/api/daemon.md` exists and `./scripts/docs_build.sh` succeeds.
 
 ### Validation
 ```bash
 npm --prefix apps/node run build && npm --prefix apps/node run test
+./scripts/docs_build.sh
+
 # Live smoke: start, status, stop
 node apps/node/dist/cli/index.js daemon start --device <device_id>
 node apps/node/dist/cli/index.js daemon status --device <device_id>
 node apps/node/dist/cli/index.js daemon stop --device <device_id>
 node apps/node/dist/cli/index.js daemon status --device <device_id>
+
+# Verify daemon run is hidden from help
+node apps/node/dist/cli/index.js --help | grep -v "daemon run"
 ```
 
 Replace `<device_id>` with the serial from `adb devices`.
 
 ### Expected Commit
 ```text
-feat(node): add clawperator daemon lifecycle commands (#<n>)
+feat(node): add clawperator daemon lifecycle commands and docs (#<n>)
 ```
 
 ---
@@ -304,158 +364,190 @@ thinking
 
 ### Goal
 Add a proxy layer that transparently routes `exec`, `snapshot`, and `screenshot`
-through the background daemon when available, with auto-start, version check, stale
-socket cleanup, and direct-mode fallback.
+through the background daemon. Introduce the shared CLI result formatter. Wire in
+auto-start, version check, stale socket cleanup, fallback safety, and atomic locking.
+Update `docs/api/daemon.md` to document the proxy behavior.
 
 ### Files to Change
 - `apps/node/src/cli/daemonProxy.ts` (new)
+- `apps/node/src/cli/output.ts` (add `formatRunExecutionResultForCli`)
 - `apps/node/src/cli/commands/execute.ts` (modify)
 - `apps/node/src/cli/commands/observe.ts` (modify)
-- `apps/node/src/cli/registry.ts` (add `--no-daemon` to exec/snapshot/screenshot flags)
+- `apps/node/src/cli/registry.ts` (add `--no-daemon` to exec/snapshot/screenshot)
 - `apps/node/src/test/unit/daemon/daemonProxy.test.ts` (new)
+- `docs/api/daemon.md` (update - document proxy behavior)
+
+### Shared Output Helper (Step 1 - Do This First)
+
+Before writing any proxy code, add `formatRunExecutionResultForCli` to
+`apps/node/src/cli/output.ts`:
+
+```typescript
+export function formatRunExecutionResultForCli(
+  result: RunExecutionResult,
+  options: OutputOptions
+): string {
+  if (result.ok) {
+    return formatSuccess(
+      {
+        envelope: result.envelope,
+        deviceId: result.deviceId,
+        terminalSource: result.terminalSource,
+        isCanonicalTerminal: result.terminalSource === "clawperator_result",
+      },
+      options
+    );
+  }
+  return formatError(result.error, options);
+}
+```
+
+Then refactor `execute.ts`, `observe.ts`, and any other command that currently calls
+`formatSuccess`/`formatError` directly on a `RunExecutionResult` to use this helper
+instead. This refactor is in scope for this PR. Do it before adding proxy calls so
+that proxy and direct paths use exactly the same code.
 
 ### Steps
 
-1. Create `apps/node/src/cli/daemonProxy.ts`. This is the highest-risk file in the
-   project. Read `tasks/node/daemon/plan.md` Section "Decision Rules" carefully before
-   writing.
+1. Add `formatRunExecutionResultForCli` to `output.ts` as specified above.
+
+2. Refactor existing direct-path callers in `execute.ts` and `observe.ts` to use
+   `formatRunExecutionResultForCli`. Confirm output is identical before proceeding.
+
+3. Create `apps/node/src/cli/daemonProxy.ts`. Read `tasks/node/daemon/plan.md`
+   sections "Decision Rules" and "Failure Modes" before writing.
+
+   **Device ID usage**: the proxy takes the raw `--device` option string as-is. Do NOT
+   pre-resolve the device ID. The daemon's `runExecution` resolves it internally. Pass
+   the raw value to both `getDaemonSocketPath()` (for socket selection) and to the
+   `/execute` request body. If the device is ambiguous (no `--device`, multiple
+   connected), the daemon returns `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` - same error
+   as direct mode, same behavior.
+
+   **Fallback safety - dispatch boundary**: track whether the HTTP request body has
+   been written to the socket. Before writing: pre-dispatch. After writing: post-
+   dispatch. Only pre-dispatch failures may fall back to direct. Post-dispatch failures
+   must be returned as errors. Classify `snapshot` and `screenshot` as idempotent
+   (they may fall back on response loss), but `exec` must not.
 
    Required exports:
 
    ```typescript
    export interface DaemonProxyOptions {
-     deviceId: string;          // must be resolved (post-device-resolution)
-     operatorPackage: string;   // must be resolved
-     noDaemon?: boolean;        // true = skip proxy, run direct
+     rawDeviceId?: string;      // raw --device option value, may be undefined
+     operatorPackage?: string;
+     noDaemon?: boolean;
    }
 
-   // Returns true if daemon is alive and version-matched.
-   export async function isDaemonReady(options: DaemonProxyOptions): Promise<boolean>
+   export interface DaemonProxyDeps {
+     spawnDaemonRunFn?: typeof spawnDaemonRun;
+     httpGetFn?: (socketPath: string, path: string) => Promise<string>;
+     httpPostFn?: (socketPath: string, path: string, body: unknown) => Promise<string>;
+     isDaemonAliveFn?: (socketPath: string) => Promise<boolean>;
+   }
 
-   // Tries to proxy execution through the daemon.
-   // Returns null if proxy is unavailable, opted-out, or device is unresolvable.
-   // Returns ExecutionResult on success.
+   // Returns null if proxy is unavailable or opted-out (pre-dispatch only).
+   // Returns RunExecutionResult on success.
+   // Returns RunExecutionResult with error on post-dispatch failure (never null).
    // Never throws.
    export async function tryDaemonExecution(
      execution: unknown,
-     options: DaemonProxyOptions
-   ): Promise<ExecutionResult | null>
+     options: DaemonProxyOptions,
+     deps?: DaemonProxyDeps
+   ): Promise<RunExecutionResult | null>
    ```
 
    Internal implementation of `tryDaemonExecution`:
-   a. Check opt-out (`CLAWPERATOR_NO_DAEMON` env or `options.noDaemon`). Return null.
-   b. Check platform (skip on Windows). Return null.
-   c. Check `options.deviceId` is non-empty. Return null if blank.
-   d. Resolve socket path via `getDaemonSocketPath(options.deviceId)`.
-   e. Check liveness: try `GET /ping` on the socket. Handle ENOENT (socket missing) and
-      ECONNREFUSED (stale socket).
-      - If ENOENT: go to step (f) auto-start.
-      - If ECONNREFUSED: delete socket file; go to step (f) auto-start.
-      - If alive: check version via `GET /version`. If mismatch: call `stopDaemon` +
-        auto-start; else proceed to step (g).
-   f. Auto-start: spawn `clawperator daemon start --device <id>` as detached process
-      (use `startDaemonProcess` from lifecycle.ts). Poll socket at 100ms intervals up
-      to 3000ms. If socket is connectable and version matches: proceed to step (g).
-      Otherwise: print stderr diagnostic "Daemon start timed out; running direct." and
-      return null.
-   g. POST to `http+unix://<socketPath>//execute` with body:
-      ```json
-      { "execution": <execution>, "deviceId": "<deviceId>", "operatorPackage": "<pkg>" }
-      ```
-      Use the `node:http` module with `socketPath` option or a Unix socket HTTP client.
-      Do NOT use `fetch()` here (it does not support Unix sockets in all Node versions).
-   h. Parse response body as JSON into `ExecutionResult`.
-   i. Return the parsed result. On any network error, print stderr diagnostic and
-      return null.
+   a. If `CLAWPERATOR_NO_DAEMON` env or `options.noDaemon`: return null (pre-dispatch).
+   b. If platform is Windows: return null (pre-dispatch).
+   c. Get socket path via `getDaemonSocketPath(options.rawDeviceId)`.
+   d. Check liveness: try GET /ping on the socket.
+      - ENOENT: auto-start (see below). If auto-start fails: return null.
+      - ECONNREFUSED: delete socket file; auto-start. If auto-start fails: return null.
+      - Alive: check version. If mismatch: stop + auto-start. If auto-start fails: return null.
+      - Pre-dispatch at this point.
+   e. Acquire start lock (try `fs.openSync(lockPath, 'wx')`). If lock exists: poll socket
+      instead of spawning (another process is starting the daemon). Give up after 3s.
+   f. Spawn `daemon run` via `spawnDaemonRun(rawDeviceId)`. Poll socket at 100ms up to
+      3000ms. Release lock when socket connectable. If timeout: release lock; return null.
+   g. **Dispatch boundary.** POST to socket `/execute` with
+      `{ execution, deviceId: rawDeviceId, operatorPackage }`. After sending the request
+      body, the operation is post-dispatch.
+   h. Parse JSON response into `RunExecutionResult`.
+   i. Return the parsed result.
+   j. On response error after dispatch: return `{ ok: false, error: { code:
+      'DAEMON_PROXY_ERROR', message: 'Daemon response lost; action may have executed' } }`.
+      Do NOT fall back to direct.
 
-   Contract preservation is critical: `tryDaemonExecution` returns the raw
-   `ExecutionResult` object. The calling command handler must then call `formatSuccess`
-   or `formatError` on it, the same way it would after a direct `runExecution` call.
-   This is the only correct pattern.
-
-2. Modify `apps/node/src/cli/commands/execute.ts`.
-   In `cmdExecute`, after the payload is loaded and validated, replace:
+4. Modify `execute.ts`. Replace the `runExecution` call with:
    ```typescript
-   const result = await runExecution(payload, { deviceId, operatorPackage, ... });
+   const proxyResult = await tryDaemonExecution(payload, { rawDeviceId: options.deviceId, operatorPackage, noDaemon });
+   const result = proxyResult ?? await runExecution(payload, { deviceId: options.deviceId, operatorPackage, ... });
+   return formatRunExecutionResultForCli(result, options);
    ```
-   With:
-   ```typescript
-   const result =
-     (await tryDaemonExecution(payload, { deviceId: resolvedDeviceId, operatorPackage, noDaemon }))
-     ?? await runExecution(payload, { deviceId: resolvedDeviceId, operatorPackage, ... });
-   ```
-   Where `noDaemon` is resolved from the `--no-daemon` flag or `CLAWPERATOR_NO_DAEMON`
-   env. `resolvedDeviceId` must be the post-resolution device ID (the same value passed
-   to `runExecution`).
+   `noDaemon` is read from `hasFlag(rest, '--no-daemon')` OR `process.env.CLAWPERATOR_NO_DAEMON`.
 
-3. Modify `apps/node/src/cli/commands/observe.ts`.
-   In `cmdObserveSnapshot` and `cmdObserveScreenshot`, apply the same proxy-before-
-   direct pattern. These internally build a `snapshot_ui` or `screenshot` execution and
-   call `runExecution`. Replace the `runExecution` call with:
-   ```typescript
-   const result =
-     (await tryDaemonExecution(execution, { deviceId: resolvedDeviceId, operatorPackage, noDaemon }))
-     ?? await runExecution(execution, { ... });
-   ```
+5. Modify `observe.ts` with the same pattern for `cmdObserveSnapshot` and
+   `cmdObserveScreenshot`. These are read-only: they may fall back to direct on response
+   loss (the proxy may return null on network error for these).
 
-4. In `registry.ts`, add `"--no-daemon"` to `supportedFlags` for `exec`, `snapshot`,
-   and `screenshot` commands. Add `"--no-daemon"` to `EXEC_PAYLOAD_FLAG_ALIASES` (or
-   the appropriate flags structure). The flag must appear in `clawperator exec --help`.
+6. In `registry.ts`, add `"--no-daemon"` to `supportedFlags` for `exec`, `snapshot`,
+   and `screenshot`. This is a command-local flag: `clawperator snapshot --no-daemon`
+   is valid; `clawperator --no-daemon snapshot` is NOT supported and must not be
+   implied. The flag must appear in the command's `--help` output.
 
-5. Write unit tests in `apps/node/src/test/unit/daemon/daemonProxy.test.ts`:
-   - `tryDaemonExecution` returns null when `CLAWPERATOR_NO_DAEMON=1` is set
-   - `tryDaemonExecution` returns null when `--no-daemon` flag is set
-   - `tryDaemonExecution` returns null when deviceId is blank
-   - `tryDaemonExecution` returns null and prints stderr when auto-start times out
-     (mock `startDaemonProcess` and `isDaemonReady` to simulate timeout)
-   - `tryDaemonExecution` returns the result when daemon is alive and version matches
-     (mock the HTTP request)
-   - `tryDaemonExecution` stops old daemon and starts fresh when version mismatches
-     (mock stop, start, and HTTP request)
-   - `tryDaemonExecution` deletes stale socket and restarts when ECONNREFUSED
-   - `tryDaemonExecution` returns null on network error after successful start (mock
-     HTTP to throw after socket is alive)
-   - Proxy result passed to `formatSuccess` produces identical output to direct result
-     (compare formatted strings for a known ExecutionResult fixture)
+7. Update `docs/api/daemon.md` to document: auto-start behavior, opt-out flags,
+   post-dispatch fallback boundary and why (double-action risk), and the `snapshot`/
+   `screenshot` idempotent exception. Run `./scripts/docs_build.sh`.
 
-   Make the HTTP client and lifecycle functions injectable for testing. Do not test
-   against a real socket in unit tests.
+8. Write unit tests in `apps/node/src/test/unit/daemon/daemonProxy.test.ts`. Use
+   injectable `deps` parameter - do NOT test against a real socket.
+
+   Required test cases:
+   - Returns null when `CLAWPERATOR_NO_DAEMON=1` is set
+   - Returns null when `noDaemon: true` is passed
+   - Returns null when auto-start times out (mock `spawnDaemonRun`, mock socket never becomes alive)
+   - Returns result when daemon is alive and version matches (mock HTTP)
+   - Stops old daemon and restarts when version mismatches (mock stop, spawn, HTTP)
+   - Deletes stale socket file and restarts when ECONNREFUSED
+   - Returns null for `snapshot` on network error after dispatch (idempotent fallback)
+   - Returns `DAEMON_PROXY_ERROR` for `exec` on network error after dispatch (non-idempotent)
+   - Two concurrent calls acquire lock; second waits rather than spawning a second daemon
+     (mock: first holds lock, second polls, socket becomes alive during poll)
+   - `formatRunExecutionResultForCli` on a successful proxied result produces identical
+     string to `formatRunExecutionResultForCli` on a direct result for the same fixture
 
 ### Acceptance Criteria
 - `npm --prefix apps/node run build && npm --prefix apps/node run test` passes.
 - All unit tests in `daemonProxy.test.ts` pass.
-- With daemon running: `clawperator snapshot --device <id>` proxies to daemon (confirm
-  via daemon log showing the request).
-- With daemon running: `clawperator exec <payload.json> --device <id>` proxies to
-  daemon.
-- With daemon stopped: `clawperator snapshot --device <id>` auto-starts daemon and
-  proxies (first call starts daemon, subsequent calls hit warm daemon).
-- With `CLAWPERATOR_NO_DAEMON=1`: commands run direct with no daemon interaction.
-- With `--no-daemon`: commands run direct.
-- CLI stdout output is identical between proxy path and direct path for the same
-  execution. Verify by running both and diffing stdout.
-- Exit codes are correct: 0 on success, 1 on execution failure, same as direct path.
+- With daemon running: `clawperator snapshot --device <id>` proxies (confirm via daemon log).
+- With daemon running: `clawperator exec <payload.json> --device <id>` proxies.
+- With daemon stopped: `clawperator snapshot --device <id>` auto-starts daemon.
+- `CLAWPERATOR_NO_DAEMON=1` runs direct with no daemon interaction.
+- `clawperator snapshot --no-daemon --device <id>` runs direct.
+- `clawperator --no-daemon snapshot --device <id>` is NOT supported (flag is command-local).
+- CLI stdout is identical between proxy and direct paths for the same execution (diff
+  the two outputs; only timing/timestamp fields should differ).
+- Exit code is 0 on success and 1 on execution failure, same as direct path.
 - `[Clawperator-Result]` appears in stdout for terminal-producing executions.
+- `./scripts/docs_build.sh` succeeds.
 
 ### Validation
 ```bash
 npm --prefix apps/node run build && npm --prefix apps/node run test
+./scripts/docs_build.sh
 
-# Start daemon manually, then test proxy
 node apps/node/dist/cli/index.js daemon start --device <device_id>
 
-# Proxy path
+# Proxy vs direct diff (snapshot is idempotent - safe to run both)
 node apps/node/dist/cli/index.js snapshot --device <device_id> > /tmp/proxy-out.json
-
-# Direct path (opt-out)
 CLAWPERATOR_NO_DAEMON=1 node apps/node/dist/cli/index.js snapshot --device <device_id> > /tmp/direct-out.json
-
-# Diff (should match on all fields except timing-sensitive fields like timestamps)
 diff /tmp/proxy-out.json /tmp/direct-out.json
 
-# Verify auto-start (stop daemon first)
+# Verify auto-start
 node apps/node/dist/cli/index.js daemon stop --device <device_id>
-node apps/node/dist/cli/index.js snapshot --device <device_id>  # should auto-start
+node apps/node/dist/cli/index.js snapshot --device <device_id>
+node apps/node/dist/cli/index.js daemon status --device <device_id>
 
 node apps/node/dist/cli/index.js daemon stop --device <device_id>
 ```
@@ -485,7 +577,8 @@ Apply the same proxy-before-direct pattern from Phase 3 to all flat action comma
 Before starting this phase, confirm that `tasks/node/handshaking/plan.md` PR-1 (the
 in-process readiness cache) has been merged. If it has, the daemon now holds a warm
 readiness cache for all callers. If it has not yet merged, note this in the commit
-message but proceed - the proxy is valuable regardless.
+message but proceed - the proxy is valuable regardless. `tasks/node/handshaking/plan.md`
+remains the authority on the readiness cache. That file still exists; do not re-author it.
 
 ### Steps
 
@@ -495,12 +588,14 @@ message but proceed - the proxy is valuable regardless.
 2. For each `cmd*` function, apply the same proxy-before-direct pattern used in
    Phase 3. The pattern is always:
    ```typescript
-   const result =
-     (await tryDaemonExecution(execution, { deviceId: resolvedDeviceId, operatorPackage, noDaemon }))
-     ?? await runExecution(execution, { deviceId: resolvedDeviceId, operatorPackage, ... });
+   const proxyResult = await tryDaemonExecution(execution, { rawDeviceId: options.deviceId, operatorPackage, noDaemon });
+   const result = proxyResult ?? await runExecution(execution, { deviceId: options.deviceId, operatorPackage, ... });
+   return formatRunExecutionResultForCli(result, options);
    ```
    `noDaemon` must be threaded from the calling options object. Add `noDaemon?: boolean`
-   to each options interface that does not already have it.
+   to each options interface that does not already have it. These are all mutating
+   commands - post-dispatch response loss must NOT fall back to direct (the proxy's
+   error return is the correct behavior).
 
 3. Note: `close_app`-only executions bypass `ensureInteractiveAutomationReady` in
    `runExecution.ts` today. The daemon's `/execute` route preserves this behavior

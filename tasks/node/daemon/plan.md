@@ -20,6 +20,14 @@ A transparent background daemon - where `clawperator snapshot` silently proxies 
 running serve process - makes the serve optimization available to all callers without
 changing skill implementations.
 
+**Expected benefit split:**
+- Daemon alone (this task pack): saves Node startup and module loading (~100-200ms per
+  call) for all proxied commands. Minimal improvement on the `doctor_ping` handshake.
+- Daemon + readiness cache (requires `tasks/node/handshaking/` PR-1 to also merge):
+  saves the full ~410ms handshake on warm calls. The cache only works when callers share
+  a process; the daemon makes the cache effective for ALL callers, including subprocesses.
+  This is the primary latency win the daemon enables.
+
 The key insight is that `apps/node/src/cli/commands/serve.ts` is already the daemon. It
 is a 805-line Express HTTP server with routes for every execution path (`/execute`,
 `/snapshot`, `/screenshot`, `/skills/:skillId/run`, `/devices`, `/events`). The missing
@@ -57,9 +65,10 @@ PR-5 is measurement only.
 ## Goal
 
 Make sequential `clawperator` CLI calls - including those made by skills via
-`execFileSync` - benefit from an in-process readiness cache and warm device state by
-transparently proxying commands through a background daemon built on the existing
-`clawperator serve` Express server.
+`execFileSync` - benefit from warm process state by transparently proxying commands
+through a background daemon built on the existing `clawperator serve` Express server.
+Once the handshaking readiness cache is also in place, all callers share the daemon's
+in-process cache, eliminating the per-call handshake overhead.
 
 ## Why Now
 
@@ -79,12 +88,19 @@ transparently proxying commands through a background daemon built on the existin
   existing `port`/`host`).
 - Adding `GET /ping` and `GET /version` health endpoints to the Express app.
 - `clawperator daemon start|stop|status|restart` lifecycle commands.
-- PID file, socket file, and log file lifecycle management under `~/.clawperator/`.
+- A hidden `clawperator daemon run` command that is the actual foreground server process
+  (see Decision Rules - Daemon lifecycle model).
+- PID file, socket file, and log file lifecycle management under `~/.clawperator/`
+  created with `0700` permissions.
+- A shared `formatRunExecutionResultForCli(result, options)` helper used by both direct
+  and proxied command paths, eliminating output divergence.
 - A daemon proxy layer (`daemonProxy.ts`) for CLI commands with auto-start, liveness
-  check, version verification, and direct-mode fallback.
+  check, version verification, atomic start locking, and direct-mode fallback.
 - Proxy support for `exec`, `snapshot`, `screenshot`, and all flat action commands.
-- `--no-daemon` flag and `CLAWPERATOR_NO_DAEMON=1` env opt-out.
-- Unit tests for all new code.
+- `--no-daemon` command-local flag and `CLAWPERATOR_NO_DAEMON=1` env opt-out.
+- Brief public docs for `clawperator daemon` landing in the same PR as the command
+  (PR-2), using `.agents/skills/docs-author/SKILL.md`.
+- Unit tests for all new code, with test glob updated to cover nested test directories.
 - Latency benchmark measurements (Phase 5).
 
 ## Out of Scope
@@ -146,27 +162,43 @@ the daemon is absent or opted out.
 
 **Deterministic - do not re-derive:**
 
-- Socket path formula: `~/.clawperator/daemon-<resolvedDeviceId>.sock`
-- PID path formula: `~/.clawperator/daemon-<resolvedDeviceId>.pid`
-- Log path formula: `~/.clawperator/daemon-<resolvedDeviceId>.log`
+- Socket filename key: sanitize the raw `--device` option by replacing `:` with `-` and
+  removing any `/` or whitespace. For `192.168.1.1:5555` use `192.168.1.1-5555`. For
+  empty string (no `--device` given), use `default`. Do NOT pre-resolve the device ID.
+- Socket path formula: `~/.clawperator/daemon-<sanitizedKey>.sock`
+- PID path formula: `~/.clawperator/daemon-<sanitizedKey>.pid`
+- Log path formula: `~/.clawperator/daemon-<sanitizedKey>.log`
+- Lock path formula: `~/.clawperator/daemon-<sanitizedKey>.lock` (auto-start lock)
+- Directory creation mode: `0700` (owner-only read/write/execute)
 - Auto-start timeout: 3000ms (3 seconds)
 - Version check endpoint: `GET /version` returns `{ version: string }`
 - Liveness check endpoint: `GET /ping` returns `{ ok: true }`
 - Version mismatch action: kill old daemon, start fresh, wait up to 3s
 - Stale socket action: socket file exists, connection refused - delete + restart
-- Direct fallback condition: daemon unreachable after auto-start timeout
-- Device scope fallback: device unresolvable without `--device` flag (multiple devices
-  connected, none specified) - skip daemon, run direct silently
-- Opt-out check: `CLAWPERATOR_NO_DAEMON=1` env OR `--no-daemon` flag - skip daemon
+- Fallback condition (pre-connect): daemon unreachable after auto-start timeout -
+  run direct for this call
+- Fallback condition (post-dispatch): NEVER fall back to direct after the HTTP request
+  has been sent to the daemon. Return the error directly; do not retry via direct mode.
+- Device scope fallback: `CLAWPERATOR_NO_DAEMON` env OR `--no-daemon` flag - skip
+  daemon and run direct. Note: multiple-device ambiguity is detected by the daemon's
+  `runExecution` and returns `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` - same error as
+  direct mode, so no pre-check needed.
 - `close_app`-only executions: the daemon's `/execute` route handles these correctly
   (the serve path already bypasses `ensureInteractiveAutomationReady` for close_app).
   No special handling needed in the proxy layer.
+- Shared output helper: `formatRunExecutionResultForCli(result, options)` takes a
+  `RunExecutionResult` and `OutputOptions`, calls `formatSuccess({ envelope,
+  deviceId, terminalSource, isCanonicalTerminal }, options)` on success or
+  `formatError(result.error, options)` on failure. Both direct and proxied paths use
+  this helper. Do NOT inline the formatting logic separately in each command.
 
 **Requires judgment:**
 
 - Stderr diagnostic message wording for fallback events
 - Log format for daemon process log file
 - Whether to print a "daemon started" notice on first auto-start (lean toward silent)
+- Whether `daemon status/start/stop/restart` output should be JSON or line-oriented text
+  (current plan: line-oriented text, consistent with lifecycle commands)
 
 ## Decision Rules
 
@@ -176,12 +208,12 @@ the daemon is absent or opted out.
 | --- | --- |
 | `CLAWPERATOR_NO_DAEMON=1` or `--no-daemon` flag is set | Skip daemon; run direct |
 | Platform is Windows | Skip daemon; run direct |
-| `deviceId` is not resolvable without user disambiguation | Skip daemon; run direct |
 | Socket file missing | Auto-start daemon (up to 3s); proceed if started; else run direct |
-| Socket file present, connection refused | Delete socket; auto-start daemon; proceed if started; else run direct |
+| Socket file present, connection refused (stale) | Delete socket; auto-start daemon; proceed if started; else run direct |
 | Socket alive but version mismatch | Stop old daemon; auto-start new one; proceed if started; else run direct |
 | Socket alive and version matches | Proxy to daemon |
-| Proxy request fails (network error) | Log to stderr; fall back to direct for this call; do not invalidate the socket |
+| Request not yet dispatched; connection error | Log to stderr; run direct for this call |
+| Request already dispatched; any error (response lost, timeout, etc.) | Return error to caller; do NOT retry via direct mode |
 
 ### Version check
 
@@ -191,12 +223,39 @@ the daemon's `/version` response and the client-side version to compare against.
 Version comparison: exact string match (`cliVersion === daemonVersion`). Semver
 comparison is not needed - the daemon and CLI are always the same binary.
 
-### Daemon auto-start
+### Daemon lifecycle model
 
-Auto-start is a fire-and-forget spawn of `clawperator daemon start --device <id>` as a
-detached child process. The CLI then polls the socket path at 100ms intervals until it
-is connectable or 3000ms elapses. If the socket is connectable, proxy the request. If
-not, fall back to direct.
+Two commands exist; only one is user-facing:
+
+- `clawperator daemon run` (internal, not advertised in top-level help): the foreground
+  server process. Starts `startServer({ socketPath })`, writes its own PID file, runs
+  until killed. This is the process that IS the daemon.
+- `clawperator daemon start` (user-facing): spawns `daemon run` as a detached child
+  process with stdout/stderr redirected to the log file. Polls the socket until
+  connectable (up to 3s), then exits with a status message. It does NOT itself run the
+  server.
+
+`daemon stop`, `daemon status`, and `daemon restart` operate on the PID file and socket
+file written by `daemon run`.
+
+The auto-start spawner in `daemonProxy.ts` spawns `daemon run` directly (not
+`daemon start`), to avoid a spawn-polling-spawn chain.
+
+### Daemon auto-start locking
+
+Two simultaneous CLI calls must not spawn two daemon processes. Locking mechanism:
+before spawning, acquire an exclusive lock file (`daemon-<key>.lock`) using
+`fs.openSync` with `wx` flag (exclusive create). If the lock exists, wait for the
+socket to become available instead of spawning. Release the lock once the socket is
+connectable. If locking fails after the timeout, fall back to direct.
+
+### Daemon auto-start flow
+
+1. Acquire start lock (exclusive, fail-fast).
+2. Spawn `clawperator daemon run --device <id>` as detached child process.
+3. Poll socket at 100ms intervals up to 3000ms.
+4. If socket is connectable and version matches: release lock, proxy request.
+5. If timeout: release lock, print stderr diagnostic, run direct.
 
 ### Contract preservation during proxy
 
@@ -204,14 +263,20 @@ The proxy layer must produce CLI stdout output identical to the direct path. The
 correct pattern is:
 
 1. POST the `execution` payload and `{ deviceId, operatorPackage }` to `/execute`.
-2. Parse the JSON response body into an `ExecutionResult`.
-3. Call `formatSuccess` or `formatError` from `apps/node/src/cli/output.ts` with the
-   parsed result and the same `options` (format, verbose, etc.) the command received.
+2. Parse the JSON response body into a `RunExecutionResult`.
+3. Call `formatRunExecutionResultForCli(result, options)` - the shared helper that
+   calls `formatSuccess({ envelope, deviceId, terminalSource, isCanonicalTerminal },
+   options)` on success or `formatError(result.error, options)` on failure.
 
-Do NOT pass the raw HTTP response body as CLI output. Do NOT skip `formatSuccess` /
-`formatError`. Exit codes are set by the `shouldCliStdoutForceExitCode1` logic in
-`apps/node/src/cli/index.ts` which operates on the formatted string, not the HTTP
+Do NOT pass the raw HTTP response body as CLI output. Do NOT inline `formatSuccess`
+or `formatError` separately in proxy and direct paths - the shared helper is the
+contract. Exit codes are set by `shouldCliStdoutForceExitCode1` in
+`apps/node/src/cli/index.ts`, which operates on the formatted string, not the HTTP
 status code.
+
+Both the direct path (current code in `execute.ts`, `observe.ts`, `action.ts`) and the
+proxy path must use this same helper. Refactor the direct path in the same PR that
+adds the proxy path (Phase 3).
 
 ## Failure Modes To Prevent
 
@@ -243,14 +308,24 @@ status code.
    some commands proxy and some do not. The proxy must be a fallback (direct still
    works), not a replacement, so partial rollout is safe.
 
+8. **Post-dispatch duplicate side effects.** If a mutating action (`click`, `type`,
+   `open-app`, arbitrary `exec`) is dispatched to the daemon and the response is lost,
+   falling back to direct re-executes the action. The fallback boundary is strict:
+   pre-connect/pre-dispatch failures may fall back to direct; post-dispatch failures
+   must return an error and stop. Read-only commands (`snapshot`, `screenshot`) may
+   still fall back on response loss because re-execution is safe, but this must be
+   classified explicitly - not assumed for all commands.
+
 ## Output Contract
 
-PR-1 through PR-2 have no user-visible CLI output change. `clawperator serve` continues
-to work identically. New `daemon` subcommands output line-oriented status text (not
-JSON) to stdout, consistent with other lifecycle commands.
+PR-1: no user-visible change. `clawperator serve` is unchanged.
+
+PR-2: adds `clawperator daemon start|stop|status|restart` with line-oriented status
+text output (not JSON). `clawperator daemon run` is a hidden internal command; it should
+not appear in top-level `--help` but must still be registered and functional.
 
 PR-3 onwards: proxied commands produce CLI output that is byte-for-byte identical to
-the direct path for the same inputs. This is the verification target for PR-3.
+the direct path for the same inputs. This is the primary verification target for PR-3.
 
 `GET /ping` response: `{ "ok": true }`
 `GET /version` response: `{ "version": "<semver>" }`
@@ -267,11 +342,16 @@ the direct path for the same inputs. This is the verification target for PR-3.
 
 ## Durable Follow-Up
 
+PR-2 must include a first draft of `docs/api/daemon.md` covering the `daemon`
+lifecycle commands, socket path formula, opt-out options, and version policy.
+PR-3 must update `docs/api/daemon.md` to document the proxy behavior and the
+post-dispatch fallback boundary. Both docs phases must use `.agents/skills/docs-author/
+SKILL.md` and run `./scripts/docs_build.sh` before committing.
+
 When this task pack is complete and all PRs are merged:
 
-1. Add `clawperator daemon` to `docs/api/overview.md` and create
-   `docs/api/daemon.md` documenting socket path, lifecycle commands, opt-out, and
-   version behavior. Use `.agents/skills/docs-author/SKILL.md` for the docs phase.
+1. Verify `docs/api/daemon.md` is complete and `docs/api/overview.md` links to it.
+   Update both if incomplete.
 
 2. Update `docs/api/errors.md` to note that proxied commands may surface daemon
    startup or connectivity errors as a new `DAEMON_UNAVAILABLE` warning (or similar)
