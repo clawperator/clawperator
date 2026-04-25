@@ -668,8 +668,7 @@ clawperator read --text-contains "Heating"
 
 # agent: climate_state is "Off"; target value is "On".
 
-clawperator click --text "Turn On"
-`}</code>
+clawperator click --text "Turn On"`}</code>
             </pre>
           </div>
         </div>
