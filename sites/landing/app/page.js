@@ -649,14 +649,14 @@ export default function Home() {
               for the full API)
             </p>
             <pre>
-              <code>{`# agent: Use an installed runtime skill when one matches the job.
+              <code>{`# agent: Use a runtime skill when one matches the job.
 clawperator skills run <google-home-application-id>.control-hvac -- --action climate_state --value On --unit-name "Living room"
 
 # Or let the agent drive the app directly with deterministic device steps:
-# agent: Open Google Home before observing its UI.
+# agent: Open Google Home.
 clawperator open --app <google-home-application-id>
 
-# agent: Inspect Google Home before deciding where to tap.
+# agent: Inspect the Google Home app UI deciding where to tap.
 clawperator snapshot
 # { "app": "Google Home", "nodes": [...] }
 
