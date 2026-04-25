@@ -30,6 +30,8 @@ Parent plan: `tasks/node/io-optimizations/plan.md`
 - Only parallelize `resolveDevice` and `checkApkPresence` when `config.deviceId` is already explicit.
 - Re-measure after the implementation phases before declaring the pack done.
 - If implementation pressure pushes toward handshake policy decisions, stop and defer to `tasks/node/handshaking/findings.md`.
+- **Delete replaced call sites; do not wrap them.** Once `logcat -c` and `logcat -d` are superseded, delete their call sites entirely. Do not leave them behind a feature flag, a disabled conditional, or a backwards-compatibility shim. No caller needs the old behavior preserved.
+- **The `logcat -d` fallback in Phase 1 step 5 is transition scaffolding, not a permanent layer.** It exists only to keep tests green while live extraction is being proved. Remove it in step 6 of the same phase.
 
 ## Required Reading
 

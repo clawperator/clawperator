@@ -85,11 +85,12 @@ The current snapshot path is too slow for tight agent loops, and the branch find
 - The current `[Clawperator-Result]` envelope contract stays unchanged.
 - Full snapshot XML must not be embedded in the single-line envelope.
 - Any readiness cache or broader handshake change belongs to the separate handshake task, not this pack.
+- **Replaced code paths are deleted, not wrapped.** Once `logcat -c` and `logcat -d` are superseded by live-stream extraction, remove their call sites entirely. Do not leave them behind a feature flag, a compatibility conditional, or a disabled-but-present fallback. There is no caller that needs the old behavior preserved.
 
 **Judgment required:**
 
 - Broadcast delay approach: the findings recommend signal-based dispatch (fire once logcat emits its first stdout line, 100ms fallback timer) as the preferred landing. If signal-based is not stable enough on first attempt, the fallback is a reduced constant of 50ms with a measurement follow-up in the same PR. Do not default to 50ms without first attempting the signal-based path.
-- How much temporary fallback logic to keep during the transition from dump-based recovery to live-stream recovery - the minimum needed to keep the tests green until the post-dump path is fully removed.
+- Duration of the transition scaffolding (`logcat -d` kept as temporary fallback in Phase 1): remove it in the same phase, in step 6, as soon as tests prove live extraction. Do not carry it into Phase 2.
 - Whether any serve-mode guidance belongs in code-adjacent help output - default is no; only add if the implementation actually changes a user-facing surface.
 
 ## Decision Rules
@@ -111,6 +112,7 @@ The current snapshot path is too slow for tight agent loops, and the branch find
 - Dispatch timing changes create envelope races or silent timeouts on slower devices or emulators
 - Explicit-device parallelism is applied to auto-resolve flows and breaks device targeting
 - Tests are added too late or are too weak to prove the new transport path actually replaced the old one
+- Old `logcat -c` or `logcat -d` call sites are left behind a feature flag or compatibility conditional instead of being deleted
 
 ## Output Contract
 
