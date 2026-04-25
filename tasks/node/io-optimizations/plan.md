@@ -219,3 +219,10 @@ Pass 6:
 - Added regression coverage where replay chunks continue beyond the old fallback window.
 - Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
 - Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.
+
+Pass 7:
+- Review found thrown pre-dispatch exceptions could bypass explicit cancellation and leave the early logcat waiter alive.
+- Added a pre-dispatch `finally` cancellation guard that aborts the early waiter unless broadcast has been released.
+- Added regression coverage for a throwing readiness preflight.
+- Validation: `npm --prefix apps/node run build && node --test apps/node/dist/test/integration/executeLogging.test.js apps/node/dist/test/unit/runExecution.test.js apps/node/dist/test/unit/snapshotHelper.test.js` passed.
+- Live smoke: `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` passed with `hasHierarchy: true`.

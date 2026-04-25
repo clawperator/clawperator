@@ -475,6 +475,7 @@ async function performExecution(
 
   let deviceId: string;
   let apkCheck: Awaited<ReturnType<typeof checkApkPresence>>;
+  let broadcastReleased = false;
   try {
     if (hasExplicitDevice) {
       const [resolved, explicitApkCheck] = await Promise.all([
@@ -611,6 +612,7 @@ async function performExecution(
     const result = earlyResultWaiter !== undefined && deferredBroadcast !== undefined
       ? await (async () => {
           dispatchStart = Date.now();
+          broadcastReleased = true;
           deferredBroadcast.release(runBroadcast);
           return earlyResultWaiter;
         })()
@@ -770,6 +772,9 @@ async function performExecution(
       },
     };
   } finally {
+    if (!broadcastReleased) {
+      cancelEarlyResultWaiter();
+    }
     release(deviceId, execution.commandId);
   }
 }

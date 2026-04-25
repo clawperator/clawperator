@@ -759,6 +759,54 @@ describe("runExecution", () => {
     assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
   });
 
+  it("cancels the early logcat waiter when readiness preflight throws", async () => {
+    const runner = new FakeProcessRunner();
+    let logcatKilled = false;
+    const execution: Execution = {
+      commandId: "cmd-throwing-preflight",
+      taskId: "task-throwing-preflight",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "sleep-1", type: "sleep", params: { durationMs: 0 } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+    runner.spawn = ((command, args, options) => {
+      runner.calls.push({ command, args, options });
+      const proc = new EventEmitter() as EventEmitter & {
+        stdout?: EventEmitter;
+        stderr?: EventEmitter;
+        kill: () => void;
+      };
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => {
+        logcatKilled = true;
+      };
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+
+    await assert.rejects(
+      runExecution(execution, {
+        deviceId: "test-device-1",
+        operatorPackage: "com.test.operator.dev",
+        runner,
+        logcatBroadcastDelayMs: 10_000,
+        ensureInteractiveAutomationReadyFn: async () => {
+          throw new Error("readiness exploded");
+        },
+      }),
+      /readiness exploded/
+    );
+
+    assert.strictEqual(logcatKilled, true);
+    assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
+  });
+
   it("continues after the shared readiness helper wakes a sleeping device", async () => {
     const runner = new FakeProcessRunner();
     const execution: Execution = {
