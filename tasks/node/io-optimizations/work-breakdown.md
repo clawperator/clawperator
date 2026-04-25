@@ -93,6 +93,14 @@ npm --prefix apps/node run build
 npm --prefix apps/node run test
 ```
 
+Live device smoke test - verify snapshot XML is returned correctly via the new live-stream path (not via `logcat -d`):
+
+```bash
+node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev
+```
+
+Confirm `envelope.stepResults[0].data.text` contains a well-formed `<hierarchy>` XML document. If the field is missing or empty, the live extraction is not working and `logcat -d` must not yet be removed.
+
 ### Expected Commit
 
 ```text
@@ -116,12 +124,12 @@ Reduce avoidable host-side idle time in the immediate snapshot path without cros
 1. Reduce or replace the fixed 300 ms `broadcastDelayMs` in `logcatResultReader.ts`. Preferred approach: fire the broadcast once logcat emits its first stdout line (signal-based), with a 100 ms fallback timer if no output arrives. If signal-based is not stable, land a 50 ms constant instead and add a measurement follow-up note in this file. See `tasks/node/io-optimizations/findings.md` I1 for the full rationale.
 2. Start the logcat stream earlier so the attach delay overlaps remaining safe preflight work. **Prerequisite: Phase 1 must be complete** - logcat -c must already be removed before the stream can be started earlier, since clearing the buffer after the stream is open would drop lines. "Safe preflight work" in this context means `resolveDevice` and `checkApkPresence`, which run after the stream is started and before broadcast fires.
 3. Parallelize `resolveDevice` and `checkApkPresence` only when `config.deviceId` is already explicit.
-5. Add or extend regression tests for:
+4. Add or extend regression tests for:
    - successful envelope receipt with the new dispatch timing
    - timeout diagnostics still being correct
    - explicit-device fast path behavior
    - auto-resolve behavior staying sequential
-4. Re-measure warm CLI and serve-mode snapshot latency after the changes. Run at least 5 consecutive warm calls and record the median. Expected target based on findings: ~1260ms CLI / ~1180ms serve (from ~1771ms baseline). Record actual numbers in a `## Measurements` section appended to this file before closing the pack.
+5. Re-measure using the skills timing comparison described in the Validation section below. Record results in `## Measurements` at the end of this file before closing the pack.
 
 ### Acceptance Criteria
 
@@ -129,18 +137,105 @@ Reduce avoidable host-side idle time in the immediate snapshot path without cros
 - Explicit-device preflight can use the safe parallel fast path.
 - Auto-resolve flows retain correct behavior.
 - Tests cover the new timing and preflight behavior.
-- Warm CLI median latency is captured and recorded in this file. Target: ~1260ms or better.
+- Skills timing comparison is captured in `## Measurements`. Both skills show measurable improvement over the global-install baseline.
 
 ### Validation
+
+Unit and build:
 
 ```bash
 npm --prefix apps/node run build
 npm --prefix apps/node run test
-node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev
 ```
+
+Skills timing comparison. Run each skill 3 times with the global install (baseline) and 3 times with the local build (optimized). Record all timings in `## Measurements`.
+
+The global install is v0.7.7 and represents the pre-optimization baseline. The local build at `apps/node/dist/` is the optimized version under test.
+
+```bash
+# Baseline - global install (pre-optimization)
+for i in 1 2 3; do
+  START=$(python3 -c "import time; print(int(time.time()*1000))")
+  clawperator skills run com.solaxcloud.starter.get-battery --device <device_serial> > /dev/null 2>&1
+  END=$(python3 -c "import time; print(int(time.time()*1000))")
+  echo "solax baseline run $i: $((END - START)) ms"
+done
+
+for i in 1 2 3; do
+  START=$(python3 -c "import time; print(int(time.time()*1000))")
+  clawperator skills run com.google.android.apps.chromecast.app.get-climate-replay --device <device_serial> --unit-name "<unit_name>" > /dev/null 2>&1
+  END=$(python3 -c "import time; print(int(time.time()*1000))")
+  echo "chromecast baseline run $i: $((END - START)) ms"
+done
+
+# Optimized - local build (post-optimization)
+for i in 1 2 3; do
+  START=$(python3 -c "import time; print(int(time.time()*1000))")
+  node apps/node/dist/cli/index.js skills run com.solaxcloud.starter.get-battery --device <device_serial> --operator-package com.clawperator.operator.dev > /dev/null 2>&1
+  END=$(python3 -c "import time; print(int(time.time()*1000))")
+  echo "solax optimized run $i: $((END - START)) ms"
+done
+
+for i in 1 2 3; do
+  START=$(python3 -c "import time; print(int(time.time()*1000))")
+  node apps/node/dist/cli/index.js skills run com.google.android.apps.chromecast.app.get-climate-replay --device <device_serial> --operator-package com.clawperator.operator.dev --unit-name "<unit_name>" > /dev/null 2>&1
+  END=$(python3 -c "import time; print(int(time.time()*1000))")
+  echo "chromecast optimized run $i: $((END - START)) ms"
+done
+```
+
+Notes:
+- `<unit_name>` is the Google Home climate unit label visible in the app. Determine the correct value by running `clawperator snapshot --device <device_serial> --operator-package com.clawperator.operator.dev` from the Google Home Climate tab before the timing runs.
+- Run baseline and optimized back-to-back with the device in the same state (same app in foreground, same screen) to minimize variance from UI state changes.
+- Skills runs include skill script overhead beyond snapshot itself. The timing delta between baseline and optimized reflects the Node transport savings only, not skill script execution time.
 
 ### Expected Commit
 
 ```text
 perf(node): reduce snapshot dispatch overhead
 ```
+
+---
+
+## Measurements
+
+*To be filled in by the implementing agent during Phase 2, step 5. Do not close the pack without completing this section.*
+
+### Device
+
+| Field | Value |
+| --- | --- |
+| Device model | Samsung SM-S901E |
+| Serial | `<device_serial>` |
+| Baseline CLI version | 0.7.7 (global install) |
+| Optimized build version | 0.7.8 (local dist) |
+
+### com.solaxcloud.starter.get-battery
+
+| Run | Baseline (ms) | Optimized (ms) |
+| --- | --- | --- |
+| 1 | | |
+| 2 | | |
+| 3 | | |
+| Median | | |
+
+### com.google.android.apps.chromecast.app.get-climate-replay
+
+Unit name used: `<fill in>`
+
+| Run | Baseline (ms) | Optimized (ms) |
+| --- | --- | --- |
+| 1 | | |
+| 2 | | |
+| 3 | | |
+| Median | | |
+
+### Summary
+
+| Metric | Baseline | Optimized | Delta |
+| --- | --- | --- | --- |
+| solax median | | | |
+| chromecast median | | | |
+| Expected from findings (~1260ms CLI) | ~1771ms | ~1260ms | ~511ms |
+
+Notes: *(record any anomalies, device state, or variance observations here)*
