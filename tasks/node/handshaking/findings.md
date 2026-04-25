@@ -7,7 +7,7 @@ Surface: Node snapshot execution preflight and readiness checks
 
 ## Scope Note
 
-This file owns the readiness-cache work and the broader handshake redesign. The immediate I/O pack (`tasks/node/io-optimizations/findings-final.md`) explicitly excludes the short-TTL `probeInteractiveState` cache because cache invalidation rules and diagnostic-preservation decisions must be locked here first. Do not implement the cache as part of the immediate pack.
+This file owns the readiness-cache work and the broader handshake redesign. The immediate I/O pack (`tasks/node/io-optimizations/findings.md`) explicitly excludes the short-TTL `probeInteractiveState` cache because cache invalidation rules and diagnostic-preservation decisions must be locked here first. Do not implement the cache as part of the immediate pack.
 
 ## Summary
 

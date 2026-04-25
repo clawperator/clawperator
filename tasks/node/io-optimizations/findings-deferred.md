@@ -5,7 +5,7 @@ Scope: Structural and higher-cost work intentionally deferred from the immediate
 
 ## Summary
 
-These items remain important for long-term snapshot performance, but they are intentionally out of scope for the immediate low-hanging-fruit Node work in `tasks/node/io-optimizations/findings-final.md`.
+These items remain important for long-term snapshot performance, but they are intentionally out of scope for the immediate low-hanging-fruit Node work in `tasks/node/io-optimizations/findings.md`.
 
 They are deferred because they require Android contract changes, transport redesign, or broader architectural planning than is appropriate for the immediate phase.
 
