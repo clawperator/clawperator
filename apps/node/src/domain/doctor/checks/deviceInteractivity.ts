@@ -102,7 +102,10 @@ export async function runDoctorPingCommand(
   return waitForEnvelope(
     config,
     { commandId, timeoutMs: 7000 },
-    async () => broadcastAgentCommand(config, payload)
+    async (beginDispatchCapture) => {
+      beginDispatchCapture();
+      return broadcastAgentCommand(config, payload);
+    }
   );
 }
 

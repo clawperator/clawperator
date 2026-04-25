@@ -11,30 +11,46 @@ export interface LogcatResultOptions {
   commandId: string;
   timeoutMs: number;
   broadcastDelayMs?: number;
+  cancelSignal?: AbortSignal;
   /** Last N lines to include in timeout diagnostics */
   lastCorrelatedLines?: number;
 }
 
 export type LogcatResult =
-  | { ok: true; envelope: ResultEnvelope; terminalSource: TerminalSource }
+  | { ok: true; envelope: ResultEnvelope; terminalSource: TerminalSource; snapshotLogLines?: string[] }
   | { ok: false; timeout: true; diagnostics: TimeoutDiagnostics }
   | { ok: false; broadcastFailed: true; diagnostics: BroadcastDiagnostics }
   | { ok: false; error: string; code?: string };
 
+function isSnapshotLogLine(line: string): boolean {
+  return line.includes("TaskScopeDefault");
+}
+
+const SIGNAL_BROADCAST_REPLAY_DRAIN_MS = 25;
+const SIGNAL_BROADCAST_MAX_DRAIN_MS = 100;
+
+type BroadcastStatus = "not_sent" | "sent" | `failed: ${string}` | `error: ${string}`;
+
+function envelopeLineReferencesCommand(line: string, commandId: string): boolean {
+  return line.includes(JSON.stringify(commandId));
+}
+
 /**
- * Start logcat stream, then invoke onBroadcast (after a short delay so logcat is attached).
+ * Start logcat stream, then invoke onBroadcast once stdout proves the stream is attached
+ * or the fallback delay elapses.
  * Wait for one terminal envelope or timeout. Kills logcat on envelope or timeout.
  */
 export async function waitForResultEnvelope(
   config: RuntimeConfig,
   options: LogcatResultOptions,
-  onBroadcast: () => Promise<{ success: boolean; stdout?: string; stderr?: string }>
+  onBroadcast: (beginDispatchCapture: () => void) => Promise<{ success: boolean; stdout?: string; stderr?: string }>
 ): Promise<LogcatResult> {
   const {
     commandId,
     timeoutMs: rawTimeoutMs,
     lastCorrelatedLines = 20,
-    broadcastDelayMs: rawBroadcastDelayMs = 300,
+    broadcastDelayMs: rawBroadcastDelayMs = 100,
+    cancelSignal,
   } = options;
   const timeoutMs = Number.isFinite(rawTimeoutMs) && rawTimeoutMs >= 0 ? rawTimeoutMs : 0;
   const broadcastDelayMs =
@@ -45,11 +61,21 @@ export async function waitForResultEnvelope(
 
   return new Promise((resolve) => {
     const correlatedLines: string[] = [];
-    let broadcastStatus = "not_sent";
+    const snapshotLogLines: string[] = [];
+    let broadcastStatus: BroadcastStatus = "not_sent";
+    let captureSnapshotLines = false;
     let pending = "";
     let settled = false;
     let stderrBuffer = "";
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: NodeJS.Timeout | undefined;
+    let broadcastStartTimer: NodeJS.Timeout | undefined;
+    let signalBroadcastStartTimer: NodeJS.Timeout | undefined;
+    let signalBroadcastMaxTimer: NodeJS.Timeout | undefined;
+    let snapshotCaptureStartTimer: NodeJS.Timeout | undefined;
+    let broadcastStarted = false;
+    let dispatchCaptureStarted = false;
+    let forcedReplayDrainDispatch = false;
+    let stdoutObserved = false;
 
     config.logger?.emit({
       ts: new Date().toISOString(),
@@ -64,7 +90,22 @@ export async function waitForResultEnvelope(
     const finalize = (result: LogcatResult) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timeoutId);
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+      if (broadcastStartTimer !== undefined) {
+        clearTimeout(broadcastStartTimer);
+      }
+      if (signalBroadcastStartTimer !== undefined) {
+        clearTimeout(signalBroadcastStartTimer);
+      }
+      if (signalBroadcastMaxTimer !== undefined) {
+        clearTimeout(signalBroadcastMaxTimer);
+      }
+      if (snapshotCaptureStartTimer !== undefined) {
+        clearTimeout(snapshotCaptureStartTimer);
+      }
+      cancelSignal?.removeEventListener("abort", abortHandler);
       resolve(result);
     };
 
@@ -76,35 +117,140 @@ export async function waitForResultEnvelope(
       }
     };
 
-    timeoutId = setTimeout(() => {
+    const abortHandler = () => {
       flush();
-      const diagnostics: TimeoutDiagnostics = {
-        code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
-        message: `No [Clawperator-Result] envelope within ${timeoutMs}ms`,
-        lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
-        broadcastDispatchStatus: broadcastStatus,
-        deviceId: config.deviceId,
-        operatorPackage: config.operatorPackage,
-      };
-      config.logger?.emit({
-        ts: new Date().toISOString(),
-        level: "debug",
-        event: "adb.complete",
-        deviceId: config.deviceId,
-        message: `${commandLine} timeoutMs=${timeoutMs} stdout=[redacted] stderr=[redacted]`,
+      finalize({
+        ok: false,
+        error: "logcat result wait canceled before broadcast dispatch",
+        code: ERROR_CODES.BROADCAST_FAILED,
       });
-      finalize({ ok: false, timeout: true, diagnostics });
-    }, timeoutMs);
+    };
+
+    if (cancelSignal?.aborted) {
+      abortHandler();
+      return;
+    }
+    cancelSignal?.addEventListener("abort", abortHandler, { once: true });
+
+    const startTimeout = () => {
+      if (timeoutId !== undefined) {
+        return;
+      }
+      timeoutId = setTimeout(() => {
+        flush();
+        const diagnostics: TimeoutDiagnostics = {
+          code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
+          message: `No [Clawperator-Result] envelope within ${timeoutMs}ms`,
+          lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
+          broadcastDispatchStatus: broadcastStatus,
+          deviceId: config.deviceId,
+          operatorPackage: config.operatorPackage,
+        };
+        config.logger?.emit({
+          ts: new Date().toISOString(),
+          level: "debug",
+          event: "adb.complete",
+          deviceId: config.deviceId,
+          message: `${commandLine} timeoutMs=${timeoutMs} stdout=[redacted] stderr=[redacted]`,
+        });
+        finalize({ ok: false, timeout: true, diagnostics });
+      }, timeoutMs);
+    };
+
+    const beginDispatchCapture = () => {
+      if (dispatchCaptureStarted) {
+        return;
+      }
+      pending = "";
+      dispatchCaptureStarted = true;
+      if (forcedReplayDrainDispatch) {
+        // The max-drain path means stdout stayed noisy long enough that some
+        // `logcat -T 1` replay may still be arriving. Delay snapshot capture
+        // by the normal drain window, while still accepting the result envelope
+        // immediately. A real snapshot_ui traversal is much slower than this
+        // guard window, and the tradeoff prevents stale replayed hierarchy XML
+        // from being attached to the fresh command.
+        snapshotCaptureStartTimer = setTimeout(() => {
+          captureSnapshotLines = true;
+        }, SIGNAL_BROADCAST_REPLAY_DRAIN_MS);
+      } else {
+        captureSnapshotLines = true;
+      }
+      broadcastStatus = "sent";
+      startTimeout();
+    };
+
+    const startBroadcast = () => {
+      if (settled || broadcastStarted) {
+        return;
+      }
+      broadcastStarted = true;
+      if (broadcastStartTimer !== undefined) {
+        clearTimeout(broadcastStartTimer);
+      }
+      if (signalBroadcastStartTimer !== undefined) {
+        clearTimeout(signalBroadcastStartTimer);
+      }
+      if (signalBroadcastMaxTimer !== undefined) {
+        clearTimeout(signalBroadcastMaxTimer);
+      }
+      (async () => {
+        try {
+          const result = await onBroadcast(beginDispatchCapture);
+          if (!result.success) {
+            const combined = (result.stderr ?? result.stdout ?? "unknown").trim();
+            const isMissingPackage = combined.includes("Target package not found") || combined.includes("does not exist");
+            const code = isMissingPackage ? ERROR_CODES.OPERATOR_NOT_INSTALLED : ERROR_CODES.BROADCAST_FAILED;
+
+            broadcastStatus = `failed: ${combined}`;
+            const diagnostics: BroadcastDiagnostics = {
+              code,
+              message: `Broadcast dispatch failed${combined ? `: ${combined}` : ""}`,
+              lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
+              broadcastDispatchStatus: broadcastStatus,
+              deviceId: config.deviceId,
+              operatorPackage: config.operatorPackage,
+            };
+            flush();
+            finalize({ ok: false, broadcastFailed: true, diagnostics });
+            return;
+          }
+          if (!dispatchCaptureStarted) {
+            beginDispatchCapture();
+          }
+        } catch (e) {
+          const err = String(e).trim();
+          broadcastStatus = `error: ${err}`;
+          const diagnostics: BroadcastDiagnostics = {
+            code: ERROR_CODES.BROADCAST_FAILED,
+            message: `Broadcast dispatch threw${err ? `: ${err}` : ""}`,
+            lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
+            broadcastDispatchStatus: broadcastStatus,
+            deviceId: config.deviceId,
+            operatorPackage: config.operatorPackage,
+          };
+          flush();
+          finalize({ ok: false, broadcastFailed: true, diagnostics });
+        }
+      })();
+    };
 
     proc.stdout?.on("data", (chunk: Buffer) => {
       pending += chunk.toString();
       const lines = pending.split("\n");
       pending = lines.pop() ?? "";
       for (const line of lines) {
-        if (line.includes("TaskScopeDefault:")) {
+        if (isSnapshotLogLine(line)) {
           correlatedLines.push(line);
+          if (captureSnapshotLines) {
+            snapshotLogLines.push(line);
+          }
         }
-        if (!line.includes(RESULT_ENVELOPE_PREFIX)) continue;
+        if (
+          broadcastStatus !== "sent"
+          || !line.includes(RESULT_ENVELOPE_PREFIX)
+          || !envelopeLineReferencesCommand(line, commandId)
+        ) continue;
 
         const parsed = parseTerminalEnvelope(line, commandId);
         if (parsed === "malformed") {
@@ -123,9 +269,30 @@ export async function waitForResultEnvelope(
             ok: true,
             envelope: parsed.envelope,
             terminalSource: parsed.terminalSource,
+            snapshotLogLines,
           });
           return;
         }
+      }
+      if (!broadcastStarted) {
+        if (!stdoutObserved) {
+          stdoutObserved = true;
+          signalBroadcastMaxTimer = setTimeout(() => {
+            forcedReplayDrainDispatch = true;
+            startBroadcast();
+          }, SIGNAL_BROADCAST_MAX_DRAIN_MS);
+        }
+        if (broadcastStartTimer !== undefined) {
+          clearTimeout(broadcastStartTimer);
+          broadcastStartTimer = undefined;
+        }
+        if (signalBroadcastStartTimer !== undefined) {
+          clearTimeout(signalBroadcastStartTimer);
+        }
+        signalBroadcastStartTimer = setTimeout(() => {
+          forcedReplayDrainDispatch = false;
+          startBroadcast();
+        }, SIGNAL_BROADCAST_REPLAY_DRAIN_MS);
       }
     });
 
@@ -173,44 +340,6 @@ export async function waitForResultEnvelope(
       finalize({ ok: false, error: stderr ? `${base}: ${stderr}` : base });
     });
 
-    // Start broadcast after logcat is attached (short delay)
-    (async () => {
-      await new Promise((r) => setTimeout(r, broadcastDelayMs));
-      try {
-        const result = await onBroadcast();
-        if (!result.success) {
-          const combined = (result.stderr ?? result.stdout ?? "unknown").trim();
-          const isMissingPackage = combined.includes("Target package not found") || combined.includes("does not exist");
-          const code = isMissingPackage ? ERROR_CODES.OPERATOR_NOT_INSTALLED : ERROR_CODES.BROADCAST_FAILED;
-
-          broadcastStatus = `failed: ${combined}`;
-          const diagnostics: BroadcastDiagnostics = {
-            code,
-            message: `Broadcast dispatch failed${combined ? `: ${combined}` : ""}`,
-            lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
-            broadcastDispatchStatus: broadcastStatus,
-            deviceId: config.deviceId,
-            operatorPackage: config.operatorPackage,
-          };
-          flush();
-          finalize({ ok: false, broadcastFailed: true, diagnostics });
-          return;
-        }
-        broadcastStatus = "sent";
-      } catch (e) {
-        const err = String(e).trim();
-        broadcastStatus = `error: ${err}`;
-        const diagnostics: BroadcastDiagnostics = {
-          code: ERROR_CODES.BROADCAST_FAILED,
-          message: `Broadcast dispatch threw${err ? `: ${err}` : ""}`,
-          lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
-          broadcastDispatchStatus: broadcastStatus,
-          deviceId: config.deviceId,
-          operatorPackage: config.operatorPackage,
-        };
-        flush();
-        finalize({ ok: false, broadcastFailed: true, diagnostics });
-      }
-    })();
+    broadcastStartTimer = setTimeout(startBroadcast, broadcastDelayMs);
   });
 }

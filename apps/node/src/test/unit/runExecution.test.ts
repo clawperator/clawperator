@@ -20,11 +20,18 @@ import type { Execution } from "../../contracts/execution.js";
 import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
+import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
+import { extractSnapshotsFromLogs } from "../../domain/executions/snapshotHelper.js";
 import { createClawperatorLogger } from "../../adapters/logger.js";
 import { clawperatorEvents, CLAWPERATOR_EVENT_TYPES } from "../../domain/observe/events.js";
 import { isAbsolute, join } from "node:path";
 import { tmpdir } from "node:os";
 import { FakeProcessRunner } from "./fakes/FakeProcessRunner.js";
+
+function formatLogcatTime(date: Date): string {
+  const pad = (value: number, width = 2) => String(value).padStart(width, "0");
+  return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`;
+}
 
 describe("attachSnapshotsToStepResults", () => {
   it("aligns fewer snapshots to the last snapshot_ui steps", () => {
@@ -549,6 +556,7 @@ describe("runExecution", () => {
   it("fails fast when the Operator APK is missing and never broadcasts", async () => {
     const runner = new FakeProcessRunner();
     const warnings: string[] = [];
+    let logcatKilled = false;
     const execution: Execution = {
       commandId: "cmd-preflight",
       taskId: "task-preflight",
@@ -563,12 +571,27 @@ describe("runExecution", () => {
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
+    runner.spawn = ((command, args, options) => {
+      runner.calls.push({ command, args, options });
+      const proc = new EventEmitter() as EventEmitter & {
+        stdout?: EventEmitter;
+        stderr?: EventEmitter;
+        kill: () => void;
+      };
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => {
+        logcatKilled = true;
+      };
+      return proc;
+    }) as FakeProcessRunner["spawn"];
 
     const result = await runExecution(execution, {
       deviceId: "test-device-1",
       operatorPackage: "com.test.operator.dev",
       runner,
       warn: message => warnings.push(message),
+      logcatBroadcastDelayMs: 10_000,
     });
 
     assert.strictEqual(result.ok, false);
@@ -580,14 +603,45 @@ describe("runExecution", () => {
       assert.match(result.error.message, /operator-debug\.apk/);
     }
     assert.strictEqual(warnings.length, 0);
+    assert.strictEqual(logcatKilled, true);
     assert.deepStrictEqual(
       runner.calls.map(call => call.args.join(" ")),
       [
+        "-s test-device-1 logcat -v time -T 1",
         "-s test-device-1 devices",
         "-s test-device-1 shell pm list packages com.test.operator.dev",
         "-s test-device-1 shell pm list packages com.test.operator",
       ]
     );
+  });
+
+  it("does not take the explicit-device early logcat path for blank deviceId", async () => {
+    const runner = new FakeProcessRunner();
+    const execution: Execution = {
+      commandId: "cmd-blank-device",
+      taskId: "task-blank-device",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "sleep-1", type: "sleep", params: { durationMs: 0 } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\nemulator-5554\tdevice\n", stderr: "" });
+
+    const result = await runExecution(execution, {
+      deviceId: "",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    assert.strictEqual(result.ok, false);
+    if (!result.ok) {
+      assert.strictEqual(result.error.code, ERROR_CODES.MULTIPLE_DEVICES_DEVICE_ID_REQUIRED);
+    }
+    assert.ok(!runner.calls.some(call => call.args.join(" ") === "logcat -v time -T 1"));
+    assert.ok(!runner.calls.some(call => call.args.join(" ") === "shell pm list packages com.test.operator.dev"));
   });
 
   it("fails before dispatch when the resolved device is not interactive", async () => {
@@ -610,6 +664,7 @@ describe("runExecution", () => {
       deviceId: "test-device-1",
       operatorPackage: "com.test.operator.dev",
       runner,
+      logcatBroadcastDelayMs: 0,
       ensureInteractiveAutomationReadyFn: async () => ({
         ok: false,
         error: {
@@ -635,6 +690,7 @@ describe("runExecution", () => {
     assert.deepStrictEqual(
       runner.calls.map(call => call.args.join(" ")),
       [
+        "-s test-device-1 logcat -v time -T 1",
         "-s test-device-1 devices",
         "-s test-device-1 shell pm list packages com.test.operator.dev",
       ]
@@ -661,6 +717,7 @@ describe("runExecution", () => {
       deviceId: "test-device-1",
       operatorPackage: "com.test.operator.dev",
       runner,
+      logcatBroadcastDelayMs: 0,
       ensureInteractiveAutomationReadyFn: async () => ({
         ok: false,
         error: {
@@ -732,6 +789,54 @@ describe("runExecution", () => {
     assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
   });
 
+  it("cancels the early logcat waiter when readiness preflight throws", async () => {
+    const runner = new FakeProcessRunner();
+    let logcatKilled = false;
+    const execution: Execution = {
+      commandId: "cmd-throwing-preflight",
+      taskId: "task-throwing-preflight",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "sleep-1", type: "sleep", params: { durationMs: 0 } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+    runner.spawn = ((command, args, options) => {
+      runner.calls.push({ command, args, options });
+      const proc = new EventEmitter() as EventEmitter & {
+        stdout?: EventEmitter;
+        stderr?: EventEmitter;
+        kill: () => void;
+      };
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => {
+        logcatKilled = true;
+      };
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+
+    await assert.rejects(
+      runExecution(execution, {
+        deviceId: "test-device-1",
+        operatorPackage: "com.test.operator.dev",
+        runner,
+        logcatBroadcastDelayMs: 10_000,
+        ensureInteractiveAutomationReadyFn: async () => {
+          throw new Error("readiness exploded");
+        },
+      }),
+      /readiness exploded/
+    );
+
+    assert.strictEqual(logcatKilled, true);
+    assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
+  });
+
   it("continues after the shared readiness helper wakes a sleeping device", async () => {
     const runner = new FakeProcessRunner();
     const execution: Execution = {
@@ -747,9 +852,9 @@ describe("runExecution", () => {
 
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" });
-    runner.spawn = (() => {
+    runner.spawn = ((command, args, options) => {
+      runner.calls.push({ command, args, options });
       const proc = new EventEmitter() as EventEmitter & {
         stdout?: EventEmitter;
         stderr?: EventEmitter;
@@ -775,6 +880,7 @@ describe("runExecution", () => {
       deviceId: "test-device-1",
       operatorPackage: "com.test.operator.dev",
       runner,
+      logcatBroadcastDelayMs: 0,
       ensureInteractiveAutomationReadyFn: async () => ({
         ok: true,
         state: {
@@ -787,10 +893,10 @@ describe("runExecution", () => {
     });
 
     assert.strictEqual(result.ok, true);
-    assert.ok(runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -c"));
+    assert.ok(!runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -c"));
   });
 
-  it("attaches clean snapshot text from noisy logcat dumps", async () => {
+  it("attaches clean snapshot text from noisy live logcat lines", async () => {
     const runner = new FakeProcessRunner();
     const execution: Execution = {
       commandId: "cmd-noisy-snapshot",
@@ -805,21 +911,9 @@ describe("runExecution", () => {
 
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "", stderr: "" });
     runner.queueResult({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" });
-    runner.queueResult({
-      code: 0,
-      stdout: [
-        "D/TaskScopeDefault: [TaskScope] UI Hierarchy:",
-        "D/TaskScopeDefault: <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
-        "D/TaskScopeDefault: <hierarchy rotation=\"0\">",
-        "V/Configuration: Updating configuration, locales updated from [] to [en_US]",
-        "D/TaskScopeDefault:   <node index=\"0\" text=\"Settings\" />",
-        "D/TaskScopeDefault: </hierarchy>",
-      ].join("\n"),
-      stderr: "",
-    });
-    runner.spawn = (() => {
+    runner.spawn = ((command, args, options) => {
+      runner.calls.push({ command, args, options });
       const proc = new EventEmitter() as EventEmitter & {
         stdout?: EventEmitter;
         stderr?: EventEmitter;
@@ -829,7 +923,15 @@ describe("runExecution", () => {
       proc.stderr = new EventEmitter();
       proc.kill = () => undefined;
       setTimeout(() => {
-        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+        const prefix = formatLogcatTime(new Date());
+        proc.stdout?.emit("data", Buffer.from([
+          `${prefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+          `${prefix} D/TaskScopeDefault(29817): <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>`,
+          `${prefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
+          `${prefix} V/Configuration(29817): Updating configuration, locales updated from [] to [en_US]`,
+          `${prefix} D/TaskScopeDefault(29817):   <node index="0" text="Settings" />`,
+          `${prefix} D/TaskScopeDefault(29817): </hierarchy>`,
+          `[Clawperator-Result] ${JSON.stringify({
           commandId: "cmd-noisy-snapshot",
           taskId: "task-noisy-snapshot",
           status: "success",
@@ -845,7 +947,8 @@ describe("runExecution", () => {
             },
           }],
           error: null,
-        })}\n`));
+        })}`,
+        ].join("\n") + "\n"));
         proc.emit("close", 0, null);
       }, 5);
       return proc;
@@ -888,7 +991,8 @@ describe("runExecution", () => {
     }
     assert.strictEqual(event.deviceId, "test-device-1");
     assert.strictEqual(event.envelope.stepResults[0].data.text, result.ok ? result.envelope.stepResults[0].data.text : undefined);
-    assert.ok(runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -d -v tag"));
+    assert.ok(!runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -d -v tag"));
+    assert.ok(!runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -c"));
   });
 
   it("allows close_app-only executions to succeed without the interactive gate", async () => {
@@ -988,6 +1092,945 @@ describe("runExecution", () => {
         data: { application_id: "com.example.app" },
       },
     ]);
+  });
+
+  it("starts logcat before explicit-device preflight and checks apk while resolving the device", async () => {
+    const runner = new FakeProcessRunner();
+    const execution: Execution = {
+      commandId: "cmd-explicit-fast-path",
+      taskId: "task-explicit-fast-path",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "sleep-1", type: "sleep", params: { durationMs: 0 } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" });
+    runner.spawn = ((command, args, options) => {
+      runner.calls.push({ command, args, options });
+      const proc = new EventEmitter() as EventEmitter & {
+        stdout?: EventEmitter;
+        stderr?: EventEmitter;
+        kill: () => void;
+      };
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      setTimeout(() => {
+        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+          commandId: "cmd-explicit-fast-path",
+          taskId: "task-explicit-fast-path",
+          status: "success",
+          stepResults: [{ id: "sleep-1", actionType: "sleep", success: true, data: {} }],
+          error: null,
+        })}\n`));
+        proc.emit("close", 0, null);
+      }, 5);
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+
+    const result = await runExecution(execution, {
+      deviceId: "test-device-1",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+      logcatBroadcastDelayMs: 0,
+      ensureInteractiveAutomationReadyFn: async () => ({
+        ok: true,
+        state: {
+          screenOn: true,
+          interactive: true,
+          deviceLocked: false,
+          userUnlocked: true,
+        },
+      }),
+    });
+
+    assert.strictEqual(result.ok, true);
+    const calls = runner.calls.map(call => call.args.join(" "));
+    assert.strictEqual(calls[0], "-s test-device-1 logcat -v time -T 1");
+    assert.strictEqual(calls[1], "-s test-device-1 devices");
+    assert.strictEqual(calls[2], "-s test-device-1 shell pm list packages com.test.operator.dev");
+    assert.match(calls[3], /shell am broadcast/);
+  });
+
+  it("keeps auto-resolve preflight sequential before starting logcat", async () => {
+    const runner = new FakeProcessRunner();
+    const execution: Execution = {
+      commandId: "cmd-auto-sequential",
+      taskId: "task-auto-sequential",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "sleep-1", type: "sleep", params: { durationMs: 0 } },
+      ],
+    };
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" });
+    runner.spawn = ((command, args, options) => {
+      runner.calls.push({ command, args, options });
+      const proc = new EventEmitter() as EventEmitter & {
+        stdout?: EventEmitter;
+        stderr?: EventEmitter;
+        kill: () => void;
+      };
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      setTimeout(() => {
+        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+          commandId: "cmd-auto-sequential",
+          taskId: "task-auto-sequential",
+          status: "success",
+          stepResults: [{ id: "sleep-1", actionType: "sleep", success: true, data: {} }],
+          error: null,
+        })}\n`));
+        proc.emit("close", 0, null);
+      }, 5);
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+
+    const result = await runExecution(execution, {
+      operatorPackage: "com.test.operator.dev",
+      runner,
+      logcatBroadcastDelayMs: 0,
+      ensureInteractiveAutomationReadyFn: async () => ({
+        ok: true,
+        state: {
+          screenOn: true,
+          interactive: true,
+          deviceLocked: false,
+          userUnlocked: true,
+        },
+      }),
+    });
+
+    assert.strictEqual(result.ok, true);
+    const calls = runner.calls.map(call => call.args.join(" "));
+    assert.strictEqual(calls[0], "devices");
+    assert.strictEqual(calls[1], "-s test-device-1 shell pm list packages com.test.operator.dev");
+    assert.strictEqual(calls[2], "-s test-device-1 logcat -v time -T 1");
+    assert.match(calls[3], /shell am broadcast/);
+  });
+});
+
+describe("waitForResultEnvelope", () => {
+  it("dispatches when the live logcat stream emits stdout before the fallback delay", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from("04-25 20:14:52.453 D/TaskScopeDefault(29817): ready\n"));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+    const startedAt = Date.now();
+    let broadcastStartedAt = 0;
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-signal-dispatch",
+        timeoutMs: 1000,
+        broadcastDelayMs: 10_000,
+      },
+      async (beginDispatchCapture) => {
+        broadcastStartedAt = Date.now();
+        beginDispatchCapture();
+        setTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-signal-dispatch",
+            taskId: "task-signal-dispatch",
+            status: "success",
+            stepResults: [],
+            error: null,
+          })}\n`));
+        });
+        return { success: true, stdout: "", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    assert.ok(broadcastStartedAt - startedAt < 1000, "broadcast should not wait for the fallback timer");
+  });
+
+  it("starts the result timeout from broadcast dispatch rather than logcat spawn", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-timeout-after-dispatch",
+        timeoutMs: 5,
+        broadcastDelayMs: 25,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        setTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-timeout-after-dispatch",
+            taskId: "task-timeout-after-dispatch",
+            status: "success",
+            stepResults: [],
+            error: null,
+          })}\n`));
+        });
+        return { success: true, stdout: "", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+  });
+
+  it("does not capture replayed snapshot lines from the first logcat attachment chunk", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+          "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node text=\"stale\" />",
+          "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+        ].join("\n") + "\n"));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-capture-boundary",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        setTimeout(() => {
+          const freshPrefix = formatLogcatTime(new Date());
+          proc.stdout?.emit("data", Buffer.from([
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
+            `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
+            `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
+            `[Clawperator-Result] ${JSON.stringify({
+              commandId: "cmd-capture-boundary",
+              taskId: "task-capture-boundary",
+              status: "success",
+              stepResults: [],
+              error: null,
+            })}`,
+          ].join("\n") + "\n"));
+        });
+        return { success: true, stdout: "", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.ok(result.snapshotLogLines?.some(line => line.includes("fresh")));
+      assert.ok(!result.snapshotLogLines?.some(line => line.includes("stale")));
+    }
+  });
+
+  it("ignores replayed matching envelopes before dispatch", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+          commandId: "cmd-replayed-envelope",
+          taskId: "old-task",
+          status: "success",
+          stepResults: [{ id: "old", actionType: "sleep", success: true, data: {} }],
+          error: null,
+        })}\n`));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-replayed-envelope",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        setTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-replayed-envelope",
+            taskId: "new-task",
+            status: "success",
+            stepResults: [{ id: "new", actionType: "sleep", success: true, data: {} }],
+            error: null,
+          })}\n`));
+        });
+        return { success: true, stdout: "", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.envelope.taskId, "new-task");
+    }
+  });
+
+  it("accepts matching envelopes emitted before broadcast command completion", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+          commandId: "cmd-sync-envelope",
+          taskId: "old-task",
+          status: "success",
+          stepResults: [{ id: "old", actionType: "sleep", success: true, data: {} }],
+          error: null,
+        })}\n`));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-sync-envelope",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+          commandId: "cmd-sync-envelope",
+          taskId: "new-task",
+          status: "failed",
+          stepResults: [],
+          error: "service unavailable",
+          errorCode: "SERVICE_UNAVAILABLE",
+        })}\n`));
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.envelope.taskId, "new-task");
+      assert.strictEqual(result.envelope.status, "failed");
+      assert.strictEqual(result.envelope.errorCode, "SERVICE_UNAVAILABLE");
+    }
+  });
+
+  it("captures fresh snapshot lines emitted before broadcast command completion", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+          "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node text=\"stale\" />",
+          "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+        ].join("\n") + "\n"));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-sync-snapshot",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        const freshPrefix = formatLogcatTime(new Date());
+        proc.stdout?.emit("data", Buffer.from([
+          `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+          `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
+          `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
+          `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
+          `[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-sync-snapshot",
+            taskId: "task-sync-snapshot",
+            status: "success",
+            stepResults: [],
+            error: null,
+          })}`,
+        ].join("\n") + "\n"));
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.ok(result.snapshotLogLines?.some(line => line.includes("fresh")));
+      assert.ok(!result.snapshotLogLines?.some(line => line.includes("stale")));
+    }
+  });
+
+  it("drains replayed snapshot lines that arrive in later chunks before dispatch starts", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from("04-25 20:14:52.453 D/TaskScopeDefault(29817): ready\n"));
+      });
+      setTimeout(() => {
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.454 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.455 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+          "04-25 20:14:52.456 D/TaskScopeDefault(29817):   <node text=\"stale\" />",
+          "04-25 20:14:52.457 D/TaskScopeDefault(29817): </hierarchy>",
+          `[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-late-replay",
+            taskId: "old-task",
+            status: "success",
+            stepResults: [{ id: "old", actionType: "sleep", success: true, data: {} }],
+            error: null,
+          })}`,
+        ].join("\n") + "\n"));
+      }, 5);
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-late-replay",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        setTimeout(() => {
+          const freshPrefix = formatLogcatTime(new Date());
+          proc.stdout?.emit("data", Buffer.from([
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
+            `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
+            `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
+            `[Clawperator-Result] ${JSON.stringify({
+              commandId: "cmd-late-replay",
+              taskId: "task-late-replay",
+              status: "success",
+              stepResults: [],
+              error: null,
+            })}`,
+          ].join("\n") + "\n"));
+        });
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.envelope.taskId, "task-late-replay");
+      assert.ok(result.snapshotLogLines?.some(line => line.includes("fresh")));
+      assert.ok(!result.snapshotLogLines?.some(line => line.includes("stale")));
+    }
+  });
+
+  it("does not let the no-output fallback interrupt replay draining after stdout", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    let broadcastStarted = false;
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from("04-25 20:14:52.453 D/TaskScopeDefault(29817): ready\n"));
+      });
+      setTimeout(() => {
+        assert.strictEqual(broadcastStarted, false, "fallback must not dispatch while replay chunks are still draining");
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.454 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.455 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+          "04-25 20:14:52.456 D/TaskScopeDefault(29817):   <node text=\"stale-after-fallback\" />",
+          "04-25 20:14:52.457 D/TaskScopeDefault(29817): </hierarchy>",
+        ].join("\n") + "\n"));
+      }, 15);
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-fallback-replay-drain",
+        timeoutMs: 1000,
+        broadcastDelayMs: 10,
+      },
+      async (beginDispatchCapture) => {
+        broadcastStarted = true;
+        beginDispatchCapture();
+        setTimeout(() => {
+          const freshPrefix = formatLogcatTime(new Date());
+          proc.stdout?.emit("data", Buffer.from([
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
+            `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
+            `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
+            `[Clawperator-Result] ${JSON.stringify({
+              commandId: "cmd-fallback-replay-drain",
+              taskId: "task-fallback-replay-drain",
+              status: "success",
+              stepResults: [],
+              error: null,
+            })}`,
+          ].join("\n") + "\n"));
+        });
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.ok(result.snapshotLogLines?.some(line => line.includes("fresh")));
+      assert.ok(!result.snapshotLogLines?.some(line => line.includes("stale-after-fallback")));
+    }
+  });
+
+  it("dispatches even when continuous logcat output keeps resetting the drain timer", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    const logTimers: NodeJS.Timeout[] = [];
+    let broadcastStartedAt = 0;
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => {
+        for (const timer of logTimers) {
+          clearTimeout(timer);
+        }
+      };
+      for (let i = 0; i < 12; i += 1) {
+        logTimers.push(setTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from(`04-25 20:14:52.${String(500 + i).padStart(3, "0")} D/TaskScopeDefault(29817): noisy replay ${i}\n`));
+        }, i * 15));
+      }
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const startedAt = Date.now();
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-noisy-drain",
+        timeoutMs: 1000,
+        broadcastDelayMs: 10_000,
+      },
+      async (beginDispatchCapture) => {
+        broadcastStartedAt = Date.now();
+        beginDispatchCapture();
+        setTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-noisy-drain",
+            taskId: "task-noisy-drain",
+            status: "success",
+            stepResults: [],
+            error: null,
+          })}\n`));
+        });
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    assert.ok(broadcastStartedAt > 0, "broadcast must start despite continuous stdout");
+    assert.ok(broadcastStartedAt - startedAt < 500, "broadcast should be bounded by the max drain timer");
+  });
+
+  it("does not capture stale snapshot lines after forced replay-drain dispatch", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    const logTimers: NodeJS.Timeout[] = [];
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => {
+        for (const timer of logTimers) {
+          clearTimeout(timer);
+        }
+      };
+      for (let i = 0; i < 12; i += 1) {
+        logTimers.push(setTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from(`04-25 20:14:52.${String(500 + i).padStart(3, "0")} D/TaskScopeDefault(29817): noisy replay ${i}\n`));
+        }, i * 15));
+      }
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-forced-replay-snapshot",
+        timeoutMs: 1000,
+        broadcastDelayMs: 10_000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.700 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.701 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+          "04-25 20:14:52.702 D/TaskScopeDefault(29817):   <node text=\"stale-forced\" />",
+          "04-25 20:14:52.703 D/TaskScopeDefault(29817): </hierarchy>",
+        ].join("\n") + "\n"));
+        setTimeout(() => {
+          const freshPrefix = formatLogcatTime(new Date());
+          proc.stdout?.emit("data", Buffer.from([
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
+            `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh-forced" />`,
+            `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
+            `[Clawperator-Result] ${JSON.stringify({
+              commandId: "cmd-forced-replay-snapshot",
+              taskId: "task-forced-replay-snapshot",
+              status: "success",
+              stepResults: [],
+              error: null,
+            })}`,
+          ].join("\n") + "\n"));
+        }, 35);
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      const snapshots = extractSnapshotsFromLogs(result.snapshotLogLines ?? []);
+      assert.ok(snapshots.some(snapshot => snapshot.includes("fresh-forced")));
+      assert.ok(!snapshots.some(snapshot => snapshot.includes("stale-forced")));
+    }
+  });
+
+  it("ignores stale malformed replayed envelopes for other commands after dispatch starts", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from("04-25 20:14:52.453 D/TaskScopeDefault(29817): ready\n"));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-current-malformed-filter",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        proc.stdout?.emit("data", Buffer.from("[Clawperator-Result] {\"commandId\":\"old-command\",\n"));
+        setTimeout(() => {
+          proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-current-malformed-filter",
+            taskId: "task-current-malformed-filter",
+            status: "success",
+            stepResults: [],
+            error: null,
+          })}\n`));
+        });
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.envelope.taskId, "task-current-malformed-filter");
+    }
+  });
+
+  it("does not capture split replayed snapshot lines before dispatch completes", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+        ].join("\n") + "\n"));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-split-replay",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async (beginDispatchCapture) => {
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node text=\"stale\" />",
+          "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+        ].join("\n") + "\n"));
+        beginDispatchCapture();
+        setTimeout(() => {
+          const freshPrefix = formatLogcatTime(new Date());
+          proc.stdout?.emit("data", Buffer.from([
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
+            `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
+            `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
+            `[Clawperator-Result] ${JSON.stringify({
+              commandId: "cmd-split-replay",
+              taskId: "task-split-replay",
+              status: "success",
+              stepResults: [],
+              error: null,
+            })}`,
+          ].join("\n") + "\n"));
+        });
+        return { success: true, stdout: "", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.ok(result.snapshotLogLines?.some(line => line.includes("fresh")));
+      assert.ok(!result.snapshotLogLines?.some(line => line.includes("stale")));
+    }
+  });
+
+  it("drops partial replayed log lines that complete after dispatch starts", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+          commandId: "cmd-partial-replay",
+          taskId: "old-task",
+          status: "success",
+          stepResults: [{ id: "old", actionType: "sleep", success: true, data: {} }],
+          error: null,
+        }).slice(0, 48)}`));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-partial-replay",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        proc.stdout?.emit("data", Buffer.from([
+          `${JSON.stringify({
+            commandId: "cmd-partial-replay",
+            taskId: "old-task",
+            status: "success",
+          stepResults: [{ id: "old", actionType: "sleep", success: true, data: {} }],
+          error: null,
+        }).slice(48)}`,
+          "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+          "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node text=\"stale-partial\" />",
+          "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+        ].join("\n") + "\n"));
+        setTimeout(() => {
+          const freshPrefix = formatLogcatTime(new Date());
+          proc.stdout?.emit("data", Buffer.from([
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
+            `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
+            `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
+            `[Clawperator-Result] ${JSON.stringify({
+              commandId: "cmd-partial-replay",
+              taskId: "task-partial-replay",
+              status: "success",
+              stepResults: [],
+              error: null,
+            })}`,
+          ].join("\n") + "\n"));
+        });
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.envelope.taskId, "task-partial-replay");
+      assert.ok(result.snapshotLogLines?.some(line => line.includes("fresh")));
+      assert.ok(!extractSnapshotsFromLogs(result.snapshotLogLines ?? []).some(snapshot => snapshot.includes("stale-partial")));
+    }
   });
 });
 
@@ -1145,7 +2188,6 @@ describe("buildTimeoutError", () => {
     runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
     const resultEvent = once(clawperatorEvents, CLAWPERATOR_EVENT_TYPES.RESULT);
     const result = await runExecution(
@@ -1207,7 +2249,6 @@ describe("buildTimeoutError", () => {
 
     runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "", stderr: "" }); // logcat -c
     runner.queueResult({ code: 0, stdout: "", stderr: "" }); // broadcast
 
     const resultEvent = once(clawperatorEvents, CLAWPERATOR_EVENT_TYPES.RESULT);
@@ -1415,7 +2456,6 @@ describe("runExecution logging", () => {
     runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
     const result = await runExecution(
       {
@@ -1481,7 +2521,6 @@ describe("runExecution logging", () => {
 
     runner.queueResult({ code: 0, stdout: "List of devices attached\ndevice-123\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
     const result = await runExecution(

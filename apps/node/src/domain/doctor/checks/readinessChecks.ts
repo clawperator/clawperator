@@ -418,7 +418,10 @@ export async function runSmokeTest(config: RuntimeConfig): Promise<DoctorCheckRe
   const result = await waitForResultEnvelope(
     config,
     { commandId, timeoutMs: 12000 },
-    async () => broadcastAgentCommand(config, payload)
+    async (beginDispatchCapture) => {
+      beginDispatchCapture();
+      return broadcastAgentCommand(config, payload);
+    }
   );
 
   if (result.ok) {

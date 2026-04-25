@@ -76,6 +76,26 @@ interface ParsedLogLine {
 }
 
 function parseLogLine(line: string): ParsedLogLine | null {
+  const timeFormatMatch = line.match(
+    /^\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+[A-Z]\/([^(]+)(?:\(\s*\d+\))?:\s?(.*)$/
+  );
+  if (timeFormatMatch) {
+    return {
+      tag: timeFormatMatch[1].trim(),
+      message: timeFormatMatch[2] ?? "",
+    };
+  }
+
+  const timeFormatPidTidMatch = line.match(
+    /^\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+\d+\s+\d+\s+[A-Z]\s+([^:]+):\s?(.*)$/
+  );
+  if (timeFormatPidTidMatch) {
+    return {
+      tag: timeFormatPidTidMatch[1].trim(),
+      message: timeFormatPidTidMatch[2] ?? "",
+    };
+  }
+
   if (/^[A-Z]\//.test(line)) {
     const delimiterIndex = line.indexOf(":");
     if (delimiterIndex !== -1) {
