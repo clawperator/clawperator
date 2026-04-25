@@ -663,12 +663,12 @@ clawperator snapshot    # Get the current UI state as structured JSON.
 clawperator click --text "Climate"
 clawperator scroll-and-click --text-contains "Living room"
 
-clawperator read --text-contains "Heating"
+clawperator read --id "<google-home-application-id>:id/low_value"
 # { "text": "Off" }
 
-# agent: Heating is off; target climate state is on.
+# agent: Power is off; target climate state is on.
 
-clawperator click --text "Turn On"`}</code>
+clawperator click --id "<google-home-application-id>:id/climate_power_button"`}</code>
             </pre>
           </div>
         </div>
