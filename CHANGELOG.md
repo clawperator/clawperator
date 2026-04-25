@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.7.8] - 2026-04-26
+
+This release tightens the upgrade guidance around PATH resolution and npm reachability while improving snapshot I/O performance and polishing the landing page example code.
+
+### 🤖 Node API & CLI
+- **Changed:** Tightened the `clawperator-upgrade` bundled skill so it resolves PATH explicitly, recovers Homebrew installs by absolute path, and requires npm reachability before using the CLI-first upgrade path.
+- **Changed:** Optimized snapshot and logcat handling to stream hierarchy XML from the live logcat result stream, reduce recovery overhead, and keep the `[Clawperator-Result]` envelope contract intact.
+
+### 📚 Documentation & Website
+- **Changed:** Synced the `clawperator-upgrade` guidance across CLI help, public docs, generated agent surfaces, and the installed host AGENTS guide.
+- **Changed:** Tightened the landing-page example code.
+
+Pull requests:
+- [fix(skills): tighten clawperator-upgrade host PATH handling](https://github.com/clawperator/clawperator/pull/236)
+- [site: improve demo code on landing page](https://github.com/clawperator/clawperator/pull/237)
+- [perf(node): optimize snapshot logcat I/O](https://github.com/clawperator/clawperator/pull/238)
+
 ## [0.7.7] - 2026-04-25
 
 This release advances the code version to 0.7.7 and tightens release publishing checks so future releases fail closed when the changelog entry is missing.
