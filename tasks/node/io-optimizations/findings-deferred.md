@@ -25,6 +25,24 @@ Requires Android contract changes, a new action parameter schema, and validation
 **What it unlocks:**
 Sub-500ms full round trips on typical screens, even with logcat transport.
 
+**Where to investigate first:**
+
+- `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/TaskScopeDefault.kt` - `logUiTree()` calls `uiTreeInspector.getCurrentUiHierarchyDump()`, logs the hierarchy, and reports `elapsed_ms`, `node_count`, and `max_depth`.
+- `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt` - `executeSnapshotUi()` routes `snapshot_ui` through `TaskScope.logUiTree()`.
+- `apps/android/shared/data/uitree/src/main/kotlin/clawperator/accessibilityservice/AccessibilityNodeInfoExtAndroid.kt` - `AccessibilityNodeInfo.buildUiTree()` and `mapToUiNode()` recursively traverse `AccessibilityNodeInfo` and map nodes.
+- `apps/android/shared/data/uitree/src/main/kotlin/clawperator/uitree/UiTreeFilterer.kt` and existing `filterOnScreenOnly()` call sites - useful prior art for visible-node filtering.
+
+**Planning guidance:**
+
+A future task pack should start by measuring the Android side directly, not by changing Node transport again. Capture at least:
+
+- `TaskScopeDefault.logUiTree()` `elapsed_ms`, `node_count`, and `max_depth`
+- hierarchy byte size
+- foreground package / window count metadata already emitted by snapshot results
+- timing split, if added, between root acquisition, `AccessibilityNodeInfo` traversal, filtering, hierarchy serialization, and log emission
+
+Then propose the smallest contract that can reduce traversal or serialization cost while preserving current full-tree behavior by default. Good first candidates are an opt-in foreground-package or visible/actionable-only filter, plus tests proving unfiltered `snapshot_ui` remains unchanged.
+
 ### D2 - Reduced attribute set in snapshot output
 
 **What changes:**
@@ -38,6 +56,16 @@ Requires Android-side changes to the serializer in `TaskScopeDefault`. Any attri
 
 **What it unlocks:**
 Smaller payloads reduce logcat transport time and parsing cost; combined with D1, could cut Android phase to under 200ms.
+
+**Where to investigate first:**
+
+- Start from the same Android snapshot path listed in D1.
+- Compare `getCurrentUiHierarchyDump()` output against the typed `UiTree` path from `AccessibilityNodeInfo.buildUiTree()`.
+- Inventory which XML attributes are used by Node, skills, docs, and common agent workflows before removing or changing any field.
+
+**Planning guidance:**
+
+This is a public snapshot contract change unless it is opt-in. Prefer adding an explicit reduced-output mode or new parameter over silently changing the default XML shape. A task pack should include migration notes, docs updates, and compatibility tests for consumers that expect `data.text` to contain full hierarchy XML.
 
 ### D3 - Incremental / diff snapshot mode
 
@@ -78,3 +106,24 @@ The completed Node-side I/O cleanup already handled:
 - parallelizing cheap preflight steps
 
 Future work should not reopen those completed Node-only items unless a regression is found. The remaining findings above own Android contract changes and transport redesign work.
+
+## Suggested Prompt For Future Task Authoring
+
+Point a future planning agent at these files:
+
+1. `tasks/node/io-optimizations/findings.md`
+2. `tasks/node/io-optimizations/findings-deferred.md`
+3. `tasks/node/handshaking/findings.md`
+4. `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/TaskScopeDefault.kt`
+5. `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt`
+6. `apps/android/shared/data/uitree/src/main/kotlin/clawperator/accessibilityservice/AccessibilityNodeInfoExtAndroid.kt`
+7. `docs/api/snapshot.md`
+8. `apps/node/src/contracts/execution.ts`
+
+Ask it to author a task pack for Android-side `snapshot_ui` traversal and serialization reduction. The pack should:
+
+- keep unfiltered `snapshot_ui` behavior unchanged unless an explicit breaking-change decision is made
+- define the new action parameters, if any, in Node and Android contracts
+- require live-device measurement before and after implementation
+- require Android unit/instrumentation coverage for filtering and serialization behavior
+- require Node contract validation and docs regeneration for any public parameter or output-shape change
