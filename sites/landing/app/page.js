@@ -649,7 +649,11 @@ export default function Home() {
               for the full API)
             </p>
             <pre>
-              <code>{`# agent: Open Google Home before observing its UI.
+              <code>{`# agent: Use an installed runtime skill when one matches the job.
+clawperator skills run com.google.android.apps.chromecast.app.control-hvac-orchestrated -- --action climate_state --value On --unit-name "Living room"
+
+# Or let the agent drive the app directly with deterministic device steps:
+# agent: Open Google Home before observing its UI.
 clawperator open --app com.google.android.apps.chromecast.app
 
 # agent: Inspect Google Home before deciding where to tap.
