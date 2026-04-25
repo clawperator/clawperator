@@ -649,16 +649,12 @@ export default function Home() {
               for the full API)
             </p>
             <pre>
-              <code>{`ACTION="climate_state"
-VALUE="On"
-UNIT_NAME="Living room"
-
-# agent: Use an installed runtime skill when one matches the job.
-clawperator skills run com.google.android.apps.chromecast.app.control-hvac -- --action "$ACTION" --value "$VALUE" --unit-name "$UNIT_NAME"
+              <code>{`# agent: Use an installed runtime skill when one matches the job.
+clawperator skills run <google-home-application-id>.control-hvac -- --action climate_state --value On --unit-name "Living room"
 
 # Or let the agent drive the app directly with deterministic device steps:
 # agent: Open Google Home before observing its UI.
-clawperator open --app com.google.android.apps.chromecast.app
+clawperator open --app <google-home-application-id>
 
 # agent: Inspect Google Home before deciding where to tap.
 clawperator snapshot
@@ -666,13 +662,13 @@ clawperator snapshot
 
 # agent: Navigate to the climate controls.
 clawperator click --text "Climate"
-clawperator scroll-and-click --text-contains "$UNIT_NAME"
+clawperator scroll-and-click --text-contains "Living room"
 
-# agent: Read the current climate_state for "$UNIT_NAME".
+# agent: Read the current climate_state for "Living room".
 clawperator read --text-contains "Heating"
 # { "text": "Off" }
 
-# agent: climate_state is "Off"; target value is "$VALUE".
+# agent: climate_state is "Off"; target value is "On".
 clawperator click --text "Turn On"
 
 # agent: Verify the result before finishing.
