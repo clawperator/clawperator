@@ -51,6 +51,13 @@ const MAX_TIMER_DELAY_MS = 2_147_483_647;
 type BroadcastResult = { success: boolean; stdout?: string; stderr?: string };
 type BroadcastFn = (beginDispatchCapture: () => void) => Promise<BroadcastResult>;
 
+/**
+ * Lets explicit-device executions attach logcat before preflight completes,
+ * while holding the actual broadcast until the device, APK, and readiness
+ * checks pass. If logcat's no-output fallback fires before the gate opens,
+ * the waiter simply parks here; releasing the gate later still sends exactly
+ * one broadcast and starts timeout accounting at dispatch capture.
+ */
 function createDeferredBroadcast(): {
   wait: BroadcastFn;
   release: (fn: BroadcastFn) => void;
@@ -451,6 +458,9 @@ async function performExecution(
 
   const payload = JSON.stringify(execution);
   const hasExplicitDevice = typeof config.deviceId === "string" && config.deviceId.trim().length > 0;
+  // Explicit-device logcat can start early because resolveDevice validates the
+  // provided serial exactly. Auto-resolve must stay sequential so the logcat
+  // reader is attached to the final resolved device.
   const deferredBroadcast = hasExplicitDevice ? createDeferredBroadcast() : undefined;
   const earlyResultAbortController = hasExplicitDevice ? new AbortController() : undefined;
   const earlyResultWaiter = deferredBroadcast !== undefined

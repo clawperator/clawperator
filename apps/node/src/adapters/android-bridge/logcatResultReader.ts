@@ -29,6 +29,8 @@ function isSnapshotLogLine(line: string): boolean {
 const SIGNAL_BROADCAST_REPLAY_DRAIN_MS = 25;
 const SIGNAL_BROADCAST_MAX_DRAIN_MS = 100;
 
+type BroadcastStatus = "not_sent" | "sent" | `failed: ${string}` | `error: ${string}`;
+
 function envelopeLineReferencesCommand(line: string, commandId: string): boolean {
   return line.includes(JSON.stringify(commandId));
 }
@@ -60,7 +62,7 @@ export async function waitForResultEnvelope(
   return new Promise((resolve) => {
     const correlatedLines: string[] = [];
     const snapshotLogLines: string[] = [];
-    let broadcastStatus = "not_sent";
+    let broadcastStatus: BroadcastStatus = "not_sent";
     let captureSnapshotLines = false;
     let pending = "";
     let settled = false;
@@ -162,6 +164,12 @@ export async function waitForResultEnvelope(
       pending = "";
       dispatchCaptureStarted = true;
       if (forcedReplayDrainDispatch) {
+        // The max-drain path means stdout stayed noisy long enough that some
+        // `logcat -T 1` replay may still be arriving. Delay snapshot capture
+        // by the normal drain window, while still accepting the result envelope
+        // immediately. A real snapshot_ui traversal is much slower than this
+        // guard window, and the tradeoff prevents stale replayed hierarchy XML
+        // from being attached to the fresh command.
         snapshotCaptureStartTimer = setTimeout(() => {
           captureSnapshotLines = true;
         }, SIGNAL_BROADCAST_REPLAY_DRAIN_MS);
