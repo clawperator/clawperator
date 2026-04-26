@@ -493,8 +493,9 @@ Verification pattern:
 }
 ```
 
-- unlike CLI `skills run`, this route calls `runSkill()` directly
-- it does not run the CLI pre-validation gate from `cmdSkillsRun()`
+- this route has its own pre-run skill validation gate aligned with CLI
+  validation, then calls `runSkill()` directly instead of invoking
+  `cmdSkillsRun()`
 - it does not inject the CLI wrapper banner
 - handle `error.code` values such as `SKILL_OUTPUT_ASSERTION_FAILED`, `SKILL_EXECUTION_FAILED`, `SKILL_EXECUTION_TIMEOUT`, and `SKILL_RESULT_PARSE_FAILED` through the nested `error` object, not as the top-level response object
 
