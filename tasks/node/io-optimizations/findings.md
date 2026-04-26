@@ -122,3 +122,44 @@ Measured improvement for warm sequential snapshot calls: ~0.414s per call
 ~32% faster overall than direct mode. The improvement is strongest for
 repeated observation or action loops. Short host-side executions such as
 `close_app` show minimal improvement (~5%, within noise margin).
+
+## Daemon Versus Direct Validation - 2026-04-26
+
+Validation was rerun after daemon closeout on a Samsung SM-S901E physical device
+over USB with branch-local `node apps/node/dist/cli/index.js` v0.7.9 and
+`com.clawperator.operator.dev`.
+
+Modes:
+
+- no daemon: `CLAWPERATOR_NO_DAEMON=1`
+- daemon: branch-local `daemon start` before the measured runs
+- snapshot runs used `snapshot --timeout-ms 60000`
+- skill runs used `skills run --timeout 240000`
+
+### Warm Snapshot Latency
+
+| Run | No-daemon snapshot (ms) | Warm daemon snapshot (ms) |
+| --- | --- | --- |
+| 1 | 1599 | 829 |
+| 2 | 1594 | 849 |
+| 3 | 1605 | 846 |
+| Median | 1599 | 846 |
+
+Median delta: daemon was 753ms faster per snapshot (-47.1%).
+
+### Skill Timing Comparison
+
+| Skill | No-daemon runs (ms) | Daemon runs (ms) | No-daemon median | Daemon median | Delta |
+| --- | --- | --- | --- | --- | --- |
+| `com.solaxcloud.starter.get-battery` | 36476, 21233, 21167 | 21317, 21363, 21653 | 21233ms | 21363ms | +130ms (+0.6%) |
+| `com.google.android.apps.chromecast.app.get-climate-replay` | 17284, 17313, 18135 | 17252, 17237, 17120 | 17313ms | 17237ms | -76ms (-0.4%) |
+
+All runs in the table completed successfully. The Google Home skill was invoked
+with `--unit-name Panasonic`, matching the visible current device label on the
+test phone. An initial attempt with the older documented example label
+`Living Room AC` failed because that target node was not present on this device.
+
+These skill timings include app launch, navigation, live app state, and parsing
+work. On this run, daemon proxying materially improved repeated bare snapshot
+latency, while the two full replay skills were dominated by app workflow time and
+landed within noise once measured on the same branch-local build.
