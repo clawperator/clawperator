@@ -109,3 +109,16 @@ Approximate known costs after the Node-side I/O cleanup:
 3. Prefer `clawperator serve` for repeated agent loops when caller context allows a persistent process.
 
 Do not treat this file as permission to implement the deferred work directly. Convert the relevant findings into a scoped task pack first.
+
+## Daemon Proxy Update
+
+The transparent daemon proxy (PR #240, commit `e4b6e1b4`) reduces per-call
+latency for subprocess skill loops. Skills that call `clawperator` via
+`execFileSync` now benefit from the daemon's warm process state and the
+in-process readiness cache (TTL 8s) without any skill-side changes.
+
+Measured improvement for warm sequential snapshot calls: ~0.414s per call
+(1.156s direct vs 0.742s warm daemon). Five-call cold-start sequence was
+~32% faster overall than direct mode. The improvement is strongest for
+repeated observation or action loops. Short host-side executions such as
+`close_app` show minimal improvement (~5%, within noise margin).
