@@ -77,4 +77,21 @@ describe("action command daemon proxy wiring", () => {
     assert.equal(proxyCalls, 0);
     assert.equal(directCalls, 1);
   });
+
+  it("forwards timeoutMs to direct execution options", async () => {
+    let observedTimeoutMs: number | undefined;
+
+    await cmdActionClick({
+      format: "json",
+      coordinate: { x: 1, y: 2 },
+      timeoutMs: 4321,
+      tryDaemonExecutionFn: async () => null,
+      runExecutionFn: async (...args) => {
+        observedTimeoutMs = (args[1] as { timeoutMs?: number }).timeoutMs;
+        return successResult;
+      },
+    } as Parameters<typeof cmdActionClick>[0] & { timeoutMs: number });
+
+    assert.equal(observedTimeoutMs, 4321);
+  });
 });
