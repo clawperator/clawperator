@@ -1,0 +1,4 @@
+interface:
+  display_name: "Task Impl Prompt"
+  short_description: "Draft scoped PR implementation prompts"
+  default_prompt: "Use $task-create-impl-prompt to draft a concise implementation prompt for PR-1 of a task pack."
