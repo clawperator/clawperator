@@ -5,9 +5,10 @@ This task spans two repositories:
 - `~/src/clawperator`
 - `~/src/clawperator-skills`
 
-Each repository must receive its own branch and pull request. Work in the skills
-repo may begin while the first Clawperator PR is under review once the
-migration-phase contract shape is stable.
+Each repository must receive its own branch and pull request. PR-C1 and PR-S1
+may be worked in parallel: PR-S1 can begin as soon as PR-C1 Phase 1 (the schema
+change) is complete on a branch. PR-S1 validation uses the branch-local PR-C1
+Node build, not a merged release. Both must land before PR-C2 can start.
 
 ## PR-C1: Clawperator Migration Contract
 
@@ -234,6 +235,9 @@ migration-phase contract shape is stable.
 **Repo:** `~/src/clawperator-skills`
 **Suggested branch:** `codex/skill-result-contract`
 **Agent tier:** default
+**Can start:** once PR-C1 Phase 1 is on a branch (schema change only; does not need PR-C1 merged)
+**May run concurrently with:** PR-C1 Phases 2 and 3
+**Must land before:** PR-C2
 
 ### Phase 4: Migrate Skill Outputs
 
