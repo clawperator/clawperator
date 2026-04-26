@@ -63,6 +63,7 @@ migration-phase contract shape is stable.
 - `apps/node/src/cli/commands/skills.ts`
 - `apps/node/src/cli/commands/serve.ts`
 - `apps/node/src/test/unit/skills.test.ts`
+- `apps/node/src/test/integration/serve.test.ts`
 
 **Tasks:**
 
@@ -74,14 +75,14 @@ migration-phase contract shape is stable.
    when `skillResult !== null` - this path uses `output` as a diagnostic showing
    what the skill printed when the assertion failed.
 3. Apply the same policy in `serve.ts`. The serve endpoint independently builds
-   its response objects at lines 658-682. Remove `output` from the success
-   (line 662) and indeterminate (line 676) response objects when
+   success, indeterminate, and assertion-failure skill response objects. Remove
+   `output` from success and indeterminate responses when
    `result.skillResult !== null`. Keep `output` in the assertion failure object
-   (line 691) regardless.
+   regardless.
 4. Do not change `runSkill.ts` or the domain-layer tests. The domain function
-   intentionally returns raw stdout. The existing test at line 3608 that asserts
-   `result.output.includes("[Clawperator-Skill-Result]")` is testing the domain
-   layer and must not be modified.
+   intentionally returns raw stdout. The existing agent-driven SkillResult test
+   that asserts `result.output.includes("[Clawperator-Skill-Result]")` is
+   testing the domain layer and must not be modified.
 5. Add CLI-layer tests in the `describe("cmdSkillsRun preflight gate")` block
    using the injected `runSkillImpl` pattern. A suitable test:
    - Creates a `fakeRunSkill` that returns `output` containing the literal
@@ -91,6 +92,10 @@ migration-phase contract shape is stable.
 6. Add a test for the `skillResult === null` path: `fakeRunSkill` returns a
    non-null `output` and a null `skillResult`. Assert `JSON.parse(stdout).output`
    is present and unchanged.
+7. Add serve integration coverage proving `/skills/:skillId/run` follows the
+   same policy: omit `output` for success and indeterminate responses with a
+   parsed `skillResult`, keep it for assertion failures, and keep it for legacy
+   unframed skill responses.
 
 **Acceptance criteria:**
 
@@ -99,7 +104,7 @@ migration-phase contract shape is stable.
 - JSON assertion-failure responses keep `output` for diagnostic context.
 - JSON responses for legacy unframed skills (skillResult null) keep `output`.
 - Domain-layer `runSkill` tests are unchanged.
-- Serve endpoint follows the same policy as the CLI command.
+- Serve endpoint tests prove the same policy as the CLI command.
 
 ### Phase 3: Update Clawperator Docs And Bundled Authoring Guidance
 
@@ -302,8 +307,9 @@ migration-phase contract shape is stable.
 2. Keep old-shape migration history out of public docs unless it describes
    still-shipped behavior.
 3. Confirm stream field wording is final: `skillResult.result` is the answer,
-   `output` is display/progress text if retained, and process streams are
-   named `stdout` and `stderr` where exposed.
+   `output` is absent from framed success-like JSON responses, retained only
+   for legacy unframed and assertion-failure diagnostics, and process streams
+   are named `stdout` and `stderr` where exposed.
 4. Confirm checkpoint guidance is final: map/state-machine checkpoints are the
    preferred shape for new and migrated non-trivial skills.
 5. Build Node and run tests.

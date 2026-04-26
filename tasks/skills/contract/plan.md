@@ -56,11 +56,11 @@ Collections still live in singular `result`, for example:
 5. `checkpoints` explain progress and evidence. They are not the primary answer
    lookup path.
 6. `diagnostics` is for runtime health, warnings, hints, and debug detail only.
-7. Drop the `output` field from success and indeterminate responses when
+7. Drop the `output` field from JSON success and indeterminate responses when
    `skillResult !== null`. Agents use `skillResult.result`. Progress text is
    available in pretty mode; it is pure token waste in JSON mode.
-8. Keep `output` when `skillResult === null`. For legacy unframed skills it is
-   the only available data. For `SKILL_OUTPUT_ASSERTION_FAILED` it shows what
+8. Keep `output` for legacy unframed skills where `skillResult === null`.
+   Also keep `output` for `SKILL_OUTPUT_ASSERTION_FAILED`, where it shows what
    the skill printed when the assertion failed.
 9. Apply the same policy in `serve.ts` as in `skills.ts`. Both currently pass
    `result.output` through independently and both need updating.
@@ -82,8 +82,9 @@ Collections still live in singular `result`, for example:
 | 8. Checkpoint presence semantics differ | PR-C1 Phase 3, PR-S1 Phase 4, PR-C2 Phase 7 |
 
 The source corrections in `findings.md` are also covered: PR-C1 tests prove
-root `result` survives only when evidence-shaped, and PR-C1 docs describe JSON
-`output` frame stripping as a contract change rather than a private bug fix.
+root `result` survives only when evidence-shaped, and PR-C1 deliberately
+supersedes the initial frame-stripping recommendation by dropping JSON `output`
+on framed success-like responses.
 
 ## Repository PRs
 
@@ -103,14 +104,15 @@ Required outcomes:
 - Existing root `result` payloads that already match the evidence union survive
   runtime parsing.
 - Invalid root `result` payloads fail validation instead of disappearing.
-- `skills run` JSON strips the terminal SkillResult frame from `output` when a
-  parsed `skillResult` exists.
-- Pretty and JSON output follow the same frame-stripping policy for success,
-  indeterminate, and `SKILL_OUTPUT_ASSERTION_FAILED` paths.
+- `skills run` JSON omits `output` on success and indeterminate responses when
+  a parsed `skillResult` exists.
+- `skills run` JSON keeps `output` for legacy unframed skills and
+  `SKILL_OUTPUT_ASSERTION_FAILED` diagnostics.
+- The serve endpoint applies the same JSON response policy.
 - Public docs in `docs/skills` explain the new extraction path and the temporary
   optional migration shape.
-- Docs define `output` as display/progress text when retained, not a raw stdout
-  contract and not a result channel.
+- Docs define where `output` is absent and where it is retained. Retained
+  `output` is diagnostic or legacy data, not the domain answer.
 - Relevant bundled skill authoring guidance under
   `apps/node/bundled-skills/clawperator-*` teaches agents to emit and inspect
   `skillResult.result`.
@@ -207,12 +209,13 @@ npm --prefix apps/node run test
 ./scripts/docs_build.sh
 ```
 
-For PR-C1, also run focused `skills run` fixture coverage that proves:
+For PR-C1, also run focused CLI and serve fixture coverage that proves:
 
 - a valid `result` survives parsing
 - an invalid `result` fails validation
-- JSON `output` strips the terminal SkillResult frame when parsed
-- `SKILL_OUTPUT_ASSERTION_FAILED` follows the same output policy
+- JSON success and indeterminate responses omit `output` when `skillResult` is
+  parsed
+- `SKILL_OUTPUT_ASSERTION_FAILED` keeps `output` for diagnostic context
 
 For PR-C2, also validate at least one migrated read skill and one migrated
 setter skill through the branch-local Node CLI.
@@ -235,7 +238,8 @@ multiple devices are connected.
 - Every framed skill has one primary answer path: `skillResult.result`.
 - `result` is present on every newly authored or migrated framed SkillResult.
 - Missing `result` is accepted only during PR-C1 and PR-S1 migration work.
-- JSON `output` no longer duplicates parsed SkillResult frames.
+- JSON success and indeterminate responses no longer include `output` when a
+  parsed `skillResult` exists.
 - Docs and bundled authoring skills teach the same contract that the runtime
   enforces.
 - Checkpoint guidance is explicit: existing push-only shapes may be read, but

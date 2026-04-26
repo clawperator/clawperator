@@ -41,9 +41,10 @@ The right implementation order is:
    `skillResult.result`.
 3. Migrate skills so primary outputs leave `diagnostics`, checkpoint-only
    evidence, and terminal-verification-only evidence.
-4. Strip the terminal frame from `output` in JSON mode. Pretty mode already
-   strips it; JSON mode should be consistent. Prefer the clean contract over
-   raw-frame retention.
+4. Drop `output` from JSON success and indeterminate responses when
+   `skillResult` is present. Keep `output` only for legacy unframed skills and
+   assertion-failure diagnostics. Prefer the clean contract over raw-frame or
+   progress-text retention.
 
 ---
 
@@ -183,7 +184,7 @@ to retain old shapes.
 
 ---
 
-### 3. Medium: JSON `output` includes the terminal SkillResult frame
+### 3. Medium: JSON `output` duplicates framed SkillResult data
 
 **Owning surface:** `apps/node/src/cli/commands/skills.ts`
 
@@ -219,40 +220,38 @@ also tempts agents to scrape `output` even when structured data exists.
 
 **Analysis:**
 
-Stripping the frame from `output` in JSON mode is the right fix. The fix is
-one conditional in `skills.ts:546-548`. The reason to call it out is not
-technical complexity - it changes `output` from raw stdout to de-framed progress
-text, and docs need to describe the new contract.
+Dropping `output` from JSON success and indeterminate responses when
+`skillResult !== null` is the cleanest fix. The earlier frame-stripping option
+would remove the embedded framed JSON, but it would still retain progress text
+that agents do not need for successful structured runs. The answer belongs in
+`skillResult.result`; proof belongs in checkpoints and terminal verification;
+debug metadata belongs in diagnostics.
 
-The two modes should behave consistently. Pretty mode already strips the frame
-(`sanitizePrettySkillStdout`). JSON mode does not. That inconsistency means the
-field `output` carries different content depending on the format flag, which is
-its own documentation problem.
+The reason to call this out is not technical complexity - it changes the wrapper
+shape. Docs and tests need to describe the new contract.
 
 **Recommendation:**
 
-Strip the terminal frame from `output` in JSON mode when `skillResult !== null`.
-Apply this to success, indeterminate, and `SKILL_OUTPUT_ASSERTION_FAILED`
-responses. Do not add a new field - that is over-engineering for a consistency
-fix. Do document the new meaning of `output`.
+Drop `output` from JSON success and indeterminate responses when
+`skillResult !== null`. Keep `output` for legacy unframed skills where
+`skillResult === null`, because it is the only available payload. Keep `output`
+for `SKILL_OUTPUT_ASSERTION_FAILED`, because it is diagnostic evidence showing
+what the skill printed when the assertion failed.
 
-**Minimal fix:**
+Apply the same policy in both `apps/node/src/cli/commands/skills.ts` and
+`apps/node/src/cli/commands/serve.ts`; both currently build skill-run response
+objects independently.
 
-```ts
-output: (options.format === "pretty" || result.skillResult !== null)
-  ? sanitizePrettySkillStdout(result.output, result.skillResult !== null)
-  : result.output,
-```
-
-Apply the same pattern to every wrapper branch that returns `output`.
-
-Document in `docs/skills/runtime.md`: `output` contains pre-frame human-readable
-progress text; the parsed result is in `skillResult`.
+Document in `docs/skills/runtime.md`: `skillResult.result` is the domain answer;
+`output` is absent from JSON success and indeterminate responses when
+`skillResult` is present; `output` is retained only for legacy unframed skills
+and assertion-failure diagnostics.
 
 **Implementation stance:**
 
-Make JSON and pretty output consistent now. Do not expose the raw terminal frame
-through `output`.
+Remove the success-path temptation to scrape `output`. Do not expose raw
+terminal frames or progress text through JSON success and indeterminate
+responses once a parsed `skillResult` exists.
 
 ---
 
@@ -387,9 +386,10 @@ Callers need separate extraction logic for successful and failed runs. The name
 **Smallest fix:**
 
 Normalize stream field naming instead of carrying aliases. Prefer `stdout` and
-`stderr` for process streams, and reserve `result` for the skill answer. If
-`output` remains, define it as a display/progress field rather than a stream or
-domain-result field.
+`stderr` for process streams, and reserve `result` for the skill answer. In JSON
+success and indeterminate responses with a parsed `skillResult`, omit `output`
+entirely. Keep `output` only where it still carries necessary payload or
+diagnostic value: legacy unframed skills and output-assertion failures.
 
 **Implementation stance:**
 
@@ -448,12 +448,13 @@ schema change. Because the proposed contract reuses `SkillCheckpointEvidence`,
 existing plain-object `result` payloads must also be migrated to
 `{ kind: "json", value: ... }`.
 
-### Correction B: Stripping the frame from JSON `output` is a contract cleanup
+### Correction B: Dropping JSON `output` is a contract cleanup
 
-Earlier findings describe this as a one-line bug fix. The code fix is small, but
-the docs must still change because `output` will no longer mean raw stdout when
-a parsed `skillResult` exists. This document's recommendation (see Finding 3)
-is to make the contract cleaner now.
+Earlier findings described frame stripping as a one-line bug fix. The cleaner
+contract is to drop `output` entirely from JSON success and indeterminate
+responses when a parsed `skillResult` exists. The docs must change because
+callers should treat `skillResult.result` as the answer and should not scrape
+progress text from `output`.
 
 ---
 
@@ -486,12 +487,12 @@ is to make the contract cleaner now.
   - then `skillResult.status`
   - then `skillResult.result`
   - then proof fields
-- Strip the terminal frame from `output` in JSON mode (see Finding 3). Update
-  `docs/skills/runtime.md` to define `output` as pre-frame human-readable
-  progress text. Apply this consistently to success, indeterminate, and
-  output-assertion failure branches.
+- Drop `output` from JSON success and indeterminate responses when
+  `skillResult` is present (see Finding 3). Keep `output` for legacy unframed
+  skills and output-assertion failure diagnostics.
+- Apply the same policy in CLI `skills run` and the serve endpoint.
 - Add CLI tests for success, indeterminate, output assertion failure, and
-  execution failure shapes.
+  execution failure shapes. Add serve endpoint coverage for the same policy.
 
 ### PR 3 - Skills Migration
 
@@ -538,8 +539,8 @@ required and update tests so framed skills without `result` fail validation.
   `{ "kind": "json", "value": { "items": [...] } }`.
 - Callers can branch safely on wrapper status before trusting nested skill
   status.
-- Process-stream fields are named consistently, and `output` is either removed
-  or clearly defined as display/progress text rather than raw stdout.
+- Process-stream fields are named consistently, and JSON success and
+  indeterminate responses omit `output` when a parsed `skillResult` exists.
 - Pretty or summary output has a clear human-scannable answer when `result` is
   present.
 - Docs describe the authored source of truth, not generated output.
