@@ -39,14 +39,13 @@ The right implementation order is:
    `skillResult.result` when present.
 3. Migrate skills so primary outputs leave `diagnostics`, checkpoint-only
    evidence, and terminal-verification-only evidence.
-4. Decide the raw stdout policy for JSON mode deliberately. Stripping the
-   terminal frame from `output` improves usability, but changing `output` from
-   "raw stdout" is a compatibility and documentation change, not a free
-   one-line cleanup.
+4. Strip the terminal frame from `output` in JSON mode. Pretty mode already
+   strips it; JSON mode should be consistent. This is a compatibility change that
+   requires docs and a changelog entry, not a silent one-line cleanup.
 
 ---
 
-## Top Findings
+## Findings
 
 ### 1. High: The parsed contract has no canonical answer field
 
@@ -83,14 +82,12 @@ locations:
 This forces per-skill knowledge into the caller. That is the opposite of a good
 agent-facing contract.
 
-**Important correction to the survey:**
-
-`findings-skill-survey.md` says two skills are already correct because they emit
-a root `result`. At the script layer that is true. At the parsed runtime
-contract layer it is false. `emittedSkillResultSchema` is a plain `z.object`
-without `.passthrough()`, so unknown root keys are stripped. Existing emitted
-`result` and `results` fields are not available in parsed `skillResult` until
-the schema adds them.
+`emittedSkillResultSchema` is a plain `z.object` without `.passthrough()`, so
+unknown root keys are stripped. `get-battery` and `install-app` already emit a
+root `result` field at the script layer, and `search-app` emits a root `results`
+field - but none of these fields survive Zod parsing. They are silently dropped
+before the parsed `skillResult` reaches CLI and serve consumers. There are
+currently zero reliable parsed `skillResult.result` consumers.
 
 **Smallest implementation-ready fix:**
 
@@ -168,7 +165,7 @@ transition if needed, but mark `result` as canonical in docs and tests.
 
 ---
 
-### 3. High: JSON `output` includes the terminal SkillResult frame, but changing it is a contract decision
+### 3. Medium: JSON `output` includes the terminal SkillResult frame - stripping it is the right call but is a contract change
 
 **Owning surface:** `apps/node/src/cli/commands/skills.ts`
 
@@ -200,28 +197,35 @@ It also contains the framed JSON twice:
 That makes default JSON hard for humans to scan and wastes agent context. It
 also tempts agents to scrape `output` even when structured data exists.
 
-**EM correction to earlier findings:**
+**Analysis:**
 
-This should not be described as a harmless one-line fix. Docs currently define
-`output` as raw stdout, and raw stdout can be useful forensic evidence. Stripping
-the frame from `output` in JSON mode may be the right product choice, but it is
-a compatibility change and should be handled explicitly.
+Stripping the frame from `output` in JSON mode is the right fix. The fix is
+one conditional in `skills.ts:546-548`. The reason it requires care is not
+technical complexity - it is that docs define `output` as raw stdout, so
+stripping silently changes an established field.
 
-**Smallest safe path:**
+The two modes should behave consistently. Pretty mode already strips the frame
+(`sanitizePrettySkillStdout`). JSON mode does not. That inconsistency means the
+field `output` carries different content depending on the format flag, which is
+its own documentation problem.
 
-Implement in two phases unless the project intentionally accepts the breaking
-contract change:
+**Recommendation:**
 
-1. Add a non-breaking field such as `displayOutput`, `stdoutWithoutResultFrame`,
-   or a summary JSON mode that contains de-framed human progress text.
-2. Document consumer precedence:
-   - use wrapper `status` and `code` for run outcome
-   - use `skillResult.result` for the answer
-   - use `skillResult` proof fields for audit and verification
-   - use `output` only as raw stdout/debug evidence
-3. If `output` should become de-framed, update docs, tests, and changelog in
-   the same change. Consider preserving `rawOutput` or `stdout` for full
-   forensic capture.
+Strip the terminal frame from `output` in JSON mode when `skillResult !== null`.
+Do not add a new field - that is over-engineering for a consistency fix. Do
+document the change as a contract update and add a compat note in the changelog.
+
+**Minimal fix:**
+
+```ts
+output: (options.format === "pretty" || result.skillResult !== null)
+  ? sanitizePrettySkillStdout(result.output, result.skillResult !== null)
+  : result.output,
+```
+
+Document in `docs/skills/runtime.md`: `output` contains pre-frame human-readable
+progress text; the parsed result is in `skillResult`. Consumers scraping the
+frame from `output` should use `skillResult` instead.
 
 **Compatibility risk:**
 
@@ -396,29 +400,31 @@ Low for docs. Medium if existing skill outputs are normalized all at once.
 
 ## Corrections To Source Findings
 
-### Correction A: Root `result` and `results` are currently stripped
+### Correction A: Root `result` and `results` fields emitted by scripts are currently stripped
 
-Earlier source findings treat root `result` and `results` fields emitted by
-some scripts as visible parsed output. They are not visible unless the schema is
-updated. Plain Zod objects strip unknown root keys by default, and
-`emittedSkillResultSchema` does not call `.passthrough()`.
+Earlier source findings describe `get-battery` and `install-app` as already
+having a `result` field, and `search-app` as having a non-contract `results`
+field at the root. These claims are accurate at the script layer but false at the
+parsed contract layer.
 
-This increases the priority of adding `result` to the schema. It also means
-migration work should include tests that prove emitted `result` survives
-`runSkill()` parsing.
+`emittedSkillResultSchema` is `z.object({...})` without `.passthrough()`. Zod
+strips unknown root keys by default. Both the `result` fields (in `get-battery`,
+`install-app`) and the `results` field (in `search-app`) are silently dropped
+before the parsed `skillResult` reaches CLI and serve consumers. No consumer
+currently receives them through the runtime contract.
 
-### Correction B: `search-app` root `results` is a non-contract field, not an accepted extension
+This makes adding `result` to the schema more urgent - it is not fixing a gap,
+it is validating intent that already exists in two scripts. Migration tests must
+confirm that emitted `result` actually survives `runSkill()` parsing after the
+schema change.
 
-`search-app` emits `results` at the root of the frame. That is not a stable
-contract extension today. The runtime parser strips it. The accessible
-structured data, where present, is through schema-defined fields such as
-`terminalVerification.observed.value`.
+### Correction B: Stripping the frame from JSON `output` is a contract change, not a bug fix
 
-### Correction C: Stripping the frame from JSON `output` is not purely a bug fix
-
-It is a product/API decision. It likely improves agent and operator UX, but it
-also changes a documented raw stdout field. Treat it as a contract change with
-tests and docs, or add a new sanitized field/mode first.
+Earlier findings describe this as a one-line bug fix with low compat risk. The
+code fix is one line, but the semantics change is not low risk. Docs define
+`output` as raw stdout. The fix should be shipped with a changelog entry and
+updated docs, not silently. This document's recommendation (see Finding 3) is to
+make the change deliberately rather than avoid it.
 
 ---
 
@@ -447,9 +453,9 @@ tests and docs, or add a new sanitized field/mode first.
   - then `skillResult.status`
   - then `skillResult.result`
   - then proof fields
-- Decide JSON stdout policy:
-  - keep `output` raw and add a sanitized field or summary mode, or
-  - strip the terminal frame from `output` and add/preserve a raw stdout field
+- Strip the terminal frame from `output` in JSON mode (see Finding 3). Update
+  `docs/skills/runtime.md` to define `output` as pre-frame human-readable
+  progress text. Add changelog entry.
 - Add CLI tests for success, indeterminate, output assertion failure, and
   execution failure shapes.
 
