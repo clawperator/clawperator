@@ -341,7 +341,8 @@ be safe to ignore for happy-path result extraction.
 
 **Smallest fix:**
 
-Do not remove the catchall immediately. Instead:
+Keep the catchall - it is appropriate for extensible runtime metadata. The fix
+is convention enforcement, not schema changes:
 
 - add `skillResult.result`
 - update authoring docs: diagnostics is for `runtimeState`, `warnings`,
