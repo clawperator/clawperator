@@ -54,12 +54,12 @@ PR-5 is measurement only.
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | PR-1 done |
 | Total PRs | 5 |
 | Total phases | 5 |
-| Completed | 0 |
-| Remaining | 5 |
-| Current / Next | Phase 1 (PR-1) |
+| Completed | 1 |
+| Remaining | 4 |
+| Current / Next | Phase 2 (PR-2), after PR-1 merge |
 | Blockers | none |
 
 ## Goal

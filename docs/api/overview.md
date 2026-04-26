@@ -14,6 +14,7 @@ This page is intentionally narrow:
 - Use [Selectors](selectors.md) for `NodeMatcher` and selector flags
 - Use [Errors](errors.md) for exact error codes and recovery
 - Use [Devices](devices.md) for target selection rules
+- Use [Daemon](daemon.md) for background daemon lifecycle commands
 
 ## CLI Output Format
 

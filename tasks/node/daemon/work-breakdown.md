@@ -8,26 +8,26 @@ Parent plan: `tasks/node/daemon/plan.md`
 non-breaking infrastructure. Phase 3 introduces the first user-visible behavior
 change. Phase 4 is mechanical rollout. Phase 5 is measurement.
 
-| PR | Purpose | Phase | Agent tier | Merge gate |
-| --- | --- | --- | --- | --- |
-| PR-1 | Server extraction + Unix socket transport | Phase 1 | default | none |
-| PR-2 | Daemon lifecycle commands | Phase 2 | default | PR-1 merged |
-| PR-3 | Proxy layer for exec / snapshot / screenshot | Phase 3 | thinking | PR-2 merged |
-| PR-4 | Expand proxy to all flat action commands; add readiness cache | Phase 4 | default | PR-3 merged |
-| PR-5 | Latency measurement and findings | Phase 5 | fast | PR-4 merged |
+| PR | Purpose | Phase | Agent tier | Merge gate | Status |
+| --- | --- | --- | --- | --- | --- |
+| PR-1 | Server extraction + Unix socket transport | Phase 1 | default | none | done |
+| PR-2 | Daemon lifecycle commands | Phase 2 | default | PR-1 merged | not started |
+| PR-3 | Proxy layer for exec / snapshot / screenshot | Phase 3 | thinking | PR-2 merged | not started |
+| PR-4 | Expand proxy to all flat action commands; add readiness cache | Phase 4 | default | PR-3 merged | not started |
+| PR-5 | Latency measurement and findings | Phase 5 | fast | PR-4 merged | not started |
 
-Current state: planning. Phase 1 is the next step.
+Current state: PR-1 / Phase 1 is done. PR-2 is the next step after PR-1 is merged.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | PR-1 done |
 | Total PRs | 5 |
 | Total phases | 5 |
-| Completed | 0 |
-| Remaining | 5 |
-| Current / Next | Phase 1 (PR-1) |
+| Completed | 1 |
+| Remaining | 4 |
+| Current / Next | Phase 2 (PR-2), after PR-1 merge |
 | Blockers | none |
 
 ## Hard Rules
@@ -98,6 +98,8 @@ Read these files IN THIS ORDER before writing anything.
 ---
 
 ## Phase 1: Server Extraction and Unix Socket Transport
+
+Status: done. PR-1 implementation and validation are complete.
 
 ### Agent Tier
 default

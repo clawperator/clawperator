@@ -10,37 +10,61 @@ import { buildScrollExecution } from "../../domain/actions/scroll.js";
 import { buildScrollUntilExecution } from "../../domain/actions/scrollUntil.js";
 import { buildCloseAppExecution } from "../../domain/actions/closeApp.js";
 import { buildSleepExecution } from "../../domain/actions/sleep.js";
+import type { Execution } from "../../contracts/execution.js";
 import type { NodeMatcher } from "../../contracts/selectors.js";
 import type { OutputOptions } from "../output.js";
-import { formatSuccess, formatError } from "../output.js";
+import { formatError, formatRunExecutionResultForCli } from "../output.js";
 import type { Logger } from "../../adapters/logger.js";
+import { tryDaemonExecution } from "../daemonProxy.js";
+import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
+
+interface ActionCommandOptions {
+  format: OutputOptions["format"];
+  deviceId?: string;
+  operatorPackage?: string;
+  timeoutMs?: number;
+  noDaemon?: boolean;
+  logger?: Logger;
+  tryDaemonExecutionFn?: typeof tryDaemonExecution;
+  runExecutionFn?: typeof runExecution;
+}
+
+async function runActionExecution(execution: Execution, options: ActionCommandOptions): Promise<string> {
+  const validatedExecution = validateExecution(execution);
+  validatePayloadSize(JSON.stringify(validatedExecution));
+  const tryDaemonExecutionFn = options.tryDaemonExecutionFn ?? tryDaemonExecution;
+  const runExecutionFn = options.runExecutionFn ?? runExecution;
+  const proxyResult = options.noDaemon === true
+    ? null
+    : await tryDaemonExecutionFn(validatedExecution, {
+      rawDeviceId: options.deviceId,
+      operatorPackage: options.operatorPackage,
+      noDaemon: options.noDaemon,
+      allowPostDispatchFallback: false,
+    });
+  const result = proxyResult ?? await runExecutionFn(validatedExecution, {
+    deviceId: options.deviceId,
+    operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+    timeoutMs: options.timeoutMs,
+    warn: message => process.stderr.write(message),
+    logger: options.logger,
+  });
+  return formatRunExecutionResultForCli(result, options);
+}
 
 export async function cmdActionOpenApp(options: {
   format: OutputOptions["format"];
   applicationId: string;
   deviceId?: string;
   operatorPackage?: string;
+  noDaemon?: boolean;
   logger?: Logger;
+  tryDaemonExecutionFn?: typeof tryDaemonExecution;
+  runExecutionFn?: typeof runExecution;
 }): Promise<string> {
   try {
     const execution = buildOpenAppExecution(options.applicationId);
-    const result = await runExecution(execution, {
-      deviceId: options.deviceId,
-      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
-      warn: message => process.stderr.write(message),
-      logger: options.logger,
-    });
-    if (result.ok)
-      return formatSuccess(
-        {
-          envelope: result.envelope,
-          deviceId: result.deviceId,
-          terminalSource: result.terminalSource,
-          isCanonicalTerminal: result.terminalSource === "clawperator_result",
-        },
-        options
-      );
-    return formatError(result.error, options);
+    return await runActionExecution(execution, options);
   } catch (e) {
     return formatError(e, options);
   }
@@ -52,27 +76,12 @@ export async function cmdSleep(options: {
   globalTimeoutMs?: number;
   deviceId?: string;
   operatorPackage?: string;
+  noDaemon?: boolean;
   logger?: Logger;
 }): Promise<string> {
   try {
     const execution = buildSleepExecution(options.durationMs, options.globalTimeoutMs);
-    const result = await runExecution(execution, {
-      deviceId: options.deviceId,
-      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
-      warn: message => process.stderr.write(message),
-      logger: options.logger,
-    });
-    if (result.ok)
-      return formatSuccess(
-        {
-          envelope: result.envelope,
-          deviceId: result.deviceId,
-          terminalSource: result.terminalSource,
-          isCanonicalTerminal: result.terminalSource === "clawperator_result",
-        },
-        options
-      );
-    return formatError(result.error, options);
+    return await runActionExecution(execution, options);
   } catch (e) {
     return formatError(e, options);
   }
@@ -84,27 +93,12 @@ export async function cmdCloseApp(options: {
   deviceId?: string;
   operatorPackage?: string;
   timeoutMs?: number;
+  noDaemon?: boolean;
   logger?: Logger;
 }): Promise<string> {
   try {
     const execution = buildCloseAppExecution(options.applicationId, options.timeoutMs);
-    const result = await runExecution(execution, {
-      deviceId: options.deviceId,
-      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
-      warn: message => process.stderr.write(message),
-      logger: options.logger,
-    });
-    if (result.ok)
-      return formatSuccess(
-        {
-          envelope: result.envelope,
-          deviceId: result.deviceId,
-          terminalSource: result.terminalSource,
-          isCanonicalTerminal: result.terminalSource === "clawperator_result",
-        },
-        options
-      );
-    return formatError(result.error, options);
+    return await runActionExecution(execution, options);
   } catch (e) {
     return formatError(e, options);
   }
@@ -117,27 +111,14 @@ export async function cmdActionClick(options: {
   clickType?: "default" | "long_click" | "focus";
   deviceId?: string;
   operatorPackage?: string;
+  noDaemon?: boolean;
   logger?: Logger;
+  tryDaemonExecutionFn?: typeof tryDaemonExecution;
+  runExecutionFn?: typeof runExecution;
 }): Promise<string> {
   try {
     const execution = buildClickExecution(options.matcher, options.clickType, options.coordinate);
-    const result = await runExecution(execution, {
-      deviceId: options.deviceId,
-      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
-      warn: message => process.stderr.write(message),
-      logger: options.logger,
-    });
-    if (result.ok)
-      return formatSuccess(
-        {
-          envelope: result.envelope,
-          deviceId: result.deviceId,
-          terminalSource: result.terminalSource,
-          isCanonicalTerminal: result.terminalSource === "clawperator_result",
-        },
-        options
-      );
-    return formatError(result.error, options);
+    return await runActionExecution(execution, options);
   } catch (e) {
     return formatError(e, options);
   }
@@ -153,6 +134,7 @@ export async function cmdActionRead(options: {
   timeoutMs?: number;
   validateOnly?: boolean;
   dryRun?: boolean;
+  noDaemon?: boolean;
   logger?: Logger;
 }): Promise<string> {
   try {
@@ -167,26 +149,11 @@ export async function cmdActionRead(options: {
         timeoutMs: options.timeoutMs,
         validateOnly: options.validateOnly,
         dryRun: options.dryRun,
+        noDaemon: options.noDaemon,
         logger: options.logger,
       });
     }
-    const result = await runExecution(execution, {
-      deviceId: options.deviceId,
-      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
-      warn: message => process.stderr.write(message),
-      logger: options.logger,
-    });
-    if (result.ok)
-      return formatSuccess(
-        {
-          envelope: result.envelope,
-          deviceId: result.deviceId,
-          terminalSource: result.terminalSource,
-          isCanonicalTerminal: result.terminalSource === "clawperator_result",
-        },
-        options
-      );
-    return formatError(result.error, options);
+    return await runActionExecution(execution, options);
   } catch (e) {
     return formatError(e, options);
   }
@@ -198,27 +165,12 @@ export async function cmdActionWait(options: {
   waitTimeoutMs?: number;
   deviceId?: string;
   operatorPackage?: string;
+  noDaemon?: boolean;
   logger?: Logger;
 }): Promise<string> {
   try {
     const execution = buildWaitExecution(options.matcher, options.waitTimeoutMs);
-    const result = await runExecution(execution, {
-      deviceId: options.deviceId,
-      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
-      warn: message => process.stderr.write(message),
-      logger: options.logger,
-    });
-    if (result.ok)
-      return formatSuccess(
-        {
-          envelope: result.envelope,
-          deviceId: result.deviceId,
-          terminalSource: result.terminalSource,
-          isCanonicalTerminal: result.terminalSource === "clawperator_result",
-        },
-        options
-      );
-    return formatError(result.error, options);
+    return await runActionExecution(execution, options);
   } catch (e) {
     return formatError(e, options);
   }
@@ -232,6 +184,7 @@ export async function cmdActionType(options: {
   clear?: boolean;
   deviceId?: string;
   operatorPackage?: string;
+  noDaemon?: boolean;
   logger?: Logger;
 }): Promise<string> {
   try {
@@ -241,23 +194,7 @@ export async function cmdActionType(options: {
       submit: options.submit ?? false,
       clear: options.clear ?? false,
     });
-    const result = await runExecution(execution, {
-      deviceId: options.deviceId,
-      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
-      warn: message => process.stderr.write(message),
-      logger: options.logger,
-    });
-    if (result.ok)
-      return formatSuccess(
-        {
-          envelope: result.envelope,
-          deviceId: result.deviceId,
-          terminalSource: result.terminalSource,
-          isCanonicalTerminal: result.terminalSource === "clawperator_result",
-        },
-        options
-      );
-    return formatError(result.error, options);
+    return await runActionExecution(execution, options);
   } catch (e) {
     return formatError(e, options);
   }
@@ -268,27 +205,12 @@ export async function cmdActionOpenUri(options: {
   uri: string;
   deviceId?: string;
   operatorPackage?: string;
+  noDaemon?: boolean;
   logger?: Logger;
 }): Promise<string> {
   try {
     const execution = buildOpenUriExecution(options.uri);
-    const result = await runExecution(execution, {
-      deviceId: options.deviceId,
-      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
-      warn: message => process.stderr.write(message),
-      logger: options.logger,
-    });
-    if (result.ok)
-      return formatSuccess(
-        {
-          envelope: result.envelope,
-          deviceId: result.deviceId,
-          terminalSource: result.terminalSource,
-          isCanonicalTerminal: result.terminalSource === "clawperator_result",
-        },
-        options
-      );
-    return formatError(result.error, options);
+    return await runActionExecution(execution, options);
   } catch (e) {
     return formatError(e, options);
   }
@@ -299,27 +221,12 @@ export async function cmdActionPressKey(options: {
   key: string;
   deviceId?: string;
   operatorPackage?: string;
+  noDaemon?: boolean;
   logger?: Logger;
 }): Promise<string> {
   try {
     const execution = buildPressKeyExecution(options.key);
-    const result = await runExecution(execution, {
-      deviceId: options.deviceId,
-      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
-      warn: message => process.stderr.write(message),
-      logger: options.logger,
-    });
-    if (result.ok)
-      return formatSuccess(
-        {
-          envelope: result.envelope,
-          deviceId: result.deviceId,
-          terminalSource: result.terminalSource,
-          isCanonicalTerminal: result.terminalSource === "clawperator_result",
-        },
-        options
-      );
-    return formatError(result.error, options);
+    return await runActionExecution(execution, options);
   } catch (e) {
     return formatError(e, options);
   }
@@ -332,27 +239,12 @@ export async function cmdScroll(options: {
   deviceId?: string;
   operatorPackage?: string;
   timeoutMs?: number;
+  noDaemon?: boolean;
   logger?: Logger;
 }): Promise<string> {
   try {
     const execution = buildScrollExecution(options.direction, options.timeoutMs, options.container);
-    const result = await runExecution(execution, {
-      deviceId: options.deviceId,
-      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
-      warn: message => process.stderr.write(message),
-      logger: options.logger,
-    });
-    if (result.ok)
-      return formatSuccess(
-        {
-          envelope: result.envelope,
-          deviceId: result.deviceId,
-          terminalSource: result.terminalSource,
-          isCanonicalTerminal: result.terminalSource === "clawperator_result",
-        },
-        options
-      );
-    return formatError(result.error, options);
+    return await runActionExecution(execution, options);
   } catch (e) {
     return formatError(e, options);
   }
@@ -367,6 +259,7 @@ export async function cmdScrollUntil(options: {
   deviceId?: string;
   operatorPackage?: string;
   timeoutMs?: number;
+  noDaemon?: boolean;
   logger?: Logger;
 }): Promise<string> {
   try {
@@ -377,23 +270,7 @@ export async function cmdScrollUntil(options: {
       options.clickAfter,
       options.timeoutMs,
     );
-    const result = await runExecution(execution, {
-      deviceId: options.deviceId,
-      operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
-      warn: message => process.stderr.write(message),
-      logger: options.logger,
-    });
-    if (result.ok)
-      return formatSuccess(
-        {
-          envelope: result.envelope,
-          deviceId: result.deviceId,
-          terminalSource: result.terminalSource,
-          isCanonicalTerminal: result.terminalSource === "clawperator_result",
-        },
-        options
-      );
-    return formatError(result.error, options);
+    return await runActionExecution(execution, options);
   } catch (e) {
     return formatError(e, options);
   }

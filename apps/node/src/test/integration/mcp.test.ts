@@ -36,6 +36,10 @@ class McpIntegrationClient {
     const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
     this.child = spawn(process.execPath, ["dist/cli/index.js", "mcp", "serve"], {
       cwd: packageRoot,
+      env: {
+        ...process.env,
+        CLAWPERATOR_NO_DAEMON: "1",
+      },
       stdio: ["pipe", "pipe", "pipe"],
     });
 

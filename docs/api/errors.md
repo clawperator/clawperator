@@ -132,6 +132,7 @@ Notes:
 | Interactive readiness | `DEVICE_NOT_INTERACTIVE` | Wake or unlock the target, rerun `clawperator doctor`, and confirm the interactive-state check passes |
 | Operator setup | `OPERATOR_NOT_INSTALLED`, `OPERATOR_VARIANT_MISMATCH`, `OPERATOR_INSTALL_FAILED`, `OPERATOR_GRANT_FAILED`, `OPERATOR_VERIFY_FAILED` | Install or repair the expected Operator APK, then rerun the command |
 | Host tooling | `ADB_NOT_FOUND`, `ADB_SERVER_FAILED`, `HOST_DEPENDENCY_MISSING`, `ANDROID_SDK_TOOL_MISSING`, `SCRCPY_NOT_FOUND` | Repair the host environment before retrying |
+| Daemon lifecycle and proxy | `DAEMON_START_FAILED`, `DAEMON_STOP_FAILED`, `DAEMON_PROXY_ERROR` | Inspect the daemon log and metadata files under `~/.clawperator/`. For `DAEMON_PROXY_ERROR`, inspect device state before retrying because the action may already have executed |
 | Payload or flag validation | `MISSING_ARGUMENT`, `EXECUTION_VALIDATION_FAILED`, `EXECUTION_ACTION_UNSUPPORTED`, `PAYLOAD_TOO_LARGE` | Change the command or payload. Do not retry unchanged |
 | Dispatch or service availability | `RESULT_ENVELOPE_TIMEOUT`, `RESULT_ENVELOPE_MALFORMED`, `BROADCAST_FAILED`, `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `DEVICE_SHELL_UNAVAILABLE` | Run `clawperator doctor`, repair the reported issue, then retry |
 | UI lookup or gesture | `NODE_NOT_FOUND`, `NODE_NOT_CLICKABLE`, `CONTAINER_NOT_FOUND`, `CONTAINER_NOT_SCROLLABLE`, `GESTURE_FAILED`, `SECURITY_BLOCK_DETECTED` | Refresh state with `snapshot`, wait for UI readiness, or adjust selectors and scroll strategy |

@@ -1,3 +1,5 @@
+import type { RunExecutionResult } from "../domain/executions/runExecution.js";
+
 /**
  * Agent-facing output: machine-readable JSON by default.
  */
@@ -21,4 +23,22 @@ export function formatError(error: unknown, options: OutputOptions): string {
     return JSON.stringify(obj, null, 2);
   }
   return JSON.stringify(obj);
+}
+
+export function formatRunExecutionResultForCli(
+  result: RunExecutionResult,
+  options: OutputOptions
+): string {
+  if (result.ok) {
+    return formatSuccess(
+      {
+        envelope: result.envelope,
+        deviceId: result.deviceId,
+        terminalSource: result.terminalSource,
+        isCanonicalTerminal: result.terminalSource === "clawperator_result",
+      },
+      options
+    );
+  }
+  return formatError(result.error, options);
 }

@@ -18,15 +18,21 @@ import { provisionEmulator } from "../../domain/android-emulators/provision.js";
 import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 import type { Logger } from "../../adapters/logger.js";
 import { resolveOperatorPackageForRequest } from "../../domain/config/resolveOperatorPackage.js";
+import { getCliBuildIdentity, getCliVersion } from "../../domain/version/compatibility.js";
 import { resolveInteractiveSkillTarget } from "./skills.js";
 import { toPublicInteractiveAutomationError } from "../../domain/doctor/checks/deviceInteractivity.js";
 
-interface ServeOptions {
-  port: number;
-  host: string;
+export interface ServeAppOptions {
   verbose: boolean;
+  operatorPackage?: string;
   logger?: Logger;
   resolveInteractiveSkillTargetImpl?: typeof resolveInteractiveSkillTarget;
+}
+
+export interface ServeOptions extends ServeAppOptions {
+  port?: number;
+  host?: string;
+  socketPath?: string;
 }
 
 export function buildServeSkillRunOptions(
@@ -81,8 +87,76 @@ export async function cmdServe(options: ServeOptions): Promise<void> {
 }
 
 export async function startServer(options: ServeOptions): Promise<Server> {
+  const hasTcpOptions = options.port !== undefined || options.host !== undefined;
+  const hasSocketOptions = options.socketPath !== undefined;
+  if (hasTcpOptions === hasSocketOptions) {
+    throw new Error("Exactly one serve transport must be provided: port/host or socketPath");
+  }
+  if (hasTcpOptions && options.port === undefined) {
+    throw new Error("TCP serve transport requires port");
+  }
+
+  const app = createServeApp(options);
+  const tcpPort = options.port as number;
+
+  return new Promise((resolve, reject) => {
+    const onListen = (server: Server) => {
+      const addr = server.address();
+      const actualPort = addr && typeof addr === "object" ? addr.port : options.port;
+      const startupMessage = options.socketPath
+        ? `Clawperator API server listening on ${options.socketPath}`
+        : `Clawperator API server listening on http://${options.host}:${actualPort}`;
+      options.logger?.emit({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "serve.server.started",
+        message: startupMessage,
+      });
+      process.stderr.write(`${startupMessage}\n`);
+      if (options.verbose) {
+        const routes = [
+          "- GET  /ping",
+          "- GET  /version",
+          "- GET  /devices",
+          "- POST /execute",
+          "- POST /snapshot",
+          "- POST /screenshot",
+          "- GET  /skills",
+          "- GET  /skills/:skillId",
+          "- POST /skills/:skillId/run",
+          "- GET  /events (SSE)",
+        ];
+        for (const r of routes) {
+          options.logger?.emit({
+            ts: new Date().toISOString(),
+            level: "debug",
+            event: "serve.server.started",
+            message: r,
+          });
+        }
+        process.stderr.write(routes.join("\n") + "\n");
+      }
+      resolve(server);
+    };
+
+    const server = options.socketPath
+      ? app.listen(options.socketPath, () => onListen(server))
+      : options.host === undefined
+        ? app.listen(tcpPort, () => onListen(server))
+        : app.listen(tcpPort, options.host, () => onListen(server));
+
+    server.on("error", (err) => {
+      reject(err);
+    });
+  });
+}
+
+export function createServeApp(options: ServeAppOptions): express.Application {
   const app = express();
   app.use(express.json({ limit: "100kb" }));
+
+  const resolveServeOperatorPackage = (requestOperatorPackage: string | undefined): string =>
+    resolveOperatorPackageForRequest(requestOperatorPackage ?? options.operatorPackage);
 
   // Log all requests when a logger is configured (filtered by log level at the file sink).
   // Without a logger, fall back to console.log only when --verbose is set (legacy behavior).
@@ -101,12 +175,20 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     next();
   });
 
+  app.get("/ping", (_req, res) => {
+    res.json({ ok: true });
+  });
+
+  app.get("/version", (_req, res) => {
+    res.json({ version: getCliVersion(), buildIdentity: getCliBuildIdentity() });
+  });
+
   // REST: List devices
   app.get("/devices", async (_req, res) => {
     try {
       const config = getDefaultRuntimeConfig({
         adbPath: process.env.ADB_PATH,
-        operatorPackage: process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+        operatorPackage: resolveServeOperatorPackage(undefined),
         logger: options.logger,
       });
       const devices = await listDevices(config);
@@ -128,7 +210,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
       emulatorPath: process.env.EMULATOR_PATH,
       sdkmanagerPath: process.env.SDKMANAGER_PATH,
       avdmanagerPath: process.env.AVDMANAGER_PATH,
-      operatorPackage: process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+      operatorPackage: resolveServeOperatorPackage(undefined),
       logger: options.logger,
     });
   }
@@ -168,7 +250,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     try {
       const result = await runExecution(execution, {
         deviceId,
-        operatorPackage: resolveOperatorPackageForRequest(operatorPackage),
+        operatorPackage: resolveServeOperatorPackage(operatorPackage),
         logger: options.logger,
       });
 
@@ -223,7 +305,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     try {
       const result = await runExecution(executionInput, { 
         deviceId, 
-        operatorPackage: resolveOperatorPackageForRequest(operatorPackage),
+        operatorPackage: resolveServeOperatorPackage(operatorPackage),
         logger: options.logger,
       });
       if (result.ok) {
@@ -280,7 +362,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     try {
       const result = await runExecution(executionInput, { 
         deviceId, 
-        operatorPackage: resolveOperatorPackageForRequest(operatorPackage),
+        operatorPackage: resolveServeOperatorPackage(operatorPackage),
         logger: options.logger,
       });
       if (result.ok) {
@@ -530,7 +612,7 @@ export async function startServer(options: ServeOptions): Promise<Server> {
         return;
       }
 
-      const resolvedOperatorPackage = resolveOperatorPackageForRequest(
+      const resolvedOperatorPackage = resolveServeOperatorPackage(
         typeof operatorPackage === "string" ? operatorPackage : undefined
       );
       const resolveInteractiveSkillTargetImpl = options.resolveInteractiveSkillTargetImpl ?? resolveInteractiveSkillTarget;
@@ -762,44 +844,5 @@ export async function startServer(options: ServeOptions): Promise<Server> {
     res.status(500).json({ ok: false, error: { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" } });
   });
 
-  return new Promise((resolve, reject) => {
-    const server = app.listen(options.port, options.host, () => {
-      const addr = server.address();
-      const actualPort = addr && typeof addr === "object" ? addr.port : options.port;
-      const startupMessage = `Clawperator API server listening on http://${options.host}:${actualPort}`;
-      options.logger?.emit({
-        ts: new Date().toISOString(),
-        level: "info",
-        event: "serve.server.started",
-        message: startupMessage,
-      });
-      process.stderr.write(`${startupMessage}\n`);
-      if (options.verbose) {
-        const routes = [
-          "- GET  /devices",
-          "- POST /execute",
-          "- POST /snapshot",
-          "- POST /screenshot",
-          "- GET  /skills",
-          "- GET  /skills/:skillId",
-          "- POST /skills/:skillId/run",
-          "- GET  /events (SSE)",
-        ];
-        for (const r of routes) {
-          options.logger?.emit({
-            ts: new Date().toISOString(),
-            level: "debug",
-            event: "serve.server.started",
-            message: r,
-          });
-        }
-        process.stderr.write(routes.join("\n") + "\n");
-      }
-      resolve(server);
-    });
-
-    server.on("error", (err) => {
-      reject(err);
-    });
-  });
+  return app;
 }

@@ -1063,6 +1063,7 @@ This page is intentionally narrow:
 - Use [Selectors](selectors.md) for `NodeMatcher` and selector flags
 - Use [Errors](errors.md) for exact error codes and recovery
 - Use [Devices](devices.md) for target selection rules
+- Use [Daemon](daemon.md) for background daemon lifecycle commands
 
 ## CLI Output Format
 
@@ -1427,26 +1428,27 @@ This page is generated from the Node CLI registry and command sources.
 | `emulator` | `emulator list`<br>`emulator inspect <name>`<br>`emulator create [--name <name>]`<br>`emulator start <name>`<br>`emulator stop <name>`<br>`emulator delete <name>`<br>`emulator status`<br>`emulator provision` | - | --name<br>Subcommands: list, inspect, create, start, stop, delete, status, provision | Manage Android emulators (AVDs) |
 | `provision` | - | - | -<br>Subcommands: emulator | Provision an Android emulator |
 | `packages` | `packages list [--device <id>] [--operator-package <pkg>] [--third-party]` | - | --third-party, --device, --operator-package | List installed packages on a device |
-| `exec` | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]`<br>`exec best-effort --goal <text> [--device <id>] [--operator-package <package>]` | execute | --payload, --validate-only, --dry-run, --goal, --device, --operator-package, --execution, --input, --file | Execute a validated command payload |
-| `snapshot` | `snapshot [--device <id>] [--operator-package <pkg>]` | snapshot-ui, snapshot_ui | --device, --operator-package | Get current Android UI hierarchy as XML |
-| `screenshot` | `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]` | take-screenshot, take_screenshot, capture-screenshot | --path, --device, --operator-package | Capture a screenshot from the device |
-| `click` | `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]` | tap | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --coordinate, --long, --focus, --device, --operator-package | Tap the first matching UI element |
-| `open` | `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]` | open-app, open_app, open-uri, open-url, open_uri, open_url | --app, --device, --operator-package, --help | Open an app, URL, or URI on the device |
-| `type` | `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]` | fill, enter-text, enter_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --submit, --clear, --device, --operator-package, --help | Type text into the first matching UI element |
-| `read` | `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]` | read-text, read_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --all, --validate-only, --dry-run, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package | Read text from the first matching UI element |
-| `wait` | `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]` | wait-for, wait_for, wait-for-node, wait_for_node, find, find-node, find_node | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --device, --operator-package, --timeout | Wait until a matching UI element appears |
-| `press` | `press <back|home|recents> [--device <id>] [--operator-package <pkg>]` | press-key, press_key | --key, --device, --operator-package, --help | Press a hardware key on the device |
-| `back` | `back [--device <id>] [--operator-package <pkg>]` | - | --device, --operator-package | Press the Android back key |
-| `close` | `close <package> [--device <id>] [--operator-package <pkg>]` | close-app, close_app | --app, --device, --operator-package | Force-stop an Android application |
-| `sleep` | `sleep <ms> [--device <id>] [--operator-package <pkg>]` | - | --device, --operator-package | Pause execution for a duration |
-| `scroll` | `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]` | - | --direction, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --help | Scroll the screen in a direction |
-| `scroll-until` | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]` | scroll_until | --click, --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package | Scroll until a target element is visible |
-| `scroll-and-click` | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]` | scroll_and_click | --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --click, --device, --operator-package | Scroll until target is visible, then click it (alias for scroll-until --click) |
-| `wait-for-nav` | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]` | wait-for-navigation, wait_for_navigation | --app, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --validate-only, --dry-run, --timeout, --device, --operator-package | Wait for app or screen navigation to complete |
-| `read-value` | `read-value --label <text>` | read-kv, read-key-value-pair, read_key_value_pair | --label, --label-id, --label-desc, --all, --validate-only, --dry-run | Read the value associated with a labeled element |
+| `exec` | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]`<br>`exec best-effort --goal <text> [--device <id>] [--operator-package <package>]` | execute | --payload, --validate-only, --dry-run, --goal, --no-daemon, --device, --operator-package, --execution, --input, --file | Execute a validated command payload |
+| `snapshot` | `snapshot [--device <id>] [--operator-package <pkg>]` | snapshot-ui, snapshot_ui | --no-daemon, --device, --operator-package | Get current Android UI hierarchy as XML |
+| `screenshot` | `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]` | take-screenshot, take_screenshot, capture-screenshot | --path, --no-daemon, --device, --operator-package | Capture a screenshot from the device |
+| `click` | `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]` | tap | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --coordinate, --long, --focus, --no-daemon, --device, --operator-package | Tap the first matching UI element |
+| `open` | `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]` | open-app, open_app, open-uri, open-url, open_uri, open_url | --app, --no-daemon, --device, --operator-package, --help | Open an app, URL, or URI on the device |
+| `type` | `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]` | fill, enter-text, enter_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --submit, --clear, --no-daemon, --device, --operator-package, --help | Type text into the first matching UI element |
+| `read` | `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]` | read-text, read_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --all, --validate-only, --dry-run, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --no-daemon, --device, --operator-package | Read text from the first matching UI element |
+| `wait` | `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]` | wait-for, wait_for, wait-for-node, wait_for_node, find, find-node, find_node | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --no-daemon, --device, --operator-package, --timeout | Wait until a matching UI element appears |
+| `press` | `press <back|home|recents> [--device <id>] [--operator-package <pkg>]` | press-key, press_key | --key, --no-daemon, --device, --operator-package, --help | Press a hardware key on the device |
+| `back` | `back [--device <id>] [--operator-package <pkg>]` | - | --no-daemon, --device, --operator-package | Press the Android back key |
+| `close` | `close <package> [--device <id>] [--operator-package <pkg>]` | close-app, close_app | --app, --no-daemon, --device, --operator-package | Force-stop an Android application |
+| `sleep` | `sleep <ms> [--device <id>] [--operator-package <pkg>]` | - | --no-daemon, --device, --operator-package | Pause execution for a duration |
+| `scroll` | `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]` | - | --direction, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --no-daemon, --device, --operator-package, --help | Scroll the screen in a direction |
+| `scroll-until` | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]` | scroll_until | --click, --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --no-daemon, --device, --operator-package | Scroll until a target element is visible |
+| `scroll-and-click` | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]` | scroll_and_click | --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --no-daemon, --click, --device, --operator-package | Scroll until target is visible, then click it (alias for scroll-until --click) |
+| `wait-for-nav` | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]` | wait-for-navigation, wait_for_navigation | --app, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --validate-only, --dry-run, --no-daemon, --timeout, --device, --operator-package | Wait for app or screen navigation to complete |
+| `read-value` | `read-value --label <text>` | read-kv, read-key-value-pair, read_key_value_pair | --label, --label-id, --label-desc, --all, --validate-only, --dry-run, --no-daemon | Read the value associated with a labeled element |
 | `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills for-app <package_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --output, --version<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
 | `bundled-skills` | `bundled-skills list`<br>`bundled-skills install`<br>`bundled-skills update` | - | --version, --output, --format, --json, --help<br>Subcommands: install, update, list | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
 | `recording` | `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]`<br>`recording stop`<br>`recording pull`<br>`recording parse --input <file> [--out <file>]`<br>`recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]`<br>`recording compare --baseline <export.json> --result <skills-run.json> [--mode <auto|literal|semantic>]` | record | --session-id, --out, --input, --snapshots, --baseline, --result, --mode, --device, --operator-package<br>Subcommands: compare, export | Manage recording sessions on the Operator app |
+| `daemon` | `daemon start|stop|status|restart [--device <id>]` | - | --device | Manage the background Unix socket daemon |
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `mcp` | `mcp serve` | - | - | Start the first-party MCP server |
 | `logs` | `logs` | - | - | Tail the Clawperator log file |
@@ -1560,9 +1562,10 @@ This page is generated from the Node CLI registry and command sources.
 
 | Command | Syntax | Aliases | Flags | Summary |
 | --- | --- | --- | --- | --- |
-| `exec` | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]`<br>`exec best-effort --goal <text> [--device <id>] [--operator-package <package>]` | execute | --payload, --validate-only, --dry-run, --goal, --device, --operator-package, --execution, --input, --file | Execute a validated command payload |
+| `exec` | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]`<br>`exec best-effort --goal <text> [--device <id>] [--operator-package <package>]` | execute | --payload, --validate-only, --dry-run, --goal, --no-daemon, --device, --operator-package, --execution, --input, --file | Execute a validated command payload |
 | `skills` | `skills list`<br>`skills get <skill_id>`<br>`skills for-app <package_id>`<br>`skills search --app <package_id> [--intent <intent>] [--keyword <text>]`<br>`skills search <keyword>`<br>`skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`<br>`skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`<br>`skills new <skill_id> [--summary <text>] [--recording-context <file>]`<br>`skills validate <skill_id> [--dry-run]`<br>`skills validate --all [--dry-run]`<br>`skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [skill_args...]`<br>`skills install`<br>`skills update [--ref <git-ref>]`<br>`skills sync --ref <git-ref>` | - | --app, --intent, --keyword, --skill-id, --artifact, --vars, --summary, --recording-context, --all, --dry-run, --device, --device-id, --operator-package, --receiver-package, --timeout, --timeout-ms, --expect-contains, --skip-validate, --ref, --output, --version<br>Subcommands: install, sync, new, validate, compile-artifact, run | Manage and run automation skills |
 | `bundled-skills` | `bundled-skills list`<br>`bundled-skills install`<br>`bundled-skills update` | - | --version, --output, --format, --json, --help<br>Subcommands: install, update, list | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
+| `daemon` | `daemon start|stop|status|restart [--device <id>]` | - | --device | Manage the background Unix socket daemon |
 | `serve` | `serve [--port <number>] [--host <string>]` | - | --port, --host | Start local HTTP/SSE server for remote control |
 | `mcp` | `mcp serve` | - | - | Start the first-party MCP server |
 
@@ -1571,7 +1574,7 @@ This page is generated from the Node CLI registry and command sources.
 - Summary: Execute a validated command payload
 - Syntax: `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]`, `exec best-effort --goal <text> [--device <id>] [--operator-package <package>]`
 - Aliases: `execute`
-- Flags: `--payload`, `--validate-only`, `--dry-run`, `--goal`, `--device`, `--operator-package`, `--execution`, `--input`, `--file`
+- Flags: `--payload`, `--validate-only`, `--dry-run`, `--goal`, `--no-daemon`, `--device`, `--operator-package`, `--execution`, `--input`, `--file`
 
 ### `skills`
 
@@ -1588,6 +1591,13 @@ This page is generated from the Node CLI registry and command sources.
 - Aliases: -
 - Flags: `--version`, `--output`, `--format`, `--json`, `--help`
 - Subcommands: `install`, `update`, `list`
+
+### `daemon`
+
+- Summary: Manage the background Unix socket daemon
+- Syntax: `daemon start|stop|status|restart [--device <id>]`
+- Aliases: -
+- Flags: `--device`
 
 ### `serve`
 
@@ -1607,134 +1617,134 @@ This page is generated from the Node CLI registry and command sources.
 
 | Command | Syntax | Aliases | Flags | Summary |
 | --- | --- | --- | --- | --- |
-| `snapshot` | `snapshot [--device <id>] [--operator-package <pkg>]` | snapshot-ui, snapshot_ui | --device, --operator-package | Get current Android UI hierarchy as XML |
-| `screenshot` | `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]` | take-screenshot, take_screenshot, capture-screenshot | --path, --device, --operator-package | Capture a screenshot from the device |
-| `click` | `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]` | tap | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --coordinate, --long, --focus, --device, --operator-package | Tap the first matching UI element |
-| `open` | `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]` | open-app, open_app, open-uri, open-url, open_uri, open_url | --app, --device, --operator-package, --help | Open an app, URL, or URI on the device |
-| `type` | `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]` | fill, enter-text, enter_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --submit, --clear, --device, --operator-package, --help | Type text into the first matching UI element |
-| `read` | `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]` | read-text, read_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --all, --validate-only, --dry-run, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package | Read text from the first matching UI element |
-| `wait` | `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]` | wait-for, wait_for, wait-for-node, wait_for_node, find, find-node, find_node | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --device, --operator-package, --timeout | Wait until a matching UI element appears |
-| `press` | `press <back|home|recents> [--device <id>] [--operator-package <pkg>]` | press-key, press_key | --key, --device, --operator-package, --help | Press a hardware key on the device |
-| `back` | `back [--device <id>] [--operator-package <pkg>]` | - | --device, --operator-package | Press the Android back key |
-| `close` | `close <package> [--device <id>] [--operator-package <pkg>]` | close-app, close_app | --app, --device, --operator-package | Force-stop an Android application |
-| `sleep` | `sleep <ms> [--device <id>] [--operator-package <pkg>]` | - | --device, --operator-package | Pause execution for a duration |
-| `scroll` | `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]` | - | --direction, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package, --help | Scroll the screen in a direction |
-| `scroll-until` | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]` | scroll_until | --click, --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --device, --operator-package | Scroll until a target element is visible |
-| `scroll-and-click` | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]` | scroll_and_click | --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --click, --device, --operator-package | Scroll until target is visible, then click it (alias for scroll-until --click) |
-| `wait-for-nav` | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]` | wait-for-navigation, wait_for_navigation | --app, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --validate-only, --dry-run, --timeout, --device, --operator-package | Wait for app or screen navigation to complete |
-| `read-value` | `read-value --label <text>` | read-kv, read-key-value-pair, read_key_value_pair | --label, --label-id, --label-desc, --all, --validate-only, --dry-run | Read the value associated with a labeled element |
+| `snapshot` | `snapshot [--device <id>] [--operator-package <pkg>]` | snapshot-ui, snapshot_ui | --no-daemon, --device, --operator-package | Get current Android UI hierarchy as XML |
+| `screenshot` | `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]` | take-screenshot, take_screenshot, capture-screenshot | --path, --no-daemon, --device, --operator-package | Capture a screenshot from the device |
+| `click` | `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]` | tap | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --coordinate, --long, --focus, --no-daemon, --device, --operator-package | Tap the first matching UI element |
+| `open` | `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]` | open-app, open_app, open-uri, open-url, open_uri, open_url | --app, --no-daemon, --device, --operator-package, --help | Open an app, URL, or URI on the device |
+| `type` | `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]` | fill, enter-text, enter_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --submit, --clear, --no-daemon, --device, --operator-package, --help | Type text into the first matching UI element |
+| `read` | `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]` | read-text, read_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --all, --validate-only, --dry-run, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --no-daemon, --device, --operator-package | Read text from the first matching UI element |
+| `wait` | `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]` | wait-for, wait_for, wait-for-node, wait_for_node, find, find-node, find_node | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --no-daemon, --device, --operator-package, --timeout | Wait until a matching UI element appears |
+| `press` | `press <back|home|recents> [--device <id>] [--operator-package <pkg>]` | press-key, press_key | --key, --no-daemon, --device, --operator-package, --help | Press a hardware key on the device |
+| `back` | `back [--device <id>] [--operator-package <pkg>]` | - | --no-daemon, --device, --operator-package | Press the Android back key |
+| `close` | `close <package> [--device <id>] [--operator-package <pkg>]` | close-app, close_app | --app, --no-daemon, --device, --operator-package | Force-stop an Android application |
+| `sleep` | `sleep <ms> [--device <id>] [--operator-package <pkg>]` | - | --no-daemon, --device, --operator-package | Pause execution for a duration |
+| `scroll` | `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]` | - | --direction, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --no-daemon, --device, --operator-package, --help | Scroll the screen in a direction |
+| `scroll-until` | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]` | scroll_until | --click, --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --no-daemon, --device, --operator-package | Scroll until a target element is visible |
+| `scroll-and-click` | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]` | scroll_and_click | --direction, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --no-daemon, --click, --device, --operator-package | Scroll until target is visible, then click it (alias for scroll-until --click) |
+| `wait-for-nav` | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]` | wait-for-navigation, wait_for_navigation | --app, --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --validate-only, --dry-run, --no-daemon, --timeout, --device, --operator-package | Wait for app or screen navigation to complete |
+| `read-value` | `read-value --label <text>` | read-kv, read-key-value-pair, read_key_value_pair | --label, --label-id, --label-desc, --all, --validate-only, --dry-run, --no-daemon | Read the value associated with a labeled element |
 
 ### `snapshot`
 
 - Summary: Get current Android UI hierarchy as XML
 - Syntax: `snapshot [--device <id>] [--operator-package <pkg>]`
 - Aliases: `snapshot-ui`, `snapshot_ui`
-- Flags: `--device`, `--operator-package`
+- Flags: `--no-daemon`, `--device`, `--operator-package`
 
 ### `screenshot`
 
 - Summary: Capture a screenshot from the device
 - Syntax: `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]`
 - Aliases: `take-screenshot`, `take_screenshot`, `capture-screenshot`
-- Flags: `--path`, `--device`, `--operator-package`
+- Flags: `--path`, `--no-daemon`, `--device`, `--operator-package`
 
 ### `click`
 
 - Summary: Tap the first matching UI element
 - Syntax: `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `tap`
-- Flags: `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--coordinate`, `--long`, `--focus`, `--device`, `--operator-package`
+- Flags: `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--coordinate`, `--long`, `--focus`, `--no-daemon`, `--device`, `--operator-package`
 
 ### `open`
 
 - Summary: Open an app, URL, or URI on the device
 - Syntax: `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `open-app`, `open_app`, `open-uri`, `open-url`, `open_uri`, `open_url`
-- Flags: `--app`, `--device`, `--operator-package`, `--help`
+- Flags: `--app`, `--no-daemon`, `--device`, `--operator-package`, `--help`
 
 ### `type`
 
 - Summary: Type text into the first matching UI element
 - Syntax: `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `fill`, `enter-text`, `enter_text`
-- Flags: `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--submit`, `--clear`, `--device`, `--operator-package`, `--help`
+- Flags: `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--submit`, `--clear`, `--no-daemon`, `--device`, `--operator-package`, `--help`
 
 ### `read`
 
 - Summary: Read text from the first matching UI element
 - Syntax: `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `read-text`, `read_text`
-- Flags: `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--all`, `--validate-only`, `--dry-run`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--device`, `--operator-package`
+- Flags: `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--all`, `--validate-only`, `--dry-run`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--no-daemon`, `--device`, `--operator-package`
 
 ### `wait`
 
 - Summary: Wait until a matching UI element appears
 - Syntax: `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]`
 - Aliases: `wait-for`, `wait_for`, `wait-for-node`, `wait_for_node`, `find`, `find-node`, `find_node`
-- Flags: `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--device`, `--operator-package`, `--timeout`
+- Flags: `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--no-daemon`, `--device`, `--operator-package`, `--timeout`
 
 ### `press`
 
 - Summary: Press a hardware key on the device
 - Syntax: `press <back|home|recents> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `press-key`, `press_key`
-- Flags: `--key`, `--device`, `--operator-package`, `--help`
+- Flags: `--key`, `--no-daemon`, `--device`, `--operator-package`, `--help`
 
 ### `back`
 
 - Summary: Press the Android back key
 - Syntax: `back [--device <id>] [--operator-package <pkg>]`
 - Aliases: -
-- Flags: `--device`, `--operator-package`
+- Flags: `--no-daemon`, `--device`, `--operator-package`
 
 ### `close`
 
 - Summary: Force-stop an Android application
 - Syntax: `close <package> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `close-app`, `close_app`
-- Flags: `--app`, `--device`, `--operator-package`
+- Flags: `--app`, `--no-daemon`, `--device`, `--operator-package`
 
 ### `sleep`
 
 - Summary: Pause execution for a duration
 - Syntax: `sleep <ms> [--device <id>] [--operator-package <pkg>]`
 - Aliases: -
-- Flags: `--device`, `--operator-package`
+- Flags: `--no-daemon`, `--device`, `--operator-package`
 
 ### `scroll`
 
 - Summary: Scroll the screen in a direction
 - Syntax: `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]`
 - Aliases: -
-- Flags: `--direction`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--device`, `--operator-package`, `--help`
+- Flags: `--direction`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--no-daemon`, `--device`, `--operator-package`, `--help`
 
 ### `scroll-until`
 
 - Summary: Scroll until a target element is visible
 - Syntax: `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]`
 - Aliases: `scroll_until`
-- Flags: `--click`, `--direction`, `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--device`, `--operator-package`
+- Flags: `--click`, `--direction`, `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--no-daemon`, `--device`, `--operator-package`
 
 ### `scroll-and-click`
 
 - Summary: Scroll until target is visible, then click it (alias for scroll-until --click)
 - Syntax: `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `scroll_and_click`
-- Flags: `--direction`, `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--click`, `--device`, `--operator-package`
+- Flags: `--direction`, `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--container-text`, `--container-text-contains`, `--container-id`, `--container-desc`, `--container-desc-contains`, `--container-role`, `--container-selector`, `--no-daemon`, `--click`, `--device`, `--operator-package`
 
 ### `wait-for-nav`
 
 - Summary: Wait for app or screen navigation to complete
 - Syntax: `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `wait-for-navigation`, `wait_for_navigation`
-- Flags: `--app`, `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--validate-only`, `--dry-run`, `--timeout`, `--device`, `--operator-package`
+- Flags: `--app`, `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`, `--selector`, `--validate-only`, `--dry-run`, `--no-daemon`, `--timeout`, `--device`, `--operator-package`
 
 ### `read-value`
 
 - Summary: Read the value associated with a labeled element
 - Syntax: `read-value --label <text>`
 - Aliases: `read-kv`, `read-key-value-pair`, `read_key_value_pair`
-- Flags: `--label`, `--label-id`, `--label-desc`, `--all`, `--validate-only`, `--dry-run`
+- Flags: `--label`, `--label-id`, `--label-desc`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon`
 
 ## Recording
 
@@ -3943,6 +3953,9 @@ Only the codes defined in `apps/node/src/contracts/errors.ts` are part of the pu
 | `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | Android system image install failed | - |
 | `ANDROID_AVD_CREATE_FAILED` | Android avd create failed | - |
 | `AGENT_SKILLS_STALE` | Agent skills stale | - |
+| `DAEMON_START_FAILED` | Daemon start failed | Daemon lifecycle |
+| `DAEMON_STOP_FAILED` | Daemon stop failed | - |
+| `DAEMON_PROXY_ERROR` | Daemon proxy error | - |
 | `OPERATOR_DOWNLOAD_UNSUPPORTED` | Operator download unsupported | Operator install |
 | `OPERATOR_METADATA_INVALID` | Operator metadata invalid | - |
 | `OPERATOR_DOWNLOAD_FAILED` | Operator download failed | - |
@@ -3996,6 +4009,7 @@ Notes:
 | Interactive readiness | `DEVICE_NOT_INTERACTIVE` | Wake or unlock the target, rerun `clawperator doctor`, and confirm the interactive-state check passes |
 | Operator setup | `OPERATOR_NOT_INSTALLED`, `OPERATOR_VARIANT_MISMATCH`, `OPERATOR_INSTALL_FAILED`, `OPERATOR_GRANT_FAILED`, `OPERATOR_VERIFY_FAILED` | Install or repair the expected Operator APK, then rerun the command |
 | Host tooling | `ADB_NOT_FOUND`, `ADB_SERVER_FAILED`, `HOST_DEPENDENCY_MISSING`, `ANDROID_SDK_TOOL_MISSING`, `SCRCPY_NOT_FOUND` | Repair the host environment before retrying |
+| Daemon lifecycle and proxy | `DAEMON_START_FAILED`, `DAEMON_STOP_FAILED`, `DAEMON_PROXY_ERROR` | Inspect the daemon log and metadata files under `~/.clawperator/`. For `DAEMON_PROXY_ERROR`, inspect device state before retrying because the action may already have executed |
 | Payload or flag validation | `MISSING_ARGUMENT`, `EXECUTION_VALIDATION_FAILED`, `EXECUTION_ACTION_UNSUPPORTED`, `PAYLOAD_TOO_LARGE` | Change the command or payload. Do not retry unchanged |
 | Dispatch or service availability | `RESULT_ENVELOPE_TIMEOUT`, `RESULT_ENVELOPE_MALFORMED`, `BROADCAST_FAILED`, `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `DEVICE_SHELL_UNAVAILABLE` | Run `clawperator doctor`, repair the reported issue, then retry |
 | UI lookup or gesture | `NODE_NOT_FOUND`, `NODE_NOT_CLICKABLE`, `CONTAINER_NOT_FOUND`, `CONTAINER_NOT_SCROLLABLE`, `GESTURE_FAILED`, `SECURITY_BLOCK_DETECTED` | Refresh state with `snapshot`, wait for UI readiness, or adjust selectors and scroll strategy |
@@ -6666,6 +6680,324 @@ Examples of route-local validation failures:
 - [Selectors](selectors.md)
 - [Devices](devices.md)
 - [Errors](errors.md)
+
+---
+
+# Daemon
+
+## Purpose
+
+Define the lifecycle contract for the Clawperator background daemon. The daemon is a long-running Node process that binds the same Express app used by `clawperator serve` to a Unix domain socket instead of a TCP port.
+
+The daemon also handles transparent proxying for `exec`, `snapshot`, `screenshot`, and the flat action commands such as `open`, `click`, `type`, `read`, `wait`, `press`, `back`, `close`, `sleep`, `scroll`, `scroll-until`, `wait-for-nav`, and `read-value`.
+
+## Sources
+
+- CLI registration and global flag parsing: `apps/node/src/cli/registry.ts`, `apps/node/src/cli/index.ts`
+- Daemon command implementation: `apps/node/src/cli/commands/daemon.ts`
+- Daemon proxy implementation: `apps/node/src/cli/daemonProxy.ts`
+- Proxied CLI commands: `apps/node/src/cli/commands/execute.ts`, `apps/node/src/cli/commands/observe.ts`, `apps/node/src/cli/commands/action.ts`
+- Daemon path and process helpers: `apps/node/src/domain/daemon/lifecycle.ts`
+- Serve app, `/ping`, and `/version`: `apps/node/src/cli/commands/serve.ts`
+- CLI version source: `apps/node/src/domain/version/compatibility.ts`
+- Error codes: `apps/node/src/contracts/errors.ts`
+
+## Commands
+
+All daemon lifecycle commands return JSON on stdout by default. `--output pretty` pretty-prints the same object.
+
+| Command | Purpose | Success status values |
+| --- | --- | --- |
+| `clawperator daemon start [--device <id>] [--operator-package <package>]` | Spawn `daemon run` as a detached background process and wait for `/ping`. | `started`, `already_running` |
+| `clawperator daemon stop [--device <id>]` | Send `SIGTERM` to the PID in the metadata file and remove PID/socket files. | `stopped`, `not_running` |
+| `clawperator daemon status [--device <id>]` | Check `/ping`, read metadata, call `/version`, and report state. | `running`, `not_running` |
+| `clawperator daemon restart [--device <id>] [--operator-package <package>]` | Stop, then start. | `started`, `already_running` |
+
+Internal command:
+
+| Command | Public support |
+| --- | --- |
+| `clawperator daemon run` | Internal foreground server process. It is registered so `daemon start` can spawn it, but it is intentionally omitted from help output. |
+
+## Device Key And Paths
+
+The daemon lifecycle is keyed by the raw `--device` value before device resolution. If `--device` is omitted or blank, the key is `default`.
+
+Sanitization from `sanitizeDaemonKey()`:
+
+| Raw device value | Daemon key |
+| --- | --- |
+| omitted | `default` |
+| `""` | `default` |
+| `192.168.1.1:5555` | `id-MTkyLjE2OC4xLjE6NTU1NQ` |
+
+Nonblank device keys use base64url encoding of the raw `--device` value so similar serials such as `host:5555` and `host-5555` cannot collide.
+
+Path formulas from `apps/node/src/domain/daemon/lifecycle.ts`:
+
+| File | Formula |
+| --- | --- |
+| socket | `~/.clawperator/daemon/daemon-<daemon_key>.sock` |
+| PID metadata | `~/.clawperator/daemon/daemon-<daemon_key>.pid` |
+| log | `~/.clawperator/daemon/daemon-<daemon_key>.log` |
+| lifecycle lock | `~/.clawperator/daemon/daemon-<daemon_key>.lock` |
+
+The daemon directory is created with mode `0700`. The PID metadata file is JSON:
+
+```json
+{
+  "pid": 12345,
+  "startedAt": 1777176000000,
+  "daemonKey": "id-ZW11bGF0b3ItNTU1NA",
+  "cliEntryPath": "/Users/<local_user>/src/clawperator/apps/node/dist/cli/index.js",
+  "rawDeviceId": "emulator-5554"
+}
+```
+
+`daemon status` uses `startedAt` to compute `daemon.uptimeSeconds`. Lifecycle commands also use the ownership fields to avoid treating an unrelated reused PID as the managed daemon.
+
+Daemon lifecycle lock files are created next to the PID metadata and socket. A lock file includes the owning process PID so later daemon commands can reclaim a stale lock when that process no longer exists.
+
+## Output Shapes
+
+### Start
+
+Started:
+
+```json
+{
+  "ok": true,
+  "daemon": {
+    "status": "started",
+    "socketPath": "/Users/<local_user>/.clawperator/daemon/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
+  }
+}
+```
+
+Already running:
+
+```json
+{
+  "ok": true,
+  "daemon": {
+    "status": "already_running",
+    "socketPath": "/Users/<local_user>/.clawperator/daemon/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
+  }
+}
+```
+
+### Status
+
+Running:
+
+```json
+{
+  "ok": true,
+  "daemon": {
+    "status": "running",
+    "pid": 12345,
+    "version": "0.7.9",
+    "buildIdentity": {
+      "entryPath": "/Users/<local_user>/src/clawperator/apps/node/dist/cli/index.js",
+      "mtimeMs": 1777176000000,
+      "size": 12345
+    },
+    "uptimeSeconds": 4,
+    "socketPath": "/Users/<local_user>/.clawperator/daemon/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
+  }
+}
+```
+
+Not running:
+
+```json
+{
+  "ok": true,
+  "daemon": {
+    "status": "not_running",
+    "socketPath": "/Users/<local_user>/.clawperator/daemon/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
+  }
+}
+```
+
+### Stop
+
+Stopped:
+
+```json
+{
+  "ok": true,
+  "daemon": {
+    "status": "stopped",
+    "socketPath": "/Users/<local_user>/.clawperator/daemon/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
+  }
+}
+```
+
+Stop when not running:
+
+```json
+{
+  "ok": true,
+  "daemon": {
+    "status": "not_running",
+    "socketPath": "/Users/<local_user>/.clawperator/daemon/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
+  }
+}
+```
+
+## Version Policy
+
+The daemon exposes `GET /version` on its Unix socket and returns:
+
+```json
+{
+  "version": "0.7.9",
+  "buildIdentity": {
+    "entryPath": "/Users/<local_user>/src/clawperator/apps/node/dist/cli/index.js",
+    "mtimeMs": 1777176000000,
+    "size": 12345
+  }
+}
+```
+
+The `version` value comes from `getCliVersion()` in `apps/node/src/domain/version/compatibility.ts`. The `buildIdentity` value is captured when the Node process starts and identifies the CLI entrypoint path, entrypoint mtime, and entrypoint size.
+
+Lifecycle status reports these values. The proxy layer compares the daemon `/version` response with the current CLI process version and build identity before dispatching. If either value differs, or if the daemon returns invalid version metadata, the proxy stops the old daemon, starts a new daemon, waits up to `3000` ms, and only dispatches after the restarted daemon reports the same version and build identity.
+
+## Transparent Proxy
+
+Daemon proxying is active for:
+
+| CLI command | Proxied endpoint | Post-dispatch fallback |
+| --- | --- | --- |
+| `clawperator exec <json-or-file>` | `POST /execute` on the daemon socket | no |
+| `clawperator snapshot` | synthetic `snapshot_ui` payload sent to `POST /execute` | yes |
+| `clawperator screenshot` | synthetic `take_screenshot` payload sent to `POST /execute` | no |
+| Flat action commands such as `open`, `click`, `type`, `read`, `wait`, `press`, `back`, `close`, `sleep`, `scroll`, `scroll-until`, `wait-for-nav`, and `read-value` | action payload sent to `POST /execute` | no |
+
+Dry-run and validation-only `exec` modes do not need the daemon because they do not dispatch to Android.
+
+If an execution contains `take_screenshot` with a caller-relative `params.path`, the command runs direct before daemon startup. This preserves the normal CLI behavior where relative screenshot paths resolve from the caller's current working directory, not from the daemon process working directory.
+
+Proxy selection rules:
+
+1. If `--no-daemon` or `CLAWPERATOR_NO_DAEMON=1` is set, the command runs direct.
+2. If the execution includes `take_screenshot` with a relative output path, the command runs direct.
+3. If the platform is Windows, the command runs direct because this task uses Unix domain sockets only.
+4. If the socket is missing, the proxy serializes daemon startup with the lifecycle lock, spawns `daemon run`, polls `/ping` every `100` ms, and waits up to `3000` ms.
+5. If the socket exists but connection is refused, the proxy deletes the stale socket and starts a new daemon.
+6. If `/version` does not match the current CLI version and build identity, the proxy stops the old daemon and starts a new one.
+7. If the daemon is ready and the version and build identity match, the command sends the execution payload to `POST /execute`.
+8. If the daemon cannot become ready before dispatch, the command runs direct for that call.
+
+The proxy sends the caller's effective Operator package in the request body. Precedence is:
+
+1. explicit `--operator-package`
+2. nonblank `CLAWPERATOR_OPERATOR_PACKAGE`
+3. `com.clawperator.operator`
+
+This preserves caller behavior even when an already-running daemon was started with a different environment.
+
+## Opt Out
+
+Global placement:
+
+```bash
+clawperator --no-daemon snapshot --device emulator-5554
+```
+
+Command-local placement:
+
+```bash
+clawperator snapshot --no-daemon --device emulator-5554
+```
+
+Environment:
+
+```bash
+CLAWPERATOR_NO_DAEMON=1 clawperator snapshot --device emulator-5554
+```
+
+Success condition for an opt-out verification:
+
+- the command returns the same CLI JSON shape as normal direct execution
+- `clawperator daemon status --device emulator-5554` is unchanged by the opt-out command
+
+## Dispatch Boundary
+
+Pre-dispatch failures can safely fall back to direct mode because no action was sent to Android.
+
+Post-dispatch failures are different. After the HTTP request body is written to the daemon socket, a lost response may mean the action already executed. Retrying a mutating action can duplicate side effects.
+
+Fallback policy:
+
+| Command category | Post-dispatch response loss behavior |
+| --- | --- |
+| `exec` | return `DAEMON_PROXY_ERROR`; do not run direct |
+| Flat action commands | return `DAEMON_PROXY_ERROR`; do not run direct |
+| `snapshot` | may run direct once because the synthetic action is read-only |
+| `screenshot` | return `DAEMON_PROXY_ERROR`; do not run direct because it can write a host output file |
+
+`DAEMON_PROXY_ERROR` shape:
+
+```json
+{
+  "code": "DAEMON_PROXY_ERROR",
+  "message": "Daemon response lost; action may have executed",
+  "details": {
+    "error": "Error: socket hang up"
+  }
+}
+```
+
+## Failure Modes
+
+| Failure | Output code | Exit code | Recovery |
+| --- | --- | --- | --- |
+| `daemon start` spawns `daemon run` but `/ping` does not become reachable within `3000` ms | `DAEMON_START_FAILED` | `1` | Inspect `~/.clawperator/daemon/daemon-<daemon_key>.log`, then retry `clawperator daemon start --device <id>`. |
+| `daemon start` cannot spawn the background process | `DAEMON_START_FAILED` | `1` | Verify the branch-local CLI entrypoint exists and retry from the same checkout. |
+| `daemon stop` cannot signal or clean up the process | `DAEMON_STOP_FAILED` | `1` | Inspect the PID metadata file and socket path, stop the process manually if needed, then retry `daemon stop`. |
+| `exec` or a flat mutating action was dispatched through the daemon but the response was lost | `DAEMON_PROXY_ERROR` | `1` | Do not blindly retry. Inspect device state first because the action may already have executed. |
+
+Top-level daemon failures use the same CLI error shape as other Node-side failures:
+
+```json
+{
+  "code": "DAEMON_START_FAILED",
+  "message": "Daemon did not become ready within 3000ms.",
+  "details": {
+    "socketPath": "/Users/<local_user>/.clawperator/daemon/daemon-id-ZW11bGF0b3ItNTU1NA.sock",
+    "timeoutMs": 3000
+  }
+}
+```
+
+## Verification
+
+Use the branch-local CLI when validating source changes:
+
+```bash
+node apps/node/dist/cli/index.js daemon start --device emulator-5554
+node apps/node/dist/cli/index.js daemon status --device emulator-5554
+node apps/node/dist/cli/index.js daemon stop --device emulator-5554
+node apps/node/dist/cli/index.js daemon status --device emulator-5554
+```
+
+Success conditions:
+
+- start exits `0` and `daemon.status` is `started` or `already_running`
+- status while running exits `0`, `daemon.status == "running"`, `daemon.pid` is a number, `daemon.version` is a string, `daemon.buildIdentity.entryPath` is a string, and `daemon.uptimeSeconds >= 0`
+- stop exits `0` and `daemon.status` is `stopped` or `not_running`
+- final status exits `0` and `daemon.status == "not_running"`
+
+Verify the internal command is hidden from help:
+
+```bash
+node apps/node/dist/cli/index.js --help | grep "daemon run"
+```
+
+Success condition: no matches.
 
 ---
 
