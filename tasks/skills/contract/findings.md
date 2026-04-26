@@ -1,32 +1,178 @@
 # SkillResult Contract - Authoritative Findings
 
 **Date:** 2026-04-26
-**Sources reconciled:** findings-claude.md, findings-codex.md, findings-skill-survey.md
+**Sources reconciled:** `findings-claude.md`, `findings-codex.md`, `findings-skill-survey.md`
+**Review stance:** EM synthesis for implementation planning
+
 **Verified against:**
+
 - `apps/node/src/cli/commands/skills.ts`
 - `apps/node/src/domain/skills/runSkill.ts`
 - `apps/node/src/contracts/skillResult.ts`
-- 14 skill scripts in `../clawperator-skills/skills/`
+- `apps/node/src/contracts/result.ts`
+- `docs/api/overview.md`
+- `docs/skills/runtime.md`
+- `docs/skills/overview.md`
+- `docs/skills/authoring.md`
+- representative scripts under `../clawperator-skills/skills/`
 
 ---
 
-## 1. Executive Summary
+## Executive Summary
 
-The contract is **not safe for general agent consumption** in its current state. Two issues block it:
+The current `clawperator skills run` JSON shape is optimized for complete
+debug capture and backward compatibility. It is parseable, but it is not yet a
+good general-purpose contract for agents or human operators who want the answer
+to a skill run.
 
-1. **Frame duplication in JSON mode.** The `output` field in JSON-mode responses contains the raw `[Clawperator-Skill-Result]` marker and the embedded JSON blob that is already parsed into `skillResult`. Agents receive the answer twice - once structured, once as escaped text inside a string. The fix is a single conditional in `skills.ts`.
+The blocking issue is not just noisy output. The runtime has no canonical,
+schema-supported location for the skill's domain result. Some skill scripts
+already emit a root `result`, but `apps/node/src/contracts/skillResult.ts` does
+not define that field, so Zod strips it before the parsed `skillResult` reaches
+CLI and serve consumers. That means there are currently zero reliable parsed
+`skillResult.result` consumers, even where individual scripts tried to emit one.
 
-2. **No canonical result location.** `SkillResult` has no `result` field. The answer to "what did this skill return?" is buried at different depths in different fields depending on which skill ran. Agents must have per-skill knowledge to extract the answer.
+The right implementation order is:
 
-Everything else in this document is real but non-blocking. Fix these two first.
+1. Add `skillResult.result` to the runtime schema as the canonical answer field.
+2. Teach docs and agents to branch on wrapper `status` first, then read
+   `skillResult.result` when present.
+3. Migrate skills so primary outputs leave `diagnostics`, checkpoint-only
+   evidence, and terminal-verification-only evidence.
+4. Decide the raw stdout policy for JSON mode deliberately. Stripping the
+   terminal frame from `output` improves usability, but changing `output` from
+   "raw stdout" is a compatibility and documentation change, not a free
+   one-line cleanup.
 
 ---
 
-## 2. Core Contract Issues (CLI + Runtime)
+## Top Findings
 
-### C-1 - High: Frame embedded in `output` in JSON mode
+### 1. High: The parsed contract has no canonical answer field
 
-**Code location:** `apps/node/src/cli/commands/skills.ts:546-548`
+**Owning surface:** `apps/node/src/contracts/skillResult.ts`
+
+`SkillResult` currently contains proof and diagnostics fields:
+
+- `goal`
+- `inputs`
+- `status`
+- `checkpoints`
+- `terminalVerification`
+- `execEnvelopes`
+- `diagnostics`
+
+It does not contain `result`.
+
+This is visible in both the TypeScript interface and the Zod schema:
+
+- `apps/node/src/contracts/skillResult.ts:97-108`
+- `apps/node/src/contracts/skillResult.ts:190-200`
+
+**Friction:**
+
+An agent asking "what value did the skill return?" must inspect skill-specific
+locations:
+
+- `checkpoints[].evidence`
+- `terminalVerification.observed`
+- `diagnostics.<customKey>`
+- root fields that may have been emitted by a script but stripped by the
+  runtime parser
+
+This forces per-skill knowledge into the caller. That is the opposite of a good
+agent-facing contract.
+
+**Important correction to the survey:**
+
+`findings-skill-survey.md` says two skills are already correct because they emit
+a root `result`. At the script layer that is true. At the parsed runtime
+contract layer it is false. `emittedSkillResultSchema` is a plain `z.object`
+without `.passthrough()`, so unknown root keys are stripped. Existing emitted
+`result` and `results` fields are not available in parsed `skillResult` until
+the schema adds them.
+
+**Smallest implementation-ready fix:**
+
+Add an optional field to both the TypeScript interface and emitted schema:
+
+```ts
+result?: SkillCheckpointEvidence | null;
+```
+
+Using the existing `SkillCheckpointEvidence` union keeps the result vocabulary
+small:
+
+- `{ kind: "text", text: "..." }`
+- `{ kind: "json", value: ... }`
+- `{ kind: "result_envelope_ref", execEnvelopeIndex: 0, stepResultId: "..." }`
+
+**Compatibility risk:**
+
+Low. Adding an optional parsed field is backward-compatible for existing
+consumers. It will also make already-emitted script `result` fields start
+surviving parsing, which is a positive behavior change but should still be
+covered by tests.
+
+---
+
+### 2. High: Primary results are scattered across proof and diagnostics fields
+
+**Owning surfaces:** runtime skill scripts in `../clawperator-skills/skills/`,
+with contract support in `apps/node/src/contracts/skillResult.ts`
+
+Across the surveyed skills, primary answers currently appear in inconsistent
+locations:
+
+| Pattern | Examples | Why it is a problem |
+| --- | --- | --- |
+| Root `result` emitted by script | `get-battery`, `install-app` | Good author intent, but currently stripped by runtime schema. |
+| Root `results` emitted by script | `search-app` | Non-contract plural field, currently stripped by runtime schema. |
+| `diagnostics.<customKey>` | `get-climate-replay`, `search-products` | Diagnostics becomes an untyped result overflow bag. |
+| `terminalVerification.observed` | many setter replay skills, `search-app` structured data | Verification evidence is treated as return data. |
+| checkpoint evidence only | `get-yesterday-usage-cost-replay` | Caller must know skill-specific checkpoint ids. |
+
+**Friction:**
+
+Agents cannot learn one stable extraction path. Human operators also have to
+scan a large nested object to find the answer.
+
+**Likely root cause:**
+
+The original `SkillResult` shape was built around proving what happened:
+checkpoint audit trail, terminal verification, diagnostics, and optional nested
+execution envelopes. It did not separately name the value being returned.
+
+**Smallest implementation-ready fix:**
+
+After adding schema support for `skillResult.result`, migrate skills in this
+order:
+
+1. Skills already emitting root `result`: verify the field survives runtime
+   parsing and add regression coverage.
+2. Skills emitting root `results`: rename to `result`, usually
+   `{ kind: "json", value: { items: [...] } }`.
+3. Skills using `diagnostics` as the primary result: move the primary output to
+   `result`; leave only health, warnings, hints, and debug data in
+   `diagnostics`.
+4. Read skills with checkpoint-only answers: put the extracted scalar or object
+   in `result`.
+5. Setter skills: only populate `result` when there is a useful caller-facing
+   confirmed value or state. Do not force a meaningless result for every setter.
+
+**Compatibility risk:**
+
+Medium across the skills repo. Existing private consumers may have learned
+skill-specific paths such as `diagnostics.climate`. Keep those fields for one
+transition if needed, but mark `result` as canonical in docs and tests.
+
+---
+
+### 3. High: JSON `output` includes the terminal SkillResult frame, but changing it is a contract decision
+
+**Owning surface:** `apps/node/src/cli/commands/skills.ts`
+
+On success and indeterminate paths, the CLI currently emits:
 
 ```ts
 output: options.format === "pretty"
@@ -34,206 +180,323 @@ output: options.format === "pretty"
   : result.output,
 ```
 
-In JSON mode, `result.output` is raw child stdout - progress lines, the `[Clawperator-Skill-Result]` marker, and the embedded JSON blob are all present. In pretty mode, `sanitizePrettySkillStdout` calls `stripTrailingSkillResultFrame` to remove the frame. The JSON path never strips it.
+The pretty path strips the terminal `[Clawperator-Skill-Result]` frame. The JSON
+path preserves raw stdout, including progress lines, human-readable answer
+lines, the frame marker, and the JSON frame that was already parsed into
+`skillResult`.
 
-- **Agent impact:** Agents receive a duplicate of the structured result as an escaped substring inside `output`. Any agent that parses `output` for the answer hits marker noise and potentially double-parses. The `skillResult` field is the correct location; `output` in JSON mode should contain only the pre-frame human-readable progress lines.
-- **Operator impact:** The raw frame and JSON add significant payload for no machine benefit.
-- **Minimal fix:** Apply `stripTrailingSkillResultFrame(result.output, result.skillResult !== null)` on the JSON path in the same conditional. One line.
-- **Compat risk:** Consumers scraping the frame out of `output` would break. Those consumers are doing the wrong thing - `skillResult` exists for them - but a changelog note is warranted.
+**Friction:**
 
-### C-2 - Medium: Wrapper `status: "indeterminate"` is not documented relative to `skillResult.status`
+The sample GloBird output contains the answer twice:
 
-**Code location:** `apps/node/src/domain/skills/runSkill.ts:1003-1015`
+- raw human output inside `output`
+- structured proof inside `skillResult`
 
-```ts
-if (hasDeclaredVerification && !contractVerification.ok) {
-  finish({
-    ok: null,
-    status: "indeterminate",
-    ...
-    skillResult: parsedSkillResult.skillResult,
-  });
-}
-```
+It also contains the framed JSON twice:
 
-When a declared verification contract (`skill.json` → `contract.verification.matcher`) fails to pass, the wrapper emits `status: "indeterminate"` while the nested `skillResult.status` may still be `"success"` (the skill reported success; the wrapper could not verify it). No documented precedence rule tells agents which status to trust.
+- escaped inside `output`
+- parsed as `skillResult`
 
-- **Agent impact:** Agents reading `result.skillResult.status` directly will miss the wrapper's rejection.
-- **Minimal fix:** Document the read order explicitly:
-  1. Branch on outer `status` (`"success"` / `"indeterminate"` / `"failed"`).
-  2. Read `skillResult.status` only after outer `status === "success"`.
-  3. Treat `skillResult` as child-authored evidence the wrapper may reject.
-- **Compat risk:** None - documentation only.
+That makes default JSON hard for humans to scan and wastes agent context. It
+also tempts agents to scrape `output` even when structured data exists.
 
-### C-3 - Low: Success and failure shapes use different stdout field names
+**EM correction to earlier findings:**
 
-**Code location:** `skills.ts:543` (success, `output`), `skills.ts:572-584` (assertion failure, `output`), `skills.ts:586-599` (general failure, `stdout` + `stderr`)
+This should not be described as a harmless one-line fix. Docs currently define
+`output` as raw stdout, and raw stdout can be useful forensic evidence. Stripping
+the frame from `output` in JSON mode may be the right product choice, but it is
+a compatibility change and should be handled explicitly.
 
-On success and output-assertion failure the response uses `output`. On general execution failure (process error, spawn failure, timeout) the response uses `stdout` and `stderr` as separate fields. The asymmetry is undocumented.
+**Smallest safe path:**
 
-- **Minimal fix:** Document the two shapes in `docs/skills/runtime.md`. Long term, unify to `stdout` + `stderr` on all paths.
-- **Compat risk:** Medium if unifying field names; low if documentation only.
+Implement in two phases unless the project intentionally accepts the breaking
+contract change:
 
----
+1. Add a non-breaking field such as `displayOutput`, `stdoutWithoutResultFrame`,
+   or a summary JSON mode that contains de-framed human progress text.
+2. Document consumer precedence:
+   - use wrapper `status` and `code` for run outcome
+   - use `skillResult.result` for the answer
+   - use `skillResult` proof fields for audit and verification
+   - use `output` only as raw stdout/debug evidence
+3. If `output` should become de-framed, update docs, tests, and changelog in
+   the same change. Consider preserving `rawOutput` or `stdout` for full
+   forensic capture.
 
-## 3. SkillResult Schema Issues
+**Compatibility risk:**
 
-### S-1 - High: No `result` field - the answer has no canonical location
-
-**Code location:** `apps/node/src/contracts/skillResult.ts:97-108` (interface), lines 190-200 (Zod schema)
-
-```ts
-export interface SkillResult {
-  contractVersion: string;
-  skillId: string;
-  source: SkillResultSource;
-  goal?: JsonObject;
-  inputs?: JsonObject;
-  status: SkillResultStatus;
-  checkpoints: SkillCheckpoint[];
-  terminalVerification?: SkillTerminalVerification | null;
-  execEnvelopes?: ResultEnvelope[];
-  diagnostics?: SkillDiagnostics;
-  // No result field.
-}
-```
-
-Neither the TypeScript interface nor `emittedSkillResultSchema` define a `result` field. The domain answer is implied by proof artifacts (checkpoints, terminalVerification) rather than declared as a first-class output.
-
-- **Agent impact:** Extracting the answer requires per-skill knowledge: which checkpoint id, or whether to read `terminalVerification.observed`, or whether the answer is in `diagnostics`. There is no `skillResult.result` shortcut that works across skills.
-- **Minimal fix:**
-
-  Add to `SkillResult` and `emittedSkillResultSchema`:
-  ```ts
-  result?: SkillCheckpointEvidence | null;
-  ```
-  Reusing `SkillCheckpointEvidence` (`kind: "text"`, `kind: "json"`, or `kind: "result_envelope_ref"`) avoids introducing a second evidence vocabulary. Skills that return a value set it explicitly; proof fields remain as-is. Additive - no compat risk.
-
-### S-2 - Medium: `SkillDiagnostics` catchall enables diagnostics as an untyped overflow bag
-
-**Code location:** `skillResult.ts:90-95`, `skillDiagnosticsSchema:184-188`
-
-```ts
-export interface SkillDiagnostics {
-  runtimeState?: SkillRuntimeState;
-  warnings?: string[];
-  hints?: string[];
-  [key: string]: JsonValue | string[] | undefined;  // catchall
-}
-```
-
-The `[key: string]` index signature accepts any field. `skillDiagnosticsSchema` uses `.catchall(jsonValueSchema)`, so arbitrary keys survive Zod validation and appear in CLI output. This is the mechanism by which two skills (see X-1) attach their primary output to `diagnostics`.
-
-- **Agent impact:** Agents have no reason to look in `diagnostics` for the answer. The field name implies runtime health; extra arbitrary fields are invisible to any consumer reading docs or types.
-- **Minimal fix:** The catchall itself is acceptable for runtime-state extensions. The fix is a documented convention: only `runtimeState`, `warnings`, and `hints` carry skill-authored content; structured results must go in `result`. Enforce through authoring docs and skill review, not schema changes.
-
-### S-3 - Medium: `terminalVerification.observed` intended as proof, used as result carrier
-
-**Code location:** `skillResult.ts:83-88`, runtime matcher at `runSkill.ts:546-562`
-
-`SkillTerminalVerification.observed` accepts any `SkillCheckpointEvidence`, including `kind: "json"`. The runtime's declared verification logic (`runSkill.ts:553-555`) calls `extractTextEvidence` on `observed`, which returns `null` for non-text evidence. If a skill uses `kind: "json"` in `observed` and the runtime's declared matcher runs, it will always fail to match.
-
-- **Agent impact:** `terminalVerification` looks like the answer because it is near the top of `skillResult` and contains observed evidence. It is a proof artifact, not the answer channel. Skills that put structured data in `observed.value` compound this by conflating verification with result delivery.
-- **Minimal fix:** Document that `terminalVerification` is a proof artifact. When `skillResult.result` exists, agents should prefer it. Skill authors should not rely on `observed` for structured output.
-- **Compat risk:** Documentation only.
+Medium. Consumers scraping the terminal frame out of `output` are undesirable,
+but possible. Consumers relying on exact raw stdout for saved-run diagnostics
+would also see a behavior change.
 
 ---
 
-## 4. Cross-Skill Inconsistencies
+### 4. Medium: Wrapper status and nested `skillResult.status` need a hard precedence rule
 
-Survey of 14 skills that emit `[Clawperator-Skill-Result]` frames.
+**Owning surface:** `apps/node/src/domain/skills/runSkill.ts`,
+`docs/skills/runtime.md`
 
-### X-1 - High: Answer location varies by skill with no documented canonical path
+When declared verification is not proved, `runSkill()` can return:
 
-| Skill | Answer location |
-|---|---|
-| `com.solaxcloud.starter.get-battery` | `skillResult.result` (correct) |
-| `com.android.vending.install-app` | `skillResult.result` (correct) |
-| `com.globird.energy.get-yesterday-usage-cost-replay` | `skillResult.checkpoints[1].evidence.text` |
-| `com.google.android.apps.chromecast.app.set-temperature-replay` | `skillResult.terminalVerification.observed.text` |
-| `com.google.android.apps.chromecast.app.set-power-replay` | `skillResult.terminalVerification.observed.text` |
-| `com.netflix.mediaclient.set-my-list-state-replay` | `skillResult.terminalVerification.observed.text` |
-| `au.com.polyaire.airtouch5.set-zone-state` (+ shared lib) | `skillResult.terminalVerification.observed.text` |
-| `com.solaxcloud.starter.set-discharge-to-limit-replay` | `skillResult.terminalVerification.observed.text` |
-| `com.google.android.apps.chromecast.app.get-climate-replay` | `skillResult.diagnostics.climate` (worst case - see below) |
-| `com.amazon.mShop.android.shopping.search-products` | `skillResult.diagnostics.results` |
-| `com.android.vending.search-app` | `skillResult.terminalVerification.observed.value` (json kind) |
-| Orchestrated harnesses | defer to wrapped skill's result |
+- wrapper `status: "indeterminate"`
+- nested `skillResult.status: "success"`
 
-Two skills are correct. Twelve are not. The fix for all of them is to populate `skillResult.result` once S-1 is resolved.
+This happens because the skill child reported success, but the wrapper could
+not verify the declared contract.
 
-### X-2 - High: `diagnostics` used as primary result carrier (2 skills)
+**Friction:**
 
-- `get-climate-replay`: climate object (device name, power state, temperature, mode, fan speed) at `skillResult.diagnostics.climate`. Also duplicated at `checkpoints[2].evidence.value` and `terminalVerification.observed.value` - three copies in total with no documented canonical location.
-- `search-products` (Amazon): structured product list at `skillResult.diagnostics.results`.
+An agent that branches on `skillResult.status` first can treat an indeterminate
+wrapper result as successful. That is a correctness bug in downstream callers.
 
-`diagnostics` is designed for runtime health data. These fields survive Zod because `skillDiagnosticsSchema` uses `.catchall()` (see S-2). An agent skipping `diagnostics` silently misses the entire output for these two skills.
+**Smallest fix:**
 
-**Minimal fix:** Move primary output to `skillResult.result`. `get-climate-replay` also collapses its three-location duplication to one.
+Document and test this consumer rule:
 
-### X-3 - Medium: Two checkpoint construction patterns with incompatible null-handling
+1. Branch first on the wrapper `status` and `code`.
+2. Read `skillResult.status` only after wrapper `status === "success"`.
+3. Treat nested `skillResult` as child-authored evidence that the wrapper can
+   reject or mark indeterminate.
 
-**Map/state-machine pattern** (pre-populated with `"skipped"`, then updated):
-- `set-temperature-replay`, `set-power-replay`, `set-discharge-to-limit-replay`, `get-climate-replay`
-- All declared checkpoint ids are always present; absent progress shows as `status: "skipped"`.
+**Compatibility risk:**
 
-**Push-based pattern** (empty array, appended as skill progresses):
-- `install-app`, `search-app`, `search-products`, `set-my-list-state-replay`, `set-zone-state`, `get-battery`
-- Only reached checkpoints appear; later checkpoints are absent on early failure.
-
-An agent calling `checkpoints.find(c => c.id === "terminal_state_verified")` gets `{ status: "skipped" }` on map-based skills and `undefined` on push-based skills for the same early-failure scenario. These require different null-handling logic.
-
-**Minimal fix:** Document both patterns and the required null-handling for each. Standardize new skills on the map/state-machine pattern to guarantee all declared checkpoint ids are always present.
-
-### X-4 - Low: `diagnostics` conditionally absent (1 skill)
-
-`set-discharge-to-limit-replay` attaches `diagnostics` only when `warnings.length > 0`. On a clean run, `skillResult.diagnostics` is `undefined`. Agents checking `result.skillResult.diagnostics?.warnings` get `undefined` on success and an array on partial failure.
-
-**Minimal fix:** Include `diagnostics: { warnings: [] }` unconditionally.
-
-### X-5 - Low: `expected === observed` on terminal verification success (1 skill)
-
-`set-my-list-state-replay` sets both `terminalVerification.expected` and `observed` to the same interpolated string on success. The fields carry no contrast - verification shows what was set, not what was separately observed to confirm it.
-
-**Minimal fix:** Set `expected` to the declaration (what the skill was looking for) and `observed` to what the device actually reported.
+Low for documentation and tests. Do not rewrite nested `skillResult.status` in
+the wrapper, because preserving child-authored evidence is useful.
 
 ---
 
-## 5. Verified Deviations and Corrections
+### 5. Medium: `terminalVerification` is proof, not the answer channel
 
-### Correction 1: N-3 schema behavior is wrong in the survey
+**Owning surface:** `apps/node/src/contracts/skillResult.ts`,
+`apps/node/src/domain/skills/runSkill.ts`
 
-`findings-skill-survey.md` states that the root-level `results` field in `search-app` "pass[es] Zod's `passthrough` behavior." This is incorrect.
+`terminalVerification` contains:
 
-`emittedSkillResultSchema` is `z.object({...})` with no `.passthrough()` call (`skillResult.ts:190-200`). Zod strips unknown root-level keys by default. The `results` field emitted by `search-app` is silently dropped during parsing and **does not appear in `skillResult`** in the CLI output.
+- `status`
+- `expected`
+- `observed`
+- `note`
 
-The actual location of the results data for `search-app` is `skillResult.terminalVerification.observed.value` (kind: "json"), which does survive because `observed` is typed as `SkillCheckpointEvidence | null`.
+The declared verification matcher only extracts text evidence from
+`terminalVerification.expected` and `terminalVerification.observed`. If
+`observed` is `{ kind: "json" }`, declared text matching cannot use it.
 
-The finding that search-app's answer location is non-standard stands - but the mechanism and the accessible location differ from the survey's description.
+**Friction:**
 
-### Correction 2: Codex line references
+Structured values in `terminalVerification.observed.value` are easy for authors
+to emit, but awkward for agents to discover and semantically wrong. The field
+proves terminal state; it should not be the only location for returned data.
 
-`findings-codex.md` cites `runSkill.ts:833` as the start of stdout/stderr capture. Line 833 is the `settled = true` assignment inside `finish()`. Actual stdout capture is at line 842 (`child.stdout?.on("data", ...)`) and stderr at line 856 (`child.stderr?.on("data", ...)`). The substantive claim is accurate; the line number is off by ~10 lines.
+**Smallest fix:**
 
-### Confirmation: C-1 is verified
+After `result` exists:
 
-Both the Claude and Codex documents identify the frame-in-output bug but from different angles. Claude correctly identifies `skills.ts:546-548` as the root cause. Codex identifies the operator-UX consequence. Both are correct and consistent. The fix is the same: apply `stripTrailingSkillResultFrame` on the JSON path.
+- skill authors may duplicate the same value into `result` and proof fields
+  when appropriate
+- callers should treat `terminalVerification` as proof and diagnostics
+- structured read results should live in `result`, not only in
+  `terminalVerification.observed`
 
-### Confirmation: `output` field asymmetry (C-3) is real
+**Compatibility risk:**
 
-Codex finding 3 correctly describes the asymmetry. `skills.ts:543` passes `output` on success; `skills.ts:586-599` passes `stdout` + `stderr` on general failure; `skills.ts:572-584` passes `output` on assertion failure. The three paths have different field sets.
+Low if this is documented as precedence rather than enforced immediately.
 
 ---
 
-## 6. Required Closeout Work
+### 6. Medium: `diagnostics` is an untyped overflow bag and is already carrying primary data
 
-Ordered by impact. Items 1-3 apply to the runtime/CLI. Items 4-8 apply to individual skills.
+**Owning surface:** `apps/node/src/contracts/skillResult.ts`,
+runtime skill scripts
 
-- [ ] **C-1: Strip frame from `output` in JSON mode.** One conditional in `skills.ts:546-548`. Apply `stripTrailingSkillResultFrame` when `skillResult !== null` on the JSON path. Add changelog note.
-- [ ] **S-1: Add `result?: SkillCheckpointEvidence | null` to `SkillResult`.** Update both the TypeScript interface (`skillResult.ts:97-108`) and `emittedSkillResultSchema` (`skillResult.ts:190-200`). Update skill authoring docs to require `result` for any skill whose purpose is to return a value.
-- [ ] **C-2: Document status precedence rule.** Wrapper `status` → `skillResult.status` → proof fields. Add to `docs/skills/runtime.md`.
-- [ ] **X-2 (get-climate-replay): Move `diagnostics.climate` to `result`.** Collapse the three-location duplication. `diagnostics.climate`, `checkpoints[2].evidence.value`, and `terminalVerification.observed.value` collapse to `result: { kind: "json", value: climate }`. This is the highest-severity single-skill case.
-- [ ] **X-2 (search-products): Move `diagnostics.results` to `result`.** `result: { kind: "json", value: items }`.
-- [ ] **X-1 (remaining read skills): Populate `result`.** Once S-1 is merged, update all read skills to emit `skillResult.result`. Setter skills may emit `result: { kind: "text", text: confirmedValue }` when they verify a terminal state.
-- [ ] **X-4: Emit `diagnostics` unconditionally in set-discharge-to-limit-replay.**
-- [ ] **X-5: Differentiate `expected` from `observed` in set-my-list-state-replay.**
+`SkillDiagnostics` allows arbitrary keys through its index signature and Zod
+`.catchall(jsonValueSchema)`. That is useful for debug metadata, but it makes it
+easy for skill authors to put primary results in diagnostics.
+
+Known examples:
+
+- `get-climate-replay`: climate object under `diagnostics.climate`
+- `search-products`: product list under `diagnostics.results`
+
+**Friction:**
+
+An agent has no reason to inspect diagnostics for the answer. Diagnostics should
+be safe to ignore for happy-path result extraction.
+
+**Smallest fix:**
+
+Do not remove the catchall immediately. Instead:
+
+- add `skillResult.result`
+- update authoring docs: diagnostics is for `runtimeState`, `warnings`,
+  `hints`, paths, timings, and debug metadata
+- add skill review guidance or tests that reject primary result fields under
+  diagnostics for new or migrated skills
+
+**Compatibility risk:**
+
+Low for contract additions. Medium if existing diagnostics result keys are
+removed without a transition.
+
+---
+
+### 7. Low: Success and failure wrappers use inconsistent stream field names
+
+**Owning surface:** `apps/node/src/cli/commands/skills.ts`,
+`docs/skills/runtime.md`
+
+Current shapes:
+
+- success: `output`
+- indeterminate: `output`
+- output assertion failure: `output`
+- execution failure or timeout: `stdout` and `stderr`
+
+**Friction:**
+
+Callers need separate extraction logic for successful and failed runs. The name
+`output` also reads like a domain result even though it means raw stdout.
+
+**Smallest fix:**
+
+Document the current shape immediately. Later, add `stdout` on success as an
+alias while keeping `output` for compatibility.
+
+**Compatibility risk:**
+
+Low for adding fields and docs. High for renaming or removing `output`.
+
+---
+
+### 8. Low: Checkpoint presence semantics differ across skills
+
+**Owning surface:** runtime skill authoring guidance in `docs/skills/authoring.md`
+and skill scripts
+
+Two patterns exist:
+
+- map/state-machine checkpoints: all declared checkpoint ids are present, with
+  unreached steps marked `skipped`
+- push-based checkpoints: only reached checkpoints are emitted
+
+**Friction:**
+
+`checkpoints.find(...)` can return a skipped checkpoint in one skill and
+`undefined` in another for equivalent early-failure progress.
+
+**Smallest fix:**
+
+Document both patterns for existing skills. Prefer the map/state-machine pattern
+for new non-trivial skills because it gives callers a complete progress map.
+
+**Compatibility risk:**
+
+Low for docs. Medium if existing skill outputs are normalized all at once.
+
+---
+
+## Corrections To Source Findings
+
+### Correction A: Root `result` and `results` are currently stripped
+
+Earlier source findings treat root `result` and `results` fields emitted by
+some scripts as visible parsed output. They are not visible unless the schema is
+updated. Plain Zod objects strip unknown root keys by default, and
+`emittedSkillResultSchema` does not call `.passthrough()`.
+
+This increases the priority of adding `result` to the schema. It also means
+migration work should include tests that prove emitted `result` survives
+`runSkill()` parsing.
+
+### Correction B: `search-app` root `results` is a non-contract field, not an accepted extension
+
+`search-app` emits `results` at the root of the frame. That is not a stable
+contract extension today. The runtime parser strips it. The accessible
+structured data, where present, is through schema-defined fields such as
+`terminalVerification.observed.value`.
+
+### Correction C: Stripping the frame from JSON `output` is not purely a bug fix
+
+It is a product/API decision. It likely improves agent and operator UX, but it
+also changes a documented raw stdout field. Treat it as a contract change with
+tests and docs, or add a new sanitized field/mode first.
+
+---
+
+## Implementation Plan
+
+### PR 1 - Runtime Contract
+
+- Add `result?: SkillCheckpointEvidence | null` to `SkillResult`.
+- Add `result: skillCheckpointEvidenceSchema.nullable().optional()` to
+  `emittedSkillResultSchema`.
+- Add unit tests proving:
+  - emitted `result` survives `runSkill()` parsing
+  - emitted unknown root fields are still stripped or otherwise intentionally
+    handled
+  - legacy framed skills without `result` still parse
+  - unframed skills still return `skillResult: null`
+- Update docs in:
+  - `docs/skills/authoring.md`
+  - `docs/skills/runtime.md`
+  - `docs/skills/overview.md`
+
+### PR 2 - Consumer Rules And Output Policy
+
+- Document wrapper status precedence:
+  - wrapper `status` and `code`
+  - then `skillResult.status`
+  - then `skillResult.result`
+  - then proof fields
+- Decide JSON stdout policy:
+  - keep `output` raw and add a sanitized field or summary mode, or
+  - strip the terminal frame from `output` and add/preserve a raw stdout field
+- Add CLI tests for success, indeterminate, output assertion failure, and
+  execution failure shapes.
+
+### PR 3 - Skills Migration
+
+In `../clawperator-skills`, migrate high-value skills first:
+
+1. Existing scripts that emit root `result`: confirm parsed output after the
+   Clawperator schema change.
+2. `com.google.android.apps.chromecast.app.get-climate-replay`: move the
+   climate object to `result`.
+3. `com.amazon.mShop.android.shopping.search-products`: move product results to
+   `result`.
+4. `com.android.vending.search-app`: replace root `results` with canonical
+   `result`.
+5. `com.globird.energy.get-yesterday-usage-cost-replay`: put the cost scalar in
+   `result`.
+6. Setter replay skills: populate `result` only when the confirmed final value
+   is useful to callers.
+
+### PR 4 - Cleanup And Conventions
+
+- Update authoring guidance for checkpoint construction.
+- Prefer map/state-machine checkpoints for new non-trivial skills.
+- Keep diagnostics present when useful, but do not require empty diagnostics on
+  every skill unless callers need it.
+- Fix isolated quality issues:
+  - `set-discharge-to-limit-replay` conditional diagnostics if still useful
+  - `set-my-list-state-replay` `expected`/`observed` duplication if still
+    accurate after the result migration
+
+---
+
+## Definition Of Done
+
+- Default machine consumers can extract a skill answer from
+  `parsed.skillResult.result` when a skill returns a value.
+- Callers can branch safely on wrapper status before trusting nested skill
+  status.
+- Raw process output remains available somewhere documented, whether as
+  `output`, `stdout`, or another explicit field.
+- Pretty or summary output has a clear human-scannable answer when `result` is
+  present.
+- Docs describe the authored source of truth, not generated output.
+- Tests cover:
+  - schema parsing of `result`
+  - unknown root key behavior
+  - JSON CLI wrapper shape
+  - failure and indeterminate wrapper shapes
+  - at least one migrated real skill output fixture or smoke path
