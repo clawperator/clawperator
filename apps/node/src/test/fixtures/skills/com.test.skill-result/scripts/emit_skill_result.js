@@ -52,6 +52,7 @@ const basePayload = {
   inputs: {
     targetPercent: 40,
   },
+  result: null,
   status: "success",
   checkpoints: [
     {
@@ -127,6 +128,12 @@ switch (mode) {
   case "valid":
     emitFrame(basePayload);
     break;
+  case "missing-result": {
+    const payload = { ...basePayload };
+    delete payload.result;
+    emitFrame(payload);
+    break;
+  }
   case "legacy":
     console.log("legacy-output-only");
     break;

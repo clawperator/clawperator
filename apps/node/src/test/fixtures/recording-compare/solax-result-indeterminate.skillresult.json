@@ -12,6 +12,7 @@
   "inputs": {
     "percent": 40
   },
+  "result": null,
   "status": "indeterminate",
   "checkpoints": [
     {

@@ -61,6 +61,7 @@ const basePayload = {
   inputs: {
     percent: 40,
   },
+  result: null,
   status: "success",
   checkpoints: [
     { id: "app_opened", status: "ok" },

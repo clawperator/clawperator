@@ -19,7 +19,10 @@
       "scrollY": 200,
       "maxScrollX": 0,
       "maxScrollY": 1000,
-      "snapshot": { "present": false, "xml": null }
+      "snapshot": {
+        "present": false,
+        "xml": null
+      }
     },
     {
       "seq": 1,
@@ -32,12 +35,17 @@
       "scrollY": 400,
       "maxScrollX": 0,
       "maxScrollY": 1000,
-      "snapshot": { "present": false, "xml": null }
+      "snapshot": {
+        "present": false,
+        "xml": null
+      }
     }
   ],
   "counts": {
     "totalEvents": 2,
-    "byType": { "scroll": 2 }
+    "byType": {
+      "scroll": 2
+    }
   },
   "packageTransitions": [],
   "timeline": {

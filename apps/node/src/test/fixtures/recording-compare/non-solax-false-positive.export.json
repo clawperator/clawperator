@@ -16,7 +16,10 @@
       "packageName": "com.example.energy",
       "className": "com.example.energy.MainActivity",
       "title": "Energy Settings",
-      "snapshot": { "present": true, "xml": null }
+      "snapshot": {
+        "present": true,
+        "xml": null
+      }
     },
     {
       "seq": 1,
@@ -27,8 +30,16 @@
       "resourceId": "com.example.energy:id/discharge_settings",
       "text": "Discharge Settings",
       "contentDesc": null,
-      "bounds": { "left": 120, "top": 620, "right": 980, "bottom": 760 },
-      "snapshot": { "present": true, "xml": null }
+      "bounds": {
+        "left": 120,
+        "top": 620,
+        "right": 980,
+        "bottom": 760
+      },
+      "snapshot": {
+        "present": true,
+        "xml": null
+      }
     },
     {
       "seq": 2,
@@ -38,7 +49,10 @@
       "packageName": "com.example.energy",
       "resourceId": "com.example.energy:id/target_value",
       "text": "40",
-      "snapshot": { "present": true, "xml": null }
+      "snapshot": {
+        "present": true,
+        "xml": null
+      }
     },
     {
       "seq": 3,
@@ -49,13 +63,25 @@
       "resourceId": "com.example.energy:id/save_button",
       "text": "Save",
       "contentDesc": "Confirm",
-      "bounds": { "left": 760, "top": 1820, "right": 1030, "bottom": 1980 },
-      "snapshot": { "present": true, "xml": null }
+      "bounds": {
+        "left": 760,
+        "top": 1820,
+        "right": 1030,
+        "bottom": 1980
+      },
+      "snapshot": {
+        "present": true,
+        "xml": null
+      }
     }
   ],
   "counts": {
     "totalEvents": 4,
-    "byType": { "window_change": 1, "click": 2, "text_change": 1 }
+    "byType": {
+      "window_change": 1,
+      "click": 2,
+      "text_change": 1
+    }
   },
   "packageTransitions": [],
   "timeline": {
