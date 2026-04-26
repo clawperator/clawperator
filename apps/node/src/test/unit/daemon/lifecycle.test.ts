@@ -368,6 +368,51 @@ describe("daemon command output", () => {
     assert.equal(shouldCliStdoutForceExitCode1(raw, false), true);
   });
 
+  it("serializes concurrent start calls before spawning", async () => {
+    const baseDir = await makeTempBaseDir();
+    const socketPath = getDaemonSocketPath(undefined, { baseDir });
+    const pidPath = getDaemonPidPath(undefined, { baseDir });
+    let spawnCount = 0;
+
+    const options = {
+      format: "json" as const,
+      baseDir,
+      pollTimeoutMs: 50,
+      pollIntervalMs: 1,
+      processController: {
+        isAlive: () => true,
+        isDaemonProcess: () => true,
+        kill: () => undefined,
+      },
+      spawnDaemonRunImpl: () => {
+        spawnCount += 1;
+        writeFileSync(pidPath, `${JSON.stringify({ pid: 9876, startedAt: 100 })}\n`, "utf8");
+        const server = createHttpServer((req, res) => {
+          if (req.url === "/ping") {
+            res.writeHead(200, { "content-type": "application/json" });
+            res.end(JSON.stringify({ ok: true }));
+            return;
+          }
+          res.writeHead(404);
+          res.end();
+        });
+        server.listen(socketPath);
+        httpServers.push(server);
+      },
+    };
+
+    const [firstRaw, secondRaw] = await Promise.all([
+      cmdDaemonStart(options),
+      cmdDaemonStart(options),
+    ]);
+    const statuses = [firstRaw, secondRaw]
+      .map((raw) => (JSON.parse(raw) as { daemon?: { status?: string } }).daemon?.status)
+      .sort();
+
+    assert.equal(spawnCount, 1);
+    assert.deepEqual(statuses, ["already_running", "started"]);
+  });
+
   it("removes a stale socket before spawning daemon run", async () => {
     const baseDir = await makeTempBaseDir();
     const socketPath = getDaemonSocketPath(undefined, { baseDir });

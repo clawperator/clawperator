@@ -259,8 +259,43 @@ export async function cmdDaemonStart(options: DaemonCommandOptions): Promise<str
       }, { format: options.format });
     }
 
-    const spawnImpl = options.spawnDaemonRunImpl ?? spawnDaemonRun;
-    spawnImpl(options.deviceId, options.operatorPackage, options);
+    const spawnStatus = await withDaemonLock(options.deviceId, async () => {
+      const refreshedState = await getSocketState(socketPath);
+      if (refreshedState === "alive") {
+        return await isDaemonRunning(options.deviceId, options) ? "already_running" : "unowned";
+      }
+      if (refreshedState === "not_ready") {
+        return "not_ready";
+      }
+      if (refreshedState === "stale") {
+        rmSync(socketPath, { force: true });
+      }
+      const spawnImpl = options.spawnDaemonRunImpl ?? spawnDaemonRun;
+      spawnImpl(options.deviceId, options.operatorPackage, options);
+      return "spawned";
+    }, options);
+    if (spawnStatus === "already_running") {
+      return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
+    }
+    if (spawnStatus === "unowned") {
+      return formatError({
+        code: ERROR_CODES.DAEMON_START_FAILED,
+        message: "Daemon socket is responding but is not owned by a managed Clawperator daemon.",
+        details: { socketPath },
+      }, { format: options.format });
+    }
+    if (spawnStatus === "not_ready") {
+      const timeoutMs = options.pollTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
+      const intervalMs = options.pollIntervalMs ?? DEFAULT_START_POLL_INTERVAL_MS;
+      if (await waitForOwnedDaemon(socketPath, options, timeoutMs, intervalMs)) {
+        return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
+      }
+      return formatError({
+        code: ERROR_CODES.DAEMON_START_FAILED,
+        message: `Daemon socket exists but did not become ready within ${timeoutMs}ms.`,
+        details: { socketPath, timeoutMs },
+      }, { format: options.format });
+    }
   } catch (error) {
     return formatError({
       code: ERROR_CODES.DAEMON_START_FAILED,
