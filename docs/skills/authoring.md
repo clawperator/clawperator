@@ -951,6 +951,9 @@ Notes on those literals:
   `CLAWPERATOR_CLI_PATH`, prefers a detected branch-local `apps/node/dist/cli/index.js`
   when present, and may contribute both a command and parsed helper args before
   `exec`
+- the scaffolded `sleep` actions are starter placeholders for app close/open
+  settling; replace them with app-specific readiness checks before treating a
+  non-trivial skill as authored
 
 The scaffolded `run.sh` just forwards to `run.js`.
 
@@ -1054,6 +1057,20 @@ Current authoring rule for new non-trivial skills:
 - if the skill is authored from a retained recording baseline, save a
   `skills run` wrapper for the run you want to compare and feed that
   wrapper directly to `clawperator recording compare`
+- design replay and scripted skills for daemon-backed polling, not arbitrary
+  time padding:
+  - split long recorded routes into the smallest execution calls that preserve
+    truthfulness
+  - use `wait_for_node`, `read_text`, `snapshot_ui`, or bounded polling loops
+    to observe readiness and terminal state
+  - stop as soon as the expected UI state is observed
+  - keep fixed `sleep` actions only when there is no observable state to poll,
+    and document that reason in `SKILL.md`
+  - pass an explicit execution timeout to nested `clawperator exec` calls when
+    a multi-step payload can legitimately run longer than the CLI default
+  - use the wrapper-injected `CLAWPERATOR_BIN` so nested calls run through the
+    same local Clawperator implementation and daemon support as the outer
+    `skills run`
 
 Current compare contract for authored skills:
 
@@ -1470,6 +1487,8 @@ So for authoring:
 - use `skills new`, then verify with `skills get` and `skills validate`; if the repo owns generated indexes, rerun the generator and finish with `skills validate --all`
 - use `skills compile-artifact` when a workflow should compile into deterministic execution JSON
 - treat `SKILL.md` as required documentation, but do not overstate its current machine enforcement
+- remove scaffolded fixed sleeps from non-trivial scripts during authoring and
+  replace them with condition-based waits or snapshot/read polling
 
 ## Related Pages
 

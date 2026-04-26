@@ -14,17 +14,21 @@ export async function cmdObserveSnapshot(options: {
   timeoutMs?: number;
   noDaemon?: boolean;
   logger?: Logger;
+  tryDaemonExecutionFn?: typeof tryDaemonExecution;
+  runExecutionFn?: typeof runExecution;
 }): Promise<string> {
   try {
     const execution = validateExecution(buildSnapshotExecution({ timeoutMs: options.timeoutMs }));
     validatePayloadSize(JSON.stringify(execution));
-    const proxyResult = await tryDaemonExecution(execution, {
+    const tryDaemonExecutionFn = options.tryDaemonExecutionFn ?? tryDaemonExecution;
+    const runExecutionFn = options.runExecutionFn ?? runExecution;
+    const proxyResult = await tryDaemonExecutionFn(execution, {
       rawDeviceId: options.deviceId,
       operatorPackage: options.operatorPackage,
       noDaemon: options.noDaemon,
       allowPostDispatchFallback: true,
     });
-    const result = proxyResult ?? await runExecution(execution, {
+    const result = proxyResult ?? await runExecutionFn(execution, {
       deviceId: options.deviceId,
       operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       timeoutMs: options.timeoutMs,
@@ -45,6 +49,8 @@ export async function cmdObserveScreenshot(options: {
   path?: string;
   noDaemon?: boolean;
   logger?: Logger;
+  tryDaemonExecutionFn?: typeof tryDaemonExecution;
+  runExecutionFn?: typeof runExecution;
 }): Promise<string> {
   try {
     const execution = validateExecution(buildScreenshotExecution({
@@ -52,13 +58,16 @@ export async function cmdObserveScreenshot(options: {
       path: options.path,
     }));
     validatePayloadSize(JSON.stringify(execution));
-    const proxyResult = await tryDaemonExecution(execution, {
+    const tryDaemonExecutionFn = options.tryDaemonExecutionFn ?? tryDaemonExecution;
+    const runExecutionFn = options.runExecutionFn ?? runExecution;
+    const proxyResult = await tryDaemonExecutionFn(execution, {
       rawDeviceId: options.deviceId,
       operatorPackage: options.operatorPackage,
       noDaemon: options.noDaemon,
+      // Relative output paths already run direct; post-dispatch loss may have written a host file.
       allowPostDispatchFallback: false,
     });
-    const result = proxyResult ?? await runExecution(execution, {
+    const result = proxyResult ?? await runExecutionFn(execution, {
       deviceId: options.deviceId,
       operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       timeoutMs: options.timeoutMs,

@@ -3,12 +3,13 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import { buildSnapshotExecution } from "../../domain/observe/snapshot.js";
 import { buildScreenshotExecution } from "../../domain/observe/screenshot.js";
-import { cmdObserveSnapshot } from "../../cli/commands/observe.js";
+import { cmdObserveScreenshot, cmdObserveSnapshot } from "../../cli/commands/observe.js";
 import { buildWaitExecution } from "../../domain/actions/wait.js";
-import { attachSnapshotsToStepResults, runExecution } from "../../domain/executions/runExecution.js";
+import { attachSnapshotsToStepResults, runExecution, type RunExecutionResult } from "../../domain/executions/runExecution.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { clawperatorEvents, CLAWPERATOR_EVENT_TYPES } from "../../domain/observe/events.js";
 import { applyMcpExecutionMetadata } from "../../mcp/tools/common.js";
+import type { DaemonProxyOptions } from "../../cli/daemonProxy.js";
 
 describe("observe executions", () => {
   it("maps snapshots only onto successful snapshot_ui steps", () => {
@@ -68,6 +69,36 @@ describe("observe executions", () => {
     const payload = JSON.parse(output) as { code?: string };
 
     assert.strictEqual(payload.code, ERROR_CODES.EXECUTION_VALIDATION_FAILED);
+  });
+
+  it("does not run direct screenshot fallback after daemon proxy response loss", async () => {
+    const proxyError: RunExecutionResult = {
+      ok: false,
+      error: {
+        code: ERROR_CODES.DAEMON_PROXY_ERROR,
+        message: "Daemon response lost; action may have executed",
+      },
+    };
+    let proxyOptions: DaemonProxyOptions | undefined;
+    let directCalls = 0;
+
+    const output = await cmdObserveScreenshot({
+      format: "json",
+      tryDaemonExecutionFn: async (_execution, options) => {
+        proxyOptions = options;
+        return proxyError;
+      },
+      runExecutionFn: async () => {
+        directCalls += 1;
+        return proxyError;
+      },
+    });
+    const payload = JSON.parse(output) as { code?: string; message?: string };
+
+    assert.strictEqual(payload.code, ERROR_CODES.DAEMON_PROXY_ERROR);
+    assert.strictEqual(payload.message, "Daemon response lost; action may have executed");
+    assert.strictEqual(proxyOptions?.allowPostDispatchFallback, false);
+    assert.strictEqual(directCalls, 0);
   });
 
   it("emits the resolved execution metadata when timeout overrides are applied", async () => {

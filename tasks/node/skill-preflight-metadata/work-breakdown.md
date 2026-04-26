@@ -8,8 +8,7 @@ Parent plan: `tasks/node/skill-preflight-metadata/plan.md`
 manifest parsing, `skills get` rendering, and the paired schema or exemplar
 updates in `../clawperator-skills`. PR-2 introduces runtime preflight
 evaluation plus structured failures for hard requirements that can be checked
-before spawn. This is follow-up to onboarding finding F6, not a continuation of
-PR #196.
+before spawn. This is a standalone skills-surface task pack.
 
 ## Status
 
@@ -25,7 +24,7 @@ PR #196.
 
 ## Hard Rules
 
-- Do not fold this work back into PR #196. It is a separate skills-surface pack.
+- Keep this work scoped to skills-surface metadata and runtime preflight.
 - Use `requirements` as the metadata field name. Do not create parallel
   `requires` and `preflight` registry fields.
 - Keep requirements metadata distinct from `contract`. If information is already

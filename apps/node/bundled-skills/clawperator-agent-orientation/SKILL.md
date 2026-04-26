@@ -104,6 +104,8 @@ Rules:
 - do not inspect `clawperator bundled-skills list` before runtime-skill discovery unless the route is already known to be authoring
 - do not start `clawperator mcp serve` unless the host has already chosen MCP as the transport
 - for the raw CLI route, use `snapshot` as the first observe step before attempting direct actions
+- for authoring routes, prefer daemon-backed polling with observable UI
+  readiness conditions over arbitrary fixed sleeps
 
 ### 4. Explain the operating loop in one sentence
 

@@ -2,15 +2,12 @@
 
 ## Executive Summary
 
-Follow-up to deferred item F6. This pack is the durable home for first-run
-requirements metadata work that PR #196 intentionally left out of the
-onboarding cleanup scope. The job here is not install/onboarding cleanup. It is
-skills-surface maturity: add first-class requirements metadata to the runtime
-skills model, surface it through discovery, and enforce only the mechanically
-provable requirements before execution. This pack is Node-dominant even though
-it includes a paired change in `../clawperator-skills`: 2 PRs, 4 phases. PR-1
-ships the metadata contract plus discovery surfaces. PR-2 ships runtime
-preflight evaluation and structured failures.
+This pack adds first-class requirements metadata to the runtime skills model,
+surfaces it through discovery, and enforces only the mechanically provable
+requirements before execution. It is Node-dominant even though it includes a
+paired change in `../clawperator-skills`: 2 PRs, 4 phases. PR-1 ships the
+metadata contract plus discovery surfaces. PR-2 ships runtime preflight
+evaluation and structured failures.
 
 ## Status
 
@@ -22,7 +19,7 @@ preflight evaluation and structured failures.
 | Completed | none |
 | Remaining | 1, 2, 3, 4 |
 | Current / Next | Phase 1 |
-| Blockers | none once PR #196 is merged; this pack is independent work afterward |
+| Blockers | none |
 
 ## Goal
 
@@ -31,48 +28,39 @@ what a skill requires before first run, and `clawperator skills run <skill_id>`
 should fail early with structured skill-surface errors when a declared hard
 requirement can be checked mechanically and is not met.
 
-## Why Now
+## Problem Statement
 
-The onboarding cleanup pack fixed discovery of the Google Home HVAC skills, but
-there is still a first-run trust gap: an agent can discover the right skill and
-still fail deep in execution because the preconditions are not visible up
-front. That is a skills contract and runtime problem, not an install/onboarding
-problem, so it deserves its own pack.
+Runtime skill discovery can identify the correct skill while still leaving a
+first-run trust gap: callers do not yet see important prerequisites before deep
+runtime execution. That is a skills contract and runtime problem, not an
+install or onboarding problem.
 
-## Historical Context Captured Here
+At minimum, Google Home exemplar skills need to surface requirements such as:
 
-This pack replaces the need to consult the deleted onboarding notes. Treat the
-following as the baseline problem statement:
+- `com.google.android.apps.chromecast.app` must be installed on the target
+  device
+- Google Home must already be signed in and have a linked climate unit
+- the caller may need to supply the exact `unit_name` that matches the UI
+- orchestrated skills can depend on their manifest-level `agent.cli`, which is
+  already guarded at runtime by `SKILL_AGENT_CLI_UNAVAILABLE`
 
-- The Google Home HVAC skills already exist and are now discoverable after
-  install. The gap is not discovery anymore.
-- The remaining problem is first-run requirements visibility and truthful early
-  failure handling.
-- At minimum, the Google Home exemplar skills still have important requirements
-  that a caller should learn before deep runtime execution:
-  - `com.google.android.apps.chromecast.app` must be installed on the target
-    device
-  - Google Home must already be signed in and have a linked climate unit
-  - the caller may need to supply the exact `unit_name` that matches the UI
-  - the orchestrated HVAC skill declares `agent.cli = "codex"` in its
-    `skill.json`, which the existing runtime already guards with
-    `SKILL_AGENT_CLI_UNAVAILABLE` before spawn (see
-    `apps/node/src/domain/skills/runSkill.ts`)
-- Not all of those requirements are equally provable ahead of time:
-  - missing Android packages on a known target device can be checked
-    mechanically; additional host CLIs declared by `requirements` (beyond the
-    manifest-level `agent.cli`, which already has its own guard) can also be
-    checked mechanically
-  - sign-in state, linked-device state, and exact unit-label correctness are
-    advisory first-run guidance unless the runtime gains a truthful proof path
-- The design intent for this pack is therefore:
-  - render all relevant requirements in discovery
-  - block execution only on hard requirements that can be checked
-    mechanically before spawn
-  - keep subjective requirements visible without pretending they are
-    authoritatively checked
-  - keep manifest-level `agent.cli` visible in discovery for orchestrated
-    skills even though its runtime guard already exists separately
+Not all requirements are equally provable ahead of time:
+
+- missing Android packages on a known target device can be checked
+  mechanically
+- additional host CLIs declared by `requirements` can be checked mechanically
+- sign-in state, linked-device state, and exact unit-label correctness are
+  advisory first-run guidance unless the runtime gains a truthful proof path
+
+The design intent for this pack is:
+
+- render all relevant requirements in discovery
+- block execution only on hard requirements that can be checked mechanically
+  before spawn
+- keep subjective requirements visible without pretending they are
+  authoritatively checked
+- keep manifest-level `agent.cli` visible in discovery for orchestrated skills
+  even though its runtime guard already exists separately
 
 ## In Scope
 
@@ -137,7 +125,7 @@ following as the baseline problem statement:
 | Public error-code contract | `docs/api/errors.md`, `apps/node/src/contracts/errors.ts` |
 | Runtime skills registry and schema | `../clawperator-skills/skills/skills-registry.json`, `../clawperator-skills/skills/skills-registry.schema.json` |
 | Canonical exemplar manifests | `../clawperator-skills/skills/com.google.android.apps.chromecast.app.*/skill.json` |
-| Historical problem framing for this pack | This `plan.md` under `Historical Context Captured Here` |
+| First-run requirements problem framing | This `plan.md` under `Problem Statement` |
 
 ## Deterministic Versus Judgment
 

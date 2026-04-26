@@ -395,6 +395,17 @@ For replay:
 - use live snapshots or fresh UI reads when the recording export is not enough,
   but say so plainly in the authored notes instead of implying the export
   alone determined the route
+- remove scaffolded or recording-derived fixed sleeps before the first
+  self-test whenever the UI exposes an observable readiness signal
+- use daemon-backed condition polling: `wait_for_node`, `read_text`,
+  `snapshot_ui`, or a short bounded loop over small executions
+- stop polling as soon as the expected controller, value, or terminal state is
+  observed instead of sleeping a guessed duration
+- keep a fixed `sleep` only when no selector, text, value, snapshot, or visual
+  condition can prove readiness; document that reason in `SKILL.md`
+- make nested `clawperator exec` calls use the wrapper-injected
+  `CLAWPERATOR_BIN` and pass an explicit execution timeout for multi-step
+  payloads that can exceed the default
 - keep the retained compare baseline separate from runtime artifacts
 - treat replay as the default first authored shape unless orchestrated was
   explicitly requested

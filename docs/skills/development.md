@@ -31,6 +31,20 @@ The code-backed defaults that shape this loop are:
 - default installed skills repo: `~/.clawperator/skills`
 - default installed registry path: `~/.clawperator/skills/skills/skills-registry.json`
 
+Performance rule for authored skills:
+
+- `clawperator exec` uses the daemon proxy by default when the daemon is
+  available; pass `--no-daemon` only for targeted direct-execution comparison
+  or diagnosis
+- daemon-backed skill loops are fastest when the skill makes small, truthful
+  observation or action calls and stops as soon as the target UI state appears
+- do not encode app readiness as fixed `sleep` actions or host-side sleeps
+  unless no observable UI condition exists
+- replace arbitrary waits with `wait_for_node`, `read_text`, `snapshot_ui`, or a
+  short bounded polling loop over those actions
+- increasing `--timeout` is not a performance strategy; it only raises the
+  wrapper ceiling for work that is still making progress
+
 ## Step 1: Scaffold
 
 ```bash

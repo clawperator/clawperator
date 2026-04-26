@@ -212,6 +212,8 @@ During discovery, keep notes on:
 
 - the exact route segments observed
 - whether the route depends on current UI state
+- which observable readiness signals can replace fixed sleeps during authoring
+  such as specific text, resource IDs, controller values, or stable snapshots
 - whether the route mutates account state
 - which probes failed and why
 - whether the outcome is likely `shared-general` or `personalized-local`
