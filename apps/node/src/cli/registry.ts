@@ -608,6 +608,7 @@ Options:
   --timeout <ms>         Max time to wait for element (default: 10000)
   --long                 Perform a long press (clickType: long_click)
   --focus                Set input focus without clicking (clickType: focus)
+  --no-daemon            Force direct execution instead of daemon proxy
 
 Also accepted as: --device-id, tap, --resource-id, --content-desc, --content-desc-contains
 
@@ -630,6 +631,7 @@ Options:
   --app <target>         Alternative to positional target argument
   --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait
+  --no-daemon            Force direct execution instead of daemon proxy
 
 Also accepted as: --device-id, open-app, open_app, open-uri, open-url, open_uri, open_url, --package, --package-id, --application-id, --app-id, --url, --uri
 
@@ -658,6 +660,7 @@ Options:
   --submit               Press Enter after typing
   --clear                Clear existing text before typing
   --timeout <ms>         Max time to wait for element
+  --no-daemon            Force direct execution instead of daemon proxy
 
 Also accepted as: --device-id, fill, enter-text, enter_text, --resource-id, --content-desc, --content-desc-contains
 
@@ -681,6 +684,7 @@ Options:
   --all                  Return all matches as a JSON array (not compatible with --output pretty)
   --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait
+  --no-daemon            Force direct execution instead of daemon proxy
 
 Also accepted as: --device-id, read-kv, read-key-value-pair, read_key_value_pair, --text, --label-text, --id, --resource-id, --desc, --content-desc
 
@@ -706,6 +710,7 @@ Options:
   --all                  Return all matches as a JSON array (not compatible with --output pretty)
   --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait for element
+  --no-daemon            Force direct execution instead of daemon proxy
 
 Container selector flags (all optional):
   --container-text <text>           Container with exact visible text
@@ -745,6 +750,7 @@ Selector flags (at least one required; combine for AND matching):
 Notes:
   - Waits until the first matching element appears.
   - --timeout sets the wait duration (not the execution envelope timeout); must be a positive number of milliseconds when provided (omit it to use the default).
+  - Use --no-daemon to force direct execution instead of daemon proxy.
   - Execution timeout is set to max(waitTimeout + 5000, globalTimeout) to prevent early termination.
   - Default wait timeout is 30000ms (30 seconds) when --timeout is not specified.
   - Multiple simple flags combine with AND semantics.
@@ -775,6 +781,7 @@ Required (choose one or both):
 Options:
   --output <json|pretty> Output format (default: json)
   --timeout <ms>         Required. Maximum time to wait (1-30000ms)
+  --no-daemon            Force direct execution instead of daemon proxy
 
 Also accepted as: --device-id, wait-for-navigation, wait_for_navigation, --package, --package-id, --application-id, --app-id, --resource-id, --content-desc, --content-desc-contains
 
@@ -797,6 +804,7 @@ Options:
   --key <name>           System key to press (alias for positional arg)
   --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait
+  --no-daemon            Force direct execution instead of daemon proxy
 
 Also accepted as: --device-id, press-key, press_key, --button
 
@@ -813,6 +821,7 @@ Usage:
 Options:
   --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait
+  --no-daemon            Force direct execution instead of daemon proxy
 
 Also accepted as: --device-id
 
@@ -832,6 +841,9 @@ Required:
 
 Synonym:
   close-app, close_app  Same as close
+
+Options:
+  --no-daemon            Force direct execution instead of daemon proxy
 
 Notes:
   - Force-stops the specified application via adb.
@@ -860,6 +872,7 @@ Notes:
   - Duration must be >= 0 and <= ${LIMITS.MAX_EXECUTION_TIMEOUT_MS}ms.
   - Execution timeout is set to max(durationMs + 5000, globalTimeout, 30000).
   - No selector flags - this is a raw timer.
+  - Use --no-daemon to force direct execution instead of daemon proxy.
 
 Examples:
   clawperator sleep 2000
@@ -885,6 +898,7 @@ Options:
   --direction <dir>      Direction to scroll (alias for positional arg)
   --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait (default: 30000ms)
+  --no-daemon            Force direct execution instead of daemon proxy
 
 Also accepted as: --device-id, --container-resource-id, --container-content-desc, --container-content-desc-contains
 
@@ -923,6 +937,7 @@ Container selector flags (all optional; restrict scroll to a specific scrollable
 Options:
   --direction <dir>      Direction to scroll (alias for positional arg)
   --click    Click the target element after scrolling to it (becomes scroll_and_click action)
+  --no-daemon            Force direct execution instead of daemon proxy
 
 Notes:
   - Synonym: scroll-and-click (implies --click)
@@ -1428,13 +1443,13 @@ COMMANDS["click"] = {
   synonyms: ["tap"],
   group: "Device Interaction",
   flagAliases: ELEMENT_SELECTOR_FLAG_ALIASES,
-  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--coordinate", "--long", "--focus"],
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--coordinate", "--long", "--focus", "--no-daemon"],
   summary: "Tap the first matching UI element",
   help: HELP_CLICK,
   topLevelBlock: `  click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]
                                             Tap the first matching UI element`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, noDaemon } = ctx;
     
     let coordinate: { x: number; y: number } | undefined;
     const coordFlags = rest.filter((token) => token === "--coordinate");
@@ -1518,6 +1533,7 @@ COMMANDS["click"] = {
       clickType,
       deviceId,
       operatorPackage,
+      noDaemon,
       logger,
     });
   },
@@ -1528,13 +1544,13 @@ COMMANDS["open"] = {
   synonyms: ["open-app", "open_app", "open-uri", "open-url", "open_uri", "open_url"],
   group: "Device Interaction",
   flagAliases: OPEN_TARGET_FLAG_ALIASES,
-  supportedFlags: ["--app"],
+  supportedFlags: ["--app", "--no-daemon"],
   summary: "Open an app, URL, or URI on the device",
   help: HELP_OPEN,
   topLevelBlock: `  open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]
                                             Open an app, URL, or URI on the device`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, noDaemon } = ctx;
     const appFlag = getOpt(rest, "--app");
     const bare = barePositionalTokens(rest, ["--app"], []);
     if (appFlag !== undefined && bare.length > 0) {
@@ -1561,6 +1577,7 @@ COMMANDS["open"] = {
         uri: target,
         deviceId,
         operatorPackage,
+        noDaemon,
         logger,
       });
     }
@@ -1569,6 +1586,7 @@ COMMANDS["open"] = {
       applicationId: target,
       deviceId,
       operatorPackage,
+      noDaemon,
       logger,
     });
   },
@@ -1579,13 +1597,13 @@ COMMANDS["type"] = {
   synonyms: ["fill", "enter-text", "enter_text"],
   group: "Device Interaction",
   flagAliases: ELEMENT_SELECTOR_FLAG_ALIASES,
-  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--submit", "--clear"],
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--submit", "--clear", "--no-daemon"],
   summary: "Type text into the first matching UI element",
   help: HELP_TYPE,
   topLevelBlock: `  type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]
                                             Type text into the first matching UI element`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, noDaemon } = ctx;
     // --text for type is the text-to-type, not an element selector.
     // Extract it first, then resolve the element selector from the remaining flags.
     const typeTextFlag = getOpt(rest, "--text");
@@ -1631,6 +1649,7 @@ COMMANDS["type"] = {
       clear: hasFlag(rest, "--clear"),
       deviceId,
       operatorPackage,
+      noDaemon,
       logger,
     });
   },
@@ -1641,13 +1660,13 @@ COMMANDS["read"] = {
   synonyms: ["read-text", "read_text"],
   group: "Device Interaction",
   flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
-  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--all", "--validate-only", "--dry-run", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--all", "--validate-only", "--dry-run", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--no-daemon"],
   summary: "Read text from the first matching UI element",
   help: HELP_READ,
   topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]
                                             Read text from the first matching UI element`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs, noDaemon } = ctx;
     if (!hasElementSelectorFlag(rest)) {
       return makeMissingSelectorError("read", format);
     }
@@ -1675,6 +1694,7 @@ COMMANDS["read"] = {
       timeoutMs,
       validateOnly: hasFlag(rest, "--validate-only"),
       dryRun: hasFlag(rest, "--dry-run"),
+      noDaemon,
       logger,
     });
   },
@@ -1685,13 +1705,13 @@ COMMANDS["wait"] = {
   synonyms: ["wait-for", "wait_for", "wait-for-node", "wait_for_node", "find", "find-node", "find_node"],
   group: "Device Interaction",
   flagAliases: ELEMENT_SELECTOR_FLAG_ALIASES,
-  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector"],
+  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--no-daemon"],
   summary: "Wait until a matching UI element appears",
   help: HELP_WAIT,
   topLevelBlock: `  wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
                                             Wait until a matching UI element appears`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs, noDaemon } = ctx;
     // For wait, the global --timeout flag sets the wait duration (not execution envelope timeout)
     // Validation: when specified, must be a positive finite duration (0 is rejected; omit --timeout for the default)
     if (timeoutMs !== undefined && (!Number.isFinite(timeoutMs) || timeoutMs <= 0)) {
@@ -1717,6 +1737,7 @@ COMMANDS["wait"] = {
       waitTimeoutMs: timeoutMs,
       deviceId,
       operatorPackage,
+      noDaemon,
       logger,
     });
   },
@@ -1727,13 +1748,13 @@ COMMANDS["press"] = {
   synonyms: ["press-key", "press_key"],
   group: "Device Interaction",
   flagAliases: PRESS_FLAG_ALIASES,
-  supportedFlags: ["--key"],
+  supportedFlags: ["--key", "--no-daemon"],
   summary: "Press a hardware key on the device",
   help: HELP_PRESS,
   topLevelBlock: `  press <back|home|recents> [--device <id>] [--operator-package <pkg>]
                                             Press a hardware key on the device`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, noDaemon } = ctx;
     const keyFlag = getOpt(rest, "--key");
     const bare = barePositionalTokens(rest, ["--key"], []);
     if (keyFlag !== undefined && bare.length > 0) {
@@ -1758,6 +1779,7 @@ COMMANDS["press"] = {
       key,
       deviceId,
       operatorPackage,
+      noDaemon,
       logger,
     });
   },
@@ -1766,24 +1788,25 @@ COMMANDS["press"] = {
 COMMANDS["back"] = {
   name: "back",
   group: "Device Interaction",
-  supportedFlags: [],
+  supportedFlags: ["--no-daemon"],
   summary: "Press the Android back key",
   help: HELP_BACK,
   topLevelBlock: `  back [--device <id>] [--operator-package <pkg>]                        Press the Android back key`,
   handler: async (ctx) => {
-    const { format, logger, deviceId, operatorPackage } = ctx;
+    const { format, logger, deviceId, operatorPackage, noDaemon } = ctx;
     return (await import("./commands/action.js")).cmdActionPressKey({
       format,
       key: "back",
       deviceId,
       operatorPackage,
+      noDaemon,
       logger,
     });
   },
 };
 
 const closeHandler = async (ctx: HandlerContext): Promise<string | void> => {
-  const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+  const { rest, format, logger, deviceId, operatorPackage, timeoutMs, noDaemon } = ctx;
   const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
   if (invalidTimeout) return invalidTimeout;
 
@@ -1813,6 +1836,7 @@ const closeHandler = async (ctx: HandlerContext): Promise<string | void> => {
     deviceId,
     operatorPackage,
     timeoutMs,
+    noDaemon,
     logger,
   });
 };
@@ -1822,7 +1846,7 @@ COMMANDS["close"] = {
   synonyms: ["close-app", "close_app"],
   group: "Device Interaction",
   flagAliases: CLOSE_TARGET_FLAG_ALIASES,
-  supportedFlags: ["--app"],
+  supportedFlags: ["--app", "--no-daemon"],
   summary: "Force-stop an Android application",
   help: HELP_CLOSE,
   topLevelBlock: `  close <package> [--device <id>] [--operator-package <pkg>]             Force-stop an Android application`,
@@ -1832,12 +1856,12 @@ COMMANDS["close"] = {
 COMMANDS["sleep"] = {
   name: "sleep",
   group: "Device Interaction",
-  supportedFlags: [],
+  supportedFlags: ["--no-daemon"],
   summary: "Pause execution for a duration",
   help: HELP_SLEEP,
   topLevelBlock: `  sleep <ms> [--device <id>] [--operator-package <pkg>]                  Pause execution for a duration`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs, noDaemon } = ctx;
 
     // Parse positional duration (handle negative numbers which look like flags)
     // Check rest[0] first since barePositionalTokens skips tokens starting with "-"
@@ -1884,6 +1908,7 @@ COMMANDS["sleep"] = {
       globalTimeoutMs: timeoutMs,
       deviceId,
       operatorPackage,
+      noDaemon,
       logger,
     });
   },
@@ -1893,13 +1918,13 @@ COMMANDS["scroll"] = {
   name: "scroll",
   group: "Device Interaction",
   flagAliases: CONTAINER_SELECTOR_FLAG_ALIASES,
-  supportedFlags: ["--direction", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
+  supportedFlags: ["--direction", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--no-daemon"],
   summary: "Scroll the screen in a direction",
   help: HELP_SCROLL,
   topLevelBlock: `  scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]
                                             Scroll the screen in a direction`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs, noDaemon } = ctx;
     const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
     if (invalidTimeout) return invalidTimeout;
     const scrollValueFlags = ["--direction", ...CONTAINER_SELECTOR_VALUE_FLAGS];
@@ -1934,6 +1959,7 @@ COMMANDS["scroll"] = {
       deviceId,
       operatorPackage,
       timeoutMs,
+      noDaemon,
       logger,
     });
   },
@@ -1941,7 +1967,7 @@ COMMANDS["scroll"] = {
 
 // scroll-until (and synonym scroll-and-click)
 const scrollUntilHandler = async (ctx: HandlerContext, clickAfterDefault: boolean): Promise<string | void> => {
-  const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+  const { rest, format, logger, deviceId, operatorPackage, timeoutMs, noDaemon } = ctx;
   const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
   if (invalidTimeout) return invalidTimeout;
 
@@ -2014,6 +2040,7 @@ const scrollUntilHandler = async (ctx: HandlerContext, clickAfterDefault: boolea
     deviceId,
     operatorPackage,
     timeoutMs,
+    noDaemon,
     logger,
   });
 };
@@ -2023,7 +2050,7 @@ COMMANDS["scroll-until"] = {
   synonyms: ["scroll_until"],
   group: "Device Interaction",
   flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
-  supportedFlags: ["--click", "--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
+  supportedFlags: ["--click", "--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--no-daemon"],
   summary: "Scroll until a target element is visible",
   help: HELP_SCROLL_UNTIL,
   topLevelBlock: `  scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]
@@ -2036,7 +2063,7 @@ COMMANDS["scroll-and-click"] = {
   synonyms: ["scroll_and_click"],
   group: "Device Interaction",
   flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
-  supportedFlags: ["--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector"],
+  supportedFlags: ["--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--no-daemon"],
   summary: "Scroll until target is visible, then click it (alias for scroll-until --click)",
   help: HELP_SCROLL_UNTIL,
   topLevelBlock: `  scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]
@@ -2050,13 +2077,13 @@ COMMANDS["wait-for-nav"] = {
   synonyms: ["wait-for-navigation", "wait_for_navigation"],
   group: "Device Interaction",
   flagAliases: WAIT_FOR_NAV_FLAG_ALIASES,
-  supportedFlags: ["--app", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--validate-only", "--dry-run"],
+  supportedFlags: ["--app", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--validate-only", "--dry-run", "--no-daemon"],
   summary: "Wait for app or screen navigation to complete",
   help: HELP_WAIT_FOR_NAV,
   topLevelBlock: `  wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]
                                             Wait for app or screen navigation to complete`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage, timeoutMs: navTimeoutMs } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs: navTimeoutMs, noDaemon } = ctx;
 
     // Parse --app flag (reject present-but-empty like --app "" so we do not silently ignore package filter)
     const appIdx = rest.indexOf("--app");
@@ -2143,6 +2170,7 @@ COMMANDS["wait-for-nav"] = {
       timeoutMs: execution.timeoutMs,
       validateOnly: hasFlag(rest, "--validate-only"),
       dryRun: hasFlag(rest, "--dry-run"),
+      noDaemon,
       logger,
     });
   },
@@ -2154,12 +2182,12 @@ COMMANDS["read-value"] = {
   synonyms: ["read-kv", "read-key-value-pair", "read_key_value_pair"],
   group: "Device Interaction",
   flagAliases: READ_VALUE_FLAG_ALIASES,
-  supportedFlags: ["--label", "--label-id", "--label-desc", "--all", "--validate-only", "--dry-run"],
+  supportedFlags: ["--label", "--label-id", "--label-desc", "--all", "--validate-only", "--dry-run", "--no-daemon"],
   summary: "Read the value associated with a labeled element",
   help: HELP_READ_VALUE,
   topLevelBlock: `  read-value --label <text>                  Read the value associated with a labeled element`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs, noDaemon } = ctx;
 
     const readAll = hasFlag(rest, "--all");
     if (readAll) {
@@ -2235,6 +2263,7 @@ COMMANDS["read-value"] = {
       timeoutMs,
       validateOnly: hasFlag(rest, "--validate-only"),
       dryRun: hasFlag(rest, "--dry-run"),
+      noDaemon,
       logger,
     });
   },

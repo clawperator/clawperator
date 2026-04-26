@@ -132,6 +132,7 @@ describe("CLI exec logging integration", () => {
       env: {
         ...process.env,
         ADB_PATH: adbPath,
+        CLAWPERATOR_NO_DAEMON: "1",
         CLAWPERATOR_LOG_DIR: logDir,
         CLAWPERATOR_LOG_LEVEL: "info",
       },

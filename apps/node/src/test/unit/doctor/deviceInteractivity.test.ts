@@ -4,7 +4,12 @@ import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtim
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import {
   ensureDeviceAwake,
+  ensureInteractiveAutomationReadyCached,
+  buildReadinessCacheKey,
+  clearReadinessCacheForTesting,
   ensureInteractiveAutomationReady,
+  invalidateReadinessCache,
+  invalidateReadinessCacheForErrorCode,
   isInteractiveAutomationReady,
   parseDoctorPingInteractiveState,
   probeInteractiveState,
@@ -48,6 +53,173 @@ describe("parseDoctorPingInteractiveState", () => {
         }),
       /invalid boolean for screen_on/
     );
+  });
+});
+
+describe("readiness cache", () => {
+  const readyState: InternalInteractiveState = {
+    screenOn: true,
+    deviceLocked: false,
+    userUnlocked: true,
+  };
+
+  function makeConfig(deviceId = "test-device", operatorPackage = "com.test.operator") {
+    return getDefaultRuntimeConfig({
+      runner: new FakeProcessRunner(),
+      deviceId,
+      operatorPackage,
+    });
+  }
+
+  it("builds cache keys from resolved device id and operator package", () => {
+    assert.strictEqual(
+      buildReadinessCacheKey("192.168.1.1:5555", "com.test.operator"),
+      "192.168.1.1:5555:com.test.operator",
+    );
+  });
+
+  it("uses the cache on a second call within the TTL", async () => {
+    clearReadinessCacheForTesting();
+    let calls = 0;
+    const config = makeConfig();
+
+    await ensureInteractiveAutomationReadyCached(config, {
+      ensureDeviceAwakeFn: async () => {
+        calls += 1;
+        return { status: "already_awake", attempts: [], state: readyState };
+      },
+    });
+    await ensureInteractiveAutomationReadyCached(config, {
+      ensureDeviceAwakeFn: async () => {
+        calls += 1;
+        return { status: "already_awake", attempts: [], state: readyState };
+      },
+    });
+
+    assert.strictEqual(calls, 1);
+  });
+
+  it("misses the cache on the first call", async () => {
+    clearReadinessCacheForTesting();
+    let calls = 0;
+    const result = await ensureInteractiveAutomationReadyCached(makeConfig(), {
+      ensureDeviceAwakeFn: async () => {
+        calls += 1;
+        return { status: "already_awake", attempts: [], state: readyState };
+      },
+    });
+
+    assert.strictEqual(calls, 1);
+    assert.strictEqual(result.ok, true);
+  });
+
+  it("expires cache entries after the TTL", async () => {
+    clearReadinessCacheForTesting();
+    let calls = 0;
+    const config = makeConfig();
+    const options = {
+      ensureDeviceAwakeFn: async () => {
+        calls += 1;
+        return { status: "already_awake" as const, attempts: [], state: readyState };
+      },
+    };
+
+    await ensureInteractiveAutomationReadyCached(config, options);
+    await new Promise((resolve) => setTimeout(resolve, 8050));
+    await ensureInteractiveAutomationReadyCached(config, options);
+
+    assert.strictEqual(calls, 2);
+  });
+
+  it("invalidates one specific key", async () => {
+    clearReadinessCacheForTesting();
+    let firstCalls = 0;
+    let secondCalls = 0;
+    await ensureInteractiveAutomationReadyCached(makeConfig("one"), {
+      ensureDeviceAwakeFn: async () => {
+        firstCalls += 1;
+        return { status: "already_awake", attempts: [], state: readyState };
+      },
+    });
+    await ensureInteractiveAutomationReadyCached(makeConfig("two"), {
+      ensureDeviceAwakeFn: async () => {
+        secondCalls += 1;
+        return { status: "already_awake", attempts: [], state: readyState };
+      },
+    });
+
+    invalidateReadinessCache("one", "com.test.operator");
+    await ensureInteractiveAutomationReadyCached(makeConfig("one"), {
+      ensureDeviceAwakeFn: async () => {
+        firstCalls += 1;
+        return { status: "already_awake", attempts: [], state: readyState };
+      },
+    });
+    await ensureInteractiveAutomationReadyCached(makeConfig("two"), {
+      ensureDeviceAwakeFn: async () => {
+        secondCalls += 1;
+        return { status: "already_awake", attempts: [], state: readyState };
+      },
+    });
+
+    assert.strictEqual(firstCalls, 2);
+    assert.strictEqual(secondCalls, 1);
+  });
+
+  it("invalidates only locked error codes including SERVICE_UNAVAILABLE", async () => {
+    for (const code of [
+      ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+      ERROR_CODES.DEVICE_ACCESSIBILITY_NOT_RUNNING,
+      ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+      ERROR_CODES.BROADCAST_FAILED,
+      ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
+      "SERVICE_UNAVAILABLE",
+    ]) {
+      clearReadinessCacheForTesting();
+      let calls = 0;
+      const config = makeConfig();
+      const options = {
+        ensureDeviceAwakeFn: async () => {
+          calls += 1;
+          return { status: "already_awake" as const, attempts: [], state: readyState };
+        },
+      };
+      await ensureInteractiveAutomationReadyCached(config, options);
+      invalidateReadinessCacheForErrorCode("test-device", "com.test.operator", code);
+      await ensureInteractiveAutomationReadyCached(config, options);
+      assert.strictEqual(calls, 2, code);
+    }
+
+    clearReadinessCacheForTesting();
+    let calls = 0;
+    const config = makeConfig();
+    const options = {
+      ensureDeviceAwakeFn: async () => {
+        calls += 1;
+        return { status: "already_awake" as const, attempts: [], state: readyState };
+      },
+    };
+    await ensureInteractiveAutomationReadyCached(config, options);
+    invalidateReadinessCacheForErrorCode("test-device", "com.test.operator", "NOT_INVALIDATING");
+    await ensureInteractiveAutomationReadyCached(config, options);
+    assert.strictEqual(calls, 1);
+  });
+
+  it("clearReadinessCacheForTesting clears all entries", async () => {
+    clearReadinessCacheForTesting();
+    let calls = 0;
+    const config = makeConfig();
+    const options = {
+      ensureDeviceAwakeFn: async () => {
+        calls += 1;
+        return { status: "already_awake" as const, attempts: [], state: readyState };
+      },
+    };
+    await ensureInteractiveAutomationReadyCached(config, options);
+    clearReadinessCacheForTesting();
+    await ensureInteractiveAutomationReadyCached(config, options);
+
+    assert.strictEqual(calls, 2);
   });
 });
 

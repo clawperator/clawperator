@@ -69,6 +69,16 @@ interface WakeCommand {
 
 const DEFAULT_WAKE_SETTLE_DELAY_MS = 750;
 const DOCTOR_PING_ACTION_ID = "h1";
+const READINESS_CACHE_TTL_MS = 8000;
+const readinessCache = new Map<string, number>();
+const READINESS_CACHE_INVALIDATION_CODES = new Set<string>([
+  ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+  ERROR_CODES.DEVICE_ACCESSIBILITY_NOT_RUNNING,
+  ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
+  ERROR_CODES.BROADCAST_FAILED,
+  ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
+  "SERVICE_UNAVAILABLE",
+]);
 
 const WAKE_COMMANDS: WakeCommand[] = [
   {
@@ -358,6 +368,59 @@ export async function ensureInteractiveAutomationReady(
         },
       };
   }
+}
+
+export function buildReadinessCacheKey(resolvedDeviceId: string, operatorPackage: string): string {
+  return `${resolvedDeviceId}:${operatorPackage}`;
+}
+
+export function invalidateReadinessCache(resolvedDeviceId: string, operatorPackage: string): void {
+  readinessCache.delete(buildReadinessCacheKey(resolvedDeviceId, operatorPackage));
+}
+
+export function invalidateReadinessCacheForErrorCode(
+  resolvedDeviceId: string,
+  operatorPackage: string,
+  code: string | undefined | null
+): void {
+  if (code !== undefined && code !== null && READINESS_CACHE_INVALIDATION_CODES.has(code)) {
+    invalidateReadinessCache(resolvedDeviceId, operatorPackage);
+  }
+}
+
+export function clearReadinessCacheForTesting(): void {
+  readinessCache.clear();
+}
+
+export async function ensureInteractiveAutomationReadyCached(
+  config: RuntimeConfig,
+  options?: Parameters<typeof ensureInteractiveAutomationReady>[1]
+): Promise<InteractiveAutomationReadyResult> {
+  if (!config.deviceId) {
+    return ensureInteractiveAutomationReady(config, options);
+  }
+
+  const key = buildReadinessCacheKey(config.deviceId, config.operatorPackage);
+  const cachedAt = readinessCache.get(key);
+  const now = Date.now();
+  if (cachedAt !== undefined && now - cachedAt < READINESS_CACHE_TTL_MS) {
+    return {
+      ok: true,
+      state: {
+        screenOn: true,
+        deviceLocked: false,
+        userUnlocked: true,
+      },
+    };
+  }
+
+  const result = await ensureInteractiveAutomationReady(config, options);
+  if (result.ok) {
+    readinessCache.set(key, now);
+  } else {
+    invalidateReadinessCacheForErrorCode(config.deviceId, config.operatorPackage, result.error.code);
+  }
+  return result;
 }
 
 export function toInteractiveStateEvidence(

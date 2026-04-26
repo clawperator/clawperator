@@ -10,7 +10,7 @@ import { broadcastAgentCommand } from "../../adapters/android-bridge/broadcastAg
 import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
 import { runAdb, formatCommandLine } from "../../adapters/android-bridge/adbClient.js";
 import { checkApkPresence } from "../doctor/checks/readinessChecks.js";
-import { ensureInteractiveAutomationReady, probeInteractiveState, toPublicInteractiveAutomationError } from "../doctor/checks/deviceInteractivity.js";
+import { ensureInteractiveAutomationReady, ensureInteractiveAutomationReadyCached, invalidateReadinessCacheForErrorCode, probeInteractiveState, toPublicInteractiveAutomationError } from "../doctor/checks/deviceInteractivity.js";
 import { getOperatorPackageApkPath } from "../version/compatibility.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
@@ -565,6 +565,7 @@ async function performExecution(
     const closeAppPreflight = await runCloseAppPreflight(execution, config);
     if (!closeAppPreflight.ok) {
       cancelEarlyResultWaiter();
+      invalidateReadinessCacheForErrorCode(deviceId, config.operatorPackage, closeAppPreflight.error.code);
       return { execution, result: { ok: false, error: closeAppPreflight.error, deviceId } };
     }
 
@@ -583,7 +584,7 @@ async function performExecution(
       };
     }
 
-    const ensureInteractiveAutomationReadyFn = options.ensureInteractiveAutomationReadyFn ?? ensureInteractiveAutomationReady;
+    const ensureInteractiveAutomationReadyFn = options.ensureInteractiveAutomationReadyFn ?? ensureInteractiveAutomationReadyCached;
     const interactiveState = await ensureInteractiveAutomationReadyFn(config, {
       probeInteractiveStateFn: options.probeInteractiveStateFn,
     });
@@ -718,6 +719,9 @@ async function performExecution(
 
       reconcileEnvelopeStatusAfterPostProcessing(result.envelope);
       injectServiceUnavailableHint(result.envelope, deviceId);
+      if (result.envelope.status === "failed") {
+        invalidateReadinessCacheForErrorCode(deviceId, config.operatorPackage, result.envelope.errorCode);
+      }
 
       emitResult(deviceId, result.envelope);
       return {
@@ -738,6 +742,7 @@ async function performExecution(
     if ("broadcastFailed" in result && result.broadcastFailed && "diagnostics" in result) {
       failureEnvelope.error = result.diagnostics.code;
       emitResult(deviceId, failureEnvelope);
+      invalidateReadinessCacheForErrorCode(deviceId, config.operatorPackage, result.diagnostics.code);
       return { execution, result: { ok: false, error: { ...result.diagnostics }, deviceId } };
     }
     if ("timeout" in result && result.timeout && "diagnostics" in result) {
@@ -760,6 +765,7 @@ async function performExecution(
         failureEnvelope.hint = timeoutHint;
       }
       emitResult(deviceId, failureEnvelope);
+      invalidateReadinessCacheForErrorCode(deviceId, config.operatorPackage, result.diagnostics.code);
       return {
         execution,
         result: {
