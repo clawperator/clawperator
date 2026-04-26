@@ -4,7 +4,7 @@ import { ERROR_CODES } from "../contracts/errors.js";
 import type { RunExecutionResult } from "../domain/executions/runExecution.js";
 import type { ResultEnvelope } from "../contracts/result.js";
 import { resolveOperatorPackageForRequest } from "../domain/config/resolveOperatorPackage.js";
-import { getDaemonSocketPath, spawnDaemonRun, stopDaemon, withDaemonLock } from "../domain/daemon/lifecycle.js";
+import { getDaemonSocketPath, isDaemonRunning, spawnDaemonRun, stopDaemon, withDaemonLock } from "../domain/daemon/lifecycle.js";
 import { getCliVersion } from "../domain/version/compatibility.js";
 
 export interface DaemonProxyOptions {
@@ -34,6 +34,7 @@ export interface DaemonProxyDeps {
   httpGetFn?: (socketPath: string, path: string) => Promise<string>;
   httpPostFn?: (socketPath: string, path: string, body: unknown) => Promise<DaemonHttpSuccess | DaemonHttpFailure>;
   isDaemonAliveFn?: (socketPath: string) => Promise<boolean>;
+  isDaemonRunningFn?: (rawDeviceId: string | undefined, options: DaemonProxyOptions) => Promise<boolean>;
 }
 
 const DEFAULT_START_TIMEOUT_MS = 3000;
@@ -160,6 +161,14 @@ async function isDaemonAlive(socketPath: string, deps: DaemonProxyDeps): Promise
   }
 }
 
+async function isOwnedDaemon(
+  rawDeviceId: string | undefined,
+  options: DaemonProxyOptions,
+  deps: DaemonProxyDeps
+): Promise<boolean> {
+  return await (deps.isDaemonRunningFn ?? isDaemonRunning)(rawDeviceId, options);
+}
+
 async function ensureDaemonReady(
   rawDeviceId: string | undefined,
   effectiveOperatorPackage: string,
@@ -172,6 +181,9 @@ async function ensureDaemonReady(
     const pingRaw = await httpGetFn(socketPath, "/ping");
     const ping = JSON.parse(pingRaw) as { ok?: unknown };
     if (ping.ok !== true) {
+      return false;
+    }
+    if (!(await isOwnedDaemon(rawDeviceId, options, deps))) {
       return false;
     }
     const versionRaw = await httpGetFn(socketPath, "/version");
@@ -201,7 +213,7 @@ async function ensureDaemonReady(
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
   const deadline = Date.now() + timeoutMs;
   while (Date.now() <= deadline) {
-    if (await isDaemonAlive(socketPath, deps)) {
+    if (await isDaemonAlive(socketPath, deps) && await isOwnedDaemon(rawDeviceId, options, deps)) {
       try {
         const versionRaw = await httpGetFn(socketPath, "/version");
         const version = JSON.parse(versionRaw) as { version?: unknown };
@@ -274,10 +286,12 @@ export async function tryDaemonExecution(
     return null;
   }
 
-  const socketPath = getDaemonSocketPath(options.rawDeviceId, options);
-  const effectiveOperatorPackage = resolveOperatorPackageForRequest(options.operatorPackage);
   let ready = false;
+  let socketPath: string;
+  let effectiveOperatorPackage: string;
   try {
+    socketPath = getDaemonSocketPath(options.rawDeviceId, options);
+    effectiveOperatorPackage = resolveOperatorPackageForRequest(options.operatorPackage);
     ready = await ensureDaemonReady(options.rawDeviceId, effectiveOperatorPackage, socketPath, options, deps);
   } catch {
     return null;

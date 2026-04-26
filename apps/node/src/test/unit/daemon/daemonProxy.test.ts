@@ -51,6 +51,10 @@ function makeAliveGet(version = getCliVersion()): (socketPath: string, path: str
   };
 }
 
+function makeOwnedDaemonDeps(): { isDaemonRunningFn: () => Promise<boolean> } {
+  return { isDaemonRunningFn: async () => true };
+}
+
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
   if (originalNoDaemon === undefined) {
@@ -124,6 +128,7 @@ describe("tryDaemonExecution", () => {
     let postedBody: unknown;
 
     const result = await tryDaemonExecution(execution, { rawDeviceId: "device-1" }, {
+      ...makeOwnedDaemonDeps(),
       httpGetFn: makeAliveGet(),
       httpPostFn: async (_socketPath, _path, body): Promise<DaemonHttpSuccess> => {
         postedBody = body;
@@ -139,12 +144,52 @@ describe("tryDaemonExecution", () => {
     });
   });
 
+  it("returns null instead of posting to an unowned responding socket", async () => {
+    let spawned = false;
+    let posted = false;
+
+    const result = await tryDaemonExecution(execution, { rawDeviceId: "device-1" }, {
+      httpGetFn: makeAliveGet(),
+      isDaemonRunningFn: async () => false,
+      spawnDaemonRunFn: () => {
+        spawned = true;
+      },
+      httpPostFn: async (): Promise<DaemonHttpSuccess> => {
+        posted = true;
+        return { ok: true, body: JSON.stringify(successResult) };
+      },
+    });
+
+    assert.equal(result, null);
+    assert.equal(spawned, false);
+    assert.equal(posted, false);
+  });
+
+  it("returns null when daemon path setup fails", async () => {
+    const baseDir = await makeBaseDir();
+    const notDirectory = join(baseDir, "not-a-directory");
+    await writeFile(notDirectory, "", "utf8");
+    let posted = false;
+
+    const result = await tryDaemonExecution(execution, { baseDir: notDirectory }, {
+      ...makeOwnedDaemonDeps(),
+      httpPostFn: async (): Promise<DaemonHttpSuccess> => {
+        posted = true;
+        return { ok: true, body: JSON.stringify(successResult) };
+      },
+    });
+
+    assert.equal(result, null);
+    assert.equal(posted, false);
+  });
+
   it("stops and restarts when daemon version mismatches", async () => {
     const versions = ["0.0.0", getCliVersion(), getCliVersion()];
     let stopped = false;
     let spawned = false;
 
     const result = await tryDaemonExecution(execution, { startTimeoutMs: 5, pollIntervalMs: 1 }, {
+      ...makeOwnedDaemonDeps(),
       httpGetFn: async (_socketPath, path) => {
         if (path === "/ping") return JSON.stringify({ ok: true });
         return JSON.stringify({ version: versions.shift() ?? getCliVersion() });
@@ -172,6 +217,7 @@ describe("tryDaemonExecution", () => {
     let spawned = false;
 
     const result = await tryDaemonExecution(execution, { rawDeviceId: "stale", baseDir, startTimeoutMs: 5, pollIntervalMs: 1 }, {
+      ...makeOwnedDaemonDeps(),
       httpGetFn: async (_socketPath, path) => {
         if (path === "/ping" && refusedPings < 2) {
           refusedPings += 1;
@@ -201,6 +247,7 @@ describe("tryDaemonExecution", () => {
     let spawned = false;
 
     const result = await tryDaemonExecution(execution, { rawDeviceId: "not-sock", baseDir, startTimeoutMs: 5, pollIntervalMs: 1 }, {
+      ...makeOwnedDaemonDeps(),
       httpGetFn: async (_socketPath, path) => {
         if (path === "/ping" && rejectedPings < 2) {
           rejectedPings += 1;
@@ -226,6 +273,7 @@ describe("tryDaemonExecution", () => {
     originalOperatorPackage = process.env.CLAWPERATOR_OPERATOR_PACKAGE;
     const bodies: unknown[] = [];
     const deps = {
+      ...makeOwnedDaemonDeps(),
       httpGetFn: makeAliveGet(),
       httpPostFn: async (_socketPath: string, _path: string, body: unknown): Promise<DaemonHttpSuccess> => {
         bodies.push(body);
@@ -252,6 +300,7 @@ describe("tryDaemonExecution", () => {
   it("allows idempotent post-dispatch fallback", async () => {
     const failure: DaemonHttpFailure = { ok: false, dispatched: true, error: new Error("lost") };
     const result = await tryDaemonExecution(execution, { allowPostDispatchFallback: true }, {
+      ...makeOwnedDaemonDeps(),
       httpGetFn: makeAliveGet(),
       httpPostFn: async () => failure,
     });
@@ -261,6 +310,7 @@ describe("tryDaemonExecution", () => {
 
   it("allows idempotent fallback when the daemon response body is malformed", async () => {
     const result = await tryDaemonExecution(execution, { allowPostDispatchFallback: true }, {
+      ...makeOwnedDaemonDeps(),
       httpGetFn: makeAliveGet(),
       httpPostFn: async (): Promise<DaemonHttpSuccess> => ({ ok: true, body: "{" }),
     });
@@ -271,6 +321,7 @@ describe("tryDaemonExecution", () => {
   it("returns DAEMON_PROXY_ERROR for non-idempotent post-dispatch loss", async () => {
     const failure: DaemonHttpFailure = { ok: false, dispatched: true, error: new Error("lost") };
     const result = await tryDaemonExecution(execution, { allowPostDispatchFallback: false }, {
+      ...makeOwnedDaemonDeps(),
       httpGetFn: makeAliveGet(),
       httpPostFn: async () => failure,
     });
@@ -283,6 +334,7 @@ describe("tryDaemonExecution", () => {
 
   it("returns DAEMON_PROXY_ERROR for non-idempotent malformed daemon responses", async () => {
     const result = await tryDaemonExecution(execution, { allowPostDispatchFallback: false }, {
+      ...makeOwnedDaemonDeps(),
       httpGetFn: makeAliveGet(),
       httpPostFn: async (): Promise<DaemonHttpSuccess> => ({ ok: true, body: "{" }),
     });
@@ -296,6 +348,7 @@ describe("tryDaemonExecution", () => {
   it("falls back direct on a POST failure before dispatch", async () => {
     const failure: DaemonHttpFailure = { ok: false, dispatched: false, error: new Error("connect ECONNREFUSED") };
     const result = await tryDaemonExecution(execution, { allowPostDispatchFallback: false }, {
+      ...makeOwnedDaemonDeps(),
       httpGetFn: makeAliveGet(),
       httpPostFn: async () => failure,
     });
@@ -307,6 +360,7 @@ describe("tryDaemonExecution", () => {
     let spawnCount = 0;
     let alive = false;
     const deps = {
+      ...makeOwnedDaemonDeps(),
       httpGetFn: async (_socketPath: string, path: string) => {
         if (path === "/ping" && !alive) {
           const error = new Error("missing") as NodeJS.ErrnoException;
