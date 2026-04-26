@@ -248,10 +248,10 @@ For PR-C1, also run focused CLI and serve fixture coverage that proves:
 
 - a valid `result` survives parsing
 - an invalid `result` fails validation
-- JSON success and indeterminate responses omit `output` when `skillResult` is
-  parsed
-- JSON framed success responses omit duplicate top-level `status`, `skillId`,
-  and `exitCode`
+- JSON framed success responses omit `status`, `skillId`, `exitCode`, and
+  `output`
+- JSON indeterminate responses with `skillResult !== null` omit `skillId`,
+  `exitCode`, and `output`
 - `SKILL_OUTPUT_ASSERTION_FAILED` keeps `output` for diagnostic context
 
 For PR-C2, also validate at least one migrated read skill and one migrated

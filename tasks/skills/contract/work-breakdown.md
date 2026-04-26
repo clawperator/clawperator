@@ -72,8 +72,7 @@ migration-phase contract shape is stable.
 
 1. In `skills.ts`, for JSON success responses where `result.skillResult !== null`,
    omit duplicate top-level `status`, `skillId`, `exitCode`, and `output`.
-   The response should lead with `skillResult`, whose first nested fields are
-   `result` and `status`.
+   `skillResult` should lead with nested `result` and `status`.
 2. In `skills.ts`, for JSON indeterminate responses where
    `result.skillResult !== null`, keep wrapper `status`, `code`, and `message`
    because they describe wrapper verification state. Omit duplicate `skillId`,
@@ -86,9 +85,13 @@ migration-phase contract shape is stable.
    what the skill printed when the assertion failed. Do not move `exitCode` into
    `SkillResult`; it is process metadata, not domain data.
 5. Apply the same policy in `serve.ts`. The serve endpoint independently builds
-   success, indeterminate, and assertion-failure skill response objects. Remove
-   duplicate top-level fields from framed success and indeterminate responses.
-   Keep `output` in the assertion failure object regardless.
+   success, indeterminate, and assertion-failure skill response objects. For
+   framed success responses, keep `ok` and `skillResult`; omit `status`,
+   `skillId`, `exitCode`, and `output`. For indeterminate responses, keep `ok`,
+   `status`, `code`, `message`, and `skillResult`; omit `skillId`, `exitCode`,
+   and `output`. Keep `output` in the assertion failure object regardless. `ok`
+   is a serve-specific HTTP-layer field and is not present in the CLI command
+   output.
 6. Do not change `runSkill.ts` or the domain-layer tests. The domain function
    intentionally returns raw stdout. The existing agent-driven SkillResult test
    that asserts `result.output.includes("[Clawperator-Skill-Result]")` is
@@ -148,10 +151,10 @@ migration-phase contract shape is stable.
 4. Document singular `result` for collection payloads.
 5. In `docs/skills/runtime.md`, add an explicit ideal framed success response
    example. It must show:
-   - a wrapper object containing `skillResult`
+   - a wrapper object with `skillResult` at the top level
    - nested `skillResult.result` as the first field
    - nested `skillResult.status` as the second field
-   - no top-level `status`, `skillId`, `exitCode`, or `output`
+   - no duplicate top-level `status`, `skillId`, `exitCode`, or `output`
    - proof fields after the answer and child-authored status
 6. In `docs/skills/authoring.md`, add authoring best practices for
    `SkillResult`:
@@ -172,11 +175,12 @@ migration-phase contract shape is stable.
    - indeterminate/failure: wrapper fields represent wrapper state
    - legacy unframed: `skillResult: null` and `output` may be the payload
    - assertion failure: `output` is retained as diagnostic evidence
-9. Document that framed success JSON responses do not duplicate top-level
-   `status`, `skillId`, `exitCode`, or `output`. Document that indeterminate
-   and failure wrappers keep only distinct wrapper state, and that `output` is
-   present on assertion-failure and legacy unframed paths. Document that failure
-   wrappers expose process streams as `stdout` and `stderr`.
+9. Document that framed success JSON responses omit `status`, `skillId`,
+   `exitCode`, and `output`. Name those absent fields explicitly. Document that
+   indeterminate wrappers keep distinct wrapper state (`status`, `code`,
+   `message`). Document that `output` is present on assertion-failure and legacy
+   unframed paths. Document that failure wrappers expose process streams as
+   `stdout` and `stderr`.
 10. Document that `terminalVerification` is proof and `diagnostics` is debug
    metadata. Neither is the primary answer channel.
 11. Document checkpoint presence semantics: existing skills may emit only reached
@@ -205,8 +209,9 @@ migration-phase contract shape is stable.
 
 - No public doc tells agents to find primary answers in `diagnostics`,
   `terminalVerification`, or checkpoint ids.
-- Public docs state that framed success JSON responses avoid duplicate wrapper
-  fields and explain where `output` is kept and why.
+- Public docs state that framed success JSON responses omit duplicate wrapper
+  fields, name the four absent fields explicitly, and explain where `output` is
+  kept and why.
 - Public docs and bundled authoring guidance show nested `SkillResult` examples
   with `result` first and `status` second.
 - `docs/skills/runtime.md` contains the ideal framed success response shape.
