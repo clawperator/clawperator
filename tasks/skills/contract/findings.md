@@ -35,7 +35,8 @@ into the canonical evidence shape after schema support lands.
 
 The right implementation order is:
 
-1. Add `skillResult.result` to the runtime schema as the canonical answer field.
+1. Add `skillResult.result` to the runtime schema as the canonical answer field,
+   initially optional for the migration window.
 2. Teach docs and agents to branch on wrapper `status` first, then read
    `skillResult.result`.
 3. Migrate skills so primary outputs leave `diagnostics`, checkpoint-only
@@ -91,17 +92,18 @@ before the parsed `skillResult` reaches CLI and serve consumers. There are
 currently zero reliable parsed `skillResult.result` consumers.
 
 The existing script-level `result` fields are plain domain objects, not
-`SkillCheckpointEvidence`. Adding a required
-`result: SkillCheckpointEvidence | null` field will make the location legal, but
-those scripts still need to wrap their current payloads as
+`SkillCheckpointEvidence`. Adding a migration-phase
+`result?: SkillCheckpointEvidence | null` field will make the location legal,
+but those scripts still need to wrap their current payloads as
 `result: { kind: "json", value: ... }` before they pass the proposed schema.
 
 **Smallest implementation-ready fix:**
 
-Add a required field to both the TypeScript interface and emitted schema:
+Add a migration-phase optional field to both the TypeScript interface and
+emitted schema:
 
 ```ts
-result: SkillCheckpointEvidence | null;
+result?: SkillCheckpointEvidence | null;
 ```
 
 Using the existing `SkillCheckpointEvidence` union keeps the result vocabulary
@@ -113,14 +115,17 @@ small:
 
 **Implementation stance:**
 
-Adding a required parsed field is safe for current internal flows. Existing
+Adding an optional parsed field is safe for the internal migration window.
+Existing
 scripts that already emit root `result` show the intended authoring direction,
 but their payload shape must be migrated to the canonical evidence union before
 those fields survive parsing.
 
-For framed `SkillResult` output, `result` should always be present. Use
-`result: null` only when the skill cannot truthfully provide a domain result,
-such as an early failure before any answer or confirmed state exists.
+For newly authored or migrated framed `SkillResult` output, `result` should
+always be present. Use `result: null` only when the skill cannot truthfully
+provide a domain result, such as an early failure before any answer or confirmed
+state exists. After all framed skills are migrated, tighten the schema to
+`result: SkillCheckpointEvidence | null` and reject missing `result`.
 
 ---
 
@@ -456,8 +461,9 @@ is to make the contract cleaner now.
 
 ### PR 1 - Runtime Contract
 
-- Add `result: SkillCheckpointEvidence | null` to `SkillResult`.
-- Add `result: skillCheckpointEvidenceSchema.nullable()` to
+- Add migration-phase `result?: SkillCheckpointEvidence | null` to
+  `SkillResult`.
+- Add migration-phase `result: skillCheckpointEvidenceSchema.nullable().optional()` to
   `emittedSkillResultSchema`.
 - Add unit tests proving:
   - emitted `result` in `SkillCheckpointEvidence` shape survives `runSkill()`
@@ -466,7 +472,7 @@ is to make the contract cleaner now.
     handled
   - emitted plain-object root `result` is rejected or stripped according to the
     chosen schema policy
-  - framed skills without `result` fail validation
+  - framed skills without `result` still parse during the migration window
   - unframed skills still return `skillResult: null`
 - Update docs in:
   - `docs/skills/authoring.md`
@@ -505,6 +511,9 @@ In `../clawperator-skills`, migrate high-value skills first:
 6. Setter replay skills: populate `result` with the confirmed final state, or
    `null` only when no result can be truthfully reported.
 
+After this migration is complete, tighten `SkillResult.result` from optional to
+required and update tests so framed skills without `result` fail validation.
+
 ### PR 4 - Cleanup And Conventions
 
 - Update authoring guidance for checkpoint construction.
@@ -520,9 +529,13 @@ In `../clawperator-skills`, migrate high-value skills first:
 
 ## Definition Of Done
 
-- Default machine consumers can read `parsed.skillResult.result` on every framed
-  skill result. Multi-result skills, such as search flows, put the collection in
-  `result`, for example `{ "kind": "json", "value": { "items": [...] } }`.
+- During the migration window, the runtime accepts framed `SkillResult` objects
+  with missing `result`, but migrated and newly authored skills always emit
+  `result`.
+- At the end of the migration, default machine consumers can read
+  `parsed.skillResult.result` on every framed skill result. Multi-result skills,
+  such as search flows, put the collection in `result`, for example
+  `{ "kind": "json", "value": { "items": [...] } }`.
 - Callers can branch safely on wrapper status before trusting nested skill
   status.
 - Process-stream fields are named consistently, and `output` is either removed
