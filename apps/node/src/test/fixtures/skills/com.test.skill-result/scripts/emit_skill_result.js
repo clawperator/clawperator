@@ -212,6 +212,34 @@ switch (mode) {
       skillId: "com.test.other-skill",
     });
     break;
+  case "result-valid":
+    emitFrame({
+      contractVersion: basePayload.contractVersion,
+      skillId: basePayload.skillId,
+      goal: basePayload.goal,
+      inputs: basePayload.inputs,
+      result: { kind: "json", value: { amount: "-$3.10" } },
+      status: "success",
+      checkpoints: basePayload.checkpoints,
+      terminalVerification: basePayload.terminalVerification,
+      execEnvelopes: basePayload.execEnvelopes,
+      diagnostics: basePayload.diagnostics,
+    });
+    break;
+  case "result-plain-object":
+    emitFrame({
+      contractVersion: basePayload.contractVersion,
+      skillId: basePayload.skillId,
+      goal: basePayload.goal,
+      inputs: basePayload.inputs,
+      result: { amount: "-$3.10" },
+      status: "success",
+      checkpoints: basePayload.checkpoints,
+      terminalVerification: basePayload.terminalVerification,
+      execEnvelopes: basePayload.execEnvelopes,
+      diagnostics: basePayload.diagnostics,
+    });
+    break;
   case "partial-frame-timeout":
     console.log("progress:before-frame");
     console.log(prefix);

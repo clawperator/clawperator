@@ -6347,9 +6347,12 @@ Argument mapping:
 
 ### Success response
 
+**Unframed success (`skillResult: null`, example `com.test.echo`):**
+
 ```json
 {
   "ok": true,
+  "status": "success",
   "skillId": "com.test.echo",
   "output": "TEST_OUTPUT:hello\nTEST_OUTPUT:api\n",
   "skillResult": null,
@@ -6360,6 +6363,27 @@ Argument mapping:
 }
 ```
 
+**Success:** top-level `status`, `skillId`, `output`, and `exitCode` are
+**omitted**. The HTTP layer includes `ok: true` and the nested `skillResult`
+(read **`skillResult.result`** for the domain answer), plus `durationMs` and
+optional `timeoutMs` / `expectedSubstring` when set.
+
+```json
+{
+  "ok": true,
+  "skillResult": {
+    "result": { "kind": "text", "text": "ok" },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.example.framed",
+    "checkpoints": [],
+    "source": { "kind": "script" }
+  },
+  "durationMs": 18,
+  "timeoutMs": 4321
+}
+```
+
 Behavior:
 
 - if `expectContains` is provided and `output` does not contain that substring, the route returns HTTP `400`
@@ -6367,9 +6391,13 @@ Behavior:
 - if the skill ID does not exist, the route returns HTTP `404`
 - if skill registry loading fails, the route returns HTTP `500` with `REGISTRY_READ_FAILED`
 - other `runSkill()` failures, including non-zero exit and timeout, return HTTP `400`
-- when a skill emits a framed `SkillResult`, successful and error responses include `skillResult`
+- success JSON **omits** duplicate top-level `status`, `skillId`, `output`, and
+  `exitCode`; **indeterminate** responses with a parsed `skillResult` keep
+  wrapper `status`, `code`, and `message` but omit
+  `skillId`, `exitCode`, and `output`
 - malformed framed output returns `SKILL_RESULT_PARSE_FAILED`
-- successful responses always include `exitCode: 0`
+- success responses omit `exitCode` at the top level; process exit is still `0`
+  on the run
 
 Failure examples:
 
@@ -8298,7 +8326,11 @@ Notes:
 - `recording compare` defaults to `--mode auto`
 - if `recording export --input` points at a file and `--out` is omitted, the output path is `<input without .ndjson>.export.json` when the input ends with `.ndjson`, otherwise `<input>.export.json`
 - if `recording export --input` points at a directory, the command picks the newest `*.ndjson` file in that directory and derives the default export path from that resolved file
-- `recording compare` reads a saved `clawperator skills run` JSON wrapper file and extracts its top-level `skillResult`
+- `recording compare` reads a saved `clawperator skills run` JSON wrapper file
+  and extracts its top-level `skillResult` (the durable compare input is still
+  the full wrapper; compare logic continues to use `skillResult.checkpoints`
+  and `skillResult.terminalVerification` as defined by the compare
+  implementation). The domain answer is expected at **`skillResult.result`**
 - for authored skills, the durable retained baseline for compare should live under a reference-style path such as `skills/<skill_id>/references/compare-baseline.export.json`
 - that retained baseline is authoring and maintenance evidence, not a runtime artifact consumed by `skills run`
 - a common authoring workflow is:
@@ -9367,8 +9399,8 @@ Important current caveats:
 - runtime behavior for orchestrated skills is currently driven by the presence of `skill.json.agent`, not by suffix inspection alone
 - the currently supported orchestrated runtime path uses `codex` as the agent CLI
 - some orchestrated harnesses currently run codex with `danger-full-access` so the runtime agent can reach live adb targets, but that is a harness-specific choice rather than a Node runtime guarantee
-- some legacy skills predate the suffix convention and may still have unsuffixed ids
-- unsuffixed legacy ids should not be read as proof that a skill is already orchestrated
+- suffixes identify the intended runtime shape when present
+- an unsuffixed id should not be read as proof that a skill is orchestrated
 
 ## Skill Structure
 
@@ -9432,7 +9464,7 @@ An orchestrated skill is an agent-driven runtime shape with these durable rules:
 - registry parity validation does not police `skill.json.agent`. The registry covers distributable skill identity and file layout, while `skill.json.agent` remains the trusted runtime execution config that `runSkill()` reads directly.
 - `SKILL.md` is the skill authority. It contains the app-specific runtime program, navigation policy, checkpoints, and terminal verification expectations.
 - `scripts/run.js` is a thin harness. It reads the injected Clawperator env vars, spawns the configured agent CLI on `SKILL.md`, and forwards stdout and stderr.
-- the harness must not absorb the real skill logic. If app-specific decision policy, navigation authority, or terminal verification rules migrate into the harness, the skill has left this contract.
+- the harness must not absorb the real skill logic. If app-specific decision policy, navigation authority, or terminal verification rules move into the harness, the skill has left this contract.
 - `runSkill()` remains the Clawperator-owned boundary. It validates the skill, injects runtime env vars, executes the harness, parses the framed result, and injects trusted `source` metadata.
 - orchestrated output is contract-bound. The runtime agent must emit exactly one terminal `[Clawperator-Skill-Result]` frame with a valid `SkillResult` object.
 - replay skills remain first-class. Orchestrated skills are an additional runtime shape, not a replacement for replay-driven skills.
@@ -9767,20 +9799,27 @@ Success response:
 
 ```json
 {
-  "skillId": "com.android.settings.capture-overview",
-  "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
-  "exitCode": 0,
+  "skillResult": {
+    "result": { "kind": "text", "text": "ok" },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.android.settings.capture-overview",
+    "checkpoints": [],
+    "source": { "kind": "script" }
+  },
   "durationMs": 15842,
   "timeoutMs": 3210
 }
 ```
 
+Default JSON **omits** top-level `status`, `skillId`, `exitCode`, and `output`
+on success. Verify `skillResult` and especially **`skillResult.result`**.
+
 Check these exact fields:
 
-- `skillId` matches the requested registry id
-- `output` is the raw stdout stream captured from the skill script
-- `skillResult` is either a parsed structured result or `null` for a legacy skill
-- `exitCode` is `0` on success
+- `skillResult.skillId` matches the requested registry id
+- `skillResult.result` is the domain answer
+- `skillResult.status` is the child-authored skill state
 - `durationMs` is the measured wrapper runtime
 - `timeoutMs` is present only when a timeout override was passed on the CLI
 
@@ -9809,9 +9848,14 @@ If the expected text is present, the success payload echoes the assertion:
 
 ```json
 {
-  "skillId": "com.android.settings.capture-overview",
-  "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
-  "exitCode": 0,
+  "skillResult": {
+    "result": { "kind": "text", "text": "ok" },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.android.settings.capture-overview",
+    "checkpoints": [],
+    "source": { "kind": "script" }
+  },
   "durationMs": 15842,
   "expectedSubstring": "RESULT"
 }
@@ -9819,42 +9863,61 @@ If the expected text is present, the success payload echoes the assertion:
 
 ## `skills run` Success Shape
 
+**Success (default JSON):** the answer is `skillResult.result`. Top-level
+`status`, `skillId`, `exitCode`, and `output` are **omitted** so agents do not
+scrape duplicate process text. See
+[Device Prep and Runtime](runtime.md#skill-result-trust-order-and-json-wrapper-policy).
+
 ```json
 {
-  "status": "success",
-  "skillId": "com.android.settings.capture-overview",
-  "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
-  "skillResult": null,
-  "exitCode": 0,
+  "skillResult": {
+    "result": { "kind": "text", "text": "ok" },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.example.app.skill",
+    "checkpoints": [],
+    "source": { "kind": "script" }
+  },
   "durationMs": 15842
 }
 ```
 
 Important:
 
-- `output` is raw stdout from the script
-- the wrapper parses a trailing framed `SkillResult` when present and returns it as `skillResult`
-- the top-level wrapper `status` is `success`, `failed`, or `indeterminate`
-- when a declared verification contract is not proved, the wrapper returns `status: "indeterminate"` without rewriting the emitted `skillResult`
-- progress lines written by the skill to stdout remain inside `output` in JSON mode
-- pretty mode writes a banner before streaming live skill output, so use default JSON output when another agent needs machine-readable output
+- read **`skillResult.result`** for the domain return value; do not use
+  `diagnostics`, `terminalVerification`, or checkpoint-only evidence as the only
+  answer path
+- the wrapper parses the terminal `SkillResult` frame and returns it as `skillResult`
+- the top-level wrapper `status` is omitted for default JSON success and
+  present on failure or indeterminate paths (see [runtime.md](runtime.md))
+- when a declared verification contract is not proved, the wrapper returns
+  `status: "indeterminate"` without rewriting the emitted `skillResult`
+- default JSON success omits `output` because the structured `skillResult` is
+  authoritative
+- pretty mode still streams human-readable output; use default JSON for machine
+  consumption
 - in JSON mode, the wrapper returns one JSON object and does not stream live child stdout separately
 - `timeoutMs` is present only when the caller passed `--timeout` or `--timeout-ms`
 - `expectedSubstring` is present only when the caller passed `--expect-contains`
 
 ## `skills run` Indeterminate Shape
 
+**Indeterminate (default JSON):** keep wrapper `status`, `code`, and `message`;
+**omit** top-level `skillId`, `exitCode`, and `output`.
+
 ```json
 {
   "status": "indeterminate",
   "code": "SKILL_VERIFICATION_INDETERMINATE",
   "message": "Declared verification was not proved.",
-  "skillId": "com.android.settings.capture-overview",
-  "output": "[Clawperator-Skill-Result]\n{\"status\":\"success\"}\n",
   "skillResult": {
-    "status": "success"
+    "result": { "kind": "json", "value": { "note": "example" } },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.android.settings.capture-overview",
+    "checkpoints": [],
+    "source": { "kind": "script" }
   },
-  "exitCode": 0,
   "durationMs": 15842
 }
 ```
@@ -10499,7 +10562,7 @@ Cross-repo baseline sync:
 - the Clawperator test fixtures under `apps/node/src/test/fixtures/recording-compare/` must stay in sync with the canonical retained baseline in the skills repo
 - when the canonical baseline changes, update the corresponding Clawperator test fixture in the same PR or the next available PR
 - to verify sync: `CLAWPERATOR_SKILLS_ROOT=../clawperator-skills npm --prefix apps/node run test`
-- this is a developer-side guard for the closeout branch, not the final durability mechanism; the generic compare follow-on should wire canonical-baseline provenance into CI or another required validation path
+- this is the current developer-side guard for canonical-baseline provenance
 
 The scaffolded `SKILL.md` includes this section before the `Usage:` block:
 
@@ -10594,9 +10657,8 @@ Current skill-type convention:
 - new and updated skills should declare one of those values in `SKILL.md`
   frontmatter
 - the validator enforces those values for current authoring work
-- one explicit temporary compatibility exception remains for the existing legacy
-  skill `au.com.polyaire.airtouch5.set-zone-state` with
-  `clawperator-skill-type: script`; do not use `script` for new work
+- `script` is accepted only for `au.com.polyaire.airtouch5.set-zone-state`;
+  do not use `script` for new work
 
 Recommended current practice:
 
@@ -10673,7 +10735,7 @@ Current contract declaration extension:
     "verification": null
   }
   ```
-- a missing `contract` block means legacy skill, with no declaration enforcement
+- a missing `contract` block means there is no declaration enforcement
 - a present-but-empty `contract` block is allowed and validates, but is treated the same as missing until an author fills a meaningful field
 - `skill.json.contract` participates in registry parity checks, unlike `agent`
 
@@ -11024,7 +11086,7 @@ Important boundary:
 - direct `node run.js ...` execution also prefers a detected branch-local
   `apps/node/dist/cli/index.js` when available, before falling back to the
   global `clawperator` binary
-- the scaffold no longer depends on a repo-level `skills/utils/common.js` file
+- the scaffolded script has no repo-level `skills/utils/common.js` dependency
 
 Current scaffold behavior on nested `clawperator exec` failure is also worth knowing:
 
@@ -11045,8 +11107,7 @@ Current runtime behavior from `apps/node/src/contracts/skillResult.ts` and
 - any non-whitespace stdout after the JSON line makes the frame malformed in v1
 - multiple frames are rejected
 - malformed framed output is rejected with `SKILL_RESULT_PARSE_FAILED`
-- legacy skills that emit no frame still succeed or fail based on process exit
-  code and return `skillResult: null`
+- skills must emit one framed `SkillResult` for structured agent consumption
 
 The emitted frame must not contain `source`. `runSkill()` injects it after
 parsing:
@@ -11061,6 +11122,8 @@ parsing:
 
 Current v1 `SkillResult` fields:
 
+- **discoverable domain answer (emitted first in nested JSON):**
+  - `result` (`SkillCheckpointEvidence` or `null` when no truthful value exists)
 - required:
   - `contractVersion`
   - `skillId`
@@ -11068,12 +11131,30 @@ Current v1 `SkillResult` fields:
   - `checkpoints`
 - injected by `runSkill()`:
   - `source`
-- optional:
+- also optional:
   - `goal`
   - `inputs`
   - `terminalVerification`
   - `execEnvelopes`
   - `diagnostics`
+
+**Authoring best practices for `result` and proof fields:**
+
+- Every framed skill emits `result` with a `SkillCheckpointEvidence` value, or
+  `result: null` when no truthful domain value exists.
+- Put **`result` before `status`** in emitted JSON so humans and agents scan the
+  answer first.
+- Use the evidence union only: `kind: "text"`, `kind: "json"`, or
+  `kind: "result_envelope_ref"`. Collections go in a singular `result`, for
+  example `{ "kind": "json", "value": { "items": [...] } }`.
+- **`terminalVerification`** is proof of final state, not the primary answer
+  channel. Duplicate values into `result` when the same value is both the answer
+  and the proof.
+- **`diagnostics`** is for `runtimeState`, warnings, hints, paths, and debug
+  metadata only, not a parallel copy of the return value.
+- For non-trivial flows, prefer **map or state-machine checkpoints**: include
+  expected checkpoint ids and mark unreached steps `skipped` instead of omitting
+  nodes, when the skill needs a complete progress map.
 
 Current status enums:
 
@@ -11087,11 +11168,11 @@ Current typed checkpoint evidence kinds:
 - `json`
 - `result_envelope_ref`
 
-Minimal framed example:
+Minimal framed example (note `result` before `status`):
 
 ```text
 [Clawperator-Skill-Result]
-{"contractVersion":"1.0.0","skillId":"com.example.demo.capture-state","status":"success","checkpoints":[{"id":"terminal_state_verified","status":"ok","evidence":{"kind":"text","text":"Discharge to 40%"}}],"terminalVerification":{"status":"verified","expected":{"kind":"text","text":"Discharge to 40%"},"observed":{"kind":"text","text":"Discharge to 40%"}}}
+{"contractVersion":"1.0.0","skillId":"com.example.demo.capture-state","result":{"kind":"text","text":"40%"},"status":"success","checkpoints":[{"id":"terminal_state_verified","status":"ok","evidence":{"kind":"text","text":"Discharge to 40%"}}],"terminalVerification":{"status":"verified","expected":{"kind":"text","text":"Discharge to 40%"},"observed":{"kind":"text","text":"Discharge to 40%"}}}
 ```
 
 Current authoring rule for new non-trivial skills:
@@ -11106,8 +11187,6 @@ Current authoring rule for new non-trivial skills:
   - script argument parsing and emitted `skillResult.inputs`
 - avoid positional-only public interfaces for non-trivial skills unless the
   contract is genuinely single-purpose and obvious
-- use `skillResult: null` only for legacy skills that have not yet been
-  upgraded
 - if the skill is authored from a retained recording baseline, save a
   `skills run` wrapper for the run you want to compare and feed that
   wrapper directly to `clawperator recording compare`
@@ -11158,16 +11237,18 @@ clawperator skills run com.example.demo.capture-state --device <device_serial>
 
 For the run result, verify:
 
-- `skillId` matches the registry id
-- `output` contains the full stdout, including the framed result when emitted
-- `exitCode` is `0`
-- `skillResult` is either a parsed object or `null` for a legacy skill
+- for default JSON **success**, top-level `skillId` and `output` are
+  **omitted**; read **`skillResult.result`** for the answer and
+  `skillResult.skillId` for identity
+- when `output` is present on **SKILL_OUTPUT_ASSERTION_FAILED**, it is raw
+  stdout, including the frame line when the skill prints one
+- `skillResult` is the parsed structured result object
 
 If the script exits non-zero, `skills run` returns `SKILL_EXECUTION_FAILED` and
 preserves `stdout`, `stderr`, `exitCode`, and any parsed `skillResult`.
 
 If the script emits a malformed frame, `skills run` returns
-`SKILL_RESULT_PARSE_FAILED` instead of falling back to legacy stdout parsing.
+`SKILL_RESULT_PARSE_FAILED`.
 
 ### Non-Trivial Skill Rule
 
@@ -11851,17 +11932,24 @@ clawperator skills run com.example.app.do-thing --device <device_serial> --opera
 First-time agent pitfall:
 
 - pretty mode streams live output and prints a banner first
-- JSON mode returns one parseable wrapper object with the child stdout captured under `output`
+- JSON mode returns one parseable wrapper object
+- success JSON omits top-level `status`, `skillId`, `exitCode`, and
+  `output`; read the domain answer from `skillResult.result`
 
 ## Step 4: Verify Output
 
-Current wrapper success data:
+Current success data:
 
 ```json
 {
-  "skillId": "com.example.app.do-thing",
-  "output": "RESULT|status=success\n",
-  "exitCode": 0,
+  "skillResult": {
+    "result": { "kind": "text", "text": "ready" },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.example.app.do-thing",
+    "checkpoints": [],
+    "terminalVerification": { "status": "verified" }
+  },
   "durationMs": 8421,
   "timeoutMs": 90000
 }
@@ -11986,7 +12074,8 @@ Verification pattern:
 }
 ```
 
-- declared-but-unproved verification response shape is:
+- declared-but-unproved verification response shape with a parsed `skillResult`
+  is:
 
 ```json
 {
@@ -11994,12 +12083,13 @@ Verification pattern:
   "ok": null,
   "code": "SKILL_VERIFICATION_INDETERMINATE",
   "message": "Declared verification was not proved.",
-  "skillId": "com.example.app.do-thing",
-  "output": "[Clawperator-Skill-Result]\n{\"status\":\"success\"}\n",
   "skillResult": {
-    "status": "success"
+    "result": { "kind": "text", "text": "ready" },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.example.app.do-thing",
+    "checkpoints": []
   },
-  "exitCode": 0,
   "durationMs": 8421,
   "timeoutMs": 90000,
   "expectedSubstring": "RESULT"
@@ -12024,8 +12114,9 @@ Verification pattern:
 }
 ```
 
-- unlike CLI `skills run`, this route calls `runSkill()` directly
-- it does not run the CLI pre-validation gate from `cmdSkillsRun()`
+- this route has its own pre-run skill validation gate aligned with CLI
+  validation, then calls `runSkill()` directly instead of invoking
+  `cmdSkillsRun()`
 - it does not inject the CLI wrapper banner
 - handle `error.code` values such as `SKILL_OUTPUT_ASSERTION_FAILED`, `SKILL_EXECUTION_FAILED`, `SKILL_EXECUTION_TIMEOUT`, and `SKILL_RESULT_PARSE_FAILED` through the nested `error` object, not as the top-level response object
 
@@ -12436,14 +12527,17 @@ Recovery:
 - exit code
 - total duration
 
-Success wrapper fields:
+Success JSON exposes the parsed `SkillResult` and timing:
 
 | Field | Meaning |
 | --- | --- |
-| `skillId` | invoked registry id |
-| `output` | raw stdout |
-| `exitCode` | child exit code |
+| `skillResult` | parsed structured skill result |
 | `durationMs` | total wrapper runtime |
+
+Default **JSON** success responses omit `status`, `skillId`, `exitCode`, and
+`output` at the top level and expose the answer under `skillResult.result` (see
+the table in [Skill result trust order and JSON wrapper
+policy](#skill-result-trust-order-and-json-wrapper-policy)).
 
 Failure wrapper fields may also include:
 
@@ -12476,6 +12570,31 @@ Verification pattern:
 - use pretty mode when a human operator wants the banner plus streamed skill output
 - if pretty mode shows an APK warning or failure, fix the package/device setup before assuming the skill logic is wrong
 
+## Skill result trust order and JSON wrapper policy
+
+**Trust order (not the same as JSON key order):**
+
+1. Branch on the **top-level** wrapper `status` and `code` (and HTTP `ok` for serve) first. When the wrapper is `indeterminate` or `failed`, do not treat nested `skillResult.status` as the primary success signal.
+2. After the wrapper is `success` (or you are intentionally reading child state), inspect nested `skillResult.status` as **child-authored** reported state. The runtime may still mark the wrapper `indeterminate` if declared verification is not proved while the child reported success.
+3. Read the **domain answer** from **`skillResult.result`**. Use `result: null` only when no truthful domain value exists.
+4. Use **`checkpoints`**, **`terminalVerification`**, and **`execEnvelopes`** as proof and audit, not as the default answer path. **Do not** direct agents to discover the primary return value only through checkpoint ids, `terminalVerification`, or `diagnostics`.
+5. **`diagnostics`** is for runtime health, warnings, hints, timings, and debug detail only, not a second copy of the answer.
+
+**Nested field order in examples and emitted JSON (human and agent scanability):** inside the nested `skillResult` object, **`result` first**, then **`status`**, then the remaining proof and metadata fields. Object key order is not required for parsers, but it is the documented authoring convention.
+
+**Default JSON for `clawperator skills run` and `POST /skills/:skillId/run`:**
+
+| Wrapper path | `skillResult` | Top-level `status` | `skillId` | `exitCode` | `output` |
+| --- | --- | --- | --- | --- | --- |
+| **Success** | not `null` | omitted | omitted | omitted | omitted |
+| **Indeterminate** (verification not proved) | not `null` | present | omitted | omitted | omitted |
+| **SKILL_OUTPUT_ASSERTION_FAILED** | may be not `null` | error shape | present in error | n/a for success | **present** (diagnostic; shows what the skill printed) |
+| **Execution / parse / other failures** | often `null` | error | varies | in error when relevant | n/a; failures use `stdout` and `stderr` for process streams |
+
+Pretty mode can show `skillId`, `exitCode`, and streamed output for operators;
+the JSON deduplication policy applies when `--output json` or the serve JSON
+body for skill runs is used.
+
 Debugging skill runs with logs:
 
 ```bash
@@ -12488,40 +12607,60 @@ clawperator skills run <skill_id> --device <device_serial> --operator-package <p
 
 The unified logger captures skill output as `skills.run.output` events, enabling post-timeout diagnostics. See [Logging](../api/logging.md) for details.
 
-## Runtime Success Example
+## Runtime success examples
+
+**Success (default JSON):** top level has only the nested object plus timing;
+**no** duplicate `status`, `skillId`, `exitCode`, or `output`. The domain
+answer is under `skillResult.result`.
 
 ```json
 {
-  "status": "success",
-  "skillId": "com.android.settings.capture-overview",
-  "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
-  "skillResult": null,
-  "exitCode": 0,
+  "skillResult": {
+    "result": {
+      "kind": "text",
+      "text": "ok"
+    },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.example.app.read-metric",
+    "goal": { "kind": "read_metric" },
+    "inputs": {},
+    "checkpoints": [],
+    "terminalVerification": { "status": "verified" },
+    "diagnostics": { "runtimeState": "healthy" },
+    "source": { "kind": "script" }
+  },
   "durationMs": 15321
 }
 ```
 
-## Runtime Indeterminate Example
+## Runtime indeterminate example
+
+When verification is not proved, default JSON **omits**
+`skillId`, `exitCode`, and `output` at the top level. Wrapper `status`, `code`,
+and `message` stay because they carry distinct wrapper state.
 
 ```json
 {
   "status": "indeterminate",
   "code": "SKILL_VERIFICATION_INDETERMINATE",
   "message": "Declared verification was not proved.",
-  "skillId": "com.android.settings.capture-overview",
-  "output": "[Clawperator-Skill-Result]\n{\"status\":\"success\"}\n",
   "skillResult": {
-    "status": "success"
+    "result": { "kind": "json", "value": { "note": "example" } },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.android.settings.capture-overview",
+    "checkpoints": [],
+    "source": { "kind": "script" }
   },
-  "exitCode": 0,
   "durationMs": 15321
 }
 ```
 
 This wrapper-level `indeterminate` state means the skill process ran without an
 upstream runtime failure, but the declared `skill.json` verification contract
-was not proved. The parsed `skillResult` is returned verbatim; the wrapper does
-not rewrite it.
+was not proved. The parsed `skillResult` is returned **verbatim**; the wrapper
+does not rewrite it.
 
 ## Runtime Failure Example
 

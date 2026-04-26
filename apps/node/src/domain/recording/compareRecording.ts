@@ -609,7 +609,17 @@ export async function loadSkillResultFromSkillsRunFile(path: string): Promise<Sk
     message?: unknown;
     skillResult?: unknown;
   };
-  if (parsedWrapper.status !== "success") {
+
+  const isExplicitTopLevelSuccess = parsedWrapper.status === "success";
+  const isDeduplicatedFramedJsonSuccess =
+    parsedWrapper.status === undefined
+    && parsedWrapper.code === undefined
+    && parsedWrapper.skillResult !== null
+    && parsedWrapper.skillResult !== undefined
+    && typeof parsedWrapper.skillResult === "object"
+    && !Array.isArray(parsedWrapper.skillResult);
+
+  if (!isExplicitTopLevelSuccess && !isDeduplicatedFramedJsonSuccess) {
     const codeSuffix = typeof parsedWrapper.code === "string" && parsedWrapper.code.length > 0
       ? ` (${parsedWrapper.code}${typeof parsedWrapper.message === "string" && parsedWrapper.message.length > 0 ? `: ${parsedWrapper.message}` : ""})`
       : "";

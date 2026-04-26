@@ -295,17 +295,24 @@ clawperator skills run com.example.app.do-thing --device <device_serial> --opera
 First-time agent pitfall:
 
 - pretty mode streams live output and prints a banner first
-- JSON mode returns one parseable wrapper object with the child stdout captured under `output`
+- JSON mode returns one parseable wrapper object
+- success JSON omits top-level `status`, `skillId`, `exitCode`, and
+  `output`; read the domain answer from `skillResult.result`
 
 ## Step 4: Verify Output
 
-Current wrapper success data:
+Current success data:
 
 ```json
 {
-  "skillId": "com.example.app.do-thing",
-  "output": "RESULT|status=success\n",
-  "exitCode": 0,
+  "skillResult": {
+    "result": { "kind": "text", "text": "ready" },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.example.app.do-thing",
+    "checkpoints": [],
+    "terminalVerification": { "status": "verified" }
+  },
   "durationMs": 8421,
   "timeoutMs": 90000
 }
@@ -430,7 +437,8 @@ Verification pattern:
 }
 ```
 
-- declared-but-unproved verification response shape is:
+- declared-but-unproved verification response shape with a parsed `skillResult`
+  is:
 
 ```json
 {
@@ -438,12 +446,13 @@ Verification pattern:
   "ok": null,
   "code": "SKILL_VERIFICATION_INDETERMINATE",
   "message": "Declared verification was not proved.",
-  "skillId": "com.example.app.do-thing",
-  "output": "[Clawperator-Skill-Result]\n{\"status\":\"success\"}\n",
   "skillResult": {
-    "status": "success"
+    "result": { "kind": "text", "text": "ready" },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.example.app.do-thing",
+    "checkpoints": []
   },
-  "exitCode": 0,
   "durationMs": 8421,
   "timeoutMs": 90000,
   "expectedSubstring": "RESULT"
@@ -468,8 +477,9 @@ Verification pattern:
 }
 ```
 
-- unlike CLI `skills run`, this route calls `runSkill()` directly
-- it does not run the CLI pre-validation gate from `cmdSkillsRun()`
+- this route has its own pre-run skill validation gate aligned with CLI
+  validation, then calls `runSkill()` directly instead of invoking
+  `cmdSkillsRun()`
 - it does not inject the CLI wrapper banner
 - handle `error.code` values such as `SKILL_OUTPUT_ASSERTION_FAILED`, `SKILL_EXECUTION_FAILED`, `SKILL_EXECUTION_TIMEOUT`, and `SKILL_RESULT_PARSE_FAILED` through the nested `error` object, not as the top-level response object
 

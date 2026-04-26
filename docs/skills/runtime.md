@@ -226,14 +226,17 @@ Recovery:
 - exit code
 - total duration
 
-Success wrapper fields:
+Success JSON exposes the parsed `SkillResult` and timing:
 
 | Field | Meaning |
 | --- | --- |
-| `skillId` | invoked registry id |
-| `output` | raw stdout |
-| `exitCode` | child exit code |
+| `skillResult` | parsed structured skill result |
 | `durationMs` | total wrapper runtime |
+
+Default **JSON** success responses omit `status`, `skillId`, `exitCode`, and
+`output` at the top level and expose the answer under `skillResult.result` (see
+the table in [Skill result trust order and JSON wrapper
+policy](#skill-result-trust-order-and-json-wrapper-policy)).
 
 Failure wrapper fields may also include:
 
@@ -266,6 +269,31 @@ Verification pattern:
 - use pretty mode when a human operator wants the banner plus streamed skill output
 - if pretty mode shows an APK warning or failure, fix the package/device setup before assuming the skill logic is wrong
 
+## Skill result trust order and JSON wrapper policy
+
+**Trust order (not the same as JSON key order):**
+
+1. Branch on the **top-level** wrapper `status` and `code` (and HTTP `ok` for serve) first. When the wrapper is `indeterminate` or `failed`, do not treat nested `skillResult.status` as the primary success signal.
+2. After the wrapper is `success` (or you are intentionally reading child state), inspect nested `skillResult.status` as **child-authored** reported state. The runtime may still mark the wrapper `indeterminate` if declared verification is not proved while the child reported success.
+3. Read the **domain answer** from **`skillResult.result`**. Use `result: null` only when no truthful domain value exists.
+4. Use **`checkpoints`**, **`terminalVerification`**, and **`execEnvelopes`** as proof and audit, not as the default answer path. **Do not** direct agents to discover the primary return value only through checkpoint ids, `terminalVerification`, or `diagnostics`.
+5. **`diagnostics`** is for runtime health, warnings, hints, timings, and debug detail only, not a second copy of the answer.
+
+**Nested field order in examples and emitted JSON (human and agent scanability):** inside the nested `skillResult` object, **`result` first**, then **`status`**, then the remaining proof and metadata fields. Object key order is not required for parsers, but it is the documented authoring convention.
+
+**Default JSON for `clawperator skills run` and `POST /skills/:skillId/run`:**
+
+| Wrapper path | `skillResult` | Top-level `status` | `skillId` | `exitCode` | `output` |
+| --- | --- | --- | --- | --- | --- |
+| **Success** | not `null` | omitted | omitted | omitted | omitted |
+| **Indeterminate** (verification not proved) | not `null` | present | omitted | omitted | omitted |
+| **SKILL_OUTPUT_ASSERTION_FAILED** | may be not `null` | error shape | present in error | n/a for success | **present** (diagnostic; shows what the skill printed) |
+| **Execution / parse / other failures** | often `null` | error | varies | in error when relevant | n/a; failures use `stdout` and `stderr` for process streams |
+
+Pretty mode can show `skillId`, `exitCode`, and streamed output for operators;
+the JSON deduplication policy applies when `--output json` or the serve JSON
+body for skill runs is used.
+
 Debugging skill runs with logs:
 
 ```bash
@@ -278,40 +306,60 @@ clawperator skills run <skill_id> --device <device_serial> --operator-package <p
 
 The unified logger captures skill output as `skills.run.output` events, enabling post-timeout diagnostics. See [Logging](../api/logging.md) for details.
 
-## Runtime Success Example
+## Runtime success examples
+
+**Success (default JSON):** top level has only the nested object plus timing;
+**no** duplicate `status`, `skillId`, `exitCode`, or `output`. The domain
+answer is under `skillResult.result`.
 
 ```json
 {
-  "status": "success",
-  "skillId": "com.android.settings.capture-overview",
-  "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
-  "skillResult": null,
-  "exitCode": 0,
+  "skillResult": {
+    "result": {
+      "kind": "text",
+      "text": "ok"
+    },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.example.app.read-metric",
+    "goal": { "kind": "read_metric" },
+    "inputs": {},
+    "checkpoints": [],
+    "terminalVerification": { "status": "verified" },
+    "diagnostics": { "runtimeState": "healthy" },
+    "source": { "kind": "script" }
+  },
   "durationMs": 15321
 }
 ```
 
-## Runtime Indeterminate Example
+## Runtime indeterminate example
+
+When verification is not proved, default JSON **omits**
+`skillId`, `exitCode`, and `output` at the top level. Wrapper `status`, `code`,
+and `message` stay because they carry distinct wrapper state.
 
 ```json
 {
   "status": "indeterminate",
   "code": "SKILL_VERIFICATION_INDETERMINATE",
   "message": "Declared verification was not proved.",
-  "skillId": "com.android.settings.capture-overview",
-  "output": "[Clawperator-Skill-Result]\n{\"status\":\"success\"}\n",
   "skillResult": {
-    "status": "success"
+    "result": { "kind": "json", "value": { "note": "example" } },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.android.settings.capture-overview",
+    "checkpoints": [],
+    "source": { "kind": "script" }
   },
-  "exitCode": 0,
   "durationMs": 15321
 }
 ```
 
 This wrapper-level `indeterminate` state means the skill process ran without an
 upstream runtime failure, but the declared `skill.json` verification contract
-was not proved. The parsed `skillResult` is returned verbatim; the wrapper does
-not rewrite it.
+was not proved. The parsed `skillResult` is returned **verbatim**; the wrapper
+does not rewrite it.
 
 ## Runtime Failure Example
 

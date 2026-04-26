@@ -28,6 +28,7 @@ import { parseSkillManifestMetadata } from "../../domain/skills/skillManifest.js
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 import { cmdSkillsRun, resolveInteractiveSkillTarget } from "../../cli/commands/skills.js";
+import type { SkillResult } from "../../contracts/skillResult.js";
 import { createClawperatorLogger } from "../../adapters/logger.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import {
@@ -3567,6 +3568,31 @@ describe("runSkill", () => {
     assert.strictEqual(result.skillResult.diagnostics?.runtimeState, "healthy");
   });
 
+  it("accepts evidence-shaped root result and surfaces skillResult.result (migration window allows missing result)", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["result-valid", "40"]);
+    assert.ok(result.ok, `Expected framed SkillResult to succeed: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.deepStrictEqual(result.skillResult.result, { kind: "json", value: { amount: "-$3.10" } });
+    assert.strictEqual(result.skillResult.status, "success");
+  });
+
+  it("rejects a plain-object root result that is not SkillCheckpointEvidence (schema validation)", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["result-plain-object", "40"]);
+    assert.ok(!result.ok, "Expected runSkill to fail when result is not evidence-shaped");
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(
+      result.message,
+      /SkillResult frame failed validation|result|Invalid discriminator|discriminator/i
+    );
+  });
+
+  it("treats missing result as undefined during the migration window (PR-C1 optional; PR-C2 will require it)", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["valid", "40"]);
+    assert.ok(result.ok, `Expected framed SkillResult to succeed: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.result, undefined);
+  });
+
   it("keeps framed scripted SkillResult parsing permissive when skill.json is unreadable", async () => {
     const temp = await createTempRegistryWithSkill({
       skillId: TEST_SKILL_RESULT,
@@ -6221,6 +6247,10 @@ console.log(JSON.stringify({
 
     assert.strictEqual(code, 0, stdout);
     const parsed = JSON.parse(stdout) as {
+      status?: string;
+      skillId?: string;
+      output?: string;
+      exitCode?: number;
       skillResult?: {
         skillId?: string;
         source?: { kind?: string };
@@ -6229,6 +6259,10 @@ console.log(JSON.stringify({
 
     assert.strictEqual(parsed.skillResult?.skillId, TEST_SKILL_RESULT);
     assert.strictEqual(parsed.skillResult?.source?.kind, "script");
+    assert.strictEqual(parsed.status, undefined);
+    assert.strictEqual(parsed.skillId, undefined);
+    assert.strictEqual(parsed.exitCode, undefined);
+    assert.strictEqual(parsed.output, undefined);
   });
 
   it("CLI skills run surfaces indeterminate for declared-but-unproved verification", async () => {
@@ -7068,6 +7102,132 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.strictEqual(runCalls, 1);
     assert.strictEqual(parsed.skillId, TEST_SKILL_VALID_ARTIFACT);
     assert.strictEqual(parsed.output, "RUN_OK");
+  });
+
+  it("JSON mode omits duplicate top-level wrapper fields when skillResult is present", async () => {
+    const frameMarker = "[Clawperator-Skill-Result]";
+    const fakeRunSkill: typeof runSkill = async () => ({
+      ok: true,
+      status: "success",
+      skillId: "com.test.framed-cli-json",
+      output: `progress\n${frameMarker}\n{}\n`,
+      exitCode: 0,
+      durationMs: 1,
+      skillResult: {
+        contractVersion: "1.0.0",
+        skillId: "com.test.framed-cli-json",
+        source: { kind: "script" },
+        status: "success",
+        checkpoints: [],
+      } satisfies SkillResult,
+    });
+
+    const stdout = await cmdSkillsRun(
+      "com.test.framed-cli-json",
+      [],
+      undefined,
+      undefined,
+      undefined,
+      {
+        format: "json",
+        skipValidate: true,
+        runSkillImpl: fakeRunSkill,
+        resolveInteractiveSkillTargetImpl: allowInteractiveTarget,
+      }
+    );
+    const parsed = JSON.parse(stdout) as Record<string, unknown>;
+    assert.ok(parsed.skillResult);
+    assert.strictEqual(parsed.status, undefined);
+    assert.strictEqual(parsed.skillId, undefined);
+    assert.strictEqual(parsed.exitCode, undefined);
+    assert.strictEqual(parsed.output, undefined);
+  });
+
+  it("JSON mode keeps legacy wrapper fields when skillResult is null", async () => {
+    const fakeRunSkill: typeof runSkill = async () => ({
+      ok: true,
+      status: "success",
+      skillId: "com.test.legacy-cli-json",
+      output: "plain\n",
+      exitCode: 0,
+      durationMs: 1,
+      skillResult: null,
+    });
+
+    const stdout = await cmdSkillsRun(
+      "com.test.legacy-cli-json",
+      [],
+      undefined,
+      undefined,
+      undefined,
+      {
+        format: "json",
+        skipValidate: true,
+        runSkillImpl: fakeRunSkill,
+        resolveInteractiveSkillTargetImpl: allowInteractiveTarget,
+      }
+    );
+    const parsed = JSON.parse(stdout) as {
+      status?: string;
+      skillId?: string;
+      output?: string;
+      exitCode?: number;
+      skillResult?: null;
+    };
+    assert.strictEqual(parsed.status, "success");
+    assert.strictEqual(parsed.skillId, "com.test.legacy-cli-json");
+    assert.strictEqual(parsed.output, "plain\n");
+    assert.strictEqual(parsed.exitCode, 0);
+    assert.strictEqual(parsed.skillResult, null);
+  });
+
+  it("JSON mode omits skillId, exitCode, and output for indeterminate with parsed skillResult", async () => {
+    const fakeRunSkill: typeof runSkill = async () => ({
+      ok: null,
+      status: "indeterminate",
+      code: "SKILL_VERIFICATION_INDETERMINATE",
+      message: "Declared verification was not proved.",
+      skillId: "com.test.indeterminate-cli",
+      output: "stdout with frame\n",
+      exitCode: 0,
+      durationMs: 2,
+      skillResult: {
+        contractVersion: "1.0.0",
+        skillId: "com.test.indeterminate-cli",
+        source: { kind: "script" },
+        status: "success",
+        checkpoints: [],
+      } satisfies SkillResult,
+    });
+
+    const stdout = await cmdSkillsRun(
+      "com.test.indeterminate-cli",
+      [],
+      undefined,
+      undefined,
+      undefined,
+      {
+        format: "json",
+        skipValidate: true,
+        runSkillImpl: fakeRunSkill,
+        resolveInteractiveSkillTargetImpl: allowInteractiveTarget,
+      }
+    );
+    const parsed = JSON.parse(stdout) as {
+      status?: string;
+      code?: string;
+      skillId?: string;
+      output?: string;
+      exitCode?: number;
+      skillResult?: { skillId?: string };
+    };
+    assert.strictEqual(parsed.status, "indeterminate");
+    assert.strictEqual(parsed.code, "SKILL_VERIFICATION_INDETERMINATE");
+    assert.strictEqual(parsed.skillId, undefined);
+    assert.strictEqual(parsed.output, undefined);
+    assert.strictEqual(parsed.exitCode, undefined);
+    assert.ok(parsed.skillResult);
+    assert.strictEqual(parsed.skillResult?.skillId, "com.test.indeterminate-cli");
   });
 
   it("validates before querying APK state in cmdSkillsRun", async () => {

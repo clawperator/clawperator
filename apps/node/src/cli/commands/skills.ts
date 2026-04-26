@@ -540,6 +540,17 @@ export async function cmdSkillsRun(
       })()
     : await runSkillImpl(skillId, args, undefined, timeoutMs, env, { logger: cliLogger }, expectContains);
   if (result.status === "success") {
+    if (options.format === "json" && result.skillResult !== null) {
+      return formatSuccess(
+        {
+          skillResult: result.skillResult,
+          durationMs: result.durationMs,
+          ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+          ...(expectContains !== undefined ? { expectedSubstring: expectContains } : {}),
+        },
+        options
+      );
+    }
     return formatSuccess({
       status: result.status,
       skillId: result.skillId,
@@ -554,6 +565,20 @@ export async function cmdSkillsRun(
     }, options);
   }
   if (result.status === "indeterminate") {
+    if (options.format === "json" && result.skillResult !== null) {
+      return formatSuccess(
+        {
+          status: result.status,
+          code: result.code,
+          message: result.message,
+          skillResult: result.skillResult,
+          durationMs: result.durationMs,
+          ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+          ...(expectContains !== undefined ? { expectedSubstring: expectContains } : {}),
+        },
+        options
+      );
+    }
     return formatSuccess({
       status: result.status,
       code: result.code,
