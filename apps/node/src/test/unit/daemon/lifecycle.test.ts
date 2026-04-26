@@ -96,6 +96,22 @@ describe("daemon process state", () => {
     assert.equal(await isDaemonRunning(undefined, options), false);
   });
 
+  it("reports not running when the PID belongs to a non-daemon process", async () => {
+    const baseDir = await makeTempBaseDir();
+    await writePidMetadata(baseDir, 12345);
+
+    const options: DaemonPathsOptions = {
+      baseDir,
+      processController: {
+        isAlive: () => true,
+        isDaemonProcess: () => false,
+        kill: () => undefined,
+      },
+    };
+
+    assert.equal(await isDaemonRunning(undefined, options), false);
+  });
+
   it("stopDaemon returns not_running when the PID file does not exist", async () => {
     const baseDir = await makeTempBaseDir();
 
@@ -147,6 +163,28 @@ describe("daemon process state", () => {
     assert.equal(await stopDaemon(undefined, options), "stopped");
     assert.equal(readFileSync(getDaemonPidPath(undefined, { baseDir }), "utf8").includes("\"pid\":1234"), true);
     assert.equal(readFileSync(getDaemonSocketPath(undefined, { baseDir }), "utf8"), "replacement socket");
+  });
+
+  it("stopDaemon removes stale metadata without killing a non-daemon process", async () => {
+    const baseDir = await makeTempBaseDir();
+    await writePidMetadata(baseDir, 9876, 100);
+    await writeFile(getDaemonSocketPath(undefined, { baseDir }), "", "utf8");
+    let killCalled = false;
+    const options: DaemonPathsOptions = {
+      baseDir,
+      processController: {
+        isAlive: () => true,
+        isDaemonProcess: () => false,
+        kill: () => {
+          killCalled = true;
+        },
+      },
+    };
+
+    assert.equal(await stopDaemon(undefined, options), "not_running");
+    assert.equal(killCalled, false);
+    assert.equal(existsSync(getDaemonPidPath(undefined, { baseDir })), false);
+    assert.equal(existsSync(getDaemonSocketPath(undefined, { baseDir })), false);
   });
 });
 

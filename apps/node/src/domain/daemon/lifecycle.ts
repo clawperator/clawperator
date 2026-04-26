@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { chmodSync, closeSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -7,6 +7,7 @@ export interface DaemonPathsOptions {
   baseDir?: string;
   processController?: {
     isAlive(pid: number): boolean;
+    isDaemonProcess?(pid: number): boolean;
     kill(pid: number, signal: NodeJS.Signals): void;
   };
   terminationTimeoutMs?: number;
@@ -39,6 +40,18 @@ function getProcessController(options?: DaemonPathsOptions): NonNullable<DaemonP
     },
     kill(pid: number, signal: NodeJS.Signals): void {
       process.kill(pid, signal);
+    },
+    isDaemonProcess(pid: number): boolean {
+      try {
+        const command = execFileSync("ps", ["-p", String(pid), "-o", "command="], {
+          encoding: "utf8",
+          timeout: 1000,
+          stdio: ["ignore", "pipe", "ignore"],
+        }).trim();
+        return /\bdaemon\s+run\b/.test(command);
+      } catch {
+        return false;
+      }
     },
   };
 }
@@ -76,6 +89,10 @@ function removeDaemonFiles(rawDeviceId: string | undefined, options?: DaemonPath
 
 function metadataMatches(left: DaemonMetadata | undefined, right: DaemonMetadata): boolean {
   return left?.pid === right.pid && left.startedAt === right.startedAt;
+}
+
+function isDaemonProcess(metadata: DaemonMetadata, controller: NonNullable<DaemonPathsOptions["processController"]>): boolean {
+  return controller.isDaemonProcess?.(metadata.pid) ?? true;
 }
 
 export function sanitizeDaemonKey(rawDeviceId: string | undefined): string {
@@ -151,7 +168,8 @@ export async function isDaemonRunning(rawDeviceId: string | undefined, options?:
   if (!metadata) {
     return false;
   }
-  return getProcessController(options).isAlive(metadata.pid);
+  const controller = getProcessController(options);
+  return controller.isAlive(metadata.pid) && isDaemonProcess(metadata, controller);
 }
 
 export async function stopDaemon(
@@ -167,6 +185,13 @@ export async function stopDaemon(
 
     const controller = getProcessController(options);
     if (!controller.isAlive(metadata.pid)) {
+      if (metadataMatches(readDaemonMetadata(pidPath), metadata)) {
+        removeDaemonFiles(rawDeviceId, options);
+      }
+      return "not_running";
+    }
+
+    if (!isDaemonProcess(metadata, controller)) {
       if (metadataMatches(readDaemonMetadata(pidPath), metadata)) {
         removeDaemonFiles(rawDeviceId, options);
       }
