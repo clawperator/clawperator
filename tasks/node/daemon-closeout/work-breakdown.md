@@ -4,13 +4,14 @@ Parent plan: `tasks/node/daemon-closeout/plan.md`
 
 ## Executive Summary
 
-2 phases in 1 PR. Phase 1 is two code fixes with a test. Phase 2 is a
+2 phases in 1 PR. Phase 1 fixes one help-text defect and adds regression
+coverage for the shipped screenshot no-fallback boundary. Phase 2 is a
 findings update and task folder cleanup. Both phases ship together in one
 reviewable PR. No merge gate between phases.
 
 | PR | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
-| PR-1 | Fix code defects, validate, update findings, clean up | Phase 1, Phase 2 | default | none |
+| PR-1 | Fix help defect, validate screenshot boundary, update findings, clean up | Phase 1, Phase 2 | default | none |
 
 ## Status
 
@@ -28,8 +29,13 @@ reviewable PR. No merge gate between phases.
 
 - Do NOT change any text in HELP_DAEMON other than the one path string at line 314 of
   `apps/node/src/cli/registry.ts`.
-- Do NOT change any `observe.ts` behavior other than setting
-  `allowPostDispatchFallback: true` in `cmdObserveScreenshot` and adding one comment.
+- Do NOT change `cmdObserveScreenshot` to `allowPostDispatchFallback: true`.
+  The shipped code and `docs/api/daemon.md` agree that screenshot post-dispatch
+  response loss returns `DAEMON_PROXY_ERROR` because screenshots can write host
+  output files.
+- Do NOT change any `observe.ts` behavior other than adding behavior-neutral
+  injectable test seams and one comment explaining why screenshot fallback
+  remains `false`.
 - Do NOT delete any task folder before `npm --prefix apps/node run build`,
   `npm --prefix apps/node run test`, and `./scripts/docs_build.sh` all pass.
 - Do NOT append to `tasks/node/io-optimizations/findings.md` if the daemon proxy
@@ -44,10 +50,11 @@ Read these files IN THIS ORDER before writing anything.
 | File | Why it matters |
 | --- | --- |
 | `tasks/node/daemon-closeout/plan.md` | Locked decisions, scope, and correctness rules |
-| `tasks/node/daemon-closeeout/findings.md` | Authoritative evidence for each defect |
+| `tasks/node/daemon-closeeout/findings.md` | Evidence for the confirmed defect, reconciled decision, and cleanup items |
 | `apps/node/src/cli/registry.ts` | Locate HELP_DAEMON; confirm the exact line before editing |
-| `apps/node/src/cli/commands/observe.ts` | Locate `cmdObserveScreenshot` and the flag to change |
-| `apps/node/src/cli/daemonProxy.ts` | Understand `hasCallerRelativeScreenshotPath` and the fallback boundary |
+| `apps/node/src/cli/commands/observe.ts` | Locate `cmdObserveScreenshot` and confirm the current fallback boundary |
+| `apps/node/src/cli/daemonProxy.ts` | Understand `hasCallerRelativeScreenshotPath`, `DAEMON_PROXY_ERROR`, and the fallback boundary |
+| `docs/api/daemon.md` | Confirm public docs describe screenshot post-dispatch fallback as no direct retry |
 | `apps/node/src/test/unit/observe.test.ts` | See the existing test shape before adding the new case |
 | `tasks/node/io-optimizations/findings.md` | Read in full before appending; confirm note is absent |
 
@@ -59,8 +66,9 @@ Read these files IN THIS ORDER before writing anything.
 default
 
 ### Goal
-Fix the HELP_DAEMON path string, correct `screenshot` `allowPostDispatchFallback` to
-`true`, add one regression test, and confirm the full test and docs build pass.
+Fix the HELP_DAEMON path string, preserve `screenshot`
+`allowPostDispatchFallback: false` with regression coverage, and confirm the full
+test and docs build pass.
 
 ### Files To Change
 
@@ -81,26 +89,33 @@ Fix the HELP_DAEMON path string, correct `screenshot` `allowPostDispatchFallback
    Do not change any other text in the file.
 
 2. Read `apps/node/src/cli/commands/observe.ts`. Find `cmdObserveScreenshot`. The call
-   to `tryDaemonExecution` currently passes `allowPostDispatchFallback: false`. Change
-   it to `allowPostDispatchFallback: true`. Add a one-line comment immediately before
-   or after the flag explaining why: caller-relative paths are already short-circuited
-   by `hasCallerRelativeScreenshotPath` before dispatch; for the no-path and
-   absolute-path cases, re-shooting the screenshot is safe.
+   to `tryDaemonExecution` currently passes `allowPostDispatchFallback: false`.
+   Keep that value. Add a one-line comment immediately before or after the flag
+   explaining why: caller-relative paths are already short-circuited by
+   `hasCallerRelativeScreenshotPath` before daemon startup, and screenshots that may
+   write a host output file must return `DAEMON_PROXY_ERROR` after post-dispatch
+   response loss instead of retrying direct.
 
-3. Read `apps/node/src/test/unit/observe.test.ts`. Add one new test case to
+3. Add behavior-neutral injectable test seams to `cmdObserveSnapshot` and
+   `cmdObserveScreenshot`, mirroring the established `tryDaemonExecutionFn` and
+   `runExecutionFn` pattern in `apps/node/src/cli/commands/execute.ts` and
+   `apps/node/src/cli/commands/action.ts`. The production defaults must remain
+   `tryDaemonExecution` and `runExecution`.
+
+4. Read `apps/node/src/test/unit/observe.test.ts`. Add one new test case to
    `cmdObserveScreenshot` coverage:
 
-   **Required case:** when `tryDaemonExecution` is injected to return `null` with
-   `dispatched: true` (simulating a post-dispatch response loss), and the
-   `runExecution` fallback returns a success result, `cmdObserveScreenshot` must
-   return the success output and exit 0.
+   **Required case:** when `tryDaemonExecution` is injected to return a
+   `RunExecutionResult` error with `ERROR_CODES.DAEMON_PROXY_ERROR` for a screenshot
+   with no path or an absolute path, `cmdObserveScreenshot` must return the formatted
+   proxy error and must not call the injected `runExecution` fallback.
 
    Use the same injectable `tryDaemonExecutionFn`/`runExecutionFn` pattern already
-   present in the file for other test cases. If that pattern does not exist, check
-   `apps/node/src/test/unit/executeCommand.test.ts` for the established injectable
-   function pattern and mirror it.
+   present in `execute.ts` and action-command tests. The assertion should also verify
+   that the options passed to `tryDaemonExecutionFn` include
+   `allowPostDispatchFallback: false`.
 
-4. Run the build and test suite:
+5. Run the build and test suite:
 
    ```bash
    npm --prefix apps/node run build && npm --prefix apps/node run test
@@ -108,7 +123,7 @@ Fix the HELP_DAEMON path string, correct `screenshot` `allowPostDispatchFallback
 
    All tests must pass before continuing.
 
-5. Run the docs build:
+6. Run the docs build:
 
    ```bash
    ./scripts/docs_build.sh
@@ -116,7 +131,7 @@ Fix the HELP_DAEMON path string, correct `screenshot` `allowPostDispatchFallback
 
    Must succeed with no errors.
 
-6. **If a device is connected**, run the live smoke sequence using the branch-local
+7. **If a device is connected**, run the live smoke sequence using the branch-local
    build and debug operator package. This step is optional; skip it when no device is
    available and note the omission in the commit message.
 
@@ -146,28 +161,29 @@ Fix the HELP_DAEMON path string, correct `screenshot` `allowPostDispatchFallback
 ### Acceptance Criteria
 
 **Mechanical:**
-- `grep '~/.clawperator/' apps/node/src/cli/registry.ts | grep HELP_DAEMON` returns
-  zero matches.
-- `grep '~/.clawperator/daemon/' apps/node/src/cli/registry.ts` matches the corrected
-  line in HELP_DAEMON.
-- `grep 'allowPostDispatchFallback: false' apps/node/src/cli/commands/observe.ts`
-  returns zero matches.
+- `rg -n "under ~/.clawperator/\\." apps/node/src/cli/registry.ts` returns zero
+  matches.
+- `rg -n "under ~/.clawperator/daemon/" apps/node/src/cli/registry.ts` matches the
+  corrected line in HELP_DAEMON.
+- `rg -n "allowPostDispatchFallback: false" apps/node/src/cli/commands/observe.ts`
+  still matches the screenshot proxy options.
 - `npm --prefix apps/node run build && npm --prefix apps/node run test` exits 0.
 - `./scripts/docs_build.sh` exits 0.
 
 **Human review:**
 - The HELP_DAEMON change is the only diff in `registry.ts`.
-- The `observe.ts` diff contains only the flag change and the comment; no other
-  behavior is altered.
-- The new test in `observe.test.ts` exercises the post-dispatch fallback path for
+- The `observe.ts` diff contains only injectable test seams and the screenshot
+  fallback-boundary comment; no production behavior is altered.
+- The new test in `observe.test.ts` exercises the post-dispatch no-fallback path for
   `cmdObserveScreenshot`, not just the pre-dispatch or relative-path path.
 
 ### Validation
 
 ```bash
 # Correctness checks
-grep '~/.clawperator/' apps/node/src/cli/registry.ts
-grep 'allowPostDispatchFallback: false' apps/node/src/cli/commands/observe.ts
+! rg -n "under ~/.clawperator/\\." apps/node/src/cli/registry.ts
+rg -n "under ~/.clawperator/daemon/" apps/node/src/cli/registry.ts
+rg -n "allowPostDispatchFallback: false" apps/node/src/cli/commands/observe.ts
 
 # Full build and test
 npm --prefix apps/node run build && npm --prefix apps/node run test
@@ -179,7 +195,7 @@ npm --prefix apps/node run build && npm --prefix apps/node run test
 ### Expected Commit
 
 ```text
-fix(node): correct HELP_DAEMON path and screenshot post-dispatch fallback
+fix(node): correct HELP_DAEMON path and cover screenshot proxy boundary
 ```
 
 ---
