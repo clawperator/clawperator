@@ -239,9 +239,6 @@ verification should be run before treating the work as fully closed:
 - Delete `tasks/node/daemon/` - all five phases are shipped; the plan and
   work-breakdown are now stale. The latency findings in `tasks/node/daemon/findings.md`
   can be deleted unless referenced from `tasks/node/io-optimizations/findings.md`.
-- Delete `tasks/node/daemon-closeeout/findings-claude.md` and
-  `tasks/node/daemon-closeeout/findings-codex.md` (source working drafts for this
-  document).
 - Delete `tasks/node/daemon-closeeout/` once this findings document is no longer needed
   as active reference.
 
