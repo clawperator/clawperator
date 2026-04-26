@@ -102,9 +102,10 @@ skill, the same run should expose the scalar answer at
 Expected properties:
 
 - wrapper `status` is still `success`
-- parsed `skillResult.status` is still `success`
 - `skillResult.result` is present
 - `skillResult.result` is evidence-shaped
+- parsed `skillResult.status` is still `success`
+- inside `skillResult`, `result` is the first field and `status` is second
 - checkpoints and terminal verification still prove how the value was found
 - diagnostics contains only runtime health, hints, warnings, paths, timings, or
   debug metadata
@@ -118,17 +119,17 @@ Expected reduced shape:
   "skillId": "com.globird.energy.get-yesterday-usage-cost-replay",
   "exitCode": 0,
   "skillResult": {
+    "result": {
+      "kind": "text",
+      "text": "-$3.10"
+    },
+    "status": "success",
     "contractVersion": "1.0.0",
     "skillId": "com.globird.energy.get-yesterday-usage-cost-replay",
     "goal": {
       "kind": "read_yesterday_usage_cost"
     },
     "inputs": {},
-    "status": "success",
-    "result": {
-      "kind": "text",
-      "text": "-$3.10"
-    },
     "checkpoints": [
       {
         "id": "opened-energy-screen",
@@ -179,9 +180,10 @@ For this seed skill, the final acceptance check is:
 
 ```text
 wrapper.status == "success"
-skillResult.status == "success"
 skillResult.result.kind == "text"
 skillResult.result.text matches /^[-+]?\$\d+(\.\d{2})?$/
+skillResult.status == "success"
+skillResult object starts with result, then status
 output field is absent
 ```
 

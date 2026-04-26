@@ -123,10 +123,11 @@ but their payload shape must be migrated to the canonical evidence union before
 those fields survive parsing.
 
 For newly authored or migrated framed `SkillResult` output, `result` should
-always be present. Use `result: null` only when the skill cannot truthfully
-provide a domain result, such as an early failure before any answer or confirmed
-state exists. After all framed skills are migrated, tighten the schema to
-`result: SkillCheckpointEvidence | null` and reject missing `result`.
+always be present and should be the first field inside the nested `SkillResult`
+object, followed by `status`. Use `result: null` only when the skill cannot
+truthfully provide a domain result, such as an early failure before any answer
+or confirmed state exists. After all framed skills are migrated, tighten the
+schema to `result: SkillCheckpointEvidence | null` and reject missing `result`.
 
 ---
 
@@ -466,6 +467,8 @@ progress text from `output`.
   `SkillResult`.
 - Add migration-phase `result: skillCheckpointEvidenceSchema.nullable().optional()` to
   `emittedSkillResultSchema`.
+- Place `result` before `status` in TypeScript, Zod schemas, fixtures, and docs
+  examples.
 - Add unit tests proving:
   - emitted `result` in `SkillCheckpointEvidence` shape survives `runSkill()`
     parsing
@@ -482,11 +485,12 @@ progress text from `output`.
 
 ### PR 2 - Consumer Rules And Output Policy
 
-- Document wrapper status precedence:
+- Document wrapper status precedence and nested field order:
   - wrapper `status` and `code`
-  - then `skillResult.status`
-  - then `skillResult.result`
-  - then proof fields
+  - nested `skillResult.status` remains child-authored state
+  - nested `skillResult.result` is the domain answer
+  - nested JSON examples put `result` first and `status` second for scanability
+  - proof fields follow after the answer and child status
 - Drop `output` from JSON success and indeterminate responses when
   `skillResult` is present (see Finding 3). Keep `output` for legacy unframed
   skills and output-assertion failure diagnostics.

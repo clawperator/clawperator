@@ -26,9 +26,10 @@ migration-phase contract shape is stable.
 **Tasks:**
 
 1. Add `result?: SkillCheckpointEvidence | null` to the `SkillResult`
-   interface.
+   interface before `status`.
 2. Add `result: skillCheckpointEvidenceSchema.nullable().optional()` to the
-   emitted SkillResult Zod schema (`emittedSkillResultSchema`).
+   emitted SkillResult Zod schema (`emittedSkillResultSchema`) before
+   `status`.
 3. Add a `result-valid` mode to `emit_skill_result.js` that emits a
    `result` field shaped as `SkillCheckpointEvidence`, e.g.:
    ```js
@@ -51,6 +52,8 @@ migration-phase contract shape is stable.
 **Acceptance criteria:**
 
 - The runtime accepts `result` only when it matches `SkillCheckpointEvidence`.
+- The nested `SkillResult` contract and test fixtures put `result` before
+  `status`.
 - Invalid plain-object `result` payloads fail validation with a clear error.
 - Current framed fixtures without `result` still pass.
 - The tests describe the temporary optional state clearly enough that PR-C2 can
@@ -122,34 +125,39 @@ migration-phase contract shape is stable.
 
 **Tasks:**
 
-1. Document wrapper extraction order:
-   wrapper `status` and `code`, then `skillResult.status`, then
-   `skillResult.result`, then proof fields.
+1. Document trust order separately from field order: consumers branch on wrapper
+   `status` and `code` first, may inspect `skillResult.status` as child-authored
+   state, and read the domain answer from `skillResult.result`. Nested
+   `SkillResult` examples still put `result` first and `status` second for
+   scanability.
 2. Document `result` as optional only during migration.
-3. Document singular `result` for collection payloads.
-4. Document that `output` is absent from JSON success and indeterminate
+3. Document that nested `skillResult` objects should be authored and shown with
+   `result` first and `status` second.
+4. Document singular `result` for collection payloads.
+5. Document that `output` is absent from JSON success and indeterminate
    responses when `skillResult` is non-null. Document that it is present on
    assertion-failure and legacy unframed paths. Document that failure wrappers
    expose process streams as `stdout` and `stderr`.
-5. Document that `terminalVerification` is proof and `diagnostics` is debug
+6. Document that `terminalVerification` is proof and `diagnostics` is debug
    metadata. Neither is the primary answer channel.
-6. Document checkpoint presence semantics: existing skills may emit only reached
+7. Document checkpoint presence semantics: existing skills may emit only reached
    checkpoints, but new and migrated non-trivial skills should prefer the
    map/state-machine pattern with unreached steps marked `skipped`.
-7. Update examples that currently show framed SkillResult output without
+8. Update examples that currently show framed SkillResult output without
    `result` when those examples are meant to guide new authoring.
-8. In `apps/node/bundled-skills/clawperator-skill-author-by-recording/SKILL.md`,
+9. In `apps/node/bundled-skills/clawperator-skill-author-by-recording/SKILL.md`,
    add `skillResult.result` to the inspection list at the section that currently
    lists `skillResult.status`, `skillResult.source`, `skillResult.checkpoints`,
-   `skillResult.terminalVerification`, and `skillResult.diagnostics`. Add a note
-   that `result` is the canonical domain answer when present.
-9. In `apps/node/bundled-skills/clawperator-skill-author-by-agent-discovery/SKILL.md`,
+   `skillResult.terminalVerification`, and `skillResult.diagnostics`. Put
+   `skillResult.result` first in that list and note that it is the canonical
+   domain answer when present.
+10. In `apps/node/bundled-skills/clawperator-skill-author-by-agent-discovery/SKILL.md`,
    add equivalent guidance. If the skill does not have an explicit field list,
    add `skillResult.result` to the skill-result inspection step.
-10. Update the corresponding `agents/openai.yaml` files for both bundled skills
+11. Update the corresponding `agents/openai.yaml` files for both bundled skills
    if `default_prompt` or `short_description` reference skill-result inspection
    behavior.
-11. Rebuild docs through the normal docs build workflow.
+12. Rebuild docs through the normal docs build workflow.
 
 **Acceptance criteria:**
 
@@ -157,6 +165,8 @@ migration-phase contract shape is stable.
   `terminalVerification`, or checkpoint ids.
 - Public docs state that `output` is absent from JSON success responses when
   `skillResult` is non-null, and explain where it is kept and why.
+- Public docs and bundled authoring guidance show nested `SkillResult` examples
+  with `result` first and `status` second.
 - Recording compare docs still say the full `skills run` wrapper is the durable
   compare input and uses `skillResult.checkpoints` and
   `skillResult.terminalVerification` for compare logic. Do not change the
@@ -193,27 +203,29 @@ migration-phase contract shape is stable.
    as the seed proof from `tasks/skills/contract/before-and-after.md`; its
    scalar answer must move to `skillResult.result` as
    `{ kind: "text", text: "<signed dollar amount>" }`.
-2. For existing root `result` skills, wrap the payload as
+2. In every migrated framed SkillResult payload, emit `result` first and
+   `status` second.
+3. For existing root `result` skills, wrap the payload as
    `{ kind: "json", value: ... }`.
-3. For root `results` skills, rename to singular `result` and represent the
+4. For root `results` skills, rename to singular `result` and represent the
    collection as `{ kind: "json", value: { items: [...] } }`.
-4. Move primary answer data out of `diagnostics`, `terminalVerification`, and
+5. Move primary answer data out of `diagnostics`, `terminalVerification`, and
    checkpoint-only evidence into `result`.
-5. Keep checkpoints and terminal verification as proof of how the answer was
+6. Keep checkpoints and terminal verification as proof of how the answer was
    obtained.
-6. For non-trivial migrated skills, prefer map/state-machine checkpoints:
+7. For non-trivial migrated skills, prefer map/state-machine checkpoints:
    include the known checkpoint ids and mark unreached steps `skipped` instead
    of omitting expected path nodes.
-7. Use `result: null` only when the skill cannot truthfully report a domain
+8. Use `result: null` only when the skill cannot truthfully report a domain
    value or confirmed final state.
-8. Fix isolated quality issues called out by `findings.md` while touching the
+9. Fix isolated quality issues called out by `findings.md` while touching the
    affected skills, including conditional diagnostics in
    `set-discharge-to-limit-replay` if still useful and
    `set-my-list-state-replay` expected/observed duplication if still accurate
    after the result migration.
-9. Update parser tests and local examples to assert the canonical `result`
+10. Update parser tests and local examples to assert the canonical `result`
    shape.
-10. Regenerate generated indexes if any skill metadata changes:
+11. Regenerate generated indexes if any skill metadata changes:
 
    ```bash
    ./scripts/generate_skill_indexes.sh
@@ -222,6 +234,8 @@ migration-phase contract shape is stable.
 **Acceptance criteria:**
 
 - Every migrated framed skill emits a root `result` field in its SkillResult.
+- Every migrated framed skill emits nested fields in the agent-scannable order:
+  `result`, then `status`, then proof and diagnostics fields.
 - `com.globird.energy.get-yesterday-usage-cost-replay` is the first migrated
   skill and matches the expected shape in
   `tasks/skills/contract/before-and-after.md`.
@@ -278,14 +292,18 @@ migration-phase contract shape is stable.
 
 1. Change the TypeScript field to `result: SkillCheckpointEvidence | null`.
 2. Change the Zod schema to require `result`.
-3. Update tests and fixtures so framed SkillResult objects include `result`.
-4. Add a regression test proving missing `result` now fails validation.
-5. Keep `result: null` valid for failures or actions with no truthful domain
+3. Keep `result` before `status` in the TypeScript interface, Zod schema,
+   fixtures, and examples.
+4. Update tests and fixtures so framed SkillResult objects include `result`.
+5. Add a regression test proving missing `result` now fails validation.
+6. Keep `result: null` valid for failures or actions with no truthful domain
    value.
 
 **Acceptance criteria:**
 
 - Missing `result` is rejected for framed SkillResult objects.
+- Required-result fixtures preserve nested field order with `result` first and
+  `status` second.
 - `result: null` remains valid when semantically correct.
 - Existing wrapper behavior for legacy skills with no framed SkillResult remains
   explicit through `skillResult: null`.
@@ -310,16 +328,20 @@ migration-phase contract shape is stable.
    `output` is absent from framed success-like JSON responses, retained only
    for legacy unframed and assertion-failure diagnostics, and process streams
    are named `stdout` and `stderr` where exposed.
-4. Confirm checkpoint guidance is final: map/state-machine checkpoints are the
+4. Confirm nested SkillResult field ordering is final: `result`, then `status`,
+   then proof and diagnostics fields.
+5. Confirm checkpoint guidance is final: map/state-machine checkpoints are the
    preferred shape for new and migrated non-trivial skills.
-5. Build Node and run tests.
-6. Build public docs.
-7. Validate at least one migrated read skill and one migrated setter skill from
+6. Build Node and run tests.
+7. Build public docs.
+8. Validate at least one migrated read skill and one migrated setter skill from
    `~/src/clawperator-skills` with the branch-local Node CLI.
 
 **Acceptance criteria:**
 
 - Public docs describe required `skillResult.result`.
+- Public docs and examples put `result` first and `status` second inside nested
+  `SkillResult` objects.
 - Bundled skill authoring guidance matches the enforced schema.
 - Public docs do not describe `output`, `diagnostics`, checkpoints, or
   `terminalVerification` as primary answer channels.

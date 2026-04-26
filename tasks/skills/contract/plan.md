@@ -49,22 +49,27 @@ Collections still live in singular `result`, for example:
 ## Contract Decisions
 
 1. Wrapper consumers branch on wrapper `status` and `code` first.
-2. When `skillResult` is present, consumers read `skillResult.status` next.
+2. Inside `skillResult`, put `result` first and `status` second. Object member
+   order is not semantic for parsers, but it matters for humans and agents
+   scanning JSON under token pressure.
 3. The domain answer is `skillResult.result`.
-4. `terminalVerification` proves the answer or final state. It is not the
+4. Consumers may inspect `skillResult.status` after wrapper `status` and
+   `code`, but `skillResult.result` remains the first field inside the nested
+   object for discoverability.
+5. `terminalVerification` proves the answer or final state. It is not the
    answer channel.
-5. `checkpoints` explain progress and evidence. They are not the primary answer
+6. `checkpoints` explain progress and evidence. They are not the primary answer
    lookup path.
-6. `diagnostics` is for runtime health, warnings, hints, and debug detail only.
-7. Drop the `output` field from JSON success and indeterminate responses when
+7. `diagnostics` is for runtime health, warnings, hints, and debug detail only.
+8. Drop the `output` field from JSON success and indeterminate responses when
    `skillResult !== null`. Agents use `skillResult.result`. Progress text is
    available in pretty mode; it is pure token waste in JSON mode.
-8. Keep `output` for legacy unframed skills where `skillResult === null`.
+9. Keep `output` for legacy unframed skills where `skillResult === null`.
    Also keep `output` for `SKILL_OUTPUT_ASSERTION_FAILED`, where it shows what
    the skill printed when the assertion failed.
-9. Apply the same policy in `serve.ts` as in `skills.ts`. Both currently pass
+10. Apply the same policy in `serve.ts` as in `skills.ts`. Both currently pass
    `result.output` through independently and both need updating.
-10. New and migrated non-trivial skills should prefer map/state-machine
+11. New and migrated non-trivial skills should prefer map/state-machine
     checkpoints: include known checkpoint ids and mark unreached steps
     `skipped`.
 
@@ -101,6 +106,8 @@ Required outcomes:
 
 - `SkillResult` TypeScript and Zod schemas accept
   `result?: SkillCheckpointEvidence | null`.
+- `SkillResult` TypeScript and Zod definitions place `result` before `status`
+  so parsed and authored examples naturally lead with the answer.
 - Existing root `result` payloads that already match the evidence union survive
   runtime parsing.
 - Invalid root `result` payloads fail validation instead of disappearing.
@@ -155,6 +162,8 @@ Required outcomes:
 
 - Runtime TypeScript and Zod schemas require
   `result: SkillCheckpointEvidence | null`.
+- Runtime TypeScript and Zod definitions keep `result` as the first nested
+  `SkillResult` field and `status` as the second.
 - Framed SkillResult fixtures, tests, docs, and bundled skill guidance no longer
   describe missing `result` as acceptable for newly framed skills.
 - Compare, serve, and CLI docs continue to describe the wrapper object as the
@@ -236,6 +245,8 @@ multiple devices are connected.
 ## Definition Of Done
 
 - Every framed skill has one primary answer path: `skillResult.result`.
+- Nested `skillResult` JSON examples and emitted migrated skills put `result`
+  first and `status` second.
 - `result` is present on every newly authored or migrated framed SkillResult.
 - Missing `result` is accepted only during PR-C1 and PR-S1 migration work.
 - JSON success and indeterminate responses no longer include `output` when a
