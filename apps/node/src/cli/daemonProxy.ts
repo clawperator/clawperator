@@ -44,6 +44,7 @@ const DEFAULT_POST_TIMEOUT_MS = 35000;
 const POST_TIMEOUT_BUFFER_MS = 5000;
 
 type DaemonReadinessState = "ready" | "replace" | "not_ready" | "unowned";
+type DaemonStartAction = "ready" | "spawned" | "unowned" | "replace";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -249,43 +250,49 @@ async function ensureDaemonReady(
 
   const timeoutMs = options.startTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
-  const ready = await withDaemonLock(rawDeviceId, async () => {
+  const action = await withDaemonLock(rawDeviceId, async (): Promise<DaemonStartAction> => {
     try {
       const state = await getDaemonReadinessState(rawDeviceId, socketPath, options, deps);
       if (state === "ready") {
-        return true;
+        return "ready";
       }
       if (state === "unowned") {
-        return false;
+        return "unowned";
       }
       if (state === "replace") {
-        return false;
+        return "replace";
       }
     } catch {
       // The initial path above handles stale socket cleanup. Missing/not-ready sockets continue to spawn.
     }
 
     (deps.spawnDaemonRunFn ?? spawnDaemonRun)(rawDeviceId, effectiveOperatorPackage, options);
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() <= deadline) {
-      try {
-        if (await isDaemonAlive(socketPath, deps) && await isOwnedDaemon(rawDeviceId, options, deps)) {
-          const versionRaw = await httpGetFn(socketPath, "/version");
-          if (daemonVersionMatches(versionRaw)) {
-            return true;
-          }
-        }
-      } catch {
-        // Keep polling until the daemon is fully ready.
-      }
-      await delay(pollIntervalMs);
-    }
-    return false;
+    return "spawned";
   }, options);
 
-  if (ready) {
+  if (action === "ready") {
     return true;
   }
+  if (action === "unowned" || action === "replace") {
+    process.stderr.write(`[clawperator] daemon unavailable after ${timeoutMs}ms; running direct for this call\n`);
+    return false;
+  }
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() <= deadline) {
+    try {
+      if (await isDaemonAlive(socketPath, deps) && await isOwnedDaemon(rawDeviceId, options, deps)) {
+        const versionRaw = await httpGetFn(socketPath, "/version");
+        if (daemonVersionMatches(versionRaw)) {
+          return true;
+        }
+      }
+    } catch {
+      // Keep polling until the daemon is fully ready.
+    }
+    await delay(pollIntervalMs);
+  }
+
   process.stderr.write(`[clawperator] daemon unavailable after ${timeoutMs}ms; running direct for this call\n`);
   return false;
 }

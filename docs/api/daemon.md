@@ -83,7 +83,7 @@ Started:
   "ok": true,
   "daemon": {
     "status": "started",
-    "socketPath": "/Users/<local_user>/.clawperator/daemon-emulator-5554.sock"
+    "socketPath": "/Users/<local_user>/.clawperator/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
   }
 }
 ```
@@ -95,7 +95,7 @@ Already running:
   "ok": true,
   "daemon": {
     "status": "already_running",
-    "socketPath": "/Users/<local_user>/.clawperator/daemon-emulator-5554.sock"
+    "socketPath": "/Users/<local_user>/.clawperator/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
   }
 }
 ```
@@ -117,7 +117,7 @@ Running:
       "size": 12345
     },
     "uptimeSeconds": 4,
-    "socketPath": "/Users/<local_user>/.clawperator/daemon-emulator-5554.sock"
+    "socketPath": "/Users/<local_user>/.clawperator/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
   }
 }
 ```
@@ -129,7 +129,7 @@ Not running:
   "ok": true,
   "daemon": {
     "status": "not_running",
-    "socketPath": "/Users/<local_user>/.clawperator/daemon-emulator-5554.sock"
+    "socketPath": "/Users/<local_user>/.clawperator/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
   }
 }
 ```
@@ -143,7 +143,7 @@ Stopped:
   "ok": true,
   "daemon": {
     "status": "stopped",
-    "socketPath": "/Users/<local_user>/.clawperator/daemon-emulator-5554.sock"
+    "socketPath": "/Users/<local_user>/.clawperator/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
   }
 }
 ```
@@ -155,7 +155,7 @@ Stop when not running:
   "ok": true,
   "daemon": {
     "status": "not_running",
-    "socketPath": "/Users/<local_user>/.clawperator/daemon-emulator-5554.sock"
+    "socketPath": "/Users/<local_user>/.clawperator/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
   }
 }
 ```
@@ -281,7 +281,7 @@ Top-level daemon failures use the same CLI error shape as other Node-side failur
   "code": "DAEMON_START_FAILED",
   "message": "Daemon did not become ready within 3000ms.",
   "details": {
-    "socketPath": "/Users/<local_user>/.clawperator/daemon-emulator-5554.sock",
+    "socketPath": "/Users/<local_user>/.clawperator/daemon-id-ZW11bGF0b3ItNTU1NA.sock",
     "timeoutMs": 3000
   }
 }

@@ -1,5 +1,6 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -12,7 +13,7 @@ import {
   type DaemonHttpSuccess,
 } from "../../../cli/daemonProxy.js";
 import { formatRunExecutionResultForCli } from "../../../cli/output.js";
-import { getDaemonSocketPath } from "../../../domain/daemon/lifecycle.js";
+import { getDaemonLockPath, getDaemonSocketPath } from "../../../domain/daemon/lifecycle.js";
 import { DEFAULT_OPERATOR_PACKAGE } from "../../../domain/config/resolveOperatorPackage.js";
 import { getCliBuildIdentity, getCliVersion } from "../../../domain/version/compatibility.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
@@ -523,6 +524,38 @@ describe("tryDaemonExecution", () => {
     assert.equal(spawnCount, 1);
     assert.deepEqual(first, successResult);
     assert.deepEqual(second, successResult);
+  });
+
+  it("releases the lifecycle lock before polling spawned daemon readiness", async () => {
+    const baseDir = await makeBaseDir();
+    const lockPath = getDaemonLockPath(undefined, { baseDir });
+    let spawned = false;
+    let polledAfterSpawn = false;
+
+    const result = await tryDaemonExecution(execution, { baseDir, startTimeoutMs: 10, pollIntervalMs: 1 }, {
+      ...makeOwnedDaemonDeps(),
+      httpGetFn: async (_socketPath: string, path: string) => {
+        if (path === "/ping" && !spawned) {
+          const error = new Error("missing") as NodeJS.ErrnoException;
+          error.code = "ENOENT";
+          throw error;
+        }
+        if (path === "/ping") {
+          polledAfterSpawn = true;
+          assert.equal(existsSync(lockPath), false);
+          return JSON.stringify({ ok: true });
+        }
+        return JSON.stringify({ version: getCliVersion(), buildIdentity: getCliBuildIdentity() });
+      },
+      spawnDaemonRunFn: () => {
+        spawned = true;
+      },
+      httpPostFn: async (): Promise<DaemonHttpSuccess> => ({ ok: true, body: JSON.stringify(successResult) }),
+    });
+
+    assert.equal(spawned, true);
+    assert.equal(polledAfterSpawn, true);
+    assert.deepEqual(result, successResult);
   });
 
   it("formats proxied and direct results identically for the same fixture", () => {
