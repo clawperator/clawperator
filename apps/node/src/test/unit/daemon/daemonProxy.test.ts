@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { tryDaemonExecution, type DaemonHttpFailure, type DaemonHttpSuccess } from "../../../cli/daemonProxy.js";
+import { getDaemonPostTimeoutMs, tryDaemonExecution, type DaemonHttpFailure, type DaemonHttpSuccess } from "../../../cli/daemonProxy.js";
 import { formatRunExecutionResultForCli } from "../../../cli/output.js";
 import { getDaemonSocketPath } from "../../../domain/daemon/lifecycle.js";
 import { DEFAULT_OPERATOR_PACKAGE } from "../../../domain/config/resolveOperatorPackage.js";
@@ -66,6 +66,12 @@ afterEach(async () => {
 });
 
 describe("tryDaemonExecution", () => {
+  it("derives POST timeout from execution timeout plus buffer", () => {
+    assert.equal(getDaemonPostTimeoutMs({ execution: { timeoutMs: 30000 } }), 35000);
+    assert.equal(getDaemonPostTimeoutMs({ execution: { timeoutMs: 12000 } }), 17000);
+    assert.equal(getDaemonPostTimeoutMs({ execution: { timeoutMs: "30000" } }), 35000);
+  });
+
   it("returns null when CLAWPERATOR_NO_DAEMON=1 is set", async () => {
     originalNoDaemon = process.env.CLAWPERATOR_NO_DAEMON;
     process.env.CLAWPERATOR_NO_DAEMON = "1";

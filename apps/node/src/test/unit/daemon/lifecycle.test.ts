@@ -1,11 +1,12 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, statSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   getDaemonLogPath,
+  getDaemonDir,
   getDaemonPidPath,
   getDaemonSocketPath,
   isDaemonRunning,
@@ -53,6 +54,15 @@ describe("daemon lifecycle paths", () => {
     assert.equal(getDaemonSocketPath("192.168.1.1:5555", { baseDir }), join(baseDir, "daemon-192.168.1.1-5555.sock"));
     assert.equal(getDaemonPidPath("192.168.1.1:5555", { baseDir }), join(baseDir, "daemon-192.168.1.1-5555.pid"));
     assert.equal(getDaemonLogPath("192.168.1.1:5555", { baseDir }), join(baseDir, "daemon-192.168.1.1-5555.log"));
+  });
+
+  it("hardens an existing daemon directory to owner-only permissions", async () => {
+    const baseDir = await makeTempBaseDir();
+    const daemonDir = join(baseDir, "daemon-dir");
+    mkdirSync(daemonDir, { mode: 0o755 });
+
+    assert.equal(getDaemonDir({ baseDir: daemonDir }), daemonDir);
+    assert.equal(statSync(daemonDir).mode & 0o777, 0o700);
   });
 });
 

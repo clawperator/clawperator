@@ -37,6 +37,8 @@ export interface DaemonProxyDeps {
 
 const DEFAULT_START_TIMEOUT_MS = 3000;
 const DEFAULT_POLL_INTERVAL_MS = 100;
+const DEFAULT_POST_TIMEOUT_MS = 35000;
+const POST_TIMEOUT_BUFFER_MS = 5000;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -80,6 +82,7 @@ async function httpPost(socketPath: string, path: string, body: unknown): Promis
   let dispatched = false;
   try {
     const payload = JSON.stringify(body);
+    const timeoutMs = getDaemonPostTimeoutMs(body);
     const responseBody = await new Promise<string>((resolve, reject) => {
       let connected = false;
       let finished = false;
@@ -96,7 +99,7 @@ async function httpPost(socketPath: string, path: string, body: unknown): Promis
           "Content-Type": "application/json",
           "Content-Length": Buffer.byteLength(payload),
         },
-        timeout: 3000,
+        timeout: timeoutMs,
       }, (res) => {
         const chunks: Buffer[] = [];
         res.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -105,7 +108,7 @@ async function httpPost(socketPath: string, path: string, body: unknown): Promis
           resolve(raw);
         });
       });
-      req.on("timeout", () => req.destroy(new Error("Daemon POST timed out")));
+      req.on("timeout", () => req.destroy(new Error(`Daemon POST timed out after ${timeoutMs}ms`)));
       req.on("error", reject);
       req.on("socket", (socket) => {
         if (socket.connecting) {
@@ -128,6 +131,19 @@ async function httpPost(socketPath: string, path: string, body: unknown): Promis
   } catch (error) {
     return { ok: false, error, dispatched };
   }
+}
+
+export function getDaemonPostTimeoutMs(body: unknown): number {
+  const execution = typeof body === "object" && body !== null && "execution" in body
+    ? (body as { execution?: unknown }).execution
+    : undefined;
+  const timeoutMs = typeof execution === "object" && execution !== null && "timeoutMs" in execution
+    ? (execution as { timeoutMs?: unknown }).timeoutMs
+    : undefined;
+  if (typeof timeoutMs === "number" && Number.isFinite(timeoutMs) && timeoutMs > 0) {
+    return timeoutMs + POST_TIMEOUT_BUFFER_MS;
+  }
+  return DEFAULT_POST_TIMEOUT_MS;
 }
 
 async function isDaemonAlive(socketPath: string, deps: DaemonProxyDeps): Promise<boolean> {

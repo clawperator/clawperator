@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { closeSync, mkdirSync, openSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, closeSync, mkdirSync, openSync, readFileSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -81,6 +81,14 @@ export function sanitizeDaemonKey(rawDeviceId: string | undefined): string {
 export function getDaemonDir(options?: DaemonPathsOptions): string {
   const dir = options?.baseDir ?? join(homedir(), ".clawperator");
   mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const stats = statSync(dir);
+  if (!stats.isDirectory()) {
+    throw new Error(`${dir} is not a directory`);
+  }
+  const currentMode = stats.mode & 0o777;
+  if (currentMode !== 0o700) {
+    chmodSync(dir, 0o700);
+  }
   return dir;
 }
 
