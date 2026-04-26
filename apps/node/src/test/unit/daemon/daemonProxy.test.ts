@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { getDaemonPostTimeoutMs, tryDaemonExecution, type DaemonHttpFailure, type DaemonHttpSuccess } from "../../../cli/daemonProxy.js";
+import { getDaemonPostTimeoutMs, parseDaemonRunExecutionResult, tryDaemonExecution, type DaemonHttpFailure, type DaemonHttpSuccess } from "../../../cli/daemonProxy.js";
 import { formatRunExecutionResultForCli } from "../../../cli/output.js";
 import { getDaemonSocketPath } from "../../../domain/daemon/lifecycle.js";
 import { DEFAULT_OPERATOR_PACKAGE } from "../../../domain/config/resolveOperatorPackage.js";
@@ -95,6 +95,11 @@ describe("tryDaemonExecution", () => {
     assert.equal(result, null);
   });
 
+  it("rejects malformed daemon execution result shapes", () => {
+    assert.throws(() => parseDaemonRunExecutionResult(JSON.stringify({ ok: true })));
+    assert.throws(() => parseDaemonRunExecutionResult(JSON.stringify({ ok: false, error: { code: "X" } })));
+  });
+
   it("returns null when auto-start times out", async () => {
     const baseDir = await makeBaseDir();
     let spawned = false;
@@ -172,6 +177,35 @@ describe("tryDaemonExecution", () => {
           refusedPings += 1;
           const error = new Error("refused") as NodeJS.ErrnoException;
           error.code = "ECONNREFUSED";
+          throw error;
+        }
+        if (path === "/ping") return JSON.stringify({ ok: true });
+        return JSON.stringify({ version: getCliVersion() });
+      },
+      spawnDaemonRunFn: () => {
+        spawned = true;
+      },
+      httpPostFn: async (): Promise<DaemonHttpSuccess> => ({ ok: true, body: JSON.stringify(successResult) }),
+    });
+
+    await assert.rejects(stat(socketPath));
+    assert.equal(spawned, true);
+    assert.deepEqual(result, successResult);
+  });
+
+  it("deletes a stale non-socket path and restarts on ENOTSOCK", async () => {
+    const baseDir = await makeBaseDir();
+    const socketPath = getDaemonSocketPath("not-sock", { baseDir });
+    await writeFile(socketPath, "", "utf8");
+    let rejectedPings = 0;
+    let spawned = false;
+
+    const result = await tryDaemonExecution(execution, { rawDeviceId: "not-sock", baseDir, startTimeoutMs: 5, pollIntervalMs: 1 }, {
+      httpGetFn: async (_socketPath, path) => {
+        if (path === "/ping" && rejectedPings < 2) {
+          rejectedPings += 1;
+          const error = new Error("not a socket") as NodeJS.ErrnoException;
+          error.code = "ENOTSOCK";
           throw error;
         }
         if (path === "/ping") return JSON.stringify({ ok: true });

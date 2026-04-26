@@ -16,6 +16,7 @@ import type { OutputOptions } from "../output.js";
 import { formatError, formatRunExecutionResultForCli } from "../output.js";
 import type { Logger } from "../../adapters/logger.js";
 import { tryDaemonExecution } from "../daemonProxy.js";
+import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 
 interface ActionCommandOptions {
   format: OutputOptions["format"];
@@ -28,17 +29,19 @@ interface ActionCommandOptions {
 }
 
 async function runActionExecution(execution: Execution, options: ActionCommandOptions): Promise<string> {
+  const validatedExecution = validateExecution(execution);
+  validatePayloadSize(JSON.stringify(validatedExecution));
   const tryDaemonExecutionFn = options.tryDaemonExecutionFn ?? tryDaemonExecution;
   const runExecutionFn = options.runExecutionFn ?? runExecution;
   const proxyResult = options.noDaemon === true
     ? null
-    : await tryDaemonExecutionFn(execution, {
+    : await tryDaemonExecutionFn(validatedExecution, {
       rawDeviceId: options.deviceId,
       operatorPackage: options.operatorPackage,
       noDaemon: options.noDaemon,
       allowPostDispatchFallback: false,
     });
-  const result = proxyResult ?? await runExecutionFn(execution, {
+  const result = proxyResult ?? await runExecutionFn(validatedExecution, {
     deviceId: options.deviceId,
     operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
     warn: message => process.stderr.write(message),

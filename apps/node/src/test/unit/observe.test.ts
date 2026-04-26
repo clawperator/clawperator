@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import { buildSnapshotExecution } from "../../domain/observe/snapshot.js";
 import { buildScreenshotExecution } from "../../domain/observe/screenshot.js";
+import { cmdObserveSnapshot } from "../../cli/commands/observe.js";
 import { buildWaitExecution } from "../../domain/actions/wait.js";
 import { attachSnapshotsToStepResults, runExecution } from "../../domain/executions/runExecution.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -60,6 +61,13 @@ describe("observe executions", () => {
     const result = await runExecution(buildSnapshotExecution(), { timeoutMs: Number.NaN });
     assert.ok(!result.ok);
     assert.strictEqual(result.error.code, ERROR_CODES.EXECUTION_VALIDATION_FAILED);
+  });
+
+  it("validates invalid snapshot timeout before daemon proxy startup", async () => {
+    const output = await cmdObserveSnapshot({ format: "json", timeoutMs: Number.NaN });
+    const payload = JSON.parse(output) as { code?: string };
+
+    assert.strictEqual(payload.code, ERROR_CODES.EXECUTION_VALIDATION_FAILED);
   });
 
   it("emits the resolved execution metadata when timeout overrides are applied", async () => {

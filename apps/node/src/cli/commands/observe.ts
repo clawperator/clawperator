@@ -5,6 +5,7 @@ import type { OutputOptions } from "../output.js";
 import { formatError, formatRunExecutionResultForCli } from "../output.js";
 import type { Logger } from "../../adapters/logger.js";
 import { tryDaemonExecution } from "../daemonProxy.js";
+import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 
 export async function cmdObserveSnapshot(options: {
   format: OutputOptions["format"];
@@ -15,7 +16,8 @@ export async function cmdObserveSnapshot(options: {
   logger?: Logger;
 }): Promise<string> {
   try {
-    const execution = buildSnapshotExecution({ timeoutMs: options.timeoutMs });
+    const execution = validateExecution(buildSnapshotExecution({ timeoutMs: options.timeoutMs }));
+    validatePayloadSize(JSON.stringify(execution));
     const proxyResult = await tryDaemonExecution(execution, {
       rawDeviceId: options.deviceId,
       operatorPackage: options.operatorPackage,
@@ -45,10 +47,11 @@ export async function cmdObserveScreenshot(options: {
   logger?: Logger;
 }): Promise<string> {
   try {
-    const execution = buildScreenshotExecution({
+    const execution = validateExecution(buildScreenshotExecution({
       timeoutMs: options.timeoutMs,
       path: options.path,
-    });
+    }));
+    validatePayloadSize(JSON.stringify(execution));
     const proxyResult = await tryDaemonExecution(execution, {
       rawDeviceId: options.deviceId,
       operatorPackage: options.operatorPackage,

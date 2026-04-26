@@ -2,6 +2,7 @@ import http from "node:http";
 import { rm } from "node:fs/promises";
 import { ERROR_CODES } from "../contracts/errors.js";
 import type { RunExecutionResult } from "../domain/executions/runExecution.js";
+import type { ResultEnvelope } from "../contracts/result.js";
 import { resolveOperatorPackageForRequest } from "../domain/config/resolveOperatorPackage.js";
 import { getDaemonSocketPath, spawnDaemonRun, stopDaemon, withDaemonLock } from "../domain/daemon/lifecycle.js";
 import { getCliVersion } from "../domain/version/compatibility.js";
@@ -181,12 +182,13 @@ async function ensureDaemonReady(
     await (deps.stopDaemonFn ?? stopDaemon)(rawDeviceId, options);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
-    if (code === "ECONNREFUSED") {
+    if (code === "ECONNREFUSED" || code === "ENOTSOCK") {
       await withDaemonLock(rawDeviceId, async () => {
         try {
           await httpGetFn(socketPath, "/ping");
         } catch (recheckError) {
-          if ((recheckError as NodeJS.ErrnoException).code === "ECONNREFUSED") {
+          const recheckCode = (recheckError as NodeJS.ErrnoException).code;
+          if (recheckCode === "ECONNREFUSED" || recheckCode === "ENOTSOCK") {
             await rm(socketPath, { force: true });
           }
         }
@@ -227,6 +229,42 @@ function proxyLostResult(error: unknown): RunExecutionResult {
   };
 }
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isResultEnvelope(value: unknown): value is ResultEnvelope {
+  return isObject(value)
+    && typeof value.commandId === "string"
+    && typeof value.taskId === "string"
+    && (value.status === "success" || value.status === "failed")
+    && Array.isArray(value.stepResults);
+}
+
+export function parseDaemonRunExecutionResult(raw: string): RunExecutionResult {
+  const parsed = JSON.parse(raw) as unknown;
+  if (!isObject(parsed) || typeof parsed.ok !== "boolean") {
+    throw new Error("Daemon returned an invalid execution result");
+  }
+  if (parsed.ok === true) {
+    if (
+      typeof parsed.deviceId !== "string" ||
+      parsed.terminalSource !== "clawperator_result" ||
+      !isResultEnvelope(parsed.envelope)
+    ) {
+      throw new Error("Daemon returned an invalid successful execution result");
+    }
+    return parsed as RunExecutionResult;
+  }
+  if (!isObject(parsed.error) || typeof parsed.error.code !== "string" || typeof parsed.error.message !== "string") {
+    throw new Error("Daemon returned an invalid failed execution result");
+  }
+  if (parsed.deviceId !== undefined && typeof parsed.deviceId !== "string") {
+    throw new Error("Daemon returned an invalid failed execution device id");
+  }
+  return parsed as RunExecutionResult;
+}
+
 export async function tryDaemonExecution(
   execution: unknown,
   options: DaemonProxyOptions,
@@ -261,7 +299,7 @@ export async function tryDaemonExecution(
       return proxyLostResult(postResult.error);
     }
     try {
-      return JSON.parse(postResult.body) as RunExecutionResult;
+      return parseDaemonRunExecutionResult(postResult.body);
     } catch (error) {
       if (options.allowPostDispatchFallback === true) {
         return null;
