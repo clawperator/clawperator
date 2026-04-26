@@ -163,3 +163,43 @@ These skill timings include app launch, navigation, live app state, and parsing
 work. On this run, daemon proxying materially improved repeated bare snapshot
 latency, while the two full replay skills were dominated by app workflow time and
 landed within noise once measured on the same branch-local build.
+
+### Investigation Notes
+
+The daemon was verified as running during daemon-mode measurements. The measured
+daemon-mode runs reported `daemon status == running` before and after each timed
+command, and the daily Clawperator log contained matching daemon socket requests:
+`GET /ping`, `GET /version`, and `POST /execute`. No-daemon runs reported
+`daemon status == not_running` before and after each timed command.
+
+The local branch build was used. `skills run` resolved `CLAWPERATOR_BIN` to the
+branch-local command:
+
+```text
+node /Users/<local_user>/src/clawperator/apps/node/dist/cli/index.js
+```
+
+The limited skill-level improvement is expected for these two replay skills:
+
+- `com.solaxcloud.starter.get-battery` makes one inner `exec` call for the whole
+  workflow and includes fixed sleeps of 1500ms plus 12000ms.
+- `com.google.android.apps.chromecast.app.get-climate-replay` makes one inner
+  `exec` call for the whole workflow and includes fixed sleeps totaling 13000ms.
+- `skills run` also performs wrapper-side target resolution, APK presence, and
+  interactivity checks before the skill script starts. The daemon does not remove
+  that wrapper preflight.
+
+Additional isolated timings confirmed the shape:
+
+| Probe | No-daemon median | Daemon median | Notes |
+| --- | --- | --- | --- |
+| SolaX inner `exec` payload only | 17286ms | 20445ms | One monolithic execution with fixed app waits; app-state variance dominated |
+| SolaX `skills run --skip-validate` | 21128ms | 17225ms | Skips registry validation, but still includes wrapper preflight and the same single inner `exec` |
+
+The earlier `Skill Timing Comparison` table compared global `clawperator` v0.7.7
+against branch-local v0.7.8. That was not an isolated daemon-versus-direct test:
+it also included the Node-side snapshot I/O cleanup and version/build changes.
+The isolated same-build v0.7.9 daemon-versus-direct measurements above show the
+daemon proxy is effective for repeated bare observations, but these specific
+replay skills do not contain enough separate CLI subprocess calls for daemon
+warm state to dominate the total runtime.
