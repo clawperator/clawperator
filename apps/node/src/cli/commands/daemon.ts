@@ -8,6 +8,7 @@ import { startServer } from "./serve.js";
 import {
   cleanupDaemonFiles,
   getDaemonSocketPath,
+  isDaemonRunning,
   readDaemonPidMetadata,
   spawnDaemonRun,
   stopDaemon,
@@ -95,15 +96,24 @@ async function readDaemonVersion(socketPath: string): Promise<string> {
   return typeof response.version === "string" ? response.version : "unknown";
 }
 
-async function waitForSocket(socketPath: string, timeoutMs: number, intervalMs: number): Promise<boolean> {
+async function waitForOwnedDaemon(
+  socketPath: string,
+  options: DaemonCommandOptions,
+  timeoutMs: number,
+  intervalMs: number
+): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() <= deadline) {
-    if (await isSocketAlive(socketPath)) {
+    if (await isSocketAlive(socketPath) && await isDaemonRunning(options.deviceId, options)) {
       return true;
     }
     await delay(intervalMs);
   }
   return false;
+}
+
+async function isOwnedDaemonAlive(socketPath: string, options: DaemonCommandOptions): Promise<boolean> {
+  return await isSocketAlive(socketPath) && await isDaemonRunning(options.deviceId, options);
 }
 
 function daemonSuccess<T>(data: T, options: { format: OutputOptions["format"] }): string {
@@ -170,7 +180,14 @@ export async function cmdDaemonStart(options: DaemonCommandOptions): Promise<str
   const socketPath = getDaemonSocketPath(options.deviceId, options);
   const initialState = await getSocketState(socketPath);
   if (initialState === "alive") {
-    return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
+    if (await isDaemonRunning(options.deviceId, options)) {
+      return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
+    }
+    return formatError({
+      code: ERROR_CODES.DAEMON_START_FAILED,
+      message: "Daemon socket is responding but is not owned by a managed Clawperator daemon.",
+      details: { socketPath },
+    }, { format: options.format });
   }
 
   try {
@@ -183,13 +200,20 @@ export async function cmdDaemonStart(options: DaemonCommandOptions): Promise<str
         }
         return refreshedState;
       }, options);
-      if (lockedState === "alive") {
+      if (lockedState === "alive" && await isDaemonRunning(options.deviceId, options)) {
         return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
+      }
+      if (lockedState === "alive") {
+        return formatError({
+          code: ERROR_CODES.DAEMON_START_FAILED,
+          message: "Daemon socket is responding but is not owned by a managed Clawperator daemon.",
+          details: { socketPath },
+        }, { format: options.format });
       }
       if (lockedState === "not_ready") {
         const timeoutMs = options.pollTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
         const intervalMs = options.pollIntervalMs ?? DEFAULT_START_POLL_INTERVAL_MS;
-        if (await waitForSocket(socketPath, timeoutMs, intervalMs)) {
+        if (await waitForOwnedDaemon(socketPath, options, timeoutMs, intervalMs)) {
           return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
         }
         return formatError({
@@ -201,7 +225,7 @@ export async function cmdDaemonStart(options: DaemonCommandOptions): Promise<str
     } else if (initialState === "not_ready") {
       const timeoutMs = options.pollTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
       const intervalMs = options.pollIntervalMs ?? DEFAULT_START_POLL_INTERVAL_MS;
-      if (await waitForSocket(socketPath, timeoutMs, intervalMs)) {
+      if (await waitForOwnedDaemon(socketPath, options, timeoutMs, intervalMs)) {
         return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
       }
       return formatError({
@@ -223,7 +247,7 @@ export async function cmdDaemonStart(options: DaemonCommandOptions): Promise<str
 
   const timeoutMs = options.pollTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
   const intervalMs = options.pollIntervalMs ?? DEFAULT_START_POLL_INTERVAL_MS;
-  if (await waitForSocket(socketPath, timeoutMs, intervalMs)) {
+  if (await waitForOwnedDaemon(socketPath, options, timeoutMs, intervalMs)) {
     return daemonSuccess({ ok: true, daemon: { status: "started", socketPath } }, options);
   }
 
@@ -250,7 +274,7 @@ export async function cmdDaemonStop(options: DaemonCommandOptions): Promise<stri
 
 export async function cmdDaemonStatus(options: DaemonCommandOptions): Promise<string> {
   const socketPath = getDaemonSocketPath(options.deviceId, options);
-  if (!(await isSocketAlive(socketPath))) {
+  if (!(await isOwnedDaemonAlive(socketPath, options))) {
     return daemonSuccess({ ok: true, daemon: { status: "not_running", socketPath } }, options);
   }
 

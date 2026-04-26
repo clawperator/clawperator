@@ -2,6 +2,7 @@ import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer as createHttpServer, type Server as HttpServer } from "node:http";
 import { createServer, type Server, type Socket } from "node:net";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -26,6 +27,7 @@ import { shouldCliStdoutForceExitCode1 } from "../../../cli/stdoutExitCode.js";
 
 const tempDirs: string[] = [];
 const servers: Server[] = [];
+const httpServers: HttpServer[] = [];
 const sockets: Socket[] = [];
 
 async function makeTempBaseDir(): Promise<string> {
@@ -43,6 +45,7 @@ afterEach(async () => {
     socket.destroy();
   }
   await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve) => server.close(() => resolve()))));
+  await Promise.all(httpServers.splice(0).map((server) => new Promise<void>((resolve) => server.close(() => resolve()))));
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
@@ -198,6 +201,67 @@ describe("daemon command output", () => {
     assert.equal(parsed.daemon?.status, "not_running");
   });
 
+  it("status does not report running for a responding socket without daemon metadata", async () => {
+    const baseDir = await makeTempBaseDir();
+    const socketPath = getDaemonSocketPath(undefined, { baseDir });
+    const server = createHttpServer((req, res) => {
+      if (req.url === "/ping") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(socketPath, resolve);
+    });
+    httpServers.push(server);
+
+    const raw = await cmdDaemonStatus({ format: "json", baseDir });
+    const parsed = JSON.parse(raw) as { ok?: boolean; daemon?: { status?: string; pid?: unknown } };
+
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.daemon?.status, "not_running");
+    assert.equal("pid" in (parsed.daemon ?? {}), false);
+  });
+
+  it("status does not report running when PID metadata belongs to a non-daemon process", async () => {
+    const baseDir = await makeTempBaseDir();
+    const socketPath = getDaemonSocketPath(undefined, { baseDir });
+    await writePidMetadata(baseDir, 9876, 100);
+    const server = createHttpServer((req, res) => {
+      if (req.url === "/ping") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(socketPath, resolve);
+    });
+    httpServers.push(server);
+
+    const raw = await cmdDaemonStatus({
+      format: "json",
+      baseDir,
+      processController: {
+        isAlive: () => true,
+        isDaemonProcess: () => false,
+        kill: () => undefined,
+      },
+    });
+    const parsed = JSON.parse(raw) as { ok?: boolean; daemon?: { status?: string; pid?: unknown } };
+
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.daemon?.status, "not_running");
+    assert.equal("pid" in (parsed.daemon ?? {}), false);
+  });
+
   it("start timeout returns DAEMON_START_FAILED and forces exit code 1", async () => {
     const baseDir = await makeTempBaseDir();
     const raw = await cmdDaemonStart({
@@ -209,6 +273,39 @@ describe("daemon command output", () => {
     });
     const parsed = JSON.parse(raw) as { code?: string };
 
+    assert.equal(parsed.code, ERROR_CODES.DAEMON_START_FAILED);
+    assert.equal(shouldCliStdoutForceExitCode1(raw, false), true);
+  });
+
+  it("start does not claim already running for a responding unmanaged socket", async () => {
+    const baseDir = await makeTempBaseDir();
+    const socketPath = getDaemonSocketPath(undefined, { baseDir });
+    const server = createHttpServer((req, res) => {
+      if (req.url === "/ping") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(socketPath, resolve);
+    });
+    httpServers.push(server);
+    let spawned = false;
+
+    const raw = await cmdDaemonStart({
+      format: "json",
+      baseDir,
+      spawnDaemonRunImpl: () => {
+        spawned = true;
+      },
+    });
+    const parsed = JSON.parse(raw) as { code?: string };
+
+    assert.equal(spawned, false);
     assert.equal(parsed.code, ERROR_CODES.DAEMON_START_FAILED);
     assert.equal(shouldCliStdoutForceExitCode1(raw, false), true);
   });
