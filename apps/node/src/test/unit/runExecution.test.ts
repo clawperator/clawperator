@@ -9,6 +9,7 @@ import {
   buildTimeoutError,
   finalizeSuccessfulCloseAppSteps,
   finalizeSuccessfulScreenshotCapture,
+  getReadinessInvalidationErrorCodes,
   injectServiceUnavailableHint,
   markExtractionFailedSnapshotSteps,
   reconcileEnvelopeStatusAfterPostProcessing,
@@ -364,6 +365,29 @@ describe("reconcileEnvelopeStatusAfterPostProcessing", () => {
     reconcileEnvelopeStatusAfterPostProcessing(envelope);
     assert.strictEqual(envelope.status, "failed");
     assert.strictEqual(envelope.error, "Accessibility service is not available");
+  });
+});
+
+describe("getReadinessInvalidationErrorCodes", () => {
+  it("includes top-level and failed step error codes", () => {
+    const envelope: ResultEnvelope = {
+      commandId: "cmd-step-failure",
+      taskId: "task-step-failure",
+      status: "failed",
+      errorCode: "SERVICE_UNAVAILABLE",
+      stepResults: [
+        { id: "a1", actionType: "click", success: false, data: { error: ERROR_CODES.DEVICE_ACCESSIBILITY_NOT_RUNNING } },
+        { id: "a2", actionType: "snapshot_ui", success: true, data: {} },
+        { id: "a3", actionType: "read_text", success: false, data: { error: "TARGET_NOT_FOUND" } },
+      ],
+      error: "failed",
+    };
+
+    assert.deepStrictEqual(getReadinessInvalidationErrorCodes(envelope), [
+      "SERVICE_UNAVAILABLE",
+      ERROR_CODES.DEVICE_ACCESSIBILITY_NOT_RUNNING,
+      "TARGET_NOT_FOUND",
+    ]);
   });
 });
 

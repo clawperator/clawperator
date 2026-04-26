@@ -12,6 +12,8 @@ export interface DaemonPathsOptions {
   terminationTimeoutMs?: number;
   terminationPollIntervalMs?: number;
   cliEntryPath?: string;
+  lockTimeoutMs?: number;
+  lockPollIntervalMs?: number;
 }
 
 export interface DaemonMetadata {
@@ -21,6 +23,8 @@ export interface DaemonMetadata {
 
 const DEFAULT_TERMINATION_TIMEOUT_MS = 2000;
 const DEFAULT_TERMINATION_POLL_INTERVAL_MS = 100;
+const DEFAULT_LOCK_TIMEOUT_MS = 3000;
+const DEFAULT_LOCK_POLL_INTERVAL_MS = 25;
 
 function getProcessController(options?: DaemonPathsOptions): NonNullable<DaemonPathsOptions["processController"]> {
   return options?.processController ?? {
@@ -70,6 +74,10 @@ function removeDaemonFiles(rawDeviceId: string | undefined, options?: DaemonPath
   rmSync(getDaemonSocketPath(rawDeviceId, options), { force: true });
 }
 
+function metadataMatches(left: DaemonMetadata | undefined, right: DaemonMetadata): boolean {
+  return left?.pid === right.pid && left.startedAt === right.startedAt;
+}
+
 export function sanitizeDaemonKey(rawDeviceId: string | undefined): string {
   if (rawDeviceId === undefined || rawDeviceId.trim().length === 0) {
     return "default";
@@ -104,6 +112,40 @@ export function getDaemonLogPath(rawDeviceId: string | undefined, options?: Daem
   return join(getDaemonDir(options), `daemon-${sanitizeDaemonKey(rawDeviceId)}.log`);
 }
 
+export function getDaemonLockPath(rawDeviceId: string | undefined, options?: DaemonPathsOptions): string {
+  return join(getDaemonDir(options), `daemon-${sanitizeDaemonKey(rawDeviceId)}.lock`);
+}
+
+export async function withDaemonLock<T>(
+  rawDeviceId: string | undefined,
+  fn: () => Promise<T> | T,
+  options?: DaemonPathsOptions
+): Promise<T> {
+  const lockPath = getDaemonLockPath(rawDeviceId, options);
+  const timeoutMs = options?.lockTimeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS;
+  const pollIntervalMs = options?.lockPollIntervalMs ?? DEFAULT_LOCK_POLL_INTERVAL_MS;
+  const deadline = Date.now() + timeoutMs;
+  let fd: number | undefined;
+  while (fd === undefined) {
+    try {
+      fd = openSync(lockPath, "wx", 0o600);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "EEXIST" || Date.now() >= deadline) {
+        throw error;
+      }
+      await delay(pollIntervalMs);
+    }
+  }
+
+  try {
+    return await fn();
+  } finally {
+    closeSync(fd);
+    rmSync(lockPath, { force: true });
+  }
+}
+
 export async function isDaemonRunning(rawDeviceId: string | undefined, options?: DaemonPathsOptions): Promise<boolean> {
   const metadata = readDaemonMetadata(getDaemonPidPath(rawDeviceId, options));
   if (!metadata) {
@@ -116,31 +158,40 @@ export async function stopDaemon(
   rawDeviceId: string | undefined,
   options?: DaemonPathsOptions
 ): Promise<"stopped" | "not_running"> {
-  const pidPath = getDaemonPidPath(rawDeviceId, options);
-  const metadata = readDaemonMetadata(pidPath);
-  if (!metadata) {
-    return "not_running";
-  }
-
-  const controller = getProcessController(options);
-  if (!controller.isAlive(metadata.pid)) {
-    removeDaemonFiles(rawDeviceId, options);
-    return "not_running";
-  }
-
-  controller.kill(metadata.pid, "SIGTERM");
-  const timeoutMs = options?.terminationTimeoutMs ?? DEFAULT_TERMINATION_TIMEOUT_MS;
-  const pollIntervalMs = options?.terminationPollIntervalMs ?? DEFAULT_TERMINATION_POLL_INTERVAL_MS;
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (!controller.isAlive(metadata.pid)) {
-      removeDaemonFiles(rawDeviceId, options);
-      return "stopped";
+  return await withDaemonLock(rawDeviceId, async () => {
+    const pidPath = getDaemonPidPath(rawDeviceId, options);
+    const metadata = readDaemonMetadata(pidPath);
+    if (!metadata) {
+      return "not_running";
     }
-    await delay(pollIntervalMs);
-  }
 
-  throw new Error(`Daemon process ${metadata.pid} did not exit within ${timeoutMs}ms`);
+    const controller = getProcessController(options);
+    if (!controller.isAlive(metadata.pid)) {
+      if (metadataMatches(readDaemonMetadata(pidPath), metadata)) {
+        removeDaemonFiles(rawDeviceId, options);
+      }
+      return "not_running";
+    }
+
+    if (!metadataMatches(readDaemonMetadata(pidPath), metadata)) {
+      return "not_running";
+    }
+    controller.kill(metadata.pid, "SIGTERM");
+    const timeoutMs = options?.terminationTimeoutMs ?? DEFAULT_TERMINATION_TIMEOUT_MS;
+    const pollIntervalMs = options?.terminationPollIntervalMs ?? DEFAULT_TERMINATION_POLL_INTERVAL_MS;
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (!controller.isAlive(metadata.pid)) {
+        if (metadataMatches(readDaemonMetadata(pidPath), metadata)) {
+          removeDaemonFiles(rawDeviceId, options);
+        }
+        return "stopped";
+      }
+      await delay(pollIntervalMs);
+    }
+
+    throw new Error(`Daemon process ${metadata.pid} did not exit within ${timeoutMs}ms`);
+  }, options);
 }
 
 export function spawnDaemonRun(

@@ -163,13 +163,13 @@ describe("tryDaemonExecution", () => {
     const baseDir = await makeBaseDir();
     const socketPath = getDaemonSocketPath("stale", { baseDir });
     await writeFile(socketPath, "", "utf8");
-    let firstPing = true;
+    let refusedPings = 0;
     let spawned = false;
 
     const result = await tryDaemonExecution(execution, { rawDeviceId: "stale", baseDir, startTimeoutMs: 5, pollIntervalMs: 1 }, {
       httpGetFn: async (_socketPath, path) => {
-        if (firstPing && path === "/ping") {
-          firstPing = false;
+        if (path === "/ping" && refusedPings < 2) {
+          refusedPings += 1;
           const error = new Error("refused") as NodeJS.ErrnoException;
           error.code = "ECONNREFUSED";
           throw error;

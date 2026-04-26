@@ -12,6 +12,7 @@ import {
   spawnDaemonRun,
   stopDaemon,
   type DaemonPathsOptions,
+  withDaemonLock,
   writeDaemonPidMetadata,
 } from "../../domain/daemon/lifecycle.js";
 
@@ -144,15 +145,17 @@ export async function cmdDaemonRun(options: DaemonRunOptions): Promise<void> {
   process.once("SIGINT", () => cleanupAndExit(0));
 
   try {
-    const startServerImpl = options.startServerImpl ?? startServer;
-    server = await startServerImpl({
-      socketPath,
-      operatorPackage: options.operatorPackage,
-      verbose: options.verbose ?? false,
-      logger: options.logger,
-    });
-    writeDaemonPidMetadata(options.deviceId, { pid: process.pid, startedAt: Date.now() }, options);
-    ownsDaemonFiles = true;
+    await withDaemonLock(options.deviceId, async () => {
+      const startServerImpl = options.startServerImpl ?? startServer;
+      server = await startServerImpl({
+        socketPath,
+        operatorPackage: options.operatorPackage,
+        verbose: options.verbose ?? false,
+        logger: options.logger,
+      });
+      writeDaemonPidMetadata(options.deviceId, { pid: process.pid, startedAt: Date.now() }, options);
+      ownsDaemonFiles = true;
+    }, options);
   } catch (error) {
     if (ownsDaemonFiles) {
       cleanupDaemonFiles(options.deviceId, options);
@@ -172,7 +175,29 @@ export async function cmdDaemonStart(options: DaemonCommandOptions): Promise<str
 
   try {
     if (initialState === "stale") {
-      rmSync(socketPath, { force: true });
+      const lockedState = await withDaemonLock(options.deviceId, async () => {
+        const refreshedState = await getSocketState(socketPath);
+        if (refreshedState === "stale") {
+          rmSync(socketPath, { force: true });
+          return "missing" as const;
+        }
+        return refreshedState;
+      }, options);
+      if (lockedState === "alive") {
+        return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
+      }
+      if (lockedState === "not_ready") {
+        const timeoutMs = options.pollTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
+        const intervalMs = options.pollIntervalMs ?? DEFAULT_START_POLL_INTERVAL_MS;
+        if (await waitForSocket(socketPath, timeoutMs, intervalMs)) {
+          return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
+        }
+        return formatError({
+          code: ERROR_CODES.DAEMON_START_FAILED,
+          message: `Daemon socket exists but did not become ready within ${timeoutMs}ms.`,
+          details: { socketPath, timeoutMs },
+        }, { format: options.format });
+      }
     } else if (initialState === "not_ready") {
       const timeoutMs = options.pollTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
       const intervalMs = options.pollIntervalMs ?? DEFAULT_START_POLL_INTERVAL_MS;

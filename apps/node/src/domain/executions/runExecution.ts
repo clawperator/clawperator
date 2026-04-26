@@ -223,6 +223,17 @@ export function reconcileEnvelopeStatusAfterPostProcessing(envelope: ResultEnvel
   }
 }
 
+export function getReadinessInvalidationErrorCodes(envelope: ResultEnvelope): string[] {
+  const codes = envelope.stepResults
+    .filter(step => !step.success)
+    .map(step => step.data?.error)
+    .filter((code): code is string => code !== undefined && code.length > 0);
+  if (typeof envelope.errorCode === "string" && envelope.errorCode.length > 0) {
+    codes.unshift(envelope.errorCode);
+  }
+  return codes;
+}
+
 export interface TimeoutErrorDetails {
   commandId?: string;
   taskId?: string;
@@ -720,7 +731,9 @@ async function performExecution(
       reconcileEnvelopeStatusAfterPostProcessing(result.envelope);
       injectServiceUnavailableHint(result.envelope, deviceId);
       if (result.envelope.status === "failed") {
-        invalidateReadinessCacheForErrorCode(deviceId, config.operatorPackage, result.envelope.errorCode);
+        for (const errorCode of getReadinessInvalidationErrorCodes(result.envelope)) {
+          invalidateReadinessCacheForErrorCode(deviceId, config.operatorPackage, errorCode);
+        }
       }
 
       emitResult(deviceId, result.envelope);

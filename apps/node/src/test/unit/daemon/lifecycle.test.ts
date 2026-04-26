@@ -1,6 +1,6 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type Server, type Socket } from "node:net";
 import { join } from "node:path";
@@ -124,6 +124,29 @@ describe("daemon process state", () => {
     assert.equal(await stopDaemon(undefined, options), "stopped");
     assert.equal(signal, "SIGTERM");
     assert.equal(await isDaemonRunning(undefined, options), false);
+  });
+
+  it("stopDaemon preserves files when PID metadata changes before cleanup", async () => {
+    const baseDir = await makeTempBaseDir();
+    await writePidMetadata(baseDir, 9876, 100);
+    await writeFile(getDaemonSocketPath(undefined, { baseDir }), "replacement socket", "utf8");
+    let alive = true;
+    const options: DaemonPathsOptions = {
+      baseDir,
+      terminationTimeoutMs: 20,
+      terminationPollIntervalMs: 1,
+      processController: {
+        isAlive: () => alive,
+        kill: () => {
+          alive = false;
+          writeFileSync(getDaemonPidPath(undefined, { baseDir }), `${JSON.stringify({ pid: 1234, startedAt: 200 })}\n`, "utf8");
+        },
+      },
+    };
+
+    assert.equal(await stopDaemon(undefined, options), "stopped");
+    assert.equal(readFileSync(getDaemonPidPath(undefined, { baseDir }), "utf8").includes("\"pid\":1234"), true);
+    assert.equal(readFileSync(getDaemonSocketPath(undefined, { baseDir }), "utf8"), "replacement socket");
   });
 });
 

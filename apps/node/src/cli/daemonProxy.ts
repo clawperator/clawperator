@@ -3,7 +3,7 @@ import { rm } from "node:fs/promises";
 import { ERROR_CODES } from "../contracts/errors.js";
 import type { RunExecutionResult } from "../domain/executions/runExecution.js";
 import { resolveOperatorPackageForRequest } from "../domain/config/resolveOperatorPackage.js";
-import { getDaemonSocketPath, spawnDaemonRun, stopDaemon } from "../domain/daemon/lifecycle.js";
+import { getDaemonSocketPath, spawnDaemonRun, stopDaemon, withDaemonLock } from "../domain/daemon/lifecycle.js";
 import { getCliVersion } from "../domain/version/compatibility.js";
 
 export interface DaemonProxyOptions {
@@ -182,7 +182,15 @@ async function ensureDaemonReady(
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code === "ECONNREFUSED") {
-      await rm(socketPath, { force: true });
+      await withDaemonLock(rawDeviceId, async () => {
+        try {
+          await httpGetFn(socketPath, "/ping");
+        } catch (recheckError) {
+          if ((recheckError as NodeJS.ErrnoException).code === "ECONNREFUSED") {
+            await rm(socketPath, { force: true });
+          }
+        }
+      }, options);
     }
   }
 
