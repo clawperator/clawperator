@@ -54,7 +54,7 @@ PR-5 is measurement only.
 
 | Item | Value |
 | --- | --- |
-| State | PR-1 done locally |
+| State | PR-1 done |
 | Total PRs | 5 |
 | Total phases | 5 |
 | Completed | 1 |

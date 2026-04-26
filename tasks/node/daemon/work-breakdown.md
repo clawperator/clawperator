@@ -10,20 +10,19 @@ change. Phase 4 is mechanical rollout. Phase 5 is measurement.
 
 | PR | Purpose | Phase | Agent tier | Merge gate | Status |
 | --- | --- | --- | --- | --- | --- |
-| PR-1 | Server extraction + Unix socket transport | Phase 1 | default | none | done locally |
+| PR-1 | Server extraction + Unix socket transport | Phase 1 | default | none | done |
 | PR-2 | Daemon lifecycle commands | Phase 2 | default | PR-1 merged | not started |
 | PR-3 | Proxy layer for exec / snapshot / screenshot | Phase 3 | thinking | PR-2 merged | not started |
 | PR-4 | Expand proxy to all flat action commands; add readiness cache | Phase 4 | default | PR-3 merged | not started |
 | PR-5 | Latency measurement and findings | Phase 5 | fast | PR-4 merged | not started |
 
-Current state: PR-1 / Phase 1 is implemented and locally verified. PR-2 is the next
-step after PR-1 is merged.
+Current state: PR-1 / Phase 1 is done. PR-2 is the next step after PR-1 is merged.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | PR-1 done locally |
+| State | PR-1 done |
 | Total PRs | 5 |
 | Total phases | 5 |
 | Completed | 1 |
@@ -100,8 +99,7 @@ Read these files IN THIS ORDER before writing anything.
 
 ## Phase 1: Server Extraction and Unix Socket Transport
 
-Status: done locally. PR-1 implementation and validation are complete on the
-current branch.
+Status: done. PR-1 implementation and validation are complete.
 
 ### Agent Tier
 default
