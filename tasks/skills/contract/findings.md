@@ -37,7 +37,7 @@ The right implementation order is:
 
 1. Add `skillResult.result` to the runtime schema as the canonical answer field.
 2. Teach docs and agents to branch on wrapper `status` first, then read
-   `skillResult.result` when present.
+   `skillResult.result`.
 3. Migrate skills so primary outputs leave `diagnostics`, checkpoint-only
    evidence, and terminal-verification-only evidence.
 4. Strip the terminal frame from `output` in JSON mode. Pretty mode already
@@ -91,17 +91,17 @@ before the parsed `skillResult` reaches CLI and serve consumers. There are
 currently zero reliable parsed `skillResult.result` consumers.
 
 The existing script-level `result` fields are plain domain objects, not
-`SkillCheckpointEvidence`. Adding `result?: SkillCheckpointEvidence | null`
-will make the location legal, but those scripts still need to wrap their current
-payloads as `result: { kind: "json", value: ... }` before they pass the proposed
-schema.
+`SkillCheckpointEvidence`. Adding a required
+`result: SkillCheckpointEvidence | null` field will make the location legal, but
+those scripts still need to wrap their current payloads as
+`result: { kind: "json", value: ... }` before they pass the proposed schema.
 
 **Smallest implementation-ready fix:**
 
-Add an optional field to both the TypeScript interface and emitted schema:
+Add a required field to both the TypeScript interface and emitted schema:
 
 ```ts
-result?: SkillCheckpointEvidence | null;
+result: SkillCheckpointEvidence | null;
 ```
 
 Using the existing `SkillCheckpointEvidence` union keeps the result vocabulary
@@ -113,10 +113,14 @@ small:
 
 **Implementation stance:**
 
-Adding an optional parsed field is safe for current internal flows. Existing
+Adding a required parsed field is safe for current internal flows. Existing
 scripts that already emit root `result` show the intended authoring direction,
 but their payload shape must be migrated to the canonical evidence union before
 those fields survive parsing.
+
+For framed `SkillResult` output, `result` should always be present. Use
+`result: null` only when the skill cannot truthfully provide a domain result,
+such as an early failure before any answer or confirmed state exists.
 
 ---
 
@@ -162,8 +166,9 @@ order:
    `diagnostics`.
 4. Read skills with checkpoint-only answers: put the extracted scalar or object
    in `result`.
-5. Setter skills: only populate `result` when there is a useful caller-facing
-   confirmed value or state. Do not force a meaningless result for every setter.
+5. Setter skills: populate `result` with the confirmed final state when
+   available. Use `result: null` only for failures that cannot truthfully report
+   a final state.
 
 **Implementation stance:**
 
@@ -451,8 +456,8 @@ is to make the contract cleaner now.
 
 ### PR 1 - Runtime Contract
 
-- Add `result?: SkillCheckpointEvidence | null` to `SkillResult`.
-- Add `result: skillCheckpointEvidenceSchema.nullable().optional()` to
+- Add `result: SkillCheckpointEvidence | null` to `SkillResult`.
+- Add `result: skillCheckpointEvidenceSchema.nullable()` to
   `emittedSkillResultSchema`.
 - Add unit tests proving:
   - emitted `result` in `SkillCheckpointEvidence` shape survives `runSkill()`
@@ -461,7 +466,7 @@ is to make the contract cleaner now.
     handled
   - emitted plain-object root `result` is rejected or stripped according to the
     chosen schema policy
-  - framed skills without `result` still parse
+  - framed skills without `result` fail validation
   - unframed skills still return `skillResult: null`
 - Update docs in:
   - `docs/skills/authoring.md`
@@ -497,8 +502,8 @@ In `../clawperator-skills`, migrate high-value skills first:
    `result`.
 5. `com.globird.energy.get-yesterday-usage-cost-replay`: put the cost scalar in
    `result`.
-6. Setter replay skills: populate `result` only when the confirmed final value
-   is useful to callers.
+6. Setter replay skills: populate `result` with the confirmed final state, or
+   `null` only when no result can be truthfully reported.
 
 ### PR 4 - Cleanup And Conventions
 
@@ -515,8 +520,9 @@ In `../clawperator-skills`, migrate high-value skills first:
 
 ## Definition Of Done
 
-- Default machine consumers can extract a skill answer from
-  `parsed.skillResult.result` when a skill returns a value.
+- Default machine consumers can read `parsed.skillResult.result` on every framed
+  skill result. Multi-result skills, such as search flows, put the collection in
+  `result`, for example `{ "kind": "json", "value": { "items": [...] } }`.
 - Callers can branch safely on wrapper status before trusting nested skill
   status.
 - Process-stream fields are named consistently, and `output` is either removed
