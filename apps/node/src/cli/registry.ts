@@ -295,6 +295,25 @@ Notes:
   - Use 'clawperator operator setup --apk <path>' when you only need direct APK install, permission grant, and verification.
 `;
 
+const HELP_DAEMON = `clawperator daemon
+
+Usage:
+  clawperator daemon start [--device <id>] [--operator-package <package>] [--output <json|pretty>]
+  clawperator daemon stop [--device <id>] [--output <json|pretty>]
+  clawperator daemon status [--device <id>] [--output <json|pretty>]
+  clawperator daemon restart [--device <id>] [--operator-package <package>] [--output <json|pretty>]
+
+Subcommands:
+  start    Start the background daemon process for the selected device key
+  stop     Stop the daemon process and clean up PID and socket files
+  status   Report daemon liveness, PID, version, uptime, and socket path
+  restart  Stop then start the daemon process
+
+Notes:
+  - The daemon uses a Unix domain socket under ~/.clawperator/.
+  - The daemon run subcommand is internal and is intentionally omitted from help.
+`;
+
 
 const HELP_SKILLS_INSTALL = `clawperator skills install
 
@@ -2607,6 +2626,39 @@ COMMANDS["recording"] = {
     } else {
       return JSON.stringify({ code: "USAGE", message: "recording start|stop|pull|parse|export|compare ... ('record' is an alias)" });
     }
+  },
+};
+
+// daemon
+COMMANDS["daemon"] = {
+  name: "daemon",
+  group: "Execution",
+  supportedFlags: [],
+  summary: "Manage the background Unix socket daemon",
+  help: HELP_DAEMON,
+  topLevelBlock: `  daemon start|stop|status|restart [--device <id>]
+                                            Manage the background Unix socket daemon`,
+  handler: async (ctx) => {
+    const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
+    const sub = rest[0];
+    const command = await import("./commands/daemon.js");
+    if (sub === "run") {
+      await command.cmdDaemonRun({ deviceId, operatorPackage, verbose, logger });
+      return undefined;
+    }
+    if (sub === "start") {
+      return command.cmdDaemonStart({ format, deviceId, operatorPackage });
+    }
+    if (sub === "stop") {
+      return command.cmdDaemonStop({ format, deviceId });
+    }
+    if (sub === "status") {
+      return command.cmdDaemonStatus({ format, deviceId });
+    }
+    if (sub === "restart") {
+      return command.cmdDaemonRestart({ format, deviceId, operatorPackage });
+    }
+    return JSON.stringify({ code: "USAGE", message: "daemon start|stop|status|restart" });
   },
 };
 

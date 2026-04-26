@@ -1,0 +1,212 @@
+import http from "node:http";
+import { writeFileSync } from "node:fs";
+import type { Server } from "node:http";
+import type { Logger } from "../../adapters/logger.js";
+import { ERROR_CODES } from "../../contracts/errors.js";
+import { formatError, formatSuccess, type OutputOptions } from "../output.js";
+import { startServer } from "./serve.js";
+import {
+  cleanupDaemonFiles,
+  getDaemonPidPath,
+  getDaemonSocketPath,
+  readDaemonPidMetadata,
+  spawnDaemonRun,
+  stopDaemon,
+  type DaemonPathsOptions,
+} from "../../domain/daemon/lifecycle.js";
+
+interface DaemonRunOptions extends DaemonPathsOptions {
+  deviceId?: string;
+  operatorPackage?: string;
+  verbose?: boolean;
+  logger?: Logger;
+}
+
+interface DaemonCommandOptions extends DaemonPathsOptions {
+  format: OutputOptions["format"];
+  deviceId?: string;
+  operatorPackage?: string;
+  pollTimeoutMs?: number;
+  pollIntervalMs?: number;
+  spawnDaemonRunImpl?: typeof spawnDaemonRun;
+}
+
+const DEFAULT_START_TIMEOUT_MS = 3000;
+const DEFAULT_START_POLL_INTERVAL_MS = 100;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function requestDaemonJson<T>(socketPath: string, path: string, timeoutMs = 500): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const req = http.request({ method: "GET", socketPath, path, timeout: timeoutMs }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (chunk: Buffer) => chunks.push(chunk));
+      res.on("end", () => {
+        if ((res.statusCode ?? 0) < 200 || (res.statusCode ?? 0) >= 300) {
+          reject(new Error(`Daemon returned HTTP ${res.statusCode ?? 0}`));
+          return;
+        }
+        try {
+          resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")) as T);
+        } catch (error) {
+          reject(error);
+        }
+      });
+    });
+    req.on("timeout", () => {
+      req.destroy(new Error(`Daemon request timed out after ${timeoutMs}ms`));
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+async function isSocketAlive(socketPath: string): Promise<boolean> {
+  try {
+    const response = await requestDaemonJson<{ ok?: unknown }>(socketPath, "/ping");
+    return response.ok === true;
+  } catch {
+    return false;
+  }
+}
+
+async function readDaemonVersion(socketPath: string): Promise<string> {
+  const response = await requestDaemonJson<{ version?: unknown }>(socketPath, "/version");
+  return typeof response.version === "string" ? response.version : "unknown";
+}
+
+async function waitForSocket(socketPath: string, timeoutMs: number, intervalMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() <= deadline) {
+    if (await isSocketAlive(socketPath)) {
+      return true;
+    }
+    await delay(intervalMs);
+  }
+  return false;
+}
+
+function daemonSuccess<T>(data: T, options: { format: OutputOptions["format"] }): string {
+  return formatSuccess(data, { format: options.format });
+}
+
+export async function cmdDaemonRun(options: DaemonRunOptions): Promise<void> {
+  const socketPath = getDaemonSocketPath(options.deviceId, options);
+  const pidPath = getDaemonPidPath(options.deviceId, options);
+  writeFileSync(pidPath, `${JSON.stringify({ pid: process.pid, startedAt: Date.now() })}\n`, { mode: 0o600 });
+
+  let server: Server | undefined;
+  let stopping = false;
+  const cleanupAndExit = (exitCode: number) => {
+    if (stopping) {
+      return;
+    }
+    stopping = true;
+    const finish = () => {
+      cleanupDaemonFiles(options.deviceId, options);
+      process.exit(exitCode);
+    };
+    if (!server) {
+      finish();
+      return;
+    }
+    server.close((error) => {
+      if (error) {
+        process.stderr.write(`Failed to close daemon server: ${String(error)}\n`);
+      }
+      finish();
+    });
+  };
+
+  process.once("SIGTERM", () => cleanupAndExit(0));
+  process.once("SIGINT", () => cleanupAndExit(0));
+
+  try {
+    server = await startServer({
+      socketPath,
+      verbose: options.verbose ?? false,
+      logger: options.logger,
+    });
+  } catch (error) {
+    cleanupDaemonFiles(options.deviceId, options);
+    throw error;
+  }
+
+  return new Promise(() => {});
+}
+
+export async function cmdDaemonStart(options: DaemonCommandOptions): Promise<string> {
+  const socketPath = getDaemonSocketPath(options.deviceId, options);
+  if (await isSocketAlive(socketPath)) {
+    return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
+  }
+
+  try {
+    const spawnImpl = options.spawnDaemonRunImpl ?? spawnDaemonRun;
+    spawnImpl(options.deviceId, options.operatorPackage, options);
+  } catch (error) {
+    return formatError({
+      code: ERROR_CODES.DAEMON_START_FAILED,
+      message: "Failed to spawn the Clawperator daemon.",
+      details: { socketPath, error: String(error) },
+    }, { format: options.format });
+  }
+
+  const timeoutMs = options.pollTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
+  const intervalMs = options.pollIntervalMs ?? DEFAULT_START_POLL_INTERVAL_MS;
+  if (await waitForSocket(socketPath, timeoutMs, intervalMs)) {
+    return daemonSuccess({ ok: true, daemon: { status: "started", socketPath } }, options);
+  }
+
+  return formatError({
+    code: ERROR_CODES.DAEMON_START_FAILED,
+    message: `Daemon did not become ready within ${timeoutMs}ms.`,
+    details: { socketPath, timeoutMs },
+  }, { format: options.format });
+}
+
+export async function cmdDaemonStop(options: DaemonCommandOptions): Promise<string> {
+  const socketPath = getDaemonSocketPath(options.deviceId, options);
+  try {
+    const status = await stopDaemon(options.deviceId, options);
+    return daemonSuccess({ ok: true, daemon: { status, socketPath } }, options);
+  } catch (error) {
+    return formatError({
+      code: ERROR_CODES.DAEMON_STOP_FAILED,
+      message: "Failed to stop the Clawperator daemon.",
+      details: { socketPath, error: String(error) },
+    }, { format: options.format });
+  }
+}
+
+export async function cmdDaemonStatus(options: DaemonCommandOptions): Promise<string> {
+  const socketPath = getDaemonSocketPath(options.deviceId, options);
+  if (!(await isSocketAlive(socketPath))) {
+    return daemonSuccess({ ok: true, daemon: { status: "not_running", socketPath } }, options);
+  }
+
+  const metadata = readDaemonPidMetadata(options.deviceId, options);
+  const version = await readDaemonVersion(socketPath);
+  const uptimeSeconds = metadata ? Math.max(0, Math.floor((Date.now() - metadata.startedAt) / 1000)) : 0;
+  return daemonSuccess({
+    ok: true,
+    daemon: {
+      status: "running",
+      pid: metadata?.pid ?? null,
+      version,
+      uptimeSeconds,
+      socketPath,
+    },
+  }, options);
+}
+
+export async function cmdDaemonRestart(options: DaemonCommandOptions): Promise<string> {
+  const stopResult = await cmdDaemonStop(options);
+  const parsedStopResult = JSON.parse(stopResult) as { code?: unknown };
+  if (typeof parsedStopResult.code === "string") {
+    return stopResult;
+  }
+  return await cmdDaemonStart(options);
+}
