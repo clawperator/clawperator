@@ -81,6 +81,13 @@ async function httpPost(socketPath: string, path: string, body: unknown): Promis
   try {
     const payload = JSON.stringify(body);
     const responseBody = await new Promise<string>((resolve, reject) => {
+      let connected = false;
+      let finished = false;
+      const markDispatchedIfSent = () => {
+        if (connected && finished) {
+          dispatched = true;
+        }
+      };
       const req = http.request({
         method: "POST",
         socketPath,
@@ -100,7 +107,21 @@ async function httpPost(socketPath: string, path: string, body: unknown): Promis
       });
       req.on("timeout", () => req.destroy(new Error("Daemon POST timed out")));
       req.on("error", reject);
-      dispatched = true;
+      req.on("socket", (socket) => {
+        if (socket.connecting) {
+          socket.once("connect", () => {
+            connected = true;
+            markDispatchedIfSent();
+          });
+        } else {
+          connected = true;
+          markDispatchedIfSent();
+        }
+      });
+      req.once("finish", () => {
+        finished = true;
+        markDispatchedIfSent();
+      });
       req.end(payload);
     });
     return { ok: true, body: responseBody };

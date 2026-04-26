@@ -24,6 +24,7 @@ import { toPublicInteractiveAutomationError } from "../../domain/doctor/checks/d
 
 export interface ServeAppOptions {
   verbose: boolean;
+  operatorPackage?: string;
   logger?: Logger;
   resolveInteractiveSkillTargetImpl?: typeof resolveInteractiveSkillTarget;
 }
@@ -154,6 +155,9 @@ export function createServeApp(options: ServeAppOptions): express.Application {
   const app = express();
   app.use(express.json({ limit: "100kb" }));
 
+  const resolveServeOperatorPackage = (requestOperatorPackage: string | undefined): string =>
+    resolveOperatorPackageForRequest(requestOperatorPackage ?? options.operatorPackage);
+
   // Log all requests when a logger is configured (filtered by log level at the file sink).
   // Without a logger, fall back to console.log only when --verbose is set (legacy behavior).
   app.use((req, _res, next) => {
@@ -184,7 +188,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
     try {
       const config = getDefaultRuntimeConfig({
         adbPath: process.env.ADB_PATH,
-        operatorPackage: process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+        operatorPackage: resolveServeOperatorPackage(undefined),
         logger: options.logger,
       });
       const devices = await listDevices(config);
@@ -206,7 +210,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
       emulatorPath: process.env.EMULATOR_PATH,
       sdkmanagerPath: process.env.SDKMANAGER_PATH,
       avdmanagerPath: process.env.AVDMANAGER_PATH,
-      operatorPackage: process.env.CLAWPERATOR_OPERATOR_PACKAGE,
+      operatorPackage: resolveServeOperatorPackage(undefined),
       logger: options.logger,
     });
   }
@@ -246,7 +250,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
     try {
       const result = await runExecution(execution, {
         deviceId,
-        operatorPackage: resolveOperatorPackageForRequest(operatorPackage),
+        operatorPackage: resolveServeOperatorPackage(operatorPackage),
         logger: options.logger,
       });
 
@@ -301,7 +305,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
     try {
       const result = await runExecution(executionInput, { 
         deviceId, 
-        operatorPackage: resolveOperatorPackageForRequest(operatorPackage),
+        operatorPackage: resolveServeOperatorPackage(operatorPackage),
         logger: options.logger,
       });
       if (result.ok) {
@@ -358,7 +362,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
     try {
       const result = await runExecution(executionInput, { 
         deviceId, 
-        operatorPackage: resolveOperatorPackageForRequest(operatorPackage),
+        operatorPackage: resolveServeOperatorPackage(operatorPackage),
         logger: options.logger,
       });
       if (result.ok) {
@@ -608,7 +612,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
         return;
       }
 
-      const resolvedOperatorPackage = resolveOperatorPackageForRequest(
+      const resolvedOperatorPackage = resolveServeOperatorPackage(
         typeof operatorPackage === "string" ? operatorPackage : undefined
       );
       const resolveInteractiveSkillTargetImpl = options.resolveInteractiveSkillTargetImpl ?? resolveInteractiveSkillTarget;

@@ -4,14 +4,14 @@
 
 Define the lifecycle contract for the Clawperator background daemon. The daemon is a long-running Node process that binds the same Express app used by `clawperator serve` to a Unix domain socket instead of a TCP port.
 
-The daemon also handles transparent proxying for `exec`, `snapshot`, and `screenshot`. Other flat action commands still run direct until the proxy rollout phase adds them.
+The daemon also handles transparent proxying for `exec`, `snapshot`, `screenshot`, and the flat action commands such as `open`, `click`, `type`, `read`, `wait`, `press`, `back`, `close`, `sleep`, `scroll`, `scroll-until`, `wait-for-nav`, and `read-value`.
 
 ## Sources
 
 - CLI registration and global flag parsing: `apps/node/src/cli/registry.ts`, `apps/node/src/cli/index.ts`
 - Daemon command implementation: `apps/node/src/cli/commands/daemon.ts`
 - Daemon proxy implementation: `apps/node/src/cli/daemonProxy.ts`
-- Proxied CLI commands: `apps/node/src/cli/commands/execute.ts`, `apps/node/src/cli/commands/observe.ts`
+- Proxied CLI commands: `apps/node/src/cli/commands/execute.ts`, `apps/node/src/cli/commands/observe.ts`, `apps/node/src/cli/commands/action.ts`
 - Daemon path and process helpers: `apps/node/src/domain/daemon/lifecycle.ts`
 - Serve app, `/ping`, and `/version`: `apps/node/src/cli/commands/serve.ts`
 - CLI version source: `apps/node/src/domain/version/compatibility.ts`
@@ -171,6 +171,7 @@ Daemon proxying is active for:
 | `clawperator exec <json-or-file>` | `POST /execute` on the daemon socket | no |
 | `clawperator snapshot` | synthetic `snapshot_ui` payload sent to `POST /execute` | yes |
 | `clawperator screenshot` | synthetic `take_screenshot` payload sent to `POST /execute` | yes |
+| Flat action commands such as `open`, `click`, `type`, `read`, `wait`, `press`, `back`, `close`, `sleep`, `scroll`, `scroll-until`, `wait-for-nav`, and `read-value` | action payload sent to `POST /execute` | no |
 
 Dry-run and validation-only `exec` modes do not need the daemon because they do not dispatch to Android.
 
@@ -228,6 +229,7 @@ Fallback policy:
 | Command category | Post-dispatch response loss behavior |
 | --- | --- |
 | `exec` | return `DAEMON_PROXY_ERROR`; do not run direct |
+| Flat action commands | return `DAEMON_PROXY_ERROR`; do not run direct |
 | `snapshot` | may run direct once because the synthetic action is read-only |
 | `screenshot` | may run direct once because the synthetic action is read-only |
 
@@ -250,7 +252,7 @@ Fallback policy:
 | `daemon start` spawns `daemon run` but `/ping` does not become reachable within `3000` ms | `DAEMON_START_FAILED` | `1` | Inspect `~/.clawperator/daemon-<daemon_key>.log`, then retry `clawperator daemon start --device <id>`. |
 | `daemon start` cannot spawn the background process | `DAEMON_START_FAILED` | `1` | Verify the branch-local CLI entrypoint exists and retry from the same checkout. |
 | `daemon stop` cannot signal or clean up the process | `DAEMON_STOP_FAILED` | `1` | Inspect the PID metadata file and socket path, stop the process manually if needed, then retry `daemon stop`. |
-| `exec` was dispatched through the daemon but the response was lost | `DAEMON_PROXY_ERROR` | `1` | Do not blindly retry. Inspect device state first because the action may already have executed. |
+| `exec` or a flat mutating action was dispatched through the daemon but the response was lost | `DAEMON_PROXY_ERROR` | `1` | Do not blindly retry. Inspect device state first because the action may already have executed. |
 
 Top-level daemon failures use the same CLI error shape as other Node-side failures:
 

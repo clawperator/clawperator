@@ -1,5 +1,5 @@
 import http from "node:http";
-import { writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import type { Server } from "node:http";
 import type { Logger } from "../../adapters/logger.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -126,6 +126,7 @@ export async function cmdDaemonRun(options: DaemonRunOptions): Promise<void> {
   try {
     server = await startServer({
       socketPath,
+      operatorPackage: options.operatorPackage,
       verbose: options.verbose ?? false,
       logger: options.logger,
     });
@@ -142,6 +143,7 @@ export async function cmdDaemonStart(options: DaemonCommandOptions): Promise<str
   if (await isSocketAlive(socketPath)) {
     return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
   }
+  rmSync(socketPath, { force: true });
 
   try {
     const spawnImpl = options.spawnDaemonRunImpl ?? spawnDaemonRun;

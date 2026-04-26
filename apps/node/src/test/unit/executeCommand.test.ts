@@ -156,6 +156,46 @@ describe("cmdExecute --dry-run", () => {
   });
 });
 
+describe("cmdExecute daemon proxy", () => {
+  it("applies timeout override before posting to daemon", async () => {
+    let postedExecution: { timeoutMs?: number } | undefined;
+    const output = await cmdExecute({
+      format: "json",
+      timeoutMs: 12000,
+      execution: JSON.stringify({
+        commandId: "cmd-proxy-timeout",
+        taskId: "cmd-proxy-timeout",
+        source: "test",
+        expectedFormat: "android-ui-automator",
+        timeoutMs: 30000,
+        actions: [{ id: "sleep-1", type: "sleep", params: { durationMs: 1 } }],
+      }),
+      tryDaemonExecutionFn: async (execution) => {
+        postedExecution = execution as { timeoutMs?: number };
+        return {
+          ok: true,
+          deviceId: "device-1",
+          terminalSource: "clawperator_result",
+          envelope: {
+            commandId: "cmd-proxy-timeout",
+            taskId: "cmd-proxy-timeout",
+            status: "success",
+            stepResults: [],
+            error: null,
+          },
+        };
+      },
+      runExecutionFn: async () => {
+        throw new Error("direct execution should not run");
+      },
+    });
+    const result = JSON.parse(output);
+
+    assert.strictEqual(result.envelope.status, "success");
+    assert.strictEqual(postedExecution?.timeoutMs, 12000);
+  });
+});
+
 describe("cmdExecute inline JSON vs file path", () => {
   it("reads payload from disk when the path starts with [ and exists", async () => {
     const minimal = {

@@ -232,6 +232,16 @@ describe("tryDaemonExecution", () => {
     }
   });
 
+  it("falls back direct on a POST failure before dispatch", async () => {
+    const failure: DaemonHttpFailure = { ok: false, dispatched: false, error: new Error("connect ECONNREFUSED") };
+    const result = await tryDaemonExecution(execution, { allowPostDispatchFallback: false }, {
+      httpGetFn: makeAliveGet(),
+      httpPostFn: async () => failure,
+    });
+
+    assert.equal(result, null);
+  });
+
   it("lets concurrent auto-start callers both receive results", async () => {
     let spawnCount = 0;
     let alive = false;

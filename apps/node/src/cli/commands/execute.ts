@@ -8,6 +8,27 @@ import { ERROR_CODES } from "../../contracts/errors.js";
 import type { Logger } from "../../adapters/logger.js";
 import { tryDaemonExecution } from "../daemonProxy.js";
 
+function applyTimeoutOverride(payload: unknown, timeoutMs: number | undefined): unknown {
+  if (timeoutMs === undefined) {
+    return payload;
+  }
+  if (!Number.isFinite(timeoutMs)) {
+    throw {
+      code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+      message: "timeoutMs must be a finite number",
+    };
+  }
+  if (timeoutMs < LIMITS.MIN_EXECUTION_TIMEOUT_MS || timeoutMs > LIMITS.MAX_EXECUTION_TIMEOUT_MS) {
+    throw {
+      code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+      message: `timeoutMs must be between ${LIMITS.MIN_EXECUTION_TIMEOUT_MS} and ${LIMITS.MAX_EXECUTION_TIMEOUT_MS}`,
+    };
+  }
+  const execution = { ...validateExecution(payload), timeoutMs };
+  validatePayloadSize(JSON.stringify(execution));
+  return execution;
+}
+
 export async function cmdExecute(options: {
   format: OutputOptions["format"];
   execution: string; // JSON string or file path
@@ -18,6 +39,8 @@ export async function cmdExecute(options: {
   dryRun?: boolean;
   noDaemon?: boolean;
   logger?: Logger;
+  tryDaemonExecutionFn?: typeof tryDaemonExecution;
+  runExecutionFn?: typeof runExecution;
 }): Promise<string> {
   let payload: unknown;
   const raw = options.execution.trim();
@@ -147,13 +170,16 @@ export async function cmdExecute(options: {
       return formatSuccess({ ok: true, validated: true, execution }, options);
     }
 
-    const proxyResult = await tryDaemonExecution(payload, {
+    const executionForRun = applyTimeoutOverride(payload, options.timeoutMs);
+    const tryDaemonExecutionFn = options.tryDaemonExecutionFn ?? tryDaemonExecution;
+    const runExecutionFn = options.runExecutionFn ?? runExecution;
+    const proxyResult = await tryDaemonExecutionFn(executionForRun, {
       rawDeviceId: options.deviceId,
       operatorPackage: options.operatorPackage,
       noDaemon: options.noDaemon,
       allowPostDispatchFallback: false,
     });
-    const result = proxyResult ?? await runExecution(payload, {
+    const result = proxyResult ?? await runExecutionFn(executionForRun, {
       deviceId: options.deviceId,
       operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       timeoutMs: options.timeoutMs,

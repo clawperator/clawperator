@@ -1,5 +1,6 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -131,6 +132,27 @@ describe("daemon command output", () => {
 
     assert.equal(parsed.code, ERROR_CODES.DAEMON_START_FAILED);
     assert.equal(shouldCliStdoutForceExitCode1(raw, false), true);
+  });
+
+  it("removes a stale socket before spawning daemon run", async () => {
+    const baseDir = await makeTempBaseDir();
+    const socketPath = getDaemonSocketPath(undefined, { baseDir });
+    await writeFile(socketPath, "", "utf8");
+    let socketExistedAtSpawn = true;
+
+    const raw = await cmdDaemonStart({
+      format: "json",
+      baseDir,
+      pollTimeoutMs: 1,
+      pollIntervalMs: 1,
+      spawnDaemonRunImpl: () => {
+        socketExistedAtSpawn = existsSync(socketPath);
+      },
+    });
+    const parsed = JSON.parse(raw) as { code?: string };
+
+    assert.equal(socketExistedAtSpawn, false);
+    assert.equal(parsed.code, ERROR_CODES.DAEMON_START_FAILED);
   });
 
   it("stop failures return DAEMON_STOP_FAILED and force exit code 1", async () => {
