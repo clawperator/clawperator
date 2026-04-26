@@ -1,5 +1,5 @@
 import http from "node:http";
-import { rmSync, writeFileSync } from "node:fs";
+import { rmSync } from "node:fs";
 import type { Server } from "node:http";
 import type { Logger } from "../../adapters/logger.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -7,12 +7,12 @@ import { formatError, formatSuccess, type OutputOptions } from "../output.js";
 import { startServer } from "./serve.js";
 import {
   cleanupDaemonFiles,
-  getDaemonPidPath,
   getDaemonSocketPath,
   readDaemonPidMetadata,
   spawnDaemonRun,
   stopDaemon,
   type DaemonPathsOptions,
+  writeDaemonPidMetadata,
 } from "../../domain/daemon/lifecycle.js";
 
 interface DaemonRunOptions extends DaemonPathsOptions {
@@ -20,6 +20,7 @@ interface DaemonRunOptions extends DaemonPathsOptions {
   operatorPackage?: string;
   verbose?: boolean;
   logger?: Logger;
+  startServerImpl?: typeof startServer;
 }
 
 interface DaemonCommandOptions extends DaemonPathsOptions {
@@ -94,11 +95,10 @@ function daemonSuccess<T>(data: T, options: { format: OutputOptions["format"] })
 
 export async function cmdDaemonRun(options: DaemonRunOptions): Promise<void> {
   const socketPath = getDaemonSocketPath(options.deviceId, options);
-  const pidPath = getDaemonPidPath(options.deviceId, options);
-  writeFileSync(pidPath, `${JSON.stringify({ pid: process.pid, startedAt: Date.now() })}\n`, { mode: 0o600 });
 
   let server: Server | undefined;
   let stopping = false;
+  let ownsDaemonFiles = false;
   const cleanupAndExit = (exitCode: number) => {
     if (stopping) {
       return;
@@ -109,7 +109,11 @@ export async function cmdDaemonRun(options: DaemonRunOptions): Promise<void> {
       process.exit(exitCode);
     };
     if (!server) {
-      finish();
+      if (ownsDaemonFiles) {
+        finish();
+      } else {
+        process.exit(exitCode);
+      }
       return;
     }
     server.close((error) => {
@@ -124,14 +128,19 @@ export async function cmdDaemonRun(options: DaemonRunOptions): Promise<void> {
   process.once("SIGINT", () => cleanupAndExit(0));
 
   try {
-    server = await startServer({
+    const startServerImpl = options.startServerImpl ?? startServer;
+    server = await startServerImpl({
       socketPath,
       operatorPackage: options.operatorPackage,
       verbose: options.verbose ?? false,
       logger: options.logger,
     });
+    writeDaemonPidMetadata(options.deviceId, { pid: process.pid, startedAt: Date.now() }, options);
+    ownsDaemonFiles = true;
   } catch (error) {
-    cleanupDaemonFiles(options.deviceId, options);
+    if (ownsDaemonFiles) {
+      cleanupDaemonFiles(options.deviceId, options);
+    }
     throw error;
   }
 

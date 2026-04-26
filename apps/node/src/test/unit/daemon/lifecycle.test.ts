@@ -1,6 +1,6 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -16,6 +16,7 @@ import {
 } from "../../../domain/daemon/lifecycle.js";
 import {
   cmdDaemonStart,
+  cmdDaemonRun,
   cmdDaemonStatus,
   cmdDaemonStop,
 } from "../../../cli/commands/daemon.js";
@@ -163,6 +164,26 @@ describe("daemon command output", () => {
 
     assert.equal(socketExistedAtSpawn, false);
     assert.equal(parsed.code, ERROR_CODES.DAEMON_START_FAILED);
+  });
+
+  it("daemon run startup failure does not remove a socket it did not bind", async () => {
+    const baseDir = await makeTempBaseDir();
+    const socketPath = getDaemonSocketPath(undefined, { baseDir });
+    const pidPath = getDaemonPidPath(undefined, { baseDir });
+    await writeFile(socketPath, "existing live socket", "utf8");
+
+    await assert.rejects(
+      cmdDaemonRun({
+        baseDir,
+        startServerImpl: async () => {
+          throw new Error("EADDRINUSE");
+        },
+      }),
+      /EADDRINUSE/,
+    );
+
+    assert.equal(readFileSync(socketPath, "utf8"), "existing live socket");
+    assert.equal(existsSync(pidPath), false);
   });
 
   it("stop failures return DAEMON_STOP_FAILED and force exit code 1", async () => {

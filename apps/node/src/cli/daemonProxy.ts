@@ -252,7 +252,14 @@ export async function tryDaemonExecution(
       }
       return proxyLostResult(postResult.error);
     }
-    return JSON.parse(postResult.body) as RunExecutionResult;
+    try {
+      return JSON.parse(postResult.body) as RunExecutionResult;
+    } catch (error) {
+      if (options.allowPostDispatchFallback === true) {
+        return null;
+      }
+      return proxyLostResult(error);
+    }
   } catch (error) {
     return proxyLostResult(error);
   }

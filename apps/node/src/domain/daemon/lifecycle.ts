@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { chmodSync, closeSync, mkdirSync, openSync, readFileSync, rmSync, statSync } from "node:fs";
+import { chmodSync, closeSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -176,6 +176,14 @@ export function readDaemonPidMetadata(
   options?: DaemonPathsOptions
 ): DaemonMetadata | undefined {
   return readDaemonMetadata(getDaemonPidPath(rawDeviceId, options));
+}
+
+export function writeDaemonPidMetadata(
+  rawDeviceId: string | undefined,
+  metadata: DaemonMetadata,
+  options?: DaemonPathsOptions
+): void {
+  writeFileSync(getDaemonPidPath(rawDeviceId, options), `${JSON.stringify(metadata)}\n`, { mode: 0o600 });
 }
 
 export function cleanupDaemonFiles(rawDeviceId: string | undefined, options?: DaemonPathsOptions): void {

@@ -225,11 +225,32 @@ describe("tryDaemonExecution", () => {
     assert.equal(result, null);
   });
 
+  it("allows idempotent fallback when the daemon response body is malformed", async () => {
+    const result = await tryDaemonExecution(execution, { allowPostDispatchFallback: true }, {
+      httpGetFn: makeAliveGet(),
+      httpPostFn: async (): Promise<DaemonHttpSuccess> => ({ ok: true, body: "{" }),
+    });
+
+    assert.equal(result, null);
+  });
+
   it("returns DAEMON_PROXY_ERROR for non-idempotent post-dispatch loss", async () => {
     const failure: DaemonHttpFailure = { ok: false, dispatched: true, error: new Error("lost") };
     const result = await tryDaemonExecution(execution, { allowPostDispatchFallback: false }, {
       httpGetFn: makeAliveGet(),
       httpPostFn: async () => failure,
+    });
+
+    assert.equal(result?.ok, false);
+    if (result?.ok === false) {
+      assert.equal(result.error.code, ERROR_CODES.DAEMON_PROXY_ERROR);
+    }
+  });
+
+  it("returns DAEMON_PROXY_ERROR for non-idempotent malformed daemon responses", async () => {
+    const result = await tryDaemonExecution(execution, { allowPostDispatchFallback: false }, {
+      httpGetFn: makeAliveGet(),
+      httpPostFn: async (): Promise<DaemonHttpSuccess> => ({ ok: true, body: "{" }),
     });
 
     assert.equal(result?.ok, false);
