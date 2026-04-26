@@ -100,6 +100,8 @@ export interface SkillResult {
   source: SkillResultSource;
   goal?: JsonObject;
   inputs?: JsonObject;
+  /** Domain answer. Optional only during the migration window (PR-C1); PR-C2 will require this field on framed results. */
+  result?: SkillCheckpointEvidence | null;
   status: SkillResultStatus;
   checkpoints: SkillCheckpoint[];
   terminalVerification?: SkillTerminalVerification | null;
@@ -192,6 +194,7 @@ export const emittedSkillResultSchema = z.object({
   skillId: z.string().min(1),
   goal: z.record(jsonValueSchema).optional(),
   inputs: z.record(jsonValueSchema).optional(),
+  result: skillCheckpointEvidenceSchema.nullable().optional(),
   status: z.enum(["success", "failed", "indeterminate"]),
   checkpoints: z.array(skillCheckpointSchema),
   terminalVerification: skillTerminalVerificationSchema.nullable().optional(),

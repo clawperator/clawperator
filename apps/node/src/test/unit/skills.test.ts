@@ -3567,6 +3567,31 @@ describe("runSkill", () => {
     assert.strictEqual(result.skillResult.diagnostics?.runtimeState, "healthy");
   });
 
+  it("accepts evidence-shaped root result and surfaces skillResult.result (migration window allows missing result)", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["result-valid", "40"]);
+    assert.ok(result.ok, `Expected framed SkillResult to succeed: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.deepStrictEqual(result.skillResult.result, { kind: "json", value: { amount: "-$3.10" } });
+    assert.strictEqual(result.skillResult.status, "success");
+  });
+
+  it("rejects a plain-object root result that is not SkillCheckpointEvidence (schema validation)", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["result-plain-object", "40"]);
+    assert.ok(!result.ok, "Expected runSkill to fail when result is not evidence-shaped");
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(
+      result.message,
+      /SkillResult frame failed validation|result|Invalid discriminator|discriminator/i
+    );
+  });
+
+  it("treats missing result as undefined during the migration window (PR-C1 optional; PR-C2 will require it)", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["valid", "40"]);
+    assert.ok(result.ok, `Expected framed SkillResult to succeed: ${"message" in result ? result.message : ""}`);
+    assert.ok(result.skillResult);
+    assert.strictEqual(result.skillResult.result, undefined);
+  });
+
   it("keeps framed scripted SkillResult parsing permissive when skill.json is unreadable", async () => {
     const temp = await createTempRegistryWithSkill({
       skillId: TEST_SKILL_RESULT,
