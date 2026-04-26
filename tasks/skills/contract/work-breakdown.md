@@ -21,23 +21,37 @@ migration-phase contract shape is stable.
 
 - `apps/node/src/contracts/skillResult.ts`
 - `apps/node/src/test/unit/skills.test.ts`
-- any existing skill-result fixtures under `apps/node/src/test/fixtures/skills/`
+- `apps/node/src/test/fixtures/skills/com.test.skill-result/scripts/emit_skill_result.js`
 
 **Tasks:**
 
 1. Add `result?: SkillCheckpointEvidence | null` to the `SkillResult`
    interface.
 2. Add `result: skillCheckpointEvidenceSchema.nullable().optional()` to the
-   emitted SkillResult Zod schema.
-3. Add tests proving a valid evidence-shaped `result` survives parsing.
-4. Add tests proving a plain domain object in root `result` is rejected instead
-   of silently stripped.
-5. Add tests proving missing `result` remains accepted during the migration
-   window.
+   emitted SkillResult Zod schema (`emittedSkillResultSchema`).
+3. Add a `result-valid` mode to `emit_skill_result.js` that emits a
+   `result` field shaped as `SkillCheckpointEvidence`, e.g.:
+   ```js
+   result: { kind: "json", value: { amount: "-$3.10" } }
+   ```
+4. Add a `result-plain-object` mode to `emit_skill_result.js` that emits a
+   plain domain object as root `result` (not wrapped as `SkillCheckpointEvidence`),
+   e.g. `result: { amount: "-$3.10" }`. This mode is used to prove the schema
+   rejects malformed payloads.
+5. In the `describe("runSkill")` block in `skills.test.ts`, add tests that
+   run the fixture in `result-valid` mode and assert `skillResult.result` is
+   present and matches the expected evidence shape.
+6. Add a test that runs the fixture in `result-plain-object` mode and asserts
+   the run fails with a schema validation error rather than silently stripping
+   the field.
+7. Add a test that runs the existing `valid` mode (no `result` field) and
+   asserts `skillResult.result` is `undefined`, proving missing `result` is
+   still accepted during the migration window.
 
 **Acceptance criteria:**
 
 - The runtime accepts `result` only when it matches `SkillCheckpointEvidence`.
+- Invalid plain-object `result` payloads fail validation with a clear error.
 - Current framed fixtures without `result` still pass.
 - The tests describe the temporary optional state clearly enough that PR-C2 can
   tighten it later.
@@ -48,17 +62,36 @@ migration-phase contract shape is stable.
 
 - `apps/node/src/cli/commands/skills.ts`
 - `apps/node/src/test/unit/skills.test.ts`
-- related CLI fixture files as needed
 
 **Tasks:**
 
-1. Reuse the existing pretty-output frame stripping policy for JSON `output`
-   whenever a parsed `skillResult` exists.
-2. Apply the same policy to success, indeterminate, and
-   `SKILL_OUTPUT_ASSERTION_FAILED`.
-3. Keep real raw process diagnostics available on parse failures where there is
-   no trusted parsed `skillResult`.
-4. Add regression tests for the changed output shape.
+1. In `skills.ts`, change the `output` field on the success, indeterminate,
+   and `SKILL_OUTPUT_ASSERTION_FAILED` branches to apply
+   `sanitizePrettySkillStdout` whenever `result.skillResult !== null`,
+   regardless of format. The recommended change from `findings.md` is:
+   ```ts
+   output: (options.format === "pretty" || result.skillResult !== null)
+     ? sanitizePrettySkillStdout(result.output, result.skillResult !== null)
+     : result.output,
+   ```
+   Apply this to all three response branches that currently use `output`.
+   General execution failure and spawn-failure branches use `stdout`/`stderr`
+   and do not need to change.
+2. Do not change `runSkill.ts` or the domain-layer tests. The `runSkill`
+   domain function intentionally returns raw stdout including the frame; the
+   existing test at line 3608 (`result.output.includes("[Clawperator-Skill-Result]")`)
+   remains correct and must not be modified.
+3. Add CLI-layer tests in the `describe("cmdSkillsRun")` block using the
+   injected `runSkillImpl` pattern already used in that block. A suitable test:
+   - Creates a `fakeRunSkill` that returns `output` containing the literal
+     `[Clawperator-Skill-Result]` marker followed by JSON, plus a non-null
+     `skillResult`.
+   - Calls `cmdSkillsRun` with `{ format: "json", runSkillImpl: fakeRunSkill }`.
+   - Asserts that `JSON.parse(stdout).output` does NOT contain
+     `[Clawperator-Skill-Result]`.
+4. Add a corresponding test for the case where `skillResult` is null and
+   `output` IS raw (frame-inclusive) stdout, to prove the non-framed path is
+   unchanged.
 
 **Acceptance criteria:**
 
@@ -66,7 +99,9 @@ migration-phase contract shape is stable.
   `skillResult` is parsed.
 - JSON indeterminate output follows the same rule.
 - JSON output-assertion failure follows the same rule.
-- Malformed frame failures still expose enough stdout to debug the parse error.
+- Malformed frame failures (where `skillResult` is null) still expose raw
+  stdout including any partial frame content for debugging.
+- Domain-layer `runSkill` tests are unchanged.
 
 ### Phase 3: Update Clawperator Docs And Bundled Authoring Guidance
 
@@ -91,17 +126,28 @@ migration-phase contract shape is stable.
 3. Document singular `result` for collection payloads.
 4. Update examples that currently show framed SkillResult output without
    `result` when those examples are meant to guide new authoring.
-5. Update bundled authoring guidance so generated or repaired skills emit
-   `skillResult.result` and surface it during self-test inspection.
-6. Rebuild docs through the normal docs build workflow.
+5. In `apps/node/bundled-skills/clawperator-skill-author-by-recording/SKILL.md`,
+   add `skillResult.result` to the inspection list at the section that currently
+   lists `skillResult.status`, `skillResult.source`, `skillResult.checkpoints`,
+   `skillResult.terminalVerification`, and `skillResult.diagnostics`. Add a note
+   that `result` is the canonical domain answer when present.
+6. In `apps/node/bundled-skills/clawperator-skill-author-by-agent-discovery/SKILL.md`,
+   add equivalent guidance. If the skill does not have an explicit field list,
+   add `skillResult.result` to the skill-result inspection step.
+7. Update the corresponding `agents/openai.yaml` files for both bundled skills
+   if `default_prompt` or `short_description` reference skill-result inspection
+   behavior.
+8. Rebuild docs through the normal docs build workflow.
 
 **Acceptance criteria:**
 
 - No public doc tells agents to find primary answers in `diagnostics`,
   `terminalVerification`, or checkpoint ids.
 - Recording compare docs still say the full `skills run` wrapper is the durable
-  compare input.
-- Bundled authoring guidance asks agents to inspect and report
+  compare input and uses `skillResult.checkpoints` and
+  `skillResult.terminalVerification` for compare logic. Do not change the
+  compare contract.
+- Both bundled authoring skills ask agents to inspect and report
   `skillResult.result`.
 - `./scripts/docs_build.sh` succeeds.
 
