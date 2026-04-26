@@ -1,5 +1,6 @@
 import http from "node:http";
 import { rm } from "node:fs/promises";
+import { isAbsolute } from "node:path";
 import { ERROR_CODES } from "../contracts/errors.js";
 import type { RunExecutionResult } from "../domain/executions/runExecution.js";
 import type { ResultEnvelope } from "../contracts/result.js";
@@ -312,6 +313,19 @@ function isResultEnvelope(value: unknown): value is ResultEnvelope {
     && Array.isArray(value.stepResults);
 }
 
+export function hasCallerRelativeScreenshotPath(execution: unknown): boolean {
+  if (!isObject(execution) || !Array.isArray(execution.actions)) {
+    return false;
+  }
+  return execution.actions.some((action) => {
+    if (!isObject(action) || action.type !== "take_screenshot" || !isObject(action.params)) {
+      return false;
+    }
+    const path = action.params.path;
+    return typeof path === "string" && path.trim() !== "" && !isAbsolute(path);
+  });
+}
+
 export function parseDaemonRunExecutionResult(raw: string): RunExecutionResult {
   const parsed = JSON.parse(raw) as unknown;
   if (!isObject(parsed) || typeof parsed.ok !== "boolean") {
@@ -342,6 +356,9 @@ export async function tryDaemonExecution(
   deps: DaemonProxyDeps = {}
 ): Promise<RunExecutionResult | null> {
   if (process.env.CLAWPERATOR_NO_DAEMON === "1" || options.noDaemon || process.platform === "win32") {
+    return null;
+  }
+  if (hasCallerRelativeScreenshotPath(execution)) {
     return null;
   }
 

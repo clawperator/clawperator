@@ -192,15 +192,18 @@ Daemon proxying is active for:
 
 Dry-run and validation-only `exec` modes do not need the daemon because they do not dispatch to Android.
 
+If an execution contains `take_screenshot` with a caller-relative `params.path`, the command runs direct before daemon startup. This preserves the normal CLI behavior where relative screenshot paths resolve from the caller's current working directory, not from the daemon process working directory.
+
 Proxy selection rules:
 
 1. If `--no-daemon` or `CLAWPERATOR_NO_DAEMON=1` is set, the command runs direct.
-2. If the platform is Windows, the command runs direct because this task uses Unix domain sockets only.
-3. If the socket is missing, the proxy serializes daemon startup with the lifecycle lock, spawns `daemon run`, polls `/ping` every `100` ms, and waits up to `3000` ms.
-4. If the socket exists but connection is refused, the proxy deletes the stale socket and starts a new daemon.
-5. If `/version` does not match the current CLI version and build identity, the proxy stops the old daemon and starts a new one.
-6. If the daemon is ready and the version and build identity match, the command sends the execution payload to `POST /execute`.
-7. If the daemon cannot become ready before dispatch, the command runs direct for that call.
+2. If the execution includes `take_screenshot` with a relative output path, the command runs direct.
+3. If the platform is Windows, the command runs direct because this task uses Unix domain sockets only.
+4. If the socket is missing, the proxy serializes daemon startup with the lifecycle lock, spawns `daemon run`, polls `/ping` every `100` ms, and waits up to `3000` ms.
+5. If the socket exists but connection is refused, the proxy deletes the stale socket and starts a new daemon.
+6. If `/version` does not match the current CLI version and build identity, the proxy stops the old daemon and starts a new one.
+7. If the daemon is ready and the version and build identity match, the command sends the execution payload to `POST /execute`.
+8. If the daemon cannot become ready before dispatch, the command runs direct for that call.
 
 The proxy sends the caller's effective Operator package in the request body. Precedence is:
 

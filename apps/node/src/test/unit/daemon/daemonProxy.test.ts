@@ -3,7 +3,14 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { getDaemonPostTimeoutMs, parseDaemonRunExecutionResult, tryDaemonExecution, type DaemonHttpFailure, type DaemonHttpSuccess } from "../../../cli/daemonProxy.js";
+import {
+  getDaemonPostTimeoutMs,
+  hasCallerRelativeScreenshotPath,
+  parseDaemonRunExecutionResult,
+  tryDaemonExecution,
+  type DaemonHttpFailure,
+  type DaemonHttpSuccess,
+} from "../../../cli/daemonProxy.js";
 import { formatRunExecutionResultForCli } from "../../../cli/output.js";
 import { getDaemonSocketPath } from "../../../domain/daemon/lifecycle.js";
 import { DEFAULT_OPERATOR_PACKAGE } from "../../../domain/config/resolveOperatorPackage.js";
@@ -142,6 +149,43 @@ describe("tryDaemonExecution", () => {
       deviceId: "device-1",
       operatorPackage: DEFAULT_OPERATOR_PACKAGE,
     });
+  });
+
+  it("detects caller-relative screenshot output paths", () => {
+    assert.equal(hasCallerRelativeScreenshotPath({
+      ...execution,
+      actions: [{ id: "shot", type: "take_screenshot", params: { path: "shot.png" } }],
+    }), true);
+    assert.equal(hasCallerRelativeScreenshotPath({
+      ...execution,
+      actions: [{ id: "shot", type: "take_screenshot", params: { path: "/tmp/shot.png" } }],
+    }), false);
+    assert.equal(hasCallerRelativeScreenshotPath({
+      ...execution,
+      actions: [{ id: "shot", type: "take_screenshot", params: { path: " " } }],
+    }), false);
+  });
+
+  it("runs direct before daemon startup when screenshot output path is relative", async () => {
+    let queried = false;
+    let posted = false;
+    const result = await tryDaemonExecution({
+      ...execution,
+      actions: [{ id: "shot", type: "take_screenshot", params: { path: "shot.png" } }],
+    }, {}, {
+      httpGetFn: async () => {
+        queried = true;
+        return JSON.stringify({ ok: true });
+      },
+      httpPostFn: async (): Promise<DaemonHttpSuccess> => {
+        posted = true;
+        return { ok: true, body: JSON.stringify(successResult) };
+      },
+    });
+
+    assert.equal(result, null);
+    assert.equal(queried, false);
+    assert.equal(posted, false);
   });
 
   it("returns null instead of posting to an unowned responding socket", async () => {
