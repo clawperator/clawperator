@@ -229,11 +229,12 @@ describe("tryDaemonExecution", () => {
   });
 
   it("stops and restarts when daemon version mismatches", async () => {
+    const baseDir = await makeBaseDir();
     let fresh = false;
     let stopped = false;
     let spawned = false;
 
-    const result = await tryDaemonExecution(execution, { startTimeoutMs: 5, pollIntervalMs: 1 }, {
+    const result = await tryDaemonExecution(execution, { baseDir, startTimeoutMs: 5, pollIntervalMs: 1 }, {
       ...makeOwnedDaemonDeps(),
       httpGetFn: async (_socketPath, path) => {
         if (path === "/ping") {
@@ -263,11 +264,12 @@ describe("tryDaemonExecution", () => {
   });
 
   it("stops and restarts when daemon build identity mismatches", async () => {
+    const baseDir = await makeBaseDir();
     let fresh = false;
     let stopped = false;
     let spawned = false;
 
-    const result = await tryDaemonExecution(execution, { startTimeoutMs: 5, pollIntervalMs: 1 }, {
+    const result = await tryDaemonExecution(execution, { baseDir, startTimeoutMs: 5, pollIntervalMs: 1 }, {
       ...makeOwnedDaemonDeps(),
       httpGetFn: async (_socketPath, path) => {
         if (path === "/ping") {
@@ -302,11 +304,12 @@ describe("tryDaemonExecution", () => {
   });
 
   it("stops and restarts when owned daemon version response is invalid", async () => {
+    const baseDir = await makeBaseDir();
     let fresh = false;
     let stopped = false;
     let spawned = false;
 
-    const result = await tryDaemonExecution(execution, { startTimeoutMs: 5, pollIntervalMs: 1 }, {
+    const result = await tryDaemonExecution(execution, { baseDir, startTimeoutMs: 5, pollIntervalMs: 1 }, {
       ...makeOwnedDaemonDeps(),
       httpGetFn: async (_socketPath, path) => {
         if (path === "/ping") {
@@ -496,6 +499,7 @@ describe("tryDaemonExecution", () => {
   });
 
   it("lets concurrent auto-start callers both receive results", async () => {
+    const baseDir = await makeBaseDir();
     let spawnCount = 0;
     let alive = false;
     const deps = {
@@ -517,8 +521,8 @@ describe("tryDaemonExecution", () => {
     };
 
     const [first, second] = await Promise.all([
-      tryDaemonExecution(execution, { startTimeoutMs: 10, pollIntervalMs: 1 }, deps),
-      tryDaemonExecution(execution, { startTimeoutMs: 10, pollIntervalMs: 1 }, deps),
+      tryDaemonExecution(execution, { baseDir, startTimeoutMs: 10, pollIntervalMs: 1 }, deps),
+      tryDaemonExecution(execution, { baseDir, startTimeoutMs: 10, pollIntervalMs: 1 }, deps),
     ]);
 
     assert.equal(spawnCount, 1);
