@@ -95,7 +95,11 @@ fake discovery. Route the work into a local shell context first.
   step whose meaning cannot be inferred safely.
 - When routing to `clawperator-skill-author-by-recording`, pass forward the observed app
   route, mutation notes, evidence inventory, classification, and any known
-  setup caveats that matter to the recording pass.
+  setup caveats that matter to the recording pass. Steer the recording workflow
+  toward the same **`SkillResult` shape** the runtime expects: nested
+  **`skillResult.result`** first (evidence-shaped), then **`skillResult.status`**,
+  then proof fields. When suggesting nearby exemplar skills from the registry,
+  prefer skills that already emit **`skillResult.result`** in framed runs.
 
 ## Discovery Budget
 

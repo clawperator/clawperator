@@ -1007,6 +1007,9 @@ parsing:
 
 Current v1 `SkillResult` fields:
 
+- **discoverable domain answer (emitted first in nested JSON; optional only during
+  migration, then required on framed objects in a follow-on release):**
+  - `result` (`SkillCheckpointEvidence` or `null` when no truthful value exists)
 - required:
   - `contractVersion`
   - `skillId`
@@ -1014,12 +1017,31 @@ Current v1 `SkillResult` fields:
   - `checkpoints`
 - injected by `runSkill()`:
   - `source`
-- optional:
+- also optional:
   - `goal`
   - `inputs`
   - `terminalVerification`
   - `execEnvelopes`
   - `diagnostics`
+
+**Authoring best practices for `result` and proof fields:**
+
+- Every **new** or **migrated** framed skill should emit `result` with a
+  `SkillCheckpointEvidence` value, or `result: null` when no truthful domain value
+  exists.
+- Put **`result` before `status`** in emitted JSON so humans and agents scan the
+  answer first.
+- Use the evidence union only: `kind: "text"`, `kind: "json"`, or
+  `kind: "result_envelope_ref"`. Collections go in a singular `result`, for
+  example `{ "kind": "json", "value": { "items": [...] } }`.
+- **`terminalVerification`** is proof of final state, not the primary answer
+  channel. Duplicate values into `result` when the same value is both the answer
+  and the proof.
+- **`diagnostics`** is for `runtimeState`, warnings, hints, paths, and debug
+  metadata only, not a parallel copy of the return value.
+- For non-trivial flows, prefer **map or state-machine checkpoints**: include
+  expected checkpoint ids and mark unreached steps `skipped` instead of omitting
+  nodes, when the skill needs a complete progress map.
 
 Current status enums:
 
@@ -1033,11 +1055,11 @@ Current typed checkpoint evidence kinds:
 - `json`
 - `result_envelope_ref`
 
-Minimal framed example:
+Minimal framed example (note `result` before `status`):
 
 ```text
 [Clawperator-Skill-Result]
-{"contractVersion":"1.0.0","skillId":"com.example.demo.capture-state","status":"success","checkpoints":[{"id":"terminal_state_verified","status":"ok","evidence":{"kind":"text","text":"Discharge to 40%"}}],"terminalVerification":{"status":"verified","expected":{"kind":"text","text":"Discharge to 40%"},"observed":{"kind":"text","text":"Discharge to 40%"}}}
+{"contractVersion":"1.0.0","skillId":"com.example.demo.capture-state","result":{"kind":"text","text":"40%"},"status":"success","checkpoints":[{"id":"terminal_state_verified","status":"ok","evidence":{"kind":"text","text":"Discharge to 40%"}}],"terminalVerification":{"status":"verified","expected":{"kind":"text","text":"Discharge to 40%"},"observed":{"kind":"text","text":"Discharge to 40%"}}}
 ```
 
 Current authoring rule for new non-trivial skills:
@@ -1104,10 +1126,15 @@ clawperator skills run com.example.demo.capture-state --device <device_serial>
 
 For the run result, verify:
 
-- `skillId` matches the registry id
-- `output` contains the full stdout, including the framed result when emitted
-- `exitCode` is `0`
-- `skillResult` is either a parsed object or `null` for a legacy skill
+- for framed default JSON **success**, top-level `skillId` and `output` are
+  **omitted**; read **`skillResult.result`** for the answer and
+  `skillResult.skillId` for identity
+- for legacy unframed success, `skillId`, `output`, and `exitCode` remain on the
+  wrapper, and `skillResult` is `null`
+- when `output` is present (legacy or **SKILL_OUTPUT_ASSERTION_FAILED**), it is
+  raw stdout, including the frame line when the skill prints one
+- `exitCode` is `0` on success when present
+- `skillResult` is either a parsed object or `null` for a legacy unframed skill
 
 If the script exits non-zero, `skills run` returns `SKILL_EXECUTION_FAILED` and
 preserves `stdout`, `stderr`, `exitCode`, and any parsed `skillResult`.

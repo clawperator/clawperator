@@ -458,9 +458,12 @@ Argument mapping:
 
 ### Success response
 
+**Unframed success (`skillResult: null`, example `com.test.echo`):**
+
 ```json
 {
   "ok": true,
+  "status": "success",
   "skillId": "com.test.echo",
   "output": "TEST_OUTPUT:hello\nTEST_OUTPUT:api\n",
   "skillResult": null,
@@ -471,6 +474,28 @@ Argument mapping:
 }
 ```
 
+**Framed success (parsed `skillResult` present):** top-level `status`, `skillId`,
+`output`, and `exitCode` are **omitted**. The HTTP layer still includes `ok: true`
+and the nested `skillResult` (read **`skillResult.result`** for the domain
+answer), plus `durationMs` and optional `timeoutMs` / `expectedSubstring` when
+set.
+
+```json
+{
+  "ok": true,
+  "skillResult": {
+    "result": { "kind": "text", "text": "ok" },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.example.framed",
+    "checkpoints": [],
+    "source": { "kind": "script" }
+  },
+  "durationMs": 18,
+  "timeoutMs": 4321
+}
+```
+
 Behavior:
 
 - if `expectContains` is provided and `output` does not contain that substring, the route returns HTTP `400`
@@ -478,9 +503,15 @@ Behavior:
 - if the skill ID does not exist, the route returns HTTP `404`
 - if skill registry loading fails, the route returns HTTP `500` with `REGISTRY_READ_FAILED`
 - other `runSkill()` failures, including non-zero exit and timeout, return HTTP `400`
-- when a skill emits a framed `SkillResult`, successful and error responses include `skillResult`
+- when a skill emits a framed `SkillResult`, success JSON **omits** duplicate top-level
+  `status`, `skillId`, `output`, and `exitCode`; **indeterminate** responses with a
+  parsed `skillResult` keep wrapper `status`, `code`, and `message` but omit
+  `skillId`, `exitCode`, and `output`
+- when `skillResult` is `null`, the route keeps the legacy top-level `skillId`, `output`,
+  and `exitCode` fields
 - malformed framed output returns `SKILL_RESULT_PARSE_FAILED`
-- successful responses always include `exitCode: 0`
+- successful unframed responses include `exitCode: 0`; framed success responses omit
+  `exitCode` at the top level (process exit is still `0` on the run)
 
 Failure examples:
 

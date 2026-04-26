@@ -459,23 +459,29 @@ Use a JSON run first so you can verify the wrapper envelope separately from the 
 clawperator skills run com.android.settings.capture-overview --timeout 3210
 ```
 
-Success response:
+Success response (legacy unframed skill, `skillResult: null`):
 
 ```json
 {
+  "status": "success",
   "skillId": "com.android.settings.capture-overview",
   "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
+  "skillResult": null,
   "exitCode": 0,
   "durationMs": 15842,
   "timeoutMs": 3210
 }
 ```
 
-Check these exact fields:
+For skills that emit a framed `SkillResult`, default JSON **omits** top-level
+`status`, `skillId`, `exitCode`, and `output` on success. Verify `skillResult`
+and especially **`skillResult.result`**.
+
+Check these exact fields (when `skillResult` is `null`):
 
 - `skillId` matches the requested registry id
 - `output` is the raw stdout stream captured from the skill script
-- `skillResult` is either a parsed structured result or `null` for a legacy skill
+- `skillResult` is `null` for a legacy unframed skill
 - `exitCode` is `0` on success
 - `durationMs` is the measured wrapper runtime
 - `timeoutMs` is present only when a timeout override was passed on the CLI
@@ -501,12 +507,15 @@ To verify wrapper-side output assertions, run:
 clawperator skills run com.android.settings.capture-overview --expect-contains RESULT
 ```
 
-If the expected text is present, the success payload echoes the assertion:
+If the expected text is present, the success payload echoes the assertion (same
+legacy top-level fields when `skillResult` is `null`):
 
 ```json
 {
+  "status": "success",
   "skillId": "com.android.settings.capture-overview",
   "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
+  "skillResult": null,
   "exitCode": 0,
   "durationMs": 15842,
   "expectedSubstring": "RESULT"
@@ -514,6 +523,28 @@ If the expected text is present, the success payload echoes the assertion:
 ```
 
 ## `skills run` Success Shape
+
+**Framed success (default JSON, `skillResult` present):** the answer is
+`skillResult.result`. Top-level `status`, `skillId`, `exitCode`, and `output`
+are **omitted** so agents do not scrape duplicate process text. See
+[Device Prep and Runtime](runtime.md#skill-result-trust-order-and-json-wrapper-policy).
+
+```json
+{
+  "skillResult": {
+    "result": { "kind": "text", "text": "ok" },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.example.app.skill",
+    "checkpoints": [],
+    "source": { "kind": "script" }
+  },
+  "durationMs": 15842
+}
+```
+
+**Legacy unframed success (`skillResult: null`):** there is no parsed frame, so
+the wrapper keeps process metadata on the top level.
 
 ```json
 {
@@ -528,32 +559,49 @@ If the expected text is present, the success payload echoes the assertion:
 
 Important:
 
-- `output` is raw stdout from the script
-- the wrapper parses a trailing framed `SkillResult` when present and returns it as `skillResult`
-- the top-level wrapper `status` is `success`, `failed`, or `indeterminate`
-- when a declared verification contract is not proved, the wrapper returns `status: "indeterminate"` without rewriting the emitted `skillResult`
-- progress lines written by the skill to stdout remain inside `output` in JSON mode
-- pretty mode writes a banner before streaming live skill output, so use default JSON output when another agent needs machine-readable output
+- for framed runs, read **`skillResult.result`** for the domain return value; do not use
+  `diagnostics`, `terminalVerification`, or checkpoint-only evidence as the only
+  answer path
+- the wrapper parses a trailing framed `SkillResult` when present and returns it as
+  `skillResult`
+- the top-level wrapper `status` is `success`, `failed`, or `indeterminate` when
+  `skillResult` is `null` or on failure paths; for **default JSON framed success** it is
+  omitted (see [runtime.md](runtime.md))
+- when a declared verification contract is not proved, the wrapper returns
+  `status: "indeterminate"` without rewriting the emitted `skillResult`
+- for legacy runs, `output` is raw stdout from the script; framed default JSON
+  success omits `output` because the structured `skillResult` is authoritative
+- pretty mode still streams human-readable output; use default JSON for machine
+  consumption
 - in JSON mode, the wrapper returns one JSON object and does not stream live child stdout separately
 - `timeoutMs` is present only when the caller passed `--timeout` or `--timeout-ms`
 - `expectedSubstring` is present only when the caller passed `--expect-contains`
 
 ## `skills run` Indeterminate Shape
 
+**Framed indeterminate (parsed `skillResult`, default JSON):** keep wrapper
+`status`, `code`, and `message`; **omit** top-level `skillId`, `exitCode`, and
+`output`.
+
 ```json
 {
   "status": "indeterminate",
   "code": "SKILL_VERIFICATION_INDETERMINATE",
   "message": "Declared verification was not proved.",
-  "skillId": "com.android.settings.capture-overview",
-  "output": "[Clawperator-Skill-Result]\n{\"status\":\"success\"}\n",
   "skillResult": {
-    "status": "success"
+    "result": { "kind": "json", "value": { "note": "example" } },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.android.settings.capture-overview",
+    "checkpoints": [],
+    "source": { "kind": "script" }
   },
-  "exitCode": 0,
   "durationMs": 15842
 }
 ```
+
+**Unframed / legacy indeterminate** (no `SkillResult` frame, `skillResult: null`):
+the wrapper may still include `output` and `skillId` because there is no frame.
 
 ## `skills run` Failure Shape
 

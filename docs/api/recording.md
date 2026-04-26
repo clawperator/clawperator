@@ -82,7 +82,7 @@ Notes:
 - `recording compare` defaults to `--mode auto`
 - if `recording export --input` points at a file and `--out` is omitted, the output path is `<input without .ndjson>.export.json` when the input ends with `.ndjson`, otherwise `<input>.export.json`
 - if `recording export --input` points at a directory, the command picks the newest `*.ndjson` file in that directory and derives the default export path from that resolved file
-- `recording compare` reads a saved `clawperator skills run` JSON wrapper file and extracts its top-level `skillResult`
+- `recording compare` reads a saved `clawperator skills run` JSON wrapper file and extracts its top-level `skillResult` (the durable compare input is still the full wrapper; compare logic continues to use `skillResult.checkpoints` and `skillResult.terminalVerification` as defined by the compare implementation). The domain answer for migrated skills is expected at **`skillResult.result`**
 - for authored skills, the durable retained baseline for compare should live under a reference-style path such as `skills/<skill_id>/references/compare-baseline.export.json`
 - that retained baseline is authoring and maintenance evidence, not a runtime artifact consumed by `skills run`
 - a common authoring workflow is:

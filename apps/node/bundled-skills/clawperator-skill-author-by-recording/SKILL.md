@@ -562,16 +562,22 @@ clawperator snapshot --device <device_serial> --operator-package <operator_packa
 
 ### 14. Surface The `SkillResult`
 
-Inspect the saved `skills run` wrapper and surface the top-level
-`skillResult`.
+Inspect the saved `skills run` wrapper. For **framed** default JSON success, the
+top level has **no** duplicate `status`, `skillId`, `exitCode`, or `output`; the
+parsed object is under `skillResult` only.
 
-Call out at least:
+Call out at least, in this order when present:
 
+- **`skillResult.result`** (canonical domain answer; authoring is incomplete until
+  a self-test proves this path is populated for the skill's real return value)
 - `skillResult.status`
 - `skillResult.source`
 - `skillResult.checkpoints`
 - `skillResult.terminalVerification`
 - `skillResult.diagnostics`
+
+Framed success wrappers should not duplicate top-level process metadata that is
+already represented inside `skillResult`.
 
 When compare is relevant, note that the saved wrapper file is the durable v1
 `--result` input for:
