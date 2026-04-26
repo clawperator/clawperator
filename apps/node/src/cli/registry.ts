@@ -2700,6 +2700,29 @@ COMMANDS["daemon"] = {
 };
 
 // serve
+export function buildServeCommandOptions(ctx: HandlerContext): {
+  ok: true;
+  options: {
+    port: number;
+    host: string;
+    operatorPackage?: string;
+    verbose: boolean;
+    logger: Logger;
+  };
+} | {
+  ok: false;
+  output: string;
+} {
+  const { rest, verbose, logger, operatorPackage } = ctx;
+  const portStr = getOpt(rest, "--port");
+  const port = portStr ? parseInt(portStr, 10) : 3000;
+  const host = getOpt(rest, "--host") ?? "127.0.0.1";
+  if (isNaN(port) || port <= 0 || port > 65535) {
+    return { ok: false, output: JSON.stringify({ code: "USAGE", message: "Invalid port number. Must be 1-65535." }) };
+  }
+  return { ok: true, options: { port, host, operatorPackage, verbose, logger } };
+}
+
 COMMANDS["serve"] = {
   name: "serve",
   group: "Execution",
@@ -2710,19 +2733,11 @@ COMMANDS["serve"] = {
   topLevelBlock: `  serve [--port <number>] [--host <string>]
                                             Start local HTTP/SSE server for remote control (default host: 127.0.0.1)`,
   handler: async (ctx) => {
-    const { rest, verbose, logger } = ctx;
-    const portStr = getOpt(rest, "--port");
-    const port = portStr ? parseInt(portStr, 10) : 3000;
-    const host = getOpt(rest, "--host") ?? "127.0.0.1";
-    if (isNaN(port) || port <= 0 || port > 65535) {
-      return JSON.stringify({ code: "USAGE", message: "Invalid port number. Must be 1-65535." });
+    const built = buildServeCommandOptions(ctx);
+    if (!built.ok) {
+      return built.output;
     }
-    await (await import("./commands/serve.js")).cmdServe({
-      port,
-      host,
-      verbose,
-      logger,
-    });
+    await (await import("./commands/serve.js")).cmdServe(built.options);
     // Long-running: cmdServe never resolves in normal operation.
     // Return undefined so the dispatcher's `result !== undefined` guard
     // skips console.log, matching the old switch behavior.

@@ -7,9 +7,16 @@ import { tmpdir } from "node:os";
 import type express from "express";
 import { createServeApp, startServer } from "../../../cli/commands/serve.js";
 import { getCliBuildIdentity, getCliVersion } from "../../../domain/version/compatibility.js";
+import { buildServeCommandOptions } from "../../../cli/registry.js";
+import type { Logger } from "../../../adapters/logger.js";
 
 const servers: Server[] = [];
 const tempDirs: string[] = [];
+const noopLogger: Logger = {
+  emit: () => undefined,
+  child: () => noopLogger,
+  logPath: () => undefined,
+};
 
 async function closeServer(server: Server): Promise<void> {
   await new Promise<void>((resolve, reject) => {
@@ -114,5 +121,31 @@ describe("serve app", () => {
       startServer({ verbose: false }),
       /Exactly one serve transport must be provided/,
     );
+  });
+});
+
+describe("serve command registry", () => {
+  it("forwards the global operator package to serve options", () => {
+    const built = buildServeCommandOptions({
+      argv: ["serve"],
+      rest: ["--port", "4321"],
+      format: "json",
+      explicitJsonOutput: true,
+      verbose: false,
+      noDaemon: false,
+      logger: noopLogger,
+      operatorPackage: "com.clawperator.operator.dev",
+    });
+
+    assert.deepEqual(built, {
+      ok: true,
+      options: {
+      port: 4321,
+      host: "127.0.0.1",
+      operatorPackage: "com.clawperator.operator.dev",
+      verbose: false,
+      logger: noopLogger,
+      },
+    });
   });
 });
