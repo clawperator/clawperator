@@ -1,6 +1,6 @@
 # SkillResult Contract Implementation Plan
 
-**Status:** ready for implementation
+**Status:** PR-C1 and PR-S1 implemented and review-clean; PR-C2 remains
 **Source findings:** `tasks/skills/contract/findings.md`
 **Scope:** `~/src/clawperator` and `~/src/clawperator-skills`
 
@@ -45,6 +45,77 @@ Collections still live in singular `result`, for example:
   core contract decision. The decision is to add canonical singular
   `skillResult.result`.
 - Do not update generated docs output by hand.
+- Do not document legacy, old-shape, or migration-window behavior in public
+  docs. This project has no external compatibility audience for those shapes;
+  public docs describe the canonical current contract only.
+
+## Current Status
+
+### Done On `~/src/clawperator`
+
+Branch: `codex/skill-result-contract-migration`
+
+Completed PR-C1:
+
+- Phase 1: added migration-phase `skillResult.result?: SkillCheckpointEvidence | null`.
+- Phase 2: deduplicated framed success and indeterminate JSON responses in
+  `skills run` and `serve` while preserving domain-layer raw stdout.
+- Phase 3: updated docs and bundled authoring guidance to teach
+  `skillResult.result`.
+- Follow-up docs cleanup: removed public legacy and migration-window framing so
+  docs describe only the canonical SkillResult shape.
+
+Validation and review status:
+
+- `npm --prefix apps/node run build && npm --prefix apps/node run test` passed.
+- `./scripts/docs_build.sh` passed after the latest docs cleanup.
+- `review-swarm-loop` completed clean for the PR-C1 scope.
+
+Relevant commits on the branch:
+
+- `5df8bec7 feat(node): add migration-phase skillResult.result to SkillResult contract`
+- `05810d73 feat(node): deduplicate framed skill JSON in CLI and serve responses`
+- `0fac157e docs: document skillResult.result and deduplicated JSON wrappers`
+- `a1168218 fix(compare): accept deduplicated skills run JSON; test indeterminate CLI JSON`
+- `f1480451 docs(skills): align development examples with skill result JSON`
+- `fac71650 docs(skills): clarify serve skill validation gate`
+- `027aff0e docs(skills): document canonical skill result shape only`
+
+### Done On `~/src/clawperator-skills`
+
+Branch: `codex/skill-result-contract`
+
+Completed PR-S1:
+
+- Phase 4: migrated read, search, setter replay, and orchestrated framed skills
+  in scope to emit canonical singular `SkillResult.result`.
+- Phase 5: validated migrated skills against the branch-local PR-C1 Node build.
+- Follow-up review fixes: migrated setter result frames and tightened
+  orchestrated harnesses so they require and preserve `result`, reject missing
+  success results, and emit `result: null` for harness failure frames.
+
+Validation and review status:
+
+- `./scripts/test_all.sh` passed.
+- Static `skills validate --dry-run` checks for the changed skill set passed
+  using the branch-local Node CLI at `~/src/clawperator/apps/node/dist/cli/index.js`.
+- `review-swarm-loop` completed clean for the PR-S1 scope.
+
+Relevant commits on the branch:
+
+- `dbfba5a feat(skills): emit skillResult.result on migrated framed skills`
+- `329f392 fix(skills): add canonical result to setter frames`
+- `08e9c05 fix(skills): validate orchestrated success results`
+
+### Remaining Work
+
+PR-C2 is the only remaining planned PR:
+
+- Make `SkillResult.result` required in runtime TypeScript and Zod schemas.
+- Update fixtures and tests so missing `result` is rejected.
+- Re-run Node tests, docs build, and cross-repo skill validation against the
+  migrated skills.
+- Keep public docs canonical. Do not add legacy or migration-window sections.
 
 ## Contract Decisions
 
@@ -68,12 +139,13 @@ Collections still live in singular `result`, for example:
    keep wrapper fields only when they add distinct wrapper state, such as
    `status`, `code`, or `message`. Do not duplicate `skillId` or process
    metadata already outside the answer path.
-10. Keep `output` for legacy unframed skills where `skillResult === null`.
-   Also keep `output` for `SKILL_OUTPUT_ASSERTION_FAILED`, where it shows what
-   the skill printed when the assertion failed.
+10. Keep `output` for `SKILL_OUTPUT_ASSERTION_FAILED`, where it shows what the
+   skill printed when the assertion failed. Runtime code may still have
+   compatibility behavior for `skillResult === null`, but public docs should
+   not teach that path.
 11. Do not move `exitCode` into `SkillResult`. It is process metadata, not a
-   domain result or proof field. Retain it only on legacy or failure paths where
-   it is useful diagnostics.
+   domain result or proof field. Retain it only on failure paths where it is
+   useful diagnostics.
 12. Apply the same policy in `serve.ts` as in `skills.ts`. Both currently pass
    `result.output` through independently and both need updating.
 13. New and migrated non-trivial skills should prefer map/state-machine
@@ -103,7 +175,7 @@ on framed success-like responses.
 ### PR-C1: Clawperator Migration Contract
 
 **Repo:** `~/src/clawperator`
-**Can start immediately:** yes
+**Status:** implemented on `codex/skill-result-contract-migration`; review-clean
 **Must land before PR-C2:** yes
 
 Add the migration-phase runtime contract and make the CLI output easier for
@@ -123,11 +195,10 @@ Required outcomes:
 - `skills run` JSON indeterminate and failure responses avoid duplicate
   `skillId` and process metadata when a parsed `skillResult` already carries
   the skill identity.
-- `skills run` JSON keeps `output` for legacy unframed skills and
-  `SKILL_OUTPUT_ASSERTION_FAILED` diagnostics.
+- `skills run` JSON keeps `output` for `SKILL_OUTPUT_ASSERTION_FAILED`
+  diagnostics.
 - The serve endpoint applies the same JSON response policy.
-- Public docs in `docs/skills` explain the new extraction path and the temporary
-  optional migration shape.
+- Public docs in `docs/skills` explain the canonical extraction path.
 - `docs/skills/runtime.md` includes an explicit ideal framed success JSON shape:
   wrapper object with `skillResult` only, nested `result` first, nested `status`
   second, no duplicate top-level `status`, `skillId`, `exitCode`, or `output`.
@@ -136,9 +207,9 @@ Required outcomes:
   diagnostics or terminal verification, and map/state-machine checkpoints for
   non-trivial flows.
 - `docs/skills/overview.md` updates high-level wrapper examples so agents learn
-  the clean framed success shape before legacy `output` examples.
+  the clean success shape.
 - Docs define where `output` is absent and where it is retained. Retained
-  `output` is diagnostic or legacy data, not the domain answer.
+  `output` is diagnostic data, not the domain answer.
 - Relevant bundled skill authoring guidance under
   `apps/node/bundled-skills/clawperator-*` teaches agents to emit and inspect
   `skillResult.result`.
@@ -151,8 +222,9 @@ Required outcomes:
 ### PR-S1: Runtime Skills Migration
 
 **Repo:** `~/src/clawperator-skills`
-**Can start after PR-C1 contract shape is stable:** yes
-**May run concurrently with PR-C1 review:** yes
+**Status:** implemented on `codex/skill-result-contract`; review-clean
+**Can start after PR-C1 contract shape is stable:** done
+**May run concurrently with PR-C1 review:** done
 **Must land before PR-C2:** yes
 
 Move primary outputs in runtime skills to canonical singular
@@ -177,7 +249,8 @@ Required outcomes:
 ### PR-C2: Clawperator Required Result
 
 **Repo:** `~/src/clawperator`
-**Can start after PR-S1 is merged or otherwise coordinated into validation:** yes
+**Status:** not started
+**Can start after PR-C1 and PR-S1 are merged or otherwise coordinated into validation:** yes
 
 Close the migration window and make `result` required for framed `SkillResult`
 objects.
@@ -188,12 +261,10 @@ Required outcomes:
   `result: SkillCheckpointEvidence | null`.
 - Runtime TypeScript and Zod definitions keep `result` as the first nested
   `SkillResult` field and `status` as the second.
-- Framed SkillResult fixtures, tests, docs, and bundled skill guidance no longer
-  describe missing `result` as acceptable for newly framed skills.
+- Framed SkillResult fixtures and tests no longer accept missing `result`.
 - Compare, serve, and CLI docs continue to describe the wrapper object as the
   durable run artifact while naming `skillResult.result` as the domain answer.
-- Public docs no longer present legacy `output`-first examples as the preferred
-  shape for framed success runs.
+- Public docs continue to describe only the canonical success shape.
 - Validation includes at least one migrated read skill and one migrated setter
   skill from `~/src/clawperator-skills`.
 

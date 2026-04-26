@@ -3,6 +3,9 @@
 **Date:** 2026-04-26
 **Sources reconciled:** `findings-claude.md`, `findings-codex.md`, `findings-skill-survey.md`
 **Review stance:** EM synthesis for implementation planning
+**Current status:** findings 1-8 have implementation coverage in PR-C1 and
+PR-S1 branches. PR-C2 remains to make `SkillResult.result` required in the
+runtime schema and close the migration window.
 
 **Verified against:**
 
@@ -20,20 +23,20 @@
 
 ## Executive Summary
 
-The current `clawperator skills run` JSON shape is optimized for complete
-debug capture and raw stdout preservation. It is parseable, but it is not yet a
-good general-purpose contract for agents or operators who want the answer to a
-skill run.
+The original audited `clawperator skills run` JSON shape was optimized for
+complete debug capture and raw stdout preservation. It was parseable, but it
+was not a good general-purpose contract for agents or operators who want the
+answer to a skill run.
 
-The blocking issue is not just noisy output. The runtime has no canonical,
+The blocking issue was not just noisy output. The runtime had no canonical,
 schema-supported location for the skill's domain result. Some skill scripts
-already emit a root `result`, but `apps/node/src/contracts/skillResult.ts` does
-not define that field, so Zod strips it before the parsed `skillResult` reaches
-CLI and serve consumers. Those existing script-level `result` payloads are also
-plain JSON objects, not `SkillCheckpointEvidence`, so they still need migration
-into the canonical evidence shape after schema support lands.
+already emitted a root `result`, but `apps/node/src/contracts/skillResult.ts`
+did not define that field, so Zod stripped it before the parsed `skillResult`
+reached CLI and serve consumers. Those existing script-level `result` payloads
+were also plain JSON objects, not `SkillCheckpointEvidence`, so they needed
+migration into the canonical evidence shape after schema support landed.
 
-The right implementation order is:
+The implementation order is:
 
 1. Add `skillResult.result` to the runtime schema as the canonical answer field,
    initially optional for the migration window.
@@ -42,9 +45,12 @@ The right implementation order is:
 3. Migrate skills so primary outputs leave `diagnostics`, checkpoint-only
    evidence, and terminal-verification-only evidence.
 4. Drop `output` from JSON success and indeterminate responses when
-   `skillResult` is present. Keep `output` only for legacy unframed skills and
-   assertion-failure diagnostics. Prefer the clean contract over raw-frame or
-   progress-text retention.
+   `skillResult` is present. Keep `output` only for assertion-failure
+   diagnostics in the canonical public contract. Prefer the clean contract over
+   raw-frame or progress-text retention.
+
+PR-C1 and PR-S1 have completed steps 1-4 for the migration branches. PR-C2
+remains to make `result` required and update tests accordingly.
 
 ---
 

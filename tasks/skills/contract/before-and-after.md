@@ -3,9 +3,13 @@
 **Purpose:** preserve the concrete run that exposed the contract problem and
 define the expected final shape after PR-C1, PR-S1, and PR-C2.
 
+**Current status:** PR-C1 and PR-S1 now implement the expected reduced shape
+below on their respective branches. PR-C2 remains to make missing `result`
+invalid at runtime.
+
 ## Seed Skill For PR-S1
 
-PR-S1 should migrate this skill first:
+PR-S1 migrated this skill first:
 
 ```text
 com.globird.energy.get-yesterday-usage-cost-replay
@@ -95,11 +99,10 @@ Reduced observed shape:
 
 ## After PR-C1 And PR-S1
 
-After PR-C1 adds migration-phase schema support and PR-S1 migrates the GloBird
-skill, the same run should expose the scalar answer at
-`skillResult.result`.
+After PR-C1 adds schema support and PR-S1 migrates the GloBird skill, the same
+run exposes the scalar answer at `skillResult.result`.
 
-Expected properties:
+Expected properties now implemented:
 
 - `skillResult.result` is present
 - `skillResult.result` is evidence-shaped
