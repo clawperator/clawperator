@@ -655,31 +655,54 @@ export function createServeApp(options: ServeAppOptions): express.Application {
         expectContainsArg
       );
       if (result.status === "success") {
-        res.json({
-          status: result.status,
-          ok: true,
-          skillId: result.skillId,
-          output: result.output,
-          exitCode: result.exitCode,
-          durationMs: result.durationMs,
-          skillResult: result.skillResult,
-          timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
-          expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
-        });
+        if (result.skillResult !== null) {
+          res.json({
+            ok: true,
+            skillResult: result.skillResult,
+            durationMs: result.durationMs,
+            timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
+            expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
+          });
+        } else {
+          res.json({
+            status: result.status,
+            ok: true,
+            skillId: result.skillId,
+            output: result.output,
+            exitCode: result.exitCode,
+            durationMs: result.durationMs,
+            skillResult: result.skillResult,
+            timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
+            expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
+          });
+        }
       } else if (result.status === "indeterminate") {
-        res.json({
-          ok: result.ok,
-          status: result.status,
-          code: result.code,
-          message: result.message,
-          skillId: result.skillId,
-          output: result.output,
-          exitCode: result.exitCode,
-          durationMs: result.durationMs,
-          skillResult: result.skillResult,
-          timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
-          expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
-        });
+        if (result.skillResult !== null) {
+          res.json({
+            ok: result.ok,
+            status: result.status,
+            code: result.code,
+            message: result.message,
+            skillResult: result.skillResult,
+            durationMs: result.durationMs,
+            timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
+            expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
+          });
+        } else {
+          res.json({
+            ok: result.ok,
+            status: result.status,
+            code: result.code,
+            message: result.message,
+            skillId: result.skillId,
+            output: result.output,
+            exitCode: result.exitCode,
+            durationMs: result.durationMs,
+            skillResult: result.skillResult,
+            timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
+            expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
+          });
+        }
       } else if (result.code === SKILL_OUTPUT_ASSERTION_FAILED) {
         res.status(400).json({
           status: result.status,

@@ -512,7 +512,10 @@ describe("serve API integration", () => {
     assert.strictEqual(res.status, 200);
     const body = await res.json() as {
       ok: boolean;
+      status?: string;
       skillId?: string;
+      output?: string;
+      exitCode?: number;
       skillResult?: {
         skillId?: string;
         status?: string;
@@ -520,7 +523,10 @@ describe("serve API integration", () => {
       } | null;
     };
     assert.strictEqual(body.ok, true);
-    assert.strictEqual(body.skillId, "com.test.skill-result");
+    assert.strictEqual(body.status, undefined);
+    assert.strictEqual(body.skillId, undefined);
+    assert.strictEqual(body.output, undefined);
+    assert.strictEqual(body.exitCode, undefined);
     assert.strictEqual(body.skillResult?.skillId, "com.test.skill-result");
     assert.strictEqual(body.skillResult?.status, "success");
     assert.strictEqual(body.skillResult?.source?.kind, "script");
@@ -637,7 +643,10 @@ describe("serve API integration", () => {
     assert.strictEqual(res.status, 200);
     const body = await res.json() as {
       ok: boolean;
+      status?: string;
       skillId?: string;
+      output?: string;
+      exitCode?: number;
       skillResult?: {
         skillId?: string;
         status?: string;
@@ -645,11 +654,42 @@ describe("serve API integration", () => {
       } | null;
     };
     assert.strictEqual(body.ok, true);
-    assert.strictEqual(body.skillId, "com.test.agent-skill-result");
+    assert.strictEqual(body.status, undefined);
+    assert.strictEqual(body.skillId, undefined);
+    assert.strictEqual(body.output, undefined);
+    assert.strictEqual(body.exitCode, undefined);
     assert.strictEqual(body.skillResult?.skillId, "com.test.agent-skill-result");
     assert.strictEqual(body.skillResult?.status, "success");
     assert.strictEqual(body.skillResult?.source?.kind, "agent");
     assert.strictEqual(body.skillResult?.source?.agentCli, "codex");
+  });
+
+  test("POST /skills/:skillId/run omits skillId, exitCode, and output for indeterminate with parsed skillResult", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.agent-skill-result/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ args: ["indeterminate", "40"] }),
+    });
+
+    assert.strictEqual(res.status, 200);
+    const body = await res.json() as {
+      status?: string;
+      code?: string;
+      ok?: null;
+      skillId?: string;
+      output?: string;
+      exitCode?: number;
+      message?: string;
+      skillResult?: { status?: string } | null;
+    };
+    assert.strictEqual(body.status, "indeterminate");
+    assert.strictEqual(body.code, "SKILL_VERIFICATION_INDETERMINATE");
+    assert.strictEqual(body.ok, null);
+    assert.strictEqual(body.skillId, undefined);
+    assert.strictEqual(body.output, undefined);
+    assert.strictEqual(body.exitCode, undefined);
+    assert.ok(body.skillResult);
+    assert.strictEqual(body.skillResult?.status, "indeterminate");
   });
 
   test("POST /skills/:skillId/run returns skillResult on framed non-zero failure", async () => {
