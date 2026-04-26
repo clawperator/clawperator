@@ -202,9 +202,11 @@ export async function cmdDaemonRun(options: DaemonRunOptions): Promise<void> {
 
 export async function cmdDaemonStart(options: DaemonCommandOptions): Promise<string> {
   const socketPath = getDaemonSocketPath(options.deviceId, options);
+  const timeoutMs = options.pollTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
+  const intervalMs = options.pollIntervalMs ?? DEFAULT_START_POLL_INTERVAL_MS;
   const initialState = await getSocketState(socketPath);
   if (initialState === "alive") {
-    if (await isDaemonRunning(options.deviceId, options)) {
+    if (await waitForOwnedDaemon(socketPath, options, timeoutMs, intervalMs)) {
       return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
     }
     return formatError({
@@ -224,10 +226,10 @@ export async function cmdDaemonStart(options: DaemonCommandOptions): Promise<str
         }
         return refreshedState;
       }, options);
-      if (lockedState === "alive" && await isDaemonRunning(options.deviceId, options)) {
-        return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
-      }
       if (lockedState === "alive") {
+        if (await waitForOwnedDaemon(socketPath, options, timeoutMs, intervalMs)) {
+          return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
+        }
         return formatError({
           code: ERROR_CODES.DAEMON_START_FAILED,
           message: "Daemon socket is responding but is not owned by a managed Clawperator daemon.",
@@ -235,8 +237,6 @@ export async function cmdDaemonStart(options: DaemonCommandOptions): Promise<str
         }, { format: options.format });
       }
       if (lockedState === "not_ready") {
-        const timeoutMs = options.pollTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
-        const intervalMs = options.pollIntervalMs ?? DEFAULT_START_POLL_INTERVAL_MS;
         if (await waitForOwnedDaemon(socketPath, options, timeoutMs, intervalMs)) {
           return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
         }
@@ -247,8 +247,6 @@ export async function cmdDaemonStart(options: DaemonCommandOptions): Promise<str
         }, { format: options.format });
       }
     } else if (initialState === "not_ready") {
-      const timeoutMs = options.pollTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
-      const intervalMs = options.pollIntervalMs ?? DEFAULT_START_POLL_INTERVAL_MS;
       if (await waitForOwnedDaemon(socketPath, options, timeoutMs, intervalMs)) {
         return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
       }
@@ -278,6 +276,9 @@ export async function cmdDaemonStart(options: DaemonCommandOptions): Promise<str
       return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
     }
     if (spawnStatus === "unowned") {
+      if (await waitForOwnedDaemon(socketPath, options, timeoutMs, intervalMs)) {
+        return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
+      }
       return formatError({
         code: ERROR_CODES.DAEMON_START_FAILED,
         message: "Daemon socket is responding but is not owned by a managed Clawperator daemon.",
@@ -285,8 +286,6 @@ export async function cmdDaemonStart(options: DaemonCommandOptions): Promise<str
       }, { format: options.format });
     }
     if (spawnStatus === "not_ready") {
-      const timeoutMs = options.pollTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
-      const intervalMs = options.pollIntervalMs ?? DEFAULT_START_POLL_INTERVAL_MS;
       if (await waitForOwnedDaemon(socketPath, options, timeoutMs, intervalMs)) {
         return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
       }
@@ -304,8 +303,6 @@ export async function cmdDaemonStart(options: DaemonCommandOptions): Promise<str
     }, { format: options.format });
   }
 
-  const timeoutMs = options.pollTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
-  const intervalMs = options.pollIntervalMs ?? DEFAULT_START_POLL_INTERVAL_MS;
   if (await waitForOwnedDaemon(socketPath, options, timeoutMs, intervalMs)) {
     return daemonSuccess({ ok: true, daemon: { status: "started", socketPath } }, options);
   }

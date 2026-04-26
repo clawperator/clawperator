@@ -412,6 +412,8 @@ describe("daemon command output", () => {
     const raw = await cmdDaemonStart({
       format: "json",
       baseDir,
+      pollTimeoutMs: 10,
+      pollIntervalMs: 1,
       spawnDaemonRunImpl: () => {
         spawned = true;
       },
@@ -421,6 +423,53 @@ describe("daemon command output", () => {
     assert.equal(spawned, false);
     assert.equal(parsed.code, ERROR_CODES.DAEMON_START_FAILED);
     assert.equal(shouldCliStdoutForceExitCode1(raw, false), true);
+  });
+
+  it("start waits for ownership metadata from a freshly listening daemon", async () => {
+    const baseDir = await makeTempBaseDir();
+    const socketPath = getDaemonSocketPath(undefined, { baseDir });
+    const server = createHttpServer((req, res) => {
+      if (req.url === "/ping") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(socketPath, resolve);
+    });
+    httpServers.push(server);
+
+    setTimeout(() => {
+      writeDaemonPidMetadata(undefined, {
+        pid: 9876,
+        startedAt: 100,
+        cliEntryPath: "/tmp/clawperator",
+        daemonKey: "default",
+      }, { baseDir });
+    }, 5);
+
+    const raw = await cmdDaemonStart({
+      format: "json",
+      baseDir,
+      pollTimeoutMs: 50,
+      pollIntervalMs: 1,
+      processController: {
+        isAlive: () => true,
+        isDaemonProcess: () => true,
+        kill: () => undefined,
+      },
+      spawnDaemonRunImpl: () => {
+        throw new Error("should not spawn while socket is alive");
+      },
+    });
+    const parsed = JSON.parse(raw) as { ok?: boolean; daemon?: { status?: string } };
+
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.daemon?.status, "already_running");
   });
 
   it("serializes concurrent start calls before spawning", async () => {

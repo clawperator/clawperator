@@ -56,7 +56,7 @@ export async function cmdObserveScreenshot(options: {
       rawDeviceId: options.deviceId,
       operatorPackage: options.operatorPackage,
       noDaemon: options.noDaemon,
-      allowPostDispatchFallback: true,
+      allowPostDispatchFallback: false,
     });
     const result = proxyResult ?? await runExecution(execution, {
       deviceId: options.deviceId,

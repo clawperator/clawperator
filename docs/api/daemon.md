@@ -187,7 +187,7 @@ Daemon proxying is active for:
 | --- | --- | --- |
 | `clawperator exec <json-or-file>` | `POST /execute` on the daemon socket | no |
 | `clawperator snapshot` | synthetic `snapshot_ui` payload sent to `POST /execute` | yes |
-| `clawperator screenshot` | synthetic `take_screenshot` payload sent to `POST /execute` | yes |
+| `clawperator screenshot` | synthetic `take_screenshot` payload sent to `POST /execute` | no |
 | Flat action commands such as `open`, `click`, `type`, `read`, `wait`, `press`, `back`, `close`, `sleep`, `scroll`, `scroll-until`, `wait-for-nav`, and `read-value` | action payload sent to `POST /execute` | no |
 
 Dry-run and validation-only `exec` modes do not need the daemon because they do not dispatch to Android.
@@ -248,7 +248,7 @@ Fallback policy:
 | `exec` | return `DAEMON_PROXY_ERROR`; do not run direct |
 | Flat action commands | return `DAEMON_PROXY_ERROR`; do not run direct |
 | `snapshot` | may run direct once because the synthetic action is read-only |
-| `screenshot` | may run direct once because the synthetic action is read-only |
+| `screenshot` | return `DAEMON_PROXY_ERROR`; do not run direct because it can write a host output file |
 
 `DAEMON_PROXY_ERROR` shape:
 
