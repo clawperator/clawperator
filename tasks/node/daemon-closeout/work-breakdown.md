@@ -233,13 +233,10 @@ temporary task folders.
    in-process readiness cache (TTL 8s) without any skill-side changes.
 
    Measured improvement for warm sequential snapshot calls: ~0.414s per call
-   (1.156s direct vs 0.742s warm daemon). The full measurement set is in
-   `tasks/node/daemon/findings.md` (retained here for reference; that task
-   folder will be deleted after this note is committed).
-
-   The improvement is strongest for repeated observation or action loops. Short
-   host-side executions such as `close_app` show minimal improvement. See
-   `tasks/node/daemon/findings.md` Assessment section for the full breakdown.
+   (1.156s direct vs 0.742s warm daemon). Five-call cold-start sequence was
+   ~32% faster overall than direct mode. The improvement is strongest for
+   repeated observation or action loops. Short host-side executions such as
+   `close_app` show minimal improvement (~5%, within noise margin).
    ```
 
 3. Delete the `tasks/node/daemon/` folder and all files within it.
