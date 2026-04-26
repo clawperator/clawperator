@@ -163,6 +163,7 @@ Required outcomes:
 For all PRs:
 
 - `tasks/skills/contract/findings.md`
+- `tasks/skills/contract/before-and-after.md`
 - `~/src/clawperator/AGENTS.md`
 - `~/src/clawperator-skills/AGENTS.md`
 
@@ -188,6 +189,7 @@ For PR-S1:
 - `~/src/clawperator-skills/skills/skills-registry.schema.json`
 - `~/src/clawperator-skills/scripts/test_all.sh`
 - representative skill scripts named in `findings.md`
+- `~/src/clawperator-skills/skills/com.globird.energy.get-yesterday-usage-cost-replay/**`
 - generated indexes under `~/src/clawperator-skills/skills/generated/`
   when metadata changes
 

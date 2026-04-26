@@ -187,27 +187,31 @@ migration-phase contract shape is stable.
 
 **Tasks:**
 
-1. For existing root `result` skills, wrap the payload as
+1. Migrate `com.globird.energy.get-yesterday-usage-cost-replay` first. Use it
+   as the seed proof from `tasks/skills/contract/before-and-after.md`; its
+   scalar answer must move to `skillResult.result` as
+   `{ kind: "text", text: "<signed dollar amount>" }`.
+2. For existing root `result` skills, wrap the payload as
    `{ kind: "json", value: ... }`.
-2. For root `results` skills, rename to singular `result` and represent the
+3. For root `results` skills, rename to singular `result` and represent the
    collection as `{ kind: "json", value: { items: [...] } }`.
-3. Move primary answer data out of `diagnostics`, `terminalVerification`, and
+4. Move primary answer data out of `diagnostics`, `terminalVerification`, and
    checkpoint-only evidence into `result`.
-4. Keep checkpoints and terminal verification as proof of how the answer was
+5. Keep checkpoints and terminal verification as proof of how the answer was
    obtained.
-5. For non-trivial migrated skills, prefer map/state-machine checkpoints:
+6. For non-trivial migrated skills, prefer map/state-machine checkpoints:
    include the known checkpoint ids and mark unreached steps `skipped` instead
    of omitting expected path nodes.
-6. Use `result: null` only when the skill cannot truthfully report a domain
+7. Use `result: null` only when the skill cannot truthfully report a domain
    value or confirmed final state.
-7. Fix isolated quality issues called out by `findings.md` while touching the
+8. Fix isolated quality issues called out by `findings.md` while touching the
    affected skills, including conditional diagnostics in
    `set-discharge-to-limit-replay` if still useful and
    `set-my-list-state-replay` expected/observed duplication if still accurate
    after the result migration.
-8. Update parser tests and local examples to assert the canonical `result`
+9. Update parser tests and local examples to assert the canonical `result`
    shape.
-9. Regenerate generated indexes if any skill metadata changes:
+10. Regenerate generated indexes if any skill metadata changes:
 
    ```bash
    ./scripts/generate_skill_indexes.sh
@@ -216,6 +220,9 @@ migration-phase contract shape is stable.
 **Acceptance criteria:**
 
 - Every migrated framed skill emits a root `result` field in its SkillResult.
+- `com.globird.energy.get-yesterday-usage-cost-replay` is the first migrated
+  skill and matches the expected shape in
+  `tasks/skills/contract/before-and-after.md`.
 - No migrated skill keeps its primary answer only in `diagnostics`,
   `terminalVerification`, or checkpoint evidence.
 - Collection skills use singular `result`.
@@ -236,6 +243,8 @@ migration-phase contract shape is stable.
 2. Run migrated skill parser tests from `~/src/clawperator-skills`.
 3. Run at least these representative skill checks when prerequisites are
    available:
+   - `com.globird.energy.get-yesterday-usage-cost-replay` as the first migrated
+     scalar read skill
    - one read skill with scalar text result
    - one read skill with JSON object result
    - one collection search skill
