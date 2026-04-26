@@ -29,8 +29,9 @@ The blocking issue is not just noisy output. The runtime has no canonical,
 schema-supported location for the skill's domain result. Some skill scripts
 already emit a root `result`, but `apps/node/src/contracts/skillResult.ts` does
 not define that field, so Zod strips it before the parsed `skillResult` reaches
-CLI and serve consumers. That means there are currently zero reliable parsed
-`skillResult.result` consumers, even where individual scripts tried to emit one.
+CLI and serve consumers. Those existing script-level `result` payloads are also
+plain JSON objects, not `SkillCheckpointEvidence`, so they still need migration
+into the canonical evidence shape after schema support lands.
 
 The right implementation order is:
 
@@ -89,6 +90,12 @@ field - but none of these fields survive Zod parsing. They are silently dropped
 before the parsed `skillResult` reaches CLI and serve consumers. There are
 currently zero reliable parsed `skillResult.result` consumers.
 
+The existing script-level `result` fields are plain domain objects, not
+`SkillCheckpointEvidence`. Adding `result?: SkillCheckpointEvidence | null`
+will make the location legal, but those scripts still need to wrap their current
+payloads as `result: { kind: "json", value: ... }` before they pass the proposed
+schema.
+
 **Smallest implementation-ready fix:**
 
 Add an optional field to both the TypeScript interface and emitted schema:
@@ -107,9 +114,9 @@ small:
 **Compatibility risk:**
 
 Low. Adding an optional parsed field is backward-compatible for existing
-consumers. It will also make already-emitted script `result` fields start
-surviving parsing, which is a positive behavior change but should still be
-covered by tests.
+consumers. Existing scripts that already emit root `result` show the intended
+authoring direction, but their payload shape must be migrated to the canonical
+evidence union before those fields survive parsing.
 
 ---
 
@@ -145,8 +152,9 @@ execution envelopes. It did not separately name the value being returned.
 After adding schema support for `skillResult.result`, migrate skills in this
 order:
 
-1. Skills already emitting root `result`: verify the field survives runtime
-   parsing and add regression coverage.
+1. Skills already emitting root `result`: wrap the existing plain object as
+   `{ kind: "json", value: ... }`, verify the field survives runtime parsing,
+   and add regression coverage.
 2. Skills emitting root `results`: rename to `result`, usually
    `{ kind: "json", value: { items: [...] } }`.
 3. Skills using `diagnostics` as the primary result: move the primary output to
@@ -169,7 +177,8 @@ transition if needed, but mark `result` as canonical in docs and tests.
 
 **Owning surface:** `apps/node/src/cli/commands/skills.ts`
 
-On success and indeterminate paths, the CLI currently emits:
+On success, indeterminate, and output-assertion failure paths, the CLI currently
+emits an `output` field. Success and indeterminate use this shape:
 
 ```ts
 output: options.format === "pretty"
@@ -180,7 +189,8 @@ output: options.format === "pretty"
 The pretty path strips the terminal `[Clawperator-Skill-Result]` frame. The JSON
 path preserves raw stdout, including progress lines, human-readable answer
 lines, the frame marker, and the JSON frame that was already parsed into
-`skillResult`.
+`skillResult`. The `SKILL_OUTPUT_ASSERTION_FAILED` path has the same pretty-vs-
+JSON conditional and should follow the same policy.
 
 **Friction:**
 
@@ -212,8 +222,10 @@ its own documentation problem.
 **Recommendation:**
 
 Strip the terminal frame from `output` in JSON mode when `skillResult !== null`.
-Do not add a new field - that is over-engineering for a consistency fix. Do
-document the change as a contract update and add a compat note in the changelog.
+Apply this to success, indeterminate, and `SKILL_OUTPUT_ASSERTION_FAILED`
+responses. Do not add a new field - that is over-engineering for a consistency
+fix. Do document the change as a contract update and add a compat note in the
+changelog.
 
 **Minimal fix:**
 
@@ -222,6 +234,8 @@ output: (options.format === "pretty" || result.skillResult !== null)
   ? sanitizePrettySkillStdout(result.output, result.skillResult !== null)
   : result.output,
 ```
+
+Apply the same pattern to every wrapper branch that returns `output`.
 
 Document in `docs/skills/runtime.md`: `output` contains pre-frame human-readable
 progress text; the parsed result is in `skillResult`. Consumers scraping the
@@ -416,7 +430,9 @@ currently receives them through the runtime contract.
 This makes adding `result` to the schema more urgent - it is not fixing a gap,
 it is validating intent that already exists in two scripts. Migration tests must
 confirm that emitted `result` actually survives `runSkill()` parsing after the
-schema change.
+schema change. Because the proposed contract reuses `SkillCheckpointEvidence`,
+existing plain-object `result` payloads must also be migrated to
+`{ kind: "json", value: ... }`.
 
 ### Correction B: Stripping the frame from JSON `output` is a contract change, not a bug fix
 
@@ -436,9 +452,12 @@ make the change deliberately rather than avoid it.
 - Add `result: skillCheckpointEvidenceSchema.nullable().optional()` to
   `emittedSkillResultSchema`.
 - Add unit tests proving:
-  - emitted `result` survives `runSkill()` parsing
+  - emitted `result` in `SkillCheckpointEvidence` shape survives `runSkill()`
+    parsing
   - emitted unknown root fields are still stripped or otherwise intentionally
     handled
+  - emitted plain-object root `result` is rejected or stripped according to the
+    chosen schema policy
   - legacy framed skills without `result` still parse
   - unframed skills still return `skillResult: null`
 - Update docs in:
@@ -455,7 +474,8 @@ make the change deliberately rather than avoid it.
   - then proof fields
 - Strip the terminal frame from `output` in JSON mode (see Finding 3). Update
   `docs/skills/runtime.md` to define `output` as pre-frame human-readable
-  progress text. Add changelog entry.
+  progress text. Apply this consistently to success, indeterminate, and
+  output-assertion failure branches. Add changelog entry.
 - Add CLI tests for success, indeterminate, output assertion failure, and
   execution failure shapes.
 
@@ -463,7 +483,8 @@ make the change deliberately rather than avoid it.
 
 In `../clawperator-skills`, migrate high-value skills first:
 
-1. Existing scripts that emit root `result`: confirm parsed output after the
+1. Existing scripts that emit root `result`: wrap current payloads in
+   `{ kind: "json", value: ... }` and confirm parsed output after the
    Clawperator schema change.
 2. `com.google.android.apps.chromecast.app.get-climate-replay`: move the
    climate object to `result`.
