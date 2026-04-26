@@ -74,6 +74,12 @@ describe("daemon lifecycle paths", () => {
     assert.equal(getDaemonLogPath("192.168.1.1:5555", { baseDir }), join(baseDir, "daemon-id-MTkyLjE2OC4xLjE6NTU1NQ.log"));
   });
 
+  it("keeps default daemon files under the daemon subdirectory", () => {
+    const socketPath = getDaemonSocketPath("emulator-5554");
+
+    assert.ok(socketPath.endsWith(join(".clawperator", "daemon", "daemon-id-ZW11bGF0b3ItNTU1NA.sock")));
+  });
+
   it("hardens an existing daemon directory to owner-only permissions", async () => {
     const baseDir = await makeTempBaseDir();
     const daemonDir = join(baseDir, "daemon-dir");

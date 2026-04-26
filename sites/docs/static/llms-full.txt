@@ -6737,9 +6737,10 @@ Path formulas from `apps/node/src/domain/daemon/lifecycle.ts`:
 
 | File | Formula |
 | --- | --- |
-| socket | `~/.clawperator/daemon-<daemon_key>.sock` |
-| PID metadata | `~/.clawperator/daemon-<daemon_key>.pid` |
-| log | `~/.clawperator/daemon-<daemon_key>.log` |
+| socket | `~/.clawperator/daemon/daemon-<daemon_key>.sock` |
+| PID metadata | `~/.clawperator/daemon/daemon-<daemon_key>.pid` |
+| log | `~/.clawperator/daemon/daemon-<daemon_key>.log` |
+| lifecycle lock | `~/.clawperator/daemon/daemon-<daemon_key>.lock` |
 
 The daemon directory is created with mode `0700`. The PID metadata file is JSON:
 
@@ -6768,7 +6769,7 @@ Started:
   "ok": true,
   "daemon": {
     "status": "started",
-    "socketPath": "/Users/<local_user>/.clawperator/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
+    "socketPath": "/Users/<local_user>/.clawperator/daemon/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
   }
 }
 ```
@@ -6780,7 +6781,7 @@ Already running:
   "ok": true,
   "daemon": {
     "status": "already_running",
-    "socketPath": "/Users/<local_user>/.clawperator/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
+    "socketPath": "/Users/<local_user>/.clawperator/daemon/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
   }
 }
 ```
@@ -6802,7 +6803,7 @@ Running:
       "size": 12345
     },
     "uptimeSeconds": 4,
-    "socketPath": "/Users/<local_user>/.clawperator/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
+    "socketPath": "/Users/<local_user>/.clawperator/daemon/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
   }
 }
 ```
@@ -6814,7 +6815,7 @@ Not running:
   "ok": true,
   "daemon": {
     "status": "not_running",
-    "socketPath": "/Users/<local_user>/.clawperator/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
+    "socketPath": "/Users/<local_user>/.clawperator/daemon/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
   }
 }
 ```
@@ -6828,7 +6829,7 @@ Stopped:
   "ok": true,
   "daemon": {
     "status": "stopped",
-    "socketPath": "/Users/<local_user>/.clawperator/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
+    "socketPath": "/Users/<local_user>/.clawperator/daemon/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
   }
 }
 ```
@@ -6840,7 +6841,7 @@ Stop when not running:
   "ok": true,
   "daemon": {
     "status": "not_running",
-    "socketPath": "/Users/<local_user>/.clawperator/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
+    "socketPath": "/Users/<local_user>/.clawperator/daemon/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
   }
 }
 ```
@@ -6954,7 +6955,7 @@ Fallback policy:
 
 | Failure | Output code | Exit code | Recovery |
 | --- | --- | --- | --- |
-| `daemon start` spawns `daemon run` but `/ping` does not become reachable within `3000` ms | `DAEMON_START_FAILED` | `1` | Inspect `~/.clawperator/daemon-<daemon_key>.log`, then retry `clawperator daemon start --device <id>`. |
+| `daemon start` spawns `daemon run` but `/ping` does not become reachable within `3000` ms | `DAEMON_START_FAILED` | `1` | Inspect `~/.clawperator/daemon/daemon-<daemon_key>.log`, then retry `clawperator daemon start --device <id>`. |
 | `daemon start` cannot spawn the background process | `DAEMON_START_FAILED` | `1` | Verify the branch-local CLI entrypoint exists and retry from the same checkout. |
 | `daemon stop` cannot signal or clean up the process | `DAEMON_STOP_FAILED` | `1` | Inspect the PID metadata file and socket path, stop the process manually if needed, then retry `daemon stop`. |
 | `exec` or a flat mutating action was dispatched through the daemon but the response was lost | `DAEMON_PROXY_ERROR` | `1` | Do not blindly retry. Inspect device state first because the action may already have executed. |
@@ -6966,7 +6967,7 @@ Top-level daemon failures use the same CLI error shape as other Node-side failur
   "code": "DAEMON_START_FAILED",
   "message": "Daemon did not become ready within 3000ms.",
   "details": {
-    "socketPath": "/Users/<local_user>/.clawperator/daemon-id-ZW11bGF0b3ItNTU1NA.sock",
+    "socketPath": "/Users/<local_user>/.clawperator/daemon/daemon-id-ZW11bGF0b3ItNTU1NA.sock",
     "timeoutMs": 3000
   }
 }

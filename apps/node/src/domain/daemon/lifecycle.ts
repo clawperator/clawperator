@@ -163,7 +163,7 @@ export function sanitizeDaemonKey(rawDeviceId: string | undefined): string {
 }
 
 export function getDaemonDir(options?: DaemonPathsOptions): string {
-  const dir = options?.baseDir ?? join(homedir(), ".clawperator");
+  const dir = options?.baseDir ?? join(homedir(), ".clawperator", "daemon");
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   const stats = statSync(dir);
   if (!stats.isDirectory()) {
