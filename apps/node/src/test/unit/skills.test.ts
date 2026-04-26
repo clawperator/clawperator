@@ -7181,6 +7181,55 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.strictEqual(parsed.skillResult, null);
   });
 
+  it("JSON mode omits skillId, exitCode, and output for indeterminate with parsed skillResult", async () => {
+    const fakeRunSkill: typeof runSkill = async () => ({
+      ok: null,
+      status: "indeterminate",
+      code: "SKILL_VERIFICATION_INDETERMINATE",
+      message: "Declared verification was not proved.",
+      skillId: "com.test.indeterminate-cli",
+      output: "stdout with frame\n",
+      exitCode: 0,
+      durationMs: 2,
+      skillResult: {
+        contractVersion: "1.0.0",
+        skillId: "com.test.indeterminate-cli",
+        source: { kind: "script" },
+        status: "success",
+        checkpoints: [],
+      } satisfies SkillResult,
+    });
+
+    const stdout = await cmdSkillsRun(
+      "com.test.indeterminate-cli",
+      [],
+      undefined,
+      undefined,
+      undefined,
+      {
+        format: "json",
+        skipValidate: true,
+        runSkillImpl: fakeRunSkill,
+        resolveInteractiveSkillTargetImpl: allowInteractiveTarget,
+      }
+    );
+    const parsed = JSON.parse(stdout) as {
+      status?: string;
+      code?: string;
+      skillId?: string;
+      output?: string;
+      exitCode?: number;
+      skillResult?: { skillId?: string };
+    };
+    assert.strictEqual(parsed.status, "indeterminate");
+    assert.strictEqual(parsed.code, "SKILL_VERIFICATION_INDETERMINATE");
+    assert.strictEqual(parsed.skillId, undefined);
+    assert.strictEqual(parsed.output, undefined);
+    assert.strictEqual(parsed.exitCode, undefined);
+    assert.ok(parsed.skillResult);
+    assert.strictEqual(parsed.skillResult?.skillId, "com.test.indeterminate-cli");
+  });
+
   it("validates before querying APK state in cmdSkillsRun", async () => {
     let runCalls = 0;
     const fakeRunSkill = async () => {

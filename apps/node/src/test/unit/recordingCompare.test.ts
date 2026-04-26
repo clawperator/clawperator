@@ -324,6 +324,17 @@ describe("recording compare file loading", () => {
     assert.strictEqual(skillResult.source.kind, "agent");
   });
 
+  it("accepts deduplicated framed JSON success without top-level status", async () => {
+    const skillResult = await loadSkillResultFromSkillsRunFile(
+      join(fixturesRoot, "deduplicated-skills-run-success.json")
+    );
+    assert.strictEqual(
+      skillResult.skillId,
+      "com.solaxcloud.starter.set-discharge-to-limit-orchestrated"
+    );
+    assert.strictEqual(skillResult.source.kind, "agent");
+  });
+
   it("rejects a saved skills run wrapper whose SkillResult contract major version is unsupported", async () => {
     const dir = await makeTempDir("clawperator-recording-compare-contract-version-");
     const resultPath = join(dir, "unsupported-contract-version.json");
