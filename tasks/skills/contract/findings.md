@@ -3,9 +3,9 @@
 **Date:** 2026-04-26
 **Sources reconciled:** `findings-claude.md`, `findings-codex.md`, `findings-skill-survey.md`
 **Review stance:** EM synthesis for implementation planning
-**Current status:** findings 1-8 have implementation coverage in PR-C1 and
-PR-S1 branches. PR-C2 remains to make `SkillResult.result` required in the
-runtime schema and close the migration window.
+**Current status:** findings 1-8 have implementation coverage in PR-C1, PR-S1,
+and PR-C2: `SkillResult.result` is required in the runtime schema (with `null`
+where no truthful value exists), closing the migration window.
 
 **Verified against:**
 

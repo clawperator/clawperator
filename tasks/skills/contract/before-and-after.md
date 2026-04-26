@@ -3,9 +3,9 @@
 **Purpose:** preserve the concrete run that exposed the contract problem and
 define the expected final shape after PR-C1, PR-S1, and PR-C2.
 
-**Current status:** PR-C1 and PR-S1 now implement the expected reduced shape
-below on their respective branches. PR-C2 remains to make missing `result`
-invalid at runtime.
+**Current status:** PR-C1, PR-S1, and PR-C2 implement the expected shape: framed
+`SkillResult` must include the `result` key (it may be `null` when no truthful
+value exists). Missing `result` is rejected at parse time.
 
 ## Seed Skill For PR-S1
 
