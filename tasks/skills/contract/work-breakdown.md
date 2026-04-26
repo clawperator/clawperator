@@ -146,31 +146,60 @@ migration-phase contract shape is stable.
 3. Document that nested `skillResult` objects should be authored and shown with
    `result` first and `status` second.
 4. Document singular `result` for collection payloads.
-5. Document that framed success JSON responses do not duplicate top-level
+5. In `docs/skills/runtime.md`, add an explicit ideal framed success response
+   example. It must show:
+   - a wrapper object containing `skillResult`
+   - nested `skillResult.result` as the first field
+   - nested `skillResult.status` as the second field
+   - no top-level `status`, `skillId`, `exitCode`, or `output`
+   - proof fields after the answer and child-authored status
+6. In `docs/skills/authoring.md`, add authoring best practices for
+   `SkillResult`:
+   - every new or migrated framed skill emits `result`
+   - `result` uses `SkillCheckpointEvidence`
+   - collections use singular `result` with a JSON payload such as
+     `{ items: [...] }`
+   - `terminalVerification` proves the result but is not the answer channel
+   - `diagnostics` is debug and health metadata only
+   - non-trivial flows prefer map/state-machine checkpoints
+   - framed payloads put `result` first and `status` second
+7. In `docs/skills/overview.md`, update the high-level `skills run` examples so
+   the first framed-success example is the clean ideal shape. Move legacy
+   unframed `output` examples into legacy or diagnostic context.
+8. In `docs/skills/runtime.md`, `docs/skills/overview.md`, and
+   `docs/skills/authoring.md`, ensure examples and prose distinguish:
+   - framed success: no duplicate top-level wrapper fields
+   - indeterminate/failure: wrapper fields represent wrapper state
+   - legacy unframed: `skillResult: null` and `output` may be the payload
+   - assertion failure: `output` is retained as diagnostic evidence
+9. Document that framed success JSON responses do not duplicate top-level
    `status`, `skillId`, `exitCode`, or `output`. Document that indeterminate
    and failure wrappers keep only distinct wrapper state, and that `output` is
    present on assertion-failure and legacy unframed paths. Document that failure
    wrappers expose process streams as `stdout` and `stderr`.
-6. Document that `terminalVerification` is proof and `diagnostics` is debug
+10. Document that `terminalVerification` is proof and `diagnostics` is debug
    metadata. Neither is the primary answer channel.
-7. Document checkpoint presence semantics: existing skills may emit only reached
+11. Document checkpoint presence semantics: existing skills may emit only reached
    checkpoints, but new and migrated non-trivial skills should prefer the
    map/state-machine pattern with unreached steps marked `skipped`.
-8. Update examples that currently show framed SkillResult output without
+12. Update examples that currently show framed SkillResult output without
    `result` when those examples are meant to guide new authoring.
-9. In `apps/node/bundled-skills/clawperator-skill-author-by-recording/SKILL.md`,
-   add `skillResult.result` to the inspection list at the section that currently
-   lists `skillResult.status`, `skillResult.source`, `skillResult.checkpoints`,
-   `skillResult.terminalVerification`, and `skillResult.diagnostics`. Put
-   `skillResult.result` first in that list and note that it is the canonical
-   domain answer when present.
-10. In `apps/node/bundled-skills/clawperator-skill-author-by-agent-discovery/SKILL.md`,
-   add equivalent guidance. If the skill does not have an explicit field list,
-   add `skillResult.result` to the skill-result inspection step.
-11. Update the corresponding `agents/openai.yaml` files for both bundled skills
+13. In `apps/node/bundled-skills/clawperator-skill-author-by-recording/SKILL.md`,
+   update the generated-skill expectations and the self-test inspection section:
+   add `skillResult.result` first, keep `skillResult.status` second, state that
+   framed success wrappers should not duplicate top-level wrapper fields, and
+   state that authoring is incomplete until a self-test surfaces the canonical
+   result path.
+14. In `apps/node/bundled-skills/clawperator-skill-author-by-agent-discovery/SKILL.md`,
+   add equivalent guidance for discovery and recording handoff. Even though this
+   skill does not author the durable runtime skill directly, its output should
+   steer the recording workflow toward the same ideal SkillResult shape and
+   should prefer nearby exemplars that already use `skillResult.result`.
+15. Update the corresponding `agents/openai.yaml` files for both bundled skills
    if `default_prompt` or `short_description` reference skill-result inspection
-   behavior.
-12. Rebuild docs through the normal docs build workflow.
+   behavior, emitted SkillResult shape, self-test expectations, or recording
+   handoff expectations.
+16. Rebuild docs through the normal docs build workflow.
 
 **Acceptance criteria:**
 
@@ -180,6 +209,10 @@ migration-phase contract shape is stable.
   fields and explain where `output` is kept and why.
 - Public docs and bundled authoring guidance show nested `SkillResult` examples
   with `result` first and `status` second.
+- `docs/skills/runtime.md` contains the ideal framed success response shape.
+- `docs/skills/authoring.md` contains author-facing SkillResult best practices.
+- `docs/skills/overview.md` teaches the clean framed success shape before
+  legacy or diagnostic examples.
 - Recording compare docs still say the full `skills run` wrapper is the durable
   compare input and uses `skillResult.checkpoints` and
   `skillResult.terminalVerification` for compare logic. Do not change the
@@ -187,7 +220,8 @@ migration-phase contract shape is stable.
 - Authoring docs prefer map/state-machine checkpoints for new and migrated
   non-trivial skills.
 - Both bundled authoring skills ask agents to inspect and report
-  `skillResult.result`.
+  `skillResult.result` and steer generated or handed-off skills toward the
+  ideal shape.
 - `./scripts/docs_build.sh` succeeds.
 
 ## PR-S1: Runtime Skills Migration
@@ -330,7 +364,10 @@ migration-phase contract shape is stable.
 - `docs/skills/authoring.md`
 - `docs/api/serve.md`
 - `docs/api/recording.md`
-- bundled skill authoring guidance if wording still mentions optional `result`
+- `apps/node/bundled-skills/clawperator-skill-author-by-recording/SKILL.md`
+- `apps/node/bundled-skills/clawperator-skill-author-by-recording/agents/openai.yaml`
+- `apps/node/bundled-skills/clawperator-skill-author-by-agent-discovery/SKILL.md`
+- `apps/node/bundled-skills/clawperator-skill-author-by-agent-discovery/agents/openai.yaml`
 
 **Tasks:**
 
@@ -346,9 +383,14 @@ migration-phase contract shape is stable.
    then proof and diagnostics fields.
 5. Confirm checkpoint guidance is final: map/state-machine checkpoints are the
    preferred shape for new and migrated non-trivial skills.
-6. Build Node and run tests.
-7. Build public docs.
-8. Validate at least one migrated read skill and one migrated setter skill from
+6. Confirm `docs/skills/runtime.md`, `docs/skills/overview.md`, and
+   `docs/skills/authoring.md` all describe the same ideal SkillResult shape.
+7. Confirm both bundled skill-author workflows teach the same shape and surface
+   `skillResult.result` before `status`, checkpoints, or diagnostics during
+   self-test review.
+8. Build Node and run tests.
+9. Build public docs.
+10. Validate at least one migrated read skill and one migrated setter skill from
    `~/src/clawperator-skills` with the branch-local Node CLI.
 
 **Acceptance criteria:**
@@ -358,6 +400,8 @@ migration-phase contract shape is stable.
   `SkillResult` objects.
 - Public docs and examples avoid duplicate framed success wrapper fields.
 - Bundled skill authoring guidance matches the enforced schema.
+- Both bundled skill-author workflows teach the ideal shape and surface
+  `skillResult.result` first during self-test review.
 - Public docs do not describe `output`, `diagnostics`, checkpoints, or
   `terminalVerification` as primary answer channels.
 - Node build and tests pass.

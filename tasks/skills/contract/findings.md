@@ -489,6 +489,13 @@ progress text from `output`.
   - `docs/skills/authoring.md`
   - `docs/skills/runtime.md`
   - `docs/skills/overview.md`
+- Public docs must include the ideal framed success shape: wrapper object with
+  `skillResult`, nested `result` first, nested `status` second, no duplicate
+  top-level `status`, `skillId`, `exitCode`, or `output`.
+- Authoring docs and bundled skill-author workflows must teach the same best
+  practices: singular evidence-shaped `result`, diagnostics for debug only,
+  terminal verification for proof only, map/state-machine checkpoints for
+  non-trivial flows, and self-test inspection starting at `skillResult.result`.
 
 ### PR 2 - Consumer Rules And Output Policy
 

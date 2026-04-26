@@ -128,11 +128,25 @@ Required outcomes:
 - The serve endpoint applies the same JSON response policy.
 - Public docs in `docs/skills` explain the new extraction path and the temporary
   optional migration shape.
+- `docs/skills/runtime.md` includes an explicit ideal framed success JSON shape:
+  wrapper object with `skillResult` only, nested `result` first, nested `status`
+  second, no duplicate top-level `status`, `skillId`, `exitCode`, or `output`.
+- `docs/skills/authoring.md` includes SkillResult best practices for authors:
+  singular `result`, evidence-shaped payloads, no primary answers in
+  diagnostics or terminal verification, and map/state-machine checkpoints for
+  non-trivial flows.
+- `docs/skills/overview.md` updates high-level wrapper examples so agents learn
+  the clean framed success shape before legacy `output` examples.
 - Docs define where `output` is absent and where it is retained. Retained
   `output` is diagnostic or legacy data, not the domain answer.
 - Relevant bundled skill authoring guidance under
   `apps/node/bundled-skills/clawperator-*` teaches agents to emit and inspect
   `skillResult.result`.
+- `clawperator-skill-author-by-recording` guidance updates the self-test
+  inspection section and generated SkillResult expectations.
+- `clawperator-skill-author-by-agent-discovery` guidance teaches discovery
+  agents that recording handoff and nearby-skill review should prefer the same
+  ideal SkillResult shape.
 
 ### PR-S1: Runtime Skills Migration
 
@@ -178,6 +192,8 @@ Required outcomes:
   describe missing `result` as acceptable for newly framed skills.
 - Compare, serve, and CLI docs continue to describe the wrapper object as the
   durable run artifact while naming `skillResult.result` as the domain answer.
+- Public docs no longer present legacy `output`-first examples as the preferred
+  shape for framed success runs.
 - Validation includes at least one migrated read skill and one migrated setter
   skill from `~/src/clawperator-skills`.
 
