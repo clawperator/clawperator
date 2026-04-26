@@ -61,15 +61,22 @@ Collections still live in singular `result`, for example:
 6. `checkpoints` explain progress and evidence. They are not the primary answer
    lookup path.
 7. `diagnostics` is for runtime health, warnings, hints, and debug detail only.
-8. Drop the `output` field from JSON success and indeterminate responses when
-   `skillResult !== null`. Agents use `skillResult.result`. Progress text is
-   available in pretty mode; it is pure token waste in JSON mode.
-9. Keep `output` for legacy unframed skills where `skillResult === null`.
+8. For JSON framed success responses, return the parsed `skillResult` without
+   duplicate wrapper fields. Omit top-level `status`, `skillId`, `exitCode`, and
+   `output`; agents use `skillResult.result` and `skillResult.status`.
+9. For JSON indeterminate and failure responses with a parsed `skillResult`,
+   keep wrapper fields only when they add distinct wrapper state, such as
+   `status`, `code`, or `message`. Do not duplicate `skillId` or process
+   metadata already outside the answer path.
+10. Keep `output` for legacy unframed skills where `skillResult === null`.
    Also keep `output` for `SKILL_OUTPUT_ASSERTION_FAILED`, where it shows what
    the skill printed when the assertion failed.
-10. Apply the same policy in `serve.ts` as in `skills.ts`. Both currently pass
+11. Do not move `exitCode` into `SkillResult`. It is process metadata, not a
+   domain result or proof field. Retain it only on legacy or failure paths where
+   it is useful diagnostics.
+12. Apply the same policy in `serve.ts` as in `skills.ts`. Both currently pass
    `result.output` through independently and both need updating.
-11. New and migrated non-trivial skills should prefer map/state-machine
+13. New and migrated non-trivial skills should prefer map/state-machine
     checkpoints: include known checkpoint ids and mark unreached steps
     `skipped`.
 
@@ -79,7 +86,7 @@ Collections still live in singular `result`, for example:
 | --- | --- |
 | 1. No canonical answer field | PR-C1 Phase 1, PR-C2 Phase 6 |
 | 2. Primary results are scattered | PR-S1 Phase 4, PR-S1 Phase 5 |
-| 3. JSON `output` includes frame | PR-C1 Phase 2, PR-C1 Phase 3 |
+| 3. JSON framed responses duplicate answer and process data | PR-C1 Phase 2, PR-C1 Phase 3 |
 | 4. Wrapper status precedence | PR-C1 Phase 3, PR-C2 Phase 7 |
 | 5. `terminalVerification` is proof | PR-C1 Phase 3, PR-S1 Phase 4 |
 | 6. `diagnostics` carries primary data | PR-C1 Phase 3, PR-S1 Phase 4 |
@@ -111,8 +118,11 @@ Required outcomes:
 - Existing root `result` payloads that already match the evidence union survive
   runtime parsing.
 - Invalid root `result` payloads fail validation instead of disappearing.
-- `skills run` JSON omits `output` on success and indeterminate responses when
-  a parsed `skillResult` exists.
+- `skills run` JSON framed success responses omit duplicate top-level `status`,
+  `skillId`, `exitCode`, and `output`.
+- `skills run` JSON indeterminate and failure responses avoid duplicate
+  `skillId` and process metadata when a parsed `skillResult` already carries
+  the skill identity.
 - `skills run` JSON keeps `output` for legacy unframed skills and
   `SKILL_OUTPUT_ASSERTION_FAILED` diagnostics.
 - The serve endpoint applies the same JSON response policy.
@@ -224,6 +234,8 @@ For PR-C1, also run focused CLI and serve fixture coverage that proves:
 - an invalid `result` fails validation
 - JSON success and indeterminate responses omit `output` when `skillResult` is
   parsed
+- JSON framed success responses omit duplicate top-level `status`, `skillId`,
+  and `exitCode`
 - `SKILL_OUTPUT_ASSERTION_FAILED` keeps `output` for diagnostic context
 
 For PR-C2, also validate at least one migrated read skill and one migrated
@@ -249,8 +261,8 @@ multiple devices are connected.
   first and `status` second.
 - `result` is present on every newly authored or migrated framed SkillResult.
 - Missing `result` is accepted only during PR-C1 and PR-S1 migration work.
-- JSON success and indeterminate responses no longer include `output` when a
-  parsed `skillResult` exists.
+- JSON framed success responses no longer include duplicate wrapper fields or
+  `output` when a parsed `skillResult` exists.
 - Docs and bundled authoring skills teach the same contract that the runtime
   enforces.
 - Checkpoint guidance is explicit: existing push-only shapes may be read, but

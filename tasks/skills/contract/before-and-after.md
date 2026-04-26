@@ -101,23 +101,19 @@ skill, the same run should expose the scalar answer at
 
 Expected properties:
 
-- wrapper `status` is still `success`
 - `skillResult.result` is present
 - `skillResult.result` is evidence-shaped
 - parsed `skillResult.status` is still `success`
 - inside `skillResult`, `result` is the first field and `status` is second
+- duplicate top-level `status`, `skillId`, `exitCode`, and `output` are absent
 - checkpoints and terminal verification still prove how the value was found
 - diagnostics contains only runtime health, hints, warnings, paths, timings, or
   debug metadata
-- `output` is absent - dropped from JSON responses when `skillResult` is non-null
 
 Expected reduced shape:
 
 ```json
 {
-  "status": "success",
-  "skillId": "com.globird.energy.get-yesterday-usage-cost-replay",
-  "exitCode": 0,
   "skillResult": {
     "result": {
       "kind": "text",
@@ -179,12 +175,11 @@ schema now rejects framed `SkillResult` objects that omit `result`.
 For this seed skill, the final acceptance check is:
 
 ```text
-wrapper.status == "success"
 skillResult.result.kind == "text"
 skillResult.result.text matches /^[-+]?\$\d+(\.\d{2})?$/
 skillResult.status == "success"
 skillResult object starts with result, then status
-output field is absent
+top-level status, skillId, exitCode, and output fields are absent
 ```
 
 This check is intentionally answer-path focused. The exact dollar amount depends

@@ -59,7 +59,7 @@ migration-phase contract shape is stable.
 - The tests describe the temporary optional state clearly enough that PR-C2 can
   tighten it later.
 
-### Phase 2: Drop `output` From Framed Success Responses
+### Phase 2: Deduplicate Framed Success Responses
 
 **Files:**
 
@@ -70,42 +70,54 @@ migration-phase contract shape is stable.
 
 **Tasks:**
 
-1. In `skills.ts`, remove the `output` field from the success and indeterminate
-   response objects when `result.skillResult !== null`. Do not strip the frame -
-   omit the field entirely. When `result.skillResult === null`, keep `output`
-   (legacy unframed skills only).
-2. In `skills.ts`, keep `output` on the `SKILL_OUTPUT_ASSERTION_FAILED` branch
+1. In `skills.ts`, for JSON success responses where `result.skillResult !== null`,
+   omit duplicate top-level `status`, `skillId`, `exitCode`, and `output`.
+   The response should lead with `skillResult`, whose first nested fields are
+   `result` and `status`.
+2. In `skills.ts`, for JSON indeterminate responses where
+   `result.skillResult !== null`, keep wrapper `status`, `code`, and `message`
+   because they describe wrapper verification state. Omit duplicate `skillId`,
+   `exitCode`, and `output`.
+3. When `result.skillResult === null`, keep the existing legacy wrapper fields,
+   including `skillId`, `exitCode`, and `output`, because no parsed
+   `SkillResult` exists to carry identity or answer data.
+4. In `skills.ts`, keep `output` on the `SKILL_OUTPUT_ASSERTION_FAILED` branch
    when `skillResult !== null` - this path uses `output` as a diagnostic showing
-   what the skill printed when the assertion failed.
-3. Apply the same policy in `serve.ts`. The serve endpoint independently builds
+   what the skill printed when the assertion failed. Do not move `exitCode` into
+   `SkillResult`; it is process metadata, not domain data.
+5. Apply the same policy in `serve.ts`. The serve endpoint independently builds
    success, indeterminate, and assertion-failure skill response objects. Remove
-   `output` from success and indeterminate responses when
-   `result.skillResult !== null`. Keep `output` in the assertion failure object
-   regardless.
-4. Do not change `runSkill.ts` or the domain-layer tests. The domain function
+   duplicate top-level fields from framed success and indeterminate responses.
+   Keep `output` in the assertion failure object regardless.
+6. Do not change `runSkill.ts` or the domain-layer tests. The domain function
    intentionally returns raw stdout. The existing agent-driven SkillResult test
    that asserts `result.output.includes("[Clawperator-Skill-Result]")` is
    testing the domain layer and must not be modified.
-5. Add CLI-layer tests in the `describe("cmdSkillsRun preflight gate")` block
+7. Add CLI-layer tests in the `describe("cmdSkillsRun preflight gate")` block
    using the injected `runSkillImpl` pattern. A suitable test:
    - Creates a `fakeRunSkill` that returns `output` containing the literal
      `[Clawperator-Skill-Result]` marker, plus a non-null `skillResult`.
    - Calls `cmdSkillsRun` with `{ format: "json", runSkillImpl: fakeRunSkill }`.
-   - Asserts that `JSON.parse(stdout).output` is `undefined`.
-6. Add a test for the `skillResult === null` path: `fakeRunSkill` returns a
-   non-null `output` and a null `skillResult`. Assert `JSON.parse(stdout).output`
-   is present and unchanged.
-7. Add serve integration coverage proving `/skills/:skillId/run` follows the
-   same policy: omit `output` for success and indeterminate responses with a
-   parsed `skillResult`, keep it for assertion failures, and keep it for legacy
-   unframed skill responses.
+   - Asserts that the parsed JSON has `skillResult`.
+   - Asserts that top-level `status`, `skillId`, `exitCode`, and `output` are
+     `undefined`.
+8. Add a test for the `skillResult === null` path: `fakeRunSkill` returns a
+   non-null `output`, `skillId`, `exitCode`, and a null `skillResult`. Assert
+   those legacy wrapper fields are present and unchanged.
+9. Add serve integration coverage proving `/skills/:skillId/run` follows the
+   same policy: deduplicate framed success and indeterminate responses, keep
+   `output` for assertion failures, and keep legacy wrapper fields for unframed
+   skill responses.
 
 **Acceptance criteria:**
 
-- JSON success and indeterminate responses omit `output` when `skillResult` is
-  non-null.
+- JSON framed success responses omit duplicate top-level `status`, `skillId`,
+  `exitCode`, and `output`.
+- JSON framed indeterminate responses keep distinct wrapper status fields but
+  omit duplicate `skillId`, `exitCode`, and `output`.
 - JSON assertion-failure responses keep `output` for diagnostic context.
-- JSON responses for legacy unframed skills (skillResult null) keep `output`.
+- JSON responses for legacy unframed skills (`skillResult` null) keep existing
+  wrapper fields.
 - Domain-layer `runSkill` tests are unchanged.
 - Serve endpoint tests prove the same policy as the CLI command.
 
@@ -134,10 +146,11 @@ migration-phase contract shape is stable.
 3. Document that nested `skillResult` objects should be authored and shown with
    `result` first and `status` second.
 4. Document singular `result` for collection payloads.
-5. Document that `output` is absent from JSON success and indeterminate
-   responses when `skillResult` is non-null. Document that it is present on
-   assertion-failure and legacy unframed paths. Document that failure wrappers
-   expose process streams as `stdout` and `stderr`.
+5. Document that framed success JSON responses do not duplicate top-level
+   `status`, `skillId`, `exitCode`, or `output`. Document that indeterminate
+   and failure wrappers keep only distinct wrapper state, and that `output` is
+   present on assertion-failure and legacy unframed paths. Document that failure
+   wrappers expose process streams as `stdout` and `stderr`.
 6. Document that `terminalVerification` is proof and `diagnostics` is debug
    metadata. Neither is the primary answer channel.
 7. Document checkpoint presence semantics: existing skills may emit only reached
@@ -163,8 +176,8 @@ migration-phase contract shape is stable.
 
 - No public doc tells agents to find primary answers in `diagnostics`,
   `terminalVerification`, or checkpoint ids.
-- Public docs state that `output` is absent from JSON success responses when
-  `skillResult` is non-null, and explain where it is kept and why.
+- Public docs state that framed success JSON responses avoid duplicate wrapper
+  fields and explain where `output` is kept and why.
 - Public docs and bundled authoring guidance show nested `SkillResult` examples
   with `result` first and `status` second.
 - Recording compare docs still say the full `skills run` wrapper is the durable
@@ -324,10 +337,11 @@ migration-phase contract shape is stable.
 1. Remove migration-window language from docs and bundled guidance.
 2. Keep old-shape migration history out of public docs unless it describes
    still-shipped behavior.
-3. Confirm stream field wording is final: `skillResult.result` is the answer,
-   `output` is absent from framed success-like JSON responses, retained only
-   for legacy unframed and assertion-failure diagnostics, and process streams
-   are named `stdout` and `stderr` where exposed.
+3. Confirm wrapper wording is final: `skillResult.result` is the answer, framed
+   success JSON responses do not duplicate top-level `status`, `skillId`,
+   `exitCode`, or `output`, `output` is retained only for legacy unframed and
+   assertion-failure diagnostics, and process streams are named `stdout` and
+   `stderr` where exposed.
 4. Confirm nested SkillResult field ordering is final: `result`, then `status`,
    then proof and diagnostics fields.
 5. Confirm checkpoint guidance is final: map/state-machine checkpoints are the
@@ -342,6 +356,7 @@ migration-phase contract shape is stable.
 - Public docs describe required `skillResult.result`.
 - Public docs and examples put `result` first and `status` second inside nested
   `SkillResult` objects.
+- Public docs and examples avoid duplicate framed success wrapper fields.
 - Bundled skill authoring guidance matches the enforced schema.
 - Public docs do not describe `output`, `diagnostics`, checkpoints, or
   `terminalVerification` as primary answer channels.

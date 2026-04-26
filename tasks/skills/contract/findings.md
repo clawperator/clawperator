@@ -254,6 +254,13 @@ Remove the success-path temptation to scrape `output`. Do not expose raw
 terminal frames or progress text through JSON success and indeterminate
 responses once a parsed `skillResult` exists.
 
+Also remove duplicate success wrapper fields. For framed JSON success responses,
+`skillResult.skillId` and `skillResult.status` are the canonical identity and
+child-authored status, and `exitCode` is process metadata that should not be
+moved into `SkillResult`. Omit top-level `status`, `skillId`, `exitCode`, and
+`output` on framed success responses. Keep wrapper status fields only where they
+carry distinct wrapper state, such as indeterminate or failure responses.
+
 ---
 
 ### 4. Medium: Wrapper status and nested `skillResult.status` need a hard precedence rule
@@ -494,6 +501,9 @@ progress text from `output`.
 - Drop `output` from JSON success and indeterminate responses when
   `skillResult` is present (see Finding 3). Keep `output` for legacy unframed
   skills and output-assertion failure diagnostics.
+- Deduplicate framed JSON success responses: omit top-level `status`, `skillId`,
+  and `exitCode` when the parsed `skillResult` already carries the skill
+  identity and child-authored status.
 - Apply the same policy in CLI `skills run` and the serve endpoint.
 - Add CLI tests for success, indeterminate, output assertion failure, and
   execution failure shapes. Add serve endpoint coverage for the same policy.
@@ -545,6 +555,8 @@ required and update tests so framed skills without `result` fail validation.
   status.
 - Process-stream fields are named consistently, and JSON success and
   indeterminate responses omit `output` when a parsed `skillResult` exists.
+- Framed JSON success responses avoid duplicate wrapper fields; `exitCode`
+  remains process metadata and is not moved into `SkillResult`.
 - Pretty or summary output has a clear human-scannable answer when `result` is
   present.
 - Docs describe the authored source of truth, not generated output.
