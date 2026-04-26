@@ -56,54 +56,50 @@ migration-phase contract shape is stable.
 - The tests describe the temporary optional state clearly enough that PR-C2 can
   tighten it later.
 
-### Phase 2: Clean JSON `skills run` Output
+### Phase 2: Drop `output` From Framed Success Responses
 
 **Files:**
 
 - `apps/node/src/cli/commands/skills.ts`
+- `apps/node/src/cli/commands/serve.ts`
 - `apps/node/src/test/unit/skills.test.ts`
 
 **Tasks:**
 
-1. In `skills.ts`, change the `output` field on the success, indeterminate,
-   and `SKILL_OUTPUT_ASSERTION_FAILED` branches to apply
-   `sanitizePrettySkillStdout` whenever `result.skillResult !== null`,
-   regardless of format. The recommended change from `findings.md` is:
-   ```ts
-   output: (options.format === "pretty" || result.skillResult !== null)
-     ? sanitizePrettySkillStdout(result.output, result.skillResult !== null)
-     : result.output,
-   ```
-   Apply this to all three response branches that currently use `output`.
-   General execution failure and spawn-failure branches use `stdout`/`stderr`
-   and do not need to change.
-2. Do not change `runSkill.ts` or the domain-layer tests. The `runSkill`
-   domain function intentionally returns raw stdout including the frame; the
-   existing agent-driven SkillResult test that asserts
-   `result.output.includes("[Clawperator-Skill-Result]")` remains correct and
-   must not be modified.
-3. Add CLI-layer tests in the `describe("cmdSkillsRun preflight gate")` block
-   using the injected `runSkillImpl` pattern already used in that block. A
-   suitable test:
+1. In `skills.ts`, remove the `output` field from the success and indeterminate
+   response objects when `result.skillResult !== null`. Do not strip the frame -
+   omit the field entirely. When `result.skillResult === null`, keep `output`
+   (legacy unframed skills only).
+2. In `skills.ts`, keep `output` on the `SKILL_OUTPUT_ASSERTION_FAILED` branch
+   when `skillResult !== null` - this path uses `output` as a diagnostic showing
+   what the skill printed when the assertion failed.
+3. Apply the same policy in `serve.ts`. The serve endpoint independently builds
+   its response objects at lines 658-682. Remove `output` from the success
+   (line 662) and indeterminate (line 676) response objects when
+   `result.skillResult !== null`. Keep `output` in the assertion failure object
+   (line 691) regardless.
+4. Do not change `runSkill.ts` or the domain-layer tests. The domain function
+   intentionally returns raw stdout. The existing test at line 3608 that asserts
+   `result.output.includes("[Clawperator-Skill-Result]")` is testing the domain
+   layer and must not be modified.
+5. Add CLI-layer tests in the `describe("cmdSkillsRun preflight gate")` block
+   using the injected `runSkillImpl` pattern. A suitable test:
    - Creates a `fakeRunSkill` that returns `output` containing the literal
-     `[Clawperator-Skill-Result]` marker followed by JSON, plus a non-null
-     `skillResult`.
+     `[Clawperator-Skill-Result]` marker, plus a non-null `skillResult`.
    - Calls `cmdSkillsRun` with `{ format: "json", runSkillImpl: fakeRunSkill }`.
-   - Asserts that `JSON.parse(stdout).output` does NOT contain
-     `[Clawperator-Skill-Result]`.
-4. Add a corresponding test for the case where `skillResult` is null and
-   `output` IS raw (frame-inclusive) stdout, to prove the non-framed path is
-   unchanged.
+   - Asserts that `JSON.parse(stdout).output` is `undefined`.
+6. Add a test for the `skillResult === null` path: `fakeRunSkill` returns a
+   non-null `output` and a null `skillResult`. Assert `JSON.parse(stdout).output`
+   is present and unchanged.
 
 **Acceptance criteria:**
 
-- JSON success output does not contain `[Clawperator-Skill-Result]` when
-  `skillResult` is parsed.
-- JSON indeterminate output follows the same rule.
-- JSON output-assertion failure follows the same rule.
-- Malformed frame failures (where `skillResult` is null) still expose raw
-  stdout including any partial frame content for debugging.
+- JSON success and indeterminate responses omit `output` when `skillResult` is
+  non-null.
+- JSON assertion-failure responses keep `output` for diagnostic context.
+- JSON responses for legacy unframed skills (skillResult null) keep `output`.
 - Domain-layer `runSkill` tests are unchanged.
+- Serve endpoint follows the same policy as the CLI command.
 
 ### Phase 3: Update Clawperator Docs And Bundled Authoring Guidance
 
@@ -126,9 +122,10 @@ migration-phase contract shape is stable.
    `skillResult.result`, then proof fields.
 2. Document `result` as optional only during migration.
 3. Document singular `result` for collection payloads.
-4. Document `output` as display/progress text when retained on success-like
-   wrappers, not raw stdout and not the domain answer. Document that failure
-   wrappers may expose process streams as `stdout` and `stderr`.
+4. Document that `output` is absent from JSON success and indeterminate
+   responses when `skillResult` is non-null. Document that it is present on
+   assertion-failure and legacy unframed paths. Document that failure wrappers
+   expose process streams as `stdout` and `stderr`.
 5. Document that `terminalVerification` is proof and `diagnostics` is debug
    metadata. Neither is the primary answer channel.
 6. Document checkpoint presence semantics: existing skills may emit only reached
@@ -153,8 +150,8 @@ migration-phase contract shape is stable.
 
 - No public doc tells agents to find primary answers in `diagnostics`,
   `terminalVerification`, or checkpoint ids.
-- Public docs define `output` as display/progress text if retained, while
-  reserving `skillResult.result` for the domain answer.
+- Public docs state that `output` is absent from JSON success responses when
+  `skillResult` is non-null, and explain where it is kept and why.
 - Recording compare docs still say the full `skills run` wrapper is the durable
   compare input and uses `skillResult.checkpoints` and
   `skillResult.terminalVerification` for compare logic. Do not change the

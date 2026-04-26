@@ -108,8 +108,7 @@ Expected properties:
 - checkpoints and terminal verification still prove how the value was found
 - diagnostics contains only runtime health, hints, warnings, paths, timings, or
   debug metadata
-- JSON `output` no longer includes the terminal `[Clawperator-Skill-Result]`
-  frame when parsed `skillResult` is present
+- `output` is absent - dropped from JSON responses when `skillResult` is non-null
 
 Expected reduced shape:
 
@@ -117,7 +116,6 @@ Expected reduced shape:
 {
   "status": "success",
   "skillId": "com.globird.energy.get-yesterday-usage-cost-replay",
-  "output": "[skill:com.globird.energy.get-yesterday-usage-cost-replay] Launching GloBird for a fresh replay run...\n[skill:com.globird.energy.get-yesterday-usage-cost-replay] Opening the Energy tab...\n[skill:com.globird.energy.get-yesterday-usage-cost-replay] Reading Yesterday usage cost...\n[skill:com.globird.energy.get-yesterday-usage-cost-replay] Parsed Yesterday usage cost.\nGloBird yesterday usage cost: -$3.10\n",
   "exitCode": 0,
   "skillResult": {
     "contractVersion": "1.0.0",
@@ -184,7 +182,7 @@ wrapper.status == "success"
 skillResult.status == "success"
 skillResult.result.kind == "text"
 skillResult.result.text matches /^[-+]?\$\d+(\.\d{2})?$/
-output does not contain "[Clawperator-Skill-Result]"
+output field is absent
 ```
 
 This check is intentionally answer-path focused. The exact dollar amount depends

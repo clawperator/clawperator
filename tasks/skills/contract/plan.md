@@ -56,12 +56,14 @@ Collections still live in singular `result`, for example:
 5. `checkpoints` explain progress and evidence. They are not the primary answer
    lookup path.
 6. `diagnostics` is for runtime health, warnings, hints, and debug detail only.
-7. JSON `output` should not include the terminal
-   `[Clawperator-Skill-Result]` frame when a parsed `skillResult` exists.
-8. `rawOutput` or a similar explicit raw stream field may be added later only if
-   a concrete machine consumer needs it. It is not required for this task.
-9. If `output` remains on success-like wrappers, docs must define it as
-   display/progress text, not raw stdout and not the domain result.
+7. Drop the `output` field from success and indeterminate responses when
+   `skillResult !== null`. Agents use `skillResult.result`. Progress text is
+   available in pretty mode; it is pure token waste in JSON mode.
+8. Keep `output` when `skillResult === null`. For legacy unframed skills it is
+   the only available data. For `SKILL_OUTPUT_ASSERTION_FAILED` it shows what
+   the skill printed when the assertion failed.
+9. Apply the same policy in `serve.ts` as in `skills.ts`. Both currently pass
+   `result.output` through independently and both need updating.
 10. New and migrated non-trivial skills should prefer map/state-machine
     checkpoints: include known checkpoint ids and mark unreached steps
     `skipped`.
