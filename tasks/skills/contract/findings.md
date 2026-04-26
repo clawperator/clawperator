@@ -21,9 +21,9 @@
 ## Executive Summary
 
 The current `clawperator skills run` JSON shape is optimized for complete
-debug capture and backward compatibility. It is parseable, but it is not yet a
-good general-purpose contract for agents or human operators who want the answer
-to a skill run.
+debug capture and raw stdout preservation. It is parseable, but it is not yet a
+good general-purpose contract for agents or operators who want the answer to a
+skill run.
 
 The blocking issue is not just noisy output. The runtime has no canonical,
 schema-supported location for the skill's domain result. Some skill scripts
@@ -41,8 +41,8 @@ The right implementation order is:
 3. Migrate skills so primary outputs leave `diagnostics`, checkpoint-only
    evidence, and terminal-verification-only evidence.
 4. Strip the terminal frame from `output` in JSON mode. Pretty mode already
-   strips it; JSON mode should be consistent. This is a compatibility change that
-   requires docs and a changelog entry, not a silent one-line cleanup.
+   strips it; JSON mode should be consistent. Prefer the clean contract over
+   raw-frame retention.
 
 ---
 
@@ -111,12 +111,12 @@ small:
 - `{ kind: "json", value: ... }`
 - `{ kind: "result_envelope_ref", execEnvelopeIndex: 0, stepResultId: "..." }`
 
-**Compatibility risk:**
+**Implementation stance:**
 
-Low. Adding an optional parsed field is backward-compatible for existing
-consumers. Existing scripts that already emit root `result` show the intended
-authoring direction, but their payload shape must be migrated to the canonical
-evidence union before those fields survive parsing.
+Adding an optional parsed field is safe for current internal flows. Existing
+scripts that already emit root `result` show the intended authoring direction,
+but their payload shape must be migrated to the canonical evidence union before
+those fields survive parsing.
 
 ---
 
@@ -165,15 +165,15 @@ order:
 5. Setter skills: only populate `result` when there is a useful caller-facing
    confirmed value or state. Do not force a meaningless result for every setter.
 
-**Compatibility risk:**
+**Implementation stance:**
 
-Medium across the skills repo. Existing private consumers may have learned
-skill-specific paths such as `diagnostics.climate`. Keep those fields for one
-transition if needed, but mark `result` as canonical in docs and tests.
+Migrate internal skills directly to the canonical `result` location. Do not keep
+duplicate primary outputs under `diagnostics` or other noncanonical fields just
+to retain old shapes.
 
 ---
 
-### 3. Medium: JSON `output` includes the terminal SkillResult frame - stripping it is the right call but is a contract change
+### 3. Medium: JSON `output` includes the terminal SkillResult frame
 
 **Owning surface:** `apps/node/src/cli/commands/skills.ts`
 
@@ -210,9 +210,9 @@ also tempts agents to scrape `output` even when structured data exists.
 **Analysis:**
 
 Stripping the frame from `output` in JSON mode is the right fix. The fix is
-one conditional in `skills.ts:546-548`. The reason it requires care is not
-technical complexity - it is that docs define `output` as raw stdout, so
-stripping silently changes an established field.
+one conditional in `skills.ts:546-548`. The reason to call it out is not
+technical complexity - it changes `output` from raw stdout to de-framed progress
+text, and docs need to describe the new contract.
 
 The two modes should behave consistently. Pretty mode already strips the frame
 (`sanitizePrettySkillStdout`). JSON mode does not. That inconsistency means the
@@ -224,8 +224,7 @@ its own documentation problem.
 Strip the terminal frame from `output` in JSON mode when `skillResult !== null`.
 Apply this to success, indeterminate, and `SKILL_OUTPUT_ASSERTION_FAILED`
 responses. Do not add a new field - that is over-engineering for a consistency
-fix. Do document the change as a contract update and add a compat note in the
-changelog.
+fix. Do document the new meaning of `output`.
 
 **Minimal fix:**
 
@@ -238,14 +237,12 @@ output: (options.format === "pretty" || result.skillResult !== null)
 Apply the same pattern to every wrapper branch that returns `output`.
 
 Document in `docs/skills/runtime.md`: `output` contains pre-frame human-readable
-progress text; the parsed result is in `skillResult`. Consumers scraping the
-frame from `output` should use `skillResult` instead.
+progress text; the parsed result is in `skillResult`.
 
-**Compatibility risk:**
+**Implementation stance:**
 
-Medium. Consumers scraping the terminal frame out of `output` are undesirable,
-but possible. Consumers relying on exact raw stdout for saved-run diagnostics
-would also see a behavior change.
+Make JSON and pretty output consistent now. Do not expose the raw terminal frame
+through `output`.
 
 ---
 
@@ -276,10 +273,11 @@ Document and test this consumer rule:
 3. Treat nested `skillResult` as child-authored evidence that the wrapper can
    reject or mark indeterminate.
 
-**Compatibility risk:**
+**Implementation stance:**
 
-Low for documentation and tests. Do not rewrite nested `skillResult.status` in
-the wrapper, because preserving child-authored evidence is useful.
+Document and test the precedence rule. Do not rewrite nested
+`skillResult.status`; preserving child-authored evidence is useful for
+diagnostics.
 
 ---
 
@@ -315,9 +313,10 @@ After `result` exists:
 - structured read results should live in `result`, not only in
   `terminalVerification.observed`
 
-**Compatibility risk:**
+**Implementation stance:**
 
-Low if this is documented as precedence rather than enforced immediately.
+Document the precedence immediately. Migrate skill outputs to `result` rather
+than teaching callers to treat `terminalVerification` as an answer channel.
 
 ---
 
@@ -350,10 +349,10 @@ Do not remove the catchall immediately. Instead:
 - add skill review guidance or tests that reject primary result fields under
   diagnostics for new or migrated skills
 
-**Compatibility risk:**
+**Implementation stance:**
 
-Low for contract additions. Medium if existing diagnostics result keys are
-removed without a transition.
+Remove primary result data from diagnostics during migration. Keep diagnostics
+for health, warnings, hints, paths, timings, and debug metadata.
 
 ---
 
@@ -376,12 +375,15 @@ Callers need separate extraction logic for successful and failed runs. The name
 
 **Smallest fix:**
 
-Document the current shape immediately. Later, add `stdout` on success as an
-alias while keeping `output` for compatibility.
+Normalize stream field naming instead of carrying aliases. Prefer `stdout` and
+`stderr` for process streams, and reserve `result` for the skill answer. If
+`output` remains, define it as a display/progress field rather than a stream or
+domain-result field.
 
-**Compatibility risk:**
+**Implementation stance:**
 
-Low for adding fields and docs. High for renaming or removing `output`.
+No alias is needed. Choose one clean naming policy and update docs and tests to
+match it.
 
 ---
 
@@ -406,9 +408,10 @@ Two patterns exist:
 Document both patterns for existing skills. Prefer the map/state-machine pattern
 for new non-trivial skills because it gives callers a complete progress map.
 
-**Compatibility risk:**
+**Implementation stance:**
 
-Low for docs. Medium if existing skill outputs are normalized all at once.
+Normalize new and migrated skills toward the map/state-machine checkpoint
+pattern. Existing inconsistent outputs do not need to be retained.
 
 ---
 
@@ -434,13 +437,12 @@ schema change. Because the proposed contract reuses `SkillCheckpointEvidence`,
 existing plain-object `result` payloads must also be migrated to
 `{ kind: "json", value: ... }`.
 
-### Correction B: Stripping the frame from JSON `output` is a contract change, not a bug fix
+### Correction B: Stripping the frame from JSON `output` is a contract cleanup
 
-Earlier findings describe this as a one-line bug fix with low compat risk. The
-code fix is one line, but the semantics change is not low risk. Docs define
-`output` as raw stdout. The fix should be shipped with a changelog entry and
-updated docs, not silently. This document's recommendation (see Finding 3) is to
-make the change deliberately rather than avoid it.
+Earlier findings describe this as a one-line bug fix. The code fix is small, but
+the docs must still change because `output` will no longer mean raw stdout when
+a parsed `skillResult` exists. This document's recommendation (see Finding 3)
+is to make the contract cleaner now.
 
 ---
 
@@ -458,7 +460,7 @@ make the change deliberately rather than avoid it.
     handled
   - emitted plain-object root `result` is rejected or stripped according to the
     chosen schema policy
-  - legacy framed skills without `result` still parse
+  - framed skills without `result` still parse
   - unframed skills still return `skillResult: null`
 - Update docs in:
   - `docs/skills/authoring.md`
@@ -475,7 +477,7 @@ make the change deliberately rather than avoid it.
 - Strip the terminal frame from `output` in JSON mode (see Finding 3). Update
   `docs/skills/runtime.md` to define `output` as pre-frame human-readable
   progress text. Apply this consistently to success, indeterminate, and
-  output-assertion failure branches. Add changelog entry.
+  output-assertion failure branches.
 - Add CLI tests for success, indeterminate, output assertion failure, and
   execution failure shapes.
 
@@ -516,8 +518,8 @@ In `../clawperator-skills`, migrate high-value skills first:
   `parsed.skillResult.result` when a skill returns a value.
 - Callers can branch safely on wrapper status before trusting nested skill
   status.
-- Raw process output remains available somewhere documented, whether as
-  `output`, `stdout`, or another explicit field.
+- Process-stream fields are named consistently, and `output` is either removed
+  or clearly defined as display/progress text rather than raw stdout.
 - Pretty or summary output has a clear human-scannable answer when `result` is
   present.
 - Docs describe the authored source of truth, not generated output.
