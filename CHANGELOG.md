@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.9.1] - 2026-04-27
+
+This release makes the framed `SkillResult` contract stricter at parse time by requiring a `result` field whenever framed output is validated.
+
+### 🤖 Node API & CLI
+- **Breaking:** **Changed:** Tightened framed `SkillResult` validation so `result` is required in TypeScript and Zod (use `null` when there is no truthful domain value); payloads that omit `result` are now rejected at parse time.
+
+Pull requests:
+- [feat(node): require SkillResult.result on framed output](https://github.com/clawperator/clawperator/pull/244)
+
 ## [0.9.0] - 2026-04-27
 
 This release introduced the canonical SkillResult answer contract and updated the Node CLI and serve API to surface framed skill results directly.
