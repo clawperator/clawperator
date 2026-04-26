@@ -311,7 +311,7 @@ Subcommands:
   restart  Stop then start the daemon process
 
 Notes:
-  - The daemon uses a Unix domain socket under ~/.clawperator/.
+  - The daemon uses a Unix domain socket under ~/.clawperator/daemon/.
   - The daemon run subcommand is internal and is intentionally omitted from help.
 `;
 
