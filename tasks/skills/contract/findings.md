@@ -49,8 +49,9 @@ The implementation order is:
    diagnostics in the canonical public contract. Prefer the clean contract over
    raw-frame or progress-text retention.
 
-PR-C1 and PR-S1 have completed steps 1-4 for the migration branches. PR-C2
-remains to make `result` required and update tests accordingly.
+PR-C1 and PR-S1 completed steps 1-4 for the migration branches. PR-C2 closes the
+migration window by making `SkillResult.result` required in the runtime schema
+(null remains valid when no truthful domain value exists).
 
 ---
 

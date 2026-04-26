@@ -14,7 +14,9 @@ Current state:
 
 - PR-C1 Phases 1-3 are implemented, validated, committed, and review-clean.
 - PR-S1 Phases 4-5 are implemented, validated, committed, and review-clean.
-- PR-C2 Phases 6-7 are not started.
+- PR-C2 Phase 6 is implemented on `codex/require-skill-result` (Clawperator).
+- PR-C2 Phase 7: confirm bundled skill prompts and re-run a quick doc skim if
+  needed; most canonical-only cleanup was already done in PR-C1.
 - PR-C2 should not start until PR-C1 and PR-S1 are merged or otherwise
   coordinated into validation.
 - Public docs now intentionally describe only the canonical contract. Do not
@@ -366,11 +368,11 @@ Current state:
 **Suggested branch:** `codex/require-skill-result`
 **Agent tier:** thinking
 **Depends on:** PR-C1 and PR-S1
-**Status:** not started
+**Status:** Phase 6 done; Phase 7 verification optional before PR
 
 ### Phase 6: Tighten Runtime Schema
 
-**Status:** not started.
+**Status:** done on branch `codex/require-skill-result`.
 
 **Files:**
 
@@ -400,9 +402,9 @@ Current state:
 
 ### Phase 7: Final Docs And Cross-Repo Smoke
 
-**Status:** not started. Most public-doc cleanup was pulled forward into PR-C1
-commit `027aff0e`; Phase 7 should verify those docs after Phase 6 rather than
-reintroduce migration-history content.
+**Status:** verify after Phase 6 merge. Most public-doc cleanup was pulled forward
+into PR-C1 commit `027aff0e`; confirm bundled skill prompts and examples still
+match required `result` (no optional-framing in public docs).
 
 **Files:**
 

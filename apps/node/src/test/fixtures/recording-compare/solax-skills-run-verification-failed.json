@@ -16,6 +16,7 @@
     "inputs": {
       "percent": 40
     },
+    "result": null,
     "status": "success",
     "checkpoints": [
       {

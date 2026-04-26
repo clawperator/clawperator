@@ -1,6 +1,6 @@
 # SkillResult Contract Implementation Plan
 
-**Status:** PR-C1 and PR-S1 implemented and review-clean; PR-C2 remains
+**Status:** PR-C1, PR-S1, and PR-C2 Phase 6 implemented on `codex/require-skill-result`; Phase 7 doc verification TBD
 **Source findings:** `tasks/skills/contract/findings.md`
 **Scope:** `~/src/clawperator` and `~/src/clawperator-skills`
 
@@ -109,13 +109,17 @@ Relevant commits on the branch:
 
 ### Remaining Work
 
-PR-C2 is the only remaining planned PR:
+- PR-C2 Phase 7: final pass on bundled skills wording if anything still implies
+  optional `result` (public docs are already canonical-only).
+- Merge PR-C2 (branch `codex/require-skill-result`).
 
-- Make `SkillResult.result` required in runtime TypeScript and Zod schemas.
-- Update fixtures and tests so missing `result` is rejected.
-- Re-run Node tests, docs build, and cross-repo skill validation against the
-  migrated skills.
-- Keep public docs canonical. Do not add legacy or migration-window sections.
+**PR-C2 Phase 6 (complete on `codex/require-skill-result`):**
+
+- `SkillResult.result` is required in TypeScript and Zod (`| null` allowed).
+- Fixtures, recording-compare JSON, and `emit_skill_result` / agent fixtures updated;
+  missing `result` is rejected with a regression test.
+- Node tests, docs build, and cross-repo `skills validate` for a migrated read
+  skill and a setter skill passed.
 
 ## Contract Decisions
 
@@ -249,7 +253,7 @@ Required outcomes:
 ### PR-C2: Clawperator Required Result
 
 **Repo:** `~/src/clawperator`
-**Status:** not started
+**Status:** Phase 6 implemented on `codex/require-skill-result`
 **Can start after PR-C1 and PR-S1 are merged or otherwise coordinated into validation:** yes
 
 Close the migration window and make `result` required for framed `SkillResult`

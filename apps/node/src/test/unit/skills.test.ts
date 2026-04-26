@@ -3558,6 +3558,7 @@ describe("runSkill", () => {
     assert.ok(result.skillResult);
     assert.strictEqual(result.skillResult.source.kind, "script");
     assert.strictEqual(result.skillResult.skillId, TEST_SKILL_RESULT);
+    assert.deepStrictEqual(result.skillResult.result, null);
     assert.strictEqual(result.skillResult.status, "success");
     assert.strictEqual(result.skillResult.checkpoints.length, 3);
     assert.deepStrictEqual(result.skillResult.checkpoints.map((checkpoint) => checkpoint.evidence?.kind), [
@@ -3568,7 +3569,7 @@ describe("runSkill", () => {
     assert.strictEqual(result.skillResult.diagnostics?.runtimeState, "healthy");
   });
 
-  it("accepts evidence-shaped root result and surfaces skillResult.result (migration window allows missing result)", async () => {
+  it("accepts evidence-shaped root result and surfaces skillResult.result", async () => {
     const result = await runSkill(TEST_SKILL_RESULT, ["result-valid", "40"]);
     assert.ok(result.ok, `Expected framed SkillResult to succeed: ${"message" in result ? result.message : ""}`);
     assert.ok(result.skillResult);
@@ -3586,11 +3587,11 @@ describe("runSkill", () => {
     );
   });
 
-  it("treats missing result as undefined during the migration window (PR-C1 optional; PR-C2 will require it)", async () => {
-    const result = await runSkill(TEST_SKILL_RESULT, ["valid", "40"]);
-    assert.ok(result.ok, `Expected framed SkillResult to succeed: ${"message" in result ? result.message : ""}`);
-    assert.ok(result.skillResult);
-    assert.strictEqual(result.skillResult.result, undefined);
+  it("rejects framed SkillResult objects that omit the required result field", async () => {
+    const result = await runSkill(TEST_SKILL_RESULT, ["missing-result", "40"]);
+    assert.ok(!result.ok, "Expected runSkill to fail when result is missing");
+    assert.strictEqual(result.code, SKILL_RESULT_PARSE_FAILED);
+    assert.match(result.message, /SkillResult frame failed validation|result/);
   });
 
   it("keeps framed scripted SkillResult parsing permissive when skill.json is unreadable", async () => {
@@ -7117,6 +7118,7 @@ describe("cmdSkillsRun preflight gate", () => {
         contractVersion: "1.0.0",
         skillId: "com.test.framed-cli-json",
         source: { kind: "script" },
+        result: null,
         status: "success",
         checkpoints: [],
       } satisfies SkillResult,
@@ -7195,6 +7197,7 @@ describe("cmdSkillsRun preflight gate", () => {
         contractVersion: "1.0.0",
         skillId: "com.test.indeterminate-cli",
         source: { kind: "script" },
+        result: null,
         status: "success",
         checkpoints: [],
       } satisfies SkillResult,
