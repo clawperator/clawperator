@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.9.0] - 2026-04-27
+
+This release introduced the canonical SkillResult answer contract and updated the Node CLI and serve API to surface framed skill results directly.
+
+### 🤖 Node API & CLI
+- **Added:** Added the canonical `skillResult.result` evidence field and supporting validation so framed skills can emit a direct domain answer alongside checkpoints and terminal verification.
+- **Changed:** Updated `skills run` and `POST /skills/:skillId/run` to prefer the framed `skillResult` payload in JSON output when available, while preserving the legacy wrapper fields for unframed runs.
+
+### 📚 Documentation & Website
+- **Changed:** Updated the public skills and API docs, bundled skill guidance, and generated agent-ingestion output to describe the canonical SkillResult contract and the new answer surface.
+
+Pull requests:
+- [feat(node, skills): add canonical SkillResult result contract](https://github.com/clawperator/clawperator/pull/243)
+
 ## [0.8.0] - 2026-04-26
 
 This release introduced the new daemon execution path, which vastly improves operations by routing core Node actions through a transparent daemon and tightening the supporting contracts and docs.
