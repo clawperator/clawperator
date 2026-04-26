@@ -5,7 +5,7 @@ import type { RunExecutionResult } from "../domain/executions/runExecution.js";
 import type { ResultEnvelope } from "../contracts/result.js";
 import { resolveOperatorPackageForRequest } from "../domain/config/resolveOperatorPackage.js";
 import { getDaemonSocketPath, isDaemonRunning, spawnDaemonRun, stopDaemon, withDaemonLock } from "../domain/daemon/lifecycle.js";
-import { getCliVersion } from "../domain/version/compatibility.js";
+import { getCliBuildIdentity, getCliVersion, type CliBuildIdentity } from "../domain/version/compatibility.js";
 
 export interface DaemonProxyOptions {
   rawDeviceId?: string;
@@ -41,6 +41,8 @@ const DEFAULT_START_TIMEOUT_MS = 3000;
 const DEFAULT_POLL_INTERVAL_MS = 100;
 const DEFAULT_POST_TIMEOUT_MS = 35000;
 const POST_TIMEOUT_BUFFER_MS = 5000;
+
+type DaemonReadinessState = "ready" | "replace" | "not_ready" | "unowned";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -169,6 +171,46 @@ async function isOwnedDaemon(
   return await (deps.isDaemonRunningFn ?? isDaemonRunning)(rawDeviceId, options);
 }
 
+function isBuildIdentity(value: unknown): value is CliBuildIdentity {
+  return isObject(value)
+    && typeof value.entryPath === "string"
+    && (typeof value.mtimeMs === "number" || value.mtimeMs === null)
+    && (typeof value.size === "number" || value.size === null);
+}
+
+function buildIdentityMatches(left: CliBuildIdentity, right: CliBuildIdentity): boolean {
+  return left.entryPath === right.entryPath && left.mtimeMs === right.mtimeMs && left.size === right.size;
+}
+
+function daemonVersionMatches(raw: string): boolean {
+  const parsed = JSON.parse(raw) as { version?: unknown; buildIdentity?: unknown };
+  return parsed.version === getCliVersion()
+    && isBuildIdentity(parsed.buildIdentity)
+    && buildIdentityMatches(parsed.buildIdentity, getCliBuildIdentity());
+}
+
+async function getDaemonReadinessState(
+  rawDeviceId: string | undefined,
+  socketPath: string,
+  options: DaemonProxyOptions,
+  deps: DaemonProxyDeps
+): Promise<DaemonReadinessState> {
+  const httpGetFn = deps.httpGetFn ?? httpGet;
+  const pingRaw = await httpGetFn(socketPath, "/ping");
+  const ping = JSON.parse(pingRaw) as { ok?: unknown };
+  if (ping.ok !== true) {
+    return "not_ready";
+  }
+  if (!(await isOwnedDaemon(rawDeviceId, options, deps))) {
+    return "unowned";
+  }
+  try {
+    return daemonVersionMatches(await httpGetFn(socketPath, "/version")) ? "ready" : "replace";
+  } catch {
+    return "replace";
+  }
+}
+
 async function ensureDaemonReady(
   rawDeviceId: string | undefined,
   effectiveOperatorPackage: string,
@@ -178,20 +220,16 @@ async function ensureDaemonReady(
 ): Promise<boolean> {
   const httpGetFn = deps.httpGetFn ?? httpGet;
   try {
-    const pingRaw = await httpGetFn(socketPath, "/ping");
-    const ping = JSON.parse(pingRaw) as { ok?: unknown };
-    if (ping.ok !== true) {
-      return false;
-    }
-    if (!(await isOwnedDaemon(rawDeviceId, options, deps))) {
-      return false;
-    }
-    const versionRaw = await httpGetFn(socketPath, "/version");
-    const version = JSON.parse(versionRaw) as { version?: unknown };
-    if (version.version === getCliVersion()) {
+    const state = await getDaemonReadinessState(rawDeviceId, socketPath, options, deps);
+    if (state === "ready") {
       return true;
     }
-    await (deps.stopDaemonFn ?? stopDaemon)(rawDeviceId, options);
+    if (state === "unowned") {
+      return false;
+    }
+    if (state === "replace") {
+      await (deps.stopDaemonFn ?? stopDaemon)(rawDeviceId, options);
+    }
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code === "ECONNREFUSED" || code === "ENOTSOCK") {
@@ -208,23 +246,44 @@ async function ensureDaemonReady(
     }
   }
 
-  (deps.spawnDaemonRunFn ?? spawnDaemonRun)(rawDeviceId, effectiveOperatorPackage, options);
   const timeoutMs = options.startTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
   const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() <= deadline) {
-    if (await isDaemonAlive(socketPath, deps) && await isOwnedDaemon(rawDeviceId, options, deps)) {
+  const ready = await withDaemonLock(rawDeviceId, async () => {
+    try {
+      const state = await getDaemonReadinessState(rawDeviceId, socketPath, options, deps);
+      if (state === "ready") {
+        return true;
+      }
+      if (state === "unowned") {
+        return false;
+      }
+      if (state === "replace") {
+        return false;
+      }
+    } catch {
+      // The initial path above handles stale socket cleanup. Missing/not-ready sockets continue to spawn.
+    }
+
+    (deps.spawnDaemonRunFn ?? spawnDaemonRun)(rawDeviceId, effectiveOperatorPackage, options);
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() <= deadline) {
       try {
-        const versionRaw = await httpGetFn(socketPath, "/version");
-        const version = JSON.parse(versionRaw) as { version?: unknown };
-        if (version.version === getCliVersion()) {
-          return true;
+        if (await isDaemonAlive(socketPath, deps) && await isOwnedDaemon(rawDeviceId, options, deps)) {
+          const versionRaw = await httpGetFn(socketPath, "/version");
+          if (daemonVersionMatches(versionRaw)) {
+            return true;
+          }
         }
       } catch {
         // Keep polling until the daemon is fully ready.
       }
+      await delay(pollIntervalMs);
     }
-    await delay(pollIntervalMs);
+    return false;
+  }, options);
+
+  if (ready) {
+    return true;
   }
   process.stderr.write(`[clawperator] daemon unavailable after ${timeoutMs}ms; running direct for this call\n`);
   return false;

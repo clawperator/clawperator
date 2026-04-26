@@ -6750,6 +6750,8 @@ The daemon directory is created with mode `0700`. The PID metadata file is JSON:
 
 `daemon status` uses `startedAt` to compute `daemon.uptimeSeconds`.
 
+Daemon lifecycle lock files are created next to the PID metadata and socket. A lock file includes the owning process PID so later daemon commands can reclaim a stale lock when that process no longer exists.
+
 ## Output Shapes
 
 ### Start
@@ -6789,6 +6791,11 @@ Running:
     "status": "running",
     "pid": 12345,
     "version": "0.7.9",
+    "buildIdentity": {
+      "entryPath": "/Users/<local_user>/src/clawperator/apps/node/dist/cli/index.js",
+      "mtimeMs": 1777176000000,
+      "size": 12345
+    },
     "uptimeSeconds": 4,
     "socketPath": "/Users/<local_user>/.clawperator/daemon-emulator-5554.sock"
   }
@@ -6839,13 +6846,18 @@ The daemon exposes `GET /version` on its Unix socket and returns:
 
 ```json
 {
-  "version": "0.7.9"
+  "version": "0.7.9",
+  "buildIdentity": {
+    "entryPath": "/Users/<local_user>/src/clawperator/apps/node/dist/cli/index.js",
+    "mtimeMs": 1777176000000,
+    "size": 12345
+  }
 }
 ```
 
-The value comes from `getCliVersion()` in `apps/node/src/domain/version/compatibility.ts`.
+The `version` value comes from `getCliVersion()` in `apps/node/src/domain/version/compatibility.ts`. The `buildIdentity` value is captured when the Node process starts and identifies the CLI entrypoint path, entrypoint mtime, and entrypoint size.
 
-Lifecycle status reports this value. The proxy layer compares the daemon `/version` response with the current CLI process version before dispatching. If the strings differ, the proxy stops the old daemon, starts a new daemon, waits up to `3000` ms, and only dispatches after the restarted daemon reports the same version.
+Lifecycle status reports these values. The proxy layer compares the daemon `/version` response with the current CLI process version and build identity before dispatching. If either value differs, or if the daemon returns invalid version metadata, the proxy stops the old daemon, starts a new daemon, waits up to `3000` ms, and only dispatches after the restarted daemon reports the same version and build identity.
 
 ## Transparent Proxy
 
@@ -6864,10 +6876,10 @@ Proxy selection rules:
 
 1. If `--no-daemon` or `CLAWPERATOR_NO_DAEMON=1` is set, the command runs direct.
 2. If the platform is Windows, the command runs direct because this task uses Unix domain sockets only.
-3. If the socket is missing, the proxy spawns `daemon run`, polls `/ping` every `100` ms, and waits up to `3000` ms.
+3. If the socket is missing, the proxy serializes daemon startup with the lifecycle lock, spawns `daemon run`, polls `/ping` every `100` ms, and waits up to `3000` ms.
 4. If the socket exists but connection is refused, the proxy deletes the stale socket and starts a new daemon.
-5. If `/version` does not match the current CLI version, the proxy stops the old daemon and starts a new one.
-6. If the daemon is ready and the version matches, the command sends the execution payload to `POST /execute`.
+5. If `/version` does not match the current CLI version and build identity, the proxy stops the old daemon and starts a new one.
+6. If the daemon is ready and the version and build identity match, the command sends the execution payload to `POST /execute`.
 7. If the daemon cannot become ready before dispatch, the command runs direct for that call.
 
 The proxy sends the caller's effective Operator package in the request body. Precedence is:
@@ -6966,7 +6978,7 @@ node apps/node/dist/cli/index.js daemon status --device emulator-5554
 Success conditions:
 
 - start exits `0` and `daemon.status` is `started` or `already_running`
-- status while running exits `0`, `daemon.status == "running"`, `daemon.pid` is a number, `daemon.version` is a string, and `daemon.uptimeSeconds >= 0`
+- status while running exits `0`, `daemon.status == "running"`, `daemon.pid` is a number, `daemon.version` is a string, `daemon.buildIdentity.entryPath` is a string, and `daemon.uptimeSeconds >= 0`
 - stop exits `0` and `daemon.status` is `stopped` or `not_running`
 - final status exits `0` and `daemon.status == "not_running"`
 

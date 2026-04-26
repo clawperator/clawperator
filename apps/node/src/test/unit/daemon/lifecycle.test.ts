@@ -9,12 +9,14 @@ import { tmpdir } from "node:os";
 import {
   getDaemonLogPath,
   getDaemonDir,
+  getDaemonLockPath,
   getDaemonPidPath,
   getDaemonSocketPath,
   isDaemonRunning,
   sanitizeDaemonKey,
   stopDaemon,
   type DaemonPathsOptions,
+  withDaemonLock,
 } from "../../../domain/daemon/lifecycle.js";
 import {
   cmdDaemonStart,
@@ -74,6 +76,22 @@ describe("daemon lifecycle paths", () => {
 
     assert.equal(getDaemonDir({ baseDir: daemonDir }), daemonDir);
     assert.equal(statSync(daemonDir).mode & 0o777, 0o700);
+  });
+});
+
+describe("daemon lifecycle lock", () => {
+  it("reclaims a lock owned by a dead process", async () => {
+    const baseDir = await makeTempBaseDir();
+    const lockPath = getDaemonLockPath(undefined, { baseDir });
+    writeFileSync(lockPath, `${JSON.stringify({ pid: 987654, createdAt: 100 })}\n`, "utf8");
+    let ran = false;
+
+    await withDaemonLock(undefined, () => {
+      ran = true;
+    }, { baseDir });
+
+    assert.equal(ran, true);
+    assert.equal(existsSync(lockPath), false);
   });
 });
 
@@ -252,6 +270,46 @@ describe("daemon command output", () => {
       processController: {
         isAlive: () => true,
         isDaemonProcess: () => false,
+        kill: () => undefined,
+      },
+    });
+    const parsed = JSON.parse(raw) as { ok?: boolean; daemon?: { status?: string; pid?: unknown } };
+
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.daemon?.status, "not_running");
+    assert.equal("pid" in (parsed.daemon ?? {}), false);
+  });
+
+  it("status returns not_running when version metadata cannot be read", async () => {
+    const baseDir = await makeTempBaseDir();
+    const socketPath = getDaemonSocketPath(undefined, { baseDir });
+    await writePidMetadata(baseDir, 9876, 100);
+    const server = createHttpServer((req, res) => {
+      if (req.url === "/ping") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+      if (req.url === "/version") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(socketPath, resolve);
+    });
+    httpServers.push(server);
+
+    const raw = await cmdDaemonStatus({
+      format: "json",
+      baseDir,
+      processController: {
+        isAlive: () => true,
+        isDaemonProcess: () => true,
         kill: () => undefined,
       },
     });

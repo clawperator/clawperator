@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type express from "express";
 import { createServeApp, startServer } from "../../../cli/commands/serve.js";
-import { getCliVersion } from "../../../domain/version/compatibility.js";
+import { getCliBuildIdentity, getCliVersion } from "../../../domain/version/compatibility.js";
 
 const servers: Server[] = [];
 const tempDirs: string[] = [];
@@ -83,7 +83,7 @@ describe("serve app", () => {
     const response = await requestJson({ hostname: "127.0.0.1", port: address.port, path: "/version" });
 
     assert.equal(response.statusCode, 200);
-    assert.deepEqual(response.body, { version: getCliVersion() });
+    assert.deepEqual(response.body, { version: getCliVersion(), buildIdentity: getCliBuildIdentity() });
   });
 
   it("starts with TCP options and accepts requests", async () => {

@@ -18,7 +18,7 @@ import { provisionEmulator } from "../../domain/android-emulators/provision.js";
 import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 import type { Logger } from "../../adapters/logger.js";
 import { resolveOperatorPackageForRequest } from "../../domain/config/resolveOperatorPackage.js";
-import { getCliVersion } from "../../domain/version/compatibility.js";
+import { getCliBuildIdentity, getCliVersion } from "../../domain/version/compatibility.js";
 import { resolveInteractiveSkillTarget } from "./skills.js";
 import { toPublicInteractiveAutomationError } from "../../domain/doctor/checks/deviceInteractivity.js";
 
@@ -180,7 +180,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
   });
 
   app.get("/version", (_req, res) => {
-    res.json({ version: getCliVersion() });
+    res.json({ version: getCliVersion(), buildIdentity: getCliBuildIdentity() });
   });
 
   // REST: List devices

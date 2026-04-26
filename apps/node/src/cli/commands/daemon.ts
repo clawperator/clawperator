@@ -16,6 +16,7 @@ import {
   withDaemonLock,
   writeDaemonPidMetadata,
 } from "../../domain/daemon/lifecycle.js";
+import type { CliBuildIdentity } from "../../domain/version/compatibility.js";
 
 interface DaemonRunOptions extends DaemonPathsOptions {
   deviceId?: string;
@@ -91,9 +92,32 @@ async function getSocketState(socketPath: string): Promise<"alive" | "missing" |
   }
 }
 
-async function readDaemonVersion(socketPath: string): Promise<string> {
-  const response = await requestDaemonJson<{ version?: unknown }>(socketPath, "/version");
-  return typeof response.version === "string" ? response.version : "unknown";
+async function readDaemonVersion(socketPath: string): Promise<{ version: string; buildIdentity?: CliBuildIdentity }> {
+  const response = await requestDaemonJson<{ version?: unknown; buildIdentity?: unknown }>(socketPath, "/version");
+  if (typeof response.version !== "string") {
+    throw new Error("Daemon returned invalid version metadata");
+  }
+  const buildIdentity = response.buildIdentity;
+  if (
+    buildIdentity !== undefined &&
+    (
+      typeof buildIdentity !== "object" ||
+      buildIdentity === null ||
+      Array.isArray(buildIdentity) ||
+      typeof (buildIdentity as Partial<CliBuildIdentity>).entryPath !== "string" ||
+      (
+        typeof (buildIdentity as Partial<CliBuildIdentity>).mtimeMs !== "number" &&
+        (buildIdentity as Partial<CliBuildIdentity>).mtimeMs !== null
+      ) ||
+      (
+        typeof (buildIdentity as Partial<CliBuildIdentity>).size !== "number" &&
+        (buildIdentity as Partial<CliBuildIdentity>).size !== null
+      )
+    )
+  ) {
+    throw new Error("Daemon returned invalid build identity metadata");
+  }
+  return { version: response.version, buildIdentity: buildIdentity as CliBuildIdentity | undefined };
 }
 
 async function waitForOwnedDaemon(
@@ -279,14 +303,20 @@ export async function cmdDaemonStatus(options: DaemonCommandOptions): Promise<st
   }
 
   const metadata = readDaemonPidMetadata(options.deviceId, options);
-  const version = await readDaemonVersion(socketPath);
+  let versionInfo: { version: string; buildIdentity?: CliBuildIdentity };
+  try {
+    versionInfo = await readDaemonVersion(socketPath);
+  } catch {
+    return daemonSuccess({ ok: true, daemon: { status: "not_running", socketPath } }, options);
+  }
   const uptimeSeconds = metadata ? Math.max(0, Math.floor((Date.now() - metadata.startedAt) / 1000)) : 0;
   return daemonSuccess({
     ok: true,
     daemon: {
       status: "running",
       pid: metadata?.pid ?? null,
-      version,
+      version: versionInfo.version,
+      buildIdentity: versionInfo.buildIdentity,
       uptimeSeconds,
       socketPath,
     },

@@ -7,7 +7,7 @@ import { getDaemonPostTimeoutMs, parseDaemonRunExecutionResult, tryDaemonExecuti
 import { formatRunExecutionResultForCli } from "../../../cli/output.js";
 import { getDaemonSocketPath } from "../../../domain/daemon/lifecycle.js";
 import { DEFAULT_OPERATOR_PACKAGE } from "../../../domain/config/resolveOperatorPackage.js";
-import { getCliVersion } from "../../../domain/version/compatibility.js";
+import { getCliBuildIdentity, getCliVersion } from "../../../domain/version/compatibility.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import type { RunExecutionResult } from "../../../domain/executions/runExecution.js";
 
@@ -46,7 +46,7 @@ async function makeBaseDir(): Promise<string> {
 function makeAliveGet(version = getCliVersion()): (socketPath: string, path: string) => Promise<string> {
   return async (_socketPath, path) => {
     if (path === "/ping") return JSON.stringify({ ok: true });
-    if (path === "/version") return JSON.stringify({ version });
+    if (path === "/version") return JSON.stringify({ version, buildIdentity: getCliBuildIdentity() });
     throw new Error(`unexpected path ${path}`);
   };
 }
@@ -184,15 +184,22 @@ describe("tryDaemonExecution", () => {
   });
 
   it("stops and restarts when daemon version mismatches", async () => {
-    const versions = ["0.0.0", getCliVersion(), getCliVersion()];
+    let fresh = false;
     let stopped = false;
     let spawned = false;
 
     const result = await tryDaemonExecution(execution, { startTimeoutMs: 5, pollIntervalMs: 1 }, {
       ...makeOwnedDaemonDeps(),
       httpGetFn: async (_socketPath, path) => {
-        if (path === "/ping") return JSON.stringify({ ok: true });
-        return JSON.stringify({ version: versions.shift() ?? getCliVersion() });
+        if (path === "/ping") {
+          if (!fresh && stopped) {
+            const error = new Error("missing") as NodeJS.ErrnoException;
+            error.code = "ENOENT";
+            throw error;
+          }
+          return JSON.stringify({ ok: true });
+        }
+        return JSON.stringify({ version: fresh ? getCliVersion() : "0.0.0", buildIdentity: getCliBuildIdentity() });
       },
       stopDaemonFn: async () => {
         stopped = true;
@@ -200,6 +207,83 @@ describe("tryDaemonExecution", () => {
       },
       spawnDaemonRunFn: () => {
         spawned = true;
+        fresh = true;
+      },
+      httpPostFn: async (): Promise<DaemonHttpSuccess> => ({ ok: true, body: JSON.stringify(successResult) }),
+    });
+
+    assert.equal(stopped, true);
+    assert.equal(spawned, true);
+    assert.deepEqual(result, successResult);
+  });
+
+  it("stops and restarts when daemon build identity mismatches", async () => {
+    let fresh = false;
+    let stopped = false;
+    let spawned = false;
+
+    const result = await tryDaemonExecution(execution, { startTimeoutMs: 5, pollIntervalMs: 1 }, {
+      ...makeOwnedDaemonDeps(),
+      httpGetFn: async (_socketPath, path) => {
+        if (path === "/ping") {
+          if (!fresh && stopped) {
+            const error = new Error("missing") as NodeJS.ErrnoException;
+            error.code = "ENOENT";
+            throw error;
+          }
+          return JSON.stringify({ ok: true });
+        }
+        return JSON.stringify({
+          version: getCliVersion(),
+          buildIdentity: fresh
+            ? getCliBuildIdentity()
+            : { ...getCliBuildIdentity(), mtimeMs: (getCliBuildIdentity().mtimeMs ?? 0) - 1 },
+        });
+      },
+      stopDaemonFn: async () => {
+        stopped = true;
+        return "stopped";
+      },
+      spawnDaemonRunFn: () => {
+        spawned = true;
+        fresh = true;
+      },
+      httpPostFn: async (): Promise<DaemonHttpSuccess> => ({ ok: true, body: JSON.stringify(successResult) }),
+    });
+
+    assert.equal(stopped, true);
+    assert.equal(spawned, true);
+    assert.deepEqual(result, successResult);
+  });
+
+  it("stops and restarts when owned daemon version response is invalid", async () => {
+    let fresh = false;
+    let stopped = false;
+    let spawned = false;
+
+    const result = await tryDaemonExecution(execution, { startTimeoutMs: 5, pollIntervalMs: 1 }, {
+      ...makeOwnedDaemonDeps(),
+      httpGetFn: async (_socketPath, path) => {
+        if (path === "/ping") {
+          if (!fresh && stopped) {
+            const error = new Error("missing") as NodeJS.ErrnoException;
+            error.code = "ENOENT";
+            throw error;
+          }
+          return JSON.stringify({ ok: true });
+        }
+        if (!fresh) {
+          return JSON.stringify({ ok: true });
+        }
+        return JSON.stringify({ version: getCliVersion(), buildIdentity: getCliBuildIdentity() });
+      },
+      stopDaemonFn: async () => {
+        stopped = true;
+        return "stopped";
+      },
+      spawnDaemonRunFn: () => {
+        spawned = true;
+        fresh = true;
       },
       httpPostFn: async (): Promise<DaemonHttpSuccess> => ({ ok: true, body: JSON.stringify(successResult) }),
     });
@@ -225,8 +309,13 @@ describe("tryDaemonExecution", () => {
           error.code = "ECONNREFUSED";
           throw error;
         }
+        if (path === "/ping" && !spawned) {
+          const error = new Error("missing") as NodeJS.ErrnoException;
+          error.code = "ENOENT";
+          throw error;
+        }
         if (path === "/ping") return JSON.stringify({ ok: true });
-        return JSON.stringify({ version: getCliVersion() });
+        return JSON.stringify({ version: getCliVersion(), buildIdentity: getCliBuildIdentity() });
       },
       spawnDaemonRunFn: () => {
         spawned = true;
@@ -255,8 +344,13 @@ describe("tryDaemonExecution", () => {
           error.code = "ENOTSOCK";
           throw error;
         }
+        if (path === "/ping" && !spawned) {
+          const error = new Error("missing") as NodeJS.ErrnoException;
+          error.code = "ENOENT";
+          throw error;
+        }
         if (path === "/ping") return JSON.stringify({ ok: true });
-        return JSON.stringify({ version: getCliVersion() });
+        return JSON.stringify({ version: getCliVersion(), buildIdentity: getCliBuildIdentity() });
       },
       spawnDaemonRunFn: () => {
         spawned = true;
@@ -368,7 +462,7 @@ describe("tryDaemonExecution", () => {
           throw error;
         }
         if (path === "/ping") return JSON.stringify({ ok: true });
-        return JSON.stringify({ version: getCliVersion() });
+        return JSON.stringify({ version: getCliVersion(), buildIdentity: getCliBuildIdentity() });
       },
       spawnDaemonRunFn: () => {
         spawnCount += 1;
@@ -382,7 +476,7 @@ describe("tryDaemonExecution", () => {
       tryDaemonExecution(execution, { startTimeoutMs: 10, pollIntervalMs: 1 }, deps),
     ]);
 
-    assert.equal(spawnCount, 2);
+    assert.equal(spawnCount, 1);
     assert.deepEqual(first, successResult);
     assert.deepEqual(second, successResult);
   });

@@ -27,6 +27,11 @@ const DEFAULT_TERMINATION_POLL_INTERVAL_MS = 100;
 const DEFAULT_LOCK_TIMEOUT_MS = 3000;
 const DEFAULT_LOCK_POLL_INTERVAL_MS = 25;
 
+interface DaemonLockMetadata {
+  pid: number;
+  createdAt: number;
+}
+
 function getProcessController(options?: DaemonPathsOptions): NonNullable<DaemonPathsOptions["processController"]> {
   return options?.processController ?? {
     isAlive(pid: number): boolean {
@@ -79,6 +84,37 @@ function readDaemonMetadata(path: string): DaemonMetadata | undefined {
     return undefined;
   } catch {
     return undefined;
+  }
+}
+
+function readDaemonLockMetadata(path: string): DaemonLockMetadata | undefined {
+  try {
+    const raw = readFileSync(path, "utf8").trim();
+    if (raw.length === 0) {
+      return undefined;
+    }
+    const parsed = JSON.parse(raw) as Partial<DaemonLockMetadata>;
+    if (
+      typeof parsed.pid === "number" &&
+      Number.isInteger(parsed.pid) &&
+      parsed.pid > 0 &&
+      typeof parsed.createdAt === "number" &&
+      Number.isFinite(parsed.createdAt)
+    ) {
+      return { pid: parsed.pid, createdAt: parsed.createdAt };
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
   }
 }
 
@@ -146,8 +182,16 @@ export async function withDaemonLock<T>(
   while (fd === undefined) {
     try {
       fd = openSync(lockPath, "wx", 0o600);
+      writeFileSync(fd, `${JSON.stringify({ pid: process.pid, createdAt: Date.now() })}\n`);
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;
+      if (code === "EEXIST") {
+        const metadata = readDaemonLockMetadata(lockPath);
+        if (metadata && !isPidAlive(metadata.pid)) {
+          rmSync(lockPath, { force: true });
+          continue;
+        }
+      }
       if (code !== "EEXIST" || Date.now() >= deadline) {
         throw error;
       }
