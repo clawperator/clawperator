@@ -7,17 +7,6 @@ description: Create concise implementation prompts for executing one specified P
 
 Draft an implementation prompt for another agent. The prompt must execute exactly one specified PR from a task pack, including all phases assigned to that PR, and must not allow work from later PRs.
 
-## Agents Metadata
-
-`agents/openai.yaml` is UI metadata for skill lists and default prompting. It is not an extra workflow document and it does not override `SKILL.md`.
-
-Keep it aligned with this skill:
-
-- `display_name` should stay human-readable.
-- `short_description` should describe the real job of the skill.
-- `default_prompt` should ask for one specified PR, not a whole task pack.
-- When the boundary contract in this file changes materially, update `agents/openai.yaml` in the same change.
-
 ## Inputs
 
 Require or infer:
