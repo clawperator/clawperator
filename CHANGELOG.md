@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.8.0] - 2026-04-26
+
+This release introduced the new daemon execution path, which vastly improves operations by routing core Node actions through a transparent daemon and tightening the supporting contracts and docs.
+
+### 🤖 Node API & CLI
+- **Added:** Introduced daemon lifecycle commands, Unix socket transport, daemon ownership metadata, version and build identity checks, structured daemon error contracts, and a readiness cache.
+- **Changed:** Proxied exec, observe, and flat action commands through the daemon while preserving CLI JSON output, exit-code behavior, operator package selection, and post-dispatch safety boundaries.
+
+### 📚 Documentation & Website
+- **Changed:** Added public daemon documentation, generated docs output, and updated skill guidance to reflect the daemon-backed execution flow and its closeout cleanup.
+
+Pull requests:
+- [docs(tasks): author daemon implementation task pack](https://github.com/clawperator/clawperator/pull/239)
+- [feat(node): add transparent daemon execution proxy](https://github.com/clawperator/clawperator/pull/240)
+- [feat(skills): add task implementation prompt skill](https://github.com/clawperator/clawperator/pull/241)
+- [fix(node): finalize daemon impl](https://github.com/clawperator/clawperator/pull/242)
+
 ## [0.7.8] - 2026-04-26
 
 This release tightens the upgrade guidance around PATH resolution and npm reachability while improving snapshot I/O performance and polishing the landing page example code.
