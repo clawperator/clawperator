@@ -17,6 +17,7 @@ import {
   stopDaemon,
   type DaemonPathsOptions,
   withDaemonLock,
+  writeDaemonPidMetadata,
 } from "../../../domain/daemon/lifecycle.js";
 import {
   cmdDaemonStart,
@@ -39,7 +40,7 @@ async function makeTempBaseDir(): Promise<string> {
 }
 
 async function writePidMetadata(baseDir: string, pid: number, startedAt = Date.now()): Promise<void> {
-  await writeFile(getDaemonPidPath(undefined, { baseDir }), `${JSON.stringify({ pid, startedAt })}\n`, "utf8");
+  writeDaemonPidMetadata(undefined, { pid, startedAt, cliEntryPath: "/tmp/clawperator", daemonKey: "default" }, { baseDir });
 }
 
 afterEach(async () => {
@@ -53,7 +54,11 @@ afterEach(async () => {
 
 describe("daemon lifecycle paths", () => {
   it("sanitizes TCP adb serials", () => {
-    assert.equal(sanitizeDaemonKey("192.168.1.1:5555"), "192.168.1.1-5555");
+    assert.equal(sanitizeDaemonKey("192.168.1.1:5555"), "id-MTkyLjE2OC4xLjE6NTU1NQ");
+  });
+
+  it("keeps similar device ids on distinct daemon keys", () => {
+    assert.notEqual(sanitizeDaemonKey("host:5555"), sanitizeDaemonKey("host-5555"));
   });
 
   it("uses default for empty or omitted device ids", () => {
@@ -64,9 +69,9 @@ describe("daemon lifecycle paths", () => {
   it("builds socket, PID, and log paths from the sanitized key", async () => {
     const baseDir = await makeTempBaseDir();
 
-    assert.equal(getDaemonSocketPath("192.168.1.1:5555", { baseDir }), join(baseDir, "daemon-192.168.1.1-5555.sock"));
-    assert.equal(getDaemonPidPath("192.168.1.1:5555", { baseDir }), join(baseDir, "daemon-192.168.1.1-5555.pid"));
-    assert.equal(getDaemonLogPath("192.168.1.1:5555", { baseDir }), join(baseDir, "daemon-192.168.1.1-5555.log"));
+    assert.equal(getDaemonSocketPath("192.168.1.1:5555", { baseDir }), join(baseDir, "daemon-id-MTkyLjE2OC4xLjE6NTU1NQ.sock"));
+    assert.equal(getDaemonPidPath("192.168.1.1:5555", { baseDir }), join(baseDir, "daemon-id-MTkyLjE2OC4xLjE6NTU1NQ.pid"));
+    assert.equal(getDaemonLogPath("192.168.1.1:5555", { baseDir }), join(baseDir, "daemon-id-MTkyLjE2OC4xLjE6NTU1NQ.log"));
   });
 
   it("hardens an existing daemon directory to owner-only permissions", async () => {
@@ -133,6 +138,56 @@ describe("daemon process state", () => {
     assert.equal(await isDaemonRunning(undefined, options), false);
   });
 
+  it("passes daemon ownership metadata into the process verifier", async () => {
+    const baseDir = await makeTempBaseDir();
+    writeDaemonPidMetadata("device-1", {
+      pid: 12345,
+      startedAt: 100,
+      cliEntryPath: "/tmp/clawperator",
+      daemonKey: sanitizeDaemonKey("device-1"),
+      rawDeviceId: "device-1",
+    }, { baseDir });
+    let observedMetadata: unknown;
+
+    const options: DaemonPathsOptions = {
+      baseDir,
+      processController: {
+        isAlive: () => true,
+        isDaemonProcess: (_pid, metadata) => {
+          observedMetadata = metadata;
+          return metadata.rawDeviceId === "device-1" &&
+            metadata.daemonKey === sanitizeDaemonKey("device-1") &&
+            metadata.cliEntryPath === "/tmp/clawperator";
+        },
+        kill: () => undefined,
+      },
+    };
+
+    assert.equal(await isDaemonRunning("device-1", options), true);
+    assert.deepEqual(observedMetadata, {
+      pid: 12345,
+      startedAt: 100,
+      daemonKey: sanitizeDaemonKey("device-1"),
+      cliEntryPath: "/tmp/clawperator",
+      rawDeviceId: "device-1",
+    });
+  });
+
+  it("treats legacy PID metadata without ownership fields as not running", async () => {
+    const baseDir = await makeTempBaseDir();
+    await writeFile(getDaemonPidPath(undefined, { baseDir }), `${JSON.stringify({ pid: 12345, startedAt: 100 })}\n`, "utf8");
+
+    const options: DaemonPathsOptions = {
+      baseDir,
+      processController: {
+        isAlive: () => true,
+        kill: () => undefined,
+      },
+    };
+
+    assert.equal(await isDaemonRunning(undefined, options), false);
+  });
+
   it("stopDaemon returns not_running when the PID file does not exist", async () => {
     const baseDir = await makeTempBaseDir();
 
@@ -176,7 +231,7 @@ describe("daemon process state", () => {
         isAlive: () => alive,
         kill: () => {
           alive = false;
-          writeFileSync(getDaemonPidPath(undefined, { baseDir }), `${JSON.stringify({ pid: 1234, startedAt: 200 })}\n`, "utf8");
+          writeDaemonPidMetadata(undefined, { pid: 1234, startedAt: 200, cliEntryPath: "/tmp/clawperator", daemonKey: "default" }, { baseDir });
         },
       },
     };
@@ -371,7 +426,6 @@ describe("daemon command output", () => {
   it("serializes concurrent start calls before spawning", async () => {
     const baseDir = await makeTempBaseDir();
     const socketPath = getDaemonSocketPath(undefined, { baseDir });
-    const pidPath = getDaemonPidPath(undefined, { baseDir });
     let spawnCount = 0;
 
     const options = {
@@ -386,7 +440,7 @@ describe("daemon command output", () => {
       },
       spawnDaemonRunImpl: () => {
         spawnCount += 1;
-        writeFileSync(pidPath, `${JSON.stringify({ pid: 9876, startedAt: 100 })}\n`, "utf8");
+        writeDaemonPidMetadata(undefined, { pid: 9876, startedAt: 100, cliEntryPath: "/tmp/clawperator", daemonKey: "default" }, { baseDir });
         const server = createHttpServer((req, res) => {
           if (req.url === "/ping") {
             res.writeHead(200, { "content-type": "application/json" });

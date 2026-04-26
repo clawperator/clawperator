@@ -7,7 +7,7 @@ export interface DaemonPathsOptions {
   baseDir?: string;
   processController?: {
     isAlive(pid: number): boolean;
-    isDaemonProcess?(pid: number): boolean;
+    isDaemonProcess?(pid: number, metadata: DaemonMetadata): boolean;
     kill(pid: number, signal: NodeJS.Signals): void;
   };
   terminationTimeoutMs?: number;
@@ -20,6 +20,9 @@ export interface DaemonPathsOptions {
 export interface DaemonMetadata {
   pid: number;
   startedAt: number;
+  daemonKey: string;
+  cliEntryPath: string;
+  rawDeviceId?: string;
 }
 
 const DEFAULT_TERMINATION_TIMEOUT_MS = 2000;
@@ -46,14 +49,20 @@ function getProcessController(options?: DaemonPathsOptions): NonNullable<DaemonP
     kill(pid: number, signal: NodeJS.Signals): void {
       process.kill(pid, signal);
     },
-    isDaemonProcess(pid: number): boolean {
+    isDaemonProcess(pid: number, metadata: DaemonMetadata): boolean {
       try {
         const command = execFileSync("ps", ["-p", String(pid), "-o", "command="], {
           encoding: "utf8",
           timeout: 1000,
           stdio: ["ignore", "pipe", "ignore"],
         }).trim();
-        return /\bdaemon\s+run\b/.test(command);
+        if (!/\bdaemon\s+run\b/.test(command) || !command.includes(metadata.cliEntryPath)) {
+          return false;
+        }
+        if (metadata.rawDeviceId !== undefined && metadata.rawDeviceId.trim().length > 0) {
+          return command.includes("--device") && command.includes(metadata.rawDeviceId);
+        }
+        return !command.includes("--device");
       } catch {
         return false;
       }
@@ -77,9 +86,20 @@ function readDaemonMetadata(path: string): DaemonMetadata | undefined {
       Number.isInteger(parsed.pid) &&
       parsed.pid > 0 &&
       typeof parsed.startedAt === "number" &&
-      Number.isFinite(parsed.startedAt)
+      Number.isFinite(parsed.startedAt) &&
+      typeof parsed.daemonKey === "string" &&
+      parsed.daemonKey.length > 0 &&
+      typeof parsed.cliEntryPath === "string" &&
+      parsed.cliEntryPath.length > 0 &&
+      (parsed.rawDeviceId === undefined || typeof parsed.rawDeviceId === "string")
     ) {
-      return { pid: parsed.pid, startedAt: parsed.startedAt };
+      return {
+        pid: parsed.pid,
+        startedAt: parsed.startedAt,
+        daemonKey: parsed.daemonKey,
+        cliEntryPath: parsed.cliEntryPath,
+        rawDeviceId: parsed.rawDeviceId,
+      };
     }
     return undefined;
   } catch {
@@ -124,19 +144,22 @@ function removeDaemonFiles(rawDeviceId: string | undefined, options?: DaemonPath
 }
 
 function metadataMatches(left: DaemonMetadata | undefined, right: DaemonMetadata): boolean {
-  return left?.pid === right.pid && left.startedAt === right.startedAt;
+  return left?.pid === right.pid &&
+    left.startedAt === right.startedAt &&
+    left.daemonKey === right.daemonKey &&
+    left.cliEntryPath === right.cliEntryPath &&
+    left.rawDeviceId === right.rawDeviceId;
 }
 
 function isDaemonProcess(metadata: DaemonMetadata, controller: NonNullable<DaemonPathsOptions["processController"]>): boolean {
-  return controller.isDaemonProcess?.(metadata.pid) ?? true;
+  return controller.isDaemonProcess?.(metadata.pid, metadata) ?? true;
 }
 
 export function sanitizeDaemonKey(rawDeviceId: string | undefined): string {
   if (rawDeviceId === undefined || rawDeviceId.trim().length === 0) {
     return "default";
   }
-  const sanitized = rawDeviceId.replace(/:/g, "-").replace(/[\/\s]/g, "");
-  return sanitized.length > 0 ? sanitized : "default";
+  return `id-${Buffer.from(rawDeviceId, "utf8").toString("base64url")}`;
 }
 
 export function getDaemonDir(options?: DaemonPathsOptions): string {
@@ -300,10 +323,17 @@ export function readDaemonPidMetadata(
 
 export function writeDaemonPidMetadata(
   rawDeviceId: string | undefined,
-  metadata: DaemonMetadata,
+  metadata: Pick<DaemonMetadata, "pid" | "startedAt"> & Partial<Pick<DaemonMetadata, "daemonKey" | "cliEntryPath" | "rawDeviceId">>,
   options?: DaemonPathsOptions
 ): void {
-  writeFileSync(getDaemonPidPath(rawDeviceId, options), `${JSON.stringify(metadata)}\n`, { mode: 0o600 });
+  const normalizedMetadata: DaemonMetadata = {
+    pid: metadata.pid,
+    startedAt: metadata.startedAt,
+    daemonKey: metadata.daemonKey ?? sanitizeDaemonKey(rawDeviceId),
+    cliEntryPath: metadata.cliEntryPath ?? (options?.cliEntryPath ?? process.argv[1] ?? "unknown"),
+    rawDeviceId: metadata.rawDeviceId ?? rawDeviceId,
+  };
+  writeFileSync(getDaemonPidPath(rawDeviceId, options), `${JSON.stringify(normalizedMetadata)}\n`, { mode: 0o600 });
 }
 
 export function cleanupDaemonFiles(rawDeviceId: string | undefined, options?: DaemonPathsOptions): void {

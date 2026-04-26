@@ -44,7 +44,9 @@ Sanitization from `sanitizeDaemonKey()`:
 | --- | --- |
 | omitted | `default` |
 | `""` | `default` |
-| `192.168.1.1:5555` | `192.168.1.1-5555` |
+| `192.168.1.1:5555` | `id-MTkyLjE2OC4xLjE6NTU1NQ` |
+
+Nonblank device keys use base64url encoding of the raw `--device` value so similar serials such as `host:5555` and `host-5555` cannot collide.
 
 Path formulas from `apps/node/src/domain/daemon/lifecycle.ts`:
 
@@ -59,11 +61,14 @@ The daemon directory is created with mode `0700`. The PID metadata file is JSON:
 ```json
 {
   "pid": 12345,
-  "startedAt": 1777176000000
+  "startedAt": 1777176000000,
+  "daemonKey": "id-ZW11bGF0b3ItNTU1NA",
+  "cliEntryPath": "/Users/<local_user>/src/clawperator/apps/node/dist/cli/index.js",
+  "rawDeviceId": "emulator-5554"
 }
 ```
 
-`daemon status` uses `startedAt` to compute `daemon.uptimeSeconds`.
+`daemon status` uses `startedAt` to compute `daemon.uptimeSeconds`. Lifecycle commands also use the ownership fields to avoid treating an unrelated reused PID as the managed daemon.
 
 Daemon lifecycle lock files are created next to the PID metadata and socket. A lock file includes the owning process PID so later daemon commands can reclaim a stale lock when that process no longer exists.
 
