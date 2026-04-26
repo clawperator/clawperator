@@ -6363,11 +6363,10 @@ Argument mapping:
 }
 ```
 
-**Framed success (parsed `skillResult` present):** top-level `status`, `skillId`,
-`output`, and `exitCode` are **omitted**. The HTTP layer still includes `ok: true`
-and the nested `skillResult` (read **`skillResult.result`** for the domain
-answer), plus `durationMs` and optional `timeoutMs` / `expectedSubstring` when
-set.
+**Success:** top-level `status`, `skillId`, `output`, and `exitCode` are
+**omitted**. The HTTP layer includes `ok: true` and the nested `skillResult`
+(read **`skillResult.result`** for the domain answer), plus `durationMs` and
+optional `timeoutMs` / `expectedSubstring` when set.
 
 ```json
 {
@@ -6392,15 +6391,13 @@ Behavior:
 - if the skill ID does not exist, the route returns HTTP `404`
 - if skill registry loading fails, the route returns HTTP `500` with `REGISTRY_READ_FAILED`
 - other `runSkill()` failures, including non-zero exit and timeout, return HTTP `400`
-- when a skill emits a framed `SkillResult`, success JSON **omits** duplicate top-level
-  `status`, `skillId`, `output`, and `exitCode`; **indeterminate** responses with a
-  parsed `skillResult` keep wrapper `status`, `code`, and `message` but omit
+- success JSON **omits** duplicate top-level `status`, `skillId`, `output`, and
+  `exitCode`; **indeterminate** responses with a parsed `skillResult` keep
+  wrapper `status`, `code`, and `message` but omit
   `skillId`, `exitCode`, and `output`
-- when `skillResult` is `null`, the route keeps the legacy top-level `skillId`, `output`,
-  and `exitCode` fields
 - malformed framed output returns `SKILL_RESULT_PARSE_FAILED`
-- successful unframed responses include `exitCode: 0`; framed success responses omit
-  `exitCode` at the top level (process exit is still `0` on the run)
+- success responses omit `exitCode` at the top level; process exit is still `0`
+  on the run
 
 Failure examples:
 
@@ -8329,7 +8326,11 @@ Notes:
 - `recording compare` defaults to `--mode auto`
 - if `recording export --input` points at a file and `--out` is omitted, the output path is `<input without .ndjson>.export.json` when the input ends with `.ndjson`, otherwise `<input>.export.json`
 - if `recording export --input` points at a directory, the command picks the newest `*.ndjson` file in that directory and derives the default export path from that resolved file
-- `recording compare` reads a saved `clawperator skills run` JSON wrapper file and extracts its top-level `skillResult` (the durable compare input is still the full wrapper; compare logic continues to use `skillResult.checkpoints` and `skillResult.terminalVerification` as defined by the compare implementation). Loaders accept both the legacy wrapper shape with `status: "success"` and the **deduplicated** framed-success JSON shape that omits top-level `status` when `skillResult` is present. The domain answer for migrated skills is expected at **`skillResult.result`**
+- `recording compare` reads a saved `clawperator skills run` JSON wrapper file
+  and extracts its top-level `skillResult` (the durable compare input is still
+  the full wrapper; compare logic continues to use `skillResult.checkpoints`
+  and `skillResult.terminalVerification` as defined by the compare
+  implementation). The domain answer is expected at **`skillResult.result`**
 - for authored skills, the durable retained baseline for compare should live under a reference-style path such as `skills/<skill_id>/references/compare-baseline.export.json`
 - that retained baseline is authoring and maintenance evidence, not a runtime artifact consumed by `skills run`
 - a common authoring workflow is:
@@ -9398,8 +9399,8 @@ Important current caveats:
 - runtime behavior for orchestrated skills is currently driven by the presence of `skill.json.agent`, not by suffix inspection alone
 - the currently supported orchestrated runtime path uses `codex` as the agent CLI
 - some orchestrated harnesses currently run codex with `danger-full-access` so the runtime agent can reach live adb targets, but that is a harness-specific choice rather than a Node runtime guarantee
-- some legacy skills predate the suffix convention and may still have unsuffixed ids
-- unsuffixed legacy ids should not be read as proof that a skill is already orchestrated
+- suffixes identify the intended runtime shape when present
+- an unsuffixed id should not be read as proof that a skill is orchestrated
 
 ## Skill Structure
 
@@ -9463,7 +9464,7 @@ An orchestrated skill is an agent-driven runtime shape with these durable rules:
 - registry parity validation does not police `skill.json.agent`. The registry covers distributable skill identity and file layout, while `skill.json.agent` remains the trusted runtime execution config that `runSkill()` reads directly.
 - `SKILL.md` is the skill authority. It contains the app-specific runtime program, navigation policy, checkpoints, and terminal verification expectations.
 - `scripts/run.js` is a thin harness. It reads the injected Clawperator env vars, spawns the configured agent CLI on `SKILL.md`, and forwards stdout and stderr.
-- the harness must not absorb the real skill logic. If app-specific decision policy, navigation authority, or terminal verification rules migrate into the harness, the skill has left this contract.
+- the harness must not absorb the real skill logic. If app-specific decision policy, navigation authority, or terminal verification rules move into the harness, the skill has left this contract.
 - `runSkill()` remains the Clawperator-owned boundary. It validates the skill, injects runtime env vars, executes the harness, parses the framed result, and injects trusted `source` metadata.
 - orchestrated output is contract-bound. The runtime agent must emit exactly one terminal `[Clawperator-Skill-Result]` frame with a valid `SkillResult` object.
 - replay skills remain first-class. Orchestrated skills are an additional runtime shape, not a replacement for replay-driven skills.
@@ -9794,30 +9795,31 @@ Use a JSON run first so you can verify the wrapper envelope separately from the 
 clawperator skills run com.android.settings.capture-overview --timeout 3210
 ```
 
-Success response (legacy unframed skill, `skillResult: null`):
+Success response:
 
 ```json
 {
-  "status": "success",
-  "skillId": "com.android.settings.capture-overview",
-  "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
-  "skillResult": null,
-  "exitCode": 0,
+  "skillResult": {
+    "result": { "kind": "text", "text": "ok" },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.android.settings.capture-overview",
+    "checkpoints": [],
+    "source": { "kind": "script" }
+  },
   "durationMs": 15842,
   "timeoutMs": 3210
 }
 ```
 
-For skills that emit a framed `SkillResult`, default JSON **omits** top-level
-`status`, `skillId`, `exitCode`, and `output` on success. Verify `skillResult`
-and especially **`skillResult.result`**.
+Default JSON **omits** top-level `status`, `skillId`, `exitCode`, and `output`
+on success. Verify `skillResult` and especially **`skillResult.result`**.
 
-Check these exact fields (when `skillResult` is `null`):
+Check these exact fields:
 
-- `skillId` matches the requested registry id
-- `output` is the raw stdout stream captured from the skill script
-- `skillResult` is `null` for a legacy unframed skill
-- `exitCode` is `0` on success
+- `skillResult.skillId` matches the requested registry id
+- `skillResult.result` is the domain answer
+- `skillResult.status` is the child-authored skill state
 - `durationMs` is the measured wrapper runtime
 - `timeoutMs` is present only when a timeout override was passed on the CLI
 
@@ -9842,16 +9844,18 @@ To verify wrapper-side output assertions, run:
 clawperator skills run com.android.settings.capture-overview --expect-contains RESULT
 ```
 
-If the expected text is present, the success payload echoes the assertion (same
-legacy top-level fields when `skillResult` is `null`):
+If the expected text is present, the success payload echoes the assertion:
 
 ```json
 {
-  "status": "success",
-  "skillId": "com.android.settings.capture-overview",
-  "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
-  "skillResult": null,
-  "exitCode": 0,
+  "skillResult": {
+    "result": { "kind": "text", "text": "ok" },
+    "status": "success",
+    "contractVersion": "1.0.0",
+    "skillId": "com.android.settings.capture-overview",
+    "checkpoints": [],
+    "source": { "kind": "script" }
+  },
   "durationMs": 15842,
   "expectedSubstring": "RESULT"
 }
@@ -9859,9 +9863,9 @@ legacy top-level fields when `skillResult` is `null`):
 
 ## `skills run` Success Shape
 
-**Framed success (default JSON, `skillResult` present):** the answer is
-`skillResult.result`. Top-level `status`, `skillId`, `exitCode`, and `output`
-are **omitted** so agents do not scrape duplicate process text. See
+**Success (default JSON):** the answer is `skillResult.result`. Top-level
+`status`, `skillId`, `exitCode`, and `output` are **omitted** so agents do not
+scrape duplicate process text. See
 [Device Prep and Runtime](runtime.md#skill-result-trust-order-and-json-wrapper-policy).
 
 ```json
@@ -9878,34 +9882,18 @@ are **omitted** so agents do not scrape duplicate process text. See
 }
 ```
 
-**Legacy unframed success (`skillResult: null`):** there is no parsed frame, so
-the wrapper keeps process metadata on the top level.
-
-```json
-{
-  "status": "success",
-  "skillId": "com.android.settings.capture-overview",
-  "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
-  "skillResult": null,
-  "exitCode": 0,
-  "durationMs": 15842
-}
-```
-
 Important:
 
-- for framed runs, read **`skillResult.result`** for the domain return value; do not use
+- read **`skillResult.result`** for the domain return value; do not use
   `diagnostics`, `terminalVerification`, or checkpoint-only evidence as the only
   answer path
-- the wrapper parses a trailing framed `SkillResult` when present and returns it as
-  `skillResult`
-- the top-level wrapper `status` is `success`, `failed`, or `indeterminate` when
-  `skillResult` is `null` or on failure paths; for **default JSON framed success** it is
-  omitted (see [runtime.md](runtime.md))
+- the wrapper parses the terminal `SkillResult` frame and returns it as `skillResult`
+- the top-level wrapper `status` is omitted for default JSON success and
+  present on failure or indeterminate paths (see [runtime.md](runtime.md))
 - when a declared verification contract is not proved, the wrapper returns
   `status: "indeterminate"` without rewriting the emitted `skillResult`
-- for legacy runs, `output` is raw stdout from the script; framed default JSON
-  success omits `output` because the structured `skillResult` is authoritative
+- default JSON success omits `output` because the structured `skillResult` is
+  authoritative
 - pretty mode still streams human-readable output; use default JSON for machine
   consumption
 - in JSON mode, the wrapper returns one JSON object and does not stream live child stdout separately
@@ -9914,9 +9902,8 @@ Important:
 
 ## `skills run` Indeterminate Shape
 
-**Framed indeterminate (parsed `skillResult`, default JSON):** keep wrapper
-`status`, `code`, and `message`; **omit** top-level `skillId`, `exitCode`, and
-`output`.
+**Indeterminate (default JSON):** keep wrapper `status`, `code`, and `message`;
+**omit** top-level `skillId`, `exitCode`, and `output`.
 
 ```json
 {
@@ -9934,9 +9921,6 @@ Important:
   "durationMs": 15842
 }
 ```
-
-**Unframed / legacy indeterminate** (no `SkillResult` frame, `skillResult: null`):
-the wrapper may still include `output` and `skillId` because there is no frame.
 
 ## `skills run` Failure Shape
 
@@ -10578,7 +10562,7 @@ Cross-repo baseline sync:
 - the Clawperator test fixtures under `apps/node/src/test/fixtures/recording-compare/` must stay in sync with the canonical retained baseline in the skills repo
 - when the canonical baseline changes, update the corresponding Clawperator test fixture in the same PR or the next available PR
 - to verify sync: `CLAWPERATOR_SKILLS_ROOT=../clawperator-skills npm --prefix apps/node run test`
-- this is a developer-side guard for the closeout branch, not the final durability mechanism; the generic compare follow-on should wire canonical-baseline provenance into CI or another required validation path
+- this is the current developer-side guard for canonical-baseline provenance
 
 The scaffolded `SKILL.md` includes this section before the `Usage:` block:
 
@@ -10673,9 +10657,8 @@ Current skill-type convention:
 - new and updated skills should declare one of those values in `SKILL.md`
   frontmatter
 - the validator enforces those values for current authoring work
-- one explicit temporary compatibility exception remains for the existing legacy
-  skill `au.com.polyaire.airtouch5.set-zone-state` with
-  `clawperator-skill-type: script`; do not use `script` for new work
+- `script` is accepted only for `au.com.polyaire.airtouch5.set-zone-state`;
+  do not use `script` for new work
 
 Recommended current practice:
 
@@ -10752,7 +10735,7 @@ Current contract declaration extension:
     "verification": null
   }
   ```
-- a missing `contract` block means legacy skill, with no declaration enforcement
+- a missing `contract` block means there is no declaration enforcement
 - a present-but-empty `contract` block is allowed and validates, but is treated the same as missing until an author fills a meaningful field
 - `skill.json.contract` participates in registry parity checks, unlike `agent`
 
@@ -11103,7 +11086,7 @@ Important boundary:
 - direct `node run.js ...` execution also prefers a detected branch-local
   `apps/node/dist/cli/index.js` when available, before falling back to the
   global `clawperator` binary
-- the scaffold no longer depends on a repo-level `skills/utils/common.js` file
+- the scaffolded script has no repo-level `skills/utils/common.js` dependency
 
 Current scaffold behavior on nested `clawperator exec` failure is also worth knowing:
 
@@ -11124,8 +11107,7 @@ Current runtime behavior from `apps/node/src/contracts/skillResult.ts` and
 - any non-whitespace stdout after the JSON line makes the frame malformed in v1
 - multiple frames are rejected
 - malformed framed output is rejected with `SKILL_RESULT_PARSE_FAILED`
-- legacy skills that emit no frame still succeed or fail based on process exit
-  code and return `skillResult: null`
+- skills must emit one framed `SkillResult` for structured agent consumption
 
 The emitted frame must not contain `source`. `runSkill()` injects it after
 parsing:
@@ -11140,8 +11122,7 @@ parsing:
 
 Current v1 `SkillResult` fields:
 
-- **discoverable domain answer (emitted first in nested JSON; optional only during
-  migration, then required on framed objects in a follow-on release):**
+- **discoverable domain answer (emitted first in nested JSON):**
   - `result` (`SkillCheckpointEvidence` or `null` when no truthful value exists)
 - required:
   - `contractVersion`
@@ -11159,9 +11140,8 @@ Current v1 `SkillResult` fields:
 
 **Authoring best practices for `result` and proof fields:**
 
-- Every **new** or **migrated** framed skill should emit `result` with a
-  `SkillCheckpointEvidence` value, or `result: null` when no truthful domain value
-  exists.
+- Every framed skill emits `result` with a `SkillCheckpointEvidence` value, or
+  `result: null` when no truthful domain value exists.
 - Put **`result` before `status`** in emitted JSON so humans and agents scan the
   answer first.
 - Use the evidence union only: `kind: "text"`, `kind: "json"`, or
@@ -11207,8 +11187,6 @@ Current authoring rule for new non-trivial skills:
   - script argument parsing and emitted `skillResult.inputs`
 - avoid positional-only public interfaces for non-trivial skills unless the
   contract is genuinely single-purpose and obvious
-- use `skillResult: null` only for legacy skills that have not yet been
-  upgraded
 - if the skill is authored from a retained recording baseline, save a
   `skills run` wrapper for the run you want to compare and feed that
   wrapper directly to `clawperator recording compare`
@@ -11259,21 +11237,18 @@ clawperator skills run com.example.demo.capture-state --device <device_serial>
 
 For the run result, verify:
 
-- for framed default JSON **success**, top-level `skillId` and `output` are
+- for default JSON **success**, top-level `skillId` and `output` are
   **omitted**; read **`skillResult.result`** for the answer and
   `skillResult.skillId` for identity
-- for legacy unframed success, `skillId`, `output`, and `exitCode` remain on the
-  wrapper, and `skillResult` is `null`
-- when `output` is present (legacy or **SKILL_OUTPUT_ASSERTION_FAILED**), it is
-  raw stdout, including the frame line when the skill prints one
-- `exitCode` is `0` on success when present
-- `skillResult` is either a parsed object or `null` for a legacy unframed skill
+- when `output` is present on **SKILL_OUTPUT_ASSERTION_FAILED**, it is raw
+  stdout, including the frame line when the skill prints one
+- `skillResult` is the parsed structured result object
 
 If the script exits non-zero, `skills run` returns `SKILL_EXECUTION_FAILED` and
 preserves `stdout`, `stderr`, `exitCode`, and any parsed `skillResult`.
 
 If the script emits a malformed frame, `skills run` returns
-`SKILL_RESULT_PARSE_FAILED` instead of falling back to legacy stdout parsing.
+`SKILL_RESULT_PARSE_FAILED`.
 
 ### Non-Trivial Skill Rule
 
@@ -11958,14 +11933,12 @@ First-time agent pitfall:
 
 - pretty mode streams live output and prints a banner first
 - JSON mode returns one parseable wrapper object
-- framed success JSON omits top-level `status`, `skillId`, `exitCode`, and
+- success JSON omits top-level `status`, `skillId`, `exitCode`, and
   `output`; read the domain answer from `skillResult.result`
-- legacy unframed success keeps child stdout under top-level `output` because
-  `skillResult` is `null`
 
 ## Step 4: Verify Output
 
-Current framed success data:
+Current success data:
 
 ```json
 {
@@ -11979,20 +11952,6 @@ Current framed success data:
   },
   "durationMs": 8421,
   "timeoutMs": 90000
-}
-```
-
-Current legacy unframed success data:
-
-```json
-{
-  "status": "success",
-  "skillId": "com.example.app.do-thing",
-  "output": "RESULT|status=success\n",
-  "exitCode": 0,
-  "durationMs": 8421,
-  "timeoutMs": 90000,
-  "skillResult": null
 }
 ```
 
@@ -12568,19 +12527,17 @@ Recovery:
 - exit code
 - total duration
 
-Success wrapper fields (when the skill is **unframed**, `skillResult === null`):
+Success JSON exposes the parsed `SkillResult` and timing:
 
 | Field | Meaning |
 | --- | --- |
-| `skillId` | invoked registry id |
-| `output` | raw stdout |
-| `exitCode` | child exit code |
+| `skillResult` | parsed structured skill result |
 | `durationMs` | total wrapper runtime |
 
-When a **framed** `SkillResult` is present, default **JSON** success responses omit
-`status`, `skillId`, `exitCode`, and `output` at the top level and expose the
-answer under `skillResult.result` (see the table in [Skill result trust order
-and JSON wrapper policy](#skill-result-trust-order-and-json-wrapper-policy)).
+Default **JSON** success responses omit `status`, `skillId`, `exitCode`, and
+`output` at the top level and expose the answer under `skillResult.result` (see
+the table in [Skill result trust order and JSON wrapper
+policy](#skill-result-trust-order-and-json-wrapper-policy)).
 
 Failure wrapper fields may also include:
 
@@ -12619,7 +12576,7 @@ Verification pattern:
 
 1. Branch on the **top-level** wrapper `status` and `code` (and HTTP `ok` for serve) first. When the wrapper is `indeterminate` or `failed`, do not treat nested `skillResult.status` as the primary success signal.
 2. After the wrapper is `success` (or you are intentionally reading child state), inspect nested `skillResult.status` as **child-authored** reported state. The runtime may still mark the wrapper `indeterminate` if declared verification is not proved while the child reported success.
-3. Read the **domain answer** from **`skillResult.result`**. It is optional on emitted frames only during the migration window; new and migrated framed skills should always emit it (use `result: null` when no truthful value exists). After migration closes, the schema will require `result` on framed objects.
+3. Read the **domain answer** from **`skillResult.result`**. Use `result: null` only when no truthful domain value exists.
 4. Use **`checkpoints`**, **`terminalVerification`**, and **`execEnvelopes`** as proof and audit, not as the default answer path. **Do not** direct agents to discover the primary return value only through checkpoint ids, `terminalVerification`, or `diagnostics`.
 5. **`diagnostics`** is for runtime health, warnings, hints, timings, and debug detail only, not a second copy of the answer.
 
@@ -12629,13 +12586,14 @@ Verification pattern:
 
 | Wrapper path | `skillResult` | Top-level `status` | `skillId` | `exitCode` | `output` |
 | --- | --- | --- | --- | --- | --- |
-| Framed **success** | not `null` | omitted | omitted | omitted | omitted |
+| **Success** | not `null` | omitted | omitted | omitted | omitted |
 | **Indeterminate** (verification not proved) | not `null` | present | omitted | omitted | omitted |
-| **Legacy** unframed success | `null` | `success` (CLI) or `ok: true` plus `status` (serve) | present | present | present (raw stdout) |
 | **SKILL_OUTPUT_ASSERTION_FAILED** | may be not `null` | error shape | present in error | n/a for success | **present** (diagnostic; shows what the skill printed) |
 | **Execution / parse / other failures** | often `null` | error | varies | in error when relevant | n/a; failures use `stdout` and `stderr` for process streams |
 
-**Pretty mode** is unchanged: it can still show `skillId`, `exitCode`, and streamed output for operators; the JSON deduplication policy applies when `--output json` (or the serve JSON body for skill runs).
+Pretty mode can show `skillId`, `exitCode`, and streamed output for operators;
+the JSON deduplication policy applies when `--output json` or the serve JSON
+body for skill runs is used.
 
 Debugging skill runs with logs:
 
@@ -12651,9 +12609,9 @@ The unified logger captures skill output as `skills.run.output` events, enabling
 
 ## Runtime success examples
 
-**Ideal framed success (default JSON, parsed `SkillResult` present):** top level
-has only the nested object plus timing; **no** duplicate `status`, `skillId`,
-`exitCode`, or `output`. The domain answer is under `skillResult.result`.
+**Success (default JSON):** top level has only the nested object plus timing;
+**no** duplicate `status`, `skillId`, `exitCode`, or `output`. The domain
+answer is under `skillResult.result`.
 
 ```json
 {
@@ -12676,23 +12634,9 @@ has only the nested object plus timing; **no** duplicate `status`, `skillId`,
 }
 ```
 
-**Legacy unframed success (`skillResult: null`):** the wrapper keeps process
-metadata because there is no parsed frame.
+## Runtime indeterminate example
 
-```json
-{
-  "status": "success",
-  "skillId": "com.android.settings.capture-overview",
-  "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
-  "skillResult": null,
-  "exitCode": 0,
-  "durationMs": 15321
-}
-```
-
-## Runtime indeterminate example (framed `skillResult`)
-
-When verification is not proved but a frame was parsed, default JSON **omits**
+When verification is not proved, default JSON **omits**
 `skillId`, `exitCode`, and `output` at the top level. Wrapper `status`, `code`,
 and `message` stay because they carry distinct wrapper state.
 
@@ -12717,9 +12661,6 @@ This wrapper-level `indeterminate` state means the skill process ran without an
 upstream runtime failure, but the declared `skill.json` verification contract
 was not proved. The parsed `skillResult` is returned **verbatim**; the wrapper
 does not rewrite it.
-
-**Legacy indeterminate (no frame, `skillResult: null`):** the wrapper keeps
-`output` and `skillId` because there is no structured result to inspect.
 
 ## Runtime Failure Example
 

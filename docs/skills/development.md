@@ -296,14 +296,12 @@ First-time agent pitfall:
 
 - pretty mode streams live output and prints a banner first
 - JSON mode returns one parseable wrapper object
-- framed success JSON omits top-level `status`, `skillId`, `exitCode`, and
+- success JSON omits top-level `status`, `skillId`, `exitCode`, and
   `output`; read the domain answer from `skillResult.result`
-- legacy unframed success keeps child stdout under top-level `output` because
-  `skillResult` is `null`
 
 ## Step 4: Verify Output
 
-Current framed success data:
+Current success data:
 
 ```json
 {
@@ -317,20 +315,6 @@ Current framed success data:
   },
   "durationMs": 8421,
   "timeoutMs": 90000
-}
-```
-
-Current legacy unframed success data:
-
-```json
-{
-  "status": "success",
-  "skillId": "com.example.app.do-thing",
-  "output": "RESULT|status=success\n",
-  "exitCode": 0,
-  "durationMs": 8421,
-  "timeoutMs": 90000,
-  "skillResult": null
 }
 ```
 

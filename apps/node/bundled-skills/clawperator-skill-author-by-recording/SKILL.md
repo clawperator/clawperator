@@ -606,7 +606,7 @@ Also surface:
 
 If the self-test was replay and it failed, looked brittle, or could not
 truthfully prove the requested outcome, say that explicitly and strongly
-recommend an orchestrated follow-on pass. When you do that, show the tradeoff
+recommend an orchestrated refinement pass. When you do that, show the tradeoff
 plainly:
 
 - replay is better for simple repeatable flows

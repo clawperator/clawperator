@@ -445,7 +445,7 @@ Cross-repo baseline sync:
 - the Clawperator test fixtures under `apps/node/src/test/fixtures/recording-compare/` must stay in sync with the canonical retained baseline in the skills repo
 - when the canonical baseline changes, update the corresponding Clawperator test fixture in the same PR or the next available PR
 - to verify sync: `CLAWPERATOR_SKILLS_ROOT=../clawperator-skills npm --prefix apps/node run test`
-- this is a developer-side guard for the closeout branch, not the final durability mechanism; the generic compare follow-on should wire canonical-baseline provenance into CI or another required validation path
+- this is the current developer-side guard for canonical-baseline provenance
 
 The scaffolded `SKILL.md` includes this section before the `Usage:` block:
 
@@ -540,9 +540,8 @@ Current skill-type convention:
 - new and updated skills should declare one of those values in `SKILL.md`
   frontmatter
 - the validator enforces those values for current authoring work
-- one explicit temporary compatibility exception remains for the existing legacy
-  skill `au.com.polyaire.airtouch5.set-zone-state` with
-  `clawperator-skill-type: script`; do not use `script` for new work
+- `script` is accepted only for `au.com.polyaire.airtouch5.set-zone-state`;
+  do not use `script` for new work
 
 Recommended current practice:
 
@@ -619,7 +618,7 @@ Current contract declaration extension:
     "verification": null
   }
   ```
-- a missing `contract` block means legacy skill, with no declaration enforcement
+- a missing `contract` block means there is no declaration enforcement
 - a present-but-empty `contract` block is allowed and validates, but is treated the same as missing until an author fills a meaningful field
 - `skill.json.contract` participates in registry parity checks, unlike `agent`
 
@@ -970,7 +969,7 @@ Important boundary:
 - direct `node run.js ...` execution also prefers a detected branch-local
   `apps/node/dist/cli/index.js` when available, before falling back to the
   global `clawperator` binary
-- the scaffold no longer depends on a repo-level `skills/utils/common.js` file
+- the scaffolded script has no repo-level `skills/utils/common.js` dependency
 
 Current scaffold behavior on nested `clawperator exec` failure is also worth knowing:
 
@@ -991,8 +990,7 @@ Current runtime behavior from `apps/node/src/contracts/skillResult.ts` and
 - any non-whitespace stdout after the JSON line makes the frame malformed in v1
 - multiple frames are rejected
 - malformed framed output is rejected with `SKILL_RESULT_PARSE_FAILED`
-- legacy skills that emit no frame still succeed or fail based on process exit
-  code and return `skillResult: null`
+- skills must emit one framed `SkillResult` for structured agent consumption
 
 The emitted frame must not contain `source`. `runSkill()` injects it after
 parsing:
@@ -1007,8 +1005,7 @@ parsing:
 
 Current v1 `SkillResult` fields:
 
-- **discoverable domain answer (emitted first in nested JSON; optional only during
-  migration, then required on framed objects in a follow-on release):**
+- **discoverable domain answer (emitted first in nested JSON):**
   - `result` (`SkillCheckpointEvidence` or `null` when no truthful value exists)
 - required:
   - `contractVersion`
@@ -1026,9 +1023,8 @@ Current v1 `SkillResult` fields:
 
 **Authoring best practices for `result` and proof fields:**
 
-- Every **new** or **migrated** framed skill should emit `result` with a
-  `SkillCheckpointEvidence` value, or `result: null` when no truthful domain value
-  exists.
+- Every framed skill emits `result` with a `SkillCheckpointEvidence` value, or
+  `result: null` when no truthful domain value exists.
 - Put **`result` before `status`** in emitted JSON so humans and agents scan the
   answer first.
 - Use the evidence union only: `kind: "text"`, `kind: "json"`, or
@@ -1074,8 +1070,6 @@ Current authoring rule for new non-trivial skills:
   - script argument parsing and emitted `skillResult.inputs`
 - avoid positional-only public interfaces for non-trivial skills unless the
   contract is genuinely single-purpose and obvious
-- use `skillResult: null` only for legacy skills that have not yet been
-  upgraded
 - if the skill is authored from a retained recording baseline, save a
   `skills run` wrapper for the run you want to compare and feed that
   wrapper directly to `clawperator recording compare`
@@ -1126,21 +1120,18 @@ clawperator skills run com.example.demo.capture-state --device <device_serial>
 
 For the run result, verify:
 
-- for framed default JSON **success**, top-level `skillId` and `output` are
+- for default JSON **success**, top-level `skillId` and `output` are
   **omitted**; read **`skillResult.result`** for the answer and
   `skillResult.skillId` for identity
-- for legacy unframed success, `skillId`, `output`, and `exitCode` remain on the
-  wrapper, and `skillResult` is `null`
-- when `output` is present (legacy or **SKILL_OUTPUT_ASSERTION_FAILED**), it is
-  raw stdout, including the frame line when the skill prints one
-- `exitCode` is `0` on success when present
-- `skillResult` is either a parsed object or `null` for a legacy unframed skill
+- when `output` is present on **SKILL_OUTPUT_ASSERTION_FAILED**, it is raw
+  stdout, including the frame line when the skill prints one
+- `skillResult` is the parsed structured result object
 
 If the script exits non-zero, `skills run` returns `SKILL_EXECUTION_FAILED` and
 preserves `stdout`, `stderr`, `exitCode`, and any parsed `skillResult`.
 
 If the script emits a malformed frame, `skills run` returns
-`SKILL_RESULT_PARSE_FAILED` instead of falling back to legacy stdout parsing.
+`SKILL_RESULT_PARSE_FAILED`.
 
 ### Non-Trivial Skill Rule
 

@@ -226,19 +226,17 @@ Recovery:
 - exit code
 - total duration
 
-Success wrapper fields (when the skill is **unframed**, `skillResult === null`):
+Success JSON exposes the parsed `SkillResult` and timing:
 
 | Field | Meaning |
 | --- | --- |
-| `skillId` | invoked registry id |
-| `output` | raw stdout |
-| `exitCode` | child exit code |
+| `skillResult` | parsed structured skill result |
 | `durationMs` | total wrapper runtime |
 
-When a **framed** `SkillResult` is present, default **JSON** success responses omit
-`status`, `skillId`, `exitCode`, and `output` at the top level and expose the
-answer under `skillResult.result` (see the table in [Skill result trust order
-and JSON wrapper policy](#skill-result-trust-order-and-json-wrapper-policy)).
+Default **JSON** success responses omit `status`, `skillId`, `exitCode`, and
+`output` at the top level and expose the answer under `skillResult.result` (see
+the table in [Skill result trust order and JSON wrapper
+policy](#skill-result-trust-order-and-json-wrapper-policy)).
 
 Failure wrapper fields may also include:
 
@@ -277,7 +275,7 @@ Verification pattern:
 
 1. Branch on the **top-level** wrapper `status` and `code` (and HTTP `ok` for serve) first. When the wrapper is `indeterminate` or `failed`, do not treat nested `skillResult.status` as the primary success signal.
 2. After the wrapper is `success` (or you are intentionally reading child state), inspect nested `skillResult.status` as **child-authored** reported state. The runtime may still mark the wrapper `indeterminate` if declared verification is not proved while the child reported success.
-3. Read the **domain answer** from **`skillResult.result`**. It is optional on emitted frames only during the migration window; new and migrated framed skills should always emit it (use `result: null` when no truthful value exists). After migration closes, the schema will require `result` on framed objects.
+3. Read the **domain answer** from **`skillResult.result`**. Use `result: null` only when no truthful domain value exists.
 4. Use **`checkpoints`**, **`terminalVerification`**, and **`execEnvelopes`** as proof and audit, not as the default answer path. **Do not** direct agents to discover the primary return value only through checkpoint ids, `terminalVerification`, or `diagnostics`.
 5. **`diagnostics`** is for runtime health, warnings, hints, timings, and debug detail only, not a second copy of the answer.
 
@@ -287,13 +285,14 @@ Verification pattern:
 
 | Wrapper path | `skillResult` | Top-level `status` | `skillId` | `exitCode` | `output` |
 | --- | --- | --- | --- | --- | --- |
-| Framed **success** | not `null` | omitted | omitted | omitted | omitted |
+| **Success** | not `null` | omitted | omitted | omitted | omitted |
 | **Indeterminate** (verification not proved) | not `null` | present | omitted | omitted | omitted |
-| **Legacy** unframed success | `null` | `success` (CLI) or `ok: true` plus `status` (serve) | present | present | present (raw stdout) |
 | **SKILL_OUTPUT_ASSERTION_FAILED** | may be not `null` | error shape | present in error | n/a for success | **present** (diagnostic; shows what the skill printed) |
 | **Execution / parse / other failures** | often `null` | error | varies | in error when relevant | n/a; failures use `stdout` and `stderr` for process streams |
 
-**Pretty mode** is unchanged: it can still show `skillId`, `exitCode`, and streamed output for operators; the JSON deduplication policy applies when `--output json` (or the serve JSON body for skill runs).
+Pretty mode can show `skillId`, `exitCode`, and streamed output for operators;
+the JSON deduplication policy applies when `--output json` or the serve JSON
+body for skill runs is used.
 
 Debugging skill runs with logs:
 
@@ -309,9 +308,9 @@ The unified logger captures skill output as `skills.run.output` events, enabling
 
 ## Runtime success examples
 
-**Ideal framed success (default JSON, parsed `SkillResult` present):** top level
-has only the nested object plus timing; **no** duplicate `status`, `skillId`,
-`exitCode`, or `output`. The domain answer is under `skillResult.result`.
+**Success (default JSON):** top level has only the nested object plus timing;
+**no** duplicate `status`, `skillId`, `exitCode`, or `output`. The domain
+answer is under `skillResult.result`.
 
 ```json
 {
@@ -334,23 +333,9 @@ has only the nested object plus timing; **no** duplicate `status`, `skillId`,
 }
 ```
 
-**Legacy unframed success (`skillResult: null`):** the wrapper keeps process
-metadata because there is no parsed frame.
+## Runtime indeterminate example
 
-```json
-{
-  "status": "success",
-  "skillId": "com.android.settings.capture-overview",
-  "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
-  "skillResult": null,
-  "exitCode": 0,
-  "durationMs": 15321
-}
-```
-
-## Runtime indeterminate example (framed `skillResult`)
-
-When verification is not proved but a frame was parsed, default JSON **omits**
+When verification is not proved, default JSON **omits**
 `skillId`, `exitCode`, and `output` at the top level. Wrapper `status`, `code`,
 and `message` stay because they carry distinct wrapper state.
 
@@ -375,9 +360,6 @@ This wrapper-level `indeterminate` state means the skill process ran without an
 upstream runtime failure, but the declared `skill.json` verification contract
 was not proved. The parsed `skillResult` is returned **verbatim**; the wrapper
 does not rewrite it.
-
-**Legacy indeterminate (no frame, `skillResult: null`):** the wrapper keeps
-`output` and `skillId` because there is no structured result to inspect.
 
 ## Runtime Failure Example
 
