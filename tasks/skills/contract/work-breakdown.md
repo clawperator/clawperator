@@ -126,29 +126,41 @@ migration-phase contract shape is stable.
    `skillResult.result`, then proof fields.
 2. Document `result` as optional only during migration.
 3. Document singular `result` for collection payloads.
-4. Update examples that currently show framed SkillResult output without
+4. Document `output` as display/progress text when retained on success-like
+   wrappers, not raw stdout and not the domain answer. Document that failure
+   wrappers may expose process streams as `stdout` and `stderr`.
+5. Document that `terminalVerification` is proof and `diagnostics` is debug
+   metadata. Neither is the primary answer channel.
+6. Document checkpoint presence semantics: existing skills may emit only reached
+   checkpoints, but new and migrated non-trivial skills should prefer the
+   map/state-machine pattern with unreached steps marked `skipped`.
+7. Update examples that currently show framed SkillResult output without
    `result` when those examples are meant to guide new authoring.
-5. In `apps/node/bundled-skills/clawperator-skill-author-by-recording/SKILL.md`,
+8. In `apps/node/bundled-skills/clawperator-skill-author-by-recording/SKILL.md`,
    add `skillResult.result` to the inspection list at the section that currently
    lists `skillResult.status`, `skillResult.source`, `skillResult.checkpoints`,
    `skillResult.terminalVerification`, and `skillResult.diagnostics`. Add a note
    that `result` is the canonical domain answer when present.
-6. In `apps/node/bundled-skills/clawperator-skill-author-by-agent-discovery/SKILL.md`,
+9. In `apps/node/bundled-skills/clawperator-skill-author-by-agent-discovery/SKILL.md`,
    add equivalent guidance. If the skill does not have an explicit field list,
    add `skillResult.result` to the skill-result inspection step.
-7. Update the corresponding `agents/openai.yaml` files for both bundled skills
+10. Update the corresponding `agents/openai.yaml` files for both bundled skills
    if `default_prompt` or `short_description` reference skill-result inspection
    behavior.
-8. Rebuild docs through the normal docs build workflow.
+11. Rebuild docs through the normal docs build workflow.
 
 **Acceptance criteria:**
 
 - No public doc tells agents to find primary answers in `diagnostics`,
   `terminalVerification`, or checkpoint ids.
+- Public docs define `output` as display/progress text if retained, while
+  reserving `skillResult.result` for the domain answer.
 - Recording compare docs still say the full `skills run` wrapper is the durable
   compare input and uses `skillResult.checkpoints` and
   `skillResult.terminalVerification` for compare logic. Do not change the
   compare contract.
+- Authoring docs prefer map/state-machine checkpoints for new and migrated
+  non-trivial skills.
 - Both bundled authoring skills ask agents to inspect and report
   `skillResult.result`.
 - `./scripts/docs_build.sh` succeeds.
@@ -183,11 +195,19 @@ migration-phase contract shape is stable.
    checkpoint-only evidence into `result`.
 4. Keep checkpoints and terminal verification as proof of how the answer was
    obtained.
-5. Use `result: null` only when the skill cannot truthfully report a domain
+5. For non-trivial migrated skills, prefer map/state-machine checkpoints:
+   include the known checkpoint ids and mark unreached steps `skipped` instead
+   of omitting expected path nodes.
+6. Use `result: null` only when the skill cannot truthfully report a domain
    value or confirmed final state.
-6. Update parser tests and local examples to assert the canonical `result`
+7. Fix isolated quality issues called out by `findings.md` while touching the
+   affected skills, including conditional diagnostics in
+   `set-discharge-to-limit-replay` if still useful and
+   `set-my-list-state-replay` expected/observed duplication if still accurate
+   after the result migration.
+8. Update parser tests and local examples to assert the canonical `result`
    shape.
-7. Regenerate generated indexes if any skill metadata changes:
+9. Regenerate generated indexes if any skill metadata changes:
 
    ```bash
    ./scripts/generate_skill_indexes.sh
@@ -200,6 +220,8 @@ migration-phase contract shape is stable.
   `terminalVerification`, or checkpoint evidence.
 - Collection skills use singular `result`.
 - Setter skills report confirmed final state where the UI can prove it.
+- Migrated non-trivial skills use map/state-machine checkpoints unless the skill
+  has a documented reason to remain push-only.
 - `./scripts/test_all.sh` succeeds.
 
 ### Phase 5: Validate Against The PR-C1 Node Build
@@ -273,15 +295,22 @@ migration-phase contract shape is stable.
 1. Remove migration-window language from docs and bundled guidance.
 2. Keep old-shape migration history out of public docs unless it describes
    still-shipped behavior.
-3. Build Node and run tests.
-4. Build public docs.
-5. Validate at least one migrated read skill and one migrated setter skill from
+3. Confirm stream field wording is final: `skillResult.result` is the answer,
+   `output` is display/progress text if retained, and process streams are
+   named `stdout` and `stderr` where exposed.
+4. Confirm checkpoint guidance is final: map/state-machine checkpoints are the
+   preferred shape for new and migrated non-trivial skills.
+5. Build Node and run tests.
+6. Build public docs.
+7. Validate at least one migrated read skill and one migrated setter skill from
    `~/src/clawperator-skills` with the branch-local Node CLI.
 
 **Acceptance criteria:**
 
 - Public docs describe required `skillResult.result`.
 - Bundled skill authoring guidance matches the enforced schema.
+- Public docs do not describe `output`, `diagnostics`, checkpoints, or
+  `terminalVerification` as primary answer channels.
 - Node build and tests pass.
 - Docs build succeeds.
 - Representative migrated skills parse successfully through `skills run`.

@@ -60,6 +60,28 @@ Collections still live in singular `result`, for example:
    `[Clawperator-Skill-Result]` frame when a parsed `skillResult` exists.
 8. `rawOutput` or a similar explicit raw stream field may be added later only if
    a concrete machine consumer needs it. It is not required for this task.
+9. If `output` remains on success-like wrappers, docs must define it as
+   display/progress text, not raw stdout and not the domain result.
+10. New and migrated non-trivial skills should prefer map/state-machine
+    checkpoints: include known checkpoint ids and mark unreached steps
+    `skipped`.
+
+## Findings Coverage
+
+| Finding | Covered by |
+| --- | --- |
+| 1. No canonical answer field | PR-C1 Phase 1, PR-C2 Phase 6 |
+| 2. Primary results are scattered | PR-S1 Phase 4, PR-S1 Phase 5 |
+| 3. JSON `output` includes frame | PR-C1 Phase 2, PR-C1 Phase 3 |
+| 4. Wrapper status precedence | PR-C1 Phase 3, PR-C2 Phase 7 |
+| 5. `terminalVerification` is proof | PR-C1 Phase 3, PR-S1 Phase 4 |
+| 6. `diagnostics` carries primary data | PR-C1 Phase 3, PR-S1 Phase 4 |
+| 7. Stream field names are inconsistent | PR-C1 Phase 2, PR-C1 Phase 3, PR-C2 Phase 7 |
+| 8. Checkpoint presence semantics differ | PR-C1 Phase 3, PR-S1 Phase 4, PR-C2 Phase 7 |
+
+The source corrections in `findings.md` are also covered: PR-C1 tests prove
+root `result` survives only when evidence-shaped, and PR-C1 docs describe JSON
+`output` frame stripping as a contract change rather than a private bug fix.
 
 ## Repository PRs
 
@@ -85,6 +107,8 @@ Required outcomes:
   indeterminate, and `SKILL_OUTPUT_ASSERTION_FAILED` paths.
 - Public docs in `docs/skills` explain the new extraction path and the temporary
   optional migration shape.
+- Docs define `output` as display/progress text when retained, not a raw stdout
+  contract and not a result channel.
 - Relevant bundled skill authoring guidance under
   `apps/node/bundled-skills/clawperator-*` teaches agents to emit and inspect
   `skillResult.result`.
@@ -108,6 +132,8 @@ Required outcomes:
   `terminalVerification` move the answer to `result`.
 - Setter skills emit the confirmed final state in `result` when available, or
   `result: null` when no truthful final state can be reported.
+- New and migrated non-trivial skills prefer map/state-machine checkpoints
+  where the known path is represented and unreached steps are marked `skipped`.
 - Skill docs and parser tests match the migrated contract.
 - Generated skill indexes are regenerated when skill metadata changes.
 - Validation uses the branch-local Clawperator Node build from PR-C1, not the
@@ -208,5 +234,7 @@ multiple devices are connected.
 - JSON `output` no longer duplicates parsed SkillResult frames.
 - Docs and bundled authoring skills teach the same contract that the runtime
   enforces.
+- Checkpoint guidance is explicit: existing push-only shapes may be read, but
+  new and migrated non-trivial skills should use map/state-machine checkpoints.
 - The final Clawperator PR rejects missing `result` for framed SkillResult
   objects.
