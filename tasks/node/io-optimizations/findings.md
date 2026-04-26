@@ -203,3 +203,104 @@ The isolated same-build v0.7.9 daemon-versus-direct measurements above show the
 daemon proxy is effective for repeated bare observations, but these specific
 replay skills do not contain enough separate CLI subprocess calls for daemon
 warm state to dominate the total runtime.
+
+## Skill Timing After Removing Fixed Sleeps - 2026-04-26
+
+Follow-up skill changes in the sibling `clawperator-skills` repo removed fixed
+Android `sleep` actions from the SolaX battery and Google Home climate replay
+skills. Both skills were rerun on the same Samsung SM-S901E physical device over
+USB with:
+
+- `com.clawperator.operator.dev`
+- branch-local `apps/node/dist/cli/index.js`
+- local `clawperator-skills` registry
+- daemon started before timing and verified `running` before and after every
+  measured run
+- wrapper environment:
+  - `CLAWPERATOR_BIN=<local_clawperator_repo>/apps/node/dist/cli/index.js`
+  - `CLAWPERATOR_SKILLS_REGISTRY=<local_clawperator_skills_repo>/skills/skills-registry.json`
+
+This verified that nested skill calls used the local CLI implementation with
+daemon support, not the global `clawperator` binary.
+
+### SolaX Battery
+
+Change under test:
+
+- starts a fresh SolaX Cloud session with `close_app` and `open_app`
+- polls small `read_text` executions for the battery value and unit resource IDs
+- stops as soon as the battery value parses as a number
+- emits attempt count and elapsed timing diagnostics in the terminal SkillResult
+
+Invocation:
+
+```text
+clawperator skills run com.solaxcloud.starter.get-battery --device <device_serial> --operator-package com.clawperator.operator.dev --timeout 240000 --output json
+```
+
+Five-run timing:
+
+| Run | Total wall time (ms) | Wrapper duration (ms) | Setup elapsed (ms) | Poll elapsed (ms) | Attempts |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 9948 | 9226 | 1301 | 7840 | 1 |
+| 2 | 10471 | 9751 | 1349 | 8322 | 1 |
+| 3 | 10326 | 9601 | 1304 | 8217 | 1 |
+| 4 | 11307 | 10575 | 1367 | 9129 | 1 |
+| 5 | 10173 | 9459 | 1324 | 8051 | 1 |
+| Median | 10326 | 9601 | 1324 | 8217 | 1 |
+
+All five runs succeeded.
+
+Compared with the old fixed-sleep daemon median of 21363ms, the condition-based
+version measured 10326ms median, a reduction of 11037ms (-51.7%). The remaining
+runtime is dominated by the first `read_text` execution waiting about 8-9
+seconds until the SolaX dashboard exposes the battery value.
+
+### Google Home Climate
+
+Change under test:
+
+- opens Google Home and snapshots the current Google Home state
+- parses the requested controller directly when the app restores to that screen
+- otherwise navigates from the Home tab to Climate and the requested controller
+- waits for concrete controller values with `wait_for_node`
+- parses all climate fields from the final snapshot
+- emits route and elapsed timing diagnostics in the terminal SkillResult
+
+Invocation:
+
+```text
+clawperator skills run com.google.android.apps.chromecast.app.get-climate-replay --device <device_serial> --operator-package com.clawperator.operator.dev --timeout 240000 --output json -- --unit-name Panasonic
+```
+
+Five-run timing:
+
+| Run | Total wall time (ms) | Wrapper duration (ms) | Open snapshot (ms) | Navigation (ms) | Route |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 8606 | 7875 | 2758 | 5037 | home-tab-navigation |
+| 2 | 12947 | 12204 | 3029 | 9096 | home-tab-navigation |
+| 3 | 8950 | 8176 | 2828 | 5270 | home-tab-navigation |
+| 4 | 9080 | 8348 | 3130 | 5133 | home-tab-navigation |
+| 5 | 12174 | 11437 | 3183 | 8175 | home-tab-navigation |
+| Median | 9080 | 8348 | 3029 | 5270 | home-tab-navigation |
+
+All five runs succeeded and returned the expected `Panasonic` climate status.
+
+Compared with the old fixed-sleep daemon median of 17237ms, the condition-based
+version measured 9080ms median, a reduction of 8157ms (-47.3%). The improvement
+comes from replacing 13000ms of fixed sleeps with observed readiness checks:
+
+- Google Home app root is present after open
+- controller status values are present before the final snapshot
+
+Runs 2 and 5 were slower because navigation readiness took around 8-9 seconds,
+which appears to be live Google Home app-state variance rather than daemon
+transport overhead.
+
+### Skill Authoring Conclusion
+
+The daemon materially improves full skill runtime when the skill is authored to
+use observable readiness polling instead of arbitrary sleeps. For these two
+skills, removing fixed sleeps and using the local daemon path cut measured median
+runtime by about 47-52%. The remaining bottleneck is app readiness and UI value
+population, not host-side process startup alone.
