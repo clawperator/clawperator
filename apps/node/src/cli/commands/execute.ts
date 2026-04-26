@@ -8,9 +8,11 @@ import { ERROR_CODES } from "../../contracts/errors.js";
 import type { Logger } from "../../adapters/logger.js";
 import { tryDaemonExecution } from "../daemonProxy.js";
 
-function applyTimeoutOverride(payload: unknown, timeoutMs: number | undefined): unknown {
+function normalizeExecutionForRun(payload: unknown, timeoutMs: number | undefined): unknown {
+  const execution = validateExecution(payload);
   if (timeoutMs === undefined) {
-    return payload;
+    validatePayloadSize(JSON.stringify(execution));
+    return execution;
   }
   if (!Number.isFinite(timeoutMs)) {
     throw {
@@ -24,9 +26,9 @@ function applyTimeoutOverride(payload: unknown, timeoutMs: number | undefined): 
       message: `timeoutMs must be between ${LIMITS.MIN_EXECUTION_TIMEOUT_MS} and ${LIMITS.MAX_EXECUTION_TIMEOUT_MS}`,
     };
   }
-  const execution = { ...validateExecution(payload), timeoutMs };
-  validatePayloadSize(JSON.stringify(execution));
-  return execution;
+  const executionWithTimeout = { ...execution, timeoutMs };
+  validatePayloadSize(JSON.stringify(executionWithTimeout));
+  return executionWithTimeout;
 }
 
 export async function cmdExecute(options: {
@@ -170,7 +172,7 @@ export async function cmdExecute(options: {
       return formatSuccess({ ok: true, validated: true, execution }, options);
     }
 
-    const executionForRun = applyTimeoutOverride(payload, options.timeoutMs);
+    const executionForRun = normalizeExecutionForRun(payload, options.timeoutMs);
     const tryDaemonExecutionFn = options.tryDaemonExecutionFn ?? tryDaemonExecution;
     const runExecutionFn = options.runExecutionFn ?? runExecution;
     const proxyResult = await tryDaemonExecutionFn(executionForRun, {

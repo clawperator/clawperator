@@ -2,6 +2,7 @@ import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer, type Server, type Socket } from "node:net";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -24,6 +25,8 @@ import { ERROR_CODES } from "../../../contracts/errors.js";
 import { shouldCliStdoutForceExitCode1 } from "../../../cli/stdoutExitCode.js";
 
 const tempDirs: string[] = [];
+const servers: Server[] = [];
+const sockets: Socket[] = [];
 
 async function makeTempBaseDir(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "clawperator-daemon-test-"));
@@ -36,6 +39,10 @@ async function writePidMetadata(baseDir: string, pid: number, startedAt = Date.n
 }
 
 afterEach(async () => {
+  for (const socket of sockets.splice(0)) {
+    socket.destroy();
+  }
+  await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve) => server.close(() => resolve()))));
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
@@ -184,6 +191,36 @@ describe("daemon command output", () => {
 
     assert.equal(readFileSync(socketPath, "utf8"), "existing live socket");
     assert.equal(existsSync(pidPath), false);
+  });
+
+  it("does not remove or spawn over a bound socket that is not ready yet", async () => {
+    const baseDir = await makeTempBaseDir();
+    const socketPath = getDaemonSocketPath(undefined, { baseDir });
+    const server = createServer((_socket) => {
+      // Keep the connection open so HTTP /ping times out instead of proving the socket stale.
+      sockets.push(_socket);
+    });
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(socketPath, resolve);
+    });
+    servers.push(server);
+    let spawned = false;
+
+    const raw = await cmdDaemonStart({
+      format: "json",
+      baseDir,
+      pollTimeoutMs: 1,
+      pollIntervalMs: 1,
+      spawnDaemonRunImpl: () => {
+        spawned = true;
+      },
+    });
+    const parsed = JSON.parse(raw) as { code?: string };
+
+    assert.equal(spawned, false);
+    assert.equal(existsSync(socketPath), true);
+    assert.equal(parsed.code, ERROR_CODES.DAEMON_START_FAILED);
   });
 
   it("stop failures return DAEMON_STOP_FAILED and force exit code 1", async () => {

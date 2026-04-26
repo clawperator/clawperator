@@ -194,6 +194,43 @@ describe("cmdExecute daemon proxy", () => {
     assert.strictEqual(result.envelope.status, "success");
     assert.strictEqual(postedExecution?.timeoutMs, 12000);
   });
+
+  it("normalizes timeout aliases before posting to daemon", async () => {
+    let postedExecution: { timeoutMs?: number } | undefined;
+    const output = await cmdExecute({
+      format: "json",
+      execution: JSON.stringify({
+        command_id: "cmd-proxy-alias-timeout",
+        task_id: "cmd-proxy-alias-timeout",
+        source: "test",
+        expected_format: "android-ui-automator",
+        timeout_ms: 12000,
+        actions: [{ id: "sleep-1", type: "sleep", params: { duration_ms: 1 } }],
+      }),
+      tryDaemonExecutionFn: async (execution) => {
+        postedExecution = execution as { timeoutMs?: number };
+        return {
+          ok: true,
+          deviceId: "device-1",
+          terminalSource: "clawperator_result",
+          envelope: {
+            commandId: "cmd-proxy-alias-timeout",
+            taskId: "cmd-proxy-alias-timeout",
+            status: "success",
+            stepResults: [],
+            error: null,
+          },
+        };
+      },
+      runExecutionFn: async () => {
+        throw new Error("direct execution should not run");
+      },
+    });
+    const result = JSON.parse(output);
+
+    assert.strictEqual(result.envelope.status, "success");
+    assert.strictEqual(postedExecution?.timeoutMs, 12000);
+  });
 });
 
 describe("cmdExecute inline JSON vs file path", () => {

@@ -73,6 +73,22 @@ async function isSocketAlive(socketPath: string): Promise<boolean> {
   }
 }
 
+async function getSocketState(socketPath: string): Promise<"alive" | "missing" | "stale" | "not_ready"> {
+  try {
+    const response = await requestDaemonJson<{ ok?: unknown }>(socketPath, "/ping");
+    return response.ok === true ? "alive" : "not_ready";
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") {
+      return "missing";
+    }
+    if (code === "ECONNREFUSED" || code === "ENOTSOCK") {
+      return "stale";
+    }
+    return "not_ready";
+  }
+}
+
 async function readDaemonVersion(socketPath: string): Promise<string> {
   const response = await requestDaemonJson<{ version?: unknown }>(socketPath, "/version");
   return typeof response.version === "string" ? response.version : "unknown";
@@ -149,12 +165,27 @@ export async function cmdDaemonRun(options: DaemonRunOptions): Promise<void> {
 
 export async function cmdDaemonStart(options: DaemonCommandOptions): Promise<string> {
   const socketPath = getDaemonSocketPath(options.deviceId, options);
-  if (await isSocketAlive(socketPath)) {
+  const initialState = await getSocketState(socketPath);
+  if (initialState === "alive") {
     return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
   }
-  rmSync(socketPath, { force: true });
 
   try {
+    if (initialState === "stale") {
+      rmSync(socketPath, { force: true });
+    } else if (initialState === "not_ready") {
+      const timeoutMs = options.pollTimeoutMs ?? DEFAULT_START_TIMEOUT_MS;
+      const intervalMs = options.pollIntervalMs ?? DEFAULT_START_POLL_INTERVAL_MS;
+      if (await waitForSocket(socketPath, timeoutMs, intervalMs)) {
+        return daemonSuccess({ ok: true, daemon: { status: "already_running", socketPath } }, options);
+      }
+      return formatError({
+        code: ERROR_CODES.DAEMON_START_FAILED,
+        message: `Daemon socket exists but did not become ready within ${timeoutMs}ms.`,
+        details: { socketPath, timeoutMs },
+      }, { format: options.format });
+    }
+
     const spawnImpl = options.spawnDaemonRunImpl ?? spawnDaemonRun;
     spawnImpl(options.deviceId, options.operatorPackage, options);
   } catch (error) {
