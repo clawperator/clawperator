@@ -79,10 +79,12 @@ migration-phase contract shape is stable.
    and do not need to change.
 2. Do not change `runSkill.ts` or the domain-layer tests. The `runSkill`
    domain function intentionally returns raw stdout including the frame; the
-   existing test at line 3608 (`result.output.includes("[Clawperator-Skill-Result]")`)
-   remains correct and must not be modified.
-3. Add CLI-layer tests in the `describe("cmdSkillsRun")` block using the
-   injected `runSkillImpl` pattern already used in that block. A suitable test:
+   existing agent-driven SkillResult test that asserts
+   `result.output.includes("[Clawperator-Skill-Result]")` remains correct and
+   must not be modified.
+3. Add CLI-layer tests in the `describe("cmdSkillsRun preflight gate")` block
+   using the injected `runSkillImpl` pattern already used in that block. A
+   suitable test:
    - Creates a `fakeRunSkill` that returns `output` containing the literal
      `[Clawperator-Skill-Result]` marker followed by JSON, plus a non-null
      `skillResult`.
