@@ -133,6 +133,7 @@ const FLAG_VALUE_ARITY = new Map<string, number>([
   ["--expect-contains", 1],
   ["--coordinate", 2],
   ["--disable-star-suggestions", 0],
+  ["--no-daemon", 0],
 ]);
 
 const COMMANDS_ALLOW_LEADING_POSITIONAL = new Set([
@@ -155,6 +156,7 @@ function getGlobalOpts(argv: string[]): {
   /** True when the user set JSON output via --json or an explicit --output/--format json (not the CLI default). */
   explicitJsonOutput: boolean;
   verbose: boolean;
+  noDaemon: boolean;
   rest: string[];
 } {
   argv = normalizeCliFlagAliasesBeforeForwardSeparator(argv, GLOBAL_FLAG_ALIASES, FLAG_VALUE_ARITY);
@@ -166,6 +168,7 @@ function getGlobalOpts(argv: string[]): {
   let output: "json" | "pretty" = "json";
   let explicitJsonOutput = false;
   let verbose = false;
+  let noDaemon = false;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--") {
       // Stop scanning for global flags. Push `--` and all remaining tokens to `rest` verbatim so
@@ -217,11 +220,13 @@ function getGlobalOpts(argv: string[]): {
       verbose = true;
     } else if (argv[i] === "--disable-star-suggestions") {
       // consumed; hint module reads process.argv directly
+    } else if (argv[i] === "--no-daemon") {
+      noDaemon = true;
     } else {
       rest.push(argv[i]);
     }
   }
-  return { deviceId, operatorPackage, timeoutMs, logLevel, output, explicitJsonOutput, verbose, rest };
+  return { deviceId, operatorPackage, timeoutMs, logLevel, output, explicitJsonOutput, verbose, noDaemon, rest };
 }
 
 /**
@@ -333,7 +338,7 @@ async function main(): Promise<void> {
         const globalFlags = [
           "--device", "--device-id", "--operator-package", "--receiver-package",
           "--json", "--output", "--format", "--log-level", "--timeout", "--timeout-ms",
-          "--verbose", "--help", "--version", "--disable-star-suggestions"
+          "--verbose", "--help", "--version", "--disable-star-suggestions", "--no-daemon"
         ];
         const flagAliases = typeof def.flagAliases === "function" ? def.flagAliases(rest) : (def.flagAliases ?? []);
         const normalizedRest = normalizeCliFlagAliasesBeforeForwardSeparator(rest, flagAliases, FLAG_VALUE_ARITY);
@@ -417,6 +422,7 @@ async function main(): Promise<void> {
             format: out.format,
             explicitJsonOutput: global.explicitJsonOutput,
             verbose: out.verbose,
+            noDaemon: global.noDaemon,
             logger,
             deviceId: global.deviceId,
             operatorPackage: global.operatorPackage,

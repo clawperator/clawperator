@@ -3,9 +3,10 @@ import { runExecution } from "../../domain/executions/runExecution.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 import { LIMITS } from "../../contracts/limits.js";
 import type { OutputOptions } from "../output.js";
-import { formatSuccess, formatError } from "../output.js";
+import { formatSuccess, formatError, formatRunExecutionResultForCli } from "../output.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import type { Logger } from "../../adapters/logger.js";
+import { tryDaemonExecution } from "../daemonProxy.js";
 
 export async function cmdExecute(options: {
   format: OutputOptions["format"];
@@ -15,6 +16,7 @@ export async function cmdExecute(options: {
   timeoutMs?: number;
   validateOnly?: boolean;
   dryRun?: boolean;
+  noDaemon?: boolean;
   logger?: Logger;
 }): Promise<string> {
   let payload: unknown;
@@ -145,25 +147,20 @@ export async function cmdExecute(options: {
       return formatSuccess({ ok: true, validated: true, execution }, options);
     }
 
-    const result = await runExecution(payload, {
+    const proxyResult = await tryDaemonExecution(payload, {
+      rawDeviceId: options.deviceId,
+      operatorPackage: options.operatorPackage,
+      noDaemon: options.noDaemon,
+      allowPostDispatchFallback: false,
+    });
+    const result = proxyResult ?? await runExecution(payload, {
       deviceId: options.deviceId,
       operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
       timeoutMs: options.timeoutMs,
       warn: message => process.stderr.write(message),
       logger: options.logger,
     });
-    if (result.ok) {
-      return formatSuccess(
-        {
-          envelope: result.envelope,
-          deviceId: result.deviceId,
-          terminalSource: result.terminalSource,
-          isCanonicalTerminal: result.terminalSource === "clawperator_result",
-        },
-        options
-      );
-    }
-    return formatError(result.error, options);
+    return formatRunExecutionResultForCli(result, options);
   } catch (e) {
     return formatError(e, options);
   }

@@ -177,6 +177,7 @@ export type HandlerContext = {
   format: "json" | "pretty";
   explicitJsonOutput: boolean;
   verbose: boolean;
+  noDaemon: boolean;
   logger: Logger;
   deviceId?: string;
   operatorPackage?: string;
@@ -557,6 +558,7 @@ Usage:
 Options:
   --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait for snapshot (default: 30000ms)
+  --no-daemon            Force direct execution instead of daemon proxy
 
 Also accepted as: --device-id
 
@@ -577,6 +579,7 @@ Options:
   --path <file>          Save PNG to file path (if omitted, output is base64)
   --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait (default: 30000ms)
+  --no-daemon            Force direct execution instead of daemon proxy
 
 Also accepted as: --device-id, --file
 
@@ -1284,7 +1287,7 @@ COMMANDS["exec"] = {
   supportedFlags: (rest) =>
     rest[0] === "best-effort"
       ? ["--payload", "--validate-only", "--dry-run", "--goal"]
-      : ["--payload", "--validate-only", "--dry-run"],
+      : ["--payload", "--validate-only", "--dry-run", "--no-daemon"],
   summary: "Execute a validated command payload",
   help: `clawperator exec
 
@@ -1303,12 +1306,14 @@ Options:
   --file <json-or-file>      Alias for --payload
   --validate-only           Validate payload without executing
   --dry-run                 Print execution plan without running
+  --no-daemon               Force direct execution instead of daemon proxy
 
 Notes:
   - Leading '{' is always parsed as inline JSON. Leading '[' tries the string as a file path first; if the file is missing, it is parsed as an inline JSON array. Any other string is read as a file path.
   - Error precedence: unreadable file path -> invalid JSON content -> missing payload.
   - 'execute' is accepted as a synonym for 'exec'.
   - '--execution', '--input', and '--file' are accepted aliases for '--payload'.
+  - Use --no-daemon to force direct execution for this call.
   - If the current host is unfamiliar, inspect 'clawperator bundled-skills list' and start with 'clawperator-agent-orientation' before driving the raw CLI directly.
 `,
   topLevelBlock: `  exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]
@@ -1316,7 +1321,7 @@ Notes:
   exec best-effort --goal <text> [--device <id>] [--operator-package <package>]
                                             Produce deterministic next-action suggestion from current UI`,
   handler: async (ctx) => {
-    const { rest, format, verbose, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const { rest, format, verbose, logger, deviceId, operatorPackage, timeoutMs, noDaemon } = ctx;
     const out = { format, verbose, logger };
     if (rest[0] === "best-effort") {
       const goal = getOpt(rest, "--goal");
@@ -1331,7 +1336,7 @@ Notes:
       if (!payloadSource) {
         // Check for positional argument (first non-flag token), including dash-prefixed
         // file paths that have already passed the unknown-flag preflight.
-        const skipFlags = new Set(["--payload", "--execution", "--validate-only", "--dry-run"]);
+        const skipFlags = new Set(["--payload", "--execution", "--validate-only", "--dry-run", "--no-daemon"]);
         for (let i = 0; i < rest.length; i += 1) {
           const token = rest[i];
           if (token === "--") {
@@ -1358,6 +1363,7 @@ Notes:
           timeoutMs,
           validateOnly: hasFlag(rest, "--validate-only"),
           dryRun: hasFlag(rest, "--dry-run"),
+          noDaemon: noDaemon || hasFlag(rest, "--no-daemon"),
           logger,
         });
       }
@@ -1371,12 +1377,12 @@ COMMANDS["snapshot"] = {
   name: "snapshot",
   synonyms: ["snapshot-ui", "snapshot_ui"],
   group: "Device Interaction",
-  supportedFlags: [],
+  supportedFlags: ["--no-daemon"],
   summary: "Get current Android UI hierarchy as XML",
   help: HELP_SNAPSHOT,
   topLevelBlock: `  snapshot [--device <id>] [--operator-package <pkg>]                     Get current Android UI hierarchy as XML`,
   handler: async (ctx) => {
-    const { format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs, noDaemon } = ctx;
     const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
     if (invalidTimeout) return invalidTimeout;
     return (await import("./commands/observe.js")).cmdObserveSnapshot({
@@ -1384,6 +1390,7 @@ COMMANDS["snapshot"] = {
       deviceId,
       operatorPackage,
       timeoutMs,
+      noDaemon: noDaemon || hasFlag(rest, "--no-daemon"),
       logger,
     });
   },
@@ -1394,13 +1401,13 @@ COMMANDS["screenshot"] = {
   synonyms: ["take-screenshot", "take_screenshot", "capture-screenshot"],
   group: "Device Interaction",
   flagAliases: SCREENSHOT_FLAG_ALIASES,
-  supportedFlags: ["--path"],
+  supportedFlags: ["--path", "--no-daemon"],
   summary: "Capture a screenshot from the device",
   help: HELP_SCREENSHOT,
   topLevelBlock: `  screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]
                                             Capture a screenshot from the device`,
   handler: async (ctx) => {
-    const { rest, format, logger, deviceId, operatorPackage, timeoutMs } = ctx;
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs, noDaemon } = ctx;
     const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
     if (invalidTimeout) return invalidTimeout;
     const path = getStringOpt(rest, "--path");
@@ -1410,6 +1417,7 @@ COMMANDS["screenshot"] = {
       operatorPackage,
       timeoutMs,
       path,
+      noDaemon: noDaemon || hasFlag(rest, "--no-daemon"),
       logger,
     });
   },
@@ -2955,6 +2963,7 @@ export function generateTopLevelHelp(commands: Record<string, CommandDef>): stri
     "  --json                                  Alias for --output json",
     "  --log-level <debug|info|warn|error>     Persistent log level (default: info)",
     "  --timeout <n>                           Override execution timeout (Also accepted as: --timeout-ms)",
+    "  --no-daemon                             Force direct execution for daemon-capable commands",
     "  --verbose                               Include debug diagnostics in output",
     "  --help                                  Show help",
     "  --version                               Show version",
