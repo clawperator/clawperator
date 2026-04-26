@@ -177,6 +177,7 @@ the `daemon` command and to accept `--no-daemon` as a boolean flag both globally
 | Result envelope shape | `apps/node/src/contracts/result.ts` |
 | Serve command and routes | `apps/node/src/cli/commands/serve.ts` |
 | Version utility | `apps/node/src/domain/version/compatibility.ts` |
+| Operator package precedence | `apps/node/src/domain/config/resolveOperatorPackage.ts` |
 | Execution domain | `apps/node/src/domain/executions/runExecution.ts` |
 | Skills subprocess model | `../clawperator-skills/skills/utils/common.js` |
 | CLI output formatting | `apps/node/src/cli/output.ts` |
@@ -213,9 +214,11 @@ the `daemon` command and to accept `--no-daemon` as a boolean flag both globally
   `runExecution` and returns `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` - same error as
   direct mode, so no pre-check needed.
 - Operator package preservation: the proxy must resolve and send the caller's effective
-  operator package in the `/execute` body. Do not let a stale daemon process environment
-  change the behavior of a caller that provided `--operator-package` or
-  `CLAWPERATOR_OPERATOR_PACKAGE`.
+  operator package in the `/execute` body using the existing
+  `resolveOperatorPackageForRequest` helper from
+  `apps/node/src/domain/config/resolveOperatorPackage.ts`. Do not let a stale daemon
+  process environment change the behavior of a caller that provided
+  `--operator-package` or `CLAWPERATOR_OPERATOR_PACKAGE`.
 - `close_app`-only executions: the daemon's `/execute` route handles these correctly
   (the serve path already bypasses `ensureInteractiveAutomationReady` for close_app).
   No special handling needed in the proxy layer.

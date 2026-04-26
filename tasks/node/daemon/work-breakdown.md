@@ -74,6 +74,7 @@ Read these files IN THIS ORDER before writing anything.
 | `tasks/node/daemon/plan.md` | Stable contract, locked decisions, failure modes |
 | `apps/node/src/cli/commands/serve.ts` | The daemon's Express app - understand `startServer()`, `createApp`-equivalent pattern, all routes, and the TCP binding |
 | `apps/node/src/cli/commands/execute.ts` | Primary proxy target; shows how `runExecution` is called and formatted |
+| `apps/node/src/domain/config/resolveOperatorPackage.ts` | Existing helper for explicit/env/default operator package precedence; import it from `daemonProxy.ts` instead of inventing a second rule |
 | `apps/node/src/cli/commands/observe.ts` | Proxy target for snapshot and screenshot |
 | `apps/node/src/cli/commands/action.ts` | Phase 4 target; shows all flat action command patterns |
 | `apps/node/src/cli/output.ts` | `formatSuccess` and `formatError` - basis for the shared `formatRunExecutionResultForCli` helper added in Phase 3 |
@@ -533,10 +534,15 @@ that proxy and direct paths use exactly the same code.
    a. If `CLAWPERATOR_NO_DAEMON` env or `options.noDaemon`: return null (pre-dispatch).
    b. If platform is Windows: return null (pre-dispatch).
    c. Get socket path via `getDaemonSocketPath(options.rawDeviceId)` and resolve the
-      effective operator package in the CLI process:
+      effective operator package in the CLI process with the existing helper:
+      `import { resolveOperatorPackageForRequest } from "../domain/config/resolveOperatorPackage.js";`
+      from the new `apps/node/src/cli/daemonProxy.ts`, then call
       `resolveOperatorPackageForRequest(options.operatorPackage)`. This preserves direct
       mode behavior even if an already-running daemon was started with a different
-      `CLAWPERATOR_OPERATOR_PACKAGE` environment.
+      `CLAWPERATOR_OPERATOR_PACKAGE` environment. Do not create a second precedence
+      rule. If the helper moved during an earlier PR, mirror its exact current
+      contract: explicit CLI option, then nonblank `CLAWPERATOR_OPERATOR_PACKAGE`, then
+      `DEFAULT_OPERATOR_PACKAGE`.
    d. Check liveness: try GET /ping on the socket.
       - ENOENT: go to auto-start (step e).
       - ECONNREFUSED (stale socket): delete socket file; go to auto-start (step e).
@@ -606,8 +612,10 @@ that proxy and direct paths use exactly the same code.
    - Returns result when daemon is alive and version matches (mock HTTP)
    - Stops old daemon and restarts when version mismatches (mock stop, spawn, HTTP)
    - Deletes stale socket file and restarts when ECONNREFUSED
-   - Passes the effective operator package in the `/execute` request body, including when
-     it came from `CLAWPERATOR_OPERATOR_PACKAGE`
+   - Passes the effective operator package in the `/execute` request body: explicit
+     option beats env; nonblank `CLAWPERATOR_OPERATOR_PACKAGE` is used when no explicit
+     option exists; blank env falls back to `DEFAULT_OPERATOR_PACKAGE`; no explicit
+     option or env sends `DEFAULT_OPERATOR_PACKAGE`
    - Returns null for `snapshot` on network error after dispatch only when
      `allowPostDispatchFallback: true` is set
    - Returns result with `ERROR_CODES.DAEMON_PROXY_ERROR` for `exec` on response loss
