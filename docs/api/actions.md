@@ -739,6 +739,7 @@ Semantics:
 - `navigationTimeoutMs` controls the readiness wait only. It does not change the execution-level timeout.
 - already-foreground launches succeed without a package-transition race.
 - callers that need content to be present after the package is foreground should follow with `wait_for_node`.
+- the `clawperator open` CLI exposes `--skip-navigation-wait` and `--navigation-timeout-ms` for package targets only; URI targets reject both flags with `EXECUTION_VALIDATION_FAILED`.
 
 Success data:
 

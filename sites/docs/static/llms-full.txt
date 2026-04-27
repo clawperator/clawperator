@@ -1432,7 +1432,7 @@ This page is generated from the Node CLI registry and command sources.
 | `snapshot` | `snapshot [--device <id>] [--operator-package <pkg>]` | snapshot-ui, snapshot_ui | --no-daemon, --device, --operator-package | Get current Android UI hierarchy as XML |
 | `screenshot` | `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]` | take-screenshot, take_screenshot, capture-screenshot | --path, --no-daemon, --device, --operator-package | Capture a screenshot from the device |
 | `click` | `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]` | tap | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --coordinate, --long, --focus, --no-daemon, --device, --operator-package | Tap the first matching UI element |
-| `open` | `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]` | open-app, open_app, open-uri, open-url, open_uri, open_url | --app, --no-daemon, --device, --operator-package, --help | Open an app, URL, or URI on the device |
+| `open` | `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]` | open-app, open_app, open-uri, open-url, open_uri, open_url | --app, --navigation-timeout-ms, --skip-navigation-wait, --no-daemon, --device, --operator-package, --help | Open an app, URL, or URI on the device |
 | `type` | `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]` | fill, enter-text, enter_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --submit, --clear, --no-daemon, --device, --operator-package, --help | Type text into the first matching UI element |
 | `read` | `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]` | read-text, read_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --all, --validate-only, --dry-run, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --no-daemon, --device, --operator-package | Read text from the first matching UI element |
 | `wait` | `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]` | wait-for, wait_for, wait-for-node, wait_for_node, find, find-node, find_node | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --no-daemon, --device, --operator-package, --timeout | Wait until a matching UI element appears |
@@ -1620,7 +1620,7 @@ This page is generated from the Node CLI registry and command sources.
 | `snapshot` | `snapshot [--device <id>] [--operator-package <pkg>]` | snapshot-ui, snapshot_ui | --no-daemon, --device, --operator-package | Get current Android UI hierarchy as XML |
 | `screenshot` | `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]` | take-screenshot, take_screenshot, capture-screenshot | --path, --no-daemon, --device, --operator-package | Capture a screenshot from the device |
 | `click` | `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]` | tap | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --coordinate, --long, --focus, --no-daemon, --device, --operator-package | Tap the first matching UI element |
-| `open` | `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]` | open-app, open_app, open-uri, open-url, open_uri, open_url | --app, --no-daemon, --device, --operator-package, --help | Open an app, URL, or URI on the device |
+| `open` | `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]` | open-app, open_app, open-uri, open-url, open_uri, open_url | --app, --navigation-timeout-ms, --skip-navigation-wait, --no-daemon, --device, --operator-package, --help | Open an app, URL, or URI on the device |
 | `type` | `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]` | fill, enter-text, enter_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --submit, --clear, --no-daemon, --device, --operator-package, --help | Type text into the first matching UI element |
 | `read` | `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]` | read-text, read_text | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --all, --validate-only, --dry-run, --container-text, --container-text-contains, --container-id, --container-desc, --container-desc-contains, --container-role, --container-selector, --no-daemon, --device, --operator-package | Read text from the first matching UI element |
 | `wait` | `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]` | wait-for, wait_for, wait-for-node, wait_for_node, find, find-node, find_node | --text, --text-contains, --id, --desc, --desc-contains, --role, --selector, --no-daemon, --device, --operator-package, --timeout | Wait until a matching UI element appears |
@@ -1660,7 +1660,7 @@ This page is generated from the Node CLI registry and command sources.
 - Summary: Open an app, URL, or URI on the device
 - Syntax: `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]`
 - Aliases: `open-app`, `open_app`, `open-uri`, `open-url`, `open_uri`, `open_url`
-- Flags: `--app`, `--no-daemon`, `--device`, `--operator-package`, `--help`
+- Flags: `--app`, `--navigation-timeout-ms`, `--skip-navigation-wait`, `--no-daemon`, `--device`, `--operator-package`, `--help`
 
 ### `type`
 
@@ -2088,6 +2088,7 @@ Common payload-key aliases also accepted on input:
 - text-entry field: `value` -> `text`
 - screenshot path fields: `file`, `filePath`, `output_path` -> `path`
 - navigation fields: `expected_package`, `expected_node`, `timeout_ms`
+- open_app fields: `skip_navigation_wait`, `navigation_timeout_ms`
 - label selector fields: `label_matcher`, `label_selector`
 
 ## Full Payload Example
@@ -2712,7 +2713,18 @@ Example:
 | --- | --- |
 | Required | `applicationId` |
 | `applicationId` | required non-empty package id string |
+| `skipNavigationWait` | optional boolean, defaults to `false` |
+| `navigationTimeoutMs` | optional integer in `[1000, 120000]`, defaults to `15000` |
 | `retry` | optional retry object in raw `exec` JSON; Android defaults to `AppLaunch` |
+
+Semantics:
+
+- `open_app` dispatches the launch intent, then waits until the launched package is the active foreground accessibility package before returning success.
+- set `skipNavigationWait: true` only when you intentionally want the older fire-and-forget behavior.
+- `navigationTimeoutMs` controls the readiness wait only. It does not change the execution-level timeout.
+- already-foreground launches succeed without a package-transition race.
+- callers that need content to be present after the package is foreground should follow with `wait_for_node`.
+- the `clawperator open` CLI exposes `--skip-navigation-wait` and `--navigation-timeout-ms` for package targets only; URI targets reject both flags with `EXECUTION_VALIDATION_FAILED`.
 
 Success data:
 
@@ -2721,6 +2733,7 @@ Success data:
 Common failures:
 
 - `EXECUTION_VALIDATION_FAILED` for missing `applicationId`
+- runtime step failures such as `NAVIGATION_TIMEOUT` when the launched package does not reach the foreground within the wait budget
 
 Example:
 
@@ -2729,7 +2742,9 @@ Example:
   "id": "open-1",
   "type": "open_app",
   "params": {
-    "applicationId": "com.android.settings"
+    "applicationId": "com.android.settings",
+    "skipNavigationWait": false,
+    "navigationTimeoutMs": 15000
   }
 }
 ```
