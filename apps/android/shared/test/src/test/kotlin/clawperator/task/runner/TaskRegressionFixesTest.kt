@@ -270,6 +270,40 @@ class TaskRegressionFixesTest : ActionTest {
         }
 
     @Test
+    fun `wait_for_navigation succeeds for already foreground open_app when allowed`() =
+        actionTest {
+            val taskScope =
+                TaskScopeDefault(
+                    appsRepository = unusedProxy(),
+                    triggerManager = unusedProxy(),
+                    appCloseManager = unusedProxy(),
+                    uiTreeInspector =
+                        SequenceUiTreeInspector(
+                            listOf(
+                                UiWindowMetadata(foregroundPackage = "com.android.settings"),
+                                UiWindowMetadata(foregroundPackage = "com.android.settings"),
+                            ),
+                        ),
+                    uiTreeFilterer = IdentityUiTreeFilterer,
+                    uiTreeFormatter = unusedProxy(),
+                    taskUiScope = unusedProxy(),
+                    urlNavigator = unusedProxy(),
+                    coroutineScopeIo = backgroundScope,
+                )
+
+            val result =
+                taskScope.waitForNavigation(
+                    expectedPackage = "com.android.settings",
+                    expectedNode = null,
+                    timeoutMs = 500,
+                    allowAlreadyForeground = true,
+                )
+
+            assertTrue(result.success)
+            assertEquals("com.android.settings", result.lastPackage)
+        }
+
+    @Test
     fun `enterText emits clear failure context when setText fails`() =
         actionTest {
             val events = mutableListOf<TaskEvent>()

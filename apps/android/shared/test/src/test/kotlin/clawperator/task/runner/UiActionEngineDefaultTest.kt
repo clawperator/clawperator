@@ -60,6 +60,118 @@ class UiActionEngineDefaultTest : ActionTest {
         }
 
     @Test
+    fun `execute open_app waits for foreground by default`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope()
+            val taskScope = RecordingTaskScope(uiScope).apply {
+                waitForNavigationResult = WaitForNavigationResult(success = true, lastPackage = "com.example.app", elapsedMs = 420)
+            }
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan =
+                        UiActionPlan(
+                            commandId = "cmd-open-default",
+                            taskId = "task-open-default",
+                            source = "test",
+                            actions =
+                                listOf(
+                                    UiAction.OpenApp(
+                                        id = "step-open",
+                                        applicationId = "com.example.app",
+                                    ),
+                                ),
+                        ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("open_app", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("com.example.app", taskScope.openedApps.single())
+            assertEquals(1, taskScope.waitForNavigationCallCount)
+            assertTrue(taskScope.waitForNavigationCalledAfterOpenApp)
+            assertTrue(taskScope.lastWaitForNavigationAllowAlreadyForeground)
+            assertEquals("420", stepResult.data["navigation_elapsed_ms"])
+            assertEquals("com.example.app", stepResult.data["resolved_package"])
+        }
+
+    @Test
+    fun `execute open_app skipNavigationWait true returns without waiting`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope()
+            val taskScope = RecordingTaskScope(uiScope)
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan =
+                        UiActionPlan(
+                            commandId = "cmd-open-skip",
+                            taskId = "task-open-skip",
+                            source = "test",
+                            actions =
+                                listOf(
+                                    UiAction.OpenApp(
+                                        id = "step-open",
+                                        applicationId = "com.example.app",
+                                        skipNavigationWait = true,
+                                    ),
+                                ),
+                        ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("open_app", stepResult.actionType)
+            assertEquals(true, stepResult.success)
+            assertEquals("com.example.app", taskScope.openedApps.single())
+            assertEquals(0, taskScope.waitForNavigationCallCount)
+            assertEquals("com.example.app", stepResult.data["application_id"])
+            assertEquals(null, stepResult.data["navigation_elapsed_ms"])
+        }
+
+    @Test
+    fun `execute open_app returns navigation timeout failure when wait times out`() =
+        actionTest {
+            val uiScope = RecordingTaskUiScope()
+            val taskScope = RecordingTaskScope(uiScope).apply {
+                waitForNavigationResult = WaitForNavigationResult(success = false, lastPackage = "com.wrong.app", elapsedMs = 5_000)
+            }
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+
+            val result =
+                engine.execute(
+                    taskScope = taskScope,
+                    plan =
+                        UiActionPlan(
+                            commandId = "cmd-open-timeout",
+                            taskId = "task-open-timeout",
+                            source = "test",
+                            actions =
+                                listOf(
+                                    UiAction.OpenApp(
+                                        id = "step-open",
+                                        applicationId = "com.example.app",
+                                    ),
+                                ),
+                        ),
+                )
+
+            val stepResult = result.stepResults.single()
+            assertEquals("open_app", stepResult.actionType)
+            assertEquals(false, stepResult.success)
+            assertEquals("NAVIGATION_TIMEOUT", stepResult.data["error"])
+            assertEquals("com.example.app", stepResult.data["application_id"])
+            assertEquals("com.wrong.app", stepResult.data["last_package"])
+            assertEquals("5000", stepResult.data["navigation_elapsed_ms"])
+            assertTrue(stepResult.data["message"]?.contains("foreground") == true)
+            assertEquals(1, taskScope.waitForNavigationCallCount)
+            assertTrue(taskScope.lastWaitForNavigationAllowAlreadyForeground)
+        }
+
+    @Test
     fun `execute click with coordinates uses raw coordinate tap`() =
         actionTest {
             val uiScope = RecordingTaskUiScope()
@@ -1680,6 +1792,9 @@ private class RecordingTaskScope(
 ) : TaskScope {
     val openedApps = mutableListOf<String>()
     var logUiTreeCount: Int = 0
+    var waitForNavigationCallCount: Int = 0
+    var waitForNavigationCalledAfterOpenApp: Boolean = false
+    var lastWaitForNavigationAllowAlreadyForeground: Boolean = false
 
     override suspend fun openApp(
         applicationId: String,
@@ -1719,7 +1834,13 @@ private class RecordingTaskScope(
         expectedPackage: String?,
         expectedNode: NodeMatcher?,
         timeoutMs: Long,
-    ): WaitForNavigationResult = waitForNavigationResult
+        allowAlreadyForeground: Boolean,
+    ): WaitForNavigationResult {
+        waitForNavigationCallCount += 1
+        waitForNavigationCalledAfterOpenApp = openedApps.isNotEmpty()
+        lastWaitForNavigationAllowAlreadyForeground = allowAlreadyForeground
+        return waitForNavigationResult
+    }
 
     override suspend fun <T> ui(block: suspend TaskUiScope.() -> T): T = uiScope.block()
 }

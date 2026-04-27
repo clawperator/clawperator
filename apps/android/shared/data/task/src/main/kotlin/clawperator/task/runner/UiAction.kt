@@ -18,6 +18,8 @@ sealed interface UiAction {
     data class OpenApp(
         override val id: String,
         val applicationId: String,
+        val skipNavigationWait: Boolean = false,
+        val navigationTimeoutMs: Long = 15_000L,
         val retry: TaskRetry = TaskRetryPresets.AppLaunch,
     ) : UiAction
 

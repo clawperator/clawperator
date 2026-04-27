@@ -1,11 +1,11 @@
 package clawperator.operator.agent
 
 import action.math.geometry.Point
+import clawperator.task.runner.UiAction
 import clawperator.task.runner.NodeMatcher
 import clawperator.task.runner.TaskRetry
 import clawperator.task.runner.TaskRetryPresets
 import clawperator.task.runner.TaskScrollDirection
-import clawperator.task.runner.UiAction
 import clawperator.task.runner.UiSystemKey
 import clawperator.task.runner.UiTextValidator
 import clawperator.uitree.UiTreeClickTypes
@@ -27,6 +27,7 @@ interface AgentCommandParser {
 class AgentCommandParserDefault : AgentCommandParser {
     companion object {
         private const val DEFAULT_TIMEOUT_MS = 30_000L
+        private const val DEFAULT_OPEN_APP_NAVIGATION_TIMEOUT_MS = 15_000L
         private const val MIN_TIMEOUT_MS = 1_000L
         private const val MAX_TIMEOUT_MS = 120_000L
         private const val MAX_PAYLOAD_BYTES = 64_000
@@ -96,6 +97,14 @@ class AgentCommandParserDefault : AgentCommandParser {
                 UiAction.OpenApp(
                     id = id,
                     applicationId = params.stringRequired("applicationId", MAX_MATCHER_VALUE_LENGTH),
+                    skipNavigationWait = params.booleanOrDefaultStrict("skipNavigationWait", false),
+                    navigationTimeoutMs =
+                        params.longOrDefaultStrict("navigationTimeoutMs", DEFAULT_OPEN_APP_NAVIGATION_TIMEOUT_MS)
+                            .also {
+                                require(it >= MIN_TIMEOUT_MS && it <= MAX_TIMEOUT_MS) {
+                                    "navigationTimeoutMs must be in [$MIN_TIMEOUT_MS, $MAX_TIMEOUT_MS]"
+                                }
+                            },
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.AppLaunch),
                 )
             "close_app" ->
@@ -383,6 +392,15 @@ class AgentCommandParserDefault : AgentCommandParser {
         key: String,
         default: Long,
     ): Long = longOrNull(key) ?: default
+
+    private fun JsonObject.longOrDefaultStrict(
+        key: String,
+        default: Long,
+    ): Long {
+        val value = this[key] ?: return default
+        val primitive = value as? JsonPrimitive ?: error("$key must be a number")
+        return primitive.longOrNull ?: error("$key must be a number")
+    }
 
     private fun JsonObject.longOrNull(key: String): Long? = (this[key] as? JsonPrimitive)?.longOrNull
 

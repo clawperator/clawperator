@@ -416,6 +416,97 @@ class AgentCommandParserDefaultTest {
     }
 
     @Test
+    fun `parse open_app defaults skipNavigationWait false and navigationTimeoutMs 15000 when absent`() {
+        val action = parseSingleAction(
+            """
+            {
+              "id": "open-1",
+              "type": "open_app",
+              "params": {
+                "applicationId": "com.example.app"
+              }
+            }
+            """.trimIndent(),
+        )
+
+        val openApp = assertIs<UiAction.OpenApp>(action)
+        assertEquals("com.example.app", openApp.applicationId)
+        assertEquals(false, openApp.skipNavigationWait)
+        assertEquals(15_000L, openApp.navigationTimeoutMs)
+    }
+
+    @Test
+    fun `parse open_app accepts skipNavigationWait true and custom navigation timeout`() {
+        val action = parseSingleAction(
+            """
+            {
+              "id": "open-1",
+              "type": "open_app",
+              "params": {
+                "applicationId": "com.example.app",
+                "skipNavigationWait": true,
+                "navigationTimeoutMs": 22000
+              }
+            }
+            """.trimIndent(),
+        )
+
+        val openApp = assertIs<UiAction.OpenApp>(action)
+        assertEquals(true, openApp.skipNavigationWait)
+        assertEquals(22_000L, openApp.navigationTimeoutMs)
+    }
+
+    @Test
+    fun `parse open_app rejects invalid navigation timeout`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-open-1",
+              "taskId": "task-open-1",
+              "source": "debug",
+              "actions": [
+                {
+                  "id": "open-1",
+                  "type": "open_app",
+                  "params": {
+                    "applicationId": "com.example.app",
+                    "navigationTimeoutMs": 999
+                  }
+                }
+              ]
+            }
+            """.trimIndent()
+
+        val result = parser.parse(payload)
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun `parse open_app rejects non boolean skipNavigationWait`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-open-2",
+              "taskId": "task-open-2",
+              "source": "debug",
+              "actions": [
+                {
+                  "id": "open-1",
+                  "type": "open_app",
+                  "params": {
+                    "applicationId": "com.example.app",
+                    "skipNavigationWait": "true"
+                  }
+                }
+              ]
+            }
+            """.trimIndent()
+
+        val result = parser.parse(payload)
+        assertTrue(result.isFailure)
+    }
+
+    @Test
     fun `parse press_key back`() {
         val payload =
             """
