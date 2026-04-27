@@ -13,13 +13,13 @@ both must be fixed in the runtime to close the failure mode for all callers.
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | PR-1 implemented locally; PR-2 pending |
 | Total PRs | 2 |
 | Total phases | 3 |
-| Completed | none |
-| Remaining | 1, 2, 3 |
-| Current / Next | Phase 1 |
-| Blockers | none |
+| Completed | PR-1 phases 1-2 |
+| Remaining | 3 |
+| Current / Next | PR-2 / Phase 3 |
+| Blockers | Non-Samsung skill validation remained blocked by the Solax dashboard read failure |
 
 ## Goal
 

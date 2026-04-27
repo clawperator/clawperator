@@ -11,20 +11,20 @@ commandId-tagged snapshot log lines. Do not start PR-2 work until PR-1 is merged
 
 | PR | Phases | Agent tier | State |
 | --- | --- | --- | --- |
-| PR-1 | 1, 2 | default, default | not started |
+| PR-1 | 1, 2 | default, default | done |
 | PR-2 | 3 | default | not started |
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | PR-1 implemented locally |
 | Total PRs | 2 |
 | Total phases | 3 |
-| Completed | none |
-| Remaining | 1, 2, 3 |
-| Current / Next | Phase 1 |
-| Blockers | none |
+| Completed | 1, 2 |
+| Remaining | 3 |
+| Current / Next | Phase 3 |
+| Blockers | Non-Samsung skill validation remained blocked by the Solax dashboard read failure |
 
 ## Hard Rules
 
