@@ -1,6 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { extractSnapshotFromLogs, extractSnapshotsFromLogs } from "../../domain/executions/snapshotHelper.js";
+import {
+  extractSnapshotFromLogs,
+  extractSnapshotRecordsFromLogs,
+  extractSnapshotsForCommand,
+  extractSnapshotsFromLogs,
+} from "../../domain/executions/snapshotHelper.js";
 
 describe("extractSnapshotFromLogs", () => {
   it("extracts hierarchy xml from logcat -v tag output with abbreviated tags", () => {
@@ -248,5 +253,53 @@ describe("extractSnapshotFromLogs", () => {
       extractSnapshotFromLogs(lines),
       '<hierarchy rotation="0">\n  <node index="0" text="Second" />\n</hierarchy>',
     );
+  });
+
+  it("parses the new commandId-tagged marker format", () => {
+    const lines = [
+      "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-new]:",
+      "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+      "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node index=\"0\" text=\"Tagged\" />",
+      "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+    ];
+
+    assert.deepStrictEqual(extractSnapshotRecordsFromLogs(lines), [
+      {
+        commandId: "cmd-new",
+        snapshot: '<hierarchy rotation="0">\n  <node index="0" text="Tagged" />\n</hierarchy>',
+      },
+    ]);
+  });
+
+  it("keeps the old marker format parseable for compatibility", () => {
+    const lines = [
+      "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+      "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+      "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node index=\"0\" text=\"Legacy\" />",
+      "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+    ];
+
+    assert.deepStrictEqual(extractSnapshotRecordsFromLogs(lines), [
+      {
+        snapshot: '<hierarchy rotation="0">\n  <node index="0" text="Legacy" />\n</hierarchy>',
+      },
+    ]);
+  });
+
+  it("filters interleaved commandId-tagged blocks down to the matching command", () => {
+    const lines = [
+      "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-other]:",
+      "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+      "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node index=\"0\" text=\"Other\" />",
+      "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+      "04-25 20:14:52.457 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-target]:",
+      "04-25 20:14:52.458 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+      "04-25 20:14:52.459 D/TaskScopeDefault(29817):   <node index=\"0\" text=\"Target\" />",
+      "04-25 20:14:52.460 D/TaskScopeDefault(29817): </hierarchy>",
+    ];
+
+    assert.deepStrictEqual(extractSnapshotsForCommand(lines, "cmd-target"), [
+      '<hierarchy rotation="0">\n  <node index="0" text="Target" />\n</hierarchy>',
+    ]);
   });
 });

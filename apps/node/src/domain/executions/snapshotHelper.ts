@@ -6,28 +6,42 @@ export function extractSnapshotFromLogs(lines: string[]): string | null {
   return snapshots.length > 0 ? snapshots[snapshots.length - 1] : null;
 }
 
+export interface ExtractedSnapshotRecord {
+  snapshot: string;
+  commandId?: string;
+}
+
 export function extractSnapshotsFromLogs(lines: string[]): string[] {
+  return extractSnapshotRecordsFromLogs(lines).map(record => record.snapshot);
+}
+
+export function extractSnapshotRecordsFromLogs(lines: string[]): ExtractedSnapshotRecord[] {
   const parsedLines = lines
     .map(parseLogLine)
     .filter((line): line is ParsedLogLine => line !== null);
 
-  const snapshots: string[] = [];
+  const snapshots: ExtractedSnapshotRecord[] = [];
   let currentSnapshotLines: string[] | null = null;
   let currentSnapshotTag: string | null = null;
+  let currentSnapshotCommandId: string | undefined;
 
   for (const line of parsedLines) {
     const { tag, message } = line;
-    if (tag !== null && message.includes("[TaskScope] UI Hierarchy:")) {
+    const marker = parseSnapshotMarkerMessage(message);
+    if (tag !== null && marker !== null) {
       const currentSnapshot = currentSnapshotLines?.join("\n").trim();
       if (currentSnapshot) {
-        snapshots.push(currentSnapshot);
+        snapshots.push({
+          snapshot: currentSnapshot,
+          commandId: currentSnapshotCommandId,
+        });
       }
 
       currentSnapshotLines = [];
       currentSnapshotTag = tag;
-      const firstLineRemainder = message.split("[TaskScope] UI Hierarchy:")[1]?.trim();
-      if (firstLineRemainder) {
-        currentSnapshotLines.push(firstLineRemainder);
+      currentSnapshotCommandId = marker.commandId;
+      if (marker.firstLineRemainder) {
+        currentSnapshotLines.push(marker.firstLineRemainder);
       }
       continue;
     }
@@ -44,10 +58,14 @@ export function extractSnapshotsFromLogs(lines: string[]): string[] {
     if (trimmed.startsWith("[") && !trimmed.startsWith("<?xml") && !trimmed.startsWith("<")) {
       const currentSnapshot = currentSnapshotLines.join("\n").trim();
       if (currentSnapshot) {
-        snapshots.push(currentSnapshot);
+        snapshots.push({
+          snapshot: currentSnapshot,
+          commandId: currentSnapshotCommandId,
+        });
       }
       currentSnapshotLines = null;
       currentSnapshotTag = null;
+      currentSnapshotCommandId = undefined;
       continue;
     }
 
@@ -55,24 +73,42 @@ export function extractSnapshotsFromLogs(lines: string[]): string[] {
     if (trimmed === "</hierarchy>") {
       const currentSnapshot = currentSnapshotLines.join("\n").trim();
       if (currentSnapshot) {
-        snapshots.push(currentSnapshot);
+        snapshots.push({
+          snapshot: currentSnapshot,
+          commandId: currentSnapshotCommandId,
+        });
       }
       currentSnapshotLines = null;
       currentSnapshotTag = null;
+      currentSnapshotCommandId = undefined;
     }
   }
 
   const trailingSnapshot = currentSnapshotLines?.join("\n").trim();
   if (trailingSnapshot) {
-    snapshots.push(trailingSnapshot);
+    snapshots.push({
+      snapshot: trailingSnapshot,
+      commandId: currentSnapshotCommandId,
+    });
   }
 
   return snapshots;
 }
 
+export function extractSnapshotsForCommand(lines: string[], expectedCommandId: string): string[] {
+  return extractSnapshotRecordsFromLogs(lines)
+    .filter(record => record.commandId === undefined || record.commandId === expectedCommandId)
+    .map(record => record.snapshot);
+}
+
 interface ParsedLogLine {
   tag: string | null;
   message: string;
+}
+
+interface ParsedSnapshotMarker {
+  commandId?: string;
+  firstLineRemainder: string;
 }
 
 function parseLogLine(line: string): ParsedLogLine | null {
@@ -110,4 +146,23 @@ function parseLogLine(line: string): ParsedLogLine | null {
 
   const trimmed = line.trim();
   return trimmed.length > 0 ? { tag: null, message: trimmed } : null;
+}
+
+function parseSnapshotMarkerMessage(message: string): ParsedSnapshotMarker | null {
+  const newFormatMatch = message.match(/^\[TaskScope\] UI Hierarchy \[commandId=([^\]]+)]:\s*(.*)$/);
+  if (newFormatMatch) {
+    return {
+      commandId: newFormatMatch[1],
+      firstLineRemainder: newFormatMatch[2]?.trim() ?? "",
+    };
+  }
+
+  const oldMarker = "[TaskScope] UI Hierarchy:";
+  if (!message.includes(oldMarker)) {
+    return null;
+  }
+
+  return {
+    firstLineRemainder: message.split(oldMarker)[1]?.trim() ?? "",
+  };
 }

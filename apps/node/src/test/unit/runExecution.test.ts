@@ -22,7 +22,7 @@ import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
-import { extractSnapshotsFromLogs } from "../../domain/executions/snapshotHelper.js";
+import { extractSnapshotsForCommand, extractSnapshotsFromLogs } from "../../domain/executions/snapshotHelper.js";
 import { createClawperatorLogger } from "../../adapters/logger.js";
 import { clawperatorEvents, CLAWPERATOR_EVENT_TYPES } from "../../domain/observe/events.js";
 import { isAbsolute, join } from "node:path";
@@ -154,6 +154,24 @@ describe("markExtractionFailedSnapshotSteps", () => {
 
     assert.strictEqual(stepResults[0].success, true);
     assert.deepStrictEqual(stepResults[0].data, {});
+  });
+
+  it("marks snapshot_ui as SNAPSHOT_EXTRACTION_FAILED when only other commandIds are present", () => {
+    const stepResults: StepResult[] = [
+      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+    ];
+    const logLines = [
+      "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-other]:",
+      "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+      "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node index=\"0\" text=\"Other\" />",
+      "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+    ];
+
+    attachSnapshotsToStepResults(stepResults, extractSnapshotsForCommand(logLines, "cmd-current"));
+    markExtractionFailedSnapshotSteps(stepResults);
+
+    assert.strictEqual(stepResults[0].success, false);
+    assert.strictEqual(stepResults[0].data.error, "SNAPSHOT_EXTRACTION_FAILED");
   });
 });
 
@@ -1580,6 +1598,63 @@ describe("waitForResultEnvelope", () => {
     if (result.ok) {
       assert.ok(result.snapshotLogLines?.some(line => line.includes("fresh")));
       assert.ok(!result.snapshotLogLines?.some(line => line.includes("stale")));
+    }
+  });
+
+  it("captures commandId-tagged snapshot blocks that arrive before dispatch capture opens", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-pre-dispatch]:",
+          "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+          "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node text=\"fresh-before-dispatch\" />",
+          "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+        ].join("\n") + "\n"));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-pre-dispatch",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        proc.stdout?.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify({
+          commandId: "cmd-pre-dispatch",
+          taskId: "task-pre-dispatch",
+          status: "success",
+          stepResults: [],
+          error: null,
+        })}\n`));
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.ok(result.snapshotLogLines?.some(line => line.includes("fresh-before-dispatch")));
+      assert.deepStrictEqual(extractSnapshotsForCommand(result.snapshotLogLines ?? [], "cmd-pre-dispatch"), [
+        '<hierarchy rotation="0">\n  <node text="fresh-before-dispatch" />\n</hierarchy>',
+      ]);
     }
   });
 

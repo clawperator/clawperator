@@ -11,10 +11,11 @@ import kotlin.coroutines.CoroutineContext
  */
 class TaskStatusElement(
     val sink: TaskStatusSink,
+    val commandId: String? = null,
 ) : AbstractCoroutineContextElement(TaskStatusElement) {
     companion object Key : CoroutineContext.Key<TaskStatusElement>
 
-    override fun toString(): String = "TaskStatusElement(sink=$sink)"
+    override fun toString(): String = "TaskStatusElement(sink=$sink, commandId=$commandId)"
 }
 
 /**
@@ -23,3 +24,5 @@ class TaskStatusElement(
  * @return The current TaskStatusSink, or TaskStatusSink.NoOp if none is present
  */
 suspend fun currentTaskStatus(): TaskStatusSink = kotlin.coroutines.coroutineContext[TaskStatusElement]?.sink ?: TaskStatusSinkNoOp()
+
+suspend fun currentTaskCommandId(): String? = kotlin.coroutines.coroutineContext[TaskStatusElement]?.commandId
