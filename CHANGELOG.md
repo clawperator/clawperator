@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.9.2] - 2026-04-27
+
+This release makes `open_app` wait for the launched app to reach the foreground by default, with an explicit opt-out and navigation timeout controls for flows that need it.
+
+### 🤖 Node API & CLI
+- **Changed:** Updated `open_app` to wait for the launched package to reach the foreground by default, with `skipNavigationWait` to opt out and navigation timeout controls.
+
+### 📚 Documentation & Website
+- **Changed:** Documented the default `open_app` foreground readiness behavior and the opt-out flag in the public actions reference.
+
+### 📱 Android Operator APK
+- **Changed:** Extended the operator task runner so launching an app can wait until the target package is in the foreground before continuing.
+
+Pull requests:
+- [feat(node, android): wait for open_app foreground by default](https://github.com/clawperator/clawperator/pull/245)
+
 ## [0.9.1] - 2026-04-27
 
 This release makes the framed `SkillResult` contract stricter at parse time by requiring a `result` field whenever framed output is validated.
