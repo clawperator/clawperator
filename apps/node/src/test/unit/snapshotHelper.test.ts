@@ -1,13 +1,18 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { extractSnapshotFromLogs, extractSnapshotsFromLogs } from "../../domain/executions/snapshotHelper.js";
+import {
+  extractSnapshotFromLogs,
+  extractSnapshotRecordsFromLogs,
+  extractSnapshotsForCommand,
+  extractSnapshotsFromLogs,
+} from "../../domain/executions/snapshotHelper.js";
 
 describe("extractSnapshotFromLogs", () => {
   it("extracts hierarchy xml from logcat -v tag output with abbreviated tags", () => {
     const lines = [
       "D/w       : [TaskRunnerManager] Task execution started",
       "D/E       : [TaskScope] Logging UI tree",
-      "D/E       : [TaskScope] UI Hierarchy:",
+      "D/E       : [TaskScope] UI Hierarchy [commandId=cmd-1]:",
       "D/E       : <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
       "D/E       : <hierarchy rotation=\"0\">",
       "D/E       :   <node index=\"0\" text=\"Settings\" resource-id=\"android:id/title\" />",
@@ -28,7 +33,7 @@ describe("extractSnapshotFromLogs", () => {
 
   it("preserves colons in marker and hierarchy lines", () => {
     const lines = [
-      "D/E       : [TaskScope] UI Hierarchy:",
+      "D/E       : [TaskScope] UI Hierarchy [commandId=cmd-1]:",
       "D/E       : <hierarchy rotation=\"0\">",
       "D/E       :   <node index=\"0\" text=\"UTC: Brisbane\" resource-id=\"android:id/title\" />",
       "D/E       : </hierarchy>",
@@ -46,7 +51,7 @@ describe("extractSnapshotFromLogs", () => {
 
   it("drops interleaved Configuration log lines from full TaskScopeDefault snapshots", () => {
     const lines = [
-      "D/TaskScopeDefault: [TaskScope] UI Hierarchy:",
+      "D/TaskScopeDefault: [TaskScope] UI Hierarchy [commandId=cmd-1]:",
       "D/TaskScopeDefault: <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
       "D/TaskScopeDefault: <hierarchy rotation=\"0\">",
       "V/Configuration: Updating configuration, locales updated from [] to [en_US]",
@@ -67,7 +72,7 @@ describe("extractSnapshotFromLogs", () => {
 
   it("drops multiple interleaved Configuration log lines at different depths", () => {
     const lines = [
-      "D/TaskScopeDefault: [TaskScope] UI Hierarchy:",
+      "D/TaskScopeDefault: [TaskScope] UI Hierarchy [commandId=cmd-1]:",
       "D/TaskScopeDefault: <hierarchy rotation=\"0\">",
       "V/Configuration: Updating configuration, locales updated from [] to [en_US]",
       "D/TaskScopeDefault:   <node index=\"0\" text=\"Root\">",
@@ -95,7 +100,7 @@ describe("extractSnapshotFromLogs", () => {
   it("ignores non-snapshot log lines before the hierarchy marker", () => {
     const lines = [
       "V/Configuration: Updating configuration before snapshot",
-      "D/TaskScopeDefault: [TaskScope] UI Hierarchy:",
+      "D/TaskScopeDefault: [TaskScope] UI Hierarchy [commandId=cmd-1]:",
       "D/TaskScopeDefault: <hierarchy rotation=\"0\">",
       "D/TaskScopeDefault:   <node index=\"0\" text=\"Settings\" />",
       "D/TaskScopeDefault: </hierarchy>",
@@ -113,7 +118,7 @@ describe("extractSnapshotFromLogs", () => {
 
   it("ignores non-snapshot log lines after the hierarchy closes", () => {
     const lines = [
-      "D/TaskScopeDefault: [TaskScope] UI Hierarchy:",
+      "D/TaskScopeDefault: [TaskScope] UI Hierarchy [commandId=cmd-1]:",
       "D/TaskScopeDefault: <hierarchy rotation=\"0\">",
       "D/TaskScopeDefault:   <node index=\"0\" text=\"Settings\" />",
       "D/TaskScopeDefault: </hierarchy>",
@@ -132,7 +137,7 @@ describe("extractSnapshotFromLogs", () => {
 
   it("drops untagged lines while a snapshot block is open", () => {
     const lines = [
-      "D/TaskScopeDefault: [TaskScope] UI Hierarchy:",
+      "D/TaskScopeDefault: [TaskScope] UI Hierarchy [commandId=cmd-1]:",
       "D/TaskScopeDefault: <hierarchy rotation=\"0\">",
       "Updating configuration, locales updated from [] to [en_US]",
       "D/TaskScopeDefault:   <node index=\"0\" text=\"Settings\" />",
@@ -172,7 +177,7 @@ describe("extractSnapshotFromLogs", () => {
 
   it("handles the exact logcat line format the Android app emits (D/E tag prefix)", () => {
     const lines = [
-      "D/E       : [TaskScope] UI Hierarchy:",
+      "D/E       : [TaskScope] UI Hierarchy [commandId=cmd-1]:",
       "D/E       : <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
       "D/E       : <hierarchy rotation=\"0\">",
       "D/E       :   <node index=\"0\" text=\"\" resource-id=\"\" class=\"android.widget.FrameLayout\" package=\"com.android.vending\" content-desc=\"\" clickable=\"false\" enabled=\"true\" bounds=\"[0,0][1080,2340]\" />",
@@ -188,7 +193,7 @@ describe("extractSnapshotFromLogs", () => {
 
   it("extracts hierarchy xml from live logcat time-format TaskScopeDefault lines", () => {
     const lines = [
-      "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+      "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-1]:",
       "04-25 20:14:52.454 D/TaskScopeDefault(29817): <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
       "04-25 20:14:52.455 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
       "04-25 20:14:52.456 V/Configuration(29817): Updating configuration, locales updated from [] to [en_US]",
@@ -209,7 +214,7 @@ describe("extractSnapshotFromLogs", () => {
 
   it("extracts hierarchy xml from live logcat time-format PID/TID lines", () => {
     const lines = [
-      "04-25 20:14:52.453 29817 29817 D TaskScopeDefault: [TaskScope] UI Hierarchy:",
+      "04-25 20:14:52.453 29817 29817 D TaskScopeDefault: [TaskScope] UI Hierarchy [commandId=cmd-1]:",
       "04-25 20:14:52.454 29817 29817 D TaskScopeDefault: <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>",
       "04-25 20:14:52.455 29817 29817 D TaskScopeDefault: <hierarchy rotation=\"0\">",
       "04-25 20:14:52.456 29817 29817 V Configuration: Updating configuration, locales updated from [] to [en_US]",
@@ -230,11 +235,11 @@ describe("extractSnapshotFromLogs", () => {
 
   it("returns the latest snapshot and preserves all snapshots in order", () => {
     const lines = [
-      "D/E       : [TaskScope] UI Hierarchy:",
+      "D/E       : [TaskScope] UI Hierarchy [commandId=cmd-1]:",
       "D/E       : <hierarchy rotation=\"0\">",
       "D/E       :   <node index=\"0\" text=\"First\" />",
       "D/E       : </hierarchy>",
-      "D/E       : [TaskScope] UI Hierarchy:",
+      "D/E       : [TaskScope] UI Hierarchy [commandId=cmd-1]:",
       "D/E       : <hierarchy rotation=\"0\">",
       "D/E       :   <node index=\"0\" text=\"Second\" />",
       "D/E       : </hierarchy>",
@@ -248,5 +253,60 @@ describe("extractSnapshotFromLogs", () => {
       extractSnapshotFromLogs(lines),
       '<hierarchy rotation="0">\n  <node index="0" text="Second" />\n</hierarchy>',
     );
+  });
+
+  it("parses the new commandId-tagged marker format", () => {
+    const lines = [
+      "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-new]:",
+      "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+      "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node index=\"0\" text=\"Tagged\" />",
+      "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+    ];
+
+    assert.deepStrictEqual(extractSnapshotRecordsFromLogs(lines), [
+      {
+        commandId: "cmd-new",
+        snapshot: '<hierarchy rotation="0">\n  <node index="0" text="Tagged" />\n</hierarchy>',
+      },
+    ]);
+  });
+
+  it("ignores the legacy untagged marker format", () => {
+    const lines = [
+      "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+      "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+      "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node index=\"0\" text=\"Legacy\" />",
+      "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+    ];
+
+    assert.deepStrictEqual(extractSnapshotRecordsFromLogs(lines), []);
+  });
+
+  it("filters interleaved commandId-tagged blocks down to the matching command", () => {
+    const lines = [
+      "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-other]:",
+      "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+      "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node index=\"0\" text=\"Other\" />",
+      "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+      "04-25 20:14:52.457 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-target]:",
+      "04-25 20:14:52.458 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+      "04-25 20:14:52.459 D/TaskScopeDefault(29817):   <node index=\"0\" text=\"Target\" />",
+      "04-25 20:14:52.460 D/TaskScopeDefault(29817): </hierarchy>",
+    ];
+
+    assert.deepStrictEqual(extractSnapshotsForCommand(lines, "cmd-target"), [
+      '<hierarchy rotation="0">\n  <node index="0" text="Target" />\n</hierarchy>',
+    ]);
+  });
+
+  it("returns no snapshots when only other commandIds are present", () => {
+    const lines = [
+      "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-other]:",
+      "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+      "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node index=\"0\" text=\"Other\" />",
+      "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+    ];
+
+    assert.deepStrictEqual(extractSnapshotsForCommand(lines, "cmd-target"), []);
   });
 });

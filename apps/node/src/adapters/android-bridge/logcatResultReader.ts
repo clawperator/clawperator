@@ -22,8 +22,78 @@ export type LogcatResult =
   | { ok: false; broadcastFailed: true; diagnostics: BroadcastDiagnostics }
   | { ok: false; error: string; code?: string };
 
-function isSnapshotLogLine(line: string): boolean {
-  return line.includes("TaskScopeDefault");
+interface ParsedLogcatLine {
+  tag: string | null;
+  message: string;
+}
+
+interface SnapshotMarkerMatch {
+  commandId?: string;
+  tag: string | null;
+}
+
+function parseLogcatLine(line: string): ParsedLogcatLine | null {
+  const timeFormatMatch = line.match(
+    /^\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+[A-Z]\/([^(]+)(?:\(\s*\d+\))?:\s?(.*)$/
+  );
+  if (timeFormatMatch) {
+    return {
+      tag: timeFormatMatch[1].trim(),
+      message: timeFormatMatch[2] ?? "",
+    };
+  }
+
+  const timeFormatPidTidMatch = line.match(
+    /^\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+\d+\s+\d+\s+[A-Z]\s+([^:]+):\s?(.*)$/
+  );
+  if (timeFormatPidTidMatch) {
+    return {
+      tag: timeFormatPidTidMatch[1].trim(),
+      message: timeFormatPidTidMatch[2] ?? "",
+    };
+  }
+
+  if (/^[A-Z]\//.test(line)) {
+    const delimiterIndex = line.indexOf(":");
+    if (delimiterIndex !== -1) {
+      const tag = line.slice(2, delimiterIndex).trim();
+      const message = line.slice(delimiterIndex + 1);
+      return {
+        tag,
+        message: message.startsWith(" ") ? message.slice(1) : message,
+      };
+    }
+  }
+
+  const trimmed = line.trim();
+  return trimmed.length > 0 ? { tag: null, message: trimmed } : null;
+}
+
+function parseSnapshotMarker(line: string): SnapshotMarkerMatch | null {
+  const parsed = parseLogcatLine(line);
+  if (parsed === null) {
+    return null;
+  }
+
+  const newFormatMatch = parsed.message.match(/^\[TaskScope\] UI Hierarchy \[commandId=([^\]]+)]:/);
+  if (!newFormatMatch) {
+    return null;
+  }
+
+  return {
+    commandId: newFormatMatch[1],
+    tag: parsed.tag,
+  };
+}
+
+function shouldEndSnapshotBlock(line: string, activeTag: string | null): boolean {
+  const parsed = parseLogcatLine(line);
+  if (parsed === null || parsed.tag !== activeTag) {
+    return true;
+  }
+
+  const trimmed = parsed.message.trim();
+  return trimmed.startsWith("[") && !trimmed.startsWith("<?xml") && !trimmed.startsWith("<");
 }
 
 const SIGNAL_BROADCAST_REPLAY_DRAIN_MS = 25;
@@ -63,7 +133,6 @@ export async function waitForResultEnvelope(
     const correlatedLines: string[] = [];
     const snapshotLogLines: string[] = [];
     let broadcastStatus: BroadcastStatus = "not_sent";
-    let captureSnapshotLines = false;
     let pending = "";
     let settled = false;
     let stderrBuffer = "";
@@ -71,11 +140,11 @@ export async function waitForResultEnvelope(
     let broadcastStartTimer: NodeJS.Timeout | undefined;
     let signalBroadcastStartTimer: NodeJS.Timeout | undefined;
     let signalBroadcastMaxTimer: NodeJS.Timeout | undefined;
-    let snapshotCaptureStartTimer: NodeJS.Timeout | undefined;
     let broadcastStarted = false;
     let dispatchCaptureStarted = false;
-    let forcedReplayDrainDispatch = false;
     let stdoutObserved = false;
+    let activeSnapshotTag: string | null = null;
+    let activeSnapshotCaptured = false;
 
     config.logger?.emit({
       ts: new Date().toISOString(),
@@ -101,9 +170,6 @@ export async function waitForResultEnvelope(
       }
       if (signalBroadcastMaxTimer !== undefined) {
         clearTimeout(signalBroadcastMaxTimer);
-      }
-      if (snapshotCaptureStartTimer !== undefined) {
-        clearTimeout(snapshotCaptureStartTimer);
       }
       cancelSignal?.removeEventListener("abort", abortHandler);
       resolve(result);
@@ -163,19 +229,6 @@ export async function waitForResultEnvelope(
       }
       pending = "";
       dispatchCaptureStarted = true;
-      if (forcedReplayDrainDispatch) {
-        // The max-drain path means stdout stayed noisy long enough that some
-        // `logcat -T 1` replay may still be arriving. Delay snapshot capture
-        // by the normal drain window, while still accepting the result envelope
-        // immediately. A real snapshot_ui traversal is much slower than this
-        // guard window, and the tradeoff prevents stale replayed hierarchy XML
-        // from being attached to the fresh command.
-        snapshotCaptureStartTimer = setTimeout(() => {
-          captureSnapshotLines = true;
-        }, SIGNAL_BROADCAST_REPLAY_DRAIN_MS);
-      } else {
-        captureSnapshotLines = true;
-      }
       broadcastStatus = "sent";
       startTimeout();
     };
@@ -240,10 +293,28 @@ export async function waitForResultEnvelope(
       const lines = pending.split("\n");
       pending = lines.pop() ?? "";
       for (const line of lines) {
-        if (isSnapshotLogLine(line)) {
+        const snapshotMarker = parseSnapshotMarker(line);
+        if (snapshotMarker !== null) {
           correlatedLines.push(line);
-          if (captureSnapshotLines) {
+          activeSnapshotTag = snapshotMarker.tag;
+          activeSnapshotCaptured = snapshotMarker.commandId === commandId;
+          if (activeSnapshotCaptured) {
             snapshotLogLines.push(line);
+          }
+        } else if (activeSnapshotTag !== null) {
+          correlatedLines.push(line);
+          if (shouldEndSnapshotBlock(line, activeSnapshotTag)) {
+            activeSnapshotTag = null;
+            activeSnapshotCaptured = false;
+          } else {
+            if (activeSnapshotCaptured) {
+              snapshotLogLines.push(line);
+            }
+            const parsed = parseLogcatLine(line);
+            if (parsed?.message.trim() === "</hierarchy>") {
+              activeSnapshotTag = null;
+              activeSnapshotCaptured = false;
+            }
           }
         }
         if (
@@ -278,7 +349,6 @@ export async function waitForResultEnvelope(
         if (!stdoutObserved) {
           stdoutObserved = true;
           signalBroadcastMaxTimer = setTimeout(() => {
-            forcedReplayDrainDispatch = true;
             startBroadcast();
           }, SIGNAL_BROADCAST_MAX_DRAIN_MS);
         }
@@ -290,7 +360,6 @@ export async function waitForResultEnvelope(
           clearTimeout(signalBroadcastStartTimer);
         }
         signalBroadcastStartTimer = setTimeout(() => {
-          forcedReplayDrainDispatch = false;
           startBroadcast();
         }, SIGNAL_BROADCAST_REPLAY_DRAIN_MS);
       }

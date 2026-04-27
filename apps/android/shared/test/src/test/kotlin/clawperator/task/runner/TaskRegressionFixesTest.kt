@@ -21,6 +21,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.advanceUntilIdle
+import timber.log.Timber
 import java.lang.reflect.Proxy
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.test.Test
@@ -304,6 +305,52 @@ class TaskRegressionFixesTest : ActionTest {
         }
 
     @Test
+    fun `logUiTree emits commandId-tagged hierarchy marker without changing XML`() =
+        actionTest {
+            val hierarchyDump =
+                """
+                <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+                <hierarchy rotation="0">
+                  <node index="0" text="Settings" />
+                </hierarchy>
+                """.trimIndent()
+            val logTree = RecordingTimberTree()
+            Timber.plant(logTree)
+            try {
+                val taskScope =
+                    TaskScopeDefault(
+                        appsRepository = unusedProxy(),
+                        triggerManager = unusedProxy(),
+                        appCloseManager = unusedProxy(),
+                        uiTreeInspector = HierarchyDumpUiTreeInspector(hierarchyDump),
+                        uiTreeFilterer = IdentityUiTreeFilterer,
+                        uiTreeFormatter = unusedProxy(),
+                        taskUiScope = unusedProxy(),
+                        urlNavigator = unusedProxy(),
+                        coroutineScopeIo = backgroundScope,
+                    )
+
+                val result =
+                    withContext(EmptyCoroutineContext + TaskStatusElement(TaskStatusSinkNoOp(), "cmd-snapshot-log")) {
+                        taskScope.logUiTree(TaskRetry.None)
+                    }
+
+                val hierarchyMessage =
+                    logTree.messages.single { (_, message) ->
+                        message.startsWith("[TaskScope] UI Hierarchy [commandId=cmd-snapshot-log]:")
+                    }.second
+
+                assertEquals(UiSnapshotActualFormat.HierarchyXml, result.actualFormat)
+                assertEquals(
+                    "[TaskScope] UI Hierarchy [commandId=cmd-snapshot-log]:\n$hierarchyDump",
+                    hierarchyMessage,
+                )
+            } finally {
+                Timber.uproot(logTree)
+            }
+        }
+
+    @Test
     fun `enterText emits clear failure context when setText fails`() =
         actionTest {
             val events = mutableListOf<TaskEvent>()
@@ -518,6 +565,32 @@ private class SequenceUiTreeInspector(
     }
 
     override suspend fun getCurrentUiHierarchyDump(): String? = null
+}
+
+private class HierarchyDumpUiTreeInspector(
+    private val hierarchyDump: String,
+    private val metadata: UiWindowMetadata? = null,
+) : UiTreeInspector {
+    override suspend fun getCurrentUiElements() = error("unused in test")
+
+    override suspend fun getCurrentUiTree(): UiTree? = null
+
+    override suspend fun getCurrentWindowMetadata(): UiWindowMetadata? = metadata
+
+    override suspend fun getCurrentUiHierarchyDump(): String = hierarchyDump
+}
+
+private class RecordingTimberTree : Timber.Tree() {
+    val messages = mutableListOf<Pair<String?, String>>()
+
+    override fun log(
+        priority: Int,
+        tag: String?,
+        message: String,
+        t: Throwable?,
+    ) {
+        messages += tag to message
+    }
 }
 
 private fun testNode(

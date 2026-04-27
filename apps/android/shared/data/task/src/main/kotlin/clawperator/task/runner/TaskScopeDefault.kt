@@ -245,7 +245,8 @@ class TaskScopeDefault(
                     ?: throw IllegalStateException(
                         "SNAPSHOT_HIERARCHY_UNAVAILABLE: UI hierarchy dump not available; accessibility service may not be ready",
                     )
-                Log.d("$TAG UI Hierarchy:\n$hierarchyDump")
+                val commandId = currentTaskCommandId() ?: "unknown"
+                Log.d("$TAG UI Hierarchy [commandId=$commandId]:\n$hierarchyDump")
                 val nodeCount = countNodesInHierarchyDump(hierarchyDump)
                 val maxDepth = maxDepthInHierarchyDump(hierarchyDump)
                 val actualFormat = UiSnapshotActualFormat.HierarchyXml
