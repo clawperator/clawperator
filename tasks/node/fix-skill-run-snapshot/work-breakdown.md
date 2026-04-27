@@ -32,8 +32,12 @@ commandId-tagged snapshot log lines. Do not start PR-2 work until PR-1 is merged
 - `skipNavigationWait` must default to `false` at every layer: Kotlin data class
   default, Android parser absent-field handling, and Node contract default.
   Do not leave any layer with opt-in behavior as the default.
-- The navigation wait must reuse `TaskScopeDefault.waitForNavigation` exactly as
-  it exists. Do not write a new polling loop.
+- The navigation wait must reuse `TaskScopeDefault.waitForNavigation` as the
+  canonical polling logic. However, current code does not satisfy when
+  `initialPackage == expectedPackage`; PR-1 must add an open-app-safe allowance
+  for the already-foreground case, either through an internal helper option or an
+  explicit fast path. Keep the existing public `wait_for_navigation` behavior
+  covered by tests if the helper signature changes.
 - Android unit tests for Phase 1 behavior must ship in the same commit as the
   Android behavior change. Do not defer them.
 - Node unit tests for Phase 2 behavior must ship in the same commit as the Node
@@ -43,11 +47,12 @@ commandId-tagged snapshot log lines. Do not start PR-2 work until PR-1 is merged
 - Do not edit `sites/docs/.build/` directly. If docs regeneration is needed,
   run the docs-build workflow. In practice, `docs/api/actions.md` is authored
   source and does not require regeneration unless it feeds a generated page.
-- One commit per logical step. Do not batch Android contract changes, engine
-  changes, and test changes into one commit.
-- If device testing reveals the 15 000 ms timeout is insufficient on a slow device,
-  the fix is a separate `navigationTimeoutMs` param. Do not increase the global
-  `open_app` timeout without explicit approval.
+- One commit per logical step is preferred, but the Android behavior and the unit
+  tests that prove it may ship in one coherent commit if splitting them would leave
+  an intermediate commit with a changed contract and no regression coverage.
+- Do not increase the global `open_app` execution timeout to paper over slow
+  foreground transitions. Use an explicit navigation wait timeout source instead
+  so launch dispatch and foreground readiness remain independently understandable.
 - Use the `.dev` Operator APK and `--operator-package com.clawperator.operator.dev`
   for all device validation unless explicitly told otherwise.
 
@@ -60,7 +65,7 @@ Read these files IN THIS ORDER before writing anything.
 | `tasks/node/fix-skill-run-snapshot/plan.md` | Stable contract, scope boundaries, and decision rules |
 | `apps/node/src/contracts/execution.ts` | Current `open_app` action params type - add `skipNavigationWait` here |
 | `apps/node/src/domain/actions/openApp.ts` | Current Node builder for `open_app` |
-| `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngineDefault.kt` | `executeOpenApp` entry point - where the wait call is inserted |
+| `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt` | `UiActionEngineDefault.executeOpenApp` entry point - where the wait call is inserted |
 | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/TaskScopeDefault.kt` | `waitForNavigation` implementation (lines 374-430) and `logUiTree` (lines 230-309) |
 | `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/agent/AgentCommandParser.kt` | Where `skipNavigationWait` must be parsed (lines 95-100 area) |
 | `apps/node/src/adapters/android-bridge/logcatResultReader.ts` | `captureSnapshotLines` gate and `beginDispatchCapture` (for Phase 3) |
@@ -90,32 +95,45 @@ opt-out. Ship Android unit tests in the same commit.
 
 ### Files to Change
 
-- `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/agent/`
+- `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiAction.kt`
   - The `UiAction.OpenApp` data class - add `skipNavigationWait: Boolean = false`
-  - `AgentCommandParser.kt` - parse `skipNavigationWait` from incoming command JSON;
-    treat absent field as `false`
-- `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngineDefault.kt`
+    and the explicit navigation timeout source if used
+- `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/agent/AgentCommandParser.kt`
+  - parse `skipNavigationWait` from incoming command JSON; treat absent field as
+    `false`
+- `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt`
   - `executeOpenApp` - after `taskScope.openApp(...)` succeeds, call
     `taskScope.waitForNavigation(expectedPackage = action.applicationId, timeoutMs = ...)`
     unless `action.skipNavigationWait == true`
+- `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/TaskScope.kt`
+  and `TaskScopeDefault.kt` if needed to support the already-foreground open-app
+  case without changing the public `wait_for_navigation` semantics
 - Android unit test file for `UiActionEngineDefault` (locate existing test or
   create adjacent to the class)
 
 ### Steps
 
-1. Read `UiActionEngineDefault.kt` `executeOpenApp` and `TaskScopeDefault.kt`
+1. Read `UiActionEngine.kt` `executeOpenApp` and `TaskScopeDefault.kt`
    `waitForNavigation` fully before writing anything. Confirm `waitForNavigation`
    is accessible from the engine call site and accepts an `expectedPackage` and
-   `timeoutMs` argument.
-2. Add `skipNavigationWait: Boolean = false` to `UiAction.OpenApp`.
+   `timeoutMs` argument. Also confirm the current already-foreground behavior and
+   decide the smallest implementation that makes `open_app` idempotent without
+   weakening explicit `wait_for_navigation`.
+2. Add `skipNavigationWait: Boolean = false` to `UiAction.OpenApp`. Add a
+   deterministic navigation timeout source, preferably
+   `navigationTimeoutMs: Long = 15_000`, because `OpenApp` does not currently have
+   `action.timeoutMs`.
 3. Update `AgentCommandParser.kt` to read `skipNavigationWait` from the command
-   JSON. Absent field must parse as `false`.
+   JSON. Absent field must parse as `false`. If `navigationTimeoutMs` is added,
+   parse it from params, reject invalid values, and default absent values to
+   15 000 ms.
 4. In `executeOpenApp`, after the existing `taskScope.openApp(...)` call succeeds,
    add: if `!action.skipNavigationWait`, call `taskScope.waitForNavigation(...)`.
-   Use the remaining timeout budget (subtract intent-dispatch time from
-   `action.timeoutMs`). If `waitForNavigation` throws or times out, return a step
-   failure with a clear error message that is distinct from an intent dispatch
-   failure.
+   Use the explicit navigation timeout from the action model. If
+   `waitForNavigation` returns `success=false`, return a step failure with
+   `error = "NAVIGATION_TIMEOUT"` or a more specific open-app navigation code.
+   Do not throw for this case. Include `application_id`, `last_package`, and
+   `navigation_elapsed_ms` when available.
 5. Add Android unit tests:
    - `open_app skipNavigationWait=false`: mock `waitForNavigation` to succeed;
      confirm it is called after intent dispatch; confirm step returns `success=true`.
@@ -124,16 +142,21 @@ opt-out. Ship Android unit tests in the same commit.
    - `open_app skipNavigationWait=false, waitForNavigation times out`: confirm step
      returns `success=false` with a navigation-timeout error message.
    - `open_app skipNavigationWait absent in JSON`: confirm it parses as `false`.
+   - `open_app target already foreground`: confirm the action succeeds without
+     timing out. If this required a helper option, also confirm explicit
+     `wait_for_navigation` still preserves its previous transition semantics.
 6. Build and run Android unit tests before committing.
 
 ### Acceptance Criteria
 
 Mechanical:
 - `./gradlew app:assembleDebug` succeeds with no new warnings
-- `./gradlew app:testDebugUnitTest` passes, including all four new test cases
-- `UiAction.OpenApp` has `skipNavigationWait: Boolean = false`
+- `./gradlew app:testDebugUnitTest` passes, including all new test cases
+- `UiAction.OpenApp` has `skipNavigationWait: Boolean = false` and an explicit
+  navigation timeout source if the implementation needs one
 - `AgentCommandParser` parses `skipNavigationWait` and defaults to `false` when absent
 - `executeOpenApp` calls `waitForNavigation` when `skipNavigationWait` is false
+- the already-foreground case succeeds instead of timing out
 
 Human review:
 - The wait call is conditional and uses the existing `waitForNavigation` - no new
@@ -171,9 +194,10 @@ Navigation timeout returns a step failure distinct from intent dispatch failure.
 ```
 test(android): add unit tests for open_app navigation wait behavior
 
-Four cases: skipNavigationWait=false (wait called), skipNavigationWait=true
+Cases: skipNavigationWait=false (wait called), skipNavigationWait=true
 (wait not called), waitForNavigation timeout (step fails), absent field (parses
-as false).
+as false), and already-foreground open_app succeeds without waiting for a package
+transition.
 ```
 
 ---
@@ -194,10 +218,13 @@ Validate on device. Remove compensatory sleeps from affected skills.
 
 - `apps/node/src/contracts/execution.ts` - add `skipNavigationWait?: boolean` to
   `open_app` action params
+- `apps/node/src/domain/executions/validateExecution.ts` - add the new params to
+  `actionParamsSchema`, with type and range validation
 - `apps/node/src/domain/actions/openApp.ts` - thread `skipNavigationWait` through
   the builder (default `false` when not supplied)
-- CLI: if `open-app` exists as a standalone CLI command, add `--skip-navigation-wait`
-  flag; check `apps/node/src/cli/registry.ts` to confirm
+- CLI: `open-app` and `open_app` are synonyms for the `open` command in
+  `apps/node/src/cli/registry.ts`; if exposing the opt-out on CLI, add
+  `--skip-navigation-wait` to that command and pass it through `cmdActionOpenApp`
 - `apps/node/src/test/unit/` - Node unit tests for the contract changes (find the
   relevant existing test file or create a focused one)
 - `docs/api/actions.md` - update `open_app` entry
@@ -214,31 +241,39 @@ of the skill changes uses `clawperator skills run` against the updated recipe fi
 ### Steps
 
 1. Add `skipNavigationWait?: boolean` to `open_app` params in `execution.ts`.
+   If Phase 1 added `navigationTimeoutMs`, add `navigationTimeoutMs?: number`
+   there too.
 2. Update `openApp.ts` builder to pass `skipNavigationWait` through to the action.
    When the caller does not supply it, the field must be absent or explicitly
    `false` - do not default to `true`.
-3. Check `apps/node/src/cli/registry.ts` for an `open-app` command entry. If it
-   exists as a standalone command, add `--skip-navigation-wait` boolean flag.
-   If `open_app` is only used inside recipe JSON and not as a direct CLI command,
-   skip this step and note it in the commit message.
-4. Add Node unit tests:
+3. Update `validateExecution.ts` so `skipNavigationWait` is accepted only as a
+   boolean. If `navigationTimeoutMs` exists, validate it as a non-negative number
+   within the same action-timeout bounds used by comparable fields.
+4. Update `apps/node/src/cli/registry.ts` and `apps/node/src/cli/commands/action.ts`
+   if the opt-out is exposed on CLI. Add `--skip-navigation-wait` to the `open`
+   command's supported flags and pass it through the builder for package targets
+   only. URL/URI opens must ignore or reject the flag deterministically.
+5. Add Node unit tests:
    - `openApp.ts` builder with no `skipNavigationWait` supplied: confirm field is
      `false` or absent in the resulting action object.
    - `openApp.ts` builder with `skipNavigationWait: true`: confirm field is `true`
      in the resulting action object.
-5. Update `docs/api/actions.md` `open_app` entry:
+   - `validateExecution` rejects non-boolean `skipNavigationWait`.
+   - if CLI support is added: valid flag passes through; invalid/missing values and
+     global vs command-local placement preserve the JSON and exit-code contracts.
+6. Update `docs/api/actions.md` `open_app` entry:
    - State that `open_app` now blocks until the launched package is the active
      accessibility window before returning success.
    - Describe `skipNavigationWait` and when to use it.
    - State that success means package-foreground readiness, not content-level
      readiness. Callers that need a specific element present should follow with
      `wait_for_node`.
-6. Build and test Node before device validation:
+7. Build and test Node before device validation:
    ```bash
    npm --prefix apps/node run build
    npm --prefix apps/node run test
    ```
-7. Device validation (requires debug APK from Phase 1 installed):
+8. Device validation (requires debug APK from Phase 1 installed):
    a. **Baseline:** Before testing the fix, run a recipe with `skipNavigationWait: true`
       (old behavior) 5 times on the Samsung device. Record how many runs produce
       `SNAPSHOT_EXTRACTION_FAILED`. This confirms the race is reproducible and
@@ -253,7 +288,7 @@ of the skill changes uses `clawperator skills run` against the updated recipe fi
       consecutive runs succeed.**
    e. These numeric thresholds are the hard pass gate. Do not proceed to step 8
       unless both device pass criteria are met.
-8. Remove the fixed sleep actions from affected skill recipes. Confirm the full
+9. Remove the fixed sleep actions from affected skill recipes. Confirm the full
    skill runs end-to-end on device without `SNAPSHOT_EXTRACTION_FAILED` after removal.
 
 ### Acceptance Criteria
@@ -262,6 +297,7 @@ Mechanical:
 - `npm --prefix apps/node run build` succeeds
 - `npm --prefix apps/node run test` passes, including new contract tests
 - `execution.ts` `open_app` params has `skipNavigationWait?: boolean`
+- `validateExecution.ts` accepts the new params with strict type/range checks
 - `openApp.ts` defaults to `skipNavigationWait: false` when not supplied
 - `docs/api/actions.md` describes the new readiness contract and `skipNavigationWait`
 - Affected skill recipes do not contain fixed sleeps after `open_app`
@@ -349,8 +385,13 @@ Files:
   `logUiTree` (lines 230-309)
 
 1. Confirm that the `commandId` (or equivalent task identifier) is accessible in
-   scope at the log site in `logUiTree`. If it must be threaded through from
-   `executeSnapshotUi`, add it as a parameter to `logUiTree`.
+   scope at the log site in `logUiTree`. Current code does not expose commandId
+   through `TaskScopeDefault`; `TaskStatusElement` carries only a `TaskStatusSink`,
+   and `UiActionPlan.commandId` is visible to the engine but not to `TaskScope`.
+   Likely implementation options are: add `commandId`/`taskId` to the task
+   coroutine context, or thread command identity through `TaskScope.logUiTree`.
+   Pick one canonical path and update tests. Do not assume commandId is already
+   available in `TaskScopeDefault`.
 2. Change the log marker from:
    `"[TaskScope] UI Hierarchy:\n$xmlDump"`
    to:
@@ -366,14 +407,20 @@ Files:
 1. Update `isSnapshotLogLine` (line 26) to accept both the new format
    (`[TaskScope] UI Hierarchy [commandId=...]`) and the old format
    (`[TaskScope] UI Hierarchy:`). Both must match.
-2. Update `extractSnapshotsFromLogs` to extract and return the `commandId` from
-   the new marker format when present.
-3. In the snapshot-to-step matching logic, when a `commandId` is present in the
-   log line, use it to filter: only attach the snapshot to the execution whose
-   `commandId` matches. When `commandId` is absent (old format), fall back to
-   the current timing-gate behavior.
+2. Update `extractSnapshotsFromLogs` or add a structured companion helper to
+   extract `commandId` from the new marker format when present. The current helper
+   returns `string[]`; commandId filtering requires a structured result or an
+   explicit `expectedCommandId` parameter.
+3. Update `attachSnapshotsToStepResults`/runExecution flow coherently. When a
+   `commandId` is present in the log line, attach only snapshots whose commandId
+   matches the current execution. When `commandId` is absent (old format), fall
+   back to the current timing-gate behavior.
 4. The `captureSnapshotLines` gate can remain for old-format lines. New-format
-   lines with a matching commandId can be accepted regardless of gate state.
+   lines with a matching commandId can be accepted regardless of gate state, but
+   this requires changing `logcatResultReader.ts` to capture candidate hierarchy
+   blocks before `beginDispatchCapture`; a marker-only `isSnapshotLogLine` change
+   is not sufficient because XML body lines are currently captured only while the
+   gate is open.
 
 **Step 4: Add tests**
 

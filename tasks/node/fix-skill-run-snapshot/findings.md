@@ -31,7 +31,7 @@ of 750 ms and max delay of 4 s.
 
 **Android action engine**
 
-`apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngineDefault.kt`
+`apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt`
 (lines 109-119) calls `taskScope.openApp(action.applicationId, action.retry)` and
 immediately returns a `UiActionStepResult` with `success=true` and
 `data = mapOf("application_id" to ...)`. It does not wait for any UI state after
@@ -380,17 +380,20 @@ mean "the app is open," not "an intent was dispatched." Add an opt-out param
 equivalent on the CLI) for callers that explicitly want fire-and-forget behavior.
 
 **How it works:**
-- `UiActionEngineDefault.executeOpenApp` calls `triggerManager.trigger(...)` as
-  today, then immediately enters the existing `TaskScopeDefault.waitForNavigation`
+- `UiActionEngineDefault.executeOpenApp` calls `taskScope.openApp(...)` as
+  today, then enters the existing `TaskScopeDefault.waitForNavigation`
   poll loop targeting the launched `applicationId`.
 - The poll loop already exists and works (`TaskScopeDefault` lines 374-430). This
-  change is an addition to one call site in the engine.
+  change is an addition to one call site in the engine, plus a required fix or
+  allowance for the already-foreground case because the helper currently requires
+  observing a package transition when the initial package already matches.
 - If the navigation wait times out (package never reaches foreground within
-  `timeoutMs`), the step fails with a distinct error - distinguishable from an
-  intent dispatch failure.
-- The existing `timeoutMs` on `open_app` (15 000 ms) must cover both the intent
-  dispatch and the foreground wait. This timeout value may need to be increased
-  as part of the change, or split into two separate timeout params.
+  the explicit navigation wait timeout), the step fails with a distinct error -
+  distinguishable from an intent dispatch failure.
+- The Android action model does not currently have an `OpenApp.timeoutMs` field.
+  Add an explicit navigation timeout source, preferably `navigationTimeoutMs`
+  defaulting to 15 000 ms, rather than relying on the Node builder's global
+  execution timeout inside Android action code.
 - With `skipNavigationWait: true`, behavior is identical to today - intent fires
   and the step returns immediately.
 
@@ -416,8 +419,11 @@ the launcher-overlay race that causes `SNAPSHOT_EXTRACTION_FAILED` in the
 observed failures.
 
 **Edge cases:**
-- App already foreground: `waitForNavigation` satisfies in the first poll
-  (package already matches). No additional latency.
+- App already foreground: current `waitForNavigation` does not satisfy in this
+  case because `shouldSatisfyExpectedPackage` requires either an initial package
+  different from the expected package or an observed package transition. The
+  `open_app` implementation must add an already-foreground allowance while keeping
+  explicit `wait_for_navigation` behavior covered by regression tests.
 - App crashes on launch: currently this reports success (intent dispatched). With
   Option F, the step correctly fails because the package never reaches foreground.
   This is a behavior improvement.
@@ -454,9 +460,10 @@ window) is orthogonal and should still be addressed independently.
 - Still only closes the accessibility-focus-level race. Skill authors that need
   content-level readiness still need `wait_for_node`. Must document this
   distinction clearly.
-- Timeout semantics become compound: the same `timeoutMs` now covers intent
-  dispatch plus foreground wait. If the current 15 000 ms budget is tight on slow
-  devices, this needs adjustment (or a separate `navigationTimeoutMs`).
+- Timeout semantics need an explicit implementation choice: Node's `open_app`
+  builder has a 15 000 ms execution timeout, but Android `UiAction.OpenApp` has no
+  action-level `timeoutMs` today. Prefer adding `navigationTimeoutMs` to the action
+  params with a safe default instead of relying on a non-existent `action.timeoutMs`.
 - Requires Android build change and Node contract update (minor: add
   `skipNavigationWait` param, thread it through the engine).
 
@@ -539,3 +546,9 @@ is produced. Verify that a fix for failure mode 2.2 (Option D) resolves it.
    same accessibility event sequence on Samsung devices as the shortcut path, or
    whether it triggers a different animation that holds the launcher overlay for
    longer.
+
+7. **What is the narrowest commandId threading path for snapshot logs?** Static
+   code review shows `TaskScopeDefault.logUiTree` does not currently have access
+   to `UiActionPlan.commandId`; `TaskStatusElement` carries only a sink. PR-2 must
+   decide whether command identity belongs in the task coroutine context or in the
+   `TaskScope.logUiTree` method signature before changing the log marker.

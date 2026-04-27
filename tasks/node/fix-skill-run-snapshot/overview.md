@@ -32,9 +32,9 @@ after dispatch. It makes no guarantee that the target app has received accessibi
 focus, drawn its first frame, or that the accessibility tree reflects the target app.
 
 Call chain (all Android-side):
-- `UiActionEngineDefault.executeOpenApp` (`apps/android/.../UiActionEngineDefault.kt` lines 109-119) -
+- `UiActionEngineDefault.executeOpenApp` (`apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt`) -
   calls `taskScope.openApp(...)` and immediately returns `success=true`
-- `TaskScopeDefault.openApp` (`apps/android/.../TaskScopeDefault.kt` lines 131-170) -
+- `TaskScopeDefault.openApp` (`apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/TaskScopeDefault.kt`) -
   calls `triggerManager.trigger(...)`, retries cover intent dispatch only, not foreground wait
 - `TriggerManagerDefault.trigger` (`apps/android/.../TriggerManagerDefault.kt` lines 38-67) -
   fire-and-forget intent via `OpenAppManagerAndroid`
@@ -45,9 +45,19 @@ The retry preset for `open_app` is `TaskRetryPresets.AppLaunch` (max 4 attempts,
 750 ms initial delay): these retries cover shortcut lookup and intent dispatch,
 not waiting for the app to appear.
 
-`waitForNavigation` already exists in `TaskScopeDefault` (lines 374-430) and polls
+`waitForNavigation` already exists in `TaskScopeDefault` and polls
 `getCurrentWindowMetadata().foregroundPackage` every ~200 ms until the active window
 matches the expected package. It is not called by `open_app`.
+
+Important current-code caveat: `waitForNavigation` does not currently satisfy
+when `initialPackage == expectedPackage`. The helper requires either an initial
+package different from the expected package or an observed package transition.
+That behavior is reasonable for an explicit navigation wait, but it is wrong for
+`open_app` idempotency because launching an already-foreground app should not
+timeout. PR-1 must either extend the helper with an internal
+`allowAlreadyAtExpectedPackage`/equivalent option used only by `open_app`, or add
+an explicit already-foreground fast path before the open-app wait. Do not call
+the helper unchanged and assume the already-foreground case is covered.
 
 ### Failure mechanism
 
@@ -68,15 +78,18 @@ in the step result but is informational only - the runtime takes no action on it
 ### Fix: open_app blocks until the app is foreground by default
 
 Change `open_app` so that it does not return success until the launched package is
-the active accessibility window. The `waitForNavigation` poll loop already exists and
-works - this is an addition of one call after intent dispatch in `executeOpenApp`,
-not a new algorithm.
+the active accessibility window. Reuse the existing `waitForNavigation` poll loop
+instead of writing a second polling algorithm, but account for the helper's current
+already-foreground behavior described above.
 
 **Default behavior after fix:**
 `open_app` dispatches the intent, then polls `rootInActiveWindow.packageName` until
-it matches `applicationId` or the timeout is reached. Returns success only when the
-package is confirmed foreground. Returns a distinct failure if the timeout expires
-before the package becomes foreground (e.g., app crashed, intent was rejected).
+it matches `applicationId` or the navigation timeout is reached. Returns success
+only when the package is confirmed foreground. Returns a distinct step failure if
+the timeout expires before the package becomes foreground (e.g., app crashed,
+intent was rejected). Do not throw from `executeOpenApp` for a navigation timeout;
+mirror `executeWaitForNavigation` by returning `UiActionStepResult(success=false, ...)`
+so the canonical result envelope can carry the step-level failure.
 
 **Why `waitForNavigation` is the right readiness probe:**
 `waitForNavigation` and `snapshot_ui` both operate on `rootInActiveWindow`. If the
@@ -114,17 +127,21 @@ represents the best-practice pattern for content-dependent skills. Document this
 distinction in the updated `open_app` API docs.
 
 **Edge cases:**
-- App already foreground: poll satisfies on first check, no added latency.
+- App already foreground: must return success without waiting for a package
+  transition. This requires a small open-app-specific allowance because the
+  current `waitForNavigation` helper does not satisfy this case unchanged.
 - App crashes on launch: step now correctly fails instead of silently succeeding.
 - System permission dialog before app foreground: poll waits past it since the
   target package eventually receives focus. Acceptable current behavior.
 - App that launches a third package (deep link): poll times out. Caller should use
   `skipNavigationWait: true` and handle readiness themselves. Document this.
-- Timeout budget: the current `open_app` timeout is 15 000 ms. With the foreground
-  wait included, this budget now covers intent dispatch plus navigation. Measure on
-  a slow device. If 15 000 ms is insufficient, prefer a separate
-  `navigationTimeoutMs` param over increasing the global timeout, so the two phases
-  are independently tunable.
+- Timeout budget: the Node `open_app` builder currently uses a 15 000 ms
+  execution timeout, but Android `UiAction.OpenApp` has no action-level timeout
+  field today. PR-1 must introduce an explicit Android-side navigation timeout
+  source, preferably `navigationTimeoutMs` on the `open_app` params with a safe
+  default of 15 000 ms and parser bounds consistent with other action timeouts.
+  Do not reference `action.timeoutMs` for `OpenApp` unless that field is actually
+  added to the action model and contract.
 
 ### Compatibility matrix
 
@@ -151,19 +168,26 @@ handles this if the field is typed `Boolean = false`.
 ### Implementation touch points
 
 Android:
-- `UiActionEngineDefault.kt` - after `taskScope.openApp(...)` succeeds, call
+- `UiActionEngine.kt` - after `taskScope.openApp(...)` succeeds, call
   `taskScope.waitForNavigation(expectedPackage = action.applicationId, ...)` unless
-  `action.skipNavigationWait == true`
-- `UiAction.OpenApp` data class - add `skipNavigationWait: Boolean = false`
+  `action.skipNavigationWait == true`; ensure the already-foreground case succeeds
+  rather than timing out
+- `UiAction.OpenApp` data class - add `skipNavigationWait: Boolean = false` and an
+  explicit navigation timeout source such as `navigationTimeoutMs: Long = 15_000`
 - `AgentCommandParser.kt` - parse `skipNavigationWait` from the incoming command
-  (absent = `false` via default)
+  and the navigation timeout from incoming command params (absent = safe defaults)
 
 Node:
 - `apps/node/src/contracts/execution.ts` - add `skipNavigationWait?: boolean` to
-  the `open_app` action params type
-- `apps/node/src/domain/actions/openApp.ts` - thread the param through the builder
-- CLI: expose `--skip-navigation-wait` flag on the `open-app` command if it exists
-  as a standalone command, or document in the recipe format reference
+  the action params type, and add `navigationTimeoutMs?: number` if PR-1 chooses
+  that explicit timeout contract
+- `apps/node/src/domain/executions/validateExecution.ts` - add the new params to
+  `actionParamsSchema` and reject invalid types or negative timeout values
+- `apps/node/src/domain/actions/openApp.ts` - thread the params through the builder
+- CLI: `open`, `open-app`, and `open_app` all resolve through the same `open`
+  command in `apps/node/src/cli/registry.ts`; add `--skip-navigation-wait` there
+  if the opt-out is exposed on the CLI, and cover valid, missing, invalid, and
+  placement cases in CLI tests
 
 Docs:
 - Update `open_app` API docs to describe the new default readiness contract,
@@ -249,10 +273,12 @@ The root cause is that Node has no reliable way to tell whether a
 `[TaskScope] UI Hierarchy:` line belongs to the current command or was replayed from
 a previous one. The drain guard is a blunt approximation.
 
-The precise fix: embed the `commandId` (already available in the Android runtime as
-part of the task context) into the `[TaskScope] UI Hierarchy:` log line on the
-Android side. Node can then filter snapshot lines by matching commandId rather than
-relying on temporal proximity.
+The precise fix: embed the `commandId` into the `[TaskScope] UI Hierarchy:` log
+line on the Android side. Current code exposes `UiActionPlan.commandId` to
+`UiActionEngineDefault`, but `TaskScopeDefault.logUiTree` does not receive it.
+PR-2 must choose one canonical threading path before changing the marker. Node can
+then filter snapshot lines by matching commandId rather than relying on temporal
+proximity.
 
 With commandId in the log line, the drain guard becomes unnecessary for snapshot
 lines. Node can collect all `TaskScopeDefault` snapshot lines from the logcat stream
@@ -274,7 +300,10 @@ Node:
 - `captureSnapshotLines` gate - relax to collect all matching lines, filtering by
   commandId instead of the timing gate
 - `extractSnapshotsFromLogs` (`snapshotHelper.ts`) - update parser to handle the new
-  marker format and propagate commandId for filtering
+  marker format and propagate commandId for filtering. This likely requires
+  returning structured snapshot records or adding a second helper; do not overload
+  the existing `string[]` return without updating `attachSnapshotsToStepResults`
+  and its tests coherently.
 - Maintain backward compatibility with the old marker format (devices running older
   APKs that emit the old format without commandId)
 
@@ -312,11 +341,11 @@ New APK emits new format; Node uses commandId filtering for those lines.
 
 ## Open questions
 
-1. **Is the 15 000 ms `open_app` timeout sufficient with the navigation wait
-   included?** On a slow device or one under background load, intent dispatch plus
-   accessibility focus transfer may exceed this. Measure on a slow device during
-   integration testing. If needed, add `navigationTimeoutMs` as a separate param
-   so the two phases are independently tunable without changing the overall timeout.
+1. **Is the 15 000 ms default navigation timeout sufficient?** On a slow device
+   or one under background load, intent dispatch plus accessibility focus transfer
+   may exceed this. Measure on a slow device during integration testing. If the
+   default is insufficient, tune the explicit navigation timeout contract rather
+   than increasing the global execution timeout.
 
 2. **Does `appsRepository.findTriggerShortcut` use the same launch path as
    `getLaunchIntentForPackage` for unknown apps?** The fallback path may produce a

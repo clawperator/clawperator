@@ -77,9 +77,9 @@ format must continue to parse correctly.
 
 | Surface | Paths |
 | --- | --- |
-| Android action engine | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngineDefault.kt` |
+| Android action engine | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt` |
 | Android task scope | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/TaskScopeDefault.kt` |
-| Android action model | `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/agent/` (UiAction, AgentCommandParser) |
+| Android action model | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiAction.kt` and `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/agent/AgentCommandParser.kt` |
 | Node execution contract | `apps/node/src/contracts/execution.ts` |
 | Node openApp builder | `apps/node/src/domain/actions/openApp.ts` |
 | Node logcat reader | `apps/node/src/adapters/android-bridge/logcatResultReader.ts` |
@@ -94,7 +94,7 @@ format must continue to parse correctly.
 | --- | --- |
 | open_app action params | `apps/node/src/contracts/execution.ts` |
 | Android action parsing | `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/agent/AgentCommandParser.kt` |
-| Android action engine entry | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngineDefault.kt` `executeOpenApp` |
+| Android action engine entry | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt` `UiActionEngineDefault.executeOpenApp` |
 | waitForNavigation implementation | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/TaskScopeDefault.kt` lines 374-430 |
 | logcat capture gate | `logcatResultReader.ts` `captureSnapshotLines`, `beginDispatchCapture` |
 | snapshot extraction | `snapshotHelper.ts` `extractSnapshotsFromLogs` |
@@ -105,17 +105,24 @@ format must continue to parse correctly.
 
 **Deterministic** (no re-derivation):
 - The `skipNavigationWait` field defaults to `false` (absent field = wait by default)
-- The navigation wait reuses `TaskScopeDefault.waitForNavigation` - no new algorithm
+- The navigation wait reuses `TaskScopeDefault.waitForNavigation` as the canonical
+  polling logic - no new polling loop. Current code does not satisfy when
+  `initialPackage == expectedPackage`, so PR-1 must add an open-app-safe allowance
+  or fast path for the already-foreground case while preserving explicit
+  `wait_for_navigation` behavior.
 - The commandId format for the log marker is `[TaskScope] UI Hierarchy [commandId=$commandId]:` -
   implementing agent must use this exact format
 - Old marker format `[TaskScope] UI Hierarchy:` must remain parseable in the Node reader
-- `open_app` timeout budget (15 000 ms) applies to the combined intent-dispatch-plus-navigation-wait;
-  if device testing shows this is insufficient, the fix is a `navigationTimeoutMs` param, not
-  increasing the global timeout
+- Android `UiAction.OpenApp` currently has no action-level timeout field. PR-1
+  must introduce a deterministic navigation timeout source, preferably
+  `navigationTimeoutMs` with a 15 000 ms default and parser bounds consistent
+  with comparable action timeouts. Do not rely on a non-existent `action.timeoutMs`.
 
 **Judgment** (implementing agent decides):
-- Whether the commandId is accessible at the `logUiTree` log site without threading, or
-  whether it must be threaded through - read the code and decide before implementing
+- Which canonical commandId threading path PR-2 should use. Current code exposes
+  `UiActionPlan.commandId` to the engine but not to `TaskScopeDefault.logUiTree`;
+  `TaskStatusElement` carries only a sink. Decide between a task identity context
+  element and a `TaskScope.logUiTree` signature change before implementing.
 - Exact Node test file location if a new file is warranted vs. extending existing
 
 ## Decision Rules
@@ -123,10 +130,10 @@ format must continue to parse correctly.
 | Scenario | Required behavior |
 | --- | --- |
 | `skipNavigationWait` absent in command JSON | Parse as `false` (wait by default) |
-| `skipNavigationWait = false` | Dispatch intent, then call `waitForNavigation` targeting `applicationId` |
+| `skipNavigationWait = false` | Dispatch intent, then wait until the active package is `applicationId`, reusing `waitForNavigation` polling with an already-foreground allowance |
 | `skipNavigationWait = true` | Dispatch intent, return immediately (current behavior) |
 | `waitForNavigation` times out | `open_app` step fails with a navigation-timeout error distinct from intent dispatch failure |
-| App already foreground when `open_app` fires | `waitForNavigation` satisfies on first poll; no extra latency |
+| App already foreground when `open_app` fires | `open_app` succeeds without waiting for a package transition; add regression coverage because current helper behavior would otherwise timeout |
 | New APK + old Node (no field sent) | APK defaults to wait (`false`). Safe. |
 | Old APK + new Node (field sent, APK ignores) | Old behavior: no wait. Bug 1 not fixed on old APK. Expected compat gap. |
 | Log line has new commandId marker | Node extracts commandId and uses it for filtering |
@@ -150,9 +157,10 @@ format must continue to parse correctly.
 
 **PR-1:** `open_app` success means the target package is the active accessibility
 window. `open_app` failure with navigation timeout means the package never reached
-foreground within the timeout budget. `skipNavigationWait: true` opts out to
-current fire-and-forget behavior. Android and Node unit tests pass. Affected skills
-re-validated on device with fixed sleeps removed. `docs/api/actions.md` updated.
+foreground within the navigation timeout budget. `skipNavigationWait: true` opts
+out to current fire-and-forget behavior. Android and Node unit tests pass.
+Affected skills re-validated on device with fixed sleeps removed.
+`docs/api/actions.md` updated.
 
 **PR-2:** `SNAPSHOT_EXTRACTION_FAILED` does not occur when the Android runtime
 correctly logs a hierarchy dump but the log lines arrive before the Node capture
@@ -162,9 +170,10 @@ Android and Node unit tests pass.
 ## Idempotency
 
 `open_app` with `skipNavigationWait = false` is idempotent if the app is already
-foreground (navigation wait satisfies immediately). It is not idempotent if the
-app is not installed or crashes - those produce a navigation-timeout failure on
-every run, which is the correct behavior.
+foreground. The implementation must handle this explicitly because the current
+`waitForNavigation` helper does not satisfy an already-matching initial package.
+It is not idempotent if the app is not installed or crashes - those produce a
+navigation-timeout failure on every run, which is the correct behavior.
 
 The commandId log tagging change is additive. Running a recipe against an old APK
 after PR-2 Node changes land produces a timing-gate fallback for snapshot lines,
