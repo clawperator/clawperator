@@ -96,8 +96,14 @@ export function extractSnapshotRecordsFromLogs(lines: string[]): ExtractedSnapsh
 }
 
 export function extractSnapshotsForCommand(lines: string[], expectedCommandId: string): string[] {
-  return extractSnapshotRecordsFromLogs(lines)
-    .filter(record => record.commandId === undefined || record.commandId === expectedCommandId)
+  const records = extractSnapshotRecordsFromLogs(lines);
+  const commandMatches = records.filter(record => record.commandId === expectedCommandId);
+  if (commandMatches.length > 0) {
+    return commandMatches.map(record => record.snapshot);
+  }
+
+  return records
+    .filter(record => record.commandId === undefined)
     .map(record => record.snapshot);
 }
 

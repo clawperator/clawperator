@@ -302,4 +302,21 @@ describe("extractSnapshotFromLogs", () => {
       '<hierarchy rotation="0">\n  <node index="0" text="Target" />\n</hierarchy>',
     ]);
   });
+
+  it("prefers matching commandId-tagged blocks over later old-format fallback blocks", () => {
+    const lines = [
+      "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-target]:",
+      "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+      "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node index=\"0\" text=\"Tagged target\" />",
+      "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+      "04-25 20:14:52.457 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+      "04-25 20:14:52.458 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+      "04-25 20:14:52.459 D/TaskScopeDefault(29817):   <node index=\"0\" text=\"Legacy fallback\" />",
+      "04-25 20:14:52.460 D/TaskScopeDefault(29817): </hierarchy>",
+    ];
+
+    assert.deepStrictEqual(extractSnapshotsForCommand(lines, "cmd-target"), [
+      '<hierarchy rotation="0">\n  <node index="0" text="Tagged target" />\n</hierarchy>',
+    ]);
+  });
 });
