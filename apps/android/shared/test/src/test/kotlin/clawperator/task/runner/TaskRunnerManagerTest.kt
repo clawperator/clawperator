@@ -112,6 +112,7 @@ class TaskRunnerManagerTest : ActionTest {
             expectedPackage: String?,
             expectedNode: NodeMatcher?,
             timeoutMs: Long,
+            allowAlreadyForeground: Boolean,
         ): WaitForNavigationResult {
             // No-op for testing
             return WaitForNavigationResult(success = false, lastPackage = null, elapsedMs = 0)

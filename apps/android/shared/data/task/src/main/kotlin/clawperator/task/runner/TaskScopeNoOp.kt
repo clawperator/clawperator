@@ -48,6 +48,7 @@ class TaskScopeNoOp : TaskScope {
         expectedPackage: String?,
         expectedNode: NodeMatcher?,
         timeoutMs: Long,
+        allowAlreadyForeground: Boolean,
     ): WaitForNavigationResult {
         throw UnsupportedOperationException("TaskScopeNoOp does not support waitForNavigation")
     }

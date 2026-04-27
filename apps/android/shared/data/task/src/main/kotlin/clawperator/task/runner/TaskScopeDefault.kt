@@ -375,6 +375,7 @@ class TaskScopeDefault(
         expectedPackage: String?,
         expectedNode: NodeMatcher?,
         timeoutMs: Long,
+        allowAlreadyForeground: Boolean,
     ): WaitForNavigationResult {
         val startTime = getCurrentTimeMillis()
         var lastPackage: String? = null
@@ -403,6 +404,7 @@ class TaskScopeDefault(
                     initialPackage = initialPackage,
                     currentPackage = lastPackage,
                     observedDifferentPackage = observedDifferentPackage,
+                    allowAlreadyForeground = allowAlreadyForeground,
                 )
             ) {
                 return WaitForNavigationResult(
@@ -442,9 +444,13 @@ private fun shouldSatisfyExpectedPackage(
     initialPackage: String?,
     currentPackage: String?,
     observedDifferentPackage: Boolean,
+    allowAlreadyForeground: Boolean,
 ): Boolean {
     if (expectedPackage == null || currentPackage != expectedPackage) {
         return false
+    }
+    if (allowAlreadyForeground) {
+        return true
     }
     // If initial package metadata was unavailable we cannot confirm a transition
     // occurred; require observing a package change as evidence.

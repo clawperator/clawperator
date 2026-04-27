@@ -111,10 +111,49 @@ class UiActionEngineDefault(
         action: UiAction.OpenApp,
     ): UiActionStepResult {
         taskScope.openApp(action.applicationId, action.retry)
+        if (action.skipNavigationWait) {
+            return UiActionStepResult(
+                id = action.id,
+                actionType = "open_app",
+                data = mapOf(
+                    "application_id" to action.applicationId,
+                ),
+            )
+        }
+
+        val navigationResult = taskScope.waitForNavigation(
+            expectedPackage = action.applicationId,
+            expectedNode = null,
+            timeoutMs = action.navigationTimeoutMs,
+            allowAlreadyForeground = true,
+        )
+
+        if (!navigationResult.success) {
+            return UiActionStepResult(
+                id = action.id,
+                actionType = "open_app",
+                success = false,
+                data = buildMap {
+                    put("application_id", action.applicationId)
+                    put("error", "NAVIGATION_TIMEOUT")
+                    navigationResult.lastPackage?.let { put("last_package", it) }
+                    put("navigation_elapsed_ms", navigationResult.elapsedMs.toString())
+                    put(
+                        "message",
+                        "Timed out waiting for ${action.applicationId} to reach the foreground package",
+                    )
+                },
+            )
+        }
+
         return UiActionStepResult(
             id = action.id,
             actionType = "open_app",
-            data = mapOf("application_id" to action.applicationId),
+            data = buildMap {
+                put("application_id", action.applicationId)
+                put("navigation_elapsed_ms", navigationResult.elapsedMs.toString())
+                navigationResult.lastPackage?.let { put("resolved_package", it) }
+            },
         )
     }
 

@@ -45,6 +45,7 @@ interface TaskScope {
         expectedPackage: String?,
         expectedNode: NodeMatcher?,
         timeoutMs: Long,
+        allowAlreadyForeground: Boolean = false,
     ): WaitForNavigationResult
 
     /**

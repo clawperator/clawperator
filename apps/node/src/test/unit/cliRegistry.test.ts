@@ -366,6 +366,29 @@ describe("agent-oriented flag aliases", () => {
     assert.match(stdout, /positional argument or via --app, not both/);
   });
 
+  it("open exposes --skip-navigation-wait as a supported flag", () => {
+    assert.deepStrictEqual(
+      resolveSupportedFlagsFromRegistry(COMMANDS.open, []),
+      ["--app", "--navigation-timeout-ms", "--skip-navigation-wait", "--no-daemon"],
+    );
+  });
+
+  it("open rejects --skip-navigation-wait for URI targets", async () => {
+    const { stdout, code } = await runCli(["open", "https://example.com", "--skip-navigation-wait"]);
+    assert.notStrictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message, /--skip-navigation-wait only applies to package targets/);
+  });
+
+  it("open rejects --navigation-timeout-ms for URI targets", async () => {
+    const { stdout, code } = await runCli(["open", "https://example.com", "--navigation-timeout-ms", "22000"]);
+    assert.notStrictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message, /--navigation-timeout-ms only applies to package targets/);
+  });
+
   it("click accepts --resource-id selector aliases", async () => {
     const { stdout, code } = await runCli(["click", "--resource-id", "com.example:id/login", "--selector", '{"textEquals":"Login"}', "--json"]);
     assert.notStrictEqual(code, 0);

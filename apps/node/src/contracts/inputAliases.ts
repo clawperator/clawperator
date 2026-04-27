@@ -43,6 +43,8 @@ const ACTION_PARAM_ALIASES: Record<string, string> = {
   expected_node: "expectedNode",
   wait_for: "expectedNode",
   timeout_ms: "timeoutMs",
+  skip_navigation_wait: "skipNavigationWait",
+  navigation_timeout_ms: "navigationTimeoutMs",
   label_matcher: "labelMatcher",
   label_selector: "labelMatcher",
 };
