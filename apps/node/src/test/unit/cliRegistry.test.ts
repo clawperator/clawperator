@@ -369,7 +369,7 @@ describe("agent-oriented flag aliases", () => {
   it("open exposes --skip-navigation-wait as a supported flag", () => {
     assert.deepStrictEqual(
       resolveSupportedFlagsFromRegistry(COMMANDS.open, []),
-      ["--app", "--skip-navigation-wait", "--no-daemon"],
+      ["--app", "--navigation-timeout-ms", "--skip-navigation-wait", "--no-daemon"],
     );
   });
 
@@ -379,6 +379,14 @@ describe("agent-oriented flag aliases", () => {
     const obj = JSON.parse(stdout);
     assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
     assert.match(obj.message, /--skip-navigation-wait only applies to package targets/);
+  });
+
+  it("open rejects --navigation-timeout-ms for URI targets", async () => {
+    const { stdout, code } = await runCli(["open", "https://example.com", "--navigation-timeout-ms", "22000"]);
+    assert.notStrictEqual(code, 0);
+    const obj = JSON.parse(stdout);
+    assert.strictEqual(obj.code, "EXECUTION_VALIDATION_FAILED");
+    assert.match(obj.message, /--navigation-timeout-ms only applies to package targets/);
   });
 
   it("click accepts --resource-id selector aliases", async () => {

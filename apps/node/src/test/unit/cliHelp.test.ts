@@ -980,6 +980,7 @@ describe("promoted flat commands - help and missing-arg errors", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator open/);
     assert.match(stdout, /package-id/);
+    assert.match(stdout, /--navigation-timeout-ms/);
     assert.match(stdout, /--skip-navigation-wait/);
   });
 

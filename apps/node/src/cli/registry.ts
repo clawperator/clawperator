@@ -631,6 +631,7 @@ Options:
   --app <target>         Alternative to positional target argument
   --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait
+  --navigation-timeout-ms <ms>  Foreground readiness wait budget for package targets
   --skip-navigation-wait Skip the foreground readiness wait after launching a package
   --no-daemon            Force direct execution instead of daemon proxy
 
@@ -1545,7 +1546,7 @@ COMMANDS["open"] = {
   synonyms: ["open-app", "open_app", "open-uri", "open-url", "open_uri", "open_url"],
   group: "Device Interaction",
   flagAliases: OPEN_TARGET_FLAG_ALIASES,
-  supportedFlags: ["--app", "--skip-navigation-wait", "--no-daemon"],
+  supportedFlags: ["--app", "--navigation-timeout-ms", "--skip-navigation-wait", "--no-daemon"],
   summary: "Open an app, URL, or URI on the device",
   help: HELP_OPEN,
   topLevelBlock: `  open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]
@@ -1553,6 +1554,7 @@ COMMANDS["open"] = {
   handler: async (ctx) => {
     const { rest, format, logger, deviceId, operatorPackage, noDaemon } = ctx;
     const appFlag = getOpt(rest, "--app");
+    const navigationTimeoutMsRaw = getStringOptStrict(rest, "--navigation-timeout-ms", ["--app", "--navigation-timeout-ms", "--skip-navigation-wait", "--no-daemon"]);
     const skipNavigationWait = hasFlag(rest, "--skip-navigation-wait");
     const bare = barePositionalTokens(rest, ["--app"], []);
     if (appFlag !== undefined && bare.length > 0) {
@@ -1574,6 +1576,15 @@ COMMANDS["open"] = {
       });
     }
     if (isOpenCliUriTarget(target)) {
+      if (navigationTimeoutMsRaw !== undefined) {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: "--navigation-timeout-ms only applies to package targets",
+          },
+          { format },
+        );
+      }
       if (skipNavigationWait) {
         return formatError(
           {
@@ -1592,9 +1603,23 @@ COMMANDS["open"] = {
         logger,
       });
     }
+    let navigationTimeoutMs: number | undefined;
+    if (navigationTimeoutMsRaw !== undefined) {
+      navigationTimeoutMs = Number(navigationTimeoutMsRaw);
+      if (!Number.isFinite(navigationTimeoutMs) || !Number.isInteger(navigationTimeoutMs)) {
+        return formatError(
+          {
+            code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+            message: "--navigation-timeout-ms must be an integer number of milliseconds",
+          },
+          { format },
+        );
+      }
+    }
     return (await import("./commands/action.js")).cmdActionOpenApp({
       format,
       applicationId: target,
+      navigationTimeoutMs,
       skipNavigationWait,
       deviceId,
       operatorPackage,
