@@ -162,6 +162,15 @@ curl -fsSL https://clawperator.com/operator.apk -o ~/.clawperator/downloads/oper
 
 Canonical public APK URL: `https://clawperator.com/operator.apk`
 
+Important compatibility note:
+
+- refresh the APK from that stable URL before reinstalling when you need recent
+  runtime fixes
+- older APKs do not include the newer `open_app` foreground wait behavior or
+  the tagged snapshot log marker used for reliable `snapshot_ui` extraction
+- keep the installed CLI and APK on current matching releases; `clawperator doctor`
+  reports version compatibility before you trust a device run
+
 ```bash
 clawperator operator setup --apk ~/.clawperator/downloads/operator.apk
 ```

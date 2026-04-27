@@ -40,8 +40,12 @@ Performance rule for authored skills:
   observation or action calls and stops as soon as the target UI state appears
 - do not encode app readiness as fixed `sleep` actions or host-side sleeps
   unless no observable UI condition exists
+- `open_app` only guarantees that the target package reached the foreground
+  accessibility window; it does not guarantee that the first screen's content
+  is fully loaded yet
 - replace arbitrary waits with `wait_for_node`, `read_text`, `snapshot_ui`, or a
-  short bounded polling loop over those actions
+  short bounded polling loop over those actions when the workflow depends on
+  content being present after `open_app`
 - increasing `--timeout` is not a performance strategy; it only raises the
   wrapper ceiling for work that is still making progress
 
