@@ -24,9 +24,12 @@ both must be fixed in the runtime to close the failure mode for all callers.
 ## Goal
 
 After both PRs ship, `open_app` followed immediately by `snapshot_ui` must
-reliably capture the target app's UI hierarchy on all connected device types.
-`SNAPSHOT_EXTRACTION_FAILED` must not occur in any skill that follows
-`open_app` with a UI read action, regardless of fixed sleeps or device speed.
+reliably capture the target app's UI hierarchy on devices running the updated
+APK and updated Node CLI. `SNAPSHOT_EXTRACTION_FAILED` must not occur in any
+skill that follows `open_app` with a UI read action when executed on the validated
+runtime versions (Samsung Galaxy device class and one non-Samsung device). Skills
+running against an older APK that predates this fix remain exposed to Bug 1 until
+the APK is updated; that is an expected compat gap, not a validation failure.
 
 ## Why Now
 
@@ -90,9 +93,9 @@ format must continue to parse correctly.
 | Topic | Verify against |
 | --- | --- |
 | open_app action params | `apps/node/src/contracts/execution.ts` |
-| Android action parsing | `apps/android/.../agent/AgentCommandParser.kt` |
-| Android action engine entry | `UiActionEngineDefault.kt` `executeOpenApp` |
-| waitForNavigation implementation | `TaskScopeDefault.kt` lines 374-430 |
+| Android action parsing | `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/agent/AgentCommandParser.kt` |
+| Android action engine entry | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngineDefault.kt` `executeOpenApp` |
+| waitForNavigation implementation | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/TaskScopeDefault.kt` lines 374-430 |
 | logcat capture gate | `logcatResultReader.ts` `captureSnapshotLines`, `beginDispatchCapture` |
 | snapshot extraction | `snapshotHelper.ts` `extractSnapshotsFromLogs` |
 | SNAPSHOT_EXTRACTION_FAILED condition | `runExecution.ts` `markExtractionFailedSnapshotSteps` lines 148-167 |
