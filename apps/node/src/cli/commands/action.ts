@@ -55,6 +55,8 @@ async function runActionExecution(execution: Execution, options: ActionCommandOp
 export async function cmdActionOpenApp(options: {
   format: OutputOptions["format"];
   applicationId: string;
+  skipNavigationWait?: boolean;
+  navigationTimeoutMs?: number;
   deviceId?: string;
   operatorPackage?: string;
   noDaemon?: boolean;
@@ -63,7 +65,10 @@ export async function cmdActionOpenApp(options: {
   runExecutionFn?: typeof runExecution;
 }): Promise<string> {
   try {
-    const execution = buildOpenAppExecution(options.applicationId);
+    const execution = buildOpenAppExecution(options.applicationId, {
+      skipNavigationWait: options.skipNavigationWait,
+      navigationTimeoutMs: options.navigationTimeoutMs,
+    });
     return await runActionExecution(execution, options);
   } catch (e) {
     return formatError(e, options);

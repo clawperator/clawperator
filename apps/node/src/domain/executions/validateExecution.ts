@@ -65,6 +65,13 @@ const actionParamsSchema = z.object({
   expectedPackage: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
   expectedNode: nodeMatcherSchema.optional(),
   timeoutMs: z.number().optional(),
+  skipNavigationWait: z.boolean().optional(),
+  navigationTimeoutMs: z
+    .number()
+    .int()
+    .min(LIMITS.MIN_EXECUTION_TIMEOUT_MS)
+    .max(LIMITS.MAX_EXECUTION_TIMEOUT_MS)
+    .optional(),
   // read_key_value_pair params
   labelMatcher: nodeMatcherSchema.optional(),
   // read_text params

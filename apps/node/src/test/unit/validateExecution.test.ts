@@ -125,6 +125,8 @@ describe("validateExecution", () => {
           type: "open_app",
           params: {
             package: "com.example.settings",
+            skip_navigation_wait: true,
+            navigation_timeout_ms: 22000,
           },
         },
       ],
@@ -135,6 +137,8 @@ describe("validateExecution", () => {
     assert.strictEqual(ex.expectedFormat, "android-ui-automator");
     assert.strictEqual(ex.timeoutMs, 5000);
     assert.strictEqual(ex.actions[0].params?.applicationId, "com.example.settings");
+    assert.strictEqual(ex.actions[0].params?.skipNavigationWait, true);
+    assert.strictEqual(ex.actions[0].params?.navigationTimeoutMs, 22000);
   });
 
   it("normalizes matcher aliases in params.matcher-like fields", () => {
@@ -389,6 +393,78 @@ describe("validateExecution", () => {
           expectedFormat: "android-ui-automator",
           timeoutMs: 5000,
           actions: [{ id: "x", type: "open_app", params: {} }],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("accepts open_app skipNavigationWait and navigationTimeoutMs", () => {
+    const ex = validateExecution({
+      commandId: "cmd-open-nav-1",
+      taskId: "task-open-nav-1",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        {
+          id: "x",
+          type: "open_app",
+          params: {
+            applicationId: "com.example.app",
+            skipNavigationWait: true,
+            navigationTimeoutMs: 20_000,
+          },
+        },
+      ],
+    });
+
+    assert.strictEqual(ex.actions[0].params?.skipNavigationWait, true);
+    assert.strictEqual(ex.actions[0].params?.navigationTimeoutMs, 20_000);
+  });
+
+  it("rejects open_app with invalid navigationTimeoutMs", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "cmd-open-nav-2",
+          taskId: "task-open-nav-2",
+          source: "test",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 5000,
+          actions: [
+            {
+              id: "x",
+              type: "open_app",
+              params: {
+                applicationId: "com.example.app",
+                navigationTimeoutMs: LIMITS.MIN_EXECUTION_TIMEOUT_MS - 1,
+              },
+            },
+          ],
+        }),
+      (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
+    );
+  });
+
+  it("rejects open_app with non boolean skipNavigationWait", () => {
+    assert.throws(
+      () =>
+        validateExecution({
+          commandId: "cmd-open-nav-3",
+          taskId: "task-open-nav-3",
+          source: "test",
+          expectedFormat: "android-ui-automator",
+          timeoutMs: 5000,
+          actions: [
+            {
+              id: "x",
+              type: "open_app",
+              params: {
+                applicationId: "com.example.app",
+                skipNavigationWait: "true" as unknown as boolean,
+              },
+            },
+          ],
         }),
       (e: unknown) => (e as { code?: string }).code === ERROR_CODES.EXECUTION_VALIDATION_FAILED
     );

@@ -103,6 +103,7 @@ Common payload-key aliases also accepted on input:
 - text-entry field: `value` -> `text`
 - screenshot path fields: `file`, `filePath`, `output_path` -> `path`
 - navigation fields: `expected_package`, `expected_node`, `timeout_ms`
+- open_app fields: `skip_navigation_wait`, `navigation_timeout_ms`
 - label selector fields: `label_matcher`, `label_selector`
 
 ## Full Payload Example
@@ -727,7 +728,17 @@ Example:
 | --- | --- |
 | Required | `applicationId` |
 | `applicationId` | required non-empty package id string |
+| `skipNavigationWait` | optional boolean, defaults to `false` |
+| `navigationTimeoutMs` | optional integer in `[1000, 120000]`, defaults to `15000` |
 | `retry` | optional retry object in raw `exec` JSON; Android defaults to `AppLaunch` |
+
+Semantics:
+
+- `open_app` dispatches the launch intent, then waits until the launched package is the active foreground accessibility package before returning success.
+- set `skipNavigationWait: true` only when you intentionally want the older fire-and-forget behavior.
+- `navigationTimeoutMs` controls the readiness wait only. It does not change the execution-level timeout.
+- already-foreground launches succeed without a package-transition race.
+- callers that need content to be present after the package is foreground should follow with `wait_for_node`.
 
 Success data:
 
@@ -736,6 +747,7 @@ Success data:
 Common failures:
 
 - `EXECUTION_VALIDATION_FAILED` for missing `applicationId`
+- runtime step failures such as `NAVIGATION_TIMEOUT` when the launched package does not reach the foreground within the wait budget
 
 Example:
 
@@ -744,7 +756,9 @@ Example:
   "id": "open-1",
   "type": "open_app",
   "params": {
-    "applicationId": "com.android.settings"
+    "applicationId": "com.android.settings",
+    "skipNavigationWait": false,
+    "navigationTimeoutMs": 15000
   }
 }
 ```

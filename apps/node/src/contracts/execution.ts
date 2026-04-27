@@ -41,6 +41,10 @@ export interface ActionParams {
   expectedNode?: NodeMatcher;
   /** Action-level timeout in milliseconds (distinct from execution-level timeoutMs) */
   timeoutMs?: number;
+  /** open_app only: skip the foreground readiness wait and return after dispatch */
+  skipNavigationWait?: boolean;
+  /** open_app only: timeout budget for the foreground readiness wait */
+  navigationTimeoutMs?: number;
   // read_key_value_pair params
   labelMatcher?: NodeMatcher;
 }
