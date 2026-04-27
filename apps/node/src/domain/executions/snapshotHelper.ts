@@ -97,13 +97,8 @@ export function extractSnapshotRecordsFromLogs(lines: string[]): ExtractedSnapsh
 
 export function extractSnapshotsForCommand(lines: string[], expectedCommandId: string): string[] {
   const records = extractSnapshotRecordsFromLogs(lines);
-  const commandMatches = records.filter(record => record.commandId === expectedCommandId);
-  if (commandMatches.length > 0) {
-    return commandMatches.map(record => record.snapshot);
-  }
-
   return records
-    .filter(record => record.commandId === undefined)
+    .filter(record => record.commandId === expectedCommandId)
     .map(record => record.snapshot);
 }
 
@@ -156,19 +151,12 @@ function parseLogLine(line: string): ParsedLogLine | null {
 
 function parseSnapshotMarkerMessage(message: string): ParsedSnapshotMarker | null {
   const newFormatMatch = message.match(/^\[TaskScope\] UI Hierarchy \[commandId=([^\]]+)]:\s*(.*)$/);
-  if (newFormatMatch) {
-    return {
-      commandId: newFormatMatch[1],
-      firstLineRemainder: newFormatMatch[2]?.trim() ?? "",
-    };
-  }
-
-  const oldMarker = "[TaskScope] UI Hierarchy:";
-  if (!message.includes(oldMarker)) {
+  if (!newFormatMatch) {
     return null;
   }
 
   return {
-    firstLineRemainder: message.split(oldMarker)[1]?.trim() ?? "",
+    commandId: newFormatMatch[1],
+    firstLineRemainder: newFormatMatch[2]?.trim() ?? "",
   };
 }

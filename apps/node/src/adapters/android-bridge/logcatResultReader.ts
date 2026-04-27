@@ -76,18 +76,12 @@ function parseSnapshotMarker(line: string): SnapshotMarkerMatch | null {
   }
 
   const newFormatMatch = parsed.message.match(/^\[TaskScope\] UI Hierarchy \[commandId=([^\]]+)]:/);
-  if (newFormatMatch) {
-    return {
-      commandId: newFormatMatch[1],
-      tag: parsed.tag,
-    };
-  }
-
-  if (!parsed.message.includes("[TaskScope] UI Hierarchy:")) {
+  if (!newFormatMatch) {
     return null;
   }
 
   return {
+    commandId: newFormatMatch[1],
     tag: parsed.tag,
   };
 }
@@ -139,7 +133,6 @@ export async function waitForResultEnvelope(
     const correlatedLines: string[] = [];
     const snapshotLogLines: string[] = [];
     let broadcastStatus: BroadcastStatus = "not_sent";
-    let captureSnapshotLines = false;
     let pending = "";
     let settled = false;
     let stderrBuffer = "";
@@ -147,10 +140,8 @@ export async function waitForResultEnvelope(
     let broadcastStartTimer: NodeJS.Timeout | undefined;
     let signalBroadcastStartTimer: NodeJS.Timeout | undefined;
     let signalBroadcastMaxTimer: NodeJS.Timeout | undefined;
-    let snapshotCaptureStartTimer: NodeJS.Timeout | undefined;
     let broadcastStarted = false;
     let dispatchCaptureStarted = false;
-    let forcedReplayDrainDispatch = false;
     let stdoutObserved = false;
     let activeSnapshotTag: string | null = null;
     let activeSnapshotCaptured = false;
@@ -179,9 +170,6 @@ export async function waitForResultEnvelope(
       }
       if (signalBroadcastMaxTimer !== undefined) {
         clearTimeout(signalBroadcastMaxTimer);
-      }
-      if (snapshotCaptureStartTimer !== undefined) {
-        clearTimeout(snapshotCaptureStartTimer);
       }
       cancelSignal?.removeEventListener("abort", abortHandler);
       resolve(result);
@@ -241,19 +229,6 @@ export async function waitForResultEnvelope(
       }
       pending = "";
       dispatchCaptureStarted = true;
-      if (forcedReplayDrainDispatch) {
-        // The max-drain path means stdout stayed noisy long enough that some
-        // `logcat -T 1` replay may still be arriving. Delay snapshot capture
-        // by the normal drain window, while still accepting the result envelope
-        // immediately. A real snapshot_ui traversal is much slower than this
-        // guard window, and the tradeoff prevents stale replayed hierarchy XML
-        // from being attached to the fresh command.
-        snapshotCaptureStartTimer = setTimeout(() => {
-          captureSnapshotLines = true;
-        }, SIGNAL_BROADCAST_REPLAY_DRAIN_MS);
-      } else {
-        captureSnapshotLines = true;
-      }
       broadcastStatus = "sent";
       startTimeout();
     };
@@ -322,7 +297,7 @@ export async function waitForResultEnvelope(
         if (snapshotMarker !== null) {
           correlatedLines.push(line);
           activeSnapshotTag = snapshotMarker.tag;
-          activeSnapshotCaptured = captureSnapshotLines || snapshotMarker.commandId !== undefined;
+          activeSnapshotCaptured = snapshotMarker.commandId === commandId;
           if (activeSnapshotCaptured) {
             snapshotLogLines.push(line);
           }
@@ -374,7 +349,6 @@ export async function waitForResultEnvelope(
         if (!stdoutObserved) {
           stdoutObserved = true;
           signalBroadcastMaxTimer = setTimeout(() => {
-            forcedReplayDrainDispatch = true;
             startBroadcast();
           }, SIGNAL_BROADCAST_MAX_DRAIN_MS);
         }
@@ -386,7 +360,6 @@ export async function waitForResultEnvelope(
           clearTimeout(signalBroadcastStartTimer);
         }
         signalBroadcastStartTimer = setTimeout(() => {
-          forcedReplayDrainDispatch = false;
           startBroadcast();
         }, SIGNAL_BROADCAST_REPLAY_DRAIN_MS);
       }

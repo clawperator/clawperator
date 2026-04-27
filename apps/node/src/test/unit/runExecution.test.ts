@@ -967,7 +967,7 @@ describe("runExecution", () => {
       setTimeout(() => {
         const prefix = formatLogcatTime(new Date());
         proc.stdout?.emit("data", Buffer.from([
-          `${prefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+          `${prefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-noisy-snapshot]:`,
           `${prefix} D/TaskScopeDefault(29817): <?xml version='1.0' encoding='UTF-8' standalone='yes' ?>`,
           `${prefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
           `${prefix} V/Configuration(29817): Updating configuration, locales updated from [] to [en_US]`,
@@ -1374,7 +1374,7 @@ describe("waitForResultEnvelope", () => {
       proc.kill = () => undefined;
       process.nextTick(() => {
         proc.stdout?.emit("data", Buffer.from([
-          "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-stale]:",
           "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
           "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node text=\"stale\" />",
           "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
@@ -1400,7 +1400,7 @@ describe("waitForResultEnvelope", () => {
         setTimeout(() => {
           const freshPrefix = formatLogcatTime(new Date());
           proc.stdout?.emit("data", Buffer.from([
-            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-capture-boundary]:`,
             `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
             `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
             `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
@@ -1553,7 +1553,7 @@ describe("waitForResultEnvelope", () => {
       proc.kill = () => undefined;
       process.nextTick(() => {
         proc.stdout?.emit("data", Buffer.from([
-          "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-stale]:",
           "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
           "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node text=\"stale\" />",
           "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
@@ -1578,7 +1578,7 @@ describe("waitForResultEnvelope", () => {
         beginDispatchCapture();
         const freshPrefix = formatLogcatTime(new Date());
         proc.stdout?.emit("data", Buffer.from([
-          `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+          `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-sync-snapshot]:`,
           `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
           `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
           `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
@@ -1675,7 +1675,7 @@ describe("waitForResultEnvelope", () => {
       });
       setTimeout(() => {
         proc.stdout?.emit("data", Buffer.from([
-          "04-25 20:14:52.454 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.454 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-stale]:",
           "04-25 20:14:52.455 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
           "04-25 20:14:52.456 D/TaskScopeDefault(29817):   <node text=\"stale\" />",
           "04-25 20:14:52.457 D/TaskScopeDefault(29817): </hierarchy>",
@@ -1708,7 +1708,7 @@ describe("waitForResultEnvelope", () => {
         setTimeout(() => {
           const freshPrefix = formatLogcatTime(new Date());
           proc.stdout?.emit("data", Buffer.from([
-            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-late-replay]:`,
             `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
             `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
             `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
@@ -1752,7 +1752,7 @@ describe("waitForResultEnvelope", () => {
       setTimeout(() => {
         assert.strictEqual(broadcastStarted, false, "fallback must not dispatch while replay chunks are still draining");
         proc.stdout?.emit("data", Buffer.from([
-          "04-25 20:14:52.454 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.454 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-stale]:",
           "04-25 20:14:52.455 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
           "04-25 20:14:52.456 D/TaskScopeDefault(29817):   <node text=\"stale-after-fallback\" />",
           "04-25 20:14:52.457 D/TaskScopeDefault(29817): </hierarchy>",
@@ -1779,7 +1779,7 @@ describe("waitForResultEnvelope", () => {
         setTimeout(() => {
           const freshPrefix = formatLogcatTime(new Date());
           proc.stdout?.emit("data", Buffer.from([
-            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-fallback-replay-drain]:`,
             `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
             `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
             `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
@@ -1903,7 +1903,7 @@ describe("waitForResultEnvelope", () => {
       async (beginDispatchCapture) => {
         beginDispatchCapture();
         proc.stdout?.emit("data", Buffer.from([
-          "04-25 20:14:52.700 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.700 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-stale]:",
           "04-25 20:14:52.701 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
           "04-25 20:14:52.702 D/TaskScopeDefault(29817):   <node text=\"stale-forced\" />",
           "04-25 20:14:52.703 D/TaskScopeDefault(29817): </hierarchy>",
@@ -1911,7 +1911,7 @@ describe("waitForResultEnvelope", () => {
         setTimeout(() => {
           const freshPrefix = formatLogcatTime(new Date());
           proc.stdout?.emit("data", Buffer.from([
-            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-forced-replay-snapshot]:`,
             `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
             `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh-forced" />`,
             `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
@@ -2002,7 +2002,7 @@ describe("waitForResultEnvelope", () => {
       proc.kill = () => undefined;
       process.nextTick(() => {
         proc.stdout?.emit("data", Buffer.from([
-          "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-stale]:",
           "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
         ].join("\n") + "\n"));
       });
@@ -2030,7 +2030,7 @@ describe("waitForResultEnvelope", () => {
         setTimeout(() => {
           const freshPrefix = formatLogcatTime(new Date());
           proc.stdout?.emit("data", Buffer.from([
-            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-split-replay]:`,
             `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
             `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
             `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,
@@ -2107,7 +2107,7 @@ describe("waitForResultEnvelope", () => {
         setTimeout(() => {
           const freshPrefix = formatLogcatTime(new Date());
           proc.stdout?.emit("data", Buffer.from([
-            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy:`,
+            `${freshPrefix} D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-partial-replay]:`,
             `${freshPrefix} D/TaskScopeDefault(29817): <hierarchy rotation="0">`,
             `${freshPrefix} D/TaskScopeDefault(29817):   <node text="fresh" />`,
             `${freshPrefix} D/TaskScopeDefault(29817): </hierarchy>`,

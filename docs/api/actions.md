@@ -602,7 +602,7 @@ Semantics:
 
 - the old `format` parameter is explicitly rejected as removed
 - built-in builders set execution timeout to `30000` unless overridden
-- snapshot extraction accepts both `[TaskScope] UI Hierarchy [commandId=<command_id>]:` and `[TaskScope] UI Hierarchy:` markers; see [Snapshot Format](snapshot.md)
+- snapshot extraction requires the `[TaskScope] UI Hierarchy [commandId=<command_id>]:` marker; see [Snapshot Format](snapshot.md)
 
 Success data:
 

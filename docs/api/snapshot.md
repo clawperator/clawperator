@@ -59,14 +59,10 @@ Example one-step payload from the `clawperator snapshot` builder:
 The current flow is:
 
 1. Android executes `snapshot_ui`.
-2. Android writes the hierarchy dump into logcat lines that begin with one of these markers:
-   - `[TaskScope] UI Hierarchy [commandId=<command_id>]:`
-   - `[TaskScope] UI Hierarchy:`
+2. Android writes the hierarchy dump into logcat lines that begin with the exact marker `[TaskScope] UI Hierarchy [commandId=<command_id>]:`.
 3. Node reads those logcat lines after execution.
 4. `extractSnapshotRecordsFromLogs()` reconstructs one or more XML documents from the log stream and preserves the parsed `commandId` when the tagged marker is present.
-5. `extractSnapshotsForCommand()` selects snapshots for the current execution:
-   - if any reconstructed snapshot has `commandId == envelope.commandId`, Node uses only those exact matches
-   - otherwise Node falls back to reconstructed snapshots from untagged markers
+5. `extractSnapshotsForCommand()` selects snapshots for the current execution by requiring `commandId == envelope.commandId`.
 6. `attachSnapshotsToStepResults()` walks backward through successful `snapshot_ui` steps and attaches the extracted XML as `stepResults[i].data.text`.
 7. `markExtractionFailedSnapshotSteps()` converts any still-successful snapshot step with missing `data.text` into a failed step with `data.error = "SNAPSHOT_EXTRACTION_FAILED"`.
 8. `addSettleWarnings()` may attach `data.warn` if the snapshot action immediately follows `click` or `scroll_and_click`.
@@ -75,8 +71,7 @@ Debugging details that matter when extraction goes wrong:
 
 - `runExecution()` clears logcat before dispatch with `adb logcat -c`
 - after the execution finishes, Node reads logcat with `adb logcat -v time -T 1`
-- `snapshotHelper.ts` recognizes both marker formats listed above
-- command-tagged markers take precedence over untagged markers when Node can match `envelope.commandId`
+- `snapshotHelper.ts` only extracts blocks whose opening marker includes the execution `commandId`
 
 Important boundaries:
 
@@ -423,7 +418,7 @@ Typical recovery:
 
 1. Run `clawperator version --check-compat`.
 2. Run `clawperator doctor`.
-3. Re-run the snapshot with `--verbose` if you need to inspect log correlation and the `[TaskScope] UI Hierarchy:` marker.
+3. Re-run the snapshot with `--verbose` if you need to inspect log correlation and the `[TaskScope] UI Hierarchy [commandId=<command_id>]:` marker.
 
 Verification pattern - confirm extraction failure handling:
 
