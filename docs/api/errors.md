@@ -131,6 +131,7 @@ Notes:
 | Device targeting | `NO_DEVICES`, `DEVICE_NOT_FOUND`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Run `clawperator devices`, pick one device, and retry with `--device <serial>` |
 | Interactive readiness | `DEVICE_NOT_INTERACTIVE` | Wake or unlock the target, rerun `clawperator doctor`, and confirm the interactive-state check passes |
 | Operator setup | `OPERATOR_NOT_INSTALLED`, `OPERATOR_VARIANT_MISMATCH`, `OPERATOR_INSTALL_FAILED`, `OPERATOR_GRANT_FAILED`, `OPERATOR_VERIFY_FAILED` | Install or repair the expected Operator APK, then rerun the command |
+| Version compatibility | `VERSION_INCOMPATIBLE`, `APK_VERSION_UNREADABLE`, `APK_VERSION_INVALID`, `CLI_VERSION_INVALID` | Align the installed CLI and Operator APK, then rerun `clawperator version --check-compat` |
 | Host tooling | `ADB_NOT_FOUND`, `ADB_SERVER_FAILED`, `HOST_DEPENDENCY_MISSING`, `ANDROID_SDK_TOOL_MISSING`, `SCRCPY_NOT_FOUND` | Repair the host environment before retrying |
 | Daemon lifecycle and proxy | `DAEMON_START_FAILED`, `DAEMON_STOP_FAILED`, `DAEMON_PROXY_ERROR` | Inspect the daemon log and metadata files under `~/.clawperator/`. For `DAEMON_PROXY_ERROR`, inspect device state before retrying because the action may already have executed |
 | Payload or flag validation | `MISSING_ARGUMENT`, `EXECUTION_VALIDATION_FAILED`, `EXECUTION_ACTION_UNSUPPORTED`, `PAYLOAD_TOO_LARGE` | Change the command or payload. Do not retry unchanged |

@@ -102,6 +102,12 @@ export function extractSnapshotsForCommand(lines: string[], expectedCommandId: s
     .map(record => record.snapshot);
 }
 
+export function hasLegacyUntaggedSnapshotMarker(lines: string[]): boolean {
+  return lines
+    .map(parseLogLine)
+    .some(line => line !== null && /^\[TaskScope\] UI Hierarchy:/.test(line.message));
+}
+
 interface ParsedLogLine {
   tag: string | null;
   message: string;

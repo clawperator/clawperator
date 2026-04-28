@@ -30,6 +30,7 @@ interface ParsedLogcatLine {
 interface SnapshotMarkerMatch {
   commandId?: string;
   tag: string | null;
+  legacy: boolean;
 }
 
 function parseLogcatLine(line: string): ParsedLogcatLine | null {
@@ -76,14 +77,22 @@ function parseSnapshotMarker(line: string): SnapshotMarkerMatch | null {
   }
 
   const newFormatMatch = parsed.message.match(/^\[TaskScope\] UI Hierarchy \[commandId=([^\]]+)]:/);
-  if (!newFormatMatch) {
-    return null;
+  if (newFormatMatch) {
+    return {
+      commandId: newFormatMatch[1],
+      tag: parsed.tag,
+      legacy: false,
+    };
   }
 
-  return {
-    commandId: newFormatMatch[1],
-    tag: parsed.tag,
-  };
+  if (parsed.message.match(/^\[TaskScope\] UI Hierarchy:/)) {
+    return {
+      tag: parsed.tag,
+      legacy: true,
+    };
+  }
+
+  return null;
 }
 
 function shouldEndSnapshotBlock(line: string, activeTag: string | null): boolean {
@@ -297,7 +306,8 @@ export async function waitForResultEnvelope(
         if (snapshotMarker !== null) {
           correlatedLines.push(line);
           activeSnapshotTag = snapshotMarker.tag;
-          activeSnapshotCaptured = snapshotMarker.commandId === commandId;
+          activeSnapshotCaptured = snapshotMarker.commandId === commandId
+            || (snapshotMarker.legacy && dispatchCaptureStarted);
           if (activeSnapshotCaptured) {
             snapshotLogLines.push(line);
           }

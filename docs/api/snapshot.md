@@ -64,7 +64,7 @@ The current flow is:
 4. `extractSnapshotRecordsFromLogs()` reconstructs one or more XML documents from the log stream and preserves the parsed `commandId` when the tagged marker is present.
 5. `extractSnapshotsForCommand()` selects snapshots for the current execution by requiring `commandId == envelope.commandId`.
 6. `attachSnapshotsToStepResults()` walks backward through successful `snapshot_ui` steps and attaches the extracted XML as `stepResults[i].data.text`.
-7. `markExtractionFailedSnapshotSteps()` converts any still-successful snapshot step with missing `data.text` into a failed step with `data.error = "SNAPSHOT_EXTRACTION_FAILED"`.
+7. `markExtractionFailedSnapshotSteps()` converts any still-successful snapshot step with missing `data.text` into a failed step. The usual error is `SNAPSHOT_EXTRACTION_FAILED`; when Node saw a legacy untagged hierarchy marker instead of the command-id-tagged marker, the error is `VERSION_INCOMPATIBLE`.
 8. `addSettleWarnings()` may attach `data.warn` if the snapshot action immediately follows `click` or `scroll_and_click`.
 
 Debugging details that matter when extraction goes wrong:
@@ -398,7 +398,9 @@ This example was captured on an emulator running Android 15 with a
 
 ## Extraction Failure
 
-If a `snapshot_ui` step initially succeeds but Node cannot attach `data.text`, Node rewrites that step into a failure:
+If a `snapshot_ui` step initially succeeds but Node cannot attach `data.text`, Node rewrites that step into a failure.
+
+The generic extraction failure shape is:
 
 ```json
 {
@@ -408,6 +410,20 @@ If a `snapshot_ui` step initially succeeds but Node cannot attach `data.text`, N
   "data": {
     "error": "SNAPSHOT_EXTRACTION_FAILED",
     "message": "UI hierarchy extraction produced no output for this step. Check clawperator version compatibility and logcat extraction health."
+  }
+}
+```
+
+If the log stream contained the legacy untagged marker `[TaskScope] UI Hierarchy:` instead of `[TaskScope] UI Hierarchy [commandId=<command_id>]:`, Node treats the missing snapshot text as a CLI/APK compatibility problem:
+
+```json
+{
+  "id": "snap",
+  "actionType": "snapshot_ui",
+  "success": false,
+  "data": {
+    "error": "VERSION_INCOMPATIBLE",
+    "message": "Snapshot hierarchy logs used the legacy untagged marker. Install a matching Operator APK that emits commandId-tagged snapshot logs, or use a compatible CLI."
   }
 }
 ```
@@ -426,7 +442,7 @@ Verification pattern - confirm extraction failure handling:
 clawperator snapshot --device <device_serial>
 ```
 
-If extraction failed, branch on:
+If extraction failed, branch on `data.error`:
 
 ```json
 {
@@ -444,6 +460,8 @@ If extraction failed, branch on:
   }
 }
 ```
+
+For `VERSION_INCOMPATIBLE`, align the installed CLI and Operator APK before retrying. For `SNAPSHOT_EXTRACTION_FAILED`, run doctor and inspect logcat extraction health.
 
 Related error case:
 

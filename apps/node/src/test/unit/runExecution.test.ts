@@ -173,6 +173,22 @@ describe("markExtractionFailedSnapshotSteps", () => {
     assert.strictEqual(stepResults[0].success, false);
     assert.strictEqual(stepResults[0].data.error, "SNAPSHOT_EXTRACTION_FAILED");
   });
+
+  it("marks missing snapshot text as VERSION_INCOMPATIBLE when legacy snapshot markers were observed", () => {
+    const stepResults: StepResult[] = [
+      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+    ];
+    const warnings: string[] = [];
+
+    markExtractionFailedSnapshotSteps(stepResults, message => warnings.push(message), {
+      sawLegacyUntaggedSnapshotMarker: true,
+    });
+
+    assert.strictEqual(stepResults[0].success, false);
+    assert.strictEqual(stepResults[0].data.error, "VERSION_INCOMPATIBLE");
+    assert.match(String(stepResults[0].data.message), /legacy untagged marker/);
+    assert.match(warnings[0] ?? "", /legacy untagged snapshot logs/);
+  });
 });
 
 describe("addSettleWarnings", () => {
@@ -1655,6 +1671,59 @@ describe("waitForResultEnvelope", () => {
       assert.deepStrictEqual(extractSnapshotsForCommand(result.snapshotLogLines ?? [], "cmd-pre-dispatch"), [
         '<hierarchy rotation="0">\n  <node text="fresh-before-dispatch" />\n</hierarchy>',
       ]);
+    }
+  });
+
+  it("captures legacy untagged snapshot blocks after dispatch for compatibility diagnostics", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-legacy-snapshot",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.453 D/kw2(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.454 D/kw2(29817): <hierarchy rotation=\"0\">",
+          "04-25 20:14:52.455 D/kw2(29817):   <node text=\"legacy\" />",
+          "04-25 20:14:52.456 D/kw2(29817): </hierarchy>",
+          `[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-legacy-snapshot",
+            taskId: "task-legacy-snapshot",
+            status: "success",
+            stepResults: [],
+            error: null,
+          })}`,
+        ].join("\n") + "\n"));
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.ok(result.snapshotLogLines?.some(line => line.includes("[TaskScope] UI Hierarchy:")));
+      assert.deepStrictEqual(extractSnapshotsForCommand(result.snapshotLogLines ?? [], "cmd-legacy-snapshot"), []);
     }
   });
 
