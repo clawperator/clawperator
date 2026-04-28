@@ -76,6 +76,7 @@ nav:
       - Authoring: skills/authoring.md
       - Development Workflow: skills/development.md
       - Device Prep and Runtime: skills/runtime.md
+      - Personalized Skills: skills/personalized-skills.md
   - Troubleshooting:
       - Operator App: troubleshooting/operator.md
       - Known Issues: troubleshooting/known-issues.md

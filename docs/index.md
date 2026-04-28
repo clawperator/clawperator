@@ -70,6 +70,7 @@ Use:
 
 - [Overview](skills/overview.md) - registry model, discovery, and wrapper execution
 - [Authoring](skills/authoring.md) - scaffolded files, artifacts, and validation
+- [Personalized Skills](skills/personalized-skills.md) - local wrappers, privacy boundaries, and shared-skill promotion rules
 - [Development Workflow](skills/development.md) - local iteration loop for skills
 - [Device Prep and Runtime](skills/runtime.md) - runtime environment, timeout, and output rules
 
