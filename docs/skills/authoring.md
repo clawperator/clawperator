@@ -392,13 +392,11 @@ Recording-derived authoring truthfulness:
 
 Personalized versus shared skills:
 
-- a recording-derived skill is often valuable even when it is personalized to
-  one user's setup, labels, account state, or device graph
-- personalized local skills are a valid first outcome
-- do not pretend a personalized skill is generic if it hardcodes local labels
-  such as room names, device names, or one user's climate tile
-- a shared skill should replace those personal assumptions with generalized
-  inputs or broader selector strategy before it is presented as reusable
+- a recording-derived skill can be a valid personalized local first outcome
+- use [Personalized Skills](personalized.md) for the full local-versus-shared
+  policy, privacy boundaries, promotion checklist, and verification rules
+- keep recording-specific notes in the authored `SKILL.md`: what came from the
+  recording, what needed live inspection, and what remains local-only
 
 Authoring mode terminology:
 

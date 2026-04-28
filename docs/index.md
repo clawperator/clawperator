@@ -72,6 +72,7 @@ Use:
 - [Authoring](skills/authoring.md) - scaffolded files, artifacts, and validation
 - [Development Workflow](skills/development.md) - local iteration loop for skills
 - [Device Prep and Runtime](skills/runtime.md) - runtime environment, timeout, and output rules
+- [Personalized Skills](skills/personalized.md) - local wrappers, privacy boundaries, and shared-skill promotion rules
 
 ## Troubleshooting
 
