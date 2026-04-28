@@ -98,7 +98,7 @@ function parseSnapshotMarker(line: string): SnapshotMarkerMatch | null {
 function shouldEndSnapshotBlock(line: string, activeTag: string | null): boolean {
   const parsed = parseLogcatLine(line);
   if (parsed === null || parsed.tag !== activeTag) {
-    return true;
+    return false;
   }
 
   const trimmed = parsed.message.trim();
@@ -313,6 +313,10 @@ export async function waitForResultEnvelope(
           }
         } else if (activeSnapshotTag !== null) {
           correlatedLines.push(line);
+          const parsed = parseLogcatLine(line);
+          if (parsed === null || parsed.tag !== activeSnapshotTag) {
+            continue;
+          }
           if (shouldEndSnapshotBlock(line, activeSnapshotTag)) {
             activeSnapshotTag = null;
             activeSnapshotCaptured = false;
@@ -320,7 +324,6 @@ export async function waitForResultEnvelope(
             if (activeSnapshotCaptured) {
               snapshotLogLines.push(line);
             }
-            const parsed = parseLogcatLine(line);
             if (parsed?.message.trim() === "</hierarchy>") {
               activeSnapshotTag = null;
               activeSnapshotCaptured = false;

@@ -1053,6 +1053,89 @@ describe("runExecution", () => {
     assert.ok(!runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -c"));
   });
 
+  it("classifies legacy untagged snapshot markers as VERSION_INCOMPATIBLE through runExecution", async () => {
+    const runner = new FakeProcessRunner();
+    const execution: Execution = {
+      commandId: "cmd-legacy-marker-snapshot",
+      taskId: "task-legacy-marker-snapshot",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions: [
+        { id: "snap-1", type: "snapshot_ui" },
+      ],
+    };
+    const warnings: string[] = [];
+
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device-1\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" });
+    runner.spawn = ((command, args, options) => {
+      runner.calls.push({ command, args, options });
+      const proc = new EventEmitter() as EventEmitter & {
+        stdout?: EventEmitter;
+        stderr?: EventEmitter;
+        kill: () => void;
+      };
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      setTimeout(() => {
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.453 D/kw2(29817): [TaskScope] UI Hierarchy:",
+          "04-25 20:14:52.454 D/kw2(29817): <hierarchy rotation=\"0\">",
+          "04-25 20:14:52.455 D/kw2(29817):   <node text=\"legacy\" />",
+          "04-25 20:14:52.456 D/kw2(29817): </hierarchy>",
+          `[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-legacy-marker-snapshot",
+            taskId: "task-legacy-marker-snapshot",
+            status: "success",
+            stepResults: [{
+              id: "snap-1",
+              actionType: "snapshot_ui",
+              success: true,
+              data: {
+                actual_format: "hierarchy_xml",
+              },
+            }],
+            error: null,
+          })}`,
+        ].join("\n") + "\n"));
+        proc.emit("close", 0, null);
+      }, 5);
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+
+    const result = await runExecution(execution, {
+      deviceId: "test-device-1",
+      operatorPackage: "com.test.operator",
+      runner,
+      logcatBroadcastDelayMs: 0,
+      warn: warning => warnings.push(warning),
+      ensureInteractiveAutomationReadyFn: async () => ({
+        ok: true,
+        state: {
+          screenOn: true,
+          interactive: true,
+          deviceLocked: false,
+          userUnlocked: true,
+        },
+      }),
+    });
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.envelope.status, "failed");
+      assert.strictEqual(result.envelope.error, "Step snap-1 (snapshot_ui) failed: VERSION_INCOMPATIBLE");
+      assert.deepStrictEqual(result.envelope.stepResults[0].data, {
+        actual_format: "hierarchy_xml",
+        error: "VERSION_INCOMPATIBLE",
+        message: "Snapshot hierarchy logs used the legacy untagged marker. Install a matching Operator APK that emits commandId-tagged snapshot logs, or use a compatible CLI.",
+      });
+    }
+    assert.match(warnings[0] ?? "", /legacy untagged snapshot logs/);
+  });
+
   it("allows close_app-only executions to succeed without the interactive gate", async () => {
     const runner = new FakeProcessRunner();
     const execution: Execution = {
@@ -2408,9 +2491,9 @@ describe("buildTimeoutError", () => {
       proc.stderr = new EventEmitter();
       proc.kill = () => undefined;
 
-      process.nextTick(() => {
-        proc.stdout?.emit("data", Buffer.from("TaskScopeDefault: example\n"));
-      });
+      setTimeout(() => {
+        proc.stdout?.emit("data", Buffer.from("04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-timeout-6]:\n"));
+      }, 5);
 
       return proc;
     }) as FakeProcessRunner["spawn"];
