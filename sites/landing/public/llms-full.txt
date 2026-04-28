@@ -74,9 +74,9 @@ Use:
 
 - [Overview](skills/overview.md) - registry model, discovery, and wrapper execution
 - [Authoring](skills/authoring.md) - scaffolded files, artifacts, and validation
+- [Personalized Skills](skills/personalized-skills.md) - local wrappers, privacy boundaries, and shared-skill promotion rules
 - [Development Workflow](skills/development.md) - local iteration loop for skills
 - [Device Prep and Runtime](skills/runtime.md) - runtime environment, timeout, and output rules
-- [Personalized Skills](skills/personalized-skills.md) - local wrappers, privacy boundaries, and shared-skill promotion rules
 
 ## Troubleshooting
 
@@ -158,6 +158,13 @@ before the CLI returns its final install status.
 The runtime-skills registry is discovered automatically from
 `~/.clawperator/skills/skills/skills-registry.json` after `clawperator skills install`, so
 `install.sh` no longer writes `CLAWPERATOR_SKILLS_REGISTRY` into shell RC files.
+
+Bundled host-agent skills are installed separately from runtime skills:
+
+- `~/.clawperator/bundled-skills/` is the canonical first-party bundled-skill store
+- `~/.claude/skills/` and the Codex skills dir receive Clawperator-managed symlinks into that store
+- `~/.agents/skills/` receives Clawperator-managed real directory copies with a `.clawperator-managed` marker so generic agents can scan them without following symlinks outside their configured root
+- runtime skills from `~/.clawperator/skills/` are not mirrored into shared agent discovery directories
 
 Canonical public next step after install:
 
@@ -680,6 +687,7 @@ These files help a host orient after install:
 | `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config written by `clawperator host setup` | Use it when you choose the MCP route. |
 | `~/.clawperator/skills/skills/skills-registry.json` | Installed runtime-skills registry | Verify it exists when `skills list` or `skills for-app` cannot discover skills. |
 | `~/.clawperator/bundled-skills/` | Installed first-party bundled skills | Inspect it through `clawperator bundled-skills list` when runtime discovery returns no relevant match. |
+| `~/.agents/skills/<clawperator-bundled-skill>/` | Managed real directory copies for generic agent skill discovery | Generic agents such as OpenClaw can discover packaged Clawperator bundled skills without following symlinks outside `~/.agents/skills`. |
 
 ## Verification
 
@@ -694,6 +702,8 @@ clawperator skills search --keyword settings
 clawperator skills get com.android.settings.capture-overview
 clawperator skills list
 clawperator bundled-skills list
+test -d ~/.agents/skills/clawperator-agent-orientation
+test ! -L ~/.agents/skills/clawperator-agent-orientation
 ```
 
 Check:
@@ -705,6 +715,7 @@ Check:
 - `skills get` returns a top-level `skill`
 - `bundled-skills list` returns top-level `skills`, `count`, and `installedDir`
 - `bundled-skills list` includes `clawperator-agent-orientation`, `clawperator-upgrade`, `clawperator-skill-author-by-agent-discovery`, and `clawperator-skill-author-by-recording` in `skills[].name`
+- packaged Clawperator bundled skills under `~/.agents/skills/` are real directories, not symlinks
 
 For MCP:
 
@@ -4906,7 +4917,7 @@ For a failing check, pretty output includes:
 | `host.adb.server` | `pass`, `fail` | `ADB_SERVER_FAILED` | adb server can start |
 | `host.skill-agent-cli.default` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | default orchestrated-skill agent CLI is a valid executable name and exists on PATH |
 | `host.skill-agent-cli.skills` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | all installed orchestrated skills can resolve their configured agent CLI executable |
-| `host.bundled-skills.staleness` | `pass`, `warn` | `AGENT_SKILLS_STALE` | when bundled skills are present, the canonical install store is readable, packaged skills are present, and managed Claude/Codex discovery links point at the canonical store |
+| `host.bundled-skills.staleness` | `pass`, `warn` | `AGENT_SKILLS_STALE` | when bundled skills are present, the canonical install store is readable, packaged skills are present, managed Claude/Codex discovery links point at the canonical store, and generic agents discovery entries are managed real directory copies |
 | `host.java.version` | `pass`, `fail` | `HOST_DEPENDENCY_MISSING` or no explicit code | Java 17 or 21 is available for full Android build checks |
 | `build.android.assemble` | `pass`, `fail` | `ANDROID_BUILD_FAILED` | `./gradlew :app:assembleDebug` succeeds |
 | `device.discovery` | `pass`, `warn`, `fail` | `NO_DEVICES`, `DEVICE_UNAUTHORIZED`, `DEVICE_OFFLINE`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED`, `DEVICE_NOT_FOUND` | device discovery succeeded and the environment is targetable, or explains why explicit `--device` selection is still required |
@@ -9397,8 +9408,9 @@ Skills are registry-driven. They are not discovered by folder scanning alone. `c
 `clawperator skills` and `skills-registry.json` cover runtime skills only.
 Authoring skills are a separate category of AI agent programs that live in
 `.agents/skills/` in source form and install separately into
-`~/.clawperator/bundled-skills/` plus the Claude Code, Codex, and generic
-agents (`~/.agents/skills/`) discovery directories.
+`~/.clawperator/bundled-skills/` plus host-agent discovery directories. Claude
+Code and Codex receive symlinks into the canonical store. Generic agents
+receive managed real directory copies under `~/.agents/skills/`.
 
 Installer-facing discovery is deliberately split:
 
@@ -10253,7 +10265,8 @@ Current install model:
 | Claude Code discovery dir | `~/.claude/skills/` | symlinks into the canonical store |
 | Codex discovery dir | `$CODEX_HOME/skills/` | symlinks into the canonical store when `CODEX_HOME` is set |
 | Codex default discovery dir | `~/.codex/skills/` | used when `CODEX_HOME` is unset |
-| Generic agents discovery dir | `~/.agents/skills/` | symlinks into the canonical store for generic agent runtimes |
+| Generic agents discovery dir | `~/.agents/skills/` | managed real directory copies for generic agent runtimes |
+| Managed-copy marker | `~/.agents/skills/<skill_name>/.clawperator-managed` | ownership marker used before refreshing or removing Clawperator-managed generic agents copies |
 
 Current packaged first-party bundled skills:
 
@@ -10275,10 +10288,16 @@ Maintenance and repair commands:
 Current command behavior:
 
 - `clawperator bundled-skills install` copies packaged first-party bundled skills
-  into `~/.clawperator/bundled-skills/` and recreates discovery
-  symlinks for Claude Code, Codex, and the generic agents runtime
+  into `~/.clawperator/bundled-skills/`, recreates discovery symlinks for
+  Claude Code and Codex, and refreshes managed directory copies under
+  `~/.agents/skills/`
 - `clawperator bundled-skills update` runs the same copy-and-wire flow but
   reports the result as an update rather than a first install
+- rerunning either command repairs legacy Clawperator-managed symlinks under
+  `~/.agents/skills/` by replacing them with managed real directories
+- the installer refuses to overwrite a non-Clawperator entry in any shared
+  discovery directory; generic agents directories are considered
+  Clawperator-managed only when they contain `.clawperator-managed`
 - `clawperator bundled-skills list` reports installed skill names and the
   absolute `SKILL.md` path for each installed bundled skill
 - the current packaged install set contains
@@ -10299,8 +10318,10 @@ Current doctor behavior:
     dangling symlink
   - one or more packaged first-party bundled-skill directories are missing
     from the canonical install store
-  - Claude Code, Codex, or generic agents discovery entries are missing, broken,
-    conflicting, or no longer point at `~/.clawperator/bundled-skills/<skill_name>`
+  - Claude Code or Codex discovery symlinks are missing, broken, conflicting,
+    or no longer point at `~/.clawperator/bundled-skills/<skill_name>`
+  - generic agents discovery copies are missing, conflicting, unmarked, stale,
+    or still present as legacy Clawperator-managed symlinks
 - recommended remediation for those `warn` states is
   `clawperator bundled-skills update`
 - if the install path itself is malformed and cannot be repaired in place,
