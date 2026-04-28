@@ -139,28 +139,36 @@ Create a grounded findings file that captures current evidence, recommended poli
 ### Steps
 
 1. Read all required files in order.
-2. Search this repo for current personalized-skill language:
+2. Confirm which personal skill home OpenClaw loads. Run:
+
+```bash
+openclaw skills list --eligible --json
+```
+
+   Look for entries with `"source": "agents-skills-personal"`. If present, `~/.agents/skills/` is confirmed as the active personal skill home and the target for Phases 2-4. If absent but workspace-skills entries appear, record in `findings.md` that `~/.openclaw/workspace/skills/` is required instead and update the target in the Required Personalized Skill Status table.
+
+3. Search this repo for current personalized-skill language:
 
 ```bash
 rg -n "personalized|personalised|preference|user preferences|local labels|device graph|account state|personal assumptions|local skill" docs .agents/skills tasks apps sites evals
 ```
 
-3. If `../clawperator-skills/` exists, search it for the same terms and inspect representative personalized or local examples under `../clawperator-skills/skills/`.
-4. If the user has named any downstream or personal-skill repos before execution, inspect only those repositories. Do not browse arbitrary private directories looking for personal data.
-5. Create `findings.md` using the required structure above.
-6. In `Recommended Policy`, explicitly cover:
+4. If `../clawperator-skills/` exists, search it for the same terms and inspect representative personalized or local examples under `../clawperator-skills/skills/`.
+5. If the user has named any downstream or personal-skill repos before execution, inspect only those repositories. Do not browse arbitrary private directories looking for personal data.
+6. Create `findings.md` using the required structure above.
+7. In `Recommended Policy`, explicitly cover:
    - personalized local skills are valid when truthful and scoped
    - agents should name personal assumptions instead of hiding them
    - shared skills require inputs, configuration, discovery, or generalized selectors
    - private values must be sanitized in public artifacts
    - user preferences are useful context, not license to invent or persist sensitive memory without support
    - runtime failures must be surfaced truthfully: report success only when the top-level wrapper status is `success` and verify `skillResult.status` second; do not claim a skill succeeded based on `skillResult.status` alone when the wrapper is `indeterminate` or `failed` (see `docs/skills/runtime.md` trust-order section)
-7. Seed `Required Personalized Skill Status` with these rows in this exact order:
+8. Seed `Required Personalized Skill Status` with these rows in this exact order:
    - `home-battery-get-level`
    - `home-energy-get-yesterday-usage-cost`
    - `media-netflix-set-my-list-state`
    - `home-hvac-control`
-8. Add cross-repo work candidates with stable IDs such as `XREPO-1`, `XREPO-2`.
+9. Add cross-repo work candidates with stable IDs such as `XREPO-1`, `XREPO-2`.
 
 ### Acceptance Criteria
 
@@ -287,8 +295,12 @@ rg -n "XREPO-[0-9]+|owning repo|validation" tasks/skills/personalized-skills/fin
 
 ### Expected Commit
 
+Personal skill files created in `~/.agents/skills/` are not committed to this repository. If that directory is tracked in a personal dotfiles repo, commit them there separately.
+
+For this repo, commit only the `findings.md` update:
+
 ```text
-feat(skills): add simple personal home wrappers
+docs(tasks): verify home-battery and home-energy personal wrappers
 ```
 
 ## Phase 3: Basic Netflix Wrapper
@@ -349,8 +361,10 @@ or record why no live mutation test was run.
 
 ### Expected Commit
 
+Personal skill files are not committed to this repo. Commit only the `findings.md` update here:
+
 ```text
-feat(skills): add personal Netflix list wrapper
+docs(tasks): verify Netflix personal wrapper
 ```
 
 ## Phase 4: Unified HVAC Control Wrapper
@@ -373,7 +387,7 @@ multi-skill AirTouch implementation details from OpenClaw and the user.
 ### Steps
 
 1. Re-read Phase 2 and Phase 3 results in `findings.md`.
-2. Create `home-hvac-control` as the only user-facing HVAC wrapper in this task.
+2. Create `home-hvac-control` as the only user-facing HVAC wrapper in this task. This wrapper is a personal AgentSkills wrapper: a `SKILL.md` at `~/.agents/skills/home-hvac-control/SKILL.md`. It is NOT a Clawperator orchestrated runtime skill (which would require `skill.json.agent` and live in the runtime skills registry under `~/.clawperator/skills/`). The multi-step sequencing happens because the `SKILL.md` instructs the OpenClaw agent to run multiple `clawperator skills run` commands in sequence, not because Clawperator's own runtime orchestrates them.
 3. Do not create or expose `home-hvac-set-power-state`, `home-hvac-set-zone-state`, `home-hvac-set-mode`, or `home-hvac-set-fan-level`.
 4. Implement the wrapper so it can accept a natural request such as: "turn on the a/c, make sure it's on in the living room, use the medium fan level".
 5. Internally sequence the required Clawperator runtime skills based on parsed intent. Candidate runtime skills from prior findings are:
@@ -408,8 +422,10 @@ rg -n "home-hvac-control" tasks/skills/personalized-skills/findings.md
 
 ### Expected Commit
 
+Personal skill files are not committed to this repo. Commit only the `findings.md` update here:
+
 ```text
-feat(skills): add unified personal HVAC control wrapper
+docs(tasks): verify unified HVAC personal wrapper
 ```
 
 ## Phase 5: Durable Public Documentation
