@@ -110,7 +110,11 @@ Key implications:
 
 1. runtime skills are installed, but not exposed through host-agent discovery
    conventions
-2. bundled skills are exposed through host-agent discovery conventions
+2. bundled skills are exposed through host-agent discovery conventions:
+   - Claude Code and Codex discovery entries are managed symlinks into
+     `~/.clawperator/bundled-skills/`
+   - generic agents discovery entries under `~/.agents/skills/` are managed
+     real directory copies marked with `.clawperator-managed`
 3. the generated guide lives under `~/.clawperator/AGENTS.md`, not the places a
    host agent is most likely to inspect first
 4. the runtime-skills registry is discovered from the installed home-directory

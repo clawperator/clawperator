@@ -69,6 +69,13 @@ The runtime-skills registry is discovered automatically from
 `~/.clawperator/skills/skills/skills-registry.json` after `clawperator skills install`, so
 `install.sh` no longer writes `CLAWPERATOR_SKILLS_REGISTRY` into shell RC files.
 
+Bundled host-agent skills are installed separately from runtime skills:
+
+- `~/.clawperator/bundled-skills/` is the canonical first-party bundled-skill store
+- `~/.claude/skills/` and the Codex skills dir receive Clawperator-managed symlinks into that store
+- `~/.agents/skills/` receives Clawperator-managed real directory copies with a `.clawperator-managed` marker so generic agents can scan them without following symlinks outside their configured root
+- runtime skills from `~/.clawperator/skills/` are not mirrored into shared agent discovery directories
+
 Canonical public next step after install:
 
 - read [Host Agent Orientation](host-agents.md) when you need to decide between
