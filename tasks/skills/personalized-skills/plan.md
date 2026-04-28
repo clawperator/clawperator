@@ -117,15 +117,22 @@ truthfulness loop before implementing argument parsing or multi-step fan-out.
 ## Personalized Skill Test Strategy
 
 Each personalized wrapper must include a small local test script beside the
-personal skill. The tests stub command execution and assert the exact
+personal skill. The tests assert the exact documented or generated
 `clawperator skills run ...` argv or command sequence before any live OpenClaw
 forward test runs.
 
+For a pure `SKILL.md` wrapper with no executable wrapper code, the test script
+may be a static content validator that reads `SKILL.md` and asserts the
+required runtime skill id, `--output json`, argument names, refusal behavior,
+and success-reporting rule are present. If the wrapper introduces executable
+normalization code, the test must exercise that code with command execution
+stubbed.
+
 Do not rely on a dry-run or plan mode as the only proof. A dry-run helper may be
-used internally, but the required acceptance signal is a test that fails if the
-wrapper passes the wrong runtime skill id, omits `--output json`, misorders
-post-`--` arguments, guesses on ambiguous input, or claims success without the
-expected runtime result shape.
+used internally, but the required acceptance signal is an executable test script
+that exits nonzero if the wrapper passes or documents the wrong runtime skill
+id, omits `--output json`, misorders post-`--` arguments, guesses on ambiguous
+input, or claims success without the expected runtime result shape.
 
 Minimum test coverage:
 
