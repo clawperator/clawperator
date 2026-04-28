@@ -3,7 +3,7 @@ name: clawperator-skill-author-by-agent-discovery
 description: "Clawperator first-party bundled skill. Route a no-match Clawperator request through bounded discovery before choosing one truthful next step: reuse an existing skill, proceed to recording, continue bounded discovery, fulfill one-shot, escalate, or decline."
 ---
 
-# Skill Author By Agent Discovery
+# Clawperator Skill Author By Agent Discovery
 
 Guide a host-facing agent through Clawperator's no-match route from "no
 installed runtime skill clearly fits" to "one truthful next step."
