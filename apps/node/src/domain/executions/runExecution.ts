@@ -15,7 +15,7 @@ import { getOperatorPackageApkPath } from "../version/compatibility.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
 import type { TimeoutDiagnostics } from "../../contracts/errors.js";
-import { extractSnapshotsFromLogs } from "./snapshotHelper.js";
+import { extractSnapshotsForCommand } from "./snapshotHelper.js";
 import { emitResult, emitExecution } from "../observe/events.js";
 import { LIMITS } from "../../contracts/limits.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -664,7 +664,7 @@ async function performExecution(
       // Reconstruct snapshot XML from the live result logcat stream.
       const hasSnapshot = result.envelope.stepResults.some(s => s.actionType === "snapshot_ui");
       if (hasSnapshot) {
-        const snapshots = extractSnapshotsFromLogs(result.snapshotLogLines ?? []);
+        const snapshots = extractSnapshotsForCommand(result.snapshotLogLines ?? [], execution.commandId);
         attachSnapshotsToStepResults(result.envelope.stepResults, snapshots);
         markExtractionFailedSnapshotSteps(result.envelope.stepResults, options.warn);
         // Attach data.warn to any snapshot_ui immediately following a click with no sleep.

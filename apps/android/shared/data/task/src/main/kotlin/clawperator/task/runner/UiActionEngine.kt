@@ -6,6 +6,7 @@ import action.devicestate.DeviceState
 import action.devicestate.DeviceStateMock
 import clawperator.uitree.UiTreeClickType
 import clawperator.uitree.UiTreeClickTypes
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -40,20 +41,21 @@ class UiActionEngineDefault(
     override suspend fun execute(
         taskScope: TaskScope,
         plan: UiActionPlan,
-    ): UiActionExecutionResult {
-        val stepResults = mutableListOf<UiActionStepResult>()
+    ): UiActionExecutionResult =
+        withContext(TaskStatusElement(currentTaskStatus(), plan.commandId)) {
+            val stepResults = mutableListOf<UiActionStepResult>()
 
-        for (action in plan.actions) {
-            val stepResult = executeSingle(taskScope, action)
-            stepResults += stepResult
+            for (action in plan.actions) {
+                val stepResult = executeSingle(taskScope, action)
+                stepResults += stepResult
+            }
+
+            UiActionExecutionResult(
+                commandId = plan.commandId,
+                taskId = plan.taskId,
+                stepResults = stepResults,
+            )
         }
-
-        return UiActionExecutionResult(
-            commandId = plan.commandId,
-            taskId = plan.taskId,
-            stepResults = stepResults,
-        )
-    }
 
     private suspend fun executeSingle(
         taskScope: TaskScope,

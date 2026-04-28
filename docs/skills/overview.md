@@ -34,8 +34,9 @@ Skills are registry-driven. They are not discovered by folder scanning alone. `c
 `clawperator skills` and `skills-registry.json` cover runtime skills only.
 Authoring skills are a separate category of AI agent programs that live in
 `.agents/skills/` in source form and install separately into
-`~/.clawperator/bundled-skills/` plus the Claude Code, Codex, and generic
-agents (`~/.agents/skills/`) discovery directories.
+`~/.clawperator/bundled-skills/` plus host-agent discovery directories. Claude
+Code and Codex receive symlinks into the canonical store. Generic agents
+receive managed real directory copies under `~/.agents/skills/`.
 
 Installer-facing discovery is deliberately split:
 

@@ -69,6 +69,13 @@ The runtime-skills registry is discovered automatically from
 `~/.clawperator/skills/skills/skills-registry.json` after `clawperator skills install`, so
 `install.sh` no longer writes `CLAWPERATOR_SKILLS_REGISTRY` into shell RC files.
 
+Bundled host-agent skills are installed separately from runtime skills:
+
+- `~/.clawperator/bundled-skills/` is the canonical first-party bundled-skill store
+- `~/.claude/skills/` and the Codex skills dir receive Clawperator-managed symlinks into that store
+- `~/.agents/skills/` receives Clawperator-managed real directory copies with a `.clawperator-managed` marker so generic agents can scan them without following symlinks outside their configured root
+- runtime skills from `~/.clawperator/skills/` are not mirrored into shared agent discovery directories
+
 Canonical public next step after install:
 
 - read [Host Agent Orientation](host-agents.md) when you need to decide between
@@ -161,6 +168,15 @@ curl -fsSL https://clawperator.com/operator.apk -o ~/.clawperator/downloads/oper
 ```
 
 Canonical public APK URL: `https://clawperator.com/operator.apk`
+
+Important compatibility note:
+
+- refresh the APK from that stable URL before reinstalling when you need recent
+  runtime fixes
+- older APKs do not include the newer `open_app` foreground wait behavior or
+  the tagged snapshot log marker used for reliable `snapshot_ui` extraction
+- keep the installed CLI and APK on current matching releases; `clawperator doctor`
+  reports version compatibility before you trust a device run
 
 ```bash
 clawperator operator setup --apk ~/.clawperator/downloads/operator.apk

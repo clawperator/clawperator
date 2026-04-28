@@ -184,6 +184,7 @@ These files help a host orient after install:
 | `~/.clawperator/mcp-config-snippet.json` | Paste-ready MCP config written by `clawperator host setup` | Use it when you choose the MCP route. |
 | `~/.clawperator/skills/skills/skills-registry.json` | Installed runtime-skills registry | Verify it exists when `skills list` or `skills for-app` cannot discover skills. |
 | `~/.clawperator/bundled-skills/` | Installed first-party bundled skills | Inspect it through `clawperator bundled-skills list` when runtime discovery returns no relevant match. |
+| `~/.agents/skills/<clawperator-bundled-skill>/` | Managed real directory copies for generic agent skill discovery | Generic agents such as OpenClaw can discover packaged Clawperator bundled skills without following symlinks outside `~/.agents/skills`. |
 
 ## Verification
 
@@ -198,6 +199,8 @@ clawperator skills search --keyword settings
 clawperator skills get com.android.settings.capture-overview
 clawperator skills list
 clawperator bundled-skills list
+test -d ~/.agents/skills/clawperator-agent-orientation
+test ! -L ~/.agents/skills/clawperator-agent-orientation
 ```
 
 Check:
@@ -209,6 +212,7 @@ Check:
 - `skills get` returns a top-level `skill`
 - `bundled-skills list` returns top-level `skills`, `count`, and `installedDir`
 - `bundled-skills list` includes `clawperator-agent-orientation`, `clawperator-upgrade`, `clawperator-skill-author-by-agent-discovery`, and `clawperator-skill-author-by-recording` in `skills[].name`
+- packaged Clawperator bundled skills under `~/.agents/skills/` are real directories, not symlinks
 
 For MCP:
 

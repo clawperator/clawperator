@@ -109,7 +109,8 @@ Current install model:
 | Claude Code discovery dir | `~/.claude/skills/` | symlinks into the canonical store |
 | Codex discovery dir | `$CODEX_HOME/skills/` | symlinks into the canonical store when `CODEX_HOME` is set |
 | Codex default discovery dir | `~/.codex/skills/` | used when `CODEX_HOME` is unset |
-| Generic agents discovery dir | `~/.agents/skills/` | symlinks into the canonical store for generic agent runtimes |
+| Generic agents discovery dir | `~/.agents/skills/` | managed real directory copies for generic agent runtimes |
+| Managed-copy marker | `~/.agents/skills/<skill_name>/.clawperator-managed` | ownership marker used before refreshing or removing Clawperator-managed generic agents copies |
 
 Current packaged first-party bundled skills:
 
@@ -131,10 +132,16 @@ Maintenance and repair commands:
 Current command behavior:
 
 - `clawperator bundled-skills install` copies packaged first-party bundled skills
-  into `~/.clawperator/bundled-skills/` and recreates discovery
-  symlinks for Claude Code, Codex, and the generic agents runtime
+  into `~/.clawperator/bundled-skills/`, recreates discovery symlinks for
+  Claude Code and Codex, and refreshes managed directory copies under
+  `~/.agents/skills/`
 - `clawperator bundled-skills update` runs the same copy-and-wire flow but
   reports the result as an update rather than a first install
+- rerunning either command repairs legacy Clawperator-managed symlinks under
+  `~/.agents/skills/` by replacing them with managed real directories
+- the installer refuses to overwrite a non-Clawperator entry in any shared
+  discovery directory; generic agents directories are considered
+  Clawperator-managed only when they contain `.clawperator-managed`
 - `clawperator bundled-skills list` reports installed skill names and the
   absolute `SKILL.md` path for each installed bundled skill
 - the current packaged install set contains
@@ -155,8 +162,10 @@ Current doctor behavior:
     dangling symlink
   - one or more packaged first-party bundled-skill directories are missing
     from the canonical install store
-  - Claude Code, Codex, or generic agents discovery entries are missing, broken,
-    conflicting, or no longer point at `~/.clawperator/bundled-skills/<skill_name>`
+  - Claude Code or Codex discovery symlinks are missing, broken, conflicting,
+    or no longer point at `~/.clawperator/bundled-skills/<skill_name>`
+  - generic agents discovery copies are missing, conflicting, unmarked, stale,
+    or still present as legacy Clawperator-managed symlinks
 - recommended remediation for those `warn` states is
   `clawperator bundled-skills update`
 - if the install path itself is malformed and cannot be repaired in place,

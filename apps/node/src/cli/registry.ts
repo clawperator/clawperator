@@ -349,7 +349,8 @@ Notes:
   - Copies packaged first-party bundled skills to ~/.clawperator/bundled-skills/
   - Installs the packaged bundled-skill front doors that help host agents operate Clawperator
   - Creates Claude Code, Codex, and generic agents discovery directories unconditionally
-  - Symlinks each installed skill into ~/.claude/skills/, the Codex skills dir, and ~/.agents/skills/
+  - Symlinks each installed skill into ~/.claude/skills/ and the Codex skills dir
+  - Copies each installed skill into ~/.agents/skills/ for generic agent runtimes
   - Use 'clawperator bundled-skills list' after install to inspect the available host-agent helpers on this machine
 `;
 
@@ -360,7 +361,8 @@ Usage:
 
 Notes:
   - Re-copies packaged first-party bundled skills into ~/.clawperator/bundled-skills/
-  - Recreates Claude Code, Codex, and generic agents discovery symlinks
+  - Recreates Claude Code and Codex discovery symlinks
+  - Refreshes generic agents discovery copies in ~/.agents/skills/
   - Safe to run multiple times
 `;
 

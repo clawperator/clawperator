@@ -68,7 +68,9 @@ The Node CLI owns Clawperator install behavior after the CLI is available.
 
 - operator remediation orchestration
 - runtime skills install
-- bundled-skills install
+- bundled-skills install, including canonical bundled-skill copies, Claude and
+  Codex discovery symlinks, and managed real directory copies under
+  `~/.agents/skills/`
 - host setup
 - state threading between those steps
 - installer-facing JSON output
