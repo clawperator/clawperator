@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.9.3] - 2026-04-28
+
+This release hardened snapshot reliability across mixed runtime versions, improved bundled skill discovery compatibility for OpenClaw hosts, and kept release Android diagnostics readable.
+
+### 🤖 Node API & CLI
+- **Changed:** Correlated snapshot hierarchy log blocks by `commandId` and preferred tagged markers while keeping compatibility with legacy marker streams.
+- **Fixed:** Classified legacy untagged snapshot hierarchy markers as `VERSION_INCOMPATIBLE` when tagged snapshots could not be attached, so mixed-version failures surface as explicit compatibility issues.
+- **Fixed:** Switched OpenClaw-facing bundled skill installation from symlinks to managed copied directories under `~/.agents/skills`, preserving user-managed entries while keeping packaged skill refresh deterministic.
+
+### 📚 Documentation & Website
+- **Changed:** Documented `open_app` foreground readiness boundaries and clarified the related skill-development flow.
+- **Changed:** Added personalized skills guidance and clarified how runtime, bundled, personalized, and workspace skill surfaces differ.
+- **Changed:** Updated docs to match bundled-skill discovery behavior and snapshot compatibility handling in mixed-version environments.
+
+### 📱 Android Operator APK
+- **Changed:** Tagged snapshot hierarchy logs with execution `commandId` so Node can correlate runtime snapshot output deterministically.
+- **Changed:** Disabled release name obfuscation to keep release logcat class and tag names readable while preserving shrinking and optimization.
+
+Pull requests:
+- [fix(runtime): correlate snapshot UI logs by commandId](https://github.com/clawperator/clawperator/pull/246)
+- [fix(node): make bundled skills discoverable to OpenClaw](https://github.com/clawperator/clawperator/pull/247)
+- [docs(skills): add personalized skills guidance](https://github.com/clawperator/clawperator/pull/248)
+- [fix(android): disable release name obfuscation](https://github.com/clawperator/clawperator/pull/249)
+- [fix(node): classify legacy snapshot markers as version mismatches](https://github.com/clawperator/clawperator/pull/250)
+
 ## [0.9.2] - 2026-04-27
 
 This release makes `open_app` wait for the launched app to reach the foreground by default, with an explicit opt-out and navigation timeout controls for flows that need it.
