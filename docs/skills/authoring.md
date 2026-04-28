@@ -393,7 +393,7 @@ Recording-derived authoring truthfulness:
 Personalized versus shared skills:
 
 - a recording-derived skill can be a valid personalized local first outcome
-- use [Personalized Skills](personalized.md) for the full local-versus-shared
+- use [Personalized Skills](personalized-skills.md) for the full local-versus-shared
   policy, privacy boundaries, promotion checklist, and verification rules
 - keep recording-specific notes in the authored `SKILL.md`: what came from the
   recording, what needed live inspection, and what remains local-only
