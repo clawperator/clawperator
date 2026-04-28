@@ -149,11 +149,30 @@ Change Clawperator's bundled-skills install/update contract so generic agents di
    - Claude: managed symlink to the canonical store.
    - Codex: managed symlink to the canonical store.
    - Generic agents: managed directory copy under `~/.agents/skills/<skill>`.
-2. Add helper logic for generic agents managed copies:
-   - Identify a managed copy by a marker that Clawperator owns, or by another deterministic method that does not claim unrelated user directories.
-   - Refresh managed copies from the canonical installed skill after the canonical store is refreshed.
-   - Treat existing Clawperator-managed symlinks in `~/.agents/skills` as repairable legacy state and replace them with managed directory copies.
-   - Refuse to overwrite non-Clawperator entries.
+2. Add helper logic for generic agents managed copies. Before writing any code,
+   decide the managed-copy detection mechanism and record the choice in the
+   commit message. Do not leave this implicit.
+
+   Two viable options:
+
+   | Option | How it works | Tradeoff |
+   | --- | --- | --- |
+   | Sentinel file | Write a `.clawperator-managed` file inside every managed copy directory during install/update. Detection reads that file. | Simple; survives across function calls. Adds one file per skill dir. |
+   | Canonical path match | Derive the expected directory content from the canonical store path and skill name; treat a directory as managed only if it contains a `SKILL.md` whose content matches the installed skill. | No extra file. Slower and fragile if content diverges. |
+
+   Use the sentinel file option unless code inspection reveals a strong reason to
+   prefer content matching. The `isManagedBundledSkillSymlink` function uses target
+   path resolution for symlinks - do not try to adapt it to directories. Write a
+   new `isManagedBundledSkillDirectory` counterpart that checks for the sentinel
+   file.
+
+   With the chosen mechanism in place:
+   - Refresh managed copies from the canonical installed skill after the canonical
+     store is refreshed.
+   - Treat existing Clawperator-managed symlinks in `~/.agents/skills` as
+     repairable legacy state and replace them with managed directory copies.
+   - Refuse to overwrite non-Clawperator entries (no sentinel file, not a
+     Clawperator-managed symlink).
 3. Keep stale cleanup narrow:
    - Remove stale canonical bundled skill directories only when they contain `SKILL.md` and are no longer packaged.
    - Remove stale Claude/Codex entries only when they are Clawperator-managed symlinks.
