@@ -184,8 +184,14 @@ Command pattern:
 ~/.agents/skills/<skill_name>/scripts/test_command_shape.sh
 openclaw skills list --eligible --json
 openclaw skills info <skill_name> --json
-openclaw agent --message "<safe request>" --json
+openclaw agent --agent <agent_id> --message "<safe request>" --json
 ```
+
+Use `--agent <agent_id>`, `--session-id <session_id>`, or
+`--to <e164_number>` for the forward test unless the OpenClaw host has a
+default route. If no safe target or route exists, record that blocker instead
+of treating a targetless `openclaw agent --message ... --json` failure as a
+skill failure.
 
 Discovery success shape:
 
