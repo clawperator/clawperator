@@ -9,6 +9,7 @@ import { copyBundledSkills, listPackagedBundledSkills, MANAGED_BUNDLED_SKILL_COP
 
 const tempRoots: string[] = [];
 const directorySymlinkType = process.platform === "win32" ? "junction" : "dir";
+const managedMarkerContent = "managed-by=clawperator\nkind=bundled-skill-copy\n";
 
 async function makeTempRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "clawperator-bundled-skills-"));
@@ -435,6 +436,60 @@ describe("copyBundledSkills", () => {
     assert.equal(await readFile(join(userSkillDir, "SKILL.md"), "utf8"), "# user-owned\n");
   });
 
+  it("refuses to overwrite a generic agents entry with an invalid managed marker", async () => {
+    const root = await makeTempRoot();
+    const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
+    const agentsSkillsDir = join(root, "home", ".agents", "skills");
+    const userSkillDir = join(agentsSkillsDir, "clawperator-skill-author-by-recording");
+    await mkdir(userSkillDir, { recursive: true });
+    await writeFile(join(userSkillDir, "SKILL.md"), "# user-owned\n", "utf8");
+    await writeFile(join(userSkillDir, MANAGED_BUNDLED_SKILL_COPY_MARKER), "managed-by=someone-else\n", "utf8");
+
+    const result = await copyBundledSkills({
+      sourceDir,
+      installedDir: join(root, "home", ".clawperator", "bundled-skills"),
+      claudeSkillsDir: join(root, "home", ".claude", "skills"),
+      codexSkillsDir: join(root, "home", ".codex", "skills"),
+      agentsSkillsDir,
+      cliVersion: "1.2.3",
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      code: "BUNDLED_SKILLS_INSTALL_FAILED",
+      message: `Refusing to overwrite non-Clawperator skill entry: ${userSkillDir}`,
+    });
+    assert.equal(await readFile(join(userSkillDir, "SKILL.md"), "utf8"), "# user-owned\n");
+  });
+
+  it("refuses to overwrite a generic agents entry with a symlinked managed marker", async () => {
+    const root = await makeTempRoot();
+    const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
+    const agentsSkillsDir = join(root, "home", ".agents", "skills");
+    const userSkillDir = join(agentsSkillsDir, "clawperator-skill-author-by-recording");
+    const markerTarget = join(root, "marker-target");
+    await mkdir(userSkillDir, { recursive: true });
+    await writeFile(join(userSkillDir, "SKILL.md"), "# user-owned\n", "utf8");
+    await writeFile(markerTarget, managedMarkerContent, "utf8");
+    await symlink(markerTarget, join(userSkillDir, MANAGED_BUNDLED_SKILL_COPY_MARKER));
+
+    const result = await copyBundledSkills({
+      sourceDir,
+      installedDir: join(root, "home", ".clawperator", "bundled-skills"),
+      claudeSkillsDir: join(root, "home", ".claude", "skills"),
+      codexSkillsDir: join(root, "home", ".codex", "skills"),
+      agentsSkillsDir,
+      cliVersion: "1.2.3",
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      code: "BUNDLED_SKILLS_INSTALL_FAILED",
+      message: `Refusing to overwrite non-Clawperator skill entry: ${userSkillDir}`,
+    });
+    assert.equal(await readFile(join(userSkillDir, "SKILL.md"), "utf8"), "# user-owned\n");
+  });
+
   it("refuses to overwrite an existing non-Clawperator skill entry with the same basename", async () => {
     const root = await makeTempRoot();
     const sourceDir = await createSourceSkill(root, "clawperator-skill-author-by-recording");
@@ -539,7 +594,7 @@ describe("copyBundledSkills", () => {
     const staleSkillDir = join(agentsSkillsDir, "old-skill");
     await mkdir(staleSkillDir, { recursive: true });
     await writeFile(join(staleSkillDir, "SKILL.md"), "# old-skill\n", "utf8");
-    await writeFile(join(staleSkillDir, MANAGED_BUNDLED_SKILL_COPY_MARKER), "managed-by=clawperator\n", "utf8");
+    await writeFile(join(staleSkillDir, MANAGED_BUNDLED_SKILL_COPY_MARKER), managedMarkerContent, "utf8");
 
     const result = await copyBundledSkills({
       sourceDir,

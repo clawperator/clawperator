@@ -1,4 +1,4 @@
-import { access, cp, lstat, mkdir, readdir, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { access, cp, lstat, mkdir, readdir, readFile, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -289,6 +289,10 @@ async function isManagedBundledSkillSymlink(linkPath: string, installedDir: stri
   return inspection.ok;
 }
 
+function isManagedBundledSkillCopyMarkerContent(content: string): boolean {
+  return content === MANAGED_BUNDLED_SKILL_COPY_MARKER_CONTENT;
+}
+
 export async function inspectManagedBundledSkillDirectory(
   directoryPath: string,
   installedDir: string,
@@ -338,8 +342,16 @@ export async function inspectManagedBundledSkillDirectory(
 
   const markerPath = join(directoryPath, MANAGED_BUNDLED_SKILL_COPY_MARKER);
   try {
-    const markerStat = await stat(markerPath);
+    const markerStat = await lstat(markerPath);
     if (markerStat.isFile()) {
+      const markerContent = await readFile(markerPath, "utf8");
+      if (!isManagedBundledSkillCopyMarkerContent(markerContent)) {
+        return {
+          ok: false,
+          status: "unmarked",
+          expectedTarget,
+        };
+      }
       try {
         const skillFileStat = await stat(join(directoryPath, "SKILL.md"));
         if (!skillFileStat.isFile()) {
