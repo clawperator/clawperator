@@ -125,18 +125,25 @@ interface BrokenAgentDiscoveryEntry {
   actualTarget?: string;
 }
 
+interface BundledSkillDiscoveryCheckTarget {
+  dirLabel: string;
+  discoveryDir: string;
+  kind: "symlink" | "copy";
+}
+
 async function findBrokenAgentDiscoveryEntries(
   installedDir: string,
   expectedSkills: string[],
   options: CheckBundledSkillsStalenessOptions
 ): Promise<BrokenAgentDiscoveryEntry[]> {
-  const discoveryDirs = [
+  const discoveryDirs: BundledSkillDiscoveryCheckTarget[] = [
     {
       dirLabel: "claude",
       discoveryDir: resolveClaudeSkillsDir({
         claudeSkillsDir: options.claudeSkillsDir,
         homeDir: options.homeDir,
       }),
+      kind: "symlink",
     },
     {
       dirLabel: "codex",
@@ -146,6 +153,7 @@ async function findBrokenAgentDiscoveryEntries(
         homeDir: options.homeDir,
         env: options.env,
       }),
+      kind: "symlink",
     },
     {
       dirLabel: "agents",
@@ -153,14 +161,15 @@ async function findBrokenAgentDiscoveryEntries(
         agentsSkillsDir: options.agentsSkillsDir,
         homeDir: options.homeDir,
       }),
+      kind: "copy",
     },
   ];
 
   const brokenEntries: BrokenAgentDiscoveryEntry[] = [];
 
-  for (const { dirLabel, discoveryDir } of discoveryDirs) {
+  for (const { dirLabel, discoveryDir, kind } of discoveryDirs) {
     for (const skillName of expectedSkills) {
-      const inspection = dirLabel === "agents"
+      const inspection = kind === "copy"
         ? await inspectManagedBundledSkillDirectory(
           join(discoveryDir, skillName),
           installedDir,

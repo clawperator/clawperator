@@ -15,7 +15,11 @@ import { ERROR_CODES } from "../../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
 import { getCliVersion } from "../../../domain/version/compatibility.js";
-import { listPackagedBundledSkills, MANAGED_BUNDLED_SKILL_COPY_MARKER } from "../../../domain/skills/copyBundledSkills.js";
+import {
+    listPackagedBundledSkills,
+    MANAGED_BUNDLED_SKILL_COPY_MARKER,
+    MANAGED_BUNDLED_SKILL_COPY_MARKER_CONTENT,
+} from "../../../domain/skills/copyBundledSkills.js";
 
 describe("Doctor: hostChecks", () => {
     const tempRoots: string[] = [];
@@ -41,7 +45,7 @@ describe("Doctor: hostChecks", () => {
 
     async function createManagedAgentsCopy(sourcePath: string, copyPath: string): Promise<void> {
         await cp(sourcePath, copyPath, { recursive: true, force: true, dereference: true });
-        await writeFile(join(copyPath, MANAGED_BUNDLED_SKILL_COPY_MARKER), "managed-by=clawperator\nkind=bundled-skill-copy\n", "utf8");
+        await writeFile(join(copyPath, MANAGED_BUNDLED_SKILL_COPY_MARKER), MANAGED_BUNDLED_SKILL_COPY_MARKER_CONTENT, "utf8");
     }
 
     async function seedHealthyAgentSkillsInstall(

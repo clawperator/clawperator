@@ -5,11 +5,15 @@ import { join, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { getCliVersion } from "../../domain/version/compatibility.js";
 import { cmdBundledSkillsInstall, cmdBundledSkillsList } from "../../cli/commands/bundledSkills.js";
-import { copyBundledSkills, listPackagedBundledSkills, MANAGED_BUNDLED_SKILL_COPY_MARKER } from "../../domain/skills/copyBundledSkills.js";
+import {
+  copyBundledSkills,
+  listPackagedBundledSkills,
+  MANAGED_BUNDLED_SKILL_COPY_MARKER,
+  MANAGED_BUNDLED_SKILL_COPY_MARKER_CONTENT,
+} from "../../domain/skills/copyBundledSkills.js";
 
 const tempRoots: string[] = [];
 const directorySymlinkType = process.platform === "win32" ? "junction" : "dir";
-const managedMarkerContent = "managed-by=clawperator\nkind=bundled-skill-copy\n";
 
 async function makeTempRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "clawperator-bundled-skills-"));
@@ -37,7 +41,7 @@ async function assertManagedAgentsCopy(agentsSkillsDir: string, skillName: strin
   const copyPath = join(agentsSkillsDir, skillName);
   assert.equal((await lstat(copyPath)).isDirectory(), true);
   assert.equal(await readFile(join(copyPath, "SKILL.md"), "utf8"), expectedSkillMarkdown);
-  assert.match(await readFile(join(copyPath, MANAGED_BUNDLED_SKILL_COPY_MARKER), "utf8"), /managed-by=clawperator/);
+  assert.equal(await readFile(join(copyPath, MANAGED_BUNDLED_SKILL_COPY_MARKER), "utf8"), MANAGED_BUNDLED_SKILL_COPY_MARKER_CONTENT);
 }
 
 afterEach(async () => {
@@ -470,7 +474,7 @@ describe("copyBundledSkills", () => {
     const markerTarget = join(root, "marker-target");
     await mkdir(userSkillDir, { recursive: true });
     await writeFile(join(userSkillDir, "SKILL.md"), "# user-owned\n", "utf8");
-    await writeFile(markerTarget, managedMarkerContent, "utf8");
+    await writeFile(markerTarget, MANAGED_BUNDLED_SKILL_COPY_MARKER_CONTENT, "utf8");
     await symlink(markerTarget, join(userSkillDir, MANAGED_BUNDLED_SKILL_COPY_MARKER));
 
     const result = await copyBundledSkills({
@@ -594,7 +598,7 @@ describe("copyBundledSkills", () => {
     const staleSkillDir = join(agentsSkillsDir, "old-skill");
     await mkdir(staleSkillDir, { recursive: true });
     await writeFile(join(staleSkillDir, "SKILL.md"), "# old-skill\n", "utf8");
-    await writeFile(join(staleSkillDir, MANAGED_BUNDLED_SKILL_COPY_MARKER), managedMarkerContent, "utf8");
+    await writeFile(join(staleSkillDir, MANAGED_BUNDLED_SKILL_COPY_MARKER), MANAGED_BUNDLED_SKILL_COPY_MARKER_CONTENT, "utf8");
 
     const result = await copyBundledSkills({
       sourceDir,

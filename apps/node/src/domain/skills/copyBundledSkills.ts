@@ -9,7 +9,7 @@ import { DEFAULT_BUNDLED_SKILLS_DIR } from "./skillsConfig.js";
 const BUNDLED_SKILLS_SOURCE_ENV_VAR = "CLAWPERATOR_BUNDLED_SKILLS";
 const VERSION_FILENAME = "version.txt";
 export const MANAGED_BUNDLED_SKILL_COPY_MARKER = ".clawperator-managed";
-const MANAGED_BUNDLED_SKILL_COPY_MARKER_CONTENT = "managed-by=clawperator\nkind=bundled-skill-copy\n";
+export const MANAGED_BUNDLED_SKILL_COPY_MARKER_CONTENT = "managed-by=clawperator\nkind=bundled-skill-copy\n";
 
 export interface BundledSkillDiscoveryDirEntry {
   label: string;
