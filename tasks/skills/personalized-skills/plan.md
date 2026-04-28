@@ -114,6 +114,28 @@ The first two skills are deliberately "dumb" wrappers. Use them to prove the
 personal skill home, OpenClaw discovery, OpenClaw invocation, and result
 truthfulness loop before implementing argument parsing or multi-step fan-out.
 
+## Personalized Skill Test Strategy
+
+Each personalized wrapper must include a small local test script beside the
+personal skill. The tests stub command execution and assert the exact
+`clawperator skills run ...` argv or command sequence before any live OpenClaw
+forward test runs.
+
+Do not rely on a dry-run or plan mode as the only proof. A dry-run helper may be
+used internally, but the required acceptance signal is a test that fails if the
+wrapper passes the wrong runtime skill id, omits `--output json`, misorders
+post-`--` arguments, guesses on ambiguous input, or claims success without the
+expected runtime result shape.
+
+Minimum test coverage:
+
+| Skill | Required local tests |
+| --- | --- |
+| `home-battery-get-level` | command shape calls `com.solaxcloud.starter.get-battery` with `--output json` and no user content arguments |
+| `home-energy-get-yesterday-usage-cost` | command shape calls the chosen GloBird runtime skill with `--output json`; if fallback is chosen, test and document the chosen fallback |
+| `media-netflix-set-my-list-state` | `add <title>` maps to `--action add --title <title> --profile <local_profile>`; `remove <title>` maps to `--action remove --title <title> --profile <local_profile>`; missing title does not run |
+| `home-hvac-control` | representative multi-part request maps to the expected ordered AirTouch runtime command sequence; unknown room alias does not run without inspection or clarification; partial failure reporting preserves which step failed |
+
 ## Source Of Truth
 
 | Topic | Verify against |
@@ -183,12 +205,14 @@ After Phase 2:
 
 - `home-battery-get-level` exists in the chosen personal skill home
 - `home-energy-get-yesterday-usage-cost` exists in the chosen personal skill home
+- both skills have local command-shape tests that pass
 - both skills are visible in `openclaw skills list --eligible --json`
 - both skills have been forward-tested through `openclaw agent --message ... --json` when safe, with results or blockers recorded in `findings.md`
 
 After Phase 3:
 
 - `media-netflix-set-my-list-state` exists in the chosen personal skill home
+- the skill has local intent-to-argv tests that pass
 - the skill is visible in `openclaw skills list --eligible --json`
 - the skill has been forward-tested through OpenClaw with at least one add/remove request when safe, with results or blockers recorded in `findings.md`
 
@@ -196,6 +220,7 @@ After Phase 4:
 
 - `home-hvac-control` exists in the chosen personal skill home
 - no separate user-facing HVAC power, zone, mode, or fan wrappers are introduced by this task
+- the skill has local intent-to-command-sequence tests that pass
 - the skill is visible in `openclaw skills list --eligible --json`
 - the skill has been forward-tested through OpenClaw with at least one realistic multi-part HVAC request when safe, with results or blockers recorded in `findings.md`
 

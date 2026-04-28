@@ -33,6 +33,8 @@ Current state is planning complete, execution not started.
 - Do not leave durable policy only in `tasks/`. Phase 5 must create `docs/skills/personalized.md`.
 - Create the required personalized skills in this order: `home-battery-get-level`, `home-energy-get-yesterday-usage-cost`, `media-netflix-set-my-list-state`, then `home-hvac-control`.
 - Do not create user-facing HVAC split wrappers such as `home-hvac-set-power-state`, `home-hvac-set-zone-state`, `home-hvac-set-mode`, or `home-hvac-set-fan-level` in this task. `home-hvac-control` is the only user-facing HVAC skill deliverable.
+- Each personalized wrapper must include a small local test script beside the skill that stubs command execution and asserts exact `clawperator skills run` argv or command sequence. Run that test before OpenClaw discovery or live-call validation.
+- Do not treat dry-run text as sufficient proof. A dry-run helper is acceptable only if a test asserts its command output and failure behavior.
 - After adding each skill, verify OpenClaw discovery before moving to the next skill.
 - For the first two no-argument wrappers, call OpenClaw through `openclaw agent --message ... --json` and record the real result or blocker in `findings.md`.
 - Use `.agents/skills/docs-author/SKILL.md` for Phase 5. Do not hand-edit generated docs under `sites/docs/.build/` or `sites/docs/site/`.
@@ -112,8 +114,8 @@ Create `tasks/skills/personalized-skills/findings.md` in Phase 1 with this exact
 | --- | --- | --- | --- | --- |
 
 ## Required Personalized Skill Status
-| Order | Skill | Target home | Status | OpenClaw discovery result | OpenClaw live-call result |
-| --- | --- | --- | --- | --- | --- |
+| Order | Skill | Target home | Status | Local test result | OpenClaw discovery result | OpenClaw live-call result |
+| --- | --- | --- | --- | --- | --- | --- |
 
 ## Docs Draft Notes
 <Specific points that must graduate to docs/skills/personalized.md.>
@@ -231,36 +233,46 @@ clawperator skills run com.solaxcloud.starter.get-battery --output json
 ```
 
    If the runtime requires device selection on the active host, put the local device rule in the local personal skill or local config only. Do not commit a real device serial to this repo.
-3. Verify `home-battery-get-level` appears in `openclaw skills list --eligible --json`, then inspect it with `openclaw skills info home-battery-get-level --json`.
-4. Call OpenClaw with a realistic request:
+3. Add and run a local test script beside the skill that stubs command execution and asserts:
+   - runtime skill id is `com.solaxcloud.starter.get-battery`
+   - argv includes `--output json`
+   - no user content arguments are required
+4. Verify `home-battery-get-level` appears in `openclaw skills list --eligible --json`, then inspect it with `openclaw skills info home-battery-get-level --json`.
+5. Call OpenClaw with a realistic request:
 
 ```bash
 openclaw agent --message "What is the home battery level? Use the personal skill if one applies." --json
 ```
 
-5. Record the discovery output and live-call result or blocker in `findings.md`.
-6. Create `home-energy-get-yesterday-usage-cost` as a no-user-argument wrapper. Prefer:
+6. Record the local test result, discovery output, and live-call result or blocker in `findings.md`.
+7. Create `home-energy-get-yesterday-usage-cost` as a no-user-argument wrapper. Prefer:
 
 ```bash
 clawperator skills run com.globird.energy.get-yesterday-usage-cost-replay --output json
 ```
 
    If Phase 1 or live validation shows that replay remains unreliable, use `com.globird.energy.get-usage` as the current runtime target and document the reason in the skill and `findings.md`.
-7. Verify `home-energy-get-yesterday-usage-cost` appears in `openclaw skills list --eligible --json`, then inspect it with `openclaw skills info home-energy-get-yesterday-usage-cost --json`.
-8. Call OpenClaw with a realistic request:
+8. Add and run a local test script beside the skill that stubs command execution and asserts:
+   - runtime skill id is the chosen GloBird skill
+   - argv includes `--output json`
+   - no user content arguments are required
+   - if fallback to `com.globird.energy.get-usage` is chosen, the test and skill body both name that fallback
+9. Verify `home-energy-get-yesterday-usage-cost` appears in `openclaw skills list --eligible --json`, then inspect it with `openclaw skills info home-energy-get-yesterday-usage-cost --json`.
+10. Call OpenClaw with a realistic request:
 
 ```bash
 openclaw agent --message "What was yesterday's home energy usage cost? Use the personal skill if one applies." --json
 ```
 
-9. Record the discovery output and live-call result or blocker in `findings.md`.
-10. For unrelated cross-repo candidates discovered in Phase 1, create or update `finalization-items.md` rather than delaying these two required wrappers.
+11. Record the local test result, discovery output, and live-call result or blocker in `findings.md`.
+12. For unrelated cross-repo candidates discovered in Phase 1, create or update `finalization-items.md` rather than delaying these two required wrappers.
 
 ### Acceptance Criteria
 
 - `home-battery-get-level` exists in the chosen personal skill home
 - `home-energy-get-yesterday-usage-cost` exists in the chosen personal skill home
 - both wrappers require no user arguments
+- both wrappers have local command-shape tests that pass before OpenClaw validation
 - neither wrapper contains committed real private identifiers
 - `openclaw skills list --eligible --json` shows both wrapper names
 - both wrappers have been called through `openclaw agent --message ... --json`, or a concrete OpenClaw/gateway blocker is recorded in `findings.md`
@@ -277,6 +289,11 @@ Human review checklist:
 
 ```bash
 test -f tasks/skills/personalized-skills/findings.md
+# Replace these paths if Phase 1 selected ~/.openclaw/workspace/skills instead.
+test -x ~/.agents/skills/home-battery-get-level/scripts/test_command_shape.sh
+test -x ~/.agents/skills/home-energy-get-yesterday-usage-cost/scripts/test_command_shape.sh
+~/.agents/skills/home-battery-get-level/scripts/test_command_shape.sh
+~/.agents/skills/home-energy-get-yesterday-usage-cost/scripts/test_command_shape.sh
 openclaw skills list --eligible --json | rg -n "home-battery-get-level"
 openclaw skills list --eligible --json | rg -n "home-energy-get-yesterday-usage-cost"
 openclaw skills info home-battery-get-level --json
@@ -336,13 +353,18 @@ clawperator skills run com.netflix.mediaclient.set-my-list-state-replay \
 ```
 
 5. Verify the wrapper appears in `openclaw skills list --eligible --json`, then inspect it with `openclaw skills info media-netflix-set-my-list-state --json`.
-6. Forward-test through OpenClaw with a safe title/request selected by the implementer or user. If the request would mutate real account state and no safe title is available, record the blocker instead of fabricating success.
-7. Record the discovery output and live-call result or blocker in `findings.md`.
+6. Add and run a local intent-to-argv test script beside the skill. Required cases:
+   - `add House of Cards` maps to `--action add --title "House of Cards" --profile <local_profile>`
+   - `remove House of Cards` maps to `--action remove --title "House of Cards" --profile <local_profile>`
+   - missing title does not run a Clawperator command
+7. Forward-test through OpenClaw with a safe title/request selected by the implementer or user. If the request would mutate real account state and no safe title is available, record the blocker instead of fabricating success.
+8. Record the local test result, discovery output, and live-call result or blocker in `findings.md`.
 
 ### Acceptance Criteria
 
 - `media-netflix-set-my-list-state` exists in the chosen personal skill home
 - the wrapper exposes only the user-facing Netflix title as the required content argument; action comes from request wording and profile/defaults stay local-only
+- local intent-to-argv tests pass before OpenClaw validation
 - OpenClaw discovers the wrapper
 - OpenClaw chooses the wrapper for a Netflix My List add/remove request, or a concrete safe-test blocker is recorded
 - success is reported only from verified runtime output
@@ -350,6 +372,9 @@ clawperator skills run com.netflix.mediaclient.set-my-list-state-replay \
 ### Validation
 
 ```bash
+# Replace this path if Phase 1 selected ~/.openclaw/workspace/skills instead.
+test -x ~/.agents/skills/media-netflix-set-my-list-state/scripts/test_intent_mapping.sh
+~/.agents/skills/media-netflix-set-my-list-state/scripts/test_intent_mapping.sh
 openclaw skills list --eligible --json | rg -n "media-netflix-set-my-list-state"
 openclaw skills info media-netflix-set-my-list-state --json
 openclaw agent --message "Add <safe_test_title> to my Netflix list. Use the personal skill if one applies." --json
@@ -397,9 +422,13 @@ multi-skill AirTouch implementation details from OpenClaw and the user.
    - `au.com.polyaire.airtouch5.set-mode`
 6. Keep local aliases such as `living room` -> `living` local to the personal skill or local config. Do not commit real private values.
 7. Surface partial failures truthfully. If power succeeds but zone or fan fails, report the exact partial result and underlying runtime failure.
-8. Verify the wrapper appears in `openclaw skills list --eligible --json`, then inspect it with `openclaw skills info home-hvac-control --json`.
-9. Forward-test through OpenClaw with at least one realistic multi-part request when safe.
-10. Record the discovery output, execution sequence, and live-call result or blocker in `findings.md`.
+8. Add and run a local intent-to-command-sequence test script beside the skill. Required cases:
+   - "turn on the a/c, make sure it's on in the living room, use the medium fan level" maps to the expected ordered AirTouch runtime command sequence
+   - unknown room alias does not run without live inspection or clarification
+   - simulated partial failure records which runtime step failed and does not report full success
+9. Verify the wrapper appears in `openclaw skills list --eligible --json`, then inspect it with `openclaw skills info home-hvac-control --json`.
+10. Forward-test through OpenClaw with at least one realistic multi-part request when safe.
+11. Record the local test result, discovery output, execution sequence, and live-call result or blocker in `findings.md`.
 
 ### Acceptance Criteria
 
@@ -408,11 +437,15 @@ multi-skill AirTouch implementation details from OpenClaw and the user.
 - OpenClaw discovers `home-hvac-control`
 - OpenClaw chooses `home-hvac-control` for a multi-part HVAC request
 - the wrapper sequences multiple runtime skills when the request requires it
+- local intent-to-command-sequence tests pass before OpenClaw validation
 - partial and full failures are reported truthfully from the underlying runtime results
 
 ### Validation
 
 ```bash
+# Replace this path if Phase 1 selected ~/.openclaw/workspace/skills instead.
+test -x ~/.agents/skills/home-hvac-control/scripts/test_intent_mapping.sh
+~/.agents/skills/home-hvac-control/scripts/test_intent_mapping.sh
 openclaw skills list --eligible --json | rg -n "home-hvac-control"
 openclaw skills info home-hvac-control --json
 openclaw skills list --eligible --json | rg -n "home-hvac-set-power-state|home-hvac-set-zone-state|home-hvac-set-mode|home-hvac-set-fan-level" && exit 1 || true
