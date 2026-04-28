@@ -15,7 +15,7 @@ import { getOperatorPackageApkPath } from "../version/compatibility.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
 import type { TimeoutDiagnostics } from "../../contracts/errors.js";
-import { extractSnapshotsForCommand } from "./snapshotHelper.js";
+import { extractSnapshotsForCommand, hasLegacyUntaggedSnapshotMarker } from "./snapshotHelper.js";
 import { emitResult, emitExecution } from "../observe/events.js";
 import { LIMITS } from "../../contracts/limits.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -147,20 +147,30 @@ export function attachSnapshotsToStepResults(stepResults: ResultEnvelope["stepRe
  */
 export function markExtractionFailedSnapshotSteps(
   stepResults: ResultEnvelope["stepResults"],
-  warn?: (message: string) => void
+  warn?: (message: string) => void,
+  options: { sawLegacyUntaggedSnapshotMarker?: boolean } = {}
 ): void {
   for (const step of stepResults) {
     if (step.actionType === "snapshot_ui" && step.success && step.data.text === undefined) {
       step.success = false;
       const { text: _text, ...remainingData } = step.data;
+      const error = options.sawLegacyUntaggedSnapshotMarker
+        ? ERROR_CODES.VERSION_INCOMPATIBLE
+        : ERROR_CODES.SNAPSHOT_EXTRACTION_FAILED;
+      const message = options.sawLegacyUntaggedSnapshotMarker
+        ? "Snapshot hierarchy logs used the legacy untagged marker. Install a matching Operator APK that emits commandId-tagged snapshot logs, or use a compatible CLI."
+        : "UI hierarchy extraction produced no output for this step. Check clawperator version compatibility and logcat extraction health.";
       step.data = {
         ...remainingData,
-        error: ERROR_CODES.SNAPSHOT_EXTRACTION_FAILED,
-        message: "UI hierarchy extraction produced no output for this step. Check clawperator version compatibility and logcat extraction health.",
+        error,
+        message,
       };
       warn?.(
-        `[clawperator] WARN: snapshot_ui step "${step.id}" UI hierarchy extraction produced no output. ` +
-        `Run 'clawperator doctor' or 'clawperator version --check-compat' to diagnose.\n`
+        options.sawLegacyUntaggedSnapshotMarker
+          ? `[clawperator] WARN: snapshot_ui step "${step.id}" saw legacy untagged snapshot logs. ` +
+            `Install a matching Operator APK or run 'clawperator version --check-compat' to diagnose.\n`
+          : `[clawperator] WARN: snapshot_ui step "${step.id}" UI hierarchy extraction produced no output. ` +
+            `Run 'clawperator doctor' or 'clawperator version --check-compat' to diagnose.\n`
       );
     }
   }
@@ -664,9 +674,12 @@ async function performExecution(
       // Reconstruct snapshot XML from the live result logcat stream.
       const hasSnapshot = result.envelope.stepResults.some(s => s.actionType === "snapshot_ui");
       if (hasSnapshot) {
-        const snapshots = extractSnapshotsForCommand(result.snapshotLogLines ?? [], execution.commandId);
+        const snapshotLogLines = result.snapshotLogLines ?? [];
+        const snapshots = extractSnapshotsForCommand(snapshotLogLines, execution.commandId);
         attachSnapshotsToStepResults(result.envelope.stepResults, snapshots);
-        markExtractionFailedSnapshotSteps(result.envelope.stepResults, options.warn);
+        markExtractionFailedSnapshotSteps(result.envelope.stepResults, options.warn, {
+          sawLegacyUntaggedSnapshotMarker: hasLegacyUntaggedSnapshotMarker(snapshotLogLines),
+        });
         // Attach data.warn to any snapshot_ui immediately following a click with no sleep.
         addSettleWarnings(result.envelope.stepResults, execution);
       }

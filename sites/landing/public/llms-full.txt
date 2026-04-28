@@ -3382,17 +3382,17 @@ The current flow is:
 
 1. Android executes `snapshot_ui`.
 2. Android writes the hierarchy dump into logcat lines that begin with the exact marker `[TaskScope] UI Hierarchy [commandId=<command_id>]:`.
-3. Node reads those logcat lines after execution.
+3. Node streams logcat with `adb logcat -v time -T 1` around dispatch and keeps the correlated snapshot lines for the current command.
 4. `extractSnapshotRecordsFromLogs()` reconstructs one or more XML documents from the log stream and preserves the parsed `commandId` when the tagged marker is present.
 5. `extractSnapshotsForCommand()` selects snapshots for the current execution by requiring `commandId == envelope.commandId`.
 6. `attachSnapshotsToStepResults()` walks backward through successful `snapshot_ui` steps and attaches the extracted XML as `stepResults[i].data.text`.
-7. `markExtractionFailedSnapshotSteps()` converts any still-successful snapshot step with missing `data.text` into a failed step with `data.error = "SNAPSHOT_EXTRACTION_FAILED"`.
+7. `markExtractionFailedSnapshotSteps()` converts any still-successful snapshot step with missing `data.text` into a failed step.
 8. `addSettleWarnings()` may attach `data.warn` if the snapshot action immediately follows `click` or `scroll_and_click`.
 
 Debugging details that matter when extraction goes wrong:
 
-- `runExecution()` clears logcat before dispatch with `adb logcat -c`
-- after the execution finishes, Node reads logcat with `adb logcat -v time -T 1`
+- `runExecution()` starts the live logcat reader before dispatch when snapshot extraction is needed.
+- The reader uses command-id markers and result-envelope correlation instead of clearing logcat.
 - `snapshotHelper.ts` only extracts blocks whose opening marker includes the execution `commandId`
 
 Important boundaries:
@@ -3748,7 +3748,7 @@ Verification pattern - confirm extraction failure handling:
 clawperator snapshot --device <device_serial>
 ```
 
-If extraction failed, branch on:
+If extraction failed, branch on `data.error`:
 
 ```json
 {
@@ -3770,6 +3770,7 @@ If extraction failed, branch on:
 Related error case:
 
 - if the command never returns an envelope at all, the caller gets a top-level `RESULT_ENVELOPE_TIMEOUT` error instead of a snapshot step result
+- if Node sees legacy untagged snapshot logs from a mismatched APK, the snapshot step can fail with `VERSION_INCOMPATIBLE`
 
 ## Settle Warning
 
@@ -3821,7 +3822,7 @@ Operationally:
 ## What To Rely On
 
 - rely on `stepResults[i].data.text` as the canonical snapshot payload
-- rely on `SNAPSHOT_EXTRACTION_FAILED` when text extraction failed after execution
+- rely on `SNAPSHOT_EXTRACTION_FAILED` when text extraction failed after execution and no more specific diagnostic code applies
 - rely on `RESULT_ENVELOPE_TIMEOUT` when no usable result envelope returned at all
 - treat `data.warn` as advisory only
 - treat Android-emitted metadata fields beyond `text` as runtime details, not as Node-guaranteed contract fields

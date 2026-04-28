@@ -5,6 +5,7 @@ import {
   extractSnapshotRecordsFromLogs,
   extractSnapshotsForCommand,
   extractSnapshotsFromLogs,
+  hasLegacyUntaggedSnapshotMarker,
 } from "../../domain/executions/snapshotHelper.js";
 
 describe("extractSnapshotFromLogs", () => {
@@ -280,6 +281,28 @@ describe("extractSnapshotFromLogs", () => {
     ];
 
     assert.deepStrictEqual(extractSnapshotRecordsFromLogs(lines), []);
+  });
+
+  it("detects legacy untagged marker format for compatibility diagnostics", () => {
+    const lines = [
+      "04-25 20:14:52.453 D/kw2(29817): [TaskScope] UI Hierarchy:",
+      "04-25 20:14:52.454 D/kw2(29817): <hierarchy rotation=\"0\">",
+      "04-25 20:14:52.455 D/kw2(29817):   <node index=\"0\" text=\"Legacy\" />",
+      "04-25 20:14:52.456 D/kw2(29817): </hierarchy>",
+    ];
+
+    assert.strictEqual(hasLegacyUntaggedSnapshotMarker(lines), true);
+  });
+
+  it("does not treat commandId-tagged marker format as legacy", () => {
+    const lines = [
+      "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-new]:",
+      "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+      "04-25 20:14:52.455 D/TaskScopeDefault(29817):   <node index=\"0\" text=\"Tagged\" />",
+      "04-25 20:14:52.456 D/TaskScopeDefault(29817): </hierarchy>",
+    ];
+
+    assert.strictEqual(hasLegacyUntaggedSnapshotMarker(lines), false);
   });
 
   it("filters interleaved commandId-tagged blocks down to the matching command", () => {

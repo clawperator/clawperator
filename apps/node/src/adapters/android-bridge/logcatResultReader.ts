@@ -30,6 +30,7 @@ interface ParsedLogcatLine {
 interface SnapshotMarkerMatch {
   commandId?: string;
   tag: string | null;
+  legacy: boolean;
 }
 
 function parseLogcatLine(line: string): ParsedLogcatLine | null {
@@ -76,20 +77,28 @@ function parseSnapshotMarker(line: string): SnapshotMarkerMatch | null {
   }
 
   const newFormatMatch = parsed.message.match(/^\[TaskScope\] UI Hierarchy \[commandId=([^\]]+)]:/);
-  if (!newFormatMatch) {
-    return null;
+  if (newFormatMatch) {
+    return {
+      commandId: newFormatMatch[1],
+      tag: parsed.tag,
+      legacy: false,
+    };
   }
 
-  return {
-    commandId: newFormatMatch[1],
-    tag: parsed.tag,
-  };
+  if (parsed.message.match(/^\[TaskScope\] UI Hierarchy:/)) {
+    return {
+      tag: parsed.tag,
+      legacy: true,
+    };
+  }
+
+  return null;
 }
 
 function shouldEndSnapshotBlock(line: string, activeTag: string | null): boolean {
   const parsed = parseLogcatLine(line);
   if (parsed === null || parsed.tag !== activeTag) {
-    return true;
+    return false;
   }
 
   const trimmed = parsed.message.trim();
@@ -297,23 +306,26 @@ export async function waitForResultEnvelope(
         if (snapshotMarker !== null) {
           correlatedLines.push(line);
           activeSnapshotTag = snapshotMarker.tag;
-          activeSnapshotCaptured = snapshotMarker.commandId === commandId;
+          activeSnapshotCaptured = snapshotMarker.commandId === commandId
+            || (snapshotMarker.legacy && dispatchCaptureStarted);
           if (activeSnapshotCaptured) {
             snapshotLogLines.push(line);
           }
         } else if (activeSnapshotTag !== null) {
           correlatedLines.push(line);
-          if (shouldEndSnapshotBlock(line, activeSnapshotTag)) {
-            activeSnapshotTag = null;
-            activeSnapshotCaptured = false;
-          } else {
-            if (activeSnapshotCaptured) {
-              snapshotLogLines.push(line);
-            }
-            const parsed = parseLogcatLine(line);
-            if (parsed?.message.trim() === "</hierarchy>") {
+          const parsed = parseLogcatLine(line);
+          if (parsed !== null && parsed.tag === activeSnapshotTag) {
+            if (shouldEndSnapshotBlock(line, activeSnapshotTag)) {
               activeSnapshotTag = null;
               activeSnapshotCaptured = false;
+            } else {
+              if (activeSnapshotCaptured) {
+                snapshotLogLines.push(line);
+              }
+              if (parsed.message.trim() === "</hierarchy>") {
+                activeSnapshotTag = null;
+                activeSnapshotCaptured = false;
+              }
             }
           }
         }
