@@ -145,7 +145,7 @@ Create a grounded findings file that captures current evidence, recommended poli
 openclaw skills list --eligible --json
 ```
 
-   Look for entries with `"source": "agents-skills-personal"`. If present, `~/.agents/skills/` is confirmed as the active personal skill home and the target for Phases 2-4. If absent but workspace-skills entries appear, record in `findings.md` that `~/.openclaw/workspace/skills/` is required instead and update the target in the Required Personalized Skill Status table.
+   Look for entries with `"source": "agents-skills-personal"`. If present, `~/.agents/skills/` is confirmed as the active personal skill home and the target for Phases 2-4. If absent but entries with `"source": "openclaw-workspace"` appear, record in `findings.md` that `~/.openclaw/workspace/skills/` is required instead and update the target in the Required Personalized Skill Status table.
 
 3. Search this repo for current personalized-skill language:
 
@@ -297,7 +297,7 @@ rg -n "XREPO-[0-9]+|owning repo|validation" tasks/skills/personalized-skills/fin
 
 Personal skill files created in `~/.agents/skills/` are not committed to this repository. If that directory is tracked in a personal dotfiles repo, commit them there separately.
 
-For this repo, commit only the `findings.md` update:
+For this repo, commit `findings.md` and `finalization-items.md` if either file was created or updated:
 
 ```text
 docs(tasks): verify home-battery and home-energy personal wrappers
@@ -361,7 +361,7 @@ or record why no live mutation test was run.
 
 ### Expected Commit
 
-Personal skill files are not committed to this repo. Commit only the `findings.md` update here:
+Personal skill files are not committed to this repo. Commit `findings.md` and `finalization-items.md` if either file was created or updated:
 
 ```text
 docs(tasks): verify Netflix personal wrapper
@@ -422,7 +422,7 @@ rg -n "home-hvac-control" tasks/skills/personalized-skills/findings.md
 
 ### Expected Commit
 
-Personal skill files are not committed to this repo. Commit only the `findings.md` update here:
+Personal skill files are not committed to this repo. Commit `findings.md` and `finalization-items.md` if either file was created or updated:
 
 ```text
 docs(tasks): verify unified HVAC personal wrapper
