@@ -314,19 +314,18 @@ export async function waitForResultEnvelope(
         } else if (activeSnapshotTag !== null) {
           correlatedLines.push(line);
           const parsed = parseLogcatLine(line);
-          if (parsed === null || parsed.tag !== activeSnapshotTag) {
-            continue;
-          }
-          if (shouldEndSnapshotBlock(line, activeSnapshotTag)) {
-            activeSnapshotTag = null;
-            activeSnapshotCaptured = false;
-          } else {
-            if (activeSnapshotCaptured) {
-              snapshotLogLines.push(line);
-            }
-            if (parsed?.message.trim() === "</hierarchy>") {
+          if (parsed !== null && parsed.tag === activeSnapshotTag) {
+            if (shouldEndSnapshotBlock(line, activeSnapshotTag)) {
               activeSnapshotTag = null;
               activeSnapshotCaptured = false;
+            } else {
+              if (activeSnapshotCaptured) {
+                snapshotLogLines.push(line);
+              }
+              if (parsed.message.trim() === "</hierarchy>") {
+                activeSnapshotTag = null;
+                activeSnapshotCaptured = false;
+              }
             }
           }
         }

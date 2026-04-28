@@ -1757,6 +1757,59 @@ describe("waitForResultEnvelope", () => {
     }
   });
 
+  it("parses envelopes from other tags while a snapshot block is still open", async () => {
+    const runner = new FakeProcessRunner();
+    let proc: EventEmitter & {
+      stdout?: EventEmitter;
+      stderr?: EventEmitter;
+      kill: () => void;
+    };
+    runner.spawn = (() => {
+      proc = new EventEmitter() as typeof proc;
+      proc.stdout = new EventEmitter();
+      proc.stderr = new EventEmitter();
+      proc.kill = () => undefined;
+      process.nextTick(() => {
+        proc.stdout?.emit("data", Buffer.from("04-25 20:14:52.453 D/TaskScopeDefault(29817): ready\n"));
+      });
+      return proc;
+    }) as FakeProcessRunner["spawn"];
+    const config = getDefaultRuntimeConfig({
+      deviceId: "device-123",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    const result = await waitForResultEnvelope(
+      config,
+      {
+        commandId: "cmd-open-snapshot",
+        timeoutMs: 1000,
+        broadcastDelayMs: 1000,
+      },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        proc.stdout?.emit("data", Buffer.from([
+          "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-open-snapshot]:",
+          "04-25 20:14:52.454 D/TaskScopeDefault(29817): <hierarchy rotation=\"0\">",
+          `[Clawperator-Result] ${JSON.stringify({
+            commandId: "cmd-open-snapshot",
+            taskId: "task-open-snapshot",
+            status: "success",
+            stepResults: [],
+            error: null,
+          })}`,
+        ].join("\n") + "\n"));
+        return { success: true, stdout: "Broadcast completed: result=0", stderr: "" };
+      }
+    );
+
+    assert.strictEqual(result.ok, true);
+    if (result.ok) {
+      assert.strictEqual(result.envelope.taskId, "task-open-snapshot");
+    }
+  });
+
   it("captures legacy untagged snapshot blocks after dispatch for compatibility diagnostics", async () => {
     const runner = new FakeProcessRunner();
     let proc: EventEmitter & {

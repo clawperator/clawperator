@@ -60,7 +60,7 @@ The current flow is:
 
 1. Android executes `snapshot_ui`.
 2. Android writes the hierarchy dump into logcat lines that begin with the exact marker `[TaskScope] UI Hierarchy [commandId=<command_id>]:`.
-3. Node reads those logcat lines after execution.
+3. Node streams logcat with `adb logcat -v time -T 1` around dispatch and keeps the correlated snapshot lines for the current command.
 4. `extractSnapshotRecordsFromLogs()` reconstructs one or more XML documents from the log stream and preserves the parsed `commandId` when the tagged marker is present.
 5. `extractSnapshotsForCommand()` selects snapshots for the current execution by requiring `commandId == envelope.commandId`.
 6. `attachSnapshotsToStepResults()` walks backward through successful `snapshot_ui` steps and attaches the extracted XML as `stepResults[i].data.text`.
@@ -69,8 +69,8 @@ The current flow is:
 
 Debugging details that matter when extraction goes wrong:
 
-- `runExecution()` clears logcat before dispatch with `adb logcat -c`
-- after the execution finishes, Node reads logcat with `adb logcat -v time -T 1`
+- `runExecution()` starts the live logcat reader before dispatch when snapshot extraction is needed.
+- The reader uses command-id markers and result-envelope correlation instead of clearing logcat.
 - `snapshotHelper.ts` only extracts blocks whose opening marker includes the execution `commandId`
 
 Important boundaries:
