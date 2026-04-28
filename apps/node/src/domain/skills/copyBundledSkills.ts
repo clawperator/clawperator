@@ -1,4 +1,4 @@
-import { access, cp, lstat, mkdir, readdir, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { access, cp, lstat, mkdir, readdir, readFile, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -8,6 +8,8 @@ import { DEFAULT_BUNDLED_SKILLS_DIR } from "./skillsConfig.js";
 
 const BUNDLED_SKILLS_SOURCE_ENV_VAR = "CLAWPERATOR_BUNDLED_SKILLS";
 const VERSION_FILENAME = "version.txt";
+export const MANAGED_BUNDLED_SKILL_COPY_MARKER = ".clawperator-managed";
+export const MANAGED_BUNDLED_SKILL_COPY_MARKER_CONTENT = "managed-by=clawperator\nkind=bundled-skill-copy\n";
 
 export interface BundledSkillDiscoveryDirEntry {
   label: string;
@@ -97,6 +99,19 @@ function resolveAgentDiscoveryDirs(options: CopyBundledSkillsOptions): BundledSk
   return [
     { label: "claude", dir: resolveClaudeSkillsDir(options) },
     { label: "codex", dir: resolveCodexSkillsDir(options) },
+    { label: "agents", dir: resolveAgentsSkillsDir(options) },
+  ];
+}
+
+function resolveSymlinkDiscoveryDirs(options: CopyBundledSkillsOptions): BundledSkillDiscoveryDirEntry[] {
+  return [
+    { label: "claude", dir: resolveClaudeSkillsDir(options) },
+    { label: "codex", dir: resolveCodexSkillsDir(options) },
+  ];
+}
+
+function resolveManagedCopyDiscoveryDirs(options: CopyBundledSkillsOptions): BundledSkillDiscoveryDirEntry[] {
+  return [
     { label: "agents", dir: resolveAgentsSkillsDir(options) },
   ];
 }
@@ -249,6 +264,13 @@ export async function inspectManagedBundledSkillLink(
   };
 }
 
+export interface ManagedBundledSkillDirectoryInspection {
+  ok: boolean;
+  status: "missing" | "conflict" | "legacy-symlink" | "unmarked" | "stale" | "ok";
+  actualTarget?: string;
+  expectedTarget: string;
+}
+
 async function isManagedBundledSkillSymlink(linkPath: string, installedDir: string, skillName: string): Promise<boolean> {
   const inspection = await inspectManagedBundledSkillLink(linkPath, installedDir, skillName);
   const legacyTargets = new Set(legacyOwnedSkillTargets(installedDir, skillName));
@@ -265,6 +287,111 @@ async function isManagedBundledSkillSymlink(linkPath: string, installedDir: stri
     return true;
   }
   return inspection.ok;
+}
+
+function isManagedBundledSkillCopyMarkerContent(content: string): boolean {
+  return content === MANAGED_BUNDLED_SKILL_COPY_MARKER_CONTENT;
+}
+
+export async function inspectManagedBundledSkillDirectory(
+  directoryPath: string,
+  installedDir: string,
+  skillName: string
+): Promise<ManagedBundledSkillDirectoryInspection> {
+  const expectedTarget = normalizeOwnedSkillTarget(installedDir, skillName);
+
+  let entryStat;
+  try {
+    entryStat = await lstat(directoryPath);
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return {
+        ok: false,
+        status: "missing",
+        expectedTarget,
+      };
+    }
+    throw error;
+  }
+
+  if (entryStat.isSymbolicLink()) {
+    const actualTarget = await resolveSymlinkTarget(directoryPath);
+    if (await isManagedBundledSkillSymlink(directoryPath, installedDir, skillName)) {
+      return {
+        ok: false,
+        status: "legacy-symlink",
+        actualTarget,
+        expectedTarget,
+      };
+    }
+    return {
+      ok: false,
+      status: "conflict",
+      actualTarget,
+      expectedTarget,
+    };
+  }
+
+  if (!entryStat.isDirectory()) {
+    return {
+      ok: false,
+      status: "conflict",
+      expectedTarget,
+    };
+  }
+
+  const markerPath = join(directoryPath, MANAGED_BUNDLED_SKILL_COPY_MARKER);
+  try {
+    const markerStat = await lstat(markerPath);
+    if (markerStat.isFile()) {
+      const markerContent = await readFile(markerPath, "utf8");
+      if (!isManagedBundledSkillCopyMarkerContent(markerContent)) {
+        return {
+          ok: false,
+          status: "unmarked",
+          expectedTarget,
+        };
+      }
+      try {
+        const skillFileStat = await stat(join(directoryPath, "SKILL.md"));
+        if (!skillFileStat.isFile()) {
+          return {
+            ok: false,
+            status: "stale",
+            expectedTarget,
+          };
+        }
+      } catch (error) {
+        if (!isMissingPathError(error)) {
+          throw error;
+        }
+        return {
+          ok: false,
+          status: "stale",
+          expectedTarget,
+        };
+      }
+      return {
+        ok: true,
+        status: "ok",
+        expectedTarget,
+      };
+    }
+  } catch (error) {
+    if (!isMissingPathError(error)) {
+      throw error;
+    }
+  }
+
+  return {
+    ok: false,
+    status: "unmarked",
+    expectedTarget,
+  };
+}
+
+function isMissingPathError(error: unknown): error is NodeJS.ErrnoException {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
 }
 
 async function ensureManagedSymlink(targetPath: string, linkPath: string, installedDir: string, skillName: string): Promise<void> {
@@ -293,6 +420,33 @@ async function assertManagedSymlinkWritable(linkPath: string, installedDir: stri
   }
 }
 
+async function ensureManagedDirectoryCopy(sourcePath: string, directoryPath: string, installedDir: string, skillName: string): Promise<void> {
+  const exists = await pathExistsNoFollow(directoryPath);
+  if (exists) {
+    const inspection = await inspectManagedBundledSkillDirectory(directoryPath, installedDir, skillName);
+    if (inspection.status !== "ok" && inspection.status !== "legacy-symlink" && inspection.status !== "stale") {
+      throw new Error(`Refusing to overwrite non-Clawperator skill entry: ${directoryPath}`);
+    }
+    await rm(directoryPath, { recursive: true, force: true });
+  }
+
+  await mkdir(dirname(directoryPath), { recursive: true });
+  await cp(sourcePath, directoryPath, { recursive: true, force: true, dereference: true });
+  await writeFile(join(directoryPath, MANAGED_BUNDLED_SKILL_COPY_MARKER), MANAGED_BUNDLED_SKILL_COPY_MARKER_CONTENT, "utf8");
+}
+
+async function assertManagedDirectoryCopyWritable(directoryPath: string, installedDir: string, skillName: string): Promise<void> {
+  const exists = await pathExistsNoFollow(directoryPath);
+  if (!exists) {
+    return;
+  }
+
+  const inspection = await inspectManagedBundledSkillDirectory(directoryPath, installedDir, skillName);
+  if (inspection.status !== "ok" && inspection.status !== "legacy-symlink" && inspection.status !== "stale") {
+    throw new Error(`Refusing to overwrite non-Clawperator skill entry: ${directoryPath}`);
+  }
+}
+
 async function removeStaleBundledSkillSymlinks(agentDir: string, activeSkills: Set<string>, installedDir: string): Promise<void> {
   const entries = await readdir(agentDir);
   for (const entry of entries) {
@@ -318,6 +472,27 @@ async function removeStaleBundledSkillSymlinks(agentDir: string, activeSkills: S
       resolvedTarget === normalizeOwnedSkillTarget(installedDir, entry)
       || legacyOwnedSkillTargets(installedDir, entry).includes(resolvedTarget ?? "")
     ) {
+      await rm(entryPath, { recursive: true, force: true });
+    }
+  }
+}
+
+async function removeStaleBundledSkillCopies(agentDir: string, activeSkills: Set<string>, installedDir: string): Promise<void> {
+  const entries = await readdir(agentDir);
+  for (const entry of entries) {
+    if (activeSkills.has(entry)) {
+      continue;
+    }
+    const entryPath = join(agentDir, entry);
+    let inspection;
+    try {
+      inspection = await inspectManagedBundledSkillDirectory(entryPath, installedDir, entry);
+    } catch {
+      // Shared discovery directories can change while being scanned. Only remove
+      // entries that can be positively identified as Clawperator-managed.
+      continue;
+    }
+    if (inspection.status === "ok" || inspection.status === "legacy-symlink" || inspection.status === "stale") {
       await rm(entryPath, { recursive: true, force: true });
     }
   }
@@ -358,6 +533,8 @@ export async function copyBundledSkills(
   const sourceDir = resolvePackagedBundledSkillsSourceDir(options);
   const installedDir = resolveBundledSkillsInstalledDir(options);
   const agentDiscoveryDirs = resolveAgentDiscoveryDirs(options);
+  const symlinkDiscoveryDirs = resolveSymlinkDiscoveryDirs(options);
+  const managedCopyDiscoveryDirs = resolveManagedCopyDiscoveryDirs(options);
 
   let sourceStat;
   try {
@@ -393,8 +570,11 @@ export async function copyBundledSkills(
     }
 
     for (const skillName of skills) {
-      for (const { dir } of agentDiscoveryDirs) {
+      for (const { dir } of symlinkDiscoveryDirs) {
         await assertManagedSymlinkWritable(join(dir, skillName), installedDir, skillName);
+      }
+      for (const { dir } of managedCopyDiscoveryDirs) {
+        await assertManagedDirectoryCopyWritable(join(dir, skillName), installedDir, skillName);
       }
     }
 
@@ -403,15 +583,21 @@ export async function copyBundledSkills(
       const targetSkillDir = join(installedDir, skillName);
       await rm(targetSkillDir, { recursive: true, force: true });
       await cp(sourceSkillDir, targetSkillDir, { recursive: true, force: true, dereference: true });
-      for (const { dir } of agentDiscoveryDirs) {
+      for (const { dir } of symlinkDiscoveryDirs) {
         await ensureManagedSymlink(targetSkillDir, join(dir, skillName), installedDir, skillName);
+      }
+      for (const { dir } of managedCopyDiscoveryDirs) {
+        await ensureManagedDirectoryCopy(targetSkillDir, join(dir, skillName), installedDir, skillName);
       }
     }
 
     const activeSkills = new Set(skills);
     await removeStaleInstalledSkills(installedDir, activeSkills);
-    for (const { dir } of agentDiscoveryDirs) {
+    for (const { dir } of symlinkDiscoveryDirs) {
       await removeStaleBundledSkillSymlinks(dir, activeSkills, installedDir);
+    }
+    for (const { dir } of managedCopyDiscoveryDirs) {
+      await removeStaleBundledSkillCopies(dir, activeSkills, installedDir);
     }
     await writeFile(join(installedDir, VERSION_FILENAME), `${options.cliVersion ?? getCliVersion()}\n`, "utf8");
 
