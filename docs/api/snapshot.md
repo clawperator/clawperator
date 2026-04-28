@@ -500,7 +500,7 @@ Operationally:
 ## What To Rely On
 
 - rely on `stepResults[i].data.text` as the canonical snapshot payload
-- rely on `SNAPSHOT_EXTRACTION_FAILED` when text extraction failed after execution
+- rely on `SNAPSHOT_EXTRACTION_FAILED` when text extraction failed after execution and no more specific diagnostic code applies
 - rely on `RESULT_ENVELOPE_TIMEOUT` when no usable result envelope returned at all
 - treat `data.warn` as advisory only
 - treat Android-emitted metadata fields beyond `text` as runtime details, not as Node-guaranteed contract fields
