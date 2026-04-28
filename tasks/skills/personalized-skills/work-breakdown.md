@@ -10,18 +10,19 @@ the basic Netflix wrapper. Phase 4 uses `thinking` for the experimental unified
 HVAC controller. Phase 5 uses `thinking` for public docs authoring and
 refinement.
 
-Current state is planning complete, execution not started.
+Current state is implementation complete, with review-loop status tracked in
+`implementation-instructions.md`.
 
 ## Status
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | implemented; review loop in progress |
 | Total PRs | 1 |
 | Total phases | 5 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4, 5 |
-| Current / Next | Phase 1 |
-| Blockers | none for Phase 1; Phases 2-4 require active OpenClaw and personal skill-home access |
+| Completed | 1, 2, 3, 4, 5 |
+| Remaining | review loop |
+| Current / Next | Review loop |
+| Blockers | Live OpenClaw forward calls require an explicit route target (`--agent`, `--session-id`, or `--to`) and mutating Netflix/HVAC tests require a user-approved safe target/window. |
 
 ## Hard Rules
 
@@ -36,7 +37,7 @@ Current state is planning complete, execution not started.
 - Each personalized wrapper must include a small local test script beside the skill that asserts exact `clawperator skills run` argv or command sequence. For pure `SKILL.md` wrappers, this may be a static content validator over `SKILL.md`; for executable wrapper code, stub command execution and test the code path. Run that test before OpenClaw discovery or live-call validation.
 - Do not treat dry-run text as sufficient proof. A dry-run helper is acceptable only if a test asserts its command output and failure behavior.
 - After adding each skill, verify OpenClaw discovery before moving to the next skill.
-- For the first two no-argument wrappers, call OpenClaw through `openclaw agent --message ... --json` and record the real result or blocker in `findings.md`.
+- For the first two no-argument wrappers, call OpenClaw through `openclaw agent --agent <agent_id> --message ... --json`, `openclaw agent --session-id <session_id> --message ... --json`, or `openclaw agent --to <e164_number> --message ... --json` when a route target is available. If no route target is available, run the targetless command once if required by the execution instructions and record the route-target blocker in `findings.md`.
 - Use `.agents/skills/docs-author/SKILL.md` for Phase 5. Do not hand-edit generated docs under `sites/docs/.build/` or `sites/docs/site/`.
 - If Phases 2-4 discover work that cannot be completed in this PR, create or update `finalization-items.md` with enough detail for a later agent to act without reconstructing context.
 - If a plan deviation changes scope or durable policy, update `plan.md` before committing that phase.
@@ -245,7 +246,7 @@ clawperator skills run com.solaxcloud.starter.get-battery --output json
 6. Call OpenClaw with a realistic request:
 
 ```bash
-openclaw agent --message "What is the home battery level? Use the personal skill if one applies." --json
+openclaw agent --agent <agent_id> --message "What is the home battery level? Use the personal skill if one applies." --json
 ```
 
 7. Record the local test result, discovery output, and live-call result or blocker in `findings.md`.
@@ -265,7 +266,7 @@ clawperator skills run com.globird.energy.get-yesterday-usage-cost-replay --outp
 11. Call OpenClaw with a realistic request:
 
 ```bash
-openclaw agent --message "What was yesterday's home energy usage cost? Use the personal skill if one applies." --json
+openclaw agent --agent <agent_id> --message "What was yesterday's home energy usage cost? Use the personal skill if one applies." --json
 ```
 
 12. Record the local test result, discovery output, and live-call result or blocker in `findings.md`.
@@ -280,7 +281,7 @@ openclaw agent --message "What was yesterday's home energy usage cost? Use the p
 - both wrappers have local command-shape tests that pass before OpenClaw validation
 - neither wrapper contains committed real private identifiers
 - `openclaw skills list --eligible --json` shows both wrapper names
-- both wrappers have been called through `openclaw agent --message ... --json`, or a concrete OpenClaw/gateway blocker is recorded in `findings.md`
+- both wrappers have been called through `openclaw agent --agent <agent_id> --message ... --json`, equivalent `--session-id` or `--to` routing, or a concrete OpenClaw/gateway blocker is recorded in `findings.md`
 - `findings.md` updates the required skill status rows for both wrappers
 
 Human review checklist:
@@ -304,8 +305,8 @@ openclaw skills list --eligible --json | rg -n "home-battery-get-level"
 openclaw skills list --eligible --json | rg -n "home-energy-get-yesterday-usage-cost"
 openclaw skills info home-battery-get-level --json
 openclaw skills info home-energy-get-yesterday-usage-cost --json
-openclaw agent --message "What is the home battery level? Use the personal skill if one applies." --json
-openclaw agent --message "What was yesterday's home energy usage cost? Use the personal skill if one applies." --json
+openclaw agent --agent <agent_id> --message "What is the home battery level? Use the personal skill if one applies." --json
+openclaw agent --agent <agent_id> --message "What was yesterday's home energy usage cost? Use the personal skill if one applies." --json
 rg -n "home-battery-get-level" tasks/skills/personalized-skills/findings.md
 rg -n "home-energy-get-yesterday-usage-cost" tasks/skills/personalized-skills/findings.md
 ```
@@ -383,7 +384,7 @@ test -x ~/.agents/skills/media-netflix-set-my-list-state/scripts/test_intent_map
 ~/.agents/skills/media-netflix-set-my-list-state/scripts/test_intent_mapping.sh
 openclaw skills list --eligible --json | rg -n "media-netflix-set-my-list-state"
 openclaw skills info media-netflix-set-my-list-state --json
-openclaw agent --message "Add <safe_test_title> to my Netflix list. Use the personal skill if one applies." --json
+openclaw agent --agent <agent_id> --message "Add <safe_test_title> to my Netflix list. Use the personal skill if one applies." --json
 rg -n "media-netflix-set-my-list-state" tasks/skills/personalized-skills/findings.md
 ```
 
@@ -455,7 +456,7 @@ test -x ~/.agents/skills/home-hvac-control/scripts/test_intent_mapping.sh
 openclaw skills list --eligible --json | rg -n "home-hvac-control"
 openclaw skills info home-hvac-control --json
 openclaw skills list --eligible --json | rg -n "home-hvac-set-power-state|home-hvac-set-zone-state|home-hvac-set-mode|home-hvac-set-fan-level" && exit 1 || true
-openclaw agent --message "Turn on the a/c, make sure it's on in the living room, and use the medium fan level. Use the personal skill if one applies." --json
+openclaw agent --agent <agent_id> --message "Turn on the a/c, make sure it's on in the living room, and use the medium fan level. Use the personal skill if one applies." --json
 rg -n "home-hvac-control" tasks/skills/personalized-skills/findings.md
 ```
 

@@ -19,13 +19,13 @@ guidance.
 ## Status
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | implemented; review loop in progress |
 | Total PRs | 1 |
 | Total phases | 5 |
-| Completed | none |
-| Remaining | 1, 2, 3, 4, 5 |
-| Current / Next | Phase 1 |
-| Blockers | access to the active OpenClaw/AgentSkills personal skill home and live OpenClaw gateway for runtime validation |
+| Completed | 1, 2, 3, 4, 5 |
+| Remaining | review loop |
+| Current / Next | Review loop |
+| Blockers | Live OpenClaw forward calls require an explicit route target (`--agent`, `--session-id`, or `--to`) and mutating Netflix/HVAC tests require a user-approved safe target/window. Current execution state lives in `implementation-instructions.md` and `findings.md`. |
 
 ## Goal
 
@@ -214,7 +214,7 @@ After Phase 2:
 - `home-energy-get-yesterday-usage-cost` exists in the chosen personal skill home
 - both skills have local command-shape tests that pass
 - both skills are visible in `openclaw skills list --eligible --json`
-- both skills have been forward-tested through `openclaw agent --message ... --json` when safe, with results or blockers recorded in `findings.md`
+- both skills have been forward-tested through `openclaw agent --agent <agent_id> --message ... --json`, `openclaw agent --session-id <session_id> --message ... --json`, or `openclaw agent --to <e164_number> --message ... --json` when safe, with results or route-target blockers recorded in `findings.md`
 
 After Phase 3:
 
