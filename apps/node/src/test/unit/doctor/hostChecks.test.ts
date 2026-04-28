@@ -1,6 +1,6 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert";
-import { chmod, mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -15,7 +15,7 @@ import { ERROR_CODES } from "../../../contracts/errors.js";
 import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
 import { getCliVersion } from "../../../domain/version/compatibility.js";
-import { listPackagedBundledSkills } from "../../../domain/skills/copyBundledSkills.js";
+import { listPackagedBundledSkills, MANAGED_BUNDLED_SKILL_COPY_MARKER } from "../../../domain/skills/copyBundledSkills.js";
 
 describe("Doctor: hostChecks", () => {
     const tempRoots: string[] = [];
@@ -39,6 +39,11 @@ describe("Doctor: hostChecks", () => {
         await symlink(targetPath, linkPath, directorySymlinkType);
     }
 
+    async function createManagedAgentsCopy(sourcePath: string, copyPath: string): Promise<void> {
+        await cp(sourcePath, copyPath, { recursive: true, force: true, dereference: true });
+        await writeFile(join(copyPath, MANAGED_BUNDLED_SKILL_COPY_MARKER), "managed-by=clawperator\nkind=bundled-skill-copy\n", "utf8");
+    }
+
     async function seedHealthyAgentSkillsInstall(
         installedDir: string,
         discoveryDirs: string[],
@@ -53,9 +58,9 @@ describe("Doctor: hostChecks", () => {
             const skillDir = join(installedDir, skillName);
             await mkdir(skillDir, { recursive: true });
             await writeFile(join(skillDir, "SKILL.md"), `# ${skillName}\n`, "utf8");
-            for (const discoveryDir of discoveryDirs) {
-                await createDirectorySymlink(skillDir, join(discoveryDir, skillName));
-            }
+            await createDirectorySymlink(skillDir, join(discoveryDirs[0], skillName));
+            await createDirectorySymlink(skillDir, join(discoveryDirs[1], skillName));
+            await createManagedAgentsCopy(skillDir, join(discoveryDirs[2], skillName));
         }
         await writeFile(join(installedDir, "version.txt"), `${version}\n`, "utf8");
         return skillNames;
@@ -962,6 +967,151 @@ describe("Doctor: hostChecks", () => {
             });
         });
 
+        it("warns when the generic agents managed copy is missing", async () => {
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-missing-agents-copy-");
+            const installedDir = join(root, "bundled-skills");
+            const claudeSkillsDir = join(root, "claude-skills");
+            const codexSkillsDir = join(root, "codex-skills");
+            const agentsSkillsDir = join(root, "agents-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const [targetSkill] = await seedHealthyAgentSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            await rm(join(agentsSkillsDir, targetSkill), { recursive: true, force: true });
+
+            const result = await checkBundledSkillsStaleness(config, {
+                installedDir,
+                claudeSkillsDir,
+                codexSkillsDir,
+                agentsSkillsDir,
+            });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.summary, "Bundled-skills discovery links are incomplete or invalid.");
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                installedVersion: getCliVersion(),
+                cliVersion: getCliVersion(),
+                brokenDiscoveryByDir: {
+                    agents: [{
+                        actualTarget: undefined,
+                        dirLabel: "agents",
+                        discoveryDir: agentsSkillsDir,
+                        skillName: targetSkill,
+                        issue: "missing",
+                        expectedTarget: join(installedDir, targetSkill),
+                    }],
+                },
+            });
+        });
+
+        it("warns when the generic agents managed copy is unmarked", async () => {
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-unmarked-agents-copy-");
+            const installedDir = join(root, "bundled-skills");
+            const claudeSkillsDir = join(root, "claude-skills");
+            const codexSkillsDir = join(root, "codex-skills");
+            const agentsSkillsDir = join(root, "agents-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const [targetSkill] = await seedHealthyAgentSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            await rm(join(agentsSkillsDir, targetSkill, MANAGED_BUNDLED_SKILL_COPY_MARKER), { force: true });
+
+            const result = await checkBundledSkillsStaleness(config, {
+                installedDir,
+                claudeSkillsDir,
+                codexSkillsDir,
+                agentsSkillsDir,
+            });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.summary, "Bundled-skills discovery links are incomplete or invalid.");
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                installedVersion: getCliVersion(),
+                cliVersion: getCliVersion(),
+                brokenDiscoveryByDir: {
+                    agents: [{
+                        actualTarget: undefined,
+                        dirLabel: "agents",
+                        discoveryDir: agentsSkillsDir,
+                        skillName: targetSkill,
+                        issue: "unmarked",
+                        expectedTarget: join(installedDir, targetSkill),
+                    }],
+                },
+            });
+        });
+
+        it("warns when the generic agents managed copy is stale", async () => {
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-stale-agents-copy-");
+            const installedDir = join(root, "bundled-skills");
+            const claudeSkillsDir = join(root, "claude-skills");
+            const codexSkillsDir = join(root, "codex-skills");
+            const agentsSkillsDir = join(root, "agents-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const [targetSkill] = await seedHealthyAgentSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            await rm(join(agentsSkillsDir, targetSkill, "SKILL.md"), { force: true });
+
+            const result = await checkBundledSkillsStaleness(config, {
+                installedDir,
+                claudeSkillsDir,
+                codexSkillsDir,
+                agentsSkillsDir,
+            });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.summary, "Bundled-skills discovery links are incomplete or invalid.");
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                installedVersion: getCliVersion(),
+                cliVersion: getCliVersion(),
+                brokenDiscoveryByDir: {
+                    agents: [{
+                        actualTarget: undefined,
+                        dirLabel: "agents",
+                        discoveryDir: agentsSkillsDir,
+                        skillName: targetSkill,
+                        issue: "stale",
+                        expectedTarget: join(installedDir, targetSkill),
+                    }],
+                },
+            });
+        });
+
+        it("warns when the generic agents entry is a legacy managed symlink", async () => {
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-legacy-agents-link-");
+            const installedDir = join(root, "bundled-skills");
+            const claudeSkillsDir = join(root, "claude-skills");
+            const codexSkillsDir = join(root, "codex-skills");
+            const agentsSkillsDir = join(root, "agents-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const [targetSkill] = await seedHealthyAgentSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            await rm(join(agentsSkillsDir, targetSkill), { recursive: true, force: true });
+            await createDirectorySymlink(join(installedDir, targetSkill), join(agentsSkillsDir, targetSkill));
+
+            const result = await checkBundledSkillsStaleness(config, {
+                installedDir,
+                claudeSkillsDir,
+                codexSkillsDir,
+                agentsSkillsDir,
+            });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.summary, "Bundled-skills discovery links are incomplete or invalid.");
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                installedVersion: getCliVersion(),
+                cliVersion: getCliVersion(),
+                brokenDiscoveryByDir: {
+                    agents: [{
+                        actualTarget: join(installedDir, targetSkill),
+                        dirLabel: "agents",
+                        discoveryDir: agentsSkillsDir,
+                        skillName: targetSkill,
+                        issue: "legacy-symlink",
+                        expectedTarget: join(installedDir, targetSkill),
+                    }],
+                },
+            });
+        });
+
         it("warns when a managed discovery link points to the wrong target", async () => {
             const root = await makeTempRoot("clawperator-doctor-agent-skills-wrong-link-target-");
             const installedDir = join(root, "bundled-skills");
@@ -1030,6 +1180,43 @@ describe("Doctor: hostChecks", () => {
                         actualTarget: undefined,
                         dirLabel: "claude",
                         discoveryDir: claudeSkillsDir,
+                        skillName: targetSkill,
+                        issue: "conflict",
+                        expectedTarget: join(installedDir, targetSkill),
+                    }],
+                },
+            });
+        });
+
+        it("warns when the generic agents entry is a conflicting file", async () => {
+            const root = await makeTempRoot("clawperator-doctor-agent-skills-conflicting-agents-entry-");
+            const installedDir = join(root, "bundled-skills");
+            const claudeSkillsDir = join(root, "claude-skills");
+            const codexSkillsDir = join(root, "codex-skills");
+            const agentsSkillsDir = join(root, "agents-skills");
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const [targetSkill] = await seedHealthyAgentSkillsInstall(installedDir, [claudeSkillsDir, codexSkillsDir, agentsSkillsDir]);
+            await rm(join(agentsSkillsDir, targetSkill), { recursive: true, force: true });
+            await writeFile(join(agentsSkillsDir, targetSkill), "not a managed copy\n", "utf8");
+
+            const result = await checkBundledSkillsStaleness(config, {
+                installedDir,
+                claudeSkillsDir,
+                codexSkillsDir,
+                agentsSkillsDir,
+            });
+
+            assert.strictEqual(result.status, "warn");
+            assert.strictEqual(result.summary, "Bundled-skills discovery links are incomplete or invalid.");
+            assert.deepStrictEqual(result.evidence, {
+                installedDir,
+                installedVersion: getCliVersion(),
+                cliVersion: getCliVersion(),
+                brokenDiscoveryByDir: {
+                    agents: [{
+                        actualTarget: undefined,
+                        dirLabel: "agents",
+                        discoveryDir: agentsSkillsDir,
                         skillName: targetSkill,
                         issue: "conflict",
                         expectedTarget: join(installedDir, targetSkill),

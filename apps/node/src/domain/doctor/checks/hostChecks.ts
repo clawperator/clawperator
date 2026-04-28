@@ -15,6 +15,7 @@ import {
 import { isOrchestratedHarnessScriptPath, resolveRepoRelativeSkillPath } from "../../skills/pathUtils.js";
 import { readSkillManifestMetadata } from "../../skills/skillManifest.js";
 import {
+  inspectManagedBundledSkillDirectory,
   inspectManagedBundledSkillLink,
   listPackagedBundledSkills,
   resolveBundledSkillsInstalledDir,
@@ -119,7 +120,7 @@ interface BrokenAgentDiscoveryEntry {
   dirLabel: string;
   discoveryDir: string;
   skillName: string;
-  issue: "missing" | "conflict" | "broken" | "wrong-target";
+  issue: "missing" | "conflict" | "broken" | "wrong-target" | "legacy-symlink" | "unmarked" | "stale";
   expectedTarget: string;
   actualTarget?: string;
 }
@@ -159,11 +160,17 @@ async function findBrokenAgentDiscoveryEntries(
 
   for (const { dirLabel, discoveryDir } of discoveryDirs) {
     for (const skillName of expectedSkills) {
-      const inspection = await inspectManagedBundledSkillLink(
-        join(discoveryDir, skillName),
-        installedDir,
-        skillName
-      );
+      const inspection = dirLabel === "agents"
+        ? await inspectManagedBundledSkillDirectory(
+          join(discoveryDir, skillName),
+          installedDir,
+          skillName
+        )
+        : await inspectManagedBundledSkillLink(
+          join(discoveryDir, skillName),
+          installedDir,
+          skillName
+        );
       if (inspection.status === "ok") {
         continue;
       }
