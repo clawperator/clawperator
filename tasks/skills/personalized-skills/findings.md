@@ -66,14 +66,33 @@
 
 | Order | Skill | Target home | Status | Local test result | OpenClaw discovery result | OpenClaw live-call result |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `home-battery-get-level` | `~/.agents/skills/` | not started | not run | not run | not run |
-| 2 | `home-energy-get-yesterday-usage-cost` | `~/.agents/skills/` | not started | not run | not run | not run |
+| 1 | `home-battery-get-level` | `~/.agents/skills/` | implemented in personal home | passed: `~/.agents/skills/home-battery-get-level/scripts/test_command_shape.sh` | passed: `openclaw skills list --eligible --json` shows the skill; `openclaw skills info home-battery-get-level --json` reports `source: agents-skills-personal`, `eligible: true` | blocked after exact required call: `openclaw agent --message "What is the home battery level? Use the personal skill if one applies." --json` failed before skill selection because OpenClaw required `--to`, `--session-id`, or `--agent` |
+| 2 | `home-energy-get-yesterday-usage-cost` | `~/.agents/skills/` | implemented in personal home | passed: `~/.agents/skills/home-energy-get-yesterday-usage-cost/scripts/test_command_shape.sh` | passed: `openclaw skills list --eligible --json` shows the skill; `openclaw skills info home-energy-get-yesterday-usage-cost --json` reports `source: agents-skills-personal`, `eligible: true` | blocked after exact required call: `openclaw agent --message "What was yesterday's home energy usage cost? Use the personal skill if one applies." --json` failed before skill selection because OpenClaw required `--to`, `--session-id`, or `--agent` |
 | 3 | `media-netflix-set-my-list-state` | `~/.agents/skills/` | not started | not run | not run | not run |
 | 4 | `home-hvac-control` | `~/.agents/skills/` | not started | not run | not run | not run |
 
 ## Test Script Convention
 
-To be created at the start of Phase 2 before wrappers are created.
+Phase 2 created a static content validator convention for instruction-only
+personal AgentSkills wrappers. Each wrapper has an executable script under
+`scripts/` that reads the neighboring `SKILL.md`, asserts the documented
+runtime skill id, `clawperator skills run` command shape, `--output json`,
+argument rules, and success-reporting rule, then exits nonzero on failure.
+
+Current scripts:
+
+- `~/.agents/skills/home-battery-get-level/scripts/test_command_shape.sh`
+  asserts `com.solaxcloud.starter.get-battery`, `--output json`, no required
+  user content arguments, and top-level wrapper status before
+  `skillResult.status`.
+- `~/.agents/skills/home-energy-get-yesterday-usage-cost/scripts/test_command_shape.sh`
+  asserts `com.globird.energy.get-yesterday-usage-cost-replay`,
+  `--output json`, no required user content arguments, and top-level wrapper
+  status before `skillResult.status`.
+
+If a later wrapper introduces executable normalization code, its local test
+must stub command execution and assert the generated argv or ordered command
+sequence without touching the live device.
 
 ## Docs Draft Notes
 

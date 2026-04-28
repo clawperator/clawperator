@@ -64,8 +64,8 @@ This PR includes only:
 
 | Phase | Status | Commit | Validation / Notes |
 | --- | --- | --- | --- |
-| Phase 1: Audit And Policy Findings | validation passed; commit pending |  | Read implementation instructions, plan, work breakdown, prior findings, AGENTS.md, docs-author guidance, docs north star, current skills docs, runtime contracts, and sibling skills repo entrypoints. Confirmed PR-1 maps to phases 1-5 only. Created `findings.md`; `openclaw skills list --eligible --json` confirmed `agents-skills-personal`; Phase 1 validation commands passed. |
-| Phase 2: No-Argument Battery And Energy Wrappers | not started |  |  |
+| Phase 1: Audit And Policy Findings | complete | `15948340` | Read implementation instructions, plan, work breakdown, prior findings, AGENTS.md, docs-author guidance, docs north star, current skills docs, runtime contracts, and sibling skills repo entrypoints. Confirmed PR-1 maps to phases 1-5 only. Created `findings.md`; `openclaw skills list --eligible --json` confirmed `agents-skills-personal`; Phase 1 validation commands passed. |
+| Phase 2: No-Argument Battery And Energy Wrappers | validation passed; commit pending |  | Re-read `findings.md`; target home is `~/.agents/skills/`. Created `home-battery-get-level` and `home-energy-get-yesterday-usage-cost` in `~/.agents/skills/`; both local static command-shape tests passed; OpenClaw list/info discovery passed for both; exact live `openclaw agent --message ... --json` calls were attempted and blocked by missing `--to`, `--session-id`, or `--agent`; blocker recorded in `findings.md`. |
 | Phase 3: Basic Netflix Wrapper | not started |  |  |
 | Phase 4: Unified HVAC Control Wrapper | not started |  |  |
 | Phase 5: Durable Public Documentation | not started |  |  |
