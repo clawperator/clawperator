@@ -64,7 +64,7 @@ This PR includes only:
 
 | Phase | Status | Commit | Validation / Notes |
 | --- | --- | --- | --- |
-| Phase 1: Audit And Policy Findings | not started |  |  |
+| Phase 1: Audit And Policy Findings | validation passed; commit pending |  | Read implementation instructions, plan, work breakdown, prior findings, AGENTS.md, docs-author guidance, docs north star, current skills docs, runtime contracts, and sibling skills repo entrypoints. Confirmed PR-1 maps to phases 1-5 only. Created `findings.md`; `openclaw skills list --eligible --json` confirmed `agents-skills-personal`; Phase 1 validation commands passed. |
 | Phase 2: No-Argument Battery And Energy Wrappers | not started |  |  |
 | Phase 3: Basic Netflix Wrapper | not started |  |  |
 | Phase 4: Unified HVAC Control Wrapper | not started |  |  |
