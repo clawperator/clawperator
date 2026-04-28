@@ -69,7 +69,7 @@
 | 1 | `home-battery-get-level` | `~/.agents/skills/` | implemented in personal home | passed: `~/.agents/skills/home-battery-get-level/scripts/test_command_shape.sh` | passed: `openclaw skills list --eligible --json` shows the skill; `openclaw skills info home-battery-get-level --json` reports `source: agents-skills-personal`, `eligible: true` | blocked after exact required call: `openclaw agent --message "What is the home battery level? Use the personal skill if one applies." --json` failed before skill selection because OpenClaw required `--to`, `--session-id`, or `--agent` |
 | 2 | `home-energy-get-yesterday-usage-cost` | `~/.agents/skills/` | implemented in personal home | passed: `~/.agents/skills/home-energy-get-yesterday-usage-cost/scripts/test_command_shape.sh` | passed: `openclaw skills list --eligible --json` shows the skill; `openclaw skills info home-energy-get-yesterday-usage-cost --json` reports `source: agents-skills-personal`, `eligible: true` | blocked after exact required call: `openclaw agent --message "What was yesterday's home energy usage cost? Use the personal skill if one applies." --json` failed before skill selection because OpenClaw required `--to`, `--session-id`, or `--agent` |
 | 3 | `media-netflix-set-my-list-state` | `~/.agents/skills/` | implemented in personal home | passed: `~/.agents/skills/media-netflix-set-my-list-state/scripts/test_intent_mapping.sh` validates add title, remove title, and missing-title refusal | passed: `openclaw skills list --eligible --json` shows the skill; `openclaw skills info media-netflix-set-my-list-state --json` reports `source: agents-skills-personal`, `eligible: true` | safe-test blocked: My List add/remove mutates account state, no user-approved safe title/profile is available in this repo, and Phase 2 exact OpenClaw agent calls show the gateway requires `--to`, `--session-id`, or `--agent` before skill selection |
-| 4 | `home-hvac-control` | `~/.agents/skills/` | not started | not run | not run | not run |
+| 4 | `home-hvac-control` | `~/.agents/skills/` | implemented in personal home | passed: `~/.agents/skills/home-hvac-control/scripts/test_intent_mapping.sh` validates ordered power, zone, and fan sequence; unknown alias refusal; and partial-failure reporting | passed: `openclaw skills list --eligible --json` shows the skill; `openclaw skills info home-hvac-control --json` reports `source: agents-skills-personal`, `eligible: true`; split HVAC wrapper names were not discovered | safe-test blocked: realistic HVAC requests mutate the local climate system, no user-approved safe HVAC mutation window is recorded in this repo, and Phase 2 exact OpenClaw agent calls show the gateway requires `--to`, `--session-id`, or `--agent` before skill selection |
 
 ## Test Script Convention
 
@@ -94,6 +94,11 @@ Current scripts:
   `com.netflix.mediaclient.set-my-list-state-replay --output json -- --action
   <add|remove> --title "House of Cards" --profile "<local_profile>"`, and
   asserts missing-title requests do not run Clawperator.
+- `~/.agents/skills/home-hvac-control/scripts/test_intent_mapping.sh`
+  asserts one unified user-facing HVAC wrapper, the representative ordered
+  AirTouch sequence for power, zone, and fan, unknown-alias refusal before
+  running Clawperator, no split HVAC wrapper directories, and partial-failure
+  reporting with the exact failed step.
 
 If a later wrapper introduces executable normalization code, its local test
 must stub command execution and assert the generated argv or ordered command
