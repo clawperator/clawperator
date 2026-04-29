@@ -3,7 +3,7 @@ name: clawperator-skill-author-by-recording
 description: Clawperator first-party bundled skill. Create or update a Clawperator skill from a fresh phone recording. Use when a developer wants the proving workflow after discovery has identified recording as the truthful next step, or when the app route is already well understood, and wants one front-door workflow that records a real device flow, derives the skill id from the recording and goal, defaults to replay on the first pass unless orchestrated is explicitly requested or clearly more truthful, and runs one self-test that surfaces the emitted SkillResult.
 ---
 
-# Skill Author By Recording
+# Clawperator Skill Author By Recording
 
 Guide a developer through Clawperator's recording workflow from "I can do this
 once on my phone" to "I now have a truthful authored skill artifact."
