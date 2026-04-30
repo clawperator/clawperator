@@ -1,16 +1,17 @@
 # Docs IA Audit - Consolidated Findings
 
 Synthesized from two independent audits (Claude + Codex) against source as of May 2026.
-Source files examined: `docs/api/`, `apps/node/src/cli/registry.ts`, `apps/node/src/contracts/`,
-`.agents/skills/docs-build/scripts/`, `sites/docs/source-map.yaml`, `sites/docs/mkdocs.yml`,
-`sites/docs/.build/api/cli.md`.
+Source files examined: `docs/api/`, `apps/node/src/cli/registry.ts`,
+`apps/node/src/contracts/` (errors, selectors, aliases, execution),
+`apps/node/src/cli/selectorFlags.ts`, `.agents/skills/docs-build/scripts/`,
+`sites/docs/source-map.yaml`, `sites/docs/mkdocs.yml`, `sites/docs/.build/api/cli.md`.
 
 ---
 
 ## Scope
 
-Public API and CLI documentation only (`docs/api/`, `sites/docs/`). Landing site (`sites/landing/`)
-and internal design docs (`docs/internal/`) are out of scope.
+Public API and CLI documentation only (`docs/api/`, `sites/docs/`). Landing site
+(`sites/landing/`) and internal design docs (`docs/internal/`) are out of scope.
 
 Questions addressed:
 1. Are canonical links established and discoverable for all major concepts?
@@ -23,33 +24,35 @@ Questions addressed:
 
 ## Executive Summary
 
-The docs surface has solid authored pages for the major API areas but has three high-priority
-structural problems that degrade it for automated agents and human developers alike.
+The docs surface has solid authored pages for the major API areas but has three
+high-priority structural problems that degrade it for automated agents and human
+developers alike.
 
 **High priority:**
 - The CLI reference page emits every command three times (generator structural bug).
-- Alias flags and shim commands appear in public output because the generator has no
-  documented-flags list for most commands.
+- Non-primary compatibility aliases and shim commands appear in public output because the
+  generator lacks a documented-flags list for most commands.
 - The docs surface has no stable anchor strategy, so deep links to specific commands,
   actions, error codes, or selectors are not reliable.
 
 **Medium priority:**
-- No canonical source-of-truth manifest: ownership of which page covers each concept is
-  implicit, causing duplication between authored pages and generated output.
-- Cross-linking between related pages is absent or accidental. An agent reading
-  `actions.md` cannot navigate to the CLI reference for the same concept, and vice versa.
-- The "API call" terminology is ambiguous throughout: it conflates CLI subcommands,
-  execution action types, and HTTP serve endpoints.
+- No declared source-of-truth manifest: ownership of which page covers each concept is
+  implicit, causing duplication that drifts.
+- Authored pages have page-level "Related Pages" sections, but generated `api/cli.md` has
+  no canonical detail links, and anchor-level cross-links (command -> action type, action
+  -> error code) are absent throughout.
+- The "API call" terminology is ambiguous: it conflates CLI commands, execution action
+  types, and HTTP serve endpoints.
 
 **Low priority:**
-- Doctor-check details are repeated across multiple pages.
-- Nav reading order doesn't follow a first-time user's mental model.
-- Error table in `errors.md` is thin compared to the range of codes emitted at runtime.
+- Doctor-check details are repeated across `setup.md` and `doctor.md` with no clear
+  ownership boundary.
+- Nav reading order does not match a first-time user's mental model.
+- Error table in `errors.md` lacks command-of-origin and retryability columns.
 
 The CLI triple-duplication and alias-flag exposure are generator bugs, not authoring bugs.
-Fixing them requires changes to `generate_cli_reference.py` and `registry.ts`, not to
-hand-authored markdown. All other findings can be addressed by authoring and generator
-configuration changes alone.
+Fixing them requires changes to `generate_cli_reference.py` and `registry.ts`. All other
+findings are addressable through authoring and generator configuration changes.
 
 ---
 
@@ -61,12 +64,13 @@ configuration changes alone.
 | `api/cli.md` | Generated | `registry.ts` via `generate_cli_reference.py` | CLI command reference |
 | `api/actions.md` | Authored | `docs/api/actions.md` | Execution action types and parameters |
 | `api/selectors.md` | Authored | `docs/api/selectors.md` | Selector fields and semantics |
-| `api/snapshot.md` | Authored | `docs/api/snapshot.md` | Snapshot command, output shape |
+| `api/snapshot.md` | Authored | `docs/api/snapshot.md` | Snapshot command and output shape |
 | `api/serve.md` | Authored | `docs/api/serve.md` | HTTP serve command and endpoints |
-| `api/recording.md` | Authored | `docs/api/recording.md` | Recording workflow, all CLI commands, output shapes, NDJSON schema, compare outcomes |
+| `api/recording.md` | Authored | `docs/api/recording.md` | Full recording workflow, all CLI commands, output shapes, NDJSON schema, compare outcomes |
+| `api/doctor.md` | Authored | `docs/api/doctor.md` | Doctor contract, check types, output interpretation |
 | `api/mcp.md` | Authored + marker | `docs/api/mcp.md` + `registry.ts` | MCP tool summary |
 | `api/errors.md` | Authored + marker | `docs/api/errors.md` + `contracts/errors.ts` | Error codes table |
-| `setup.md` | Authored | `docs/setup.md` | Device setup, APK install |
+| `setup.md` | Authored | `docs/setup.md` | Device setup, APK install, readiness gate summary |
 
 Generated output pipeline:
 ```
@@ -84,309 +88,404 @@ docs/ (authored) + registry.ts + contracts/
 Each concept has exactly one owned location. Current ownership is implicit; it should be
 declared in `source-map.yaml` or a companion manifest.
 
-| Concept category | Canonical owner | Secondary references OK? |
-|------------------|-----------------|--------------------------|
-| CLI command flags and descriptions | `registry.ts` (`documentedFlags`) | Generator reads; authored pages may summarize |
-| Execution action types and parameters | `contracts/execution.ts` + `docs/api/actions.md` | `actions.md` is the durable home; generator may emit a summary |
-| Selector fields | `contracts/selectors.ts` + `docs/api/selectors.md` | CLI reference lists primary flags inline; full detail in selectors.md |
+| Concept category | Canonical owner | Notes |
+|------------------|-----------------|-------|
+| CLI command flags and descriptions | `registry.ts` (`documentedFlags`) | Generator reads; authored pages may summarize with links |
+| Execution action types and parameters | `contracts/aliases.ts` (canonical types) + `docs/api/actions.md` | `actions.md` is the durable authored home; generator may emit summary table |
+| Selector fields | `contracts/selectors.ts` + `apps/node/src/cli/selectorFlags.ts` + `docs/api/selectors.md` | CLI reference lists primary flags inline; full semantics in `selectors.md` |
 | Error codes | `contracts/errors.ts` via marker expansion | `errors.md` is the single rendered location |
-| Result envelope shape | `contracts/result.ts` + `docs/api/overview.md` | overview.md is the durable home |
-| Serve endpoints | `apps/node/src/cli/commands/serve.ts` + `docs/api/serve.md` | serve.md is the durable home |
+| Result envelope shape | `contracts/result.ts` + `docs/api/overview.md` | `overview.md` is the durable authored home |
+| Serve endpoints | `apps/node/src/cli/commands/serve.ts` + `docs/api/serve.md` | `serve.md` is the durable home |
 | MCP tools | `registry.ts` via marker expansion | `mcp.md` is the durable home |
-| Doctor checks | `domain/doctor/checks/` + `docs/setup.md` | setup.md is the durable home; no repetition on other pages |
-| Recording workflow | `docs/api/recording.md` | Comprehensive; no repetition needed |
+| Doctor checks and output | `domain/doctor/checks/` + `docs/api/doctor.md` | `doctor.md` owns the full Doctor contract; `setup.md` references it only for the readiness gate |
+| Recording workflow | `docs/api/recording.md` | Comprehensive; CLI reference need not repeat recording command detail |
 
 ---
 
 ## Findings
 
+Each finding includes:
+- **What** - the specific structural problem
+- **Why it matters for humans** - impact on developers reading the docs
+- **Why it matters for agents** - impact on automated agents using the docs as a reference
+- **Fix** - recommended action
+
+---
+
 ### F-01 - CLI triple-duplication (High)
 
 **What:** The generated `api/cli.md` renders each command three times: once in the global
 summary table, once in the per-group table, and once in the per-command bullet section.
-`render_group()` in `generate_cli_reference.py` produces both the group table and the
-per-command sections in a single call, in addition to the global summary table emitted
-by `main()`.
+`render_group()` in `generate_cli_reference.py` emits both the group table and per-command
+sections in a single pass, stacked on top of the global summary table from `main()`.
 
-**Evidence:** `sites/docs/.build/api/cli.md` (361 lines, ~12 commands, each appearing 3 times).
+**Why it matters for humans:** The reference is 361 lines long and visually noisy. When
+the three layers diverge (one updated, others stale), a single file contains contradictory
+descriptions of the same command.
 
-**Impact:** Agents and developers reading the CLI reference must visually filter duplicate
-entries. Inconsistencies between the three layers (when one is updated and another is not)
-will produce contradictions in the same file.
+**Why it matters for agents:** An agent scanning the CLI reference must filter duplicates
+without a reliable signal for which layer is authoritative. An index with a canonical
+per-command section would be unambiguous.
 
-**Fix:** Restructure the generator to emit one global index table followed by one
-per-command detail section. Remove the intermediate per-group tables or collapse them into
-the index. Per-command sections become the detail layer; the index table becomes the
-navigation layer.
+**Fix:** Restructure the generator to emit one global index table (one row per command,
+linking to the per-command anchor) followed by one per-command detail section per command.
+Remove the intermediate per-group tables; they add length without adding information not
+already in the index.
 
 ---
 
-### F-02 - Alias flags and shim commands exposed in public output (High)
+### F-02 - Compatibility-alias flags and shim commands in public output (High)
 
-**What:** The generator uses `documentedFlags` when present, else falls back to regex
-extraction of all `--flag` tokens in the command body. Most commands have no
-`documentedFlags` array, so the regex picks up deprecated aliases, internal flags, and
-receiver flags not intended for direct agent use. The `skills` command is the primary
-example: `--receiver-package`, `--device-id`, and `--timeout-ms` appear as equal-weight
-flags in the public reference.
+**What:** Two distinct problems share the same root cause (no `documentedFlags` whitelist):
 
-Additionally, two command types appear in the public CLI index that should not:
-- `setup`: a guidance shim. Its handler immediately returns a USAGE error directing the
-  caller to `clawperator operator setup --apk <path>`. It is not a callable command; it
-  exists to catch misuse and redirect it.
-- `provision` (top-level): a working alias for `emulator provision`, not deprecated and
-  not broken, but its presence alongside `emulator provision` creates surface confusion.
-  It should appear in an aliases section, not as a peer top-level command.
+**2a - Alias flags exposed as primary flags.** The generator falls back to regex
+extraction when a command has no `documentedFlags` array, picking up all `--flag` tokens
+in the command body - including compatibility aliases. From `selectorFlags.ts`:
+- `--id` is the primary flag; `--resource-id` is a compatibility alias.
+- `--desc` is the primary flag; `--content-desc` is a compatibility alias.
+The `skills` command is the clearest current example: `--receiver-package` and
+`--device-id` appear at the same visual weight as the primary flags.
 
-**Evidence:** `registry.ts` lines 1142-1154 (setup shim), 1256-1274 (provision alias);
-`sites/docs/.build/api/cli.md` flags section for `skills`.
+**2b - Shim commands in the public index.** Two command types should not appear in the
+main index:
+- `setup` (top-level): a guidance shim. Its handler immediately returns a USAGE error:
+  "clawperator setup is not a valid top-level command. Use: clawperator operator setup
+  --apk `<path>`". It is not callable; it exists solely to redirect misuse.
+- `provision` (top-level): a working alias for `emulator provision`. It is not broken and
+  not deprecated, but its peer placement alongside `emulator provision` creates surface
+  confusion. Correct treatment is an aliases section, not a main-index entry.
 
-**Impact:** An agent reading the CLI reference may attempt to call `setup` directly (it
-will fail with USAGE), may be confused by duplicate provision paths, and may pass
-deprecated flags that the runtime rejects or ignores.
+**Why it matters for humans:** A developer reading the flag list cannot distinguish primary
+from compatibility forms without reading the source. The USAGE error from `setup` is
+surprising if the docs present it as a callable command.
+
+**Why it matters for agents:** An agent attempting `clawperator setup` will receive a
+USAGE error after trusting the reference. An agent passing `--resource-id` or
+`--content-desc` receives values the runtime internally normalizes - but the canonical
+form the agent should learn is `--id` and `--desc`.
 
 **Fix (two parts):**
-1. Add `documentedFlags` arrays to all commands in `registry.ts`. Use the explicit list
-   to declare which flags are primary and agent-facing.
-2. In the generator, add a `commandKind` concept: `normal | shim | alias`. Shims are
-   omitted from the main table. Working aliases appear in an "Aliases" appendix or a
-   collapsible alias note under the canonical command entry.
+1. Add `documentedFlags` arrays to every command in `registry.ts`, listing only
+   primary agent-facing flags. Compatibility aliases must not appear in
+   `documentedFlags`. The generator must never fall back to regex extraction for public
+   output.
+2. Add a `commandKind` concept: `normal | shim | alias`. Shims are omitted from all
+   public output. Working aliases appear under their canonical command with a brief note,
+   and in an aliases appendix if the count warrants one.
 
 ---
 
 ### F-03 - No stable anchor strategy (High)
 
 **What:** The docs site has no declared naming convention for within-page anchors. Deep
-links from one page to a specific command, action type, error code, or selector field
-rely on whatever heading text MkDocs happens to generate. Heading renames silently break
-those links; no tooling catches them.
+links rely on MkDocs heading-slug generation. Heading renames silently break those links;
+no tooling detects them. The generated `api/cli.md` has no per-command anchors at all.
 
-**Impact:** Agent-facing link tables (e.g., a skills manifest linking to specific doc
-sections) become unreliable. Cross-links between pages become maintenance debt.
+**Why it matters for humans:** "Link to the snapshot command docs" produces a URL that may
+break on the next heading rename or generator change.
 
-**Recommended anchor pattern:**
-| Concept | Anchor format | Example |
-|---------|---------------|---------|
+**Why it matters for agents:** A skills manifest or agent system prompt that references
+`#command-snapshot` or `#action-click` must be stable across doc regenerations. Implicit
+MkDocs slugs are not a reliable contract.
+
+**Recommended anchor convention:**
+
+| Concept | Format | Example |
+|---------|--------|---------|
 | CLI command | `command-<name>` | `#command-snapshot` |
-| Execution action type | `action-<type>` | `#action-tap` |
-| Selector field | `selector-field-<field>` | `#selector-field-resource-id` |
-| Error code | `error-<code>` | `#error-execution-timeout` |
+| Execution action type | `action-<type>` | `#action-click` |
+| Selector field | `selector-field-<field>` | `#selector-field-id` |
+| Error code | `error-<code>` | `#error-node-not-found` |
 | Serve endpoint | `endpoint-<method>-<path>` | `#endpoint-post-execute` |
 | Setup step | `setup-step-<slug>` | `#setup-step-grant-permissions` |
 
-**Fix:** Declare this convention in `docs/internal/design/` and add explicit `<a>` anchor
-tags to generated and authored pages at each canonical entry point. The generator should
-emit these tags automatically for each command section.
+Note: `click` is the canonical action type (`tap` and `press` are input aliases that
+normalize to `click` before validation - see `contracts/aliases.ts`). Anchors should use
+the canonical type, not input aliases.
+
+**Fix:** Declare this convention in `docs/internal/design/`. The CLI reference generator
+should emit `<a id="command-<name>">` before each per-command section automatically.
+Authored pages should add explicit `<a>` tags at each canonical entry point.
 
 ---
 
-### F-04 - No canonical source-of-truth manifest (Medium)
+### F-04 - No declared source-of-truth manifest (Medium)
 
-**What:** Which page "owns" a concept is implicit. When a concept appears on multiple
-pages (e.g., doctor checks in both `setup.md` and `overview.md`), there is no signal
-about which is authoritative and which is a summary. This causes pages to drift out of
-sync when the concept changes.
+**What:** Which page owns which concept is implicit. Doctor checks appear in both
+`doctor.md` and `setup.md`; envelope shape details appear in both `overview.md` and
+`snapshot.md`. There is no build-time signal when a summary page begins drifting from its
+source page.
 
-**Recommended fix:** Extend `source-map.yaml` (or a companion `ownership.yaml`) to
-declare:
-- Which page owns each major concept category.
-- Which pages are permitted to include summaries, and at what depth.
-- Which concepts are fully generated (and should never be hand-edited in `.build/`).
+**Why it matters for humans:** When a field is renamed, a developer must remember to
+update all pages that mention it. There is no authoritative list of which pages need
+updating.
 
-This manifest gives the docs-build skill an authority check: if a page attempts to define
-a concept it does not own, the build can warn.
+**Why it matters for agents:** An agent following links from one page may find contradictory
+field descriptions on another and have no basis for resolving the conflict.
+
+**Fix:** Extend `source-map.yaml` (or add `ownership.yaml`) to declare:
+- Which page is the canonical home for each major concept category.
+- Which pages may include summaries, and at what depth.
+- Which concept categories are fully generated.
+
+A warning-only build check for pages that define content outside their declared ownership
+is viable as a Phase 5 addition (see Implementation Direction).
 
 ---
 
-### F-05 - Absent cross-linking (Medium)
+### F-05 - Cross-links present at page level, absent at anchor level (Medium)
 
-**What:** Related pages do not link to each other at concept boundaries. Specific gaps:
-- `actions.md` has no links to `api/cli.md` for the corresponding CLI commands.
-- `api/cli.md` has no links back to `actions.md` for execution action types.
-- `selectors.md` has no backlink from `actions.md` selector parameter descriptions.
-- `errors.md` is not linked from command pages where those errors are emitted.
-- `api/serve.md` has no link to `overview.md` for envelope shape.
+**What:** The authored pages (`overview.md`, `actions.md`, `errors.md`) all have "Related
+Pages" sections providing page-level navigation. The gap is more precise: the generated
+`api/cli.md` has no links from a command entry to the corresponding action type in
+`actions.md`, and authored pages lack stable anchor-level links between related concepts
+(e.g., an error code mention in `serve.md` does not link to the specific `#error-<code>`
+anchor in `errors.md`).
 
-**Impact:** An agent reading the docs in topic order must guess that a related page exists.
-The first command an agent tries from `cli.md` may fail with an error code that appears
-only in `errors.md` with no navigation path between them.
+**Why it matters for humans:** Page-level links exist; concept-level links do not. A
+developer reading a command description must manually navigate to `actions.md` and search
+for the action type.
 
-**Fix:** Add "See also" footers to each page listing at least the two or three most
-directly related pages. For generated pages, emit these footers from the generator using a
-static configuration block.
+**Why it matters for agents:** An agent following the docs flow from CLI command to action
+type to error codes requires three manual navigations with no guidance links between them.
+
+**Fix:** After anchors are stable (F-03), add anchor-level "See also" links in:
+- Each CLI command section in `api/cli.md` -> `#action-<type>` in `actions.md`
+- Each action type section in `actions.md` -> `#command-<name>` in `cli.md`
+- Error mentions in `serve.md`, `recording.md`, and `snapshot.md` -> `#error-<code>` in
+  `errors.md`
+
+The generator should emit these links automatically for CLI-to-action cross-references
+using a static command-to-action mapping in the generator configuration.
 
 ---
 
 ### F-06 - Ambiguous "API call" terminology (Medium)
 
-**What:** The phrase "API call" is used throughout the docs to mean different things
-depending on context:
-- A CLI subcommand invocation (`clawperator snapshot`).
-- An execution action type sent in the actions array (`{ "type": "tap", ... }`).
-- An HTTP endpoint call to the serve interface (`POST /execute`).
-- A Node.js function call via the programmatic interface.
+**What:** The phrase "API call" is used to mean at least four different things:
+- A CLI command invocation (`clawperator snapshot`).
+- An execution action type in the `actions[]` array (`{ "type": "click", ... }`).
+- An HTTP endpoint call (`POST /execute`).
+- A programmatic Node.js call.
 
-An agent reading the docs cannot reliably determine which surface is being described
-without reading surrounding context carefully.
+The ambiguity is worst in `overview.md` and `actions.md`.
 
-**Fix:** Adopt explicit terminology across all pages:
+**Why it matters for humans:** A developer reading "make an API call" cannot determine
+without context whether to reach for the CLI, construct a JSON payload, or hit an HTTP
+endpoint.
+
+**Why it matters for agents:** An agent parsing the docs to understand how to request
+automation must correctly identify the surface. Conflated terminology increases the chance
+of the agent attempting the wrong surface first.
+
+**Fix:** Adopt and consistently apply explicit terminology across all pages:
 - "CLI command" for `clawperator <command>` invocations.
 - "Execution action" or "action type" for items in the `actions[]` array.
-- "Serve endpoint" or "HTTP endpoint" for `POST /execute` and siblings.
+- "Serve endpoint" or "HTTP endpoint" for `/execute` and siblings.
 - "Node API" for programmatic use.
 
-Apply this consistently in `overview.md`, `actions.md`, `serve.md`, and the CLI reference.
-Add a terminology note near the top of `overview.md`.
+Add a terminology note near the top of `overview.md` defining these terms once.
 
 ---
 
 ### F-07 - Result envelope canonical home unclear (Medium)
 
 **What:** The result envelope shape (`[Clawperator-Result]` JSON, `success`, `commandId`,
-`taskId`, `error`, `data`) is described in `overview.md` but also partially documented in
+`taskId`, `error`, `data`) is described in `overview.md` but field details also appear in
 `snapshot.md`, `serve.md`, and `recording.md`. The authoritative field list lives in
 `contracts/result.ts`.
 
-**Impact:** Field additions or renames may update in one place but not others.
+**Why it matters for humans:** When a field is added or renamed, it is not obvious which
+pages need updating.
+
+**Why it matters for agents:** An agent reading envelope shape from `snapshot.md` may see
+a subset of the full field list. The canonical location is not signposted.
 
 **Fix:** Declare `overview.md` as the canonical home for the envelope shape. Other pages
-may show abbreviated examples but should link to `overview.md` for the full field list.
-Add a marker expansion in `source-map.yaml` to generate the field table directly from
-`contracts/result.ts`.
+may show abbreviated examples but must link to `overview.md` for the full field list.
+Consider a marker expansion in `source-map.yaml` to generate the field table from
+`contracts/result.ts`, similar to how error codes are generated from `contracts/errors.ts`.
 
 ---
 
-### F-08 - Serve wrapper vs. Node error codes not distinguished (Medium)
+### F-08 - Serve error layers not distinguished (Medium)
 
-**What:** `serve.md` documents the HTTP serve interface but does not clearly distinguish
-between errors that come from the serve wrapper (HTTP 400, 500) and errors in the
-`[Clawperator-Result]` envelope (Node error codes like `EXECUTION_TIMEOUT`,
-`SELECTOR_NOT_FOUND`). A caller of the serve interface must understand both layers.
+**What:** `serve.md` documents the HTTP serve interface but does not clearly separate the
+two error layers a caller must handle:
+1. HTTP response status (400, 500) from the serve wrapper.
+2. `error.code` in the `[Clawperator-Result]` envelope, such as `RESULT_ENVELOPE_TIMEOUT`
+   or `NODE_NOT_FOUND`.
 
-**Fix:** Add a section to `serve.md` explicitly covering the two error layers:
-the HTTP response status and the envelope `error.code` field. Link to `errors.md` for the
-full error code table.
+**Why it matters for humans:** A developer integrating with the serve interface writes
+error handling for one layer and discovers the other in production.
 
----
+**Why it matters for agents:** An agent calling the serve endpoint and receiving a
+successful HTTP 200 may still have a failed execution indicated by the envelope. Without
+explicit docs on this two-layer contract, the agent may misinterpret the response.
 
-### F-09 - Setup page mixed concerns (Low-Medium)
-
-**What:** `setup.md` covers device prerequisite steps, APK installation, operator setup,
-and permission grants - but it also contains doctor-check details that repeat content
-better owned by the doctor implementation itself. The page reads as a sequential script
-rather than reference material.
-
-**Fix:** Separate into two concerns:
-- `setup.md`: installation and first-time device prep only.
-- A dedicated `troubleshooting.md` or a `doctor.md` page for runtime health checks,
-  doctor output interpretation, and recovery patterns.
-
-Keep doctor check details out of `setup.md` beyond a brief mention of `clawperator doctor`
-as the verification command.
+**Fix:** Add a dedicated section to `serve.md` covering the two error layers explicitly,
+with a table of HTTP status meanings and a note that `error.code` values follow the full
+error code contract in `errors.md`.
 
 ---
 
-### F-10 - Selector flag duplication (Low-Medium)
+### F-09 - Doctor ownership boundary unclear (Low-Medium)
 
-**What:** Selector flags (`--text`, `--resource-id`, `--content-desc`, etc.) appear in the
-generated CLI reference for every command that accepts them, and again in full in
-`selectors.md`. The generator emits them as full flag entries rather than a single
-selector-flags reference.
+**What:** `docs/api/doctor.md` should own the full Doctor contract: checks, output
+interpretation, exit codes, and recovery patterns. `setup.md` should reference `doctor.md`
+only for the readiness gate step ("run `clawperator doctor` to verify setup"). Currently,
+doctor-check details appear in both pages without a clear ownership signal.
 
-**Fix:** In the CLI reference, list only the primary selector flags inline per command
-(e.g., `--text`, `--resource-id`), and add a "Full selector options: see Selectors" link.
-Do not repeat the full semantics in the CLI reference - that duplication will drift.
+**Why it matters for humans:** A developer updating a doctor check must remember to update
+two pages.
+
+**Why it matters for agents:** An agent diagnosing a failed doctor run may find different
+details on `setup.md` vs. `doctor.md` and cannot reliably determine which is current.
+
+**Fix:** Audit both pages; move all doctor contract details (check types, output format,
+recovery patterns) to `doctor.md`. Trim `setup.md` to a single reference: "run
+`clawperator doctor` to verify your setup is complete; see [Doctor](doctor.md) for output
+interpretation."
+
+---
+
+### F-10 - Selector flag duplication in CLI reference (Low-Medium)
+
+**What:** Selector flags appear in the generated CLI reference for every command that
+accepts them, and again in full in `selectors.md`. The generator emits them as full flag
+entries rather than a primary-flag-only summary.
+
+Primary selector flags (from `selectorFlags.ts`): `--selector`, `--text`,
+`--text-contains`, `--id`, `--desc`, `--desc-contains`, `--role`.
+Compatibility aliases (not primary): `--resource-id` (alias for `--id`),
+`--content-desc` (alias for `--desc`), `--content-desc-contains` (alias for
+`--desc-contains`).
+
+**Why it matters for humans:** Every command section repeats the same six-flag block,
+inflating the reference significantly.
+
+**Why it matters for agents:** An agent reading the CLI reference sees selector flag
+semantics defined in multiple places and may encounter the compatibility alias names
+(`--resource-id`, `--content-desc`) in the generated output rather than the canonical
+short forms (`--id`, `--desc`).
+
+**Fix:** In the CLI reference, show only the most-used primary selector flags inline per
+command (`--text`, `--id`, `--desc`, `--role`), followed by a note: "For all selector
+options, see [Selectors](selectors.md)." Remove compatibility aliases from generated
+output entirely (addressed by F-02 `documentedFlags` fix).
 
 ---
 
 ### F-11 - Actions.md CLI-to-action mapping (Low-Medium)
 
-**What:** `actions.md` includes a table mapping CLI commands to equivalent execution action
-types (e.g., `clawperator tap` -> `{ "type": "tap" }`). Both the Claude and Codex audits
-flagged this as potentially redundant with the CLI reference.
+**What:** `actions.md` includes a table mapping CLI commands to canonical execution action
+types (e.g., `clawperator snapshot` -> `{ "type": "snapshot" }`). Both audits considered
+whether this table is redundant with the CLI reference.
 
-**Decision:** Keep this table. The reverse-lookup value (action type -> CLI command) is
-distinct from the CLI reference's forward-lookup direction. Agents constructing action
-arrays directly benefit from seeing the action type alongside the CLI equivalent. This
-table does not duplicate; it adds a join that neither page provides alone.
+**Why it matters for humans:** The CLI reference is a forward lookup (what does this
+command do?). The actions table is a reverse lookup (I have an action type, what is the
+CLI equivalent?). These are distinct operations.
+
+**Why it matters for agents:** An agent constructing a raw `actions[]` payload benefits
+from seeing the canonical action type alongside the CLI synonym in one place. The CLI
+reference's command-centric view does not provide this join easily.
+
+**Decision:** Keep the table. The reverse-lookup value is additive, not duplicative. The
+table should use canonical action types only (`click`, not `tap`).
 
 ---
 
-### F-12 - Error table thin (Low)
+### F-12 - Error table incomplete (Low)
 
 **What:** The `errors.md` error code table, generated from `contracts/errors.ts`, lists
-codes with brief descriptions but omits: which commands emit each code, typical recovery
-patterns, and whether the error is retryable.
+codes with brief descriptions but omits: which commands typically emit each code, and
+whether the error is retryable. Actual codes include `RESULT_ENVELOPE_TIMEOUT`,
+`NODE_NOT_FOUND`, `NODE_NOT_CLICKABLE`, `CONTAINER_NOT_FOUND`, and others.
 
-**Fix:** Extend either the marker template or a companion authored section to add at
-minimum: primary commands that emit each code, and a retryable flag.
+**Why it matters for humans:** A developer debugging a `NODE_NOT_FOUND` error must search
+the codebase to learn which commands can emit it.
+
+**Why it matters for agents:** An agent receiving `RESULT_ENVELOPE_TIMEOUT` cannot
+determine from the docs alone whether to retry, adjust timing, or report the failure.
+
+**Fix:** Extend the error table template to add: a "Primary commands" column and a
+"Retryable" flag column. These can be maintained as authored annotations alongside the
+generated code values.
 
 ---
 
 ### F-13 - Nav reading order (Low)
 
 **What:** The nav in `mkdocs.yml` places CLI Reference second after Overview, before
-Actions, Selectors, and Setup. An agent or developer reading the docs in order encounters
-the detailed command reference before understanding the execution model.
+Actions and Selectors. An agent or developer reading in order encounters the detailed
+command reference before understanding the execution model or action types the commands
+invoke.
+
+**Why it matters for humans:** The reference is hard to use without the conceptual
+foundation that Actions and Selectors provide.
+
+**Why it matters for agents:** An agent constructing a system prompt from the docs in
+nav order may include CLI details before it has the action-type and selector vocabulary
+needed to interpret them.
 
 **Recommended order:**
-1. Overview (execution model, envelope, correlation IDs)
-2. Actions (action types and parameters)
-3. Selectors (selector fields)
-4. CLI Reference (commands using the above concepts)
-5. Snapshot / Serve / Recording (feature-specific deep dives)
-6. MCP
-7. Errors
-8. Setup
+1. Overview
+2. Actions
+3. Selectors
+4. CLI Reference
+5. Snapshot / Serve / Recording
+6. Doctor
+7. MCP
+8. Errors
+9. Setup
 
 ---
 
 ### F-14 - Docs compensating for API friction (Low - agent UX note)
 
-**What:** Several doc pages include workarounds and "if X doesn't work, try Y" guidance
-that exists because the API rejects intuitive forms. This is a signal that the API itself
-should accept those forms.
+**What:** Several doc pages include workaround guidance ("if X doesn't work, try Y") that
+exists because the API rejects intuitive command forms. This is a signal for the runtime,
+not a docs problem to be solved by more documentation.
 
-**Examples observed:** The agent UX principle - the command an agent tries first should
-work - applies here. When docs-only fixes are required for friction that the runtime could
-absorb, consider whether the runtime should be extended rather than the docs
-extended.
+**Why it matters for agents:** The agent UX principle - the command an agent tries first
+should work - applies. When an intuitive form is rejected, adding docs guidance is a
+temporary patch; the runtime accepting the intuitive form is the durable fix.
 
-**This is an observation, not a docs fix.** Flag to engineering when specific cases are
-identified.
+**This is an observation only.** Flag specific instances to engineering when identified.
+Docs cannot fully substitute for runtime ergonomics.
 
 ---
 
 ## Recommended Link and Anchor Strategy
 
-### Anchor naming convention
+### Naming convention
 
-Declare explicit anchors in all generated and authored pages using this scheme:
+Declare explicit anchors at all canonical entry points using this scheme:
 
 | Concept | Format | Example |
 |---------|--------|---------|
 | CLI command | `command-<name>` | `#command-snapshot` |
-| Execution action type | `action-<type>` | `#action-tap` |
-| Selector field | `selector-field-<field>` | `#selector-field-resource-id` |
-| Error code | `error-<code>` | `#error-execution-timeout` |
+| Execution action type | `action-<type>` | `#action-click` |
+| Selector field | `selector-field-<field>` | `#selector-field-id` |
+| Error code | `error-<code>` | `#error-node-not-found` |
 | Serve endpoint | `endpoint-<method>-<path>` | `#endpoint-post-execute` |
 | Setup step | `setup-step-<slug>` | `#setup-step-grant-permissions` |
 
+Use canonical forms only: `action-click` not `action-tap`; `selector-field-id` not
+`selector-field-resource-id`.
+
 ### Generator responsibility
 
-The CLI reference generator should emit `<a id="command-<name>">` before each command
-section. This makes anchors stable across heading renames.
+The CLI reference generator must emit `<a id="command-<name>">` before each per-command
+section, making anchors stable across heading renames.
 
 ### Cross-link requirements
 
-Each page should include a "See also" section at the bottom with links to:
-- `overview.md` -> `actions.md`, `selectors.md`, `errors.md`
-- `actions.md` -> `selectors.md`, `cli.md` (with anchor), `errors.md`
-- `selectors.md` -> `actions.md`, `cli.md`
-- `cli.md` -> `actions.md`, `selectors.md`, `errors.md`
-- `errors.md` -> `overview.md`, `cli.md`
-- `serve.md` -> `overview.md`, `errors.md`
-- `recording.md` -> `cli.md`, `errors.md`
+After anchors are stable:
+- Each CLI command section -> `#action-<type>` in `actions.md`
+- Each action type section -> `#command-<name>` in `cli.md`
+- Each error mention in feature pages -> `#error-<code>` in `errors.md`
+- `setup.md` -> `doctor.md` (readiness gate reference)
 
 ---
 
@@ -394,90 +493,95 @@ Each page should include a "See also" section at the bottom with links to:
 
 ### Generator restructure
 
-Current output structure (causes triple duplication):
+Current structure (causes triple duplication):
 ```
 Global summary table
   Group A table
     Command A1 bullets
     Command A2 bullets
   Group B table
-    Command B1 bullets
     ...
 ```
 
-Target output structure:
+Target structure:
 ```
-Index table (one row per command, links to anchor)
-  Per-command section (one per command, with stable anchor)
-    Description
-    Flags table (from documentedFlags only)
-    Example
-    See also links
+Index table (one row per command, anchor link in name column)
+Per-command sections (one each, stable anchor, generated flags from documentedFlags only)
+  Description
+  Primary flags table
+  Example
+  Action type cross-link (where applicable)
+Aliases appendix (working aliases with pointers to canonical command)
 ```
 
-### documentedFlags requirement
+### `documentedFlags` requirement
 
-Every command in `registry.ts` must have a `documentedFlags` array listing the primary
-agent-facing flags. The generator must not fall back to regex extraction in public output.
-Alias flags and internal flags must be excluded from `documentedFlags`.
+Every command in `registry.ts` must have a `documentedFlags` array listing only
+primary agent-facing flags. Compatibility aliases must not appear in `documentedFlags`.
+The generator must not fall back to regex extraction for any public output.
 
 ### Command visibility tiers
 
-Add a `commandKind` (or equivalent) field to each command entry:
-
 | Kind | Treatment |
 |------|-----------|
-| `normal` | Appears in main index and gets a full section |
-| `shim` | Omitted from public output entirely; present in registry for error-redirect only |
-| `alias` | Appears in an "Aliases" appendix with a note pointing to the canonical command |
-
-`setup` is a shim. `provision` (top-level) is an alias for `emulator provision`.
+| `normal` | Main index and full per-command section |
+| `shim` | Omitted from all public output (e.g., `setup`) |
+| `alias` | Aliases appendix with pointer to canonical command (e.g., `provision`) |
 
 ### Selector flags in CLI reference
 
-List only primary selector flags inline per command (`--text`, `--resource-id`).
-Add: "For all selector options, see [Selectors](selectors.md)."
-Do not repeat selector semantics in the CLI reference.
+Show only the four most-used primary selector flags inline (`--text`, `--id`, `--desc`,
+`--role`) with a note linking to `selectors.md`. Do not show `--selector` (advanced
+use), `--text-contains`, or `--desc-contains` (specialized) in the inline summary.
 
 ---
 
 ## Recommended Implementation Direction
 
-Ordered by impact and dependency:
-
-### Phase 1 - Generator correctness (unblock all other work)
-1. Add `commandKind` to registry commands; mark `setup` as shim.
-2. Add `documentedFlags` arrays to all commands.
+### Phase 1 - Generator correctness (prerequisite for all other phases)
+1. Add `commandKind` to registry entries; mark `setup` as `shim`, `provision` as `alias`.
+2. Add `documentedFlags` arrays to all commands in `registry.ts`. Use canonical flag names
+   only; exclude compatibility aliases.
 3. Restructure `generate_cli_reference.py`: emit index table + per-command sections only.
-4. Emit stable `<a id="command-<name>">` anchors in per-command sections.
-5. Rebuild and verify `sites/docs/.build/api/cli.md` has no duplicate entries and no
-   alias flags in public output.
+4. Emit `<a id="command-<name>">` anchors in each per-command section automatically.
+5. Emit an aliases appendix for `alias`-kind commands.
+6. Rebuild and verify: no command appears more than once; no alias flags in flag tables;
+   `--resource-id` and `--content-desc` are absent from generated output.
+
+Note: the `skills` command is the highest-priority `documentedFlags` case because it
+currently exposes `--receiver-package` as a primary flag. Complete all of Phase 1 together
+rather than treating `skills` as a standalone fix.
 
 ### Phase 2 - Anchor and cross-link foundation
 1. Declare anchor convention in `docs/internal/design/docs-anchor-strategy.md`.
-2. Add "See also" sections to `overview.md`, `actions.md`, `selectors.md`, `errors.md`,
-   `serve.md`, `recording.md`.
-3. Add explicit anchors to authored pages for major entry points.
+2. Add explicit `<a id>` anchors to authored pages at all major entry points (action types,
+   error codes, selector fields, serve endpoints).
+3. Add anchor-level cross-links from CLI command sections to action types and vice versa.
+4. Add error code anchor links from `serve.md`, `recording.md`, `snapshot.md`.
 
 ### Phase 3 - Source-of-truth manifest
 1. Extend `source-map.yaml` or add `ownership.yaml` declaring canonical page per concept.
-2. Add a build-time check (warning-only) for pages that define content outside their
-   declared ownership.
-3. Add a marker expansion for the result envelope shape from `contracts/result.ts`.
+2. Clarify doctor ownership: trim `setup.md` doctor detail, confirm `doctor.md` as owner.
+3. Consider a marker expansion for the result envelope shape from `contracts/result.ts`.
 
 ### Phase 4 - Authored page improvements
-1. Apply consistent terminology (`CLI command` / `execution action` / `serve endpoint`).
-2. Improve `errors.md` with primary-command column and retryable flag.
-3. Add serve error-layer section to `serve.md`.
-4. Separate setup / doctor-check concerns (setup.md vs. troubleshooting page).
-5. Adjust nav reading order in `mkdocs.yml`.
+1. Apply consistent terminology (CLI command / execution action / serve endpoint) across
+   all pages, starting with `overview.md` and `actions.md`. Roll out incrementally as
+   pages are touched; prioritize high-traffic pages first.
+2. Improve `errors.md` with primary-command and retryable columns.
+3. Add serve two-layer error section to `serve.md`.
+4. Adjust nav reading order in `mkdocs.yml` (requires redirect_maps entries for any
+   affected anchor URLs).
+5. Do not split `setup.md` into separate files at this phase. Trim doctor-check detail
+   and replace with a link to `doctor.md`. A setup/troubleshooting split is a later IA
+   decision, deferred until anchor stability and redirect overhead can be properly scoped.
 
-### Phase 5 - Docs lint (optional, low-risk)
+### Phase 5 - Docs lint (warning-only)
 Warning-only lint is viable and worth adding once anchors are stable:
-- Detect broken internal anchor links (high value, low false-positive risk).
-- Detect known alias-flag names appearing in authored content (catches manual copy-paste
-  of deprecated flag names into authored pages).
-- Do not add lint that fires on judgment calls (e.g., "this page should link to X").
+- Broken internal anchor links (high value, low false-positive risk).
+- Known compatibility alias names appearing in authored content pages (catches manual
+  copy-paste of `--resource-id` or `--content-desc` into authored text).
+- Do not add lint that fires on structural or judgment calls.
 
 ---
 
@@ -485,35 +589,36 @@ Warning-only lint is viable and worth adding once anchors are stable:
 
 | Question | Decision | Rationale |
 |----------|----------|-----------|
-| Is `setup` deprecated? | No. It is a guidance shim that returns a USAGE error. It should be hidden from public output, not labeled deprecated. | Code inspection: `registry.ts` lines 1142-1154. |
-| Is `provision emulator` deprecated? | No. It is a working alias for `emulator provision`. It should appear in an aliases section, not the main command table. | Code inspection: `registry.ts` lines 1256-1274. |
-| Does `recording.md` need new authored CLI docs? | No. `recording.md` already has 1088 lines covering the full recording workflow, all CLI commands, output shapes, NDJSON schema, error codes, and compare outcomes. The earlier finding claiming it was missing was wrong. | Direct file read confirmed. |
-| Should the actions.md CLI-to-action mapping table be kept or removed? | Keep it. The reverse-lookup direction (action type -> CLI command) adds value that neither page provides alone. | User decision, confirmed reasonable. |
-| How strongly should docs linting be recommended? | Warning-only lint for exact code spans is viable and worth adding in a later phase, not in Phase 1. Lint that fires on structural/judgment calls should be avoided. | Nuanced position; not a hard no. |
-| Generator dict vs. docs-owned manifest for concept ownership? | Prefer a docs-owned manifest (`source-map.yaml` extension or `ownership.yaml`) over hardcoding ownership in the generator. Long-term maintainability. | User preference confirmed. |
-| How many selector flags to show inline in the CLI reference? | Primary flags only (`--text`, `--resource-id`), with a link to `selectors.md` for the full list. | Reduces duplication without hiding the most-used flags. |
+| Is `setup` deprecated? | No. It is a guidance shim returning a USAGE error. Omit from public output entirely; do not label deprecated. | `registry.ts` lines 1142-1154: handler returns USAGE error unconditionally. |
+| Is `provision emulator` deprecated? | No. It is a working alias for `emulator provision`. Appears in aliases appendix, not main index. | `registry.ts` lines 1256-1274: handler calls `cmdProvisionEmulator()`. |
+| Does recording need new authored CLI docs? | No. `recording.md` is 1088 lines and covers the full workflow, all CLI commands, output shapes, NDJSON schema, and compare outcomes exhaustively. | Direct file read confirmed. |
+| Should `actions.md` CLI-to-action mapping be kept? | Yes. The reverse-lookup direction (action type -> CLI command) is additive, not duplicative. Use canonical action types only. | Confirmed by Codex and Claude audits. |
+| Lint recommendation strength? | Warning-only lint for broken anchor links and alias-name occurrences in authored content is viable in Phase 5. Not Phase 1. | Nuanced position supported by both audits. |
+| Generator dict vs. docs-owned manifest? | Prefer docs-owned manifest (`source-map.yaml` extension or `ownership.yaml`) over hardcoding ownership inside the generator. | Long-term maintainability; decouples authoring decisions from build tooling. |
+| How many selector flags inline in CLI reference? | Four primary flags (`--text`, `--id`, `--desc`, `--role`) + link to `selectors.md`. Omit `--selector`, `--text-contains`, `--desc-contains` from inline summary. | Reduces clutter; primary flags cover the common case. |
+| Alias appendix format? | Show working aliases under their canonical command entry. Add a dedicated aliases appendix only if the total alias count exceeds roughly five entries. | Low alias count today; appendix overhead is not warranted unless inventory grows. |
+| Terminology migration scope? | Incremental, tied to touched pages. Prioritize `overview.md` and `actions.md` first (highest traffic). Do not do a big-bang pass. | Reduces risk of large-scope authoring errors; changes are reviewable in context. |
+| Setup page split timing? | Do not split early. First pass: trim doctor-check detail from `setup.md`, add link to `doctor.md`. Full split to a separate troubleshooting page is a later IA decision. | Split requires redirects and anchor-stability planning. Premature before Phase 2 lands. |
+| Skills `documentedFlags` as standalone fix? | No. Address as the first high-priority command in Phase 1's full generator cleanup, not as a one-off patch. | A one-off patch leaves the generator fallback behavior intact for all other commands. |
 
 ---
 
 ## Open Questions
 
-1. **Alias appendix format:** Should the "Aliases" appendix in the CLI reference be a
-   table, a collapsible section per alias, or a single note under the canonical command?
-   Depends on how many aliases exist; inventory needed.
+These require human judgment and cannot be resolved from the source files alone.
 
-2. **Marker expansion for result envelope:** `contracts/result.ts` would need a stable
-   extraction marker (similar to error codes). Is the shape stable enough to warrant this,
-   or is overview.md prose sufficient for now?
+1. **Result envelope marker expansion:** The envelope shape in `contracts/result.ts` is
+   relatively stable. Should a marker expansion be added to auto-generate the field table
+   in `overview.md` (as error codes are generated in `errors.md`), or is hand-authored
+   prose in `overview.md` sufficient and preferable for the envelope shape description?
 
-3. **Terminology migration scope:** Applying consistent terminology across all pages is
-   a medium-effort authoring task. Should this be done in one pass or incrementally as
-   other page edits happen?
+2. **Recording commands in CLI reference:** Recording lifecycle commands (`record start`,
+   `record stop`, `record pull`, etc.) are currently covered only in `recording.md`, not
+   in `api/cli.md`. Should they also appear in the generated CLI reference (with detail
+   links pointing to `recording.md`), or should `recording.md` remain the sole reference
+   and `cli.md` link to it at the group level? The choice affects Phase 1 generator scope.
 
-4. **Setup page split timing:** Separating `setup.md` into setup + troubleshooting affects
-   nav, redirects, and any external links. Should this happen early (Phase 4) or be
-   deferred until the site has more traffic and anchor stability matters more?
-
-5. **Skills CLI reference:** The `skills` command currently exposes alias flags in public
-   output (the highest-priority instance of F-02). Should `skills` get `documentedFlags`
-   added as a standalone fix before the full Phase 1 generator restructure, or wait for
-   the whole Phase 1 to ship together?
+3. **Nav reorder redirect overhead:** Reordering the nav changes page URLs for any
+   affected entries (depending on how MkDocs resolves paths) and requires new redirect_map
+   entries. Is this change worth doing before the site has significant external link
+   surface, or should it be deferred until a planned URL-stability pass?
