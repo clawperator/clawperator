@@ -192,6 +192,8 @@ export interface CommandDef {
   subtopics?: Record<string, string>;
   topLevelBlock?: string;
   group: string;
+  docsVisibility?: "normal" | "shim" | "alias";
+  docsAliasOf?: string;
   documentedFlags?: string[];
   supportedFlags?: string[] | ((rest: string[]) => string[]);
   flagAliases?: readonly CliFlagAliasSpec[] | ((rest: string[]) => readonly CliFlagAliasSpec[]);
@@ -1035,6 +1037,7 @@ const SERVE_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
 COMMANDS["operator"] = {
   name: "operator",
   group: "Setup",
+  documentedFlags: ["--apk", "--operator-package"],
   supportedFlags: (rest) => {
     const sub = rest[0];
     if (sub === "setup" || sub === "install") return ["--apk"];
@@ -1101,6 +1104,7 @@ COMMANDS["operator"] = {
 COMMANDS["host"] = {
   name: "host",
   group: "Setup",
+  documentedFlags: ["--installed-at", "--cli-version", "--apk-version", "--last-device-serial"],
   supportedFlags: (rest) => {
     const sub = rest[0];
     if (sub === "setup") {
@@ -1142,6 +1146,8 @@ COMMANDS["host"] = {
 COMMANDS["setup"] = {
   name: "setup",
   group: "Setup",
+  docsVisibility: "shim",
+  documentedFlags: [],
   summary: "Alias guidance - use operator setup instead",
   help: HELP_OPERATOR_SETUP,
   handler: async (_ctx) => {
@@ -1175,6 +1181,7 @@ COMMANDS["install"] = {
 COMMANDS["devices"] = {
   name: "devices",
   group: "Device Management",
+  documentedFlags: [],
   supportedFlags: [],
   summary: "List connected Android devices",
   help: "clawperator devices\n\nUsage:\n  clawperator devices\n\nNotes:\n  - Lists all connected Android devices detected via adb.\n",
@@ -1189,6 +1196,7 @@ COMMANDS["devices"] = {
 COMMANDS["emulator"] = {
   name: "emulator",
   group: "Device Management",
+  documentedFlags: ["--name"],
   supportedFlags: (rest) => {
     const sub = rest[0];
     if (sub === "create") return ["--name"];
@@ -1256,6 +1264,9 @@ COMMANDS["emulator"] = {
 COMMANDS["provision"] = {
   name: "provision",
   group: "Device Management",
+  docsVisibility: "alias",
+  docsAliasOf: "emulator provision",
+  documentedFlags: [],
   supportedFlags: [],
   summary: "Provision an Android emulator",
   help: HELP_EMULATOR,
@@ -1277,6 +1288,7 @@ COMMANDS["provision"] = {
 COMMANDS["packages"] = {
   name: "packages",
   group: "Device Management",
+  documentedFlags: ["--third-party"],
   supportedFlags: ["--third-party"],
   summary: "List installed packages on a device",
   help: "clawperator packages list\n\nUsage:\n  clawperator packages list [--device <id>] [--operator-package <pkg>] [--third-party]\n",
@@ -1303,6 +1315,7 @@ COMMANDS["exec"] = {
   synonyms: ["execute"],
   group: "Execution",
   flagAliases: EXEC_PAYLOAD_FLAG_ALIASES,
+  documentedFlags: ["--payload", "--validate-only", "--dry-run", "--goal", "--no-daemon"],
   supportedFlags: (rest) =>
     rest[0] === "best-effort"
       ? ["--payload", "--validate-only", "--dry-run", "--goal"]
@@ -1396,6 +1409,7 @@ COMMANDS["snapshot"] = {
   name: "snapshot",
   synonyms: ["snapshot-ui", "snapshot_ui"],
   group: "Device Interaction",
+  documentedFlags: ["--no-daemon"],
   supportedFlags: ["--no-daemon"],
   summary: "Get current Android UI hierarchy as XML",
   help: HELP_SNAPSHOT,
@@ -1420,6 +1434,7 @@ COMMANDS["screenshot"] = {
   synonyms: ["take-screenshot", "take_screenshot", "capture-screenshot"],
   group: "Device Interaction",
   flagAliases: SCREENSHOT_FLAG_ALIASES,
+  documentedFlags: ["--path", "--no-daemon"],
   supportedFlags: ["--path", "--no-daemon"],
   summary: "Capture a screenshot from the device",
   help: HELP_SCREENSHOT,
@@ -1447,6 +1462,7 @@ COMMANDS["click"] = {
   synonyms: ["tap"],
   group: "Device Interaction",
   flagAliases: ELEMENT_SELECTOR_FLAG_ALIASES,
+  documentedFlags: ["--text", "--id", "--desc", "--role", "--coordinate", "--long", "--focus", "--no-daemon"],
   supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--coordinate", "--long", "--focus", "--no-daemon"],
   summary: "Tap the first matching UI element",
   help: HELP_CLICK,
@@ -1548,6 +1564,7 @@ COMMANDS["open"] = {
   synonyms: ["open-app", "open_app", "open-uri", "open-url", "open_uri", "open_url"],
   group: "Device Interaction",
   flagAliases: OPEN_TARGET_FLAG_ALIASES,
+  documentedFlags: ["--app", "--navigation-timeout-ms", "--skip-navigation-wait", "--no-daemon"],
   supportedFlags: ["--app", "--navigation-timeout-ms", "--skip-navigation-wait", "--no-daemon"],
   summary: "Open an app, URL, or URI on the device",
   help: HELP_OPEN,
@@ -1636,6 +1653,7 @@ COMMANDS["type"] = {
   synonyms: ["fill", "enter-text", "enter_text"],
   group: "Device Interaction",
   flagAliases: ELEMENT_SELECTOR_FLAG_ALIASES,
+  documentedFlags: ["--id", "--desc", "--role", "--submit", "--clear", "--no-daemon"],
   supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--submit", "--clear", "--no-daemon"],
   summary: "Type text into the first matching UI element",
   help: HELP_TYPE,
@@ -1699,6 +1717,7 @@ COMMANDS["read"] = {
   synonyms: ["read-text", "read_text"],
   group: "Device Interaction",
   flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
+  documentedFlags: ["--text", "--id", "--desc", "--role", "--all", "--validate-only", "--dry-run", "--no-daemon"],
   supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--all", "--validate-only", "--dry-run", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--no-daemon"],
   summary: "Read text from the first matching UI element",
   help: HELP_READ,
@@ -1744,6 +1763,7 @@ COMMANDS["wait"] = {
   synonyms: ["wait-for", "wait_for", "wait-for-node", "wait_for_node", "find", "find-node", "find_node"],
   group: "Device Interaction",
   flagAliases: ELEMENT_SELECTOR_FLAG_ALIASES,
+  documentedFlags: ["--text", "--id", "--desc", "--role", "--no-daemon"],
   supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--no-daemon"],
   summary: "Wait until a matching UI element appears",
   help: HELP_WAIT,
@@ -1787,6 +1807,7 @@ COMMANDS["press"] = {
   synonyms: ["press-key", "press_key"],
   group: "Device Interaction",
   flagAliases: PRESS_FLAG_ALIASES,
+  documentedFlags: ["--key", "--no-daemon"],
   supportedFlags: ["--key", "--no-daemon"],
   summary: "Press a hardware key on the device",
   help: HELP_PRESS,
@@ -1827,6 +1848,7 @@ COMMANDS["press"] = {
 COMMANDS["back"] = {
   name: "back",
   group: "Device Interaction",
+  documentedFlags: ["--no-daemon"],
   supportedFlags: ["--no-daemon"],
   summary: "Press the Android back key",
   help: HELP_BACK,
@@ -1885,6 +1907,7 @@ COMMANDS["close"] = {
   synonyms: ["close-app", "close_app"],
   group: "Device Interaction",
   flagAliases: CLOSE_TARGET_FLAG_ALIASES,
+  documentedFlags: ["--app", "--no-daemon"],
   supportedFlags: ["--app", "--no-daemon"],
   summary: "Force-stop an Android application",
   help: HELP_CLOSE,
@@ -1895,6 +1918,7 @@ COMMANDS["close"] = {
 COMMANDS["sleep"] = {
   name: "sleep",
   group: "Device Interaction",
+  documentedFlags: ["--no-daemon"],
   supportedFlags: ["--no-daemon"],
   summary: "Pause execution for a duration",
   help: HELP_SLEEP,
@@ -1957,6 +1981,7 @@ COMMANDS["scroll"] = {
   name: "scroll",
   group: "Device Interaction",
   flagAliases: CONTAINER_SELECTOR_FLAG_ALIASES,
+  documentedFlags: ["--direction", "--no-daemon"],
   supportedFlags: ["--direction", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--no-daemon"],
   summary: "Scroll the screen in a direction",
   help: HELP_SCROLL,
@@ -2089,6 +2114,7 @@ COMMANDS["scroll-until"] = {
   synonyms: ["scroll_until"],
   group: "Device Interaction",
   flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
+  documentedFlags: ["--text", "--id", "--desc", "--role", "--click", "--direction", "--no-daemon"],
   supportedFlags: ["--click", "--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--no-daemon"],
   summary: "Scroll until a target element is visible",
   help: HELP_SCROLL_UNTIL,
@@ -2102,6 +2128,7 @@ COMMANDS["scroll-and-click"] = {
   synonyms: ["scroll_and_click"],
   group: "Device Interaction",
   flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
+  documentedFlags: ["--text", "--id", "--desc", "--role", "--direction", "--no-daemon"],
   supportedFlags: ["--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--no-daemon"],
   summary: "Scroll until target is visible, then click it (alias for scroll-until --click)",
   help: HELP_SCROLL_UNTIL,
@@ -2116,6 +2143,7 @@ COMMANDS["wait-for-nav"] = {
   synonyms: ["wait-for-navigation", "wait_for_navigation"],
   group: "Device Interaction",
   flagAliases: WAIT_FOR_NAV_FLAG_ALIASES,
+  documentedFlags: ["--app", "--text", "--id", "--desc", "--role", "--validate-only", "--dry-run", "--no-daemon"],
   supportedFlags: ["--app", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--validate-only", "--dry-run", "--no-daemon"],
   summary: "Wait for app or screen navigation to complete",
   help: HELP_WAIT_FOR_NAV,
@@ -2221,6 +2249,7 @@ COMMANDS["read-value"] = {
   synonyms: ["read-kv", "read-key-value-pair", "read_key_value_pair"],
   group: "Device Interaction",
   flagAliases: READ_VALUE_FLAG_ALIASES,
+  documentedFlags: ["--label", "--label-id", "--label-desc", "--all", "--validate-only", "--dry-run", "--no-daemon"],
   supportedFlags: ["--label", "--label-id", "--label-desc", "--all", "--validate-only", "--dry-run", "--no-daemon"],
   summary: "Read the value associated with a labeled element",
   help: HELP_READ_VALUE,
@@ -2312,6 +2341,7 @@ COMMANDS["read-value"] = {
 COMMANDS["skills"] = {
   name: "skills",
   group: "Execution",
+  documentedFlags: ["--app", "--intent", "--keyword", "--skill-id", "--artifact", "--vars", "--summary", "--recording-context", "--all", "--dry-run", "--device", "--operator-package", "--timeout", "--expect-contains", "--skip-validate", "--ref"],
   flagAliases: (rest) => {
     const sub = rest[0];
     if (sub === "search") return SKILLS_SEARCH_FLAG_ALIASES;
@@ -2543,6 +2573,7 @@ COMMANDS["bundled-skills"] = {
   name: "bundled-skills",
   group: "Execution",
   summary: "Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes",
+  documentedFlags: [],
   supportedFlags: ["--version", "--output", "--format", "--json", "--help"],
   help: `clawperator bundled-skills
 
@@ -2591,6 +2622,7 @@ COMMANDS["recording"] = {
   name: "recording",
   synonyms: ["record"],
   group: "Recording",
+  documentedFlags: ["--session-id", "--out", "--input", "--snapshots", "--baseline", "--result", "--mode"],
   supportedFlags: (rest) => {
     const sub = rest[0];
     if (sub === "start" || sub === "stop") return ["--session-id"];
@@ -2709,6 +2741,7 @@ COMMANDS["recording"] = {
 COMMANDS["daemon"] = {
   name: "daemon",
   group: "Execution",
+  documentedFlags: [],
   supportedFlags: [],
   summary: "Manage the background Unix socket daemon",
   help: HELP_DAEMON,
@@ -2766,6 +2799,7 @@ COMMANDS["serve"] = {
   name: "serve",
   group: "Execution",
   flagAliases: SERVE_FLAG_ALIASES,
+  documentedFlags: ["--port", "--host"],
   supportedFlags: ["--port", "--host"],
   summary: "Start local HTTP/SSE server for remote control",
   help: "clawperator serve\n\nUsage:\n  clawperator serve [--port <number>] [--host <string>]\n\nNotes:\n  - Default host: 127.0.0.1\n",
@@ -2787,6 +2821,7 @@ COMMANDS["serve"] = {
 COMMANDS["mcp"] = {
   name: "mcp",
   group: "Execution",
+  documentedFlags: [],
   supportedFlags: [],
   summary: "Start the first-party MCP server",
   help: "clawperator mcp\n\nUsage:\n  clawperator mcp serve\n\nNotes:\n  - Starts the stdio MCP server.\n  - Use this when the host already supports stdio MCP and wants registered Clawperator tools.\n  - For app-oriented runtime-skill discovery, start with 'clawperator skills for-app <package_id>'.\n  - Post-install orientation: https://docs.clawperator.com/host-agents/\n  - Use 'node dist/cli/index.js mcp serve' for branch-local development.\n",
@@ -2808,6 +2843,7 @@ COMMANDS["mcp"] = {
 COMMANDS["logs"] = {
   name: "logs",
   group: "Utilities",
+  documentedFlags: [],
   supportedFlags: [],
   summary: "Tail the Clawperator log file",
   help: "clawperator logs\n\nUsage:\n  clawperator logs\n\nNotes:\n  - Dumps existing log content then streams new lines.\n  - Press Ctrl+C to stop streaming.\n",
@@ -2824,6 +2860,7 @@ COMMANDS["logs"] = {
 COMMANDS["doctor"] = {
   name: "doctor",
   group: "Setup",
+  documentedFlags: ["--fix", "--full", "--check-only"],
   supportedFlags: ["--fix", "--full", "--check-only"],
   summary: "Run environment and runtime checks",
   help: HELP_DOCTOR,
@@ -2856,6 +2893,7 @@ COMMANDS["doctor"] = {
 COMMANDS["grant-device-permissions"] = {
   name: "grant-device-permissions",
   group: "Setup",
+  documentedFlags: [],
   supportedFlags: [],
   summary: "Re-grant accessibility and notification permissions",
   help: HELP_GRANT_DEVICE_PERMISSIONS,
@@ -2876,6 +2914,7 @@ COMMANDS["grant-device-permissions"] = {
 COMMANDS["version"] = {
   name: "version",
   group: "Setup",
+  documentedFlags: ["--check-compat"],
   supportedFlags: ["--check-compat"],
   summary: "Show the CLI version",
   help: HELP_VERSION,
