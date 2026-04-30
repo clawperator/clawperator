@@ -710,7 +710,7 @@ Example:
 | Field | Valid values |
 | --- | --- |
 | Required | `durationMs` |
-| `durationMs` | required number `>= 0` and `<= MAX_EXECUTION_TIMEOUT_MS` |
+| `durationMs` | required number `>= 0` and `<=` the maximum execution timeout constant |
 | `retry` | optional retry object in raw `exec` JSON; Android defaults to `None` |
 
 Semantics:

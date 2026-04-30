@@ -25,7 +25,7 @@ This page assumes you have already decided that MCP is the correct front door.
 
 ## What It Is
 
-`clawperator mcp serve` starts a local stdio MCP server for MCP clients such as Claude Desktop. The server is transport-only:
+`clawperator mcp serve` starts a local stdio MCP server for MCP clients such as Claude Desktop. Execution-backed tools may return the shared [result envelope](overview.md#result-envelope) in tool output. The server is transport-only:
 
 - it speaks MCP over stdin/stdout
 - it does not expose HTTP or SSE

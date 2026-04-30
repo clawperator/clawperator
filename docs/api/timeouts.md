@@ -54,8 +54,8 @@ Current hard limits:
 
 Those values come from:
 
-- `LIMITS.MIN_EXECUTION_TIMEOUT_MS = 1000`
-- `LIMITS.MAX_EXECUTION_TIMEOUT_MS = 120000`
+- minimum execution timeout constant: `1000`
+- maximum execution timeout constant: `120000`
 
 If the caller provides a non-finite timeout or a value outside that range, Node returns a top-level validation failure:
 

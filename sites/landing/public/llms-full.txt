@@ -338,69 +338,20 @@ clawperator doctor --device <device_serial>
 
 ### Doctor checks
 
-| Check ID | What it verifies |
-| --- | --- |
-| `host.node.version` | Node.js >= 24 |
-| `host.java.version` | Java 17 or 21 is installed |
-| `host.adb.presence` | adb is installed and on PATH |
-| `host.adb.server` | adb server starts successfully |
-| `device.discovery` | At least one device is connected and in state `device` |
-| `device.capability` | Device shell is available (SDK version, screen size) |
-| `readiness.apk.presence` | Operator APK is installed on the device |
-| `readiness.settings.dev_options` | Developer options enabled |
-| `readiness.settings.usb_debugging` | USB debugging enabled |
-| `readiness.version.compatibility` | CLI version is compatible with installed APK version |
-| `readiness.handshake` | Node can dispatch a command and receive a result envelope from the Operator |
-| `readiness.smoke` | End-to-end test: open Settings, capture UI snapshot |
-
-### DoctorReport shape
-
-```json
-{
-  "ok": true,
-  "criticalOk": true,
-  "deviceId": "<device_serial>",
-  "operatorPackage": "com.clawperator.operator",
-  "checks": [
-    {
-      "id": "host.node.version",
-      "status": "pass",
-      "summary": "Node version v24.x.x is compatible."
-    }
-  ],
-  "nextActions": []
-}
-```
-
-Failed checks include additional fields:
-
-```json
-{
-  "id": "readiness.handshake",
-  "status": "fail",
-  "code": "RESULT_ENVELOPE_TIMEOUT",
-  "summary": "Handshake timed out.",
-  "detail": "No [Clawperator-Result] envelope received within 7000ms.",
-  "fix": {
-    "title": "Grant accessibility permissions via adb",
-    "platform": "any",
-    "steps": [
-      { "kind": "shell", "value": "clawperator grant-device-permissions --device <device_serial>" }
-    ]
-  }
-}
-```
+Doctor checks host prerequisites, adb/device discovery, Operator APK presence,
+version compatibility, handshake readiness, and interactive device state. The
+full check order, `DoctorReport` shape, `checks[]` fields, `nextActions`
+behavior, and `--fix` semantics are owned by [Doctor](api/doctor.md#doctor-report-contract).
 
 ### Success conditions
 
 - Exit code `0` means all critical checks passed.
 - JSON has `"criticalOk": true`.
 - `checks[]` contains only `"pass"` or non-critical `"warn"` statuses.
-- Each check has `status`: `"pass"`, `"warn"`, or `"fail"`.
 
 ### Doctor flags
 
-- `doctor --fix` automatically executes shell-type remediation steps from failed checks. Manual steps are still reported. Use this for unattended recovery loops.
+- `doctor --fix` can execute shell-type remediation steps from failed checks.
 - `doctor --check-only` always exits `0` regardless of failures. Do not use it as the setup gate.
 
 See [Doctor](api/doctor.md) for the full report contract and [Errors](api/errors.md) for recovery by code.
@@ -1092,6 +1043,23 @@ This page is intentionally narrow:
 - Use [Devices](devices.md) for target selection rules
 - Use [Daemon](daemon.md) for background daemon lifecycle commands
 
+## Surface Terminology
+
+Clawperator exposes several public surfaces. Use the precise surface name when
+you document, call, or parse behavior:
+
+| Surface | What it is | Canonical owner |
+| --- | --- | --- |
+| CLI command | A top-level shell command such as `snapshot`, `click`, or `skills`. | [CLI Reference](cli.md) for command lookup; behavior lives on the linked owner page. |
+| CLI subcommand | A nested shell command such as `skills run`, `recording export`, or `emulator provision`. | The subsystem page, such as [Skills CLI](../skills/cli.md) or [Recording](recording.md). |
+| Execution action | A JSON action inside `ExecutionInput.actions[]`, such as `click` or `open_app`. | [Actions](actions.md). |
+| Node contract | A TypeScript-backed data shape accepted or returned by the Node package. | This page for execution payload and [result envelope](#result-envelope); feature pages for narrower contracts. |
+| Serve endpoint | An HTTP or SSE route exposed by `clawperator serve`, such as `POST /execute`. | [Serve API](serve.md). |
+| MCP tool | A stdio MCP tool exposed by `clawperator mcp serve`, such as `snapshot` or `execute`. | [MCP Server](mcp.md). |
+| Selector | A `NodeMatcher` object or CLI selector flags used to find UI nodes. | [Selectors](selectors.md). |
+| Error code | A stable Node-side code from `apps/node/src/contracts/errors.ts`, or a documented feature-specific code. | [Errors](errors.md) for Node codes; feature pages for feature-specific codes. |
+| Result envelope | The `[Clawperator-Result]` terminal envelope emitted by the Operator and wrapped by Node. | [Result Envelope](#result-envelope). |
+
 ## CLI Output Format
 
 CLI commands return JSON by default. Agents should parse stdout directly with
@@ -1351,16 +1319,18 @@ Non-runtime success wrappers from `clawperator exec`:
 }
 ```
 
-## Surface Differences
+## Wrapper Differences
 
 Use the wrapper shape that matches the surface you called:
 
-| Surface | Success shape |
-| --- | --- |
-| CLI device execution commands | `{ "envelope": ..., "deviceId": "...", "terminalSource": "clawperator_result", "isCanonicalTerminal": true }` |
-| `clawperator exec --validate` | `{ "ok": true, "validated": true, "execution": ... }` |
-| `clawperator exec --dry-run` | `{ "ok": true, "dryRun": true, "plan": ... }` |
-| `clawperator serve` execution endpoints | `{ "ok": true, "deviceId": "...", "terminalSource": "...", "envelope": ... }` |
+| Surface | Success shape | Result-envelope rule |
+| --- | --- | --- |
+| CLI device execution command | `{ "envelope": ..., "deviceId": "...", "terminalSource": "clawperator_result", "isCanonicalTerminal": true }` | Read `envelope` with the [result-envelope](#result-envelope) rules. |
+| `clawperator exec --validate` | `{ "ok": true, "validated": true, "execution": ... }` | Pre-dispatch only; no result envelope exists. |
+| `clawperator exec --dry-run` | `{ "ok": true, "dryRun": true, "plan": ... }` | Pre-dispatch only; no result envelope exists. |
+| Serve execution endpoint | `{ "ok": true, "deviceId": "...", "terminalSource": "...", "envelope": ... }` | Read `envelope` with the same [result-envelope](#result-envelope) rules. |
+| MCP execution-backed tool | Tool-specific `structuredContent` containing action output and usually `envelope`. | When present, read `envelope` with the same [result-envelope](#result-envelope) rules. |
+| Skills CLI command | Skill wrapper JSON with `skillResult`, `durationMs`, or feature-specific error fields. | Not a `[Clawperator-Result]` envelope unless a skill chooses to expose one in its own result. |
 
 `isCanonicalTerminal` is a CLI wrapper field. HTTP serve execution responses do not include it.
 
@@ -1454,638 +1424,6 @@ Agent-side success test:
 - [Doctor](doctor.md)
 - [Serve API](serve.md)
 - [Setup](../setup.md)
-
----
-
-# CLI Reference
-
-This page is generated from the Node CLI registry and command sources.
-
-Use this page as a command index. Detailed behavior, output shapes, and recovery guidance live in the authored API pages.
-
-## Command Index
-
-| Command | Group | Primary syntax | Primary flags | Details | Summary |
-| --- | --- | --- | --- | --- | --- |
-| [`operator`](#command-operator) | Setup | `operator setup --apk <path> [--device <id>] [--operator-package <package>]` | `--apk`, `--operator-package` | [Setup](../setup.md#setup-step-install-operator-apk) | Install the Operator APK and configure the device |
-| [`host`](#command-host) | Setup | `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]` | `--installed-at`, `--cli-version`, `--apk-version`, `--last-device-serial` | [Setup](../setup.md#setup-step-install-cli) | Set up durable host artifacts owned by the CLI |
-| [`install`](#command-install) | Setup | `install [--operator-package <package>]` | `--operator-package` | [Setup](../setup.md#setup-step-install-cli) | Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup |
-| [`devices`](#command-devices) | Device Management | `devices` | - | [Devices](devices.md#clawperator-devices) | List connected Android devices |
-| [`emulator`](#command-emulator) | Device Management | `emulator list` | `--name` | [Emulator provisioning](serve.md#endpoint-post-android-provision-emulator) | Manage Android emulators (AVDs) |
-| [`packages`](#command-packages) | Device Management | `packages list [--device <id>] [--operator-package <pkg>] [--third-party]` | `--third-party` | [Devices](devices.md) | List installed packages on a device |
-| [`exec`](#command-exec) | Execution | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]` | `--payload`, `--validate-only`, `--dry-run`, `--goal`, `--no-daemon` | [Execution payload](overview.md#execution-payload) | Execute a validated command payload |
-| [`snapshot`](#command-snapshot) | Device Interaction | `snapshot [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | [Action: snapshot](actions.md#action-snapshot) | Get current Android UI hierarchy as XML |
-| [`screenshot`](#command-screenshot) | Device Interaction | `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]` | `--path`, `--no-daemon` | [Action: take_screenshot](actions.md#action-take-screenshot) | Capture a screenshot from the device |
-| [`click`](#command-click) | Device Interaction | `click --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--coordinate`, `--long`, `--focus`, `--no-daemon` | [Action: click](actions.md#action-click) | Tap the first matching UI element |
-| [`open`](#command-open) | Device Interaction | `open <package-id\|url\|uri> [--device <id>] [--operator-package <pkg>]` | `--app`, `--navigation-timeout-ms`, `--skip-navigation-wait`, `--no-daemon` | [Actions: open_app / open_uri](actions.md#action-open-app) | Open an app, URL, or URI on the device |
-| [`type`](#command-type) | Device Interaction | `type <text> --role <role> \| --id <id> [--device <id>] [--operator-package <pkg>]` | `--id`, `--desc`, `--role`, `--submit`, `--clear`, `--no-daemon` | [Action: enter_text](actions.md#action-enter-text) | Type text into the first matching UI element |
-| [`read`](#command-read) | Device Interaction | `read --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon` | [Action: read_text](actions.md#action-read-text) | Read text from the first matching UI element |
-| [`wait`](#command-wait) | Device Interaction | `wait --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]` | `--text`, `--id`, `--desc`, `--role`, `--no-daemon` | [Action: wait_for_node](actions.md#action-wait-for-node) | Wait until a matching UI element appears |
-| [`press`](#command-press) | Device Interaction | `press <back\|home\|recents> [--device <id>] [--operator-package <pkg>]` | `--key`, `--no-daemon` | [Action: press_key](actions.md#action-press-key) | Press a hardware key on the device |
-| [`back`](#command-back) | Device Interaction | `back [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | [Action: press_key](actions.md#action-press-key) | Press the Android back key |
-| [`close`](#command-close) | Device Interaction | `close <package> [--device <id>] [--operator-package <pkg>]` | `--app`, `--no-daemon` | [Action: close_app](actions.md#action-close-app) | Force-stop an Android application |
-| [`sleep`](#command-sleep) | Device Interaction | `sleep <ms> [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | [Action: sleep](actions.md#action-sleep) | Pause execution for a duration |
-| [`scroll`](#command-scroll) | Device Interaction | `scroll <down\|up\|left\|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]` | `--direction`, `--no-daemon` | [Action: scroll](actions.md#action-scroll) | Scroll the screen in a direction |
-| [`scroll-until`](#command-scroll-until) | Device Interaction | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--click`, `--direction`, `--no-daemon` | [Action: scroll_until](actions.md#action-scroll-until) | Scroll until a target element is visible |
-| [`scroll-and-click`](#command-scroll-and-click) | Device Interaction | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--direction`, `--no-daemon` | [Action: scroll_and_click](actions.md#action-scroll-and-click) | Scroll until target is visible, then click it (alias for scroll-until --click) |
-| [`wait-for-nav`](#command-wait-for-nav) | Device Interaction | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]` | `--app`, `--timeout`, `--text`, `--id`, `--desc`, `--role`, `--validate-only`, `--dry-run`, `--no-daemon` | [Action: wait_for_navigation](actions.md#action-wait-for-navigation) | Wait for app or screen navigation to complete |
-| [`read-value`](#command-read-value) | Device Interaction | `read-value --label <text>` | `--label`, `--label-id`, `--label-desc`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon` | [Action: read_key_value_pair](actions.md#action-read-key-value-pair) | Read the value associated with a labeled element |
-| [`skills`](#command-skills) | Execution | `skills list` | `--app`, `--intent`, `--keyword`, `--skill-id`, `--artifact`, `--vars`, `--summary`, `--recording-context`, `--all`, `--dry-run`, `--device`, `--operator-package`, `--timeout`, `--expect-contains`, `--skip-validate`, `--ref` | Planned: `../skills/cli.md` (PR-3 / Phase 4) | Manage and run automation skills |
-| [`bundled-skills`](#command-bundled-skills) | Execution | `bundled-skills list` | - | [Host agent orientation](../host-agents.md) | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
-| [`recording`](#command-recording) | Recording | `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]` | `--session-id`, `--out`, `--input`, `--snapshots`, `--baseline`, `--result`, `--mode` | [api/recording](recording.md) | Manage recording sessions on the Operator app |
-| [`daemon`](#command-daemon) | Execution | `daemon start\|stop\|status\|restart [--device <id>]` | - | [Daemon](daemon.md) | Manage the background Unix socket daemon |
-| [`serve`](#command-serve) | Execution | `serve [--port <number>] [--host <string>]` | `--port`, `--host` | [Serve API](serve.md) | Start local HTTP/SSE server for remote control |
-| [`mcp`](#command-mcp) | Execution | `mcp serve` | - | [MCP server](mcp.md) | Start the first-party MCP server |
-| [`logs`](#command-logs) | Utilities | `logs` | - | [Logging](logging.md#the-clawperator-logs-command) | Tail the Clawperator log file |
-| [`doctor`](#command-doctor) | Setup | `doctor` | `--fix`, `--full`, `--check-only` | [Doctor contract](doctor.md#doctor-report-contract) | Run environment and runtime checks |
-| [`grant-device-permissions`](#command-grant-device-permissions) | Setup | `grant-device-permissions [--device <id>] [--operator-package <package>]` | - | [Setup recovery](../setup.md#setup-step-regrant-permissions) | Re-grant accessibility and notification permissions |
-| [`version`](#command-version) | Setup | `version` | `--check-compat` | [Version checks](../setup.md#setup-step-verify-readiness-with-doctor) | Show the CLI version |
-
-## Commands
-
-<a id="command-operator"></a>
-### `operator`
-
-Install the Operator APK and configure the device
-
-- Group: Setup
-- Syntax: `operator setup --apk <path> [--device <id>] [--operator-package <package>]`, `operator download [--operator-package <package>]`, `operator remediate [--operator-package <package>]`
-- Primary flags: `--apk`, `--operator-package`
-- Details: [Setup](../setup.md#setup-step-install-operator-apk)
-- See also: [Doctor contract](doctor.md#doctor-report-contract)
-- Subcommands: `setup`, `install`, `download`, `remediate`
-
-<a id="command-host"></a>
-### `host`
-
-Set up durable host artifacts owned by the CLI
-
-- Group: Setup
-- Syntax: `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]`
-- Primary flags: `--installed-at`, `--cli-version`, `--apk-version`, `--last-device-serial`
-- Details: [Setup](../setup.md#setup-step-install-cli)
-- Subcommands: `setup`
-
-<a id="command-install"></a>
-### `install`
-
-Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup
-
-- Group: Setup
-- Syntax: `install [--operator-package <package>]`
-- Primary flags: `--operator-package`
-- Details: [Setup](../setup.md#setup-step-install-cli)
-
-<a id="command-devices"></a>
-### `devices`
-
-List connected Android devices
-
-- Group: Device Management
-- Syntax: `devices`
-- Primary flags: -
-- Details: [Devices](devices.md#clawperator-devices)
-- See also: [Serve GET /devices](serve.md#endpoint-get-devices)
-
-<a id="command-emulator"></a>
-### `emulator`
-
-Manage Android emulators (AVDs)
-
-- Group: Device Management
-- Syntax: `emulator list`, `emulator inspect <name>`, `emulator create [--name <name>]`, `emulator start <name>`, `emulator stop <name>`, `emulator delete <name>`, `emulator status`, `emulator provision`
-- Primary flags: `--name`
-- Details: [Emulator provisioning](serve.md#endpoint-post-android-provision-emulator)
-- See also: [Devices](devices.md)
-- Alias notes: `provision emulator` is an alias for `emulator provision`.
-- Subcommands: `list`, `inspect`, `create`, `start`, `stop`, `delete`, `status`, `provision`
-
-<a id="command-packages"></a>
-### `packages`
-
-List installed packages on a device
-
-- Group: Device Management
-- Syntax: `packages list [--device <id>] [--operator-package <pkg>] [--third-party]`
-- Primary flags: `--third-party`
-- Details: [Devices](devices.md)
-
-<a id="command-exec"></a>
-### `exec`
-
-Execute a validated command payload
-
-- Group: Execution
-- Syntax: `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]`, `exec best-effort --goal <text> [--device <id>] [--operator-package <package>]`
-- Primary flags: `--payload`, `--validate-only`, `--dry-run`, `--goal`, `--no-daemon`
-- Details: [Execution payload](overview.md#execution-payload)
-- See also: [Actions](actions.md#action-click)
-- Command aliases: `execute`
-
-<a id="command-snapshot"></a>
-### `snapshot`
-
-Get current Android UI hierarchy as XML
-
-- Group: Device Interaction
-- Syntax: `snapshot [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--no-daemon`
-- Details: [Action: snapshot](actions.md#action-snapshot)
-- Action links: [`snapshot`](actions.md#action-snapshot)
-- Command aliases: `snapshot-ui`, `snapshot_ui`
-
-<a id="command-screenshot"></a>
-### `screenshot`
-
-Capture a screenshot from the device
-
-- Group: Device Interaction
-- Syntax: `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]`
-- Primary flags: `--path`, `--no-daemon`
-- Details: [Action: take_screenshot](actions.md#action-take-screenshot)
-- Action links: [`take_screenshot`](actions.md#action-take-screenshot)
-- Command aliases: `take-screenshot`, `take_screenshot`, `capture-screenshot`
-
-<a id="command-click"></a>
-### `click`
-
-Tap the first matching UI element
-
-- Group: Device Interaction
-- Syntax: `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--text`, `--id`, `--desc`, `--role`, `--coordinate`, `--long`, `--focus`, `--no-daemon`
-- Details: [Action: click](actions.md#action-click)
-- Action links: [`click`](actions.md#action-click)
-- Command aliases: `tap`
-
-<a id="command-open"></a>
-### `open`
-
-Open an app, URL, or URI on the device
-
-- Group: Device Interaction
-- Syntax: `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--app`, `--navigation-timeout-ms`, `--skip-navigation-wait`, `--no-daemon`
-- Details: [Actions: open_app / open_uri](actions.md#action-open-app)
-- Action links: [`open_app`](actions.md#action-open-app), [`open_uri`](actions.md#action-open-uri)
-- Command aliases: `open-app`, `open_app`, `open-uri`, `open-url`, `open_uri`, `open_url`
-
-<a id="command-type"></a>
-### `type`
-
-Type text into the first matching UI element
-
-- Group: Device Interaction
-- Syntax: `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--id`, `--desc`, `--role`, `--submit`, `--clear`, `--no-daemon`
-- Details: [Action: enter_text](actions.md#action-enter-text)
-- Action links: [`enter_text`](actions.md#action-enter-text)
-- Command aliases: `fill`, `enter-text`, `enter_text`
-
-<a id="command-read"></a>
-### `read`
-
-Read text from the first matching UI element
-
-- Group: Device Interaction
-- Syntax: `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--text`, `--id`, `--desc`, `--role`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon`
-- Details: [Action: read_text](actions.md#action-read-text)
-- Action links: [`read_text`](actions.md#action-read-text)
-- See also: [Selectors](selectors.md#selector-flag-text)
-- Command aliases: `read-text`, `read_text`
-
-<a id="command-wait"></a>
-### `wait`
-
-Wait until a matching UI element appears
-
-- Group: Device Interaction
-- Syntax: `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]`
-- Primary flags: `--text`, `--id`, `--desc`, `--role`, `--no-daemon`
-- Details: [Action: wait_for_node](actions.md#action-wait-for-node)
-- Action links: [`wait_for_node`](actions.md#action-wait-for-node)
-- Command aliases: `wait-for`, `wait_for`, `wait-for-node`, `wait_for_node`, `find`, `find-node`, `find_node`
-
-<a id="command-press"></a>
-### `press`
-
-Press a hardware key on the device
-
-- Group: Device Interaction
-- Syntax: `press <back|home|recents> [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--key`, `--no-daemon`
-- Details: [Action: press_key](actions.md#action-press-key)
-- Action links: [`press_key`](actions.md#action-press-key)
-- Command aliases: `press-key`, `press_key`
-
-<a id="command-back"></a>
-### `back`
-
-Press the Android back key
-
-- Group: Device Interaction
-- Syntax: `back [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--no-daemon`
-- Details: [Action: press_key](actions.md#action-press-key)
-- Action links: [`press_key`](actions.md#action-press-key)
-
-<a id="command-close"></a>
-### `close`
-
-Force-stop an Android application
-
-- Group: Device Interaction
-- Syntax: `close <package> [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--app`, `--no-daemon`
-- Details: [Action: close_app](actions.md#action-close-app)
-- Action links: [`close_app`](actions.md#action-close-app)
-- Command aliases: `close-app`, `close_app`
-
-<a id="command-sleep"></a>
-### `sleep`
-
-Pause execution for a duration
-
-- Group: Device Interaction
-- Syntax: `sleep <ms> [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--no-daemon`
-- Details: [Action: sleep](actions.md#action-sleep)
-- Action links: [`sleep`](actions.md#action-sleep)
-
-<a id="command-scroll"></a>
-### `scroll`
-
-Scroll the screen in a direction
-
-- Group: Device Interaction
-- Syntax: `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--direction`, `--no-daemon`
-- Details: [Action: scroll](actions.md#action-scroll)
-- Action links: [`scroll`](actions.md#action-scroll)
-
-<a id="command-scroll-until"></a>
-### `scroll-until`
-
-Scroll until a target element is visible
-
-- Group: Device Interaction
-- Syntax: `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--text`, `--id`, `--desc`, `--role`, `--click`, `--direction`, `--no-daemon`
-- Details: [Action: scroll_until](actions.md#action-scroll-until)
-- Action links: [`scroll_until`](actions.md#action-scroll-until)
-- Command aliases: `scroll_until`
-
-<a id="command-scroll-and-click"></a>
-### `scroll-and-click`
-
-Scroll until target is visible, then click it (alias for scroll-until --click)
-
-- Group: Device Interaction
-- Syntax: `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--text`, `--id`, `--desc`, `--role`, `--direction`, `--no-daemon`
-- Details: [Action: scroll_and_click](actions.md#action-scroll-and-click)
-- Action links: [`scroll_and_click`](actions.md#action-scroll-and-click)
-- Command aliases: `scroll_and_click`
-
-<a id="command-wait-for-nav"></a>
-### `wait-for-nav`
-
-Wait for app or screen navigation to complete
-
-- Group: Device Interaction
-- Syntax: `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--app`, `--timeout`, `--text`, `--id`, `--desc`, `--role`, `--validate-only`, `--dry-run`, `--no-daemon`
-- Details: [Action: wait_for_navigation](actions.md#action-wait-for-navigation)
-- Action links: [`wait_for_navigation`](actions.md#action-wait-for-navigation)
-- Command aliases: `wait-for-navigation`, `wait_for_navigation`
-
-<a id="command-read-value"></a>
-### `read-value`
-
-Read the value associated with a labeled element
-
-- Group: Device Interaction
-- Syntax: `read-value --label <text>`
-- Primary flags: `--label`, `--label-id`, `--label-desc`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon`
-- Details: [Action: read_key_value_pair](actions.md#action-read-key-value-pair)
-- Action links: [`read_key_value_pair`](actions.md#action-read-key-value-pair)
-- Command aliases: `read-kv`, `read-key-value-pair`, `read_key_value_pair`
-
-<a id="command-skills"></a>
-### `skills`
-
-Manage and run automation skills
-
-- Group: Execution
-- Syntax: `skills list`, `skills get <skill_id>`, `skills for-app <package_id>`, `skills search --app <package_id> [--intent <intent>] [--keyword <text>]`, `skills search <keyword>`, `skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`, `skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`, `skills new <skill_id> [--summary <text>] [--recording-context <file>]`, `skills validate <skill_id> [--dry-run]`, `skills validate --all [--dry-run]`, `skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [skill_args...]`, `skills install`, `skills update [--ref <git-ref>]`, `skills sync --ref <git-ref>`
-- Primary flags: `--app`, `--intent`, `--keyword`, `--skill-id`, `--artifact`, `--vars`, `--summary`, `--recording-context`, `--all`, `--dry-run`, `--device`, `--operator-package`, `--timeout`, `--expect-contains`, `--skip-validate`, `--ref`
-- Details: Planned: `../skills/cli.md` (PR-3 / Phase 4)
-- Subcommands: `install`, `sync`, `new`, `validate`, `compile-artifact`, `run`
-
-<a id="command-bundled-skills"></a>
-### `bundled-skills`
-
-Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes
-
-- Group: Execution
-- Syntax: `bundled-skills list`, `bundled-skills install`, `bundled-skills update`
-- Primary flags: -
-- Details: [Host agent orientation](../host-agents.md)
-- See also: [Skills overview](../skills/overview.md)
-- Subcommands: `install`, `update`, `list`
-
-<a id="command-recording"></a>
-### `recording`
-
-Manage recording sessions on the Operator app
-
-- Group: Recording
-- Syntax: `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]`, `recording stop`, `recording pull`, `recording parse --input <file> [--out <file>]`, `recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]`, `recording compare --baseline <export.json> --result <skills-run.json> [--mode <auto|literal|semantic>]`
-- Primary flags: `--session-id`, `--out`, `--input`, `--snapshots`, `--baseline`, `--result`, `--mode`
-- Details: [api/recording](recording.md)
-- Command aliases: `record`
-- Subcommands: `compare`, `export`
-
-<a id="command-daemon"></a>
-### `daemon`
-
-Manage the background Unix socket daemon
-
-- Group: Execution
-- Syntax: `daemon start|stop|status|restart [--device <id>]`
-- Primary flags: -
-- Details: [Daemon](daemon.md)
-
-<a id="command-serve"></a>
-### `serve`
-
-Start local HTTP/SSE server for remote control
-
-- Group: Execution
-- Syntax: `serve [--port <number>] [--host <string>]`
-- Primary flags: `--port`, `--host`
-- Details: [Serve API](serve.md)
-
-<a id="command-mcp"></a>
-### `mcp`
-
-Start the first-party MCP server
-
-- Group: Execution
-- Syntax: `mcp serve`
-- Primary flags: -
-- Details: [MCP server](mcp.md)
-
-<a id="command-logs"></a>
-### `logs`
-
-Tail the Clawperator log file
-
-- Group: Utilities
-- Syntax: `logs`
-- Primary flags: -
-- Details: [Logging](logging.md#the-clawperator-logs-command)
-
-<a id="command-doctor"></a>
-### `doctor`
-
-Run environment and runtime checks
-
-- Group: Setup
-- Syntax: `doctor`, `doctor --fix`, `doctor --full`, `doctor --check-only`
-- Primary flags: `--fix`, `--full`, `--check-only`
-- Details: [Doctor contract](doctor.md#doctor-report-contract)
-
-<a id="command-grant-device-permissions"></a>
-### `grant-device-permissions`
-
-Re-grant accessibility and notification permissions
-
-- Group: Setup
-- Syntax: `grant-device-permissions [--device <id>] [--operator-package <package>]`
-- Primary flags: -
-- Details: [Setup recovery](../setup.md#setup-step-regrant-permissions)
-
-<a id="command-version"></a>
-### `version`
-
-Show the CLI version
-
-- Group: Setup
-- Syntax: `version`, `version --check-compat [--device <id>] [--operator-package <package>]`
-- Primary flags: `--check-compat`
-- Details: [Version checks](../setup.md#setup-step-verify-readiness-with-doctor)
-
----
-
-# Logging
-
-## Purpose
-
-Clawperator logs every significant event to a local NDJSON file for post-run diagnostics. An agent can inspect this file after a timeout or failure to determine what happened step by step.
-
-## Log File Location
-
-Logs are written to a daily file at:
-
-```
-~/.clawperator/logs/clawperator-YYYY-MM-DD.log
-```
-
-The path components are:
-
-| Component | Value | Source |
-|-----------|-------|--------|
-| Base directory | `~/.clawperator/logs` | Default, or `CLAWPERATOR_LOG_DIR` env var |
-| Filename prefix | `clawperator-` | Hardcoded in `formatLogPath()` in `contracts/logging.ts` |
-| Date format | `YYYY-MM-DD` | Local calendar date of the log entry (from `formatDate()` in `contracts/logging.ts`) |
-| Extension | `.log` | Hardcoded in `formatLogPath()` in `contracts/logging.ts` |
-
-Example path: `/home/user/.clawperator/logs/clawperator-2026-03-28.log`
-
-To change the base directory, set the `CLAWPERATOR_LOG_DIR` environment variable. See [Environment Variables](environment.md) for details.
-
-## NDJSON Format
-
-Each line is a valid JSON object (NDJSON - Newline Delimited JSON). No wrapping array, no trailing commas. One event per line.
-
-### Required Fields
-
-Every log event has these fields:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `ts` | string | ISO 8601 timestamp (e.g., `2026-03-28T12:34:56.789Z`) |
-| `level` | string | One of: `debug`, `info`, `warn`, `error` |
-| `event` | string | Dot-separated event name (e.g., `skills.run.start`) |
-| `message` | string | Human-readable summary |
-
-### Optional Context Fields
-
-Events may include additional context fields:
-
-| Field | Type | Present When |
-|-------|------|--------------|
-| `commandId` | string | CLI command or execution has a correlation ID |
-| `taskId` | string | Part of a larger task sequence |
-| `deviceId` | string | Event targets a specific device |
-| `skillId` | string | Skill execution event |
-| `stream` | string | `stdout` or `stderr` for skill output lines |
-| `status` | string | Completion status (e.g., `pass`, `fail`) |
-| `durationMs` | number | Operation completed, measured in milliseconds |
-| `exitCode` | number | Process exit code for skill/execution events |
-
-### Example Log Lines
-
-```jsonl
-{"ts":"2026-03-28T10:15:30.123Z","level":"info","event":"skills.run.start","message":"Skill com.example.app.get-status started","skillId":"com.example.app.get-status","commandId":"cmd-123"}
-{"ts":"2026-03-28T10:15:30.456Z","level":"info","event":"skills.run.output","message":"Opening app...","skillId":"com.example.app.get-status","stream":"stdout"}
-{"ts":"2026-03-28T10:15:32.789Z","level":"info","event":"skills.run.complete","message":"Skill com.example.app.get-status completed successfully in 2345ms","skillId":"com.example.app.get-status","durationMs":2345,"exitCode":0}
-```
-
-## Log Levels
-
-Four levels are available, in order of increasing severity:
-
-| Level | Numeric Value | Use Case |
-|-------|---------------|----------|
-| `debug` | 0 | Detailed diagnostic information |
-| `info` | 1 | Normal operational events |
-| `warn` | 2 | Unexpected but recoverable conditions |
-| `error` | 3 | Failures that prevent intended operation |
-
-### Threshold Behavior
-
-The `--log-level` flag (or `CLAWPERATOR_LOG_LEVEL` env var) controls which events are written to the file. Events at or above the threshold are logged.
-
-| Setting | Events Logged |
-|---------|---------------|
-| `debug` | All events (debug, info, warn, error) |
-| `info` | info, warn, error (default) |
-| `warn` | warn, error |
-| `error` | error only |
-
-Default: `info` (from `normalizeLogLevel()` in `adapters/logger.ts`)
-
-Valid values: `debug`, `info`, `warn`, `error` (case-insensitive)
-
-Invalid values fall back silently to `info`.
-
-**Exception:** Skill output events (`skills.run.output`) are always written to the file regardless of level threshold, so agents can diagnose timeouts even when `--log-level error` is set.
-
-## Event Naming Conventions
-
-Events use dot-separated names with prefix-based categories:
-
-| Prefix | Category | Example |
-|--------|----------|---------|
-| `skills.run.` | Skill execution lifecycle | `skills.run.start`, `skills.run.complete` |
-| `cli.` | CLI output | `cli.banner` |
-| `doctor.` | Doctor diagnostics | `doctor.check` |
-| `serve.` | HTTP/SSE server | `serve.server.started`, `serve.http.request` |
-
-<a id="the-clawperator-logs-command"></a>
-
-## The `clawperator logs` Command
-
-Stream the log file in real time.
-
-### Usage
-
-```bash
-clawperator logs
-```
-
-### Behavior
-
-1. Dumps all existing content from the current daily log file to stdout
-2. Streams new lines as they are written
-3. Runs until interrupted
-
-### Interrupt
-
-Press `Ctrl+C` (SIGINT) to stop. The command exits with code 0.
-
-### Output Format
-
-Raw NDJSON lines on stdout. No formatting, no filtering, no color.
-
-### No Flags
-
-The command accepts no flags. It always operates on the current daily log file determined by `CLAWPERATOR_LOG_DIR` (or the default `~/.clawperator/logs`).
-
-### Missing File Behavior
-
-If the log file does not exist, the command writes a message to stderr and exits with code 0:
-
-```
-No log file found at /home/user/.clawperator/logs/clawperator-2026-03-28.log
-```
-
-## Fail-Open Behavior
-
-If the log directory cannot be written to (permissions, disk full, path does not exist), Clawperator:
-
-1. Writes one warning to stderr
-2. Disables file logging for the remainder of the process
-3. Continues normal operation
-
-Example warning (includes the error message when available):
-
-```
-[clawperator] WARN: logging disabled after write failure for /home/user/.clawperator/logs/clawperator-2026-03-28.log: EACCES: permission denied, mkdir '/home/user/.clawperator'
-```
-
-The command or skill still executes normally. Only the log file is affected.
-
-## Verification
-
-Confirm logging is active:
-
-```bash
-# Check the log file exists and has recent content
-ls -la ~/.clawperator/logs/
-
-# Stream logs in real time
-clawperator logs
-```
-
-Generate log entries:
-
-```bash
-# Skill runs produce lifecycle and output events
-clawperator skills run <skill_id> --device <device_serial>
-
-# Snapshot commands produce execution lifecycle events
-clawperator snapshot --device <device_serial>
-```
-
-Verify entries appear:
-
-```bash
-# Check for skill lifecycle events
-grep '"event":"skills.run.start"' ~/.clawperator/logs/clawperator-$(date +%F).log
-
-# Check for the CLI banner (emitted at debug level during skill runs)
-grep '"event":"cli.banner"' ~/.clawperator/logs/clawperator-$(date +%F).log
-
-# Parse the NDJSON file with jq to see all events from a specific category
-jq -c 'select(.event | startswith("skills.run."))' ~/.clawperator/logs/clawperator-$(date +%F).log
-```
-
-Note: `cli.banner` is logged at `debug` level. To see it in the file, use `--log-level debug`.
-
-## Environment Variables
-
-See [Environment Variables](environment.md) for complete details on:
-
-- `CLAWPERATOR_LOG_DIR` - Change the log directory base path
-- `CLAWPERATOR_LOG_LEVEL` - Set the file logging threshold
-
-## JSON Mode Cleanliness
-
-When JSON output mode is active, the unified logger never writes to stdout. Log events go only to the file. This ensures the JSON output stream remains parseable without interleaved log lines.
 
 ---
 
@@ -2801,7 +2139,7 @@ Example:
 | Field | Valid values |
 | --- | --- |
 | Required | `durationMs` |
-| `durationMs` | required number `>= 0` and `<= MAX_EXECUTION_TIMEOUT_MS` |
+| `durationMs` | required number `>= 0` and `<=` the maximum execution timeout constant |
 | `retry` | optional retry object in raw `exec` JSON; Android defaults to `None` |
 
 Semantics:
@@ -3449,11 +2787,435 @@ clawperator read-value --label "Battery"
 
 ---
 
+# CLI Reference
+
+This page is generated from the Node CLI registry and command sources.
+
+Use this page as a command index. Detailed behavior, output shapes, and recovery guidance live in the authored API pages.
+
+## Command Index
+
+| Command | Group | Primary syntax | Primary flags | Details | Summary |
+| --- | --- | --- | --- | --- | --- |
+| [`operator`](#command-operator) | Setup | `operator setup --apk <path> [--device <id>] [--operator-package <package>]` | `--apk`, `--operator-package` | [Setup](../setup.md#setup-step-install-operator-apk) | Install the Operator APK and configure the device |
+| [`host`](#command-host) | Setup | `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]` | `--installed-at`, `--cli-version`, `--apk-version`, `--last-device-serial` | [Setup](../setup.md#setup-step-install-cli) | Set up durable host artifacts owned by the CLI |
+| [`install`](#command-install) | Setup | `install [--operator-package <package>]` | `--operator-package` | [Setup](../setup.md#setup-step-install-cli) | Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup |
+| [`devices`](#command-devices) | Device Management | `devices` | - | [Devices](devices.md#clawperator-devices) | List connected Android devices |
+| [`emulator`](#command-emulator) | Device Management | `emulator list` | `--name` | [Emulator provisioning](serve.md#endpoint-post-android-provision-emulator) | Manage Android emulators (AVDs) |
+| [`packages`](#command-packages) | Device Management | `packages list [--device <id>] [--operator-package <pkg>] [--third-party]` | `--third-party` | [Devices](devices.md) | List installed packages on a device |
+| [`exec`](#command-exec) | Execution | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]` | `--payload`, `--validate-only`, `--dry-run`, `--goal`, `--no-daemon` | [Execution payload](overview.md#execution-payload) | Execute a validated command payload |
+| [`snapshot`](#command-snapshot) | Device Interaction | `snapshot [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | [Action: snapshot](actions.md#action-snapshot) | Get current Android UI hierarchy as XML |
+| [`screenshot`](#command-screenshot) | Device Interaction | `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]` | `--path`, `--no-daemon` | [Action: take_screenshot](actions.md#action-take-screenshot) | Capture a screenshot from the device |
+| [`click`](#command-click) | Device Interaction | `click --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--coordinate`, `--long`, `--focus`, `--no-daemon` | [Action: click](actions.md#action-click) | Tap the first matching UI element |
+| [`open`](#command-open) | Device Interaction | `open <package-id\|url\|uri> [--device <id>] [--operator-package <pkg>]` | `--app`, `--navigation-timeout-ms`, `--skip-navigation-wait`, `--no-daemon` | [Actions: open_app / open_uri](actions.md#action-open-app) | Open an app, URL, or URI on the device |
+| [`type`](#command-type) | Device Interaction | `type <text> --role <role> \| --id <id> [--device <id>] [--operator-package <pkg>]` | `--id`, `--desc`, `--role`, `--submit`, `--clear`, `--no-daemon` | [Action: enter_text](actions.md#action-enter-text) | Type text into the first matching UI element |
+| [`read`](#command-read) | Device Interaction | `read --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon` | [Action: read_text](actions.md#action-read-text) | Read text from the first matching UI element |
+| [`wait`](#command-wait) | Device Interaction | `wait --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]` | `--text`, `--id`, `--desc`, `--role`, `--no-daemon` | [Action: wait_for_node](actions.md#action-wait-for-node) | Wait until a matching UI element appears |
+| [`press`](#command-press) | Device Interaction | `press <back\|home\|recents> [--device <id>] [--operator-package <pkg>]` | `--key`, `--no-daemon` | [Action: press_key](actions.md#action-press-key) | Press a hardware key on the device |
+| [`back`](#command-back) | Device Interaction | `back [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | [Action: press_key](actions.md#action-press-key) | Press the Android back key |
+| [`close`](#command-close) | Device Interaction | `close <package> [--device <id>] [--operator-package <pkg>]` | `--app`, `--no-daemon` | [Action: close_app](actions.md#action-close-app) | Force-stop an Android application |
+| [`sleep`](#command-sleep) | Device Interaction | `sleep <ms> [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | [Action: sleep](actions.md#action-sleep) | Pause execution for a duration |
+| [`scroll`](#command-scroll) | Device Interaction | `scroll <down\|up\|left\|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]` | `--direction`, `--no-daemon` | [Action: scroll](actions.md#action-scroll) | Scroll the screen in a direction |
+| [`scroll-until`](#command-scroll-until) | Device Interaction | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--click`, `--direction`, `--no-daemon` | [Action: scroll_until](actions.md#action-scroll-until) | Scroll until a target element is visible |
+| [`scroll-and-click`](#command-scroll-and-click) | Device Interaction | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--direction`, `--no-daemon` | [Action: scroll_and_click](actions.md#action-scroll-and-click) | Scroll until target is visible, then click it (alias for scroll-until --click) |
+| [`wait-for-nav`](#command-wait-for-nav) | Device Interaction | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]` | `--app`, `--timeout`, `--text`, `--id`, `--desc`, `--role`, `--validate-only`, `--dry-run`, `--no-daemon` | [Action: wait_for_navigation](actions.md#action-wait-for-navigation) | Wait for app or screen navigation to complete |
+| [`read-value`](#command-read-value) | Device Interaction | `read-value --label <text>` | `--label`, `--label-id`, `--label-desc`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon` | [Action: read_key_value_pair](actions.md#action-read-key-value-pair) | Read the value associated with a labeled element |
+| [`skills`](#command-skills) | Execution | `skills list` | `--app`, `--intent`, `--keyword`, `--skill-id`, `--artifact`, `--vars`, `--summary`, `--recording-context`, `--all`, `--dry-run`, `--device`, `--operator-package`, `--timeout`, `--expect-contains`, `--skip-validate`, `--ref` | [Skills CLI](../skills/cli.md) | Manage and run automation skills |
+| [`bundled-skills`](#command-bundled-skills) | Execution | `bundled-skills list` | - | [Host agent orientation](../host-agents.md) | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
+| [`recording`](#command-recording) | Recording | `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]` | `--session-id`, `--out`, `--input`, `--snapshots`, `--baseline`, `--result`, `--mode` | [api/recording](recording.md) | Manage recording sessions on the Operator app |
+| [`daemon`](#command-daemon) | Execution | `daemon start\|stop\|status\|restart [--device <id>]` | - | [Daemon](daemon.md) | Manage the background Unix socket daemon |
+| [`serve`](#command-serve) | Execution | `serve [--port <number>] [--host <string>]` | `--port`, `--host` | [Serve API](serve.md) | Start local HTTP/SSE server for remote control |
+| [`mcp`](#command-mcp) | Execution | `mcp serve` | - | [MCP server](mcp.md) | Start the first-party MCP server |
+| [`logs`](#command-logs) | Utilities | `logs` | - | [Logging](logging.md#the-clawperator-logs-command) | Tail the Clawperator log file |
+| [`doctor`](#command-doctor) | Setup | `doctor` | `--fix`, `--full`, `--check-only` | [Doctor contract](doctor.md#doctor-report-contract) | Run environment and runtime checks |
+| [`grant-device-permissions`](#command-grant-device-permissions) | Setup | `grant-device-permissions [--device <id>] [--operator-package <package>]` | - | [Setup recovery](../setup.md#setup-step-regrant-permissions) | Re-grant accessibility and notification permissions |
+| [`version`](#command-version) | Setup | `version` | `--check-compat` | [Version checks](../setup.md#setup-step-verify-readiness-with-doctor) | Show the CLI version |
+
+## Commands
+
+<a id="command-operator"></a>
+### `operator`
+
+Install the Operator APK and configure the device
+
+- Group: Setup
+- Syntax: `operator setup --apk <path> [--device <id>] [--operator-package <package>]`, `operator download [--operator-package <package>]`, `operator remediate [--operator-package <package>]`
+- Primary flags: `--apk`, `--operator-package`
+- Details: [Setup](../setup.md#setup-step-install-operator-apk)
+- See also: [Doctor contract](doctor.md#doctor-report-contract)
+- Subcommands: `setup`, `install`, `download`, `remediate`
+
+<a id="command-host"></a>
+### `host`
+
+Set up durable host artifacts owned by the CLI
+
+- Group: Setup
+- Syntax: `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]`
+- Primary flags: `--installed-at`, `--cli-version`, `--apk-version`, `--last-device-serial`
+- Details: [Setup](../setup.md#setup-step-install-cli)
+- Subcommands: `setup`
+
+<a id="command-install"></a>
+### `install`
+
+Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup
+
+- Group: Setup
+- Syntax: `install [--operator-package <package>]`
+- Primary flags: `--operator-package`
+- Details: [Setup](../setup.md#setup-step-install-cli)
+
+<a id="command-devices"></a>
+### `devices`
+
+List connected Android devices
+
+- Group: Device Management
+- Syntax: `devices`
+- Primary flags: -
+- Details: [Devices](devices.md#clawperator-devices)
+- See also: [Serve GET /devices](serve.md#endpoint-get-devices)
+
+<a id="command-emulator"></a>
+### `emulator`
+
+Manage Android emulators (AVDs)
+
+- Group: Device Management
+- Syntax: `emulator list`, `emulator inspect <name>`, `emulator create [--name <name>]`, `emulator start <name>`, `emulator stop <name>`, `emulator delete <name>`, `emulator status`, `emulator provision`
+- Primary flags: `--name`
+- Details: [Emulator provisioning](serve.md#endpoint-post-android-provision-emulator)
+- See also: [Devices](devices.md)
+- Alias notes: `provision emulator` is an alias for `emulator provision`.
+- Subcommands: `list`, `inspect`, `create`, `start`, `stop`, `delete`, `status`, `provision`
+
+<a id="command-packages"></a>
+### `packages`
+
+List installed packages on a device
+
+- Group: Device Management
+- Syntax: `packages list [--device <id>] [--operator-package <pkg>] [--third-party]`
+- Primary flags: `--third-party`
+- Details: [Devices](devices.md)
+
+<a id="command-exec"></a>
+### `exec`
+
+Execute a validated command payload
+
+- Group: Execution
+- Syntax: `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]`, `exec best-effort --goal <text> [--device <id>] [--operator-package <package>]`
+- Primary flags: `--payload`, `--validate-only`, `--dry-run`, `--goal`, `--no-daemon`
+- Details: [Execution payload](overview.md#execution-payload)
+- See also: [Actions](actions.md#action-click)
+- Command aliases: `execute`
+
+<a id="command-snapshot"></a>
+### `snapshot`
+
+Get current Android UI hierarchy as XML
+
+- Group: Device Interaction
+- Syntax: `snapshot [--device <id>] [--operator-package <pkg>]`
+- Primary flags: `--no-daemon`
+- Details: [Action: snapshot](actions.md#action-snapshot)
+- Action links: [`snapshot`](actions.md#action-snapshot)
+- Command aliases: `snapshot-ui`, `snapshot_ui`
+
+<a id="command-screenshot"></a>
+### `screenshot`
+
+Capture a screenshot from the device
+
+- Group: Device Interaction
+- Syntax: `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]`
+- Primary flags: `--path`, `--no-daemon`
+- Details: [Action: take_screenshot](actions.md#action-take-screenshot)
+- Action links: [`take_screenshot`](actions.md#action-take-screenshot)
+- Command aliases: `take-screenshot`, `take_screenshot`, `capture-screenshot`
+
+<a id="command-click"></a>
+### `click`
+
+Tap the first matching UI element
+
+- Group: Device Interaction
+- Syntax: `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]`
+- Primary flags: `--text`, `--id`, `--desc`, `--role`, `--coordinate`, `--long`, `--focus`, `--no-daemon`
+- Details: [Action: click](actions.md#action-click)
+- Action links: [`click`](actions.md#action-click)
+- Command aliases: `tap`
+
+<a id="command-open"></a>
+### `open`
+
+Open an app, URL, or URI on the device
+
+- Group: Device Interaction
+- Syntax: `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]`
+- Primary flags: `--app`, `--navigation-timeout-ms`, `--skip-navigation-wait`, `--no-daemon`
+- Details: [Actions: open_app / open_uri](actions.md#action-open-app)
+- Action links: [`open_app`](actions.md#action-open-app), [`open_uri`](actions.md#action-open-uri)
+- Command aliases: `open-app`, `open_app`, `open-uri`, `open-url`, `open_uri`, `open_url`
+
+<a id="command-type"></a>
+### `type`
+
+Type text into the first matching UI element
+
+- Group: Device Interaction
+- Syntax: `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]`
+- Primary flags: `--id`, `--desc`, `--role`, `--submit`, `--clear`, `--no-daemon`
+- Details: [Action: enter_text](actions.md#action-enter-text)
+- Action links: [`enter_text`](actions.md#action-enter-text)
+- Command aliases: `fill`, `enter-text`, `enter_text`
+
+<a id="command-read"></a>
+### `read`
+
+Read text from the first matching UI element
+
+- Group: Device Interaction
+- Syntax: `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]`
+- Primary flags: `--text`, `--id`, `--desc`, `--role`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon`
+- Details: [Action: read_text](actions.md#action-read-text)
+- Action links: [`read_text`](actions.md#action-read-text)
+- See also: [Selectors](selectors.md#selector-flag-text)
+- Command aliases: `read-text`, `read_text`
+
+<a id="command-wait"></a>
+### `wait`
+
+Wait until a matching UI element appears
+
+- Group: Device Interaction
+- Syntax: `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]`
+- Primary flags: `--text`, `--id`, `--desc`, `--role`, `--no-daemon`
+- Details: [Action: wait_for_node](actions.md#action-wait-for-node)
+- Action links: [`wait_for_node`](actions.md#action-wait-for-node)
+- Command aliases: `wait-for`, `wait_for`, `wait-for-node`, `wait_for_node`, `find`, `find-node`, `find_node`
+
+<a id="command-press"></a>
+### `press`
+
+Press a hardware key on the device
+
+- Group: Device Interaction
+- Syntax: `press <back|home|recents> [--device <id>] [--operator-package <pkg>]`
+- Primary flags: `--key`, `--no-daemon`
+- Details: [Action: press_key](actions.md#action-press-key)
+- Action links: [`press_key`](actions.md#action-press-key)
+- Command aliases: `press-key`, `press_key`
+
+<a id="command-back"></a>
+### `back`
+
+Press the Android back key
+
+- Group: Device Interaction
+- Syntax: `back [--device <id>] [--operator-package <pkg>]`
+- Primary flags: `--no-daemon`
+- Details: [Action: press_key](actions.md#action-press-key)
+- Action links: [`press_key`](actions.md#action-press-key)
+
+<a id="command-close"></a>
+### `close`
+
+Force-stop an Android application
+
+- Group: Device Interaction
+- Syntax: `close <package> [--device <id>] [--operator-package <pkg>]`
+- Primary flags: `--app`, `--no-daemon`
+- Details: [Action: close_app](actions.md#action-close-app)
+- Action links: [`close_app`](actions.md#action-close-app)
+- Command aliases: `close-app`, `close_app`
+
+<a id="command-sleep"></a>
+### `sleep`
+
+Pause execution for a duration
+
+- Group: Device Interaction
+- Syntax: `sleep <ms> [--device <id>] [--operator-package <pkg>]`
+- Primary flags: `--no-daemon`
+- Details: [Action: sleep](actions.md#action-sleep)
+- Action links: [`sleep`](actions.md#action-sleep)
+
+<a id="command-scroll"></a>
+### `scroll`
+
+Scroll the screen in a direction
+
+- Group: Device Interaction
+- Syntax: `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]`
+- Primary flags: `--direction`, `--no-daemon`
+- Details: [Action: scroll](actions.md#action-scroll)
+- Action links: [`scroll`](actions.md#action-scroll)
+
+<a id="command-scroll-until"></a>
+### `scroll-until`
+
+Scroll until a target element is visible
+
+- Group: Device Interaction
+- Syntax: `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]`
+- Primary flags: `--text`, `--id`, `--desc`, `--role`, `--click`, `--direction`, `--no-daemon`
+- Details: [Action: scroll_until](actions.md#action-scroll-until)
+- Action links: [`scroll_until`](actions.md#action-scroll-until)
+- Command aliases: `scroll_until`
+
+<a id="command-scroll-and-click"></a>
+### `scroll-and-click`
+
+Scroll until target is visible, then click it (alias for scroll-until --click)
+
+- Group: Device Interaction
+- Syntax: `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]`
+- Primary flags: `--text`, `--id`, `--desc`, `--role`, `--direction`, `--no-daemon`
+- Details: [Action: scroll_and_click](actions.md#action-scroll-and-click)
+- Action links: [`scroll_and_click`](actions.md#action-scroll-and-click)
+- Command aliases: `scroll_and_click`
+
+<a id="command-wait-for-nav"></a>
+### `wait-for-nav`
+
+Wait for app or screen navigation to complete
+
+- Group: Device Interaction
+- Syntax: `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]`
+- Primary flags: `--app`, `--timeout`, `--text`, `--id`, `--desc`, `--role`, `--validate-only`, `--dry-run`, `--no-daemon`
+- Details: [Action: wait_for_navigation](actions.md#action-wait-for-navigation)
+- Action links: [`wait_for_navigation`](actions.md#action-wait-for-navigation)
+- Command aliases: `wait-for-navigation`, `wait_for_navigation`
+
+<a id="command-read-value"></a>
+### `read-value`
+
+Read the value associated with a labeled element
+
+- Group: Device Interaction
+- Syntax: `read-value --label <text>`
+- Primary flags: `--label`, `--label-id`, `--label-desc`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon`
+- Details: [Action: read_key_value_pair](actions.md#action-read-key-value-pair)
+- Action links: [`read_key_value_pair`](actions.md#action-read-key-value-pair)
+- Command aliases: `read-kv`, `read-key-value-pair`, `read_key_value_pair`
+
+<a id="command-skills"></a>
+### `skills`
+
+Manage and run automation skills
+
+- Group: Execution
+- Syntax: `skills list`, `skills get <skill_id>`, `skills for-app <package_id>`, `skills search --app <package_id> [--intent <intent>] [--keyword <text>]`, `skills search <keyword>`, `skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`, `skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`, `skills new <skill_id> [--summary <text>] [--recording-context <file>]`, `skills validate <skill_id> [--dry-run]`, `skills validate --all [--dry-run]`, `skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [skill_args...]`, `skills install`, `skills update [--ref <git-ref>]`, `skills sync --ref <git-ref>`
+- Primary flags: `--app`, `--intent`, `--keyword`, `--skill-id`, `--artifact`, `--vars`, `--summary`, `--recording-context`, `--all`, `--dry-run`, `--device`, `--operator-package`, `--timeout`, `--expect-contains`, `--skip-validate`, `--ref`
+- Details: [Skills CLI](../skills/cli.md)
+- Subcommands: `install`, `sync`, `new`, `validate`, `compile-artifact`, `run`
+
+<a id="command-bundled-skills"></a>
+### `bundled-skills`
+
+Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes
+
+- Group: Execution
+- Syntax: `bundled-skills list`, `bundled-skills install`, `bundled-skills update`
+- Primary flags: -
+- Details: [Host agent orientation](../host-agents.md)
+- See also: [Skills overview](../skills/overview.md)
+- Subcommands: `install`, `update`, `list`
+
+<a id="command-recording"></a>
+### `recording`
+
+Manage recording sessions on the Operator app
+
+- Group: Recording
+- Syntax: `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]`, `recording stop`, `recording pull`, `recording parse --input <file> [--out <file>]`, `recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]`, `recording compare --baseline <export.json> --result <skills-run.json> [--mode <auto|literal|semantic>]`
+- Primary flags: `--session-id`, `--out`, `--input`, `--snapshots`, `--baseline`, `--result`, `--mode`
+- Details: [api/recording](recording.md)
+- Command aliases: `record`
+- Subcommands: `compare`, `export`
+
+<a id="command-daemon"></a>
+### `daemon`
+
+Manage the background Unix socket daemon
+
+- Group: Execution
+- Syntax: `daemon start|stop|status|restart [--device <id>]`
+- Primary flags: -
+- Details: [Daemon](daemon.md)
+
+<a id="command-serve"></a>
+### `serve`
+
+Start local HTTP/SSE server for remote control
+
+- Group: Execution
+- Syntax: `serve [--port <number>] [--host <string>]`
+- Primary flags: `--port`, `--host`
+- Details: [Serve API](serve.md)
+
+<a id="command-mcp"></a>
+### `mcp`
+
+Start the first-party MCP server
+
+- Group: Execution
+- Syntax: `mcp serve`
+- Primary flags: -
+- Details: [MCP server](mcp.md)
+
+<a id="command-logs"></a>
+### `logs`
+
+Tail the Clawperator log file
+
+- Group: Utilities
+- Syntax: `logs`
+- Primary flags: -
+- Details: [Logging](logging.md#the-clawperator-logs-command)
+
+<a id="command-doctor"></a>
+### `doctor`
+
+Run environment and runtime checks
+
+- Group: Setup
+- Syntax: `doctor`, `doctor --fix`, `doctor --full`, `doctor --check-only`
+- Primary flags: `--fix`, `--full`, `--check-only`
+- Details: [Doctor contract](doctor.md#doctor-report-contract)
+
+<a id="command-grant-device-permissions"></a>
+### `grant-device-permissions`
+
+Re-grant accessibility and notification permissions
+
+- Group: Setup
+- Syntax: `grant-device-permissions [--device <id>] [--operator-package <package>]`
+- Primary flags: -
+- Details: [Setup recovery](../setup.md#setup-step-regrant-permissions)
+
+<a id="command-version"></a>
+### `version`
+
+Show the CLI version
+
+- Group: Setup
+- Syntax: `version`, `version --check-compat [--device <id>] [--operator-package <package>]`
+- Primary flags: `--check-compat`
+- Details: [Version checks](../setup.md#setup-step-verify-readiness-with-doctor)
+
+---
+
 # Snapshot Format
 
 ## Purpose
 
-Define what `snapshot` returns, where the XML hierarchy is attached in the result envelope, what extraction failures look like, and what parts of the snapshot contract an agent can rely on.
+Define what `snapshot` returns, where the XML hierarchy is attached in the
+[result envelope](overview.md#result-envelope), what extraction failures look
+like, and what parts of the snapshot contract an agent can rely on.
 
 ## Sources
 
@@ -3964,413 +3726,6 @@ Operationally:
 - [Selectors](selectors.md)
 - [Errors](errors.md)
 - [Navigation Patterns](navigation.md)
-
----
-
-# Errors
-
-## Purpose
-
-Document the public error-code contract, show where failures appear in CLI output versus result envelopes, and give concrete recovery steps for the most common host, validation, and runtime failures.
-
-## Sources
-
-- Public error-code enum: `apps/node/src/contracts/errors.ts`
-- Result envelope shape: `apps/node/src/contracts/result.ts`
-- Execution validation: `apps/node/src/domain/executions/validateExecution.ts`
-- CLI formatting: `apps/node/src/cli/output.ts`
-
-## Two Failure Shapes
-
-Clawperator surfaces failures in two main shapes.
-
-### 1. Top-level CLI error object
-
-This appears when Node fails before it can return an execution envelope, for example during argument parsing, payload validation, device selection, or host checks.
-
-Example:
-
-```json
-{
-  "code": "EXECUTION_VALIDATION_FAILED",
-  "message": "open_uri requires params.uri",
-  "details": {
-    "path": "actions.0.params.uri",
-    "actionId": "open-1",
-    "actionType": "open_uri"
-  }
-}
-```
-
-Success condition for recovery:
-
-- you change the command or payload
-- rerunning no longer returns a top-level `{ "code": ... }` object
-
-### 2. Result envelope failure
-
-This appears when Node successfully sends the command but the execution still fails at dispatch time or during one of the steps.
-
-Per-step example:
-
-```json
-{
-  "envelope": {
-    "commandId": "read-1",
-    "taskId": "read-1",
-    "status": "failed",
-    "error": "Step a1 (read_text) failed: NODE_NOT_FOUND",
-    "stepResults": [
-      {
-        "id": "a1",
-        "actionType": "read_text",
-        "success": false,
-        "data": {
-          "error": "NODE_NOT_FOUND",
-          "message": "No matching node found"
-        }
-      }
-    ]
-  },
-  "deviceId": "emulator-5554",
-  "terminalSource": "clawperator_result",
-  "isCanonicalTerminal": true
-}
-```
-
-Envelope-level example with `errorCode`:
-
-```json
-{
-  "envelope": {
-    "commandId": "snapshot-1",
-    "taskId": "snapshot-1",
-    "status": "failed",
-    "stepResults": [],
-    "error": "Accessibility service is not available",
-    "errorCode": "SERVICE_UNAVAILABLE",
-    "hint": "Accessibility service not running. Run 'clawperator doctor --fix --device emulator-5554' to diagnose and repair, or 'clawperator operator setup --apk <path-to-apk> --device emulator-5554' to reinstall."
-  },
-  "deviceId": "emulator-5554",
-  "terminalSource": "clawperator_result",
-  "isCanonicalTerminal": true
-}
-```
-
-Success condition for recovery:
-
-- `envelope.status == "success"`
-- every `stepResults[i].success == true`
-
-## Public Error Codes
-
-Only the codes defined in `apps/node/src/contracts/errors.ts` are part of the public error-code contract documented on this page.
-
-| Code | Derived label | Notes |
-| --- | --- | --- |
-| <a id="error-host-dependency-missing"></a>`HOST_DEPENDENCY_MISSING` | Host dependency missing | Host |
-| <a id="error-adb-not-found"></a>`ADB_NOT_FOUND` | Adb not found | Setup & Connectivity |
-| <a id="error-no-devices"></a>`NO_DEVICES` | No devices | - |
-| <a id="error-multiple-devices-device-id-required"></a>`MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Multiple devices device id required | Recovery: pass `--device` (alias `--device-id`) when adb shows multiple targets. |
-| <a id="error-operator-not-installed"></a>`OPERATOR_NOT_INSTALLED` | Operator not installed | - |
-| <a id="error-device-not-found"></a>`DEVICE_NOT_FOUND` | Device not found | Recovery: the `--device` serial is not connected (alias `--device-id`). |
-| <a id="error-execution-validation-failed"></a>`EXECUTION_VALIDATION_FAILED` | Execution validation failed | Execution & State |
-| <a id="error-execution-action-unsupported"></a>`EXECUTION_ACTION_UNSUPPORTED` | Execution action unsupported | - |
-| <a id="error-execution-conflict-in-flight"></a>`EXECUTION_CONFLICT_IN_FLIGHT` | Execution conflict in flight | - |
-| <a id="error-result-envelope-timeout"></a>`RESULT_ENVELOPE_TIMEOUT` | Result envelope timeout | - |
-| <a id="error-result-envelope-malformed"></a>`RESULT_ENVELOPE_MALFORMED` | Result envelope malformed | - |
-| <a id="error-snapshot-extraction-failed"></a>`SNAPSHOT_EXTRACTION_FAILED` | Snapshot extraction failed | - |
-| <a id="error-missing-argument"></a>`MISSING_ARGUMENT` | Missing argument | CLI Usage |
-| <a id="error-node-not-found"></a>`NODE_NOT_FOUND` | Node not found | UI & Nodes |
-| <a id="error-node-not-clickable"></a>`NODE_NOT_CLICKABLE` | Node not clickable | - |
-| <a id="error-security-block-detected"></a>`SECURITY_BLOCK_DETECTED` | Security block detected | - |
-| <a id="error-container-not-found"></a>`CONTAINER_NOT_FOUND` | Container not found | - |
-| <a id="error-container-not-scrollable"></a>`CONTAINER_NOT_SCROLLABLE` | Container not scrollable | - |
-| <a id="error-gesture-failed"></a>`GESTURE_FAILED` | Gesture failed | - |
-| <a id="error-node-too-old"></a>`NODE_TOO_OLD` | Node too old | Doctor & Host |
-| <a id="error-adb-server-failed"></a>`ADB_SERVER_FAILED` | Adb server failed | - |
-| <a id="error-adb-no-usb-permissions"></a>`ADB_NO_USB_PERMISSIONS` | Adb no usb permissions | - |
-| <a id="error-device-unauthorized"></a>`DEVICE_UNAUTHORIZED` | Device unauthorized | - |
-| <a id="error-device-offline"></a>`DEVICE_OFFLINE` | Device offline | - |
-| <a id="error-device-shell-unavailable"></a>`DEVICE_SHELL_UNAVAILABLE` | Device shell unavailable | - |
-| <a id="error-operator-variant-mismatch"></a>`OPERATOR_VARIANT_MISMATCH` | Operator variant mismatch | Installed release/debug Operator APK variant does not match `--operator-package`. |
-| <a id="error-device-dev-options-disabled"></a>`DEVICE_DEV_OPTIONS_DISABLED` | Device dev options disabled | - |
-| <a id="error-device-usb-debugging-disabled"></a>`DEVICE_USB_DEBUGGING_DISABLED` | Device usb debugging disabled | - |
-| <a id="error-device-accessibility-not-running"></a>`DEVICE_ACCESSIBILITY_NOT_RUNNING` | Device accessibility not running | - |
-| <a id="error-device-not-interactive"></a>`DEVICE_NOT_INTERACTIVE` | Device not interactive | - |
-| <a id="error-android-build-failed"></a>`ANDROID_BUILD_FAILED` | Android build failed | - |
-| <a id="error-android-install-failed"></a>`ANDROID_INSTALL_FAILED` | Android install failed | - |
-| <a id="error-android-app-launch-failed"></a>`ANDROID_APP_LAUNCH_FAILED` | Android app launch failed | - |
-| <a id="error-smoke-open-settings-failed"></a>`SMOKE_OPEN_SETTINGS_FAILED` | Smoke open settings failed | - |
-| <a id="error-scrcpy-not-found"></a>`SCRCPY_NOT_FOUND` | Scrcpy not found | - |
-| <a id="error-apk-version-unreadable"></a>`APK_VERSION_UNREADABLE` | Apk version unreadable | - |
-| <a id="error-apk-version-invalid"></a>`APK_VERSION_INVALID` | Apk version invalid | - |
-| <a id="error-cli-version-invalid"></a>`CLI_VERSION_INVALID` | Cli version invalid | - |
-| <a id="error-version-incompatible"></a>`VERSION_INCOMPATIBLE` | Version incompatible | - |
-| <a id="error-logcat-unavailable"></a>`LOGCAT_UNAVAILABLE` | Logcat unavailable | - |
-| <a id="error-android-sdk-tool-missing"></a>`ANDROID_SDK_TOOL_MISSING` | Android sdk tool missing | - |
-| <a id="error-emulator-not-found"></a>`EMULATOR_NOT_FOUND` | Emulator not found | - |
-| <a id="error-emulator-already-running"></a>`EMULATOR_ALREADY_RUNNING` | Emulator already running | - |
-| <a id="error-emulator-not-running"></a>`EMULATOR_NOT_RUNNING` | Emulator not running | - |
-| <a id="error-emulator-unsupported"></a>`EMULATOR_UNSUPPORTED` | Emulator unsupported | - |
-| <a id="error-emulator-create-failed"></a>`EMULATOR_CREATE_FAILED` | Emulator create failed | - |
-| <a id="error-emulator-start-failed"></a>`EMULATOR_START_FAILED` | Emulator start failed | - |
-| <a id="error-emulator-stop-failed"></a>`EMULATOR_STOP_FAILED` | Emulator stop failed | - |
-| <a id="error-emulator-delete-failed"></a>`EMULATOR_DELETE_FAILED` | Emulator delete failed | - |
-| <a id="error-emulator-boot-timeout"></a>`EMULATOR_BOOT_TIMEOUT` | Emulator boot timeout | - |
-| <a id="error-android-system-image-install-failed"></a>`ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | Android system image install failed | - |
-| <a id="error-android-avd-create-failed"></a>`ANDROID_AVD_CREATE_FAILED` | Android avd create failed | - |
-| <a id="error-agent-skills-stale"></a>`AGENT_SKILLS_STALE` | Agent skills stale | - |
-| <a id="error-daemon-start-failed"></a>`DAEMON_START_FAILED` | Daemon start failed | Daemon lifecycle |
-| <a id="error-daemon-stop-failed"></a>`DAEMON_STOP_FAILED` | Daemon stop failed | - |
-| <a id="error-daemon-proxy-error"></a>`DAEMON_PROXY_ERROR` | Daemon proxy error | - |
-| <a id="error-operator-download-unsupported"></a>`OPERATOR_DOWNLOAD_UNSUPPORTED` | Operator download unsupported | Operator install |
-| <a id="error-operator-metadata-invalid"></a>`OPERATOR_METADATA_INVALID` | Operator metadata invalid | - |
-| <a id="error-operator-download-failed"></a>`OPERATOR_DOWNLOAD_FAILED` | Operator download failed | - |
-| <a id="error-operator-checksum-failed"></a>`OPERATOR_CHECKSUM_FAILED` | Operator checksum failed | - |
-| <a id="error-operator-apk-not-found"></a>`OPERATOR_APK_NOT_FOUND` | Operator apk not found | - |
-| <a id="error-operator-install-failed"></a>`OPERATOR_INSTALL_FAILED` | Operator install failed | - |
-| <a id="error-operator-grant-failed"></a>`OPERATOR_GRANT_FAILED` | Operator grant failed | - |
-| <a id="error-operator-verify-failed"></a>`OPERATOR_VERIFY_FAILED` | Operator verify failed | - |
-| <a id="error-recording-already-in-progress"></a>`RECORDING_ALREADY_IN_PROGRESS` | Recording already in progress | Recording |
-| <a id="error-recording-not-in-progress"></a>`RECORDING_NOT_IN_PROGRESS` | Recording not in progress | - |
-| <a id="error-recording-session-not-found"></a>`RECORDING_SESSION_NOT_FOUND` | Recording session not found | - |
-| <a id="error-recording-pull-failed"></a>`RECORDING_PULL_FAILED` | Recording pull failed | - |
-| <a id="error-recording-parse-failed"></a>`RECORDING_PARSE_FAILED` | Recording parse failed | - |
-| <a id="error-recording-export-failed"></a>`RECORDING_EXPORT_FAILED` | Recording export failed | - |
-| <a id="error-recording-compare-failed"></a>`RECORDING_COMPARE_FAILED` | Recording compare failed | - |
-| <a id="error-recording-schema-version-unsupported"></a>`RECORDING_SCHEMA_VERSION_UNSUPPORTED` | Recording schema version unsupported | - |
-| <a id="error-broadcast-failed"></a>`BROADCAST_FAILED` | Broadcast failed | ADB broadcast dispatch to the Operator package failed. |
-| <a id="error-payload-too-large"></a>`PAYLOAD_TOO_LARGE` | Payload too large | - |
-| <a id="error-doctor-failed"></a>`DOCTOR_FAILED` | Doctor failed | - |
-
-## Fast Triage
-
-1. If the output is a top-level object with `code`, treat it as a Node-side failure before or outside the Android result envelope.
-2. If `envelope.status == "failed"` and `stepResults` is empty, treat it as a dispatch, service, or envelope failure.
-3. If `envelope.status == "failed"` and one step has `success == false`, branch on the first failed step's `data.error`.
-4. Prefer exact codes over string-matching the human-readable `message` or `error`.
-
-## What To Trust
-
-Use these fields in order:
-
-| Situation | Fields to inspect first |
-| --- | --- |
-| Top-level CLI error object | `code`, then `details`, then `message` |
-| Envelope-level runtime failure | `envelope.errorCode`, then `envelope.hint`, then `envelope.error` |
-| Per-step action failure | `stepResults[i].data.error`, then `stepResults[i].data.message` |
-
-Notes:
-
-- `errorCode` is optional on the envelope. Older APK behavior and some unclassified failures may leave it unset.
-- envelope `errorCode` may contain Android-emitted values such as `SERVICE_UNAVAILABLE` that are not part of Node's public `errors.ts` enum
-- per-step failures do not use the envelope `errorCode`; they usually expose the actionable code in `stepResults[i].data.error`
-- `StepResult.data` values are strings, so treat `data.error` and `data.message` as string fields
-- Node post-processing can turn some Android-internal failure markers into success results, for example normalizing `UNSUPPORTED_RUNTIME_CLOSE` into a successful `close_app` step when adb pre-flight already succeeded
-
-## Recovery Patterns
-
-| Family | Typical codes | What to do next |
-| --- | --- | --- |
-| Device targeting | `NO_DEVICES`, `DEVICE_NOT_FOUND`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Run `clawperator devices`, pick one device, and retry with `--device <serial>` |
-| Interactive readiness | `DEVICE_NOT_INTERACTIVE` | Wake or unlock the target, rerun `clawperator doctor`, and confirm the interactive-state check passes |
-| Operator setup | `OPERATOR_NOT_INSTALLED`, `OPERATOR_VARIANT_MISMATCH`, `OPERATOR_INSTALL_FAILED`, `OPERATOR_GRANT_FAILED`, `OPERATOR_VERIFY_FAILED` | Install or repair the expected Operator APK, then rerun the command |
-| Host tooling | `ADB_NOT_FOUND`, `ADB_SERVER_FAILED`, `HOST_DEPENDENCY_MISSING`, `ANDROID_SDK_TOOL_MISSING`, `SCRCPY_NOT_FOUND` | Repair the host environment before retrying |
-| Daemon lifecycle and proxy | `DAEMON_START_FAILED`, `DAEMON_STOP_FAILED`, `DAEMON_PROXY_ERROR` | Inspect the daemon log and metadata files under `~/.clawperator/`. For `DAEMON_PROXY_ERROR`, inspect device state before retrying because the action may already have executed |
-| Payload or flag validation | `MISSING_ARGUMENT`, `EXECUTION_VALIDATION_FAILED`, `EXECUTION_ACTION_UNSUPPORTED`, `PAYLOAD_TOO_LARGE` | Change the command or payload. Do not retry unchanged |
-| Dispatch or service availability | `RESULT_ENVELOPE_TIMEOUT`, `RESULT_ENVELOPE_MALFORMED`, `BROADCAST_FAILED`, `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `DEVICE_SHELL_UNAVAILABLE` | Run `clawperator doctor`, repair the reported issue, then retry |
-| UI lookup or gesture | `NODE_NOT_FOUND`, `NODE_NOT_CLICKABLE`, `CONTAINER_NOT_FOUND`, `CONTAINER_NOT_SCROLLABLE`, `GESTURE_FAILED`, `SECURITY_BLOCK_DETECTED` | Refresh state with `snapshot`, wait for UI readiness, or adjust selectors and scroll strategy |
-| Recording state | `RECORDING_ALREADY_IN_PROGRESS`, `RECORDING_NOT_IN_PROGRESS`, `RECORDING_SESSION_NOT_FOUND`, `RECORDING_PULL_FAILED`, `RECORDING_PARSE_FAILED`, `RECORDING_SCHEMA_VERSION_UNSUPPORTED` | Repair recording state or use the right session before retrying |
-
-## Key Cases
-
-### `EXECUTION_VALIDATION_FAILED`
-
-Use this when the command or payload is structurally wrong before Android execution starts.
-
-Common triggers:
-
-- missing required action fields such as `open_uri.params.uri`
-- invalid ranges such as `scroll_until.maxScrolls > 200`
-- selector parser violations such as mixing `--selector` with shorthand flags
-- invalid JSON payloads for `clawperator exec`
-
-Typical output:
-
-```json
-{
-  "code": "EXECUTION_VALIDATION_FAILED",
-  "message": "scroll_until params.maxScrolls must be an integer in [1, 200]",
-  "details": {
-    "path": "actions.0.params.maxScrolls",
-    "actionId": "scroll-1",
-    "actionType": "scroll_until"
-  }
-}
-```
-
-Recovery:
-
-- fix the payload
-- rerun validation
-- do not retry unchanged
-
-### `MISSING_ARGUMENT`
-
-Use this for CLI commands that are missing a required positional argument or required flag value.
-
-Common triggers:
-
-- `exec` without a payload
-- `wait-for-nav` without `--timeout`
-- `read-value` without any label selector flags
-
-Example:
-
-```json
-{
-  "code": "MISSING_ARGUMENT",
-  "message": "wait-for-nav requires --timeout <ms>."
-}
-```
-
-Recovery:
-
-- add the missing argument or flag
-- rerun the command
-
-### `RESULT_ENVELOPE_TIMEOUT`
-
-Use this when Node dispatched the command but did not receive a valid `[Clawperator-Result]` envelope before the execution timeout expired.
-
-Typical fields:
-
-```json
-{
-  "code": "RESULT_ENVELOPE_TIMEOUT",
-  "message": "Timed out waiting for [Clawperator-Result]",
-  "details": {
-    "commandId": "snapshot-1",
-    "taskId": "snapshot-1",
-    "lastActionId": "a1",
-    "lastActionType": "snapshot",
-    "lastActionCaveat": "payload-last only; Android execution position is unknown",
-    "elapsedMs": 30000,
-    "timeoutMs": 30000
-  },
-  "hint": "No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --device emulator-5554 --operator-package com.clawperator.operator.dev' to diagnose."
-}
-```
-
-Recovery:
-
-- run `clawperator doctor`
-- if `hint` mentions no correlated Android log lines, treat it as a compatibility or accessibility diagnostic path rather than a generic retry
-- confirm the accessibility service and operator package are healthy
-- increase timeout only if the action legitimately needs more wall-clock time
-
-### `OPERATOR_NOT_INSTALLED`
-
-Use this when the requested operator package is not installed on the selected device.
-
-Typical recovery:
-
-```bash
-clawperator operator setup --apk <path-to-apk> --device <device_serial> --operator-package <package_name>
-```
-
-If you are doing local branch validation, prefer the debug package:
-
-- `com.clawperator.operator.dev`
-
-### `OPERATOR_VARIANT_MISMATCH`
-
-Use this when the device has an installed Operator APK, but it is the other known package variant than the one requested.
-
-Recovery options:
-
-- pass the installed package via `--operator-package`
-- or reinstall the intended APK variant
-
-### `DEVICE_NOT_INTERACTIVE`
-
-Current shipped surface:
-
-- the doctor check `readiness.device.interactive`
-- direct execution preflight before dispatch
-- high-level skill-wrapper pre-spawn checks in:
-  - `clawperator skills run`
-  - `POST /skills/:skillId/run`
-
-Meaning:
-
-- the target device is not currently ready for interactive automation
-- the doctor check reports structured evidence telling you why:
-  - `screenOn`
-  - `deviceLocked`
-  - `userUnlocked`
-- execution and skill-wrapper failures use a generic top-level error message rather
-  than exposing lock-state evidence on the public execution surface
-- direct execution and high-level skill wrappers may make a bounded host-side
-  wake attempt first when the screen is off
-- if the device remains asleep, is still locked, or still requires post-boot
-  unlock, the runtime returns this error instead of proceeding
-
-Typical recovery:
-
-- wake the device if `screenOn == false`
-- unlock the device if `deviceLocked == true`
-- complete the post-boot unlock if `userUnlocked == false`
-- rerun `clawperator doctor` and require
-  `readiness.device.interactive.status == "pass"`
-
-### `NODE_NOT_FOUND`
-
-This usually appears as a per-step failure in `stepResults[i].data.error`, not as the top-level CLI `code`.
-
-Common triggers:
-
-- the selector never matched
-- the app navigated somewhere unexpected
-- the UI had not settled before the action ran
-- the target was inside a different scroll container
-
-Recovery:
-
-- run `snapshot` or `read` to inspect current UI state
-- add `wait` or `sleep` before the failing action when appropriate
-- tighten or loosen the selector based on what the snapshot actually shows
-- add a container selector or a scroll step if the target is off-screen
-
-### `DEVICE_ACCESSIBILITY_NOT_RUNNING`
-
-This is a doctor- and readiness-related failure indicating the Operator accessibility service is not active.
-
-Recovery:
-
-- run `clawperator doctor --fix --device <serial>`
-- if needed, reinstall the Operator package and re-enable accessibility access
-
-## Legacy CLI Usage Objects
-
-Some CLI handlers and tests still emit usage-style objects with string codes that are not part of `apps/node/src/contracts/errors.ts`. Treat those as command-line usage failures, not as public stable error codes.
-
-What this means for agents:
-
-- if the code is in `errors.ts`, you can branch on it as part of the public contract
-- if the code is not in `errors.ts`, treat it as a CLI-specific usage object and prefer fixing the command shape rather than building long-term logic around that string
-- similarly, Android may emit envelope `errorCode` values outside the Node enum; branch on them when present in the envelope, but do not confuse them with the documented Node-side top-level `code` contract
-
-## Related Pages
-
-- [API Overview](overview.md)
-- [Actions](actions.md)
-- [Selectors](selectors.md)
-- [Setup](../setup.md)
-- [Devices](devices.md)
-- [Doctor](doctor.md)
-- [Operator App Troubleshooting](../troubleshooting/operator.md)
 
 ---
 
@@ -5253,8 +4608,8 @@ Current hard limits:
 
 Those values come from:
 
-- `LIMITS.MIN_EXECUTION_TIMEOUT_MS = 1000`
-- `LIMITS.MAX_EXECUTION_TIMEOUT_MS = 120000`
+- minimum execution timeout constant: `1000`
+- maximum execution timeout constant: `120000`
 
 If the caller provides a non-finite timeout or a value outside that range, Node returns a top-level validation failure:
 
@@ -5706,356 +5061,443 @@ The builder cushion is there to stop the envelope layer from killing the run too
 
 ---
 
-# Environment Variables
+# Errors
 
 ## Purpose
 
-Define every environment variable the Node CLI reads, its exact default, where it takes effect, and how to verify it is working. Use environment variables for workspace-wide defaults in headless, CI, or agent environments where repeating CLI flags on every command is impractical.
+Document the public error-code contract, show where failures appear in CLI
+output versus [result envelopes](overview.md#result-envelope), and give
+concrete recovery steps for the most common host, validation, and runtime
+failures.
 
 ## Sources
 
-- Global flag parsing (reads `--log-level`, `--operator-package`, `--device`, `--timeout`): `apps/node/src/cli/index.ts`
-- Logger construction (reads `CLAWPERATOR_LOG_DIR`, `CLAWPERATOR_LOG_LEVEL`): `apps/node/src/adapters/logger.ts`
-- Android SDK tool resolution (reads `ANDROID_HOME`, `ANDROID_SDK_ROOT`): `apps/node/src/adapters/android-bridge/runtimeConfig.ts`
-- Skill binary and package resolution (reads `CLAWPERATOR_BIN`, `CLAWPERATOR_OPERATOR_PACKAGE`): `apps/node/src/domain/skills/skillsConfig.ts`
-- Skills registry path (reads `CLAWPERATOR_SKILLS_REGISTRY`): `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`
-- Per-command operator package and adb path: `apps/node/src/cli/registry.ts` plus device-targeting handlers in `apps/node/src/cli/commands/`
-- Execution runtime (reads `CLAWPERATOR_OPERATOR_PACKAGE`, `ADB_PATH`): `apps/node/src/domain/executions/runExecution.ts`
+- Public error-code enum: `apps/node/src/contracts/errors.ts`
+- Result envelope shape: `apps/node/src/contracts/result.ts`
+- Execution validation: `apps/node/src/domain/executions/validateExecution.ts`
+- CLI formatting: `apps/node/src/cli/output.ts`
 
-## Precedence Rule
+## Two Failure Shapes
 
-When both a CLI flag and an environment variable control the same setting, the CLI flag wins. The CLI parses global flags before dispatching to any command, so flags like `--operator-package` and `--log-level` can appear anywhere on the command line.
+Clawperator surfaces failures in two main shapes.
 
-Resolution order for a typical setting:
+### 1. Top-level CLI error object
 
-1. Explicit CLI flag (highest priority)
-2. Environment variable
-3. Hardcoded default (lowest priority)
-
-There is no configuration file layer between the environment variable and the default.
-
-## Complete Reference
-
-| Variable | Default if unset | CLI flag override |
-| --- | --- | --- |
-| `CLAWPERATOR_OPERATOR_PACKAGE` | `com.clawperator.operator` | `--operator-package` |
-| `CLAWPERATOR_LOG_DIR` | `~/.clawperator/logs` | none |
-| `CLAWPERATOR_LOG_LEVEL` | `info` | `--log-level` |
-| `CLAWPERATOR_SKILLS_REGISTRY` | `<cwd>/skills/skills-registry.json` | none |
-| `CLAWPERATOR_BIN` | local sibling build if present, otherwise `clawperator` | none |
-| `ADB_PATH` | `adb` (from `PATH`) | none |
-| `ANDROID_HOME` | unset | none |
-| `ANDROID_SDK_ROOT` | unset (fallback for `ANDROID_HOME`) | none |
-
-## `CLAWPERATOR_OPERATOR_PACKAGE`
-
-Controls which Operator APK package name the runtime targets when `--operator-package` is not passed.
-
-Blank or whitespace-only values are normalized to unset before the runtime resolves the package, so the default package is used instead of treating an empty string as a real package id.
-
-Read by every device-targeting CLI command (`snapshot`, `click`, `read`, `wait`, `scroll`, `doctor`, `record start`, `record stop`, `record pull`, `operator setup`, `grant-device-permissions`, `version --check-compat`, `exec`, `serve`), plus `runExecution()` and `resolveOperatorPackage()` in the skills runtime.
-
-Default: `com.clawperator.operator`
-
-Common values:
-
-| Value | When to use |
-| --- | --- |
-| `com.clawperator.operator` | Release APK. Default. |
-| `com.clawperator.operator.dev` | Local debug APK built from source. |
+This appears when Node fails before it can return an execution envelope, for example during argument parsing, payload validation, device selection, or host checks.
 
 Example:
-
-```bash
-export CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev
-clawperator snapshot --device emulator-5554
-```
-
-That snapshot runs against the debug Operator package. No `--operator-package` flag needed.
-
-Verification - confirm the env var took effect:
-
-```bash
-clawperator doctor --device emulator-5554
-```
-
-Check `report.operatorPackage` in the JSON output:
 
 ```json
 {
-  "ok": true,
-  "criticalOk": true,
-  "deviceId": "emulator-5554",
-  "operatorPackage": "com.clawperator.operator.dev",
-  "checks": []
+  "code": "EXECUTION_VALIDATION_FAILED",
+  "message": "open_uri requires params.uri",
+  "details": {
+    "path": "actions.0.params.uri",
+    "actionId": "open-1",
+    "actionType": "open_uri"
+  }
 }
 ```
 
-If `operatorPackage` shows the value you set, the env var is active.
+Success condition for recovery:
 
-Error case:
+- you change the command or payload
+- rerunning no longer returns a top-level `{ "code": ... }` object
 
-- if the env var names a package that is not installed, device-targeting commands fail with `OPERATOR_NOT_INSTALLED`
-- if only the alternate known Operator variant is installed, `clawperator doctor` reports `OPERATOR_VARIANT_MISMATCH` as a readiness warning
+### 2. Result envelope failure
 
-Note: the CLI also accepts `--receiver-package` as a legacy alias for `--operator-package`. Both override the same env var. Do not use `--receiver-package` in new code.
+This appears when Node successfully sends the command but the execution still fails at dispatch time or during one of the steps.
 
-## `CLAWPERATOR_LOG_DIR`
+Per-step example:
 
-Controls where the CLI writes structured log files.
-
-Default: `~/.clawperator/logs`
-
-Log files are named `clawperator-YYYY-MM-DD.log` and contain NDJSON `LogEvent` objects.
-
-Guaranteed fields:
-
-- `ts`
-- `level`
-- `event`
-- `message`
-
-Optional fields, present only when the emitter supplied them:
-
-- `commandId`
-- `taskId`
-- `deviceId`
-
-There is no CLI flag to override this. To change the log directory, set the env var.
-
-Example:
-
-```bash
-export CLAWPERATOR_LOG_DIR=/tmp/clawperator-logs
-clawperator snapshot
-# logs written to /tmp/clawperator-logs/clawperator-2026-03-25.log
+```json
+{
+  "envelope": {
+    "commandId": "read-1",
+    "taskId": "read-1",
+    "status": "failed",
+    "error": "Step a1 (read_text) failed: NODE_NOT_FOUND",
+    "stepResults": [
+      {
+        "id": "a1",
+        "actionType": "read_text",
+        "success": false,
+        "data": {
+          "error": "NODE_NOT_FOUND",
+          "message": "No matching node found"
+        }
+      }
+    ]
+  },
+  "deviceId": "emulator-5554",
+  "terminalSource": "clawperator_result",
+  "isCanonicalTerminal": true
+}
 ```
 
-This variable affects logging only. It does not change device behavior, result envelopes, or execution outcomes.
+Envelope-level example with `errorCode`:
 
-## `CLAWPERATOR_LOG_LEVEL`
-
-Controls the logger threshold when `--log-level` is not passed.
-
-Default: `info`
-
-Valid values: `debug`, `info`, `warn`, `error`
-
-If set to an unrecognized value (e.g., `trace`, `verbose`, or an empty string), the logger silently falls back to `info`. This is not an error - it is how `normalizeLogLevel()` in `logger.ts` works.
-
-`--log-level` is a global flag. It can appear anywhere on the command line and takes priority over this env var:
-
-```bash
-# env var sets warn, but flag overrides to debug
-export CLAWPERATOR_LOG_LEVEL=warn
-clawperator snapshot --log-level debug
-# logger threshold is debug for this command
+```json
+{
+  "envelope": {
+    "commandId": "snapshot-1",
+    "taskId": "snapshot-1",
+    "status": "failed",
+    "stepResults": [],
+    "error": "Accessibility service is not available",
+    "errorCode": "SERVICE_UNAVAILABLE",
+    "hint": "Accessibility service not running. Run 'clawperator doctor --fix --device emulator-5554' to diagnose and repair, or 'clawperator operator setup --apk <path-to-apk> --device emulator-5554' to reinstall."
+  },
+  "deviceId": "emulator-5554",
+  "terminalSource": "clawperator_result",
+  "isCanonicalTerminal": true
+}
 ```
 
-## `CLAWPERATOR_SKILLS_REGISTRY`
+Success condition for recovery:
 
-Defines the path to the active `skills-registry.json` used by all skill commands when they do not pass an explicit registry-path argument into `loadRegistry()`.
+- `envelope.status == "success"`
+- every `stepResults[i].success == true`
 
-Read by: `skills list`, `skills get`, `skills search`, `skills run`, `skills validate`, `skills compile-artifact`, `skills new`, and the `/skills` serve endpoints.
+## Public Error Codes
 
-Default when unset: `<cwd>/skills/skills-registry.json` where `<cwd>` is `process.cwd()`.
+Only the codes defined in `apps/node/src/contracts/errors.ts` are part of the public error-code contract documented on this page.
 
-Current `loadRegistry()` precedence is:
-
-1. explicit `registryPath` argument, when a caller supplied one
-2. `CLAWPERATOR_SKILLS_REGISTRY`, when it is set and non-blank
-3. default path `<cwd>/skills/skills-registry.json`
-
-Fallback behavior after that initial choice:
-
-1. If an explicit `registryPath` argument was passed and that read fails, `loadRegistry()` throws immediately
-2. If `CLAWPERATOR_SKILLS_REGISTRY` is set but blank, `loadRegistry()` throws immediately
-3. If `CLAWPERATOR_SKILLS_REGISTRY` is set to a non-blank path and that read fails, `loadRegistry()` throws a configured-path error immediately
-4. If the default-path read fails with no env var and no explicit `registryPath`, `loadRegistry()` next tries:
-   - `<cwd>/../../skills/skills-registry.json` when the current working directory is `apps/node`
-   - `~/.clawperator/skills/skills/skills-registry.json`
-
-After `clawperator skills install` or `clawperator skills sync`, the registry lives at `~/.clawperator/skills/skills/skills-registry.json`. That path is automatically discovered as a fallback when `CLAWPERATOR_SKILLS_REGISTRY` is not set, so no env var change is needed after a normal install:
-
-```bash
-clawperator skills list
-```
-
-Set `CLAWPERATOR_SKILLS_REGISTRY` only when pointing at a non-standard registry path, such as a development checkout outside the installed home. For the normal post-install flow, start with [Host Agent Orientation](../host-agents.md).
-
-Error case: if the path does not exist, skill commands fail with `REGISTRY_READ_FAILED`. The error message includes the path that was tried.
-
-Current recovery rules:
-
-- missing default path with no env var: run `clawperator skills install` to restore the registry at `~/.clawperator/skills/skills/skills-registry.json`
-- blank `CLAWPERATOR_SKILLS_REGISTRY`: unset it or point it at a valid registry path
-- wrong `CLAWPERATOR_SKILLS_REGISTRY` path: fix the env var, or unset it to fall back to the installed home path
-- explicit caller-supplied registry path: fix the explicit path because `loadRegistry()` does not fall back from it
-
-## `CLAWPERATOR_BIN`
-
-Controls which Clawperator CLI binary is used when skill scripts call back into Clawperator. This is for skill subprocesses, not for the main CLI bootstrap.
-
-When `clawperator skills run` executes a skill script, it resolves a command string and injects it into the child process environment as `CLAWPERATOR_BIN`.
-
-Resolution order in `resolveSkillBin()`:
-
-1. Explicit `CLAWPERATOR_BIN` env var (if non-empty)
-2. Local sibling build at `apps/node/dist/cli/index.js` relative to the running module (if the file exists)
-3. Global `clawperator` command
-
-Default: the sibling build when running from a local checkout, otherwise `clawperator`.
-
-The sibling build is preferred over the global binary because it is always in sync with the local Android Operator APK. The global binary may lag behind due to npm publish delays.
-
-Example:
-
-```bash
-export CLAWPERATOR_BIN=/usr/local/bin/clawperator-nightly
-clawperator skills run com.test.echo --device emulator-5554
-# the skill script receives CLAWPERATOR_BIN=/usr/local/bin/clawperator-nightly
-```
-
-## Orchestrated Skill Runtime Env Vars
-
-`runSkill()` injects these env vars when a skill declares `skill.json.agent`
-and runs through `scripts/run.js`. The harness reads them directly. This is
-the runtime contract for agent-driven orchestrated skills.
-
-| Variable | Default if unset | Where it takes effect |
+| Code | Derived label | Notes |
 | --- | --- | --- |
-| `CLAWPERATOR_SKILL_AGENT_CLI` | `skill.json.agent.cli` | injected into the orchestrated harness so it knows the configured CLI name |
-| `CLAWPERATOR_SKILL_AGENT_CLI_PATH` | none | injected into the orchestrated harness after `runSkill()` resolves the executable path |
-| `CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS` | caller `--timeout`, otherwise `skill.json.agent.timeoutMs`, otherwise `120000` | injected into the orchestrated harness as the effective timeout in milliseconds |
-| `CLAWPERATOR_SKILL_PROGRAM` | none | absolute path to the skill's `SKILL.md` runtime program |
-| `CLAWPERATOR_SKILL_INPUTS` | JSON serialization of the forwarded skill args array | injected into the orchestrated harness for agent input parity checks |
-| `CLAWPERATOR_SKILL_ID` | none | injected into the orchestrated harness as the invoked skill id |
-| `CLAWPERATOR_DEVICE_ID` | none | selected device serial that the wrapper or CLI passed into the skill run |
+| <a id="error-host-dependency-missing"></a>`HOST_DEPENDENCY_MISSING` | Host dependency missing | Host |
+| <a id="error-adb-not-found"></a>`ADB_NOT_FOUND` | Adb not found | Setup & Connectivity |
+| <a id="error-no-devices"></a>`NO_DEVICES` | No devices | - |
+| <a id="error-multiple-devices-device-id-required"></a>`MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Multiple devices device id required | Recovery: pass `--device` (alias `--device-id`) when adb shows multiple targets. |
+| <a id="error-operator-not-installed"></a>`OPERATOR_NOT_INSTALLED` | Operator not installed | - |
+| <a id="error-device-not-found"></a>`DEVICE_NOT_FOUND` | Device not found | Recovery: the `--device` serial is not connected (alias `--device-id`). |
+| <a id="error-execution-validation-failed"></a>`EXECUTION_VALIDATION_FAILED` | Execution validation failed | Execution & State |
+| <a id="error-execution-action-unsupported"></a>`EXECUTION_ACTION_UNSUPPORTED` | Execution action unsupported | - |
+| <a id="error-execution-conflict-in-flight"></a>`EXECUTION_CONFLICT_IN_FLIGHT` | Execution conflict in flight | - |
+| <a id="error-result-envelope-timeout"></a>`RESULT_ENVELOPE_TIMEOUT` | Result envelope timeout | - |
+| <a id="error-result-envelope-malformed"></a>`RESULT_ENVELOPE_MALFORMED` | Result envelope malformed | - |
+| <a id="error-snapshot-extraction-failed"></a>`SNAPSHOT_EXTRACTION_FAILED` | Snapshot extraction failed | - |
+| <a id="error-missing-argument"></a>`MISSING_ARGUMENT` | Missing argument | CLI Usage |
+| <a id="error-node-not-found"></a>`NODE_NOT_FOUND` | Node not found | UI & Nodes |
+| <a id="error-node-not-clickable"></a>`NODE_NOT_CLICKABLE` | Node not clickable | - |
+| <a id="error-security-block-detected"></a>`SECURITY_BLOCK_DETECTED` | Security block detected | - |
+| <a id="error-container-not-found"></a>`CONTAINER_NOT_FOUND` | Container not found | - |
+| <a id="error-container-not-scrollable"></a>`CONTAINER_NOT_SCROLLABLE` | Container not scrollable | - |
+| <a id="error-gesture-failed"></a>`GESTURE_FAILED` | Gesture failed | - |
+| <a id="error-node-too-old"></a>`NODE_TOO_OLD` | Node too old | Doctor & Host |
+| <a id="error-adb-server-failed"></a>`ADB_SERVER_FAILED` | Adb server failed | - |
+| <a id="error-adb-no-usb-permissions"></a>`ADB_NO_USB_PERMISSIONS` | Adb no usb permissions | - |
+| <a id="error-device-unauthorized"></a>`DEVICE_UNAUTHORIZED` | Device unauthorized | - |
+| <a id="error-device-offline"></a>`DEVICE_OFFLINE` | Device offline | - |
+| <a id="error-device-shell-unavailable"></a>`DEVICE_SHELL_UNAVAILABLE` | Device shell unavailable | - |
+| <a id="error-operator-variant-mismatch"></a>`OPERATOR_VARIANT_MISMATCH` | Operator variant mismatch | Installed release/debug Operator APK variant does not match `--operator-package`. |
+| <a id="error-device-dev-options-disabled"></a>`DEVICE_DEV_OPTIONS_DISABLED` | Device dev options disabled | - |
+| <a id="error-device-usb-debugging-disabled"></a>`DEVICE_USB_DEBUGGING_DISABLED` | Device usb debugging disabled | - |
+| <a id="error-device-accessibility-not-running"></a>`DEVICE_ACCESSIBILITY_NOT_RUNNING` | Device accessibility not running | - |
+| <a id="error-device-not-interactive"></a>`DEVICE_NOT_INTERACTIVE` | Device not interactive | - |
+| <a id="error-android-build-failed"></a>`ANDROID_BUILD_FAILED` | Android build failed | - |
+| <a id="error-android-install-failed"></a>`ANDROID_INSTALL_FAILED` | Android install failed | - |
+| <a id="error-android-app-launch-failed"></a>`ANDROID_APP_LAUNCH_FAILED` | Android app launch failed | - |
+| <a id="error-smoke-open-settings-failed"></a>`SMOKE_OPEN_SETTINGS_FAILED` | Smoke open settings failed | - |
+| <a id="error-scrcpy-not-found"></a>`SCRCPY_NOT_FOUND` | Scrcpy not found | - |
+| <a id="error-apk-version-unreadable"></a>`APK_VERSION_UNREADABLE` | Apk version unreadable | - |
+| <a id="error-apk-version-invalid"></a>`APK_VERSION_INVALID` | Apk version invalid | - |
+| <a id="error-cli-version-invalid"></a>`CLI_VERSION_INVALID` | Cli version invalid | - |
+| <a id="error-version-incompatible"></a>`VERSION_INCOMPATIBLE` | Version incompatible | - |
+| <a id="error-logcat-unavailable"></a>`LOGCAT_UNAVAILABLE` | Logcat unavailable | - |
+| <a id="error-android-sdk-tool-missing"></a>`ANDROID_SDK_TOOL_MISSING` | Android sdk tool missing | - |
+| <a id="error-emulator-not-found"></a>`EMULATOR_NOT_FOUND` | Emulator not found | - |
+| <a id="error-emulator-already-running"></a>`EMULATOR_ALREADY_RUNNING` | Emulator already running | - |
+| <a id="error-emulator-not-running"></a>`EMULATOR_NOT_RUNNING` | Emulator not running | - |
+| <a id="error-emulator-unsupported"></a>`EMULATOR_UNSUPPORTED` | Emulator unsupported | - |
+| <a id="error-emulator-create-failed"></a>`EMULATOR_CREATE_FAILED` | Emulator create failed | - |
+| <a id="error-emulator-start-failed"></a>`EMULATOR_START_FAILED` | Emulator start failed | - |
+| <a id="error-emulator-stop-failed"></a>`EMULATOR_STOP_FAILED` | Emulator stop failed | - |
+| <a id="error-emulator-delete-failed"></a>`EMULATOR_DELETE_FAILED` | Emulator delete failed | - |
+| <a id="error-emulator-boot-timeout"></a>`EMULATOR_BOOT_TIMEOUT` | Emulator boot timeout | - |
+| <a id="error-android-system-image-install-failed"></a>`ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | Android system image install failed | - |
+| <a id="error-android-avd-create-failed"></a>`ANDROID_AVD_CREATE_FAILED` | Android avd create failed | - |
+| <a id="error-agent-skills-stale"></a>`AGENT_SKILLS_STALE` | Agent skills stale | - |
+| <a id="error-daemon-start-failed"></a>`DAEMON_START_FAILED` | Daemon start failed | Daemon lifecycle |
+| <a id="error-daemon-stop-failed"></a>`DAEMON_STOP_FAILED` | Daemon stop failed | - |
+| <a id="error-daemon-proxy-error"></a>`DAEMON_PROXY_ERROR` | Daemon proxy error | - |
+| <a id="error-operator-download-unsupported"></a>`OPERATOR_DOWNLOAD_UNSUPPORTED` | Operator download unsupported | Operator install |
+| <a id="error-operator-metadata-invalid"></a>`OPERATOR_METADATA_INVALID` | Operator metadata invalid | - |
+| <a id="error-operator-download-failed"></a>`OPERATOR_DOWNLOAD_FAILED` | Operator download failed | - |
+| <a id="error-operator-checksum-failed"></a>`OPERATOR_CHECKSUM_FAILED` | Operator checksum failed | - |
+| <a id="error-operator-apk-not-found"></a>`OPERATOR_APK_NOT_FOUND` | Operator apk not found | - |
+| <a id="error-operator-install-failed"></a>`OPERATOR_INSTALL_FAILED` | Operator install failed | - |
+| <a id="error-operator-grant-failed"></a>`OPERATOR_GRANT_FAILED` | Operator grant failed | - |
+| <a id="error-operator-verify-failed"></a>`OPERATOR_VERIFY_FAILED` | Operator verify failed | - |
+| <a id="error-recording-already-in-progress"></a>`RECORDING_ALREADY_IN_PROGRESS` | Recording already in progress | Recording |
+| <a id="error-recording-not-in-progress"></a>`RECORDING_NOT_IN_PROGRESS` | Recording not in progress | - |
+| <a id="error-recording-session-not-found"></a>`RECORDING_SESSION_NOT_FOUND` | Recording session not found | - |
+| <a id="error-recording-pull-failed"></a>`RECORDING_PULL_FAILED` | Recording pull failed | - |
+| <a id="error-recording-parse-failed"></a>`RECORDING_PARSE_FAILED` | Recording parse failed | - |
+| <a id="error-recording-export-failed"></a>`RECORDING_EXPORT_FAILED` | Recording export failed | - |
+| <a id="error-recording-compare-failed"></a>`RECORDING_COMPARE_FAILED` | Recording compare failed | - |
+| <a id="error-recording-schema-version-unsupported"></a>`RECORDING_SCHEMA_VERSION_UNSUPPORTED` | Recording schema version unsupported | - |
+| <a id="error-broadcast-failed"></a>`BROADCAST_FAILED` | Broadcast failed | ADB broadcast dispatch to the Operator package failed. |
+| <a id="error-payload-too-large"></a>`PAYLOAD_TOO_LARGE` | Payload too large | - |
+| <a id="error-doctor-failed"></a>`DOCTOR_FAILED` | Doctor failed | - |
 
-Behavior details:
+## Fast Triage
 
-- `CLAWPERATOR_SKILL_AGENT_CLI` comes from `skill.json.agent.cli` unless the
-  caller overrides it with the same env var before `runSkill()` resolves the
-  effective agent config
-- `CLAWPERATOR_SKILL_AGENT_CLI_PATH` is present only after
-  `resolveAgentCliExecutable()` succeeds
-- `CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS` always reflects the effective timeout
-  that `runSkill()` will enforce around the harness
-- `CLAWPERATOR_SKILL_PROGRAM`, `CLAWPERATOR_SKILL_INPUTS`, and
-  `CLAWPERATOR_SKILL_ID` are only present for agent-driven orchestrated runs
-- `CLAWPERATOR_DEVICE_ID` is skill-scoped consumption: the CLI wrapper sets it
-  when `skills run --device <serial>` is used, and `runSkill()` forwards it to
-  the child process environment
+1. If the output is a top-level object with `code`, treat it as a Node-side failure before or outside the Android result envelope.
+2. If `envelope.status == "failed"` and `stepResults` is empty, treat it as a dispatch, service, or envelope failure.
+3. If `envelope.status == "failed"` and one step has `success == false`, branch on the first failed step's `data.error`.
+4. Prefer exact codes over string-matching the human-readable `message` or `error`.
 
-Verification:
+## What To Trust
 
-```bash
-CLAWPERATOR_SKILLS_REGISTRY=/abs/path/to/skills/skills-registry.json \
-node apps/node/dist/cli/index.js skills run com.test.agent-skill-result \
-  --device emulator-5554 \
-  -- valid
+Use these fields in order:
+
+| Situation | Fields to inspect first |
+| --- | --- |
+| Top-level CLI error object | `code`, then `details`, then `message` |
+| Envelope-level runtime failure | `envelope.errorCode`, then `envelope.hint`, then `envelope.error` |
+| Per-step action failure | `stepResults[i].data.error`, then `stepResults[i].data.message` |
+
+Notes:
+
+- `errorCode` is optional on the envelope. Older APK behavior and some unclassified failures may leave it unset.
+- envelope `errorCode` may contain Android-emitted values such as `SERVICE_UNAVAILABLE` that are not part of Node's public `errors.ts` enum
+- per-step failures do not use the envelope `errorCode`; they usually expose the actionable code in `stepResults[i].data.error`
+- `StepResult.data` values are strings, so treat `data.error` and `data.message` as string fields
+- Node post-processing can turn some Android-internal failure markers into success results, for example normalizing `UNSUPPORTED_RUNTIME_CLOSE` into a successful `close_app` step when adb pre-flight already succeeded
+
+## Recovery Patterns
+
+| Family | Typical codes | What to do next |
+| --- | --- | --- |
+| Device targeting | `NO_DEVICES`, `DEVICE_NOT_FOUND`, `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Run `clawperator devices`, pick one device, and retry with `--device <serial>` |
+| Interactive readiness | `DEVICE_NOT_INTERACTIVE` | Wake or unlock the target, rerun `clawperator doctor`, and confirm the interactive-state check passes |
+| Operator setup | `OPERATOR_NOT_INSTALLED`, `OPERATOR_VARIANT_MISMATCH`, `OPERATOR_INSTALL_FAILED`, `OPERATOR_GRANT_FAILED`, `OPERATOR_VERIFY_FAILED` | Install or repair the expected Operator APK, then rerun the command |
+| Host tooling | `ADB_NOT_FOUND`, `ADB_SERVER_FAILED`, `HOST_DEPENDENCY_MISSING`, `ANDROID_SDK_TOOL_MISSING`, `SCRCPY_NOT_FOUND` | Repair the host environment before retrying |
+| Daemon lifecycle and proxy | `DAEMON_START_FAILED`, `DAEMON_STOP_FAILED`, `DAEMON_PROXY_ERROR` | Inspect the daemon log and metadata files under `~/.clawperator/`. For `DAEMON_PROXY_ERROR`, inspect device state before retrying because the action may already have executed |
+| Payload or flag validation | `MISSING_ARGUMENT`, `EXECUTION_VALIDATION_FAILED`, `EXECUTION_ACTION_UNSUPPORTED`, `PAYLOAD_TOO_LARGE` | Change the command or payload. Do not retry unchanged |
+| Dispatch or service availability | `RESULT_ENVELOPE_TIMEOUT`, `RESULT_ENVELOPE_MALFORMED`, `BROADCAST_FAILED`, `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `DEVICE_SHELL_UNAVAILABLE` | Run `clawperator doctor`, repair the reported issue, then retry |
+| UI lookup or gesture | `NODE_NOT_FOUND`, `NODE_NOT_CLICKABLE`, `CONTAINER_NOT_FOUND`, `CONTAINER_NOT_SCROLLABLE`, `GESTURE_FAILED`, `SECURITY_BLOCK_DETECTED` | Refresh state with `snapshot`, wait for UI readiness, or adjust selectors and scroll strategy |
+| Recording state | `RECORDING_ALREADY_IN_PROGRESS`, `RECORDING_NOT_IN_PROGRESS`, `RECORDING_SESSION_NOT_FOUND`, `RECORDING_PULL_FAILED`, `RECORDING_PARSE_FAILED`, `RECORDING_SCHEMA_VERSION_UNSUPPORTED` | Repair recording state or use the right session before retrying |
+
+## Key Cases
+
+### `EXECUTION_VALIDATION_FAILED`
+
+Use this when the command or payload is structurally wrong before Android execution starts.
+
+Common triggers:
+
+- missing required action fields such as `open_uri.params.uri`
+- invalid ranges such as `scroll_until.maxScrolls > 200`
+- selector parser violations such as mixing `--selector` with shorthand flags
+- invalid JSON payloads for `clawperator exec`
+
+Typical output:
+
+```json
+{
+  "code": "EXECUTION_VALIDATION_FAILED",
+  "message": "scroll_until params.maxScrolls must be an integer in [1, 200]",
+  "details": {
+    "path": "actions.0.params.maxScrolls",
+    "actionId": "scroll-1",
+    "actionType": "scroll_until"
+  }
+}
 ```
 
-Check the parsed `skillResult.source` and the successful JSON envelope. The
-fixture harness under `apps/node/src/test/fixtures/skills/com.test.agent-skill-result/`
-only succeeds when `CLAWPERATOR_SKILL_AGENT_CLI_PATH`,
-`CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS`, `CLAWPERATOR_SKILL_INPUTS`,
-`CLAWPERATOR_SKILL_ID`, and `CLAWPERATOR_DEVICE_ID` are all populated as the
-runtime expects.
+Recovery:
 
-Failure cases:
+- fix the payload
+- rerun validation
+- do not retry unchanged
 
-- if `CLAWPERATOR_SKILL_AGENT_CLI` resolves to an unavailable executable,
-  `skills run` fails with `SKILL_AGENT_CLI_UNAVAILABLE`
-- if `CLAWPERATOR_SKILL_AGENT_CLI_PATH` or `CLAWPERATOR_SKILL_PROGRAM` are
-  missing inside the harness, the harness exits non-zero and `runSkill()`
-  returns `SKILL_EXECUTION_FAILED`
-- if `CLAWPERATOR_SKILL_INPUTS` is malformed JSON, behavior depends on the
-  harness that parses it; this runtime only defines the environment variable
-  contract, so malformed input should be treated as a harness-specific failure
-  rather than a guaranteed fallback to empty args
+### `MISSING_ARGUMENT`
 
-## `ADB_PATH`
+Use this for CLI commands that are missing a required positional argument or required flag value.
 
-Overrides the adb binary used by the entire runtime. Affects device listing, doctor checks, execution dispatch, recording, operator setup, permission grants, emulator management, package listing, and the serve server.
+Common triggers:
 
-Default: `adb` (resolved from the process `PATH`).
-
-There is no CLI flag that overrides `ADB_PATH`. This env var is the only way to specify a non-default adb binary.
-
-Read at two levels:
-
-- CLI command handlers pass `adbPath: process.env.ADB_PATH` into domain functions
-- `runExecution()` falls back to `process.env.ADB_PATH` when `options.adbPath` is not provided
+- `exec` without a payload
+- `wait-for-nav` without `--timeout`
+- `read-value` without any label selector flags
 
 Example:
 
-```bash
-export ADB_PATH=/opt/android/platform-tools/adb
-clawperator devices
+```json
+{
+  "code": "MISSING_ARGUMENT",
+  "message": "wait-for-nav requires --timeout <ms>."
+}
 ```
 
-Error case: if the path does not point to a working adb binary, `clawperator doctor` reports `ADB_NOT_FOUND` for the `host.adb.presence` check.
+Recovery:
 
-Verification:
+- add the missing argument or flag
+- rerun the command
 
-```bash
-clawperator doctor
+### `RESULT_ENVELOPE_TIMEOUT`
+
+Use this when Node dispatched the command but did not receive a valid `[Clawperator-Result]` envelope before the execution timeout expired.
+
+Typical fields:
+
+```json
+{
+  "code": "RESULT_ENVELOPE_TIMEOUT",
+  "message": "Timed out waiting for [Clawperator-Result]",
+  "details": {
+    "commandId": "snapshot-1",
+    "taskId": "snapshot-1",
+    "lastActionId": "a1",
+    "lastActionType": "snapshot",
+    "lastActionCaveat": "payload-last only; Android execution position is unknown",
+    "elapsedMs": 30000,
+    "timeoutMs": 30000
+  },
+  "hint": "No correlated Android log lines were captured. This often indicates an APK/CLI version mismatch or an accessibility service issue. Run 'clawperator doctor --device emulator-5554 --operator-package com.clawperator.operator.dev' to diagnose."
+}
 ```
 
-If `host.adb.presence` passes, the configured adb binary is usable.
+Recovery:
 
-## `ANDROID_HOME` and `ANDROID_SDK_ROOT`
+- run `clawperator doctor`
+- if `hint` mentions no correlated Android log lines, treat it as a compatibility or accessibility diagnostic path rather than a generic retry
+- confirm the accessibility service and operator package are healthy
+- increase timeout only if the action legitimately needs more wall-clock time
 
-These are standard Android SDK environment variables, not Clawperator-specific. The runtime reads them when resolving paths to `emulator`, `sdkmanager`, and `avdmanager`.
+### `OPERATOR_NOT_INSTALLED`
 
-Resolution in `runtimeConfig.ts`:
+Use this when the requested operator package is not installed on the selected device.
 
-1. Check `ANDROID_HOME`
-2. If unset, check `ANDROID_SDK_ROOT`
-3. If neither is set, fall back to bare command names (`emulator`, `sdkmanager`, `avdmanager`) resolved from `PATH`
-
-These variables matter for emulator provisioning flows (`clawperator emulator create`, `emulator start`, and the `/android/emulators` serve endpoints). They do not affect normal device execution against an already-connected adb target.
-
-Tool paths resolved from the SDK root:
-
-| Tool | Resolved path |
-| --- | --- |
-| `emulator` | `<sdk_root>/emulator/emulator` |
-| `sdkmanager` | `<sdk_root>/cmdline-tools/latest/bin/sdkmanager` |
-| `avdmanager` | `<sdk_root>/cmdline-tools/latest/bin/avdmanager` |
-
-If the resolved path does not exist, the runtime falls back to the bare command name.
-
-## Agent Configuration Pattern
-
-For deterministic agent environments, set these variables and forget about per-command flags:
+Typical recovery:
 
 ```bash
-export CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev
-export ADB_PATH=/usr/local/bin/adb
+clawperator operator setup --apk <path-to-apk> --device <device_serial> --operator-package <package_name>
 ```
 
-Then every command uses consistent defaults:
+If you are doing local branch validation, prefer the debug package:
 
-```bash
-clawperator doctor --device emulator-5554
-clawperator snapshot --device emulator-5554
-clawperator skills run com.test.echo --device emulator-5554
-```
+- `com.clawperator.operator.dev`
 
-The only flag you still need per-command is `--device` when multiple targets are connected. There is no environment variable equivalent for `--device` - device selection must always be explicit.
+### `OPERATOR_VARIANT_MISMATCH`
 
-After `clawperator skills install`, the registry at `~/.clawperator/skills/skills/skills-registry.json` is discovered automatically. Setting `CLAWPERATOR_SKILLS_REGISTRY` is only needed when overriding to a non-standard path. For the post-install orientation flow, read [Host Agent Orientation](../host-agents.md).
+Use this when the device has an installed Operator APK, but it is the other known package variant than the one requested.
+
+Recovery options:
+
+- pass the installed package via `--operator-package`
+- or reinstall the intended APK variant
+
+### `BROADCAST_FAILED`
+
+Use this when Node could not dispatch the execution payload broadcast to the
+selected Operator package.
+
+Common triggers:
+
+- wrong `--operator-package` for the installed APK variant
+- device shell transport failure
+- the Operator package is missing or not reachable through Android broadcast
+  delivery
+
+Recovery:
+
+- run `clawperator doctor --device <serial> --operator-package <package>`
+- verify package presence and variant compatibility
+- rerun the failing command only after doctor reports the target ready
+
+### `PAYLOAD_TOO_LARGE`
+
+Use this when a CLI, Serve, or execution payload exceeds a configured size
+limit before dispatch.
+
+Recovery:
+
+- split long action lists into smaller executions
+- move large inline data into files or skill artifacts where the command
+  supports that pattern
+- for Serve requests, keep the JSON body under the documented `100kb` limit
+
+### `DEVICE_NOT_INTERACTIVE`
+
+Current shipped surface:
+
+- the doctor check `readiness.device.interactive`
+- direct execution preflight before dispatch
+- high-level skill-wrapper pre-spawn checks in:
+  - `clawperator skills run`
+  - `POST /skills/:skillId/run`
+
+Meaning:
+
+- the target device is not currently ready for interactive automation
+- the doctor check reports structured evidence telling you why:
+  - `screenOn`
+  - `deviceLocked`
+  - `userUnlocked`
+- execution and skill-wrapper failures use a generic top-level error message rather
+  than exposing lock-state evidence on the public execution surface
+- direct execution and high-level skill wrappers may make a bounded host-side
+  wake attempt first when the screen is off
+- if the device remains asleep, is still locked, or still requires post-boot
+  unlock, the runtime returns this error instead of proceeding
+
+Typical recovery:
+
+- wake the device if `screenOn == false`
+- unlock the device if `deviceLocked == true`
+- complete the post-boot unlock if `userUnlocked == false`
+- rerun `clawperator doctor` and require
+  `readiness.device.interactive.status == "pass"`
+
+### `NODE_NOT_FOUND`
+
+This usually appears as a per-step failure in `stepResults[i].data.error`, not as the top-level CLI `code`.
+
+Common triggers:
+
+- the selector never matched
+- the app navigated somewhere unexpected
+- the UI had not settled before the action ran
+- the target was inside a different scroll container
+
+Recovery:
+
+- run `snapshot` or `read` to inspect current UI state
+- add `wait` or `sleep` before the failing action when appropriate
+- tighten or loosen the selector based on what the snapshot actually shows
+- add a container selector or a scroll step if the target is off-screen
+
+### `DEVICE_ACCESSIBILITY_NOT_RUNNING`
+
+This is a doctor- and readiness-related failure indicating the Operator accessibility service is not active.
+
+Recovery:
+
+- run `clawperator doctor --fix --device <serial>`
+- if needed, reinstall the Operator package and re-enable accessibility access
+
+## Legacy CLI Usage Objects
+
+Some CLI handlers and tests still emit usage-style objects with string codes that are not part of `apps/node/src/contracts/errors.ts`. Treat those as command-line usage failures, not as public stable error codes.
+
+What this means for agents:
+
+- if the code is in `errors.ts`, you can branch on it as part of the public contract
+- if the code is not in `errors.ts`, treat it as a CLI-specific usage object and prefer fixing the command shape rather than building long-term logic around that string
+- similarly, Android may emit envelope `errorCode` values outside the Node enum; branch on them when present in the envelope, but do not confuse them with the documented Node-side top-level `code` contract
 
 ## Related Pages
 
-- [Host Agent Orientation](../host-agents.md)
+- [API Overview](overview.md)
+- [Actions](actions.md)
+- [Selectors](selectors.md)
 - [Setup](../setup.md)
 - [Devices](devices.md)
 - [Doctor](doctor.md)
-- [Serve API](serve.md)
-- [Skills Overview](../skills/overview.md)
+- [Operator App Troubleshooting](../troubleshooting/operator.md)
 
 ---
 
@@ -6069,7 +5511,8 @@ Define the local HTTP and SSE contract exposed by `clawperator serve`, including
 
 - HTTP server and handlers: `apps/node/src/cli/commands/serve.ts`
 - Execution result contract: `apps/node/src/domain/executions/runExecution.ts`
-- Result envelope: `apps/node/src/contracts/result.ts`
+- Result envelope source: `apps/node/src/contracts/result.ts`; canonical docs:
+  [Result Envelope](overview.md#result-envelope)
 - Skills registry contract: `apps/node/src/contracts/skills.ts`
 - SSE event names: `apps/node/src/domain/observe/events.ts`
 - Emulator response types: `apps/node/src/domain/android-emulators/types.ts`
@@ -6096,7 +5539,7 @@ Most REST endpoints return one of these shapes.
 
 Important boundary:
 
-- `/execute`, `/snapshot`, and `/screenshot` pass through `runExecution()` results on success and on cross-surface execution failures
+- `/execute`, `/snapshot`, and `/screenshot` pass through `runExecution()` results on success and on cross-surface execution failures; read `envelope` fields through the canonical [Result Envelope](overview.md#result-envelope) contract
 - malformed request bodies and route-local validation failures are serve-layer wrappers only and are not part of the shared execution contract
 
 ### Success wrapper
@@ -6163,11 +5606,10 @@ Success conditions for execution endpoints:
 
 ## Endpoint Summary
 
-<a id="endpoint-get-ping"></a>
-<a id="endpoint-get-version"></a>
-
 | Method | Path | Purpose |
 | --- | --- | --- |
+| `GET` | `/ping` | health probe for the local serve process |
+| `GET` | `/version` | report the CLI version and build identity |
 | `GET` | `/devices` | list adb-visible devices |
 | `POST` | `/execute` | run a caller-supplied execution payload |
 | `POST` | `/snapshot` | run a synthetic one-step `snapshot` execution |
@@ -6184,6 +5626,49 @@ Success conditions for execution endpoints:
 | `DELETE` | `/android/emulators/:name` | delete an AVD |
 | `POST` | `/android/provision/emulator` | create or reuse a supported emulator and boot it |
 | `GET` | `/events` | subscribe to SSE execution events |
+
+<a id="endpoint-get-ping"></a>
+## `GET /ping`
+
+Health probe for the serve process.
+
+Response:
+
+```json
+{
+  "ok": true
+}
+```
+
+Meaning:
+
+- the Express app is running and can answer requests
+- no adb, device, Operator APK, skill registry, or execution readiness check is performed
+
+<a id="endpoint-get-version"></a>
+## `GET /version`
+
+Reports the CLI version and build identity for the running server process.
+
+Response:
+
+```json
+{
+  "version": "0.9.4",
+  "buildIdentity": {
+    "entryPath": "/path/to/clawperator/dist/cli/index.js",
+    "mtimeMs": 1710000000000,
+    "size": 123456
+  }
+}
+```
+
+Meaning:
+
+- `version` is the same package version returned by the CLI version helper
+- `buildIdentity.entryPath` is the resolved CLI entrypoint path when Node can resolve it
+- `buildIdentity.mtimeMs` and `buildIdentity.size` come from `statSync()` and are `null` when the entrypoint cannot be inspected
+- no device or Operator APK check is performed
 
 <a id="endpoint-get-devices"></a>
 ## `GET /devices`
@@ -6631,6 +6116,25 @@ Malformed framed result:
   }
 }
 ```
+
+## Error Layers
+
+Serve has three distinct error layers. Keep them separate when recovering from a
+failure.
+
+| Layer | Where it comes from | Shape | Recovery |
+| --- | --- | --- | --- |
+| Route-local wrapper error | Express JSON parsing or per-route request checks in `serve.ts` | `{ "ok": false, "error": { "code": "INVALID_BODY", ... } }` or similar route-local codes | Fix the HTTP request shape and retry. These codes are not the shared execution contract. |
+| Shared execution error | `runExecution()` returns `ok: false` for `/execute`, `/snapshot`, or `/screenshot` | `{ "ok": false, "error": { "code": "<errors.ts code>", ... } }` | Branch on `error.code` and use [Errors](errors.md) for recovery. |
+| Failed result envelope | Android returned an execution envelope with `envelope.status == "failed"` | `{ "ok": true, "envelope": { "status": "failed", ... } }` in success-wrapper passthrough cases | Read [Result Envelope](overview.md#result-envelope), then branch on `envelope.errorCode` or failed `stepResults[].data.error`. |
+| Feature-specific wrapper error | Skills and emulator routes call their subsystem helpers directly | `{ "ok": false, "error": { "code": "SKILL_NOT_FOUND", ... } }` or emulator codes | Use the owning feature page: [Skills CLI](../skills/cli.md), [Serve skills routes](#endpoint-get-skills), or emulator endpoint notes below. |
+
+Machine-checkable rule:
+
+- first check HTTP status and top-level `ok`
+- for execution endpoints, also inspect `envelope.status` when an envelope is present
+- do not treat route-local codes such as `INVALID_BODY`, `INVALID_DEVICE_ID`, or
+  `MISSING_EXECUTION` as public `errors.ts` codes
 
 ## Global Serve-Layer Failures
 
@@ -7247,7 +6751,7 @@ This page assumes you have already decided that MCP is the correct front door.
 
 ## What It Is
 
-`clawperator mcp serve` starts a local stdio MCP server for MCP clients such as Claude Desktop. The server is transport-only:
+`clawperator mcp serve` starts a local stdio MCP server for MCP clients such as Claude Desktop. Execution-backed tools may return the shared [result envelope](overview.md#result-envelope) in tool output. The server is transport-only:
 
 - it speaks MCP over stdin/stdout
 - it does not expose HTTP or SSE
@@ -8448,7 +7952,12 @@ That three-step flow is the most reliable current navigation pattern for agents.
 
 ## Purpose
 
-Document the current recording workflow, the raw NDJSON schema written by the Operator app, the parsed step-log format produced by `clawperator record parse`, the agent-context export produced by `clawperator recording export`, and the compare workflow exposed by `clawperator recording compare`.
+Document the current recording workflow, the raw NDJSON schema written by the
+Operator app, the parsed step-log format produced by `clawperator record parse`,
+the agent-context export produced by `clawperator recording export`, and the
+compare workflow exposed by `clawperator recording compare`. Recording start
+and stop commands are execution-backed and return the shared
+[result envelope](overview.md#result-envelope) wrapper.
 
 ## Sources
 
@@ -9540,18 +9049,582 @@ Typical failure shape:
 
 ---
 
+# Logging
+
+## Purpose
+
+Clawperator logs every significant event to a local NDJSON file for post-run diagnostics. An agent can inspect this file after a timeout or failure to determine what happened step by step.
+
+## Log File Location
+
+Logs are written to a daily file at:
+
+```
+~/.clawperator/logs/clawperator-YYYY-MM-DD.log
+```
+
+The path components are:
+
+| Component | Value | Source |
+|-----------|-------|--------|
+| Base directory | `~/.clawperator/logs` | Default, or `CLAWPERATOR_LOG_DIR` env var |
+| Filename prefix | `clawperator-` | Hardcoded in `formatLogPath()` in `contracts/logging.ts` |
+| Date format | `YYYY-MM-DD` | Local calendar date of the log entry (from `formatDate()` in `contracts/logging.ts`) |
+| Extension | `.log` | Hardcoded in `formatLogPath()` in `contracts/logging.ts` |
+
+Example path: `/home/user/.clawperator/logs/clawperator-2026-03-28.log`
+
+To change the base directory, set the `CLAWPERATOR_LOG_DIR` environment variable. See [Environment Variables](environment.md) for details.
+
+## NDJSON Format
+
+Each line is a valid JSON object (NDJSON - Newline Delimited JSON). No wrapping array, no trailing commas. One event per line.
+
+### Required Fields
+
+Every log event has these fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ts` | string | ISO 8601 timestamp (e.g., `2026-03-28T12:34:56.789Z`) |
+| `level` | string | One of: `debug`, `info`, `warn`, `error` |
+| `event` | string | Dot-separated event name (e.g., `skills.run.start`) |
+| `message` | string | Human-readable summary |
+
+### Optional Context Fields
+
+Events may include additional context fields:
+
+| Field | Type | Present When |
+|-------|------|--------------|
+| `commandId` | string | CLI command or execution has a correlation ID |
+| `taskId` | string | Part of a larger task sequence |
+| `deviceId` | string | Event targets a specific device |
+| `skillId` | string | Skill execution event |
+| `stream` | string | `stdout` or `stderr` for skill output lines |
+| `status` | string | Completion status (e.g., `pass`, `fail`) |
+| `durationMs` | number | Operation completed, measured in milliseconds |
+| `exitCode` | number | Process exit code for skill/execution events |
+
+### Example Log Lines
+
+```jsonl
+{"ts":"2026-03-28T10:15:30.123Z","level":"info","event":"skills.run.start","message":"Skill com.example.app.get-status started","skillId":"com.example.app.get-status","commandId":"cmd-123"}
+{"ts":"2026-03-28T10:15:30.456Z","level":"info","event":"skills.run.output","message":"Opening app...","skillId":"com.example.app.get-status","stream":"stdout"}
+{"ts":"2026-03-28T10:15:32.789Z","level":"info","event":"skills.run.complete","message":"Skill com.example.app.get-status completed successfully in 2345ms","skillId":"com.example.app.get-status","durationMs":2345,"exitCode":0}
+```
+
+## Log Levels
+
+Four levels are available, in order of increasing severity:
+
+| Level | Numeric Value | Use Case |
+|-------|---------------|----------|
+| `debug` | 0 | Detailed diagnostic information |
+| `info` | 1 | Normal operational events |
+| `warn` | 2 | Unexpected but recoverable conditions |
+| `error` | 3 | Failures that prevent intended operation |
+
+### Threshold Behavior
+
+The `--log-level` flag (or `CLAWPERATOR_LOG_LEVEL` env var) controls which events are written to the file. Events at or above the threshold are logged.
+
+| Setting | Events Logged |
+|---------|---------------|
+| `debug` | All events (debug, info, warn, error) |
+| `info` | info, warn, error (default) |
+| `warn` | warn, error |
+| `error` | error only |
+
+Default: `info` (from `normalizeLogLevel()` in `adapters/logger.ts`)
+
+Valid values: `debug`, `info`, `warn`, `error` (case-insensitive)
+
+Invalid values fall back silently to `info`.
+
+**Exception:** Skill output events (`skills.run.output`) are always written to the file regardless of level threshold, so agents can diagnose timeouts even when `--log-level error` is set.
+
+## Event Naming Conventions
+
+Events use dot-separated names with prefix-based categories:
+
+| Prefix | Category | Example |
+|--------|----------|---------|
+| `skills.run.` | Skill execution lifecycle | `skills.run.start`, `skills.run.complete` |
+| `cli.` | CLI output | `cli.banner` |
+| `doctor.` | Doctor diagnostics | `doctor.check` |
+| `serve.` | HTTP/SSE server | `serve.server.started`, `serve.http.request` |
+
+<a id="the-clawperator-logs-command"></a>
+
+## The `clawperator logs` Command
+
+Stream the log file in real time.
+
+### Usage
+
+```bash
+clawperator logs
+```
+
+### Behavior
+
+1. Dumps all existing content from the current daily log file to stdout
+2. Streams new lines as they are written
+3. Runs until interrupted
+
+### Interrupt
+
+Press `Ctrl+C` (SIGINT) to stop. The command exits with code 0.
+
+### Output Format
+
+Raw NDJSON lines on stdout. No formatting, no filtering, no color.
+
+### No Flags
+
+The command accepts no flags. It always operates on the current daily log file determined by `CLAWPERATOR_LOG_DIR` (or the default `~/.clawperator/logs`).
+
+### Missing File Behavior
+
+If the log file does not exist, the command writes a message to stderr and exits with code 0:
+
+```
+No log file found at /home/user/.clawperator/logs/clawperator-2026-03-28.log
+```
+
+## Fail-Open Behavior
+
+If the log directory cannot be written to (permissions, disk full, path does not exist), Clawperator:
+
+1. Writes one warning to stderr
+2. Disables file logging for the remainder of the process
+3. Continues normal operation
+
+Example warning (includes the error message when available):
+
+```
+[clawperator] WARN: logging disabled after write failure for /home/user/.clawperator/logs/clawperator-2026-03-28.log: EACCES: permission denied, mkdir '/home/user/.clawperator'
+```
+
+The command or skill still executes normally. Only the log file is affected.
+
+## Verification
+
+Confirm logging is active:
+
+```bash
+# Check the log file exists and has recent content
+ls -la ~/.clawperator/logs/
+
+# Stream logs in real time
+clawperator logs
+```
+
+Generate log entries:
+
+```bash
+# Skill runs produce lifecycle and output events
+clawperator skills run <skill_id> --device <device_serial>
+
+# Snapshot commands produce execution lifecycle events
+clawperator snapshot --device <device_serial>
+```
+
+Verify entries appear:
+
+```bash
+# Check for skill lifecycle events
+grep '"event":"skills.run.start"' ~/.clawperator/logs/clawperator-$(date +%F).log
+
+# Check for the CLI banner (emitted at debug level during skill runs)
+grep '"event":"cli.banner"' ~/.clawperator/logs/clawperator-$(date +%F).log
+
+# Parse the NDJSON file with jq to see all events from a specific category
+jq -c 'select(.event | startswith("skills.run."))' ~/.clawperator/logs/clawperator-$(date +%F).log
+```
+
+Note: `cli.banner` is logged at `debug` level. To see it in the file, use `--log-level debug`.
+
+## Environment Variables
+
+See [Environment Variables](environment.md) for complete details on:
+
+- `CLAWPERATOR_LOG_DIR` - Change the log directory base path
+- `CLAWPERATOR_LOG_LEVEL` - Set the file logging threshold
+
+## JSON Mode Cleanliness
+
+When JSON output mode is active, the unified logger never writes to stdout. Log events go only to the file. This ensures the JSON output stream remains parseable without interleaved log lines.
+
+---
+
+# Environment Variables
+
+## Purpose
+
+Define every environment variable the Node CLI reads, its exact default, where it takes effect, and how to verify it is working. Use environment variables for workspace-wide defaults in headless, CI, or agent environments where repeating CLI flags on every command is impractical.
+
+## Sources
+
+- Global flag parsing (reads `--log-level`, `--operator-package`, `--device`, `--timeout`): `apps/node/src/cli/index.ts`
+- Logger construction (reads `CLAWPERATOR_LOG_DIR`, `CLAWPERATOR_LOG_LEVEL`): `apps/node/src/adapters/logger.ts`
+- Android SDK tool resolution (reads `ANDROID_HOME`, `ANDROID_SDK_ROOT`): `apps/node/src/adapters/android-bridge/runtimeConfig.ts`
+- Skill binary and package resolution (reads `CLAWPERATOR_BIN`, `CLAWPERATOR_OPERATOR_PACKAGE`): `apps/node/src/domain/skills/skillsConfig.ts`
+- Skills registry path (reads `CLAWPERATOR_SKILLS_REGISTRY`): `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`
+- Per-command operator package and adb path: `apps/node/src/cli/registry.ts` plus device-targeting handlers in `apps/node/src/cli/commands/`
+- Execution runtime (reads `CLAWPERATOR_OPERATOR_PACKAGE`, `ADB_PATH`): `apps/node/src/domain/executions/runExecution.ts`
+
+## Precedence Rule
+
+When both a CLI flag and an environment variable control the same setting, the CLI flag wins. The CLI parses global flags before dispatching to any command, so flags like `--operator-package` and `--log-level` can appear anywhere on the command line.
+
+Resolution order for a typical setting:
+
+1. Explicit CLI flag (highest priority)
+2. Environment variable
+3. Hardcoded default (lowest priority)
+
+There is no configuration file layer between the environment variable and the default.
+
+## Complete Reference
+
+| Variable | Default if unset | CLI flag override |
+| --- | --- | --- |
+| `CLAWPERATOR_OPERATOR_PACKAGE` | `com.clawperator.operator` | `--operator-package` |
+| `CLAWPERATOR_LOG_DIR` | `~/.clawperator/logs` | none |
+| `CLAWPERATOR_LOG_LEVEL` | `info` | `--log-level` |
+| `CLAWPERATOR_SKILLS_REGISTRY` | `<cwd>/skills/skills-registry.json` | none |
+| `CLAWPERATOR_BIN` | local sibling build if present, otherwise `clawperator` | none |
+| `ADB_PATH` | `adb` (from `PATH`) | none |
+| `ANDROID_HOME` | unset | none |
+| `ANDROID_SDK_ROOT` | unset (fallback for `ANDROID_HOME`) | none |
+
+## `CLAWPERATOR_OPERATOR_PACKAGE`
+
+Controls which Operator APK package name the runtime targets when `--operator-package` is not passed.
+
+Blank or whitespace-only values are normalized to unset before the runtime resolves the package, so the default package is used instead of treating an empty string as a real package id.
+
+Read by every device-targeting CLI command (`snapshot`, `click`, `read`, `wait`, `scroll`, `doctor`, `record start`, `record stop`, `record pull`, `operator setup`, `grant-device-permissions`, `version --check-compat`, `exec`, `serve`), plus `runExecution()` and `resolveOperatorPackage()` in the skills runtime.
+
+Default: `com.clawperator.operator`
+
+Common values:
+
+| Value | When to use |
+| --- | --- |
+| `com.clawperator.operator` | Release APK. Default. |
+| `com.clawperator.operator.dev` | Local debug APK built from source. |
+
+Example:
+
+```bash
+export CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev
+clawperator snapshot --device emulator-5554
+```
+
+That snapshot runs against the debug Operator package. No `--operator-package` flag needed.
+
+Verification - confirm the env var took effect:
+
+```bash
+clawperator doctor --device emulator-5554
+```
+
+Check `report.operatorPackage` in the JSON output:
+
+```json
+{
+  "ok": true,
+  "criticalOk": true,
+  "deviceId": "emulator-5554",
+  "operatorPackage": "com.clawperator.operator.dev",
+  "checks": []
+}
+```
+
+If `operatorPackage` shows the value you set, the env var is active.
+
+Error case:
+
+- if the env var names a package that is not installed, device-targeting commands fail with `OPERATOR_NOT_INSTALLED`
+- if only the alternate known Operator variant is installed, `clawperator doctor` reports `OPERATOR_VARIANT_MISMATCH` as a readiness warning
+
+Note: the CLI also accepts `--receiver-package` as a legacy alias for `--operator-package`. Both override the same env var. Do not use `--receiver-package` in new code.
+
+## `CLAWPERATOR_LOG_DIR`
+
+Controls where the CLI writes structured log files.
+
+Default: `~/.clawperator/logs`
+
+Log files are named `clawperator-YYYY-MM-DD.log` and contain NDJSON `LogEvent` objects.
+
+Guaranteed fields:
+
+- `ts`
+- `level`
+- `event`
+- `message`
+
+Optional fields, present only when the emitter supplied them:
+
+- `commandId`
+- `taskId`
+- `deviceId`
+
+There is no CLI flag to override this. To change the log directory, set the env var.
+
+Example:
+
+```bash
+export CLAWPERATOR_LOG_DIR=/tmp/clawperator-logs
+clawperator snapshot
+# logs written to /tmp/clawperator-logs/clawperator-2026-03-25.log
+```
+
+This variable affects logging only. It does not change device behavior, result envelopes, or execution outcomes.
+
+## `CLAWPERATOR_LOG_LEVEL`
+
+Controls the logger threshold when `--log-level` is not passed.
+
+Default: `info`
+
+Valid values: `debug`, `info`, `warn`, `error`
+
+If set to an unrecognized value (e.g., `trace`, `verbose`, or an empty string), the logger silently falls back to `info`. This is not an error - it is how `normalizeLogLevel()` in `logger.ts` works.
+
+`--log-level` is a global flag. It can appear anywhere on the command line and takes priority over this env var:
+
+```bash
+# env var sets warn, but flag overrides to debug
+export CLAWPERATOR_LOG_LEVEL=warn
+clawperator snapshot --log-level debug
+# logger threshold is debug for this command
+```
+
+## `CLAWPERATOR_SKILLS_REGISTRY`
+
+Defines the path to the active `skills-registry.json` used by all skill commands when they do not pass an explicit registry-path argument into `loadRegistry()`.
+
+Read by: `skills list`, `skills get`, `skills search`, `skills run`, `skills validate`, `skills compile-artifact`, `skills new`, and the `/skills` serve endpoints.
+
+Default when unset: `<cwd>/skills/skills-registry.json` where `<cwd>` is `process.cwd()`.
+
+Current `loadRegistry()` precedence is:
+
+1. explicit `registryPath` argument, when a caller supplied one
+2. `CLAWPERATOR_SKILLS_REGISTRY`, when it is set and non-blank
+3. default path `<cwd>/skills/skills-registry.json`
+
+Fallback behavior after that initial choice:
+
+1. If an explicit `registryPath` argument was passed and that read fails, `loadRegistry()` throws immediately
+2. If `CLAWPERATOR_SKILLS_REGISTRY` is set but blank, `loadRegistry()` throws immediately
+3. If `CLAWPERATOR_SKILLS_REGISTRY` is set to a non-blank path and that read fails, `loadRegistry()` throws a configured-path error immediately
+4. If the default-path read fails with no env var and no explicit `registryPath`, `loadRegistry()` next tries:
+   - `<cwd>/../../skills/skills-registry.json` when the current working directory is `apps/node`
+   - `~/.clawperator/skills/skills/skills-registry.json`
+
+After `clawperator skills install` or `clawperator skills sync`, the registry lives at `~/.clawperator/skills/skills/skills-registry.json`. That path is automatically discovered as a fallback when `CLAWPERATOR_SKILLS_REGISTRY` is not set, so no env var change is needed after a normal install:
+
+```bash
+clawperator skills list
+```
+
+Set `CLAWPERATOR_SKILLS_REGISTRY` only when pointing at a non-standard registry path, such as a development checkout outside the installed home. For the normal post-install flow, start with [Host Agent Orientation](../host-agents.md).
+
+Error case: if the path does not exist, skill commands fail with `REGISTRY_READ_FAILED`. The error message includes the path that was tried.
+
+Current recovery rules:
+
+- missing default path with no env var: run `clawperator skills install` to restore the registry at `~/.clawperator/skills/skills/skills-registry.json`
+- blank `CLAWPERATOR_SKILLS_REGISTRY`: unset it or point it at a valid registry path
+- wrong `CLAWPERATOR_SKILLS_REGISTRY` path: fix the env var, or unset it to fall back to the installed home path
+- explicit caller-supplied registry path: fix the explicit path because `loadRegistry()` does not fall back from it
+
+## `CLAWPERATOR_BIN`
+
+Controls which Clawperator CLI binary is used when skill scripts call back into Clawperator. This is for skill subprocesses, not for the main CLI bootstrap.
+
+When `clawperator skills run` executes a skill script, it resolves a command string and injects it into the child process environment as `CLAWPERATOR_BIN`.
+
+Resolution order in `resolveSkillBin()`:
+
+1. Explicit `CLAWPERATOR_BIN` env var (if non-empty)
+2. Local sibling build at `apps/node/dist/cli/index.js` relative to the running module (if the file exists)
+3. Global `clawperator` command
+
+Default: the sibling build when running from a local checkout, otherwise `clawperator`.
+
+The sibling build is preferred over the global binary because it is always in sync with the local Android Operator APK. The global binary may lag behind due to npm publish delays.
+
+Example:
+
+```bash
+export CLAWPERATOR_BIN=/usr/local/bin/clawperator-nightly
+clawperator skills run com.test.echo --device emulator-5554
+# the skill script receives CLAWPERATOR_BIN=/usr/local/bin/clawperator-nightly
+```
+
+## Orchestrated Skill Runtime Env Vars
+
+`runSkill()` injects these env vars when a skill declares `skill.json.agent`
+and runs through `scripts/run.js`. The harness reads them directly. This is
+the runtime contract for agent-driven orchestrated skills.
+
+| Variable | Default if unset | Where it takes effect |
+| --- | --- | --- |
+| `CLAWPERATOR_SKILL_AGENT_CLI` | `skill.json.agent.cli` | injected into the orchestrated harness so it knows the configured CLI name |
+| `CLAWPERATOR_SKILL_AGENT_CLI_PATH` | none | injected into the orchestrated harness after `runSkill()` resolves the executable path |
+| `CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS` | caller `--timeout`, otherwise `skill.json.agent.timeoutMs`, otherwise `120000` | injected into the orchestrated harness as the effective timeout in milliseconds |
+| `CLAWPERATOR_SKILL_PROGRAM` | none | absolute path to the skill's `SKILL.md` runtime program |
+| `CLAWPERATOR_SKILL_INPUTS` | JSON serialization of the forwarded skill args array | injected into the orchestrated harness for agent input parity checks |
+| `CLAWPERATOR_SKILL_ID` | none | injected into the orchestrated harness as the invoked skill id |
+| `CLAWPERATOR_DEVICE_ID` | none | selected device serial that the wrapper or CLI passed into the skill run |
+
+Behavior details:
+
+- `CLAWPERATOR_SKILL_AGENT_CLI` comes from `skill.json.agent.cli` unless the
+  caller overrides it with the same env var before `runSkill()` resolves the
+  effective agent config
+- `CLAWPERATOR_SKILL_AGENT_CLI_PATH` is present only after
+  `resolveAgentCliExecutable()` succeeds
+- `CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS` always reflects the effective timeout
+  that `runSkill()` will enforce around the harness
+- `CLAWPERATOR_SKILL_PROGRAM`, `CLAWPERATOR_SKILL_INPUTS`, and
+  `CLAWPERATOR_SKILL_ID` are only present for agent-driven orchestrated runs
+- `CLAWPERATOR_DEVICE_ID` is skill-scoped consumption: the CLI wrapper sets it
+  when `skills run --device <serial>` is used, and `runSkill()` forwards it to
+  the child process environment
+
+Verification:
+
+```bash
+CLAWPERATOR_SKILLS_REGISTRY=/abs/path/to/skills/skills-registry.json \
+node apps/node/dist/cli/index.js skills run com.test.agent-skill-result \
+  --device emulator-5554 \
+  -- valid
+```
+
+Check the parsed `skillResult.source` and the successful JSON envelope. The
+fixture harness under `apps/node/src/test/fixtures/skills/com.test.agent-skill-result/`
+only succeeds when `CLAWPERATOR_SKILL_AGENT_CLI_PATH`,
+`CLAWPERATOR_SKILL_AGENT_TIMEOUT_MS`, `CLAWPERATOR_SKILL_INPUTS`,
+`CLAWPERATOR_SKILL_ID`, and `CLAWPERATOR_DEVICE_ID` are all populated as the
+runtime expects.
+
+Failure cases:
+
+- if `CLAWPERATOR_SKILL_AGENT_CLI` resolves to an unavailable executable,
+  `skills run` fails with `SKILL_AGENT_CLI_UNAVAILABLE`
+- if `CLAWPERATOR_SKILL_AGENT_CLI_PATH` or `CLAWPERATOR_SKILL_PROGRAM` are
+  missing inside the harness, the harness exits non-zero and `runSkill()`
+  returns `SKILL_EXECUTION_FAILED`
+- if `CLAWPERATOR_SKILL_INPUTS` is malformed JSON, behavior depends on the
+  harness that parses it; this runtime only defines the environment variable
+  contract, so malformed input should be treated as a harness-specific failure
+  rather than a guaranteed fallback to empty args
+
+## `ADB_PATH`
+
+Overrides the adb binary used by the entire runtime. Affects device listing, doctor checks, execution dispatch, recording, operator setup, permission grants, emulator management, package listing, and the serve server.
+
+Default: `adb` (resolved from the process `PATH`).
+
+There is no CLI flag that overrides `ADB_PATH`. This env var is the only way to specify a non-default adb binary.
+
+Read at two levels:
+
+- CLI command handlers pass `adbPath: process.env.ADB_PATH` into domain functions
+- `runExecution()` falls back to `process.env.ADB_PATH` when `options.adbPath` is not provided
+
+Example:
+
+```bash
+export ADB_PATH=/opt/android/platform-tools/adb
+clawperator devices
+```
+
+Error case: if the path does not point to a working adb binary, `clawperator doctor` reports `ADB_NOT_FOUND` for the `host.adb.presence` check.
+
+Verification:
+
+```bash
+clawperator doctor
+```
+
+If `host.adb.presence` passes, the configured adb binary is usable.
+
+## `ANDROID_HOME` and `ANDROID_SDK_ROOT`
+
+These are standard Android SDK environment variables, not Clawperator-specific. The runtime reads them when resolving paths to `emulator`, `sdkmanager`, and `avdmanager`.
+
+Resolution in `runtimeConfig.ts`:
+
+1. Check `ANDROID_HOME`
+2. If unset, check `ANDROID_SDK_ROOT`
+3. If neither is set, fall back to bare command names (`emulator`, `sdkmanager`, `avdmanager`) resolved from `PATH`
+
+These variables matter for emulator provisioning flows (`clawperator emulator create`, `emulator start`, and the `/android/emulators` serve endpoints). They do not affect normal device execution against an already-connected adb target.
+
+Tool paths resolved from the SDK root:
+
+| Tool | Resolved path |
+| --- | --- |
+| `emulator` | `<sdk_root>/emulator/emulator` |
+| `sdkmanager` | `<sdk_root>/cmdline-tools/latest/bin/sdkmanager` |
+| `avdmanager` | `<sdk_root>/cmdline-tools/latest/bin/avdmanager` |
+
+If the resolved path does not exist, the runtime falls back to the bare command name.
+
+## Agent Configuration Pattern
+
+For deterministic agent environments, set these variables and forget about per-command flags:
+
+```bash
+export CLAWPERATOR_OPERATOR_PACKAGE=com.clawperator.operator.dev
+export ADB_PATH=/usr/local/bin/adb
+```
+
+Then every command uses consistent defaults:
+
+```bash
+clawperator doctor --device emulator-5554
+clawperator snapshot --device emulator-5554
+clawperator skills run com.test.echo --device emulator-5554
+```
+
+The only flag you still need per-command is `--device` when multiple targets are connected. There is no environment variable equivalent for `--device` - device selection must always be explicit.
+
+After `clawperator skills install`, the registry at `~/.clawperator/skills/skills/skills-registry.json` is discovered automatically. Setting `CLAWPERATOR_SKILLS_REGISTRY` is only needed when overriding to a non-standard path. For the post-install orientation flow, read [Host Agent Orientation](../host-agents.md).
+
+## Related Pages
+
+- [Host Agent Orientation](../host-agents.md)
+- [Setup](../setup.md)
+- [Devices](devices.md)
+- [Doctor](doctor.md)
+- [Serve API](serve.md)
+- [Skills Overview](../skills/overview.md)
+
+---
+
 # Skills
 
 # Skills Overview
 
 ## Purpose
 
-Explain what Clawperator skills are, how the registry model works, how skills are discovered, and what the `clawperator skills` wrapper actually does.
+Explain what Clawperator skills are, how the registry model works, and how
+runtime skills relate to authored skill packages and host-agent helpers.
 
 For the post-install decision of when to start with `clawperator skills`
 instead of MCP or direct CLI automation, read
-[Host Agent Orientation](../host-agents.md) first. This page is the detailed
-runtime-skills contract.
+[Host Agent Orientation](../host-agents.md) first. Use [Skills CLI](cli.md) for
+the exact `clawperator skills` command contract.
 
 ## Sources
 
@@ -9786,61 +9859,134 @@ Recovery depends on how the path was chosen:
 
 Wrapper failure fields like `stdout` and `stderr` are optional. `runSkill.ts` includes them only when the child process actually emitted non-empty data on those streams.
 
-## Discovery
+## Runtime-Skill Workflow
 
-If you are starting from a fresh install, the shortest discovery flow is:
+The conceptual workflow is:
 
-```bash
-clawperator skills for-app <package_id>
-clawperator skills search --keyword <text>
-clawperator skills get <skill_id>
-clawperator skills run <skill_id>
-```
+1. discover candidate runtime skills from the registry
+2. inspect the selected skill metadata
+3. validate the skill before live use
+4. run the skill through the wrapper
+5. parse the structured result or feature-specific error
 
-Start with `skills for-app` when you know the Android package id. Use
-`skills search --keyword` when you only have app names or user-language intent
-terms.
+Use [Skills CLI](cli.md) for exact command syntax, output shapes, success
+conditions, and recovery for `skills list`, `skills search`, `skills get`,
+`skills validate`, `skills compile-artifact`, `skills new`, `skills run`,
+`skills install`, `skills update`, and `skills sync`.
 
-Current discovery commands:
+## Serve API Context
+
+The local HTTP server exposes skills routes that use the same registry and
+`runSkill()` runtime:
+
+- `GET /skills`
+- `GET /skills/:skillId`
+- `POST /skills/:skillId/run`
+
+Serve adds route-local request validation and HTTP status codes. Use
+[Serve API](../api/serve.md#endpoint-get-skills) for the HTTP contract, and use
+[Skills CLI](cli.md) for the underlying runtime-skill command behavior.
+
+## Practical Model
+
+- use skills when you need a reusable app-specific workflow, not a one-off raw
+  UI action
+- use `skills list`, `skills search`, and `skills get` to discover what is
+  available
+- use `skills validate --dry-run` when you want to confirm registry integrity
+  before a live run
+- use `skills run` when you want the wrapper's validation gate, timeout, env
+  injection, and JSON wrapper
+- use `skillResult.result` as the deterministic domain answer when a skill
+  emits a framed `SkillResult`
+
+## Related Pages
+
+- [Host Agent Orientation](../host-agents.md)
+- [Skills CLI](cli.md)
+- [Authoring](authoring.md)
+- [Development Workflow](development.md)
+- [Device Prep and Runtime](runtime.md)
+- [Environment Variables](../api/environment.md)
+- [Serve API](../api/serve.md)
+
+---
+
+# Skills CLI
+
+## Purpose
+
+Define the canonical `clawperator skills` command contract for runtime-skill
+discovery, validation, artifact compilation, local scaffolding, install/sync,
+and execution.
+
+Conceptual skill model, registry shape, and orchestrated-skill runtime rules
+live in [Skills Overview](overview.md). This page owns the command behavior,
+output shapes, success conditions, and recovery rules for the Skills CLI.
+
+## Sources
+
+- CLI dispatch: `apps/node/src/cli/registry.ts`
+- CLI command handlers: `apps/node/src/cli/commands/skills.ts`
+- Registry contract: `apps/node/src/contracts/skills.ts`
+- Registry loading and search: `apps/node/src/adapters/skills-repo/localSkillsRegistry.ts`, `apps/node/src/domain/skills/searchSkills.ts`
+- Runtime wrapper: `apps/node/src/domain/skills/runSkill.ts`
+- Skill validation: `apps/node/src/domain/skills/validateSkill.ts`
+- Artifact compilation: `apps/node/src/domain/skills/compileArtifact.ts`
+
+## Command Summary
 
 ```bash
 clawperator skills list
-clawperator skills for-app <package_id>
-clawperator skills search --app <package_id>
-clawperator skills search --intent <intent>
-clawperator skills search --keyword <text>
 clawperator skills get <skill_id>
+clawperator skills for-app <package_id>
+clawperator skills search --app <package_id> [--intent <intent>] [--keyword <text>]
+clawperator skills search <keyword>
+clawperator skills compile-artifact <skill_id> --artifact <name> [--vars <json>]
+clawperator skills new <skill_id> [--summary <text>] [--recording-context <file>]
+clawperator skills validate <skill_id> [--dry-run]
+clawperator skills validate --all [--dry-run]
+clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [skill_args...]
+clawperator skills install
+clawperator skills update [--ref <git-ref>]
+clawperator skills sync --ref <git-ref>
 ```
 
-### `skills list`
+Public command lookup remains in the generated [CLI Reference](../api/cli.md#command-skills).
 
-`cmdSkillsList()` returns the raw registry entries plus a computed `count`:
+## Discovery Commands
+
+Use discovery before running a skill unless you already have the exact registry
+id.
+
+| Command | Purpose | Success shape |
+| --- | --- | --- |
+| `skills list` | Return every registry entry. | `{ "skills": [...], "count": <number> }` |
+| `skills for-app <package_id>` | Search by exact `applicationId`. | Same as `skills search --app`. |
+| `skills search --app <package_id>` | Search by exact `applicationId`. | `{ "skills": [...], "count": <number> }` |
+| `skills search --intent <intent>` | Search by exact intent. | `{ "skills": [...], "count": <number> }` |
+| `skills search --keyword <text>` | Search by ranked keyword match. | `{ "skills": [...], "count": <number> }` |
+| `skills search <keyword>` | Shorthand for keyword search. | `{ "skills": [...], "count": <number> }` |
+| `skills get <skill_id>` | Return one registry entry. | `{ "skill": { ... } }` |
+
+Registry entry shape:
 
 ```json
 {
-  "skills": [
-    {
-      "id": "com.android.settings.capture-overview",
-      "applicationId": "com.android.settings",
-      "intent": "capture-overview",
-      "summary": "Capture a Settings overview snapshot",
-      "path": "skills/com.android.settings.capture-overview",
-      "skillFile": "skills/com.android.settings.capture-overview/SKILL.md",
-      "scripts": [
-        "skills/com.android.settings.capture-overview/scripts/run.js"
-      ],
-      "artifacts": []
-    }
+  "id": "com.android.settings.capture-overview",
+  "applicationId": "com.android.settings",
+  "intent": "capture-overview",
+  "summary": "Capture a Settings overview snapshot",
+  "path": "skills/com.android.settings.capture-overview",
+  "skillFile": "skills/com.android.settings.capture-overview/SKILL.md",
+  "scripts": [
+    "skills/com.android.settings.capture-overview/scripts/run.js"
   ],
-  "count": 1
+  "artifacts": []
 }
 ```
 
-### `skills search`
-
-Search filters are exact for `--app` and `--intent`.
-
-`--keyword` matching is case-insensitive and deterministic. Current ranking order is:
+Search ranking for `--keyword` is deterministic:
 
 1. exact `keywords[]` entry match
 2. tokenized `keywords[]` match
@@ -9850,161 +9996,230 @@ Search filters are exact for `--app` and `--intent`.
 6. substring in `id` or `applicationId`
 7. substring in `summary`
 
-Equal-ranked results keep their original registry order.
+Equal-ranked results keep registry order.
 
-`skills search` success uses the same response shape as `skills list`:
+## Registry Failures
+
+All discovery commands read the registry through the same loader. When the
+registry cannot be read, they return:
 
 ```json
 {
-  "skills": [
-    {
-      "id": "com.android.settings.capture-overview",
-      "applicationId": "com.android.settings",
-      "intent": "capture-overview",
-      "summary": "Capture a Settings overview snapshot",
-      "path": "skills/com.android.settings.capture-overview",
-      "skillFile": "skills/com.android.settings.capture-overview/SKILL.md",
-      "scripts": [
-        "skills/com.android.settings.capture-overview/scripts/run.js"
-      ],
-      "artifacts": []
-    }
-  ],
-  "count": 1
+  "code": "REGISTRY_READ_FAILED",
+  "message": "Registry not found at configured path: /tmp/missing-registry.json. Update CLAWPERATOR_SKILLS_REGISTRY or run clawperator skills install."
 }
 ```
 
-### `skills for-app`
+Recovery depends on how the path was chosen:
 
-`cmdSkillsForApp()` is a thin discovery alias over `skills search --app <package_id>`.
+- if `CLAWPERATOR_SKILLS_REGISTRY` points at a missing or invalid file, fix or
+  unset that env var
+- if no env var is set, verify
+  `~/.clawperator/skills/skills/skills-registry.json`
+- run `clawperator skills install` when the installed skills repo is absent
+- run `clawperator skills list` again and require a parsed `skills` array
 
-Use `skills for-app` when you already know the Android package id and want the shortest answer to "what can this host do for this app?" Use `skills search --keyword` when you only have user-language terms such as app names or intents.
+If the registry loads but a requested id is absent, `skills get`, `skills
+validate`, and `skills run` can return `SKILL_NOT_FOUND`.
 
-Example:
+## Install, Update, And Sync
 
-```bash
-clawperator skills for-app com.android.settings
-```
+| Command | Behavior |
+| --- | --- |
+| `skills install` | Calls the sync path with `main`, cloning or refreshing the default skills repo under `~/.clawperator/skills/`. |
+| `skills update [--ref <git-ref>]` | Calls sync with the supplied ref, or `main` when omitted. |
+| `skills sync --ref <git-ref>` | Requires `--ref` and pins the local skills checkout to that ref. |
 
-It returns the same response shape as `skills search --app ...`.
-
-### `skills get`
-
-`cmdSkillsGet()` wraps a single registry entry under `skill`:
-
-```bash
-clawperator skills get com.android.settings.capture-overview
-```
+Successful `skills install` responses include the registry path:
 
 ```json
 {
+  "synced": true,
+  "message": "Skills synced.",
+  "registryPath": "/Users/<local_user>/.clawperator/skills/skills/skills-registry.json"
+}
+```
+
+Successful `skills update` and `skills sync` responses include `synced` and
+`message`; they do not repeat the registry path.
+
+`skills sync` without `--ref` returns a usage object:
+
+```json
+{
+  "code": "USAGE",
+  "message": "skills sync --ref <git-ref>"
+}
+```
+
+## Validate
+
+Validate one skill:
+
+```bash
+clawperator skills validate <skill_id> [--dry-run]
+```
+
+Validate every registry entry:
+
+```bash
+clawperator skills validate --all [--dry-run]
+```
+
+Successful single-skill validation includes the registry entry, registry path,
+and concrete file paths checked by the validator:
+
+```json
+{
+  "valid": true,
   "skill": {
-    "id": "com.android.settings.capture-overview",
-    "applicationId": "com.android.settings",
-    "intent": "capture-overview",
-    "summary": "Capture a Settings overview snapshot",
-    "path": "skills/com.android.settings.capture-overview",
-    "skillFile": "skills/com.android.settings.capture-overview/SKILL.md",
-    "scripts": [
-      "skills/com.android.settings.capture-overview/scripts/run.js"
+    "id": "com.android.settings.capture-overview"
+  },
+  "registryPath": "/Users/<local_user>/.clawperator/skills/skills/skills-registry.json",
+  "checks": {
+    "skillJsonPath": "/Users/<local_user>/.clawperator/skills/skills/com.android.settings.capture-overview/skill.json",
+    "skillFilePath": "/Users/<local_user>/.clawperator/skills/skills/com.android.settings.capture-overview/SKILL.md",
+    "scriptPaths": [
+      "/Users/<local_user>/.clawperator/skills/skills/com.android.settings.capture-overview/scripts/run.js"
     ],
-    "artifacts": []
+    "artifactPaths": []
   }
 }
 ```
 
-### Discovery Verification
-
-Use these commands to verify the three core discovery paths:
-
-```bash
-clawperator skills list
-clawperator skills for-app com.android.settings
-clawperator skills search --app com.android.settings
-clawperator skills get com.android.settings.capture-overview
-```
-
-Check these exact fields:
-
-- `count` matches the number of returned entries for `list` and `search`
-- every result entry includes `id`, `applicationId`, `intent`, `path`, `skillFile`, `scripts`, and `artifacts`
-- `skills get` returns a top-level `skill` object, not a `skills` array
-
-### Discovery Error Cases
-
-Top-level usage and lookup failures are exact:
+`--dry-run` extends validation to compiled artifact payloads. Script-only skills
+skip payload validation during dry run because their payload is generated at
+runtime by the skill script:
 
 ```json
 {
-  "code": "USAGE",
-  "message": "skills get <skill_id>"
+  "valid": true,
+  "dryRun": {
+    "payloadValidation": "skipped",
+    "reason": "skill has no pre-compiled artifacts; payload is generated at runtime by the skill script"
+  }
 }
 ```
+
+Validation failures return `SKILL_VALIDATION_FAILED` with `details` describing
+missing files, registry parity mismatches, or invalid compiled payloads.
+
+## Compile Artifact
+
+```bash
+clawperator skills compile-artifact <skill_id> --artifact <name> [--vars <json>]
+clawperator skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]
+```
+
+Rules:
+
+- `skill_id` may be positional or supplied with `--skill-id`
+- `--artifact` accepts the bare artifact name or the full `.recipe.json` file name
+- `--vars` defaults to `{}`
+- `--vars` must be a JSON object string
+- the compiled payload is validated before success is returned
+
+Success shape:
 
 ```json
 {
-  "code": "USAGE",
-  "message": "skills search requires --app <package_id>, --intent <intent>, or --keyword <text>",
-  "example": "clawperator skills search --keyword solax"
+  "execution": {
+    "commandId": "cmd-<stable_hash>",
+    "taskId": "task-<stable_hash>",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      {
+        "id": "<action_id>",
+        "type": "<action_type>"
+      }
+    ],
+    "mode": "artifact_compiled"
+  }
 }
 ```
+
+The command and task ids are generated deterministically from the skill id,
+artifact name, and sorted compile vars unless the artifact template supplies
+`COMMAND_ID` or `TASK_ID`.
+
+Run `clawperator exec --validate-only --payload <file-or-json>` when you want a
+second contract-only check before live execution.
+
+## New Skill Scaffold
+
+```bash
+clawperator skills new <skill_id> [--summary <text>] [--recording-context <file>]
+```
+
+Behavior:
+
+- creates a new local skill folder in the configured skills registry repo
+- derives `applicationId` and `intent` by splitting `<skill_id>` on the final dot
+- creates `SKILL.md`, `skill.json`, `scripts/run.js`, and `scripts/run.sh`
+- copies `--recording-context` into the skill folder when provided
+- updates the configured registry JSON
+
+Success shape:
 
 ```json
 {
-  "code": "SKILL_NOT_FOUND",
-  "message": "Skill not found: com.android.settings.capture-overview"
+  "created": true,
+  "skillId": "com.example.app.intent",
+  "registryPath": "/path/to/skills-registry.json",
+  "skillPath": "/path/to/skills/com.example.app.intent",
+  "files": ["SKILL.md", "skill.json", "scripts/run.js", "scripts/run.sh"]
 }
 ```
 
-`SKILL_NOT_FOUND` comes from `getSkill()` in `apps/node/src/domain/skills/getSkill.ts`. `REGISTRY_READ_FAILED` comes from the shared registry loader and can appear on `list`, `search`, and `get`.
+Use the bundled host-agent authoring skills when discovery returned no relevant
+skill and you need guided app exploration or recording-based authoring. The
+low-level `skills new` command only scaffolds files.
 
-## Execution
-
-Current execution command:
-
-```bash
-clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--timeout-ms <ms>] [--expect-contains <text>] [--skip-validate] [skill_args...]
-```
-
-What the wrapper does:
-
-1. resolves `CLAWPERATOR_BIN` for the child process
-2. resolves `CLAWPERATOR_OPERATOR_PACKAGE` for the child process
-3. validates the skill with `validateSkill(skillId, undefined, { dryRun: true })` unless `--skip-validate` is passed
-4. resolves the target device and probes interactive state
-5. loads the registry entry
-6. chooses a script, preferring `.js`, then `.sh`, then the first listed script
-7. spawns the script
-8. captures raw stdout and stderr
-9. enforces a timeout
-
-Argument passing rules:
-
-- if `--device` was provided, the wrapper passes that explicit device id through `CLAWPERATOR_DEVICE_ID`, and `runSkill()` prepends it as the first script argument for script-driven skills
-- if `--device` was omitted, the wrapper still may resolve a single connected device for preflight, but it does not inject that implicit device selection into the child env or argv, and inherited ambient `CLAWPERATOR_DEVICE_ID` is cleared for the child process
-- unknown trailing tokens such as `--limit 40` are forwarded to the script unchanged
-- use `--` when you need to force literal passthrough for tokens that would otherwise be parsed as wrapper flags
-- `CLAWPERATOR_BIN` and `CLAWPERATOR_OPERATOR_PACKAGE` are injected into the script environment
-- in JSON mode, the wrapper suppresses the pretty banner so stdout stays parseable JSON
-
-Default execution values are exact:
-
-- `DEFAULT_TIMEOUT_MS = 120000`
-- `DEFAULT_OPERATOR_PACKAGE = com.clawperator.operator`
-- `CLAWPERATOR_BIN` resolution order is:
-  1. non-empty `CLAWPERATOR_BIN`
-  2. branch-local sibling build at `apps/node/dist/cli/index.js`
-  3. global `clawperator` binary
-
-### `skills run` Verification
-
-Use a JSON run first so you can verify the wrapper envelope separately from the skill's own stdout contract:
+## Run
 
 ```bash
-clawperator skills run com.android.settings.capture-overview --timeout 3210
+clawperator skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [skill_args...]
 ```
 
-Success response:
+Wrapper sequence:
+
+1. resolve `CLAWPERATOR_BIN` for the child process
+2. resolve `CLAWPERATOR_OPERATOR_PACKAGE`
+3. validate the skill with `validateSkill(skillId, undefined, { dryRun: true })` unless `--skip-validate` is passed
+4. resolve the target device and verify interactive readiness
+5. load the registry entry
+6. choose a script, preferring `.js`, then `.sh`, then the first listed script
+7. spawn the script
+8. capture stdout and stderr
+9. enforce the timeout
+
+Argument and env rules:
+
+- if `--device` was provided, the wrapper injects it through
+  `CLAWPERATOR_DEVICE_ID`
+- if `--device` was omitted, preflight may resolve one target, but inherited
+  ambient `CLAWPERATOR_DEVICE_ID` is cleared for the child process
+- unknown trailing tokens are forwarded to the skill script unchanged
+- use `--` before literal passthrough args that would otherwise look like
+  wrapper flags
+- `CLAWPERATOR_BIN` and `CLAWPERATOR_OPERATOR_PACKAGE` are injected into the
+  script environment
+- `--timeout` overrides the wrapper timeout for this run only
+
+Default runtime values:
+
+| Field | Default |
+| --- | --- |
+| wrapper timeout | `120000` milliseconds |
+| operator package | `com.clawperator.operator` |
+| JSON output | default output mode |
+
+### Successful Framed Result
+
+Default JSON success with a parsed `SkillResult` omits duplicate top-level
+`status`, `skillId`, `exitCode`, and `output`. Read `skillResult.result` for
+the domain answer.
 
 ```json
 {
@@ -10021,98 +10236,29 @@ Success response:
 }
 ```
 
-Default JSON **omits** top-level `status`, `skillId`, `exitCode`, and `output`
-on success. Verify `skillResult` and especially **`skillResult.result`**.
+`timeoutMs` appears only when the caller passed `--timeout`. `expectedSubstring`
+appears only when the caller passed `--expect-contains`.
 
-Check these exact fields:
+### Successful Unframed Result
 
-- `skillResult.skillId` matches the requested registry id
-- `skillResult.result` is the domain answer
-- `skillResult.status` is the child-authored skill state
-- `durationMs` is the measured wrapper runtime
-- `timeoutMs` is present only when a timeout override was passed on the CLI
-
-To verify the wrapper-side readiness gate, run against a sleeping or locked device:
-
-```bash
-clawperator skills run com.android.settings.capture-overview --device <device_serial>
-```
-
-Expected pre-spawn failure shape:
+When a skill exits successfully but does not emit a parsed `SkillResult`, the
+wrapper returns process-oriented fields:
 
 ```json
 {
-  "code": "DEVICE_NOT_INTERACTIVE",
-  "message": "Device is not interactive. Interactive automation requires an awake, usable device state."
+  "status": "success",
+  "skillId": "com.example.echo",
+  "output": "TEST_OUTPUT:hello\n",
+  "exitCode": 0,
+  "durationMs": 18,
+  "skillResult": null
 }
 ```
 
-To verify wrapper-side output assertions, run:
+### Indeterminate Result
 
-```bash
-clawperator skills run com.android.settings.capture-overview --expect-contains RESULT
-```
-
-If the expected text is present, the success payload echoes the assertion:
-
-```json
-{
-  "skillResult": {
-    "result": { "kind": "text", "text": "ok" },
-    "status": "success",
-    "contractVersion": "1.0.0",
-    "skillId": "com.android.settings.capture-overview",
-    "checkpoints": [],
-    "source": { "kind": "script" }
-  },
-  "durationMs": 15842,
-  "expectedSubstring": "RESULT"
-}
-```
-
-## `skills run` Success Shape
-
-**Success (default JSON):** the answer is `skillResult.result`. Top-level
-`status`, `skillId`, `exitCode`, and `output` are **omitted** so agents do not
-scrape duplicate process text. See
-[Device Prep and Runtime](runtime.md#skill-result-trust-order-and-json-wrapper-policy).
-
-```json
-{
-  "skillResult": {
-    "result": { "kind": "text", "text": "ok" },
-    "status": "success",
-    "contractVersion": "1.0.0",
-    "skillId": "com.example.app.skill",
-    "checkpoints": [],
-    "source": { "kind": "script" }
-  },
-  "durationMs": 15842
-}
-```
-
-Important:
-
-- read **`skillResult.result`** for the domain return value; do not use
-  `diagnostics`, `terminalVerification`, or checkpoint-only evidence as the only
-  answer path
-- the wrapper parses the terminal `SkillResult` frame and returns it as `skillResult`
-- the top-level wrapper `status` is omitted for default JSON success and
-  present on failure or indeterminate paths (see [runtime.md](runtime.md))
-- when a declared verification contract is not proved, the wrapper returns
-  `status: "indeterminate"` without rewriting the emitted `skillResult`
-- default JSON success omits `output` because the structured `skillResult` is
-  authoritative
-- pretty mode still streams human-readable output; use default JSON for machine
-  consumption
-- in JSON mode, the wrapper returns one JSON object and does not stream live child stdout separately
-- `timeoutMs` is present only when the caller passed `--timeout` or `--timeout-ms`
-- `expectedSubstring` is present only when the caller passed `--expect-contains`
-
-## `skills run` Indeterminate Shape
-
-**Indeterminate (default JSON):** keep wrapper `status`, `code`, and `message`;
-**omit** top-level `skillId`, `exitCode`, and `output`.
+When a declared verification contract is not proved, the wrapper returns
+`status: "indeterminate"` and preserves the emitted `skillResult`:
 
 ```json
 {
@@ -10131,196 +10277,97 @@ Important:
 }
 ```
 
-## `skills run` Failure Shape
+### Run Failures
+
+Common wrapper failures:
+
+| Code | When it appears | Recovery |
+| --- | --- | --- |
+| `REGISTRY_READ_FAILED` | registry cannot be loaded | repair `CLAWPERATOR_SKILLS_REGISTRY` or reinstall/sync skills |
+| `SKILL_NOT_FOUND` | requested id is absent | confirm the id with `skills list`, `skills search`, or `skills get` |
+| `SKILL_VALIDATION_FAILED` | pre-run validation found missing files or invalid artifacts | repair the skill before rerunning |
+| `SKILL_SCRIPT_NOT_FOUND` | chosen script path is missing | restore the script or fix the registry entry |
+| `SKILL_EXECUTION_FAILED` | child process exited non-zero or failed to spawn | inspect `stdout`, `stderr`, and the script exit code |
+| <code>SKILL_EXECUTION_<wbr>TIMEOUT</code> | wrapper timeout elapsed | inspect partial `stdout`; raise `--timeout` only if the skill is still making progress |
+| `SKILL_AGENT_CLI_UNAVAILABLE` | orchestrated skill declares an unavailable agent CLI | install or configure the declared agent CLI |
+| `SKILL_OUTPUT_ASSERTION_FAILED` | `--expect-contains` text was absent | verify the expected substring against `output` |
+| `SKILL_RESULT_PARSE_FAILED` | terminal `SkillResult` frame was malformed or untrusted | fix the frame JSON or trusted provenance metadata |
+
+Output assertion failure:
+
+```json
+{
+  "code": "SKILL_OUTPUT_ASSERTION_FAILED",
+  "message": "Skill com.example.echo output did not include expected text",
+  "skillId": "com.example.echo",
+  "output": "TEST_OUTPUT:api\n",
+  "skillResult": null,
+  "expectedSubstring": "TEST_OUTPUT:hello"
+}
+```
+
+Non-zero child exit:
 
 ```json
 {
   "status": "failed",
   "code": "SKILL_EXECUTION_FAILED",
-  "message": "Skill com.android.settings.capture-overview exited with code 2",
-  "skillId": "com.android.settings.capture-overview",
+  "message": "Skill com.example.echo exited with code 2",
+  "skillId": "com.example.echo",
   "exitCode": 2,
-  "stdout": "RESULT|status=partial|snapshot=/tmp/settings.xml\n",
-  "stderr": "Timed out waiting for expected node\n",
+  "stdout": "partial output\n",
+  "stderr": "fatal error\n",
   "skillResult": null
 }
 ```
 
-Other wrapper failures are distinct and worth handling separately:
+## Serve Skills Routes
 
-```json
-{
-  "code": "SKILL_EXECUTION_TIMEOUT",
-  "message": "Skill com.android.settings.capture-overview timed out after 150ms",
-  "skillId": "com.android.settings.capture-overview",
-  "stdout": "{\"stage\":\"before-timeout\"}\n"
-}
-```
-
-```json
-{
-  "code": "SKILL_OUTPUT_ASSERTION_FAILED",
-  "message": "Skill com.android.settings.capture-overview output did not include expected text",
-  "skillId": "com.android.settings.capture-overview",
-  "output": "RESULT|status=success|snapshot=/tmp/settings.xml\n",
-  "skillResult": null,
-  "expectedSubstring": "missing-value"
-}
-```
-
-```json
-{
-  "code": "SKILL_RESULT_PARSE_FAILED",
-  "message": "SkillResult frame contained invalid JSON: ...",
-  "skillId": "com.android.settings.capture-overview",
-  "stdout": "[Clawperator-Skill-Result]\n{not-json\n",
-  "skillResult": null
-}
-```
-
-```json
-{
-  "code": "SKILL_SCRIPT_NOT_FOUND",
-  "message": "Script not found: /abs/path/to/skills/com.android.settings.capture-overview/scripts/run.js",
-  "skillId": "com.android.settings.capture-overview"
-}
-```
-
-### `skills run` Error Cases
-
-There are three layers of failure to expect:
-
-1. CLI usage and option parsing
-2. validation gate failure before the skill starts
-3. wrapper execution failure after the child process is spawned
-
-Exact CLI parsing failures include:
-
-```json
-{
-  "code": "USAGE",
-  "message": "--timeout-ms requires a value"
-}
-```
-
-```json
-{
-  "code": "USAGE",
-  "message": "--expect-contains requires a value"
-}
-```
-
-```json
-{
-  "code": "EXECUTION_VALIDATION_FAILED",
-  "message": "timeoutMs must be a finite number"
-}
-```
-
-The pre-run validation gate can stop the command before script execution. `cmdSkillsRun()` calls `validateSkill(..., { dryRun: true })` unless `--skip-validate` is present. That gate fails with `SKILL_VALIDATION_FAILED` when required files or artifact payloads are wrong:
-
-```json
-{
-  "code": "SKILL_VALIDATION_FAILED",
-  "message": "Skill com.android.settings.capture-overview is missing required files",
-  "details": {
-    "skillJsonPath": "/abs/path/to/skills/com.android.settings.capture-overview/skill.json",
-    "missingFiles": [
-      "/abs/path/to/skills/com.android.settings.capture-overview/scripts/run.js"
-    ]
-  }
-}
-```
-
-The readiness gate can also stop the command before script execution when the
-resolved device is not interactive:
-
-```json
-{
-  "code": "DEVICE_NOT_INTERACTIVE",
-  "message": "Device is not interactive. Interactive automation requires an awake, usable device state."
-}
-```
-
-For script-only skills, dry-run payload validation is skipped on purpose. The success payload from `skills validate --dry-run` includes:
-
-```json
-{
-  "valid": true,
-  "dryRun": {
-    "payloadValidation": "skipped",
-    "reason": "skill has no pre-compiled artifacts; payload is generated at runtime by the skill script"
-  }
-}
-```
-
-Recovery depends on the error code:
-
-- `REGISTRY_READ_FAILED`: fix `CLAWPERATOR_SKILLS_REGISTRY`, run from the correct working directory, or reinstall the skills repo
-- `SKILL_NOT_FOUND`: confirm the exact `id` with `skills list` or `skills search`
-- `SKILL_VALIDATION_FAILED`: repair missing files, mismatched `skill.json` metadata, or invalid artifact payloads before rerunning
-- `SKILL_SCRIPT_NOT_FOUND`: fix the registry entry or restore the script on disk
-- `SKILL_EXECUTION_FAILED`: inspect `stdout`, `stderr`, and the skill script's exit code
-- `SKILL_EXECUTION_TIMEOUT`: raise `--timeout` only after confirming the skill is still making progress
-- `SKILL_OUTPUT_ASSERTION_FAILED`: verify the expected substring against the raw `output`
-- `SKILL_RESULT_PARSE_FAILED`: fix malformed framed output or trusted-provenance metadata before rerunning
-
-## Serve API Context
-
-The local HTTP server exposes:
+The local Serve API exposes related skills routes:
 
 - `GET /skills`
 - `GET /skills/:skillId`
 - `POST /skills/:skillId/run`
 
-The serve wrapper uses the same underlying registry and `runSkill()` runtime, with route-local request validation layered on top.
+Those routes use the same registry and `runSkill()` runtime, with HTTP request
+validation layered on top. See [Serve API](../api/serve.md#endpoint-get-skills)
+for route-local request and response details.
 
-Important boundary:
+## Verification
 
-- the serve route validates the skill, resolves `operatorPackage`, and after the requested Operator package check passes it uses the same bounded pre-spawn readiness preparation as `skills run`
-- when the screen is off, that preparation may wake the device before the skill process is spawned
-- it still fails with `DEVICE_NOT_INTERACTIVE` for awake-but-locked or post-boot-locked states
-- it does not go through the full CLI `cmdSkillsRun()` path, so it still does not include the CLI banner behavior
-- serve accepts optional request fields:
-  - `deviceId`
-  - `operatorPackage`
-  - `args`
-  - `timeoutMs`
-  - `expectContains`
+Discovery verification:
 
-## Error Codes
+```bash
+clawperator skills list
+clawperator skills for-app com.android.settings
+clawperator skills search --keyword settings
+clawperator skills get com.android.settings.capture-overview
+```
 
-The skills contract defines its own stable codes in `apps/node/src/contracts/skills.ts`.
+Run verification:
 
-Common ones:
+```bash
+clawperator skills validate com.android.settings.capture-overview --dry-run
+clawperator skills run com.android.settings.capture-overview --timeout 3210
+```
 
-| Code | Meaning |
-| --- | --- |
-| `REGISTRY_READ_FAILED` | registry file missing, unreadable, or invalid |
-| `SKILL_NOT_FOUND` | requested id is not in the registry |
-| `SKILL_VALIDATION_FAILED` | pre-run validation found missing files, mismatched metadata, or invalid artifacts |
-| `SKILL_SCRIPT_NOT_FOUND` | registry exists but the chosen script file does not |
-| `SKILL_EXECUTION_FAILED` | subprocess exited non-zero or failed to spawn |
-| `SKILL_EXECUTION_TIMEOUT` | wrapper timeout elapsed |
-| `SKILL_AGENT_CLI_UNAVAILABLE` | orchestrated skill declared `agent.cli` but the configured agent CLI could not be resolved |
-| `SKILL_OUTPUT_ASSERTION_FAILED` | `--expect-contains` was set and the output did not contain the text |
-| `SKILL_RESULT_PARSE_FAILED` | a framed `SkillResult` was malformed or could not be trusted |
+Machine-checkable success:
 
-## Practical Model
-
-- use `skills list`, `skills search`, and `skills get` to discover what is available
-- use `skills validate --dry-run` when you want to confirm registry integrity before a live run
-- use `skills run` when you want the wrapper's validation gate, timeout, env injection, and JSON envelope
-- use skill output as deterministic wrapper output, not as autonomous reasoning
+- discovery responses parse as JSON and expose either `skills[]` plus `count`,
+  or one `skill`
+- validation success has `valid == true`
+- framed run success has `skillResult.status == "success"` and a domain answer
+  at `skillResult.result`
+- unframed run success has `status == "success"` and `exitCode == 0`
 
 ## Related Pages
 
-- [Host Agent Orientation](../host-agents.md)
+- [Skills Overview](overview.md)
 - [Authoring](authoring.md)
 - [Development Workflow](development.md)
 - [Device Prep and Runtime](runtime.md)
-- [Environment Variables](../api/environment.md)
 - [Serve API](../api/serve.md)
+- [CLI Reference](../api/cli.md#command-skills)
 
 ---
 
@@ -12200,12 +12247,14 @@ Additional execution failures to expect:
 
 ```json
 {
-  "code": "SKILL_EXECUTION_TIMEOUT",
+  "code": "<skill-timeout-code>",
   "message": "Skill com.example.app.do-thing timed out after 90000ms",
   "skillId": "com.example.app.do-thing",
   "stdout": "{\"stage\":\"before-timeout\"}\n"
 }
 ```
+
+The timeout `code` is <code>SKILL_EXECUTION_<wbr>TIMEOUT</code>.
 
 ```json
 {
@@ -12338,7 +12387,7 @@ Verification pattern:
   validation, then calls `runSkill()` directly instead of invoking
   `cmdSkillsRun()`
 - it does not inject the CLI wrapper banner
-- handle `error.code` values such as `SKILL_OUTPUT_ASSERTION_FAILED`, `SKILL_EXECUTION_FAILED`, `SKILL_EXECUTION_TIMEOUT`, and `SKILL_RESULT_PARSE_FAILED` through the nested `error` object, not as the top-level response object
+- handle `error.code` values such as `SKILL_OUTPUT_ASSERTION_FAILED`, `SKILL_EXECUTION_FAILED`, <code>SKILL_EXECUTION_<wbr>TIMEOUT</code>, and `SKILL_RESULT_PARSE_FAILED` through the nested `error` object, not as the top-level response object
 
 ## Skill Sync
 
@@ -12453,7 +12502,7 @@ Fix:
 - inspect the returned `details`
 - correct metadata or payload shape
 
-### `SKILL_EXECUTION_TIMEOUT`
+### <code>SKILL_EXECUTION_<wbr>TIMEOUT</code>
 
 Cause:
 
@@ -12680,7 +12729,7 @@ clawperator skills run <skill_id> --timeout 90000
 If the child does not exit in time:
 
 - the wrapper sends `SIGTERM`
-- the command fails with `SKILL_EXECUTION_TIMEOUT`
+- the command fails with <code>SKILL_EXECUTION_<wbr>TIMEOUT</code>
 
 Top-level timeout parsing failures happen before the skill starts:
 
@@ -12887,7 +12936,7 @@ does not rewrite it.
 ```json
 {
   "status": "failed",
-  "code": "SKILL_EXECUTION_TIMEOUT",
+  "code": "<skill-timeout-code>",
   "message": "Skill com.android.settings.capture-overview timed out after 120000ms",
   "skillId": "com.android.settings.capture-overview",
   "stdout": "RESULT|status=partial\n",
@@ -12895,6 +12944,8 @@ does not rewrite it.
   "skillResult": null
 }
 ```
+
+The timeout `code` is <code>SKILL_EXECUTION_<wbr>TIMEOUT</code>.
 
 Another common failure is a bad registry or missing script:
 
@@ -12927,7 +12978,7 @@ Recovery patterns:
 - `SKILL_NOT_FOUND`: confirm the exact registry `id` with `clawperator skills list`
 - `SKILL_SCRIPT_NOT_FOUND`: repair the registry entry or restore the script file on disk
 - `SKILL_EXECUTION_FAILED`: inspect `exitCode`, `stdout`, and `stderr`
-- `SKILL_EXECUTION_TIMEOUT`: inspect partial `stdout` and only then consider increasing `--timeout`
+- <code>SKILL_EXECUTION_<wbr>TIMEOUT</code>: inspect partial `stdout` and only then consider increasing `--timeout`
 - `SKILL_RESULT_PARSE_FAILED`: fix malformed framed output or unreadable trusted source metadata in `skill.json`
 
 ## Practical Runtime Rules

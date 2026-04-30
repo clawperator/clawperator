@@ -2,7 +2,9 @@
 
 ## Purpose
 
-Define what `snapshot` returns, where the XML hierarchy is attached in the result envelope, what extraction failures look like, and what parts of the snapshot contract an agent can rely on.
+Define what `snapshot` returns, where the XML hierarchy is attached in the
+[result envelope](overview.md#result-envelope), what extraction failures look
+like, and what parts of the snapshot contract an agent can rely on.
 
 ## Sources
 

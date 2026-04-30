@@ -248,69 +248,20 @@ clawperator doctor --device <device_serial>
 
 ### Doctor checks
 
-| Check ID | What it verifies |
-| --- | --- |
-| `host.node.version` | Node.js >= 24 |
-| `host.java.version` | Java 17 or 21 is installed |
-| `host.adb.presence` | adb is installed and on PATH |
-| `host.adb.server` | adb server starts successfully |
-| `device.discovery` | At least one device is connected and in state `device` |
-| `device.capability` | Device shell is available (SDK version, screen size) |
-| `readiness.apk.presence` | Operator APK is installed on the device |
-| `readiness.settings.dev_options` | Developer options enabled |
-| `readiness.settings.usb_debugging` | USB debugging enabled |
-| `readiness.version.compatibility` | CLI version is compatible with installed APK version |
-| `readiness.handshake` | Node can dispatch a command and receive a result envelope from the Operator |
-| `readiness.smoke` | End-to-end test: open Settings, capture UI snapshot |
-
-### DoctorReport shape
-
-```json
-{
-  "ok": true,
-  "criticalOk": true,
-  "deviceId": "<device_serial>",
-  "operatorPackage": "com.clawperator.operator",
-  "checks": [
-    {
-      "id": "host.node.version",
-      "status": "pass",
-      "summary": "Node version v24.x.x is compatible."
-    }
-  ],
-  "nextActions": []
-}
-```
-
-Failed checks include additional fields:
-
-```json
-{
-  "id": "readiness.handshake",
-  "status": "fail",
-  "code": "RESULT_ENVELOPE_TIMEOUT",
-  "summary": "Handshake timed out.",
-  "detail": "No [Clawperator-Result] envelope received within 7000ms.",
-  "fix": {
-    "title": "Grant accessibility permissions via adb",
-    "platform": "any",
-    "steps": [
-      { "kind": "shell", "value": "clawperator grant-device-permissions --device <device_serial>" }
-    ]
-  }
-}
-```
+Doctor checks host prerequisites, adb/device discovery, Operator APK presence,
+version compatibility, handshake readiness, and interactive device state. The
+full check order, `DoctorReport` shape, `checks[]` fields, `nextActions`
+behavior, and `--fix` semantics are owned by [Doctor](api/doctor.md#doctor-report-contract).
 
 ### Success conditions
 
 - Exit code `0` means all critical checks passed.
 - JSON has `"criticalOk": true`.
 - `checks[]` contains only `"pass"` or non-critical `"warn"` statuses.
-- Each check has `status`: `"pass"`, `"warn"`, or `"fail"`.
 
 ### Doctor flags
 
-- `doctor --fix` automatically executes shell-type remediation steps from failed checks. Manual steps are still reported. Use this for unattended recovery loops.
+- `doctor --fix` can execute shell-type remediation steps from failed checks.
 - `doctor --check-only` always exits `0` regardless of failures. Do not use it as the setup gate.
 
 See [Doctor](api/doctor.md) for the full report contract and [Errors](api/errors.md) for recovery by code.

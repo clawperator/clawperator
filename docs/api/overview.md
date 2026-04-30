@@ -16,6 +16,23 @@ This page is intentionally narrow:
 - Use [Devices](devices.md) for target selection rules
 - Use [Daemon](daemon.md) for background daemon lifecycle commands
 
+## Surface Terminology
+
+Clawperator exposes several public surfaces. Use the precise surface name when
+you document, call, or parse behavior:
+
+| Surface | What it is | Canonical owner |
+| --- | --- | --- |
+| CLI command | A top-level shell command such as `snapshot`, `click`, or `skills`. | [CLI Reference](cli.md) for command lookup; behavior lives on the linked owner page. |
+| CLI subcommand | A nested shell command such as `skills run`, `recording export`, or `emulator provision`. | The subsystem page, such as [Skills CLI](../skills/cli.md) or [Recording](recording.md). |
+| Execution action | A JSON action inside `ExecutionInput.actions[]`, such as `click` or `open_app`. | [Actions](actions.md). |
+| Node contract | A TypeScript-backed data shape accepted or returned by the Node package. | This page for execution payload and [result envelope](#result-envelope); feature pages for narrower contracts. |
+| Serve endpoint | An HTTP or SSE route exposed by `clawperator serve`, such as `POST /execute`. | [Serve API](serve.md). |
+| MCP tool | A stdio MCP tool exposed by `clawperator mcp serve`, such as `snapshot` or `execute`. | [MCP Server](mcp.md). |
+| Selector | A `NodeMatcher` object or CLI selector flags used to find UI nodes. | [Selectors](selectors.md). |
+| Error code | A stable Node-side code from `apps/node/src/contracts/errors.ts`, or a documented feature-specific code. | [Errors](errors.md) for Node codes; feature pages for feature-specific codes. |
+| Result envelope | The `[Clawperator-Result]` terminal envelope emitted by the Operator and wrapped by Node. | [Result Envelope](#result-envelope). |
+
 ## CLI Output Format
 
 CLI commands return JSON by default. Agents should parse stdout directly with
@@ -275,16 +292,18 @@ Non-runtime success wrappers from `clawperator exec`:
 }
 ```
 
-## Surface Differences
+## Wrapper Differences
 
 Use the wrapper shape that matches the surface you called:
 
-| Surface | Success shape |
-| --- | --- |
-| CLI device execution commands | `{ "envelope": ..., "deviceId": "...", "terminalSource": "clawperator_result", "isCanonicalTerminal": true }` |
-| `clawperator exec --validate` | `{ "ok": true, "validated": true, "execution": ... }` |
-| `clawperator exec --dry-run` | `{ "ok": true, "dryRun": true, "plan": ... }` |
-| `clawperator serve` execution endpoints | `{ "ok": true, "deviceId": "...", "terminalSource": "...", "envelope": ... }` |
+| Surface | Success shape | Result-envelope rule |
+| --- | --- | --- |
+| CLI device execution command | `{ "envelope": ..., "deviceId": "...", "terminalSource": "clawperator_result", "isCanonicalTerminal": true }` | Read `envelope` with the [result-envelope](#result-envelope) rules. |
+| `clawperator exec --validate` | `{ "ok": true, "validated": true, "execution": ... }` | Pre-dispatch only; no result envelope exists. |
+| `clawperator exec --dry-run` | `{ "ok": true, "dryRun": true, "plan": ... }` | Pre-dispatch only; no result envelope exists. |
+| Serve execution endpoint | `{ "ok": true, "deviceId": "...", "terminalSource": "...", "envelope": ... }` | Read `envelope` with the same [result-envelope](#result-envelope) rules. |
+| MCP execution-backed tool | Tool-specific `structuredContent` containing action output and usually `envelope`. | When present, read `envelope` with the same [result-envelope](#result-envelope) rules. |
+| Skills CLI command | Skill wrapper JSON with `skillResult`, `durationMs`, or feature-specific error fields. | Not a `[Clawperator-Result]` envelope unless a skill chooses to expose one in its own result. |
 
 `isCanonicalTerminal` is a CLI wrapper field. HTTP serve execution responses do not include it.
 
