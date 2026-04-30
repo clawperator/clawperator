@@ -28,7 +28,7 @@ This skill updates public release-facing surfaces such as:
 - the generated docs-site outputs produced by `./scripts/docs_build.sh`, including the docs home page and `llms-full.txt`
 - generated `llms-full.txt` artifacts
 
-It then rebuilds docs/site artifacts and creates a dedicated follow-up commit:
+It then rebuilds docs/site artifacts, verifies that the built docs homepage and generated `llms-full.txt` artifacts contain the target release marker, and creates a dedicated follow-up commit:
 
 ```bash
 git commit -m "docs(release): update published version to <version>"

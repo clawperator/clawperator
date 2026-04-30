@@ -55,6 +55,43 @@ def parse_version(version: str) -> tuple[int, int, int]:
     return tuple(int(part) for part in match.groups())
 
 
+def current_release_marker_html(version: str) -> re.Pattern[str]:
+    tag_href = re.escape(f"https://github.com/clawperator/clawperator/releases/tag/v{version}")
+    release_text = re.escape(version)
+    return re.compile(rf'<strong>Current release:\s*<a href="{tag_href}">{release_text}</a></strong>')
+
+
+def current_release_marker_text(version: str) -> str:
+    return f"**Current release: [{version}](https://github.com/clawperator/clawperator/releases/tag/v{version})**"
+
+
+def published_version_output_problems(repo_root: Path, version: str) -> list[str]:
+    problems: list[str] = []
+
+    html_path = repo_root / "sites" / "docs" / "site" / "index.html"
+    html_marker = current_release_marker_html(version)
+    if not html_path.exists():
+        problems.append(f"missing built docs homepage: {html_path}")
+    elif not html_marker.search(html_path.read_text(encoding="utf-8")):
+        problems.append(f"{html_path}: missing current release marker for {version}")
+
+    expected_text = current_release_marker_text(version)
+    artifact_paths = [
+        repo_root / "sites" / "docs" / "static" / "llms-full.txt",
+        repo_root / "sites" / "docs" / "site" / "llms-full.txt",
+        repo_root / "sites" / "landing" / "public" / "llms-full.txt",
+    ]
+    for artifact_path in artifact_paths:
+        if not artifact_path.exists():
+            problems.append(f"missing generated release artifact: {artifact_path}")
+            continue
+        content = artifact_path.read_text(encoding="utf-8")
+        if expected_text not in content:
+            problems.append(f"{artifact_path}: missing current release marker for {version}")
+
+    return problems
+
+
 def update_compatibility_versioned_apk_downloads(path: Path, version: str) -> bool:
     """
     Best-effort migration of release follow-up "version injection" into the
@@ -186,6 +223,13 @@ def main() -> None:
     )
 
     subprocess.run(["./scripts/docs_build.sh"], cwd=repo_root, check=True)
+
+    published_version_problems = published_version_output_problems(repo_root, version)
+    if published_version_problems:
+        die(
+            "published version verification failed:\n"
+            + "\n".join(f"- {problem}" for problem in published_version_problems)
+        )
 
     commit_message = f"docs(release): update published version to {version}"
 
