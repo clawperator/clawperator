@@ -1225,6 +1225,8 @@ Current Node-side validation limits are:
 
 If validation fails on limits, shorten the action list, split a large workflow into multiple executions, or avoid embedding oversized inline artifacts in the payload.
 
+<a id="result-envelope"></a>
+
 ## Result Envelope
 
 Authoritative source: `apps/node/src/contracts/result.ts`
