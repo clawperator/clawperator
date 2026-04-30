@@ -10198,8 +10198,12 @@ Argument and env rules:
 
 - if `--device` was provided, the wrapper injects it through
   `CLAWPERATOR_DEVICE_ID`
+- for script-driven skills, that explicit device id is also prepended as the
+  first child argument, so Node scripts receive `argv[2] = <device_serial>`
+  before forwarded args
 - if `--device` was omitted, preflight may resolve one target, but inherited
-  ambient `CLAWPERATOR_DEVICE_ID` is cleared for the child process
+  ambient `CLAWPERATOR_DEVICE_ID` is cleared for the child process and no
+  synthetic device argument is added
 - unknown trailing tokens are forwarded to the skill script unchanged
 - use `--` before literal passthrough args that would otherwise look like
   wrapper flags
