@@ -71,6 +71,24 @@ class PublishedVersionOutputTests(unittest.TestCase):
             msg=f"Expected docs homepage mismatch in problems: {problems}",
         )
 
+    def test_rejects_mismatched_generated_release_artifact(self) -> None:
+        self.write_outputs("0.9.3")
+        (self.repo_root / "sites/landing/public/llms-full.txt").write_text(
+            published_version.current_release_marker_text("0.9.2"),
+            encoding="utf-8",
+        )
+
+        problems = published_version.published_version_output_problems(self.repo_root, "0.9.3")
+
+        self.assertTrue(
+            any(
+                "sites/landing/public/llms-full.txt: missing current release marker for 0.9.3"
+                in problem
+                for problem in problems
+            ),
+            msg=f"Expected generated artifact mismatch in problems: {problems}",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
