@@ -348,13 +348,11 @@ def render_command_section(command: CommandInfo, notes: list[str], detail: Detai
     return "\n".join(lines)
 
 
-def warn_for_missing_details(commands: list[CommandInfo], command_details: dict[str, DetailLink]) -> None:
+def require_command_details(commands: list[CommandInfo], command_details: dict[str, DetailLink]) -> None:
     missing = [command.name for command in public_commands(commands) if command.name not in command_details]
     if missing:
-        warnings.warn(
+        raise ValueError(
             "Missing command detail ownership for: " + ", ".join(missing),
-            RuntimeWarning,
-            stacklevel=2,
         )
 
 
@@ -362,7 +360,7 @@ def render_reference(commands: list[CommandInfo], command_details: dict[str, Det
     visible_commands = public_commands(commands)
     notes_by_command = alias_notes(commands)
     command_details = command_details or {}
-    warn_for_missing_details(commands, command_details)
+    require_command_details(commands, command_details)
 
     lines = [
         "# CLI Reference",

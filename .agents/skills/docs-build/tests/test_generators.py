@@ -227,7 +227,7 @@ COMMANDS["second"] = {
         self.assertIn("[`click`](actions.md#action-click)", rendered)
         self.assertIn("[Selectors](selectors.md#selector-flag-text)", rendered)
 
-    def test_public_reference_warns_for_missing_detail_links(self) -> None:
+    def test_public_reference_fails_for_missing_detail_links(self) -> None:
         commands = [
             cli_reference.CommandInfo(
                 name="snapshot",
@@ -242,16 +242,11 @@ COMMANDS["second"] = {
             ),
         ]
 
-        with warnings.catch_warnings(record=True) as captured:
-            warnings.simplefilter("always")
+        with self.assertRaisesRegex(
+            ValueError,
+            "Missing command detail ownership for: snapshot",
+        ):
             cli_reference.render_reference(commands, {})
-
-        self.assertTrue(
-            any(
-                "Missing command detail ownership for: snapshot" in str(warning.message)
-                for warning in captured
-            )
-        )
 
 
 class GenerateSelectorTableTests(unittest.TestCase):
