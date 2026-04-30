@@ -580,6 +580,32 @@ Recommendation:
 
 When cleanup finds repeated prose explaining a non-obvious CLI shape, file an API ergonomics follow-up rather than adding more docs. Keep this out of the first docs cleanup task unless a specific parser bug is discovered.
 
+### F-15 - Skills CLI Needs A Canonical Detail Page
+
+Severity: Medium
+
+Surface: generated `api/cli.md`, `docs/skills/`, `registry.ts`
+
+Evidence:
+
+- The `skills` command has a large subcommand surface, including list, get, for-app, search, compile-artifact, new, validate, run, install, update, and sync.
+- The generated CLI reference currently lists syntax and flags but should not own behavior, output shapes, success conditions, or recovery.
+- Existing skills pages explain concepts such as overview, authoring, development workflow, runtime, and personalized skills, but there is no dedicated skills CLI command contract page.
+
+Why it matters for humans:
+
+Skills are a primary user-facing workflow. A developer should not have to infer `skills run`, `skills validate`, or `skills search` behavior from a generated flag row.
+
+Why it matters for agents:
+
+Agents are likely to use `clawperator skills` as an entry point after install. They need exact command behavior, output shape, success conditions, and failure recovery in one canonical location.
+
+Recommendation:
+
+Add a canonical authored `docs/skills/cli.md` page in the authored docs cleanup phase. The generated `/api/cli/` page should include the `skills` command and link its details to `docs/skills/cli.md`.
+
+This page should be under the Skills nav rather than the API nav because the user intent is skill discovery and execution. The API CLI index remains the command directory and routing surface.
+
 ## Recommended Link And Anchor Strategy
 
 Anchor rules:
@@ -717,8 +743,9 @@ Work:
 2. Trim Doctor contract detail from `setup.md`; keep setup readiness gate and link to `doctor.md`.
 3. Add a Serve "Error Layers" section.
 4. Add or improve result-envelope links from feature pages to `overview.md#result-envelope`.
-5. Add authored annotations to `errors.md` only where recovery remains thin.
-6. Reorder API nav entries after `/api/cli/` is fixed. Do not add redirects for nav-only reordering.
+5. Add `docs/skills/cli.md` as the canonical skills CLI command detail page and link to it from the generated CLI reference.
+6. Add authored annotations to `errors.md` only where recovery remains thin.
+7. Reorder API nav entries after `/api/cli/` is fixed. Do not add redirects for nav-only reordering.
 
 Validation:
 
@@ -750,6 +777,7 @@ Do not add broad prose autolinking or judgment-heavy lint.
 | Recording behavioral ownership | `docs/api/recording.md` remains canonical for lifecycle, output, NDJSON, export, compare, and failures. |
 | Nav reorder redirect overhead | No redirect overhead for nav-only reorder when file paths stay unchanged. Reorder later as a low-risk docs IA cleanup. |
 | Skills `documentedFlags` | Do within the full generator metadata cleanup, prioritizing `skills`, not as a one-off patch. |
+| Skills CLI detail page | Add `docs/skills/cli.md` as the canonical detail page for `clawperator skills` subcommands. Link to it from `api/cli.md`. |
 | Selector flags inline | Show `--text`, `--id`, `--desc`, `--role`; link to Selectors for full options. |
 | Action mapping table in `actions.md` | Keep. It provides reverse lookup from execution action to CLI verification path. |
 | Ownership metadata location | Prefer docs-owned manifest over hardcoding docs IA in `registry.ts`; keep runtime behavior metadata in code. |
