@@ -11,6 +11,9 @@ Inspected surfaces:
 - `sites/docs/.build/api/cli.md`
 - `.agents/skills/docs-build/scripts/assemble.py`
 - `.agents/skills/docs-build/scripts/generate_cli_reference.py`
+- `.agents/skills/docs-build/scripts/generate_error_table.py`
+- `.agents/skills/docs-build/scripts/generate_selector_table.py`
+- `.agents/skills/docs-build/scripts/generate_mcp_tool_summary.py`
 - `docs/index.md`
 - `docs/setup.md`
 - `docs/api/overview.md`
@@ -28,6 +31,11 @@ Inspected surfaces:
 - `docs/api/daemon.md`
 - `docs/api/mcp.md`
 - `docs/api/logging.md`
+- `docs/skills/overview.md`
+- `docs/skills/authoring.md`
+- `docs/skills/development.md`
+- `docs/skills/runtime.md`
+- `docs/skills/personalized-skills.md`
 
 Inspected source-of-truth code:
 
@@ -60,7 +68,7 @@ Highest-impact recommendations:
 3. Classify command visibility. Guidance shims such as top-level `setup` should be hidden from the public command index; working aliases such as top-level `provision emulator` should appear under their canonical command, not as peer commands.
 4. Define stable anchors for commands, action types, selector concepts, error codes, result-envelope fields, serve endpoints, and setup steps.
 5. Add a docs-owned ownership and link manifest so generated pages can route readers to the canonical authored pages.
-6. Keep result-envelope prose authored for now, keep recording command coverage in both `api/cli.md` and `recording.md` at different depths, and treat nav reordering as low-risk because page URLs do not change when file paths stay the same.
+6. Keep result-envelope prose authored for now, keep recording command coverage in both `api/cli.md` and `recording.md` at different depths, fix the small Serve endpoint inventory mismatch, and treat nav reordering as low-risk because page URLs do not change when file paths stay the same.
 
 This findings file is ready to feed into `$task-author`. There are no blocking open questions for task-pack creation.
 
@@ -85,6 +93,8 @@ This findings file is ready to feed into `$task-author`. There are no blocking o
 | `docs/api/navigation.md` | Authored | Composed navigation patterns |
 | `docs/api/timeouts.md` | Authored | Execution and action timeout budgeting |
 | `docs/api/environment.md` | Authored | Environment variables and runtime configuration |
+| `docs/skills/overview.md` | Authored | Runtime skills model plus current skills CLI behavior |
+| `docs/skills/*.md` | Authored | Skills authoring, development, runtime, and personalized-skill guidance |
 
 Generation pipeline:
 
@@ -122,6 +132,8 @@ Current generated pieces:
 | Setup flow | installer, operator setup/remediate, doctor readiness | `docs/setup.md` | Authored happy path with links to contract pages |
 | Serve endpoints | `apps/node/src/cli/commands/serve.ts` | `docs/api/serve.md` | Authored |
 | Recording workflow | recording domain code and CLI handlers | `docs/api/recording.md`; summarized in `api/cli.md` | Authored detail, generated CLI routing |
+| MCP tools | `apps/node/src/mcp/tools/`, `apps/node/src/mcp/server.ts`, `generate_mcp_tool_summary.py` | `docs/api/mcp.md` | Authored detail + generated tool summary |
+| Skills CLI | `apps/node/src/cli/registry.ts`, `apps/node/src/cli/commands/skills.ts`, skills domain code | `docs/skills/cli.md` after cleanup; `docs/skills/overview.md` currently carries much of this | Authored detail, generated CLI routing |
 | Examples | verified authored docs | Relevant authored page | Authored only |
 
 Key terminology decisions:
@@ -130,6 +142,7 @@ Key terminology decisions:
 - Use **CLI subcommand** for nested CLI surfaces such as `operator setup` or `recording export`.
 - Use **execution action** or **action type** for `actions[i].type` values in execution JSON.
 - Use **Serve endpoint** or **HTTP endpoint** for `POST /execute`, `GET /devices`, and related routes.
+- Use **MCP tool** for tool names exposed through `clawperator mcp serve`; do not conflate these with CLI commands or Serve endpoints.
 - Use **Node contract** for TypeScript data shapes under `apps/node/src/contracts/`.
 - Use **result envelope** only for the `[Clawperator-Result]` terminal envelope. CLI and serve may wrap it.
 
@@ -174,6 +187,7 @@ Surface: `generate_cli_reference.py`, `registry.ts`, generated `api/cli.md`
 Evidence:
 
 - `parse_supported_flags()` falls back to regex extraction of every `--flag` token in a command body when `documentedFlags` is absent.
+- `CommandDef` already has a `documentedFlags?: string[]` field, but current `registry.ts` uses it sparsely rather than as a complete docs contract.
 - This captures compatibility aliases, help prose, examples, error strings, and internal implementation details.
 - The selector source confirms primary flags are `--id`, `--desc`, `--role`, `--text`, and related canonical forms. Longer spellings such as resource-id and content-description variants are compatibility aliases, not primary docs forms.
 - The generated `skills` row currently exposes a legacy package-name alias and other compatibility flags at the same visual weight as primary flags.
@@ -188,7 +202,7 @@ Agents learn from docs. If compatibility aliases are shown as primary forms, age
 
 Recommendation:
 
-Add curated command metadata for public docs:
+Complete curated command metadata for public docs:
 
 - `documentedFlags`: only primary agent-facing flags.
 - Optional `acceptedAliases`: compatibility forms that should be hidden from main reference output.
@@ -243,7 +257,7 @@ Evidence:
 
 - Headings currently rely on MkDocs slug generation.
 - Generated command headings are incidental and not declared as stable public anchors.
-- Action, error, selector, endpoint, and setup-step references do not have a shared anchor convention.
+- Action, error, selector, endpoint, MCP tool, and setup-step references do not have a shared anchor convention.
 
 Why it matters for humans:
 
@@ -267,9 +281,10 @@ Define and implement this anchor strategy:
 | Error code | `error-<lowercase-code>` | `#error-node-not-found` |
 | Result envelope field | `result-envelope-<field>` | `#result-envelope-command-id` |
 | Serve endpoint | `endpoint-<method>-<path>` | `#endpoint-post-execute` |
+| MCP tool | `mcp-tool-<name>` | `#mcp-tool-configure` |
 | Setup step | `setup-step-<slug>` | `#setup-step-install-operator-apk` |
 
-Use canonical action types from `contracts/aliases.ts`; for example, use `action-click`, not `action-tap`.
+Use canonical action types from `contracts/aliases.ts`; for example, anchor the canonical `click` action, not its `tap` input alias.
 
 ### F-05 - Canonical Ownership Is Implicit
 
@@ -315,7 +330,7 @@ Evidence:
 
 - Authored pages already include many page-level related links.
 - Generated `api/cli.md` does not link command rows or sections to canonical authored detail pages.
-- Existing links rarely target specific anchors for commands, action types, error codes, selectors, or endpoints.
+- Existing links rarely target specific anchors for commands, action types, error codes, selectors, endpoints, or MCP tools.
 
 Why it matters for humans:
 
@@ -332,6 +347,7 @@ After anchors exist, add generated and authored anchor-level links:
 - CLI command -> canonical command detail page
 - CLI command -> action type where applicable
 - action type -> CLI command where useful for verification
+- MCP tool -> underlying action, selector, or result-envelope contract where applicable
 - feature page error mention -> exact error code anchor
 - setup readiness gate -> Doctor contract anchor
 
@@ -426,7 +442,31 @@ Add a `serve.md` section named "Error Layers" with:
 - exact fields to inspect in order
 - links to `errors.md` and `overview.md#result-envelope`
 
-### F-10 - Doctor Contract Ownership Is Blurry Between Setup And Doctor Pages
+### F-10 - Serve Endpoint Inventory Is Missing Implemented Health Routes
+
+Severity: Medium
+
+Surface: `docs/api/serve.md`, `apps/node/src/cli/commands/serve.ts`
+
+Evidence:
+
+- `serve.ts` registers `GET /ping` and `GET /version` before the device, execution, skills, emulator, and events routes.
+- The current `serve.md` endpoint summary starts at `GET /devices` and omits `GET /ping` and `GET /version`.
+- The verbose startup route list in `serve.ts` includes `/ping`, `/version`, `/devices`, `/execute`, `/snapshot`, `/screenshot`, `/skills`, `/skills/:skillId`, `/skills/:skillId/run`, and `/events`, but omits emulator routes, so it is useful corroboration but not the complete route inventory.
+
+Why it matters for humans:
+
+Health and version routes are common first checks for local HTTP APIs. Missing them makes the reference look less complete than the implementation.
+
+Why it matters for agents:
+
+Agents often probe a local service with `/ping` or `/version` before attempting stateful work. If those routes are undocumented, an agent may miss a cheap readiness check and jump straight to device-mutating endpoints.
+
+Recommendation:
+
+Update `serve.md` from `serve.ts` so the endpoint summary includes every public route, including `GET /ping` and `GET /version`. Add stable endpoint anchors in the same pass. Keep route-local wrapper errors separate from shared `errors.ts` codes because health-route errors are not execution-envelope failures.
+
+### F-11 - Doctor Contract Ownership Is Blurry Between Setup And Doctor Pages
 
 Severity: Medium
 
@@ -456,7 +496,7 @@ Keep `setup.md` focused on first-run flow:
 
 Move or reduce full Doctor contract details in `setup.md`. Do not split `setup.md` into a new troubleshooting page in the first cleanup task.
 
-### F-11 - Selector Flags Are Repeated Too Verbosely In CLI Output
+### F-12 - Selector Flags Are Repeated Too Verbosely In CLI Output
 
 Severity: Medium
 
@@ -487,7 +527,7 @@ In `api/cli.md`, show only the most-used primary selector flags inline:
 
 Then link to `selectors.md` for `--selector`, contains variants, container selectors, mutual exclusion, blank-value rules, and compatibility aliases.
 
-### F-12 - Error Code Table Is Complete But Thin
+### F-13 - Error Code Table Is Complete But Thin
 
 Severity: Low
 
@@ -496,7 +536,8 @@ Surface: `docs/api/errors.md`, `generate_error_table.py`, `contracts/errors.ts`
 Evidence:
 
 - The generated error table enumerates codes from `contracts/errors.ts`.
-- Many rows have sparse notes.
+- `generate_error_table.py` derives labels mechanically and uses only adjacent source comments as notes.
+- Many rows therefore have `-` notes or category labels such as `Host`, `Execution & State`, or `Recording`, rather than actionable recovery guidance.
 - Recovery families and key cases exist, but less-common codes are not easy to act on.
 
 Why it matters for humans:
@@ -517,7 +558,7 @@ After anchor work, add authored annotations for:
 
 Do not block the initial CLI reference cleanup on this.
 
-### F-13 - Nav Order Can Better Match The Learning Path
+### F-14 - Nav Order Can Better Match The Learning Path
 
 Severity: Low
 
@@ -558,7 +599,7 @@ After `/api/cli/` is simplified, reorder only the API nav entries so concepts pr
 
 This does not require redirects as long as file paths remain unchanged. MkDocs nav order changes presentation, not page URLs.
 
-### F-14 - Docs Should Not Compensate For API Friction
+### F-15 - Docs Should Not Compensate For API Friction
 
 Severity: Low
 
@@ -580,7 +621,7 @@ Recommendation:
 
 When cleanup finds repeated prose explaining a non-obvious CLI shape, file an API ergonomics follow-up rather than adding more docs. Keep this out of the first docs cleanup task unless a specific parser bug is discovered.
 
-### F-15 - Skills CLI Needs A Canonical Detail Page
+### F-16 - Skills CLI Needs A Canonical Detail Page
 
 Severity: Medium
 
@@ -590,7 +631,9 @@ Evidence:
 
 - The `skills` command has a large subcommand surface, including list, get, for-app, search, compile-artifact, new, validate, run, install, update, and sync.
 - The generated CLI reference currently lists syntax and flags but should not own behavior, output shapes, success conditions, or recovery.
-- Existing skills pages explain concepts such as overview, authoring, development workflow, runtime, and personalized skills, but there is no dedicated skills CLI command contract page.
+- Existing skills pages explain concepts such as overview, authoring, development workflow, runtime, and personalized skills.
+- `docs/skills/overview.md` currently carries substantial skills CLI contract detail, including discovery commands, output shapes, registry failure behavior, and execution flow.
+- There is no dedicated skills CLI command contract page, so `overview.md` is doing both conceptual orientation and command-reference work.
 
 Why it matters for humans:
 
@@ -602,7 +645,7 @@ Agents are likely to use `clawperator skills` as an entry point after install. T
 
 Recommendation:
 
-Add a canonical authored `docs/skills/cli.md` page in the authored docs cleanup phase. The generated `/api/cli/` page should include the `skills` command and link its details to `docs/skills/cli.md`.
+Add a canonical authored `docs/skills/cli.md` page in the authored docs cleanup phase. Move or summarize command-contract material from `docs/skills/overview.md` so Overview remains conceptual and `cli.md` owns exact command behavior, output shapes, success conditions, and recovery.
 
 This page should be under the Skills nav rather than the API nav because the user intent is skill discovery and execution. The API CLI index remains the command directory and routing surface.
 
@@ -628,6 +671,8 @@ Canonical examples:
 | `NODE_NOT_FOUND` error | `api/errors.md#error-node-not-found` |
 | `commandId` result-envelope field | `api/overview.md#result-envelope-command-id` |
 | `POST /execute` | `api/serve.md#endpoint-post-execute` |
+| `GET /ping` | `api/serve.md#endpoint-get-ping` |
+| `configure` MCP tool | `api/mcp.md#mcp-tool-configure` |
 
 Cross-link maintenance:
 
@@ -742,10 +787,11 @@ Work:
 1. Clarify API surface terminology in `overview.md`.
 2. Trim Doctor contract detail from `setup.md`; keep setup readiness gate and link to `doctor.md`.
 3. Add a Serve "Error Layers" section.
-4. Add or improve result-envelope links from feature pages to `overview.md#result-envelope`.
-5. Add `docs/skills/cli.md` as the canonical skills CLI command detail page and link to it from the generated CLI reference.
-6. Add authored annotations to `errors.md` only where recovery remains thin.
-7. Reorder API nav entries after `/api/cli/` is fixed. Do not add redirects for nav-only reordering.
+4. Add `GET /ping` and `GET /version` to `serve.md`, verify the endpoint table against `serve.ts`, and add stable endpoint anchors.
+5. Add or improve result-envelope links from feature pages to `overview.md#result-envelope`.
+6. Add `docs/skills/cli.md` as the canonical skills CLI command detail page, move command-contract detail out of `docs/skills/overview.md` where appropriate, and link to it from the generated CLI reference.
+7. Add authored annotations to `errors.md` only where recovery remains thin.
+8. Reorder API nav entries after `/api/cli/` is fixed. Do not add redirects for nav-only reordering.
 
 Validation:
 
@@ -775,9 +821,10 @@ Do not add broad prose autolinking or judgment-heavy lint.
 | Result envelope marker generation | Defer. Keep `overview.md` as authored canonical home for now. |
 | Recording commands in `api/cli.md` | Yes. Include them in the generated all-CLI index with links to `recording.md`. |
 | Recording behavioral ownership | `docs/api/recording.md` remains canonical for lifecycle, output, NDJSON, export, compare, and failures. |
+| Serve health routes | `GET /ping` and `GET /version` are implemented public Serve endpoints and should be documented with the rest of the endpoint inventory. |
 | Nav reorder redirect overhead | No redirect overhead for nav-only reorder when file paths stay unchanged. Reorder later as a low-risk docs IA cleanup. |
 | Skills `documentedFlags` | Do within the full generator metadata cleanup, prioritizing `skills`, not as a one-off patch. |
-| Skills CLI detail page | Add `docs/skills/cli.md` as the canonical detail page for `clawperator skills` subcommands. Link to it from `api/cli.md`. |
+| Skills CLI detail page | Add `docs/skills/cli.md` as the canonical detail page for `clawperator skills` subcommands. Treat current `docs/skills/overview.md` command-contract content as migration material, not as proof that no CLI page is needed. Link to the new page from `api/cli.md`. |
 | Selector flags inline | Show `--text`, `--id`, `--desc`, `--role`; link to Selectors for full options. |
 | Action mapping table in `actions.md` | Keep. It provides reverse lookup from execution action to CLI verification path. |
 | Ownership metadata location | Prefer docs-owned manifest over hardcoding docs IA in `registry.ts`; keep runtime behavior metadata in code. |
