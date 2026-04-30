@@ -1,6 +1,6 @@
 # Version Compatibility
 
-**Current release: [0.5.2](https://github.com/clawperator/clawperator/releases/tag/v0.5.2)**
+**Current release: [0.9.3](https://github.com/clawperator/clawperator/releases/tag/v0.9.3)**
 
 *This is the latest published release. Download URLs below reference this version. See [Docs Home](../index.md) for the unreleased code version.*
 
