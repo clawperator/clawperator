@@ -122,6 +122,7 @@ Recommended recording-count stance:
 
 ## CLI Commands
 
+<a id="command-recording-start"></a>
 ### Start
 
 ```bash
@@ -185,6 +186,7 @@ Expected success wrapper shape:
 }
 ```
 
+<a id="command-recording-stop"></a>
 ### Stop
 
 ```bash
@@ -246,6 +248,7 @@ Expected success wrapper shape:
 }
 ```
 
+<a id="command-recording-pull"></a>
 ### Pull
 
 ```bash
@@ -278,6 +281,7 @@ Check:
 - `sessionId == "demo-session"`
 - `localPath` ends with `/demo-session.ndjson`
 
+<a id="command-recording-parse"></a>
 ### Parse
 
 ```bash
@@ -315,6 +319,7 @@ Check:
 - `stepCount` matches the parsed `steps.length`
 - `stdout` contains the JSON result, while `stderr` also receives a human-readable step summary from `printStepSummary()`
 
+<a id="command-recording-export"></a>
 ### Export
 
 ```bash
@@ -439,6 +444,7 @@ Exported event types:
 | `press_key` | `seq`, `ts`, `deltaMsSincePrevious`, `type`, `key`, `snapshot` |
 | `text_change` | `seq`, `ts`, `deltaMsSincePrevious`, `type`, `packageName`, `resourceId`, `text`, `snapshot` |
 
+<a id="command-recording-compare"></a>
 ### Compare
 
 ```bash

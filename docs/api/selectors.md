@@ -29,6 +29,15 @@ The raw selector object shared by `matcher`, `container`, `expectedNode`, and `l
 
 Meaning of each field:
 
+Stable field anchors:
+
+- <a id="selector-field-resource-id"></a>`resourceId`
+- <a id="selector-field-role"></a>`role`
+- <a id="selector-field-text-equals"></a>`textEquals`
+- <a id="selector-field-text-contains"></a>`textContains`
+- <a id="selector-field-content-desc-equals"></a>`contentDescEquals`
+- <a id="selector-field-content-desc-contains"></a>`contentDescContains`
+
 | Field | Match behavior |
 | --- | --- |
 | `resourceId` | exact Android resource ID match |
@@ -164,6 +173,23 @@ names. In those cases, `contentDescEquals` and visible text may be the most
 practical stable selectors available.
 
 ## Selector Flags
+
+Stable CLI flag anchors:
+
+- <a id="selector-flag-selector"></a>`--selector`
+- <a id="selector-flag-text"></a>`--text`
+- <a id="selector-flag-text-contains"></a>`--text-contains`
+- <a id="selector-flag-id"></a>`--id`
+- <a id="selector-flag-desc"></a>`--desc`
+- <a id="selector-flag-desc-contains"></a>`--desc-contains`
+- <a id="selector-flag-role"></a>`--role`
+- <a id="selector-flag-container-selector"></a>`--container-selector`
+- <a id="selector-flag-container-text"></a>`--container-text`
+- <a id="selector-flag-container-text-contains"></a>`--container-text-contains`
+- <a id="selector-flag-container-id"></a>`--container-id`
+- <a id="selector-flag-container-desc"></a>`--container-desc`
+- <a id="selector-flag-container-desc-contains"></a>`--container-desc-contains`
+- <a id="selector-flag-container-role"></a>`--container-role`
 
 <!-- CODE-DERIVED: selector-flags -->
 

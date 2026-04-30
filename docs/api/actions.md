@@ -149,6 +149,7 @@ Success condition for that payload:
 
 ## Action Reference
 
+<a id="action-click"></a>
 ### `click`
 
 | Field | Valid values |
@@ -187,6 +188,7 @@ Example:
 }
 ```
 
+<a id="action-scroll"></a>
 ### `scroll`
 
 | Field | Valid values |
@@ -233,6 +235,7 @@ Example:
 }
 ```
 
+<a id="action-scroll-until"></a>
 ### `scroll_until`
 
 | Field | Valid values |
@@ -285,6 +288,7 @@ Example:
 }
 ```
 
+<a id="action-scroll-and-click"></a>
 ### `scroll_and_click`
 
 | Field | Valid values |
@@ -333,6 +337,7 @@ Example:
 }
 ```
 
+<a id="action-read-text"></a>
 ### `read_text`
 
 | Field | Valid values |
@@ -377,6 +382,7 @@ Example:
 }
 ```
 
+<a id="action-read-key-value-pair"></a>
 ### `read_key_value_pair`
 
 | Field | Valid values |
@@ -412,6 +418,7 @@ Example:
 }
 ```
 
+<a id="action-enter-text"></a>
 ### `enter_text`
 
 | Field | Valid values |
@@ -491,6 +498,7 @@ Android live-route verification:
 - current shipped strategy names are `legacy_action_set_text` and
   `api33_input_connection`
 
+<a id="action-press-key"></a>
 ### `press_key`
 
 | Field | Valid values |
@@ -519,6 +527,7 @@ Example:
 }
 ```
 
+<a id="action-wait-for-node"></a>
 ### `wait_for_node`
 
 | Field | Valid values |
@@ -556,6 +565,7 @@ Example:
 }
 ```
 
+<a id="action-wait-for-navigation"></a>
 ### `wait_for_navigation`
 
 | Field | Valid values |
@@ -591,6 +601,7 @@ Example:
 }
 ```
 
+<a id="action-snapshot"></a>
 ### `snapshot`
 
 | Field | Valid values |
@@ -623,6 +634,7 @@ Example:
 }
 ```
 
+<a id="action-take-screenshot"></a>
 ### `take_screenshot`
 
 | Field | Valid values |
@@ -657,6 +669,7 @@ Example:
 }
 ```
 
+<a id="action-close-app"></a>
 ### `close_app`
 
 | Field | Valid values |
@@ -691,6 +704,7 @@ Example:
 }
 ```
 
+<a id="action-sleep"></a>
 ### `sleep`
 
 | Field | Valid values |
@@ -723,6 +737,7 @@ Example:
 }
 ```
 
+<a id="action-open-app"></a>
 ### `open_app`
 
 | Field | Valid values |
@@ -765,6 +780,7 @@ Example:
 }
 ```
 
+<a id="action-open-uri"></a>
 ### `open_uri`
 
 | Field | Valid values |
@@ -793,6 +809,7 @@ Example:
 }
 ```
 
+<a id="action-start-recording"></a>
 ### `start_recording`
 
 | Field | Valid values |
@@ -822,6 +839,7 @@ Example:
 }
 ```
 
+<a id="action-stop-recording"></a>
 ### `stop_recording`
 
 | Field | Valid values |

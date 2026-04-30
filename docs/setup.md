@@ -15,6 +15,7 @@ Get from an empty host to a first successful `clawperator snapshot` with one det
 
 **Java note:** The installer provisions Java 17 automatically on supported platforms (macOS with Homebrew, Ubuntu/Debian, Arch). Java 17 or 21 is required as the host JDK for Android builds (AGP 8.x requirement). The Android Gradle build compiles Java and Kotlin with Java 17 settings; device compatibility is handled by Android's DEX pipeline, not by targeting an older bytecode level.
 
+<a id="setup-step-install-cli"></a>
 ## 1. Install the CLI
 
 Recommended - the installer handles Node, Java 17, adb, CLI bootstrap, and the delegated `clawperator install` flow in one step:
@@ -126,6 +127,7 @@ When choosing the host-facing surface:
 See [Host Agent Orientation](host-agents.md) for the post-install decision flow
 and the first discovery commands to try.
 
+<a id="setup-step-prepare-android-target"></a>
 ## 2. Prepare the Android target
 
 Required device state:
@@ -157,6 +159,7 @@ adb kill-server && adb start-server
 
 If more than one target is connected, record the serial you will use and pass `--device <serial>` on every later command.
 
+<a id="setup-step-install-operator-apk"></a>
 ## 3. Install the Operator APK
 
 To avoid stale cached copies, always refresh the stable release APK before
@@ -217,6 +220,7 @@ Success condition:
 
 Do not use raw `adb install` for setup. The CLI setup command is the only path that performs install, permission grant, and verification as one operation.
 
+<a id="setup-step-regrant-permissions"></a>
 ## 4. Re-grant permissions (recovery only)
 
 ```bash
@@ -229,6 +233,7 @@ If you force-stop the Operator package during debugging and the next handshake
 or snapshot stops working, use this same recovery step before trusting the
 runtime again, then re-run `clawperator doctor`.
 
+<a id="setup-step-verify-readiness-with-doctor"></a>
 ## 5. Verify readiness with doctor
 
 ```bash
@@ -310,6 +315,7 @@ Failed checks include additional fields:
 
 See [Doctor](api/doctor.md) for the full report contract and [Errors](api/errors.md) for recovery by code.
 
+<a id="setup-step-run-first-command"></a>
 ## 6. Run the first command
 
 ```bash

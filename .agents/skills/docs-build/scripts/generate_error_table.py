@@ -19,6 +19,10 @@ def derive_label(code: str) -> str:
     return code.lower().replace("_", " ").capitalize()
 
 
+def anchor_for_code(code: str) -> str:
+    return "error-" + code.lower().replace("_", "-")
+
+
 def parse_entries(text: str) -> list[tuple[str, str]]:
     body_match = re.search(r"ERROR_CODES\s*=\s*{(.*?)}\s*as const", text, re.S)
     if not body_match:
@@ -57,7 +61,7 @@ def main() -> int:
         "| --- | --- | --- |",
     ]
     for code, note in entries:
-        lines.append(f"| `{code}` | {derive_label(code)} | {note or '-'} |")
+        lines.append(f'| <a id="{anchor_for_code(code)}"></a>`{code}` | {derive_label(code)} | {note or "-"} |')
     sys.stdout.write("\n".join(lines) + "\n")
     return 0
 

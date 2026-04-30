@@ -105,6 +105,7 @@ Get from an empty host to a first successful `clawperator snapshot` with one det
 
 **Java note:** The installer provisions Java 17 automatically on supported platforms (macOS with Homebrew, Ubuntu/Debian, Arch). Java 17 or 21 is required as the host JDK for Android builds (AGP 8.x requirement). The Android Gradle build compiles Java and Kotlin with Java 17 settings; device compatibility is handled by Android's DEX pipeline, not by targeting an older bytecode level.
 
+<a id="setup-step-install-cli"></a>
 ## 1. Install the CLI
 
 Recommended - the installer handles Node, Java 17, adb, CLI bootstrap, and the delegated `clawperator install` flow in one step:
@@ -216,6 +217,7 @@ When choosing the host-facing surface:
 See [Host Agent Orientation](host-agents.md) for the post-install decision flow
 and the first discovery commands to try.
 
+<a id="setup-step-prepare-android-target"></a>
 ## 2. Prepare the Android target
 
 Required device state:
@@ -247,6 +249,7 @@ adb kill-server && adb start-server
 
 If more than one target is connected, record the serial you will use and pass `--device <serial>` on every later command.
 
+<a id="setup-step-install-operator-apk"></a>
 ## 3. Install the Operator APK
 
 To avoid stale cached copies, always refresh the stable release APK before
@@ -307,6 +310,7 @@ Success condition:
 
 Do not use raw `adb install` for setup. The CLI setup command is the only path that performs install, permission grant, and verification as one operation.
 
+<a id="setup-step-regrant-permissions"></a>
 ## 4. Re-grant permissions (recovery only)
 
 ```bash
@@ -319,6 +323,7 @@ If you force-stop the Operator package during debugging and the next handshake
 or snapshot stops working, use this same recovery step before trusting the
 runtime again, then re-run `clawperator doctor`.
 
+<a id="setup-step-verify-readiness-with-doctor"></a>
 ## 5. Verify readiness with doctor
 
 ```bash
@@ -400,6 +405,7 @@ Failed checks include additional fields:
 
 See [Doctor](api/doctor.md) for the full report contract and [Errors](api/errors.md) for recovery by code.
 
+<a id="setup-step-run-first-command"></a>
 ## 6. Run the first command
 
 ```bash
@@ -1120,6 +1126,8 @@ That doctor check exposes structured evidence:
 If doctor reports `DEVICE_NOT_INTERACTIVE`, recover the device state first and
 rerun doctor before moving on to execution commands.
 
+<a id="execution-payload"></a>
+
 ## Execution Payload
 
 Authoritative source: `apps/node/src/contracts/execution.ts`
@@ -1217,6 +1225,8 @@ Current Node-side validation limits are:
 
 If validation fails on limits, shorten the action list, split a large workflow into multiple executions, or avoid embedding oversized inline artifacts in the payload.
 
+<a id="result-envelope"></a>
+
 ## Result Envelope
 
 Authoritative source: `apps/node/src/contracts/result.ts`
@@ -1269,6 +1279,20 @@ Inside that wrapper, the canonical envelope shape is:
 ```
 
 Field meanings:
+
+Stable field anchors:
+
+- <a id="result-envelope-command-id"></a>`commandId`
+- <a id="result-envelope-task-id"></a>`taskId`
+- <a id="result-envelope-status"></a>`status`
+- <a id="result-envelope-step-results"></a>`stepResults`
+- <a id="result-envelope-step-results-id"></a>`stepResults[].id`
+- <a id="result-envelope-step-results-action-type"></a>`stepResults[].actionType`
+- <a id="result-envelope-step-results-success"></a>`stepResults[].success`
+- <a id="result-envelope-step-results-data"></a>`stepResults[].data`
+- <a id="result-envelope-error"></a>`error`
+- <a id="result-envelope-error-code"></a>`errorCode`
+- <a id="result-envelope-hint"></a>`hint`
 
 | Field | Meaning |
 | --- | --- |
@@ -1441,41 +1465,41 @@ Use this page as a command index. Detailed behavior, output shapes, and recovery
 
 ## Command Index
 
-| Command | Group | Primary syntax | Primary flags | Summary |
-| --- | --- | --- | --- | --- |
-| [`operator`](#command-operator) | Setup | `operator setup --apk <path> [--device <id>] [--operator-package <package>]` | `--apk`, `--operator-package` | Install the Operator APK and configure the device |
-| [`host`](#command-host) | Setup | `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]` | `--installed-at`, `--cli-version`, `--apk-version`, `--last-device-serial` | Set up durable host artifacts owned by the CLI |
-| [`install`](#command-install) | Setup | `install [--operator-package <package>]` | `--operator-package` | Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup |
-| [`devices`](#command-devices) | Device Management | `devices` | - | List connected Android devices |
-| [`emulator`](#command-emulator) | Device Management | `emulator list` | `--name` | Manage Android emulators (AVDs) |
-| [`packages`](#command-packages) | Device Management | `packages list [--device <id>] [--operator-package <pkg>] [--third-party]` | `--third-party` | List installed packages on a device |
-| [`exec`](#command-exec) | Execution | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]` | `--payload`, `--validate-only`, `--dry-run`, `--goal`, `--no-daemon` | Execute a validated command payload |
-| [`snapshot`](#command-snapshot) | Device Interaction | `snapshot [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | Get current Android UI hierarchy as XML |
-| [`screenshot`](#command-screenshot) | Device Interaction | `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]` | `--path`, `--no-daemon` | Capture a screenshot from the device |
-| [`click`](#command-click) | Device Interaction | `click --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--coordinate`, `--long`, `--focus`, `--no-daemon` | Tap the first matching UI element |
-| [`open`](#command-open) | Device Interaction | `open <package-id\|url\|uri> [--device <id>] [--operator-package <pkg>]` | `--app`, `--navigation-timeout-ms`, `--skip-navigation-wait`, `--no-daemon` | Open an app, URL, or URI on the device |
-| [`type`](#command-type) | Device Interaction | `type <text> --role <role> \| --id <id> [--device <id>] [--operator-package <pkg>]` | `--id`, `--desc`, `--role`, `--submit`, `--clear`, `--no-daemon` | Type text into the first matching UI element |
-| [`read`](#command-read) | Device Interaction | `read --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon` | Read text from the first matching UI element |
-| [`wait`](#command-wait) | Device Interaction | `wait --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]` | `--text`, `--id`, `--desc`, `--role`, `--no-daemon` | Wait until a matching UI element appears |
-| [`press`](#command-press) | Device Interaction | `press <back\|home\|recents> [--device <id>] [--operator-package <pkg>]` | `--key`, `--no-daemon` | Press a hardware key on the device |
-| [`back`](#command-back) | Device Interaction | `back [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | Press the Android back key |
-| [`close`](#command-close) | Device Interaction | `close <package> [--device <id>] [--operator-package <pkg>]` | `--app`, `--no-daemon` | Force-stop an Android application |
-| [`sleep`](#command-sleep) | Device Interaction | `sleep <ms> [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | Pause execution for a duration |
-| [`scroll`](#command-scroll) | Device Interaction | `scroll <down\|up\|left\|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]` | `--direction`, `--no-daemon` | Scroll the screen in a direction |
-| [`scroll-until`](#command-scroll-until) | Device Interaction | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--click`, `--direction`, `--no-daemon` | Scroll until a target element is visible |
-| [`scroll-and-click`](#command-scroll-and-click) | Device Interaction | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--direction`, `--no-daemon` | Scroll until target is visible, then click it (alias for scroll-until --click) |
-| [`wait-for-nav`](#command-wait-for-nav) | Device Interaction | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]` | `--app`, `--timeout`, `--text`, `--id`, `--desc`, `--role`, `--validate-only`, `--dry-run`, `--no-daemon` | Wait for app or screen navigation to complete |
-| [`read-value`](#command-read-value) | Device Interaction | `read-value --label <text>` | `--label`, `--label-id`, `--label-desc`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon` | Read the value associated with a labeled element |
-| [`skills`](#command-skills) | Execution | `skills list` | `--app`, `--intent`, `--keyword`, `--skill-id`, `--artifact`, `--vars`, `--summary`, `--recording-context`, `--all`, `--dry-run`, `--device`, `--operator-package`, `--timeout`, `--expect-contains`, `--skip-validate`, `--ref` | Manage and run automation skills |
-| [`bundled-skills`](#command-bundled-skills) | Execution | `bundled-skills list` | - | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
-| [`recording`](#command-recording) | Recording | `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]` | `--session-id`, `--out`, `--input`, `--snapshots`, `--baseline`, `--result`, `--mode` | Manage recording sessions on the Operator app |
-| [`daemon`](#command-daemon) | Execution | `daemon start\|stop\|status\|restart [--device <id>]` | - | Manage the background Unix socket daemon |
-| [`serve`](#command-serve) | Execution | `serve [--port <number>] [--host <string>]` | `--port`, `--host` | Start local HTTP/SSE server for remote control |
-| [`mcp`](#command-mcp) | Execution | `mcp serve` | - | Start the first-party MCP server |
-| [`logs`](#command-logs) | Utilities | `logs` | - | Tail the Clawperator log file |
-| [`doctor`](#command-doctor) | Setup | `doctor` | `--fix`, `--full`, `--check-only` | Run environment and runtime checks |
-| [`grant-device-permissions`](#command-grant-device-permissions) | Setup | `grant-device-permissions [--device <id>] [--operator-package <package>]` | - | Re-grant accessibility and notification permissions |
-| [`version`](#command-version) | Setup | `version` | `--check-compat` | Show the CLI version |
+| Command | Group | Primary syntax | Primary flags | Details | Summary |
+| --- | --- | --- | --- | --- | --- |
+| [`operator`](#command-operator) | Setup | `operator setup --apk <path> [--device <id>] [--operator-package <package>]` | `--apk`, `--operator-package` | [Setup](../setup.md#setup-step-install-operator-apk) | Install the Operator APK and configure the device |
+| [`host`](#command-host) | Setup | `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]` | `--installed-at`, `--cli-version`, `--apk-version`, `--last-device-serial` | [Setup](../setup.md#setup-step-install-cli) | Set up durable host artifacts owned by the CLI |
+| [`install`](#command-install) | Setup | `install [--operator-package <package>]` | `--operator-package` | [Setup](../setup.md#setup-step-install-cli) | Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup |
+| [`devices`](#command-devices) | Device Management | `devices` | - | [Devices](devices.md#clawperator-devices) | List connected Android devices |
+| [`emulator`](#command-emulator) | Device Management | `emulator list` | `--name` | [Emulator provisioning](serve.md#endpoint-post-android-provision-emulator) | Manage Android emulators (AVDs) |
+| [`packages`](#command-packages) | Device Management | `packages list [--device <id>] [--operator-package <pkg>] [--third-party]` | `--third-party` | [Devices](devices.md) | List installed packages on a device |
+| [`exec`](#command-exec) | Execution | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]` | `--payload`, `--validate-only`, `--dry-run`, `--goal`, `--no-daemon` | [Execution payload](overview.md#execution-payload) | Execute a validated command payload |
+| [`snapshot`](#command-snapshot) | Device Interaction | `snapshot [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | [Action: snapshot](actions.md#action-snapshot) | Get current Android UI hierarchy as XML |
+| [`screenshot`](#command-screenshot) | Device Interaction | `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]` | `--path`, `--no-daemon` | [Action: take_screenshot](actions.md#action-take-screenshot) | Capture a screenshot from the device |
+| [`click`](#command-click) | Device Interaction | `click --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--coordinate`, `--long`, `--focus`, `--no-daemon` | [Action: click](actions.md#action-click) | Tap the first matching UI element |
+| [`open`](#command-open) | Device Interaction | `open <package-id\|url\|uri> [--device <id>] [--operator-package <pkg>]` | `--app`, `--navigation-timeout-ms`, `--skip-navigation-wait`, `--no-daemon` | [Actions: open_app / open_uri](actions.md#action-open-app) | Open an app, URL, or URI on the device |
+| [`type`](#command-type) | Device Interaction | `type <text> --role <role> \| --id <id> [--device <id>] [--operator-package <pkg>]` | `--id`, `--desc`, `--role`, `--submit`, `--clear`, `--no-daemon` | [Action: enter_text](actions.md#action-enter-text) | Type text into the first matching UI element |
+| [`read`](#command-read) | Device Interaction | `read --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon` | [Action: read_text](actions.md#action-read-text) | Read text from the first matching UI element |
+| [`wait`](#command-wait) | Device Interaction | `wait --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]` | `--text`, `--id`, `--desc`, `--role`, `--no-daemon` | [Action: wait_for_node](actions.md#action-wait-for-node) | Wait until a matching UI element appears |
+| [`press`](#command-press) | Device Interaction | `press <back\|home\|recents> [--device <id>] [--operator-package <pkg>]` | `--key`, `--no-daemon` | [Action: press_key](actions.md#action-press-key) | Press a hardware key on the device |
+| [`back`](#command-back) | Device Interaction | `back [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | [Action: press_key](actions.md#action-press-key) | Press the Android back key |
+| [`close`](#command-close) | Device Interaction | `close <package> [--device <id>] [--operator-package <pkg>]` | `--app`, `--no-daemon` | [Action: close_app](actions.md#action-close-app) | Force-stop an Android application |
+| [`sleep`](#command-sleep) | Device Interaction | `sleep <ms> [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | [Action: sleep](actions.md#action-sleep) | Pause execution for a duration |
+| [`scroll`](#command-scroll) | Device Interaction | `scroll <down\|up\|left\|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]` | `--direction`, `--no-daemon` | [Action: scroll](actions.md#action-scroll) | Scroll the screen in a direction |
+| [`scroll-until`](#command-scroll-until) | Device Interaction | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--click`, `--direction`, `--no-daemon` | [Action: scroll_until](actions.md#action-scroll-until) | Scroll until a target element is visible |
+| [`scroll-and-click`](#command-scroll-and-click) | Device Interaction | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--direction`, `--no-daemon` | [Action: scroll_and_click](actions.md#action-scroll-and-click) | Scroll until target is visible, then click it (alias for scroll-until --click) |
+| [`wait-for-nav`](#command-wait-for-nav) | Device Interaction | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]` | `--app`, `--timeout`, `--text`, `--id`, `--desc`, `--role`, `--validate-only`, `--dry-run`, `--no-daemon` | [Action: wait_for_navigation](actions.md#action-wait-for-navigation) | Wait for app or screen navigation to complete |
+| [`read-value`](#command-read-value) | Device Interaction | `read-value --label <text>` | `--label`, `--label-id`, `--label-desc`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon` | [Action: read_key_value_pair](actions.md#action-read-key-value-pair) | Read the value associated with a labeled element |
+| [`skills`](#command-skills) | Execution | `skills list` | `--app`, `--intent`, `--keyword`, `--skill-id`, `--artifact`, `--vars`, `--summary`, `--recording-context`, `--all`, `--dry-run`, `--device`, `--operator-package`, `--timeout`, `--expect-contains`, `--skip-validate`, `--ref` | Planned: `../skills/cli.md` (PR-3 / Phase 4) | Manage and run automation skills |
+| [`bundled-skills`](#command-bundled-skills) | Execution | `bundled-skills list` | - | [Host agent orientation](../host-agents.md) | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
+| [`recording`](#command-recording) | Recording | `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]` | `--session-id`, `--out`, `--input`, `--snapshots`, `--baseline`, `--result`, `--mode` | [api/recording](recording.md) | Manage recording sessions on the Operator app |
+| [`daemon`](#command-daemon) | Execution | `daemon start\|stop\|status\|restart [--device <id>]` | - | [Daemon](daemon.md) | Manage the background Unix socket daemon |
+| [`serve`](#command-serve) | Execution | `serve [--port <number>] [--host <string>]` | `--port`, `--host` | [Serve API](serve.md) | Start local HTTP/SSE server for remote control |
+| [`mcp`](#command-mcp) | Execution | `mcp serve` | - | [MCP server](mcp.md) | Start the first-party MCP server |
+| [`logs`](#command-logs) | Utilities | `logs` | - | [Logging](logging.md#the-clawperator-logs-command) | Tail the Clawperator log file |
+| [`doctor`](#command-doctor) | Setup | `doctor` | `--fix`, `--full`, `--check-only` | [Doctor contract](doctor.md#doctor-report-contract) | Run environment and runtime checks |
+| [`grant-device-permissions`](#command-grant-device-permissions) | Setup | `grant-device-permissions [--device <id>] [--operator-package <package>]` | - | [Setup recovery](../setup.md#setup-step-regrant-permissions) | Re-grant accessibility and notification permissions |
+| [`version`](#command-version) | Setup | `version` | `--check-compat` | [Version checks](../setup.md#setup-step-verify-readiness-with-doctor) | Show the CLI version |
 
 ## Commands
 
@@ -1487,6 +1511,8 @@ Install the Operator APK and configure the device
 - Group: Setup
 - Syntax: `operator setup --apk <path> [--device <id>] [--operator-package <package>]`, `operator download [--operator-package <package>]`, `operator remediate [--operator-package <package>]`
 - Primary flags: `--apk`, `--operator-package`
+- Details: [Setup](../setup.md#setup-step-install-operator-apk)
+- See also: [Doctor contract](doctor.md#doctor-report-contract)
 - Subcommands: `setup`, `install`, `download`, `remediate`
 
 <a id="command-host"></a>
@@ -1497,6 +1523,7 @@ Set up durable host artifacts owned by the CLI
 - Group: Setup
 - Syntax: `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]`
 - Primary flags: `--installed-at`, `--cli-version`, `--apk-version`, `--last-device-serial`
+- Details: [Setup](../setup.md#setup-step-install-cli)
 - Subcommands: `setup`
 
 <a id="command-install"></a>
@@ -1507,6 +1534,7 @@ Run the CLI-owned post-bootstrap install flow for device remediation, runtime sk
 - Group: Setup
 - Syntax: `install [--operator-package <package>]`
 - Primary flags: `--operator-package`
+- Details: [Setup](../setup.md#setup-step-install-cli)
 
 <a id="command-devices"></a>
 ### `devices`
@@ -1516,6 +1544,8 @@ List connected Android devices
 - Group: Device Management
 - Syntax: `devices`
 - Primary flags: -
+- Details: [Devices](devices.md#clawperator-devices)
+- See also: [Serve GET /devices](serve.md#endpoint-get-devices)
 
 <a id="command-emulator"></a>
 ### `emulator`
@@ -1525,6 +1555,8 @@ Manage Android emulators (AVDs)
 - Group: Device Management
 - Syntax: `emulator list`, `emulator inspect <name>`, `emulator create [--name <name>]`, `emulator start <name>`, `emulator stop <name>`, `emulator delete <name>`, `emulator status`, `emulator provision`
 - Primary flags: `--name`
+- Details: [Emulator provisioning](serve.md#endpoint-post-android-provision-emulator)
+- See also: [Devices](devices.md)
 - Alias notes: `provision emulator` is an alias for `emulator provision`.
 - Subcommands: `list`, `inspect`, `create`, `start`, `stop`, `delete`, `status`, `provision`
 
@@ -1536,6 +1568,7 @@ List installed packages on a device
 - Group: Device Management
 - Syntax: `packages list [--device <id>] [--operator-package <pkg>] [--third-party]`
 - Primary flags: `--third-party`
+- Details: [Devices](devices.md)
 
 <a id="command-exec"></a>
 ### `exec`
@@ -1545,6 +1578,8 @@ Execute a validated command payload
 - Group: Execution
 - Syntax: `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]`, `exec best-effort --goal <text> [--device <id>] [--operator-package <package>]`
 - Primary flags: `--payload`, `--validate-only`, `--dry-run`, `--goal`, `--no-daemon`
+- Details: [Execution payload](overview.md#execution-payload)
+- See also: [Actions](actions.md#action-click)
 - Command aliases: `execute`
 
 <a id="command-snapshot"></a>
@@ -1555,6 +1590,8 @@ Get current Android UI hierarchy as XML
 - Group: Device Interaction
 - Syntax: `snapshot [--device <id>] [--operator-package <pkg>]`
 - Primary flags: `--no-daemon`
+- Details: [Action: snapshot](actions.md#action-snapshot)
+- Action links: [`snapshot`](actions.md#action-snapshot)
 - Command aliases: `snapshot-ui`, `snapshot_ui`
 
 <a id="command-screenshot"></a>
@@ -1565,6 +1602,8 @@ Capture a screenshot from the device
 - Group: Device Interaction
 - Syntax: `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]`
 - Primary flags: `--path`, `--no-daemon`
+- Details: [Action: take_screenshot](actions.md#action-take-screenshot)
+- Action links: [`take_screenshot`](actions.md#action-take-screenshot)
 - Command aliases: `take-screenshot`, `take_screenshot`, `capture-screenshot`
 
 <a id="command-click"></a>
@@ -1575,6 +1614,8 @@ Tap the first matching UI element
 - Group: Device Interaction
 - Syntax: `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]`
 - Primary flags: `--text`, `--id`, `--desc`, `--role`, `--coordinate`, `--long`, `--focus`, `--no-daemon`
+- Details: [Action: click](actions.md#action-click)
+- Action links: [`click`](actions.md#action-click)
 - Command aliases: `tap`
 
 <a id="command-open"></a>
@@ -1585,6 +1626,8 @@ Open an app, URL, or URI on the device
 - Group: Device Interaction
 - Syntax: `open <package-id|url|uri> [--device <id>] [--operator-package <pkg>]`
 - Primary flags: `--app`, `--navigation-timeout-ms`, `--skip-navigation-wait`, `--no-daemon`
+- Details: [Actions: open_app / open_uri](actions.md#action-open-app)
+- Action links: [`open_app`](actions.md#action-open-app), [`open_uri`](actions.md#action-open-uri)
 - Command aliases: `open-app`, `open_app`, `open-uri`, `open-url`, `open_uri`, `open_url`
 
 <a id="command-type"></a>
@@ -1595,6 +1638,8 @@ Type text into the first matching UI element
 - Group: Device Interaction
 - Syntax: `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]`
 - Primary flags: `--id`, `--desc`, `--role`, `--submit`, `--clear`, `--no-daemon`
+- Details: [Action: enter_text](actions.md#action-enter-text)
+- Action links: [`enter_text`](actions.md#action-enter-text)
 - Command aliases: `fill`, `enter-text`, `enter_text`
 
 <a id="command-read"></a>
@@ -1605,6 +1650,9 @@ Read text from the first matching UI element
 - Group: Device Interaction
 - Syntax: `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]`
 - Primary flags: `--text`, `--id`, `--desc`, `--role`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon`
+- Details: [Action: read_text](actions.md#action-read-text)
+- Action links: [`read_text`](actions.md#action-read-text)
+- See also: [Selectors](selectors.md#selector-flag-text)
 - Command aliases: `read-text`, `read_text`
 
 <a id="command-wait"></a>
@@ -1615,6 +1663,8 @@ Wait until a matching UI element appears
 - Group: Device Interaction
 - Syntax: `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]`
 - Primary flags: `--text`, `--id`, `--desc`, `--role`, `--no-daemon`
+- Details: [Action: wait_for_node](actions.md#action-wait-for-node)
+- Action links: [`wait_for_node`](actions.md#action-wait-for-node)
 - Command aliases: `wait-for`, `wait_for`, `wait-for-node`, `wait_for_node`, `find`, `find-node`, `find_node`
 
 <a id="command-press"></a>
@@ -1625,6 +1675,8 @@ Press a hardware key on the device
 - Group: Device Interaction
 - Syntax: `press <back|home|recents> [--device <id>] [--operator-package <pkg>]`
 - Primary flags: `--key`, `--no-daemon`
+- Details: [Action: press_key](actions.md#action-press-key)
+- Action links: [`press_key`](actions.md#action-press-key)
 - Command aliases: `press-key`, `press_key`
 
 <a id="command-back"></a>
@@ -1635,6 +1687,8 @@ Press the Android back key
 - Group: Device Interaction
 - Syntax: `back [--device <id>] [--operator-package <pkg>]`
 - Primary flags: `--no-daemon`
+- Details: [Action: press_key](actions.md#action-press-key)
+- Action links: [`press_key`](actions.md#action-press-key)
 
 <a id="command-close"></a>
 ### `close`
@@ -1644,6 +1698,8 @@ Force-stop an Android application
 - Group: Device Interaction
 - Syntax: `close <package> [--device <id>] [--operator-package <pkg>]`
 - Primary flags: `--app`, `--no-daemon`
+- Details: [Action: close_app](actions.md#action-close-app)
+- Action links: [`close_app`](actions.md#action-close-app)
 - Command aliases: `close-app`, `close_app`
 
 <a id="command-sleep"></a>
@@ -1654,6 +1710,8 @@ Pause execution for a duration
 - Group: Device Interaction
 - Syntax: `sleep <ms> [--device <id>] [--operator-package <pkg>]`
 - Primary flags: `--no-daemon`
+- Details: [Action: sleep](actions.md#action-sleep)
+- Action links: [`sleep`](actions.md#action-sleep)
 
 <a id="command-scroll"></a>
 ### `scroll`
@@ -1663,6 +1721,8 @@ Scroll the screen in a direction
 - Group: Device Interaction
 - Syntax: `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]`
 - Primary flags: `--direction`, `--no-daemon`
+- Details: [Action: scroll](actions.md#action-scroll)
+- Action links: [`scroll`](actions.md#action-scroll)
 
 <a id="command-scroll-until"></a>
 ### `scroll-until`
@@ -1672,6 +1732,8 @@ Scroll until a target element is visible
 - Group: Device Interaction
 - Syntax: `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]`
 - Primary flags: `--text`, `--id`, `--desc`, `--role`, `--click`, `--direction`, `--no-daemon`
+- Details: [Action: scroll_until](actions.md#action-scroll-until)
+- Action links: [`scroll_until`](actions.md#action-scroll-until)
 - Command aliases: `scroll_until`
 
 <a id="command-scroll-and-click"></a>
@@ -1682,6 +1744,8 @@ Scroll until target is visible, then click it (alias for scroll-until --click)
 - Group: Device Interaction
 - Syntax: `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]`
 - Primary flags: `--text`, `--id`, `--desc`, `--role`, `--direction`, `--no-daemon`
+- Details: [Action: scroll_and_click](actions.md#action-scroll-and-click)
+- Action links: [`scroll_and_click`](actions.md#action-scroll-and-click)
 - Command aliases: `scroll_and_click`
 
 <a id="command-wait-for-nav"></a>
@@ -1692,6 +1756,8 @@ Wait for app or screen navigation to complete
 - Group: Device Interaction
 - Syntax: `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]`
 - Primary flags: `--app`, `--timeout`, `--text`, `--id`, `--desc`, `--role`, `--validate-only`, `--dry-run`, `--no-daemon`
+- Details: [Action: wait_for_navigation](actions.md#action-wait-for-navigation)
+- Action links: [`wait_for_navigation`](actions.md#action-wait-for-navigation)
 - Command aliases: `wait-for-navigation`, `wait_for_navigation`
 
 <a id="command-read-value"></a>
@@ -1702,6 +1768,8 @@ Read the value associated with a labeled element
 - Group: Device Interaction
 - Syntax: `read-value --label <text>`
 - Primary flags: `--label`, `--label-id`, `--label-desc`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon`
+- Details: [Action: read_key_value_pair](actions.md#action-read-key-value-pair)
+- Action links: [`read_key_value_pair`](actions.md#action-read-key-value-pair)
 - Command aliases: `read-kv`, `read-key-value-pair`, `read_key_value_pair`
 
 <a id="command-skills"></a>
@@ -1712,6 +1780,7 @@ Manage and run automation skills
 - Group: Execution
 - Syntax: `skills list`, `skills get <skill_id>`, `skills for-app <package_id>`, `skills search --app <package_id> [--intent <intent>] [--keyword <text>]`, `skills search <keyword>`, `skills compile-artifact <skill_id> --artifact <name> [--vars <json>]`, `skills compile-artifact --skill-id <id> --artifact <name> [--vars <json>]`, `skills new <skill_id> [--summary <text>] [--recording-context <file>]`, `skills validate <skill_id> [--dry-run]`, `skills validate --all [--dry-run]`, `skills run <skill_id> [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--expect-contains <text>] [--skip-validate] [--output <json|pretty>] [skill_args...]`, `skills install`, `skills update [--ref <git-ref>]`, `skills sync --ref <git-ref>`
 - Primary flags: `--app`, `--intent`, `--keyword`, `--skill-id`, `--artifact`, `--vars`, `--summary`, `--recording-context`, `--all`, `--dry-run`, `--device`, `--operator-package`, `--timeout`, `--expect-contains`, `--skip-validate`, `--ref`
+- Details: Planned: `../skills/cli.md` (PR-3 / Phase 4)
 - Subcommands: `install`, `sync`, `new`, `validate`, `compile-artifact`, `run`
 
 <a id="command-bundled-skills"></a>
@@ -1722,6 +1791,8 @@ Manage first-party bundled skills for Claude Code, Codex, and generic agent runt
 - Group: Execution
 - Syntax: `bundled-skills list`, `bundled-skills install`, `bundled-skills update`
 - Primary flags: -
+- Details: [Host agent orientation](../host-agents.md)
+- See also: [Skills overview](../skills/overview.md)
 - Subcommands: `install`, `update`, `list`
 
 <a id="command-recording"></a>
@@ -1732,6 +1803,7 @@ Manage recording sessions on the Operator app
 - Group: Recording
 - Syntax: `recording start [--session-id <id>] [--device <serial>] [--operator-package <pkg>]`, `recording stop`, `recording pull`, `recording parse --input <file> [--out <file>]`, `recording export --input <file|directory> [--out <file>] [--snapshots <omit|include>]`, `recording compare --baseline <export.json> --result <skills-run.json> [--mode <auto|literal|semantic>]`
 - Primary flags: `--session-id`, `--out`, `--input`, `--snapshots`, `--baseline`, `--result`, `--mode`
+- Details: [api/recording](recording.md)
 - Command aliases: `record`
 - Subcommands: `compare`, `export`
 
@@ -1743,6 +1815,7 @@ Manage the background Unix socket daemon
 - Group: Execution
 - Syntax: `daemon start|stop|status|restart [--device <id>]`
 - Primary flags: -
+- Details: [Daemon](daemon.md)
 
 <a id="command-serve"></a>
 ### `serve`
@@ -1752,6 +1825,7 @@ Start local HTTP/SSE server for remote control
 - Group: Execution
 - Syntax: `serve [--port <number>] [--host <string>]`
 - Primary flags: `--port`, `--host`
+- Details: [Serve API](serve.md)
 
 <a id="command-mcp"></a>
 ### `mcp`
@@ -1761,6 +1835,7 @@ Start the first-party MCP server
 - Group: Execution
 - Syntax: `mcp serve`
 - Primary flags: -
+- Details: [MCP server](mcp.md)
 
 <a id="command-logs"></a>
 ### `logs`
@@ -1770,6 +1845,7 @@ Tail the Clawperator log file
 - Group: Utilities
 - Syntax: `logs`
 - Primary flags: -
+- Details: [Logging](logging.md#the-clawperator-logs-command)
 
 <a id="command-doctor"></a>
 ### `doctor`
@@ -1779,6 +1855,7 @@ Run environment and runtime checks
 - Group: Setup
 - Syntax: `doctor`, `doctor --fix`, `doctor --full`, `doctor --check-only`
 - Primary flags: `--fix`, `--full`, `--check-only`
+- Details: [Doctor contract](doctor.md#doctor-report-contract)
 
 <a id="command-grant-device-permissions"></a>
 ### `grant-device-permissions`
@@ -1788,6 +1865,7 @@ Re-grant accessibility and notification permissions
 - Group: Setup
 - Syntax: `grant-device-permissions [--device <id>] [--operator-package <package>]`
 - Primary flags: -
+- Details: [Setup recovery](../setup.md#setup-step-regrant-permissions)
 
 <a id="command-version"></a>
 ### `version`
@@ -1797,6 +1875,7 @@ Show the CLI version
 - Group: Setup
 - Syntax: `version`, `version --check-compat [--device <id>] [--operator-package <package>]`
 - Primary flags: `--check-compat`
+- Details: [Version checks](../setup.md#setup-step-verify-readiness-with-doctor)
 
 ---
 
@@ -1905,6 +1984,8 @@ Events use dot-separated names with prefix-based categories:
 | `cli.` | CLI output | `cli.banner` |
 | `doctor.` | Doctor diagnostics | `doctor.check` |
 | `serve.` | HTTP/SSE server | `serve.server.started`, `serve.http.request` |
+
+<a id="the-clawperator-logs-command"></a>
 
 ## The `clawperator logs` Command
 
@@ -2159,6 +2240,7 @@ Success condition for that payload:
 
 ## Action Reference
 
+<a id="action-click"></a>
 ### `click`
 
 | Field | Valid values |
@@ -2197,6 +2279,7 @@ Example:
 }
 ```
 
+<a id="action-scroll"></a>
 ### `scroll`
 
 | Field | Valid values |
@@ -2243,6 +2326,7 @@ Example:
 }
 ```
 
+<a id="action-scroll-until"></a>
 ### `scroll_until`
 
 | Field | Valid values |
@@ -2295,6 +2379,7 @@ Example:
 }
 ```
 
+<a id="action-scroll-and-click"></a>
 ### `scroll_and_click`
 
 | Field | Valid values |
@@ -2343,6 +2428,7 @@ Example:
 }
 ```
 
+<a id="action-read-text"></a>
 ### `read_text`
 
 | Field | Valid values |
@@ -2387,6 +2473,7 @@ Example:
 }
 ```
 
+<a id="action-read-key-value-pair"></a>
 ### `read_key_value_pair`
 
 | Field | Valid values |
@@ -2422,6 +2509,7 @@ Example:
 }
 ```
 
+<a id="action-enter-text"></a>
 ### `enter_text`
 
 | Field | Valid values |
@@ -2501,6 +2589,7 @@ Android live-route verification:
 - current shipped strategy names are `legacy_action_set_text` and
   `api33_input_connection`
 
+<a id="action-press-key"></a>
 ### `press_key`
 
 | Field | Valid values |
@@ -2529,6 +2618,7 @@ Example:
 }
 ```
 
+<a id="action-wait-for-node"></a>
 ### `wait_for_node`
 
 | Field | Valid values |
@@ -2566,6 +2656,7 @@ Example:
 }
 ```
 
+<a id="action-wait-for-navigation"></a>
 ### `wait_for_navigation`
 
 | Field | Valid values |
@@ -2601,6 +2692,7 @@ Example:
 }
 ```
 
+<a id="action-snapshot"></a>
 ### `snapshot`
 
 | Field | Valid values |
@@ -2633,6 +2725,7 @@ Example:
 }
 ```
 
+<a id="action-take-screenshot"></a>
 ### `take_screenshot`
 
 | Field | Valid values |
@@ -2667,6 +2760,7 @@ Example:
 }
 ```
 
+<a id="action-close-app"></a>
 ### `close_app`
 
 | Field | Valid values |
@@ -2701,6 +2795,7 @@ Example:
 }
 ```
 
+<a id="action-sleep"></a>
 ### `sleep`
 
 | Field | Valid values |
@@ -2733,6 +2828,7 @@ Example:
 }
 ```
 
+<a id="action-open-app"></a>
 ### `open_app`
 
 | Field | Valid values |
@@ -2775,6 +2871,7 @@ Example:
 }
 ```
 
+<a id="action-open-uri"></a>
 ### `open_uri`
 
 | Field | Valid values |
@@ -2803,6 +2900,7 @@ Example:
 }
 ```
 
+<a id="action-start-recording"></a>
 ### `start_recording`
 
 | Field | Valid values |
@@ -2832,6 +2930,7 @@ Example:
 }
 ```
 
+<a id="action-stop-recording"></a>
 ### `stop_recording`
 
 | Field | Valid values |
@@ -2963,6 +3062,15 @@ The raw selector object shared by `matcher`, `container`, `expectedNode`, and `l
 ```
 
 Meaning of each field:
+
+Stable field anchors:
+
+- <a id="selector-field-resource-id"></a>`resourceId`
+- <a id="selector-field-role"></a>`role`
+- <a id="selector-field-text-equals"></a>`textEquals`
+- <a id="selector-field-text-contains"></a>`textContains`
+- <a id="selector-field-content-desc-equals"></a>`contentDescEquals`
+- <a id="selector-field-content-desc-contains"></a>`contentDescContains`
 
 | Field | Match behavior |
 | --- | --- |
@@ -3099,6 +3207,23 @@ names. In those cases, `contentDescEquals` and visible text may be the most
 practical stable selectors available.
 
 ## Selector Flags
+
+Stable CLI flag anchors:
+
+- <a id="selector-flag-selector"></a>`--selector`
+- <a id="selector-flag-text"></a>`--text`
+- <a id="selector-flag-text-contains"></a>`--text-contains`
+- <a id="selector-flag-id"></a>`--id`
+- <a id="selector-flag-desc"></a>`--desc`
+- <a id="selector-flag-desc-contains"></a>`--desc-contains`
+- <a id="selector-flag-role"></a>`--role`
+- <a id="selector-flag-container-selector"></a>`--container-selector`
+- <a id="selector-flag-container-text"></a>`--container-text`
+- <a id="selector-flag-container-text-contains"></a>`--container-text-contains`
+- <a id="selector-flag-container-id"></a>`--container-id`
+- <a id="selector-flag-container-desc"></a>`--container-desc`
+- <a id="selector-flag-container-desc-contains"></a>`--container-desc-contains`
+- <a id="selector-flag-container-role"></a>`--container-role`
 
 | Flag | Description | Notes |
 | --- | --- | --- |
@@ -3943,81 +4068,81 @@ Only the codes defined in `apps/node/src/contracts/errors.ts` are part of the pu
 
 | Code | Derived label | Notes |
 | --- | --- | --- |
-| `HOST_DEPENDENCY_MISSING` | Host dependency missing | Host |
-| `ADB_NOT_FOUND` | Adb not found | Setup & Connectivity |
-| `NO_DEVICES` | No devices | - |
-| `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Multiple devices device id required | Recovery: pass `--device` (alias `--device-id`) when adb shows multiple targets. |
-| `OPERATOR_NOT_INSTALLED` | Operator not installed | - |
-| `DEVICE_NOT_FOUND` | Device not found | Recovery: the `--device` serial is not connected (alias `--device-id`). |
-| `EXECUTION_VALIDATION_FAILED` | Execution validation failed | Execution & State |
-| `EXECUTION_ACTION_UNSUPPORTED` | Execution action unsupported | - |
-| `EXECUTION_CONFLICT_IN_FLIGHT` | Execution conflict in flight | - |
-| `RESULT_ENVELOPE_TIMEOUT` | Result envelope timeout | - |
-| `RESULT_ENVELOPE_MALFORMED` | Result envelope malformed | - |
-| `SNAPSHOT_EXTRACTION_FAILED` | Snapshot extraction failed | - |
-| `MISSING_ARGUMENT` | Missing argument | CLI Usage |
-| `NODE_NOT_FOUND` | Node not found | UI & Nodes |
-| `NODE_NOT_CLICKABLE` | Node not clickable | - |
-| `SECURITY_BLOCK_DETECTED` | Security block detected | - |
-| `CONTAINER_NOT_FOUND` | Container not found | - |
-| `CONTAINER_NOT_SCROLLABLE` | Container not scrollable | - |
-| `GESTURE_FAILED` | Gesture failed | - |
-| `NODE_TOO_OLD` | Node too old | Doctor & Host |
-| `ADB_SERVER_FAILED` | Adb server failed | - |
-| `ADB_NO_USB_PERMISSIONS` | Adb no usb permissions | - |
-| `DEVICE_UNAUTHORIZED` | Device unauthorized | - |
-| `DEVICE_OFFLINE` | Device offline | - |
-| `DEVICE_SHELL_UNAVAILABLE` | Device shell unavailable | - |
-| `OPERATOR_VARIANT_MISMATCH` | Operator variant mismatch | Installed release/debug Operator APK variant does not match `--operator-package`. |
-| `DEVICE_DEV_OPTIONS_DISABLED` | Device dev options disabled | - |
-| `DEVICE_USB_DEBUGGING_DISABLED` | Device usb debugging disabled | - |
-| `DEVICE_ACCESSIBILITY_NOT_RUNNING` | Device accessibility not running | - |
-| `DEVICE_NOT_INTERACTIVE` | Device not interactive | - |
-| `ANDROID_BUILD_FAILED` | Android build failed | - |
-| `ANDROID_INSTALL_FAILED` | Android install failed | - |
-| `ANDROID_APP_LAUNCH_FAILED` | Android app launch failed | - |
-| `SMOKE_OPEN_SETTINGS_FAILED` | Smoke open settings failed | - |
-| `SCRCPY_NOT_FOUND` | Scrcpy not found | - |
-| `APK_VERSION_UNREADABLE` | Apk version unreadable | - |
-| `APK_VERSION_INVALID` | Apk version invalid | - |
-| `CLI_VERSION_INVALID` | Cli version invalid | - |
-| `VERSION_INCOMPATIBLE` | Version incompatible | - |
-| `LOGCAT_UNAVAILABLE` | Logcat unavailable | - |
-| `ANDROID_SDK_TOOL_MISSING` | Android sdk tool missing | - |
-| `EMULATOR_NOT_FOUND` | Emulator not found | - |
-| `EMULATOR_ALREADY_RUNNING` | Emulator already running | - |
-| `EMULATOR_NOT_RUNNING` | Emulator not running | - |
-| `EMULATOR_UNSUPPORTED` | Emulator unsupported | - |
-| `EMULATOR_CREATE_FAILED` | Emulator create failed | - |
-| `EMULATOR_START_FAILED` | Emulator start failed | - |
-| `EMULATOR_STOP_FAILED` | Emulator stop failed | - |
-| `EMULATOR_DELETE_FAILED` | Emulator delete failed | - |
-| `EMULATOR_BOOT_TIMEOUT` | Emulator boot timeout | - |
-| `ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | Android system image install failed | - |
-| `ANDROID_AVD_CREATE_FAILED` | Android avd create failed | - |
-| `AGENT_SKILLS_STALE` | Agent skills stale | - |
-| `DAEMON_START_FAILED` | Daemon start failed | Daemon lifecycle |
-| `DAEMON_STOP_FAILED` | Daemon stop failed | - |
-| `DAEMON_PROXY_ERROR` | Daemon proxy error | - |
-| `OPERATOR_DOWNLOAD_UNSUPPORTED` | Operator download unsupported | Operator install |
-| `OPERATOR_METADATA_INVALID` | Operator metadata invalid | - |
-| `OPERATOR_DOWNLOAD_FAILED` | Operator download failed | - |
-| `OPERATOR_CHECKSUM_FAILED` | Operator checksum failed | - |
-| `OPERATOR_APK_NOT_FOUND` | Operator apk not found | - |
-| `OPERATOR_INSTALL_FAILED` | Operator install failed | - |
-| `OPERATOR_GRANT_FAILED` | Operator grant failed | - |
-| `OPERATOR_VERIFY_FAILED` | Operator verify failed | - |
-| `RECORDING_ALREADY_IN_PROGRESS` | Recording already in progress | Recording |
-| `RECORDING_NOT_IN_PROGRESS` | Recording not in progress | - |
-| `RECORDING_SESSION_NOT_FOUND` | Recording session not found | - |
-| `RECORDING_PULL_FAILED` | Recording pull failed | - |
-| `RECORDING_PARSE_FAILED` | Recording parse failed | - |
-| `RECORDING_EXPORT_FAILED` | Recording export failed | - |
-| `RECORDING_COMPARE_FAILED` | Recording compare failed | - |
-| `RECORDING_SCHEMA_VERSION_UNSUPPORTED` | Recording schema version unsupported | - |
-| `BROADCAST_FAILED` | Broadcast failed | ADB broadcast dispatch to the Operator package failed. |
-| `PAYLOAD_TOO_LARGE` | Payload too large | - |
-| `DOCTOR_FAILED` | Doctor failed | - |
+| <a id="error-host-dependency-missing"></a>`HOST_DEPENDENCY_MISSING` | Host dependency missing | Host |
+| <a id="error-adb-not-found"></a>`ADB_NOT_FOUND` | Adb not found | Setup & Connectivity |
+| <a id="error-no-devices"></a>`NO_DEVICES` | No devices | - |
+| <a id="error-multiple-devices-device-id-required"></a>`MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` | Multiple devices device id required | Recovery: pass `--device` (alias `--device-id`) when adb shows multiple targets. |
+| <a id="error-operator-not-installed"></a>`OPERATOR_NOT_INSTALLED` | Operator not installed | - |
+| <a id="error-device-not-found"></a>`DEVICE_NOT_FOUND` | Device not found | Recovery: the `--device` serial is not connected (alias `--device-id`). |
+| <a id="error-execution-validation-failed"></a>`EXECUTION_VALIDATION_FAILED` | Execution validation failed | Execution & State |
+| <a id="error-execution-action-unsupported"></a>`EXECUTION_ACTION_UNSUPPORTED` | Execution action unsupported | - |
+| <a id="error-execution-conflict-in-flight"></a>`EXECUTION_CONFLICT_IN_FLIGHT` | Execution conflict in flight | - |
+| <a id="error-result-envelope-timeout"></a>`RESULT_ENVELOPE_TIMEOUT` | Result envelope timeout | - |
+| <a id="error-result-envelope-malformed"></a>`RESULT_ENVELOPE_MALFORMED` | Result envelope malformed | - |
+| <a id="error-snapshot-extraction-failed"></a>`SNAPSHOT_EXTRACTION_FAILED` | Snapshot extraction failed | - |
+| <a id="error-missing-argument"></a>`MISSING_ARGUMENT` | Missing argument | CLI Usage |
+| <a id="error-node-not-found"></a>`NODE_NOT_FOUND` | Node not found | UI & Nodes |
+| <a id="error-node-not-clickable"></a>`NODE_NOT_CLICKABLE` | Node not clickable | - |
+| <a id="error-security-block-detected"></a>`SECURITY_BLOCK_DETECTED` | Security block detected | - |
+| <a id="error-container-not-found"></a>`CONTAINER_NOT_FOUND` | Container not found | - |
+| <a id="error-container-not-scrollable"></a>`CONTAINER_NOT_SCROLLABLE` | Container not scrollable | - |
+| <a id="error-gesture-failed"></a>`GESTURE_FAILED` | Gesture failed | - |
+| <a id="error-node-too-old"></a>`NODE_TOO_OLD` | Node too old | Doctor & Host |
+| <a id="error-adb-server-failed"></a>`ADB_SERVER_FAILED` | Adb server failed | - |
+| <a id="error-adb-no-usb-permissions"></a>`ADB_NO_USB_PERMISSIONS` | Adb no usb permissions | - |
+| <a id="error-device-unauthorized"></a>`DEVICE_UNAUTHORIZED` | Device unauthorized | - |
+| <a id="error-device-offline"></a>`DEVICE_OFFLINE` | Device offline | - |
+| <a id="error-device-shell-unavailable"></a>`DEVICE_SHELL_UNAVAILABLE` | Device shell unavailable | - |
+| <a id="error-operator-variant-mismatch"></a>`OPERATOR_VARIANT_MISMATCH` | Operator variant mismatch | Installed release/debug Operator APK variant does not match `--operator-package`. |
+| <a id="error-device-dev-options-disabled"></a>`DEVICE_DEV_OPTIONS_DISABLED` | Device dev options disabled | - |
+| <a id="error-device-usb-debugging-disabled"></a>`DEVICE_USB_DEBUGGING_DISABLED` | Device usb debugging disabled | - |
+| <a id="error-device-accessibility-not-running"></a>`DEVICE_ACCESSIBILITY_NOT_RUNNING` | Device accessibility not running | - |
+| <a id="error-device-not-interactive"></a>`DEVICE_NOT_INTERACTIVE` | Device not interactive | - |
+| <a id="error-android-build-failed"></a>`ANDROID_BUILD_FAILED` | Android build failed | - |
+| <a id="error-android-install-failed"></a>`ANDROID_INSTALL_FAILED` | Android install failed | - |
+| <a id="error-android-app-launch-failed"></a>`ANDROID_APP_LAUNCH_FAILED` | Android app launch failed | - |
+| <a id="error-smoke-open-settings-failed"></a>`SMOKE_OPEN_SETTINGS_FAILED` | Smoke open settings failed | - |
+| <a id="error-scrcpy-not-found"></a>`SCRCPY_NOT_FOUND` | Scrcpy not found | - |
+| <a id="error-apk-version-unreadable"></a>`APK_VERSION_UNREADABLE` | Apk version unreadable | - |
+| <a id="error-apk-version-invalid"></a>`APK_VERSION_INVALID` | Apk version invalid | - |
+| <a id="error-cli-version-invalid"></a>`CLI_VERSION_INVALID` | Cli version invalid | - |
+| <a id="error-version-incompatible"></a>`VERSION_INCOMPATIBLE` | Version incompatible | - |
+| <a id="error-logcat-unavailable"></a>`LOGCAT_UNAVAILABLE` | Logcat unavailable | - |
+| <a id="error-android-sdk-tool-missing"></a>`ANDROID_SDK_TOOL_MISSING` | Android sdk tool missing | - |
+| <a id="error-emulator-not-found"></a>`EMULATOR_NOT_FOUND` | Emulator not found | - |
+| <a id="error-emulator-already-running"></a>`EMULATOR_ALREADY_RUNNING` | Emulator already running | - |
+| <a id="error-emulator-not-running"></a>`EMULATOR_NOT_RUNNING` | Emulator not running | - |
+| <a id="error-emulator-unsupported"></a>`EMULATOR_UNSUPPORTED` | Emulator unsupported | - |
+| <a id="error-emulator-create-failed"></a>`EMULATOR_CREATE_FAILED` | Emulator create failed | - |
+| <a id="error-emulator-start-failed"></a>`EMULATOR_START_FAILED` | Emulator start failed | - |
+| <a id="error-emulator-stop-failed"></a>`EMULATOR_STOP_FAILED` | Emulator stop failed | - |
+| <a id="error-emulator-delete-failed"></a>`EMULATOR_DELETE_FAILED` | Emulator delete failed | - |
+| <a id="error-emulator-boot-timeout"></a>`EMULATOR_BOOT_TIMEOUT` | Emulator boot timeout | - |
+| <a id="error-android-system-image-install-failed"></a>`ANDROID_SYSTEM_IMAGE_INSTALL_FAILED` | Android system image install failed | - |
+| <a id="error-android-avd-create-failed"></a>`ANDROID_AVD_CREATE_FAILED` | Android avd create failed | - |
+| <a id="error-agent-skills-stale"></a>`AGENT_SKILLS_STALE` | Agent skills stale | - |
+| <a id="error-daemon-start-failed"></a>`DAEMON_START_FAILED` | Daemon start failed | Daemon lifecycle |
+| <a id="error-daemon-stop-failed"></a>`DAEMON_STOP_FAILED` | Daemon stop failed | - |
+| <a id="error-daemon-proxy-error"></a>`DAEMON_PROXY_ERROR` | Daemon proxy error | - |
+| <a id="error-operator-download-unsupported"></a>`OPERATOR_DOWNLOAD_UNSUPPORTED` | Operator download unsupported | Operator install |
+| <a id="error-operator-metadata-invalid"></a>`OPERATOR_METADATA_INVALID` | Operator metadata invalid | - |
+| <a id="error-operator-download-failed"></a>`OPERATOR_DOWNLOAD_FAILED` | Operator download failed | - |
+| <a id="error-operator-checksum-failed"></a>`OPERATOR_CHECKSUM_FAILED` | Operator checksum failed | - |
+| <a id="error-operator-apk-not-found"></a>`OPERATOR_APK_NOT_FOUND` | Operator apk not found | - |
+| <a id="error-operator-install-failed"></a>`OPERATOR_INSTALL_FAILED` | Operator install failed | - |
+| <a id="error-operator-grant-failed"></a>`OPERATOR_GRANT_FAILED` | Operator grant failed | - |
+| <a id="error-operator-verify-failed"></a>`OPERATOR_VERIFY_FAILED` | Operator verify failed | - |
+| <a id="error-recording-already-in-progress"></a>`RECORDING_ALREADY_IN_PROGRESS` | Recording already in progress | Recording |
+| <a id="error-recording-not-in-progress"></a>`RECORDING_NOT_IN_PROGRESS` | Recording not in progress | - |
+| <a id="error-recording-session-not-found"></a>`RECORDING_SESSION_NOT_FOUND` | Recording session not found | - |
+| <a id="error-recording-pull-failed"></a>`RECORDING_PULL_FAILED` | Recording pull failed | - |
+| <a id="error-recording-parse-failed"></a>`RECORDING_PARSE_FAILED` | Recording parse failed | - |
+| <a id="error-recording-export-failed"></a>`RECORDING_EXPORT_FAILED` | Recording export failed | - |
+| <a id="error-recording-compare-failed"></a>`RECORDING_COMPARE_FAILED` | Recording compare failed | - |
+| <a id="error-recording-schema-version-unsupported"></a>`RECORDING_SCHEMA_VERSION_UNSUPPORTED` | Recording schema version unsupported | - |
+| <a id="error-broadcast-failed"></a>`BROADCAST_FAILED` | Broadcast failed | ADB broadcast dispatch to the Operator package failed. |
+| <a id="error-payload-too-large"></a>`PAYLOAD_TOO_LARGE` | Payload too large | - |
+| <a id="error-doctor-failed"></a>`DOCTOR_FAILED` | Doctor failed | - |
 
 ## Fast Triage
 
@@ -4260,6 +4385,8 @@ Define the `clawperator devices` output shape, document how Node resolves a targ
 - Device listing: `apps/node/src/domain/devices/listDevices.ts`
 - Device resolution: `apps/node/src/domain/devices/resolveDevice.ts`
 - CLI wrapper: `apps/node/src/cli/commands/devices.ts`
+
+<a id="clawperator-devices"></a>
 
 ## `clawperator devices`
 
@@ -4565,6 +4692,7 @@ Defaults:
 - output defaults to the full `DoctorReport` JSON object
 - use `--output json` when you want to request JSON explicitly
 
+<a id="doctor-report-contract"></a>
 ## `DoctorReport` Contract
 
 `DoctorReport` is:
@@ -4633,6 +4761,7 @@ Machine-checkable implication:
 - with `--fix`, `nextActions` can be less complete because attempted shell steps are omitted even if execution failed
 - always gate on `criticalOk` and `checks[]`, not on whether `nextActions` is empty
 
+<a id="doctor-check-result-contract"></a>
 ## `DoctorCheckResult` Contract
 
 Each entry in `checks[]` has:
@@ -6034,6 +6163,9 @@ Success conditions for execution endpoints:
 
 ## Endpoint Summary
 
+<a id="endpoint-get-ping"></a>
+<a id="endpoint-get-version"></a>
+
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/devices` | list adb-visible devices |
@@ -6053,6 +6185,7 @@ Success conditions for execution endpoints:
 | `POST` | `/android/provision/emulator` | create or reuse a supported emulator and boot it |
 | `GET` | `/events` | subscribe to SSE execution events |
 
+<a id="endpoint-get-devices"></a>
 ## `GET /devices`
 
 Returns the same parsed adb listing used by [Devices](devices.md).
@@ -6085,6 +6218,7 @@ Failure behavior:
 - server-side listing failures return HTTP `500`
 - this route does not use the `errors.ts` status mapping table
 
+<a id="endpoint-post-execute"></a>
 ## `POST /execute`
 
 ### Request body
@@ -6209,6 +6343,7 @@ Device-resolution failure example:
 }
 ```
 
+<a id="endpoint-post-snapshot"></a>
 ## `POST /snapshot`
 
 This route builds a synthetic execution with:
@@ -6258,6 +6393,7 @@ Notes:
 }
 ```
 
+<a id="endpoint-post-screenshot"></a>
 ## `POST /screenshot`
 
 This route builds a synthetic execution with:
@@ -6310,6 +6446,7 @@ Route validation:
 }
 ```
 
+<a id="endpoint-get-skills"></a>
 ## `GET /skills`
 
 Without query parameters, returns every registry entry:
@@ -6341,6 +6478,7 @@ Optional query parameters:
 | `intent` | string | exact `intent` match |
 | `keyword` | string | case-insensitive substring match across `id`, `summary`, and `applicationId` |
 
+<a id="endpoint-get-skills-skill-id"></a>
 ## `GET /skills/:skillId`
 
 Success response:
@@ -6361,6 +6499,7 @@ Success response:
 }
 ```
 
+<a id="endpoint-post-skills-skill-id-run"></a>
 ## `POST /skills/:skillId/run`
 
 ### Request body
@@ -6507,6 +6646,7 @@ Many individual route handlers also return `INTERNAL_ERROR` from local `catch` b
 
 ## Emulator Endpoints
 
+<a id="endpoint-get-android-emulators"></a>
 ### `GET /android/emulators`
 
 Lists configured AVDs, merged with running-state information:
@@ -6531,6 +6671,7 @@ Lists configured AVDs, merged with running-state information:
 }
 ```
 
+<a id="endpoint-get-android-emulators-running"></a>
 ### `GET /android/emulators/running`
 
 ```json
@@ -6549,6 +6690,7 @@ Lists configured AVDs, merged with running-state information:
 }
 ```
 
+<a id="endpoint-get-android-emulators-name"></a>
 ### `GET /android/emulators/:name`
 
 Returns one `ConfiguredAvd` object merged into the success wrapper:
@@ -6569,6 +6711,7 @@ Returns one `ConfiguredAvd` object merged into the success wrapper:
 }
 ```
 
+<a id="endpoint-post-android-emulators-create"></a>
 ### `POST /android/emulators/create`
 
 Request body:
@@ -6611,6 +6754,7 @@ Success response:
 }
 ```
 
+<a id="endpoint-post-android-emulators-name-start"></a>
 ### `POST /android/emulators/:name/start`
 
 Success response:
@@ -6631,6 +6775,7 @@ Behavior:
 - rejects already-running AVDs
 - starts the emulator, waits for adb registration, waits for boot completion, then enables developer settings
 
+<a id="endpoint-post-android-emulators-name-stop"></a>
 ### `POST /android/emulators/:name/stop`
 
 ```json
@@ -6641,6 +6786,7 @@ Behavior:
 }
 ```
 
+<a id="endpoint-delete-android-emulators-name"></a>
 ### `DELETE /android/emulators/:name`
 
 ```json
@@ -6651,6 +6797,7 @@ Behavior:
 }
 ```
 
+<a id="endpoint-post-android-provision-emulator"></a>
 ### `POST /android/provision/emulator`
 
 This route calls `provisionEmulator()` and may reuse a supported running emulator, start an existing supported AVD, or create and start a new one.
@@ -6676,6 +6823,7 @@ Meaning of flags:
 - `started`: the emulator process was started during this request
 - `reused`: an existing supported emulator or AVD was reused
 
+<a id="endpoint-get-events"></a>
 ## `GET /events` SSE Stream
 
 The server responds with:
@@ -7270,6 +7418,7 @@ All execution-backed tools accept these common options unless noted otherwise:
 
 You can also store `deviceId`, `operatorPackage`, and `timeoutMs` once per MCP server process with `configure`. When both are present, per-call values win over session defaults for each field independently.
 
+<a id="mcp-tool-devices"></a>
 ### `devices`
 
 List adb-visible devices.
@@ -7298,6 +7447,7 @@ Notes:
 - this is observational output only
 - it does not apply execution-time device resolution rules
 
+<a id="mcp-tool-snapshot"></a>
 ### `snapshot`
 
 Capture the current UI hierarchy XML.
@@ -7331,6 +7481,7 @@ Success payload includes:
 
 When `maxChars` is applied, the returned `envelope` is truncated consistently with the top-level `snapshot` field, so MCP clients do not receive a second full-copy XML payload through `content` or `structuredContent`.
 
+<a id="mcp-tool-execute"></a>
 ### `execute`
 
 Run a caller-supplied action list through the canonical execution validator and runtime.
@@ -7370,6 +7521,7 @@ Validation boundary:
 
 Use [Actions](actions.md) for canonical action types and params.
 
+<a id="mcp-tool-configure"></a>
 ### `configure`
 
 Store per-session defaults for execution-backed MCP tools.
@@ -7414,6 +7566,7 @@ Example success payload:
 }
 ```
 
+<a id="mcp-tool-open"></a>
 ### `open`
 
 Open an app or URI.
@@ -7450,6 +7603,7 @@ Example URI launch:
 }
 ```
 
+<a id="mcp-tool-click"></a>
 ### `click`
 
 Click a node or an absolute coordinate.
@@ -7492,6 +7646,7 @@ Example coordinate click:
 }
 ```
 
+<a id="mcp-tool-type"></a>
 ### `type`
 
 Type text into a matching field.
@@ -7531,6 +7686,7 @@ Example call:
 }
 ```
 
+<a id="mcp-tool-read"></a>
 ### `read`
 
 Read text from one node or all matches. Supports regex validation to filter results at the runtime boundary.
@@ -7584,6 +7740,7 @@ Example regex-validated read:
 }
 ```
 
+<a id="mcp-tool-press"></a>
 ### `press`
 
 Press a supported Android navigation key.
@@ -7606,6 +7763,7 @@ Example call:
 }
 ```
 
+<a id="mcp-tool-wait"></a>
 ### `wait`
 
 Wait until a matching node appears.
@@ -7631,6 +7789,7 @@ Example call:
 }
 ```
 
+<a id="mcp-tool-scroll-until"></a>
 ### `scroll_until`
 
 Scroll in the given direction until a matching node appears, optionally clicking it afterward.
@@ -8409,6 +8568,7 @@ Recommended recording-count stance:
 
 ## CLI Commands
 
+<a id="command-recording-start"></a>
 ### Start
 
 ```bash
@@ -8472,6 +8632,7 @@ Expected success wrapper shape:
 }
 ```
 
+<a id="command-recording-stop"></a>
 ### Stop
 
 ```bash
@@ -8533,6 +8694,7 @@ Expected success wrapper shape:
 }
 ```
 
+<a id="command-recording-pull"></a>
 ### Pull
 
 ```bash
@@ -8565,6 +8727,7 @@ Check:
 - `sessionId == "demo-session"`
 - `localPath` ends with `/demo-session.ndjson`
 
+<a id="command-recording-parse"></a>
 ### Parse
 
 ```bash
@@ -8602,6 +8765,7 @@ Check:
 - `stepCount` matches the parsed `steps.length`
 - `stdout` contains the JSON result, while `stderr` also receives a human-readable step summary from `printStepSummary()`
 
+<a id="command-recording-export"></a>
 ### Export
 
 ```bash
@@ -8726,6 +8890,7 @@ Exported event types:
 | `press_key` | `seq`, `ts`, `deltaMsSincePrevious`, `type`, `key`, `snapshot` |
 | `text_change` | `seq`, `ts`, `deltaMsSincePrevious`, `type`, `packageName`, `resourceId`, `text`, `snapshot` |
 
+<a id="command-recording-compare"></a>
 ### Compare
 
 ```bash

@@ -10,7 +10,8 @@ foundation plus ownership manifest and generated detail links. **PR-3** contains
 Phase 4, focused authored-doc cleanup. **PR-4** contains Phase 5, warning-only
 docs checks.
 
-Current state assumes PR-1 has merged. Phase 1 is complete, and Phase 2 is next.
+Current state assumes PR-2 has merged. Phases 1, 2, and 3 are complete, and
+Phase 4 is next.
 
 ## Status
 
@@ -19,9 +20,9 @@ Current state assumes PR-1 has merged. Phase 1 is complete, and Phase 2 is next.
 | State | in progress |
 | Total PRs | 4 |
 | Total phases | 5 |
-| Completed | PR-1 / Phase 1 |
-| Remaining | 2, 3, 4, 5 |
-| Current / Next | Phase 2 |
+| Completed | PR-1 / Phase 1; PR-2 / Phases 2-3 |
+| Remaining | 4, 5 |
+| Current / Next | PR-3 / Phase 4 |
 | Blockers | none |
 
 ## Hard Rules
