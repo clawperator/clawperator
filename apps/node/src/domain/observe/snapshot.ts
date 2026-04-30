@@ -3,7 +3,7 @@ import { runExecution } from "../executions/runExecution.js";
 import type { RunExecutionOptions } from "../executions/runExecution.js";
 
 /**
- * Build execution that runs a single snapshot_ui and run it.
+ * Build execution that runs a single snapshot and run it.
  */
 export function buildSnapshotExecution(options?: { timeoutMs?: number }): Execution {
   const commandId = `snapshot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -16,7 +16,7 @@ export function buildSnapshotExecution(options?: { timeoutMs?: number }): Execut
     actions: [
       {
         id: "snap",
-        type: "snapshot_ui",
+        type: "snapshot",
       },
     ],
     mode: "direct",

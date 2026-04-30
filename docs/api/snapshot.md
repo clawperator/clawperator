@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define what `snapshot_ui` returns, where the XML hierarchy is attached in the result envelope, what extraction failures look like, and what parts of the snapshot contract an agent can rely on.
+Define what `snapshot` returns, where the XML hierarchy is attached in the result envelope, what extraction failures look like, and what parts of the snapshot contract an agent can rely on.
 
 ## Sources
 
@@ -12,16 +12,16 @@ Define what `snapshot_ui` returns, where the XML hierarchy is attached in the re
 - Snapshot builder: `apps/node/src/domain/observe/snapshot.ts`
 - Action contract summary: `docs/api/actions.md`
 
-## What `snapshot_ui` Returns
+## What `snapshot` Returns
 
-`snapshot_ui` is the canonical read-only UI observation action. The Android runtime writes the hierarchy dump to logcat, then the Node layer extracts the XML and attaches it to the successful step result as `data.text`.
+`snapshot` is the canonical read-only UI observation action. The Android runtime writes the hierarchy dump to logcat, then the Node layer extracts the XML and attaches it to the successful step result as `data.text`.
 
 The built-in `clawperator snapshot` command constructs a one-step execution with these exact defaults:
 
 - `source: "clawperator-observe"`
 - `expectedFormat: "android-ui-automator"`
 - `timeoutMs: 30000` when `buildSnapshotExecution()` is called without an override
-- one action with `id: "snap"` and `type: "snapshot_ui"`
+- one action with `id: "snap"` and `type: "snapshot"`
 - `mode: "direct"`
 - `commandId` is generated as `snapshot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 - `taskId` equals the generated `commandId`
@@ -31,7 +31,7 @@ For CLI `snapshot`, machine-checkable success means:
 - exit code `0`
 - top-level JSON has `envelope`
 - `envelope.status == "success"`
-- `envelope.stepResults[0].actionType == "snapshot_ui"`
+- `envelope.stepResults[0].actionType == "snapshot"`
 - `envelope.stepResults[0].success == true`
 - `envelope.stepResults[0].data.text` is present
 
@@ -47,7 +47,7 @@ Example one-step payload from the `clawperator snapshot` builder:
   "actions": [
     {
       "id": "snap",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ],
   "mode": "direct"
@@ -58,12 +58,12 @@ Example one-step payload from the `clawperator snapshot` builder:
 
 The current flow is:
 
-1. Android executes `snapshot_ui`.
+1. Node accepts the canonical `snapshot` action. For current Android compatibility, Node dispatches the equivalent Android snapshot action to the Operator.
 2. Android writes the hierarchy dump into logcat lines that begin with the exact marker `[TaskScope] UI Hierarchy [commandId=<command_id>]:`.
 3. Node streams logcat with `adb logcat -v time -T 1` around dispatch and keeps the correlated snapshot lines for the current command.
 4. `extractSnapshotRecordsFromLogs()` reconstructs one or more XML documents from the log stream and preserves the parsed `commandId` when the tagged marker is present.
 5. `extractSnapshotsForCommand()` selects snapshots for the current execution by requiring `commandId == envelope.commandId`.
-6. `attachSnapshotsToStepResults()` walks backward through successful `snapshot_ui` steps and attaches the extracted XML as `stepResults[i].data.text`.
+6. `attachSnapshotsToStepResults()` walks backward through successful `snapshot` steps and attaches the extracted XML as `stepResults[i].data.text`.
 7. `markExtractionFailedSnapshotSteps()` converts any still-successful snapshot step with missing `data.text` into a failed step.
 8. `addSettleWarnings()` may attach `data.warn` if the snapshot action immediately follows `click` or `scroll_and_click`.
 
@@ -76,14 +76,14 @@ Debugging details that matter when extraction goes wrong:
 Important boundaries:
 
 - Node does not parse the XML into a typed object. It treats the hierarchy as opaque text.
-- When multiple snapshots exist in one execution, Node attaches the most recent extracted snapshot to the most recent successful `snapshot_ui` step, walking backward through both lists.
-- If no successful `snapshot_ui` steps exist, extraction output is ignored.
-- Node only reads logcat for snapshot extraction when the result envelope already contains at least one `snapshot_ui` step.
+- When multiple snapshots exist in one execution, Node attaches the most recent extracted snapshot to the most recent successful `snapshot` step, walking backward through both lists.
+- If no successful `snapshot` steps exist, extraction output is ignored.
+- Node only reads logcat for snapshot extraction when the result envelope already contains at least one snapshot step.
 - for direct snapshot executions like `clawperator snapshot`, the step `id` matches the action `id` (`"snap"`)
 
 ## Envelope Placement
 
-Successful `snapshot_ui` data lives inside the step result, not in a separate top-level field:
+Successful `snapshot` data lives inside the step result, not in a separate top-level field:
 
 ```json
 {
@@ -94,7 +94,7 @@ Successful `snapshot_ui` data lives inside the step result, not in a separate to
     "stepResults": [
       {
         "id": "snap",
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
@@ -123,7 +123,7 @@ Check these exact fields:
     "status": "success",
     "stepResults": [
       {
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
@@ -211,7 +211,7 @@ because it produces reproducible results that any device can create and run.
     "stepResults": [
       {
         "id": "snap",
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "actual_format": "hierarchy_xml",
@@ -398,12 +398,12 @@ This example was captured on an emulator running Android 15 with a
 
 ## Extraction Failure
 
-If a `snapshot_ui` step initially succeeds but Node cannot attach `data.text`, Node rewrites that step into a failure:
+If a `snapshot` step initially succeeds but Node cannot attach `data.text`, Node rewrites that step into a failure:
 
 ```json
 {
   "id": "snap",
-  "actionType": "snapshot_ui",
+  "actionType": "snapshot",
   "success": false,
   "data": {
     "error": "SNAPSHOT_EXTRACTION_FAILED",
@@ -434,7 +434,7 @@ If extraction failed, branch on `data.error`:
     "status": "failed",
     "stepResults": [
       {
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": false,
         "data": {
           "error": "SNAPSHOT_EXTRACTION_FAILED"
@@ -456,7 +456,7 @@ Node also adds a best-effort warning to successful snapshots when the immediatel
 
 ```json
 {
-  "warn": "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot_ui"
+  "warn": "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot"
 }
 ```
 
@@ -489,7 +489,7 @@ Operationally:
 ```json
 {
   "id": "snap",
-  "actionType": "snapshot_ui",
+  "actionType": "snapshot",
   "success": true,
   "data": {
     "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\"><node index=\"0\" text=\"Settings\" resource-id=\"com.android.settings:id/action_bar\" class=\"android.widget.TextView\" package=\"com.android.settings\" content-desc=\"\" clickable=\"false\" enabled=\"true\" bounds=\"[0,0][1080,176]\" /></hierarchy>"

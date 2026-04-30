@@ -299,7 +299,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
       source: "serve-api",
       expectedFormat: "android-ui-automator",
       timeoutMs: 30000,
-      actions: [{ id: "snap", type: "snapshot_ui" }],
+      actions: [{ id: "snap", type: "snapshot" }],
     };
 
     try {

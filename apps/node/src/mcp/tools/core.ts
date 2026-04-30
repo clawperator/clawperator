@@ -168,7 +168,7 @@ export function getCoreMcpTools(
 
         return await runExecutionTool(execution, opts, logger, (result) => {
           const extracted = extractStepDataValue(result.envelope, {
-            actionType: "snapshot_ui",
+            actionType: "snapshot",
             dataKey: "text",
             errorKey: "error",
           });

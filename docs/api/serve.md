@@ -66,7 +66,7 @@ Successful shape:
     "stepResults": [
       {
         "id": "snap",
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<hierarchy rotation=\"0\">...</hierarchy>"
@@ -106,7 +106,7 @@ Success conditions for execution endpoints:
 | --- | --- | --- |
 | `GET` | `/devices` | list adb-visible devices |
 | `POST` | `/execute` | run a caller-supplied execution payload |
-| `POST` | `/snapshot` | run a synthetic one-step `snapshot_ui` execution |
+| `POST` | `/snapshot` | run a synthetic one-step `snapshot` execution |
 | `POST` | `/screenshot` | run a synthetic one-step `take_screenshot` execution |
 | `GET` | `/skills` | list all skills or search by query |
 | `GET` | `/skills/:skillId` | fetch one skill registry entry |
@@ -175,7 +175,7 @@ Failure behavior:
       },
       {
         "id": "a2",
-        "type": "snapshot_ui"
+        "type": "snapshot"
       }
     ]
   },
@@ -231,7 +231,7 @@ Representative serve-layer `400` wrappers for this route:
       },
       {
         "id": "a2",
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<hierarchy rotation=\"0\">...</hierarchy>"
@@ -284,7 +284,7 @@ This route builds a synthetic execution with:
 - `source: "serve-api"`
 - `expectedFormat: "android-ui-automator"`
 - `timeoutMs: 30000`
-- one action: `{ "id": "snap", "type": "snapshot_ui" }`
+- one action: `{ "id": "snap", "type": "snapshot" }`
 
 ### Request body
 
@@ -314,7 +314,7 @@ Notes:
     "stepResults": [
       {
         "id": "snap",
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<hierarchy rotation=\"0\">...</hierarchy>"

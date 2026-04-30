@@ -59,7 +59,7 @@ Use:
 - [CLI Reference](api/cli.md) - generated command and flag reference
 - [Actions](api/actions.md) - canonical action types and parameter semantics
 - [Selectors](api/selectors.md) - `NodeMatcher` contract and CLI selector mapping
-- [Snapshot Format](api/snapshot.md) - where `snapshot_ui` XML lives and how extraction works
+- [Snapshot Format](api/snapshot.md) - where `snapshot` XML lives and how extraction works
 - [Errors](api/errors.md) - public error-code contract and recovery patterns
 - [Devices](api/devices.md) - device discovery and deterministic targeting
 - [Doctor](api/doctor.md) - doctor report contract and readiness checks
@@ -264,7 +264,7 @@ Important compatibility note:
 - refresh the APK from that stable URL before reinstalling when you need recent
   runtime fixes
 - older APKs do not include the newer `open_app` foreground wait behavior or
-  the tagged snapshot log marker used for reliable `snapshot_ui` extraction
+  the tagged snapshot log marker used for reliable `snapshot` extraction
 - keep the installed CLI and APK on current matching releases; `clawperator doctor`
   reports version compatibility before you trust a device run
 
@@ -416,7 +416,7 @@ Success conditions:
 
 - Exit code `0`.
 - `envelope.status` is `"success"`.
-- `envelope.stepResults[0].actionType` is `"snapshot_ui"`.
+- `envelope.stepResults[0].actionType` is `"snapshot"`.
 - `envelope.stepResults[0].success` is `true`.
 - `envelope.stepResults[0].data.text` contains the XML hierarchy.
 
@@ -774,7 +774,7 @@ Observe  ->  Decide  ->  Act
 Repeat until the task is done.
 
 **Targeting rule:** do not guess selectors. If the next action needs a target,
-take a fresh `snapshot_ui`, derive the selector from the current hierarchy, and
+take a fresh `snapshot`, derive the selector from the current hierarchy, and
 then act. A guessed label failing is not a Clawperator bug - it means the
 target was not proven from the current screen state.
 
@@ -782,7 +782,7 @@ target was not proven from the current screen state.
 
 ## Step 1: Observe
 
-The canonical observation action is `snapshot_ui`. Run it with the built-in
+The canonical observation action is `snapshot`. Run it with the built-in
 `snapshot` command:
 
 ```bash
@@ -800,7 +800,7 @@ Success conditions to check before proceeding:
     "status": "success",
     "stepResults": [
       {
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n<hierarchy rotation=\"0\">...</hierarchy>"
@@ -914,7 +914,7 @@ Example - click the "Connections" row, wait for navigation, then take a snapshot
     },
     {
       "id": "snap-2",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ],
   "mode": "direct"
@@ -972,7 +972,7 @@ clawperator doctor --device <device_serial>
     },
     {
       "id": "snap-1",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ],
   "mode": "direct"
@@ -1005,7 +1005,7 @@ Scroll payload (use when the target row is below the visible area):
     },
     {
       "id": "snap-2",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ],
   "mode": "direct"
@@ -1039,7 +1039,7 @@ the "Android version" row:
     },
     {
       "id": "snap-3",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ],
   "mode": "direct"
@@ -1141,7 +1141,7 @@ Each action has:
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `id` | `string` | Step correlation id. |
-| `type` | `string` | Canonical action type such as `click` or `snapshot_ui`. |
+| `type` | `string` | Canonical action type such as `click` or `snapshot`. |
 | `params` | `ActionParams` | Optional action-specific parameters. |
 
 Minimum valid payload example:
@@ -1156,7 +1156,7 @@ Minimum valid payload example:
   "actions": [
     {
       "id": "snap-1",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ],
   "mode": "direct"
@@ -1200,7 +1200,7 @@ Success condition:
 - `execution.taskId == "task-001"`
 - `execution.expectedFormat == "android-ui-automator"`
 - `execution.timeoutMs == 30000`
-- `execution.actions[0].type == "snapshot_ui"`
+- `execution.actions[0].type == "snapshot"`
 
 CLI payload-source aliases accepted by `clawperator exec`:
 
@@ -1232,7 +1232,7 @@ The Android runtime emits a `[Clawperator-Result]` envelope. The Node CLI wraps 
     "stepResults": [
       {
         "id": "snap-1",
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<hierarchy/>"
@@ -1306,7 +1306,7 @@ Non-runtime success wrappers from `clawperator exec`:
     "expectedFormat": "android-ui-automator",
     "timeoutMs": 30000,
     "actions": [
-      { "id": "snap-1", "type": "snapshot_ui" }
+      { "id": "snap-1", "type": "snapshot" }
     ]
   }
 }
@@ -1321,7 +1321,7 @@ Non-runtime success wrappers from `clawperator exec`:
     "timeoutMs": 30000,
     "actionCount": 1,
     "actions": [
-      { "id": "snap-1", "type": "snapshot_ui" }
+      { "id": "snap-1", "type": "snapshot" }
     ]
   }
 }
@@ -1366,7 +1366,7 @@ Exact machine-checkable success condition for most CLI device commands:
 - A top-level failure can also arrive with zero steps, for example when Android returns a failure envelope before a normal step list exists, such as `SERVICE_UNAVAILABLE`.
 - Execution timeout is different: `runExecution()` returns a top-level host-side error object such as `RESULT_ENVELOPE_TIMEOUT`, not a zero-step success-wrapper envelope.
 - Node may modify step data after the runtime returns. Examples:
-  - `snapshot_ui` success steps get `data.text` attached from extracted log output
+  - `snapshot` success steps get `data.text` attached from extracted log output
   - missing snapshot text is converted into `SNAPSHOT_EXTRACTION_FAILED`
   - successful `take_screenshot` steps get `data.path`
   - successful pre-flight `close_app` steps are normalized to `data.application_id`
@@ -1399,7 +1399,7 @@ Success output shape:
     "stepResults": [
       {
         "id": "snap",
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<hierarchy rotation=\"0\">...</hierarchy>"
@@ -1417,7 +1417,7 @@ Success output shape:
 Agent-side success test:
 
 - `envelope.status == "success"`
-- `envelope.stepResults[0].actionType == "snapshot_ui"`
+- `envelope.stepResults[0].actionType == "snapshot"`
 - `envelope.stepResults[0].success == true`
 - `"text" in envelope.stepResults[0].data`
 
@@ -2077,7 +2077,7 @@ scroll
 scroll_until
 read_text
 enter_text
-snapshot_ui
+snapshot
 take_screenshot
 sleep
 press_key
@@ -2094,7 +2094,7 @@ Input aliases normalized by Node before validation:
 | `press` | `click` |
 | `wait_for`, `find`, `find_node` | `wait_for_node` |
 | `read` | `read_text` |
-| `snapshot` | `snapshot_ui` |
+| `snapshot_ui` | `snapshot` |
 | `screenshot`, `capture_screenshot` | `take_screenshot` |
 | `type_text`, `text_entry`, `input_text` | `enter_text` |
 | `key_press` | `press_key` |
@@ -2139,7 +2139,7 @@ Common payload-key aliases also accepted on input:
     },
     {
       "id": "snap-1",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ],
   "mode": "direct"
@@ -2150,7 +2150,7 @@ Success condition for that payload:
 
 - `envelope.status == "success"`
 - every `envelope.stepResults[i].success == true`
-- `envelope.stepResults[2].actionType == "snapshot_ui"`
+- `envelope.stepResults[2].actionType == "snapshot"`
 - `"text" in envelope.stepResults[2].data`
 
 ## Action Reference
@@ -2597,7 +2597,7 @@ Example:
 }
 ```
 
-### `snapshot_ui`
+### `snapshot`
 
 | Field | Valid values |
 | --- | --- |
@@ -2625,7 +2625,7 @@ Example:
 ```json
 {
   "id": "snap-1",
-  "type": "snapshot_ui"
+  "type": "snapshot"
 }
 ```
 
@@ -2867,7 +2867,7 @@ Example:
 | `read-value` | `read_key_value_pair` | built from label selector flags |
 | `wait` | `wait_for_node` | action timeout comes from `--timeout` |
 | `wait-for-nav` | `wait_for_navigation` | requires `--timeout` |
-| `snapshot` | `snapshot_ui` | no action params |
+| `snapshot` | `snapshot` | no action params |
 | `screenshot` | `take_screenshot` | optional `path` |
 | `close` | `close_app` | `close-app` is a CLI synonym |
 | `sleep` | `sleep` | duration is positional |
@@ -2881,7 +2881,7 @@ Example:
 
 | Action type | Success keys Node guarantees |
 | --- | --- |
-| `snapshot_ui` | `data.text`; optional `data.warn` |
+| `snapshot` | `data.text`; optional `data.warn` |
 | `take_screenshot` | `data.path` |
 | `close_app` | `data.application_id` when Node pre-flight succeeded |
 | all others | no fixed success keys guaranteed by Node |
@@ -2899,16 +2899,16 @@ Concrete success example for `take_screenshot`:
 }
 ```
 
-Concrete success example for `snapshot_ui`:
+Concrete success example for `snapshot`:
 
 ```json
 {
   "id": "snap-1",
-  "actionType": "snapshot_ui",
+  "actionType": "snapshot",
   "success": true,
   "data": {
     "text": "<hierarchy rotation=\"0\">...</hierarchy>",
-    "warn": "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot_ui"
+    "warn": "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot"
   }
 }
 ```
@@ -3324,7 +3324,7 @@ clawperator read-value --label "Battery"
 
 ## Purpose
 
-Define what `snapshot_ui` returns, where the XML hierarchy is attached in the result envelope, what extraction failures look like, and what parts of the snapshot contract an agent can rely on.
+Define what `snapshot` returns, where the XML hierarchy is attached in the result envelope, what extraction failures look like, and what parts of the snapshot contract an agent can rely on.
 
 ## Sources
 
@@ -3334,16 +3334,16 @@ Define what `snapshot_ui` returns, where the XML hierarchy is attached in the re
 - Snapshot builder: `apps/node/src/domain/observe/snapshot.ts`
 - Action contract summary: `docs/api/actions.md`
 
-## What `snapshot_ui` Returns
+## What `snapshot` Returns
 
-`snapshot_ui` is the canonical read-only UI observation action. The Android runtime writes the hierarchy dump to logcat, then the Node layer extracts the XML and attaches it to the successful step result as `data.text`.
+`snapshot` is the canonical read-only UI observation action. The Android runtime writes the hierarchy dump to logcat, then the Node layer extracts the XML and attaches it to the successful step result as `data.text`.
 
 The built-in `clawperator snapshot` command constructs a one-step execution with these exact defaults:
 
 - `source: "clawperator-observe"`
 - `expectedFormat: "android-ui-automator"`
 - `timeoutMs: 30000` when `buildSnapshotExecution()` is called without an override
-- one action with `id: "snap"` and `type: "snapshot_ui"`
+- one action with `id: "snap"` and `type: "snapshot"`
 - `mode: "direct"`
 - `commandId` is generated as `snapshot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 - `taskId` equals the generated `commandId`
@@ -3353,7 +3353,7 @@ For CLI `snapshot`, machine-checkable success means:
 - exit code `0`
 - top-level JSON has `envelope`
 - `envelope.status == "success"`
-- `envelope.stepResults[0].actionType == "snapshot_ui"`
+- `envelope.stepResults[0].actionType == "snapshot"`
 - `envelope.stepResults[0].success == true`
 - `envelope.stepResults[0].data.text` is present
 
@@ -3369,7 +3369,7 @@ Example one-step payload from the `clawperator snapshot` builder:
   "actions": [
     {
       "id": "snap",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ],
   "mode": "direct"
@@ -3380,12 +3380,12 @@ Example one-step payload from the `clawperator snapshot` builder:
 
 The current flow is:
 
-1. Android executes `snapshot_ui`.
+1. Node accepts the canonical `snapshot` action. For current Android compatibility, Node dispatches the equivalent Android snapshot action to the Operator.
 2. Android writes the hierarchy dump into logcat lines that begin with the exact marker `[TaskScope] UI Hierarchy [commandId=<command_id>]:`.
 3. Node streams logcat with `adb logcat -v time -T 1` around dispatch and keeps the correlated snapshot lines for the current command.
 4. `extractSnapshotRecordsFromLogs()` reconstructs one or more XML documents from the log stream and preserves the parsed `commandId` when the tagged marker is present.
 5. `extractSnapshotsForCommand()` selects snapshots for the current execution by requiring `commandId == envelope.commandId`.
-6. `attachSnapshotsToStepResults()` walks backward through successful `snapshot_ui` steps and attaches the extracted XML as `stepResults[i].data.text`.
+6. `attachSnapshotsToStepResults()` walks backward through successful `snapshot` steps and attaches the extracted XML as `stepResults[i].data.text`.
 7. `markExtractionFailedSnapshotSteps()` converts any still-successful snapshot step with missing `data.text` into a failed step.
 8. `addSettleWarnings()` may attach `data.warn` if the snapshot action immediately follows `click` or `scroll_and_click`.
 
@@ -3398,14 +3398,14 @@ Debugging details that matter when extraction goes wrong:
 Important boundaries:
 
 - Node does not parse the XML into a typed object. It treats the hierarchy as opaque text.
-- When multiple snapshots exist in one execution, Node attaches the most recent extracted snapshot to the most recent successful `snapshot_ui` step, walking backward through both lists.
-- If no successful `snapshot_ui` steps exist, extraction output is ignored.
-- Node only reads logcat for snapshot extraction when the result envelope already contains at least one `snapshot_ui` step.
+- When multiple snapshots exist in one execution, Node attaches the most recent extracted snapshot to the most recent successful `snapshot` step, walking backward through both lists.
+- If no successful `snapshot` steps exist, extraction output is ignored.
+- Node only reads logcat for snapshot extraction when the result envelope already contains at least one snapshot step.
 - for direct snapshot executions like `clawperator snapshot`, the step `id` matches the action `id` (`"snap"`)
 
 ## Envelope Placement
 
-Successful `snapshot_ui` data lives inside the step result, not in a separate top-level field:
+Successful `snapshot` data lives inside the step result, not in a separate top-level field:
 
 ```json
 {
@@ -3416,7 +3416,7 @@ Successful `snapshot_ui` data lives inside the step result, not in a separate to
     "stepResults": [
       {
         "id": "snap",
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
@@ -3445,7 +3445,7 @@ Check these exact fields:
     "status": "success",
     "stepResults": [
       {
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\">...</hierarchy>"
@@ -3533,7 +3533,7 @@ because it produces reproducible results that any device can create and run.
     "stepResults": [
       {
         "id": "snap",
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "actual_format": "hierarchy_xml",
@@ -3720,12 +3720,12 @@ This example was captured on an emulator running Android 15 with a
 
 ## Extraction Failure
 
-If a `snapshot_ui` step initially succeeds but Node cannot attach `data.text`, Node rewrites that step into a failure:
+If a `snapshot` step initially succeeds but Node cannot attach `data.text`, Node rewrites that step into a failure:
 
 ```json
 {
   "id": "snap",
-  "actionType": "snapshot_ui",
+  "actionType": "snapshot",
   "success": false,
   "data": {
     "error": "SNAPSHOT_EXTRACTION_FAILED",
@@ -3756,7 +3756,7 @@ If extraction failed, branch on `data.error`:
     "status": "failed",
     "stepResults": [
       {
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": false,
         "data": {
           "error": "SNAPSHOT_EXTRACTION_FAILED"
@@ -3778,7 +3778,7 @@ Node also adds a best-effort warning to successful snapshots when the immediatel
 
 ```json
 {
-  "warn": "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot_ui"
+  "warn": "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot"
 }
 ```
 
@@ -3811,7 +3811,7 @@ Operationally:
 ```json
 {
   "id": "snap",
-  "actionType": "snapshot_ui",
+  "actionType": "snapshot",
   "success": true,
   "data": {
     "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\"><node index=\"0\" text=\"Settings\" resource-id=\"com.android.settings:id/action_bar\" class=\"android.widget.TextView\" package=\"com.android.settings\" content-desc=\"\" clickable=\"false\" enabled=\"true\" bounds=\"[0,0][1080,176]\" /></hierarchy>"
@@ -4125,7 +4125,7 @@ Typical fields:
     "commandId": "snapshot-1",
     "taskId": "snapshot-1",
     "lastActionId": "a1",
-    "lastActionType": "snapshot_ui",
+    "lastActionType": "snapshot",
     "lastActionCaveat": "payload-last only; Android execution position is unknown",
     "elapsedMs": 30000,
     "timeoutMs": 30000
@@ -4931,7 +4931,7 @@ For a failing check, pretty output includes:
 | `readiness.settings.usb_debugging` | `pass`, `warn` | `DEVICE_USB_DEBUGGING_DISABLED` | USB debugging setting is enabled |
 | `readiness.handshake` | `pass`, `fail` | `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `RESULT_ENVELOPE_TIMEOUT`, `BROADCAST_FAILED`, `OPERATOR_NOT_INSTALLED` | Node can dispatch and receive a valid result envelope |
 | `readiness.device.interactive` | `pass`, `fail` | `DEVICE_NOT_INTERACTIVE`, or the underlying probe failure code if state could not be verified | the target is awake enough for interactive automation, with evidence fields `deviceLocked`, `screenOn`, and `userUnlocked` |
-| `readiness.smoke` | `pass`, `fail` | `SMOKE_OPEN_SETTINGS_FAILED` | smoke execution can open Settings and produce at least one successful `snapshot_ui` step |
+| `readiness.smoke` | `pass`, `fail` | `SMOKE_OPEN_SETTINGS_FAILED` | smoke execution can open Settings and produce at least one successful `snapshot` step |
 
 ## Common Failure Recovery
 
@@ -5143,7 +5143,7 @@ If the runtime exceeds the budget and Node never receives a valid result envelop
 Verification pattern - confirm a timeout value was accepted without dispatching:
 
 ```bash
-clawperator exec --validate-only --execution '{"commandId":"timeout-check","taskId":"timeout-check","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"snap","type":"snapshot_ui"}]}'
+clawperator exec --validate-only --execution '{"commandId":"timeout-check","taskId":"timeout-check","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"snap","type":"snapshot"}]}'
 ```
 
 Expected success shape:
@@ -5161,7 +5161,7 @@ Expected success shape:
     "actions": [
       {
         "id": "snap",
-        "type": "snapshot_ui"
+        "type": "snapshot"
       }
     ]
   }
@@ -5324,7 +5324,7 @@ Exact builder literals:
 - action id: `sleep`
 - action type: `sleep`
 
-### `snapshot_ui`
+### `snapshot`
 
 `buildSnapshotExecution()` defaults to `30000`. It has no separate action-level timeout field.
 
@@ -5332,7 +5332,7 @@ Exact snapshot builder literals:
 
 - `source: "clawperator-observe"`
 - action id: `snap`
-- action type: `snapshot_ui`
+- action type: `snapshot`
 - `mode: "direct"`
 
 ## Best-Effort Runtime Ceiling
@@ -5371,7 +5371,7 @@ Agent guidance:
   "expectedFormat": "android-ui-automator",
   "timeoutMs": 30000,
   "actions": [
-    { "id": "snap", "type": "snapshot_ui" }
+    { "id": "snap", "type": "snapshot" }
   ]
 }
 ```
@@ -5452,7 +5452,7 @@ Why `35000` is the right budget here:
     },
     {
       "id": "snap-1",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ]
 }
@@ -5467,7 +5467,7 @@ Reasonable because:
 Verification pattern - inspect the plan without dispatching:
 
 ```bash
-clawperator exec --dry-run --execution '{"commandId":"read-after-click","taskId":"read-after-click","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":45000,"actions":[{"id":"click-1","type":"click","params":{"matcher":{"textEquals":"Settings"}}},{"id":"sleep-1","type":"sleep","params":{"durationMs":1500}},{"id":"wait-1","type":"wait_for_node","params":{"matcher":{"textEquals":"Connected devices"},"timeoutMs":10000}},{"id":"snap-1","type":"snapshot_ui"}]}'
+clawperator exec --dry-run --execution '{"commandId":"read-after-click","taskId":"read-after-click","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":45000,"actions":[{"id":"click-1","type":"click","params":{"matcher":{"textEquals":"Settings"}}},{"id":"sleep-1","type":"sleep","params":{"durationMs":1500}},{"id":"wait-1","type":"wait_for_node","params":{"matcher":{"textEquals":"Connected devices"},"timeoutMs":10000}},{"id":"snap-1","type":"snapshot"}]}'
 ```
 
 Expected success shape:
@@ -5509,7 +5509,7 @@ Expected success shape:
       },
       {
         "id": "snap-1",
-        "type": "snapshot_ui"
+        "type": "snapshot"
       }
     ]
   }
@@ -5994,7 +5994,7 @@ Successful shape:
     "stepResults": [
       {
         "id": "snap",
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<hierarchy rotation=\"0\">...</hierarchy>"
@@ -6034,7 +6034,7 @@ Success conditions for execution endpoints:
 | --- | --- | --- |
 | `GET` | `/devices` | list adb-visible devices |
 | `POST` | `/execute` | run a caller-supplied execution payload |
-| `POST` | `/snapshot` | run a synthetic one-step `snapshot_ui` execution |
+| `POST` | `/snapshot` | run a synthetic one-step `snapshot` execution |
 | `POST` | `/screenshot` | run a synthetic one-step `take_screenshot` execution |
 | `GET` | `/skills` | list all skills or search by query |
 | `GET` | `/skills/:skillId` | fetch one skill registry entry |
@@ -6103,7 +6103,7 @@ Failure behavior:
       },
       {
         "id": "a2",
-        "type": "snapshot_ui"
+        "type": "snapshot"
       }
     ]
   },
@@ -6159,7 +6159,7 @@ Representative serve-layer `400` wrappers for this route:
       },
       {
         "id": "a2",
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<hierarchy rotation=\"0\">...</hierarchy>"
@@ -6212,7 +6212,7 @@ This route builds a synthetic execution with:
 - `source: "serve-api"`
 - `expectedFormat: "android-ui-automator"`
 - `timeoutMs: 30000`
-- one action: `{ "id": "snap", "type": "snapshot_ui" }`
+- one action: `{ "id": "snap", "type": "snapshot" }`
 
 ### Request body
 
@@ -6242,7 +6242,7 @@ Notes:
     "stepResults": [
       {
         "id": "snap",
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<hierarchy rotation=\"0\">...</hierarchy>"
@@ -6939,7 +6939,7 @@ Daemon proxying is active for:
 | CLI command | Proxied endpoint | Post-dispatch fallback |
 | --- | --- | --- |
 | `clawperator exec <json-or-file>` | `POST /execute` on the daemon socket | no |
-| `clawperator snapshot` | synthetic `snapshot_ui` payload sent to `POST /execute` | yes |
+| `clawperator snapshot` | synthetic `snapshot` payload sent to `POST /execute` | yes |
 | `clawperator screenshot` | synthetic `take_screenshot` payload sent to `POST /execute` | no |
 | Flat action commands such as `open`, `click`, `type`, `read`, `wait`, `press`, `back`, `close`, `sleep`, `scroll`, `scroll-until`, `wait-for-nav`, and `read-value` | action payload sent to `POST /execute` | no |
 
@@ -7319,7 +7319,7 @@ Example call:
 
 Success payload includes:
 
-- `snapshot`: XML string from `snapshot_ui`
+- `snapshot`: XML string from `snapshot`
 - `truncated`: present as `true` only when `maxChars` shortened the XML
 - `deviceId`
 - `terminalSource`
@@ -7727,7 +7727,7 @@ The smoke script prefers a physical device when both a physical device and an em
 
 ## Purpose
 
-Show how agents compose `open_app`, `open_uri`, `wait_for_navigation`, and `snapshot_ui` into deterministic navigation workflows.
+Show how agents compose `open_app`, `open_uri`, `wait_for_navigation`, and `snapshot` into deterministic navigation workflows.
 
 This page focuses on composition. For full per-action parameter rules, use [Actions](actions.md).
 
@@ -7752,12 +7752,12 @@ The normal three-step shape is:
 
 - `open_app` or `open_uri`
 - `wait_for_navigation`
-- `snapshot_ui`
+- `snapshot`
 
 Verification pattern - preview a composed navigation payload without dispatching:
 
 ```bash
-clawperator exec --dry-run --execution '{"commandId":"settings-nav-1","taskId":"settings-nav-1","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"open","type":"open_app","params":{"applicationId":"com.android.settings"}},{"id":"wait","type":"wait_for_navigation","params":{"expectedPackage":"com.android.settings","timeoutMs":5000}},{"id":"snap","type":"snapshot_ui"}]}'
+clawperator exec --dry-run --execution '{"commandId":"settings-nav-1","taskId":"settings-nav-1","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"open","type":"open_app","params":{"applicationId":"com.android.settings"}},{"id":"wait","type":"wait_for_navigation","params":{"expectedPackage":"com.android.settings","timeoutMs":5000}},{"id":"snap","type":"snapshot"}]}'
 ```
 
 ## Launcher And Home-Screen Navigation
@@ -7769,7 +7769,7 @@ Practical rules:
 - prefer direct `open_app` for installed apps instead of trying to traverse the
   home screen first
 - do not assume a paged launcher workspace is a generic scrollable container
-- use `snapshot_ui` to confirm what surface is actually visible before choosing
+- use `snapshot` to confirm what surface is actually visible before choosing
   the next action
 
 Why this matters:
@@ -7783,7 +7783,7 @@ Why this matters:
   foreground
 
 If the app is already installed and you know the package ID, `open_app` plus
-`wait_for_navigation` plus `snapshot_ui` is usually a more deterministic route
+`wait_for_navigation` plus `snapshot` is usually a more deterministic route
 than launcher traversal.
 
 ## `open_app`
@@ -7885,7 +7885,7 @@ What to verify after `open_app`:
 
 - do not rely on the open action alone
 - follow with `wait_for_navigation` using `expectedPackage`
-- then confirm the target screen with `snapshot_ui` or another read action
+- then confirm the target screen with `snapshot` or another read action
 
 Error cases:
 
@@ -7985,7 +7985,7 @@ What Node validates versus what it does not:
 What to verify after `open_uri`:
 
 - use `wait_for_navigation` if you expect a package or visible node
-- use `snapshot_ui` to confirm the actual screen reached
+- use `snapshot` to confirm the actual screen reached
 
 Error cases:
 
@@ -8099,7 +8099,7 @@ The recommended pattern for deterministic app navigation is:
 
 1. `open_app`
 2. `wait_for_navigation`
-3. `snapshot_ui`
+3. `snapshot`
 
 Example payload:
 
@@ -8128,7 +8128,7 @@ Example payload:
     },
     {
       "id": "snap",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ]
 }
@@ -8141,13 +8141,13 @@ Machine-checkable success conditions:
 - `stepResults[0].data.application_id == "com.android.settings"`
 - `stepResults[1].actionType == "wait_for_navigation"` and `stepResults[1].success == true`
 - when waiting by `expectedPackage`, `stepResults[1].data.resolved_package == "com.android.settings"`
-- `stepResults[2].actionType == "snapshot_ui"` and `stepResults[2].success == true`
+- `stepResults[2].actionType == "snapshot"` and `stepResults[2].success == true`
 - `stepResults[2].data.text` exists
 
 Verification command:
 
 ```bash
-clawperator exec --execution '{"commandId":"settings-nav-1","taskId":"settings-nav-1","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"open","type":"open_app","params":{"applicationId":"com.android.settings"}},{"id":"wait","type":"wait_for_navigation","params":{"expectedPackage":"com.android.settings","timeoutMs":5000}},{"id":"snap","type":"snapshot_ui"}]}' --device <device_serial>
+clawperator exec --execution '{"commandId":"settings-nav-1","taskId":"settings-nav-1","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"open","type":"open_app","params":{"applicationId":"com.android.settings"}},{"id":"wait","type":"wait_for_navigation","params":{"expectedPackage":"com.android.settings","timeoutMs":5000}},{"id":"snap","type":"snapshot"}]}' --device <device_serial>
 ```
 
 ## Complete JSON Example
@@ -8178,7 +8178,7 @@ clawperator exec --execution '{"commandId":"settings-nav-1","taskId":"settings-n
       },
       {
         "id": "snap",
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<hierarchy rotation=\"0\">...</hierarchy>"
@@ -8202,7 +8202,7 @@ There is no dedicated Node validation code for "target app is missing" on `open_
 What to do:
 
 - inspect `stepResults[0]`
-- follow with `snapshot_ui` or `wait_for_navigation` to see where the device actually landed
+- follow with `snapshot` or `wait_for_navigation` to see where the device actually landed
 - if the Operator package itself is missing instead of the target app, the execution fails earlier with `OPERATOR_NOT_INSTALLED`
 
 ### Navigation timeout
@@ -8267,7 +8267,7 @@ Recovery:
 
 - use `open_app` or `open_uri` only as the trigger
 - use `wait_for_navigation` as the readiness gate
-- use `snapshot_ui` as the final confirmation step
+- use `snapshot` as the final confirmation step
 
 That three-step flow is the most reliable current navigation pattern for agents.
 
@@ -11096,7 +11096,7 @@ The scaffold writes an exact default `run.js` payload shape:
     },
     {
       "id": "snap",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ]
 }
@@ -11241,7 +11241,7 @@ Current authoring rule for new non-trivial skills:
   time padding:
   - split long recorded routes into the smallest execution calls that preserve
     truthfulness
-  - use `wait_for_node`, `read_text`, `snapshot_ui`, or bounded polling loops
+  - use `wait_for_node`, `read_text`, `snapshot`, or bounded polling loops
     to observe readiness and terminal state
   - stop as soon as the expected UI state is observed
   - keep fixed `sleep` actions only when there is no observable state to poll,
@@ -11376,7 +11376,7 @@ Compile success example:
     "actions": [
       {
         "id": "snap",
-        "type": "snapshot_ui"
+        "type": "snapshot"
       }
     ],
     "mode": "artifact_compiled"
@@ -11413,7 +11413,7 @@ Success shape:
     "actions": [
       {
         "id": "snap",
-        "type": "snapshot_ui"
+        "type": "snapshot"
       }
     ],
     "mode": "artifact_compiled"
@@ -11727,7 +11727,7 @@ Performance rule for authored skills:
 - `open_app` only guarantees that the target package reached the foreground
   accessibility window; it does not guarantee that the first screen's content
   is fully loaded yet
-- replace arbitrary waits with `wait_for_node`, `read_text`, `snapshot_ui`, or a
+- replace arbitrary waits with `wait_for_node`, `read_text`, `snapshot`, or a
   short bounded polling loop over those actions when the workflow depends on
   content being present after `open_app`
 - increasing `--timeout` is not a performance strategy; it only raises the

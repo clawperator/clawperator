@@ -223,7 +223,7 @@ class AgentCommandParserDefault : AgentCommandParser {
                     clear = params.booleanOrDefaultStrict("clear", false),
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
                 )
-            "snapshot_ui" ->
+            "snapshot", "snapshot_ui" ->
                 UiAction.SnapshotUi(
                     id = id,
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),

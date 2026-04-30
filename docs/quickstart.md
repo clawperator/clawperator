@@ -32,7 +32,7 @@ Observe  ->  Decide  ->  Act
 Repeat until the task is done.
 
 **Targeting rule:** do not guess selectors. If the next action needs a target,
-take a fresh `snapshot_ui`, derive the selector from the current hierarchy, and
+take a fresh `snapshot`, derive the selector from the current hierarchy, and
 then act. A guessed label failing is not a Clawperator bug - it means the
 target was not proven from the current screen state.
 
@@ -40,7 +40,7 @@ target was not proven from the current screen state.
 
 ## Step 1: Observe
 
-The canonical observation action is `snapshot_ui`. Run it with the built-in
+The canonical observation action is `snapshot`. Run it with the built-in
 `snapshot` command:
 
 ```bash
@@ -58,7 +58,7 @@ Success conditions to check before proceeding:
     "status": "success",
     "stepResults": [
       {
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n<hierarchy rotation=\"0\">...</hierarchy>"
@@ -172,7 +172,7 @@ Example - click the "Connections" row, wait for navigation, then take a snapshot
     },
     {
       "id": "snap-2",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ],
   "mode": "direct"
@@ -230,7 +230,7 @@ clawperator doctor --device <device_serial>
     },
     {
       "id": "snap-1",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ],
   "mode": "direct"
@@ -263,7 +263,7 @@ Scroll payload (use when the target row is below the visible area):
     },
     {
       "id": "snap-2",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ],
   "mode": "direct"
@@ -297,7 +297,7 @@ the "Android version" row:
     },
     {
       "id": "snap-3",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ],
   "mode": "direct"

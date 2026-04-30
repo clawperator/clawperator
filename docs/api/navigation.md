@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Show how agents compose `open_app`, `open_uri`, `wait_for_navigation`, and `snapshot_ui` into deterministic navigation workflows.
+Show how agents compose `open_app`, `open_uri`, `wait_for_navigation`, and `snapshot` into deterministic navigation workflows.
 
 This page focuses on composition. For full per-action parameter rules, use [Actions](actions.md).
 
@@ -27,12 +27,12 @@ The normal three-step shape is:
 
 - `open_app` or `open_uri`
 - `wait_for_navigation`
-- `snapshot_ui`
+- `snapshot`
 
 Verification pattern - preview a composed navigation payload without dispatching:
 
 ```bash
-clawperator exec --dry-run --execution '{"commandId":"settings-nav-1","taskId":"settings-nav-1","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"open","type":"open_app","params":{"applicationId":"com.android.settings"}},{"id":"wait","type":"wait_for_navigation","params":{"expectedPackage":"com.android.settings","timeoutMs":5000}},{"id":"snap","type":"snapshot_ui"}]}'
+clawperator exec --dry-run --execution '{"commandId":"settings-nav-1","taskId":"settings-nav-1","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"open","type":"open_app","params":{"applicationId":"com.android.settings"}},{"id":"wait","type":"wait_for_navigation","params":{"expectedPackage":"com.android.settings","timeoutMs":5000}},{"id":"snap","type":"snapshot"}]}'
 ```
 
 ## Launcher And Home-Screen Navigation
@@ -44,7 +44,7 @@ Practical rules:
 - prefer direct `open_app` for installed apps instead of trying to traverse the
   home screen first
 - do not assume a paged launcher workspace is a generic scrollable container
-- use `snapshot_ui` to confirm what surface is actually visible before choosing
+- use `snapshot` to confirm what surface is actually visible before choosing
   the next action
 
 Why this matters:
@@ -58,7 +58,7 @@ Why this matters:
   foreground
 
 If the app is already installed and you know the package ID, `open_app` plus
-`wait_for_navigation` plus `snapshot_ui` is usually a more deterministic route
+`wait_for_navigation` plus `snapshot` is usually a more deterministic route
 than launcher traversal.
 
 ## `open_app`
@@ -160,7 +160,7 @@ What to verify after `open_app`:
 
 - do not rely on the open action alone
 - follow with `wait_for_navigation` using `expectedPackage`
-- then confirm the target screen with `snapshot_ui` or another read action
+- then confirm the target screen with `snapshot` or another read action
 
 Error cases:
 
@@ -260,7 +260,7 @@ What Node validates versus what it does not:
 What to verify after `open_uri`:
 
 - use `wait_for_navigation` if you expect a package or visible node
-- use `snapshot_ui` to confirm the actual screen reached
+- use `snapshot` to confirm the actual screen reached
 
 Error cases:
 
@@ -374,7 +374,7 @@ The recommended pattern for deterministic app navigation is:
 
 1. `open_app`
 2. `wait_for_navigation`
-3. `snapshot_ui`
+3. `snapshot`
 
 Example payload:
 
@@ -403,7 +403,7 @@ Example payload:
     },
     {
       "id": "snap",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ]
 }
@@ -416,13 +416,13 @@ Machine-checkable success conditions:
 - `stepResults[0].data.application_id == "com.android.settings"`
 - `stepResults[1].actionType == "wait_for_navigation"` and `stepResults[1].success == true`
 - when waiting by `expectedPackage`, `stepResults[1].data.resolved_package == "com.android.settings"`
-- `stepResults[2].actionType == "snapshot_ui"` and `stepResults[2].success == true`
+- `stepResults[2].actionType == "snapshot"` and `stepResults[2].success == true`
 - `stepResults[2].data.text` exists
 
 Verification command:
 
 ```bash
-clawperator exec --execution '{"commandId":"settings-nav-1","taskId":"settings-nav-1","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"open","type":"open_app","params":{"applicationId":"com.android.settings"}},{"id":"wait","type":"wait_for_navigation","params":{"expectedPackage":"com.android.settings","timeoutMs":5000}},{"id":"snap","type":"snapshot_ui"}]}' --device <device_serial>
+clawperator exec --execution '{"commandId":"settings-nav-1","taskId":"settings-nav-1","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"open","type":"open_app","params":{"applicationId":"com.android.settings"}},{"id":"wait","type":"wait_for_navigation","params":{"expectedPackage":"com.android.settings","timeoutMs":5000}},{"id":"snap","type":"snapshot"}]}' --device <device_serial>
 ```
 
 ## Complete JSON Example
@@ -453,7 +453,7 @@ clawperator exec --execution '{"commandId":"settings-nav-1","taskId":"settings-n
       },
       {
         "id": "snap",
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<hierarchy rotation=\"0\">...</hierarchy>"
@@ -477,7 +477,7 @@ There is no dedicated Node validation code for "target app is missing" on `open_
 What to do:
 
 - inspect `stepResults[0]`
-- follow with `snapshot_ui` or `wait_for_navigation` to see where the device actually landed
+- follow with `snapshot` or `wait_for_navigation` to see where the device actually landed
 - if the Operator package itself is missing instead of the target app, the execution fails earlier with `OPERATOR_NOT_INSTALLED`
 
 ### Navigation timeout
@@ -542,7 +542,7 @@ Recovery:
 
 - use `open_app` or `open_uri` only as the trigger
 - use `wait_for_navigation` as the readiness gate
-- use `snapshot_ui` as the final confirmation step
+- use `snapshot` as the final confirmation step
 
 That three-step flow is the most reliable current navigation pattern for agents.
 

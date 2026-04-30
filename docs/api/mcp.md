@@ -237,7 +237,7 @@ Example call:
 
 Success payload includes:
 
-- `snapshot`: XML string from `snapshot_ui`
+- `snapshot`: XML string from `snapshot`
 - `truncated`: present as `true` only when `maxChars` shortened the XML
 - `deviceId`
 - `terminalSource`

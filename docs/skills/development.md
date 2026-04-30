@@ -43,7 +43,7 @@ Performance rule for authored skills:
 - `open_app` only guarantees that the target package reached the foreground
   accessibility window; it does not guarantee that the first screen's content
   is fully loaded yet
-- replace arbitrary waits with `wait_for_node`, `read_text`, `snapshot_ui`, or a
+- replace arbitrary waits with `wait_for_node`, `read_text`, `snapshot`, or a
   short bounded polling loop over those actions when the workflow depends on
   content being present after `open_app`
 - increasing `--timeout` is not a performance strategy; it only raises the

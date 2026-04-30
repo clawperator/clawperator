@@ -71,7 +71,7 @@ scroll
 scroll_until
 read_text
 enter_text
-snapshot_ui
+snapshot
 take_screenshot
 sleep
 press_key
@@ -88,7 +88,7 @@ Input aliases normalized by Node before validation:
 | `press` | `click` |
 | `wait_for`, `find`, `find_node` | `wait_for_node` |
 | `read` | `read_text` |
-| `snapshot` | `snapshot_ui` |
+| `snapshot_ui` | `snapshot` |
 | `screenshot`, `capture_screenshot` | `take_screenshot` |
 | `type_text`, `text_entry`, `input_text` | `enter_text` |
 | `key_press` | `press_key` |
@@ -133,7 +133,7 @@ Common payload-key aliases also accepted on input:
     },
     {
       "id": "snap-1",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ],
   "mode": "direct"
@@ -144,7 +144,7 @@ Success condition for that payload:
 
 - `envelope.status == "success"`
 - every `envelope.stepResults[i].success == true`
-- `envelope.stepResults[2].actionType == "snapshot_ui"`
+- `envelope.stepResults[2].actionType == "snapshot"`
 - `"text" in envelope.stepResults[2].data`
 
 ## Action Reference
@@ -591,7 +591,7 @@ Example:
 }
 ```
 
-### `snapshot_ui`
+### `snapshot`
 
 | Field | Valid values |
 | --- | --- |
@@ -619,7 +619,7 @@ Example:
 ```json
 {
   "id": "snap-1",
-  "type": "snapshot_ui"
+  "type": "snapshot"
 }
 ```
 
@@ -861,7 +861,7 @@ Example:
 | `read-value` | `read_key_value_pair` | built from label selector flags |
 | `wait` | `wait_for_node` | action timeout comes from `--timeout` |
 | `wait-for-nav` | `wait_for_navigation` | requires `--timeout` |
-| `snapshot` | `snapshot_ui` | no action params |
+| `snapshot` | `snapshot` | no action params |
 | `screenshot` | `take_screenshot` | optional `path` |
 | `close` | `close_app` | `close-app` is a CLI synonym |
 | `sleep` | `sleep` | duration is positional |
@@ -875,7 +875,7 @@ Example:
 
 | Action type | Success keys Node guarantees |
 | --- | --- |
-| `snapshot_ui` | `data.text`; optional `data.warn` |
+| `snapshot` | `data.text`; optional `data.warn` |
 | `take_screenshot` | `data.path` |
 | `close_app` | `data.application_id` when Node pre-flight succeeded |
 | all others | no fixed success keys guaranteed by Node |
@@ -893,16 +893,16 @@ Concrete success example for `take_screenshot`:
 }
 ```
 
-Concrete success example for `snapshot_ui`:
+Concrete success example for `snapshot`:
 
 ```json
 {
   "id": "snap-1",
-  "actionType": "snapshot_ui",
+  "actionType": "snapshot",
   "success": true,
   "data": {
     "text": "<hierarchy rotation=\"0\">...</hierarchy>",
-    "warn": "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot_ui"
+    "warn": "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot"
   }
 }
 ```

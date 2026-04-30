@@ -94,7 +94,7 @@ const supportedTypes = [
   "scroll_until",
   "read_text",
   "enter_text",
-  "snapshot_ui",
+  "snapshot",
   "take_screenshot",
   "sleep",
   "press_key",
@@ -109,7 +109,7 @@ const actionSchema = z.object({
 }).strict();
 
 const validationHintByActionParam = new Map<string, string>([
-  ["snapshot_ui.format", "'format' was removed from snapshot_ui. Remove this parameter."],
+  ["snapshot.format", "'format' was removed from snapshot. Remove this parameter."],
 ]);
 
 const executionSchema = z.object({

@@ -70,12 +70,12 @@ describe("extractStepDataValue", () => {
       taskId: "t1",
       status: "success",
       stepResults: [
-        { id: "snap", actionType: "snapshot_ui", success: true, data: { text: "<hierarchy />" } },
+        { id: "snap", actionType: "snapshot", success: true, data: { text: "<hierarchy />" } },
       ],
     };
 
     const extracted = extractStepDataValue(envelope, {
-      actionType: "snapshot_ui",
+      actionType: "snapshot",
       dataKey: "text",
       errorKey: "error",
     });
@@ -93,13 +93,13 @@ describe("extractStepDataValue", () => {
       taskId: "t1",
       status: "failed",
       stepResults: [
-        { id: "snap", actionType: "snapshot_ui", success: false, data: { error: "SNAPSHOT_EXTRACTION_FAILED" } },
+        { id: "snap", actionType: "snapshot", success: false, data: { error: "SNAPSHOT_EXTRACTION_FAILED" } },
       ],
       error: "failed",
     };
 
     const extracted = extractStepDataValue(envelope, {
-      actionType: "snapshot_ui",
+      actionType: "snapshot",
       dataKey: "text",
       errorKey: "error",
     });
@@ -107,7 +107,7 @@ describe("extractStepDataValue", () => {
     assert.deepStrictEqual(extracted, {
       ok: false,
       error: "SNAPSHOT_EXTRACTION_FAILED",
-      message: "snapshot_ui step result did not include text.",
+      message: "snapshot step result did not include text.",
       step: envelope.stepResults[0],
     });
   });
@@ -285,7 +285,7 @@ describe("applySnapshotMaxCharsToEnvelope", () => {
       stepResults: [
         {
           id: "snap",
-          actionType: "snapshot_ui",
+          actionType: "snapshot",
           success: true,
           data: {
             text: "<hierarchy>abcdef</hierarchy>",
@@ -325,7 +325,7 @@ describe("applySnapshotMaxCharsToEnvelope", () => {
       stepResults: [
         {
           id: "snap",
-          actionType: "snapshot_ui",
+          actionType: "snapshot",
           success: true,
           data: {
             text: "abc",
@@ -559,7 +559,7 @@ describe("normalizeMcpError", () => {
         stepResults: [
           {
             id: "snap",
-            actionType: "snapshot_ui",
+            actionType: "snapshot",
             success: false,
             data: {
               error: "SNAPSHOT_EXTRACTION_FAILED",
@@ -580,7 +580,7 @@ describe("normalizeMcpError", () => {
         stepResults: [
           {
             id: "snap",
-            actionType: "snapshot_ui",
+            actionType: "snapshot",
             success: false,
             data: {
               error: "SNAPSHOT_EXTRACTION_FAILED",
