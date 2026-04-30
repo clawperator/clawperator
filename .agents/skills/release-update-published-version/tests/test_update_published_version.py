@@ -26,6 +26,8 @@ published_version = load_module(
     "release_update_published_version",
 )
 
+TARGET_VERSION = "9.9.9"
+
 
 class PublishedVersionOutputTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -51,38 +53,38 @@ class PublishedVersionOutputTests(unittest.TestCase):
         (self.repo_root / "sites/landing/public/llms-full.txt").write_text(text, encoding="utf-8")
 
     def test_verifies_current_release_markers_in_generated_outputs(self) -> None:
-        self.write_outputs("0.9.3")
+        self.write_outputs(TARGET_VERSION)
 
         self.assertEqual(
-            published_version.published_version_output_problems(self.repo_root, "0.9.3"),
+            published_version.published_version_output_problems(self.repo_root, TARGET_VERSION),
             [],
         )
 
     def test_rejects_mismatched_docs_home_marker(self) -> None:
-        self.write_outputs("0.9.2")
+        self.write_outputs("0.9.8")
 
-        problems = published_version.published_version_output_problems(self.repo_root, "0.9.3")
+        problems = published_version.published_version_output_problems(self.repo_root, TARGET_VERSION)
 
         self.assertTrue(
             any(
-                "sites/docs/site/index.html: missing current release marker for 0.9.3" in problem
+                f"sites/docs/site/index.html: missing current release marker for {TARGET_VERSION}" in problem
                 for problem in problems
             ),
             msg=f"Expected docs homepage mismatch in problems: {problems}",
         )
 
     def test_rejects_mismatched_generated_release_artifact(self) -> None:
-        self.write_outputs("0.9.3")
+        self.write_outputs(TARGET_VERSION)
         (self.repo_root / "sites/landing/public/llms-full.txt").write_text(
-            published_version.current_release_marker_text("0.9.2"),
+            published_version.current_release_marker_text("0.9.8"),
             encoding="utf-8",
         )
 
-        problems = published_version.published_version_output_problems(self.repo_root, "0.9.3")
+        problems = published_version.published_version_output_problems(self.repo_root, TARGET_VERSION)
 
         self.assertTrue(
             any(
-                "sites/landing/public/llms-full.txt: missing current release marker for 0.9.3"
+                f"sites/landing/public/llms-full.txt: missing current release marker for {TARGET_VERSION}"
                 in problem
                 for problem in problems
             ),
