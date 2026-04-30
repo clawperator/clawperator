@@ -497,14 +497,15 @@ async function performExecution(
     execution = { ...execution, timeoutMs: options.timeoutMs };
   }
 
+  const androidExecution = buildAndroidExecutionPayload(execution);
+  const payload = JSON.stringify(androidExecution);
   try {
-    validatePayloadSize(JSON.stringify(execution));
+    validatePayloadSize(payload);
   } catch (e) {
     return { execution, result: { ok: false, error: e as { code: string; message: string; [k: string]: unknown } } };
   }
 
-  const androidExecution = buildAndroidExecutionPayload(execution);
-  const payload = JSON.stringify(androidExecution);
+
   const hasExplicitDevice = typeof config.deviceId === "string" && config.deviceId.trim().length > 0;
   // Explicit-device logcat can start early because resolveDevice validates the
   // provided serial exactly. Auto-resolve must stay sequential so the logcat
