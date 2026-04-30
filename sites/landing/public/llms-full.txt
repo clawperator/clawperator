@@ -1326,7 +1326,7 @@ Use the wrapper shape that matches the surface you called:
 | Surface | Success shape | Result-envelope rule |
 | --- | --- | --- |
 | CLI device execution command | `{ "envelope": ..., "deviceId": "...", "terminalSource": "clawperator_result", "isCanonicalTerminal": true }` | Read `envelope` with the [result-envelope](#result-envelope) rules. |
-| `clawperator exec --validate` | `{ "ok": true, "validated": true, "execution": ... }` | Pre-dispatch only; no result envelope exists. |
+| `clawperator exec --validate-only` | `{ "ok": true, "validated": true, "execution": ... }` | Pre-dispatch only; no result envelope exists. |
 | `clawperator exec --dry-run` | `{ "ok": true, "dryRun": true, "plan": ... }` | Pre-dispatch only; no result envelope exists. |
 | Serve execution endpoint | `{ "ok": true, "deviceId": "...", "terminalSource": "...", "envelope": ... }` | Read `envelope` with the same [result-envelope](#result-envelope) rules. |
 | MCP execution-backed tool | Tool-specific `structuredContent` containing action output and usually `envelope`. | When present, read `envelope` with the same [result-envelope](#result-envelope) rules. |
@@ -10288,7 +10288,7 @@ Common wrapper failures:
 | `SKILL_VALIDATION_FAILED` | pre-run validation found missing files or invalid artifacts | repair the skill before rerunning |
 | `SKILL_SCRIPT_NOT_FOUND` | chosen script path is missing | restore the script or fix the registry entry |
 | `SKILL_EXECUTION_FAILED` | child process exited non-zero or failed to spawn | inspect `stdout`, `stderr`, and the script exit code |
-| <code>SKILL_EXECUTION_<wbr>TIMEOUT</code> | wrapper timeout elapsed | inspect partial `stdout`; raise `--timeout` only if the skill is still making progress |
+| <code>SKILL_EXECUTION_TIMEOUT</code> | wrapper timeout elapsed | inspect partial `stdout`; raise `--timeout` only if the skill is still making progress |
 | `SKILL_AGENT_CLI_UNAVAILABLE` | orchestrated skill declares an unavailable agent CLI | install or configure the declared agent CLI |
 | `SKILL_OUTPUT_ASSERTION_FAILED` | `--expect-contains` text was absent | verify the expected substring against `output` |
 | `SKILL_RESULT_PARSE_FAILED` | terminal `SkillResult` frame was malformed or untrusted | fix the frame JSON or trusted provenance metadata |
@@ -12247,14 +12247,13 @@ Additional execution failures to expect:
 
 ```json
 {
-  "code": "<skill-timeout-code>",
   "message": "Skill com.example.app.do-thing timed out after 90000ms",
   "skillId": "com.example.app.do-thing",
   "stdout": "{\"stage\":\"before-timeout\"}\n"
 }
 ```
 
-The timeout `code` is <code>SKILL_EXECUTION_<wbr>TIMEOUT</code>.
+The timeout `code` is <code>SKILL_EXECUTION_TIMEOUT</code>.
 
 ```json
 {
@@ -12387,7 +12386,7 @@ Verification pattern:
   validation, then calls `runSkill()` directly instead of invoking
   `cmdSkillsRun()`
 - it does not inject the CLI wrapper banner
-- handle `error.code` values such as `SKILL_OUTPUT_ASSERTION_FAILED`, `SKILL_EXECUTION_FAILED`, <code>SKILL_EXECUTION_<wbr>TIMEOUT</code>, and `SKILL_RESULT_PARSE_FAILED` through the nested `error` object, not as the top-level response object
+- handle `error.code` values such as `SKILL_OUTPUT_ASSERTION_FAILED`, `SKILL_EXECUTION_FAILED`, <code>SKILL_EXECUTION_TIMEOUT</code>, and `SKILL_RESULT_PARSE_FAILED` through the nested `error` object, not as the top-level response object
 
 ## Skill Sync
 
@@ -12502,7 +12501,7 @@ Fix:
 - inspect the returned `details`
 - correct metadata or payload shape
 
-### <code>SKILL_EXECUTION_<wbr>TIMEOUT</code>
+### <code>SKILL_EXECUTION_TIMEOUT</code>
 
 Cause:
 
@@ -12729,7 +12728,7 @@ clawperator skills run <skill_id> --timeout 90000
 If the child does not exit in time:
 
 - the wrapper sends `SIGTERM`
-- the command fails with <code>SKILL_EXECUTION_<wbr>TIMEOUT</code>
+- the command fails with <code>SKILL_EXECUTION_TIMEOUT</code>
 
 Top-level timeout parsing failures happen before the skill starts:
 
@@ -12936,7 +12935,6 @@ does not rewrite it.
 ```json
 {
   "status": "failed",
-  "code": "<skill-timeout-code>",
   "message": "Skill com.android.settings.capture-overview timed out after 120000ms",
   "skillId": "com.android.settings.capture-overview",
   "stdout": "RESULT|status=partial\n",
@@ -12945,7 +12943,7 @@ does not rewrite it.
 }
 ```
 
-The timeout `code` is <code>SKILL_EXECUTION_<wbr>TIMEOUT</code>.
+The timeout `code` is <code>SKILL_EXECUTION_TIMEOUT</code>.
 
 Another common failure is a bad registry or missing script:
 
@@ -12978,7 +12976,7 @@ Recovery patterns:
 - `SKILL_NOT_FOUND`: confirm the exact registry `id` with `clawperator skills list`
 - `SKILL_SCRIPT_NOT_FOUND`: repair the registry entry or restore the script file on disk
 - `SKILL_EXECUTION_FAILED`: inspect `exitCode`, `stdout`, and `stderr`
-- <code>SKILL_EXECUTION_<wbr>TIMEOUT</code>: inspect partial `stdout` and only then consider increasing `--timeout`
+- <code>SKILL_EXECUTION_TIMEOUT</code>: inspect partial `stdout` and only then consider increasing `--timeout`
 - `SKILL_RESULT_PARSE_FAILED`: fix malformed framed output or unreadable trusted source metadata in `skill.json`
 
 ## Practical Runtime Rules

@@ -299,7 +299,7 @@ Use the wrapper shape that matches the surface you called:
 | Surface | Success shape | Result-envelope rule |
 | --- | --- | --- |
 | CLI device execution command | `{ "envelope": ..., "deviceId": "...", "terminalSource": "clawperator_result", "isCanonicalTerminal": true }` | Read `envelope` with the [result-envelope](#result-envelope) rules. |
-| `clawperator exec --validate` | `{ "ok": true, "validated": true, "execution": ... }` | Pre-dispatch only; no result envelope exists. |
+| `clawperator exec --validate-only` | `{ "ok": true, "validated": true, "execution": ... }` | Pre-dispatch only; no result envelope exists. |
 | `clawperator exec --dry-run` | `{ "ok": true, "dryRun": true, "plan": ... }` | Pre-dispatch only; no result envelope exists. |
 | Serve execution endpoint | `{ "ok": true, "deviceId": "...", "terminalSource": "...", "envelope": ... }` | Read `envelope` with the same [result-envelope](#result-envelope) rules. |
 | MCP execution-backed tool | Tool-specific `structuredContent` containing action output and usually `envelope`. | When present, read `envelope` with the same [result-envelope](#result-envelope) rules. |

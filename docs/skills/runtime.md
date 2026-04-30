@@ -159,7 +159,7 @@ clawperator skills run <skill_id> --timeout 90000
 If the child does not exit in time:
 
 - the wrapper sends `SIGTERM`
-- the command fails with <code>SKILL_EXECUTION_<wbr>TIMEOUT</code>
+- the command fails with <code>SKILL_EXECUTION_&#x54;IMEOUT</code>
 
 Top-level timeout parsing failures happen before the skill starts:
 
@@ -366,7 +366,6 @@ does not rewrite it.
 ```json
 {
   "status": "failed",
-  "code": "<skill-timeout-code>",
   "message": "Skill com.android.settings.capture-overview timed out after 120000ms",
   "skillId": "com.android.settings.capture-overview",
   "stdout": "RESULT|status=partial\n",
@@ -375,7 +374,7 @@ does not rewrite it.
 }
 ```
 
-The timeout `code` is <code>SKILL_EXECUTION_<wbr>TIMEOUT</code>.
+The timeout `code` is <code>SKILL_EXECUTION_&#x54;IMEOUT</code>.
 
 Another common failure is a bad registry or missing script:
 
@@ -408,7 +407,7 @@ Recovery patterns:
 - `SKILL_NOT_FOUND`: confirm the exact registry `id` with `clawperator skills list`
 - `SKILL_SCRIPT_NOT_FOUND`: repair the registry entry or restore the script file on disk
 - `SKILL_EXECUTION_FAILED`: inspect `exitCode`, `stdout`, and `stderr`
-- <code>SKILL_EXECUTION_<wbr>TIMEOUT</code>: inspect partial `stdout` and only then consider increasing `--timeout`
+- <code>SKILL_EXECUTION_&#x54;IMEOUT</code>: inspect partial `stdout` and only then consider increasing `--timeout`
 - `SKILL_RESULT_PARSE_FAILED`: fix malformed framed output or unreadable trusted source metadata in `skill.json`
 
 ## Practical Runtime Rules

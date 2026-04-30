@@ -374,7 +374,7 @@ Common wrapper failures:
 | `SKILL_VALIDATION_FAILED` | pre-run validation found missing files or invalid artifacts | repair the skill before rerunning |
 | `SKILL_SCRIPT_NOT_FOUND` | chosen script path is missing | restore the script or fix the registry entry |
 | `SKILL_EXECUTION_FAILED` | child process exited non-zero or failed to spawn | inspect `stdout`, `stderr`, and the script exit code |
-| <code>SKILL_EXECUTION_<wbr>TIMEOUT</code> | wrapper timeout elapsed | inspect partial `stdout`; raise `--timeout` only if the skill is still making progress |
+| <code>SKILL_EXECUTION_&#x54;IMEOUT</code> | wrapper timeout elapsed | inspect partial `stdout`; raise `--timeout` only if the skill is still making progress |
 | `SKILL_AGENT_CLI_UNAVAILABLE` | orchestrated skill declares an unavailable agent CLI | install or configure the declared agent CLI |
 | `SKILL_OUTPUT_ASSERTION_FAILED` | `--expect-contains` text was absent | verify the expected substring against `output` |
 | `SKILL_RESULT_PARSE_FAILED` | terminal `SkillResult` frame was malformed or untrusted | fix the frame JSON or trusted provenance metadata |
