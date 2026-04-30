@@ -505,6 +505,7 @@ async function performExecution(
     return { execution, result: { ok: false, error: e as { code: string; message: string; [k: string]: unknown } } };
   }
 
+
   const hasExplicitDevice = typeof config.deviceId === "string" && config.deviceId.trim().length > 0;
   // Explicit-device logcat can start early because resolveDevice validates the
   // provided serial exactly. Auto-resolve must stay sequential so the logcat

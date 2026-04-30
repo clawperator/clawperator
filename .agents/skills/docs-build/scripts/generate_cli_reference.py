@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import sys
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,6 +18,8 @@ class CommandInfo:
     syntax: list[str]
     flags: list[str]
     subcommands: list[str]
+    docs_visibility: str
+    docs_alias_of: str | None
 
 
 def repo_root() -> Path:
@@ -60,13 +63,16 @@ def parse_string_list(raw: str) -> list[str]:
     return re.findall(r'"([^"]+)"', raw)
 
 
-def parse_supported_flags(body: str) -> list[str]:
+def parse_documented_flags(name: str, body: str) -> list[str]:
     documented_flags_match = re.search(r"documentedFlags:\s*\[([^\]]*)\]", body, re.S)
     if documented_flags_match:
         return parse_string_list(documented_flags_match.group(1))
 
-    collected = re.findall(r"--[A-Za-z0-9][A-Za-z0-9-]*", body)
-    return list(dict.fromkeys(collected))
+    warnings.warn(
+        f"Command {name} has no documentedFlags metadata; public CLI reference will omit flags",
+        stacklevel=2,
+    )
+    return []
 
 
 def parse_top_level_block(name: str, body: str) -> list[str]:
@@ -99,6 +105,11 @@ def parse_subcommands(body: str) -> list[str]:
     return subcommands
 
 
+def parse_optional_string_field(body: str, field: str) -> str | None:
+    match = re.search(rf'{field}:\s*"([^"]+)"', body)
+    return match.group(1) if match else None
+
+
 def parse_command_info(name: str, body: str) -> CommandInfo:
     aliases_match = re.search(r"synonyms:\s*\[([^\]]*)\]", body, re.S)
     group_match = re.search(r'group:\s*"([^"]+)"', body)
@@ -107,7 +118,7 @@ def parse_command_info(name: str, body: str) -> CommandInfo:
         raise ValueError(f"Failed to parse required metadata for command {name}")
     aliases = parse_string_list(aliases_match.group(1)) if aliases_match else []
     syntax = parse_top_level_block(name, body)
-    flags = parse_supported_flags(body)
+    flags = parse_documented_flags(name, body)
     subcommands = parse_subcommands(body)
     return CommandInfo(
         name=name,
@@ -117,43 +128,114 @@ def parse_command_info(name: str, body: str) -> CommandInfo:
         syntax=syntax,
         flags=flags,
         subcommands=subcommands,
+        docs_visibility=parse_optional_string_field(body, "docsVisibility") or "normal",
+        docs_alias_of=parse_optional_string_field(body, "docsAliasOf"),
     )
 
 
-def render_table(commands: list[CommandInfo]) -> str:
+def markdown_cell(text: str) -> str:
+    return text.replace("|", "\\|").replace("\n", "<br>")
+
+
+def anchor_for_command(command: CommandInfo) -> str:
+    return f"command-{command.name.replace('_', '-').replace(' ', '-')}"
+
+
+def command_ref(command: CommandInfo) -> str:
+    return f"[`{command.name}`](#{anchor_for_command(command)})"
+
+
+def format_code_list(items: list[str]) -> str:
+    return ", ".join(f"`{item}`" for item in items) if items else "-"
+
+
+def alias_notes(commands: list[CommandInfo]) -> dict[str, list[str]]:
+    notes: dict[str, list[str]] = {}
+    for command in commands:
+        if command.docs_visibility != "alias" or not command.docs_alias_of:
+            continue
+        canonical = command.docs_alias_of.split()[0]
+        alias_text = command.name
+        if command.subcommands:
+            alias_text = f"{command.name} {'|'.join(command.subcommands)}"
+        notes.setdefault(canonical, []).append(
+            f"`{alias_text}` is an alias for `{command.docs_alias_of}`."
+        )
+    return notes
+
+
+def public_commands(commands: list[CommandInfo]) -> list[CommandInfo]:
+    return [command for command in commands if command.docs_visibility == "normal"]
+
+
+def render_index(commands: list[CommandInfo]) -> str:
     lines = [
-        "| Command | Syntax | Aliases | Flags | Summary |",
+        "| Command | Group | Primary syntax | Primary flags | Summary |",
         "| --- | --- | --- | --- | --- |",
     ]
     for command in commands:
-        syntax_text = "<br>".join(f"`{item}`" for item in command.syntax) if command.syntax else "-"
-        alias_text = ", ".join(command.aliases) if command.aliases else "-"
-        flag_text = ", ".join(command.flags) if command.flags else "-"
-        if command.subcommands:
-            flag_text = f"{flag_text}<br>Subcommands: {', '.join(command.subcommands)}"
+        syntax_text = f"`{command.syntax[0]}`" if command.syntax else "-"
+        flag_text = format_code_list(command.flags)
         lines.append(
-            f"| `{command.name}` | {syntax_text} | {alias_text} | {flag_text} | {command.summary} |"
+            "| "
+            + " | ".join(
+                [
+                    command_ref(command),
+                    markdown_cell(command.group),
+                    markdown_cell(syntax_text),
+                    markdown_cell(flag_text),
+                    markdown_cell(command.summary),
+                ]
+            )
+            + " |"
         )
     return "\n".join(lines)
 
 
-def render_group(group: str, commands: list[CommandInfo]) -> str:
-    lines = [f"## {group}", "", render_table(commands), ""]
-    for command in commands:
-        lines.extend(
-            [
-                f"### `{command.name}`",
-                "",
-                f"- Summary: {command.summary}",
-                f"- Syntax: {', '.join(f'`{item}`' for item in command.syntax) if command.syntax else '-'}",
-                f"- Aliases: {', '.join(f'`{alias}`' for alias in command.aliases) if command.aliases else '-'}",
-                f"- Flags: {', '.join(f'`{flag}`' for flag in command.flags) if command.flags else '-'}",
-            ]
-        )
-        if command.subcommands:
-            lines.append(f"- Subcommands: {', '.join(f'`{item}`' for item in command.subcommands)}")
-        lines.append("")
+def render_command_section(command: CommandInfo, notes: list[str]) -> str:
+    lines = [
+        f'<a id="{anchor_for_command(command)}"></a>',
+        f"### `{command.name}`",
+        "",
+        command.summary,
+        "",
+        f"- Group: {command.group}",
+        f"- Syntax: {format_code_list(command.syntax)}",
+        f"- Primary flags: {format_code_list(command.flags)}",
+    ]
+    if command.aliases:
+        lines.append(f"- Command aliases: {format_code_list(command.aliases)}")
+    if notes:
+        lines.append(f"- Alias notes: {' '.join(notes)}")
+    if command.subcommands:
+        lines.append(f"- Subcommands: {format_code_list(command.subcommands)}")
+    lines.append("")
     return "\n".join(lines)
+
+
+def render_reference(commands: list[CommandInfo]) -> str:
+    visible_commands = public_commands(commands)
+    notes_by_command = alias_notes(commands)
+
+    lines = [
+        "# CLI Reference",
+        "",
+        "This page is generated from the Node CLI registry and command sources.",
+        "",
+        "Use this page as a command index. Detailed behavior, output shapes, and recovery guidance live in the authored API pages.",
+        "",
+        "## Command Index",
+        "",
+        render_index(visible_commands),
+        "",
+        "## Commands",
+        "",
+    ]
+
+    for command in visible_commands:
+        lines.append(render_command_section(command, notes_by_command.get(command.name, [])))
+
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def main() -> int:
@@ -164,29 +246,9 @@ def main() -> int:
         raise FileNotFoundError(f"Missing command directory: {commands_dir()}")
 
     text = read_text(registry)
-    commands: list[CommandInfo] = []
-    for name, body in extract_command_bodies(text):
-        commands.append(parse_command_info(name, body))
+    commands = [parse_command_info(name, body) for name, body in extract_command_bodies(text)]
 
-    grouped: dict[str, list[CommandInfo]] = {}
-    for command in commands:
-        grouped.setdefault(command.group, []).append(command)
-
-    lines = [
-        "# CLI Reference",
-        "",
-        "This page is generated from the Node CLI registry and command sources.",
-        "",
-        "## Command Summary",
-        "",
-        render_table(commands),
-        "",
-    ]
-
-    for group in grouped:
-        lines.append(render_group(group, grouped[group]))
-
-    sys.stdout.write("\n".join(lines).rstrip() + "\n")
+    sys.stdout.write(render_reference(commands))
     return 0
 
 

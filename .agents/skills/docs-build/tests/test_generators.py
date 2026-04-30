@@ -72,6 +72,110 @@ COMMANDS["second"] = {
             ["install", "compile-artifact", "run"],
         )
 
+    def test_public_reference_uses_docs_metadata_not_regex_flags(self) -> None:
+        body = """
+  summary: "Tap something",
+  group: "Device Interaction",
+  documentedFlags: ["--text", "--id", "--desc", "--role"],
+  help: `Also accepted as: --resource-id, --content-desc`,
+  topLevelBlock: `  click --text <text>
+                                            Tap something`,
+"""
+
+        command = cli_reference.parse_command_info("click", body)
+
+        self.assertEqual(command.flags, ["--text", "--id", "--desc", "--role"])
+        self.assertNotIn("--resource-id", command.flags)
+        self.assertNotIn("--content-desc", command.flags)
+
+    def test_public_reference_omits_shims_and_peer_alias_commands(self) -> None:
+        commands = [
+            cli_reference.CommandInfo(
+                name="setup",
+                aliases=[],
+                group="Setup",
+                summary="Guidance shim",
+                syntax=[],
+                flags=[],
+                subcommands=[],
+                docs_visibility="shim",
+                docs_alias_of=None,
+            ),
+            cli_reference.CommandInfo(
+                name="emulator",
+                aliases=[],
+                group="Device Management",
+                summary="Manage emulators",
+                syntax=["emulator provision"],
+                flags=[],
+                subcommands=["provision"],
+                docs_visibility="normal",
+                docs_alias_of=None,
+            ),
+            cli_reference.CommandInfo(
+                name="provision",
+                aliases=[],
+                group="Device Management",
+                summary="Provision emulator",
+                syntax=[],
+                flags=[],
+                subcommands=["emulator"],
+                docs_visibility="alias",
+                docs_alias_of="emulator provision",
+            ),
+        ]
+
+        rendered = cli_reference.render_reference(commands)
+
+        self.assertNotIn("### `setup`", rendered)
+        self.assertNotIn("| [`setup`]", rendered)
+        self.assertNotIn("### `provision`", rendered)
+        self.assertNotIn("| [`provision`]", rendered)
+        self.assertIn("`provision emulator` is an alias for `emulator provision`.", rendered)
+        self.assertIn('<a id="command-emulator"></a>', rendered)
+
+    def test_public_reference_keeps_recording_discoverable(self) -> None:
+        commands = [
+            cli_reference.CommandInfo(
+                name="recording",
+                aliases=["record"],
+                group="Recording",
+                summary="Manage recording sessions",
+                syntax=["recording start", "recording export --input <file>"],
+                flags=["--session-id", "--input", "--out"],
+                subcommands=["start", "export"],
+                docs_visibility="normal",
+                docs_alias_of=None,
+            ),
+        ]
+
+        rendered = cli_reference.render_reference(commands)
+
+        self.assertIn("[`recording`](#command-recording)", rendered)
+        self.assertIn("### `recording`", rendered)
+        self.assertIn("`record`", rendered)
+
+    def test_missing_documented_flags_warns_without_regex_fallback(self) -> None:
+        body = """
+  summary: "Read text",
+  group: "Device Interaction",
+  help: `Also accepted as: --resource-id, --content-desc`,
+  topLevelBlock: `  read --text <text>
+                                            Read text`,
+"""
+
+        with warnings.catch_warnings(record=True) as captured:
+            warnings.simplefilter("always")
+            command = cli_reference.parse_command_info("read", body)
+
+        self.assertEqual(command.flags, [])
+        self.assertTrue(
+            any(
+                "Command read has no documentedFlags metadata" in str(warning.message)
+                for warning in captured
+            )
+        )
+
 
 class GenerateSelectorTableTests(unittest.TestCase):
     def test_known_flag_uses_explicit_documentation(self) -> None:
