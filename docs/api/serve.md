@@ -102,6 +102,9 @@ Success conditions for execution endpoints:
 
 ## Endpoint Summary
 
+<a id="endpoint-get-ping"></a>
+<a id="endpoint-get-version"></a>
+
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/devices` | list adb-visible devices |
@@ -121,6 +124,7 @@ Success conditions for execution endpoints:
 | `POST` | `/android/provision/emulator` | create or reuse a supported emulator and boot it |
 | `GET` | `/events` | subscribe to SSE execution events |
 
+<a id="endpoint-get-devices"></a>
 ## `GET /devices`
 
 Returns the same parsed adb listing used by [Devices](devices.md).
@@ -153,6 +157,7 @@ Failure behavior:
 - server-side listing failures return HTTP `500`
 - this route does not use the `errors.ts` status mapping table
 
+<a id="endpoint-post-execute"></a>
 ## `POST /execute`
 
 ### Request body
@@ -277,6 +282,7 @@ Device-resolution failure example:
 }
 ```
 
+<a id="endpoint-post-snapshot"></a>
 ## `POST /snapshot`
 
 This route builds a synthetic execution with:
@@ -326,6 +332,7 @@ Notes:
 }
 ```
 
+<a id="endpoint-post-screenshot"></a>
 ## `POST /screenshot`
 
 This route builds a synthetic execution with:
@@ -378,6 +385,7 @@ Route validation:
 }
 ```
 
+<a id="endpoint-get-skills"></a>
 ## `GET /skills`
 
 Without query parameters, returns every registry entry:
@@ -409,6 +417,7 @@ Optional query parameters:
 | `intent` | string | exact `intent` match |
 | `keyword` | string | case-insensitive substring match across `id`, `summary`, and `applicationId` |
 
+<a id="endpoint-get-skills-skill-id"></a>
 ## `GET /skills/:skillId`
 
 Success response:
@@ -429,6 +438,7 @@ Success response:
 }
 ```
 
+<a id="endpoint-post-skills-skill-id-run"></a>
 ## `POST /skills/:skillId/run`
 
 ### Request body
@@ -575,6 +585,7 @@ Many individual route handlers also return `INTERNAL_ERROR` from local `catch` b
 
 ## Emulator Endpoints
 
+<a id="endpoint-get-android-emulators"></a>
 ### `GET /android/emulators`
 
 Lists configured AVDs, merged with running-state information:
@@ -599,6 +610,7 @@ Lists configured AVDs, merged with running-state information:
 }
 ```
 
+<a id="endpoint-get-android-emulators-running"></a>
 ### `GET /android/emulators/running`
 
 ```json
@@ -617,6 +629,7 @@ Lists configured AVDs, merged with running-state information:
 }
 ```
 
+<a id="endpoint-get-android-emulators-name"></a>
 ### `GET /android/emulators/:name`
 
 Returns one `ConfiguredAvd` object merged into the success wrapper:
@@ -637,6 +650,7 @@ Returns one `ConfiguredAvd` object merged into the success wrapper:
 }
 ```
 
+<a id="endpoint-post-android-emulators-create"></a>
 ### `POST /android/emulators/create`
 
 Request body:
@@ -679,6 +693,7 @@ Success response:
 }
 ```
 
+<a id="endpoint-post-android-emulators-name-start"></a>
 ### `POST /android/emulators/:name/start`
 
 Success response:
@@ -699,6 +714,7 @@ Behavior:
 - rejects already-running AVDs
 - starts the emulator, waits for adb registration, waits for boot completion, then enables developer settings
 
+<a id="endpoint-post-android-emulators-name-stop"></a>
 ### `POST /android/emulators/:name/stop`
 
 ```json
@@ -709,6 +725,7 @@ Behavior:
 }
 ```
 
+<a id="endpoint-delete-android-emulators-name"></a>
 ### `DELETE /android/emulators/:name`
 
 ```json
@@ -719,6 +736,7 @@ Behavior:
 }
 ```
 
+<a id="endpoint-post-android-provision-emulator"></a>
 ### `POST /android/provision/emulator`
 
 This route calls `provisionEmulator()` and may reuse a supported running emulator, start an existing supported AVD, or create and start a new one.
@@ -744,6 +762,7 @@ Meaning of flags:
 - `started`: the emulator process was started during this request
 - `reused`: an existing supported emulator or AVD was reused
 
+<a id="endpoint-get-events"></a>
 ## `GET /events` SSE Stream
 
 The server responds with:

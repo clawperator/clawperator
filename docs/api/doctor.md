@@ -39,6 +39,7 @@ Defaults:
 - output defaults to the full `DoctorReport` JSON object
 - use `--output json` when you want to request JSON explicitly
 
+<a id="doctor-report-contract"></a>
 ## `DoctorReport` Contract
 
 `DoctorReport` is:
@@ -107,6 +108,7 @@ Machine-checkable implication:
 - with `--fix`, `nextActions` can be less complete because attempted shell steps are omitted even if execution failed
 - always gate on `criticalOk` and `checks[]`, not on whether `nextActions` is empty
 
+<a id="doctor-check-result-contract"></a>
 ## `DoctorCheckResult` Contract
 
 Each entry in `checks[]` has:

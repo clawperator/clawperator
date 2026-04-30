@@ -184,6 +184,7 @@ All execution-backed tools accept these common options unless noted otherwise:
 
 You can also store `deviceId`, `operatorPackage`, and `timeoutMs` once per MCP server process with `configure`. When both are present, per-call values win over session defaults for each field independently.
 
+<a id="mcp-tool-devices"></a>
 ### `devices`
 
 List adb-visible devices.
@@ -212,6 +213,7 @@ Notes:
 - this is observational output only
 - it does not apply execution-time device resolution rules
 
+<a id="mcp-tool-snapshot"></a>
 ### `snapshot`
 
 Capture the current UI hierarchy XML.
@@ -245,6 +247,7 @@ Success payload includes:
 
 When `maxChars` is applied, the returned `envelope` is truncated consistently with the top-level `snapshot` field, so MCP clients do not receive a second full-copy XML payload through `content` or `structuredContent`.
 
+<a id="mcp-tool-execute"></a>
 ### `execute`
 
 Run a caller-supplied action list through the canonical execution validator and runtime.
@@ -284,6 +287,7 @@ Validation boundary:
 
 Use [Actions](actions.md) for canonical action types and params.
 
+<a id="mcp-tool-configure"></a>
 ### `configure`
 
 Store per-session defaults for execution-backed MCP tools.
@@ -328,6 +332,7 @@ Example success payload:
 }
 ```
 
+<a id="mcp-tool-open"></a>
 ### `open`
 
 Open an app or URI.
@@ -364,6 +369,7 @@ Example URI launch:
 }
 ```
 
+<a id="mcp-tool-click"></a>
 ### `click`
 
 Click a node or an absolute coordinate.
@@ -406,6 +412,7 @@ Example coordinate click:
 }
 ```
 
+<a id="mcp-tool-type"></a>
 ### `type`
 
 Type text into a matching field.
@@ -445,6 +452,7 @@ Example call:
 }
 ```
 
+<a id="mcp-tool-read"></a>
 ### `read`
 
 Read text from one node or all matches. Supports regex validation to filter results at the runtime boundary.
@@ -498,6 +506,7 @@ Example regex-validated read:
 }
 ```
 
+<a id="mcp-tool-press"></a>
 ### `press`
 
 Press a supported Android navigation key.
@@ -520,6 +529,7 @@ Example call:
 }
 ```
 
+<a id="mcp-tool-wait"></a>
 ### `wait`
 
 Wait until a matching node appears.
@@ -545,6 +555,7 @@ Example call:
 }
 ```
 
+<a id="mcp-tool-scroll-until"></a>
 ### `scroll_until`
 
 Scroll in the given direction until a matching node appears, optionally clicking it afterward.

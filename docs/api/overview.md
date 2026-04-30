@@ -200,6 +200,20 @@ Inside that wrapper, the canonical envelope shape is:
 
 Field meanings:
 
+Stable field anchors:
+
+- <a id="result-envelope-command-id"></a>`commandId`
+- <a id="result-envelope-task-id"></a>`taskId`
+- <a id="result-envelope-status"></a>`status`
+- <a id="result-envelope-step-results"></a>`stepResults`
+- <a id="result-envelope-step-results-id"></a>`stepResults[].id`
+- <a id="result-envelope-step-results-action-type"></a>`stepResults[].actionType`
+- <a id="result-envelope-step-results-success"></a>`stepResults[].success`
+- <a id="result-envelope-step-results-data"></a>`stepResults[].data`
+- <a id="result-envelope-error"></a>`error`
+- <a id="result-envelope-error-code"></a>`errorCode`
+- <a id="result-envelope-hint"></a>`hint`
+
 | Field | Meaning |
 | --- | --- |
 | `status` | Top-level outcome after Node post-processing. `"failed"` means at least one step failed or the runtime returned a top-level failure. |

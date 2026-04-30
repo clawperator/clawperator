@@ -29,6 +29,10 @@ selector_table = load_module(
     ".agents/skills/docs-build/scripts/generate_selector_table.py",
     "docs_generate_generate_selector_table",
 )
+error_table = load_module(
+    ".agents/skills/docs-build/scripts/generate_error_table.py",
+    "docs_generate_generate_error_table",
+)
 
 
 class GenerateCliReferenceTests(unittest.TestCase):
@@ -205,6 +209,14 @@ class GenerateSelectorTableTests(unittest.TestCase):
                 "Unrecognized selector flag --fancy-new-flag" in str(warning.message)
                 for warning in captured
             )
+        )
+
+
+class GenerateErrorTableTests(unittest.TestCase):
+    def test_error_anchor_uses_lowercase_kebab_case(self) -> None:
+        self.assertEqual(
+            error_table.anchor_for_code("NODE_NOT_FOUND"),
+            "error-node-not-found",
         )
 
 
