@@ -47,8 +47,15 @@ Current state is planning complete and implementation not started.
   top-level `provision emulator` is an alias for `emulator provision`.
 - Keep recording commands in `api/cli.md`. The generated CLI page is the
   all-CLI index even though `docs/api/recording.md` owns behavior details.
+- Do not create an authored `docs/api/cli.md` file. The CLI reference is
+  generated into `sites/docs/.build/api/cli.md` for the public `api/cli.md`
+  path.
 - Keep `docs/api/overview.md` as the result-envelope owner in this task. Do not
   add result-envelope marker generation.
+- The current `sites/docs/mkdocs.yml` does not enable a Markdown heading-id
+  extension such as `attr_list`. For authored pages, use HTML anchors such as
+  `<a id="action-click"></a>` immediately before the owning heading unless the
+  implementation PR also enables and validates another explicit-anchor syntax.
 - A phase that changes generator behavior must include tests or deterministic
   checks for that behavior in the same phase and commit.
 - Commit each phase as a coherent unit after validation passes. Content-heavy
@@ -76,6 +83,7 @@ Read these files IN THIS ORDER before writing anything for each PR.
 | `.agents/skills/docs-build/scripts/generate_error_table.py` | Error-code generated table behavior |
 | `.agents/skills/docs-build/scripts/generate_selector_table.py` | Selector generated table behavior |
 | `.agents/skills/docs-build/scripts/generate_mcp_tool_summary.py` | MCP generated summary behavior |
+| `.agents/skills/docs-build/tests/test_generators.py` | Existing Python unittest coverage for docs-build generators; extend this before inventing a new test harness |
 | `apps/node/src/cli/registry.ts` | CLI command names, summaries, aliases, and docs metadata |
 | `apps/node/src/cli/selectorFlags.ts` | CLI selector flag definitions and aliases |
 | `apps/node/src/contracts/selectors.ts` | Selector contract source |
@@ -188,6 +196,7 @@ Human review checklist:
 ```bash
 npm --prefix apps/node run build
 npm --prefix apps/node run test
+python3 -m unittest discover -s .agents/skills/docs-build/tests
 python3 .agents/skills/docs-build/scripts/generate_cli_reference.py > /tmp/clawperator-cli-reference.md
 ./scripts/docs_build.sh
 rg -n "recording" sites/docs/.build/api/cli.md
@@ -242,15 +251,22 @@ authored pages before generated detail links depend on them.
    - setup steps: `setup-step-<slug>`
 3. Use canonical names, not aliases. For actions, verify against
    `contracts/aliases.ts` and `contracts/execution.ts`.
-4. Add only the links needed to prove the anchor pattern works. Leave broader
+4. Use an anchor syntax that the current docs build actually supports. With the
+   current `mkdocs.yml`, prefer HTML anchors such as
+   `<a id="error-node-not-found"></a>` immediately before the owning heading.
+   Do not use `{#error-node-not-found}` unless the same PR enables and validates
+   a Markdown extension that supports it.
+5. Add only the links needed to prove the anchor pattern works. Leave broader
    cross-linking to Phase 3 and Phase 4.
-5. Run docs build and link validation available in the current docs workflow.
+6. Run docs build and link validation available in the current docs workflow.
 
 ### Acceptance Criteria
 
 - Anchor conventions exist in a durable internal design note.
 - Authored canonical pages declare stable anchors for the public concepts they
   own.
+- Explicit anchor syntax is supported by the current docs build; unsupported
+  `{#...}` heading markers are not introduced.
 - `#action-click` exists and no canonical anchor is introduced for the `tap`
   input alias.
 - `#endpoint-get-ping` and `#endpoint-get-version` are reserved for Serve health
@@ -267,7 +283,7 @@ Human review checklist:
 
 ```bash
 ./scripts/docs_build.sh
-rg -n "#action-click|#error-node-not-found|#endpoint-get-ping|#result-envelope-command-id" docs sites/docs/.build
+rg -n "id=\"action-click\"|id=\"error-node-not-found\"|id=\"endpoint-get-ping\"|id=\"result-envelope-command-id\"" docs sites/docs/.build
 git diff --check -- docs sites/docs
 ```
 
@@ -349,6 +365,7 @@ Human review checklist:
 ```bash
 npm --prefix apps/node run build
 npm --prefix apps/node run test
+python3 -m unittest discover -s .agents/skills/docs-build/tests
 ./scripts/docs_build.sh
 rg -n "Details|See also|api/recording|skills/cli" sites/docs/.build/api/cli.md
 git diff --check -- sites/docs .agents/skills/docs-build apps/node docs
@@ -556,7 +573,7 @@ Human review checklist:
 
 ```bash
 ./scripts/docs_build.sh
-python3 -m pytest .agents/skills/docs-build/scripts
+python3 -m unittest discover -s .agents/skills/docs-build/tests
 bad_short='Cl''aw'
 bad_timeout='EXECUTION_''TIMEOUT'
 bad_selector='SELECTOR_''NOT_FOUND'
@@ -567,9 +584,9 @@ if rg -n "$bad_timeout|$bad_selector" docs .agents/skills/docs-build/scripts; th
 git diff --check -- .agents/skills/docs-build docs sites/docs tasks/docs/cleanup
 ```
 
-If the docs-build scripts do not currently use `pytest`, add the appropriate
-repo-local test command in the implementation and update this validation block
-in the same phase commit.
+If the docs-build test harness changes away from `unittest`, update this
+validation block in the same phase commit and explain the change in the commit
+body.
 
 ### Expected Commit
 

@@ -71,6 +71,7 @@ owners.
 - redesigning the visual theme or MkDocs styling
 - changing the landing site under `sites/landing/`
 - changing CLI parser behavior except for docs metadata needed by the generator
+- creating an authored `docs/api/cli.md` source file
 - adding broad prose autolinking
 - generating result-envelope field tables in the first cleanup
 - splitting `docs/setup.md` into multiple pages
@@ -102,7 +103,7 @@ owners.
 | `.agents/skills/docs-build/scripts/generate_cli_reference.py` | CLI reference layout, command anchors, primary flag rendering, alias treatment | PR-1 / Phase 1, PR-2 / Phase 3 |
 | `sites/docs/source-map.yaml` or `sites/docs/ownership.yaml` | Docs-owned canonical ownership and generated detail-link metadata | PR-2 / Phase 3 |
 | `docs/internal/design/` | Internal anchor and ownership strategy note | PR-2 / Phase 2 |
-| `docs/api/cli.md` | Generated output only; do not hand-edit | PR-1 / Phase 1, PR-2 / Phase 3 |
+| `sites/docs/.build/api/cli.md` | Generated staging output for public path `api/cli.md`; do not hand-edit and do not create an authored `docs/api/cli.md` source | PR-1 / Phase 1, PR-2 / Phase 3 |
 | `docs/api/actions.md` | Canonical execution action anchors and links | PR-2 / Phase 2, PR-3 / Phase 4 |
 | `docs/api/selectors.md` | Canonical selector field and flag anchors | PR-2 / Phase 2, PR-3 / Phase 4 |
 | `docs/api/errors.md` | Error-code anchors and focused recovery annotations | PR-2 / Phase 2, PR-3 / Phase 4 |
@@ -128,6 +129,7 @@ owners.
 | Docs nav and generated-page inputs | `sites/docs/mkdocs.yml`, `sites/docs/source-map.yaml` |
 | Docs assembly pipeline | `.agents/skills/docs-build/scripts/assemble.py` |
 | CLI reference generator | `.agents/skills/docs-build/scripts/generate_cli_reference.py` |
+| Docs-build generator tests | `.agents/skills/docs-build/tests/test_generators.py` |
 | Error and selector table generation | `.agents/skills/docs-build/scripts/generate_error_table.py`, `.agents/skills/docs-build/scripts/generate_selector_table.py` |
 | MCP generated summary | `.agents/skills/docs-build/scripts/generate_mcp_tool_summary.py` |
 | CLI command names, flags, aliases, and summaries | `apps/node/src/cli/registry.ts` |
@@ -169,6 +171,10 @@ owners.
   same.
 - Use a docs-owned manifest for docs ownership and detail links. Do not encode
   docs IA into runtime command behavior unless the CLI needs to emit that URL.
+- The current MkDocs config does not enable a Markdown heading-id extension such
+  as `attr_list`. For authored docs, use HTML anchors such as
+  `<a id="action-click"></a>` immediately before the owning heading unless the
+  implementation PR also enables and validates another explicit-anchor syntax.
 
 **Judgment required:**
 
@@ -207,6 +213,8 @@ owners.
   shim or alias classification
 - adding anchors that depend on incidental MkDocs slugs rather than declared
   stable identifiers
+- using unsupported `{#anchor}` heading syntax without enabling and validating
+  the required MkDocs extension
 - adding broad autolinking that links generic words such as setup, open, read,
   type, wait, or press incorrectly
 - moving behavior detail from generated docs into another page without adding a
