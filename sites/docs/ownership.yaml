@@ -1,0 +1,171 @@
+concepts:
+  actions: api/actions.md
+  selectors: api/selectors.md
+  errors: api/errors.md
+  result_envelope: api/overview.md#result-envelope
+  serve_endpoints: api/serve.md
+  mcp_tools: api/mcp.md
+  setup_flow: setup.md
+  doctor_contract: api/doctor.md#doctor-report-contract
+  recording_workflow: api/recording.md
+  skills_cli:
+    path: skills/cli.md
+    status: planned
+    phase: PR-3 / Phase 4
+
+command_details:
+  operator:
+    href: ../setup.md#setup-step-install-operator-apk
+    label: Setup
+    see_also:
+      - href: doctor.md#doctor-report-contract
+        label: Doctor contract
+  host:
+    href: ../setup.md#setup-step-install-cli
+    label: Setup
+  install:
+    href: ../setup.md#setup-step-install-cli
+    label: Setup
+  devices:
+    href: devices.md#clawperator-devices
+    label: Devices
+    see_also:
+      - href: serve.md#endpoint-get-devices
+        label: Serve GET /devices
+  emulator:
+    href: serve.md#endpoint-post-android-provision-emulator
+    label: Emulator provisioning
+    see_also:
+      - href: devices.md
+        label: Devices
+  packages:
+    href: devices.md
+    label: Devices
+  exec:
+    href: overview.md#execution-payload
+    label: Execution payload
+    see_also:
+      - href: actions.md#action-click
+        label: Actions
+  snapshot:
+    href: actions.md#action-snapshot
+    label: "Action: snapshot"
+    action: snapshot
+  screenshot:
+    href: actions.md#action-take-screenshot
+    label: "Action: take_screenshot"
+    action: take_screenshot
+  click:
+    href: actions.md#action-click
+    label: "Action: click"
+    action: click
+  open:
+    href: actions.md#action-open-app
+    label: "Actions: open_app / open_uri"
+    actions:
+      - open_app
+      - open_uri
+  type:
+    href: actions.md#action-enter-text
+    label: "Action: enter_text"
+    action: enter_text
+  read:
+    href: actions.md#action-read-text
+    label: "Action: read_text"
+    action: read_text
+    see_also:
+      - href: selectors.md#selector-flag-text
+        label: Selectors
+  wait:
+    href: actions.md#action-wait-for-node
+    label: "Action: wait_for_node"
+    action: wait_for_node
+  press:
+    href: actions.md#action-press-key
+    label: "Action: press_key"
+    action: press_key
+  back:
+    href: actions.md#action-press-key
+    label: "Action: press_key"
+    action: press_key
+  close:
+    href: actions.md#action-close-app
+    label: "Action: close_app"
+    action: close_app
+  sleep:
+    href: actions.md#action-sleep
+    label: "Action: sleep"
+    action: sleep
+  scroll:
+    href: actions.md#action-scroll
+    label: "Action: scroll"
+    action: scroll
+  scroll-until:
+    href: actions.md#action-scroll-until
+    label: "Action: scroll_until"
+    action: scroll_until
+  scroll-and-click:
+    href: actions.md#action-scroll-and-click
+    label: "Action: scroll_and_click"
+    action: scroll_and_click
+  wait-for-nav:
+    href: actions.md#action-wait-for-navigation
+    label: "Action: wait_for_navigation"
+    action: wait_for_navigation
+  read-value:
+    href: actions.md#action-read-key-value-pair
+    label: "Action: read_key_value_pair"
+    action: read_key_value_pair
+  skills:
+    planned_href: ../skills/cli.md
+    label: Skills CLI
+    status: planned
+    phase: PR-3 / Phase 4
+  bundled-skills:
+    href: ../host-agents.md
+    label: Host agent orientation
+    see_also:
+      - href: ../skills/overview.md
+        label: Skills overview
+  recording:
+    href: recording.md
+    label: api/recording
+  daemon:
+    href: daemon.md
+    label: Daemon
+  serve:
+    href: serve.md
+    label: Serve API
+  mcp:
+    href: mcp.md
+    label: MCP server
+  logs:
+    href: logging.md#the-clawperator-logs-command
+    label: Logging
+  doctor:
+    href: doctor.md#doctor-report-contract
+    label: Doctor contract
+  grant-device-permissions:
+    href: ../setup.md#setup-step-regrant-permissions
+    label: Setup recovery
+  version:
+    href: ../setup.md#setup-step-verify-readiness-with-doctor
+    label: Version checks
+
+owners:
+  recording_workflow:
+    canonical: api/recording.md
+    summaries:
+      - api/cli.md
+  doctor_contract:
+    canonical: api/doctor.md#doctor-report-contract
+    summaries:
+      - setup.md
+  setup_flow:
+    canonical: setup.md
+    summaries:
+      - api/doctor.md
+  skills_cli:
+    canonical: skills/cli.md
+    status: planned
+    phase: PR-3 / Phase 4

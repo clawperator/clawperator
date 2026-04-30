@@ -129,7 +129,15 @@ COMMANDS["second"] = {
             ),
         ]
 
-        rendered = cli_reference.render_reference(commands)
+        rendered = cli_reference.render_reference(
+            commands,
+            {
+                "emulator": cli_reference.DetailLink(
+                    href="serve.md#endpoint-post-android-provision-emulator",
+                    label="Emulator provisioning",
+                ),
+            },
+        )
 
         self.assertNotIn("### `setup`", rendered)
         self.assertNotIn("| [`setup`]", rendered)
@@ -153,11 +161,20 @@ COMMANDS["second"] = {
             ),
         ]
 
-        rendered = cli_reference.render_reference(commands)
+        rendered = cli_reference.render_reference(
+            commands,
+            {
+                "recording": cli_reference.DetailLink(
+                    href="recording.md",
+                    label="Recording workflow",
+                ),
+            },
+        )
 
         self.assertIn("[`recording`](#command-recording)", rendered)
         self.assertIn("### `recording`", rendered)
         self.assertIn("`record`", rendered)
+        self.assertIn("[Recording workflow](recording.md)", rendered)
 
     def test_missing_documented_flags_warns_without_regex_fallback(self) -> None:
         body = """
@@ -176,6 +193,62 @@ COMMANDS["second"] = {
         self.assertTrue(
             any(
                 "Command read has no documentedFlags metadata" in str(warning.message)
+                for warning in captured
+            )
+        )
+
+    def test_public_reference_renders_detail_and_action_links(self) -> None:
+        commands = [
+            cli_reference.CommandInfo(
+                name="click",
+                aliases=["tap"],
+                group="Device Interaction",
+                summary="Tap the first matching UI element",
+                syntax=["click --text <text>"],
+                flags=["--text", "--id", "--desc", "--role"],
+                subcommands=[],
+                docs_visibility="normal",
+                docs_alias_of=None,
+            ),
+        ]
+        details = {
+            "click": cli_reference.DetailLink(
+                href="actions.md#action-click",
+                label="Action: click",
+                action_links=("click",),
+                see_also=(("selectors.md#selector-flag-text", "Selectors"),),
+            ),
+        }
+
+        rendered = cli_reference.render_reference(commands, details)
+
+        self.assertIn("| [`click`](#command-click)", rendered)
+        self.assertIn("[Action: click](actions.md#action-click)", rendered)
+        self.assertIn("[`click`](actions.md#action-click)", rendered)
+        self.assertIn("[Selectors](selectors.md#selector-flag-text)", rendered)
+
+    def test_public_reference_warns_for_missing_detail_links(self) -> None:
+        commands = [
+            cli_reference.CommandInfo(
+                name="snapshot",
+                aliases=[],
+                group="Device Interaction",
+                summary="Get current Android UI hierarchy as XML",
+                syntax=["snapshot"],
+                flags=[],
+                subcommands=[],
+                docs_visibility="normal",
+                docs_alias_of=None,
+            ),
+        ]
+
+        with warnings.catch_warnings(record=True) as captured:
+            warnings.simplefilter("always")
+            cli_reference.render_reference(commands, {})
+
+        self.assertTrue(
+            any(
+                "Missing command detail ownership for: snapshot" in str(warning.message)
                 for warning in captured
             )
         )

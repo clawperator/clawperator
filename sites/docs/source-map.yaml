@@ -6,6 +6,7 @@ code_derived:
     sources:
       - apps/node/src/cli/registry.ts
       - apps/node/src/cli/commands/
+      - sites/docs/ownership.yaml
 
 markers:
   - page: api/errors.md

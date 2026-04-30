@@ -10,6 +10,8 @@ Define the `clawperator devices` output shape, document how Node resolves a targ
 - Device resolution: `apps/node/src/domain/devices/resolveDevice.ts`
 - CLI wrapper: `apps/node/src/cli/commands/devices.ts`
 
+<a id="clawperator-devices"></a>
+
 ## `clawperator devices`
 
 `clawperator devices` is a direct listing of `adb devices` output after Node parses each non-empty line into:

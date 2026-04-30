@@ -104,6 +104,8 @@ Events use dot-separated names with prefix-based categories:
 | `doctor.` | Doctor diagnostics | `doctor.check` |
 | `serve.` | HTTP/SSE server | `serve.server.started`, `serve.http.request` |
 
+<a id="the-clawperator-logs-command"></a>
+
 ## The `clawperator logs` Command
 
 Stream the log file in real time.

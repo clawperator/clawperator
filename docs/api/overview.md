@@ -50,6 +50,8 @@ That doctor check exposes structured evidence:
 If doctor reports `DEVICE_NOT_INTERACTIVE`, recover the device state first and
 rerun doctor before moving on to execution commands.
 
+<a id="execution-payload"></a>
+
 ## Execution Payload
 
 Authoritative source: `apps/node/src/contracts/execution.ts`
