@@ -20,6 +20,7 @@ import { buildResultEnvelopeTimeoutHint } from "../../domain/executions/timeoutG
 import type { Execution } from "../../contracts/execution.js";
 import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
+import { LIMITS } from "../../contracts/limits.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
 import { extractSnapshotsForCommand, extractSnapshotsFromLogs } from "../../domain/executions/snapshotHelper.js";
@@ -1057,6 +1058,46 @@ describe("runExecution", () => {
     assert.strictEqual(event.envelope.stepResults[0].data.text, result.ok ? result.envelope.stepResults[0].data.text : undefined);
     assert.ok(!runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -d -v tag"));
     assert.ok(!runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -c"));
+  });
+
+  it("validates payload size after rewriting snapshot to the Android wire action", async () => {
+    const runner = new FakeProcessRunner();
+    const actions = Array.from({ length: LIMITS.MAX_EXECUTION_ACTIONS }, (_, index) => ({
+      id: `s${index}`,
+      type: "snapshot",
+      ...(index === 0 ? { params: { retry: { padding: "" } } } : {}),
+    }));
+    const execution: Execution = {
+      commandId: "cmd-payload-boundary",
+      taskId: "task-payload-boundary",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions,
+    };
+    const emptyPaddingBytes = new TextEncoder().encode(JSON.stringify(execution)).length;
+    const paddingBytes = LIMITS.MAX_PAYLOAD_BYTES - emptyPaddingBytes - 1;
+    assert.ok(paddingBytes > 0, "test fixture should start below the payload limit");
+    (execution.actions[0].params!.retry as Record<string, unknown>).padding = "x".repeat(paddingBytes);
+
+    const canonicalBytes = new TextEncoder().encode(JSON.stringify(execution)).length;
+    const androidBytes = new TextEncoder().encode(JSON.stringify({
+      ...execution,
+      actions: execution.actions.map(action => ({ ...action, type: "snapshot_ui" })),
+    })).length;
+    assert.strictEqual(canonicalBytes, LIMITS.MAX_PAYLOAD_BYTES - 1);
+    assert.ok(androidBytes > LIMITS.MAX_PAYLOAD_BYTES);
+
+    const result = await runExecution(execution, {
+      deviceId: "test-device-1",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.error.code, ERROR_CODES.PAYLOAD_TOO_LARGE);
+    assert.match(result.error.message, new RegExp(`Payload exceeds ${LIMITS.MAX_PAYLOAD_BYTES} bytes`));
+    assert.deepStrictEqual(runner.calls, []);
   });
 
   it("classifies legacy untagged snapshot markers as VERSION_INCOMPATIBLE through runExecution", async () => {
