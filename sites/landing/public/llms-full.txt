@@ -1464,7 +1464,7 @@ Use this page as a command index. Detailed behavior, output shapes, and recovery
 | [`scroll`](#command-scroll) | Device Interaction | `scroll <down\|up\|left\|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]` | `--direction`, `--no-daemon` | Scroll the screen in a direction |
 | [`scroll-until`](#command-scroll-until) | Device Interaction | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--click`, `--direction`, `--no-daemon` | Scroll until a target element is visible |
 | [`scroll-and-click`](#command-scroll-and-click) | Device Interaction | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--direction`, `--no-daemon` | Scroll until target is visible, then click it (alias for scroll-until --click) |
-| [`wait-for-nav`](#command-wait-for-nav) | Device Interaction | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]` | `--app`, `--text`, `--id`, `--desc`, `--role`, `--validate-only`, `--dry-run`, `--no-daemon` | Wait for app or screen navigation to complete |
+| [`wait-for-nav`](#command-wait-for-nav) | Device Interaction | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]` | `--app`, `--timeout`, `--text`, `--id`, `--desc`, `--role`, `--validate-only`, `--dry-run`, `--no-daemon` | Wait for app or screen navigation to complete |
 | [`read-value`](#command-read-value) | Device Interaction | `read-value --label <text>` | `--label`, `--label-id`, `--label-desc`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon` | Read the value associated with a labeled element |
 | [`skills`](#command-skills) | Execution | `skills list` | `--app`, `--intent`, `--keyword`, `--skill-id`, `--artifact`, `--vars`, `--summary`, `--recording-context`, `--all`, `--dry-run`, `--device`, `--operator-package`, `--timeout`, `--expect-contains`, `--skip-validate`, `--ref` | Manage and run automation skills |
 | [`bundled-skills`](#command-bundled-skills) | Execution | `bundled-skills list` | - | Manage first-party bundled skills for Claude Code, Codex, and generic agent runtimes |
@@ -1691,7 +1691,7 @@ Wait for app or screen navigation to complete
 
 - Group: Device Interaction
 - Syntax: `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--app`, `--text`, `--id`, `--desc`, `--role`, `--validate-only`, `--dry-run`, `--no-daemon`
+- Primary flags: `--app`, `--timeout`, `--text`, `--id`, `--desc`, `--role`, `--validate-only`, `--dry-run`, `--no-daemon`
 - Command aliases: `wait-for-navigation`, `wait_for_navigation`
 
 <a id="command-read-value"></a>

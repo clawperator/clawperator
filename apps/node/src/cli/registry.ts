@@ -2143,7 +2143,7 @@ COMMANDS["wait-for-nav"] = {
   synonyms: ["wait-for-navigation", "wait_for_navigation"],
   group: "Device Interaction",
   flagAliases: WAIT_FOR_NAV_FLAG_ALIASES,
-  documentedFlags: ["--app", "--text", "--id", "--desc", "--role", "--validate-only", "--dry-run", "--no-daemon"],
+  documentedFlags: ["--app", "--timeout", "--text", "--id", "--desc", "--role", "--validate-only", "--dry-run", "--no-daemon"],
   supportedFlags: ["--app", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--validate-only", "--dry-run", "--no-daemon"],
   summary: "Wait for app or screen navigation to complete",
   help: HELP_WAIT_FOR_NAV,
