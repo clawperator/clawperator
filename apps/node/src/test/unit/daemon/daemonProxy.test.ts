@@ -29,7 +29,7 @@ const execution = {
   source: "test",
   expectedFormat: "android-ui-automator",
   timeoutMs: 30000,
-  actions: [{ id: "snap", type: "snapshot_ui" }],
+  actions: [{ id: "snap", type: "snapshot" }],
 };
 
 const successResult: RunExecutionResult = {

@@ -25,12 +25,25 @@ describe("validateExecution", () => {
       source: "test",
       expectedFormat: "android-ui-automator",
       timeoutMs: 8000,
-      actions: [{ id: "snap-1", type: "snapshot_ui" }],
+      actions: [{ id: "snap-1", type: "snapshot" }],
     });
 
     assert.strictEqual(ex.commandId, "cmd-anchor-1");
     assert.strictEqual(ex.taskId, "task-anchor-1");
     assert.strictEqual(ex.actions[0].id, "snap-1");
+  });
+
+  it("normalizes legacy snapshot_ui action type to snapshot", () => {
+    const ex = validateExecution({
+      commandId: "cmd-snapshot-alias",
+      taskId: "task-snapshot-alias",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 8000,
+      actions: [{ id: "snap-1", type: "snapshot_ui" }],
+    });
+
+    assert.strictEqual(ex.actions[0].type, "snapshot");
   });
 
   it("accepts click actions with coordinates", () => {
@@ -308,7 +321,7 @@ describe("validateExecution", () => {
           source: "test",
           expectedFormat: "android-ui-automator",
           timeoutMs: 5000,
-          actions: [{ id: "snap-1", type: "snapshot_ui" }],
+          actions: [{ id: "snap-1", type: "snapshot" }],
         }),
       (e: unknown) => {
         const err = e as {
@@ -554,7 +567,7 @@ describe("validateExecution", () => {
         actions: [
           {
             id: "snap",
-            type: "snapshot_ui",
+            type: "snapshot",
             params: { format: "ascii" },
           },
         ],
@@ -574,7 +587,7 @@ describe("validateExecution", () => {
       };
       assert.strictEqual(err.code, ERROR_CODES.EXECUTION_VALIDATION_FAILED);
       assert.strictEqual(err.details?.actionId, "snap");
-      assert.strictEqual(err.details?.actionType, "snapshot_ui");
+      assert.strictEqual(err.details?.actionType, "snapshot");
       assert.deepStrictEqual(err.details?.invalidKeys, ["format"]);
       assert.strictEqual(err.details?.path, "actions.0.params");
     }
@@ -591,7 +604,7 @@ describe("validateExecution", () => {
         actions: [
           {
             id: "snap",
-            type: "snapshot_ui",
+            type: "snapshot",
             params: { format: "ascii" },
           },
         ],
@@ -605,7 +618,7 @@ describe("validateExecution", () => {
       };
       assert.strictEqual(
         err.details?.hint,
-        "'format' was removed from snapshot_ui. Remove this parameter."
+        "'format' was removed from snapshot. Remove this parameter."
       );
     }
 
@@ -619,7 +632,7 @@ describe("validateExecution", () => {
         actions: [
           {
             id: "snap",
-            type: "snapshot_ui",
+            type: "snapshot",
             params: { other: "value" },
           },
         ],
@@ -646,7 +659,7 @@ describe("validateExecution", () => {
         actions: [
           {
             id: "snap",
-            type: "snapshot",
+            type: "snapshot_ui",
             params: { format: "ascii" },
           },
         ],
@@ -659,10 +672,10 @@ describe("validateExecution", () => {
           hint?: string;
         };
       };
-      assert.strictEqual(err.details?.actionType, "snapshot");
+      assert.strictEqual(err.details?.actionType, "snapshot_ui");
       assert.strictEqual(
         err.details?.hint,
-        "'format' was removed from snapshot_ui. Remove this parameter."
+        "'format' was removed from snapshot. Remove this parameter."
       );
     }
   });

@@ -426,7 +426,7 @@ export async function runSmokeTest(config: RuntimeConfig): Promise<DoctorCheckRe
 
   if (result.ok) {
     const hasSettings = result.envelope.stepResults.some(s =>
-      s.actionType === "snapshot_ui" && s.success
+      (s.actionType === "snapshot" || s.actionType === "snapshot_ui") && s.success
     );
     if (hasSettings) {
       return {

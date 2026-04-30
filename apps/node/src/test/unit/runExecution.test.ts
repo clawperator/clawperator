@@ -20,6 +20,7 @@ import { buildResultEnvelopeTimeoutHint } from "../../domain/executions/timeoutG
 import type { Execution } from "../../contracts/execution.js";
 import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
+import { LIMITS } from "../../contracts/limits.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { waitForResultEnvelope } from "../../adapters/android-bridge/logcatResultReader.js";
 import { extractSnapshotsForCommand, extractSnapshotsFromLogs } from "../../domain/executions/snapshotHelper.js";
@@ -35,12 +36,12 @@ function formatLogcatTime(date: Date): string {
 }
 
 describe("attachSnapshotsToStepResults", () => {
-  it("aligns fewer snapshots to the last snapshot_ui steps", () => {
+  it("aligns fewer snapshots to the last snapshot steps", () => {
     const stepResults: StepResult[] = [
-      { id: "s1", actionType: "snapshot_ui", success: false, data: { error: "FAILED" } },
+      { id: "s1", actionType: "snapshot", success: false, data: { error: "FAILED" } },
       { id: "click-1", actionType: "click", success: true, data: {} },
-      { id: "s2", actionType: "snapshot_ui", success: true, data: {} },
-      { id: "s3", actionType: "snapshot_ui", success: true, data: {} },
+      { id: "s2", actionType: "snapshot", success: true, data: {} },
+      { id: "s3", actionType: "snapshot", success: true, data: {} },
     ];
 
     attachSnapshotsToStepResults(stepResults, ["<tree-two/>", "<tree-three/>"]);
@@ -52,8 +53,8 @@ describe("attachSnapshotsToStepResults", () => {
 
   it("keeps the most recent snapshots when logs contain more dumps than steps", () => {
     const stepResults: StepResult[] = [
-      { id: "s1", actionType: "snapshot_ui", success: true, data: {} },
-      { id: "s2", actionType: "snapshot_ui", success: true, data: {} },
+      { id: "s1", actionType: "snapshot", success: true, data: {} },
+      { id: "s2", actionType: "snapshot", success: true, data: {} },
     ];
 
     attachSnapshotsToStepResults(stepResults, ["<old/>", "<new-one/>", "<new-two/>"]);
@@ -64,7 +65,7 @@ describe("attachSnapshotsToStepResults", () => {
 
   it("does not set data.text when snapshot extraction returned no snapshots", () => {
     const stepResults: StepResult[] = [
-      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot", success: true, data: {} },
     ];
 
     attachSnapshotsToStepResults(stepResults, []);
@@ -78,7 +79,7 @@ describe("attachSnapshotsToStepResults", () => {
 describe("markExtractionFailedSnapshotSteps", () => {
   it("marks success:true snapshot steps with no data.text as SNAPSHOT_EXTRACTION_FAILED", () => {
     const stepResults: StepResult[] = [
-      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot", success: true, data: {} },
     ];
 
     markExtractionFailedSnapshotSteps(stepResults);
@@ -91,7 +92,7 @@ describe("markExtractionFailedSnapshotSteps", () => {
 
   it("emits the warning through the provided callback", () => {
     const stepResults: StepResult[] = [
-      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot", success: true, data: {} },
     ];
 
     const warnings: string[] = [];
@@ -101,12 +102,12 @@ describe("markExtractionFailedSnapshotSteps", () => {
     });
 
     assert.strictEqual(warnings.length, 1);
-    assert.match(warnings[0], /snapshot_ui step "snap-1"/);
+    assert.match(warnings[0], /snapshot step "snap-1"/);
   });
 
   it("does not emit the warning when no callback is provided", () => {
     const stepResults: StepResult[] = [
-      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot", success: true, data: {} },
     ];
     markExtractionFailedSnapshotSteps(stepResults);
     assert.strictEqual(stepResults[0].success, false);
@@ -114,7 +115,7 @@ describe("markExtractionFailedSnapshotSteps", () => {
 
   it("does not modify snapshot steps that already have data.text", () => {
     const stepResults: StepResult[] = [
-      { id: "snap-1", actionType: "snapshot_ui", success: true, data: { text: "<hierarchy/>" } },
+      { id: "snap-1", actionType: "snapshot", success: true, data: { text: "<hierarchy/>" } },
     ];
 
     markExtractionFailedSnapshotSteps(stepResults);
@@ -125,7 +126,7 @@ describe("markExtractionFailedSnapshotSteps", () => {
 
   it("does not treat an existing empty-string text field as missing", () => {
     const stepResults: StepResult[] = [
-      { id: "snap-1", actionType: "snapshot_ui", success: true, data: { text: "" } },
+      { id: "snap-1", actionType: "snapshot", success: true, data: { text: "" } },
     ];
 
     markExtractionFailedSnapshotSteps(stepResults);
@@ -136,7 +137,7 @@ describe("markExtractionFailedSnapshotSteps", () => {
 
   it("does not modify snapshot steps that are already failed", () => {
     const stepResults: StepResult[] = [
-      { id: "snap-1", actionType: "snapshot_ui", success: false, data: { error: "NODE_NOT_FOUND" } },
+      { id: "snap-1", actionType: "snapshot", success: false, data: { error: "NODE_NOT_FOUND" } },
     ];
 
     markExtractionFailedSnapshotSteps(stepResults);
@@ -156,9 +157,9 @@ describe("markExtractionFailedSnapshotSteps", () => {
     assert.deepStrictEqual(stepResults[0].data, {});
   });
 
-  it("marks snapshot_ui as SNAPSHOT_EXTRACTION_FAILED when only other commandIds are present", () => {
+  it("marks snapshot as SNAPSHOT_EXTRACTION_FAILED when only other commandIds are present", () => {
     const stepResults: StepResult[] = [
-      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot", success: true, data: {} },
     ];
     const logLines = [
       "04-25 20:14:52.453 D/TaskScopeDefault(29817): [TaskScope] UI Hierarchy [commandId=cmd-other]:",
@@ -176,7 +177,7 @@ describe("markExtractionFailedSnapshotSteps", () => {
 
   it("marks missing snapshot text as VERSION_INCOMPATIBLE when legacy snapshot markers were observed", () => {
     const stepResults: StepResult[] = [
-      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot", success: true, data: {} },
     ];
     const warnings: string[] = [];
 
@@ -192,7 +193,7 @@ describe("markExtractionFailedSnapshotSteps", () => {
 });
 
 describe("addSettleWarnings", () => {
-  it("warns when snapshot_ui follows click without a sleep step", () => {
+  it("warns when snapshot follows click without a sleep step", () => {
     const execution: Execution = {
       commandId: "cmd-settle",
       taskId: "task-settle",
@@ -201,12 +202,12 @@ describe("addSettleWarnings", () => {
       timeoutMs: 5000,
       actions: [
         { id: "click-1", type: "click" },
-        { id: "snap-1", type: "snapshot_ui" },
+        { id: "snap-1", type: "snapshot" },
       ],
     };
     const stepResults: StepResult[] = [
       { id: "click-1", actionType: "click", success: true, data: {} },
-      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot", success: true, data: {} },
     ];
 
     addSettleWarnings(stepResults, execution);
@@ -214,7 +215,7 @@ describe("addSettleWarnings", () => {
     assert.match(stepResults[1].data.warn ?? "", /snapshot captured without a preceding sleep step/);
   });
 
-  it("does not warn when a sleep step appears between click and snapshot_ui", () => {
+  it("does not warn when a sleep step appears between click and snapshot", () => {
     const execution: Execution = {
       commandId: "cmd-settle",
       taskId: "task-settle",
@@ -224,13 +225,13 @@ describe("addSettleWarnings", () => {
       actions: [
         { id: "click-1", type: "click" },
         { id: "sleep-1", type: "sleep" },
-        { id: "snap-1", type: "snapshot_ui" },
+        { id: "snap-1", type: "snapshot" },
       ],
     };
     const stepResults: StepResult[] = [
       { id: "click-1", actionType: "click", success: true, data: {} },
       { id: "sleep-1", actionType: "sleep", success: true, data: {} },
-      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot", success: true, data: {} },
     ];
 
     addSettleWarnings(stepResults, execution);
@@ -247,12 +248,12 @@ describe("addSettleWarnings", () => {
       timeoutMs: 5000,
       actions: [
         { id: "open-1", type: "open_app" },
-        { id: "snap-1", type: "snapshot_ui" },
+        { id: "snap-1", type: "snapshot" },
       ],
     };
     const stepResults: StepResult[] = [
       { id: "open-1", actionType: "open_app", success: true, data: {} },
-      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot", success: true, data: {} },
     ];
 
     addSettleWarnings(stepResults, execution);
@@ -260,7 +261,7 @@ describe("addSettleWarnings", () => {
     assert.ok(!("warn" in stepResults[1].data));
   });
 
-  it("warns when snapshot_ui follows scroll_and_click without a sleep step", () => {
+  it("warns when snapshot follows scroll_and_click without a sleep step", () => {
     const execution: Execution = {
       commandId: "cmd-settle",
       taskId: "task-settle",
@@ -269,12 +270,12 @@ describe("addSettleWarnings", () => {
       timeoutMs: 5000,
       actions: [
         { id: "scroll-1", type: "scroll_and_click" },
-        { id: "snap-1", type: "snapshot_ui" },
+        { id: "snap-1", type: "snapshot" },
       ],
     };
     const stepResults: StepResult[] = [
       { id: "scroll-1", actionType: "scroll_and_click", success: true, data: {} },
-      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot", success: true, data: {} },
     ];
 
     addSettleWarnings(stepResults, execution);
@@ -282,7 +283,7 @@ describe("addSettleWarnings", () => {
     assert.match(stepResults[1].data.warn ?? "", /snapshot captured without a preceding sleep step/);
   });
 
-  it("does not warn when a non-sleep intermediate step separates click from snapshot_ui", () => {
+  it("does not warn when a non-sleep intermediate step separates click from snapshot", () => {
     // read_text, wait_for_node, etc. may themselves introduce settling time —
     // only warn when click is the immediately preceding action.
     const execution: Execution = {
@@ -294,13 +295,13 @@ describe("addSettleWarnings", () => {
       actions: [
         { id: "click-1", type: "click" },
         { id: "read-1", type: "read_text" },
-        { id: "snap-1", type: "snapshot_ui" },
+        { id: "snap-1", type: "snapshot" },
       ],
     };
     const stepResults: StepResult[] = [
       { id: "click-1", actionType: "click", success: true, data: {} },
       { id: "read-1", actionType: "read_text", success: true, data: {} },
-      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot", success: true, data: {} },
     ];
 
     addSettleWarnings(stepResults, execution);
@@ -411,7 +412,7 @@ describe("getReadinessInvalidationErrorCodes", () => {
       errorCode: "SERVICE_UNAVAILABLE",
       stepResults: [
         { id: "a1", actionType: "click", success: false, data: { error: ERROR_CODES.DEVICE_ACCESSIBILITY_NOT_RUNNING } },
-        { id: "a2", actionType: "snapshot_ui", success: true, data: {} },
+        { id: "a2", actionType: "snapshot", success: true, data: {} },
         { id: "a3", actionType: "read_text", success: false, data: { error: "TARGET_NOT_FOUND" } },
       ],
       error: "failed",
@@ -963,7 +964,7 @@ describe("runExecution", () => {
       expectedFormat: "android-ui-automator",
       timeoutMs: 5000,
       actions: [
-        { id: "snap-1", type: "snapshot_ui" },
+        { id: "snap-1", type: "snapshot" },
       ],
     };
 
@@ -1031,8 +1032,13 @@ describe("runExecution", () => {
 
     const [event] = await resultEvent as [{ deviceId: string; envelope: ResultEnvelope }];
     assert.strictEqual(result.ok, true);
+    assert.ok(
+      runner.calls.some(call => call.args.join(" ").includes('"type":"snapshot_ui"')),
+      "broadcast payload should use the Android-compatible snapshot_ui action"
+    );
     if (result.ok) {
       assert.strictEqual(result.envelope.status, "success");
+      assert.strictEqual(result.envelope.stepResults[0].actionType, "snapshot");
       assert.deepStrictEqual(result.envelope.stepResults[0].data, {
         actual_format: "hierarchy_xml",
         foreground_package: "com.android.settings",
@@ -1048,9 +1054,50 @@ describe("runExecution", () => {
       assert.ok(!result.envelope.stepResults[0].data.text.includes("Updating configuration"));
     }
     assert.strictEqual(event.deviceId, "test-device-1");
+    assert.strictEqual(event.envelope.stepResults[0].actionType, "snapshot");
     assert.strictEqual(event.envelope.stepResults[0].data.text, result.ok ? result.envelope.stepResults[0].data.text : undefined);
     assert.ok(!runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -d -v tag"));
     assert.ok(!runner.calls.some(call => call.args.join(" ") === "-s test-device-1 logcat -c"));
+  });
+
+  it("validates payload size after rewriting snapshot to the Android wire action", async () => {
+    const runner = new FakeProcessRunner();
+    const actions = Array.from({ length: LIMITS.MAX_EXECUTION_ACTIONS }, (_, index) => ({
+      id: `s${index}`,
+      type: "snapshot",
+      ...(index === 0 ? { params: { retry: { padding: "" } } } : {}),
+    }));
+    const execution: Execution = {
+      commandId: "cmd-payload-boundary",
+      taskId: "task-payload-boundary",
+      source: "test",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 5000,
+      actions,
+    };
+    const emptyPaddingBytes = new TextEncoder().encode(JSON.stringify(execution)).length;
+    const paddingBytes = LIMITS.MAX_PAYLOAD_BYTES - emptyPaddingBytes - 1;
+    assert.ok(paddingBytes > 0, "test fixture should start below the payload limit");
+    (execution.actions[0].params!.retry as Record<string, unknown>).padding = "x".repeat(paddingBytes);
+
+    const canonicalBytes = new TextEncoder().encode(JSON.stringify(execution)).length;
+    const androidBytes = new TextEncoder().encode(JSON.stringify({
+      ...execution,
+      actions: execution.actions.map(action => ({ ...action, type: "snapshot_ui" })),
+    })).length;
+    assert.strictEqual(canonicalBytes, LIMITS.MAX_PAYLOAD_BYTES - 1);
+    assert.ok(androidBytes > LIMITS.MAX_PAYLOAD_BYTES);
+
+    const result = await runExecution(execution, {
+      deviceId: "test-device-1",
+      operatorPackage: "com.test.operator.dev",
+      runner,
+    });
+
+    assert.strictEqual(result.ok, false);
+    assert.strictEqual(result.error.code, ERROR_CODES.PAYLOAD_TOO_LARGE);
+    assert.match(result.error.message, new RegExp(`Payload exceeds ${LIMITS.MAX_PAYLOAD_BYTES} bytes`));
+    assert.deepStrictEqual(runner.calls, []);
   });
 
   it("classifies legacy untagged snapshot markers as VERSION_INCOMPATIBLE through runExecution", async () => {
@@ -1062,7 +1109,7 @@ describe("runExecution", () => {
       expectedFormat: "android-ui-automator",
       timeoutMs: 5000,
       actions: [
-        { id: "snap-1", type: "snapshot_ui" },
+        { id: "snap-1", type: "snapshot" },
       ],
     };
     const warnings: string[] = [];
@@ -1092,7 +1139,7 @@ describe("runExecution", () => {
             status: "success",
             stepResults: [{
               id: "snap-1",
-              actionType: "snapshot_ui",
+              actionType: "snapshot",
               success: true,
               data: {
                 actual_format: "hierarchy_xml",
@@ -1126,7 +1173,7 @@ describe("runExecution", () => {
     assert.strictEqual(result.ok, true);
     if (result.ok) {
       assert.strictEqual(result.envelope.status, "failed");
-      assert.strictEqual(result.envelope.error, "Step snap-1 (snapshot_ui) failed: VERSION_INCOMPATIBLE");
+      assert.strictEqual(result.envelope.error, "Step snap-1 (snapshot) failed: VERSION_INCOMPATIBLE");
       assert.deepStrictEqual(result.envelope.stepResults[0].data, {
         actual_format: "hierarchy_xml",
         error: "VERSION_INCOMPATIBLE",
@@ -2346,7 +2393,7 @@ describe("buildTimeoutError", () => {
         taskId: "task-timeout-1",
         actions: [
           { id: "click-1", type: "click" },
-          { id: "snap-1", type: "snapshot_ui" },
+          { id: "snap-1", type: "snapshot" },
         ],
         timeoutMs: 30000,
       },
@@ -2363,7 +2410,7 @@ describe("buildTimeoutError", () => {
       commandId: "cmd-timeout-1",
       taskId: "task-timeout-1",
       lastActionId: "snap-1",
-      lastActionType: "snapshot_ui",
+      lastActionType: "snapshot",
       lastActionCaveat: "payload-last only; Android execution position is unknown",
       elapsedMs: 321,
       timeoutMs: 30000,
@@ -2373,7 +2420,7 @@ describe("buildTimeoutError", () => {
   it("omits commandId and taskId keys when they are absent from the payload", () => {
     const error = buildTimeoutError(
       {
-        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        actions: [{ id: "snap-1", type: "snapshot" }],
         timeoutMs: 1000,
       },
       {
@@ -2393,7 +2440,7 @@ describe("buildTimeoutError", () => {
       {
         commandId: "cmd-timeout-2",
         taskId: "task-timeout-2",
-        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        actions: [{ id: "snap-1", type: "snapshot" }],
         timeoutMs: 2000,
       },
       {
@@ -2419,7 +2466,7 @@ describe("buildTimeoutError", () => {
       {
         commandId: "cmd-timeout-3",
         taskId: "task-timeout-3",
-        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        actions: [{ id: "snap-1", type: "snapshot" }],
         timeoutMs: 2000,
       },
       {
@@ -2443,7 +2490,7 @@ describe("buildTimeoutError", () => {
       {
         commandId: "cmd-timeout-4",
         taskId: "task-timeout-4",
-        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        actions: [{ id: "snap-1", type: "snapshot" }],
         timeoutMs: 2000,
       },
       {
@@ -2501,7 +2548,7 @@ describe("buildTimeoutError", () => {
         source: "test",
         expectedFormat: "android-ui-automator",
         timeoutMs: 1000,
-        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        actions: [{ id: "snap-1", type: "snapshot" }],
       },
       {
         deviceId: "device-123",
@@ -2563,7 +2610,7 @@ describe("buildTimeoutError", () => {
         source: "test",
         expectedFormat: "android-ui-automator",
         timeoutMs: 1000,
-        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        actions: [{ id: "snap-1", type: "snapshot" }],
       },
       {
         deviceId: "device-123",
@@ -2891,7 +2938,7 @@ describe("runExecution logging", () => {
       {
         commandId: "cmd-timeout",
         taskId: "task-timeout",
-        actions: [{ id: "a1", type: "snapshot_ui" }],
+        actions: [{ id: "a1", type: "snapshot" }],
         timeoutMs: 1000,
       },
       {

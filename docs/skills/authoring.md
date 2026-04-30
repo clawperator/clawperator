@@ -939,7 +939,7 @@ The scaffold writes an exact default `run.js` payload shape:
     },
     {
       "id": "snap",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ]
 }
@@ -1084,7 +1084,7 @@ Current authoring rule for new non-trivial skills:
   time padding:
   - split long recorded routes into the smallest execution calls that preserve
     truthfulness
-  - use `wait_for_node`, `read_text`, `snapshot_ui`, or bounded polling loops
+  - use `wait_for_node`, `read_text`, `snapshot`, or bounded polling loops
     to observe readiness and terminal state
   - stop as soon as the expected UI state is observed
   - keep fixed `sleep` actions only when there is no observable state to poll,
@@ -1219,7 +1219,7 @@ Compile success example:
     "actions": [
       {
         "id": "snap",
-        "type": "snapshot_ui"
+        "type": "snapshot"
       }
     ],
     "mode": "artifact_compiled"
@@ -1256,7 +1256,7 @@ Success shape:
     "actions": [
       {
         "id": "snap",
-        "type": "snapshot_ui"
+        "type": "snapshot"
       }
     ],
     "mode": "artifact_compiled"

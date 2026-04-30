@@ -71,7 +71,7 @@ Each action has:
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `id` | `string` | Step correlation id. |
-| `type` | `string` | Canonical action type such as `click` or `snapshot_ui`. |
+| `type` | `string` | Canonical action type such as `click` or `snapshot`. |
 | `params` | `ActionParams` | Optional action-specific parameters. |
 
 Minimum valid payload example:
@@ -86,7 +86,7 @@ Minimum valid payload example:
   "actions": [
     {
       "id": "snap-1",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ],
   "mode": "direct"
@@ -130,7 +130,7 @@ Success condition:
 - `execution.taskId == "task-001"`
 - `execution.expectedFormat == "android-ui-automator"`
 - `execution.timeoutMs == 30000`
-- `execution.actions[0].type == "snapshot_ui"`
+- `execution.actions[0].type == "snapshot"`
 
 CLI payload-source aliases accepted by `clawperator exec`:
 
@@ -162,7 +162,7 @@ The Android runtime emits a `[Clawperator-Result]` envelope. The Node CLI wraps 
     "stepResults": [
       {
         "id": "snap-1",
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<hierarchy/>"
@@ -236,7 +236,7 @@ Non-runtime success wrappers from `clawperator exec`:
     "expectedFormat": "android-ui-automator",
     "timeoutMs": 30000,
     "actions": [
-      { "id": "snap-1", "type": "snapshot_ui" }
+      { "id": "snap-1", "type": "snapshot" }
     ]
   }
 }
@@ -251,7 +251,7 @@ Non-runtime success wrappers from `clawperator exec`:
     "timeoutMs": 30000,
     "actionCount": 1,
     "actions": [
-      { "id": "snap-1", "type": "snapshot_ui" }
+      { "id": "snap-1", "type": "snapshot" }
     ]
   }
 }
@@ -296,7 +296,7 @@ Exact machine-checkable success condition for most CLI device commands:
 - A top-level failure can also arrive with zero steps, for example when Android returns a failure envelope before a normal step list exists, such as `SERVICE_UNAVAILABLE`.
 - Execution timeout is different: `runExecution()` returns a top-level host-side error object such as `RESULT_ENVELOPE_TIMEOUT`, not a zero-step success-wrapper envelope.
 - Node may modify step data after the runtime returns. Examples:
-  - `snapshot_ui` success steps get `data.text` attached from extracted log output
+  - `snapshot` success steps get `data.text` attached from extracted log output
   - missing snapshot text is converted into `SNAPSHOT_EXTRACTION_FAILED`
   - successful `take_screenshot` steps get `data.path`
   - successful pre-flight `close_app` steps are normalized to `data.application_id`
@@ -329,7 +329,7 @@ Success output shape:
     "stepResults": [
       {
         "id": "snap",
-        "actionType": "snapshot_ui",
+        "actionType": "snapshot",
         "success": true,
         "data": {
           "text": "<hierarchy rotation=\"0\">...</hierarchy>"
@@ -347,7 +347,7 @@ Success output shape:
 Agent-side success test:
 
 - `envelope.status == "success"`
-- `envelope.stepResults[0].actionType == "snapshot_ui"`
+- `envelope.stepResults[0].actionType == "snapshot"`
 - `envelope.stepResults[0].success == true`
 - `"text" in envelope.stepResults[0].data`
 

@@ -187,7 +187,7 @@ Daemon proxying is active for:
 | CLI command | Proxied endpoint | Post-dispatch fallback |
 | --- | --- | --- |
 | `clawperator exec <json-or-file>` | `POST /execute` on the daemon socket | no |
-| `clawperator snapshot` | synthetic `snapshot_ui` payload sent to `POST /execute` | yes |
+| `clawperator snapshot` | synthetic `snapshot` payload sent to `POST /execute` | yes |
 | `clawperator screenshot` | synthetic `take_screenshot` payload sent to `POST /execute` | no |
 | Flat action commands such as `open`, `click`, `type`, `read`, `wait`, `press`, `back`, `close`, `sleep`, `scroll`, `scroll-until`, `wait-for-nav`, and `read-value` | action payload sent to `POST /execute` | no |
 

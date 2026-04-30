@@ -77,7 +77,7 @@ If the runtime exceeds the budget and Node never receives a valid result envelop
 Verification pattern - confirm a timeout value was accepted without dispatching:
 
 ```bash
-clawperator exec --validate-only --execution '{"commandId":"timeout-check","taskId":"timeout-check","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"snap","type":"snapshot_ui"}]}'
+clawperator exec --validate-only --execution '{"commandId":"timeout-check","taskId":"timeout-check","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":30000,"actions":[{"id":"snap","type":"snapshot"}]}'
 ```
 
 Expected success shape:
@@ -95,7 +95,7 @@ Expected success shape:
     "actions": [
       {
         "id": "snap",
-        "type": "snapshot_ui"
+        "type": "snapshot"
       }
     ]
   }
@@ -258,7 +258,7 @@ Exact builder literals:
 - action id: `sleep`
 - action type: `sleep`
 
-### `snapshot_ui`
+### `snapshot`
 
 `buildSnapshotExecution()` defaults to `30000`. It has no separate action-level timeout field.
 
@@ -266,7 +266,7 @@ Exact snapshot builder literals:
 
 - `source: "clawperator-observe"`
 - action id: `snap`
-- action type: `snapshot_ui`
+- action type: `snapshot`
 - `mode: "direct"`
 
 ## Best-Effort Runtime Ceiling
@@ -305,7 +305,7 @@ Agent guidance:
   "expectedFormat": "android-ui-automator",
   "timeoutMs": 30000,
   "actions": [
-    { "id": "snap", "type": "snapshot_ui" }
+    { "id": "snap", "type": "snapshot" }
   ]
 }
 ```
@@ -386,7 +386,7 @@ Why `35000` is the right budget here:
     },
     {
       "id": "snap-1",
-      "type": "snapshot_ui"
+      "type": "snapshot"
     }
   ]
 }
@@ -401,7 +401,7 @@ Reasonable because:
 Verification pattern - inspect the plan without dispatching:
 
 ```bash
-clawperator exec --dry-run --execution '{"commandId":"read-after-click","taskId":"read-after-click","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":45000,"actions":[{"id":"click-1","type":"click","params":{"matcher":{"textEquals":"Settings"}}},{"id":"sleep-1","type":"sleep","params":{"durationMs":1500}},{"id":"wait-1","type":"wait_for_node","params":{"matcher":{"textEquals":"Connected devices"},"timeoutMs":10000}},{"id":"snap-1","type":"snapshot_ui"}]}'
+clawperator exec --dry-run --execution '{"commandId":"read-after-click","taskId":"read-after-click","source":"docs","expectedFormat":"android-ui-automator","timeoutMs":45000,"actions":[{"id":"click-1","type":"click","params":{"matcher":{"textEquals":"Settings"}}},{"id":"sleep-1","type":"sleep","params":{"durationMs":1500}},{"id":"wait-1","type":"wait_for_node","params":{"matcher":{"textEquals":"Connected devices"},"timeoutMs":10000}},{"id":"snap-1","type":"snapshot"}]}'
 ```
 
 Expected success shape:
@@ -443,7 +443,7 @@ Expected success shape:
       },
       {
         "id": "snap-1",
-        "type": "snapshot_ui"
+        "type": "snapshot"
       }
     ]
   }

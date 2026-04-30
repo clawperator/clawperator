@@ -238,10 +238,10 @@ Best-effort mode is an execution path for unknown or drifting UIs where the agen
 
 The steps below describe what an **agent** should do using Clawperator's primitives - not what Clawperator does autonomously:
 
-1. Agent calls `snapshot_ui` to observe current UI.
+1. Agent calls `snapshot` to observe current UI.
 2. Agent identifies likely anchors (toolbar/tab/menu/button/search patterns) from the snapshot.
 3. Agent calls a constrained navigation or click action.
-4. Agent calls `snapshot_ui` again to verify progress.
+4. Agent calls `snapshot` again to verify progress.
 5. Agent retries within its own safety bounds if progress stalled.
 
 Clawperator's role in each step is unchanged: execute the requested action, return the result. It does not identify anchors, decide whether progress was made, or choose the next action. Those decisions belong to the agent.
@@ -321,7 +321,7 @@ Supported action types (v1):
 - `scroll`
 - `scroll_until`
 - `read_text`
-- `snapshot_ui`
+- `snapshot`
 - `take_screenshot`
 - `enter_text`
 - `sleep`

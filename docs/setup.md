@@ -174,7 +174,7 @@ Important compatibility note:
 - refresh the APK from that stable URL before reinstalling when you need recent
   runtime fixes
 - older APKs do not include the newer `open_app` foreground wait behavior or
-  the tagged snapshot log marker used for reliable `snapshot_ui` extraction
+  the tagged snapshot log marker used for reliable `snapshot` extraction
 - keep the installed CLI and APK on current matching releases; `clawperator doctor`
   reports version compatibility before you trust a device run
 
@@ -326,7 +326,7 @@ Success conditions:
 
 - Exit code `0`.
 - `envelope.status` is `"success"`.
-- `envelope.stepResults[0].actionType` is `"snapshot_ui"`.
+- `envelope.stepResults[0].actionType` is `"snapshot"`.
 - `envelope.stepResults[0].success` is `true`.
 - `envelope.stepResults[0].data.text` contains the XML hierarchy.
 

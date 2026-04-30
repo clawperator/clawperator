@@ -51,6 +51,32 @@ const MAX_TIMER_DELAY_MS = 2_147_483_647;
 type BroadcastResult = { success: boolean; stdout?: string; stderr?: string };
 type BroadcastFn = (beginDispatchCapture: () => void) => Promise<BroadcastResult>;
 
+const SNAPSHOT_ACTION_TYPE = "snapshot";
+const LEGACY_ANDROID_SNAPSHOT_ACTION_TYPE = "snapshot_ui";
+
+function isSnapshotActionType(actionType: string): boolean {
+  return actionType === SNAPSHOT_ACTION_TYPE || actionType === LEGACY_ANDROID_SNAPSHOT_ACTION_TYPE;
+}
+
+function buildAndroidExecutionPayload(execution: Execution): Execution {
+  return {
+    ...execution,
+    actions: execution.actions.map(action =>
+      action.type === SNAPSHOT_ACTION_TYPE
+        ? { ...action, type: LEGACY_ANDROID_SNAPSHOT_ACTION_TYPE }
+        : action
+    ),
+  };
+}
+
+function normalizePublicStepActionTypes(stepResults: ResultEnvelope["stepResults"]): void {
+  for (const step of stepResults) {
+    if (step.actionType === LEGACY_ANDROID_SNAPSHOT_ACTION_TYPE) {
+      step.actionType = SNAPSHOT_ACTION_TYPE;
+    }
+  }
+}
+
 /**
  * Lets explicit-device executions attach logcat before preflight completes,
  * while holding the actual broadcast until the device, APK, and readiness
@@ -123,7 +149,7 @@ function validateNonNegativeFiniteNumber(
 }
 
 export function attachSnapshotsToStepResults(stepResults: ResultEnvelope["stepResults"], snapshots: string[]): void {
-  const snapshotSteps = stepResults.filter(step => step.actionType === "snapshot_ui" && step.success);
+  const snapshotSteps = stepResults.filter(step => isSnapshotActionType(step.actionType) && step.success);
   if (snapshotSteps.length === 0 || snapshots.length === 0) {
     return;
   }
@@ -140,7 +166,7 @@ export function attachSnapshotsToStepResults(stepResults: ResultEnvelope["stepRe
 }
 
 /**
- * After snapshot attachment, mark any snapshot_ui step that is still success:true but has
+ * After snapshot attachment, mark any snapshot step that is still success:true but has
  * no data.text as SNAPSHOT_EXTRACTION_FAILED, and emit a warning to stderr for each
  * affected step so users running CLI commands interactively can diagnose the problem
  * without parsing JSON.
@@ -151,7 +177,7 @@ export function markExtractionFailedSnapshotSteps(
   options: { sawLegacyUntaggedSnapshotMarker?: boolean } = {}
 ): void {
   for (const step of stepResults) {
-    if (step.actionType === "snapshot_ui" && step.success && step.data.text === undefined) {
+    if (isSnapshotActionType(step.actionType) && step.success && step.data.text === undefined) {
       step.success = false;
       const { text: _text, ...remainingData } = step.data;
       const error = options.sawLegacyUntaggedSnapshotMarker
@@ -167,9 +193,9 @@ export function markExtractionFailedSnapshotSteps(
       };
       warn?.(
         options.sawLegacyUntaggedSnapshotMarker
-          ? `[clawperator] WARN: snapshot_ui step "${step.id}" saw legacy untagged snapshot logs. ` +
+          ? `[clawperator] WARN: snapshot step "${step.id}" saw legacy untagged snapshot logs. ` +
             `Install a matching Operator APK or run 'clawperator version --check-compat' to diagnose.\n`
-          : `[clawperator] WARN: snapshot_ui step "${step.id}" UI hierarchy extraction produced no output. ` +
+          : `[clawperator] WARN: snapshot step "${step.id}" UI hierarchy extraction produced no output. ` +
             `Run 'clawperator doctor' or 'clawperator version --check-compat' to diagnose.\n`
       );
     }
@@ -180,7 +206,7 @@ export function addSettleWarnings(stepResults: ResultEnvelope["stepResults"], ex
   const actionIndexes = new Map(execution.actions.map((action, index) => [action.id, index]));
 
   for (const step of stepResults) {
-    if (step.actionType !== "snapshot_ui" || !step.success) {
+    if (!isSnapshotActionType(step.actionType) || !step.success) {
       continue;
     }
 
@@ -196,7 +222,7 @@ export function addSettleWarnings(stepResults: ResultEnvelope["stepResults"], ex
     if (preceding?.type === "click" || preceding?.type === "scroll_and_click") {
       step.data = {
         ...step.data,
-        warn: "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot_ui",
+        warn: "snapshot captured without a preceding sleep step; UI may not have settled - consider adding a sleep step between click and snapshot",
       };
     }
   }
@@ -471,13 +497,14 @@ async function performExecution(
     execution = { ...execution, timeoutMs: options.timeoutMs };
   }
 
+  const androidExecution = buildAndroidExecutionPayload(execution);
+  const payload = JSON.stringify(androidExecution);
   try {
-    validatePayloadSize(JSON.stringify(execution));
+    validatePayloadSize(payload);
   } catch (e) {
     return { execution, result: { ok: false, error: e as { code: string; message: string; [k: string]: unknown } } };
   }
 
-  const payload = JSON.stringify(execution);
   const hasExplicitDevice = typeof config.deviceId === "string" && config.deviceId.trim().length > 0;
   // Explicit-device logcat can start early because resolveDevice validates the
   // provided serial exactly. Auto-resolve must stay sequential so the logcat
@@ -672,7 +699,7 @@ async function performExecution(
       finalizeSuccessfulCloseAppSteps(result.envelope.stepResults, execution, closeAppPreflight.successfulCloseActionIds);
 
       // Reconstruct snapshot XML from the live result logcat stream.
-      const hasSnapshot = result.envelope.stepResults.some(s => s.actionType === "snapshot_ui");
+      const hasSnapshot = result.envelope.stepResults.some(s => isSnapshotActionType(s.actionType));
       if (hasSnapshot) {
         const snapshotLogLines = result.snapshotLogLines ?? [];
         const snapshots = extractSnapshotsForCommand(snapshotLogLines, execution.commandId);
@@ -680,9 +707,10 @@ async function performExecution(
         markExtractionFailedSnapshotSteps(result.envelope.stepResults, options.warn, {
           sawLegacyUntaggedSnapshotMarker: hasLegacyUntaggedSnapshotMarker(snapshotLogLines),
         });
-        // Attach data.warn to any snapshot_ui immediately following a click with no sleep.
+        // Attach data.warn to any snapshot immediately following a click with no sleep.
         addSettleWarnings(result.envelope.stepResults, execution);
       }
+      normalizePublicStepActionTypes(result.envelope.stepResults);
 
       const hasScreenshot = result.envelope.stepResults.some(s => s.actionType === "take_screenshot");
       const screenAction = execution.actions.find(a => a.type === "take_screenshot");

@@ -35,7 +35,7 @@ describe("cmdExecute --validate-only", () => {
         source: "test",
         expectedFormat: "android-ui-automator",
         timeoutMs: 5000,
-        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        actions: [{ id: "snap-1", type: "snapshot" }],
       }),
     });
 
@@ -57,7 +57,7 @@ describe("cmdExecute --validate-only", () => {
         source: "test",
         expectedFormat: "android-ui-automator",
         timeoutMs: 5000,
-        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        actions: [{ id: "snap-1", type: "snapshot" }],
       }),
     });
 
@@ -75,7 +75,7 @@ describe("cmdExecute --validate-only", () => {
         source: "test",
         expectedFormat: "android-ui-automator",
         timeoutMs: 5000,
-        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        actions: [{ id: "snap-1", type: "snapshot" }],
       }),
     });
 
@@ -146,7 +146,7 @@ describe("cmdExecute --dry-run", () => {
         source: "test",
         expectedFormat: "android-ui-automator",
         timeoutMs: 5000,
-        actions: [{ id: "snap-1", type: "snapshot_ui" }],
+        actions: [{ id: "snap-1", type: "snapshot" }],
       }),
     });
 
@@ -269,7 +269,7 @@ describe("clawperator exec CLI", () => {
 
     assert.notStrictEqual(code, 0);
     assert.match(stdout, /actionId/);
-    assert.match(stdout, /snapshot_ui/);
+    assert.match(stdout, /snapshot/);
   });
 
   it("accepts execute as a synonym for exec", async () => {

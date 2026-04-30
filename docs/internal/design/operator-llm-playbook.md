@@ -63,7 +63,7 @@ For app automation commands, default to:
 | `click` | `matcher: NodeMatcher`, `clickType?: "default"\|"long_click"\|"focus"` | CLI: `click` (synonym: `tap`) |
 | `read_text` | `matcher: NodeMatcher`, `validator?: "temperature"`, `retry?: object` | CLI: `read`. Result in `data.text`. Other validator values are rejected by the runtime |
 | `wait_for_node` | `matcher: NodeMatcher`, `retry?: object` | CLI: `wait`. Waits with internal retry |
-| `snapshot_ui` | `retry?: object` | CLI: `snapshot`. Snapshot content in `data.text` as `hierarchy_xml`, plus best-effort `foreground_package` / `has_overlay` metadata |
+| `snapshot` | `retry?: object` | CLI: `snapshot`. Snapshot content in `data.text` as `hierarchy_xml`, plus best-effort `foreground_package` / `has_overlay` metadata |
 | `take_screenshot` | `path?: string`, `retry?: object` | Node captures screenshot via ADB and returns local file path |
 | `scroll_and_click` | `target: NodeMatcher`, `container?: NodeMatcher`, `direction?`, `maxSwipes?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `clickAfter?: boolean`, `scrollRetry?: object`, `clickRetry?: object` | Scrolls until target is visible, then clicks by default. Set `clickAfter: false` to reveal the target without tapping it. `scrollRetry` defaults to UiScroll; `clickRetry` defaults to UiReadiness |
 | `scroll` | `container?: NodeMatcher`, `direction?`, `distanceRatio?`, `settleDelayMs?`, `findFirstScrollableChild?`, `retry?: object` | Performs exactly one scroll gesture and reports `scroll_outcome` as `moved`, `edge_reached`, or `gesture_failed` |
@@ -95,7 +95,7 @@ For app automation commands, default to:
 
 **NodeMatcher fields:** `resourceId`, `contentDescEquals`, `textEquals`, `textContains`, `contentDescContains`, `role`. All fields are AND-combined. Prefer `resourceId` when available. Full reference in `docs/api/selectors.md`.
 
-**Scroll targeting rule:** If a screen contains nested or multiple scrollable containers, do not rely on auto-detect. Capture `snapshot_ui`, identify the intended list's `resource-id`, and pass it as `params.container`.
+**Scroll targeting rule:** If a screen contains nested or multiple scrollable containers, do not rely on auto-detect. Capture `snapshot`, identify the intended list's `resource-id`, and pass it as `params.container`.
 
 ### Visual verification with ADB screenshots (recommended)
 Use screenshots alongside UI-tree logs when building/debugging skills.
@@ -143,7 +143,7 @@ Due to the dynamic nature of mobile apps (A/B tests, server-side flags, unexpect
 
 1. When the target flow needs a clean baseline, start from a fresh app session
    (`close_app` then `open_app`).
-2. Capture `snapshot_ui` and an ADB screenshot.
+2. Capture `snapshot` and an ADB screenshot.
 3. Identify robust selectors (`resource-id` first).
 4. Create `skills/<appId>.<intent>/SKILL.md`.
 5. Add `scripts/*.sh` deterministic wrapper(s).

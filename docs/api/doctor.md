@@ -409,7 +409,7 @@ For a failing check, pretty output includes:
 | `readiness.settings.usb_debugging` | `pass`, `warn` | `DEVICE_USB_DEBUGGING_DISABLED` | USB debugging setting is enabled |
 | `readiness.handshake` | `pass`, `fail` | `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `RESULT_ENVELOPE_TIMEOUT`, `BROADCAST_FAILED`, `OPERATOR_NOT_INSTALLED` | Node can dispatch and receive a valid result envelope |
 | `readiness.device.interactive` | `pass`, `fail` | `DEVICE_NOT_INTERACTIVE`, or the underlying probe failure code if state could not be verified | the target is awake enough for interactive automation, with evidence fields `deviceLocked`, `screenOn`, and `userUnlocked` |
-| `readiness.smoke` | `pass`, `fail` | `SMOKE_OPEN_SETTINGS_FAILED` | smoke execution can open Settings and produce at least one successful `snapshot_ui` step |
+| `readiness.smoke` | `pass`, `fail` | `SMOKE_OPEN_SETTINGS_FAILED` | smoke execution can open Settings and produce at least one successful `snapshot` step |
 
 ## Common Failure Recovery
 

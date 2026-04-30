@@ -2044,7 +2044,7 @@ describe("skills validate dry-run", () => {
     assert.strictEqual(parsed.details?.actionId, "snap");
     assert.strictEqual(parsed.details?.actionType, "snapshot_ui");
     assert.deepStrictEqual(parsed.details?.invalidKeys, ["format"]);
-    assert.match(parsed.details?.hint ?? "", /removed from snapshot_ui/);
+    assert.match(parsed.details?.hint ?? "", /removed from snapshot/);
   });
 
   it("skips payload validation for script-only skills and logs the reason in pretty mode", async () => {

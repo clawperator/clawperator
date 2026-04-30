@@ -175,7 +175,7 @@ Recipe artifact semantics (inside a skill) are split into three explicit layers:
 1. `probe`
    - Single observation/read operation.
    - No side effects.
-   - Typical shape: `snapshot_ui` + `read_text` + parse.
+   - Typical shape: `snapshot` + `read_text` + parse.
 2. `flow`
    - Multi-step procedure.
    - Navigation and reads, optionally side-effect free.
@@ -456,7 +456,7 @@ Compiler may only emit supported runtime action types:
 - `click`
 - `scroll_and_click`
 - `read_text`
-- `snapshot_ui`
+- `snapshot`
 - `sleep`
 
 Compilation must be deterministic and pure:

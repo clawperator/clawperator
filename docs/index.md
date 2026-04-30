@@ -55,7 +55,7 @@ Use:
 - [CLI Reference](api/cli.md) - generated command and flag reference
 - [Actions](api/actions.md) - canonical action types and parameter semantics
 - [Selectors](api/selectors.md) - `NodeMatcher` contract and CLI selector mapping
-- [Snapshot Format](api/snapshot.md) - where `snapshot_ui` XML lives and how extraction works
+- [Snapshot Format](api/snapshot.md) - where `snapshot` XML lives and how extraction works
 - [Errors](api/errors.md) - public error-code contract and recovery patterns
 - [Devices](api/devices.md) - device discovery and deterministic targeting
 - [Doctor](api/doctor.md) - doctor report contract and readiness checks

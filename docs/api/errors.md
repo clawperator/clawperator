@@ -209,7 +209,7 @@ Typical fields:
     "commandId": "snapshot-1",
     "taskId": "snapshot-1",
     "lastActionId": "a1",
-    "lastActionType": "snapshot_ui",
+    "lastActionType": "snapshot",
     "lastActionCaveat": "payload-last only; Android execution position is unknown",
     "elapsedMs": 30000,
     "timeoutMs": 30000

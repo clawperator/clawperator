@@ -66,6 +66,31 @@ class AgentCommandParserDefaultTest {
     }
 
     @Test
+    fun `parse accepts canonical snapshot action`() {
+        val payload =
+            """
+            {
+              "commandId": "cmd-snapshot",
+              "taskId": "task-snapshot",
+              "source": "debug",
+              "actions": [
+                {
+                  "id": "snap",
+                  "type": "snapshot"
+                }
+              ]
+            }
+            """.trimIndent()
+
+        val result = parser.parse(payload)
+        assertTrue(result.isSuccess)
+
+        val command = result.getOrThrow()
+        assertEquals(1, command.actions.size)
+        assertIs<UiAction.SnapshotUi>(command.actions[0])
+    }
+
+    @Test
     fun `parse click action with coordinates`() {
         val payload =
             """

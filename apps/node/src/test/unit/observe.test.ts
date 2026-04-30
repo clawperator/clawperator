@@ -12,21 +12,21 @@ import { applyMcpExecutionMetadata } from "../../mcp/tools/common.js";
 import type { DaemonProxyOptions } from "../../cli/daemonProxy.js";
 
 describe("observe executions", () => {
-  it("maps snapshots only onto successful snapshot_ui steps", () => {
+  it("maps snapshots only onto successful snapshot steps", () => {
     const stepResults = [
-      { id: "snap-1", actionType: "snapshot_ui", success: true, data: {} },
+      { id: "snap-1", actionType: "snapshot", success: true, data: {} },
       { id: "tap-1", actionType: "tap", success: true, data: {} },
-      { id: "snap-2", actionType: "snapshot_ui", success: true, data: {} },
-      { id: "snap-3", actionType: "snapshot_ui", success: false, data: {} },
+      { id: "snap-2", actionType: "snapshot", success: true, data: {} },
+      { id: "snap-3", actionType: "snapshot", success: false, data: {} },
     ];
 
     attachSnapshotsToStepResults(stepResults, ["first snapshot", "second snapshot"]);
 
     assert.deepStrictEqual(stepResults, [
-      { id: "snap-1", actionType: "snapshot_ui", success: true, data: { text: "first snapshot" } },
+      { id: "snap-1", actionType: "snapshot", success: true, data: { text: "first snapshot" } },
       { id: "tap-1", actionType: "tap", success: true, data: {} },
-      { id: "snap-2", actionType: "snapshot_ui", success: true, data: { text: "second snapshot" } },
-      { id: "snap-3", actionType: "snapshot_ui", success: false, data: {} },
+      { id: "snap-2", actionType: "snapshot", success: true, data: { text: "second snapshot" } },
+      { id: "snap-3", actionType: "snapshot", success: false, data: {} },
     ]);
   });
 
