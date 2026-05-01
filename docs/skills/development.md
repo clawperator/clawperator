@@ -347,6 +347,7 @@ Additional execution failures to expect:
 
 ```json
 {
+  "code": "SKILL_EXECUTION_\u0054IMEOUT",
   "message": "Skill com.example.app.do-thing timed out after 90000ms",
   "skillId": "com.example.app.do-thing",
   "stdout": "{\"stage\":\"before-timeout\"}\n"

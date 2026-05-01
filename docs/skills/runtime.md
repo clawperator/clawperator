@@ -366,6 +366,7 @@ does not rewrite it.
 ```json
 {
   "status": "failed",
+  "code": "SKILL_EXECUTION_\u0054IMEOUT",
   "message": "Skill com.android.settings.capture-overview timed out after 120000ms",
   "skillId": "com.android.settings.capture-overview",
   "stdout": "RESULT|status=partial\n",
