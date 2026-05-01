@@ -5,7 +5,7 @@ import { listDevices } from "../../domain/devices/listDevices.js";
 import { listSkills } from "../../domain/skills/listSkills.js";
 import { getSkill } from "../../domain/skills/getSkill.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
-import { runSkill, type SkillRunEnv, type SkillRunError, type SkillRunResult } from "../../domain/skills/runSkill.js";
+import { runSkill, buildSkillRunLogs, type SkillRunEnv } from "../../domain/skills/runSkill.js";
 import { validateSkill } from "../../domain/skills/validateSkill.js";
 import { clawperatorEvents, CLAWPERATOR_EVENT_TYPES } from "../../domain/observe/events.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -33,16 +33,6 @@ export interface ServeOptions extends ServeAppOptions {
   port?: number;
   host?: string;
   socketPath?: string;
-}
-
-function buildSkillRunLogs(result: SkillRunResult | SkillRunError): { skillRunId?: string; path?: string; tailCommand?: string } {
-  return {
-    ...(result.skillRunId !== undefined ? { skillRunId: result.skillRunId } : {}),
-    ...(result.logPath !== undefined ? {
-      path: result.logPath,
-      tailCommand: `tail -f ${result.logPath}`,
-    } : {}),
-  };
 }
 
 export function buildServeSkillRunOptions(

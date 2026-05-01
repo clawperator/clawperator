@@ -6,8 +6,7 @@ import { getSkill } from "../../domain/skills/getSkill.js";
 import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { syncSkills } from "../../domain/skills/syncSkills.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
-import { runSkill, type SkillRunEnv } from "../../domain/skills/runSkill.js";
-import type { SkillRunError, SkillRunResult } from "../../domain/skills/runSkill.js";
+import { runSkill, buildSkillRunLogs, type SkillRunEnv } from "../../domain/skills/runSkill.js";
 import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -63,16 +62,6 @@ function emitCliEvent(logger: Logger | undefined, event: Omit<LogEvent, "ts">): 
     ts: new Date().toISOString(),
     ...event,
   });
-}
-
-function buildSkillRunLogs(result: SkillRunResult | SkillRunError): { skillRunId?: string; path?: string; tailCommand?: string } {
-  return {
-    ...(result.skillRunId !== undefined ? { skillRunId: result.skillRunId } : {}),
-    ...(result.logPath !== undefined ? {
-      path: result.logPath,
-      tailCommand: `tail -f ${result.logPath}`,
-    } : {}),
-  };
 }
 
 function splitTextIntoLinesPreservingEndings(text: string): string[] {

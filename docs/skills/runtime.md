@@ -345,7 +345,7 @@ answer is under `skillResult.result`.
   "logs": {
     "skillRunId": "skillrun_1777600000000_00000000-0000-4000-8000-000000000000",
     "path": "/home/user/.clawperator/logs/clawperator-2026-03-28.log",
-    "tailCommand": "tail -f /home/user/.clawperator/logs/clawperator-2026-03-28.log"
+    "tailCommand": "tail -f \"/home/user/.clawperator/logs/clawperator-2026-03-28.log\""
   },
   "durationMs": 15321
 }

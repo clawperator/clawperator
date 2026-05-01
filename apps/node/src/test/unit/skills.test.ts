@@ -29,6 +29,7 @@ import { validateAllSkills, validateSkill } from "../../domain/skills/validateSk
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 import { cmdSkillsRun, resolveInteractiveSkillTarget } from "../../cli/commands/skills.js";
 import type { SkillResult } from "../../contracts/skillResult.js";
+import { CLAWPERATOR_SKILL_RUN_ID_ENV_VAR } from "../../contracts/logging.js";
 import { createClawperatorLogger } from "../../adapters/logger.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import {
@@ -7151,7 +7152,7 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.deepStrictEqual(parsed.logs, {
       skillRunId: "skillrun_test_json",
       path: "/tmp/clawperator-test.log",
-      tailCommand: "tail -f /tmp/clawperator-test.log",
+      tailCommand: 'tail -f "/tmp/clawperator-test.log"',
     });
   });
 
@@ -7995,7 +7996,7 @@ describe("runSkill logging", () => {
     assert.strictEqual(outputLines[0]?.skillRunId, logLocationLine?.skillRunId);
     assert.strictEqual(completeLine?.skillRunId, logLocationLine?.skillRunId);
     assert.strictEqual(logLocationLine?.logPath, logger.logPath());
-    assert.strictEqual(logLocationLine?.tailCommand, `tail -f ${logger.logPath()}`);
+    assert.strictEqual(logLocationLine?.tailCommand, `tail -f "${logger.logPath()}"`);
     assert.strictEqual(result.skillRunId, logLocationLine?.skillRunId);
     assert.strictEqual(result.logPath, logger.logPath());
   });
@@ -8086,5 +8087,33 @@ describe("runSkill logging", () => {
     const fallbackLine = lines.find((line) => line.event === "skills.run.signal_fallback");
     assert.strictEqual(fallbackLine?.skillId, "com.test.partial-timeout");
     assert.match(fallbackLine?.message ?? "", /falling back to direct child termination/i);
+  });
+
+  it("inherits skillRunId from process.env for nested CLI invocations", async () => {
+    const parentSkillRunId = "skillrun_parent_test_inherited";
+    const originalEnvValue = process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+    process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = parentSkillRunId;
+    try {
+      const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });
+      const result = await runSkill(TEST_FIXTURE_MIXED_STREAMS, [], undefined, undefined, undefined, { logger });
+
+      assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.skillRunId, parentSkillRunId);
+
+      const contents = await readFile(logger.logPath()!, "utf8");
+      const lines = parseLogEvents(contents);
+      const logLocationLine = lines.find((line) => line.event === "skills.run.log_location");
+      assert.strictEqual(logLocationLine?.skillRunId, parentSkillRunId);
+      const startLine = lines.find((line) => line.event === "skills.run.start");
+      assert.strictEqual(startLine?.skillRunId, parentSkillRunId);
+      const completeLine = lines.find((line) => line.event === "skills.run.complete");
+      assert.strictEqual(completeLine?.skillRunId, parentSkillRunId);
+    } finally {
+      if (originalEnvValue === undefined) {
+        delete process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+      } else {
+        process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = originalEnvValue;
+      }
+    }
   });
 });

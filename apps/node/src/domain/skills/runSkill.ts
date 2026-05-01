@@ -596,6 +596,16 @@ function createSkillRunId(): string {
   return `skillrun_${Date.now()}_${randomUUID()}`;
 }
 
+export function buildSkillRunLogs(result: SkillRunResult | SkillRunError): { skillRunId?: string; path?: string; tailCommand?: string } {
+  return {
+    ...(result.skillRunId !== undefined ? { skillRunId: result.skillRunId } : {}),
+    ...(result.logPath !== undefined ? {
+      path: result.logPath,
+      tailCommand: `tail -f "${result.logPath}"`,
+    } : {}),
+  };
+}
+
 export async function runSkill(
   skillId: string,
   args: string[],
@@ -624,12 +634,14 @@ export async function runSkill(
       }
     }
   }
-  const inheritedSkillRunId = env?.[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR]?.trim();
+  const inheritedSkillRunId =
+    env?.[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR]?.trim() ??
+    process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR]?.trim();
   const skillRunId = callbacks?.skillRunId ?? inheritedSkillRunId ?? createSkillRunId();
   childEnv[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = skillRunId;
   const skillLogger = callbacks?.logger?.child({ skillId, skillRunId });
   const logPath = skillLogger?.logPath();
-  const tailCommand = logPath !== undefined ? `tail -f ${logPath}` : undefined;
+  const tailCommand = logPath !== undefined ? `tail -f "${logPath}"` : undefined;
   const addRunMetadata = <T extends object>(result: T): T & { skillRunId: string; logPath?: string } => ({
     ...result,
     skillRunId,
