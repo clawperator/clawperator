@@ -16,12 +16,12 @@ runtime skill, or implement well-known skill discovery endpoints.
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | in progress |
 | Total PRs | 1 |
 | Total phases | 2 |
-| Completed | none |
-| Remaining | 1, 2 |
-| Current / Next | Phase 1 |
+| Completed | 1 |
+| Remaining | 2 |
+| Current / Next | Phase 2 |
 | Blockers | none |
 
 ## Hard Rules

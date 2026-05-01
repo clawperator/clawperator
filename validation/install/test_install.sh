@@ -40,8 +40,9 @@ else
 fi
 
 echo "=== Running install-related validation harnesses (including shared agent bridge coverage) ==="
+bash validation/install/test_skill_md.sh
 bash validation/install/test_operator_package_env.sh
-bash validation/test_doctor.sh
+env -u ADB_PATH bash validation/test_doctor.sh
 bash validation/install/test_java.sh
 bash validation/install/test_cli_bootstrap.sh
 bash validation/install/test_main_delegation.sh

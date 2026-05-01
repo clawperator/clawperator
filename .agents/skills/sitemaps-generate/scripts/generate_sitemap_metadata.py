@@ -121,6 +121,20 @@ def landing_manifest():
             ],
         },
         {
+            "loc": f"{LANDING_BASE_URL}/skill.md",
+            "priority": "0.9",
+            "sources": [
+                "sites/landing/public/skill.md",
+            ],
+        },
+        {
+            "loc": f"{LANDING_BASE_URL}/agents.md",
+            "priority": "0.8",
+            "sources": [
+                "sites/landing/public/agents.md",
+            ],
+        },
+        {
             "loc": f"{LANDING_BASE_URL}/install.sh",
             "priority": "0.8",
             "sources": [
