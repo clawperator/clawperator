@@ -493,6 +493,40 @@ export default function Home() {
           </p>
         </div>
 
+        <div className="agent-prompt-block">
+          <p className="quickstart-hint">Tell your agent to:</p>
+          <div className="command-row">
+            <pre>
+              <code>{agentSetupPrompt}</code>
+            </pre>
+            <button
+              type="button"
+              className={agentPromptCopied ? "copy-btn copied" : "copy-btn"}
+              onClick={handleAgentPromptCopy}
+              title={agentPromptCopied ? "Copied" : "Copy agent prompt"}
+            >
+              <span className="copy-btn-label">{agentPromptCopied ? "Copied" : "Copy agent prompt"}</span>
+              {agentPromptCopied ? (
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path
+                    d="M20 7L9 18l-5-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <rect x="9" y="9" width="11" height="11" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
+                  <rect x="4" y="4" width="11" height="11" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
+                </svg>
+              )}
+            </button>
+          </div>
+        </div>
+
         <div className="quickstart-block" aria-label="Quickstart terminal">
           <div className="quickstart-top">
             <div className="traffic-lights" aria-hidden="true">
@@ -519,40 +553,6 @@ export default function Home() {
                 aria-selected={mode === "npm"}
               >
                 npm
-              </button>
-            </div>
-          </div>
-
-          <div className="agent-prompt-block">
-            <p className="quickstart-hint">Tell your agent to:</p>
-            <div className="command-row">
-              <pre>
-                <code>{agentSetupPrompt}</code>
-              </pre>
-              <button
-                type="button"
-                className={agentPromptCopied ? "copy-btn copied" : "copy-btn"}
-                onClick={handleAgentPromptCopy}
-                title={agentPromptCopied ? "Copied" : "Copy agent prompt"}
-              >
-                <span className="copy-btn-label">{agentPromptCopied ? "Copied" : "Copy agent prompt"}</span>
-                {agentPromptCopied ? (
-                  <svg viewBox="0 0 24 24" focusable="false">
-                    <path
-                      d="M20 7L9 18l-5-5"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" focusable="false">
-                    <rect x="9" y="9" width="11" height="11" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
-                    <rect x="4" y="4" width="11" height="11" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
-                  </svg>
-                )}
               </button>
             </div>
           </div>
