@@ -36,6 +36,10 @@ For now, only accept prerelease-stage versions in the `0.x.y` series. Do not pro
    - Run `$release-set-code-version-number` again for the next unreleased version.
    - Default to the next patch version unless the user explicitly asks for a different bump.
    - Keep the next version in the `0.x.y` series unless the user explicitly requests otherwise and the repo policy has changed.
+7. Push the completed release commits only after every prior step has succeeded.
+   - Push the branch commits after the release has been verified, the published surfaces have been updated, and the next code-version bump has been committed.
+   - Do not push anything if verification fails, the release is not live, or any step is still incomplete.
+   - Keep the release tag push separate from the branch commit push.
 
 ## Guardrails
 
@@ -45,3 +49,4 @@ For now, only accept prerelease-stage versions in the `0.x.y` series. Do not pro
 - If `release-create` already produced the published-version follow-up commit, review it instead of recreating it.
 - Do not push `main` directly.
 - If the user has already completed one of the steps, resume from the first incomplete step.
+- Do not push the branch until the release is successfully verified and all release-phase commits are complete.
