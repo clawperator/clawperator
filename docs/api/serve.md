@@ -738,7 +738,7 @@ Defaults when omitted:
 | `playStore` | `true` unless explicitly `false` |
 
 New AVDs are written with `disk.dataPartition.size=12G` before first boot so
-the emulator has enough internal app storage for Google Play workflows.
+the emulator has enough internal app storage for Google Play and a reasonable number of user apps.
 
 Success response:
 
