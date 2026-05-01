@@ -70,6 +70,16 @@ body {
   }
 }
 
+@media only screen and (max-width: 69.99em) {
+  #terminal-mkdocs-side-panel {
+    display: none;
+  }
+
+  .terminal-mkdocs-main-grid {
+    display: block;
+  }
+}
+
 #mkdocs-terminal-content pre {
   max-width: 100%;
   overflow-x: auto;
@@ -99,4 +109,50 @@ body {
 
 #mkdocs-terminal-content :not(pre) > code {
   padding: 0 0.15em;
+}
+
+@media only screen and (max-width: 48em) {
+  body {
+    padding-top: 28px;
+    padding-bottom: 32px;
+  }
+
+  .terminal-nav {
+    gap: 0.75rem;
+  }
+
+  .terminal-menu {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .terminal-menu ul {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 1rem;
+    justify-content: flex-start;
+    margin-top: 0;
+    padding-bottom: 0.25rem !important;
+  }
+
+  .terminal-menu li {
+    flex: 0 0 auto;
+    margin: 0;
+  }
+
+  .terminal-menu li a:not(.btn) {
+    width: auto;
+    white-space: nowrap;
+  }
+}
+
+@media only screen and (max-width: 600px) {
+  .container {
+    width: min(calc(100% - 28px), var(--page-width));
+  }
+
+  #mkdocs-terminal-content table td,
+  #mkdocs-terminal-content table th {
+    padding: 0.45rem;
+  }
 }
