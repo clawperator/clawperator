@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it } from "node:test";
 import assert from "node:assert";
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
@@ -154,10 +154,23 @@ describe("emulator provisioning", () => {
     runner.queueResult({ code: 0, stdout: "Installed packages:\n", stderr: "" }); // sdkmanager --list_installed
     runner.queueResult({ code: 0, stdout: "licenses accepted", stderr: "" }); // sdkmanager --licenses
     runner.queueResult({ code: 0, stdout: "installed", stderr: "" }); // sdkmanager <image>
-    runner.queueResult({ code: 0, stdout: "created", stderr: "" }); // avdmanager create avd
+    runner.queueResult(
+      { code: 0, stdout: "created", stderr: "" },
+      () => writeAvd(
+        testHome,
+        "clawperator-pixel-20gb",
+        [
+          "PlayStore.enabled=true",
+          "abi.type=arm64-v8a",
+          "disk.dataPartition.size=6G",
+          "image.sysdir.1=system-images/android-35/google_apis_playstore/arm64-v8a/",
+          "hw.device.name=pixel_7",
+        ].join("\n")
+      )
+    ); // avdmanager create avd
     // waitForEmulatorRegistration
     runner.queueResult({ code: 0, stdout: "List of devices attached\nemulator-5554\tdevice\n", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "OK\nclawperator-pixel\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "OK\nclawperator-pixel-20gb\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "1\n", stderr: "" }); // sys.boot_completed
     runner.queueResult({ code: 0, stdout: "1\n", stderr: "" }); // dev.bootcomplete
     // waitForBootCompletion
@@ -167,18 +180,25 @@ describe("emulator provisioning", () => {
     runner.queueResult({ code: 0, stdout: "", stderr: "" }); // adb_enabled
 
     const config = getDefaultRuntimeConfig({ runner });
-    const result = await provisionEmulator(config);
+    const result = await provisionEmulator(config, { dataPartitionSize: "20GB" });
 
     assert.strictEqual(result.created, true);
     assert.strictEqual(result.started, true);
     assert.strictEqual(result.reused, false);
-    assert.strictEqual(result.avdName, "clawperator-pixel");
+    assert.strictEqual(result.avdName, "clawperator-pixel-20gb");
+    assert.deepStrictEqual(runner.calls[9].args, [
+      "create", "avd", "--force", "--name", "clawperator-pixel-20gb",
+      "--package", "system-images;android-35;google_apis_playstore;arm64-v8a",
+      "--device", "pixel_7",
+    ]);
+    const configIni = await readFile(join(testHome, ".android", "avd", "clawperator-pixel-20gb.avd", "config.ini"), "utf8");
+    assert.match(configIni, /^disk\.dataPartition\.size=20G$/m);
   });
 
   it("refuses to auto-provision an existing unsupported default AVD", async () => {
     await writeAvd(
       testHome,
-      "clawperator-pixel",
+      "clawperator-pixel-12gb",
       [
         "PlayStore.enabled=false",
         "abi.type=x86_64",

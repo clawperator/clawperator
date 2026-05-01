@@ -19,9 +19,9 @@ import { REGISTRY_READ_FAILED, SKILL_NOT_FOUND, SKILL_OUTPUT_ASSERTION_FAILED } 
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { listConfiguredAvds, inspectConfiguredAvd } from "../../domain/android-emulators/configuredAvds.js";
 import { listRunningEmulators } from "../../domain/android-emulators/runningEmulators.js";
-import { createAvd, deleteAvd, enableEmulatorDeveloperSettings, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
+import { buildDefaultEmulatorAvdName, createAvd, deleteAvd, enableEmulatorDeveloperSettings, normalizeEmulatorDataPartitionSize, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
 import { provisionEmulator } from "../../domain/android-emulators/provision.js";
-import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
+import { DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 import type { Logger } from "../../adapters/logger.js";
 import { normalizeSkillRunId } from "../../contracts/logging.js";
 import { resolveOperatorPackageForRequest } from "../../domain/config/resolveOperatorPackage.js";
@@ -255,6 +255,28 @@ export function createServeApp(options: ServeAppOptions): express.Application {
       operatorPackage: resolveServeOperatorPackage(undefined),
       logger: options.logger,
     });
+  }
+
+  function parseEmulatorDataPartitionSizeFromBody(body: Record<string, unknown>): { ok: true; value: string | undefined } | { ok: false; message: string } {
+    const aliases = ["storageSize", "size", "diskSize", "dataPartitionSize"];
+    const provided = aliases
+      .map((field) => ({ field, value: body[field] }))
+      .filter((entry) => entry.value !== undefined);
+    if (provided.length === 0) {
+      return { ok: true, value: undefined };
+    }
+    if (provided.length > 1) {
+      return { ok: false, message: "Use only one emulator storage size field: storageSize, size, diskSize, or dataPartitionSize" };
+    }
+    const value = provided[0].value;
+    if (typeof value !== "string") {
+      return { ok: false, message: `${provided[0].field} must be a string such as 12G or 12GB` };
+    }
+    try {
+      return { ok: true, value: normalizeEmulatorDataPartitionSize(value) };
+    } catch {
+      return { ok: false, message: `${provided[0].field} must be a positive integer followed by G or GB, for example 12G` };
+    }
   }
 
   // REST: Execute command
@@ -497,18 +519,25 @@ export function createServeApp(options: ServeAppOptions): express.Application {
     try {
       const config = getEmulatorConfig();
       const body = (req.body && typeof req.body === "object") ? req.body as Record<string, unknown> : {};
-      const name = typeof body.name === "string" && body.name.length > 0 ? body.name : DEFAULT_EMULATOR_AVD_NAME;
       const apiLevel = typeof body.apiLevel === "number" ? body.apiLevel : SUPPORTED_EMULATOR_API_LEVEL;
       const abi = typeof body.abi === "string" && body.abi.length > 0 ? body.abi : "arm64-v8a";
       const deviceProfile = typeof body.deviceProfile === "string" && body.deviceProfile.length > 0
         ? body.deviceProfile
         : DEFAULT_EMULATOR_DEVICE_PROFILE;
       const playStore = body.playStore !== false;
+      const dataPartitionSize = parseEmulatorDataPartitionSizeFromBody(body);
+      if (!dataPartitionSize.ok) {
+        res.status(400).json({ ok: false, error: { code: "INVALID_BODY", message: dataPartitionSize.message } });
+        return;
+      }
+      const name = typeof body.name === "string" && body.name.length > 0
+        ? body.name
+        : buildDefaultEmulatorAvdName(dataPartitionSize.value);
       const systemImage = playStore
         ? `system-images;android-${apiLevel};google_apis_playstore;${abi}`
         : `system-images;android-${apiLevel};google_apis;${abi}`;
 
-      await createAvd(config, { name, systemImage, deviceProfile });
+      await createAvd(config, { name, systemImage, deviceProfile, dataPartitionSize: dataPartitionSize.value });
       const avd = await inspectConfiguredAvd(name);
       res.json({ ok: true, ...avd });
     } catch (error) {
@@ -564,10 +593,16 @@ export function createServeApp(options: ServeAppOptions): express.Application {
     }
   });
 
-  app.post("/android/provision/emulator", async (_req, res) => {
+  app.post("/android/provision/emulator", async (req, res) => {
     try {
       const config = getEmulatorConfig();
-      const result = await provisionEmulator(config);
+      const body = (req.body && typeof req.body === "object") ? req.body as Record<string, unknown> : {};
+      const dataPartitionSize = parseEmulatorDataPartitionSizeFromBody(body);
+      if (!dataPartitionSize.ok) {
+        res.status(400).json({ ok: false, error: { code: "INVALID_BODY", message: dataPartitionSize.message } });
+        return;
+      }
+      const result = await provisionEmulator(config, { dataPartitionSize: dataPartitionSize.value });
       res.json({ ok: true, ...result });
     } catch (error) {
       const e = error as { code?: string; message?: string };

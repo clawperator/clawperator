@@ -27,6 +27,7 @@ describe("emulator CLI help and usage", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /clawperator emulator/);
     assert.match(stdout, /emulator inspect <name>/);
+    assert.match(stdout, /--storage-size <sizeG>/);
     assert.match(stdout, /provision emulator/);
   });
 
@@ -42,5 +43,29 @@ describe("emulator CLI help and usage", () => {
     assert.strictEqual(code, 0);
     assert.match(stdout, /"code":"USAGE"/);
     assert.match(stdout, /provision emulator/);
+  });
+
+  it("rejects invalid emulator storage-size units before provisioning", async () => {
+    const { stdout, code } = await runCli(["emulator", "create", "--storage-size", "12000M"]);
+    assert.notStrictEqual(code, 0);
+    const parsed = JSON.parse(stdout);
+    assert.strictEqual(parsed.code, "USAGE");
+    assert.match(parsed.message, /positive integer followed by G or GB/);
+  });
+
+  it("rejects missing emulator storage-size values", async () => {
+    const { stdout, code } = await runCli(["emulator", "create", "--storage-size"]);
+    assert.notStrictEqual(code, 0);
+    const parsed = JSON.parse(stdout);
+    assert.strictEqual(parsed.code, "USAGE");
+    assert.match(parsed.message, /--storage-size requires a value/);
+  });
+
+  it("rejects multiple emulator storage-size aliases", async () => {
+    const { stdout, code } = await runCli(["emulator", "provision", "--size", "12G", "--disk-size", "16G"]);
+    assert.notStrictEqual(code, 0);
+    const parsed = JSON.parse(stdout);
+    assert.strictEqual(parsed.code, "USAGE");
+    assert.match(parsed.message, /Use only one emulator storage size flag/);
   });
 });

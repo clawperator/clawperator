@@ -1,4 +1,6 @@
 import { setTimeout as delay } from "node:timers/promises";
+import { readFile, writeFile } from "node:fs/promises";
+import { basename, join } from "node:path";
 import { runAdb } from "../../adapters/android-bridge/adbClient.js";
 import type { RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { runAndroidSdkTool } from "../../adapters/android-sdk/hostToolClient.js";
@@ -6,11 +8,14 @@ import { type ClawperatorError, ERROR_CODES } from "../../contracts/errors.js";
 import {
   ADB_REGISTRATION_TIMEOUT_MS,
   BOOT_POLL_INTERVAL_MS,
+  DEFAULT_EMULATOR_AVD_NAME,
+  DEFAULT_EMULATOR_DATA_PARTITION_SIZE,
   DEFAULT_EMULATOR_DEVICE_PROFILE,
+  EMULATOR_DATA_PARTITION_SIZE_PATTERN,
   DEFAULT_EMULATOR_SYSTEM_IMAGE,
   EMULATOR_BOOT_TIMEOUT_MS,
 } from "./constants.js";
-import { inspectConfiguredAvd } from "./configuredAvds.js";
+import { getAvdRoot, inspectConfiguredAvd } from "./configuredAvds.js";
 import { isEmulatorBooted, resolveRunningEmulatorByName } from "./runningEmulators.js";
 
 function buildError(
@@ -19,6 +24,108 @@ function buildError(
   details?: Record<string, unknown>
 ): ClawperatorError {
   return { code, message, details };
+}
+
+export function normalizeEmulatorDataPartitionSize(size: string): string {
+  const normalized = size.trim().toUpperCase();
+  const match = normalized.match(EMULATOR_DATA_PARTITION_SIZE_PATTERN);
+  if (!match) {
+    throw buildError(
+      ERROR_CODES.ANDROID_AVD_CREATE_FAILED,
+      "Emulator data partition size must be a positive integer followed by G or GB",
+      { value: size, expectedFormat: "<positive_integer>G|GB" }
+    );
+  }
+  return `${match[1]}G`;
+}
+
+export function buildDefaultEmulatorAvdName(
+  size: string = DEFAULT_EMULATOR_DATA_PARTITION_SIZE
+): string {
+  const normalizedSize = normalizeEmulatorDataPartitionSize(size).toLowerCase().replace(/g$/, "gb");
+  return `${DEFAULT_EMULATOR_AVD_NAME}-${normalizedSize}`;
+}
+
+export function validateAvdName(name: string): void {
+  if (basename(name) !== name || name.includes("\\")) {
+    throw buildError(
+      ERROR_CODES.ANDROID_AVD_CREATE_FAILED,
+      "AVD names must not include path separators",
+      { name }
+    );
+  }
+}
+
+function getAvdConfigPath(name: string): string {
+  validateAvdName(name);
+  return join(getAvdRoot(), `${name}.avd`, "config.ini");
+}
+
+async function setAvdConfigValue(path: string, key: string, value: string): Promise<void> {
+  let contents: string;
+  try {
+    contents = await readFile(path, "utf8");
+  } catch (error) {
+    throw buildError(
+      ERROR_CODES.ANDROID_AVD_CREATE_FAILED,
+      `Failed to read created AVD config at ${path}`,
+      { path, cause: error instanceof Error ? error.message : String(error) }
+    );
+  }
+
+  const line = `${key}=${value}`;
+  const lines = contents.length > 0 ? contents.split("\n") : [];
+  const index = lines.findIndex((existing) => existing.trimStart().startsWith(`${key}=`));
+  if (index >= 0) {
+    lines[index] = line;
+  } else {
+    if (lines.length > 0 && lines[lines.length - 1] === "") {
+      lines[lines.length - 1] = line;
+      lines.push("");
+    } else {
+      lines.push(line);
+    }
+  }
+  try {
+    await writeFile(path, lines.join("\n"), "utf8");
+  } catch (error) {
+    throw buildError(
+      ERROR_CODES.ANDROID_AVD_CREATE_FAILED,
+      `Failed to write AVD config at ${path}`,
+      { path, key, value, cause: error instanceof Error ? error.message : String(error) }
+    );
+  }
+}
+
+export async function setAvdDataPartitionSize(
+  name: string,
+  size: string = DEFAULT_EMULATOR_DATA_PARTITION_SIZE
+): Promise<void> {
+  await setAvdConfigValue(getAvdConfigPath(name), "disk.dataPartition.size", normalizeEmulatorDataPartitionSize(size));
+}
+
+async function deleteCreatedAvdAfterFailedConfigUpdate(
+  config: RuntimeConfig,
+  name: string,
+  cause: unknown
+): Promise<never> {
+  const result = await runAndroidSdkTool(config, "avdmanager", ["delete", "avd", "--name", name], {
+    timeoutMs: 60_000,
+  });
+  const typedCause = cause as { message?: string; details?: Record<string, unknown> };
+  throw buildError(
+    ERROR_CODES.ANDROID_AVD_CREATE_FAILED,
+    typedCause.message ?? `Failed to configure Android Virtual Device ${name}`,
+    {
+      ...(typedCause.details ?? {}),
+      name,
+      cleanup: {
+        attempted: true,
+        succeeded: result.code === 0,
+        stderr: result.stderr,
+      },
+    }
+  );
 }
 
 export async function isSystemImageInstalled(config: RuntimeConfig, systemImage: string): Promise<boolean> {
@@ -71,10 +178,14 @@ export async function createAvd(
     name: string;
     systemImage?: string;
     deviceProfile?: string;
+    dataPartitionSize?: string;
   }
 ): Promise<void> {
   const systemImage = options.systemImage ?? DEFAULT_EMULATOR_SYSTEM_IMAGE;
   const deviceProfile = options.deviceProfile ?? DEFAULT_EMULATOR_DEVICE_PROFILE;
+  const dataPartitionSize = options.dataPartitionSize ?? DEFAULT_EMULATOR_DATA_PARTITION_SIZE;
+  validateAvdName(options.name);
+  const existedBeforeCreate = (await inspectConfiguredAvd(options.name)).exists;
 
   await ensureSystemImageInstalled(config, systemImage);
   const result = await runAndroidSdkTool(
@@ -89,6 +200,15 @@ export async function createAvd(
       result.stderr || "Failed to create Android Virtual Device",
       { name: options.name, systemImage, deviceProfile }
     );
+  }
+
+  try {
+    await setAvdDataPartitionSize(options.name, dataPartitionSize);
+  } catch (error) {
+    if (!existedBeforeCreate) {
+      await deleteCreatedAvdAfterFailedConfigUpdate(config, options.name, error);
+    }
+    throw error;
   }
 }
 

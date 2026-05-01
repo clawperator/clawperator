@@ -719,11 +719,11 @@ Request body:
 
 ```json
 {
-  "name": "clawperator-pixel",
   "apiLevel": 35,
   "abi": "arm64-v8a",
   "deviceProfile": "pixel_8",
-  "playStore": true
+  "playStore": true,
+  "storageSize": "12G"
 }
 ```
 
@@ -731,18 +731,27 @@ Defaults when omitted:
 
 | Field | Default |
 | --- | --- |
-| `name` | `DEFAULT_EMULATOR_AVD_NAME` (`clawperator-pixel`) |
+| `name` | derived from storage size, for example `clawperator-pixel-12gb` |
 | `apiLevel` | `SUPPORTED_EMULATOR_API_LEVEL` (`35`) |
 | `abi` | `arm64-v8a` |
 | `deviceProfile` | `DEFAULT_EMULATOR_DEVICE_PROFILE` (`pixel_7`) |
 | `playStore` | `true` unless explicitly `false` |
+| `storageSize` | `12G` |
+
+`storageSize` accepts positive integer gigabyte values such as `12G`, `12GB`,
+or `16G`. The aliases `size`, `diskSize`, and `dataPartitionSize` are also
+accepted. Only one storage size field may be provided.
+
+When `name` is omitted, the server derives the AVD name from the normalized
+storage size. For example, `12G` and `12GB` both default to
+`clawperator-pixel-12gb`.
 
 Success response:
 
 ```json
 {
   "ok": true,
-  "name": "clawperator-pixel",
+  "name": "clawperator-pixel-12gb",
   "exists": true,
   "running": false,
   "apiLevel": 35,
@@ -802,6 +811,22 @@ Behavior:
 ### `POST /android/provision/emulator`
 
 This route calls `provisionEmulator()` and may reuse a supported running emulator, start an existing supported AVD, or create and start a new one.
+
+Optional request body:
+
+```json
+{
+  "storageSize": "16GB"
+}
+```
+
+When a new AVD is created, `storageSize` controls the internal app storage data
+partition. It accepts the same gigabyte-only values and aliases as
+`POST /android/emulators/create`. Omit it to use `12G`.
+
+When a new AVD is created and no name is provided by the caller, provisioning
+uses the same storage-derived default name, such as `clawperator-pixel-12gb`
+for the default `12G` size.
 
 Success response:
 

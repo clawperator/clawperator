@@ -121,6 +121,32 @@ describe("serve API integration", () => {
     assert.ok(body.ok ? typeof body.serial === "string" : body.error !== undefined);
   });
 
+  test("POST /android/provision/emulator rejects non-gigabyte storage sizes", async () => {
+    const res = await fetch(`http://localhost:${port}/android/provision/emulator`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ storageSize: "12000M" }),
+    });
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as { ok: boolean; error: { code: string; message: string } };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "INVALID_BODY");
+    assert.match(body.error.message, /positive integer followed by G or GB/);
+  });
+
+  test("POST /android/emulators/create rejects conflicting storage size aliases", async () => {
+    const res = await fetch(`http://localhost:${port}/android/emulators/create`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ storageSize: "12G", diskSize: "16G" }),
+    });
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as { ok: boolean; error: { code: string; message: string } };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "INVALID_BODY");
+    assert.match(body.error.message, /Use only one emulator storage size field/);
+  });
+
   test("POST /execute with no body returns 400", async () => {
     const res = await fetch(`http://localhost:${port}/execute`, {
       method: "POST",

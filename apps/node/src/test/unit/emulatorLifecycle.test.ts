@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it } from "node:test";
 import assert from "node:assert";
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
@@ -10,6 +10,7 @@ import {
   deleteAvd,
   enableEmulatorDeveloperSettings,
   ensureSystemImageInstalled,
+  normalizeEmulatorDataPartitionSize,
   startAvd,
   stopAvd,
   waitForBootCompletion,
@@ -17,17 +18,29 @@ import {
 } from "../../domain/android-emulators/lifecycle.js";
 import { FakeProcessRunner } from "./fakes/FakeProcessRunner.js";
 
-async function writeAvd(homeDir: string, name: string, configIni: string): Promise<void> {
-  const avdRoot = join(homeDir, ".android", "avd");
+async function writeAvdAtRoot(avdRoot: string, name: string, configIni: string): Promise<void> {
   await mkdir(join(avdRoot, `${name}.avd`), { recursive: true });
   await writeFile(join(avdRoot, `${name}.avd`, "config.ini"), configIni, "utf8");
   await writeFile(join(avdRoot, `${name}.ini`), "target=android-35\n", "utf8");
+}
+
+async function writeAvd(homeDir: string, name: string, configIni: string): Promise<void> {
+  await writeAvdAtRoot(join(homeDir, ".android", "avd"), name, configIni);
+}
+
+function restoreOptionalEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
 }
 
 describe("emulator lifecycle", () => {
   const originalHome = process.env.HOME;
   const originalAndroidHome = process.env.ANDROID_HOME;
   const originalAndroidSdkRoot = process.env.ANDROID_SDK_ROOT;
+  const originalAndroidAvdHome = process.env.ANDROID_AVD_HOME;
   let testHome: string;
 
   beforeEach(async () => {
@@ -35,12 +48,14 @@ describe("emulator lifecycle", () => {
     process.env.HOME = testHome;
     delete process.env.ANDROID_HOME;
     delete process.env.ANDROID_SDK_ROOT;
+    delete process.env.ANDROID_AVD_HOME;
   });
 
   afterEach(() => {
     process.env.HOME = originalHome;
-    process.env.ANDROID_HOME = originalAndroidHome;
-    process.env.ANDROID_SDK_ROOT = originalAndroidSdkRoot;
+    restoreOptionalEnv("ANDROID_HOME", originalAndroidHome);
+    restoreOptionalEnv("ANDROID_SDK_ROOT", originalAndroidSdkRoot);
+    restoreOptionalEnv("ANDROID_AVD_HOME", originalAndroidAvdHome);
   });
 
   it("installs a missing system image after accepting licenses", async () => {
@@ -67,7 +82,17 @@ describe("emulator lifecycle", () => {
       stdout: "system-images;android-35;google_apis_playstore;arm64-v8a\n",
       stderr: "",
     });
-    runner.queueResult({ code: 0, stdout: "created", stderr: "" });
+    runner.queueResult(
+      { code: 0, stdout: "created", stderr: "" },
+      () => writeAvd(
+        testHome,
+        "clawperator-pixel",
+        [
+          "PlayStore.enabled=true",
+          "disk.dataPartition.size=6G",
+        ].join("\n")
+      )
+    );
 
     const config = getDefaultRuntimeConfig({ runner });
     await createAvd(config, { name: "clawperator-pixel" });
@@ -78,6 +103,158 @@ describe("emulator lifecycle", () => {
       "--package", "system-images;android-35;google_apis_playstore;arm64-v8a",
       "--device", "pixel_7",
     ]);
+    const configIni = await readFile(join(testHome, ".android", "avd", "clawperator-pixel.avd", "config.ini"), "utf8");
+    assert.match(configIni, /^disk\.dataPartition\.size=12G$/m);
+  });
+
+  it("creates an AVD with a caller-provided gigabyte data partition size", async () => {
+    const runner = new FakeProcessRunner();
+    runner.queueResult({
+      code: 0,
+      stdout: "system-images;android-35;google_apis_playstore;arm64-v8a\n",
+      stderr: "",
+    });
+    runner.queueResult(
+      { code: 0, stdout: "created", stderr: "" },
+      () => writeAvd(
+        testHome,
+        "clawperator-pixel",
+        [
+          "PlayStore.enabled=true",
+          "disk.dataPartition.size=6G",
+        ].join("\n")
+      )
+    );
+
+    const config = getDefaultRuntimeConfig({ runner });
+    await createAvd(config, { name: "clawperator-pixel", dataPartitionSize: "16GB" });
+
+    const configIni = await readFile(join(testHome, ".android", "avd", "clawperator-pixel.avd", "config.ini"), "utf8");
+    assert.match(configIni, /^disk\.dataPartition\.size=16G$/m);
+  });
+
+  it("normalizes gigabyte data partition size values and rejects other units", () => {
+    assert.strictEqual(normalizeEmulatorDataPartitionSize("16GB"), "16G");
+    assert.strictEqual(normalizeEmulatorDataPartitionSize("16g"), "16G");
+    assert.strictEqual(normalizeEmulatorDataPartitionSize("16gb"), "16G");
+    assert.throws(
+      () => normalizeEmulatorDataPartitionSize("16384M"),
+      (error: unknown) => {
+        const typed = error as { code?: string; details?: { expectedFormat?: string } };
+        assert.strictEqual(typed.code, ERROR_CODES.ANDROID_AVD_CREATE_FAILED);
+        assert.strictEqual(typed.details?.expectedFormat, "<positive_integer>G|GB");
+        return true;
+      }
+    );
+    assert.throws(
+      () => normalizeEmulatorDataPartitionSize("0G"),
+      (error: unknown) => {
+        const typed = error as { code?: string };
+        assert.strictEqual(typed.code, ERROR_CODES.ANDROID_AVD_CREATE_FAILED);
+        return true;
+      }
+    );
+  });
+
+  it("sizes created AVDs under ANDROID_AVD_HOME when it is set", async () => {
+    const runner = new FakeProcessRunner();
+    runner.queueResult({
+      code: 0,
+      stdout: "system-images;android-35;google_apis_playstore;arm64-v8a\n",
+      stderr: "",
+    });
+
+    const avdRoot = join(testHome, "custom-avd-home");
+    process.env.ANDROID_AVD_HOME = ` ${avdRoot} `;
+    runner.queueResult(
+      { code: 0, stdout: "created", stderr: "" },
+      () => writeAvdAtRoot(
+        avdRoot,
+        "clawperator-pixel",
+        [
+          "PlayStore.enabled=true",
+          "disk.dataPartition.size=6G",
+        ].join("\n")
+      )
+    );
+
+    const config = getDefaultRuntimeConfig({ runner });
+    await createAvd(config, { name: "clawperator-pixel" });
+
+    const configIni = await readFile(join(avdRoot, "clawperator-pixel.avd", "config.ini"), "utf8");
+    assert.match(configIni, /^disk\.dataPartition\.size=12G$/m);
+  });
+
+  it("wraps data partition config write failures in the AVD create contract", async () => {
+    const runner = new FakeProcessRunner();
+    runner.queueResult({
+      code: 0,
+      stdout: "system-images;android-35;google_apis_playstore;arm64-v8a\n",
+      stderr: "",
+    });
+    runner.queueResult(
+      { code: 0, stdout: "created", stderr: "" },
+      async () => {
+        await writeAvd(
+          testHome,
+          "clawperator-pixel",
+          [
+            "PlayStore.enabled=true",
+            "disk.dataPartition.size=6G",
+          ].join("\n")
+        );
+        const configPath = join(testHome, ".android", "avd", "clawperator-pixel.avd", "config.ini");
+        await chmod(configPath, 0o444);
+      }
+    );
+    runner.queueResult({ code: 0, stdout: "deleted", stderr: "" });
+
+    const configPath = join(testHome, ".android", "avd", "clawperator-pixel.avd", "config.ini");
+
+    const config = getDefaultRuntimeConfig({ runner });
+    await assert.rejects(
+      () => createAvd(config, { name: "clawperator-pixel" }),
+      (error: unknown) => {
+        const typed = error as { code: string; details?: { path?: string } };
+        assert.strictEqual(typed.code, ERROR_CODES.ANDROID_AVD_CREATE_FAILED);
+        assert.strictEqual(typed.details?.path, configPath);
+        return true;
+      }
+    );
+    assert.deepStrictEqual(runner.calls[2].args, ["delete", "avd", "--name", "clawperator-pixel"]);
+  });
+
+  it("does not delete a preexisting AVD when data partition config write fails", async () => {
+    const runner = new FakeProcessRunner();
+    runner.queueResult({
+      code: 0,
+      stdout: "system-images;android-35;google_apis_playstore;arm64-v8a\n",
+      stderr: "",
+    });
+    runner.queueResult({ code: 0, stdout: "created", stderr: "" });
+
+    await writeAvd(
+      testHome,
+      "clawperator-pixel",
+      [
+        "PlayStore.enabled=true",
+        "disk.dataPartition.size=6G",
+      ].join("\n")
+    );
+    const configPath = join(testHome, ".android", "avd", "clawperator-pixel.avd", "config.ini");
+    await chmod(configPath, 0o444);
+
+    const config = getDefaultRuntimeConfig({ runner });
+    await assert.rejects(
+      () => createAvd(config, { name: "clawperator-pixel" }),
+      (error: unknown) => {
+        const typed = error as { code: string; details?: { path?: string } };
+        assert.strictEqual(typed.code, ERROR_CODES.ANDROID_AVD_CREATE_FAILED);
+        assert.strictEqual(typed.details?.path, configPath);
+        return true;
+      }
+    );
+    assert.strictEqual(runner.calls.length, 2);
   });
 
   it("starts an AVD detached with fully ignored stdio", () => {

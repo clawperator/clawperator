@@ -1,5 +1,6 @@
 import { ERROR_CODES } from "../contracts/errors.js";
 import { LIMITS } from "../contracts/limits.js";
+import { normalizeEmulatorDataPartitionSize } from "../domain/android-emulators/lifecycle.js";
 import { formatError } from "./output.js";
 import type { Logger } from "../adapters/logger.js";
 import type { NodeMatcher } from "../contracts/selectors.js";
@@ -69,6 +70,25 @@ export function getStringOptStrict(
   }
 
   return value;
+}
+
+function getEmulatorStorageSizeOpt(rest: string[], knownFlags: readonly string[]): string | undefined {
+  const flagAliases = ["--storage-size", "--size", "--disk-size", "--data-partition-size"];
+  const provided = flagAliases
+    .map((flag) => ({ flag, value: getStringOptStrict(rest, flag, knownFlags) }))
+    .filter((entry): entry is { flag: string; value: string } => entry.value !== undefined);
+  if (provided.length > 1) {
+    throw new UsageError("Use only one emulator storage size flag: --storage-size, --size, --disk-size, or --data-partition-size");
+  }
+  const value = provided[0]?.value;
+  if (value === undefined) {
+    return undefined;
+  }
+  try {
+    return normalizeEmulatorDataPartitionSize(value);
+  } catch {
+    throw new UsageError("--storage-size must be a positive integer followed by G or GB, for example 12G");
+  }
 }
 
 export function getNumberOpt(rest: string[], flag: string): number | undefined {
@@ -966,17 +986,20 @@ const HELP_EMULATOR = `clawperator emulator
 Usage:
   clawperator emulator list [--output <json|pretty>]
   clawperator emulator inspect <name> [--output <json|pretty>]
-  clawperator emulator create [--name <name>] [--output <json|pretty>]
+  clawperator emulator create [--name <name>] [--storage-size <sizeG>] [--output <json|pretty>]
   clawperator emulator start <name> [--output <json|pretty>]
   clawperator emulator stop <name> [--output <json|pretty>]
   clawperator emulator delete <name> [--output <json|pretty>]
   clawperator emulator status [--output <json|pretty>]
-  clawperator emulator provision [--output <json|pretty>]
-  clawperator provision emulator [--output <json|pretty>]
+  clawperator emulator provision [--storage-size <sizeG>] [--output <json|pretty>]
+  clawperator provision emulator [--storage-size <sizeG>] [--output <json|pretty>]
 
 Notes:
   - Emulator provisioning prefers: running supported emulator, stopped supported AVD, then new AVD creation.
-  - New AVDs target Android API 35 and a Google Play image by default.
+  - New AVDs target Android API 35, a Google Play image, and a 12G data partition by default.
+  - When --name is omitted, the AVD name includes the storage size, for example clawperator-pixel-12gb.
+  - --storage-size accepts positive integer gigabyte values such as 12G, 12GB, or 16G.
+  - --size, --disk-size, and --data-partition-size are accepted as aliases.
   - JSON is the canonical output format for agent callers.
 `;
 
@@ -1196,10 +1219,11 @@ COMMANDS["devices"] = {
 COMMANDS["emulator"] = {
   name: "emulator",
   group: "Device Management",
-  documentedFlags: ["--name"],
+  documentedFlags: ["--name", "--storage-size"],
   supportedFlags: (rest) => {
     const sub = rest[0];
-    if (sub === "create") return ["--name"];
+    if (sub === "create") return ["--name", "--storage-size", "--size", "--disk-size", "--data-partition-size"];
+    if (sub === "provision") return ["--storage-size", "--size", "--disk-size", "--data-partition-size"];
     return [];
   },
   summary: "Manage Android emulators (AVDs)",
@@ -1237,6 +1261,7 @@ COMMANDS["emulator"] = {
       return (await import("./commands/emulator.js")).cmdEmulatorCreate({
         ...out,
         name: getOpt(rest, "--name"),
+        dataPartitionSize: getEmulatorStorageSizeOpt(rest, ["--name", "--storage-size", "--size", "--disk-size", "--data-partition-size"]),
       });
     } else if (sub === "start") {
       return rest[1]
@@ -1253,7 +1278,10 @@ COMMANDS["emulator"] = {
     } else if (sub === "status") {
       return (await import("./commands/emulator.js")).cmdEmulatorStatus(out);
     } else if (sub === "provision") {
-      return (await import("./commands/emulator.js")).cmdProvisionEmulator(out);
+      return (await import("./commands/emulator.js")).cmdProvisionEmulator({
+        ...out,
+        dataPartitionSize: getEmulatorStorageSizeOpt(rest, ["--storage-size", "--size", "--disk-size", "--data-partition-size"]),
+      });
     } else {
       return JSON.stringify({ code: "USAGE", message: "emulator list|inspect|create|start|stop|delete|status|provision" });
     }
@@ -1266,8 +1294,8 @@ COMMANDS["provision"] = {
   group: "Device Management",
   docsVisibility: "alias",
   docsAliasOf: "emulator provision",
-  documentedFlags: [],
-  supportedFlags: [],
+  documentedFlags: ["--storage-size"],
+  supportedFlags: (rest) => rest[0] === "emulator" ? ["--storage-size", "--size", "--disk-size", "--data-partition-size"] : [],
   summary: "Provision an Android emulator",
   help: HELP_EMULATOR,
   subtopics: {
@@ -1277,7 +1305,10 @@ COMMANDS["provision"] = {
     const { rest, format, verbose, logger } = ctx;
     const out = { format, verbose, logger };
     if (rest[0] === "emulator") {
-      return (await import("./commands/emulator.js")).cmdProvisionEmulator(out);
+      return (await import("./commands/emulator.js")).cmdProvisionEmulator({
+        ...out,
+        dataPartitionSize: getEmulatorStorageSizeOpt(rest, ["--storage-size", "--size", "--disk-size", "--data-partition-size"]),
+      });
     } else {
       return JSON.stringify({ code: "USAGE", message: "provision emulator" });
     }
