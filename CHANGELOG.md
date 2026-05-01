@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.9.4] - 2026-05-01
+
+This release broadened the canonical `snapshot` action across the Node, Android, and docs surfaces while also refining the generated docs and skill-facing output.
+
+### 🤖 Node API & CLI
+- **Changed:** Updated bundled skill headings to include the `Clawperator` prefix for clearer branding in packaged skill files.
+- **Changed:** Reworked the canonical `snapshot` action path so Node treats `snapshot` as the primary action name in execution and readiness checks.
+- **Changed:** Simplified the generated CLI reference and added curated command metadata so public command output is more focused and hides compatibility-only aliases.
+
+### 📚 Documentation & Website
+- **Changed:** Added stable anchors and ownership links across the CLI reference and related API docs.
+- **Changed:** Added a canonical Skills CLI detail page and clarified docs ownership and navigation around the API surfaces.
+- **Changed:** Added warning-only docs organization checks and tightened docs-author guidance for authored versus generated surfaces.
+- **Fixed:** Refreshed the docs site layout with wider content, local scrollers for wide tables and code blocks, and a more compact mobile navigation.
+
+### 📱 Android Operator APK
+- **Changed:** Updated Android command parsing and tests to treat `snapshot` as the canonical action while keeping the compatibility alias in place.
+
+Pull requests:
+- [feat(skills): prefix SKILL headings with 'Clawperator'](https://github.com/clawperator/clawperator/pull/251)
+- [fix(release): verify published version outputs](https://github.com/clawperator/clawperator/pull/252)
+- [refactor(node): `snapshot` is the canonical action name](https://github.com/clawperator/clawperator/pull/253)
+- [feat(docs): simplify generated CLI reference and add curated command metadata](https://github.com/clawperator/clawperator/pull/254)
+- [feat(docs): stable anchors and ownership links for the CLI reference](https://github.com/clawperator/clawperator/pull/255)
+- [docs: clarify canonical docs ownership and add Skills CLI detail page](https://github.com/clawperator/clawperator/pull/256)
+- [feat(docs): add warning-only docs organization guardrails and tighten docs-author guidance](https://github.com/clawperator/clawperator/pull/257)
+- [fix(docs): docs website layout and responsive CSS](https://github.com/clawperator/clawperator/pull/258)
+
 ## [0.9.3] - 2026-04-28
 
 This release hardened snapshot reliability across mixed runtime versions, improved bundled skill discovery compatibility for OpenClaw hosts, and kept release Android diagnostics readable.
