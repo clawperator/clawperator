@@ -18,12 +18,12 @@ skill so future agents preserve the new IA.
 
 | Item | Value |
 | --- | --- |
-| State | in progress |
+| State | complete |
 | Total PRs | 4 |
 | Total phases | 5 |
-| Completed | PR-1 / Phase 1; PR-2 / Phases 2-3; PR-3 / Phase 4 |
-| Remaining | 5 |
-| Current / Next | PR-4 / Phase 5 |
+| Completed | PR-1 / Phase 1; PR-2 / Phases 2-3; PR-3 / Phase 4; PR-4 / Phase 5 |
+| Remaining | none |
+| Current / Next | none |
 | Blockers | none |
 
 ## Goal

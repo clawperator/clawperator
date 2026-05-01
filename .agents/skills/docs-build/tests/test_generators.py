@@ -4,6 +4,7 @@ import importlib.util
 import sys
 import warnings
 from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
 
@@ -36,6 +37,10 @@ error_table = load_module(
 llms_full = load_module(
     ".agents/skills/docs-build/scripts/generate_llms_full.py",
     "docs_generate_generate_llms_full",
+)
+docs_ia = load_module(
+    ".agents/skills/docs-build/scripts/validate_docs_ia.py",
+    "docs_validate_docs_ia",
 )
 
 
@@ -300,6 +305,74 @@ class GenerateLlmsFullTests(unittest.TestCase):
 
         self.assertIn("<code>SKILL_EXECUTION_TIMEOUT</code>", rendered)
         self.assertIn("Network &amp; internet", rendered)
+
+
+class ValidateDocsIaTests(unittest.TestCase):
+    def test_valid_anchor_link_has_no_warning(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            build = root / "build"
+            build.mkdir()
+            (build / "target.md").write_text(
+                '<a id="action-click"></a>\n## Click\n',
+                encoding="utf-8",
+            )
+            (build / "source.md").write_text(
+                "[Click](target.md#action-click)\n",
+                encoding="utf-8",
+            )
+
+            warnings = docs_ia.check_internal_anchors(build)
+
+        self.assertEqual(warnings, [])
+
+    def test_missing_anchor_warns(self) -> None:
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            build = root / "build"
+            build.mkdir()
+            (build / "target.md").write_text("## Click\n", encoding="utf-8")
+            (build / "source.md").write_text(
+                "[Click](target.md#action-click)\n",
+                encoding="utf-8",
+            )
+
+            warnings = docs_ia.check_internal_anchors(build)
+
+        self.assertEqual(len(warnings), 1)
+        self.assertEqual(warnings[0].kind, "anchor")
+        self.assertIn("#action-click", warnings[0].message)
+
+    def test_compatibility_selector_alias_warns_in_authored_docs(self) -> None:
+        with TemporaryDirectory() as tmp:
+            docs = Path(tmp)
+            (docs / "api").mkdir()
+            (docs / "api" / "actions.md").write_text(
+                "Prefer --id, not --resource-id.\n",
+                encoding="utf-8",
+            )
+
+            warnings = docs_ia.check_compatibility_aliases(docs)
+
+        self.assertEqual(len(warnings), 1)
+        self.assertEqual(warnings[0].kind, "compat-alias")
+        self.assertIn("--resource-id", warnings[0].message)
+
+    def test_generated_command_without_detail_link_warns(self) -> None:
+        with TemporaryDirectory() as tmp:
+            cli_reference = Path(tmp) / "cli.md"
+            cli_reference.write_text(
+                "| Command | Group | Primary syntax | Primary flags | Details | Summary |\n"
+                "| --- | --- | --- | --- | --- | --- |\n"
+                "| [`read`](#command-read) | Device | `read --text <text> \\| --id <id>` | - | - | Read |\n",
+                encoding="utf-8",
+            )
+
+            warnings = docs_ia.check_generated_cli_details(cli_reference)
+
+        self.assertEqual(len(warnings), 1)
+        self.assertEqual(warnings[0].kind, "command-detail")
+        self.assertIn("read", warnings[0].message)
 
 
 if __name__ == "__main__":
