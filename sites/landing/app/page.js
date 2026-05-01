@@ -7,6 +7,8 @@ const installCommands = {
   npm: "npm install -g clawperator"
 };
 
+const agentSetupPrompt = "Read https://clawperator.com/skill.md and get me set up with Clawperator.";
+
 const reliabilityCards = [
   {
     title: "Deterministic",
@@ -108,6 +110,7 @@ export default function Home() {
   const [mode, setMode] = useState("oneLiner");
   const [copied, setCopied] = useState(false);
   const [emulatorCommandCopied, setEmulatorCommandCopied] = useState(false);
+  const [agentPromptCopied, setAgentPromptCopied] = useState(false);
   const [activeSection, setActiveSection] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const activeCommand = mode === "npm" ? installCommands.npm : installCommands.oneLiner;
@@ -123,6 +126,7 @@ export default function Home() {
 
   const copyTimeoutRef = useRef(null);
   const emulatorCopyTimeoutRef = useRef(null);
+  const agentPromptCopyTimeoutRef = useRef(null);
   const toggleMobileMenu = () => setMobileMenuOpen((open) => !open);
   const closeMobileMenu = () => setMobileMenuOpen(false);
   const renderResourceIcon = (icon) => {
@@ -222,11 +226,13 @@ export default function Home() {
 
   const handleCopy = () => copyToClipboard(activeCommand, setCopied, copyTimeoutRef);
   const handleEmulatorCommandCopy = () => copyToClipboard(emulatorCommand, setEmulatorCommandCopied, emulatorCopyTimeoutRef);
+  const handleAgentPromptCopy = () => copyToClipboard(agentSetupPrompt, setAgentPromptCopied, agentPromptCopyTimeoutRef);
 
   useEffect(() => {
     return () => {
       if (copyTimeoutRef.current) window.clearTimeout(copyTimeoutRef.current);
       if (emulatorCopyTimeoutRef.current) window.clearTimeout(emulatorCopyTimeoutRef.current);
+      if (agentPromptCopyTimeoutRef.current) window.clearTimeout(agentPromptCopyTimeoutRef.current);
     };
   }, []);
 
@@ -585,6 +591,40 @@ export default function Home() {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+
+        <div className="agent-prompt-block">
+          <p className="quickstart-hint">Tell your agent to:</p>
+          <div className="command-row">
+            <pre>
+              <code>{agentSetupPrompt}</code>
+            </pre>
+            <button
+              type="button"
+              className={agentPromptCopied ? "copy-btn copied" : "copy-btn"}
+              onClick={handleAgentPromptCopy}
+              title={agentPromptCopied ? "Copied" : "Copy agent prompt"}
+            >
+              <span className="copy-btn-label">{agentPromptCopied ? "Copied" : "Copy agent prompt"}</span>
+              {agentPromptCopied ? (
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <path
+                    d="M20 7L9 18l-5-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" focusable="false">
+                  <rect x="9" y="9" width="11" height="11" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
+                  <rect x="4" y="4" width="11" height="11" rx="2" ry="2" fill="none" stroke="currentColor" strokeWidth="2" />
+                </svg>
+              )}
+            </button>
           </div>
         </div>
 

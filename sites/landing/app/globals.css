@@ -632,6 +632,14 @@ body {
   box-shadow: var(--panel-shadow);
 }
 
+.agent-prompt-block {
+  margin-top: 1rem;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
 .quickstart-docs {
   margin: 1rem 0 0;
   color: var(--text-muted);
@@ -825,6 +833,18 @@ body {
 .copy-btn svg {
   width: 1.15rem;
   height: 1.15rem;
+}
+
+.copy-btn-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .copy-btn.copied {
