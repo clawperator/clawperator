@@ -75,6 +75,7 @@ The current docs site looks unpolished on desktop and becomes hard to use on tab
 | Docs site theme configuration | `sites/docs/mkdocs.yml` |
 | Authored custom template override | `sites/docs/overrides/main.html` |
 | Authored custom CSS override | `sites/docs/overrides/stylesheets/terminal-theme.css` |
+| Rendered page layout block emitted by the theme | `sites/docs/site/api/actions/index.html`, `sites/docs/site/api/cli/index.html`, `sites/docs/site/skills/runtime/index.html` |
 | Generated docs boundaries | `sites/docs/source-map.yaml`, `sites/docs/.build/`, `sites/docs/site/` |
 | Reference pages to test | `sites/docs/.build/api/cli.md`, `sites/docs/.build/api/actions.md`, `sites/docs/.build/api/errors.md`, `sites/docs/.build/skills/cli.md`, `sites/docs/.build/skills/runtime.md` |
 | Browser verification workflow | `~/.codex/plugins/cache/openai-bundled/browser-use/0.1.0-alpha1/skills/browser/SKILL.md` |
@@ -89,6 +90,7 @@ Deterministic rules:
 - Edit authored docs-site sources, not generated output.
 - Preserve exact technical text in code blocks. Do not wrap long code, JSON, commands, paths, package identifiers, or flags in ways that change copy/paste readability.
 - Keep generated reference tables contained inside a local horizontal scroller when they are wider than the viewport or content column.
+- Inspect at least one rendered `sites/docs/site/.../index.html` page so the actual page-level layout style block is visible alongside the shared CSS overrides.
 - Pass `./scripts/docs_build.sh` before treating the work as complete.
 - Confirm mobile page-level overflow is fixed with `document.documentElement.scrollWidth <= window.innerWidth` on target mobile pages, except for intentional inner scrollers.
 

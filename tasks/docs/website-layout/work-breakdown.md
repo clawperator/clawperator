@@ -46,6 +46,7 @@ Read these files IN THIS ORDER before writing anything.
 | `sites/docs/mkdocs.yml` | MkDocs theme configuration and docs-site nav surface |
 | `sites/docs/overrides/main.html` | Current template override and injected stylesheet path |
 | `sites/docs/overrides/stylesheets/terminal-theme.css` | Primary authored CSS surface to edit |
+| `sites/docs/site/api/actions/index.html` | Example rendered page showing the theme-emitted layout style block that must be overridden indirectly |
 | `sites/docs/source-map.yaml` | Generated docs boundaries and source mapping |
 | `sites/docs/.build/api/cli.md` | Generated CLI reference source with wide table content |
 | `sites/docs/.build/api/actions.md` | Generated/reference content with code blocks and tables |
@@ -78,6 +79,7 @@ Fix the desktop page shell, sidebar/content grid, code block behavior, table ove
 ### Steps
 
 1. Inspect the rendered MkDocs Terminal CSS defaults in `sites/docs/site/css/terminal.css` and `sites/docs/site/css/theme.css` to confirm the selectors being overridden.
+   - Also inspect one rendered `sites/docs/site/.../index.html` page, because the `.terminal-mkdocs-main-grid` rules are emitted in a page-level style block rather than in the shared CSS files.
 2. Update `sites/docs/overrides/stylesheets/terminal-theme.css` so the effective page shell uses a responsive width around `1180px` to `1200px`, not the current effective 900px shell.
 3. Override the desktop `.terminal-mkdocs-main-grid` behavior so the side navigation uses a fixed column around `220px` to `240px` and the main column uses `minmax(0, 1fr)`.
 4. Add `min-width: 0` to the main grid content wrappers needed to prevent wide tables or code from expanding the grid.
