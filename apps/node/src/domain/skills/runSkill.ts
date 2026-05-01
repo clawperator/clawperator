@@ -658,12 +658,14 @@ export async function runSkill(
   const skillLogger = callbacks?.logger?.child({ skillId, skillRunId });
   const initialLogPath = skillLogger?.logPath();
   const tailCommand = initialLogPath !== undefined ? buildTailCommand(initialLogPath) : undefined;
-  let logPath: string | undefined = initialLogPath;
-  const addRunMetadata = <T extends object>(result: T): T & { skillRunId: string; logPath?: string } => ({
-    ...result,
-    skillRunId,
-    ...(logPath !== undefined ? { logPath } : {}),
-  });
+  const addRunMetadata = <T extends object>(result: T): T & { skillRunId: string; logPath?: string } => {
+    const currentLogPath = skillLogger?.logPath();
+    return {
+      ...result,
+      skillRunId,
+      ...(currentLogPath !== undefined ? { logPath: currentLogPath } : {}),
+    };
+  };
 
   if (callbacks?.logLocationEmitted !== true) {
     skillLogger?.emit({
@@ -677,7 +679,6 @@ export async function runSkill(
         ? `Skill ${skillId} run ${skillRunId} logging to ${initialLogPath}; observe with: ${tailCommand}`
         : `Skill ${skillId} run ${skillRunId} started with file logging unavailable`,
     });
-    logPath = skillLogger?.logPath();
   }
 
   try {

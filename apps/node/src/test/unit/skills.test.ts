@@ -8068,6 +8068,30 @@ describe("runSkill logging", () => {
     assert.strictEqual(logger.logPath(), undefined);
   });
 
+  it("omits logPath metadata when file logging disables after the location event", async () => {
+    let disabled = false;
+    const logger = {
+      emit(event: { event?: string }) {
+        if (event.event === "skills.run.start") {
+          disabled = true;
+        }
+      },
+      child() {
+        return this;
+      },
+      logPath() {
+        return disabled ? undefined : "/tmp/clawperator-later-disabled.log";
+      },
+    };
+
+    const result = await runSkill(TEST_FIXTURE_MIXED_STREAMS, [], undefined, undefined, undefined, {
+      logger,
+    });
+
+    assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.logPath, undefined);
+  });
+
   it("logs start and complete without leaking sentinel args", async () => {
     const sentinel = "CLAWPERATOR_TEST_SENTINEL_X9Z";
     const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });

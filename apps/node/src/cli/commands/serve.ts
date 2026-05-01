@@ -574,8 +574,33 @@ export function createServeApp(options: ServeAppOptions): express.Application {
   // REST: Run skill (convenience)
   app.post("/skills/:skillId/run", async (req, res) => {
     try {
+      const routeSkillId = req.params.skillId;
+      const bodyForContext = typeof req.body === "object" && req.body !== null && !Array.isArray(req.body)
+        ? req.body as { deviceId?: unknown }
+        : undefined;
+      const validDeviceContext = typeof bodyForContext?.deviceId === "string" && bodyForContext.deviceId.trim().length > 0
+        ? bodyForContext.deviceId
+        : undefined;
+      const skillRunId = createSkillRunId();
+      const skillLogger = options.logger?.child({ skillId: routeSkillId, deviceId: validDeviceContext, skillRunId });
+      let preRunLogs = buildSkillRunLogMetadata(skillRunId, skillLogger?.logPath());
+      const currentPreRunLogs = () => buildSkillRunLogMetadata(skillRunId, skillLogger?.logPath());
+
+      skillLogger?.emit({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "skills.run.log_location",
+        skillId: routeSkillId,
+        logPath: preRunLogs.path,
+        tailCommand: preRunLogs.tailCommand,
+        message: preRunLogs.path !== undefined
+          ? `Skill ${routeSkillId} run ${skillRunId} logging to ${preRunLogs.path}; observe with: ${preRunLogs.tailCommand}`
+          : `Skill ${routeSkillId} run ${skillRunId} started with file logging unavailable`,
+      });
+      preRunLogs = currentPreRunLogs();
+
       if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
-        res.status(400).json({ ok: false, error: { code: "INVALID_BODY", message: "Request body must be a JSON object" } });
+        res.status(400).json({ ok: false, error: { code: "INVALID_BODY", message: "Request body must be a JSON object", logs: preRunLogs } });
         return;
       }
 
@@ -592,26 +617,6 @@ export function createServeApp(options: ServeAppOptions): express.Application {
         timeoutMs?: unknown;
         expectContains?: unknown;
       };
-      const routeSkillId = req.params.skillId;
-      const validDeviceContext = typeof deviceId === "string" && deviceId.trim().length > 0
-        ? deviceId
-        : undefined;
-      const skillRunId = createSkillRunId();
-      const skillLogger = options.logger?.child({ skillId: routeSkillId, deviceId: validDeviceContext, skillRunId });
-      let preRunLogs = buildSkillRunLogMetadata(skillRunId, skillLogger?.logPath());
-
-      skillLogger?.emit({
-        ts: new Date().toISOString(),
-        level: "info",
-        event: "skills.run.log_location",
-        skillId: routeSkillId,
-        logPath: preRunLogs.path,
-        tailCommand: preRunLogs.tailCommand,
-        message: preRunLogs.path !== undefined
-          ? `Skill ${routeSkillId} run ${skillRunId} logging to ${preRunLogs.path}; observe with: ${preRunLogs.tailCommand}`
-          : `Skill ${routeSkillId} run ${skillRunId} started with file logging unavailable`,
-      });
-      preRunLogs = buildSkillRunLogMetadata(skillRunId, skillLogger?.logPath());
 
       if (deviceId !== undefined && typeof deviceId !== "string") {
         res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string", logs: preRunLogs } });
@@ -664,7 +669,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
             skillId: routeSkillId,
             timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
             expectedSubstring: expectContainsArg,
-            logs: preRunLogs,
+            logs: currentPreRunLogs(),
           },
         });
         return;
@@ -692,7 +697,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
             skillId: routeSkillId,
             timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
             expectedSubstring: expectContainsArg,
-            logs: preRunLogs,
+            logs: currentPreRunLogs(),
           },
         });
         return;

@@ -287,6 +287,24 @@ describe("serve API integration", () => {
     assert.ok(body.error.stderr?.includes("FAIL_OUTPUT:intentional"));
   });
 
+  test("POST /skills/:skillId/run includes logs for invalid body", async () => {
+    const res = await fetch(`http://localhost:${port}/skills/com.test.fail/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify([]),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as {
+      ok: boolean;
+      error: { code: string; message: string; logs?: { skillRunId?: string } };
+    };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "INVALID_BODY");
+    assert.match(body.error.message, /JSON object/i);
+    assert.match(body.error.logs?.skillRunId ?? "", /^skillrun_/);
+  });
+
   test("POST /skills/:skillId/run rejects blank deviceId", async () => {
     const res = await fetch(`http://localhost:${port}/skills/com.test.fail/run`, {
       method: "POST",
@@ -295,14 +313,14 @@ describe("serve API integration", () => {
     });
 
     assert.strictEqual(res.status, 400);
-      const body = await res.json() as {
-        ok: boolean;
-        error: { code: string; message: string; logs?: { skillRunId?: string } };
-      };
-      assert.strictEqual(body.ok, false);
-      assert.strictEqual(body.error.code, "INVALID_DEVICE_ID");
-      assert.match(body.error.message, /non-empty string/i);
-      assert.match(body.error.logs?.skillRunId ?? "", /^skillrun_/);
+    const body = await res.json() as {
+      ok: boolean;
+      error: { code: string; message: string; logs?: { skillRunId?: string } };
+    };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "INVALID_DEVICE_ID");
+    assert.match(body.error.message, /non-empty string/i);
+    assert.match(body.error.logs?.skillRunId ?? "", /^skillrun_/);
   });
 
   test("POST /skills/:skillId/run fails before spawn when the device is not interactive", async () => {

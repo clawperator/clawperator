@@ -420,6 +420,7 @@ export async function cmdSkillsRun(
   const skillRunId = createSkillRunId();
   const cliLogger = options.logger?.child({ skillId, deviceId: options.deviceId, skillRunId });
   let preRunLogs = buildSkillRunLogMetadata(skillRunId, cliLogger?.logPath());
+  const currentPreRunLogs = () => buildSkillRunLogMetadata(skillRunId, cliLogger?.logPath());
 
   emitCliEvent(cliLogger, {
     level: "info",
@@ -431,7 +432,7 @@ export async function cmdSkillsRun(
       ? `Skill ${skillId} run ${skillRunId} logging to ${preRunLogs.path}; observe with: ${preRunLogs.tailCommand}`
       : `Skill ${skillId} run ${skillRunId} started with file logging unavailable`,
   });
-  preRunLogs = buildSkillRunLogMetadata(skillRunId, cliLogger?.logPath());
+  preRunLogs = currentPreRunLogs();
 
   const env: SkillRunEnv = {
     [CLAWPERATOR_BIN_ENV_VAR]: resolvedBin,
@@ -478,7 +479,7 @@ export async function cmdSkillsRun(
         ...(interactiveError.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE
           ? toPublicInteractiveAutomationError(interactiveError)
           : interactiveError),
-        logs: preRunLogs,
+        logs: currentPreRunLogs(),
       },
       options
     );
