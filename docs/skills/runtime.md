@@ -246,6 +246,22 @@ Failure wrapper fields may also include:
 | `stderr` | partial stderr captured before failure |
 | `exitCode` | non-zero child exit code when available |
 
+JSON responses for `clawperator skills run` include a `logs` object. The CLI
+creates it before validation and readiness preflight, so early failures can
+still be correlated with the daily log when file logging is available:
+
+| Field | Meaning |
+| --- | --- |
+| `logs.skillRunId` | correlation id for this invocation |
+| `logs.path` | daily NDJSON log file path |
+| `logs.tailCommand` | ready-to-run command for observing that log file |
+
+The same `skillRunId` is also available to the skill script as
+`CLAWPERATOR_SKILL_RUN_ID`. Nested Clawperator CLI calls inherit it. When those
+calls use the daemon, the id is sent on the individual daemon request so
+request-specific execution logs can correlate to the skill run without making
+the long-lived daemon process inherit stale per-run state.
+
 In pretty mode, the CLI also prints a one-line banner with:
 
 - CLI version
@@ -290,6 +306,10 @@ Verification pattern:
 | **SKILL_OUTPUT_ASSERTION_FAILED** | may be not `null` | error shape | present in error | n/a for success | **present** (diagnostic; shows what the skill printed) |
 | **Execution / parse / other failures** | often `null` | error | varies | in error when relevant | n/a; failures use `stdout` and `stderr` for process streams |
 
+The additive `logs` object is present alongside these wrappers when a skill run
+was started. It is not a second output channel and does not change the daily log
+file location.
+
 Pretty mode can show `skillId`, `exitCode`, and streamed output for operators;
 the JSON deduplication policy applies when `--output json` or the serve JSON
 body for skill runs is used.
@@ -304,7 +324,7 @@ clawperator logs
 clawperator skills run <skill_id> --device <device_serial> --operator-package <package>
 ```
 
-The unified logger captures skill output as `skills.run.output` events, enabling post-timeout diagnostics. See [Logging](../api/logging.md) for details.
+The unified logger captures skill output as `skills.run.output` events, enabling post-timeout diagnostics. See [Logging](../api/logging.md) for details. Each run also emits a `skills.run.log_location` event with the same `logs.skillRunId` and daily file path.
 
 ## Runtime success examples
 
@@ -328,6 +348,11 @@ answer is under `skillResult.result`.
     "terminalVerification": { "status": "verified" },
     "diagnostics": { "runtimeState": "healthy" },
     "source": { "kind": "script" }
+  },
+  "logs": {
+    "skillRunId": "skillrun_1777600000000_00000000-0000-4000-8000-000000000000",
+    "path": "/home/user/.clawperator/logs/clawperator-2026-03-28.log",
+    "tailCommand": "tail -f '/home/user/.clawperator/logs/clawperator-2026-03-28.log'"
   },
   "durationMs": 15321
 }

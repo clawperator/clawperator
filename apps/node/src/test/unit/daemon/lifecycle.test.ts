@@ -14,11 +14,13 @@ import {
   getDaemonSocketPath,
   isDaemonRunning,
   sanitizeDaemonKey,
+  spawnDaemonRun,
   stopDaemon,
   type DaemonPathsOptions,
   withDaemonLock,
   writeDaemonPidMetadata,
 } from "../../../domain/daemon/lifecycle.js";
+import { CLAWPERATOR_SKILL_RUN_ID_ENV_VAR } from "../../../contracts/logging.js";
 import {
   cmdDaemonStart,
   cmdDaemonRun,
@@ -610,5 +612,34 @@ describe("daemon command output", () => {
 
     assert.equal(parsed.code, ERROR_CODES.DAEMON_STOP_FAILED);
     assert.equal(shouldCliStdoutForceExitCode1(raw, false), true);
+  });
+
+  it("spawnDaemonRun does not pass CLAWPERATOR_SKILL_RUN_ID to the spawned daemon", async () => {
+    const baseDir = await makeTempBaseDir();
+    const envOutputPath = join(baseDir, "daemon-env.json");
+    const scriptPath = join(baseDir, "fake-daemon.cjs");
+    await writeFile(scriptPath, `const { writeFileSync } = require("node:fs");\nwriteFileSync(${JSON.stringify(envOutputPath)}, JSON.stringify(process.env));\n`);
+
+    const skillRunId = "skillrun_daemon_env_leak_regression";
+    const originalValue = process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+    process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = skillRunId;
+    try {
+      spawnDaemonRun(undefined, undefined, { baseDir, cliEntryPath: scriptPath });
+
+      const deadline = Date.now() + 5000;
+      while (!existsSync(envOutputPath) && Date.now() < deadline) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 25));
+      }
+
+      assert.ok(existsSync(envOutputPath), "fake daemon script did not write env output within timeout");
+      const spawnedEnv = JSON.parse(readFileSync(envOutputPath, "utf8")) as Record<string, string>;
+      assert.equal(spawnedEnv[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR], undefined);
+    } finally {
+      if (originalValue === undefined) {
+        delete process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+      } else {
+        process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = originalValue;
+      }
+    }
   });
 });

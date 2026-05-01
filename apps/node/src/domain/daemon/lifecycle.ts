@@ -2,6 +2,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { chmodSync, closeSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { CLAWPERATOR_SKILL_RUN_ID_ENV_VAR } from "../../contracts/logging.js";
 
 export interface DaemonPathsOptions {
   baseDir?: string;
@@ -304,9 +305,15 @@ export function spawnDaemonRun(
       args.push("--operator-package", operatorPackage);
     }
 
+    // Strip skill run correlation so the long-lived daemon does not inherit a
+    // stale skillRunId from the skill script that triggered this start.
+    const daemonEnv = { ...process.env };
+    delete daemonEnv[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+
     const child = spawn(process.execPath, args, {
       detached: true,
       stdio: ["ignore", logFd, logFd],
+      env: daemonEnv,
     });
     child.unref();
   } finally {

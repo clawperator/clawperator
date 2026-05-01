@@ -318,10 +318,12 @@ async function main(): Promise<void> {
     process.exit(0);
   }
   const out = { format: global.output as "json" | "pretty", verbose: global.verbose };
+  const disableAmbientSkillRunId = cmd === "daemon" && rest[0] === "run";
   const logger = createClawperatorLogger({
     logDir: process.env.CLAWPERATOR_LOG_DIR,
     logLevel: global.logLevel ?? process.env.CLAWPERATOR_LOG_LEVEL,
     outputFormat: global.output,
+    inheritSkillRunId: !disableAmbientSkillRunId,
   });
 
   let result: string | undefined;

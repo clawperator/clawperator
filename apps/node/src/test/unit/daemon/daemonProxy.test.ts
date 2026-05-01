@@ -17,11 +17,13 @@ import { getDaemonLockPath, getDaemonSocketPath } from "../../../domain/daemon/l
 import { DEFAULT_OPERATOR_PACKAGE } from "../../../domain/config/resolveOperatorPackage.js";
 import { getCliBuildIdentity, getCliVersion } from "../../../domain/version/compatibility.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
+import { CLAWPERATOR_SKILL_RUN_ID_ENV_VAR } from "../../../contracts/logging.js";
 import type { RunExecutionResult } from "../../../domain/executions/runExecution.js";
 
 const tempDirs: string[] = [];
 let originalNoDaemon: string | undefined;
 let originalOperatorPackage: string | undefined;
+let originalSkillRunId: string | undefined;
 
 const execution = {
   commandId: "daemon-proxy-test",
@@ -74,6 +76,11 @@ afterEach(async () => {
     delete process.env.CLAWPERATOR_OPERATOR_PACKAGE;
   } else {
     process.env.CLAWPERATOR_OPERATOR_PACKAGE = originalOperatorPackage;
+  }
+  if (originalSkillRunId === undefined) {
+    delete process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+  } else {
+    process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = originalSkillRunId;
   }
 });
 
@@ -133,6 +140,52 @@ describe("tryDaemonExecution", () => {
   });
 
   it("returns a daemon result when version matches", async () => {
+    let postedBody: unknown;
+
+    const result = await tryDaemonExecution(execution, { rawDeviceId: "device-1" }, {
+      ...makeOwnedDaemonDeps(),
+      httpGetFn: makeAliveGet(),
+      httpPostFn: async (_socketPath, _path, body): Promise<DaemonHttpSuccess> => {
+        postedBody = body;
+        return { ok: true, body: JSON.stringify(successResult) };
+      },
+    });
+
+    assert.deepEqual(result, successResult);
+    assert.deepEqual(postedBody, {
+      execution,
+      deviceId: "device-1",
+      operatorPackage: DEFAULT_OPERATOR_PACKAGE,
+    });
+  });
+
+  it("passes inherited skillRunId to the daemon execute request", async () => {
+    const parentSkillRunId = "skillrun_parent_daemon_request";
+    originalSkillRunId = process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+    process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = parentSkillRunId;
+    let postedBody: unknown;
+
+    const result = await tryDaemonExecution(execution, { rawDeviceId: "device-1" }, {
+      ...makeOwnedDaemonDeps(),
+      httpGetFn: makeAliveGet(),
+      httpPostFn: async (_socketPath, _path, body): Promise<DaemonHttpSuccess> => {
+        postedBody = body;
+        return { ok: true, body: JSON.stringify(successResult) };
+      },
+    });
+
+    assert.deepEqual(result, successResult);
+    assert.deepEqual(postedBody, {
+      execution,
+      deviceId: "device-1",
+      operatorPackage: DEFAULT_OPERATOR_PACKAGE,
+      skillRunId: parentSkillRunId,
+    });
+  });
+
+  it("does not pass malformed inherited skillRunId to the daemon execute request", async () => {
+    originalSkillRunId = process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+    process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = "not a skill run id";
     let postedBody: unknown;
 
     const result = await tryDaemonExecution(execution, { rawDeviceId: "device-1" }, {

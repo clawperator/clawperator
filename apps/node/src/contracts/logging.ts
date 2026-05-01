@@ -31,6 +31,9 @@ export interface LogEvent {
   taskId?: string;
   deviceId?: string;
   skillId?: string;
+  skillRunId?: string;
+  logPath?: string;
+  tailCommand?: string;
   stream?: "stdout" | "stderr";
   status?: string;
   durationMs?: number;
@@ -45,6 +48,21 @@ export interface ClawperatorLogger {
   emit(event: LogEvent): void;
   child(defaultContext: Partial<LogEvent>): ClawperatorLogger;
   logPath(): string | undefined;
+}
+
+export const CLAWPERATOR_SKILL_RUN_ID_ENV_VAR = "CLAWPERATOR_SKILL_RUN_ID";
+export const SKILL_RUN_ID_PATTERN = /^skillrun_[A-Za-z0-9._:-]+$/;
+export const SKILL_RUN_ID_MAX_LENGTH = 240;
+
+export function normalizeSkillRunId(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > SKILL_RUN_ID_MAX_LENGTH) {
+    return undefined;
+  }
+  return SKILL_RUN_ID_PATTERN.test(trimmed) ? trimmed : undefined;
 }
 
 // ---------------------------------------------------------------------------

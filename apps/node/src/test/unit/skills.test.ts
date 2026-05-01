@@ -22,13 +22,14 @@ import { listSkills } from "../../domain/skills/listSkills.js";
 import { getSkill } from "../../domain/skills/getSkill.js";
 import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
-import { runSkill } from "../../domain/skills/runSkill.js";
+import { buildSkillRunLogs, runSkill } from "../../domain/skills/runSkill.js";
 import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { parseSkillManifestMetadata } from "../../domain/skills/skillManifest.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 import { cmdSkillsRun, resolveInteractiveSkillTarget } from "../../cli/commands/skills.js";
 import type { SkillResult } from "../../contracts/skillResult.js";
+import { CLAWPERATOR_SKILL_RUN_ID_ENV_VAR } from "../../contracts/logging.js";
 import { createClawperatorLogger } from "../../adapters/logger.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import {
@@ -593,10 +594,13 @@ function getLogPathForDir(logDir: string): string {
   return join(logDir, `clawperator-${yyyy}-${mm}-${dd}.log`);
 }
 
-function parseLogEvents(contents: string): Array<{ event?: string; skillId?: string; stream?: string; message?: string; level?: string; exitCode?: number }> {
+function parseLogEvents(contents: string): Array<{ event?: string; skillId?: string; skillRunId?: string; logPath?: string; tailCommand?: string; stream?: string; message?: string; level?: string; exitCode?: number }> {
   return contents.trimEnd().split("\n").filter(Boolean).map((line) => JSON.parse(line) as {
     event?: string;
     skillId?: string;
+    skillRunId?: string;
+    logPath?: string;
+    tailCommand?: string;
     stream?: string;
     message?: string;
     level?: string;
@@ -7045,12 +7049,15 @@ describe("cmdSkillsRun preflight gate", () => {
 
   it("aborts invalid artifact skills before runSkill is called", async () => {
     let runCalls = 0;
+    const logDir = await mkdtemp(join(tmpdir(), "clawperator-pre-run-log-"));
+    const logger = createClawperatorLogger({ logDir, logLevel: "debug" });
     const fakeRunSkill = async () => {
       runCalls += 1;
       return {
         ok: true,
         status: "success",
         skillId: TEST_SKILL_INVALID_ARTIFACT,
+        skillRunId: "skillrun_test",
         output: "should-not-run",
         exitCode: 0,
         durationMs: 1,
@@ -7058,28 +7065,50 @@ describe("cmdSkillsRun preflight gate", () => {
       } as const;
     };
 
-    const stdout = await cmdSkillsRun(
-      TEST_SKILL_INVALID_ARTIFACT,
-      [],
-      undefined,
-      undefined,
-      undefined,
-      { format: "json", runSkillImpl: fakeRunSkill as typeof runSkill }
-    );
-    const parsed = JSON.parse(stdout) as { code?: string; details?: { artifact?: string } };
-    assert.strictEqual(runCalls, 0);
-    assert.strictEqual(parsed.code, SKILL_VALIDATION_FAILED);
-    assert.strictEqual(parsed.details?.artifact, "artifact.json");
+    try {
+      const stdout = await cmdSkillsRun(
+        TEST_SKILL_INVALID_ARTIFACT,
+        [],
+        undefined,
+        undefined,
+        undefined,
+        { format: "json", runSkillImpl: fakeRunSkill as typeof runSkill, logger }
+      );
+      const parsed = JSON.parse(stdout) as {
+        code?: string;
+        details?: { artifact?: string };
+        logs?: { skillRunId?: string; path?: string; tailCommand?: string };
+      };
+      assert.strictEqual(runCalls, 0);
+      assert.strictEqual(parsed.code, SKILL_VALIDATION_FAILED);
+      assert.strictEqual(parsed.details?.artifact, "artifact.json");
+      assert.match(parsed.logs?.skillRunId ?? "", /^skillrun_/);
+      assert.strictEqual(parsed.logs?.path, logger.logPath());
+      assert.strictEqual(parsed.logs?.tailCommand, `tail -f '${logger.logPath()}'`);
+
+      const contents = await readFile(logger.logPath()!, "utf8");
+      const lines = parseLogEvents(contents);
+      const logLocationLine = lines.find((line) => line.event === "skills.run.log_location");
+      assert.strictEqual(logLocationLine?.skillRunId, parsed.logs?.skillRunId);
+      assert.strictEqual(logLocationLine?.logPath, parsed.logs?.path);
+    } finally {
+      await rm(logDir, { recursive: true, force: true });
+    }
   });
 
   it("proceeds for valid artifact skills and calls runSkill", async () => {
     let runCalls = 0;
-    const fakeRunSkill = async () => {
+    let observedSkillRunId: string | undefined;
+    let observedLogLocationEmitted: boolean | undefined;
+    const fakeRunSkill: typeof runSkill = async (_skillId, _args, _registryPath, _timeoutMs, _env, callbacks) => {
       runCalls += 1;
+      observedSkillRunId = callbacks?.skillRunId;
+      observedLogLocationEmitted = callbacks?.logLocationEmitted;
       return {
         ok: true,
         status: "success",
         skillId: TEST_SKILL_VALID_ARTIFACT,
+        skillRunId: callbacks?.skillRunId ?? "skillrun_test",
         output: "RUN_OK",
         exitCode: 0,
         durationMs: 1,
@@ -7095,14 +7124,61 @@ describe("cmdSkillsRun preflight gate", () => {
       undefined,
       {
         format: "json",
-        runSkillImpl: fakeRunSkill as typeof runSkill,
+        runSkillImpl: fakeRunSkill,
         resolveInteractiveSkillTargetImpl: allowInteractiveTarget,
       }
     );
-    const parsed = JSON.parse(stdout) as { skillId?: string; output?: string };
+    const parsed = JSON.parse(stdout) as { skillId?: string; output?: string; logs?: { skillRunId?: string } };
     assert.strictEqual(runCalls, 1);
+    assert.match(observedSkillRunId ?? "", /^skillrun_/);
+    assert.strictEqual(observedLogLocationEmitted, true);
     assert.strictEqual(parsed.skillId, TEST_SKILL_VALID_ARTIFACT);
     assert.strictEqual(parsed.output, "RUN_OK");
+    assert.strictEqual(parsed.logs?.skillRunId, observedSkillRunId);
+  });
+
+  it("reuses ambient skillRunId for nested CLI skill runs", async () => {
+    const parentSkillRunId = "skillrun_parent_cli_run";
+    const originalEnvValue = process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+    process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = parentSkillRunId;
+    let observedSkillRunId: string | undefined;
+    const fakeRunSkill: typeof runSkill = async (_skillId, _args, _registryPath, _timeoutMs, _env, callbacks) => {
+      observedSkillRunId = callbacks?.skillRunId;
+      return {
+        ok: true,
+        status: "success",
+        skillId: TEST_SKILL_VALID_ARTIFACT,
+        skillRunId: callbacks?.skillRunId ?? "missing",
+        output: "RUN_OK",
+        exitCode: 0,
+        durationMs: 1,
+        skillResult: null,
+      } as const;
+    };
+
+    try {
+      const stdout = await cmdSkillsRun(
+        TEST_SKILL_VALID_ARTIFACT,
+        [],
+        undefined,
+        undefined,
+        undefined,
+        {
+          format: "json",
+          runSkillImpl: fakeRunSkill,
+          resolveInteractiveSkillTargetImpl: allowInteractiveTarget,
+        }
+      );
+      const parsed = JSON.parse(stdout) as { logs?: { skillRunId?: string } };
+      assert.strictEqual(observedSkillRunId, parentSkillRunId);
+      assert.strictEqual(parsed.logs?.skillRunId, parentSkillRunId);
+    } finally {
+      if (originalEnvValue === undefined) {
+        delete process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+      } else {
+        process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = originalEnvValue;
+      }
+    }
   });
 
   it("JSON mode omits duplicate top-level wrapper fields when skillResult is present", async () => {
@@ -7111,6 +7187,8 @@ describe("cmdSkillsRun preflight gate", () => {
       ok: true,
       status: "success",
       skillId: "com.test.framed-cli-json",
+      skillRunId: "skillrun_test_json",
+      logPath: "/tmp/clawperator-test.log",
       output: `progress\n${frameMarker}\n{}\n`,
       exitCode: 0,
       durationMs: 1,
@@ -7143,6 +7221,11 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.strictEqual(parsed.skillId, undefined);
     assert.strictEqual(parsed.exitCode, undefined);
     assert.strictEqual(parsed.output, undefined);
+    assert.deepStrictEqual(parsed.logs, {
+      skillRunId: "skillrun_test_json",
+      path: "/tmp/clawperator-test.log",
+      tailCommand: "tail -f '/tmp/clawperator-test.log'",
+    });
   });
 
   it("JSON mode keeps legacy wrapper fields when skillResult is null", async () => {
@@ -7150,6 +7233,7 @@ describe("cmdSkillsRun preflight gate", () => {
       ok: true,
       status: "success",
       skillId: "com.test.legacy-cli-json",
+      skillRunId: "skillrun_test",
       output: "plain\n",
       exitCode: 0,
       durationMs: 1,
@@ -7190,6 +7274,7 @@ describe("cmdSkillsRun preflight gate", () => {
       code: "SKILL_VERIFICATION_INDETERMINATE",
       message: "Declared verification was not proved.",
       skillId: "com.test.indeterminate-cli",
+      skillRunId: "skillrun_test",
       output: "stdout with frame\n",
       exitCode: 0,
       durationMs: 2,
@@ -7241,6 +7326,7 @@ describe("cmdSkillsRun preflight gate", () => {
         ok: true,
         status: "success",
         skillId: TEST_SKILL_VALID_ARTIFACT,
+        skillRunId: "skillrun_test",
         output: "RUN_OK",
         exitCode: 0,
         durationMs: 1,
@@ -7288,6 +7374,7 @@ describe("cmdSkillsRun preflight gate", () => {
             ok: true,
             status: "success",
             skillId: TEST_SKILL_VALID_ARTIFACT,
+            skillRunId: "skillrun_test",
             output: "RUN_OK",
             exitCode: 0,
             durationMs: 1,
@@ -7336,6 +7423,7 @@ describe("cmdSkillsRun preflight gate", () => {
             ok: true,
             status: "success",
             skillId: TEST_SKILL_VALID_ARTIFACT,
+            skillRunId: "skillrun_test",
             output: "RUN_OK",
             exitCode: 0,
             durationMs: 1,
@@ -7385,6 +7473,7 @@ describe("cmdSkillsRun preflight gate", () => {
             ok: true,
             status: "success",
             skillId: TEST_SKILL_VALID_ARTIFACT,
+            skillRunId: "skillrun_test",
             output: "RUN_OK",
             exitCode: 0,
             durationMs: 1,
@@ -7413,6 +7502,7 @@ describe("cmdSkillsRun preflight gate", () => {
         ok: true,
         status: "success",
         skillId: TEST_SKILL_VALID_ARTIFACT,
+        skillRunId: "skillrun_test",
         output: "RUN_OK",
         exitCode: 0,
         durationMs: 1,
@@ -7468,6 +7558,7 @@ describe("cmdSkillsRun preflight gate", () => {
             ok: true,
             status: "success",
             skillId: ${JSON.stringify(TEST_SKILL_VALID_ARTIFACT)},
+            skillRunId: "skillrun_test",
             output: "RUN_OK",
             exitCode: 0,
             durationMs: 1,
@@ -7529,6 +7620,7 @@ describe("cmdSkillsRun preflight gate", () => {
               ok: true,
               status: "success",
               skillId: ${JSON.stringify(TEST_FIXTURE_CHUNKED_OUTPUT)},
+              skillRunId: "skillrun_test",
               output: "chunk1\\nchunk2\\n",
               exitCode: 0,
               durationMs: 1,
@@ -7564,6 +7656,7 @@ describe("cmdSkillsRun preflight gate", () => {
         ok: true,
         status: "success",
         skillId: TEST_SKILL_INVALID_ARTIFACT,
+        skillRunId: "skillrun_test",
         output: "RUN_OK",
         exitCode: 0,
         durationMs: 1,
@@ -7976,8 +8069,71 @@ describe("runSkill logging", () => {
     );
     const startLine = lines.find((line) => line.event === "skills.run.start");
     const completeLine = lines.find((line) => line.event === "skills.run.complete");
+    const logLocationLine = lines.find((line) => line.event === "skills.run.log_location");
     assert.strictEqual(startLine?.skillId, TEST_FIXTURE_MIXED_STREAMS);
     assert.strictEqual(completeLine?.skillId, TEST_FIXTURE_MIXED_STREAMS);
+    assert.strictEqual(logLocationLine?.skillId, TEST_FIXTURE_MIXED_STREAMS);
+    assert.match(logLocationLine?.skillRunId ?? "", /^skillrun_/);
+    assert.strictEqual(startLine?.skillRunId, logLocationLine?.skillRunId);
+    assert.strictEqual(outputLines[0]?.skillRunId, logLocationLine?.skillRunId);
+    assert.strictEqual(completeLine?.skillRunId, logLocationLine?.skillRunId);
+    assert.strictEqual(logLocationLine?.logPath, logger.logPath());
+    assert.strictEqual(logLocationLine?.tailCommand, `tail -f '${logger.logPath()}'`);
+    assert.strictEqual(result.skillRunId, logLocationLine?.skillRunId);
+    assert.strictEqual(result.logPath, logger.logPath());
+  });
+
+  it("shell-quotes log paths in the advisory tail command", () => {
+    const logs = buildSkillRunLogs({
+      ok: false,
+      status: "failed",
+      code: "TEST",
+      message: "failed",
+      skillId: "com.test",
+      skillResult: null,
+      skillRunId: "skillrun_test",
+      logPath: `/tmp/clawperator logs/owner's "daily".log`,
+    });
+
+    assert.strictEqual(logs.tailCommand, `tail -f '/tmp/clawperator logs/owner'"'"'s "daily".log'`);
+  });
+
+  it("omits logPath metadata when file logging disables on the first write", async () => {
+    const blockedLogDir = join(tempRoot, "not-a-directory");
+    await writeFile(blockedLogDir, "not a directory", "utf8");
+    const logger = createClawperatorLogger({ logDir: blockedLogDir, logLevel: "debug" });
+
+    const result = await runSkill(TEST_FIXTURE_MIXED_STREAMS, [], undefined, undefined, undefined, {
+      logger,
+    });
+
+    assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.logPath, undefined);
+    assert.strictEqual(logger.logPath(), undefined);
+  });
+
+  it("omits logPath metadata when file logging disables after the location event", async () => {
+    let disabled = false;
+    const logger = {
+      emit(event: { event?: string }) {
+        if (event.event === "skills.run.start") {
+          disabled = true;
+        }
+      },
+      child() {
+        return this;
+      },
+      logPath() {
+        return disabled ? undefined : "/tmp/clawperator-later-disabled.log";
+      },
+    };
+
+    const result = await runSkill(TEST_FIXTURE_MIXED_STREAMS, [], undefined, undefined, undefined, {
+      logger,
+    });
+
+    assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.logPath, undefined);
   });
 
   it("logs start and complete without leaking sentinel args", async () => {
@@ -8066,5 +8222,57 @@ describe("runSkill logging", () => {
     const fallbackLine = lines.find((line) => line.event === "skills.run.signal_fallback");
     assert.strictEqual(fallbackLine?.skillId, "com.test.partial-timeout");
     assert.match(fallbackLine?.message ?? "", /falling back to direct child termination/i);
+  });
+
+  it("inherits skillRunId from process.env for nested CLI invocations", async () => {
+    const parentSkillRunId = "skillrun_parent_test_inherited";
+    const originalEnvValue = process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+    process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = parentSkillRunId;
+    try {
+      const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });
+      const result = await runSkill(TEST_FIXTURE_MIXED_STREAMS, [], undefined, undefined, undefined, { logger });
+
+      assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+      assert.strictEqual(result.skillRunId, parentSkillRunId);
+
+      const contents = await readFile(logger.logPath()!, "utf8");
+      const lines = parseLogEvents(contents);
+      const logLocationLine = lines.find((line) => line.event === "skills.run.log_location");
+      assert.strictEqual(logLocationLine?.skillRunId, parentSkillRunId);
+      const startLine = lines.find((line) => line.event === "skills.run.start");
+      assert.strictEqual(startLine?.skillRunId, parentSkillRunId);
+      const completeLine = lines.find((line) => line.event === "skills.run.complete");
+      assert.strictEqual(completeLine?.skillRunId, parentSkillRunId);
+    } finally {
+      if (originalEnvValue === undefined) {
+        delete process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+      } else {
+        process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = originalEnvValue;
+      }
+    }
+  });
+
+  it("generates a fresh skillRunId when inherited environment value is blank", async () => {
+    const originalEnvValue = process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+    process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = "   ";
+    try {
+      const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });
+      const result = await runSkill(TEST_FIXTURE_MIXED_STREAMS, [], undefined, undefined, undefined, { logger });
+
+      assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+      assert.match(result.skillRunId, /^skillrun_/);
+      assert.notStrictEqual(result.skillRunId, "");
+
+      const contents = await readFile(logger.logPath()!, "utf8");
+      const lines = parseLogEvents(contents);
+      const logLocationLine = lines.find((line) => line.event === "skills.run.log_location");
+      assert.strictEqual(logLocationLine?.skillRunId, result.skillRunId);
+    } finally {
+      if (originalEnvValue === undefined) {
+        delete process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+      } else {
+        process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = originalEnvValue;
+      }
+    }
   });
 });

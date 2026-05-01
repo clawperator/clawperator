@@ -5,7 +5,13 @@ import { listDevices } from "../../domain/devices/listDevices.js";
 import { listSkills } from "../../domain/skills/listSkills.js";
 import { getSkill } from "../../domain/skills/getSkill.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
-import { runSkill, type SkillRunEnv } from "../../domain/skills/runSkill.js";
+import {
+  runSkill,
+  buildSkillRunLogMetadata,
+  buildSkillRunLogs,
+  createSkillRunId,
+  type SkillRunEnv,
+} from "../../domain/skills/runSkill.js";
 import { validateSkill } from "../../domain/skills/validateSkill.js";
 import { clawperatorEvents, CLAWPERATOR_EVENT_TYPES } from "../../domain/observe/events.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -17,10 +23,15 @@ import { createAvd, deleteAvd, enableEmulatorDeveloperSettings, startAvd, stopAv
 import { provisionEmulator } from "../../domain/android-emulators/provision.js";
 import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 import type { Logger } from "../../adapters/logger.js";
+import { normalizeSkillRunId } from "../../contracts/logging.js";
 import { resolveOperatorPackageForRequest } from "../../domain/config/resolveOperatorPackage.js";
 import { getCliBuildIdentity, getCliVersion } from "../../domain/version/compatibility.js";
 import { resolveInteractiveSkillTarget } from "./skills.js";
 import { toPublicInteractiveAutomationError } from "../../domain/doctor/checks/deviceInteractivity.js";
+
+interface ServeSkillRunLocals {
+  skillRunId?: string;
+}
 
 export interface ServeAppOptions {
   verbose: boolean;
@@ -66,6 +77,33 @@ export function mapServeErrorCodeToStatus(code: string): number {
     case ERROR_CODES.EMULATOR_ALREADY_RUNNING: return 409;
     default: return 500;
   }
+}
+
+function extractRequestSkillRunId(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null || !("skillRunId" in body)) {
+    return undefined;
+  }
+  const value = (body as { skillRunId?: unknown }).skillRunId;
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  return normalizeSkillRunId(value);
+}
+
+function requestLoggerForSkillRun(options: ServeAppOptions, skillRunId: string | undefined): Logger | undefined {
+  return skillRunId === undefined ? options.logger : options.logger?.child({ skillRunId });
+}
+
+function isServeSkillRunRequest(method: string, path: string): boolean {
+  return method === "POST" && /^\/skills\/[^/]+\/run(?:\/)?$/.test(path);
+}
+
+function getServeSkillRunId(res: express.Response): string | undefined {
+  return (res.locals as ServeSkillRunLocals).skillRunId;
+}
+
+function setServeSkillRunId(res: express.Response, skillRunId: string): void {
+  (res.locals as ServeSkillRunLocals).skillRunId = skillRunId;
 }
 
 export async function cmdServe(options: ServeOptions): Promise<void> {
@@ -160,10 +198,14 @@ export function createServeApp(options: ServeAppOptions): express.Application {
 
   // Log all requests when a logger is configured (filtered by log level at the file sink).
   // Without a logger, fall back to console.log only when --verbose is set (legacy behavior).
-  app.use((req, _res, next) => {
+  app.use((req, res, next) => {
+    if (isServeSkillRunRequest(req.method, req.path) && getServeSkillRunId(res) === undefined) {
+      setServeSkillRunId(res, createSkillRunId());
+    }
     const clientIp = req.socket.remoteAddress || "unknown";
-    if (options.logger) {
-      options.logger.emit({
+    const requestLogger = requestLoggerForSkillRun(options, getServeSkillRunId(res) ?? extractRequestSkillRunId(req.body));
+    if (requestLogger) {
+      requestLogger.emit({
         ts: new Date().toISOString(),
         level: "info",
         event: "serve.http.request",
@@ -222,7 +264,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
       return;
     }
 
-    const { execution, deviceId, operatorPackage } = req.body;
+    const { execution, deviceId, operatorPackage, skillRunId } = req.body;
     
     if (!execution) {
       res.status(400).json({ ok: false, error: { code: "MISSING_EXECUTION", message: "Missing 'execution' in body" } });
@@ -247,11 +289,25 @@ export function createServeApp(options: ServeAppOptions): express.Application {
       return;
     }
 
+    if (skillRunId !== undefined && typeof skillRunId !== "string") {
+      res.status(400).json({ ok: false, error: { code: "INVALID_SKILL_RUN_ID", message: "'skillRunId' must be a string when provided" } });
+      return;
+    }
+    if (typeof skillRunId === "string" && skillRunId.trim().length === 0) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_SKILL_RUN_ID", message: "'skillRunId' must be a non-empty string when provided" } });
+      return;
+    }
+    if (typeof skillRunId === "string" && normalizeSkillRunId(skillRunId) === undefined) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_SKILL_RUN_ID", message: "'skillRunId' must start with 'skillrun_' and contain only safe identifier characters" } });
+      return;
+    }
+
     try {
+      const requestSkillRunId = normalizeSkillRunId(skillRunId);
       const result = await runExecution(execution, {
         deviceId,
         operatorPackage: resolveServeOperatorPackage(operatorPackage),
-        logger: options.logger,
+        logger: requestLoggerForSkillRun(options, requestSkillRunId),
       });
 
       if (result.ok) {
@@ -537,8 +593,33 @@ export function createServeApp(options: ServeAppOptions): express.Application {
   // REST: Run skill (convenience)
   app.post("/skills/:skillId/run", async (req, res) => {
     try {
+      const routeSkillId = req.params.skillId;
+      const bodyForContext = typeof req.body === "object" && req.body !== null && !Array.isArray(req.body)
+        ? req.body as { deviceId?: unknown }
+        : undefined;
+      const validDeviceContext = typeof bodyForContext?.deviceId === "string" && bodyForContext.deviceId.trim().length > 0
+        ? bodyForContext.deviceId
+        : undefined;
+      const skillRunId = getServeSkillRunId(res) ?? createSkillRunId();
+      const skillLogger = options.logger?.child({ skillId: routeSkillId, deviceId: validDeviceContext, skillRunId });
+      let preRunLogs = buildSkillRunLogMetadata(skillRunId, skillLogger?.logPath());
+      const currentPreRunLogs = () => buildSkillRunLogMetadata(skillRunId, skillLogger?.logPath());
+
+      skillLogger?.emit({
+        ts: new Date().toISOString(),
+        level: "info",
+        event: "skills.run.log_location",
+        skillId: routeSkillId,
+        logPath: preRunLogs.path,
+        tailCommand: preRunLogs.tailCommand,
+        message: preRunLogs.path !== undefined
+          ? `Skill ${routeSkillId} run ${skillRunId} logging to ${preRunLogs.path}; observe with: ${preRunLogs.tailCommand}`
+          : `Skill ${routeSkillId} run ${skillRunId} started with file logging unavailable`,
+      });
+      preRunLogs = currentPreRunLogs();
+
       if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
-        res.status(400).json({ ok: false, error: { code: "INVALID_BODY", message: "Request body must be a JSON object" } });
+        res.status(400).json({ ok: false, error: { code: "INVALID_BODY", message: "Request body must be a JSON object", logs: preRunLogs } });
         return;
       }
 
@@ -557,42 +638,42 @@ export function createServeApp(options: ServeAppOptions): express.Application {
       };
 
       if (deviceId !== undefined && typeof deviceId !== "string") {
-        res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string" } });
+        res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a string", logs: preRunLogs } });
         return;
       }
       if (typeof deviceId === "string" && deviceId.trim().length === 0) {
-        res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a non-empty string when provided" } });
+        res.status(400).json({ ok: false, error: { code: "INVALID_DEVICE_ID", message: "'deviceId' must be a non-empty string when provided", logs: preRunLogs } });
         return;
       }
 
       if (operatorPackage !== undefined && typeof operatorPackage !== "string") {
-        res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a string" } });
+        res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a string", logs: preRunLogs } });
         return;
       }
       if (typeof operatorPackage === "string" && operatorPackage.trim().length === 0) {
-        res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a non-empty string" } });
+        res.status(400).json({ ok: false, error: { code: "INVALID_OPERATOR_PACKAGE", message: "'operatorPackage' must be a non-empty string", logs: preRunLogs } });
         return;
       }
 
       if (args !== undefined && !Array.isArray(args)) {
-        res.status(400).json({ ok: false, error: { code: "INVALID_ARGS", message: "'args' must be an array" } });
+        res.status(400).json({ ok: false, error: { code: "INVALID_ARGS", message: "'args' must be an array", logs: preRunLogs } });
         return;
       }
 
       if (timeoutMs !== undefined && (!Number.isInteger(timeoutMs) || Number(timeoutMs) <= 0)) {
-        res.status(400).json({ ok: false, error: { code: "INVALID_TIMEOUT_MS", message: "'timeoutMs' must be a positive integer" } });
+        res.status(400).json({ ok: false, error: { code: "INVALID_TIMEOUT_MS", message: "'timeoutMs' must be a positive integer", logs: preRunLogs } });
         return;
       }
 
       if (expectContains !== undefined && typeof expectContains !== "string") {
-        res.status(400).json({ ok: false, error: { code: "INVALID_EXPECT_CONTAINS", message: "'expectContains' must be a string" } });
+        res.status(400).json({ ok: false, error: { code: "INVALID_EXPECT_CONTAINS", message: "'expectContains' must be a string", logs: preRunLogs } });
         return;
       }
 
       const requestedArgs = Array.isArray(args) ? args.map(String) : undefined;
       const expectContainsArg =
         typeof expectContains === "string" ? expectContains : undefined;
-      const validation = await validateSkill(req.params.skillId, undefined, { dryRun: true });
+      const validation = await validateSkill(routeSkillId, undefined, { dryRun: true });
       if (!validation.ok) {
         const status = validation.code === SKILL_NOT_FOUND ? 404
           : validation.code === REGISTRY_READ_FAILED ? 500
@@ -604,9 +685,10 @@ export function createServeApp(options: ServeAppOptions): express.Application {
             code: validation.code,
             message: validation.message,
             details: validation.details,
-            skillId: req.params.skillId,
+            skillId: routeSkillId,
             timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
             expectedSubstring: expectContainsArg,
+            logs: currentPreRunLogs(),
           },
         });
         return;
@@ -619,7 +701,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
       const interactiveTarget = await resolveInteractiveSkillTargetImpl(resolvedOperatorPackage, {
         adbPath: process.env.ADB_PATH,
         deviceId: typeof deviceId === "string" ? deviceId : undefined,
-        logger: options.logger,
+        logger: skillLogger,
       });
       if (!interactiveTarget.ok) {
         const interactiveError = interactiveTarget.error;
@@ -631,9 +713,10 @@ export function createServeApp(options: ServeAppOptions): express.Application {
           ok: false,
           error: {
             ...publicError,
-            skillId: req.params.skillId,
+            skillId: routeSkillId,
             timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
             expectedSubstring: expectContainsArg,
+            logs: currentPreRunLogs(),
           },
         });
         return;
@@ -646,12 +729,12 @@ export function createServeApp(options: ServeAppOptions): express.Application {
       );
 
       const result = await runSkill(
-        req.params.skillId,
+        routeSkillId,
         scriptArgs,
         undefined,
         typeof timeoutMs === "number" ? timeoutMs : undefined,
         skillEnv,
-        { logger: options.logger },
+        { logger: skillLogger, skillRunId, logLocationEmitted: true },
         expectContainsArg
       );
       if (result.status === "success") {
@@ -660,6 +743,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
             ok: true,
             skillResult: result.skillResult,
             durationMs: result.durationMs,
+            logs: buildSkillRunLogs(result),
             timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
             expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
           });
@@ -672,6 +756,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
             exitCode: result.exitCode,
             durationMs: result.durationMs,
             skillResult: result.skillResult,
+            logs: buildSkillRunLogs(result),
             timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
             expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
           });
@@ -685,6 +770,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
             message: result.message,
             skillResult: result.skillResult,
             durationMs: result.durationMs,
+            logs: buildSkillRunLogs(result),
             timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
             expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
           });
@@ -699,6 +785,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
             exitCode: result.exitCode,
             durationMs: result.durationMs,
             skillResult: result.skillResult,
+            logs: buildSkillRunLogs(result),
             timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
             expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
           });
@@ -713,6 +800,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
             skillId: result.skillId,
             output: result.output,
             skillResult: result.skillResult,
+            logs: buildSkillRunLogs(result),
             expectedSubstring: result.expectedSubstring,
             timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
           },
@@ -732,6 +820,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
             stdout: result.stdout,
             stderr: result.stderr,
             skillResult: result.skillResult,
+            logs: buildSkillRunLogs(result),
             timeoutMs: typeof timeoutMs === "number" ? timeoutMs : undefined,
             expectedSubstring: typeof expectContains === "string" ? expectContains : undefined,
           },
