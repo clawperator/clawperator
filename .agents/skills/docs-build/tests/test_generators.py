@@ -374,6 +374,22 @@ class ValidateDocsIaTests(unittest.TestCase):
         self.assertEqual(warnings[0].kind, "command-detail")
         self.assertIn("read", warnings[0].message)
 
+    def test_generated_command_with_planned_detail_warns(self) -> None:
+        with TemporaryDirectory() as tmp:
+            cli_reference = Path(tmp) / "cli.md"
+            cli_reference.write_text(
+                "| Command | Group | Primary syntax | Primary flags | Details | Summary |\n"
+                "| --- | --- | --- | --- | --- | --- |\n"
+                "| [`skills`](#command-skills) | Execution | `skills list` | - | Planned: `../skills/cli.md` | Skills |\n",
+                encoding="utf-8",
+            )
+
+            warnings = docs_ia.check_generated_cli_details(cli_reference)
+
+        self.assertEqual(len(warnings), 1)
+        self.assertEqual(warnings[0].kind, "command-detail")
+        self.assertIn("skills", warnings[0].message)
+
 
 if __name__ == "__main__":
     unittest.main()

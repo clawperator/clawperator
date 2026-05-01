@@ -68,7 +68,7 @@ echo "Validating docs routes and machine-facing files..."
   --mkdocs-yml "$DOCS_DIR/mkdocs.yml"
 
 echo "Running warning-only docs IA checks..."
-"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/docs-build/scripts/validate_docs_ia.py" || true
+"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/docs-build/scripts/validate_docs_ia.py"
 
 # Verify build output
 if [ -d "site" ] && [ -f "site/index.html" ]; then

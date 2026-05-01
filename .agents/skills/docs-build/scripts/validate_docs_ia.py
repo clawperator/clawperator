@@ -189,7 +189,7 @@ def check_generated_cli_details(cli_reference: Path) -> list[DocsIaWarning]:
             continue
         command = cells[0]
         details = cells[4]
-        if details == "-":
+        if details == "-" or details.startswith("Planned:"):
             warnings.append(DocsIaWarning(
                 kind="command-detail",
                 path=display_path(cli_reference),
@@ -197,7 +197,7 @@ def check_generated_cli_details(cli_reference: Path) -> list[DocsIaWarning]:
                 message=f"generated command {command} has no Details link",
                 suggestion="Add command_details metadata in sites/docs/ownership.yaml.",
             ))
-    for match in re.finditer(r"(?m)^### `([^`]+)`\n(?:.*\n){0,8}?\- Details: -$", text):
+    for match in re.finditer(r"(?m)^### `([^`]+)`\n(?:.*\n){0,8}?\- Details: (-|Planned: .*)$", text):
         line = text.count("\n", 0, match.start()) + 1
         warnings.append(DocsIaWarning(
             kind="command-detail",
