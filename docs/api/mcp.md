@@ -437,7 +437,7 @@ Behavior notes:
 - if submit is requested but no truthful submit action exists after text entry,
   the text-entry step still succeeds
 - for the full action contract and runtime details, see
-  [Actions - `enter_text`](actions.md#enter_text)
+  [Actions - `enter_text`](actions.md#action-enter-text)
 
 Example call:
 

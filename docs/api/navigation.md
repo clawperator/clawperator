@@ -276,7 +276,7 @@ CLI aliases accepted for agent-first ergonomics:
 
 - command alias: `wait_for_navigation`
 - target-package flags: `--package`, `--package-id`, `--application-id`
-- selector flag aliases from [Selectors](selectors.md): `--resource-id`, `--content-desc`, `--content-desc-contains`
+- selector flags from [Selectors](selectors.md): `--id`, `--desc`, `--desc-contains`
 
 Current public parameters:
 
