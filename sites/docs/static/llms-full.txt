@@ -10209,7 +10209,8 @@ Argument and env rules:
   wrapper flags
 - `CLAWPERATOR_BIN` and `CLAWPERATOR_OPERATOR_PACKAGE` are injected into the
   script environment
-- `--timeout` overrides the wrapper timeout for this run only
+- `--timeout` overrides the wrapper timeout for this run only; `--timeout-ms`
+  is accepted as an alias
 
 Default runtime values:
 
@@ -10240,8 +10241,8 @@ the domain answer.
 }
 ```
 
-`timeoutMs` appears only when the caller passed `--timeout`. `expectedSubstring`
-appears only when the caller passed `--expect-contains`.
+`timeoutMs` appears only when the caller passed `--timeout` or `--timeout-ms`.
+`expectedSubstring` appears only when the caller passed `--expect-contains`.
 
 ### Successful Unframed Result
 
