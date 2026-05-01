@@ -49,7 +49,7 @@ Existing documentation - including other pages in `docs/` - is advisory only. Fo
 
 If existing docs and code disagree, the code is correct.
 
-## Docs IA Guardrails
+## Docs Organization Guardrails
 
 Keep authored pages, generated pages, and routing metadata in their own lanes:
 
@@ -189,7 +189,7 @@ After each page, run:
 ./scripts/docs_build.sh
 ```
 
-The build includes warning-only docs IA checks for broken internal anchors,
+The build includes warning-only docs organization checks for broken internal anchors,
 compatibility-only selector aliases in authored public docs, and generated CLI
 commands missing detail links. Warnings do not fail the build yet, but treat
 them as review items and fix the source, generator, or ownership metadata when

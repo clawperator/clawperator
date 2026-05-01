@@ -77,7 +77,7 @@ The design intent for this pack is:
 ## Out of Scope
 
 - Install-script or onboarding artifact changes
-- Docs IA or CLI-orientation work from D1 and D2
+- Docs organization or CLI-orientation work from D1 and D2
 - New runtime skills or app-specific workflow redesign
 - Deep UI-state probing for subjective preconditions such as "user is signed in"
 - Turning `doctor` into a skill-capability browser

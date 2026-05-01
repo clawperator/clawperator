@@ -72,7 +72,7 @@ wrong mental model.
 - folding bundled skills into the runtime `clawperator skills` namespace
 - changing or versioning the sibling `../clawperator-skills` repo
 - adding new bundled skills beyond the current four shipped entries
-- redesigning runtime-skill behavior, registry format, or runtime-skill docs IA
+- redesigning runtime-skill behavior, registry format, or runtime-skill docs organization
 - rewriting unrelated repo-local maintenance skills under `.agents/skills/`
 
 ## Existing Artifact Scope

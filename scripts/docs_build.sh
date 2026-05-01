@@ -67,8 +67,8 @@ echo "Validating docs routes and machine-facing files..."
   --llms-txt "$DOCS_DIR/static/llms.txt" \
   --mkdocs-yml "$DOCS_DIR/mkdocs.yml"
 
-echo "Running warning-only docs IA checks..."
-"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/docs-build/scripts/validate_docs_ia.py"
+echo "Running warning-only docs organization checks..."
+"$VENV_DIR/bin/python" "$REPO_ROOT/.agents/skills/docs-build/scripts/validate_docs_organization.py"
 
 # Verify build output
 if [ -d "site" ] && [ -f "site/index.html" ]; then

@@ -18,7 +18,7 @@ COMPATIBILITY_SELECTOR_ALIASES = {
 
 
 @dataclass(frozen=True)
-class DocsIaWarning:
+class DocsOrganizationWarning:
     kind: str
     path: str
     message: str
@@ -29,7 +29,7 @@ class DocsIaWarning:
         location = self.path
         if self.line is not None:
             location = f"{location}:{self.line}"
-        rendered = f"WARNING docs-ia {self.kind}: {location}: {self.message}"
+        rendered = f"WARNING docs-organization {self.kind}: {location}: {self.message}"
         if self.suggestion:
             rendered += f" Suggested owner: {self.suggestion}"
         return rendered
@@ -113,8 +113,8 @@ def resolve_markdown_target(source: Path, build_root: Path, href_path: str) -> P
     return candidate
 
 
-def check_internal_anchors(build_root: Path) -> list[DocsIaWarning]:
-    warnings: list[DocsIaWarning] = []
+def check_internal_anchors(build_root: Path) -> list[DocsOrganizationWarning]:
+    warnings: list[DocsOrganizationWarning] = []
     anchor_cache: dict[Path, set[str]] = {}
     for source in sorted(build_root.rglob("*.md")):
         text = source.read_text(encoding="utf-8")
@@ -126,7 +126,7 @@ def check_internal_anchors(build_root: Path) -> list[DocsIaWarning]:
                 continue
             target = resolve_markdown_target(source, build_root, href_path)
             if target is None or not target.exists():
-                warnings.append(DocsIaWarning(
+                warnings.append(DocsOrganizationWarning(
                     kind="anchor",
                     path=display_path(source, build_root),
                     line=line,
@@ -137,7 +137,7 @@ def check_internal_anchors(build_root: Path) -> list[DocsIaWarning]:
             if target not in anchor_cache:
                 anchor_cache[target] = anchors_for_markdown(target.read_text(encoding="utf-8"))
             if anchor not in anchor_cache[target]:
-                warnings.append(DocsIaWarning(
+                warnings.append(DocsOrganizationWarning(
                     kind="anchor",
                     path=display_path(source, build_root),
                     line=line,
@@ -147,8 +147,8 @@ def check_internal_anchors(build_root: Path) -> list[DocsIaWarning]:
     return warnings
 
 
-def check_compatibility_aliases(docs_root: Path) -> list[DocsIaWarning]:
-    warnings: list[DocsIaWarning] = []
+def check_compatibility_aliases(docs_root: Path) -> list[DocsOrganizationWarning]:
+    warnings: list[DocsOrganizationWarning] = []
     for source in sorted(docs_root.rglob("*.md")):
         relative = source.relative_to(docs_root)
         if relative.parts and relative.parts[0] == "internal":
@@ -160,7 +160,7 @@ def check_compatibility_aliases(docs_root: Path) -> list[DocsIaWarning]:
             pattern = rf"(?<![A-Za-z0-9_-]){re.escape(alias)}(?![A-Za-z0-9_-])"
             for match in re.finditer(pattern, text):
                 line = text.count("\n", 0, match.start()) + 1
-                warnings.append(DocsIaWarning(
+                warnings.append(DocsOrganizationWarning(
                     kind="compat-alias",
                     path=display_path(source),
                     line=line,
@@ -170,16 +170,16 @@ def check_compatibility_aliases(docs_root: Path) -> list[DocsIaWarning]:
     return warnings
 
 
-def check_generated_cli_details(cli_reference: Path) -> list[DocsIaWarning]:
+def check_generated_cli_details(cli_reference: Path) -> list[DocsOrganizationWarning]:
     if not cli_reference.exists():
-        return [DocsIaWarning(
+        return [DocsOrganizationWarning(
             kind="command-detail",
             path=display_path(cli_reference),
             message="generated CLI reference is missing",
             suggestion="Run the docs-build assembly workflow.",
         )]
 
-    warnings: list[DocsIaWarning] = []
+    warnings: list[DocsOrganizationWarning] = []
     text = cli_reference.read_text(encoding="utf-8")
     for line_number, line in enumerate(text.splitlines(), start=1):
         if not line.startswith("| [`"):
@@ -190,7 +190,7 @@ def check_generated_cli_details(cli_reference: Path) -> list[DocsIaWarning]:
         command = cells[0]
         details = cells[4]
         if details == "-" or details.startswith("Planned:"):
-            warnings.append(DocsIaWarning(
+            warnings.append(DocsOrganizationWarning(
                 kind="command-detail",
                 path=display_path(cli_reference),
                 line=line_number,
@@ -199,7 +199,7 @@ def check_generated_cli_details(cli_reference: Path) -> list[DocsIaWarning]:
             ))
     for match in re.finditer(r"(?m)^### `([^`]+)`\n(?:.*\n){0,8}?\- Details: (-|Planned: .*)$", text):
         line = text.count("\n", 0, match.start()) + 1
-        warnings.append(DocsIaWarning(
+        warnings.append(DocsOrganizationWarning(
             kind="command-detail",
             path=display_path(cli_reference),
             line=line,
@@ -235,8 +235,8 @@ def split_markdown_table_row(line: str) -> list[str]:
     return cells
 
 
-def run_checks(docs_root: Path, build_root: Path) -> list[DocsIaWarning]:
-    warnings: list[DocsIaWarning] = []
+def run_checks(docs_root: Path, build_root: Path) -> list[DocsOrganizationWarning]:
+    warnings: list[DocsOrganizationWarning] = []
     warnings.extend(check_internal_anchors(build_root))
     warnings.extend(check_compatibility_aliases(docs_root))
     warnings.extend(check_generated_cli_details(build_root / "api" / "cli.md"))
@@ -244,7 +244,7 @@ def run_checks(docs_root: Path, build_root: Path) -> list[DocsIaWarning]:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Warning-only docs IA drift checks.")
+    parser = argparse.ArgumentParser(description="Warning-only docs organization drift checks.")
     parser.add_argument("--docs-root", type=Path, default=default_docs_root())
     parser.add_argument("--build-root", type=Path, default=default_build_root())
     return parser.parse_args()
@@ -256,9 +256,9 @@ def main() -> int:
     for warning in warnings:
         print(warning.render(), file=sys.stderr)
     if warnings:
-        print(f"Docs IA warning-only check emitted {len(warnings)} warning(s).", file=sys.stderr)
+        print(f"Docs organization warning-only check emitted {len(warnings)} warning(s).", file=sys.stderr)
     else:
-        print("Docs IA warning-only check emitted no warnings.", file=sys.stderr)
+        print("Docs organization warning-only check emitted no warnings.", file=sys.stderr)
     return 0
 
 

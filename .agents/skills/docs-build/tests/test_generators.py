@@ -38,9 +38,9 @@ llms_full = load_module(
     ".agents/skills/docs-build/scripts/generate_llms_full.py",
     "docs_generate_generate_llms_full",
 )
-docs_ia = load_module(
-    ".agents/skills/docs-build/scripts/validate_docs_ia.py",
-    "docs_validate_docs_ia",
+docs_organization = load_module(
+    ".agents/skills/docs-build/scripts/validate_docs_organization.py",
+    "docs_validate_docs_organization",
 )
 
 
@@ -307,7 +307,7 @@ class GenerateLlmsFullTests(unittest.TestCase):
         self.assertIn("Network &amp; internet", rendered)
 
 
-class ValidateDocsIaTests(unittest.TestCase):
+class ValidateDocsOrganizationTests(unittest.TestCase):
     def test_valid_anchor_link_has_no_warning(self) -> None:
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -322,7 +322,7 @@ class ValidateDocsIaTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            warnings = docs_ia.check_internal_anchors(build)
+            warnings = docs_organization.check_internal_anchors(build)
 
         self.assertEqual(warnings, [])
 
@@ -337,7 +337,7 @@ class ValidateDocsIaTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            warnings = docs_ia.check_internal_anchors(build)
+            warnings = docs_organization.check_internal_anchors(build)
 
         self.assertEqual(len(warnings), 1)
         self.assertEqual(warnings[0].kind, "anchor")
@@ -352,7 +352,7 @@ class ValidateDocsIaTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            warnings = docs_ia.check_compatibility_aliases(docs)
+            warnings = docs_organization.check_compatibility_aliases(docs)
 
         self.assertEqual(len(warnings), 1)
         self.assertEqual(warnings[0].kind, "compat-alias")
@@ -368,7 +368,7 @@ class ValidateDocsIaTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            warnings = docs_ia.check_generated_cli_details(cli_reference)
+            warnings = docs_organization.check_generated_cli_details(cli_reference)
 
         self.assertEqual(len(warnings), 1)
         self.assertEqual(warnings[0].kind, "command-detail")
@@ -384,7 +384,7 @@ class ValidateDocsIaTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            warnings = docs_ia.check_generated_cli_details(cli_reference)
+            warnings = docs_organization.check_generated_cli_details(cli_reference)
 
         self.assertEqual(len(warnings), 1)
         self.assertEqual(warnings[0].kind, "command-detail")

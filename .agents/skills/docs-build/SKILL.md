@@ -49,7 +49,7 @@ directory first.
    - `.agents/skills/docs-build/scripts/generate_selector_table.py`
 5. Validate the assembled docs and built site:
    - `./scripts/docs_build.sh`
-   - The build also runs warning-only docs IA checks for anchors, compatibility
+   - The build also runs warning-only docs organization checks for anchors, compatibility
      aliases, and generated command detail links.
 6. If the build fails, fix the underlying source or generator and rerun the build.
 
@@ -69,7 +69,7 @@ Do not leave deleted docs referenced in the docs site manifest or navigation.
 ## Churn Policy
 
 - Prefer minimal edits to existing authored pages.
-- Do not reorder navigation or rename output files unless the IA changes.
+- Do not reorder navigation or rename output files unless the docs organization changes.
 - Do not rewrap paragraphs just to change formatting.
 - If a user explicitly wants stale docs removed, prefer deletion plus link cleanup over adding "historical note" text.
 
@@ -91,5 +91,5 @@ Do not leave deleted docs referenced in the docs site manifest or navigation.
   - Deterministic docs staging assembly.
 - `.agents/skills/docs-build/scripts/generate_llms_full.py`
   - Build the primary `llms-full.txt` artifact from `mkdocs.yml` and `.build/`.
-- `.agents/skills/docs-build/scripts/validate_docs_ia.py`
-  - Warning-only checks for docs IA drift. These warnings do not fail the build.
+- `.agents/skills/docs-build/scripts/validate_docs_organization.py`
+  - Warning-only checks for docs organization drift. These warnings do not fail the build.
