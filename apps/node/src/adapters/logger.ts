@@ -1,6 +1,7 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  CLAWPERATOR_SKILL_RUN_ID_ENV_VAR,
   type LogEvent,
   type LogLevel,
   type ClawperatorLogger,
@@ -144,6 +145,6 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
     };
   }
 
-  return buildLogger();
+  const inheritedSkillRunId = process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR]?.trim();
+  return buildLogger(inheritedSkillRunId ? { skillRunId: inheritedSkillRunId } : undefined);
 }
-

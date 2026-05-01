@@ -1,8 +1,10 @@
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { access, readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { loadRegistry, findSkillById, getRepoRoot } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import type { Logger } from "../../adapters/logger.js";
+import { CLAWPERATOR_SKILL_RUN_ID_ENV_VAR } from "../../contracts/logging.js";
 import {
   hasMeaningfulSkillContract,
   parseSkillContractInputSchema,
@@ -51,6 +53,8 @@ export interface SkillRunSuccess {
   ok: true;
   status: "success";
   skillId: string;
+  skillRunId?: string;
+  logPath?: string;
   output: string;
   exitCode: number;
   durationMs: number;
@@ -63,6 +67,8 @@ export interface SkillRunIndeterminate {
   code: "SKILL_VERIFICATION_INDETERMINATE";
   message: string;
   skillId: string;
+  skillRunId?: string;
+  logPath?: string;
   output: string;
   exitCode: number;
   durationMs: number;
@@ -75,6 +81,8 @@ export interface SkillRunError {
   code: string;
   message: string;
   skillId?: string;
+  skillRunId?: string;
+  logPath?: string;
   exitCode?: number;
   stdout?: string;
   stderr?: string;
@@ -99,6 +107,7 @@ export interface SkillRunEnv {
 export interface SkillRunCallbacks {
   onOutput?: (chunk: string, stream: "stdout" | "stderr") => void;
   logger?: Logger;
+  skillRunId?: string;
 }
 
 interface SkillSourceResolutionSuccess {
@@ -583,6 +592,10 @@ async function skillJsonRawMayDeclareContract(repoRoot: string, skillPath: strin
   }
 }
 
+function createSkillRunId(): string {
+  return `skillrun_${Date.now()}_${randomUUID()}`;
+}
+
 export async function runSkill(
   skillId: string,
   args: string[],
@@ -611,23 +624,47 @@ export async function runSkill(
       }
     }
   }
+  const inheritedSkillRunId = env?.[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR]?.trim();
+  const skillRunId = callbacks?.skillRunId ?? inheritedSkillRunId ?? createSkillRunId();
+  childEnv[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = skillRunId;
+  const skillLogger = callbacks?.logger?.child({ skillId, skillRunId });
+  const logPath = skillLogger?.logPath();
+  const tailCommand = logPath !== undefined ? `tail -f ${logPath}` : undefined;
+  const addRunMetadata = <T extends object>(result: T): T & { skillRunId: string; logPath?: string } => ({
+    ...result,
+    skillRunId,
+    ...(logPath !== undefined ? { logPath } : {}),
+  });
+
+  skillLogger?.emit({
+    ts: new Date().toISOString(),
+    level: "info",
+    event: "skills.run.log_location",
+    skillId,
+    logPath,
+    tailCommand,
+    message: logPath !== undefined
+      ? `Skill ${skillId} run ${skillRunId} logging to ${logPath}; observe with: ${tailCommand}`
+      : `Skill ${skillId} run ${skillRunId} started with file logging unavailable`,
+  });
+
   try {
     const loaded = await loadRegistry(registryPath);
     resolvedRegistryPath = loaded.resolvedPath;
     const skill = findSkillById(loaded.registry, skillId);
     if (!skill) {
-      return { ok: false, status: "failed", code: SKILL_NOT_FOUND, message: `Skill not found: ${skillId}`, skillId, skillResult: null };
+      return addRunMetadata({ ok: false, status: "failed", code: SKILL_NOT_FOUND, message: `Skill not found: ${skillId}`, skillId, skillResult: null });
     }
 
     if (!skill.scripts || skill.scripts.length === 0) {
-      return {
+      return addRunMetadata({
         ok: false,
         status: "failed",
         code: SKILL_SCRIPT_NOT_FOUND,
         message: `Skill ${skillId} has no scripts defined`,
         skillId,
         skillResult: null,
-      };
+      });
     }
 
     const repoRoot = getRepoRoot(loaded.resolvedPath);
@@ -635,14 +672,14 @@ export async function runSkill(
       skill.scripts.find((s) => extname(s) === ".sh") ??
       skill.scripts[0];
     if (!scriptRelative) {
-      return {
+      return addRunMetadata({
         ok: false,
         status: "failed",
         code: SKILL_SCRIPT_NOT_FOUND,
         message: `Skill ${skillId} has no runnable script defined`,
         skillId,
         skillResult: null,
-      };
+      });
     }
 
     const harnessScriptRelative = skill.scripts.find((scriptPath) => isOrchestratedHarnessScriptPath(scriptPath));
@@ -650,14 +687,14 @@ export async function runSkill(
     if (!manifestResult.ok) {
       const rawSkillJsonDeclaresContract = await skillJsonRawMayDeclareContract(repoRoot, skill.path);
       if (harnessScriptRelative || hasMeaningfulSkillContract(skill.contract) || rawSkillJsonDeclaresContract) {
-        return {
+        return addRunMetadata({
           ok: false,
           status: "failed",
           code: SKILL_VALIDATION_FAILED,
           message: manifestResult.message,
           skillId,
           skillResult: null,
-        };
+        });
       }
     }
     if (manifestResult.ok) {
@@ -685,7 +722,7 @@ export async function runSkill(
       : scriptRelative;
 
     if (!runnableScriptRelative) {
-      return {
+      return addRunMetadata({
         ok: false,
         status: "failed",
         code: SKILL_SCRIPT_NOT_FOUND,
@@ -694,7 +731,7 @@ export async function runSkill(
           : `Skill ${skillId} has no runnable script defined`,
         skillId,
         skillResult: null,
-      };
+      });
     }
 
     resolvedPath = resolveRepoRelativeSkillPath(repoRoot, runnableScriptRelative);
@@ -702,14 +739,14 @@ export async function runSkill(
     if (isAgentDriven) {
       const effectiveAgentConfig = resolveConfiguredAgentCli(manifestAgent, childEnv);
       if (!effectiveAgentConfig.ok) {
-        return {
+        return addRunMetadata({
           ok: false,
           status: "failed",
           code: SKILL_AGENT_CLI_UNAVAILABLE,
           message: `Skill ${skillId} requires agent CLI '${manifestAgent.cli}', but it is unavailable. ${effectiveAgentConfig.message}`,
           skillId,
           skillResult: null,
-        };
+        });
       }
       resolvedAgentConfig = effectiveAgentConfig.agent;
       effectiveTimeoutMs = timeoutMs ?? resolvedAgentConfig.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -719,47 +756,47 @@ export async function runSkill(
         childEnv
       );
       if (!agentResolution.ok) {
-        return {
+        return addRunMetadata({
           ok: false,
           status: "failed",
           code: SKILL_AGENT_CLI_UNAVAILABLE,
           message: `Skill ${skillId} requires agent CLI '${resolvedAgentConfig.cli}', but it is unavailable. ${agentResolution.message}`,
           skillId,
           skillResult: null,
-        };
+        });
       }
       resolvedAgentExecutablePath = agentResolution.executablePath;
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return { ok: false, status: "failed", code: REGISTRY_READ_FAILED, message, skillResult: null };
+    return addRunMetadata({ ok: false, status: "failed", code: REGISTRY_READ_FAILED, message, skillResult: null });
   }
 
   try {
     await access(resolvedPath);
   } catch {
-    return {
+    return addRunMetadata({
       ok: false,
       status: "failed",
       code: SKILL_SCRIPT_NOT_FOUND,
       message: `Script not found: ${resolvedPath}`,
       skillId,
       skillResult: null,
-    };
+    });
   }
 
   if (resolvedAgentConfig && skillProgramPath !== null) {
     try {
       await access(skillProgramPath);
     } catch {
-      return {
+      return addRunMetadata({
         ok: false,
         status: "failed",
         code: SKILL_SCRIPT_NOT_FOUND,
         message: `Skill program not found: ${skillProgramPath}`,
         skillId,
         skillResult: null,
-      };
+      });
     }
   }
 
@@ -772,7 +809,6 @@ export async function runSkill(
       : args;
   const cmdArgs = ext === ".js" ? [resolvedPath, ...forwardedArgs] : forwardedArgs;
   const timeout = effectiveTimeoutMs;
-  const skillLogger = callbacks?.logger?.child({ skillId });
 
   // Merge provided env with process.env, with provided env taking precedence
   if (resolvedAgentConfig && resolvedAgentExecutablePath && skillProgramPath) {
@@ -872,7 +908,7 @@ export async function runSkill(
         typeof (err as { code?: unknown }).code === "string"
           ? (err as { code?: string }).code
           : "SPAWN_FAILED";
-      finish({
+      finish(addRunMetadata({
         ok: false,
         status: "failed",
         code: SKILL_EXECUTION_FAILED,
@@ -881,7 +917,7 @@ export async function runSkill(
         stdout: stdout || undefined,
         stderr: stderr || undefined,
         skillResult: null,
-      });
+      }));
     });
 
     child.on("close", (code, signal) => {
@@ -893,7 +929,7 @@ export async function runSkill(
         return;
       }
       if (timedOut) {
-        finish({
+        finish(addRunMetadata({
           ok: false,
           status: "failed",
           code: SKILL_EXECUTION_TIMEOUT,
@@ -902,7 +938,7 @@ export async function runSkill(
           stdout: stdout || undefined,
           stderr: stderr || undefined,
           skillResult: null,
-        });
+        }));
         return;
       }
 
@@ -916,7 +952,7 @@ export async function runSkill(
         skillLogger
       );
       if (!parsedSkillResult.ok) {
-        finish({
+        finish(addRunMetadata({
           ok: false,
           status: "failed",
           code: SKILL_RESULT_PARSE_FAILED,
@@ -926,7 +962,7 @@ export async function runSkill(
           stdout: stdout || undefined,
           stderr: stderr || undefined,
           skillResult: null,
-        });
+        }));
         return;
       }
 
@@ -947,7 +983,7 @@ export async function runSkill(
           exitCode,
           message: `Skill ${skillId} exited with code ${exitCode} after ${durationMs}ms`,
         });
-        finish({
+        finish(addRunMetadata({
           ok: false,
           status: "failed",
           code: SKILL_EXECUTION_FAILED,
@@ -957,7 +993,7 @@ export async function runSkill(
           stdout: stdout || undefined,
           stderr: stderr || undefined,
           skillResult: parsedSkillResult.skillResult,
-        });
+        }));
         return;
       }
 
@@ -970,7 +1006,7 @@ export async function runSkill(
         message: `Skill ${skillId} exited with code 0 after ${durationMs}ms`,
       });
       if (expectContains !== undefined && !stdout.includes(expectContains)) {
-        finish({
+        finish(addRunMetadata({
           ok: false,
           status: "failed",
           code: SKILL_OUTPUT_ASSERTION_FAILED,
@@ -979,7 +1015,7 @@ export async function runSkill(
           output: stdout,
           expectedSubstring: expectContains,
           skillResult: parsedSkillResult.skillResult,
-        });
+        }));
         return;
       }
       const contractVerification = verifyDeclaredSkillContract(resolvedContract, parsedSkillResult.skillResult, args);
@@ -987,7 +1023,7 @@ export async function runSkill(
         && hasMeaningfulSkillContract(resolvedContract)
         && resolvedContract.verification !== null;
       if (hasDeclaredVerification && parsedSkillResult.skillResult?.status === "failed") {
-        finish({
+        finish(addRunMetadata({
           ok: false,
           status: "failed",
           code: SKILL_EXECUTION_FAILED,
@@ -997,11 +1033,11 @@ export async function runSkill(
           stdout: stdout || undefined,
           stderr: stderr || undefined,
           skillResult: parsedSkillResult.skillResult,
-        });
+        }));
         return;
       }
       if (hasDeclaredVerification && !contractVerification.ok) {
-        finish({
+        finish(addRunMetadata({
           ok: null,
           status: "indeterminate",
           code: "SKILL_VERIFICATION_INDETERMINATE",
@@ -1011,10 +1047,10 @@ export async function runSkill(
           exitCode: 0,
           durationMs,
           skillResult: parsedSkillResult.skillResult,
-        });
+        }));
         return;
       }
-      finish({
+      finish(addRunMetadata({
         ok: true,
         status: "success",
         skillId,
@@ -1022,7 +1058,7 @@ export async function runSkill(
         exitCode: 0,
         durationMs,
         skillResult: parsedSkillResult.skillResult,
-      });
+      }));
     });
 
     timeoutId = setTimeout(() => {

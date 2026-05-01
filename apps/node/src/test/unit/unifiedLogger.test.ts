@@ -4,13 +4,14 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createClawperatorLogger } from "../../adapters/logger.js";
-import type { LogEvent } from "../../contracts/logging.js";
+import { CLAWPERATOR_SKILL_RUN_ID_ENV_VAR, type LogEvent } from "../../contracts/logging.js";
 
 describe("createClawperatorLogger", () => {
   let tempRoot: string;
   let originalStderrWrite: typeof process.stderr.write;
   let originalLogDir: string | undefined;
   let originalLogLevel: string | undefined;
+  let originalSkillRunId: string | undefined;
   const stderrLines: string[] = [];
 
   beforeEach(async () => {
@@ -18,6 +19,7 @@ describe("createClawperatorLogger", () => {
     originalStderrWrite = process.stderr.write.bind(process.stderr);
     originalLogDir = process.env.CLAWPERATOR_LOG_DIR;
     originalLogLevel = process.env.CLAWPERATOR_LOG_LEVEL;
+    originalSkillRunId = process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
     stderrLines.length = 0;
     process.stderr.write = ((chunk: unknown) => {
       stderrLines.push(String(chunk));
@@ -25,6 +27,7 @@ describe("createClawperatorLogger", () => {
     }) as typeof process.stderr.write;
     delete process.env.CLAWPERATOR_LOG_DIR;
     delete process.env.CLAWPERATOR_LOG_LEVEL;
+    delete process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
   });
 
   afterEach(async () => {
@@ -38,6 +41,11 @@ describe("createClawperatorLogger", () => {
       delete process.env.CLAWPERATOR_LOG_LEVEL;
     } else {
       process.env.CLAWPERATOR_LOG_LEVEL = originalLogLevel;
+    }
+    if (originalSkillRunId === undefined) {
+      delete process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+    } else {
+      process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = originalSkillRunId;
     }
     await rm(tempRoot, { recursive: true, force: true });
   });
@@ -271,6 +279,18 @@ describe("createClawperatorLogger", () => {
       const lines = await readLogLines(logDir);
       assert.strictEqual(lines.length, 1);
       assert.strictEqual(lines[0].deviceId, "specific-device");
+    });
+
+    it("inherits skillRunId from the process environment", async () => {
+      const logDir = join(tempRoot, "logs");
+      process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = "skillrun_test_123";
+      const logger = createClawperatorLogger({ logDir, logLevel: "debug" });
+
+      logger.emit(makeEvent({ event: "test.inherited-skill-run" }));
+
+      const lines = await readLogLines(logDir);
+      assert.strictEqual(lines.length, 1);
+      assert.strictEqual(lines[0].skillRunId, "skillrun_test_123");
     });
 
     it("does not mutate parent logger context", async () => {

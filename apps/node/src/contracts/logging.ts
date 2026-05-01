@@ -31,6 +31,9 @@ export interface LogEvent {
   taskId?: string;
   deviceId?: string;
   skillId?: string;
+  skillRunId?: string;
+  logPath?: string;
+  tailCommand?: string;
   stream?: "stdout" | "stderr";
   status?: string;
   durationMs?: number;
@@ -46,6 +49,8 @@ export interface ClawperatorLogger {
   child(defaultContext: Partial<LogEvent>): ClawperatorLogger;
   logPath(): string | undefined;
 }
+
+export const CLAWPERATOR_SKILL_RUN_ID_ENV_VAR = "CLAWPERATOR_SKILL_RUN_ID";
 
 // ---------------------------------------------------------------------------
 // Routing rules

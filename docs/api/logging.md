@@ -50,6 +50,9 @@ Events may include additional context fields:
 | `taskId` | string | Part of a larger task sequence |
 | `deviceId` | string | Event targets a specific device |
 | `skillId` | string | Skill execution event |
+| `skillRunId` | string | Events belong to one `clawperator skills run` invocation |
+| `logPath` | string | Event points at the active daily log file |
+| `tailCommand` | string | Event supplies a ready-to-run command for observing the log |
 | `stream` | string | `stdout` or `stderr` for skill output lines |
 | `status` | string | Completion status (e.g., `pass`, `fail`) |
 | `durationMs` | number | Operation completed, measured in milliseconds |
@@ -58,9 +61,10 @@ Events may include additional context fields:
 ### Example Log Lines
 
 ```jsonl
-{"ts":"2026-03-28T10:15:30.123Z","level":"info","event":"skills.run.start","message":"Skill com.example.app.get-status started","skillId":"com.example.app.get-status","commandId":"cmd-123"}
-{"ts":"2026-03-28T10:15:30.456Z","level":"info","event":"skills.run.output","message":"Opening app...","skillId":"com.example.app.get-status","stream":"stdout"}
-{"ts":"2026-03-28T10:15:32.789Z","level":"info","event":"skills.run.complete","message":"Skill com.example.app.get-status completed successfully in 2345ms","skillId":"com.example.app.get-status","durationMs":2345,"exitCode":0}
+{"ts":"2026-03-28T10:15:30.100Z","level":"info","event":"skills.run.log_location","message":"Skill com.example.app.get-status run skillrun_1777600000000_00000000-0000-4000-8000-000000000000 logging to /home/user/.clawperator/logs/clawperator-2026-03-28.log; observe with: tail -f /home/user/.clawperator/logs/clawperator-2026-03-28.log","skillId":"com.example.app.get-status","skillRunId":"skillrun_1777600000000_00000000-0000-4000-8000-000000000000","logPath":"/home/user/.clawperator/logs/clawperator-2026-03-28.log","tailCommand":"tail -f /home/user/.clawperator/logs/clawperator-2026-03-28.log"}
+{"ts":"2026-03-28T10:15:30.123Z","level":"info","event":"skills.run.start","message":"Skill com.example.app.get-status started","skillId":"com.example.app.get-status","skillRunId":"skillrun_1777600000000_00000000-0000-4000-8000-000000000000","commandId":"cmd-123"}
+{"ts":"2026-03-28T10:15:30.456Z","level":"info","event":"skills.run.output","message":"Opening app...","skillId":"com.example.app.get-status","skillRunId":"skillrun_1777600000000_00000000-0000-4000-8000-000000000000","stream":"stdout"}
+{"ts":"2026-03-28T10:15:32.789Z","level":"info","event":"skills.run.complete","message":"Skill com.example.app.get-status completed successfully in 2345ms","skillId":"com.example.app.get-status","skillRunId":"skillrun_1777600000000_00000000-0000-4000-8000-000000000000","durationMs":2345,"exitCode":0}
 ```
 
 ## Log Levels
@@ -103,6 +107,20 @@ Events use dot-separated names with prefix-based categories:
 | `cli.` | CLI output | `cli.banner` |
 | `doctor.` | Doctor diagnostics | `doctor.check` |
 | `serve.` | HTTP/SSE server | `serve.server.started`, `serve.http.request` |
+
+### Skill Run Correlation
+
+Every `clawperator skills run` invocation creates a `skillRunId` and emits a
+`skills.run.log_location` event at `info` level as the run starts. That event
+contains the daily `logPath` and a `tailCommand` for human or agent observers.
+
+The log file remains the same daily NDJSON file. Clawperator does not create a
+separate per-run log file. The `skillRunId` is additive correlation metadata
+for filtering events that belong to one invocation.
+
+Skill scripts receive the same value in `CLAWPERATOR_SKILL_RUN_ID`. When a
+script invokes nested Clawperator commands, those child CLI processes inherit
+the id and attach it to their log events.
 
 <a id="the-clawperator-logs-command"></a>
 
@@ -191,6 +209,9 @@ grep '"event":"cli.banner"' ~/.clawperator/logs/clawperator-$(date +%F).log
 
 # Parse the NDJSON file with jq to see all events from a specific category
 jq -c 'select(.event | startswith("skills.run."))' ~/.clawperator/logs/clawperator-$(date +%F).log
+
+# Filter one skill invocation by run id
+jq -c 'select(.skillRunId == "skillrun_1777600000000_00000000-0000-4000-8000-000000000000")' ~/.clawperator/logs/clawperator-$(date +%F).log
 ```
 
 Note: `cli.banner` is logged at `debug` level. To see it in the file, use `--log-level debug`.

@@ -7,6 +7,7 @@ import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { syncSkills } from "../../domain/skills/syncSkills.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
 import { runSkill, type SkillRunEnv } from "../../domain/skills/runSkill.js";
+import type { SkillRunError, SkillRunResult } from "../../domain/skills/runSkill.js";
 import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -62,6 +63,16 @@ function emitCliEvent(logger: Logger | undefined, event: Omit<LogEvent, "ts">): 
     ts: new Date().toISOString(),
     ...event,
   });
+}
+
+function buildSkillRunLogs(result: SkillRunResult | SkillRunError): { skillRunId?: string; path?: string; tailCommand?: string } {
+  return {
+    ...(result.skillRunId !== undefined ? { skillRunId: result.skillRunId } : {}),
+    ...(result.logPath !== undefined ? {
+      path: result.logPath,
+      tailCommand: `tail -f ${result.logPath}`,
+    } : {}),
+  };
 }
 
 function splitTextIntoLinesPreservingEndings(text: string): string[] {
@@ -545,6 +556,7 @@ export async function cmdSkillsRun(
         {
           skillResult: result.skillResult,
           durationMs: result.durationMs,
+          logs: buildSkillRunLogs(result),
           ...(timeoutMs !== undefined ? { timeoutMs } : {}),
           ...(expectContains !== undefined ? { expectedSubstring: expectContains } : {}),
         },
@@ -560,6 +572,7 @@ export async function cmdSkillsRun(
       exitCode: result.exitCode,
       durationMs: result.durationMs,
       skillResult: result.skillResult,
+      logs: buildSkillRunLogs(result),
       timeoutMs: timeoutMs ?? undefined,
       expectedSubstring: expectContains ?? undefined,
     }, options);
@@ -573,6 +586,7 @@ export async function cmdSkillsRun(
           message: result.message,
           skillResult: result.skillResult,
           durationMs: result.durationMs,
+          logs: buildSkillRunLogs(result),
           ...(timeoutMs !== undefined ? { timeoutMs } : {}),
           ...(expectContains !== undefined ? { expectedSubstring: expectContains } : {}),
         },
@@ -590,6 +604,7 @@ export async function cmdSkillsRun(
       exitCode: result.exitCode,
       durationMs: result.durationMs,
       skillResult: result.skillResult,
+      logs: buildSkillRunLogs(result),
       timeoutMs: timeoutMs ?? undefined,
       expectedSubstring: expectContains ?? undefined,
     }, options);
@@ -604,6 +619,7 @@ export async function cmdSkillsRun(
         ? sanitizePrettySkillStdout(result.output, result.skillResult !== null)
         : result.output,
       skillResult: result.skillResult,
+      logs: buildSkillRunLogs(result),
       expectedSubstring: result.expectedSubstring,
       timeoutMs: timeoutMs ?? undefined,
     }, options);
@@ -619,6 +635,7 @@ export async function cmdSkillsRun(
       : result.stdout,
     stderr: result.stderr,
     skillResult: result.skillResult,
+    logs: buildSkillRunLogs(result),
     timeoutMs: timeoutMs ?? undefined,
     expectedSubstring: expectContains ?? undefined,
   }, options);

@@ -593,10 +593,13 @@ function getLogPathForDir(logDir: string): string {
   return join(logDir, `clawperator-${yyyy}-${mm}-${dd}.log`);
 }
 
-function parseLogEvents(contents: string): Array<{ event?: string; skillId?: string; stream?: string; message?: string; level?: string; exitCode?: number }> {
+function parseLogEvents(contents: string): Array<{ event?: string; skillId?: string; skillRunId?: string; logPath?: string; tailCommand?: string; stream?: string; message?: string; level?: string; exitCode?: number }> {
   return contents.trimEnd().split("\n").filter(Boolean).map((line) => JSON.parse(line) as {
     event?: string;
     skillId?: string;
+    skillRunId?: string;
+    logPath?: string;
+    tailCommand?: string;
     stream?: string;
     message?: string;
     level?: string;
@@ -7111,6 +7114,8 @@ describe("cmdSkillsRun preflight gate", () => {
       ok: true,
       status: "success",
       skillId: "com.test.framed-cli-json",
+      skillRunId: "skillrun_test_json",
+      logPath: "/tmp/clawperator-test.log",
       output: `progress\n${frameMarker}\n{}\n`,
       exitCode: 0,
       durationMs: 1,
@@ -7143,6 +7148,11 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.strictEqual(parsed.skillId, undefined);
     assert.strictEqual(parsed.exitCode, undefined);
     assert.strictEqual(parsed.output, undefined);
+    assert.deepStrictEqual(parsed.logs, {
+      skillRunId: "skillrun_test_json",
+      path: "/tmp/clawperator-test.log",
+      tailCommand: "tail -f /tmp/clawperator-test.log",
+    });
   });
 
   it("JSON mode keeps legacy wrapper fields when skillResult is null", async () => {
@@ -7976,8 +7986,18 @@ describe("runSkill logging", () => {
     );
     const startLine = lines.find((line) => line.event === "skills.run.start");
     const completeLine = lines.find((line) => line.event === "skills.run.complete");
+    const logLocationLine = lines.find((line) => line.event === "skills.run.log_location");
     assert.strictEqual(startLine?.skillId, TEST_FIXTURE_MIXED_STREAMS);
     assert.strictEqual(completeLine?.skillId, TEST_FIXTURE_MIXED_STREAMS);
+    assert.strictEqual(logLocationLine?.skillId, TEST_FIXTURE_MIXED_STREAMS);
+    assert.match(logLocationLine?.skillRunId ?? "", /^skillrun_/);
+    assert.strictEqual(startLine?.skillRunId, logLocationLine?.skillRunId);
+    assert.strictEqual(outputLines[0]?.skillRunId, logLocationLine?.skillRunId);
+    assert.strictEqual(completeLine?.skillRunId, logLocationLine?.skillRunId);
+    assert.strictEqual(logLocationLine?.logPath, logger.logPath());
+    assert.strictEqual(logLocationLine?.tailCommand, `tail -f ${logger.logPath()}`);
+    assert.strictEqual(result.skillRunId, logLocationLine?.skillRunId);
+    assert.strictEqual(result.logPath, logger.logPath());
   });
 
   it("logs start and complete without leaking sentinel args", async () => {
