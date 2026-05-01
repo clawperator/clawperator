@@ -419,7 +419,7 @@ export async function cmdSkillsRun(
   const resolvedOperatorPackage = operatorPackage ?? resolveOperatorPackage();
   const skillRunId = createSkillRunId();
   const cliLogger = options.logger?.child({ skillId, deviceId: options.deviceId, skillRunId });
-  const preRunLogs = buildSkillRunLogMetadata(skillRunId, cliLogger?.logPath());
+  let preRunLogs = buildSkillRunLogMetadata(skillRunId, cliLogger?.logPath());
 
   emitCliEvent(cliLogger, {
     level: "info",
@@ -431,6 +431,7 @@ export async function cmdSkillsRun(
       ? `Skill ${skillId} run ${skillRunId} logging to ${preRunLogs.path}; observe with: ${preRunLogs.tailCommand}`
       : `Skill ${skillId} run ${skillRunId} started with file logging unavailable`,
   });
+  preRunLogs = buildSkillRunLogMetadata(skillRunId, cliLogger?.logPath());
 
   const env: SkillRunEnv = {
     [CLAWPERATOR_BIN_ENV_VAR]: resolvedBin,
@@ -497,7 +498,7 @@ export async function cmdSkillsRun(
   const mm = String(logDate.getMonth() + 1).padStart(2, "0");
   const dd = String(logDate.getDate()).padStart(2, "0");
   const logPath = preRunLogs.path ?? join(homedir(), ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
-  const tailCommand = preRunLogs.tailCommand ?? `tail -f ${logPath}`;
+  const tailCommand = preRunLogs.tailCommand ?? buildSkillRunLogMetadata(skillRunId, logPath).tailCommand;
   const bannerMessage = `[Clawperator] v${getCliVersion()}  APK: ${apkStatus}  Logs: ${logPath}  Hint: ${tailCommand}  Docs: https://docs.clawperator.com/llms.txt`;
   if (cliLogger !== undefined) {
     emitCliEvent(cliLogger, {

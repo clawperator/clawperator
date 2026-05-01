@@ -8054,6 +8054,20 @@ describe("runSkill logging", () => {
     assert.strictEqual(logs.tailCommand, `tail -f '/tmp/clawperator logs/owner'"'"'s "daily".log'`);
   });
 
+  it("omits logPath metadata when file logging disables on the first write", async () => {
+    const blockedLogDir = join(tempRoot, "not-a-directory");
+    await writeFile(blockedLogDir, "not a directory", "utf8");
+    const logger = createClawperatorLogger({ logDir: blockedLogDir, logLevel: "debug" });
+
+    const result = await runSkill(TEST_FIXTURE_MIXED_STREAMS, [], undefined, undefined, undefined, {
+      logger,
+    });
+
+    assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+    assert.strictEqual(result.logPath, undefined);
+    assert.strictEqual(logger.logPath(), undefined);
+  });
+
   it("logs start and complete without leaking sentinel args", async () => {
     const sentinel = "CLAWPERATOR_TEST_SENTINEL_X9Z";
     const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });

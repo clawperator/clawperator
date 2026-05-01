@@ -656,8 +656,9 @@ export async function runSkill(
   const skillRunId = normalizeSkillRunId(callbacks?.skillRunId) ?? inheritedSkillRunId ?? createSkillRunId();
   childEnv[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = skillRunId;
   const skillLogger = callbacks?.logger?.child({ skillId, skillRunId });
-  const logPath = skillLogger?.logPath();
-  const tailCommand = logPath !== undefined ? buildTailCommand(logPath) : undefined;
+  const initialLogPath = skillLogger?.logPath();
+  const tailCommand = initialLogPath !== undefined ? buildTailCommand(initialLogPath) : undefined;
+  let logPath: string | undefined = initialLogPath;
   const addRunMetadata = <T extends object>(result: T): T & { skillRunId: string; logPath?: string } => ({
     ...result,
     skillRunId,
@@ -670,12 +671,13 @@ export async function runSkill(
       level: "info",
       event: "skills.run.log_location",
       skillId,
-      logPath,
+      logPath: initialLogPath,
       tailCommand,
-      message: logPath !== undefined
-        ? `Skill ${skillId} run ${skillRunId} logging to ${logPath}; observe with: ${tailCommand}`
+      message: initialLogPath !== undefined
+        ? `Skill ${skillId} run ${skillRunId} logging to ${initialLogPath}; observe with: ${tailCommand}`
         : `Skill ${skillId} run ${skillRunId} started with file logging unavailable`,
     });
+    logPath = skillLogger?.logPath();
   }
 
   try {

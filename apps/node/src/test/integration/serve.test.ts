@@ -295,13 +295,14 @@ describe("serve API integration", () => {
     });
 
     assert.strictEqual(res.status, 400);
-    const body = await res.json() as {
-      ok: boolean;
-      error: { code: string; message: string };
-    };
-    assert.strictEqual(body.ok, false);
-    assert.strictEqual(body.error.code, "INVALID_DEVICE_ID");
-    assert.match(body.error.message, /non-empty string/i);
+      const body = await res.json() as {
+        ok: boolean;
+        error: { code: string; message: string; logs?: { skillRunId?: string } };
+      };
+      assert.strictEqual(body.ok, false);
+      assert.strictEqual(body.error.code, "INVALID_DEVICE_ID");
+      assert.match(body.error.message, /non-empty string/i);
+      assert.match(body.error.logs?.skillRunId ?? "", /^skillrun_/);
   });
 
   test("POST /skills/:skillId/run fails before spawn when the device is not interactive", async () => {
@@ -372,6 +373,7 @@ describe("serve API integration", () => {
       assert.strictEqual(body.error.deviceId, "resolved-device-123");
       assert.strictEqual(body.error.details, undefined);
       assert.strictEqual(body.error.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
+      assert.match((body.error as { logs?: { skillRunId?: string } }).logs?.skillRunId ?? "", /^skillrun_/);
       await assert.rejects(readFile(markerPath, "utf8"));
     } finally {
       await new Promise<void>((resolve, reject) => {
@@ -457,6 +459,7 @@ describe("serve API integration", () => {
           message?: string;
           details?: { command?: string };
           deviceId?: string;
+          logs?: { skillRunId?: string };
         };
       };
       assert.strictEqual(body.ok, false);
@@ -464,6 +467,7 @@ describe("serve API integration", () => {
       assert.deepStrictEqual(body.error.details, { command: "cmd power wakeup" });
       assert.strictEqual(body.error.deviceId, "resolved-device-123");
       assert.strictEqual(body.error.message, "adb shell broke");
+      assert.match(body.error.logs?.skillRunId ?? "", /^skillrun_/);
       await assert.rejects(readFile(markerPath, "utf8"));
     } finally {
       await new Promise<void>((resolve, reject) => {
@@ -966,6 +970,62 @@ describe("serve API integration", () => {
       const lines = contents.trimEnd().split("\n").map(line => JSON.parse(line) as { event: string; skillRunId?: string });
       const requestEvent = lines.find(line => line.event === "serve.http.request" && line.skillRunId === skillRunId);
       assert.ok(requestEvent, "POST /execute request log should carry the request-scoped skillRunId");
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        testServer.close((err) => (err ? reject(err) : resolve()));
+      });
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("POST /skills/:skillId/run correlates preflight failure logs", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-serve-skill-preflight-log-"));
+    const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
+
+    const testServer = await startServer({
+      port: 0,
+      host: "localhost",
+      verbose: false,
+      logger,
+      resolveInteractiveSkillTargetImpl: async (_operatorPackage, options) => {
+        options?.logger?.emit({
+          ts: new Date().toISOString(),
+          level: "info",
+          event: "preflight.test",
+          message: "preflight test failure",
+        });
+        return {
+          ok: false,
+          error: {
+            code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+            message: "Device is not interactive.",
+          },
+        };
+      },
+    });
+    const addr = testServer.address();
+    const testPort = addr && typeof addr === "object" ? addr.port : 0;
+
+    try {
+      const res = await fetch(`http://localhost:${testPort}/skills/com.test.skill-result/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      assert.strictEqual(res.status, 409);
+      const body = await res.json() as {
+        error?: { logs?: { skillRunId?: string; path?: string; tailCommand?: string } };
+      };
+      const skillRunId = body.error?.logs?.skillRunId;
+      assert.match(skillRunId ?? "", /^skillrun_/);
+      assert.strictEqual(body.error?.logs?.path, logger.logPath());
+      assert.strictEqual(body.error?.logs?.tailCommand, `tail -f '${logger.logPath()}'`);
+
+      const contents = await readFile(logger.logPath()!, "utf8");
+      const lines = contents.trimEnd().split("\n").map(line => JSON.parse(line) as { event: string; skillRunId?: string });
+      assert.ok(lines.some(line => line.event === "skills.run.log_location" && line.skillRunId === skillRunId));
+      assert.ok(lines.some(line => line.event === "preflight.test" && line.skillRunId === skillRunId));
     } finally {
       await new Promise<void>((resolve, reject) => {
         testServer.close((err) => (err ? reject(err) : resolve()));
