@@ -46,7 +46,7 @@ export function buildDefaultEmulatorAvdName(
   return `${DEFAULT_EMULATOR_AVD_NAME}-${normalizedSize}`;
 }
 
-function getAvdConfigPath(name: string): string {
+export function validateAvdName(name: string): void {
   if (basename(name) !== name || name.includes("\\")) {
     throw buildError(
       ERROR_CODES.ANDROID_AVD_CREATE_FAILED,
@@ -54,6 +54,10 @@ function getAvdConfigPath(name: string): string {
       { name }
     );
   }
+}
+
+function getAvdConfigPath(name: string): string {
+  validateAvdName(name);
   return join(getAvdRoot(), `${name}.avd`, "config.ini");
 }
 
@@ -180,7 +184,7 @@ export async function createAvd(
   const systemImage = options.systemImage ?? DEFAULT_EMULATOR_SYSTEM_IMAGE;
   const deviceProfile = options.deviceProfile ?? DEFAULT_EMULATOR_DEVICE_PROFILE;
   const dataPartitionSize = options.dataPartitionSize ?? DEFAULT_EMULATOR_DATA_PARTITION_SIZE;
-  getAvdConfigPath(options.name);
+  validateAvdName(options.name);
   const existedBeforeCreate = (await inspectConfiguredAvd(options.name)).exists;
 
   await ensureSystemImageInstalled(config, systemImage);

@@ -145,6 +145,14 @@ describe("emulator lifecycle", () => {
         return true;
       }
     );
+    assert.throws(
+      () => normalizeEmulatorDataPartitionSize("0G"),
+      (error: unknown) => {
+        const typed = error as { code?: string };
+        assert.strictEqual(typed.code, ERROR_CODES.ANDROID_AVD_CREATE_FAILED);
+        return true;
+      }
+    );
   });
 
   it("sizes created AVDs under ANDROID_AVD_HOME when it is set", async () => {

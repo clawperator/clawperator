@@ -2,9 +2,9 @@ import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeCo
 import type { OutputOptions } from "../output.js";
 import { formatError, formatSuccess } from "../output.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
-import { DEFAULT_EMULATOR_DATA_PARTITION_SIZE, DEFAULT_EMULATOR_DEVICE_PROFILE, EMULATOR_DATA_PARTITION_SIZE_PATTERN, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
+import { DEFAULT_EMULATOR_DATA_PARTITION_SIZE, DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 import { inspectConfiguredAvd, listConfiguredAvds } from "../../domain/android-emulators/configuredAvds.js";
-import { buildDefaultEmulatorAvdName, createAvd, deleteAvd, enableEmulatorDeveloperSettings, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
+import { buildDefaultEmulatorAvdName, createAvd, deleteAvd, enableEmulatorDeveloperSettings, normalizeEmulatorDataPartitionSize, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
 import { provisionEmulator } from "../../domain/android-emulators/provision.js";
 import { listRunningEmulators } from "../../domain/android-emulators/runningEmulators.js";
 import type { Logger } from "../../adapters/logger.js";
@@ -23,16 +23,15 @@ function parseDataPartitionSize(value: string | undefined): string {
   if (value === undefined) {
     return DEFAULT_EMULATOR_DATA_PARTITION_SIZE;
   }
-  const normalized = value.trim().toUpperCase();
-  const match = normalized.match(EMULATOR_DATA_PARTITION_SIZE_PATTERN);
-  if (!match) {
+  try {
+    return normalizeEmulatorDataPartitionSize(value);
+  } catch {
     throw {
       code: "USAGE",
       message: "--storage-size must be a positive integer followed by G or GB, for example 12G",
       details: { value },
     };
   }
-  return `${match[1]}G`;
 }
 
 function getConfig(logger?: Logger) {
