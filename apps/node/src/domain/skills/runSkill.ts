@@ -601,6 +601,8 @@ export function buildSkillRunLogs(result: SkillRunResult | SkillRunError): { ski
     skillRunId: result.skillRunId,
     ...(result.logPath !== undefined ? {
       path: result.logPath,
+      // Advisory only - never executed by Clawperator. Not shell-escaped;
+      // logPath contains a double quote only if CLAWPERATOR_LOG_DIR does.
       tailCommand: `tail -f "${result.logPath}"`,
     } : {}),
   };
@@ -641,7 +643,7 @@ export async function runSkill(
   childEnv[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = skillRunId;
   const skillLogger = callbacks?.logger?.child({ skillId, skillRunId });
   const logPath = skillLogger?.logPath();
-  const tailCommand = logPath !== undefined ? `tail -f "${logPath}"` : undefined;
+  const tailCommand = logPath !== undefined ? `tail -f "${logPath}"` : undefined; // advisory only, see buildSkillRunLogs
   const addRunMetadata = <T extends object>(result: T): T & { skillRunId: string; logPath?: string } => ({
     ...result,
     skillRunId,
