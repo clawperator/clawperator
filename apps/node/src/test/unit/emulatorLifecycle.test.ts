@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it } from "node:test";
 import assert from "node:assert";
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
@@ -88,6 +88,38 @@ describe("emulator lifecycle", () => {
     ]);
     const configIni = await readFile(join(testHome, ".android", "avd", "clawperator-pixel.avd", "config.ini"), "utf8");
     assert.match(configIni, /^disk\.dataPartition\.size=12G$/m);
+  });
+
+  it("wraps data partition config write failures in the AVD create contract", async () => {
+    const runner = new FakeProcessRunner();
+    runner.queueResult({
+      code: 0,
+      stdout: "system-images;android-35;google_apis_playstore;arm64-v8a\n",
+      stderr: "",
+    });
+    runner.queueResult({ code: 0, stdout: "created", stderr: "" });
+
+    await writeAvd(
+      testHome,
+      "clawperator-pixel",
+      [
+        "PlayStore.enabled=true",
+        "disk.dataPartition.size=6G",
+      ].join("\n")
+    );
+    const configPath = join(testHome, ".android", "avd", "clawperator-pixel.avd", "config.ini");
+    await chmod(configPath, 0o444);
+
+    const config = getDefaultRuntimeConfig({ runner });
+    await assert.rejects(
+      () => createAvd(config, { name: "clawperator-pixel" }),
+      (error: unknown) => {
+        const typed = error as { code: string; details?: { path?: string } };
+        assert.strictEqual(typed.code, ERROR_CODES.ANDROID_AVD_CREATE_FAILED);
+        assert.strictEqual(typed.details?.path, configPath);
+        return true;
+      }
+    );
   });
 
   it("starts an AVD detached with fully ignored stdio", () => {

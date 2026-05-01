@@ -61,7 +61,15 @@ async function setAvdConfigValue(path: string, key: string, value: string): Prom
       lines.push(line);
     }
   }
-  await writeFile(path, lines.join("\n"), "utf8");
+  try {
+    await writeFile(path, lines.join("\n"), "utf8");
+  } catch (error) {
+    throw buildError(
+      ERROR_CODES.ANDROID_AVD_CREATE_FAILED,
+      `Failed to write AVD config at ${path}`,
+      { path, key, value, cause: error instanceof Error ? error.message : String(error) }
+    );
+  }
 }
 
 export async function setAvdDataPartitionSize(
