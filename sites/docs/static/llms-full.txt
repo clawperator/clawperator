@@ -12250,16 +12250,12 @@ During development, inspect:
 
 Additional execution failures to expect:
 
-```json
-{
-  "code": "SKILL_EXECUTION_\u0054IMEOUT",
+<pre><code>{
+  "code": "SKILL_EXECUTION_TIMEOUT",
   "message": "Skill com.example.app.do-thing timed out after 90000ms",
   "skillId": "com.example.app.do-thing",
   "stdout": "{\"stage\":\"before-timeout\"}\n"
-}
-```
-
-The JSON escape `\u0054` renders as `T`; the timeout `code` is <code>SKILL_EXECUTION_TIMEOUT</code>.
+}</code></pre>
 
 ```json
 {
@@ -12938,19 +12934,15 @@ does not rewrite it.
 
 ## Runtime Failure Example
 
-```json
-{
+<pre><code>{
   "status": "failed",
-  "code": "SKILL_EXECUTION_\u0054IMEOUT",
+  "code": "SKILL_EXECUTION_TIMEOUT",
   "message": "Skill com.android.settings.capture-overview timed out after 120000ms",
   "skillId": "com.android.settings.capture-overview",
   "stdout": "RESULT|status=partial\n",
   "stderr": "still waiting for target node\n",
   "skillResult": null
-}
-```
-
-The JSON escape `\u0054` renders as `T`; the timeout `code` is <code>SKILL_EXECUTION_TIMEOUT</code>.
+}</code></pre>
 
 Another common failure is a bad registry or missing script:
 

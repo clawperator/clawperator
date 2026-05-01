@@ -298,13 +298,20 @@ class GenerateErrorTableTests(unittest.TestCase):
 
 
 class GenerateLlmsFullTests(unittest.TestCase):
-    def test_decodes_entities_inside_inline_code_only(self) -> None:
-        rendered = llms_full.decode_inline_code_entities(
+    def test_decodes_entities_inside_code_only(self) -> None:
+        rendered = llms_full.decode_code_entities(
             "Use <code>SKILL_EXECUTION_&#x54;IMEOUT</code> but keep XML Network &amp; internet."
         )
 
         self.assertIn("<code>SKILL_EXECUTION_TIMEOUT</code>", rendered)
         self.assertIn("Network &amp; internet", rendered)
+
+    def test_decodes_entities_inside_multiline_code_blocks(self) -> None:
+        rendered = llms_full.decode_code_entities(
+            '<pre><code>{\n  "code": "SKILL_EXECUTION_&#x54;IMEOUT"\n}</code></pre>'
+        )
+
+        self.assertIn('"code": "SKILL_EXECUTION_TIMEOUT"', rendered)
 
 
 class ValidateDocsOrganizationTests(unittest.TestCase):
