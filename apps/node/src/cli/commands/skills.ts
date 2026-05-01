@@ -32,7 +32,7 @@ import {
 } from "../../domain/doctor/checks/deviceInteractivity.js";
 import { resolveDevice } from "../../domain/devices/resolveDevice.js";
 import type { Logger } from "../../adapters/logger.js";
-import type { LogEvent } from "../../contracts/logging.js";
+import { CLAWPERATOR_SKILL_RUN_ID_ENV_VAR, normalizeSkillRunId, type LogEvent } from "../../contracts/logging.js";
 import {
   CLAWPERATOR_BIN_ENV_VAR,
   CLAWPERATOR_DEVICE_ID_ENV_VAR,
@@ -417,7 +417,7 @@ export async function cmdSkillsRun(
   // Priority: explicit flag > env var > default
   const resolvedBin = resolveSkillBinCommand();
   const resolvedOperatorPackage = operatorPackage ?? resolveOperatorPackage();
-  const skillRunId = createSkillRunId();
+  const skillRunId = normalizeSkillRunId(process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR]) ?? createSkillRunId();
   const cliLogger = options.logger?.child({ skillId, deviceId: options.deviceId, skillRunId });
   let preRunLogs = buildSkillRunLogMetadata(skillRunId, cliLogger?.logPath());
   const currentPreRunLogs = () => buildSkillRunLogMetadata(skillRunId, cliLogger?.logPath());

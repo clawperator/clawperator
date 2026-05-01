@@ -7137,6 +7137,50 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.strictEqual(parsed.logs?.skillRunId, observedSkillRunId);
   });
 
+  it("reuses ambient skillRunId for nested CLI skill runs", async () => {
+    const parentSkillRunId = "skillrun_parent_cli_run";
+    const originalEnvValue = process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+    process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = parentSkillRunId;
+    let observedSkillRunId: string | undefined;
+    const fakeRunSkill: typeof runSkill = async (_skillId, _args, _registryPath, _timeoutMs, _env, callbacks) => {
+      observedSkillRunId = callbacks?.skillRunId;
+      return {
+        ok: true,
+        status: "success",
+        skillId: TEST_SKILL_VALID_ARTIFACT,
+        skillRunId: callbacks?.skillRunId ?? "missing",
+        output: "RUN_OK",
+        exitCode: 0,
+        durationMs: 1,
+        skillResult: null,
+      } as const;
+    };
+
+    try {
+      const stdout = await cmdSkillsRun(
+        TEST_SKILL_VALID_ARTIFACT,
+        [],
+        undefined,
+        undefined,
+        undefined,
+        {
+          format: "json",
+          runSkillImpl: fakeRunSkill,
+          resolveInteractiveSkillTargetImpl: allowInteractiveTarget,
+        }
+      );
+      const parsed = JSON.parse(stdout) as { logs?: { skillRunId?: string } };
+      assert.strictEqual(observedSkillRunId, parentSkillRunId);
+      assert.strictEqual(parsed.logs?.skillRunId, parentSkillRunId);
+    } finally {
+      if (originalEnvValue === undefined) {
+        delete process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+      } else {
+        process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = originalEnvValue;
+      }
+    }
+  });
+
   it("JSON mode omits duplicate top-level wrapper fields when skillResult is present", async () => {
     const frameMarker = "[Clawperator-Skill-Result]";
     const fakeRunSkill: typeof runSkill = async () => ({

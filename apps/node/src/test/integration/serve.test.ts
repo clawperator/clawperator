@@ -1043,6 +1043,7 @@ describe("serve API integration", () => {
       const contents = await readFile(logger.logPath()!, "utf8");
       const lines = contents.trimEnd().split("\n").map(line => JSON.parse(line) as { event: string; skillRunId?: string });
       assert.ok(lines.some(line => line.event === "skills.run.log_location" && line.skillRunId === skillRunId));
+      assert.ok(lines.some(line => line.event === "serve.http.request" && line.skillRunId === skillRunId));
       assert.ok(lines.some(line => line.event === "preflight.test" && line.skillRunId === skillRunId));
     } finally {
       await new Promise<void>((resolve, reject) => {

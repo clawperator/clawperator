@@ -29,6 +29,10 @@ import { getCliBuildIdentity, getCliVersion } from "../../domain/version/compati
 import { resolveInteractiveSkillTarget } from "./skills.js";
 import { toPublicInteractiveAutomationError } from "../../domain/doctor/checks/deviceInteractivity.js";
 
+interface ServeSkillRunLocals {
+  skillRunId?: string;
+}
+
 export interface ServeAppOptions {
   verbose: boolean;
   operatorPackage?: string;
@@ -88,6 +92,18 @@ function extractRequestSkillRunId(body: unknown): string | undefined {
 
 function requestLoggerForSkillRun(options: ServeAppOptions, skillRunId: string | undefined): Logger | undefined {
   return skillRunId === undefined ? options.logger : options.logger?.child({ skillRunId });
+}
+
+function isServeSkillRunRequest(method: string, path: string): boolean {
+  return method === "POST" && /^\/skills\/[^/]+\/run(?:\/)?$/.test(path);
+}
+
+function getServeSkillRunId(res: express.Response): string | undefined {
+  return (res.locals as ServeSkillRunLocals).skillRunId;
+}
+
+function setServeSkillRunId(res: express.Response, skillRunId: string): void {
+  (res.locals as ServeSkillRunLocals).skillRunId = skillRunId;
 }
 
 export async function cmdServe(options: ServeOptions): Promise<void> {
@@ -182,9 +198,12 @@ export function createServeApp(options: ServeAppOptions): express.Application {
 
   // Log all requests when a logger is configured (filtered by log level at the file sink).
   // Without a logger, fall back to console.log only when --verbose is set (legacy behavior).
-  app.use((req, _res, next) => {
+  app.use((req, res, next) => {
+    if (isServeSkillRunRequest(req.method, req.path) && getServeSkillRunId(res) === undefined) {
+      setServeSkillRunId(res, createSkillRunId());
+    }
     const clientIp = req.socket.remoteAddress || "unknown";
-    const requestLogger = requestLoggerForSkillRun(options, extractRequestSkillRunId(req.body));
+    const requestLogger = requestLoggerForSkillRun(options, getServeSkillRunId(res) ?? extractRequestSkillRunId(req.body));
     if (requestLogger) {
       requestLogger.emit({
         ts: new Date().toISOString(),
@@ -581,7 +600,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
       const validDeviceContext = typeof bodyForContext?.deviceId === "string" && bodyForContext.deviceId.trim().length > 0
         ? bodyForContext.deviceId
         : undefined;
-      const skillRunId = createSkillRunId();
+      const skillRunId = getServeSkillRunId(res) ?? createSkillRunId();
       const skillLogger = options.logger?.child({ skillId: routeSkillId, deviceId: validDeviceContext, skillRunId });
       let preRunLogs = buildSkillRunLogMetadata(skillRunId, skillLogger?.logPath());
       const currentPreRunLogs = () => buildSkillRunLogMetadata(skillRunId, skillLogger?.logPath());
