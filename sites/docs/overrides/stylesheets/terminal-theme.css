@@ -2,7 +2,7 @@
   color-scheme: light;
 
   --background-color: #fffdf8;
-  --page-width: 60em;
+  --page-width: 1180px;
   --font-color: #1e2430;
   --invert-font-color: #fffdf8;
   --primary-color: #ff6a3d;
@@ -11,7 +11,7 @@
   --error-color: #b42318;
   --progress-bar-background: #d6d3d1;
   --progress-bar-fill: #ff6a3d;
-  --code-bg-color: #f4ede1;
+  --code-bg-color: #f7f1e8;
   --block-background-color: #fffaf3;
 }
 
@@ -30,5 +30,147 @@
     --progress-bar-fill: #ff6a3d;
     --code-bg-color: #3f3f44;
     --block-background-color: #2b2b30;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  max-width: 100%;
+  width: 100%;
+}
+
+.container {
+  width: min(calc(100% - 32px), var(--page-width));
+  max-width: min(calc(100vw - 32px), var(--page-width));
+}
+
+.container,
+.container-fluid {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.terminal-mkdocs-main-grid,
+.terminal-mkdocs-main-grid > *,
+#terminal-mkdocs-main-content,
+#mkdocs-terminal-content {
+  min-width: 0;
+  max-width: 100%;
+}
+
+#mkdocs-terminal-content > * {
+  max-width: 100%;
+}
+
+@media only screen and (min-width: 70em) {
+  .terminal-mkdocs-main-grid {
+    grid-template-columns: 232px minmax(0, 1fr);
+    column-gap: 2rem;
+  }
+}
+
+@media only screen and (max-width: 69.99em) {
+  #terminal-mkdocs-side-panel {
+    display: none;
+  }
+
+  .terminal-mkdocs-main-grid {
+    display: block;
+  }
+}
+
+#mkdocs-terminal-content pre {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: pre;
+  word-break: normal;
+  word-wrap: normal;
+  overflow-wrap: normal;
+}
+
+#mkdocs-terminal-content pre code {
+  display: block;
+  min-width: max-content;
+  overflow-x: visible;
+  white-space: inherit;
+}
+
+#mkdocs-terminal-content table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+#mkdocs-terminal-content table code {
+  white-space: nowrap;
+}
+
+#mkdocs-terminal-content :not(pre) > code {
+  overflow-wrap: anywhere;
+  padding: 0 0.15em;
+  white-space: normal;
+  word-break: normal;
+}
+
+#mkdocs-terminal-content table :not(pre) > code {
+  white-space: nowrap;
+}
+
+@media only screen and (max-width: 48em) {
+  body {
+    padding-top: 28px;
+    padding-bottom: 32px;
+  }
+
+  .terminal-nav {
+    gap: 0.75rem;
+  }
+
+  .terminal-menu {
+    max-width: 100%;
+    overflow-x: visible;
+  }
+
+  .terminal-menu ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 1rem;
+    justify-content: flex-start;
+    margin-top: 0;
+  }
+
+  .terminal-menu li {
+    flex: 0 0 auto;
+    margin: 0;
+  }
+
+  .terminal-menu li a:not(.btn) {
+    width: auto;
+    white-space: nowrap;
+  }
+}
+
+@media only screen and (max-width: 600px) {
+  .container {
+    max-width: calc(100vw - 28px);
+    width: calc(100vw - 28px);
+  }
+
+  #mkdocs-terminal-content,
+  #mkdocs-terminal-content p,
+  #mkdocs-terminal-content li {
+    overflow-wrap: break-word;
+  }
+
+  #mkdocs-terminal-content table td,
+  #mkdocs-terminal-content table th {
+    padding: 0.45rem;
   }
 }
