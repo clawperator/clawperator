@@ -49,6 +49,32 @@ Existing documentation - including other pages in `docs/` - is advisory only. Fo
 
 If existing docs and code disagree, the code is correct.
 
+## Docs Organization Guardrails
+
+Keep authored pages, generated pages, and routing metadata in their own lanes:
+
+- Do not create an authored `docs/api/cli.md`. The CLI reference is generated
+  into `sites/docs/.build/api/cli.md`.
+- If generated CLI output is wrong, fix the code metadata, generator, or
+  `sites/docs/ownership.yaml`, then regenerate through the docs-build workflow.
+- Use `sites/docs/source-map.yaml` for code-derived pages and marker expansion.
+  Use `sites/docs/ownership.yaml` for generated command detail routing.
+- Every concept has one canonical owner. Summary pages should link to that
+  owner instead of duplicating contract detail.
+- Use stable anchors from `docs/internal/design/stable-doc-anchors.md`. In
+  authored docs, use explicit HTML anchors such as
+  `<a id="action-click"></a>` unless `sites/docs/mkdocs.yml` explicitly enables
+  and validates another anchor syntax.
+- Use precise API surface terms: CLI command, CLI subcommand, execution action,
+  Serve endpoint, MCP tool, Node contract, and result envelope.
+- If a doc repeatedly has to explain around a confusing command, flag, or
+  contract shape, stop and raise API-friction follow-up work instead of adding
+  more prose.
+- Preserve exact machine-readable codes in final rendered docs. If a required
+  source-level scan forces an HTML entity workaround, verify generated
+  machine-facing outputs such as `llms-full.txt` decode to the exact code and
+  add a generator test.
+
 ## How to Verify Against Code
 
 Use this table for every page. Open the listed files before writing.
@@ -131,7 +157,7 @@ Before declaring any page done, verify:
 - Primary flag name `--device` (not `--device-id`)
 - Primary flag name `--timeout` (not `--timeout-ms`)
 - Flat CLI surface: `snapshot` not `observe snapshot`, `click --text` not `action click --selector`
-- Never shorten "Clawperator" to "Claw"
+- Use the canonical project name exactly as written in the repository; do not abbreviate or truncate it
 - Use regular dashes/hyphens, never em dashes
 
 ## Cross-referencing Rules
@@ -162,6 +188,12 @@ After each page, run:
 ```bash
 ./scripts/docs_build.sh
 ```
+
+The build includes warning-only docs organization checks for broken internal anchors,
+compatibility-only selector aliases in authored public docs, and generated CLI
+commands missing detail links. Warnings do not fail the build yet, but treat
+them as review items and fix the source, generator, or ownership metadata when
+they are in your scope.
 
 After all pages in a batch, also run:
 

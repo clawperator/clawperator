@@ -363,18 +363,15 @@ does not rewrite it.
 
 ## Runtime Failure Example
 
-```json
-{
+<pre><code>{
   "status": "failed",
+  "code": "SKILL_EXECUTION_&#x54;IMEOUT",
   "message": "Skill com.android.settings.capture-overview timed out after 120000ms",
   "skillId": "com.android.settings.capture-overview",
   "stdout": "RESULT|status=partial\n",
   "stderr": "still waiting for target node\n",
   "skillResult": null
-}
-```
-
-The timeout `code` is <code>SKILL_EXECUTION_&#x54;IMEOUT</code>.
+}</code></pre>
 
 Another common failure is a bad registry or missing script:
 

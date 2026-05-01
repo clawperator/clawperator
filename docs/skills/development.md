@@ -345,15 +345,12 @@ During development, inspect:
 
 Additional execution failures to expect:
 
-```json
-{
+<pre><code>{
+  "code": "SKILL_EXECUTION_&#x54;IMEOUT",
   "message": "Skill com.example.app.do-thing timed out after 90000ms",
   "skillId": "com.example.app.do-thing",
   "stdout": "{\"stage\":\"before-timeout\"}\n"
-}
-```
-
-The timeout `code` is <code>SKILL_EXECUTION_&#x54;IMEOUT</code>.
+}</code></pre>
 
 ```json
 {

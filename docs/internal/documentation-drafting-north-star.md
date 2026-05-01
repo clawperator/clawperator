@@ -306,7 +306,7 @@ These are enforced across all authored documentation:
 - Primary flag name `--device` (not `--device-id`)
 - Primary flag name `--timeout` (not `--timeout-ms`)
 - Flat CLI surface: `snapshot` not `observe snapshot`, `click --text` not `action click --selector`
-- Never shorten the project name.
+- Use the canonical project name exactly as written in the repository; do not abbreviate or truncate it.
 - Use regular dashes/hyphens, never em dashes
 
 ---
