@@ -19,9 +19,9 @@ import { REGISTRY_READ_FAILED, SKILL_NOT_FOUND, SKILL_OUTPUT_ASSERTION_FAILED } 
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { listConfiguredAvds, inspectConfiguredAvd } from "../../domain/android-emulators/configuredAvds.js";
 import { listRunningEmulators } from "../../domain/android-emulators/runningEmulators.js";
-import { createAvd, deleteAvd, enableEmulatorDeveloperSettings, normalizeEmulatorDataPartitionSize, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
+import { buildDefaultEmulatorAvdName, createAvd, deleteAvd, enableEmulatorDeveloperSettings, normalizeEmulatorDataPartitionSize, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
 import { provisionEmulator } from "../../domain/android-emulators/provision.js";
-import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
+import { DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 import type { Logger } from "../../adapters/logger.js";
 import { normalizeSkillRunId } from "../../contracts/logging.js";
 import { resolveOperatorPackageForRequest } from "../../domain/config/resolveOperatorPackage.js";
@@ -519,7 +519,6 @@ export function createServeApp(options: ServeAppOptions): express.Application {
     try {
       const config = getEmulatorConfig();
       const body = (req.body && typeof req.body === "object") ? req.body as Record<string, unknown> : {};
-      const name = typeof body.name === "string" && body.name.length > 0 ? body.name : DEFAULT_EMULATOR_AVD_NAME;
       const apiLevel = typeof body.apiLevel === "number" ? body.apiLevel : SUPPORTED_EMULATOR_API_LEVEL;
       const abi = typeof body.abi === "string" && body.abi.length > 0 ? body.abi : "arm64-v8a";
       const deviceProfile = typeof body.deviceProfile === "string" && body.deviceProfile.length > 0
@@ -531,6 +530,9 @@ export function createServeApp(options: ServeAppOptions): express.Application {
         res.status(400).json({ ok: false, error: { code: "INVALID_BODY", message: dataPartitionSize.message } });
         return;
       }
+      const name = typeof body.name === "string" && body.name.length > 0
+        ? body.name
+        : buildDefaultEmulatorAvdName(dataPartitionSize.value);
       const systemImage = playStore
         ? `system-images;android-${apiLevel};google_apis_playstore;${abi}`
         : `system-images;android-${apiLevel};google_apis;${abi}`;

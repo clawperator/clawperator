@@ -2,9 +2,9 @@ import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeCo
 import type { OutputOptions } from "../output.js";
 import { formatError, formatSuccess } from "../output.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
-import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DATA_PARTITION_SIZE, DEFAULT_EMULATOR_DEVICE_PROFILE, EMULATOR_DATA_PARTITION_SIZE_PATTERN, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
+import { DEFAULT_EMULATOR_DATA_PARTITION_SIZE, DEFAULT_EMULATOR_DEVICE_PROFILE, EMULATOR_DATA_PARTITION_SIZE_PATTERN, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 import { inspectConfiguredAvd, listConfiguredAvds } from "../../domain/android-emulators/configuredAvds.js";
-import { createAvd, deleteAvd, enableEmulatorDeveloperSettings, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
+import { buildDefaultEmulatorAvdName, createAvd, deleteAvd, enableEmulatorDeveloperSettings, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
 import { provisionEmulator } from "../../domain/android-emulators/provision.js";
 import { listRunningEmulators } from "../../domain/android-emulators/runningEmulators.js";
 import type { Logger } from "../../adapters/logger.js";
@@ -80,7 +80,8 @@ export async function cmdEmulatorStatus(options: OutputOptions & { logger?: Logg
 export async function cmdEmulatorCreate(options: EmulatorCommandOptions): Promise<string> {
   try {
     const config = getConfig(options.logger);
-    const name = options.name ?? DEFAULT_EMULATOR_AVD_NAME;
+    const dataPartitionSize = parseDataPartitionSize(options.dataPartitionSize);
+    const name = options.name ?? buildDefaultEmulatorAvdName(dataPartitionSize);
     const apiLevel = options.apiLevel ?? SUPPORTED_EMULATOR_API_LEVEL;
     const systemImage = options.playStore === false
       ? `system-images;android-${apiLevel};google_apis;${options.abi ?? "arm64-v8a"}`
@@ -89,7 +90,7 @@ export async function cmdEmulatorCreate(options: EmulatorCommandOptions): Promis
       name,
       systemImage,
       deviceProfile: options.deviceProfile ?? DEFAULT_EMULATOR_DEVICE_PROFILE,
-      dataPartitionSize: parseDataPartitionSize(options.dataPartitionSize),
+      dataPartitionSize,
     });
     const avd = await inspectConfiguredAvd(name);
     return formatSuccess(avd, options);

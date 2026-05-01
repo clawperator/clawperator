@@ -8,6 +8,7 @@ import { type ClawperatorError, ERROR_CODES } from "../../contracts/errors.js";
 import {
   ADB_REGISTRATION_TIMEOUT_MS,
   BOOT_POLL_INTERVAL_MS,
+  DEFAULT_EMULATOR_AVD_NAME,
   DEFAULT_EMULATOR_DATA_PARTITION_SIZE,
   DEFAULT_EMULATOR_DEVICE_PROFILE,
   EMULATOR_DATA_PARTITION_SIZE_PATTERN,
@@ -36,6 +37,13 @@ export function normalizeEmulatorDataPartitionSize(size: string): string {
     );
   }
   return `${match[1]}G`;
+}
+
+export function buildDefaultEmulatorAvdName(
+  size: string = DEFAULT_EMULATOR_DATA_PARTITION_SIZE
+): string {
+  const normalizedSize = normalizeEmulatorDataPartitionSize(size).toLowerCase().replace(/g$/, "gb");
+  return `${DEFAULT_EMULATOR_AVD_NAME}-${normalizedSize}`;
 }
 
 function getAvdConfigPath(name: string): string {

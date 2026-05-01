@@ -998,6 +998,7 @@ Usage:
 Notes:
   - Emulator provisioning prefers: running supported emulator, stopped supported AVD, then new AVD creation.
   - New AVDs target Android API 35, a Google Play image, and a 12G data partition by default.
+  - When --name is omitted, the AVD name includes the storage size, for example clawperator-pixel-12gb.
   - --storage-size accepts positive integer gigabyte values such as 12G, 12GB, or 16G.
   - --size, --disk-size, and --data-partition-size are accepted as aliases.
   - JSON is the canonical output format for agent callers.

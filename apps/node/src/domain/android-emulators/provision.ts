@@ -2,12 +2,12 @@ import type { RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.
 import { assertRequiredEmulatorTools } from "./hostRequirements.js";
 import { type ClawperatorError, ERROR_CODES } from "../../contracts/errors.js";
 import {
-  DEFAULT_EMULATOR_AVD_NAME,
   DEFAULT_EMULATOR_DEVICE_PROFILE,
   DEFAULT_EMULATOR_SYSTEM_IMAGE,
 } from "./constants.js";
 import { inspectConfiguredAvd, listConfiguredAvds } from "./configuredAvds.js";
 import {
+  buildDefaultEmulatorAvdName,
   createAvd,
   enableEmulatorDeveloperSettings,
   startAvd,
@@ -44,7 +44,7 @@ export async function provisionEmulator(
 ): Promise<ProvisionedEmulator> {
   await assertRequiredEmulatorTools(config);
 
-  const desiredName = options?.name ?? DEFAULT_EMULATOR_AVD_NAME;
+  const desiredName = options?.name ?? buildDefaultEmulatorAvdName(options?.dataPartitionSize);
   const systemImage = options?.systemImage ?? DEFAULT_EMULATOR_SYSTEM_IMAGE;
   const deviceProfile = options?.deviceProfile ?? DEFAULT_EMULATOR_DEVICE_PROFILE;
 

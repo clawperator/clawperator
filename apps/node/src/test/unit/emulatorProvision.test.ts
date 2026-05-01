@@ -158,7 +158,7 @@ describe("emulator provisioning", () => {
       { code: 0, stdout: "created", stderr: "" },
       () => writeAvd(
         testHome,
-        "clawperator-pixel",
+        "clawperator-pixel-20gb",
         [
           "PlayStore.enabled=true",
           "abi.type=arm64-v8a",
@@ -170,7 +170,7 @@ describe("emulator provisioning", () => {
     ); // avdmanager create avd
     // waitForEmulatorRegistration
     runner.queueResult({ code: 0, stdout: "List of devices attached\nemulator-5554\tdevice\n", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "OK\nclawperator-pixel\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "OK\nclawperator-pixel-20gb\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "1\n", stderr: "" }); // sys.boot_completed
     runner.queueResult({ code: 0, stdout: "1\n", stderr: "" }); // dev.bootcomplete
     // waitForBootCompletion
@@ -185,15 +185,20 @@ describe("emulator provisioning", () => {
     assert.strictEqual(result.created, true);
     assert.strictEqual(result.started, true);
     assert.strictEqual(result.reused, false);
-    assert.strictEqual(result.avdName, "clawperator-pixel");
-    const configIni = await readFile(join(testHome, ".android", "avd", "clawperator-pixel.avd", "config.ini"), "utf8");
+    assert.strictEqual(result.avdName, "clawperator-pixel-20gb");
+    assert.deepStrictEqual(runner.calls[9].args, [
+      "create", "avd", "--force", "--name", "clawperator-pixel-20gb",
+      "--package", "system-images;android-35;google_apis_playstore;arm64-v8a",
+      "--device", "pixel_7",
+    ]);
+    const configIni = await readFile(join(testHome, ".android", "avd", "clawperator-pixel-20gb.avd", "config.ini"), "utf8");
     assert.match(configIni, /^disk\.dataPartition\.size=20G$/m);
   });
 
   it("refuses to auto-provision an existing unsupported default AVD", async () => {
     await writeAvd(
       testHome,
-      "clawperator-pixel",
+      "clawperator-pixel-12gb",
       [
         "PlayStore.enabled=false",
         "abi.type=x86_64",
