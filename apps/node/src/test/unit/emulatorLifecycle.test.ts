@@ -17,17 +17,29 @@ import {
 } from "../../domain/android-emulators/lifecycle.js";
 import { FakeProcessRunner } from "./fakes/FakeProcessRunner.js";
 
-async function writeAvd(homeDir: string, name: string, configIni: string): Promise<void> {
-  const avdRoot = join(homeDir, ".android", "avd");
+async function writeAvdAtRoot(avdRoot: string, name: string, configIni: string): Promise<void> {
   await mkdir(join(avdRoot, `${name}.avd`), { recursive: true });
   await writeFile(join(avdRoot, `${name}.avd`, "config.ini"), configIni, "utf8");
   await writeFile(join(avdRoot, `${name}.ini`), "target=android-35\n", "utf8");
+}
+
+async function writeAvd(homeDir: string, name: string, configIni: string): Promise<void> {
+  await writeAvdAtRoot(join(homeDir, ".android", "avd"), name, configIni);
+}
+
+function restoreOptionalEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
 }
 
 describe("emulator lifecycle", () => {
   const originalHome = process.env.HOME;
   const originalAndroidHome = process.env.ANDROID_HOME;
   const originalAndroidSdkRoot = process.env.ANDROID_SDK_ROOT;
+  const originalAndroidAvdHome = process.env.ANDROID_AVD_HOME;
   let testHome: string;
 
   beforeEach(async () => {
@@ -35,12 +47,14 @@ describe("emulator lifecycle", () => {
     process.env.HOME = testHome;
     delete process.env.ANDROID_HOME;
     delete process.env.ANDROID_SDK_ROOT;
+    delete process.env.ANDROID_AVD_HOME;
   });
 
   afterEach(() => {
     process.env.HOME = originalHome;
-    process.env.ANDROID_HOME = originalAndroidHome;
-    process.env.ANDROID_SDK_ROOT = originalAndroidSdkRoot;
+    restoreOptionalEnv("ANDROID_HOME", originalAndroidHome);
+    restoreOptionalEnv("ANDROID_SDK_ROOT", originalAndroidSdkRoot);
+    restoreOptionalEnv("ANDROID_AVD_HOME", originalAndroidAvdHome);
   });
 
   it("installs a missing system image after accepting licenses", async () => {
@@ -89,6 +103,35 @@ describe("emulator lifecycle", () => {
       "--device", "pixel_7",
     ]);
     const configIni = await readFile(join(testHome, ".android", "avd", "clawperator-pixel.avd", "config.ini"), "utf8");
+    assert.match(configIni, /^disk\.dataPartition\.size=12G$/m);
+  });
+
+  it("sizes created AVDs under ANDROID_AVD_HOME when it is set", async () => {
+    const runner = new FakeProcessRunner();
+    runner.queueResult({
+      code: 0,
+      stdout: "system-images;android-35;google_apis_playstore;arm64-v8a\n",
+      stderr: "",
+    });
+
+    const avdRoot = join(testHome, "custom-avd-home");
+    process.env.ANDROID_AVD_HOME = avdRoot;
+    runner.queueResult(
+      { code: 0, stdout: "created", stderr: "" },
+      () => writeAvdAtRoot(
+        avdRoot,
+        "clawperator-pixel",
+        [
+          "PlayStore.enabled=true",
+          "disk.dataPartition.size=6G",
+        ].join("\n")
+      )
+    );
+
+    const config = getDefaultRuntimeConfig({ runner });
+    await createAvd(config, { name: "clawperator-pixel" });
+
+    const configIni = await readFile(join(avdRoot, "clawperator-pixel.avd", "config.ini"), "utf8");
     assert.match(configIni, /^disk\.dataPartition\.size=12G$/m);
   });
 

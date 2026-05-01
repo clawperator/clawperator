@@ -1,6 +1,5 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { runAdb } from "../../adapters/android-bridge/adbClient.js";
 import type { RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
@@ -14,7 +13,7 @@ import {
   DEFAULT_EMULATOR_SYSTEM_IMAGE,
   EMULATOR_BOOT_TIMEOUT_MS,
 } from "./constants.js";
-import { inspectConfiguredAvd } from "./configuredAvds.js";
+import { getAvdRoot, inspectConfiguredAvd } from "./configuredAvds.js";
 import { isEmulatorBooted, resolveRunningEmulatorByName } from "./runningEmulators.js";
 
 function buildError(
@@ -33,7 +32,7 @@ function getAvdConfigPath(name: string): string {
       { name }
     );
   }
-  return join(homedir(), ".android", "avd", `${name}.avd`, "config.ini");
+  return join(getAvdRoot(), `${name}.avd`, "config.ini");
 }
 
 async function setAvdConfigValue(path: string, key: string, value: string): Promise<void> {
