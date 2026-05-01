@@ -39,6 +39,7 @@ export async function provisionEmulator(
     name?: string;
     systemImage?: string;
     deviceProfile?: string;
+    dataPartitionSize?: string;
   }
 ): Promise<ProvisionedEmulator> {
   await assertRequiredEmulatorTools(config);
@@ -97,6 +98,7 @@ export async function provisionEmulator(
       name: desiredName,
       systemImage,
       deviceProfile,
+      dataPartitionSize: options?.dataPartitionSize,
     });
   }
 

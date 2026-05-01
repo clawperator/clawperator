@@ -180,14 +180,14 @@ describe("emulator provisioning", () => {
     runner.queueResult({ code: 0, stdout: "", stderr: "" }); // adb_enabled
 
     const config = getDefaultRuntimeConfig({ runner });
-    const result = await provisionEmulator(config);
+    const result = await provisionEmulator(config, { dataPartitionSize: "20GB" });
 
     assert.strictEqual(result.created, true);
     assert.strictEqual(result.started, true);
     assert.strictEqual(result.reused, false);
     assert.strictEqual(result.avdName, "clawperator-pixel");
     const configIni = await readFile(join(testHome, ".android", "avd", "clawperator-pixel.avd", "config.ini"), "utf8");
-    assert.match(configIni, /^disk\.dataPartition\.size=12G$/m);
+    assert.match(configIni, /^disk\.dataPartition\.size=20G$/m);
   });
 
   it("refuses to auto-provision an existing unsupported default AVD", async () => {

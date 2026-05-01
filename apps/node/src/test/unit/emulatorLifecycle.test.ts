@@ -10,6 +10,7 @@ import {
   deleteAvd,
   enableEmulatorDeveloperSettings,
   ensureSystemImageInstalled,
+  normalizeEmulatorDataPartitionSize,
   startAvd,
   stopAvd,
   waitForBootCompletion,
@@ -104,6 +105,46 @@ describe("emulator lifecycle", () => {
     ]);
     const configIni = await readFile(join(testHome, ".android", "avd", "clawperator-pixel.avd", "config.ini"), "utf8");
     assert.match(configIni, /^disk\.dataPartition\.size=12G$/m);
+  });
+
+  it("creates an AVD with a caller-provided gigabyte data partition size", async () => {
+    const runner = new FakeProcessRunner();
+    runner.queueResult({
+      code: 0,
+      stdout: "system-images;android-35;google_apis_playstore;arm64-v8a\n",
+      stderr: "",
+    });
+    runner.queueResult(
+      { code: 0, stdout: "created", stderr: "" },
+      () => writeAvd(
+        testHome,
+        "clawperator-pixel",
+        [
+          "PlayStore.enabled=true",
+          "disk.dataPartition.size=6G",
+        ].join("\n")
+      )
+    );
+
+    const config = getDefaultRuntimeConfig({ runner });
+    await createAvd(config, { name: "clawperator-pixel", dataPartitionSize: "16GB" });
+
+    const configIni = await readFile(join(testHome, ".android", "avd", "clawperator-pixel.avd", "config.ini"), "utf8");
+    assert.match(configIni, /^disk\.dataPartition\.size=16G$/m);
+  });
+
+  it("normalizes gigabyte data partition size values and rejects other units", () => {
+    assert.strictEqual(normalizeEmulatorDataPartitionSize("16GB"), "16G");
+    assert.strictEqual(normalizeEmulatorDataPartitionSize("16g"), "16G");
+    assert.strictEqual(normalizeEmulatorDataPartitionSize("16gb"), "16G");
+    assert.throws(
+      () => normalizeEmulatorDataPartitionSize("16384M"),
+      (error: unknown) => {
+        const typed = error as { code?: string };
+        assert.strictEqual(typed.code, ERROR_CODES.ANDROID_AVD_CREATE_FAILED);
+        return true;
+      }
+    );
   });
 
   it("sizes created AVDs under ANDROID_AVD_HOME when it is set", async () => {

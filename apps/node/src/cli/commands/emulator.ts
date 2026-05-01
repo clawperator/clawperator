@@ -2,7 +2,7 @@ import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeCo
 import type { OutputOptions } from "../output.js";
 import { formatError, formatSuccess } from "../output.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
-import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
+import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DATA_PARTITION_SIZE, DEFAULT_EMULATOR_DEVICE_PROFILE, EMULATOR_DATA_PARTITION_SIZE_PATTERN, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 import { inspectConfiguredAvd, listConfiguredAvds } from "../../domain/android-emulators/configuredAvds.js";
 import { createAvd, deleteAvd, enableEmulatorDeveloperSettings, startAvd, stopAvd, waitForBootCompletion, waitForEmulatorRegistration } from "../../domain/android-emulators/lifecycle.js";
 import { provisionEmulator } from "../../domain/android-emulators/provision.js";
@@ -15,7 +15,24 @@ interface EmulatorCommandOptions extends OutputOptions {
   deviceProfile?: string;
   abi?: string;
   playStore?: boolean;
+  dataPartitionSize?: string;
   logger?: Logger;
+}
+
+function parseDataPartitionSize(value: string | undefined): string {
+  if (value === undefined) {
+    return DEFAULT_EMULATOR_DATA_PARTITION_SIZE;
+  }
+  const normalized = value.trim().toUpperCase();
+  const match = normalized.match(EMULATOR_DATA_PARTITION_SIZE_PATTERN);
+  if (!match) {
+    throw {
+      code: "USAGE",
+      message: "--storage-size must be a positive integer followed by G or GB, for example 12G",
+      details: { value },
+    };
+  }
+  return `${match[1]}G`;
 }
 
 function getConfig(logger?: Logger) {
@@ -72,6 +89,7 @@ export async function cmdEmulatorCreate(options: EmulatorCommandOptions): Promis
       name,
       systemImage,
       deviceProfile: options.deviceProfile ?? DEFAULT_EMULATOR_DEVICE_PROFILE,
+      dataPartitionSize: parseDataPartitionSize(options.dataPartitionSize),
     });
     const avd = await inspectConfiguredAvd(name);
     return formatSuccess(avd, options);
@@ -121,10 +139,12 @@ export async function cmdEmulatorDelete(name: string, options: OutputOptions & {
   }
 }
 
-export async function cmdProvisionEmulator(options: OutputOptions & { logger?: Logger }): Promise<string> {
+export async function cmdProvisionEmulator(options: OutputOptions & { logger?: Logger; dataPartitionSize?: string }): Promise<string> {
   try {
     const config = getConfig(options.logger);
-    const result = await provisionEmulator(config);
+    const result = await provisionEmulator(config, {
+      dataPartitionSize: parseDataPartitionSize(options.dataPartitionSize),
+    });
     return formatSuccess(result, options);
   } catch (error) {
     return formatError(error, options);

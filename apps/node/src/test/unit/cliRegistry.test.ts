@@ -331,6 +331,24 @@ describe("record synonym dispatches to recording handler", () => {
       ["--baseline", "--result", "--mode"],
     );
   });
+
+  it("emulator create exposes storage-size aliases", () => {
+    assert.deepStrictEqual(
+      resolveSupportedFlagsFromRegistry(COMMANDS.emulator, ["create"]),
+      ["--name", "--storage-size", "--size", "--disk-size", "--data-partition-size"],
+    );
+  });
+
+  it("emulator provision exposes storage-size aliases", () => {
+    assert.deepStrictEqual(
+      resolveSupportedFlagsFromRegistry(COMMANDS.emulator, ["provision"]),
+      ["--storage-size", "--size", "--disk-size", "--data-partition-size"],
+    );
+    assert.deepStrictEqual(
+      resolveSupportedFlagsFromRegistry(COMMANDS.provision, ["emulator"]),
+      ["--storage-size", "--size", "--disk-size", "--data-partition-size"],
+    );
+  });
 });
 
 describe("agent-oriented command aliases", () => {

@@ -2870,7 +2870,7 @@ Use this page as a command index. Detailed behavior, output shapes, and recovery
 | [`host`](#command-host) | Setup | `host setup [--installed-at <iso8601>] [--cli-version <version>] [--apk-version <version>] [--last-device-serial <serial>]` | `--installed-at`, `--cli-version`, `--apk-version`, `--last-device-serial` | [Setup](../setup.md#setup-step-install-cli) | Set up durable host artifacts owned by the CLI |
 | [`install`](#command-install) | Setup | `install [--operator-package <package>]` | `--operator-package` | [Setup](../setup.md#setup-step-install-cli) | Run the CLI-owned post-bootstrap install flow for device remediation, runtime skills, bundled skills, and host setup |
 | [`devices`](#command-devices) | Device Management | `devices` | - | [Devices](devices.md#clawperator-devices) | List connected Android devices |
-| [`emulator`](#command-emulator) | Device Management | `emulator list` | `--name` | [Emulator provisioning](serve.md#endpoint-post-android-provision-emulator) | Manage Android emulators (AVDs) |
+| [`emulator`](#command-emulator) | Device Management | `emulator list` | `--name`, `--storage-size` | [Emulator provisioning](serve.md#endpoint-post-android-provision-emulator) | Manage Android emulators (AVDs) |
 | [`packages`](#command-packages) | Device Management | `packages list [--device <id>] [--operator-package <pkg>] [--third-party]` | `--third-party` | [Devices](devices.md) | List installed packages on a device |
 | [`exec`](#command-exec) | Execution | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]` | `--payload`, `--validate-only`, `--dry-run`, `--goal`, `--no-daemon` | [Execution payload](overview.md#execution-payload) | Execute a validated command payload |
 | [`snapshot`](#command-snapshot) | Device Interaction | `snapshot [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | [Action: snapshot](actions.md#action-snapshot) | Get current Android UI hierarchy as XML |
@@ -2953,7 +2953,7 @@ Manage Android emulators (AVDs)
 
 - Group: Device Management
 - Syntax: `emulator list`, `emulator inspect <name>`, `emulator create [--name <name>]`, `emulator start <name>`, `emulator stop <name>`, `emulator delete <name>`, `emulator status`, `emulator provision`
-- Primary flags: `--name`
+- Primary flags: `--name`, `--storage-size`
 - Details: [Emulator provisioning](serve.md#endpoint-post-android-provision-emulator)
 - See also: [Devices](devices.md)
 - Alias notes: `provision emulator` is an alias for `emulator provision`.
@@ -6295,7 +6295,8 @@ Request body:
   "apiLevel": 35,
   "abi": "arm64-v8a",
   "deviceProfile": "pixel_8",
-  "playStore": true
+  "playStore": true,
+  "storageSize": "12G"
 }
 ```
 
@@ -6308,9 +6309,11 @@ Defaults when omitted:
 | `abi` | `arm64-v8a` |
 | `deviceProfile` | `DEFAULT_EMULATOR_DEVICE_PROFILE` (`pixel_7`) |
 | `playStore` | `true` unless explicitly `false` |
+| `storageSize` | `12G` |
 
-New AVDs are written with `disk.dataPartition.size=12G` before first boot so
-the emulator has enough internal app storage for Google Play and a reasonable number of user apps.
+`storageSize` accepts positive integer gigabyte values such as `12G`, `12GB`,
+or `16G`. The aliases `size`, `diskSize`, and `dataPartitionSize` are also
+accepted. Only one storage size field may be provided.
 
 Success response:
 
@@ -6377,6 +6380,18 @@ Behavior:
 ### `POST /android/provision/emulator`
 
 This route calls `provisionEmulator()` and may reuse a supported running emulator, start an existing supported AVD, or create and start a new one.
+
+Optional request body:
+
+```json
+{
+  "storageSize": "16GB"
+}
+```
+
+When a new AVD is created, `storageSize` controls the internal app storage data
+partition. It accepts the same gigabyte-only values and aliases as
+`POST /android/emulators/create`. Omit it to use `12G`.
 
 Success response:
 

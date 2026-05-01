@@ -10,6 +10,7 @@ import {
   BOOT_POLL_INTERVAL_MS,
   DEFAULT_EMULATOR_DATA_PARTITION_SIZE,
   DEFAULT_EMULATOR_DEVICE_PROFILE,
+  EMULATOR_DATA_PARTITION_SIZE_PATTERN,
   DEFAULT_EMULATOR_SYSTEM_IMAGE,
   EMULATOR_BOOT_TIMEOUT_MS,
 } from "./constants.js";
@@ -22,6 +23,19 @@ function buildError(
   details?: Record<string, unknown>
 ): ClawperatorError {
   return { code, message, details };
+}
+
+export function normalizeEmulatorDataPartitionSize(size: string): string {
+  const normalized = size.trim().toUpperCase();
+  const match = normalized.match(EMULATOR_DATA_PARTITION_SIZE_PATTERN);
+  if (!match) {
+    throw buildError(
+      ERROR_CODES.ANDROID_AVD_CREATE_FAILED,
+      "Emulator data partition size must be a positive integer followed by G or GB",
+      { value: size, expectedFormat: "<positive_integer>G" }
+    );
+  }
+  return `${match[1]}G`;
 }
 
 function getAvdConfigPath(name: string): string {
@@ -75,7 +89,7 @@ export async function setAvdDataPartitionSize(
   name: string,
   size: string = DEFAULT_EMULATOR_DATA_PARTITION_SIZE
 ): Promise<void> {
-  await setAvdConfigValue(getAvdConfigPath(name), "disk.dataPartition.size", size);
+  await setAvdConfigValue(getAvdConfigPath(name), "disk.dataPartition.size", normalizeEmulatorDataPartitionSize(size));
 }
 
 async function deleteCreatedAvdAfterFailedConfigUpdate(
@@ -152,10 +166,12 @@ export async function createAvd(
     name: string;
     systemImage?: string;
     deviceProfile?: string;
+    dataPartitionSize?: string;
   }
 ): Promise<void> {
   const systemImage = options.systemImage ?? DEFAULT_EMULATOR_SYSTEM_IMAGE;
   const deviceProfile = options.deviceProfile ?? DEFAULT_EMULATOR_DEVICE_PROFILE;
+  const dataPartitionSize = options.dataPartitionSize ?? DEFAULT_EMULATOR_DATA_PARTITION_SIZE;
   getAvdConfigPath(options.name);
   const existedBeforeCreate = (await inspectConfiguredAvd(options.name)).exists;
 
@@ -175,7 +191,7 @@ export async function createAvd(
   }
 
   try {
-    await setAvdDataPartitionSize(options.name);
+    await setAvdDataPartitionSize(options.name, dataPartitionSize);
   } catch (error) {
     if (!existedBeforeCreate) {
       await deleteCreatedAvdAfterFailedConfigUpdate(config, options.name, error);

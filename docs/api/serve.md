@@ -723,7 +723,8 @@ Request body:
   "apiLevel": 35,
   "abi": "arm64-v8a",
   "deviceProfile": "pixel_8",
-  "playStore": true
+  "playStore": true,
+  "storageSize": "12G"
 }
 ```
 
@@ -736,9 +737,11 @@ Defaults when omitted:
 | `abi` | `arm64-v8a` |
 | `deviceProfile` | `DEFAULT_EMULATOR_DEVICE_PROFILE` (`pixel_7`) |
 | `playStore` | `true` unless explicitly `false` |
+| `storageSize` | `12G` |
 
-New AVDs are written with `disk.dataPartition.size=12G` before first boot so
-the emulator has enough internal app storage for Google Play and a reasonable number of user apps.
+`storageSize` accepts positive integer gigabyte values such as `12G`, `12GB`,
+or `16G`. The aliases `size`, `diskSize`, and `dataPartitionSize` are also
+accepted. Only one storage size field may be provided.
 
 Success response:
 
@@ -805,6 +808,18 @@ Behavior:
 ### `POST /android/provision/emulator`
 
 This route calls `provisionEmulator()` and may reuse a supported running emulator, start an existing supported AVD, or create and start a new one.
+
+Optional request body:
+
+```json
+{
+  "storageSize": "16GB"
+}
+```
+
+When a new AVD is created, `storageSize` controls the internal app storage data
+partition. It accepts the same gigabyte-only values and aliases as
+`POST /android/emulators/create`. Omit it to use `12G`.
 
 Success response:
 
