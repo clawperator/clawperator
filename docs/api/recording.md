@@ -2,7 +2,12 @@
 
 ## Purpose
 
-Document the current recording workflow, the raw NDJSON schema written by the Operator app, the parsed step-log format produced by `clawperator record parse`, the agent-context export produced by `clawperator recording export`, and the compare workflow exposed by `clawperator recording compare`.
+Document the current recording workflow, the raw NDJSON schema written by the
+Operator app, the parsed step-log format produced by `clawperator record parse`,
+the agent-context export produced by `clawperator recording export`, and the
+compare workflow exposed by `clawperator recording compare`. Recording start
+and stop commands are execution-backed and return the shared
+[result envelope](overview.md#result-envelope) wrapper.
 
 ## Sources
 

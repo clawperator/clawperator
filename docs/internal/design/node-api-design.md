@@ -293,8 +293,8 @@ This supports agent feedback loops during best-effort execution.
 Public limits (v1):
 
 - `MAX_EXECUTION_ACTIONS = 50`
-- `MAX_EXECUTION_TIMEOUT_MS = 120000`
-- `MIN_EXECUTION_TIMEOUT_MS = 1000`
+- maximum execution timeout constant: `120000`
+- minimum execution timeout constant: `1000`
 - `MAX_PAYLOAD_BYTES = 64000`
 - `MAX_RETRY_ATTEMPTS_PER_STEP = 10`
 - `MAX_SNAPSHOT_LINES = 2000`

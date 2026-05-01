@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sys
+import html
+import re
 from pathlib import Path
 
 try:
@@ -76,6 +78,14 @@ def read_page(build_dir: Path, page_path: str) -> str:
     return resolved.read_text(encoding="utf-8").rstrip("\n")
 
 
+def decode_inline_code_entities(markdown: str) -> str:
+    return re.sub(
+        r"<code>(.*?)</code>",
+        lambda match: f"<code>{html.unescape(match.group(1))}</code>",
+        markdown,
+    )
+
+
 def render_llms_full(
     build_dir: Path,
     nav_entries: list[tuple[str, list[tuple[str, str]]]],
@@ -92,7 +102,7 @@ def render_llms_full(
             lines.append(f"# {section_title}")
             lines.append("")
         for page_title, page_path in pages:
-            page_content = read_page(build_dir, page_path)
+            page_content = decode_inline_code_entities(read_page(build_dir, page_path))
             if not page_content.lstrip().startswith("#"):
                 lines.append(f"## {page_title}")
             lines.append(page_content)

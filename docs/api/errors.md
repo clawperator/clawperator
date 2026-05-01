@@ -2,7 +2,10 @@
 
 ## Purpose
 
-Document the public error-code contract, show where failures appear in CLI output versus result envelopes, and give concrete recovery steps for the most common host, validation, and runtime failures.
+Document the public error-code contract, show where failures appear in CLI
+output versus [result envelopes](overview.md#result-envelope), and give
+concrete recovery steps for the most common host, validation, and runtime
+failures.
 
 ## Sources
 
@@ -247,6 +250,36 @@ Recovery options:
 
 - pass the installed package via `--operator-package`
 - or reinstall the intended APK variant
+
+### `BROADCAST_FAILED`
+
+Use this when Node could not dispatch the execution payload broadcast to the
+selected Operator package.
+
+Common triggers:
+
+- wrong `--operator-package` for the installed APK variant
+- device shell transport failure
+- the Operator package is missing or not reachable through Android broadcast
+  delivery
+
+Recovery:
+
+- run `clawperator doctor --device <serial> --operator-package <package>`
+- verify package presence and variant compatibility
+- rerun the failing command only after doctor reports the target ready
+
+### `PAYLOAD_TOO_LARGE`
+
+Use this when a CLI, Serve, or execution payload exceeds a configured size
+limit before dispatch.
+
+Recovery:
+
+- split long action lists into smaller executions
+- move large inline data into files or skill artifacts where the command
+  supports that pattern
+- for Serve requests, keep the JSON body under the documented `100kb` limit
 
 ### `DEVICE_NOT_INTERACTIVE`
 

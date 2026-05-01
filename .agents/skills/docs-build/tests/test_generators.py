@@ -33,6 +33,10 @@ error_table = load_module(
     ".agents/skills/docs-build/scripts/generate_error_table.py",
     "docs_generate_generate_error_table",
 )
+llms_full = load_module(
+    ".agents/skills/docs-build/scripts/generate_llms_full.py",
+    "docs_generate_generate_llms_full",
+)
 
 
 class GenerateCliReferenceTests(unittest.TestCase):
@@ -286,6 +290,16 @@ class GenerateErrorTableTests(unittest.TestCase):
             error_table.anchor_for_code("NODE_NOT_FOUND"),
             "error-node-not-found",
         )
+
+
+class GenerateLlmsFullTests(unittest.TestCase):
+    def test_decodes_entities_inside_inline_code_only(self) -> None:
+        rendered = llms_full.decode_inline_code_entities(
+            "Use <code>SKILL_EXECUTION_&#x54;IMEOUT</code> but keep XML Network &amp; internet."
+        )
+
+        self.assertIn("<code>SKILL_EXECUTION_TIMEOUT</code>", rendered)
+        self.assertIn("Network &amp; internet", rendered)
 
 
 if __name__ == "__main__":

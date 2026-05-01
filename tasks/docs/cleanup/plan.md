@@ -20,9 +20,9 @@ cleanup. **PR-4** adds warning-only docs checks.
 | State | in progress |
 | Total PRs | 4 |
 | Total phases | 5 |
-| Completed | PR-1 / Phase 1; PR-2 / Phases 2-3 |
-| Remaining | 4, 5 |
-| Current / Next | PR-3 / Phase 4 |
+| Completed | PR-1 / Phase 1; PR-2 / Phases 2-3; PR-3 / Phase 4 |
+| Remaining | 5 |
+| Current / Next | PR-4 / Phase 5 |
 | Blockers | none |
 
 ## Goal

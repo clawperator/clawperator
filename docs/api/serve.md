@@ -8,7 +8,8 @@ Define the local HTTP and SSE contract exposed by `clawperator serve`, including
 
 - HTTP server and handlers: `apps/node/src/cli/commands/serve.ts`
 - Execution result contract: `apps/node/src/domain/executions/runExecution.ts`
-- Result envelope: `apps/node/src/contracts/result.ts`
+- Result envelope source: `apps/node/src/contracts/result.ts`; canonical docs:
+  [Result Envelope](overview.md#result-envelope)
 - Skills registry contract: `apps/node/src/contracts/skills.ts`
 - SSE event names: `apps/node/src/domain/observe/events.ts`
 - Emulator response types: `apps/node/src/domain/android-emulators/types.ts`
@@ -35,7 +36,7 @@ Most REST endpoints return one of these shapes.
 
 Important boundary:
 
-- `/execute`, `/snapshot`, and `/screenshot` pass through `runExecution()` results on success and on cross-surface execution failures
+- `/execute`, `/snapshot`, and `/screenshot` pass through `runExecution()` results on success and on cross-surface execution failures; read `envelope` fields through the canonical [Result Envelope](overview.md#result-envelope) contract
 - malformed request bodies and route-local validation failures are serve-layer wrappers only and are not part of the shared execution contract
 
 ### Success wrapper
@@ -102,11 +103,10 @@ Success conditions for execution endpoints:
 
 ## Endpoint Summary
 
-<a id="endpoint-get-ping"></a>
-<a id="endpoint-get-version"></a>
-
 | Method | Path | Purpose |
 | --- | --- | --- |
+| `GET` | `/ping` | health probe for the local serve process |
+| `GET` | `/version` | report the CLI version and build identity |
 | `GET` | `/devices` | list adb-visible devices |
 | `POST` | `/execute` | run a caller-supplied execution payload |
 | `POST` | `/snapshot` | run a synthetic one-step `snapshot` execution |
@@ -123,6 +123,49 @@ Success conditions for execution endpoints:
 | `DELETE` | `/android/emulators/:name` | delete an AVD |
 | `POST` | `/android/provision/emulator` | create or reuse a supported emulator and boot it |
 | `GET` | `/events` | subscribe to SSE execution events |
+
+<a id="endpoint-get-ping"></a>
+## `GET /ping`
+
+Health probe for the serve process.
+
+Response:
+
+```json
+{
+  "ok": true
+}
+```
+
+Meaning:
+
+- the Express app is running and can answer requests
+- no adb, device, Operator APK, skill registry, or execution readiness check is performed
+
+<a id="endpoint-get-version"></a>
+## `GET /version`
+
+Reports the CLI version and build identity for the running server process.
+
+Response:
+
+```json
+{
+  "version": "0.9.4",
+  "buildIdentity": {
+    "entryPath": "/path/to/clawperator/dist/cli/index.js",
+    "mtimeMs": 1710000000000,
+    "size": 123456
+  }
+}
+```
+
+Meaning:
+
+- `version` is the same package version returned by the CLI version helper
+- `buildIdentity.entryPath` is the resolved CLI entrypoint path when Node can resolve it
+- `buildIdentity.mtimeMs` and `buildIdentity.size` come from `statSync()` and are `null` when the entrypoint cannot be inspected
+- no device or Operator APK check is performed
 
 <a id="endpoint-get-devices"></a>
 ## `GET /devices`
@@ -570,6 +613,25 @@ Malformed framed result:
   }
 }
 ```
+
+## Error Layers
+
+Serve has three distinct error layers. Keep them separate when recovering from a
+failure.
+
+| Layer | Where it comes from | Shape | Recovery |
+| --- | --- | --- | --- |
+| Route-local wrapper error | Express JSON parsing or per-route request checks in `serve.ts` | `{ "ok": false, "error": { "code": "INVALID_BODY", ... } }` or similar route-local codes | Fix the HTTP request shape and retry. These codes are not the shared execution contract. |
+| Shared execution error | `runExecution()` returns `ok: false` for `/execute`, `/snapshot`, or `/screenshot` | `{ "ok": false, "error": { "code": "<errors.ts code>", ... } }` | Branch on `error.code` and use [Errors](errors.md) for recovery. |
+| Failed result envelope | Android returned an execution envelope with `envelope.status == "failed"` | `{ "ok": true, "envelope": { "status": "failed", ... } }` in success-wrapper passthrough cases | Read [Result Envelope](overview.md#result-envelope), then branch on `envelope.errorCode` or failed `stepResults[].data.error`. |
+| Feature-specific wrapper error | Skills and emulator routes call their subsystem helpers directly | `{ "ok": false, "error": { "code": "SKILL_NOT_FOUND", ... } }` or emulator codes | Use the owning feature page: [Skills CLI](../skills/cli.md), [Serve skills routes](#endpoint-get-skills), or emulator endpoint notes below. |
+
+Machine-checkable rule:
+
+- first check HTTP status and top-level `ok`
+- for execution endpoints, also inspect `envelope.status` when an envelope is present
+- do not treat route-local codes such as `INVALID_BODY`, `INVALID_DEVICE_ID`, or
+  `MISSING_EXECUTION` as public `errors.ts` codes
 
 ## Global Serve-Layer Failures
 

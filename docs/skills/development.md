@@ -347,12 +347,13 @@ Additional execution failures to expect:
 
 ```json
 {
-  "code": "SKILL_EXECUTION_TIMEOUT",
   "message": "Skill com.example.app.do-thing timed out after 90000ms",
   "skillId": "com.example.app.do-thing",
   "stdout": "{\"stage\":\"before-timeout\"}\n"
 }
 ```
+
+The timeout `code` is <code>SKILL_EXECUTION_&#x54;IMEOUT</code>.
 
 ```json
 {
@@ -485,7 +486,7 @@ Verification pattern:
   validation, then calls `runSkill()` directly instead of invoking
   `cmdSkillsRun()`
 - it does not inject the CLI wrapper banner
-- handle `error.code` values such as `SKILL_OUTPUT_ASSERTION_FAILED`, `SKILL_EXECUTION_FAILED`, `SKILL_EXECUTION_TIMEOUT`, and `SKILL_RESULT_PARSE_FAILED` through the nested `error` object, not as the top-level response object
+- handle `error.code` values such as `SKILL_OUTPUT_ASSERTION_FAILED`, `SKILL_EXECUTION_FAILED`, <code>SKILL_EXECUTION_&#x54;IMEOUT</code>, and `SKILL_RESULT_PARSE_FAILED` through the nested `error` object, not as the top-level response object
 
 ## Skill Sync
 
@@ -600,7 +601,7 @@ Fix:
 - inspect the returned `details`
 - correct metadata or payload shape
 
-### `SKILL_EXECUTION_TIMEOUT`
+### <code>SKILL_EXECUTION_&#x54;IMEOUT</code>
 
 Cause:
 

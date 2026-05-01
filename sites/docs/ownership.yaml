@@ -10,8 +10,6 @@ concepts:
   recording_workflow: api/recording.md
   skills_cli:
     path: skills/cli.md
-    status: planned
-    phase: PR-3 / Phase 4
 
 command_details:
   operator:
@@ -117,10 +115,8 @@ command_details:
     label: "Action: read_key_value_pair"
     action: read_key_value_pair
   skills:
-    planned_href: ../skills/cli.md
+    href: ../skills/cli.md
     label: Skills CLI
-    status: planned
-    phase: PR-3 / Phase 4
   bundled-skills:
     href: ../host-agents.md
     label: Host agent orientation
@@ -167,5 +163,6 @@ owners:
       - api/doctor.md
   skills_cli:
     canonical: skills/cli.md
-    status: planned
-    phase: PR-3 / Phase 4
+    summaries:
+      - api/cli.md
+      - skills/overview.md

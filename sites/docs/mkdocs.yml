@@ -56,23 +56,24 @@ nav:
   - Quickstart: quickstart.md
   - API:
       - Overview: api/overview.md
-      - CLI Reference: api/cli.md
-      - Logging: api/logging.md
       - Actions: api/actions.md
       - Selectors: api/selectors.md
+      - CLI Reference: api/cli.md
       - Snapshot Format: api/snapshot.md
-      - Errors: api/errors.md
       - Devices: api/devices.md
       - Doctor: api/doctor.md
       - Timeouts: api/timeouts.md
-      - Environment Variables: api/environment.md
+      - Errors: api/errors.md
       - Serve API: api/serve.md
       - Daemon: api/daemon.md
       - MCP Server: api/mcp.md
       - Navigation Patterns: api/navigation.md
       - Recording Format: api/recording.md
+      - Logging: api/logging.md
+      - Environment Variables: api/environment.md
   - Skills:
       - Overview: skills/overview.md
+      - Skills CLI: skills/cli.md
       - Authoring: skills/authoring.md
       - Development Workflow: skills/development.md
       - Device Prep and Runtime: skills/runtime.md
