@@ -5,7 +5,7 @@ import { listDevices } from "../../domain/devices/listDevices.js";
 import { listSkills } from "../../domain/skills/listSkills.js";
 import { getSkill } from "../../domain/skills/getSkill.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
-import { runSkill, buildSkillRunLogs, type SkillRunEnv } from "../../domain/skills/runSkill.js";
+import { runSkill, buildSkillRunLogs, createSkillRunId, type SkillRunEnv } from "../../domain/skills/runSkill.js";
 import { validateSkill } from "../../domain/skills/validateSkill.js";
 import { clawperatorEvents, CLAWPERATOR_EVENT_TYPES } from "../../domain/observe/events.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -651,7 +651,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
         undefined,
         typeof timeoutMs === "number" ? timeoutMs : undefined,
         skillEnv,
-        { logger: options.logger },
+        { logger: options.logger, skillRunId: createSkillRunId() },
         expectContainsArg
       );
       if (result.status === "success") {

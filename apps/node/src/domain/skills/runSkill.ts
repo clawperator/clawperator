@@ -53,7 +53,7 @@ export interface SkillRunSuccess {
   ok: true;
   status: "success";
   skillId: string;
-  skillRunId?: string;
+  skillRunId: string;
   logPath?: string;
   output: string;
   exitCode: number;
@@ -67,7 +67,7 @@ export interface SkillRunIndeterminate {
   code: "SKILL_VERIFICATION_INDETERMINATE";
   message: string;
   skillId: string;
-  skillRunId?: string;
+  skillRunId: string;
   logPath?: string;
   output: string;
   exitCode: number;
@@ -81,7 +81,7 @@ export interface SkillRunError {
   code: string;
   message: string;
   skillId?: string;
-  skillRunId?: string;
+  skillRunId: string;
   logPath?: string;
   exitCode?: number;
   stdout?: string;
@@ -592,13 +592,13 @@ async function skillJsonRawMayDeclareContract(repoRoot: string, skillPath: strin
   }
 }
 
-function createSkillRunId(): string {
+export function createSkillRunId(): string {
   return `skillrun_${Date.now()}_${randomUUID()}`;
 }
 
-export function buildSkillRunLogs(result: SkillRunResult | SkillRunError): { skillRunId?: string; path?: string; tailCommand?: string } {
+export function buildSkillRunLogs(result: SkillRunResult | SkillRunError): { skillRunId: string; path?: string; tailCommand?: string } {
   return {
-    ...(result.skillRunId !== undefined ? { skillRunId: result.skillRunId } : {}),
+    skillRunId: result.skillRunId,
     ...(result.logPath !== undefined ? {
       path: result.logPath,
       tailCommand: `tail -f "${result.logPath}"`,
