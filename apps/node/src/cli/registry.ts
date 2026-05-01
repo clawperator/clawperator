@@ -1,5 +1,6 @@
 import { ERROR_CODES } from "../contracts/errors.js";
 import { LIMITS } from "../contracts/limits.js";
+import { EMULATOR_DATA_PARTITION_SIZE_PATTERN } from "../domain/android-emulators/constants.js";
 import { formatError } from "./output.js";
 import type { Logger } from "../adapters/logger.js";
 import type { NodeMatcher } from "../contracts/selectors.js";
@@ -79,7 +80,16 @@ function getEmulatorStorageSizeOpt(rest: string[], knownFlags: readonly string[]
   if (provided.length > 1) {
     throw new UsageError("Use only one emulator storage size flag: --storage-size, --size, --disk-size, or --data-partition-size");
   }
-  return provided[0]?.value;
+  const value = provided[0]?.value;
+  if (value === undefined) {
+    return undefined;
+  }
+  const normalized = value.trim().toUpperCase();
+  const match = normalized.match(EMULATOR_DATA_PARTITION_SIZE_PATTERN);
+  if (!match) {
+    throw new UsageError("--storage-size must be a positive integer followed by G or GB, for example 12G");
+  }
+  return `${match[1]}G`;
 }
 
 export function getNumberOpt(rest: string[], flag: string): number | undefined {

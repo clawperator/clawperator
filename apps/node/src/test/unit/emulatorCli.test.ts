@@ -47,7 +47,7 @@ describe("emulator CLI help and usage", () => {
 
   it("rejects invalid emulator storage-size units before provisioning", async () => {
     const { stdout, code } = await runCli(["emulator", "create", "--storage-size", "12000M"]);
-    assert.strictEqual(code, 0);
+    assert.notStrictEqual(code, 0);
     const parsed = JSON.parse(stdout);
     assert.strictEqual(parsed.code, "USAGE");
     assert.match(parsed.message, /positive integer followed by G or GB/);
