@@ -51,6 +51,19 @@ export interface ClawperatorLogger {
 }
 
 export const CLAWPERATOR_SKILL_RUN_ID_ENV_VAR = "CLAWPERATOR_SKILL_RUN_ID";
+export const SKILL_RUN_ID_PATTERN = /^skillrun_[A-Za-z0-9._:-]+$/;
+export const SKILL_RUN_ID_MAX_LENGTH = 240;
+
+export function normalizeSkillRunId(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > SKILL_RUN_ID_MAX_LENGTH) {
+    return undefined;
+  }
+  return SKILL_RUN_ID_PATTERN.test(trimmed) ? trimmed : undefined;
+}
 
 // ---------------------------------------------------------------------------
 // Routing rules

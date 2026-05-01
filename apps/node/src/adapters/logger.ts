@@ -10,6 +10,7 @@ import {
   DEFAULT_ROUTING_RULES,
   expandHomePath,
   formatLogPath,
+  normalizeSkillRunId,
 } from "../contracts/logging.js";
 
 // Re-export contract types for consumers
@@ -61,6 +62,7 @@ export interface CreateClawperatorLoggerOptions {
   logDir?: string;
   logLevel?: string;
   outputFormat?: "json" | "pretty";
+  inheritSkillRunId?: boolean;
 }
 
 /**
@@ -145,6 +147,8 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
     };
   }
 
-  const inheritedSkillRunId = process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR]?.trim();
-  return buildLogger(inheritedSkillRunId ? { skillRunId: inheritedSkillRunId } : undefined);
+  const inheritedSkillRunId = options?.inheritSkillRunId === false
+    ? undefined
+    : normalizeSkillRunId(process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR]);
+  return buildLogger(inheritedSkillRunId !== undefined ? { skillRunId: inheritedSkillRunId } : undefined);
 }

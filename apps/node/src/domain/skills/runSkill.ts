@@ -4,7 +4,7 @@ import { access, readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { loadRegistry, findSkillById, getRepoRoot } from "../../adapters/skills-repo/localSkillsRegistry.js";
 import type { Logger } from "../../adapters/logger.js";
-import { CLAWPERATOR_SKILL_RUN_ID_ENV_VAR } from "../../contracts/logging.js";
+import { CLAWPERATOR_SKILL_RUN_ID_ENV_VAR, normalizeSkillRunId } from "../../contracts/logging.js";
 import {
   hasMeaningfulSkillContract,
   parseSkillContractInputSchema,
@@ -108,6 +108,7 @@ export interface SkillRunCallbacks {
   onOutput?: (chunk: string, stream: "stdout" | "stderr") => void;
   logger?: Logger;
   skillRunId?: string;
+  logLocationEmitted?: boolean;
 }
 
 interface SkillSourceResolutionSuccess {
@@ -607,14 +608,18 @@ function buildTailCommand(logPath: string): string {
   return `tail -f ${shellQuote(logPath)}`;
 }
 
-export function buildSkillRunLogs(result: SkillRunResult | SkillRunError): { skillRunId: string; path?: string; tailCommand?: string } {
+export function buildSkillRunLogMetadata(skillRunId: string, logPath?: string): { skillRunId: string; path?: string; tailCommand?: string } {
   return {
-    skillRunId: result.skillRunId,
-    ...(result.logPath !== undefined ? {
-      path: result.logPath,
-      tailCommand: buildTailCommand(result.logPath),
+    skillRunId,
+    ...(logPath !== undefined ? {
+      path: logPath,
+      tailCommand: buildTailCommand(logPath),
     } : {}),
   };
+}
+
+export function buildSkillRunLogs(result: SkillRunResult | SkillRunError): { skillRunId: string; path?: string; tailCommand?: string } {
+  return buildSkillRunLogMetadata(result.skillRunId, result.logPath);
 }
 
 export async function runSkill(
@@ -646,9 +651,9 @@ export async function runSkill(
     }
   }
   const inheritedSkillRunId =
-    env?.[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR]?.trim() ??
-    process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR]?.trim();
-  const skillRunId = callbacks?.skillRunId ?? inheritedSkillRunId ?? createSkillRunId();
+    normalizeSkillRunId(env?.[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR]) ??
+    normalizeSkillRunId(process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR]);
+  const skillRunId = normalizeSkillRunId(callbacks?.skillRunId) ?? inheritedSkillRunId ?? createSkillRunId();
   childEnv[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = skillRunId;
   const skillLogger = callbacks?.logger?.child({ skillId, skillRunId });
   const logPath = skillLogger?.logPath();
@@ -659,17 +664,19 @@ export async function runSkill(
     ...(logPath !== undefined ? { logPath } : {}),
   });
 
-  skillLogger?.emit({
-    ts: new Date().toISOString(),
-    level: "info",
-    event: "skills.run.log_location",
-    skillId,
-    logPath,
-    tailCommand,
-    message: logPath !== undefined
-      ? `Skill ${skillId} run ${skillRunId} logging to ${logPath}; observe with: ${tailCommand}`
-      : `Skill ${skillId} run ${skillRunId} started with file logging unavailable`,
-  });
+  if (callbacks?.logLocationEmitted !== true) {
+    skillLogger?.emit({
+      ts: new Date().toISOString(),
+      level: "info",
+      event: "skills.run.log_location",
+      skillId,
+      logPath,
+      tailCommand,
+      message: logPath !== undefined
+        ? `Skill ${skillId} run ${skillRunId} logging to ${logPath}; observe with: ${tailCommand}`
+        : `Skill ${skillId} run ${skillRunId} started with file logging unavailable`,
+    });
+  }
 
   try {
     const loaded = await loadRegistry(registryPath);

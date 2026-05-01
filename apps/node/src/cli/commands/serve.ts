@@ -17,6 +17,7 @@ import { createAvd, deleteAvd, enableEmulatorDeveloperSettings, startAvd, stopAv
 import { provisionEmulator } from "../../domain/android-emulators/provision.js";
 import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 import type { Logger } from "../../adapters/logger.js";
+import { normalizeSkillRunId } from "../../contracts/logging.js";
 import { resolveOperatorPackageForRequest } from "../../domain/config/resolveOperatorPackage.js";
 import { getCliBuildIdentity, getCliVersion } from "../../domain/version/compatibility.js";
 import { resolveInteractiveSkillTarget } from "./skills.js";
@@ -68,12 +69,6 @@ export function mapServeErrorCodeToStatus(code: string): number {
   }
 }
 
-const SKILL_RUN_ID_PATTERN = /^skillrun_[A-Za-z0-9._:-]+$/;
-
-function isValidSkillRunId(value: string): boolean {
-  return value.length <= 240 && SKILL_RUN_ID_PATTERN.test(value);
-}
-
 function extractRequestSkillRunId(body: unknown): string | undefined {
   if (typeof body !== "object" || body === null || !("skillRunId" in body)) {
     return undefined;
@@ -82,8 +77,7 @@ function extractRequestSkillRunId(body: unknown): string | undefined {
   if (typeof value !== "string") {
     return undefined;
   }
-  const trimmed = value.trim();
-  return isValidSkillRunId(trimmed) ? trimmed : undefined;
+  return normalizeSkillRunId(value);
 }
 
 function requestLoggerForSkillRun(options: ServeAppOptions, skillRunId: string | undefined): Logger | undefined {
@@ -278,13 +272,13 @@ export function createServeApp(options: ServeAppOptions): express.Application {
       res.status(400).json({ ok: false, error: { code: "INVALID_SKILL_RUN_ID", message: "'skillRunId' must be a non-empty string when provided" } });
       return;
     }
-    if (typeof skillRunId === "string" && !isValidSkillRunId(skillRunId.trim())) {
+    if (typeof skillRunId === "string" && normalizeSkillRunId(skillRunId) === undefined) {
       res.status(400).json({ ok: false, error: { code: "INVALID_SKILL_RUN_ID", message: "'skillRunId' must start with 'skillrun_' and contain only safe identifier characters" } });
       return;
     }
 
     try {
-      const requestSkillRunId = typeof skillRunId === "string" ? skillRunId.trim() : undefined;
+      const requestSkillRunId = normalizeSkillRunId(skillRunId);
       const result = await runExecution(execution, {
         deviceId,
         operatorPackage: resolveServeOperatorPackage(operatorPackage),

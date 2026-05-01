@@ -111,8 +111,11 @@ Events use dot-separated names with prefix-based categories:
 ### Skill Run Correlation
 
 Every `clawperator skills run` invocation creates a `skillRunId` and emits a
-`skills.run.log_location` event at `info` level as the run starts. That event
+`skills.run.log_location` event at `info` level as the run starts, before
+validation, readiness preflight, or child process execution. That event
 contains the daily `logPath` and a `tailCommand` for human or agent observers.
+JSON errors from early validation or preflight failures include the same
+additive `logs` object when the CLI has a logger available.
 
 The log file remains the same daily NDJSON file. Clawperator does not create a
 separate per-run log file. The `skillRunId` is additive correlation metadata

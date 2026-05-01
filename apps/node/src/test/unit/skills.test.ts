@@ -7049,6 +7049,8 @@ describe("cmdSkillsRun preflight gate", () => {
 
   it("aborts invalid artifact skills before runSkill is called", async () => {
     let runCalls = 0;
+    const logDir = await mkdtemp(join(tmpdir(), "clawperator-pre-run-log-"));
+    const logger = createClawperatorLogger({ logDir, logLevel: "debug" });
     const fakeRunSkill = async () => {
       runCalls += 1;
       return {
@@ -7063,29 +7065,50 @@ describe("cmdSkillsRun preflight gate", () => {
       } as const;
     };
 
-    const stdout = await cmdSkillsRun(
-      TEST_SKILL_INVALID_ARTIFACT,
-      [],
-      undefined,
-      undefined,
-      undefined,
-      { format: "json", runSkillImpl: fakeRunSkill as typeof runSkill }
-    );
-    const parsed = JSON.parse(stdout) as { code?: string; details?: { artifact?: string } };
-    assert.strictEqual(runCalls, 0);
-    assert.strictEqual(parsed.code, SKILL_VALIDATION_FAILED);
-    assert.strictEqual(parsed.details?.artifact, "artifact.json");
+    try {
+      const stdout = await cmdSkillsRun(
+        TEST_SKILL_INVALID_ARTIFACT,
+        [],
+        undefined,
+        undefined,
+        undefined,
+        { format: "json", runSkillImpl: fakeRunSkill as typeof runSkill, logger }
+      );
+      const parsed = JSON.parse(stdout) as {
+        code?: string;
+        details?: { artifact?: string };
+        logs?: { skillRunId?: string; path?: string; tailCommand?: string };
+      };
+      assert.strictEqual(runCalls, 0);
+      assert.strictEqual(parsed.code, SKILL_VALIDATION_FAILED);
+      assert.strictEqual(parsed.details?.artifact, "artifact.json");
+      assert.match(parsed.logs?.skillRunId ?? "", /^skillrun_/);
+      assert.strictEqual(parsed.logs?.path, logger.logPath());
+      assert.strictEqual(parsed.logs?.tailCommand, `tail -f '${logger.logPath()}'`);
+
+      const contents = await readFile(logger.logPath()!, "utf8");
+      const lines = parseLogEvents(contents);
+      const logLocationLine = lines.find((line) => line.event === "skills.run.log_location");
+      assert.strictEqual(logLocationLine?.skillRunId, parsed.logs?.skillRunId);
+      assert.strictEqual(logLocationLine?.logPath, parsed.logs?.path);
+    } finally {
+      await rm(logDir, { recursive: true, force: true });
+    }
   });
 
   it("proceeds for valid artifact skills and calls runSkill", async () => {
     let runCalls = 0;
-    const fakeRunSkill = async () => {
+    let observedSkillRunId: string | undefined;
+    let observedLogLocationEmitted: boolean | undefined;
+    const fakeRunSkill: typeof runSkill = async (_skillId, _args, _registryPath, _timeoutMs, _env, callbacks) => {
       runCalls += 1;
+      observedSkillRunId = callbacks?.skillRunId;
+      observedLogLocationEmitted = callbacks?.logLocationEmitted;
       return {
         ok: true,
         status: "success",
         skillId: TEST_SKILL_VALID_ARTIFACT,
-        skillRunId: "skillrun_test",
+        skillRunId: callbacks?.skillRunId ?? "skillrun_test",
         output: "RUN_OK",
         exitCode: 0,
         durationMs: 1,
@@ -7101,14 +7124,17 @@ describe("cmdSkillsRun preflight gate", () => {
       undefined,
       {
         format: "json",
-        runSkillImpl: fakeRunSkill as typeof runSkill,
+        runSkillImpl: fakeRunSkill,
         resolveInteractiveSkillTargetImpl: allowInteractiveTarget,
       }
     );
-    const parsed = JSON.parse(stdout) as { skillId?: string; output?: string };
+    const parsed = JSON.parse(stdout) as { skillId?: string; output?: string; logs?: { skillRunId?: string } };
     assert.strictEqual(runCalls, 1);
+    assert.match(observedSkillRunId ?? "", /^skillrun_/);
+    assert.strictEqual(observedLogLocationEmitted, true);
     assert.strictEqual(parsed.skillId, TEST_SKILL_VALID_ARTIFACT);
     assert.strictEqual(parsed.output, "RUN_OK");
+    assert.strictEqual(parsed.logs?.skillRunId, observedSkillRunId);
   });
 
   it("JSON mode omits duplicate top-level wrapper fields when skillResult is present", async () => {
@@ -8135,6 +8161,30 @@ describe("runSkill logging", () => {
       assert.strictEqual(startLine?.skillRunId, parentSkillRunId);
       const completeLine = lines.find((line) => line.event === "skills.run.complete");
       assert.strictEqual(completeLine?.skillRunId, parentSkillRunId);
+    } finally {
+      if (originalEnvValue === undefined) {
+        delete process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+      } else {
+        process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = originalEnvValue;
+      }
+    }
+  });
+
+  it("generates a fresh skillRunId when inherited environment value is blank", async () => {
+    const originalEnvValue = process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+    process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = "   ";
+    try {
+      const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "debug" });
+      const result = await runSkill(TEST_FIXTURE_MIXED_STREAMS, [], undefined, undefined, undefined, { logger });
+
+      assert.ok(result.ok, `Expected runSkill to succeed: ${"message" in result ? result.message : ""}`);
+      assert.match(result.skillRunId, /^skillrun_/);
+      assert.notStrictEqual(result.skillRunId, "");
+
+      const contents = await readFile(logger.logPath()!, "utf8");
+      const lines = parseLogEvents(contents);
+      const logLocationLine = lines.find((line) => line.event === "skills.run.log_location");
+      assert.strictEqual(logLocationLine?.skillRunId, result.skillRunId);
     } finally {
       if (originalEnvValue === undefined) {
         delete process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];

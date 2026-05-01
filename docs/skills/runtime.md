@@ -246,8 +246,9 @@ Failure wrapper fields may also include:
 | `stderr` | partial stderr captured before failure |
 | `exitCode` | non-zero child exit code when available |
 
-When the runtime reaches skill execution, JSON responses also include a `logs`
-object:
+JSON responses for `clawperator skills run` include a `logs` object. The CLI
+creates it before validation and readiness preflight, so early failures can
+still be correlated with the daily log when file logging is available:
 
 | Field | Meaning |
 | --- | --- |

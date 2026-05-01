@@ -4,7 +4,7 @@ import { isAbsolute } from "node:path";
 import { ERROR_CODES } from "../contracts/errors.js";
 import type { RunExecutionResult } from "../domain/executions/runExecution.js";
 import type { ResultEnvelope } from "../contracts/result.js";
-import { CLAWPERATOR_SKILL_RUN_ID_ENV_VAR } from "../contracts/logging.js";
+import { CLAWPERATOR_SKILL_RUN_ID_ENV_VAR, normalizeSkillRunId } from "../contracts/logging.js";
 import { resolveOperatorPackageForRequest } from "../domain/config/resolveOperatorPackage.js";
 import { getDaemonSocketPath, isDaemonRunning, spawnDaemonRun, stopDaemon, withDaemonLock } from "../domain/daemon/lifecycle.js";
 import { getCliBuildIdentity, getCliVersion, type CliBuildIdentity } from "../domain/version/compatibility.js";
@@ -310,8 +310,7 @@ function proxyLostResult(error: unknown): RunExecutionResult {
 }
 
 function getInheritedSkillRunId(): string | undefined {
-  const skillRunId = process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR]?.trim();
-  return skillRunId && skillRunId.length > 0 ? skillRunId : undefined;
+  return normalizeSkillRunId(process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR]);
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

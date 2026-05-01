@@ -293,6 +293,18 @@ describe("createClawperatorLogger", () => {
       assert.strictEqual(lines[0].skillRunId, "skillrun_test_123");
     });
 
+    it("can opt out of inherited skillRunId for long-lived daemon processes", async () => {
+      const logDir = join(tempRoot, "logs");
+      process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = "skillrun_test_123";
+      const logger = createClawperatorLogger({ logDir, logLevel: "debug", inheritSkillRunId: false });
+
+      logger.emit(makeEvent({ event: "test.no-inherited-skill-run" }));
+
+      const lines = await readLogLines(logDir);
+      assert.strictEqual(lines.length, 1);
+      assert.strictEqual(lines[0].skillRunId, undefined);
+    });
+
     it("does not mutate parent logger context", async () => {
       const logDir = join(tempRoot, "logs");
       const logger = createClawperatorLogger({ logDir, logLevel: "debug" });

@@ -6,7 +6,13 @@ import { getSkill } from "../../domain/skills/getSkill.js";
 import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { syncSkills } from "../../domain/skills/syncSkills.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
-import { runSkill, buildSkillRunLogs, type SkillRunEnv } from "../../domain/skills/runSkill.js";
+import {
+  runSkill,
+  buildSkillRunLogMetadata,
+  buildSkillRunLogs,
+  createSkillRunId,
+  type SkillRunEnv,
+} from "../../domain/skills/runSkill.js";
 import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -411,6 +417,20 @@ export async function cmdSkillsRun(
   // Priority: explicit flag > env var > default
   const resolvedBin = resolveSkillBinCommand();
   const resolvedOperatorPackage = operatorPackage ?? resolveOperatorPackage();
+  const skillRunId = createSkillRunId();
+  const cliLogger = options.logger?.child({ skillId, deviceId: options.deviceId, skillRunId });
+  const preRunLogs = buildSkillRunLogMetadata(skillRunId, cliLogger?.logPath());
+
+  emitCliEvent(cliLogger, {
+    level: "info",
+    event: "skills.run.log_location",
+    skillId,
+    logPath: preRunLogs.path,
+    tailCommand: preRunLogs.tailCommand,
+    message: preRunLogs.path !== undefined
+      ? `Skill ${skillId} run ${skillRunId} logging to ${preRunLogs.path}; observe with: ${preRunLogs.tailCommand}`
+      : `Skill ${skillId} run ${skillRunId} started with file logging unavailable`,
+  });
 
   const env: SkillRunEnv = {
     [CLAWPERATOR_BIN_ENV_VAR]: resolvedBin,
@@ -422,6 +442,7 @@ export async function cmdSkillsRun(
       return formatError({
         code: "INVALID_DEVICE_ID",
         message: "'deviceId' must be a non-empty string when provided",
+        logs: preRunLogs,
       }, options);
     }
     env[CLAWPERATOR_DEVICE_ID_ENV_VAR] = options.deviceId;
@@ -429,7 +450,6 @@ export async function cmdSkillsRun(
 
   const runSkillImpl = options.runSkillImpl ?? runSkill;
   const validateSkillImpl = options.validateSkillImpl ?? validateSkill;
-  const cliLogger = options.logger?.child({ skillId, deviceId: options.deviceId });
   const resolveInteractiveSkillTargetImpl = options.resolveInteractiveSkillTargetImpl ?? resolveInteractiveSkillTarget;
   let validationSkipped = false;
   if (!options.skipValidate) {
@@ -439,6 +459,7 @@ export async function cmdSkillsRun(
         code: validation.code,
         message: validation.message,
         details: validation.details,
+        logs: preRunLogs,
       }, options);
     }
     validationSkipped = validation.dryRun?.payloadValidation === "skipped";
@@ -452,9 +473,12 @@ export async function cmdSkillsRun(
   if (!interactiveTarget.ok) {
     const interactiveError = interactiveTarget.error;
     return formatError(
-      interactiveError.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE
-        ? toPublicInteractiveAutomationError(interactiveError)
-        : interactiveError,
+      {
+        ...(interactiveError.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE
+          ? toPublicInteractiveAutomationError(interactiveError)
+          : interactiveError),
+        logs: preRunLogs,
+      },
       options
     );
   }
@@ -472,8 +496,9 @@ export async function cmdSkillsRun(
   const yyyy = String(logDate.getFullYear());
   const mm = String(logDate.getMonth() + 1).padStart(2, "0");
   const dd = String(logDate.getDate()).padStart(2, "0");
-  const logPath = cliLogger?.logPath() ?? join(homedir(), ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
-  const bannerMessage = `[Clawperator] v${getCliVersion()}  APK: ${apkStatus}  Logs: ${logPath}  Hint: tail -f ${logPath}  Docs: https://docs.clawperator.com/llms.txt`;
+  const logPath = preRunLogs.path ?? join(homedir(), ".clawperator", "logs", `clawperator-${yyyy}-${mm}-${dd}.log`);
+  const tailCommand = preRunLogs.tailCommand ?? `tail -f ${logPath}`;
+  const bannerMessage = `[Clawperator] v${getCliVersion()}  APK: ${apkStatus}  Logs: ${logPath}  Hint: ${tailCommand}  Docs: https://docs.clawperator.com/llms.txt`;
   if (cliLogger !== undefined) {
     emitCliEvent(cliLogger, {
       level: "debug",
@@ -528,6 +553,8 @@ export async function cmdSkillsRun(
               }
             },
             logger: cliLogger,
+            skillRunId,
+            logLocationEmitted: true,
           }, expectContains);
           stdoutForwarder.finish({
             stripTerminalFrame: runResult.skillResult !== null,
@@ -538,7 +565,11 @@ export async function cmdSkillsRun(
           removeStderrErrorListener();
         }
       })()
-    : await runSkillImpl(skillId, args, undefined, timeoutMs, env, { logger: cliLogger }, expectContains);
+    : await runSkillImpl(skillId, args, undefined, timeoutMs, env, {
+        logger: cliLogger,
+        skillRunId,
+        logLocationEmitted: true,
+      }, expectContains);
   if (result.status === "success") {
     if (options.format === "json" && result.skillResult !== null) {
       return formatSuccess(

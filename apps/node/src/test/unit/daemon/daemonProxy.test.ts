@@ -183,6 +183,28 @@ describe("tryDaemonExecution", () => {
     });
   });
 
+  it("does not pass malformed inherited skillRunId to the daemon execute request", async () => {
+    originalSkillRunId = process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR];
+    process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR] = "not a skill run id";
+    let postedBody: unknown;
+
+    const result = await tryDaemonExecution(execution, { rawDeviceId: "device-1" }, {
+      ...makeOwnedDaemonDeps(),
+      httpGetFn: makeAliveGet(),
+      httpPostFn: async (_socketPath, _path, body): Promise<DaemonHttpSuccess> => {
+        postedBody = body;
+        return { ok: true, body: JSON.stringify(successResult) };
+      },
+    });
+
+    assert.deepEqual(result, successResult);
+    assert.deepEqual(postedBody, {
+      execution,
+      deviceId: "device-1",
+      operatorPackage: DEFAULT_OPERATOR_PACKAGE,
+    });
+  });
+
   it("detects caller-relative screenshot output paths", () => {
     assert.equal(hasCallerRelativeScreenshotPath({
       ...execution,
