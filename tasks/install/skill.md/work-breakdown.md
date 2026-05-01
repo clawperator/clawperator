@@ -119,11 +119,11 @@ from landing machine surfaces, and validate their contract.
      `llms-full.txt`.
    - Keep it compact. Do not create a full `/agents` page redesign.
 4. Update `sites/landing/public/_redirects`.
-   - Remove or retarget the stale `/agents.md /index.md 308` rule.
-   - It is acceptable to retarget `/agent.md` and `/for-agents.md` to
-     `/agents.md` if that keeps the aliases useful.
-   - Preserve existing `/agent` and `/for-agents` behavior unless changing it
-     is necessary for the Markdown endpoint.
+   - Remove the stale `/agents.md /index.md 308` rule.
+   - Retarget `/agent.md /agents.md 308` and `/for-agents.md /agents.md 308`
+     so those aliases reach the new page, not `/index.md`.
+   - Preserve existing `/agent /agents 308` and `/for-agents /agents 308`
+     behavior because `/agents` is the existing rendered landing route.
 5. Update `sites/landing/public/index.md`.
    - Add a small "Tell your agent" entry near the existing installation
      snippet.
@@ -143,13 +143,14 @@ from landing machine surfaces, and validate their contract.
    - Validate that `skill.md` includes the exact public prompt target,
      `clawperator`, Node.js 24+, `clawperator install`, `clawperator doctor`,
      `clawperator devices`, `clawperator snapshot --device <device_serial>`,
-     `~/.clawperator/AGENTS.md`, and `clawperator mcp serve`.
+     `~/.clawperator/AGENTS.md`, `~/.clawperator/mcp-config-snippet.json`,
+     and `clawperator mcp serve`.
    - Validate that `skill.md` does not include stale or out-of-scope strings:
      `@clawperator/node`, `Node.js 18`, `.dev`, `.codex-plugin`,
      `.claude-plugin`, `raw.githubusercontent.com`, or
      `/.well-known/skills`.
-   - Validate that `_redirects` no longer redirects `/agents.md` to
-     `/index.md`.
+   - Validate that `_redirects` no longer redirects `/agents.md`,
+     `/agent.md`, or `/for-agents.md` to `/index.md`.
    - Validate that `llms.txt` and `landing-sitemap.xml` include the new URLs.
    - Validate that touched new Markdown files do not contain em dashes.
 9. Wire `test_skill_md.sh` into `validation/install/test_install.sh`.
@@ -160,7 +161,7 @@ from landing machine surfaces, and validate their contract.
 ### Acceptance Criteria
 
 - `skill.md` and `agents.md` are present under `sites/landing/public/`.
-- `/agents.md` is not redirected to `/index.md`.
+- `/agents.md`, `/agent.md`, and `/for-agents.md` are not redirected to `/index.md`.
 - Landing discovery files include `/skill.md` and `/agents.md`.
 - The validation harness proves the public Markdown contract and guards against
   stale package, Node, redirect, and out-of-scope claims.

@@ -113,7 +113,7 @@ do not give a compact, prescriptive "agent, set this up" contract. A public
 | --- | --- | --- |
 | `sites/landing/public/skill.md` | New canonical public setup skill | Phase 1 |
 | `sites/landing/public/agents.md` | New compact agent entrypoint | Phase 1 |
-| `sites/landing/public/_redirects` | Remove or retarget stale `/agents.md` redirect | Phase 1 |
+| `sites/landing/public/_redirects` | Remove stale `/agents.md` redirect and retarget `.md` aliases | Phase 1 |
 | `sites/landing/public/index.md` | Add a small "Tell your agent" entry | Phase 1 |
 | `sites/landing/public/llms.txt` | Add `/skill.md` and `/agents.md` discovery links | Phase 1 |
 | `sites/landing/public/landing-sitemap.xml` | Add `/skill.md` and `/agents.md` URLs | Phase 1 |
@@ -177,8 +177,8 @@ source before editing.
   `apps/node/package.json` at implementation time and keep the marker easy to
   validate.
 - The exact placement of the new prompt in `index.md` and public docs.
-- Whether `agent.md` and `for-agents.md` redirects should point to
-  `/agents.md`; `/agents.md` itself must not redirect to `/index.md`.
+- The exact placement of redirect rules after removing `/agents.md /index.md`
+  and retargeting `/agent.md` and `/for-agents.md` to `/agents.md`.
 
 ## Public `skill.md` Content Contract
 
@@ -260,7 +260,8 @@ redesign. It should include:
 | --- | --- |
 | What owns `/skill.md`? | `sites/landing/public/skill.md`, served directly from `clawperator.com`. |
 | Should `/skill.md` redirect to GitHub raw? | No. Keep it direct and static for this first implementation. |
-| Should `/agents.md` redirect to `/index.md`? | No. Once `agents.md` exists, remove or retarget the stale redirect. |
+| Should `/agents.md`, `/agent.md`, or `/for-agents.md` redirect to `/index.md`? | No. Once `agents.md` exists, remove `/agents.md /index.md` and retarget `/agent.md` and `/for-agents.md` to `/agents.md`. |
+| Should `/agent` and `/for-agents` change? | No. Preserve their existing redirects to `/agents`, the existing rendered landing route. |
 | How much runtime guidance belongs in `skill.md`? | Only enough to verify readiness and hand off to docs, MCP, or skill discovery. Do not create a full runtime tutorial. |
 | Should the public skill mention local debug package defaults? | No. Keep public setup oriented toward release defaults. |
 | Should the task add well-known skill discovery endpoints? | No. Leave them as future work unless a later task scopes them explicitly. |
@@ -269,7 +270,7 @@ redesign. It should include:
 
 ## Failure Modes To Prevent
 
-- `/agents.md` is created but still redirected to `/index.md`.
+- `/agents.md`, `/agent.md`, or `/for-agents.md` are still redirected to `/index.md` after the new file exists.
 - The public skill names the wrong npm package.
 - The public skill states Node.js 18+ or another stale requirement.
 - The public skill over-promises device setup, permissions, sign-in, or MCP
