@@ -634,7 +634,7 @@ body {
 
 .agent-prompt-block {
   margin-top: 1rem;
-  padding: 1.15rem 1.25rem;
+  padding: 1.15rem 1.75rem;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--surface);
