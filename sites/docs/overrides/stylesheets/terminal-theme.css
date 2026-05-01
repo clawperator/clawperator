@@ -42,11 +42,12 @@
 html,
 body {
   max-width: 100%;
+  width: 100%;
 }
 
 .container {
   width: min(calc(100% - 32px), var(--page-width));
-  max-width: var(--page-width);
+  max-width: min(calc(100vw - 32px), var(--page-width));
 }
 
 .container,
@@ -60,6 +61,10 @@ body {
 #terminal-mkdocs-main-content,
 #mkdocs-terminal-content {
   min-width: 0;
+  max-width: 100%;
+}
+
+#mkdocs-terminal-content > * {
   max-width: 100%;
 }
 
@@ -130,16 +135,15 @@ body {
 
   .terminal-menu {
     max-width: 100%;
-    overflow-x: auto;
+    overflow-x: visible;
   }
 
   .terminal-menu ul {
     flex-direction: row;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 1rem;
     justify-content: flex-start;
     margin-top: 0;
-    padding-bottom: 0.25rem !important;
   }
 
   .terminal-menu li {
@@ -154,16 +158,14 @@ body {
 }
 
 @media only screen and (max-width: 600px) {
-  html,
-  body {
-    overflow-x: hidden;
-  }
-
   .container {
-    width: min(calc(100% - 28px), var(--page-width));
+    max-width: calc(100vw - 28px);
+    width: calc(100vw - 28px);
   }
 
-  #mkdocs-terminal-content {
+  #mkdocs-terminal-content,
+  #mkdocs-terminal-content p,
+  #mkdocs-terminal-content li {
     overflow-wrap: break-word;
   }
 
