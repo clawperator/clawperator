@@ -98,6 +98,7 @@ describe("emulator lifecycle", () => {
       stderr: "",
     });
     runner.queueResult({ code: 0, stdout: "created", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "deleted", stderr: "" });
 
     await writeAvd(
       testHome,
@@ -120,6 +121,7 @@ describe("emulator lifecycle", () => {
         return true;
       }
     );
+    assert.deepStrictEqual(runner.calls[2].args, ["delete", "avd", "--name", "clawperator-pixel"]);
   });
 
   it("starts an AVD detached with fully ignored stdio", () => {

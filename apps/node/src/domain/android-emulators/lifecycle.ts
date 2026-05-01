@@ -79,6 +79,30 @@ export async function setAvdDataPartitionSize(
   await setAvdConfigValue(getAvdConfigPath(name), "disk.dataPartition.size", size);
 }
 
+async function deleteCreatedAvdAfterFailedConfigUpdate(
+  config: RuntimeConfig,
+  name: string,
+  cause: unknown
+): Promise<never> {
+  const result = await runAndroidSdkTool(config, "avdmanager", ["delete", "avd", "--name", name], {
+    timeoutMs: 60_000,
+  });
+  const typedCause = cause as { message?: string; details?: Record<string, unknown> };
+  throw buildError(
+    ERROR_CODES.ANDROID_AVD_CREATE_FAILED,
+    typedCause.message ?? `Failed to configure Android Virtual Device ${name}`,
+    {
+      ...(typedCause.details ?? {}),
+      name,
+      cleanup: {
+        attempted: true,
+        succeeded: result.code === 0,
+        stderr: result.stderr,
+      },
+    }
+  );
+}
+
 export async function isSystemImageInstalled(config: RuntimeConfig, systemImage: string): Promise<boolean> {
   const result = await runAndroidSdkTool(config, "sdkmanager", ["--list_installed"], { timeoutMs: 30_000 });
   if (result.code !== 0) {
@@ -150,7 +174,11 @@ export async function createAvd(
     );
   }
 
-  await setAvdDataPartitionSize(options.name);
+  try {
+    await setAvdDataPartitionSize(options.name);
+  } catch (error) {
+    await deleteCreatedAvdAfterFailedConfigUpdate(config, options.name, error);
+  }
 }
 
 export function startAvd(
