@@ -255,6 +255,12 @@ object:
 | `logs.path` | daily NDJSON log file path |
 | `logs.tailCommand` | ready-to-run command for observing that log file |
 
+The same `skillRunId` is also available to the skill script as
+`CLAWPERATOR_SKILL_RUN_ID`. Nested Clawperator CLI calls inherit it. When those
+calls use the daemon, the id is sent on the individual daemon request so
+request-specific execution logs can correlate to the skill run without making
+the long-lived daemon process inherit stale per-run state.
+
 In pretty mode, the CLI also prints a one-line banner with:
 
 - CLI version
@@ -345,7 +351,7 @@ answer is under `skillResult.result`.
   "logs": {
     "skillRunId": "skillrun_1777600000000_00000000-0000-4000-8000-000000000000",
     "path": "/home/user/.clawperator/logs/clawperator-2026-03-28.log",
-    "tailCommand": "tail -f \"/home/user/.clawperator/logs/clawperator-2026-03-28.log\""
+    "tailCommand": "tail -f '/home/user/.clawperator/logs/clawperator-2026-03-28.log'"
   },
   "durationMs": 15321
 }

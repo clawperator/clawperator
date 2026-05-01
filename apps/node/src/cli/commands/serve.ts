@@ -68,6 +68,28 @@ export function mapServeErrorCodeToStatus(code: string): number {
   }
 }
 
+const SKILL_RUN_ID_PATTERN = /^skillrun_[A-Za-z0-9._:-]+$/;
+
+function isValidSkillRunId(value: string): boolean {
+  return value.length <= 240 && SKILL_RUN_ID_PATTERN.test(value);
+}
+
+function extractRequestSkillRunId(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null || !("skillRunId" in body)) {
+    return undefined;
+  }
+  const value = (body as { skillRunId?: unknown }).skillRunId;
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return isValidSkillRunId(trimmed) ? trimmed : undefined;
+}
+
+function requestLoggerForSkillRun(options: ServeAppOptions, skillRunId: string | undefined): Logger | undefined {
+  return skillRunId === undefined ? options.logger : options.logger?.child({ skillRunId });
+}
+
 export async function cmdServe(options: ServeOptions): Promise<void> {
   try {
     await startServer(options);
@@ -162,8 +184,9 @@ export function createServeApp(options: ServeAppOptions): express.Application {
   // Without a logger, fall back to console.log only when --verbose is set (legacy behavior).
   app.use((req, _res, next) => {
     const clientIp = req.socket.remoteAddress || "unknown";
-    if (options.logger) {
-      options.logger.emit({
+    const requestLogger = requestLoggerForSkillRun(options, extractRequestSkillRunId(req.body));
+    if (requestLogger) {
+      requestLogger.emit({
         ts: new Date().toISOString(),
         level: "info",
         event: "serve.http.request",
@@ -222,7 +245,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
       return;
     }
 
-    const { execution, deviceId, operatorPackage } = req.body;
+    const { execution, deviceId, operatorPackage, skillRunId } = req.body;
     
     if (!execution) {
       res.status(400).json({ ok: false, error: { code: "MISSING_EXECUTION", message: "Missing 'execution' in body" } });
@@ -247,11 +270,25 @@ export function createServeApp(options: ServeAppOptions): express.Application {
       return;
     }
 
+    if (skillRunId !== undefined && typeof skillRunId !== "string") {
+      res.status(400).json({ ok: false, error: { code: "INVALID_SKILL_RUN_ID", message: "'skillRunId' must be a string when provided" } });
+      return;
+    }
+    if (typeof skillRunId === "string" && skillRunId.trim().length === 0) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_SKILL_RUN_ID", message: "'skillRunId' must be a non-empty string when provided" } });
+      return;
+    }
+    if (typeof skillRunId === "string" && !isValidSkillRunId(skillRunId.trim())) {
+      res.status(400).json({ ok: false, error: { code: "INVALID_SKILL_RUN_ID", message: "'skillRunId' must start with 'skillrun_' and contain only safe identifier characters" } });
+      return;
+    }
+
     try {
+      const requestSkillRunId = typeof skillRunId === "string" ? skillRunId.trim() : undefined;
       const result = await runExecution(execution, {
         deviceId,
         operatorPackage: resolveServeOperatorPackage(operatorPackage),
-        logger: options.logger,
+        logger: requestLoggerForSkillRun(options, requestSkillRunId),
       });
 
       if (result.ok) {

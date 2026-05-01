@@ -61,7 +61,7 @@ Events may include additional context fields:
 ### Example Log Lines
 
 ```jsonl
-{"ts":"2026-03-28T10:15:30.100Z","level":"info","event":"skills.run.log_location","message":"Skill com.example.app.get-status run skillrun_1777600000000_00000000-0000-4000-8000-000000000000 logging to /home/user/.clawperator/logs/clawperator-2026-03-28.log; observe with: tail -f \"/home/user/.clawperator/logs/clawperator-2026-03-28.log\"","skillId":"com.example.app.get-status","skillRunId":"skillrun_1777600000000_00000000-0000-4000-8000-000000000000","logPath":"/home/user/.clawperator/logs/clawperator-2026-03-28.log","tailCommand":"tail -f \"/home/user/.clawperator/logs/clawperator-2026-03-28.log\""}
+{"ts":"2026-03-28T10:15:30.100Z","level":"info","event":"skills.run.log_location","message":"Skill com.example.app.get-status run skillrun_1777600000000_00000000-0000-4000-8000-000000000000 logging to /home/user/.clawperator/logs/clawperator-2026-03-28.log; observe with: tail -f '/home/user/.clawperator/logs/clawperator-2026-03-28.log'","skillId":"com.example.app.get-status","skillRunId":"skillrun_1777600000000_00000000-0000-4000-8000-000000000000","logPath":"/home/user/.clawperator/logs/clawperator-2026-03-28.log","tailCommand":"tail -f '/home/user/.clawperator/logs/clawperator-2026-03-28.log'"}
 {"ts":"2026-03-28T10:15:30.123Z","level":"info","event":"skills.run.start","message":"Skill com.example.app.get-status started","skillId":"com.example.app.get-status","skillRunId":"skillrun_1777600000000_00000000-0000-4000-8000-000000000000","commandId":"cmd-123"}
 {"ts":"2026-03-28T10:15:30.456Z","level":"info","event":"skills.run.output","message":"Opening app...","skillId":"com.example.app.get-status","skillRunId":"skillrun_1777600000000_00000000-0000-4000-8000-000000000000","stream":"stdout"}
 {"ts":"2026-03-28T10:15:32.789Z","level":"info","event":"skills.run.complete","message":"Skill com.example.app.get-status completed successfully in 2345ms","skillId":"com.example.app.get-status","skillRunId":"skillrun_1777600000000_00000000-0000-4000-8000-000000000000","durationMs":2345,"exitCode":0}
@@ -119,8 +119,16 @@ separate per-run log file. The `skillRunId` is additive correlation metadata
 for filtering events that belong to one invocation.
 
 Skill scripts receive the same value in `CLAWPERATOR_SKILL_RUN_ID`. When a
-script invokes nested Clawperator commands, those child CLI processes inherit
-the id and attach it to their log events.
+script invokes nested Clawperator CLI commands, those short-lived child CLI
+processes inherit the id and attach it to their log events.
+
+Long-lived daemon processes do not inherit `CLAWPERATOR_SKILL_RUN_ID` from the
+script that happened to start them. For daemon-backed execution, the nested CLI
+passes the id on the individual daemon `/execute` request instead. This keeps
+request-specific execution events such as `serve.http.request`,
+`preflight.apk.pass`, `broadcast.dispatched`, and `envelope.received`
+correlated to the skill run without permanently tagging unrelated future daemon
+events.
 
 <a id="the-clawperator-logs-command"></a>
 

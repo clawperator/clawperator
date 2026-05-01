@@ -178,6 +178,28 @@ describe("serve API integration", () => {
     assert.strictEqual(body.error.code, "DEVICE_NOT_FOUND");
   });
 
+  test("POST /execute rejects malformed skillRunId", async () => {
+    const executionInput = {
+      commandId: "test-bad-skill-run-id",
+      taskId: "test-task",
+      source: "test-suite",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 1000,
+      actions: [{ id: "s1", type: "sleep", params: { durationMs: 10 } }],
+    };
+
+    const res = await fetch(`http://localhost:${port}/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ execution: executionInput, skillRunId: "not a skill run id" }),
+    });
+
+    assert.strictEqual(res.status, 400);
+    const body = await res.json() as { ok: boolean; error: { code: string } };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "INVALID_SKILL_RUN_ID");
+  });
+
   test("GET /events returns SSE stream", async () => {
     const res = await fetch(`http://localhost:${port}/events`);
     assert.strictEqual(res.status, 200);
@@ -903,6 +925,47 @@ describe("serve API integration", () => {
       const startedEvent = lines.find(line => line.event === "serve.server.started");
       assert.ok(startedEvent, "Log should contain serve.server.started event");
       assert.ok(startedEvent.message?.includes("listening"), "Message should indicate server is listening");
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        testServer.close((err) => (err ? reject(err) : resolve()));
+      });
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  test("POST /execute applies skillRunId to request logs without daemon process inheritance", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-serve-skillrun-log-"));
+    const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
+    const skillRunId = "skillrun_request_scope_test";
+
+    const testServer = await startServer({ port: 0, host: "localhost", verbose: false, logger });
+    const addr = testServer.address();
+    const testPort = addr && typeof addr === "object" ? addr.port : 0;
+
+    try {
+      const res = await fetch(`http://localhost:${testPort}/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          skillRunId,
+          execution: {
+            commandId: "test-skillrun-request-log",
+            taskId: "test-task",
+            source: "test-suite",
+            expectedFormat: "android-ui-automator",
+            timeoutMs: 1000,
+            actions: [{ id: "k1", type: "press_key", params: {} }],
+          },
+        }),
+      });
+
+      assert.strictEqual(res.status, 400);
+      const logPath = logger.logPath();
+      assert.ok(logPath, "Logger should have a log path");
+      const contents = await readFile(logPath, "utf8");
+      const lines = contents.trimEnd().split("\n").map(line => JSON.parse(line) as { event: string; skillRunId?: string });
+      const requestEvent = lines.find(line => line.event === "serve.http.request" && line.skillRunId === skillRunId);
+      assert.ok(requestEvent, "POST /execute request log should carry the request-scoped skillRunId");
     } finally {
       await new Promise<void>((resolve, reject) => {
         testServer.close((err) => (err ? reject(err) : resolve()));

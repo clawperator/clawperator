@@ -22,7 +22,7 @@ import { listSkills } from "../../domain/skills/listSkills.js";
 import { getSkill } from "../../domain/skills/getSkill.js";
 import { compileArtifact } from "../../domain/skills/compileArtifact.js";
 import { searchSkills } from "../../domain/skills/searchSkills.js";
-import { runSkill } from "../../domain/skills/runSkill.js";
+import { buildSkillRunLogs, runSkill } from "../../domain/skills/runSkill.js";
 import { scaffoldSkill } from "../../domain/skills/scaffoldSkill.js";
 import { parseSkillManifestMetadata } from "../../domain/skills/skillManifest.js";
 import { validateAllSkills, validateSkill } from "../../domain/skills/validateSkill.js";
@@ -7154,7 +7154,7 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.deepStrictEqual(parsed.logs, {
       skillRunId: "skillrun_test_json",
       path: "/tmp/clawperator-test.log",
-      tailCommand: 'tail -f "/tmp/clawperator-test.log"',
+      tailCommand: "tail -f '/tmp/clawperator-test.log'",
     });
   });
 
@@ -8008,9 +8008,24 @@ describe("runSkill logging", () => {
     assert.strictEqual(outputLines[0]?.skillRunId, logLocationLine?.skillRunId);
     assert.strictEqual(completeLine?.skillRunId, logLocationLine?.skillRunId);
     assert.strictEqual(logLocationLine?.logPath, logger.logPath());
-    assert.strictEqual(logLocationLine?.tailCommand, `tail -f "${logger.logPath()}"`);
+    assert.strictEqual(logLocationLine?.tailCommand, `tail -f '${logger.logPath()}'`);
     assert.strictEqual(result.skillRunId, logLocationLine?.skillRunId);
     assert.strictEqual(result.logPath, logger.logPath());
+  });
+
+  it("shell-quotes log paths in the advisory tail command", () => {
+    const logs = buildSkillRunLogs({
+      ok: false,
+      status: "failed",
+      code: "TEST",
+      message: "failed",
+      skillId: "com.test",
+      skillResult: null,
+      skillRunId: "skillrun_test",
+      logPath: `/tmp/clawperator logs/owner's "daily".log`,
+    });
+
+    assert.strictEqual(logs.tailCommand, `tail -f '/tmp/clawperator logs/owner'"'"'s "daily".log'`);
   });
 
   it("logs start and complete without leaking sentinel args", async () => {
