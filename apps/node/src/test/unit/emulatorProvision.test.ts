@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it } from "node:test";
 import assert from "node:assert";
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
@@ -154,7 +154,20 @@ describe("emulator provisioning", () => {
     runner.queueResult({ code: 0, stdout: "Installed packages:\n", stderr: "" }); // sdkmanager --list_installed
     runner.queueResult({ code: 0, stdout: "licenses accepted", stderr: "" }); // sdkmanager --licenses
     runner.queueResult({ code: 0, stdout: "installed", stderr: "" }); // sdkmanager <image>
-    runner.queueResult({ code: 0, stdout: "created", stderr: "" }); // avdmanager create avd
+    runner.queueResult(
+      { code: 0, stdout: "created", stderr: "" },
+      () => writeAvd(
+        testHome,
+        "clawperator-pixel",
+        [
+          "PlayStore.enabled=true",
+          "abi.type=arm64-v8a",
+          "disk.dataPartition.size=6G",
+          "image.sysdir.1=system-images/android-35/google_apis_playstore/arm64-v8a/",
+          "hw.device.name=pixel_7",
+        ].join("\n")
+      )
+    ); // avdmanager create avd
     // waitForEmulatorRegistration
     runner.queueResult({ code: 0, stdout: "List of devices attached\nemulator-5554\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "OK\nclawperator-pixel\n", stderr: "" });
@@ -173,6 +186,8 @@ describe("emulator provisioning", () => {
     assert.strictEqual(result.started, true);
     assert.strictEqual(result.reused, false);
     assert.strictEqual(result.avdName, "clawperator-pixel");
+    const configIni = await readFile(join(testHome, ".android", "avd", "clawperator-pixel.avd", "config.ini"), "utf8");
+    assert.match(configIni, /^disk\.dataPartition\.size=12G$/m);
   });
 
   it("refuses to auto-provision an existing unsupported default AVD", async () => {

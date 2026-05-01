@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
-import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DEVICE_PROFILE, DEFAULT_EMULATOR_SYSTEM_IMAGE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
+import { DEFAULT_EMULATOR_AVD_NAME, DEFAULT_EMULATOR_DATA_PARTITION_SIZE, DEFAULT_EMULATOR_DEVICE_PROFILE, DEFAULT_EMULATOR_SYSTEM_IMAGE, SUPPORTED_EMULATOR_API_LEVEL } from "../../domain/android-emulators/constants.js";
 import { assertRequiredEmulatorTools, checkRequiredEmulatorTools } from "../../domain/android-emulators/hostRequirements.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { FakeProcessRunner } from "./fakes/FakeProcessRunner.js";
@@ -10,6 +10,7 @@ describe("android emulator foundation", () => {
   it("defines deterministic emulator defaults", () => {
     assert.strictEqual(DEFAULT_EMULATOR_AVD_NAME, "clawperator-pixel");
     assert.strictEqual(DEFAULT_EMULATOR_DEVICE_PROFILE, "pixel_7");
+    assert.strictEqual(DEFAULT_EMULATOR_DATA_PARTITION_SIZE, "12G");
     assert.strictEqual(SUPPORTED_EMULATOR_API_LEVEL, 35);
     assert.strictEqual(
       DEFAULT_EMULATOR_SYSTEM_IMAGE,

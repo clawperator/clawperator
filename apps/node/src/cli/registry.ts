@@ -976,7 +976,7 @@ Usage:
 
 Notes:
   - Emulator provisioning prefers: running supported emulator, stopped supported AVD, then new AVD creation.
-  - New AVDs target Android API 35 and a Google Play image by default.
+  - New AVDs target Android API 35, a Google Play image, and a 12 GB data partition by default.
   - JSON is the canonical output format for agent callers.
 `;
 

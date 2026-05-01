@@ -1,4 +1,7 @@
 import { setTimeout as delay } from "node:timers/promises";
+import { readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { basename, join } from "node:path";
 import { runAdb } from "../../adapters/android-bridge/adbClient.js";
 import type { RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { runAndroidSdkTool } from "../../adapters/android-sdk/hostToolClient.js";
@@ -6,6 +9,7 @@ import { type ClawperatorError, ERROR_CODES } from "../../contracts/errors.js";
 import {
   ADB_REGISTRATION_TIMEOUT_MS,
   BOOT_POLL_INTERVAL_MS,
+  DEFAULT_EMULATOR_DATA_PARTITION_SIZE,
   DEFAULT_EMULATOR_DEVICE_PROFILE,
   DEFAULT_EMULATOR_SYSTEM_IMAGE,
   EMULATOR_BOOT_TIMEOUT_MS,
@@ -19,6 +23,52 @@ function buildError(
   details?: Record<string, unknown>
 ): ClawperatorError {
   return { code, message, details };
+}
+
+function getAvdConfigPath(name: string): string {
+  if (basename(name) !== name || name.includes("\\")) {
+    throw buildError(
+      ERROR_CODES.ANDROID_AVD_CREATE_FAILED,
+      "AVD names must not include path separators",
+      { name }
+    );
+  }
+  return join(homedir(), ".android", "avd", `${name}.avd`, "config.ini");
+}
+
+async function setAvdConfigValue(path: string, key: string, value: string): Promise<void> {
+  let contents: string;
+  try {
+    contents = await readFile(path, "utf8");
+  } catch (error) {
+    throw buildError(
+      ERROR_CODES.ANDROID_AVD_CREATE_FAILED,
+      `Failed to read created AVD config at ${path}`,
+      { path, cause: error instanceof Error ? error.message : String(error) }
+    );
+  }
+
+  const line = `${key}=${value}`;
+  const lines = contents.length > 0 ? contents.split("\n") : [];
+  const index = lines.findIndex((existing) => existing.trimStart().startsWith(`${key}=`));
+  if (index >= 0) {
+    lines[index] = line;
+  } else {
+    if (lines.length > 0 && lines[lines.length - 1] === "") {
+      lines[lines.length - 1] = line;
+      lines.push("");
+    } else {
+      lines.push(line);
+    }
+  }
+  await writeFile(path, lines.join("\n"), "utf8");
+}
+
+export async function setAvdDataPartitionSize(
+  name: string,
+  size: string = DEFAULT_EMULATOR_DATA_PARTITION_SIZE
+): Promise<void> {
+  await setAvdConfigValue(getAvdConfigPath(name), "disk.dataPartition.size", size);
 }
 
 export async function isSystemImageInstalled(config: RuntimeConfig, systemImage: string): Promise<boolean> {
@@ -75,6 +125,7 @@ export async function createAvd(
 ): Promise<void> {
   const systemImage = options.systemImage ?? DEFAULT_EMULATOR_SYSTEM_IMAGE;
   const deviceProfile = options.deviceProfile ?? DEFAULT_EMULATOR_DEVICE_PROFILE;
+  getAvdConfigPath(options.name);
 
   await ensureSystemImageInstalled(config, systemImage);
   const result = await runAndroidSdkTool(
@@ -90,6 +141,8 @@ export async function createAvd(
       { name: options.name, systemImage, deviceProfile }
     );
   }
+
+  await setAvdDataPartitionSize(options.name);
 }
 
 export function startAvd(

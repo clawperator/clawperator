@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it } from "node:test";
 import assert from "node:assert";
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
@@ -70,6 +70,14 @@ describe("emulator lifecycle", () => {
     runner.queueResult({ code: 0, stdout: "created", stderr: "" });
 
     const config = getDefaultRuntimeConfig({ runner });
+    await writeAvd(
+      testHome,
+      "clawperator-pixel",
+      [
+        "PlayStore.enabled=true",
+        "disk.dataPartition.size=6G",
+      ].join("\n")
+    );
     await createAvd(config, { name: "clawperator-pixel" });
 
     assert.strictEqual(runner.calls[1].command, config.avdmanagerPath);
@@ -78,6 +86,8 @@ describe("emulator lifecycle", () => {
       "--package", "system-images;android-35;google_apis_playstore;arm64-v8a",
       "--device", "pixel_7",
     ]);
+    const configIni = await readFile(join(testHome, ".android", "avd", "clawperator-pixel.avd", "config.ini"), "utf8");
+    assert.match(configIni, /^disk\.dataPartition\.size=12G$/m);
   });
 
   it("starts an AVD detached with fully ignored stdio", () => {
