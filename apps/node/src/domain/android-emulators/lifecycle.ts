@@ -158,6 +158,7 @@ export async function createAvd(
   const systemImage = options.systemImage ?? DEFAULT_EMULATOR_SYSTEM_IMAGE;
   const deviceProfile = options.deviceProfile ?? DEFAULT_EMULATOR_DEVICE_PROFILE;
   getAvdConfigPath(options.name);
+  const existedBeforeCreate = (await inspectConfiguredAvd(options.name)).exists;
 
   await ensureSystemImageInstalled(config, systemImage);
   const result = await runAndroidSdkTool(
@@ -177,7 +178,10 @@ export async function createAvd(
   try {
     await setAvdDataPartitionSize(options.name);
   } catch (error) {
-    await deleteCreatedAvdAfterFailedConfigUpdate(config, options.name, error);
+    if (!existedBeforeCreate) {
+      await deleteCreatedAvdAfterFailedConfigUpdate(config, options.name, error);
+    }
+    throw error;
   }
 }
 
