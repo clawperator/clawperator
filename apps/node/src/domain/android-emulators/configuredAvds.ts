@@ -11,7 +11,7 @@ type IniMap = Record<string, string>;
 export function getAvdRoot(): string {
   const androidAvdHome = process.env.ANDROID_AVD_HOME;
   if (typeof androidAvdHome === "string" && androidAvdHome.trim().length > 0) {
-    return androidAvdHome;
+    return androidAvdHome.trim();
   }
   return join(homedir(), ".android", "avd");
 }

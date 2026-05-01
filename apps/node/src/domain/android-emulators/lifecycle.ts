@@ -33,7 +33,7 @@ export function normalizeEmulatorDataPartitionSize(size: string): string {
     throw buildError(
       ERROR_CODES.ANDROID_AVD_CREATE_FAILED,
       "Emulator data partition size must be a positive integer followed by G or GB",
-      { value: size, expectedFormat: "<positive_integer>G" }
+      { value: size, expectedFormat: "<positive_integer>G|GB" }
     );
   }
   return `${match[1]}G`;

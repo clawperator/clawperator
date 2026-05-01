@@ -140,8 +140,9 @@ describe("emulator lifecycle", () => {
     assert.throws(
       () => normalizeEmulatorDataPartitionSize("16384M"),
       (error: unknown) => {
-        const typed = error as { code?: string };
+        const typed = error as { code?: string; details?: { expectedFormat?: string } };
         assert.strictEqual(typed.code, ERROR_CODES.ANDROID_AVD_CREATE_FAILED);
+        assert.strictEqual(typed.details?.expectedFormat, "<positive_integer>G|GB");
         return true;
       }
     );
@@ -164,7 +165,7 @@ describe("emulator lifecycle", () => {
     });
 
     const avdRoot = join(testHome, "custom-avd-home");
-    process.env.ANDROID_AVD_HOME = avdRoot;
+    process.env.ANDROID_AVD_HOME = ` ${avdRoot} `;
     runner.queueResult(
       { code: 0, stdout: "created", stderr: "" },
       () => writeAvdAtRoot(
