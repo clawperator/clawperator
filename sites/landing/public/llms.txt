@@ -5,6 +5,8 @@ Clawperator is a deterministic Android automation runtime for AI agents. It is t
 ## Start here
 
 - Homepage: https://clawperator.com/
+- Public setup skill: https://clawperator.com/skill.md
+- Agent entrypoint: https://clawperator.com/agents.md
 - Docs home: https://docs.clawperator.com/
 - Setup: https://docs.clawperator.com/setup/
 - API overview: https://docs.clawperator.com/api/overview/

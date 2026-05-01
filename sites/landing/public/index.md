@@ -11,6 +11,13 @@ Clawperator runs on a host machine and connects to an **Android device** (physic
 curl -fsSL https://clawperator.com/install.sh | bash
 ```
 
+**Tell your agent:**
+```text
+Read https://clawperator.com/skill.md and get me set up with Clawperator.
+```
+
+Agent setup skill: https://clawperator.com/skill.md
+
 **Canonical device setup:**
 To prepare an Android device, use the one-step setup command which installs the [Clawperator Operator Android app](https://docs.clawperator.com/getting-started/android-operator-apk/) and grants all required device permissions:
 ```bash
