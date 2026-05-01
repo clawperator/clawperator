@@ -11,7 +11,8 @@ generation code.
 This task ships in **4 PRs across 5 phases**. **PR-1** fixes the generated CLI
 reference and command metadata. **PR-2** adds canonical anchors, ownership
 metadata, and generated detail links. **PR-3** performs focused authored-doc
-cleanup. **PR-4** adds warning-only docs checks.
+cleanup. **PR-4** adds warning-only docs checks and tightens the docs-author
+skill so future agents preserve the new IA.
 
 ## Status
 
@@ -63,6 +64,8 @@ owners.
 - API nav reordering after the CLI reference is simplified
 - warning-only docs checks for internal anchors, compatibility-only aliases, and
   missing generated detail links
+- `.agents/skills/docs-author/SKILL.md` guidance updates that teach the durable
+  lessons from the cleanup
 - docs regeneration through the existing docs-build workflow
 
 ## Out of Scope
@@ -116,6 +119,7 @@ owners.
 | `docs/skills/cli.md` | New canonical skills CLI detail page | PR-3 / Phase 4 |
 | `docs/skills/overview.md` | Conceptual skills overview after command-contract content moves | PR-3 / Phase 4 |
 | `sites/docs/mkdocs.yml` | API and Skills nav ordering | PR-3 / Phase 4 |
+| `.agents/skills/docs-author/SKILL.md` | Durable authoring guidance for generated-vs-authored surfaces, ownership, anchors, terminology, and API-friction escalation | PR-4 / Phase 5 |
 | docs validation scripts or checks | Warning-only drift checks | PR-4 / Phase 5 |
 
 ## Source Of Truth
@@ -141,6 +145,7 @@ owners.
 | Current authored API docs | `docs/api/` |
 | Current setup docs | `docs/setup.md` |
 | Current skills docs | `docs/skills/` |
+| Docs-author workflow | `.agents/skills/docs-author/SKILL.md` |
 
 ## Deterministic Versus Judgment
 
@@ -259,6 +264,9 @@ After PR-4:
 
 - warning-only docs checks cover broken internal anchors, compatibility-only
   aliases in authored docs, and generated command rows missing detail links
+- `.agents/skills/docs-author/SKILL.md` reflects the cleanup lessons so future
+  docs agents avoid recreating generated/authored ambiguity, duplicated concept
+  ownership, unsupported anchor syntax, and API terminology drift
 - docs build still succeeds end to end
 
 ## Idempotency
@@ -280,6 +288,7 @@ After PR-4:
 | CLI generated docs behavior | `.agents/skills/docs-build/scripts/generate_cli_reference.py` and docs-build tests or checks |
 | Docs ownership and detail-link routing | `sites/docs/ownership.yaml` or `sites/docs/source-map.yaml` |
 | Anchor conventions | `docs/internal/design/` |
+| Public docs authoring workflow lessons | `.agents/skills/docs-author/SKILL.md` |
 | Result envelope semantics | `docs/api/overview.md` |
 | Action, selector, error, Serve, MCP, Doctor, recording, and skills CLI contracts | The specific canonical public docs pages named in this plan |
 | Cleanup rationale while the task is active | `tasks/docs/cleanup/findings.md`; delete the task folder only after durable knowledge has moved to real docs or code |

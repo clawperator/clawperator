@@ -8,7 +8,7 @@ Parent plan: `tasks/docs/cleanup/plan.md`
 command metadata cleanup. **PR-2** contains Phases 2 and 3, the anchor
 foundation plus ownership manifest and generated detail links. **PR-3** contains
 Phase 4, focused authored-doc cleanup. **PR-4** contains Phase 5, warning-only
-docs checks.
+docs checks plus docs-author guidance tightening.
 
 Current state assumes PR-3 has merged. Phases 1, 2, 3, and 4 are complete, and
 Phase 5 is next.
@@ -112,7 +112,7 @@ Read these files IN THIS ORDER before writing anything for each PR.
 | PR-1 | Simplify generated CLI reference and add command docs metadata | 1 | thinking | none |
 | PR-2 | Add anchor foundation, ownership manifest, and generated detail links | 2, 3 | thinking, thinking | PR-1 merged |
 | PR-3 | Clean up focused authored docs and nav | 4 | thinking | PR-2 merged |
-| PR-4 | Add warning-only docs checks | 5 | default | PR-3 merged |
+| PR-4 | Add warning-only docs checks and docs-author guardrails | 5 | default | PR-3 merged |
 
 ## Phase 1: CLI Reference Generator And Metadata
 
@@ -516,7 +516,7 @@ ambiguous term.
 docs(api): clarify canonical docs ownership
 ```
 
-## Phase 5: Warning-Only Docs Checks
+## Phase 5: Warning-Only Docs Checks And Docs-Author Guardrails
 
 ### Agent Tier
 
@@ -526,6 +526,8 @@ default
 
 Add lightweight warning-only validation so future docs changes notice broken
 anchors, compatibility-only alias drift, and missing generated detail links.
+Tighten the docs-author skill in the same PR so future agents learn the new IA
+rules before they write docs.
 
 ### Files or Surfaces To Change
 
@@ -533,6 +535,7 @@ anchors, compatibility-only alias drift, and missing generated detail links.
 - docs-build validation wiring, if an existing hook is appropriate
 - tests or fixtures for the new check
 - documentation for running the check, if needed
+- `.agents/skills/docs-author/SKILL.md`
 
 ### Steps
 
@@ -554,6 +557,41 @@ anchors, compatibility-only alias drift, and missing generated detail links.
 6. Decide whether the warning-only check should run inside `./scripts/docs_build.sh`
    or as a separate docs-build helper. If integrated into docs build, warnings
    must not fail the build in this phase.
+7. Update `.agents/skills/docs-author/SKILL.md` with the durable lessons from
+   this cleanup. Add concise, executable guidance for:
+   - generated vs authored surfaces:
+     - do not create an authored `docs/api/cli.md`
+     - the CLI reference is generated into `sites/docs/.build/api/cli.md`
+     - fix the source, ownership metadata, or generator before regenerating
+   - canonical ownership:
+     - one concept owner
+     - summary pages link instead of duplicating contract detail
+     - use `sites/docs/ownership.yaml` or `sites/docs/source-map.yaml` when a
+       generated surface needs routing metadata
+   - stable anchors:
+     - use the cleanup anchor strategy and existing stable anchors
+     - use supported HTML anchors in authored docs unless the MkDocs config
+       explicitly enables another syntax
+   - API terminology:
+     - CLI command
+     - CLI subcommand
+     - execution action
+     - Serve endpoint
+     - MCP tool
+     - Node contract
+     - result envelope
+   - API-friction escalation:
+     - if docs repeatedly explain around a confusing command or API shape,
+       consider whether the API boundary needs a follow-up instead of adding
+       more prose
+   - exact-code preservation:
+     - avoid hiding or splitting machine-readable codes in final rendered docs
+     - if a source-level scan requires an HTML entity workaround, make sure
+       generated machine-facing outputs such as `llms-full.txt` decode to the
+       exact code and add a generator test
+8. Update the docs-author validation guidance to reference the new warning-only
+   docs checks after those checks exist. Keep the guidance concrete and avoid
+   duplicating the full docs-build workflow.
 
 ### Acceptance Criteria
 
@@ -562,12 +600,19 @@ anchors, compatibility-only alias drift, and missing generated detail links.
 - Warnings are deterministic and actionable.
 - The checks do not block docs build on first introduction.
 - Tests or fixtures prove the key warning cases.
+- `.agents/skills/docs-author/SKILL.md` tells future docs agents how to handle
+  generated-vs-authored surfaces, canonical ownership, stable anchors, precise
+  API terminology, docs-vs-API-friction escalation, and exact code preservation.
+- The docs-author update is short enough to remain usable as a skill and does
+  not restate the entire docs-build workflow.
 
 Human review checklist:
 
 - The checks catch the drift identified in `findings.md`.
 - The checks are narrow enough that future docs authors will not ignore noisy
   output.
+- The docs-author guidance would have prevented the docs IA mistakes corrected
+  by PR-1 through PR-3.
 - No generated output was hand-edited to satisfy the checks.
 
 ### Validation
@@ -582,7 +627,7 @@ bad_dash=$'\u2014'
 if rg -n "$bad_dash" docs tasks/docs/cleanup .agents/skills/docs-build/scripts; then exit 1; fi
 if rg -n "\\b${bad_short}\\b" docs tasks/docs/cleanup .agents/skills/docs-build/scripts; then exit 1; fi
 if rg -n "$bad_timeout|$bad_selector" docs .agents/skills/docs-build/scripts; then exit 1; fi
-git diff --check -- .agents/skills/docs-build docs sites/docs tasks/docs/cleanup
+git diff --check -- .agents/skills/docs-build .agents/skills/docs-author docs sites/docs tasks/docs/cleanup
 ```
 
 If the docs-build test harness changes away from `unittest`, update this
@@ -592,5 +637,5 @@ body.
 ### Expected Commit
 
 ```text
-test(docs): add warning checks for docs links
+docs: add guardrails for docs IA drift
 ```
