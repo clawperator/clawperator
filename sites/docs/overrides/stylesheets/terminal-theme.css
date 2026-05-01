@@ -108,7 +108,14 @@ body {
 }
 
 #mkdocs-terminal-content :not(pre) > code {
+  overflow-wrap: anywhere;
   padding: 0 0.15em;
+  white-space: normal;
+  word-break: normal;
+}
+
+#mkdocs-terminal-content table :not(pre) > code {
+  white-space: nowrap;
 }
 
 @media only screen and (max-width: 48em) {
@@ -147,8 +154,17 @@ body {
 }
 
 @media only screen and (max-width: 600px) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
+
   .container {
     width: min(calc(100% - 28px), var(--page-width));
+  }
+
+  #mkdocs-terminal-content {
+    overflow-wrap: break-word;
   }
 
   #mkdocs-terminal-content table td,
