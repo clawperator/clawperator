@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.9.5] - 2026-05-01
+
+This release improved skill-run log discoverability and added direct public Markdown setup entrypoints for Clawperator's agent onboarding surfaces.
+
+### 🤖 Node API & CLI
+- **Changed:** Added per-run skill logging metadata and tail-command details so `clawperator skills run` outputs point directly at the relevant daily log entries.
+
+### 📚 Documentation & Website
+- **Changed:** Added public `skill.md` and `agents.md` setup entrypoints, updated the related discovery and install surfaces, and refreshed the agent setup documentation.
+
+Pull requests:
+- [feat(skills): show log tail command for each skill run](https://github.com/clawperator/clawperator/pull/259)
+- [docs(install): add public skill.md setup entrypoint](https://github.com/clawperator/clawperator/pull/261)
+
 ## [0.9.4] - 2026-05-01
 
 This release broadened the canonical `snapshot` action across the Node, Android, and docs surfaces while also refining the generated docs and skill-facing output.
