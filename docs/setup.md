@@ -15,6 +15,48 @@ Get from an empty host to a first successful `clawperator snapshot` with one det
 
 **Java note:** The installer provisions Java 17 automatically on supported platforms (macOS with Homebrew, Ubuntu/Debian, Arch). Java 17 or 21 is required as the host JDK for Android builds (AGP 8.x requirement). The Android Gradle build compiles Java and Kotlin with Java 17 settings; device compatibility is handled by Android's DEX pipeline, not by targeting an older bytecode level.
 
+## Agent-directed setup
+
+When a user wants an outside agent to install, repair, verify, and orient
+Clawperator, give the agent this prompt:
+
+```text
+Read https://clawperator.com/skill.md and get me set up with Clawperator.
+```
+
+`https://clawperator.com/skill.md` is the public setup skill for agents. It is
+the pre-install entrypoint that tells an agent when to use the shell installer,
+when to use direct npm install, when to run `clawperator install`, which
+readiness checks prove setup, and which human approval boundaries must stop the
+agent.
+
+The public skill does not replace `clawperator install`. It points the agent to
+`clawperator install` as the canonical post-bootstrap route after the CLI
+exists. After install, local host-specific orientation moves to:
+
+| Path | Use |
+| --- | --- |
+| `~/.clawperator/AGENTS.md` | Local guide written by host setup for the current machine. |
+| `~/.clawperator/install-state.json` | Install metadata, registry path, APK version, and last device serial when known. |
+| `~/.clawperator/mcp-config-snippet.json` | Generated stdio MCP configuration for hosts that choose `clawperator mcp serve`. |
+
+Machine-checkable verification after an agent-directed setup:
+
+```bash
+clawperator doctor
+clawperator devices
+clawperator snapshot --device <device_serial>
+test -f ~/.clawperator/AGENTS.md
+test -f ~/.clawperator/mcp-config-snippet.json
+```
+
+Continue only when `clawperator doctor` exits `0`, `criticalOk` is `true`, and
+the snapshot command returns a successful result envelope. Human action can
+still be required for OS prompts, Developer Options, USB debugging
+authorization, Android accessibility permission, notification permission, app
+installation, app sign-in, and choosing the correct device when multiple
+targets are connected.
+
 <a id="setup-step-install-cli"></a>
 ## 1. Install the CLI
 

@@ -19,6 +19,33 @@ upgrade sequence when the host is already viable, and falls back to
 `install.sh` only as recovery when the CLI is not reachable or the bootstrap
 prerequisites still need repair.
 
+## Public Setup Skill
+
+Use the public setup skill before this page when the host is not installed,
+needs repair, or has not been verified yet:
+
+```text
+Read https://clawperator.com/skill.md and get me set up with Clawperator.
+```
+
+`https://clawperator.com/skill.md` is the outside-agent setup entrypoint. It
+covers the installer fallback, direct npm install, `clawperator install`,
+readiness checks, local orientation files, MCP setup handoff, and stop
+conditions for human approval boundaries.
+
+After `clawperator install` succeeds, this page takes over as the durable
+post-install routing guide. Read the local host guide first when present:
+
+```bash
+cat ~/.clawperator/AGENTS.md
+cat ~/.clawperator/install-state.json
+cat ~/.clawperator/mcp-config-snippet.json
+```
+
+Use `~/.clawperator/mcp-config-snippet.json` only after deciding that the host
+should connect through stdio MCP and `clawperator mcp serve`. Use direct CLI
+commands or `clawperator skills` when the host does not need MCP.
+
 ## When To Read This Page
 
 Read this page after [Setup](setup.md) succeeds.
