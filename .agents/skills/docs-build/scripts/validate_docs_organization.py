@@ -31,7 +31,7 @@ class DocsOrganizationWarning:
             location = f"{location}:{self.line}"
         rendered = f"WARNING docs-organization {self.kind}: {location}: {self.message}"
         if self.suggestion:
-            rendered += f" Suggested owner: {self.suggestion}"
+            rendered += f" Suggestion: {self.suggestion}"
         return rendered
 
 
@@ -50,9 +50,9 @@ def default_build_root() -> Path:
 def display_path(path: Path, root: Path | None = None) -> str:
     base = root or repo_root()
     try:
-        return str(path.resolve().relative_to(base.resolve())).replace("/", "/")
+        return path.resolve().relative_to(base.resolve()).as_posix()
     except ValueError:
-        return str(path)
+        return path.as_posix()
 
 
 def strip_markdown_markup(text: str) -> str:

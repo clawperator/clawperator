@@ -12259,7 +12259,7 @@ Additional execution failures to expect:
 }
 ```
 
-The timeout `code` is <code>SKILL_EXECUTION_TIMEOUT</code>.
+The JSON escape `\u0054` renders as `T`; the timeout `code` is <code>SKILL_EXECUTION_TIMEOUT</code>.
 
 ```json
 {
@@ -12950,7 +12950,7 @@ does not rewrite it.
 }
 ```
 
-The timeout `code` is <code>SKILL_EXECUTION_TIMEOUT</code>.
+The JSON escape `\u0054` renders as `T`; the timeout `code` is <code>SKILL_EXECUTION_TIMEOUT</code>.
 
 Another common failure is a bad registry or missing script:
 

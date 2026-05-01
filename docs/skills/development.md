@@ -354,7 +354,7 @@ Additional execution failures to expect:
 }
 ```
 
-The timeout `code` is <code>SKILL_EXECUTION_&#x54;IMEOUT</code>.
+The JSON escape `\u0054` renders as `T`; the timeout `code` is <code>SKILL_EXECUTION_&#x54;IMEOUT</code>.
 
 ```json
 {
