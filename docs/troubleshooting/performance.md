@@ -20,10 +20,13 @@ internal measurement path, not the public caller API; use the
 [Serve API](../api/serve.md) as the public persistent API for repeated calls.
 
 Direct daemon means the timing harness posts the execution payload directly to
-the already-running Clawperator daemon's internal Unix socket `/execute`
-endpoint. This bypasses fresh CLI process startup, CLI argument parsing, stdout
-formatting, and other per-command CLI wrapper work. It is a diagnostic
-measurement path, not the recommended public API.
+the already-running Clawperator daemon over the daemon's internal Unix socket,
+using that internal server's `/execute` route. It is not the public
+[Serve API `POST /execute`](../api/serve.md#endpoint-post-execute), and it is
+not the same as running `clawperator execute` from a fresh shell. This path
+bypasses fresh CLI process startup, CLI argument parsing, stdout formatting, and
+other per-command CLI wrapper work. It is a diagnostic measurement path, not
+the recommended public API.
 
 These rule-of-thumb values come from the 2026-05-02 skill validation run at
 commit `d77c3915`, using release package `com.clawperator.operator`, 10
@@ -52,7 +55,7 @@ Average overheads from the same run:
 |------|-----------------|-------------|----------|
 | Fresh CLI through daemon | `clawperator snapshot` | Starts a new Node process for each call, then proxies through the daemon when available | Human terminal use and compatibility checks |
 | [Serve API](../api/serve.md) | `clawperator serve` then HTTP requests, such as [`POST /snapshot`](../api/serve.md#endpoint-post-snapshot) | One long-running Node process | Repeated agent loops and throughput-sensitive callers |
-| Direct daemon socket | Internal Unix socket under `~/.clawperator/daemon/` | One daemon process | Measurement and implementation diagnostics |
+| Direct daemon socket | Internal daemon Unix socket under `~/.clawperator/daemon/`, posted to by the timing harness | One daemon process | Measurement and implementation diagnostics, not public API use |
 | Direct execution | `--no-daemon` or `CLAWPERATOR_NO_DAEMON=1` | No daemon proxy | Debugging daemon behavior, not throughput |
 
 Code sources:
