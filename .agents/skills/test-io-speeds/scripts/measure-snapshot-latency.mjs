@@ -12,11 +12,14 @@ const defaultApps = [
   { id: "play-store", name: "Google Play Store", packageName: "com.android.vending" },
 ];
 
+function sanitizePathSegment(value) {
+  return value.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "") || "device";
+}
+
 function parseArgs(argv) {
-  const defaultOutDir = join(homedir(), ".clawperator", "timings", new Date().toISOString().slice(0, 10));
   const options = {
     device: process.env.CLAWPERATOR_MEASURE_DEVICE ?? "emulator-5554",
-    outDir: process.env.CLAWPERATOR_MEASURE_OUT_DIR ?? defaultOutDir,
+    outDir: process.env.CLAWPERATOR_MEASURE_OUT_DIR,
     cli: process.env.CLAWPERATOR_MEASURE_CLI ?? "apps/node/dist/cli/index.js",
     operatorPackage: process.env.CLAWPERATOR_MEASURE_OPERATOR_PACKAGE ?? "com.clawperator.operator",
     warmups: Number(process.env.CLAWPERATOR_MEASURE_WARMUPS ?? 3),
@@ -50,7 +53,7 @@ Options:
   --device <serial>              adb device serial
   --operator-package <package>   Operator package, default com.clawperator.operator
   --cli <path>                   branch-local CLI path, default apps/node/dist/cli/index.js
-  --out-dir <path>               output directory, default ~/.clawperator/timings/YYYY-MM-DD
+  --out-dir <path>               output directory, default ~/.clawperator/timings/YYYY-MM-DD/<device>
   --warmups <n>                  warmup calls per app, default 3
   --measured <n>                 measured calls per app, default 10
   --apps-file <path>             JSON array of app specs
@@ -74,9 +77,11 @@ App spec shape:
       }
     }
   }
+  const outDir = options.outDir
+    ?? join(homedir(), ".clawperator", "timings", new Date().toISOString().slice(0, 10), sanitizePathSegment(options.device));
   return {
     ...options,
-    outDir: isAbsolute(options.outDir) ? options.outDir : join(repo, options.outDir),
+    outDir: isAbsolute(outDir) ? outDir : join(repo, outDir),
     cli: isAbsolute(options.cli) ? options.cli : join(repo, options.cli),
   };
 }

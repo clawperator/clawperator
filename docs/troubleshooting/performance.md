@@ -80,8 +80,10 @@ node .agents/skills/test-io-speeds/scripts/measure-snapshot-latency.mjs \
 ```
 
 By default, the harness writes local timing artifacts to
-`~/.clawperator/timings/YYYY-MM-DD`. Use `--out-dir <path>` only when a run
-needs a different local output directory.
+`~/.clawperator/timings/YYYY-MM-DD/<device_serial>`. Use `--out-dir <path>`
+only when a run needs a different local output directory. When both an emulator
+and a physical device are connected, run the harness once per explicit
+`--device` value so the two result sets do not overwrite each other.
 
 Use a custom app set with `--apps-file`:
 
