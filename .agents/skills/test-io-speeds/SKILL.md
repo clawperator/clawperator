@@ -19,7 +19,8 @@ Ask for or infer these inputs:
   - `name`
   - `packageName`
   - optional screen-prep notes to perform manually before measurement
-- output directory for local artifacts
+- output directory for local artifacts, defaulting to
+  `~/.clawperator/timings/YYYY-MM-DD`
 
 If the caller does not specify apps, use this default app list:
 
@@ -83,7 +84,6 @@ activity from a clean app start.
    node .agents/skills/test-io-speeds/scripts/measure-snapshot-latency.mjs \
      --device <device_serial> \
      --operator-package com.clawperator.operator \
-     --out-dir tasks/node/io-optimizations/<date>-timing-artifacts \
      --warmups 3 \
      --measured 10
    ```
@@ -108,6 +108,10 @@ For each app, the harness writes:
 
 - `<app-id>.json`
 - `<app-id>-direct-daemon.json`
+
+By default, these files are written under
+`~/.clawperator/timings/YYYY-MM-DD`. Pass `--out-dir <path>` only when the
+caller explicitly wants another local artifact directory.
 
 The normal mode removes raw host logs after extracting summary timing. Passing
 `--keep-raw-logs` keeps host logs and logcat captures locally for debugging;

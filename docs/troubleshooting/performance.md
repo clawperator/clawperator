@@ -75,10 +75,13 @@ adb -s <device_serial> shell setprop log.tag.ClawpSnapshotTiming DEBUG
 node .agents/skills/test-io-speeds/scripts/measure-snapshot-latency.mjs \
   --device <device_serial> \
   --operator-package com.clawperator.operator \
-  --out-dir tasks/node/io-optimizations/<date>-timing-artifacts \
   --warmups 3 \
   --measured 10
 ```
+
+By default, the harness writes local timing artifacts to
+`~/.clawperator/timings/YYYY-MM-DD`. Use `--out-dir <path>` only when a run
+needs a different local output directory.
 
 Use a custom app set with `--apps-file`:
 

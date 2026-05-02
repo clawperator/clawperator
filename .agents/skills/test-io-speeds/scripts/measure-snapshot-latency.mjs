@@ -1,6 +1,7 @@
 import http from "node:http";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { performance } from "node:perf_hooks";
 
@@ -12,9 +13,10 @@ const defaultApps = [
 ];
 
 function parseArgs(argv) {
+  const defaultOutDir = join(homedir(), ".clawperator", "timings", new Date().toISOString().slice(0, 10));
   const options = {
     device: process.env.CLAWPERATOR_MEASURE_DEVICE ?? "emulator-5554",
-    outDir: process.env.CLAWPERATOR_MEASURE_OUT_DIR ?? `tasks/node/io-optimizations/${new Date().toISOString().slice(0, 10)}-timing-artifacts`,
+    outDir: process.env.CLAWPERATOR_MEASURE_OUT_DIR ?? defaultOutDir,
     cli: process.env.CLAWPERATOR_MEASURE_CLI ?? "apps/node/dist/cli/index.js",
     operatorPackage: process.env.CLAWPERATOR_MEASURE_OPERATOR_PACKAGE ?? "com.clawperator.operator",
     warmups: Number(process.env.CLAWPERATOR_MEASURE_WARMUPS ?? 3),
@@ -48,7 +50,7 @@ Options:
   --device <serial>              adb device serial
   --operator-package <package>   Operator package, default com.clawperator.operator
   --cli <path>                   branch-local CLI path, default apps/node/dist/cli/index.js
-  --out-dir <path>               output directory
+  --out-dir <path>               output directory, default ~/.clawperator/timings/YYYY-MM-DD
   --warmups <n>                  warmup calls per app, default 3
   --measured <n>                 measured calls per app, default 10
   --apps-file <path>             JSON array of app specs
