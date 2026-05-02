@@ -98,6 +98,32 @@ function adb(args) {
   return run("adb", ["-s", device, ...args]);
 }
 
+function runAppLifecycleCommand(command, app, logDir) {
+  const stdout = run("node", [
+    cli,
+    command,
+    "--app", app.packageName,
+    "--device", device,
+    "--operator-package", operatorPackage,
+    "--format", "json",
+  ], {
+    env: {
+      CLAWPERATOR_LOG_DIR: logDir,
+      CLAWPERATOR_LOG_LEVEL: "debug",
+    },
+  });
+  const parsed = JSON.parse(stdout);
+  const status = parsed.envelope?.status;
+  if (status !== "success") {
+    throw new Error(`${command} app failed for ${app.packageName}: ${stdout.slice(0, 1000)}`);
+  }
+  return parsed;
+}
+
+function closeApp(app, logDir) {
+  return runAppLifecycleCommand("close", app, logDir);
+}
+
 function openApp(app, logDir) {
   const stdout = run("node", [
     cli,
@@ -306,6 +332,8 @@ for (const app of apps) {
     throw new Error(`daemon status did not include socketPath: ${JSON.stringify(daemonStatus)}`);
   }
 
+  closeApp(app, logDir);
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
   openApp(app, logDir);
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000);
   const focusedBefore = adb(["shell", "dumpsys", "window"]).split("\n").filter(line => /mCurrentFocus|mFocusedApp/.test(line)).join("\n");

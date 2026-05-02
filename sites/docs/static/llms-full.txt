@@ -13933,8 +13933,9 @@ The bundled default app set is package-only:
 - YouTube: `com.google.android.youtube`
 - Google Play Store: `com.android.vending`
 
-The harness opens these with `clawperator open --app <package>`, so the device
-chooses the launcher target.
+The harness first runs `clawperator close --app <package>`, then
+`clawperator open --app <package>`, so each measured app starts from its normal
+launcher entry point.
 
 ```bash
 node .agents/skills/test-io-speeds/scripts/measure-snapshot-latency.mjs \

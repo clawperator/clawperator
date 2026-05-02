@@ -27,9 +27,10 @@ Default app list in the bundled script:
 - YouTube: `com.google.android.youtube`
 - Google Play Store: `com.android.vending`
 
-The harness opens apps through the branch-local Clawperator `open --app`
-command. Do not hardcode Android activity names in the default app set; let the
-device resolve the launch activity.
+The harness first closes each target app through branch-local Clawperator
+`close --app`, then opens it through `open --app`. Do not hardcode Android
+activity names in the default app set; let the device resolve the launch
+activity from a clean app start.
 
 ## Required Method
 
