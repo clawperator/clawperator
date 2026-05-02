@@ -13854,10 +13854,10 @@ locations, and raw artifact handling.
 
 ## Current Timing Snapshot
 
-These values come from the 2026-05-02 `test-io-speeds` validation run at commit
-`d77c3915`, using release package `com.clawperator.operator`, 10 measured calls
-per app, and these apps: Android Settings, Google Play Store, YouTube, and
-Google Home.
+These values come from a `test-io-speeds` validation run after the `0.9.5`
+release, using release package `com.clawperator.operator`, 10 measured calls per
+app, and these apps: Android Settings, Google Play Store, YouTube, and Google
+Home.
 
 | Path | Mean snapshot latency | Cost versus fastest | What it means |
 |------|-----------------------|---------------------|---------------|
