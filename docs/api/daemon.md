@@ -290,13 +290,13 @@ Top-level daemon failures use the same CLI error shape as other Node-side failur
 
 ## Verification
 
-Use the branch-local CLI when validating source changes:
+Use the installed CLI when validating daemon behavior:
 
 ```bash
-node apps/node/dist/cli/index.js daemon start --device emulator-5554
-node apps/node/dist/cli/index.js daemon status --device emulator-5554
-node apps/node/dist/cli/index.js daemon stop --device emulator-5554
-node apps/node/dist/cli/index.js daemon status --device emulator-5554
+clawperator daemon start --device emulator-5554
+clawperator daemon status --device emulator-5554
+clawperator daemon stop --device emulator-5554
+clawperator daemon status --device emulator-5554
 ```
 
 Success conditions:
@@ -309,7 +309,7 @@ Success conditions:
 Verify the internal command is hidden from help:
 
 ```bash
-node apps/node/dist/cli/index.js --help | grep "daemon run"
+clawperator --help | grep "daemon run"
 ```
 
 Success condition: no matches.

@@ -3,6 +3,8 @@ package clawperator.task.runner
 import action.log.Log
 import action.system.model.ApplicationId
 import action.time.getCurrentTimeMillis
+import android.os.SystemClock
+import android.util.Log as AndroidLog
 import clawperator.app.close.AppCloseManager
 import clawperator.apps.AppsRepository
 import clawperator.trigger.TriggerManager
@@ -32,6 +34,7 @@ class TaskScopeDefault(
 ) : TaskScope {
     companion object {
         private const val TAG = "[TaskScope]"
+        private const val SNAPSHOT_TIMING_LOG_TAG = "ClawpSnapshotTiming"
     }
 
     /**
@@ -241,16 +244,31 @@ class TaskScopeDefault(
         while (true) {
             try {
                 Log.d("$TAG Logging UI tree")
+                val snapshotTimingEnabled = AndroidLog.isLoggable(SNAPSHOT_TIMING_LOG_TAG, AndroidLog.DEBUG)
+                val snapshotStartNs = if (snapshotTimingEnabled) SystemClock.elapsedRealtimeNanos() else 0L
                 val hierarchyDump = uiTreeInspector.getCurrentUiHierarchyDump()
                     ?: throw IllegalStateException(
                         "SNAPSHOT_HIERARCHY_UNAVAILABLE: UI hierarchy dump not available; accessibility service may not be ready",
                     )
+                val hierarchyReadyNs = if (snapshotTimingEnabled) SystemClock.elapsedRealtimeNanos() else 0L
                 val commandId = currentTaskCommandId() ?: "unknown"
                 Log.d("$TAG UI Hierarchy [commandId=$commandId]:\n$hierarchyDump")
+                val hierarchyLoggedNs = if (snapshotTimingEnabled) SystemClock.elapsedRealtimeNanos() else 0L
                 val nodeCount = countNodesInHierarchyDump(hierarchyDump)
                 val maxDepth = maxDepthInHierarchyDump(hierarchyDump)
                 val actualFormat = UiSnapshotActualFormat.HierarchyXml
                 val windowMetadata = uiTreeInspector.getCurrentWindowMetadata()
+                if (snapshotTimingEnabled) {
+                    val metadataReadyNs = SystemClock.elapsedRealtimeNanos()
+                    AndroidLog.i(
+                        SNAPSHOT_TIMING_LOG_TAG,
+                        "[SnapshotTiming] commandId=$commandId hierarchyBytes=${hierarchyDump.encodeToByteArray().size} " +
+                            "hierarchyBuildUs=${(hierarchyReadyNs - snapshotStartNs) / 1_000} " +
+                            "logCallUs=${(hierarchyLoggedNs - hierarchyReadyNs) / 1_000} " +
+                            "metadataAndStatsUs=${(metadataReadyNs - hierarchyLoggedNs) / 1_000} " +
+                            "operatorSnapshotUs=${(metadataReadyNs - snapshotStartNs) / 1_000}",
+                    )
+                }
 
                 val totalElapsedMs = getCurrentTimeMillis() - stageStartTime
 
