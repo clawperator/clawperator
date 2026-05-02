@@ -243,7 +243,7 @@ Verification:
 
 ```bash
 CLAWPERATOR_SKILLS_REGISTRY=/abs/path/to/skills/skills-registry.json \
-node apps/node/dist/cli/index.js skills run com.test.agent-skill-result \
+clawperator skills run com.test.agent-skill-result \
   --device emulator-5554 \
   -- valid
 ```

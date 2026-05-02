@@ -67,20 +67,21 @@ Code sources:
 
 ## Fresh CLI Versus Serve
 
-Fresh CLI means each `snapshot` call starts `node`, parses CLI arguments, resolves
-configuration, checks or starts the daemon, proxies the request, parses the result,
-and formats stdout. The daemon still helps because the Android execution work is
-kept behind a warm host process, but the caller pays per-process overhead.
+Fresh CLI means each `snapshot` call starts a new `clawperator` process, parses
+CLI arguments, resolves configuration, checks or starts the daemon, proxies the
+request, parses the result, and formats stdout. The daemon still helps because
+the Android execution work is kept behind a warm host process, but the caller
+pays per-process overhead.
 
 Serve means the caller starts one HTTP server and sends repeated requests to that
-same process. This avoids fresh Node startup and CLI formatting on every call.
+same process. This avoids fresh process startup and CLI formatting on every call.
 For repeated agent loops, the [Serve API](../api/serve.md) is the public
 persistent API to prefer.
 
 Start serve:
 
 ```bash
-node apps/node/dist/cli/index.js serve --host 127.0.0.1 --port 3000 --operator-package com.clawperator.operator
+clawperator serve --host 127.0.0.1 --port 3000 --operator-package com.clawperator.operator
 ```
 
 Request a snapshot:
@@ -105,20 +106,20 @@ for every observation:
 
 ```bash
 for i in $(seq 1 20); do
-  node apps/node/dist/cli/index.js snapshot \
+  clawperator snapshot \
     --device <device_serial> \
     --operator-package com.clawperator.operator \
     --format json > "snapshot-$i.json"
 done
 ```
 
-That pattern pays fresh Node startup, CLI parsing, daemon discovery/proxy work,
-JSON parsing, stdout formatting, and process exit on every iteration.
+That pattern pays fresh process startup, CLI parsing, daemon discovery/proxy
+work, JSON parsing, stdout formatting, and process exit on every iteration.
 
 Instead, start one Serve API process:
 
 ```bash
-node apps/node/dist/cli/index.js serve \
+clawperator serve \
   --host 127.0.0.1 \
   --port 3000 \
   --operator-package com.clawperator.operator

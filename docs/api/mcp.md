@@ -42,11 +42,11 @@ Installed package command:
 clawperator mcp serve
 ```
 
-Branch-local development command:
+Development validation command:
 
 ```bash
 npm --prefix apps/node run build
-node apps/node/dist/cli/index.js mcp serve
+clawperator mcp serve
 ```
 
 Notes:
@@ -641,7 +641,7 @@ node validation/test_mcp_stdio_smoke.mjs
 
 What the smoke script proves:
 
-1. it starts `node apps/node/dist/cli/index.js mcp serve`
+1. it starts the MCP stdio server command
 2. it completes the MCP initialize handshake over stdio
 3. it verifies `devices`
 4. it opens Android Settings on a real device or emulator
