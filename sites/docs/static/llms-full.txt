@@ -13854,6 +13854,12 @@ The fastest measured path is emulator plus direct daemon. Direct daemon is an
 internal measurement path, not the public caller API; use `serve` as the public
 persistent API for repeated calls.
 
+Direct daemon means the timing harness posts the execution payload directly to
+the already-running Clawperator daemon's internal Unix socket `/execute`
+endpoint. This bypasses fresh CLI process startup, CLI argument parsing, stdout
+formatting, and other per-command CLI wrapper work. It is a diagnostic
+measurement path, not the recommended public API.
+
 These rule-of-thumb values come from the 2026-05-02 skill validation run at
 commit `d77c3915`, using release package `com.clawperator.operator`, 10
 measured calls per app, and these apps: Android Settings, Google Play Store,
