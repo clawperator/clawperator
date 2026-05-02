@@ -13851,8 +13851,8 @@ The repeatable timing workflow lives in the repo-local
 ## Fastest Path
 
 The fastest measured path is emulator plus direct daemon. Direct daemon is an
-internal measurement path, not the public caller API; use `serve` as the public
-persistent API for repeated calls.
+internal measurement path, not the public caller API; use the
+[Serve API](../api/serve.md) as the public persistent API for repeated calls.
 
 Direct daemon means the timing harness posts the execution payload directly to
 the already-running Clawperator daemon's internal Unix socket `/execute`
@@ -13886,7 +13886,7 @@ Average overheads from the same run:
 | Path | Command surface | Persistence | Best use |
 |------|-----------------|-------------|----------|
 | Fresh CLI through daemon | `clawperator snapshot` | Starts a new Node process for each call, then proxies through the daemon when available | Human terminal use and compatibility checks |
-| Serve API | `clawperator serve` then HTTP requests | One long-running Node process | Repeated agent loops and throughput-sensitive callers |
+| [Serve API](../api/serve.md) | `clawperator serve` then HTTP requests, such as [`POST /snapshot`](../api/serve.md#endpoint-post-snapshot) | One long-running Node process | Repeated agent loops and throughput-sensitive callers |
 | Direct daemon socket | Internal Unix socket under `~/.clawperator/daemon/` | One daemon process | Measurement and implementation diagnostics |
 | Direct execution | `--no-daemon` or `CLAWPERATOR_NO_DAEMON=1` | No daemon proxy | Debugging daemon behavior, not throughput |
 
@@ -13906,7 +13906,8 @@ kept behind a warm host process, but the caller pays per-process overhead.
 
 Serve means the caller starts one HTTP server and sends repeated requests to that
 same process. This avoids fresh Node startup and CLI formatting on every call.
-For repeated agent loops, `serve` is the public persistent API to prefer.
+For repeated agent loops, the [Serve API](../api/serve.md) is the public
+persistent API to prefer.
 
 Start serve:
 
