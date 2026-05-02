@@ -13833,6 +13833,231 @@ See [Logging](../api/logging.md) for complete documentation.
 
 ---
 
+# Performance
+
+## Purpose
+
+Use this page to measure and improve Clawperator I/O latency on Android devices.
+The current high-impact checks are:
+
+- use a release Operator APK for timing
+- prefer an emulator baseline when the target app can run there
+- use a persistent API path for repeated calls
+- record device, app screen, package, APK, Node version, and code commit with every result
+
+The repeatable timing workflow lives in the repo-local
+[`test-io-speeds` skill](https://github.com/clawperator/clawperator/tree/main/.agents/skills/test-io-speeds).
+
+## Current API Paths
+
+| Path | Command surface | Persistence | Best use |
+|------|-----------------|-------------|----------|
+| Fresh CLI through daemon | `clawperator snapshot` | Starts a new Node process for each call, then proxies through the daemon when available | Human terminal use and compatibility checks |
+| Serve API | `clawperator serve` then HTTP requests | One long-running Node process | Repeated agent loops and throughput-sensitive callers |
+| Direct daemon socket | Internal Unix socket under `~/.clawperator/daemon/` | One daemon process | Measurement and implementation diagnostics |
+| Direct execution | `--no-daemon` or `CLAWPERATOR_NO_DAEMON=1` | No daemon proxy | Debugging daemon behavior, not throughput |
+
+Code sources:
+
+- `apps/node/src/cli/registry.ts` defines `snapshot`, `--no-daemon`, `daemon`, and `serve`.
+- `apps/node/src/cli/commands/serve.ts` defines `GET /ping`, `GET /version`, `POST /execute`, `POST /snapshot`, and related endpoints.
+- `apps/node/src/cli/daemonProxy.ts` proxies daemon-capable CLI calls to `/execute` unless `--no-daemon`, `CLAWPERATOR_NO_DAEMON=1`, Windows, or an unsupported request forces direct execution.
+- `apps/node/src/domain/executions/runExecution.ts` performs device resolution, APK/readiness checks, adb broadcast dispatch, logcat result reading, snapshot extraction, and result envelope normalization.
+
+## Fresh CLI Versus Serve
+
+Fresh CLI means each `snapshot` call starts `node`, parses CLI arguments, resolves
+configuration, checks or starts the daemon, proxies the request, parses the result,
+and formats stdout. The daemon still helps because the Android execution work is
+kept behind a warm host process, but the caller pays per-process overhead.
+
+Serve means the caller starts one HTTP server and sends repeated requests to that
+same process. This avoids fresh Node startup and CLI formatting on every call.
+For repeated agent loops, `serve` is the public persistent API to prefer.
+
+Start serve:
+
+```bash
+node apps/node/dist/cli/index.js serve --host 127.0.0.1 --port 3000 --operator-package com.clawperator.operator
+```
+
+Request a snapshot:
+
+```bash
+curl -s http://127.0.0.1:3000/snapshot \
+  -H 'Content-Type: application/json' \
+  -d '{"deviceId":"<device_serial>","operatorPackage":"com.clawperator.operator"}'
+```
+
+Success condition:
+
+- HTTP status is `200`
+- JSON field `ok` is `true`
+- JSON field `envelope.status` is `"success"`
+- JSON field `envelope.stepResults[0].data.text` is a non-empty Android UI Automator XML string
+
+## Measurement Workflow
+
+Run measurements from the repository root with branch-local Node artifacts.
+
+```bash
+adb devices -l
+npm --prefix apps/node run build
+./gradlew :app:assembleRelease
+adb -s <device_serial> install apps/android/app/build/outputs/apk/release/app-release.apk
+./scripts/clawperator_grant_android_permissions.sh --release --serial <device_serial>
+adb -s <device_serial> shell setprop log.tag.ClawpSnapshotTiming DEBUG
+node .agents/skills/test-io-speeds/scripts/measure-snapshot-latency.mjs \
+  --device <device_serial> \
+  --operator-package com.clawperator.operator \
+  --out-dir tasks/node/io-optimizations/<date>-timing-artifacts \
+  --warmups 3 \
+  --measured 10
+```
+
+Use a custom app set with `--apps-file`:
+
+```json
+[
+  {
+    "id": "play-store",
+    "name": "Google Play Store",
+    "packageName": "com.android.vending",
+    "activity": ".AssetBrowserActivity"
+  }
+]
+```
+
+```bash
+node .agents/skills/test-io-speeds/scripts/measure-snapshot-latency.mjs \
+  --device <device_serial> \
+  --operator-package com.clawperator.operator \
+  --apps-file /path/to/apps.json
+```
+
+Do not commit raw timing artifacts. The harness writes per-app JSON summaries
+and can keep raw logcat and host logs with `--keep-raw-logs`; those raw files
+may contain screen text, package state, local paths, or device identifiers.
+
+## 2026-05-02 Findings
+
+Measurements on 2026-05-02 used branch-local Node build `0.9.6`, command
+surface `snapshot`, release package `com.clawperator.operator`, and locally
+built release APKs. The emulator baseline was collected at commit
+`f3333c5689991889c3f3c4e1640861ba39dc65fd`. The physical companion run was
+collected after adding gated Android timing logs in commit `3a7dcf65`.
+
+The gated Android timing log tag is `ClawpSnapshotTiming`. When the tag is not
+enabled, the production path pays only the Android `Log.isLoggable` check and
+does not emit per-snapshot timing logs. Keep this behavior gated.
+
+### Devices
+
+| Device | Serial in reports | Model | Android | Screen | Notes |
+|--------|-------------------|-------|---------|--------|-------|
+| Emulator | `emulator-5554` | `sdk_gphone64_arm64` | Android 16, API 36 | 1080x2400, density 420 | Google Play emulator |
+| Physical | redacted in committed docs | Samsung `SM-S901E` | Android 16, API 36 | 1080x2340, density 480 | USB transport |
+
+### Timing Summary
+
+All values are milliseconds. Each app used 3 warmup calls and 10 measured calls.
+Fresh CLI mean is the normal `snapshot` CLI call through an already-running
+daemon. Direct daemon mean posts directly to the daemon `/execute` socket from
+the timing harness and removes fresh CLI process overhead. Operator snapshot
+mean is Android-side snapshot work reported by `ClawpSnapshotTiming`.
+
+| App and screen | Emulator fresh CLI mean | Physical fresh CLI mean | Emulator direct daemon mean | Physical direct daemon mean | Emulator operator snapshot mean | Physical operator snapshot mean |
+|----------------|-------------------------|--------------------------|-----------------------------|------------------------------|---------------------------------|----------------------------------|
+| Google Home, stable home screen | 198.5 | 277.2 | 77.7 | 178.2 | 9.89 | 22.68 |
+| Google Play Store, stable store screen | 199.7 | 292.5 | 66.9 | 196.6 | 13.82 | 30.65 |
+| AirTouch, stable app screen | 187.9 | 327.6 | 75.6 | 173.4 | 5.25 | 24.76 |
+
+### Payload Summary
+
+| App | Emulator payload bytes, mean | Physical payload bytes, mean |
+|-----|------------------------------|-------------------------------|
+| Google Home | 57,083 | 61,719 |
+| Google Play Store | 46,091 | 40,794 |
+| AirTouch | 10,828 | 11,325 |
+
+### Interpretation
+
+The emulator was materially faster than the physical USB device for both host
+transport and Android-side snapshot work. Direct daemon latency on the emulator
+was about 67-78 ms, while the physical device was about 173-197 ms. Fresh CLI
+latency added about 96-154 ms over direct daemon on the physical device and
+about 122-133 ms over direct daemon on the emulator.
+
+The main bottleneck for repeated calls is not Android UI hierarchy traversal
+alone. Android operator snapshot work was 5-14 ms on the emulator and 23-31 ms
+on the physical device. The larger costs are host transport, logcat/result
+delivery, daemon proxying, fresh CLI startup, result parsing, and formatting.
+
+For throughput-sensitive loops:
+
+1. Prefer an emulator baseline when the target app supports emulator use.
+2. Use release APK timing when evaluating product performance.
+3. Use `serve` for repeated caller API traffic.
+4. Use fresh CLI timing only when measuring terminal command experience.
+5. Treat physical-device USB results as device-and-transport-specific.
+
+## Comparison To Earlier Findings
+
+Earlier task notes under `tasks/node/io-optimizations/findings.md` reported
+larger values. They are not directly comparable to the 2026-05-02 controlled
+release APK benchmark.
+
+| Source | Date found from git/logs | Likely setup | Snapshot timing |
+|--------|--------------------------|--------------|-----------------|
+| PR #238, `698e7edc` | 2026-04-26 | Physical Samsung over USB, `.dev` debug Operator, pre-final daemon work, branch-local Node `0.7.8` | Warm CLI median about 2219 ms, serve-mode median about 1750 ms |
+| PR #242, `7590a2e7` | 2026-04-26 | Physical Samsung over USB, daemon-aware flow, likely fresh CLI over daemon, app context probably Play Store install/search flow | Warm snapshot improved from about 1599 ms no-daemon to about 846 ms warm daemon |
+| 2026-05-02 controlled emulator run | 2026-05-02 | Emulator, release Operator, controlled Google Home, Play Store, and AirTouch screens | Fresh CLI mean about 188-200 ms, direct daemon mean about 67-78 ms |
+| 2026-05-02 controlled physical run | 2026-05-02 | Physical Samsung over USB, release Operator, same app set | Fresh CLI mean about 277-328 ms, direct daemon mean about 173-197 ms |
+
+Plausible reasons for the older one-second-scale timings:
+
+- debug `.dev` APK was used for at least part of the earlier work
+- the earlier baseline used a physical USB device
+- app screens were not the same controlled screen set
+- part of the earlier work predated the finalized daemon path
+- some earlier values measured fresh CLI behavior, not a persistent caller
+
+Do not use those older values as a current release APK latency baseline.
+
+## Failure Modes
+
+| Symptom | Check | Recovery |
+|---------|-------|----------|
+| Timing uses the debug package | `adb shell pm path com.clawperator.operator.dev` and command flags | Rebuild and install release, then pass `--operator-package com.clawperator.operator` |
+| Multiple devices skew results | `adb devices -l` and `clawperator devices` | Pass `--device <device_serial>` on every command |
+| Fresh CLI remains slower than expected | Compare fresh CLI mean to direct daemon mean | Use `clawperator serve` for repeated calls |
+| Daemon is stale after rebuilding Node | `clawperator daemon status --format json` and `GET /version` | Restart the daemon or let the daemon proxy replace a mismatched daemon |
+| Physical device is much slower than emulator | Compare direct daemon and operator snapshot timing on both | Use emulator for the baseline and keep physical numbers as compatibility data |
+| Snapshot appears successful but has no XML | Check `envelope.stepResults[0].data.text` | Treat the run as invalid and inspect version compatibility, operator package, and logcat extraction |
+
+## Validation Commands
+
+Build and test the Node package after changing the timing harness or CLI path:
+
+```bash
+npm --prefix apps/node run build
+npm --prefix apps/node run test
+```
+
+Build the release APK before performance timing:
+
+```bash
+./gradlew :app:assembleRelease
+```
+
+Build the public docs after editing this page:
+
+```bash
+./scripts/docs_build.sh
+```
+
+---
+
 # Known Issues
 
 ## Purpose
