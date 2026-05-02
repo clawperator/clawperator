@@ -82,16 +82,24 @@ Serve means the caller starts one local HTTP server and sends repeated requests
 to that same process. This avoids fresh process startup and CLI formatting on
 every call.
 
-## Replace Fresh CLI Loops
+## Replace Fresh CLI Observe-Act-Observe
 
-Do not write latency-sensitive loops that start a fresh `clawperator` process
-for every observation:
+A common slow skill pattern is observe, act, then observe again by shelling out
+for each step:
 
 ```bash
-for i in $(seq 1 20); do
-  clawperator snapshot > "snapshot-$i.json"
-done
+before="$(clawperator snapshot)"
+
+if printf '%s' "$before" | grep -q 'Activate'; then
+  clawperator click --text "Activate"
+fi
+
+after="$(clawperator snapshot)"
+printf '%s' "$after" | grep -q 'Activated'
 ```
+
+That starts a fresh process for each observation and action. In retries or
+bounded polling, the cost repeats.
 
 Instead, start one Serve API process:
 
@@ -99,19 +107,53 @@ Instead, start one Serve API process:
 clawperator serve
 ```
 
-Then keep the caller process alive and reuse HTTP requests:
+Then keep the caller process alive. Use
+[`POST /snapshot`](../api/serve.md#endpoint-post-snapshot) for observation:
 
 ```bash
-for i in $(seq 1 20); do
-  curl -s http://127.0.0.1:3000/snapshot \
-    -H 'Content-Type: application/json' \
-    -d '{}' \
-    > "snapshot-$i.json"
-done
+before="$(curl -s http://127.0.0.1:3000/snapshot \
+  -H 'Content-Type: application/json' \
+  -d '{}')"
 ```
 
-For multi-action payloads, use the public
-[`POST /execute`](../api/serve.md#endpoint-post-execute) endpoint.
+When ready to act and verify, send the action and verification as one
+[`POST /execute`](../api/serve.md#endpoint-post-execute) payload:
+
+```bash
+curl -s http://127.0.0.1:3000/execute \
+  -H 'Content-Type: application/json' \
+  -d @- <<'JSON'
+{
+  "execution": {
+    "commandId": "activate-flow",
+    "taskId": "activate-flow",
+    "source": "performance-doc",
+    "expectedFormat": "android-ui-automator",
+    "timeoutMs": 30000,
+    "actions": [
+      {
+        "id": "tap-activate",
+        "type": "click",
+        "params": { "matcher": { "textEquals": "Activate" } }
+      },
+      {
+        "id": "wait-activated",
+        "type": "wait_for_node",
+        "params": {
+          "matcher": { "textContains": "Activated" },
+          "timeoutMs": 15000
+        }
+      },
+      { "id": "verify", "type": "snapshot" }
+    ]
+  }
+}
+JSON
+```
+
+This mirrors real skill structure: observe, click by selector, wait for the
+target UI state, and capture the final snapshot, while keeping process startup
+out of the repeated path.
 
 ## Practical Guidance
 
