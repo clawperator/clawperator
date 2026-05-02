@@ -18,6 +18,8 @@ Ask for or infer these inputs:
   - `id`
   - `name`
   - `packageName`
+  - optional `allowedForegroundPackages` for apps that legitimately hand off to
+    another foreground package during launch
   - optional screen-prep notes to perform manually before measurement
 - output directory for local artifacts, defaulting to
   `~/.clawperator/timings/YYYY-MM-DD/<device_serial>`
@@ -35,7 +37,8 @@ If the caller does not specify apps, use this default app list:
 
 If the caller wants other apps measured, ask them to provide an app list with
 `id`, `name`, and `packageName` for each app, then pass it with `--apps-file`
-or `--apps-json`.
+or `--apps-json`. App IDs must be safe filename segments because they are used
+for local artifact names.
 
 The harness first closes each target app through branch-local Clawperator
 `close <package>`, then opens it through `open <package>`. Do not hardcode
@@ -105,7 +108,9 @@ launch activity from a clean app start.
    ```
 
 7. Confirm every measured result contains a valid snapshot text payload. Do not
-   rely on exit code alone.
+   rely on exit code alone. The harness also verifies that the snapshot
+   foreground package matches the requested app package or one of the app
+   spec's `allowedForegroundPackages`.
 
 8. Summarize the JSON outputs into a markdown report. Do not commit raw artifact
    JSON, logcat captures, host logs, screen text, or local device serials.

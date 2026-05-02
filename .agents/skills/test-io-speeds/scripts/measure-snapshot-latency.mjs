@@ -16,9 +16,15 @@ function sanitizePathSegment(value) {
   return value.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "") || "device";
 }
 
+function assertSafeAppId(id) {
+  if (id !== sanitizePathSegment(id) || id === "." || id === "..") {
+    throw new Error(`App id must be a safe filename segment: ${id}`);
+  }
+}
+
 function parseArgs(argv) {
   const options = {
-    device: process.env.CLAWPERATOR_MEASURE_DEVICE ?? "emulator-5554",
+    device: process.env.CLAWPERATOR_MEASURE_DEVICE,
     outDir: process.env.CLAWPERATOR_MEASURE_OUT_DIR,
     cli: process.env.CLAWPERATOR_MEASURE_CLI ?? "apps/node/dist/cli/index.js",
     operatorPackage: process.env.CLAWPERATOR_MEASURE_OPERATOR_PACKAGE ?? "com.clawperator.operator",
@@ -50,7 +56,7 @@ function parseArgs(argv) {
       console.log(`Usage: node .agents/skills/test-io-speeds/scripts/measure-snapshot-latency.mjs [options]
 
 Options:
-  --device <serial>              adb device serial
+  --device <serial>              adb device serial, required unless CLAWPERATOR_MEASURE_DEVICE is set
   --operator-package <package>   Operator package, default com.clawperator.operator
   --cli <path>                   branch-local CLI path, default apps/node/dist/cli/index.js
   --out-dir <path>               output directory, default ~/.clawperator/timings/YYYY-MM-DD/<device>
@@ -61,19 +67,32 @@ Options:
   --keep-raw-logs                keep logcat and host logs in output
 
 App spec shape:
-  {"id":"play-store","name":"Google Play Store","packageName":"com.android.vending"}`);
+  {"id":"play-store","name":"Google Play Store","packageName":"com.android.vending"}
+
+Optional app spec fields:
+  allowedForegroundPackages: extra package names accepted as the measured foreground app`);
       process.exit(0);
     } else {
       throw new Error(`Unknown option: ${arg}`);
     }
   }
 
+  if (typeof options.device !== "string" || options.device.trim() === "") {
+    throw new Error("--device <serial> is required unless CLAWPERATOR_MEASURE_DEVICE is set");
+  }
   if (!Number.isInteger(options.warmups) || options.warmups < 0) throw new Error("--warmups must be a non-negative integer");
   if (!Number.isInteger(options.measured) || options.measured < 1) throw new Error("--measured must be a positive integer");
   for (const app of options.apps) {
     for (const key of ["id", "name", "packageName"]) {
       if (typeof app[key] !== "string" || app[key].trim() === "") {
         throw new Error(`Each app spec must include nonblank ${key}`);
+      }
+    }
+    assertSafeAppId(app.id);
+    if (app.allowedForegroundPackages !== undefined) {
+      if (!Array.isArray(app.allowedForegroundPackages)
+        || !app.allowedForegroundPackages.every(value => typeof value === "string" && value.trim() !== "")) {
+        throw new Error("allowedForegroundPackages must be an array of nonblank strings when provided");
       }
     }
   }
@@ -154,7 +173,18 @@ function openApp(app, logDir) {
   return parsed;
 }
 
-function snapshot(logDir) {
+function expectedForegroundPackages(app) {
+  return new Set([app.packageName, ...(app.allowedForegroundPackages ?? [])]);
+}
+
+function assertExpectedForeground(app, foregroundPackage, context) {
+  if (typeof foregroundPackage !== "string" || !expectedForegroundPackages(app).has(foregroundPackage)) {
+    const expected = [...expectedForegroundPackages(app)].join(", ");
+    throw new Error(`${context} returned foreground package ${foregroundPackage ?? "<missing>"}; expected one of: ${expected}`);
+  }
+}
+
+function snapshot(logDir, app) {
   let stdout = "";
   let wallMs = 0;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -186,6 +216,7 @@ function snapshot(logDir) {
   if (parsed.envelope?.status !== "success" || typeof text !== "string" || text.length === 0) {
     throw new Error(`invalid snapshot result: ${stdout.slice(0, 1000)}`);
   }
+  assertExpectedForeground(app, step.data.foreground_package, "snapshot");
   return {
     commandId: parsed.envelope.commandId,
     wallMs,
@@ -221,8 +252,8 @@ function daemonPost(socketPath, body) {
   });
 }
 
-async function directDaemonSnapshot(socketPath, appId, index) {
-  const commandId = `direct-${appId}-${Date.now()}-${index}`;
+async function directDaemonSnapshot(socketPath, app, index) {
+  const commandId = `direct-${app.id}-${Date.now()}-${index}`;
   const execution = {
     commandId,
     taskId: commandId,
@@ -251,6 +282,7 @@ async function directDaemonSnapshot(socketPath, appId, index) {
   if (!parsed.ok || typeof text !== "string" || text.length === 0) {
     throw new Error(`invalid direct daemon snapshot result: ${raw.slice(0, 1000)}`);
   }
+  assertExpectedForeground(app, step.data.foreground_package, "direct daemon snapshot");
   return {
     commandId,
     wallMs,
@@ -347,13 +379,13 @@ for (const app of apps) {
 
   const warmupResults = [];
   for (let i = 0; i < warmups; i += 1) {
-    warmupResults.push(snapshot(logDir));
+    warmupResults.push(snapshot(logDir, app));
   }
 
   adb(["logcat", "-c"]);
   const calls = [];
   for (let i = 0; i < measured; i += 1) {
-    calls.push(snapshot(logDir));
+    calls.push(snapshot(logDir, app));
   }
   const logcat = adb(["logcat", "-d", "-v", "time"]);
   if (keepRawLogs) {
@@ -399,7 +431,7 @@ for (const app of apps) {
 
   const directCalls = [];
   for (let i = 0; i < warmups + measured; i += 1) {
-    const direct = await directDaemonSnapshot(socketPath, app.id, i);
+    const direct = await directDaemonSnapshot(socketPath, app, i);
     if (i >= warmups) {
       directCalls.push(direct);
     }
