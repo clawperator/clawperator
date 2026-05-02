@@ -13933,6 +13933,48 @@ Success condition:
 - JSON field `envelope.status` is `"success"`
 - JSON field `envelope.stepResults[0].data.text` is a non-empty Android UI Automator XML string
 
+## Replace Fresh CLI Loops
+
+Do not write latency-sensitive loops that start a fresh `clawperator` process
+for every observation:
+
+```bash
+for i in $(seq 1 20); do
+  node apps/node/dist/cli/index.js snapshot \
+    --device <device_serial> \
+    --operator-package com.clawperator.operator \
+    --format json > "snapshot-$i.json"
+done
+```
+
+That pattern pays fresh Node startup, CLI parsing, daemon discovery/proxy work,
+JSON parsing, stdout formatting, and process exit on every iteration.
+
+Instead, start one Serve API process:
+
+```bash
+node apps/node/dist/cli/index.js serve \
+  --host 127.0.0.1 \
+  --port 3000 \
+  --operator-package com.clawperator.operator
+```
+
+Then keep the caller process alive and reuse HTTP requests:
+
+```bash
+for i in $(seq 1 20); do
+  curl -s http://127.0.0.1:3000/snapshot \
+    -H 'Content-Type: application/json' \
+    -d '{"deviceId":"<device_serial>","operatorPackage":"com.clawperator.operator"}' \
+    > "snapshot-$i.json"
+done
+```
+
+For multi-action payloads, use the public
+[`POST /execute`](../api/serve.md#endpoint-post-execute) endpoint. Do not
+interpret the direct-daemon timing path as a recommendation to call the
+daemon's internal Unix socket from skills.
+
 ## Measurement Workflow
 
 Run measurements from the repository root with branch-local Node artifacts.
