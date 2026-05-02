@@ -59,6 +59,13 @@ class TaskScopeDefault(
         return result to elapsedMs
     }
 
+    private fun isSnapshotTimingEnabled(): Boolean =
+        try {
+            AndroidLog.isLoggable(SNAPSHOT_TIMING_LOG_TAG, AndroidLog.DEBUG)
+        } catch (_: RuntimeException) {
+            false
+        }
+
     private suspend inline fun <T> withRetry(
         retry: TaskRetry,
         stageId: String,
@@ -244,7 +251,7 @@ class TaskScopeDefault(
         while (true) {
             try {
                 Log.d("$TAG Logging UI tree")
-                val snapshotTimingEnabled = AndroidLog.isLoggable(SNAPSHOT_TIMING_LOG_TAG, AndroidLog.DEBUG)
+                val snapshotTimingEnabled = isSnapshotTimingEnabled()
                 val snapshotStartNs = if (snapshotTimingEnabled) SystemClock.elapsedRealtimeNanos() else 0L
                 val hierarchyDump = uiTreeInspector.getCurrentUiHierarchyDump()
                     ?: throw IllegalStateException(
