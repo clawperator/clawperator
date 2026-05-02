@@ -38,9 +38,9 @@ If the caller wants other apps measured, ask them to provide an app list with
 or `--apps-json`.
 
 The harness first closes each target app through branch-local Clawperator
-`close --app`, then opens it through `open --app`. Do not hardcode Android
-activity names in the default app set; let the device resolve the launch
-activity from a clean app start.
+`close <package>`, then opens it through `open <package>`. Do not hardcode
+Android activity names in the default app set; let the device resolve the
+launch activity from a clean app start.
 
 ## Required Method
 

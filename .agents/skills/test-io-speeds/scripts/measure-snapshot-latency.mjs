@@ -109,7 +109,7 @@ function runAppLifecycleCommand(command, app, logDir) {
   const stdout = run("node", [
     cli,
     command,
-    "--app", app.packageName,
+    app.packageName,
     "--device", device,
     "--operator-package", operatorPackage,
     "--format", "json",
@@ -135,7 +135,7 @@ function openApp(app, logDir) {
   const stdout = run("node", [
     cli,
     "open",
-    "--app", app.packageName,
+    app.packageName,
     "--device", device,
     "--operator-package", operatorPackage,
     "--navigation-timeout-ms", "15000",

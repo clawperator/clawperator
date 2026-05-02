@@ -13938,8 +13938,8 @@ The bundled default app set is package-only:
 - YouTube: `com.google.android.youtube`
 - Google Play Store: `com.android.vending`
 
-The harness first runs `clawperator close --app <package>`, then
-`clawperator open --app <package>`, so each measured app starts from its normal
+The harness first runs `clawperator close <package>`, then
+`clawperator open <package>`, so each measured app starts from its normal
 launcher entry point.
 
 ```bash
