@@ -106,10 +106,7 @@ for every observation:
 
 ```bash
 for i in $(seq 1 20); do
-  clawperator snapshot \
-    --device <device_serial> \
-    --operator-package com.clawperator.operator \
-    --format json > "snapshot-$i.json"
+  clawperator snapshot > "snapshot-$i.json"
 done
 ```
 
@@ -119,10 +116,7 @@ work, JSON parsing, stdout formatting, and process exit on every iteration.
 Instead, start one Serve API process:
 
 ```bash
-clawperator serve \
-  --host 127.0.0.1 \
-  --port 3000 \
-  --operator-package com.clawperator.operator
+clawperator serve
 ```
 
 Then keep the caller process alive and reuse HTTP requests:
@@ -131,7 +125,7 @@ Then keep the caller process alive and reuse HTTP requests:
 for i in $(seq 1 20); do
   curl -s http://127.0.0.1:3000/snapshot \
     -H 'Content-Type: application/json' \
-    -d '{"deviceId":"<device_serial>","operatorPackage":"com.clawperator.operator"}' \
+    -d '{}' \
     > "snapshot-$i.json"
 done
 ```
