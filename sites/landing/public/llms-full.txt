@@ -13922,11 +13922,19 @@ Use a custom app set with `--apps-file`:
   {
     "id": "play-store",
     "name": "Google Play Store",
-    "packageName": "com.android.vending",
-    "activity": ".AssetBrowserActivity"
+    "packageName": "com.android.vending"
   }
 ]
 ```
+
+The bundled default app set is package-only:
+
+- Android Settings: `com.android.settings`
+- YouTube: `com.google.android.youtube`
+- Google Play Store: `com.android.vending`
+
+The harness opens these with `clawperator open --app <package>`, so the device
+chooses the launcher target.
 
 ```bash
 node .agents/skills/test-io-speeds/scripts/measure-snapshot-latency.mjs \

@@ -6,9 +6,9 @@ import { performance } from "node:perf_hooks";
 
 const repo = process.cwd();
 const defaultApps = [
-  { id: "google-home", name: "Google Home", packageName: "com.google.android.apps.chromecast.app", activity: ".DiscoveryActivity" },
-  { id: "play-store", name: "Google Play Store", packageName: "com.android.vending", activity: ".AssetBrowserActivity" },
-  { id: "airtouch", name: "AirTouch", packageName: "au.com.polyaire.airtouch5", activity: ".MainActivity" },
+  { id: "settings", name: "Android Settings", packageName: "com.android.settings" },
+  { id: "youtube", name: "YouTube", packageName: "com.google.android.youtube" },
+  { id: "play-store", name: "Google Play Store", packageName: "com.android.vending" },
 ];
 
 function parseArgs(argv) {
@@ -56,7 +56,7 @@ Options:
   --keep-raw-logs                keep logcat and host logs in output
 
 App spec shape:
-  {"id":"play-store","name":"Google Play Store","packageName":"com.android.vending","activity":".AssetBrowserActivity"}`);
+  {"id":"play-store","name":"Google Play Store","packageName":"com.android.vending"}`);
       process.exit(0);
     } else {
       throw new Error(`Unknown option: ${arg}`);
@@ -66,7 +66,7 @@ App spec shape:
   if (!Number.isInteger(options.warmups) || options.warmups < 0) throw new Error("--warmups must be a non-negative integer");
   if (!Number.isInteger(options.measured) || options.measured < 1) throw new Error("--measured must be a positive integer");
   for (const app of options.apps) {
-    for (const key of ["id", "name", "packageName", "activity"]) {
+    for (const key of ["id", "name", "packageName"]) {
       if (typeof app[key] !== "string" || app[key].trim() === "") {
         throw new Error(`Each app spec must include nonblank ${key}`);
       }
@@ -96,6 +96,29 @@ function run(cmd, args, options = {}) {
 
 function adb(args) {
   return run("adb", ["-s", device, ...args]);
+}
+
+function openApp(app, logDir) {
+  const stdout = run("node", [
+    cli,
+    "open",
+    "--app", app.packageName,
+    "--device", device,
+    "--operator-package", operatorPackage,
+    "--navigation-timeout-ms", "15000",
+    "--format", "json",
+  ], {
+    env: {
+      CLAWPERATOR_LOG_DIR: logDir,
+      CLAWPERATOR_LOG_LEVEL: "debug",
+    },
+  });
+  const parsed = JSON.parse(stdout);
+  const status = parsed.envelope?.status;
+  if (status !== "success") {
+    throw new Error(`open app failed for ${app.packageName}: ${stdout.slice(0, 1000)}`);
+  }
+  return parsed;
 }
 
 function snapshot(logDir) {
@@ -283,8 +306,8 @@ for (const app of apps) {
     throw new Error(`daemon status did not include socketPath: ${JSON.stringify(daemonStatus)}`);
   }
 
-  adb(["shell", "am", "start", "-n", `${app.packageName}/${app.activity}`]);
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5000);
+  openApp(app, logDir);
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1000);
   const focusedBefore = adb(["shell", "dumpsys", "window"]).split("\n").filter(line => /mCurrentFocus|mFocusedApp/.test(line)).join("\n");
 
   const warmupResults = [];

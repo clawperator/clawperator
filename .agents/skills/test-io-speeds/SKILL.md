@@ -18,15 +18,18 @@ Ask for or infer these inputs:
   - `id`
   - `name`
   - `packageName`
-  - `activity`
   - optional screen-prep notes to perform manually before measurement
 - output directory for local artifacts
 
 Default app list in the bundled script:
 
-- Google Home: `com.google.android.apps.chromecast.app/.DiscoveryActivity`
-- Google Play Store: `com.android.vending/.AssetBrowserActivity`
-- AirTouch: `au.com.polyaire.airtouch5/.MainActivity`
+- Android Settings: `com.android.settings`
+- YouTube: `com.google.android.youtube`
+- Google Play Store: `com.android.vending`
+
+The harness opens apps through the branch-local Clawperator `open --app`
+command. Do not hardcode Android activity names in the default app set; let the
+device resolve the launch activity.
 
 ## Required Method
 
