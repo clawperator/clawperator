@@ -21,11 +21,15 @@ Ask for or infer these inputs:
   - optional screen-prep notes to perform manually before measurement
 - output directory for local artifacts
 
-Default app list in the bundled script:
+If the caller does not specify apps, use this default app list:
 
 - Android Settings: `com.android.settings`
 - YouTube: `com.google.android.youtube`
 - Google Play Store: `com.android.vending`
+
+If the caller wants other apps measured, ask them to provide an app list with
+`id`, `name`, and `packageName` for each app, then pass it with `--apps-file`
+or `--apps-json`.
 
 The harness first closes each target app through branch-local Clawperator
 `close --app`, then opens it through `open --app`. Do not hardcode Android
