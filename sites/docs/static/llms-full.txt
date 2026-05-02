@@ -13875,14 +13875,14 @@ YouTube, and Google Home.
 | Physical USB + direct daemon | about 197 ms | about +119 ms | Cost of using the physical USB device instead of the emulator on the direct-daemon path |
 | Physical USB + fresh CLI through daemon | about 326 ms | about +248 ms | Both costs together: physical USB transport/device plus fresh CLI overhead |
 
-Average overheads from the same run:
+Average deltas from the same run:
 
-| Question | Observed cost |
-|----------|---------------|
-| Not using direct daemon, on emulator | about +142 ms |
-| Not using direct daemon, on physical USB | about +129 ms |
-| Not using emulator, direct daemon path | about +119 ms |
-| Not using emulator, fresh CLI path | about +106 ms |
+| Comparison | Observed delta |
+|------------|----------------|
+| Fresh CLI overhead on emulator | about +142 ms |
+| Fresh CLI overhead on physical USB | about +129 ms |
+| Physical USB penalty versus emulator, direct daemon path | about +119 ms |
+| Physical USB penalty versus emulator, fresh CLI path | about +106 ms |
 
 ## Current API Paths
 
