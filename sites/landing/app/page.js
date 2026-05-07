@@ -428,7 +428,7 @@ export default function Home() {
             Clawperator is the hand.
           </p>
           <p className="hero-summary hero-summary-secondary">
-            Connect a dedicated Android burner phone, run your own private skills, and get answers your agent can trust.
+            Use a dedicated Android phone or Google Play-equipped emulator, sign into the apps you care about, and leave it ready for your agent.
           </p>
 
           <div className="hero-image-panel">
@@ -445,10 +445,7 @@ export default function Home() {
           </div>
 
           <p className="hero-summary hero-summary-secondary">
-            Any cheap Android phone works. Log in to the accounts you care about and leave your burner ready for your agent. You do not need to switch from iPhone to Android.
-          </p>
-          <p className="hero-summary hero-summary-secondary">
-            Don&apos;t have an Android device? No problem. Clawperator can create a Google Play-equipped Android emulator for you.
+            Keep using your iPhone. Clawperator gives your agent the Android side of the workflow.
           </p>
 
           <div className="resource-grid" aria-label="Primary resources">
