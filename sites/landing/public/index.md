@@ -75,7 +75,7 @@ Skills are reusable, app-specific workflows that simplify agent interaction:
 ## Runtime model
 
 - **Preferred Target**: A physical Android device (often a dedicated "burner"). This ensures reliability and allows the agent to operate without interfering with a user's primary phone.
-- **Alternative Target**: An **Android emulator** (provisioned via `clawperator provision emulator`).
+- **Alternative Target**: An **Android emulator** (provisioned via `clawperator emulator provision`).
 - **Environment Responsibility**: The user installs the required **user-installed Android apps** and configures login state. Clawperator interacts with already-installed apps and does not manage user credentials.
 
 ## Why Clawperator exists

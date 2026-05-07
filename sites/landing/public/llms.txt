@@ -38,5 +38,5 @@ Clawperator is a deterministic Android automation runtime for AI agents. It is t
 - The docs site contains the canonical technical documentation.
 - Prefer the docs site, Node API overview, and CLI reference over inferring behavior from marketing copy.
 - Clawperator is an actuator, not an autonomous planner.
-- If no physical Android device is available, install Clawperator first, then provision an emulator with `clawperator provision emulator`.
+- If no physical Android device is available, install Clawperator first, then provision an emulator with `clawperator emulator provision`.
 - Skills repository: https://github.com/clawperator/clawperator-skills
