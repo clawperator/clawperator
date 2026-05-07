@@ -412,18 +412,15 @@ export default function Home() {
           <p className="hero-summary">
             Clawperator is a deterministic execution layer that lets agents run skills on real Android apps to read data and take action on behalf of users.
           </p>
-          <div className="hero-video-panel">
-            <h2 className="hero-image-heading">Watch the video</h2>
-            <div className="hero-video-frame">
-              <iframe
-                src="https://www.youtube-nocookie.com/embed/lQnMRqi6Zag?rel=0&modestbranding=1"
-                title="Clawperator introduction video"
-                loading="lazy"
-                referrerPolicy="strict-origin-when-cross-origin"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              />
-            </div>
+          <div className="hero-video-embed">
+            <iframe
+              src="https://www.youtube-nocookie.com/embed/lQnMRqi6Zag?rel=0&modestbranding=1"
+              title="Clawperator introduction video"
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
           </div>
           <p className="hero-brain-hand">
             Your OpenClaw/agent is the brain.
