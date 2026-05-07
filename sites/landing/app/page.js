@@ -114,7 +114,7 @@ export default function Home() {
   const [activeSection, setActiveSection] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const activeCommand = mode === "npm" ? installCommands.npm : installCommands.oneLiner;
-  const emulatorCommand = "clawperator provision emulator";
+  const emulatorCommand = "clawperator emulator provision";
 
   const sectionIds = ["install", "skills", "how-it-works", "faq"];
   const sectionLabels = {
@@ -404,11 +404,11 @@ export default function Home() {
           <img src="/clawperator-logo.png" alt="" aria-hidden="true" className="hero-logo" />
           <p className="hero-product-name">Clawperator</p>
           <h1 className="hero-catchphrase">
-            YOUR AGENT THINKS.
+            PLAYWRIGHT-STYLE AUTOMATION
             <br />
-            CLAWPERATOR ACTS.
+            FOR ANDROID APPS.
           </h1>
-          <p className="hero-category-line">Clawperator makes Android apps programmable - think Playwright for mobile apps.</p>
+          <p className="hero-category-line">When services do not have APIs, Clawperator lets agents use the app instead.</p>
           <p className="hero-summary">
             Clawperator is a deterministic execution layer that lets agents run skills on real Android apps to read data and take action on behalf of users.
           </p>
