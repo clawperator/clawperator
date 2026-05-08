@@ -114,7 +114,7 @@ export default function Home() {
   const [activeSection, setActiveSection] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const activeCommand = mode === "npm" ? installCommands.npm : installCommands.oneLiner;
-  const emulatorCommand = "clawperator provision emulator";
+  const emulatorCommand = "clawperator emulator provision";
 
   const sectionIds = ["install", "skills", "how-it-works", "faq"];
   const sectionLabels = {
@@ -404,21 +404,31 @@ export default function Home() {
           <img src="/clawperator-logo.png" alt="" aria-hidden="true" className="hero-logo" />
           <p className="hero-product-name">Clawperator</p>
           <h1 className="hero-catchphrase">
-            YOUR AGENT THINKS.
+            PLAYWRIGHT-STYLE AUTOMATION
             <br />
-            CLAWPERATOR ACTS.
+            FOR ANDROID APPS.
           </h1>
-          <p className="hero-category-line">Clawperator makes Android apps programmable - think Playwright for mobile apps.</p>
+          <p className="hero-category-line">When services do not have APIs, Clawperator lets agents use the app instead.</p>
           <p className="hero-summary">
             Clawperator is a deterministic execution layer that lets agents run skills on real Android apps to read data and take action on behalf of users.
           </p>
+          <div className="hero-video-embed">
+            <iframe
+              src="https://www.youtube-nocookie.com/embed/lQnMRqi6Zag?rel=0&modestbranding=1"
+              title="Clawperator introduction video"
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          </div>
           <p className="hero-brain-hand">
             Your OpenClaw/agent is the brain.
             <br />
             Clawperator is the hand.
           </p>
           <p className="hero-summary hero-summary-secondary">
-            Connect a dedicated Android burner phone, run your own private skills, and get answers your agent can trust.
+            Use a dedicated Android phone or Google Play-equipped emulator, sign into the apps you care about, and leave it ready for your agent.
           </p>
 
           <div className="hero-image-panel">
@@ -435,10 +445,7 @@ export default function Home() {
           </div>
 
           <p className="hero-summary hero-summary-secondary">
-            Any cheap Android phone works. Log in to the accounts you care about and leave your burner ready for your agent. You do not need to switch from iPhone to Android.
-          </p>
-          <p className="hero-summary hero-summary-secondary">
-            Don&apos;t have an Android device? No problem. Clawperator can create a Google Play-equipped Android emulator for you.
+            Keep using your iPhone. Clawperator gives your agent the Android side of the workflow.
           </p>
 
           <div className="resource-grid" aria-label="Primary resources">

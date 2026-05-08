@@ -542,15 +542,20 @@ body {
   align-items: center;
 }
 
-.hero-image-heading {
-  margin: 0 0 1rem;
-  font-size: 1.55rem;
-  line-height: 1.15;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  text-align: center;
-  color: #000000;
-  text-shadow: none;
+.hero-video-embed {
+  margin-top: 2.2rem;
+  width: 100%;
+  max-width: 860px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #000000;
+}
+
+.hero-video-embed iframe {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: 0;
 }
 
 @media (prefers-color-scheme: dark) {
