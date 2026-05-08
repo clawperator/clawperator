@@ -422,13 +422,16 @@ export default function Home() {
               allowFullScreen
             />
           </div>
+          <p className="hero-summary hero-summary-secondary">
+            Use a dedicated Android "burner" deivce, or let Clawperator create a Google Play-equipped emulator that runs all your apps.
+          </p>
+
           <p className="hero-brain-hand">
             Your OpenClaw/agent is the brain.
             <br />
             Clawperator is the hand.
-          </p>
-          <p className="hero-summary hero-summary-secondary">
-            Use a dedicated Android phone or Google Play-equipped emulator, sign into the apps you care about, and leave it ready for your agent.
+            <br />
+            Repeatable app flows become skills, so automations can be packaged and run again.
           </p>
 
           <div className="hero-image-panel">
