@@ -408,7 +408,7 @@ export default function Home() {
             <br />
             FOR ANDROID APPS.
           </h1>
-          <p className="hero-category-line">When services do not have APIs, Clawperator lets agents use the app instead.</p>
+          <p className="hero-category-line">Clawperator gives agents direct control of real Android apps.</p>
           <p className="hero-summary">
             Clawperator is a deterministic execution layer that lets agents run skills on real Android apps to read data and take action on behalf of users.
           </p>
@@ -422,13 +422,17 @@ export default function Home() {
               allowFullScreen
             />
           </div>
+          <p className="hero-summary hero-summary-secondary">
+            Keep using your iPhone. Use a dedicated Android &quot;burner&quot; device, or let Clawperator create a Google
+            Play-equipped emulator that runs all your apps.
+          </p>
+
           <p className="hero-brain-hand">
             Your OpenClaw/agent is the brain.
             <br />
             Clawperator is the hand.
-          </p>
-          <p className="hero-summary hero-summary-secondary">
-            Use a dedicated Android phone or Google Play-equipped emulator, sign into the apps you care about, and leave it ready for your agent.
+            <br />
+            Repeatable app flows become skills, so automations can be packaged and run again.
           </p>
 
           <div className="hero-image-panel">
@@ -443,10 +447,6 @@ export default function Home() {
             />
             <p className="hero-image-caption">Automate any Android app. No API required.</p>
           </div>
-
-          <p className="hero-summary hero-summary-secondary">
-            Keep using your iPhone. Clawperator gives your agent the Android side of the workflow.
-          </p>
 
           <div className="resource-grid" aria-label="Primary resources">
             {resourceCards.map((card) => {
