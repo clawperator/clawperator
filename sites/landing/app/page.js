@@ -423,7 +423,8 @@ export default function Home() {
             />
           </div>
           <p className="hero-summary hero-summary-secondary">
-            Use a dedicated Android phone or a Google Play-equipped emulator, and leave the app signed in for your agent.
+            Keep using your iPhone. Use a dedicated Android &quot;burner&quot; device, or let Clawperator create a Google
+            Play-equipped emulator that runs all your apps.
           </p>
 
           <p className="hero-brain-hand">
@@ -446,10 +447,6 @@ export default function Home() {
             />
             <p className="hero-image-caption">Automate any Android app. No API required.</p>
           </div>
-
-          <p className="hero-summary hero-summary-secondary">
-            Keep using your iPhone. Clawperator runs the Android app on a separate device.
-          </p>
 
           <div className="resource-grid" aria-label="Primary resources">
             {resourceCards.map((card) => {
