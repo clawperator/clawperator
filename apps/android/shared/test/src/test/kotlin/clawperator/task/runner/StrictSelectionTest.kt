@@ -36,6 +36,32 @@ class StrictSelectionTest : ActionTest {
         )
     }
 
+    @Test fun `non-strict scroll search preserves initial container failure results`() = actionTest {
+        for ((children, expectedReason) in listOf(
+            emptyList<UiNode>() to TaskScrollTerminationReason.ContainerNotFound,
+            listOf(node("scope")) to TaskScrollTerminationReason.ContainerNotScrollable,
+        )) {
+            val f = Fixture(listOf(UiTree(node("root", children = children))), backgroundScope)
+            val result = f.ui.scrollLoop(NodeMatcher(resourceId = "target"), NodeMatcher(resourceId = "scope"))
+            assertEquals(expectedReason, result.terminationReason)
+            assertEquals(0, result.scrollsExecuted)
+            assertNull(result.resolvedContainerId)
+            assertTrue(f.dispatches.isEmpty())
+        }
+    }
+
+    @Test fun `strict scroll search propagates initial container selection failures`() = actionTest {
+        for (count in listOf(0, 2)) {
+            val f = Fixture(listOf(UiTree(node("root", children = List(count) { node("scope", scroll = true) }))), backgroundScope)
+            val error = assertFailsWith<StrictSelectionException> {
+                f.ui.scrollLoop(NodeMatcher(resourceId = "target"), NodeMatcher(resourceId = "scope"), strict = true)
+            }
+            assertEquals(if (count == 0) "CONTAINER_NOT_FOUND" else "CONTAINER_AMBIGUOUS", error.code)
+            assertEquals(count, error.candidateCount)
+            assertTrue(f.dispatches.isEmpty())
+        }
+    }
+
     @Test fun `non-strict duplicate targets retain dispatch and teach strict mode`() = actionTest {
         for (strict in listOf(false, true)) {
             val f = Fixture(listOf(UiTree(node("root", children = List(2) { node("target") }))), backgroundScope)

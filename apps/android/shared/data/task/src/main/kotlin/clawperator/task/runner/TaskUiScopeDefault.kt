@@ -912,21 +912,21 @@ class TaskUiScopeDefault(
 
         val uiTree = currentUiTreeFiltered()
 
-        if (target != null) {
-            val visibleTarget = scrollTarget(target, uiTree, container, strict, findFirstScrollableChild)
-            if (visibleTarget != null) {
-                Log.d("$TAG scrollLoop: TARGET_FOUND before scrolling")
-                return TaskScrollLoopResult(
-                    terminationReason = TaskScrollTerminationReason.TargetFound,
-                    scrollsExecuted = 0,
-                    resolvedContainerId = null,
-                )
-            }
-        }
-
-        // Resolve container once upfront; fail fast if not found
+        // Target checks also resolve the container and must preserve structured container failures.
         val resolvedContainerId: String?
         try {
+            if (target != null) {
+                val visibleTarget = scrollTarget(target, uiTree, container, strict, findFirstScrollableChild)
+                if (visibleTarget != null) {
+                    Log.d("$TAG scrollLoop: TARGET_FOUND before scrolling")
+                    return TaskScrollLoopResult(
+                        terminationReason = TaskScrollTerminationReason.TargetFound,
+                        scrollsExecuted = 0,
+                        resolvedContainerId = null,
+                    )
+                }
+            }
+
             val scrollNode = scrollNode(uiTree, container, strict, findFirstScrollableChild) ?: throw IllegalStateException("No scrollable container visible")
             resolvedContainerId = scrollNode.resourceId
         } catch (e: IllegalStateException) {
