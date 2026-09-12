@@ -113,6 +113,15 @@ sealed interface UiAction {
         val retry: TaskRetry = TaskRetryPresets.UiReadiness,
     ) : UiAction
 
+    data class SetOnScreenLog(
+        override val id: String,
+        val spec: OnScreenLogSpec,
+    ) : UiAction
+
+    data class ClearOnScreenLog(
+        override val id: String,
+    ) : UiAction
+
     data class StartRecording(
         override val id: String,
         val sessionId: String? = null,
@@ -179,6 +188,7 @@ data class UiSnapshotResult(
     val hasOverlay: Boolean = false,
     val overlayPackage: String? = null,
     val windowCount: Int? = null,
+    val operatorOverlayVisible: Boolean = false,
 )
 
 enum class UiTextValidator {

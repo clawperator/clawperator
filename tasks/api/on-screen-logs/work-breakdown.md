@@ -10,13 +10,13 @@ Two PRs, four sequential phases. PR-1 contains Phases 1-2: render/controller pro
 
 | Item | Value |
 | --- | --- |
-| State | planning |
+| State | in progress |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | 1-4 |
-| Current / Next | Phase 1 |
-| Blockers | PR-2 waits for PR-1 merge |
+| Completed | Phases 1-2 |
+| Remaining | 3-4 |
+| Current / Next | PR-2 after PR-1 merge and explicit continuation |
+| Blockers | PR-2 waits for PR-1 merge and explicit continuation |
 
 ## Hard Rules
 

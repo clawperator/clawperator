@@ -6,6 +6,7 @@ import action.log.Log
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.accessibilityservice.InputMethod
+import android.content.res.Configuration
 import android.os.Build
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
@@ -13,6 +14,7 @@ import android.view.inputmethod.EditorInfo
 import androidx.annotation.RequiresApi
 import clawperator.accessibilityservice.AccessibilityServiceManagerAndroid
 import clawperator.operator.recording.RecordingEventFilter
+import clawperator.operator.onscreenlog.OnScreenLogPanelLifecycle
 import clawperator.routine.RoutineManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -27,6 +29,7 @@ class OperatorAccessibilityService :
     private val routineManager: RoutineManager by inject()
     private val coroutineScopes: CoroutineScopes by inject()
     private val recordingEventFilter: RecordingEventFilter by inject()
+    private val onScreenLogPanelLifecycle: OnScreenLogPanelLifecycle by inject()
     private var routineLoopJob: Job? = null
     private val recordingDiagnosticHook: RecordingDiagnosticHook? by lazy {
         if (buildConfig.debug) {
@@ -83,6 +86,7 @@ class OperatorAccessibilityService :
 
         Log.d("[Operator-AccessibilityService] Enhanced accessibility configured with flags: ${serviceInfo?.flags}")
         accessibilityServiceManager.setCurrentAccessibilityService(this, set = true)
+        onScreenLogPanelLifecycle.attach(this)
         runRecordingDiagnosticHook(
             hook = recordingDiagnosticHook,
             hookLabel = "for service connected",
@@ -105,6 +109,7 @@ class OperatorAccessibilityService :
 
     override fun onDestroy() {
         Log.d("[Operator-AccessibilityService] onDestroy()")
+        onScreenLogPanelLifecycle.detach()
         runRecordingDiagnosticHook(
             hook = recordingDiagnosticHook,
             hookLabel = "for service destroyed",
@@ -117,6 +122,11 @@ class OperatorAccessibilityService :
         routineLoopJob?.cancel()
         routineLoopJob = null
         Log.d("[Operator-AccessibilityService] RoutineManager loop stopped")
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        onScreenLogPanelLifecycle.onConfigurationChanged()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {

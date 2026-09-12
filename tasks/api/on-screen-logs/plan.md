@@ -10,13 +10,13 @@ Two PRs, four sequential phases. PR-1 proves and ships the Android renderer plus
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | in progress |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | 1-4 |
-| Current / Next | Phase 1 |
-| Blockers | no known blocker; mechanism requires live proof |
+| Completed | Phases 1-2 |
+| Remaining | 3-4 |
+| Current / Next | PR-2 after PR-1 merge and explicit continuation |
+| Blockers | PR-2 waits for PR-1 merge and explicit continuation |
 
 ## Goal
 
@@ -97,7 +97,7 @@ All window mutations occur on the Android main thread. Keep state in the service
 
 ### Raw API
 
-Add canonical actions `set_on_screen_log` and `clear_on_screen_log`. These use the normal execution envelope, action IDs, and explicit target selection. Do not add aliases in v1. `clear_on_screen_log` accepts omitted params or `{}` only. `set_on_screen_log` accepts only these fields:
+Add canonical actions `set_on_screen_log` and `clear_on_screen_log`. These use the normal execution envelope, action IDs, and explicit target selection. At the Node input boundary, accept the exact lower-case aliases `on_screen_log_set` and `on_screen_log_clear`, then normalize them to their canonical types before validation and dispatch. Reject case and whitespace variants. `clear_on_screen_log` accepts omitted params or `{}` only. `set_on_screen_log` accepts only these fields:
 
 | Field | Type / accepted range | Default / meaning |
 | --- | --- | --- |

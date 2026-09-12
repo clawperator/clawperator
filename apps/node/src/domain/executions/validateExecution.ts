@@ -2,7 +2,7 @@ import { z } from "zod";
 import { LIMITS } from "../../contracts/limits.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
 import { getCanonicalActionType } from "../../contracts/aliases.js";
-import type { Execution } from "../../contracts/execution.js";
+import type { ActionParams, Execution } from "../../contracts/execution.js";
 import { normalizeExecutionInput } from "../../contracts/inputAliases.js";
 
 const nodeMatcherSchema = z
@@ -32,6 +32,36 @@ const coordinateSchema = z
     y: z.number().int().nonnegative(),
   })
   .strict();
+
+const onScreenLogIntegerSchema = z.number().finite().int().optional();
+const onScreenLogColorPattern = /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/;
+// Keep this explicit list aligned with OnScreenLogContract.isContractWhitespace on Android.
+const onScreenLogWhitespaceOnlyPattern = /^[\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]*$/u;
+const onScreenLogAllowedParamKeys = new Set([
+  "text",
+  "anchor",
+  "textAlign",
+  "topOffsetDp",
+  "edgeOffsetDp",
+  "widthDp",
+  "fontSizeSp",
+  "textColor",
+  "backgroundColor",
+  "ttlMs",
+]);
+
+function hasForbiddenOnScreenLogControlCharacter(value: string): boolean {
+  return /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/u.test(value);
+}
+
+function hasOnScreenLogNonWhitespaceCharacter(value: string): boolean {
+  return !onScreenLogWhitespaceOnlyPattern.test(value);
+}
+
+function normalizeOnScreenLogColor(value: string): string {
+  const uppercase = value.toUpperCase();
+  return uppercase.length === 7 ? `#FF${uppercase.slice(1)}` : uppercase;
+}
 
 const actionParamsSchema = z.object({
   applicationId: z.string().optional(),
@@ -78,6 +108,35 @@ const actionParamsSchema = z.object({
   all: z.boolean().optional(),
 }).strict();
 
+const setOnScreenLogParamsSchema = z.object({
+  text: z.string().max(2048),
+  anchor: z.enum(["left", "right"]).optional(),
+  textAlign: z.enum(["left", "right"]).optional(),
+  topOffsetDp: onScreenLogIntegerSchema,
+  edgeOffsetDp: onScreenLogIntegerSchema,
+  widthDp: onScreenLogIntegerSchema,
+  fontSizeSp: onScreenLogIntegerSchema,
+  textColor: z.string().optional(),
+  backgroundColor: z.string().optional(),
+  ttlMs: onScreenLogIntegerSchema,
+}).strict();
+
+const clearOnScreenLogParamsSchema = z.object({}).strict();
+
+function paramsSchemaForAction(actionType: string) {
+  if (actionType === "set_on_screen_log") {
+    return setOnScreenLogParamsSchema.optional();
+  }
+  if (actionType === "clear_on_screen_log") {
+    return clearOnScreenLogParamsSchema.optional();
+  }
+  return actionParamsSchema.optional();
+}
+
+function hasStructurallyValidActionParams(actionType: string, params: unknown): boolean {
+  return paramsSchemaForAction(actionType).safeParse(params).success;
+}
+
 // NOTE: "doctor_ping" is intentionally excluded. It is an internal diagnostic action
 // used only by `clawperator doctor`, which bypasses validateExecution and dispatches
 // directly via broadcastAgentCommand. It is not part of the public agent-facing API.
@@ -100,13 +159,27 @@ const supportedTypes = [
   "press_key",
   "wait_for_navigation",
   "read_key_value_pair",
+  "set_on_screen_log",
+  "clear_on_screen_log",
 ] as const;
 
 const actionSchema = z.object({
   id: z.string().min(1).max(LIMITS.MAX_ID_LENGTH),
   type: z.string().max(64).transform((s) => getCanonicalActionType(s)),
-  params: actionParamsSchema.optional(),
-}).strict();
+  params: z.unknown().optional(),
+}).strict().superRefine((action, ctx) => {
+  const paramsSchema = paramsSchemaForAction(action.type);
+  const parsedParams = paramsSchema.safeParse(action.params);
+  if (parsedParams.success) {
+    return;
+  }
+  for (const issue of parsedParams.error.errors) {
+    ctx.addIssue({
+      ...issue,
+      path: ["params", ...issue.path],
+    });
+  }
+});
 
 const validationHintByActionParam = new Map<string, string>([
   ["snapshot.format", "'format' was removed from snapshot. Remove this parameter."],
@@ -148,7 +221,13 @@ const executionSchema = z.object({
   };
 
   execution.actions.forEach((action, index) => {
-    const params = action.params;
+    // The action-level refinement already reports structural parameter errors. Do not run
+    // semantic checks on malformed raw values, where legacy checks may assume strings or
+    // objects and otherwise throw instead of returning EXECUTION_VALIDATION_FAILED.
+    if (!hasStructurallyValidActionParams(action.type, action.params)) {
+      return;
+    }
+    const params = action.params as ActionParams | undefined;
     switch (action.type) {
       case "open_app":
       case "close_app":
@@ -220,6 +299,69 @@ const executionSchema = z.object({
           addIssue(index, "enter_text requires non-empty params.text", ["params", "text"]);
         }
         break;
+      case "set_on_screen_log": {
+        const invalidKeys = Object.keys(params ?? {}).filter(key => !onScreenLogAllowedParamKeys.has(key));
+        for (const invalidKey of invalidKeys) {
+          addIssue(
+            index,
+            `set_on_screen_log does not accept params.${invalidKey}`,
+            ["params", invalidKey]
+          );
+        }
+
+        if (typeof params?.text !== "string") {
+          addIssue(index, "set_on_screen_log requires params.text", ["params", "text"]);
+        } else {
+          if (params.text.length < 1 || params.text.length > 2048) {
+            addIssue(index, "set_on_screen_log params.text must contain 1..2048 UTF-16 code units", ["params", "text"]);
+          }
+          if (!hasOnScreenLogNonWhitespaceCharacter(params.text)) {
+            addIssue(index, "set_on_screen_log params.text must include a non-whitespace character", ["params", "text"]);
+          }
+          if (hasForbiddenOnScreenLogControlCharacter(params.text)) {
+            addIssue(index, "set_on_screen_log params.text contains a control character other than LF or TAB", ["params", "text"]);
+          }
+        }
+
+        const validateRange = (key: "topOffsetDp" | "edgeOffsetDp" | "widthDp" | "fontSizeSp" | "ttlMs", minimum: number, maximum: number) => {
+          const value = params?.[key];
+          if (value !== undefined && (value < minimum || value > maximum)) {
+            addIssue(index, `set_on_screen_log params.${key} must be in [${minimum}, ${maximum}]`, ["params", key]);
+          }
+        };
+        validateRange("topOffsetDp", 0, 1000);
+        validateRange("edgeOffsetDp", 0, 1000);
+        validateRange("widthDp", 80, 600);
+        validateRange("fontSizeSp", 8, 24);
+        validateRange("ttlMs", 1000, 3600000);
+
+        for (const key of ["textColor", "backgroundColor"] as const) {
+          const value = params?.[key];
+          if (value !== undefined && !onScreenLogColorPattern.test(value)) {
+            addIssue(
+              index,
+              `set_on_screen_log params.${key} must be exactly #RRGGBB or #AARRGGBB`,
+              ["params", key]
+            );
+          }
+        }
+        break;
+      }
+      case "clear_on_screen_log": {
+        const rawParams = action.params;
+        if (
+          rawParams !== undefined &&
+          (
+            typeof rawParams !== "object" ||
+            rawParams === null ||
+            Array.isArray(rawParams) ||
+            Object.keys(rawParams).length > 0
+          )
+        ) {
+          addIssue(index, "clear_on_screen_log accepts omitted params or {} only", ["params"]);
+        }
+        break;
+      }
       case "scroll_and_click":
         if (!params?.matcher) {
           addIssue(index, "scroll_and_click requires params.matcher", ["params", "matcher"]);
@@ -400,7 +542,25 @@ export function validateExecution(input: unknown): Execution {
     };
     throw err;
   }
-  return parsed.data as Execution;
+  const execution = parsed.data as Execution;
+  return {
+    ...execution,
+    actions: execution.actions.map((action) => {
+      if (action.type !== "set_on_screen_log" || action.params === undefined) {
+        return action;
+      }
+      const textColor = action.params.textColor;
+      const backgroundColor = action.params.backgroundColor;
+      return {
+        ...action,
+        params: {
+          ...action.params,
+          ...(textColor !== undefined ? { textColor: normalizeOnScreenLogColor(textColor) } : {}),
+          ...(backgroundColor !== undefined ? { backgroundColor: normalizeOnScreenLogColor(backgroundColor) } : {}),
+        },
+      };
+    }),
+  };
 }
 
 /**

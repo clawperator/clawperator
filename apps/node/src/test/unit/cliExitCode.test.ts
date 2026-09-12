@@ -88,6 +88,16 @@ describe("shouldCliStdoutForceExitCode1", () => {
     );
   });
 
+  it("forces exit 1 for a failed on-screen log renderer envelope", () => {
+    assert.strictEqual(
+      shouldCliStdoutForceExitCode1(
+        '{"envelope":{"status":"failed","errorCode":"ON_SCREEN_LOG_RENDER_TIMEOUT","stepResults":[{"id":"set-panel","actionType":"set_on_screen_log","success":false,"data":{"error":"ON_SCREEN_LOG_RENDER_TIMEOUT"}}],"error":"draw acknowledgement timed out"},"deviceId":"d"}',
+        false,
+      ),
+      true,
+    );
+  });
+
   it("does not force exit 1 when envelope steps all succeeded", () => {
     assert.strictEqual(
       shouldCliStdoutForceExitCode1(

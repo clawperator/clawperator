@@ -317,6 +317,105 @@ describe("mcp stdio integration", () => {
     assert.ok(payload.envelope);
   });
 
+  it("normalizes exact on-screen-log action aliases through the execute tool", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("execute", {
+      deviceId: "non-existent",
+      timeoutMs: 1000,
+      actions: [
+        {
+          id: "set-panel",
+          type: "on_screen_log_set",
+          params: {
+            text: "FLOW-001: Observe settings",
+            anchor: "right",
+            textAlign: "left",
+            topOffsetDp: 0,
+            edgeOffsetDp: 12,
+            widthDp: 320,
+            fontSizeSp: 16,
+            textColor: "#a1b2c3",
+            backgroundColor: "#7f0a0b0c",
+            ttlMs: 12000,
+          },
+        },
+        {
+          id: "clear-panel",
+          type: "on_screen_log_clear",
+        },
+      ],
+    });
+
+    // The generic MCP action schema leaves field validation to the canonical executor. A
+    // device-resolution error therefore proves these exact raw fields passed that boundary.
+    const payload = parseToolPayload(result) as { code?: string };
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(payload.code, "DEVICE_NOT_FOUND");
+  });
+
+  it("rejects padded on-screen-log action types instead of normalizing them", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("execute", {
+      deviceId: "non-existent",
+      timeoutMs: 1000,
+      actions: [
+        {
+          id: "set-panel",
+          type: " set_on_screen_log ",
+          params: { text: "strict canonical action" },
+        },
+      ],
+    });
+
+    const payload = parseToolPayload(result) as { code?: string };
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+  });
+
+  it("delegates non-object raw action params to the canonical execution validator", async () => {
+    await client.initialize();
+
+    for (const params of [null, [], "not-an-object"]) {
+      const result = await client.callTool("execute", {
+        deviceId: "non-existent",
+        timeoutMs: 1000,
+        actions: [
+          {
+            id: "clear-panel",
+            type: "clear_on_screen_log",
+            params,
+          },
+        ],
+      });
+
+      const payload = parseToolPayload(result) as { code?: string };
+      assert.strictEqual(result.isError, true);
+      assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+    }
+  });
+
+  it("returns canonical validation errors for malformed generic action params", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("execute", {
+      deviceId: "non-existent",
+      timeoutMs: 1000,
+      actions: [
+        {
+          id: "open-app",
+          type: "open_app",
+          params: { applicationId: 1 },
+        },
+      ],
+    });
+
+    const payload = parseToolPayload(result) as { code?: string };
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+  });
+
   it("configure with no args returns empty session state", async () => {
     await client.initialize();
 

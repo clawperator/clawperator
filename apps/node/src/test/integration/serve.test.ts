@@ -204,6 +204,51 @@ describe("serve API integration", () => {
     assert.strictEqual(body.error.code, "DEVICE_NOT_FOUND");
   });
 
+  test("POST /execute normalizes exact on-screen-log action aliases through the canonical executor", async () => {
+    const executionInput = {
+      commandId: "test-on-screen-log-serve",
+      taskId: "test-task",
+      source: "test-suite",
+      expectedFormat: "android-ui-automator",
+      timeoutMs: 1000,
+      actions: [
+        {
+          id: "set-panel",
+          type: "on_screen_log_set",
+          params: {
+            text: "FLOW-001: Observe settings",
+            anchor: "right",
+            textAlign: "left",
+            topOffsetDp: 0,
+            edgeOffsetDp: 12,
+            widthDp: 320,
+            fontSizeSp: 16,
+            textColor: "#a1b2c3",
+            backgroundColor: "#7f0a0b0c",
+            ttlMs: 12000,
+          },
+        },
+        {
+          id: "clear-panel",
+          type: "on_screen_log_clear",
+        },
+      ],
+    };
+
+    const res = await fetch(`http://localhost:${port}/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ execution: executionInput, deviceId: "non-existent" }),
+    });
+
+    // A device-resolution error proves the action passed the shared validator and reached
+    // the same canonical executor as raw execution. A schema error would return HTTP 400.
+    assert.strictEqual(res.status, 404);
+    const body = await res.json() as { ok: boolean; error: { code: string } };
+    assert.strictEqual(body.ok, false);
+    assert.strictEqual(body.error.code, "DEVICE_NOT_FOUND");
+  });
+
   test("POST /execute rejects malformed skillRunId", async () => {
     const executionInput = {
       commandId: "test-bad-skill-run-id",
