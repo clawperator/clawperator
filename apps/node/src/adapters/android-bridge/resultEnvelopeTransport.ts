@@ -22,6 +22,11 @@ export class ResultEnvelopeTransport {
 
   constructor(private readonly commandId: string) {}
 
+  diagnostics(): Record<string, unknown> {
+    return { receivedChunks: this.chunks.length, receivedBytes: this.receivedBytes,
+      expectedChunks: this.header?.count, expectedBytes: this.header?.byteLength };
+  }
+
   consume(line: string): string | null {
     if (!line.startsWith(CHUNK_PREFIX)) return line;
     let chunk: Chunk;
@@ -40,7 +45,7 @@ export class ResultEnvelopeTransport {
       chunk.count !== Math.ceil(chunk.byteLength / 1024) ||
       typeof chunk.sha256 !== "string" || !/^[0-9a-f]{64}$/.test(chunk.sha256) ||
       typeof chunk.data !== "string" || chunk.data.length > 1368
-    ) throw new Error("Invalid result transport chunk");
+    ) throw new Error(`Invalid result transport chunk (expectedIndex=${this.chunks.length}, receivedIndex=${chunk.index}, count=${chunk.count}, byteLength=${chunk.byteLength})`);
     if (this.header && ["taskId", "count", "byteLength", "sha256"].some(key =>
       chunk[key as keyof Chunk] !== this.header![key as keyof Chunk]
     )) throw new Error("Inconsistent result transport chunks");

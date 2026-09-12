@@ -47,6 +47,7 @@ def main(argv=None):
         'validation': [
             ['python3', '-m', 'unittest', 'discover', '-s', 'validation'],
             ['python3', '-m', 'unittest', 'discover', '-s', 'validation/sensitive-hierarchy-access'],
+            ['python3', '-m', 'unittest', 'discover', '-s', 'validation/result-transport-reliability'],
             ['bash', 'validation/test_blocked_terms_policy.sh'],
             ['bash', 'validation/install/test_install.sh'],
             *[['bash', str(path.relative_to(ROOT))] for path in sorted(

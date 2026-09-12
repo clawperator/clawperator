@@ -28,6 +28,10 @@ export const ERROR_CODES = {
   EXECUTION_ACTION_UNSUPPORTED: "EXECUTION_ACTION_UNSUPPORTED",
   EXECUTION_CONFLICT_IN_FLIGHT: "EXECUTION_CONFLICT_IN_FLIGHT",
   RESULT_ENVELOPE_TIMEOUT: "RESULT_ENVELOPE_TIMEOUT",
+  RESULT_TRANSPORT_SPAWN_FAILED: "RESULT_TRANSPORT_SPAWN_FAILED",
+  RESULT_TRANSPORT_EXITED: "RESULT_TRANSPORT_EXITED",
+  RESULT_TRANSPORT_CANCELLED: "RESULT_TRANSPORT_CANCELLED",
+  RESULT_TRANSPORT_FAILED: "RESULT_TRANSPORT_FAILED",
   RESULT_ENVELOPE_MALFORMED: "RESULT_ENVELOPE_MALFORMED",
   SNAPSHOT_EXTRACTION_FAILED: "SNAPSHOT_EXTRACTION_FAILED",
 
@@ -135,6 +139,7 @@ export interface ClawperatorError {
 export interface TimeoutDiagnostics {
   code: typeof ERROR_CODES.RESULT_ENVELOPE_TIMEOUT;
   message: string;
+  details?: Record<string, unknown>;
   lastCorrelatedEvents?: string[];
   broadcastDispatchStatus?: string;
   deviceId?: string;
@@ -144,6 +149,7 @@ export interface TimeoutDiagnostics {
 export interface BroadcastDiagnostics {
   code: typeof ERROR_CODES.BROADCAST_FAILED | typeof ERROR_CODES.OPERATOR_NOT_INSTALLED;
   message: string;
+  details?: Record<string, unknown>;
   lastCorrelatedEvents?: string[];
   broadcastDispatchStatus?: string;
   deviceId?: string;

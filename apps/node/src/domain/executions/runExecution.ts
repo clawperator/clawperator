@@ -286,6 +286,7 @@ export function getReadinessInvalidationErrorCodes(envelope: ResultEnvelope): st
 }
 
 export interface TimeoutErrorDetails {
+  [key: string]: unknown;
   commandId?: string;
   taskId?: string;
   lastActionId?: string;
@@ -319,6 +320,7 @@ export function buildTimeoutError(
     ...diagnostics,
     ...(hint !== undefined ? { hint } : {}),
     details: {
+      ...diagnostics.details,
       ...(execution.commandId !== undefined ? { commandId: execution.commandId } : {}),
       ...(execution.taskId !== undefined ? { taskId: execution.taskId } : {}),
       ...(lastAction?.id !== undefined ? { lastActionId: lastAction.id } : {}),
@@ -531,6 +533,7 @@ async function performExecution(
         config,
         {
           commandId: execution.commandId,
+          taskId: execution.taskId,
           timeoutMs: options.resultEnvelopeTimeoutMs ?? (execution.timeoutMs + 5000),
           broadcastDelayMs: options.logcatBroadcastDelayMs,
           lastCorrelatedLines: 30,
@@ -694,6 +697,7 @@ async function performExecution(
           config,
           {
             commandId: execution.commandId,
+            taskId: execution.taskId,
             timeoutMs: options.resultEnvelopeTimeoutMs ?? (execution.timeoutMs + 5000), // buffer for envelope write
             broadcastDelayMs: options.logcatBroadcastDelayMs,
             lastCorrelatedLines: 30,
@@ -799,27 +803,12 @@ async function performExecution(
       };
     }
 
-    // Handle failure emission for SSE subscribers relying on the terminal envelope signal.
-    const failureEnvelope: ResultEnvelope = {
-      commandId: execution.commandId,
-      taskId: execution.taskId,
-      status: "failed",
-      stepResults: [],
-      error: "Execution failed during runtime"
-    };
-
     if ("broadcastFailed" in result && result.broadcastFailed && "diagnostics" in result) {
-      failureEnvelope.error = result.diagnostics.code;
-      emitResult(deviceId, failureEnvelope);
       invalidateReadinessCacheForErrorCode(deviceId, config.operatorPackage, result.diagnostics.code);
       return { execution, result: { ok: false, error: { ...result.diagnostics }, deviceId } };
     }
     if ("timeout" in result && result.timeout && "diagnostics" in result) {
       const elapsedMs = Date.now() - dispatchStart;
-      const timeoutHint = buildResultEnvelopeTimeoutHint(result.diagnostics, {
-        deviceId: result.diagnostics.deviceId,
-        operatorPackage: result.diagnostics.operatorPackage,
-      });
       options.logger?.emit({
         ts: new Date().toISOString(),
         level: "error",
@@ -829,11 +818,6 @@ async function performExecution(
         deviceId,
         message: `Timeout waiting for result envelope after ${elapsedMs}ms`,
       });
-      failureEnvelope.error = result.diagnostics.code;
-      if (timeoutHint !== undefined) {
-        failureEnvelope.hint = timeoutHint;
-      }
-      emitResult(deviceId, failureEnvelope);
       invalidateReadinessCacheForErrorCode(deviceId, config.operatorPackage, result.diagnostics.code);
       return {
         execution,
@@ -845,14 +829,15 @@ async function performExecution(
       };
     }
     
-    const errCode = ("code" in result && result.code) ? (result.code as string) : (("error" in result && typeof result.error === "string") ? result.error : "UNKNOWN_RUNTIME_ERROR");
-    failureEnvelope.error = errCode;
-    emitResult(deviceId, failureEnvelope);
+    const errCode = ("code" in result && result.code) ? result.code : ERROR_CODES.RESULT_TRANSPORT_FAILED;
     return {
       execution,
       result: {
         ok: false,
-        error: { code: errCode, message: ("error" in result && typeof result.error === "string") ? result.error : "Unknown error" },
+        error: { code: errCode, message: ("error" in result && typeof result.error === "string") ? result.error : "Unknown transport error",
+          details: { ...("diagnostics" in result ? result.diagnostics : {}),
+            commandId: execution.commandId, taskId: execution.taskId, deviceId,
+            operatorPackage: config.operatorPackage, executionPosition: "unknown" } },
         deviceId,
       },
     };

@@ -35,3 +35,22 @@ private data class ResultEnvelopeChunk(
     val sha256: String,
     val data: String,
 )
+
+/**
+ * Give logd time to drain between records. Android's nonblocking logger can drop
+ * a burst of chunks while its public write API still reports success.
+ * Publication stays synchronous, including when publishing a cancelled command.
+ */
+internal fun publishResultEnvelope(
+    canonicalLine: String,
+    commandId: String,
+    taskId: String,
+    writeLine: (String) -> Unit = { action.log.Log.i(it) },
+    pause: () -> Unit = { android.os.SystemClock.sleep(1) },
+) {
+    val lines = resultEnvelopeLogLines(canonicalLine, commandId, taskId)
+    lines.forEachIndexed { index, line ->
+        if (index > 0) pause()
+        writeLine(line)
+    }
+}

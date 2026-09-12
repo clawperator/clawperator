@@ -68,4 +68,19 @@ class ResultEnvelopeTransportTest {
                 .jsonPrimitive.content,
         )
     }
+    @Test
+    fun `publication spaces large records without replay or reordering`() {
+        val line = "x".repeat(70000)
+        val expected = resultEnvelopeLogLines(line, "command", "task")
+        val events = mutableListOf<String>()
+        publishResultEnvelope(line, "command", "task", { events += it }, { events += "pause" })
+        assertEquals(expected, events.filter { it != "pause" })
+        assertEquals(expected.size - 1, events.count { it == "pause" })
+        events.forEachIndexed { index, event ->
+            if (index % 2 == 1) assertEquals("pause", event)
+        }
+        events.clear()
+        publishResultEnvelope("small", "command", "task", { events += it }, { events += "pause" })
+        assertEquals(listOf("small"), events)
+    }
 }

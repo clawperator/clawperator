@@ -2535,7 +2535,7 @@ describe("buildTimeoutError", () => {
     );
   });
 
-  it("emits the timeout hint on the terminal result envelope", async () => {
+  it("emits the timeout hint on the execution outcome without fabricating an envelope", async () => {
     const runner = new FakeProcessRunner();
     runner.spawn = (() => {
       const proc = new EventEmitter() as EventEmitter & {
@@ -2553,7 +2553,7 @@ describe("buildTimeoutError", () => {
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
-    const resultEvent = once(clawperatorEvents, CLAWPERATOR_EVENT_TYPES.RESULT);
+    const resultEvent = once(clawperatorEvents, CLAWPERATOR_EVENT_TYPES.EXECUTION);
     const result = await runExecution(
       {
         commandId: "cmd-timeout-5",
@@ -2588,8 +2588,8 @@ describe("buildTimeoutError", () => {
       assert.match(String(result.error.hint ?? ""), /No correlated Android log lines were captured/);
     }
     assert.strictEqual(event.deviceId, "device-123");
-    assert.match(event.envelope.hint ?? "", /No correlated Android log lines were captured/);
-    assert.match(event.envelope.hint ?? "", /clawperator doctor --device device-123 --operator-package com\.test\.operator\.dev/);
+    assert.match(event.result.error.hint ?? "", /No correlated Android log lines were captured/);
+    assert.match(event.result.error.hint ?? "", /clawperator doctor --device device-123 --operator-package com\.test\.operator\.dev/);
   });
 
   it("does not emit the timeout hint when correlated log lines were captured", async () => {
@@ -2615,7 +2615,7 @@ describe("buildTimeoutError", () => {
     runner.queueResult({ code: 0, stdout: "package:com.test.operator.dev\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" }); // broadcast
 
-    const resultEvent = once(clawperatorEvents, CLAWPERATOR_EVENT_TYPES.RESULT);
+    const resultEvent = once(clawperatorEvents, CLAWPERATOR_EVENT_TYPES.EXECUTION);
     const result = await runExecution(
       {
         commandId: "cmd-timeout-6",
@@ -2649,7 +2649,7 @@ describe("buildTimeoutError", () => {
       assert.strictEqual(result.error.hint, undefined);
     }
     assert.strictEqual(event.deviceId, "device-123");
-    assert.strictEqual(event.envelope.hint, undefined);
+    assert.strictEqual(event.result.error.hint, undefined);
   });
 
   it("rejects invalid resultEnvelopeTimeoutMs overrides before dispatch", async () => {
@@ -2967,4 +2967,59 @@ describe("runExecution logging", () => {
     assert.strictEqual(isAbsolute(error.details.logPath), true);
     assert.strictEqual((await stat(error.details.logPath)).isFile(), true);
   });
+});
+
+describe("transport failure execution evidence", () => {
+  for (const afterDispatch of [false, true]) {
+    it(`never fabricates a terminal envelope or repeats dispatch (afterDispatch=${afterDispatch})`, async () => {
+      const runner = new FakeProcessRunner();
+      const proc = new EventEmitter() as EventEmitter & { stdout: EventEmitter; stderr: EventEmitter; kill: () => void };
+      Object.assign(proc, { stdout: new EventEmitter(), stderr: new EventEmitter(), kill: () => undefined });
+      runner.spawn = () => proc;
+      let broadcasts = 0;
+      runner.run = async (_command, args) => {
+        if (args.includes("devices")) return { code: 0, stdout: "List of devices attached\ntransport-device\tdevice\n", stderr: "" };
+        if (args.includes("pm")) return { code: 0, stdout: "package:com.test.operator\n", stderr: "" };
+        if (args.some(arg => arg.startsWith("am broadcast "))) {
+          broadcasts++;
+          proc.stderr.emit("data", Buffer.from("reader disconnected"));
+          proc.emit("close", 255, null);
+          return { code: 0, stdout: "Broadcast completed: result=0", stderr: "" };
+        }
+        throw new Error(`Unexpected command ${args.join(" ")}`);
+      };
+      const terminalEvents: unknown[] = [];
+      const onTerminal = (event: unknown) => terminalEvents.push(event);
+      clawperatorEvents.on(CLAWPERATOR_EVENT_TYPES.RESULT, onTerminal);
+      const outcome = once(clawperatorEvents, CLAWPERATOR_EVENT_TYPES.EXECUTION);
+      try {
+        const result = await runExecution({ commandId: "transport-command", taskId: "transport-task", source: "test",
+          expectedFormat: "android-ui-automator", timeoutMs: 1000,
+          actions: [{ id: "back", type: "press_key", params: { key: "BACK" } }] }, {
+          runner, deviceId: "transport-device", operatorPackage: "com.test.operator", logcatBroadcastDelayMs: 0,
+          ensureInteractiveAutomationReadyFn: async () => {
+            if (!afterDispatch) {
+              // Allow the reader's broadcast callback to park at the preflight gate.
+              await new Promise(resolve => setTimeout(resolve, 10));
+              proc.emit("close", 255, null);
+            }
+            return { ok: true, state: { screenOn: true, interactive: true, deviceLocked: false, userUnlocked: true } };
+          },
+        });
+        await new Promise(resolve => setImmediate(resolve));
+        assert.ok(!result.ok);
+        assert.equal(result.error.code, "RESULT_TRANSPORT_EXITED");
+        const details = result.error.details as Record<string, unknown>;
+        assert.equal(details.commandId, "transport-command");
+        assert.equal(details.taskId, "transport-task");
+        assert.equal(details.dispatchAttempted, afterDispatch);
+        assert.equal(details.executionPosition, "unknown");
+        assert.equal(broadcasts, afterDispatch ? 1 : 0);
+        assert.equal(terminalEvents.length, 0);
+        assert.deepStrictEqual((await outcome)[0].result, result);
+      } finally {
+        clawperatorEvents.off(CLAWPERATOR_EVENT_TYPES.RESULT, onTerminal);
+      }
+    });
+  }
 });

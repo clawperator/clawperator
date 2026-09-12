@@ -40,7 +40,7 @@ class AgentCommandExecutorDefault(
         fun publish(canonicalLine: String) {
             if (terminalPublished) return
             terminalPublished = true
-            resultEnvelopeLogLines(canonicalLine, command.commandId, command.taskId).forEach { Log.i(it) }
+            publishResultEnvelope(canonicalLine, command.commandId, command.taskId)
         }
         return try {
             // Timeout intentionally includes queue wait + execution time.
