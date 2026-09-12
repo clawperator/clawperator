@@ -1,24 +1,26 @@
 ---
 name: release-notes-author
-description: Generate and insert release notes into CHANGELOG.md for a version range by gathering git commit data and synthesizing them into user-facing sections grouped by product surface.
+description: Write a CHANGELOG.md release entry from a git range using the repository's classification helpers.
 ---
 
 # Release Notes Author
 
-Use this skill to turn a git tag range into a changelog entry in `CHANGELOG.md`. The deterministic shell scripts make the keep/drop and PR-order decisions. You only author the release notes from the script output.
+Turn a git range into a changelog entry in `CHANGELOG.md`. The deterministic
+helpers own keep/drop and PR ordering; use their output to organize the notes
+and verify unclear behavioral claims against the relevant code.
 
 Run: $release-notes-author v0.5.0 v0.5.1
 
 Use the same invocation shape for any release range. It maps to the gather script below.
 
-1. Run the gather commit script and print the full output before proceeding.
+1. Run the commit gather script and inspect its structured output.
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
 bash .agents/skills/release-notes-author/scripts/gather_commits.sh <start-tag> <end-tag>
 ```
 
-2. Run the PR gather script and print the full output before proceeding.
+2. Run the PR gather script and inspect its structured output.
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -52,7 +54,10 @@ version bumps do not show up as changelog-worthy documentation work.
 
 6. Synthesize `keep` commits into bullets.
 
-Write in past tense and keep the language user-facing. Never copy a commit subject verbatim. Ground every claim in the commit `SUBJECT`, `BODY`, and `FILES` only. Do not inspect diffs.
+Write in past tense and describe the user-facing outcome. Use `SUBJECT`, `BODY`,
+and `FILES` as the starting evidence. Inspect the relevant diff or source when
+those fields leave behavior or breaking-change impact unclear. Keep the helper's
+classification and PR ordering; inspecting code is for factual verification.
 
 Use this category rubric:
 
@@ -63,7 +68,11 @@ Use this category rubric:
 | `Fixed` | A defect, error condition, or incorrect behavior was corrected |
 | `Removed` | A capability was deleted. Always prefix with `**Breaking:**` |
 
-Breaking changes require explicit evidence in the `SUBJECT` or `BODY`, or a deleted `[src]` file that represents a user-facing capability with no replacement in the same commit. Use `**Breaking:** **Removed:**` when a user-facing capability was deleted without replacement. Use `**Breaking:** **Changed:**` when the deletion is part of a rename or replacement. If the deleted source file was purely internal and there is no user-facing change, do not invent a changelog bullet.
+Breaking changes require evidence in commit metadata or the relevant diff that
+a public contract changed incompatibly. A deleted source file alone is not
+proof. Use `**Breaking:** **Removed:**` for a deleted user-facing capability
+without replacement, or `**Breaking:** **Changed:**` for an incompatible rename
+or replacement. Do not invent user-facing changes for purely internal deletions.
 
 Merged commits:
 

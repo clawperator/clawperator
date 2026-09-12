@@ -1,6 +1,6 @@
 ---
 name: release-orchestrator
-description: Orchestrates the full Clawperator release flow from an optional unreleased code-version bump through release creation, release verification, published-version updates, and the next code-version bump. Use when you need to run or resume the complete release workflow end to end and keep prerelease-stage versions in the `0.x.y` series.
+description: Run or resume the complete Clawperator release workflow, including publication and version follow-up.
 ---
 
 # Release Orchestrator
@@ -14,7 +14,8 @@ For now, only accept prerelease-stage versions in the `0.x.y` series. Do not pro
 ## Workflow
 
 1. Establish the target versions.
-   - Confirm the intended release version and the intended next code version before making changes.
+   - Use the release version already specified by the user. Infer the next patch
+     version unless another bump was requested; ask only if the versions remain ambiguous.
    - If the unreleased code version does not already match the intended release version, run `$release-set-code-version-number` first.
    - Treat the release version as the version that will be tagged and published.
    - Treat the next code version as the post-release unreleased version.
@@ -26,7 +27,7 @@ For now, only accept prerelease-stage versions in the `0.x.y` series. Do not pro
    - Run `$release-create` for the intended release version.
    - Pass the exact release commit when needed.
    - Keep the release-create validations intact.
-3. Verify the release.
+4. Verify the release.
    - After the release workflows complete, run `$release-verify` for the same version.
    - Stop if any verification surface fails.
 5. Update published surfaces.

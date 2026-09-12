@@ -1,291 +1,166 @@
 # Repository Guidelines
 
-## Mission
-Clawperator is a deterministic actuator tool for device automation, primarily targeting Android. It acts as the "hand" for an LLM "brain," allowing it to automate device control and perform actions on behalf of a user using a dedicated **"burner" device**.
+Clawperator is the deterministic "hand" for an agent's "brain". Planning and
+app-specific strategy stay in the agent or skills; the Android runtime and Node
+API execute validated actions and return structured evidence.
 
-This setup ensures that any cheap or old Android device can be used as a reliable actuator, regardless of the user's primary phone choice (e.g., iOS).
+## Working Scope and Completion
 
-Core intent:
-- provide a stable Node-based interface for LLM agents
-- execute validated UI actions reliably on a device target (Android)
-- remain a simple and predictable execution substrate for user-on-behalf tasks
+Read the sources relevant to the requested change. Use the routing below when
+needed; there is no required full-repository reading pass.
 
-Clawperator is not an autonomous planner. Agent reasoning stays outside this runtime.
-
-## Operating Model: Brain and Hand
-Clawperator is the "hand" for an LLM "brain":
-1.  **The Brain (Agent):** Interacts with the **Clawperator Node API** to reason about state and decide what to do next.
-2.  **The Hand (Clawperator):** Translates Node API commands into precise device actions (currently Android) and returns structured sensory data (UI snapshots and terminal results).
-
-Design consequence:
-- prioritize deterministic command execution and diagnostics over hidden heuristics
-- avoid embedding app-specific strategy in core runtime paths
+Complete the requested scope through implementation, relevant validation,
+repair of failures caused by the change, documentation, and local commits.
+Continue through those steps without pausing for approval of routine local work.
+Stop when the scope is complete or a missing decision, permission, or external
+dependency blocks it. Report any validation that could not run and what remains
+unproven. Do not expand into unrelated fixes or later PRs.
 
 ## Runtime Contracts
-- The **Clawperator Node API/CLI** is the canonical interface for all agent-driven interactions.
-- Canonical terminal envelope is required: `[Clawperator-Result]`.
-- Node API should remain strict and contract-driven.
-- Per-command correlation IDs (`commandId`, `taskId`) must remain stable end-to-end.
-- When testing or developing Node API/CLI changes in this repo, use the branch-local
-  build from `apps/node/` and its generated artifacts, not the globally installed
-  `clawperator` binary. The global install may lag behind the checked-out branch and
-  silently hide new or renamed commands.
-- Keep operator package and action identifiers consistent with current defaults:
-  - `com.clawperator.operator` (Release)
-  - `com.clawperator.operator.dev` (Local/Debug)
-- For local development, prefer the `.dev` Operator APK and pass
- `--operator-package com.clawperator.operator.dev` unless you are explicitly
-  validating the release variant. This keeps local CLI changes aligned with the
-  debug app that is usually installed on a developer device.
-- **Clawperator is an actuator:** It does not own strategy, planning, or autonomous reasoning. These live in the Agent.
-- Treat optional API strings carefully:
-  - use explicit `undefined` checks when `""` and omitted mean different things
-  - do not use truthy/falsy checks like `value || fallback` on contract fields such as file paths
-  - reject blank strings at validation boundaries when they are not valid values
-- If Node performs a pre-flight or fallback outside the Android runtime, only normalize the result to success when that pre-flight or fallback actually succeeded.
-- CLI parsing changes must preserve both the structured JSON contract and the exit-code contract. Test valid, invalid, and missing-value cases for any new flag.
 
-## Key Docs
-- `docs/setup.md` - Device setup and APK installation
-- `docs/api/overview.md` - API contract and execution model
-- `docs/api/actions.md` - Action types and parameter semantics
-- `docs/api/errors.md` - Error codes and recovery patterns
-- `docs/internal/design/` - Internal design documents
+- The Node API/CLI is the canonical interface for agent-driven device actions.
+  Preserve the `[Clawperator-Result]` envelope and stable `commandId`/`taskId`
+  correlation end to end.
+- Use the branch-local build in `apps/node/` for development and verification,
+  not the global `clawperator` install, which may lag the checkout.
+- Local development defaults to `com.clawperator.operator.dev`; pass
+  `--operator-package com.clawperator.operator.dev`. Use
+  `com.clawperator.operator` for explicit release validation.
+- Keep contracts strict. Distinguish omitted strings from `""` with explicit
+  `undefined` checks; reject blank values where invalid. Avoid truthy fallbacks
+  on contract fields such as file paths.
+- Normalize a Node preflight or fallback to success only when it succeeded.
+- Verify branch claims against code and runtime, not task notes or commit prose.
 
-## How to Verify Against Code
-For every claim in the documentation, there must be a code path that confirms it.
-- CLI command names and flags: read `apps/node/src/cli/registry.ts`
-- Selector flags and behavior: read `apps/node/src/cli/selectorFlags.ts` and `apps/node/src/contracts/selectors.ts`
-- Action types and parameters: read `apps/node/src/contracts/execution.ts`
-- Error codes and meanings: read `apps/node/src/contracts/errors.ts`
-- Result envelope shape: read `apps/node/src/contracts/result.ts`
-- Doctor checks: read `apps/node/src/domain/doctor/checks/`
-- Serve command: read `apps/node/src/cli/commands/serve.ts`
+## Source Routing
 
-Do not write documentation from memory or from existing docs alone. Open the
-code file and write the docs from what you see. If the code contradicts
-existing docs, the code is correct.
+| Work | Source |
+| --- | --- |
+| CLI commands, flags, aliases | `apps/node/src/cli/registry.ts` and command modules |
+| Selectors | `apps/node/src/cli/selectorFlags.ts`, `apps/node/src/contracts/selectors.ts` |
+| Actions, errors, results | `apps/node/src/contracts/execution.ts`, `errors.ts`, `result.ts` |
+| Doctor checks | `apps/node/src/domain/doctor/checks/` |
+| Serve endpoints | `apps/node/src/cli/commands/serve.ts` |
+| Android behavior | `apps/android/` |
+| Device setup | `docs/setup.md` |
+| API design decisions | `docs/internal/design/node-api-design-guiding-principles.md` |
+| Skill and prompt maintenance | `docs/internal/design/agent-instructions.md` |
 
-## Public Sites
-- Clawperator has two public website surfaces with different build systems and purposes:
-  - `sites/landing/` - Next.js static landing site for `https://clawperator.com`
-  - `sites/docs/` - MkDocs documentation site for `https://docs.clawperator.com`
-- Do not confuse the landing site with the docs site when making website changes:
-  - marketing homepage, install entrypoints, and root-level files for `clawperator.com` belong in `sites/landing/`
-  - technical docs content for `docs.clawperator.com` belongs in `docs/` and `apps/node/src/`, and is published through `sites/docs/`
-- Root-level machine-facing files must be updated on the correct surface:
-  - `clawperator.com/robots.txt`, `llms.txt`, `sitemap.xml`, `install.sh` come from `sites/landing/public/`
-  - `docs.clawperator.com/robots.txt` and `llms.txt` come from `sites/docs/static/`
-- Deployment behavior:
-  - both public website surfaces deploy automatically to Cloudflare after changes are merged to `main`
-  - for website-only changes, source/build validation in this repo is usually sufficient before PR
-  - no manual website deployment step is expected unless the automation is broken
-- Build commands:
-  - landing site: `./scripts/site_build.sh`
-  - docs site: `./scripts/docs_build.sh`
+## Documentation and Sites
 
-## Skills
-- Skills are distributed from the public GitHub repository at `https://github.com/clawperator/clawperator-skills`. The canonical source is in the sibling repo `../clawperator-skills`.
-- Typical local layout is sibling repos:
-  - `../clawperator` (this repo)
-  - `../clawperator-skills` (skills repo)
-- Canonical skills documentation is authored in this repo at `docs/skills/`; the skills repo provides runtime/user-facing skill packages.
-- Repo-specific Codex skills live in `.agents/skills/` in this repository.
-- Current project-local skills:
-  - `.agents/skills/docs-build/` - compiles `sites/docs/.build/` from `docs/`, `apps/node/src/`, and `sites/docs/source-map.yaml`
-  - `.agents/skills/docs-author/` - guides authoring and updating documentation content in `docs/`
-- Clawperator runtime and Node API execute plans/actions; skill logic, recipes, and app-specific wrappers live in `../clawperator-skills`.
-- Keep the distinction clear:
-  - `../clawperator-skills` contains runtime/user-facing skills consumed by Clawperator
-  - `.agents/skills/` contains repository-local Codex workflows for maintaining this repo
-- When changing contracts that affect skills (action shapes, envelope fields, CLI behavior), bump skill version, update both repos in lockstep and re-run skills smoke checks.
-- When validating a skill, do not stop at process exit code. Verify the skill's documented inputs, emitted output markers, screenshot/text artifacts, and runtime behavior against the current Clawperator validator and runtime contract.
+Verify changed behavioral claims against their implementation. Document current
+behavior, exact contract values, and observable success/failure conditions.
+Keep authored docs aligned with public API, CLI, setup, and runtime changes in
+the same change. Durable engineering guidance belongs in `docs/internal/design/`.
 
-## Documentation Discipline
+Use `.agents/skills/docs-author/SKILL.md` for authored docs and
+`.agents/skills/docs-build/SKILL.md` for regeneration.
 
-`sites/docs/.build/` is generated staging output produced by the `docs-build`
-skill. Never edit it directly - changes will be overwritten on the next run.
+| Surface | Authored inputs | Build |
+| --- | --- | --- |
+| `clawperator.com` landing site | `sites/landing/`; root machine-facing files and installer in `sites/landing/public/` | `./scripts/site_build.sh` |
+| `docs.clawperator.com` technical docs | `docs/`, code-derived inputs in `apps/node/src/`; root static files in `sites/docs/static/` | `./scripts/docs_build.sh` |
 
-If your diff touches `sites/docs/.build/` before you have updated a canonical
-source file in `docs/` or `apps/node/src/`, stop and fix the source first.
-Generated staging output is an artifact, not an authored surface.
+`sites/docs/.build/` and `sites/docs/site/` are generated. Fix the canonical
+source or generator, then rebuild; do not hand-edit output. Use
+`sites/docs/source-map.yaml` for code-derived pages and markers,
+`sites/docs/ownership.yaml` for generated command detail routing, and
+`sites/docs/mkdocs.yml` for navigation. Commit source and tracked regenerated
+output together. When removing a page, remove its navigation, source-map entries,
+and incoming links, then regenerate.
 
-`sites/docs/site/` is deployable MkDocs build output. Do not hand-edit it either, except as a temporary local build artifact. Source-controlled docs-site root files live in `sites/docs/static/` and are copied into `sites/docs/site/` by `./scripts/docs_build.sh`.
+Both sites deploy to Cloudflare after merge to `main`; website-only changes
+normally need source/build validation, not manual deployment.
 
-Items under `tasks/` should be treated as temporary working notes, not durable documentation. It is fine during iterative development to capture in-progress findings, plans, or draft documentation in `tasks/`, but before opening a PR we typically delete that task entry. By that point, any durable knowledge must have been migrated into its proper long-term home in `docs/` or `apps/node/src/` as appropriate.
+Remove stale guidance after migrating any still-useful content. Keep historical
+material only where release/version management requires it.
 
-Temporary does not mean "only one task pack" or "only multi-PR packs are
-allowed." When multiple distinct pieces of active work exist at the same time,
-it is fine to create separate task packs under `tasks/` even if one of them is
-a small or single-PR effort. Keep separate work separate when that improves
-clarity, ownership, or reviewability. The cleanup rule is about lifecycle, not
-granularity: once a temporary task pack is no longer active and its durable
-guidance has been migrated elsewhere, delete it.
+## Skills and Task Packs
 
-**Exception — multi-phase project files:** When a task file covers a sequenced series of PRs (e.g. PR-1 through PR-7), do not delete completed task entries between phases. Keep them in place, marked `[DONE]`, until the final PR in the project ships. An agent working on a later phase benefits from reading the full history: dependency rationale, implementation choices made in earlier phases, and acceptance criteria that later tasks reference. Delete the whole file only when all phases are complete.
+- Runtime/user-facing skills live in the sibling `../clawperator-skills` repo,
+  published at `https://github.com/clawperator/clawperator-skills`.
+  Their canonical documentation lives here in `docs/skills/`.
+- Repo maintenance skills live in `.agents/skills/`. Keep descriptions narrowly
+  scoped and load conditional references only when needed.
+- For contract changes affecting runtime skills, update both repos in lockstep,
+  bump affected skill versions, and run skills smoke checks.
+- `tasks/` holds temporary handoffs. Separate active tasks may have separate
+  packs, including small tasks. Before retiring a pack, move durable knowledge
+  to docs, skills, or code and preserve actionable follow-up.
+- For a sequence of PRs, retain completed entries marked `[DONE]` until the
+  final PR ships. Delete the pack only once the whole sequence is complete.
 
-Do not rely on `tasks/` as the final home for agent-facing behavior notes, API caveats, validation expectations, or operational guidance. If an agent would need the information after the task folder is deleted, it belongs in the real docs.
+## Validation
 
-If you find an error in a generated page, check `sites/docs/source-map.yaml` to find the generator or marker source, fix it there, then re-run the skill to regenerate. Source locations:
-- Content errors: `docs/`
-- CLI/API reference errors: `apps/node/src/`
+Choose checks for the changed behavior. Documentation or instruction-only edits
+do not require Android installation or unrelated runtime suites.
 
-Commit the source fix and the regenerated output together.
+| Changed surface | Validation |
+| --- | --- |
+| Node API/CLI | `npm --prefix apps/node run build && npm --prefix apps/node run test` |
+| Android | `./gradlew :app:assembleDebug` and `./gradlew :app:testDebugUnitTest` |
+| Device/runtime behavior | Install the matching APK and verify a real scenario on an explicit device |
+| Docs | `./scripts/docs_build.sh` |
+| Landing site | `./scripts/site_build.sh` |
+| Installer | Matching coverage in `validation/install/` and `./validation/install/test_install.sh` |
 
-If a change affects a public API, CLI command, error code, execution contract,
-setup flow, or user-visible runtime behavior, update the relevant authored docs
-in the same change. Then regenerate `sites/docs/.build/` and run
-`./scripts/docs_build.sh` so the public docs stay aligned with the shipped
-behavior.
+Build Node before tests that consume `dist/`; do not run build and test in
+parallel. CLI option regressions must cover valid, invalid, and missing values,
+global/command-local placement where supported, exit codes, and structured JSON.
 
-When docs need regeneration, use the repo docs-build workflow rather than hand-editing generated pages. The project-local skill is `.agents/skills/docs-build/`, and the public docs site build can be validated with `./scripts/docs_build.sh`. For authoring or updating documentation content, use the `docs-author` skill at `.agents/skills/docs-author/`.
+For gestures, accessibility, navigation, screenshots, snapshots, and runtime
+skills, verify the intended result on a physical device or emulator when a
+runnable path exists. A successful process exit alone does not prove the right
+screen, persisted state, output marker, or artifact. Add regression coverage for
+live failures discovered during the change.
 
-Before treating docs changes as valid, run `./scripts/docs_build.sh` and
-confirm it succeeds end to end.
+Relevant device helpers:
 
-Documentation updates should be considered part of the feature or bug-fix work, not optional follow-up. At minimum, agents should update:
-- `docs/` for API shape, contract, error code, result-envelope, setup/install/device-prep, troubleshooting, or other authored public docs changes
-- `docs/internal/design/` when internal design guidance, engineering expectations, or skill-authoring guidance changed in a durable way
+- Debug install: `./gradlew :app:installDebug`; launch the app's actual main activity.
+- Permissions: `./scripts/clawperator_grant_android_permissions.sh`.
+- Ingress: `./scripts/clawperator_validate_operator_ingress.sh`.
+- Smoke: `./scripts/clawperator_smoke_core.sh`, `./scripts/clawperator_smoke_skills.sh`.
+- Opt-in integration: `CLAWPERATOR_RUN_INTEGRATION=1 ./scripts/clawperator_integration_canonical.sh`.
+- Formatting: `./scripts/apply_coding_standards.sh -f`.
 
-Docs must not over-promise behavior. When code, validators, scripts, and docs disagree, fix the implementation or narrow the docs so they accurately describe the current shipped behavior. Do not document aspirational or partially implemented behavior as if it already exists.
+New repo validation harnesses belong in `validation/` and should be wired into
+CI there. Repeat or broaden checks when changes, failures, or unresolved risks
+justify it; successful checks need no ritual rerun.
 
-Delete stale documentation instead of preserving it as historical context unless it is still an active source of truth. Completed task files, superseded roadmaps, and obsolete release checklists should be removed once their remaining actionable content is migrated elsewhere.
+### Device Selection and Measurements
 
-Clawperator is still pre-alpha. Documentation should focus on accurately describing the current behavior and current state of the project, not maintaining development history, previous versions, superseded behavior, or change logs unless a document is explicitly meant for release/version management. Prefer deleting or rewriting stale material over documenting how the system used to work.
+Check `adb devices` or branch-local `devices` before choosing a target.
+Pass `--device <device_serial>` when multiple devices are connected. Prefer a
+physical device for skill testing unless the scenario calls for an emulator;
+both are supported targets.
 
-When removing a source doc, also remove its docs-site references and assembled
-output:
-- `sites/docs/source-map.yaml`
-- `sites/docs/mkdocs.yml`
-- any `sites/docs/.build/` pages that would otherwise become dead links
+For accessibility measurements, verify that the app and input method actually
+emit the events being measured. adb input may differ from human input. If a
+substitute screen is needed, record why, preserve per-event evidence locally,
+and report missing event categories and other measurement limits.
 
-## Required Iteration Loop
-For non-trivial changes, do all steps before commit:
-1. Make focused changes.
-2. Compile Android: `./gradlew :app:assembleDebug`
-3. Run Android unit tests: `./gradlew testDebugUnitTest` (or `./gradlew unitTest`)
-4. Build/test Node API: `npm --prefix apps/node run build && npm --prefix apps/node run test`
-5. Install and launch on device:
-   - `./gradlew :app:installDebug`
-   - `adb shell am start -n <applicationId>/<mainActivity>`
-6. Run smoke/verification scripts relevant to your change.
-7. Commit only after failures are resolved.
+## Privacy and Git
 
-Testing is part of the default definition of done. Agents should assume they are expected to run unit/integration validation for the areas they touched, and when the change affects real device behavior they should also verify on a physical device or emulator when appropriate. Do not rely solely on static inspection for changes involving gestures, accessibility, app navigation, screenshots, snapshots, skills, or device/runtime contracts if a runnable verification path exists.
+Use placeholders such as `<device_serial>`, `<person_name>`, and `<local_user>`
+in committed examples. Do not hardcode private names, device identifiers, or
+machine paths. Do not abbreviate Clawperator to Claw; Claw refers to OpenClaw or
+similar agents. Use regular hyphens rather than em dashes in Markdown.
 
-Tests and smoke scripts should prove the intended behavior, not just exercise code paths. Be alert for false-confidence checks, especially around scrolling, container selection, snapshot extraction, screenshots, and skill wrappers that can succeed while validating the wrong thing.
+Keep `core.hooksPath=.githooks` and do not bypass hooks with `--no-verify`.
+The local terms file is `~/.clawperator/blocked-terms.txt`, with one term per
+non-empty line and `#` comments. `CLAWPERATOR_BLOCKED_TERMS_FILE` overrides
+its location. A missing file permits commits; an unreadable configured file
+blocks them. The hooks scan staged content and the sanitized commit message,
+case-insensitively, matching identifiers or literal phrases as appropriate.
+Verify changes to this policy with `./validation/test_blocked_terms_policy.sh`.
+Before release or force-push events, scan for blocked terms and verify history.
 
-When Node tests execute built `dist/` artifacts, run build before test and avoid parallel build/test runs that could leave tests exercising stale compiled output.
+Create narrow local Conventional Commits when coherent work is validated,
+before returning for review. Prefer incremental commits over rewriting history.
+Keep attribution trailers out of commit messages. Breaking contracts need
+migration notes in the commit and relevant docs.
 
-For CLI option work, add regression coverage for:
-- valid values
-- invalid values
-- missing values
-- global vs command-local placement when both forms exist
-- exit code and structured JSON output
-
-For runtime behavior changes, prefer reproducing a real user-visible scenario on a physical device or emulator before declaring the change safe. If live testing finds a bug, add a focused regression test for that exact failure mode.
-
-### Device Selection
-
-When multiple devices are connected (physical + emulator), be explicit about which device to target:
-
-1. **Check connected devices first:**
-   ```bash
-   clawperator devices
-   # or
-   adb devices
-   ```
-
-2. **Default to physical device when both exist:** If both a physical device and emulator are connected, prefer the physical device for skill testing unless there's a specific reason to use the emulator. This avoids accidentally testing on the wrong target.
-
-3. **Prefer the debug Operator APK for local CLI/API work:** When validating branch-local
-   recording, docs, or command-surface changes, use the `.dev` variant and
-   `--operator-package com.clawperator.operator.dev` unless the change is specifically
-   about the release build. This reduces false negatives caused by a stale release APK
-   or a mismatched global CLI install.
-
-4. **Always use `--device` when multiple devices are connected** (accepted alias: `--device-id`):
-   ```bash
-   clawperator snapshot --device <device_serial>
-   clawperator skills run <skill_id> --device <device_serial>
-   ```
-
-5. **Do not assume device availability:** The presence of `emulator-5554` does not mean a physical device is unavailable. Check `clawperator devices` output and explicitly select the appropriate device for the test scenario.
-
-6. **Both device types are valid production targets:** Emulators with Google Play can be fully configured with user credentials and provide a complete automation environment. Physical devices offer OEM-specific behaviors and hardware sensors. Choose based on the testing scenario, not assumptions about capability.
-
-### Accessibility Instrumentation Notes
-
-- Do not assume adb-driven navigation or text entry reproduces the same accessibility events as real user input. For instrumentation work that depends on `TYPE_VIEW_TEXT_CHANGED`, `TYPE_VIEW_SCROLLED`, back-key delivery, or click timing, verify that the target app and input path actually emit those events before treating the scenario as valid.
-- If the primary target app does not emit the required accessibility events under the available input method, use a substitute app or screen that exercises the same event category and document the substitution and the reason. Valid measurements are better than forcing the nominal app path when the runtime does not expose the needed signals.
-- For AccessibilityService measurement work, log both the per-event samples and the caveats discovered during collection. Missing event categories are a measurement result, not something to silently smooth over.
-
-## Validation Commands
-- From the repo root, the Android Gradle app module tasks are typically invoked as `app:*` tasks such as `./gradlew app:assembleDebug`, `./gradlew app:testDebugUnitTest`, and `./gradlew app:installDebug`. Prefer the working task names already used in this file over guessing deeper module paths from the directory layout.
-- Permissions/bootstrap: `./scripts/clawperator_grant_android_permissions.sh`
-- Operator ingress check: `./scripts/clawperator_validate_operator_ingress.sh`
-- Core smoke: `./scripts/clawperator_smoke_core.sh`
-- Skills smoke: `./scripts/clawperator_smoke_skills.sh`
-- Installer validation suite: `./validation/install/test_install.sh`
-- Canonical integration check (opt-in): `CLAWPERATOR_RUN_INTEGRATION=1 ./scripts/clawperator_integration_canonical.sh`
-- Formatting/quality: `./scripts/apply_coding_standards.sh -f`
-- Repo-specific validation harnesses belong in `validation/` and should be wired into CI there, not added as one-off scripts under `scripts/`.
-- When changing `sites/landing/public/install.sh`, update or add the matching coverage under `validation/install/` in the same change and run `./validation/install/test_install.sh` before treating the work as done.
-
-## Security and Privacy Guardrails
-- Do not hardcode personal names, device identifiers, or local machine paths.
-- Use placeholders in examples:
-  - `<device_id>`, `<device_serial>`, `<person_name>`, `<local_user>`
-- Never shorten `Clawperator` to `Claw` in code, docs, comments, or commit messages. `Claw` is reserved for OpenClaw or OpenClaw-like agents and is not an acceptable shorthand for this project.
-
-### Local Blocked-Term Policy
-
-Use the user-scoped file `~/.clawperator/blocked-terms.txt` to prevent local
-commits from containing private or otherwise prohibited terms. The file accepts
-one term per non-empty line. Lines whose first non-whitespace character is `#`
-are comments.
-
-- The tracked hooks require `core.hooksPath` to be `.githooks`.
-- `.githooks/pre-commit` scans staged content in added, copied, modified, and
-  renamed files.
-- `.githooks/commit-msg` scans the final commit message after attribution
-  trailers are removed.
-- Matching is case-insensitive. Identifier-like terms match complete
-  identifiers; phrases and punctuation-containing terms match literal text.
-- Set `CLAWPERATOR_BLOCKED_TERMS_FILE` only when the terms file must live at a
-  different local path.
-- A missing terms file allows the commit. An unreadable configured path blocks
-  it to avoid an accidental bypass.
-- Do not use `--no-verify`, which bypasses the protection.
-
-Verify the configuration and regression coverage with:
-
-```bash
-git config --get core.hooksPath
-./validation/test_blocked_terms_policy.sh
-```
-
-Before release or force-push events, run a blocked-term scan and verify clean history.
-
-## Coding and Commit Conventions
-- Use Conventional Commits (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`).
-- Keep commits narrow and reviewable.
-- Prefer adding new incremental commits when working in branches rather than amending previous commits. This is easier for users to track at a glance. PRs are ultimately squashed and merged, so incremental commit history is not a negative.
-- Prefer explicit contracts and deterministic behavior over convenience shortcuts.
-- When making breaking contract changes, include migration notes in commit message and docs.
-- Do not add AI attribution lines to commit messages. Never include trailers such as `Co-Authored-By: Claude ...`, `Made With: Cursor`, `Made with Cursor`, or `Generated with Cursor`. Commit messages should contain only project-relevant content.
-- Agents should create commits proactively as work reaches a natural breakpoint, not only at the very end. A natural breakpoint usually means one coherent fix, one verified documentation pass, one validation repair, or one reviewable sub-task. Default to committing progress with a conventional commit message once that unit is working and validated.
-
-When reviewing or extending an existing branch, verify branch claims against the actual code and runtime rather than assuming previous notes, task files, or commit messages are correct.
-
-## Git and Push Discipline
-- **Branch Pushing:** Agents may push to feature branches or any branch that has already been pushed to the remote, but only when the user or the active workflow explicitly calls for a push or remote sync. Do not treat branch pushes as the default. Follow the commit-before-review rule first.
-- **Main Branch Protection:** NEVER push directly to the `main` branch without explicit user permission. Changes should typically be merged into `main` via pull requests using the `pr-autoloop` or `pr-squash-merge` skills.
-- **Commit Before Review:** When an agent finishes a logical unit of work and is waiting for user review or the next instruction, it should create a local commit for that work. Keep those commits narrow, reviewable, and in conventional-commit format. By default, stop after committing and do not push unless the user asks or the active workflow explicitly calls for it.
-- **Worktree Location:** Any agent or tool that creates local worktrees in this repo should use the top-level `/.worktrees/` directory. Do not create new worktrees under `.claude/worktrees/`.
-- **Worktree Naming:** Prefer descriptive, task-shaped names for branches and worktrees, such as `add-snapshot-api-argument` or `fix-node-result-envelope`, instead of opaque autogenerated names. The name should make the purpose of the worktree obvious at a glance.
-
-## Documentation Style
-- **No em dashes:** Never use em dashes (`-`). Use a regular dash or hyphen (`-`) instead for clarity and consistency.
-- Use clean, monospace-friendly formatting for all markdown files.
+Push only when the user or active workflow requests remote sync. Never push
+directly to `main` without explicit permission; use a PR by default. Keep local
+worktrees under the repository's top-level `.worktrees/`, with descriptive
+task-shaped names.

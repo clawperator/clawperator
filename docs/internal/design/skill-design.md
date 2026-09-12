@@ -14,7 +14,7 @@ Skills are the primary artifact for agents and humans.
 
 For the recording-to-skill workflow and the normalization rules that turn a
 raw capture into a reusable skill, see [Skill Authoring from
-Recordings](../skills/authoring.md#recording-driven-workflow-stance).
+Recordings](../../skills/authoring.md#recording-driven-workflow-stance).
 
 Each skill may include:
 - `SKILL.md` (canonical agent-facing interface)
@@ -94,8 +94,9 @@ Do not treat "the dialog accepted the input" as success.
 For state-changing flows, the runtime program should:
 
 - read the current value before editing
-- choose a target value that differs from the current value
-- complete the save path, including any confirmation prompts
+- use the user's requested target; verify an already-satisfied value without
+  changing it merely to exercise the save path
+- complete the save path when a change is needed, including confirmation prompts
 - reopen the persisted screen state
 - read the terminal UI again
 
@@ -103,10 +104,13 @@ This proved especially important for flows where the app returns to an editor
 screen after `Confirm` and requires another save-confirm cycle before the
 change actually persists.
 
-For repeated reliability runs, carry forward the last known persisted value and
-choose a different target on the next run. Repeating the same requested value
-can create a false-confidence no-op that looks green without proving a real
-state change.
+For explicitly authorized reliability runs, carry forward the last known
+persisted value and choose a different target within the permitted test range
+when testing mutations. Repeating the same value proves an already-satisfied
+state, not that a save operation persisted a change.
+
+For prompt scope, conditional references, and completion guidance, see
+[Writing Agent Instructions](../../skills/authoring.md#writing-agent-instructions).
 
 ### Decorative UI Text Must Not Cause False Failures
 

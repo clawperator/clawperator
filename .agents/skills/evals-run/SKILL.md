@@ -1,6 +1,6 @@
 ---
 name: evals-run
-description: Run, debug, replay, and rescore Clawperator evals. Use when working in the `evals/` harness, choosing between `local-dev` and `published` runtime targets, diagnosing `VERSION_INCOMPATIBLE` or other preflight failures, or inspecting eval artifacts and replay output.
+description: Run, replay, rescore, or diagnose Clawperator eval harness runs and their artifacts.
 ---
 
 # Evals Run

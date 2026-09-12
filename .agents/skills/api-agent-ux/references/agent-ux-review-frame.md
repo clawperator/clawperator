@@ -1,9 +1,8 @@
 # Agent UX Review Frame
 
-Compact mid-review lookup. The source design note is mandatory reading before
-using this reference:
-
-`docs/internal/design/node-api-design-guiding-principles.md`
+Use this compact checklist for a focused review. Consult
+`docs/internal/design/node-api-design-guiding-principles.md` when a decision
+needs the fuller design rationale.
 
 ---
 
@@ -11,8 +10,9 @@ using this reference:
 
 The command an agent tries first, based on intuition from Playwright, adb, GitHub
 CLI, or general CLI habits, should work when it maps cleanly to a deterministic
-Clawperator contract. When it does not, change the API - a synonym, a flag alias,
-a teaching error. Better documentation for the existing API is not a fix.
+Clawperator contract. When it does not, consider an alias or a teaching error
+within the requested scope. Report the gap during a review-only task; do not
+silently change runtime behavior.
 
 ---
 

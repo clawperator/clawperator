@@ -1,6 +1,6 @@
 ---
 name: release-update-published-version
-description: Updates public release-facing docs and website artifacts to the newly live Clawperator version, rebuilds outputs, and commits the follow-up change locally.
+description: Update and locally commit public version surfaces after the release is live on npm and GitHub.
 ---
 
 Use this skill only after a release is actually live on npm and GitHub Releases.

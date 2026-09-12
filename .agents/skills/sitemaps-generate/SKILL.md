@@ -1,6 +1,6 @@
 ---
 name: sitemaps-generate
-description: Regenerate Clawperator landing and docs sitemap metadata from per-URL source files using each file's last git commit timestamp, then validate the resulting XML and build integration.
+description: Regenerate Clawperator sitemap metadata from source-file commit timestamps.
 ---
 
 # Sitemaps Generate

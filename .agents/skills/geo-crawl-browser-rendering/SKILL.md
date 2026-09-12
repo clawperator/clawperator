@@ -1,6 +1,6 @@
 ---
 name: geo-crawl-browser-rendering
-description: Use Cloudflare Browser Rendering REST APIs to audit clawperator.com and docs.clawperator.com for GEO and agent-ingestibility, including crawl coverage, markdown extraction quality, link discovery, JS dependency risk, and Cloudflare crawl API anomalies.
+description: Audit Clawperator site crawl coverage and rendered extraction through Cloudflare Browser Rendering.
 ---
 
 # GEO Crawl Browser Rendering

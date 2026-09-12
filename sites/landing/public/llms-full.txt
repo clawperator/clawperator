@@ -11507,6 +11507,39 @@ program. In that shape:
 - the currently supported orchestrated runtime path uses `codex` as the agent CLI
 - some orchestrated harnesses currently run codex with `danger-full-access` so the runtime agent can reach live adb targets, but that is a harness-specific choice rather than a Node runtime guarantee
 
+<a id="writing-agent-instructions"></a>
+## Writing Agent Instructions
+
+Write for a capable agent while preserving Clawperator's exact runtime
+contracts. These are authoring recommendations, not additional validator rules.
+
+- Keep the description short: name the capability and the request that should
+  select it. Avoid broad app or domain keywords that attract unrelated tasks.
+- Put the intended outcome, inputs, essential constraints, completion evidence,
+  and relevant routing in `SKILL.md`.
+- Link substantial mode-specific examples and troubleshooting from supporting
+  references, with a reason to read each. Keep a simple skill self-contained.
+  Before relying on references at runtime, verify the configured agent harness
+  can access them; do not assume links are automatically loaded.
+- Retain exact output frames, input constraints, serialized device commands,
+  and terminal verification rules. Concise instructions do not relax these
+  contracts.
+- Describe checkpoints and meaningful state transitions. Prescribe exact
+  navigation only where app behavior requires it; let an orchestrated agent
+  continue from an already-valid UI state.
+- Keep deterministic replay steps and parsing in their existing executable
+  contracts. Do not replace them with agent guesswork.
+- Preserve the user's requested values and existing authorization. A skill
+  should not broaden the task, select a different target merely for testing,
+  or add repeated approval pauses for already-authorized steps.
+- Define when the goal is complete and when recovery should stop, including
+  runtime budgets and cases where success cannot be verified.
+
+For meaningful instruction changes, try representative requests and check
+observable outcomes, including an already-satisfied target and a recoverable
+intermediate state where relevant. Structural validation alone cannot prove
+that the agent selected the right workflow, stayed in scope, or verified success.
+
 ## `skill.json` Contract
 
 `skill.json` is stricter than `SKILL.md`. Validation compares its parsed fields against the registry entry.
@@ -11693,8 +11726,10 @@ real orchestrated skills.
   crosses multiple app states.
 - When the current UI is already inside the target app flow, continue from the
   current state instead of forcing a full restart path every time.
-- If the flow changes persisted state, choose a target value that is different
-  from the currently observed value so the verification proves a real change.
+- Use the user's requested target value. If it is already set, verify that
+  persisted state and report it accurately. In an explicitly authorized
+  reliability test, choose a different value within the allowed test range
+  when needed to prove a real mutation.
 
 ### What The Harness Should Do
 

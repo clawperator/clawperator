@@ -1,6 +1,6 @@
 ---
 name: release-verify
-description: Verifies a published Clawperator release end to end across git tags, GitHub Actions, GitHub Releases, npm, Cloudflare metadata, immutable artifact URLs, checksums, and the stable APK redirect.
+description: Verify a published Clawperator release across tags, workflows, packages, APKs, and checksums.
 ---
 
 Use this skill after a release tag has already been pushed and the release workflows have had time to finish.
