@@ -32,7 +32,10 @@ evidence remains available.
 The screenshot uses the same targeted ADB capture helper as normal screenshots
 and does not require an application accessibility root or an available Operator.
 Hierarchy capture still requires the selected Operator and preserves its actual
-success or failure. Screenshot bytes must decode as a valid PNG with matching,
+success or failure. Its readiness check is read-only: a sleeping or locked device
+returns a hierarchy failure without wake or Home input. Expiring the device-work
+budget records screenshot cancellation as `COMMAND_TIMEOUT` and retains any
+partial image bytes. Screenshot bytes must decode as a valid PNG with matching,
 positive dimensions. Capture is limited to 64 MiB and decoding to 32 million
 pixels. Empty, corrupt, or incomplete PNGs cannot mark an image complete.
 

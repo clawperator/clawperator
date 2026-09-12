@@ -2,11 +2,16 @@ import type { ProcessRunner, ProcessResult } from "../../adapters/android-bridge
 
 /** One capture owns a deadline and cached device inventory; later work cannot dispatch after it. */
 export class EvidenceBudgetRunner implements ProcessRunner {
+  private readonly deadlineController = new AbortController();
+  get signal(): AbortSignal { return this.deadlineController.signal; }
   private inventory?: ProcessResult;
   private readonly children = new Set<ReturnType<ProcessRunner["spawn"]>>();
   private readonly timer: NodeJS.Timeout;
   constructor(private readonly delegate: ProcessRunner, private readonly deadline: number) {
-    this.timer = setTimeout(() => this.close(), this.remaining());
+    this.timer = setTimeout(() => {
+      this.deadlineController.abort({ code: "COMMAND_TIMEOUT", message: "Evidence capture budget exhausted" });
+      this.close();
+    }, this.remaining());
   }
   remaining(): number { return Math.max(0, Math.floor(this.deadline - performance.now())); }
   private check(): number {

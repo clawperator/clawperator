@@ -14,6 +14,7 @@ import { projectCompactSnapshot } from "../observe/compactSnapshot.js";
 import type { Execution } from "../../contracts/execution.js";
 import type { RunExecutionOptions, RunExecutionResult } from "../executions/runExecution.js";
 import { runExecution } from "../executions/runExecution.js";
+import { probeInteractiveState, isInteractiveAutomationReady, buildDeviceNotInteractiveError } from "../doctor/checks/deviceInteractivity.js";
 import { EvidenceBudgetRunner } from "./budget.js";
 import { collectEvidenceMetadata } from "./metadata.js";
 import type { Logger } from "../../adapters/logger.js";
@@ -147,7 +148,7 @@ export async function captureEvidence(options: EvidenceCaptureOptions, dependenc
     await store("screenshot", "screenshot.png", "image/png", async () => {
       if (remaining() <= 0) throw { code: "COMMAND_TIMEOUT", message: "Screenshot not dispatched: capture budget exhausted" };
       try {
-        const image = await (dependencies.screenshot ?? captureScreenshot)(runtime, { timeoutMs: remaining(), ...screenshotIds });
+        const image = await (dependencies.screenshot ?? captureScreenshot)(runtime, { timeoutMs: remaining(), signal: runner.signal, ...screenshotIds });
         captures.push({ kind: "screenshot", source: "adb_screencap", ...screenshotIds, result: { ok: true, bytes: image.length } });
         return image;
       } catch (error) {
@@ -159,7 +160,14 @@ export async function captureEvidence(options: EvidenceCaptureOptions, dependenc
     await store("hierarchy", "hierarchy.xml", "application/xml", async () => {
       if (remaining() < 1000) throw { code: "COMMAND_TIMEOUT", message: "Hierarchy not dispatched: less than the minimum execution budget remains" };
       const result = await (dependencies.snapshot ?? runExecution)(execution, { deviceId: runtime.deviceId, operatorPackage: runtime.operatorPackage,
-        adbPath: runtime.adbPath, runner, timeoutMs: remaining(), resultEnvelopeTimeoutMs: remaining(), logger: options.logger });
+        adbPath: runtime.adbPath, runner, timeoutMs: remaining(), resultEnvelopeTimeoutMs: remaining(), logger: options.logger,
+        ensureInteractiveAutomationReadyFn: async (config, probeOptions) => {
+          const probe = await (probeOptions?.probeInteractiveStateFn ?? probeInteractiveState)(config);
+          if (!probe.ok) return { ok: false, error: { code: probe.code, message: probe.message } };
+          return isInteractiveAutomationReady(probe.state)
+            ? { ok: true, state: probe.state }
+            : { ok: false, error: buildDeviceNotInteractiveError(probe.state) };
+        } });
       captures.push({ kind: "hierarchy", source: "operator", commandId: execution.commandId, taskId: execution.taskId, result });
       if (!result.ok) throw result.error;
       if (result.envelope.status !== "success") throw { code: result.envelope.errorCode ?? "EVIDENCE_CAPTURE_FAILED", message: result.envelope.error ?? "Hierarchy capture failed" };

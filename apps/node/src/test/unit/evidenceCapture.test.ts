@@ -91,6 +91,58 @@ describe("still evidence capture", () => {
       assert.ok(f.runner.calls.every(args => args[0] === "-s" && args[1] === "test-device"));
     } finally { await f.cleanup(); }
   });
+  for (const state of [
+    { screenOn: false, deviceLocked: false, userUnlocked: true },
+    { screenOn: true, deviceLocked: true, userUnlocked: true },
+    { screenOn: true, deviceLocked: false, userUnlocked: true },
+  ]) {
+    it(`probes hierarchy readiness without input for ${JSON.stringify(state)}`, async () => {
+      const f = await fixture();
+      const snapshot = f.dependencies.snapshot!;
+      f.dependencies.snapshot = async (execution, options) => {
+        assert.ok(options?.ensureInteractiveAutomationReadyFn);
+        const before = f.runner.calls.length;
+        const readiness = await options.ensureInteractiveAutomationReadyFn(f.config, {
+          probeInteractiveStateFn: async () => ({ ok: true, state }),
+        });
+        assert.equal(f.runner.calls.length, before, "readiness must not send wake or Home input");
+        if (!readiness.ok) return { ok: false, error: { ...readiness.error } };
+        return snapshot(execution, options);
+      };
+      try {
+        const result = await captureEvidence({ outputDir: f.outputDir }, f.dependencies);
+        const manifest = await manifestAt(result.manifestPath);
+        assert.equal(manifest.artifacts[0].status, "complete");
+        if (state.screenOn && !state.deviceLocked) assert.equal(result.status, "complete");
+        else {
+          assert.equal(result.status, "partial");
+          assert.equal(manifest.artifacts[1].error?.code, "DEVICE_NOT_INTERACTIVE");
+        }
+      } finally { await f.cleanup(); }
+    });
+  }
+  it("retains partial screenshot bytes and timeout cause when the overall deadline expires", async () => {
+    const f = await fixture();
+    f.runner.spawn = () => {
+      const child = Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), kill: () => {
+        queueMicrotask(() => child.emit("close", null));
+        return true;
+      } });
+      queueMicrotask(() => child.stdout.emit("data", Buffer.from("partial")));
+      return child;
+    };
+    // Keep the helper's own timeout later so only the shared deadline can cancel it.
+    f.dependencies.screenshot = (config, options) => captureScreenshot(config, { ...options, timeoutMs: 5000 });
+    try {
+      const result = await captureEvidence({ outputDir: f.outputDir, timeoutMs: 1000 }, f.dependencies);
+      const manifest = await manifestAt(result.manifestPath);
+      assert.equal(manifest.artifacts[0].error?.code, "COMMAND_TIMEOUT");
+      assert.equal(manifest.artifacts[0].path, "screenshot.partial.png");
+      assert.equal(await fs.readFile(join(f.outputDir, "screenshot.partial.png"), "utf8"), "partial");
+      const captures = JSON.parse(await fs.readFile(join(f.outputDir, "captures.json"), "utf8"));
+      assert.equal(captures[0].result.error.code, "COMMAND_TIMEOUT");
+    } finally { await f.cleanup(); }
+  });
   it("preserves the screenshot and canonical hierarchy failure when no application root exists", async () => {
     const f = await fixture();
     try {
