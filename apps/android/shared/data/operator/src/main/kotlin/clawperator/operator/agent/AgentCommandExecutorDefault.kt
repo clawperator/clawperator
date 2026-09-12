@@ -37,7 +37,7 @@ class AgentCommandExecutorDefault(
 
         val journal = ActionExecutionJournal()
         var terminalPublished = false
-        fun publish(canonicalLine: String) {
+        suspend fun publish(canonicalLine: String) {
             if (terminalPublished) return
             terminalPublished = true
             publishResultEnvelope(canonicalLine, command.commandId, command.taskId)

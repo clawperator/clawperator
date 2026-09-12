@@ -50,11 +50,13 @@ the missing-record evidence; the exact kernel error was not captured.
 
 `publishResultEnvelope` now inserts a 1 ms pause between chunk records. It
 preserves order and publishes each record once, without retrying actions or
-weakening integrity. Small envelopes incur no pause. Synchronous publication
-also preserves cancellation-terminal behavior. This is pacing, not a durable
+weakening integrity. Small envelopes incur no pause. Publication is awaited on
+`Dispatchers.IO` inside `NonCancellable`, so chunk encoding and inter-record delays leave the Android main thread available while
+preserving cancellation-terminal delivery. This is pacing, not a durable
 delivery guarantee. A 69-record result adds 68 requested pauses; actual scheduling
 can take longer. Unit coverage asserts the inter-record pause and exact output
-sequence, including unchanged small-envelope publication.
+sequence, including unchanged small-envelope publication, caller-thread
+responsiveness, and complete publication before or during cancellation.
 
 ## Declared live evidence and limits
 
@@ -113,3 +115,17 @@ No runtime skill contract changed, and no sibling skill migration is required.
 The scoped consumer tests preserve specific failure codes and non-success
 semantics; MCP retains its intentional stderr redaction. This work does not
 claim live daemon/MCP parity across both variants or the full hierarchy gate.
+
+### Background publication follow-up
+
+The main-thread publication fix passed the debug APK build, app unit tests and
+all-module unit tests (449 tests, zero failures or skips). Regression tests
+verify that writes leave the caller thread and that every record is published
+when cancellation occurs before publication or between records.
+
+The updated debug APK was installed on an explicit API-35 emulator with only
+the debug Operator accessibility service enabled. A branch-local execution
+containing 20 full Settings queries returned one successful 641,390-byte CLI
+result; every query contained nonempty, untruncated nodes. This checks live
+chunk reassembly; caller-thread responsiveness and cancellation are covered by
+the controlled unit tests. The release variant was not rerun for this follow-up.

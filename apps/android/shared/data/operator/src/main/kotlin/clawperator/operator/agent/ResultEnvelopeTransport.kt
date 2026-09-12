@@ -1,5 +1,9 @@
 package clawperator.operator.agent
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -39,15 +43,15 @@ private data class ResultEnvelopeChunk(
 /**
  * Give logd time to drain between records. Android's nonblocking logger can drop
  * a burst of chunks while its public write API still reports success.
- * Publication stays synchronous, including when publishing a cancelled command.
+ * Await publication off the caller thread, even when the command is cancelled.
  */
-internal fun publishResultEnvelope(
+internal suspend fun publishResultEnvelope(
     canonicalLine: String,
     commandId: String,
     taskId: String,
     writeLine: (String) -> Unit = { action.log.Log.i(it) },
-    pause: () -> Unit = { android.os.SystemClock.sleep(1) },
-) {
+    pause: suspend () -> Unit = { delay(1) },
+) = withContext(NonCancellable + Dispatchers.IO) {
     val lines = resultEnvelopeLogLines(canonicalLine, commandId, taskId)
     lines.forEachIndexed { index, line ->
         if (index > 0) pause()
