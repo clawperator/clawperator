@@ -40,6 +40,11 @@ per-node sensitivity metadata from hierarchy access.
   unique resource/class match and unchanged bounds, path, and ancestor context.
   Paths alone are never handles or proof of identity. Ambiguity is `unknown`;
   disappearance is `container_lost`. No current path emits `edge_reached`.
+  Hierarchy capture transfers retained Android node handles to the tree without
+  recycling them. On API 32 and earlier, recycling clears their identity fields
+  and allows pool reuse, making unrelated nodes compare equal. Retained handles
+  are garbage collected with the tree; temporary traversal handles are still
+  recycled after use.
   Re-observation searches all visible nodes for the original identity, independently
   of their current scrollable flag. It never substitutes an eligible descendant.
 - A `TaskScrollScope` retains the initial tree and node only within the operation;
