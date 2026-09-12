@@ -1,3 +1,4 @@
+import { cmdOnScreenLog } from "../../../cli/commands/action.js";
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
@@ -621,4 +622,37 @@ describe("tryDaemonExecution", () => {
       formatRunExecutionResultForCli(successResult, { format: "json" }),
     );
   });
+});
+
+
+describe("on-screen-log public mutation proxy", () => {
+  for (const operation of ["set", "clear"] as const) {
+    for (const failureKind of ["before-dispatch", "lost-acknowledgement", "malformed-response"] as const) {
+      it(`${operation}: ${failureKind} never duplicates a dispatched mutation`, async () => {
+        let posts = 0;
+        let directCalls = 0;
+        const result = await cmdOnScreenLog({
+          operation,
+          params: operation === "set" ? { text: "proxy proof" } : undefined,
+          format: "json",
+          deviceId: "device-1",
+          operatorPackage: "com.clawperator.operator.dev",
+          tryDaemonExecutionFn: (payload, options) => tryDaemonExecution(payload, options, {
+            ...makeOwnedDaemonDeps(),
+            httpGetFn: makeAliveGet(),
+            httpPostFn: async () => {
+              posts++;
+              return failureKind === "malformed-response"
+                ? { ok: true, body: "{" }
+                : { ok: false, dispatched: failureKind !== "before-dispatch", error: new Error("lost") };
+            },
+          }),
+          runExecutionFn: async () => { directCalls++; return successResult; },
+        });
+        assert.equal(posts, 1);
+        assert.equal(directCalls, failureKind === "before-dispatch" ? 1 : 0);
+        assert.equal(JSON.parse(result).code, failureKind === "before-dispatch" ? undefined : ERROR_CODES.DAEMON_PROXY_ERROR);
+      });
+    }
+  }
 });

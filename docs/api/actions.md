@@ -648,7 +648,7 @@ Example:
 <a id="action-set-on-screen-log"></a>
 ### `set_on_screen_log`
 
-Use this raw action to show one static, noninteractive diagnostic label owned by the connected Operator accessibility service. It has no flat CLI convenience command. See [On-screen logs](on-screen-logs.md) for lifecycle, capture, and transport details.
+Use this raw action to show one static, noninteractive diagnostic label owned by the connected Operator accessibility service. The CLI convenience command is `on-screen-log set --text <text>`. See [On-screen logs](on-screen-logs.md) for lifecycle, capture, and transport details.
 
 | Field | Valid values | Default / meaning |
 | --- | --- | --- |
@@ -980,7 +980,7 @@ Example:
 | `scroll-until` | `scroll_until` or `scroll_and_click` | `--click` switches to `scroll_and_click` |
 | `scroll-and-click` | `scroll_and_click` | alias that implies click-after |
 
-`set_on_screen_log` and `clear_on_screen_log` deliberately have no flat CLI command. Use them only in a raw `clawperator exec` payload or through an existing generic execute transport.
+`on-screen-log set --text <text>` and `on-screen-log clear` map to `set_on_screen_log` and `clear_on_screen_log`. See [On-screen logs](on-screen-logs.md#cli-commands) for the flags and separate-execution capture sequence. Raw `clawperator exec` and existing generic execute transports remain supported.
 
 ## Result Data You Can Rely On
 

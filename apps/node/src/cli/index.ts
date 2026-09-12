@@ -5,6 +5,7 @@ const require = createRequire(import.meta.url);
 import { createClawperatorLogger } from "../adapters/logger.js";
 import {
   COMMANDS,
+  ON_SCREEN_LOG_FLAGS,
   UsageError,
   didYouMean,
   generateTopLevelHelp,
@@ -62,6 +63,7 @@ function findClosestFlagMatch(flag: string, candidates: Iterable<string>): { mat
 }
 
 const FLAG_VALUE_ARITY = new Map<string, number>([
+  ...Object.keys(ON_SCREEN_LOG_FLAGS).map(flag => [flag, 1] as [string, number]),
   ["--device", 1],
   ["--device-id", 1],
   ["--operator-package", 1],

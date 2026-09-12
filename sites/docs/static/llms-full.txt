@@ -2154,7 +2154,7 @@ Example:
 <a id="action-set-on-screen-log"></a>
 ### `set_on_screen_log`
 
-Use this raw action to show one static, noninteractive diagnostic label owned by the connected Operator accessibility service. It has no flat CLI convenience command. See [On-screen logs](on-screen-logs.md) for lifecycle, capture, and transport details.
+Use this raw action to show one static, noninteractive diagnostic label owned by the connected Operator accessibility service. The CLI convenience command is `on-screen-log set --text <text>`. See [On-screen logs](on-screen-logs.md) for lifecycle, capture, and transport details.
 
 | Field | Valid values | Default / meaning |
 | --- | --- | --- |
@@ -2486,7 +2486,7 @@ Example:
 | `scroll-until` | `scroll_until` or `scroll_and_click` | `--click` switches to `scroll_and_click` |
 | `scroll-and-click` | `scroll_and_click` | alias that implies click-after |
 
-`set_on_screen_log` and `clear_on_screen_log` deliberately have no flat CLI command. Use them only in a raw `clawperator exec` payload or through an existing generic execute transport.
+`on-screen-log set --text <text>` and `on-screen-log clear` map to `set_on_screen_log` and `clear_on_screen_log`. See [On-screen logs](on-screen-logs.md#cli-commands) for the flags and separate-execution capture sequence. Raw `clawperator exec` and existing generic execute transports remain supported.
 
 ## Result Data You Can Rely On
 
@@ -2569,9 +2569,9 @@ attempts to attach a window.
 
 ## Raw Actions
 
-Use canonical lower-case action names in stored execution payloads. There is no
-separate CLI convenience command, HTTP endpoint, or MCP tool for this feature.
-Existing generic execution transports carry the same raw action list.
+Use canonical lower-case action names in stored execution payloads. The CLI
+commands below map to the same actions. There is no separate HTTP endpoint or
+MCP tool; existing generic execution transports carry the same raw action list.
 
 | Canonical action | Exact Node input alias | Purpose | Parameters |
 | --- | --- | --- | --- |
@@ -2624,6 +2624,66 @@ table and validation limits.
   ]
 }
 ```
+
+## CLI Commands
+
+`on-screen-log set` shows or fully replaces the panel. `on-screen-log clear`
+removes it, including when it is already hidden. Both use the canonical action
+validator and the normal mutation execution path.
+
+```bash
+clawperator on-screen-log set --text "FLOW-001: Observe settings" --anchor right --text-align left --top-offset-dp 24 --edge-offset-dp 12 --width-dp 280 --font-size-sp 12 --text-color '#FFFFFFFF' --background-color '#B3000000' --ttl-ms 300000 --device <device_serial>
+clawperator on-screen-log clear --device <device_serial>
+```
+
+| Set flag | Raw field |
+| --- | --- |
+| `--text` (required) | `text` |
+| `--anchor` | `anchor` |
+| `--text-align` | `textAlign` |
+| `--top-offset-dp` | `topOffsetDp` |
+| `--edge-offset-dp` | `edgeOffsetDp` |
+| `--width-dp` | `widthDp` |
+| `--font-size-sp` | `fontSizeSp` |
+| `--text-color` | `textColor` |
+| `--background-color` | `backgroundColor` |
+| `--ttl-ms` | `ttlMs` |
+
+The [raw parameter limits and defaults](actions.md#action-set-on-screen-log)
+apply unchanged. Omitted flags remain omitted until canonical defaults apply;
+zero offsets are preserved. Numeric flags accept a complete integral JSON
+number token, including `12.0` and `1e3`. Blank, hexadecimal, fractional,
+nonfinite, and suffix-bearing tokens such as `12px` are rejected before dispatch.
+Text preserves whitespace and newlines within the API's validation limits.
+
+Clear accepts only common execution/output options. Both commands reject extra
+positional arguments, unknown flags, and missing values. Set also rejects
+repeated panel flags. Syntax errors return structured errors with nonzero status;
+canonical parameter violations return `EXECUTION_VALIDATION_FAILED`.
+
+Common options include `--device`, `--operator-package`, `--timeout`,
+`--output json|pretty`, and `--no-daemon`, before or after the command.
+For local debug builds, pass `--operator-package com.clawperator.operator.dev`.
+JSON is the default and wraps the normal execution result under `envelope`;
+step data uses exactly the string-valued keys below. The host `logs` command
+is unchanged.
+
+Both commands permit direct fallback only when the daemon has not dispatched.
+An uncertain post-dispatch result is never automatically replayed; explicit
+`--no-daemon` runs the same validated payload directly.
+
+For visible capture, await each command separately:
+
+```bash
+clawperator on-screen-log set --text "FLOW-001: Before" --device <device_serial>
+clawperator screenshot --path <absolute_before_png> --device <device_serial>
+clawperator on-screen-log set --text "FLOW-001: After" --anchor right --device <device_serial>
+clawperator screenshot --path <absolute_after_png> --device <device_serial>
+clawperator on-screen-log clear --device <device_serial>
+```
+
+Inspect the images independently. Successful draw acknowledgement does not
+promise that a compositor capture includes that generation.
 
 ## Replacement and Lifetime
 
@@ -3271,6 +3331,7 @@ Use this page as a command index. Detailed behavior, output shapes, and recovery
 | [`press`](#command-press) | Device Interaction | `press <back\|home\|recents> [--device <id>] [--operator-package <pkg>]` | `--key`, `--no-daemon` | [Action: press_key](actions.md#action-press-key) | Press a hardware key on the device |
 | [`back`](#command-back) | Device Interaction | `back [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | [Action: press_key](actions.md#action-press-key) | Press the Android back key |
 | [`close`](#command-close) | Device Interaction | `close <package> [--device <id>] [--operator-package <pkg>]` | `--app`, `--no-daemon` | [Action: close_app](actions.md#action-close-app) | Force-stop an Android application |
+| [`on-screen-log`](#command-on-screen-log) | Device Interaction | - | `--no-daemon` | [On-screen logs](on-screen-logs.md#cli-commands) | Show, replace, or clear a static on-device diagnostic panel |
 | [`sleep`](#command-sleep) | Device Interaction | `sleep <ms> [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | [Action: sleep](actions.md#action-sleep) | Pause execution for a duration |
 | [`scroll`](#command-scroll) | Device Interaction | `scroll <down\|up\|left\|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]` | `--direction`, `--no-daemon` | [Action: scroll](actions.md#action-scroll) | Scroll the screen in a direction |
 | [`scroll-until`](#command-scroll-until) | Device Interaction | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--click`, `--direction`, `--no-daemon` | [Action: scroll_until](actions.md#action-scroll-until) | Scroll until a target element is visible |
@@ -3488,6 +3549,17 @@ Force-stop an Android application
 - Details: [Action: close_app](actions.md#action-close-app)
 - Action links: [`close_app`](actions.md#action-close-app)
 - Command aliases: `close-app`, `close_app`
+
+<a id="command-on-screen-log"></a>
+### `on-screen-log`
+
+Show, replace, or clear a static on-device diagnostic panel
+
+- Group: Device Interaction
+- Syntax: -
+- Primary flags: `--no-daemon`
+- Details: [On-screen logs](on-screen-logs.md#cli-commands)
+- Subcommands: `set`
 
 <a id="command-sleep"></a>
 ### `sleep`
