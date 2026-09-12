@@ -438,3 +438,26 @@ inspect `help` on the actual target. This recipe's read-only capability checks
 were verified on an API 35 emulator. That emulator printed the supported commands
 but returned a nonzero status for `help`; the role-holder read returned zero.
 Role assignment and physical-device behavior are not part of the readiness proof.
+
+## Sensitive hierarchy access
+
+Both v0.10 Operator variants declare `android:isAccessibilityTool="true"`.
+This permits broader access to views Android marks as accessibility-data
+sensitive, including the tested Android 15 Settings Internet screen. Android
+[defines this declaration](https://developer.android.com/reference/android/accessibilityservice/AccessibilityServiceInfo#attr_android:isAccessibilityTool)
+as identifying services used to assist users with disabilities. Clawperator's
+selected distribution is outside Google Play; both development and release
+variants use the same access declaration.
+
+Install the matching APK using `clawperator operator setup --apk <apk_path>`
+with the explicit device and Operator package. Android may briefly disconnect
+the accessibility service during an upgrade. Wait for setup/readiness to succeed
+before issuing UI commands. If the service remains unavailable, re-enable the
+selected Operator in Android accessibility settings and rerun doctor. Do not
+switch packages implicitly. An upgrade on the tested API 35 emulator reconnected
+without a manual re-enable; other Android builds may differ.
+
+Queries and XML expose Android's [per-node sensitivity evidence](api/actions.md#action-query-ui)
+on API 34+. Unknown values remain unknown. Broader access does not guarantee
+universal hierarchy availability and does not change screenshot capture,
+redaction, or logging policy.

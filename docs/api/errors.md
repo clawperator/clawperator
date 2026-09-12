@@ -397,6 +397,10 @@ What this means for agents:
 
 ### Query hierarchy unavailable
 
+Both v0.10 Operator variants request access to Android-marked sensitive
+hierarchies. This does not guarantee that every application exposes a root.
+See [setup](../setup.md#sensitive-hierarchy-access) after an APK upgrade.
+
 `UI_TREE_UNAVAILABLE` is a failed `query_ui` capture, not a successful query with
 zero matches. The envelope and failed step carry the code; completed steps are
 preserved and subsequent actions do not run. Inspect the failed step's serialized

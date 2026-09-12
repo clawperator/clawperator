@@ -33,6 +33,8 @@ data class UiNode(
     val isVisible: Boolean,
     /** Unique resource identifier if available */
     val resourceId: String? = null,
+    /** Android-reported sensitivity; null when unavailable or capture failed. */
+    val accessibilityDataSensitive: Boolean? = null,
     /** Additional hints about the element (e.g., "heading"="true", "checked"="false") */
     val hints: Map<String, String> = emptyMap(),
     /** Child nodes in the hierarchy */

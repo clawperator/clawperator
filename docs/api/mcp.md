@@ -483,7 +483,9 @@ Success includes a parsed `query` object and the original correlated result
 envelope whose `data.query` remains a JSON string. Zero matches succeed. See
 [query_ui](actions.md#action-query-ui) for NodeSummary fields, null state,
 visibility, truncation, the 256 KiB response limit, and observation-local paths.
-The tool does not convert paths into action targets.
+The parsed result preserves per-node `accessibilityDataSensitive`, including
+null and old-APK omission. It does not infer a sensitivity value or private-mode
+verdict. The tool does not convert paths into action targets.
 
 ### `read`
 

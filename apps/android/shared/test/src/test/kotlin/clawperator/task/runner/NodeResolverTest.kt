@@ -26,6 +26,7 @@ class NodeResolverTest {
         label: String = "",
         id: String = "duplicate",
         visible: Boolean = true,
+        sensitivity: Boolean? = null,
         children: List<UiNode> = emptyList(),
         hints: Map<String, String> = emptyMap(),
         bounds: Rect = Rect(10f, 30f, 110f, 130f),
@@ -41,9 +42,30 @@ class NodeResolverTest {
         resourceId = id,
         children = children,
         hints = hints,
+        accessibilityDataSensitive = sensitivity,
     )
 
     private fun resolver(root: UiNode): NodeResolver = NodeResolver(UiTreeFiltererDefault(WindowFrameManagerNoOp).filterOnScreenOnly(UiTree(root)))
+
+    @Test
+    fun `sensitivity remains per node through filtering relationships and limits`() {
+        val root =
+            node(
+                "Root",
+                sensitivity = true,
+                children = listOf(node(sensitivity = false), node(sensitivity = null), node(sensitivity = true, visible = false)),
+            )
+        val resolver = resolver(root)
+        val all = Json.parseToJsonElement(resolver.query(null, "all")).jsonObject
+        assertEquals(1, all.getValue("schemaVersion").jsonPrimitive.int)
+        assertEquals(
+            listOf("true", "false", "null", "true"),
+            all.getValue("nodes").jsonArray.map { it.jsonObject.getValue("accessibilityDataSensitive").toString() },
+        )
+        val filtered = Json.parseToJsonElement(resolver.query(NodeMatcher(ancestor = NodePredicate(textEquals = "Root")), limit = 1)).jsonObject
+        assertEquals(2, filtered.getValue("totalMatches").jsonPrimitive.int)
+        assertEquals("false", filtered.getValue("nodes").jsonArray.single().jsonObject.getValue("accessibilityDataSensitive").toString())
+    }
 
     @Test
     fun `blank controls count and false differs from unknown with stable raw paths`() {
@@ -166,14 +188,14 @@ class NodeResolverTest {
 
     @Test
     fun `unavailable platform state remains null`() {
-        val result = Json.parseToJsonElement(resolver(node(hints = mapOf("stateUnavailable" to "true"))).query(null)).jsonObject
+        val result = Json.parseToJsonElement(resolver(node(sensitivity = true, hints = mapOf("stateUnavailable" to "true"))).query(null)).jsonObject
         val node =
             result
                 .getValue("nodes")
                 .jsonArray
                 .single()
                 .jsonObject
-        for (field in listOf("visibleToUser", "enabled", "clickable", "checked", "checkable", "selected", "scrollable")) {
+        for (field in listOf("visibleToUser", "enabled", "clickable", "checked", "checkable", "selected", "scrollable", "accessibilityDataSensitive")) {
             assertEquals(JsonNull, node[field], field)
         }
     }

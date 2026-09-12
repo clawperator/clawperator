@@ -99,6 +99,7 @@ class NodeResolver(
                     checkable = node.hints["checkable"]?.toBooleanStrictOrNull(),
                     checked = node.hints["checked"]?.toBooleanStrictOrNull(),
                     selected = node.hints["selected"]?.toBooleanStrictOrNull(),
+                    accessibilityDataSensitive = node.accessibilityDataSensitive.takeIf { stateAvailable },
                     scrollable = node.hints["scrollable"]?.toBooleanStrictOrNull(),
                 )
             }
@@ -161,6 +162,7 @@ data class NodeSummary(
     val checked: Boolean?,
     val selected: Boolean?,
     val scrollable: Boolean?,
+    val accessibilityDataSensitive: Boolean?,
 )
 
 @Serializable

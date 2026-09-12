@@ -175,7 +175,8 @@ string with this shape:
     "checkable": true,
     "checked": false,
     "selected": false,
-    "scrollable": false
+    "scrollable": false,
+    "accessibilityDataSensitive": false
   }]
 }
 ```
@@ -185,6 +186,21 @@ string with this shape:
 nodes. Unavailable state stays `null`, distinct from `false`. `clickable` reports
 the platform node's clickability when captured, rather than inherited ancestor
 clickability used by legacy action dispatch.
+
+`accessibilityDataSensitive` is Android's per-node accessibility-data flag,
+read at capture time on API 34+. `true` means Android reports sensitive data;
+`false` means it reports non-sensitive data; `null` means the API is unavailable,
+the node is a fallback, or the read failed. New APKs emit the field even when null.
+Older APKs may omit it within `schemaVersion: 1`; treat omission as unknown,
+never false. A filtered query only reports its returned nodes, so use an
+unfiltered query to inspect root sensitivity.
+
+Raw XML emits `accessibility-data-sensitive="true"` or `"false"` when known,
+and omits the attribute when unknown. XML and queries capture independently;
+compare stable fixture nodes, not observation paths. Sensitivity does not change
+matching, success, redaction, or export behavior. It does not establish private
+browsing, screenshot protection, password status, or whether content is safe to
+share. Verify browser-mode indicators and behavior separately.
 
 Nodes are in preorder. Paths use child indices in the captured `UiNode` tree,
 rooted at `"0"`, and retain their original indices across visibility filtering.
