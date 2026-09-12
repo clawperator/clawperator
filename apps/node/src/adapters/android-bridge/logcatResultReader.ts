@@ -149,6 +149,8 @@ export async function waitForResultEnvelope(
     const decoder = new StringDecoder("utf8");
     const transport = new ResultEnvelopeTransport(commandId);
     let settled = false;
+    let processExited = false;
+    const dispatchAfterReaderExitError = new Error("Result reader stopped before broadcast dispatch");
     let stderrBuffer = "";
     let timeoutId: NodeJS.Timeout | undefined;
     let broadcastStartTimer: NodeJS.Timeout | undefined;
@@ -259,7 +261,7 @@ export async function waitForResultEnvelope(
 
     const beginDispatchCapture = () => {
       // A deferred preflight callback must never dispatch after its reader has died.
-      if (settled) throw new Error("Result reader settled before broadcast dispatch");
+      if (settled || processExited) throw dispatchAfterReaderExitError;
       if (dispatchCaptureStarted) {
         return;
       }
@@ -270,7 +272,7 @@ export async function waitForResultEnvelope(
     };
 
     const startBroadcast = () => {
-      if (settled || broadcastStarted) {
+      if (settled || processExited || broadcastStarted) {
         return;
       }
       broadcastStarted = true;
@@ -308,7 +310,8 @@ export async function waitForResultEnvelope(
             beginDispatchCapture();
           }
         } catch (e) {
-          if (settled) return;
+          // The close handler owns the exit failure and drains remaining diagnostics.
+          if (settled || e === dispatchAfterReaderExitError) return;
           const err = String(e).trim();
           broadcastStatus = `error: ${err}`;
           const diagnostics: BroadcastDiagnostics = {
@@ -442,6 +445,12 @@ export async function waitForResultEnvelope(
         finalize({ ok: false, code: ERROR_CODES.RESULT_TRANSPORT_SPAWN_FAILED, error: `logcat spawn failed: ${error.message}`,
           diagnostics: { processErrorCode: error.code, originalMessage: error.message } });
       }
+    });
+
+    proc.on("exit", () => {
+      // Exit precedes close when output pipes still have buffered data or other
+      // writers. Block new dispatch now, but keep draining an accepted result.
+      processExited = true;
     });
 
     proc.on("close", (code: number | null, signal: string | null) => {

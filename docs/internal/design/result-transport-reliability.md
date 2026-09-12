@@ -174,3 +174,59 @@ preserves all final cases, earlier failures, setup observations, source and APK
 hashes. This resolves the local combined-harness gap described above. The manual
 supported-image CI release gate and historical causal limits remain explicit;
 a finite series does not prove failure-free transport under every condition.
+
+## PR-2 recurring reader exit investigation
+
+The independent audit at `6367227a` retained a debug Internet parity query with
+`RESULT_TRANSPORT_EXITED`, exit 255, empty stderr, a sent broadcast and a
+correlated Android command-start event, but no received chunks. Its later fixed
+series passed 60/60 commands on each variant. Both observations remain valid;
+the passing series does not close the causal reliability gate.
+
+PR-2 starts from main at `8d398706`, including PR-1 and the integrated hierarchy
+setup repairs. Inspection separates these mechanisms:
+
+- `NodeProcessRunner.spawn` has no generic process timeout. Reader timeout and
+  cancellation settle before killing their child, preserving their specific
+  code. The result reader does not restart or redispatch an accepted execution.
+- Framing uses a UTF-8 decoder and drains a final unterminated line at close.
+  Chunk validation still enforces order, identity, size, canonical base64 and
+  checksum. Android still publishes once with the existing background pacing.
+- The [ADB shell client](https://android.googlesource.com/platform/packages/modules/adb/+/7c2fd99d6ec7e0d2d977ba03cecc82375af1baad/client/commandline.cpp)
+  initializes its shell-protocol result to 255 for unexpected disconnection and
+  replaces it when a remote exit packet arrives. Thus host exit 255 does not
+  establish that Android logcat itself returned 255. Missing shell completion
+  is a source-supported hypothesis, not a captured explanation of this audit.
+- [Android logcat](https://android.googlesource.com/platform/system/logging/+/refs/heads/android15-s1-release/logcat/logcat.cpp)
+  reports read/EOF failures with stderr diagnostics. Empty stderr alone cannot
+  distinguish an ADB connection interruption from device-side termination or
+  lost diagnostics. There is no evidence here to blame accessibility or change
+  publication pacing, buffer sizes, transport integrity or timeouts.
+
+### Repaired exit-to-close dispatch race
+
+[Node process lifecycle](https://nodejs.org/api/child_process.html#event-close)
+allows `exit` before output-pipe `close`, including when another process retains
+an inherited pipe. A real controlled subprocess exited 255 at about 33 ms and
+closed its pipes at about 363 ms. Two deterministic regressions failed against
+the original reader: a deferred preflight dispatched in this interval, and the
+startup timer could start a new broadcast after exit.
+
+The reader now marks process death on `exit`. Both broadcast startup and the
+dispatch boundary refuse new work from that point. It still drains pipes until
+`close`, so late stderr, a complete already dispatched terminal result, and
+specific integrity errors retain their authority. A rejected deferred callback
+does not replace the reader's exit failure with `BROADCAST_FAILED`. Controlled
+real-process and event-order tests cover the race; execution/SSE coverage checks
+zero dispatch, correlation and no invented terminal envelope.
+
+This is a demonstrated dispatch-safety repair. It does **not** explain the
+audit's already observed Android command start or prevent an external reader
+connection from exiting. That recurring cause remains unresolved unless a new
+failure captures its process/protocol context.
+
+The manual fixed-series harness also stops after any failed `open`, preserving
+remaining attempts as unrun. Previously the next cycle could issue the same
+mutation despite an uncertain outcome. Read-only query failures remain recorded
+and are never replaced with successful retries. Offline tests cover both paths;
+`summary.json` records failures, unrun counts and independent-reader exit state.

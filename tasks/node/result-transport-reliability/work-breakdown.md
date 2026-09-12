@@ -65,7 +65,7 @@ capture, followed by two successful 68-node captures with the switch. No retry
 was made; preserve this failure and the manual CI gate. See durable evidence.
 
 
-## Subsequent combined acceptance
+## Earlier combined acceptance (before the independent PR #285 audit)
 
 Merged R11/R12/R13 plus harness fixes through `306b38d` passed all six
 fresh/subpage/search full hierarchy runs across debug/release, and a new fixed
@@ -73,7 +73,15 @@ fresh/subpage/search full hierarchy runs across debug/release, and a new fixed
 was changed beyond merged `0c4ed5ce`. The readiness and stale-binding setup
 repairs, the earlier interrupted release series, and exact build identity are
 preserved in the [acceptance record](../../../validation/sensitive-hierarchy-access/README.md#integrated-r11r12r13-acceptance).
-The local combined-proof gap is closed. Remaining follow-up is the manual
-supported-image release CI gate and the already documented historical causal
-limits; neither authorizes replaying failed mutations or claiming zero failures
+At that revision the local combined-proof gap was closed. The later PR-2
+recurrence below reopens causal follow-up in addition to the manual
+supported-image release CI gate; neither authorizes replaying failed mutations or claiming zero failures
 under all conditions. R12's completed pack is retired.
+
+## PR-2: diagnose the recurring reader exit
+
+Status: dispatch-safety repairs implemented with regression coverage; bounded live verification in progress. The recurring causal reliability gate remains open. The independent `6367227a` audit reproduced exit 255 during an Internet parity query after confirmed command start, with zero received chunks. Stable public diagnostics passed; causal reliability remains unresolved. The later declared debug/release transport series passed 120/120 commands and must be retained alongside the failure.
+
+Reproduce with the checked-in hierarchy fixture and independent bounded stream/process diagnostics on the same build. Inspect logcat process lifecycle, reader startup/teardown, host cancellation and device logging separately; make only evidence-supported repairs. Capture raw failure context privately and add deterministic tests for the reproduced cause. Preserve existing codes, command IDs, strict chunk integrity and no-replay semantics. Run the original PR's relevant checks and a declared finite series plus the complete hierarchy fixture on both variants. Report unreproduced causes or remaining failures explicitly; a retry-to-green is not completion. Update durable causal findings and release status, then commit the validated scope locally.
+
+R14 is independent. Do not turn this follow-up into media implementation or automatic emulator CI; the supported-image release workflow remains manual.

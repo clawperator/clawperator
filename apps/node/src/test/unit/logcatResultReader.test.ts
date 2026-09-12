@@ -137,3 +137,90 @@ it("retains bounded stderr and rejected chunk evidence without replay", async ()
   assert.match(result.error, /expectedIndex=0, receivedIndex=1/);
   assert.equal(dispatches, 1);
 });
+
+it("blocks deferred dispatch between process exit and pipe close while retaining late diagnostics", async () => {
+  const f = fake();
+  let dispatches = 0;
+  const result = await waitForResultEnvelope(f.runtime, options, async begin => {
+    f.proc.emit("exit", 255, null);
+    // Node can report exit before inherited stdout/stderr pipes close.
+    setImmediate(() => {
+      f.stderr.write("late reader diagnostic");
+      f.proc.emit("close", 255, null);
+    });
+    begin();
+    dispatches++;
+    return { success: true };
+  });
+  assert.ok(!result.ok && "error" in result);
+  assert.equal(result.code, "RESULT_TRANSPORT_EXITED");
+  assert.equal(result.diagnostics?.dispatchAttempted, false);
+  assert.equal(result.diagnostics?.stderr, "late reader diagnostic");
+  assert.equal(dispatches, 0);
+});
+
+it("does not start a broadcast when the process exits before its pipes close", async () => {
+  const f = fake();
+  let dispatches = 0;
+  const waiting = waitForResultEnvelope(f.runtime, options, async begin => {
+    begin(); dispatches++; return { success: true };
+  });
+  f.proc.emit("exit", 255, null);
+  await new Promise(resolve => setTimeout(resolve, 20));
+  f.proc.emit("close", 255, null);
+  const result = await waiting;
+  assert.ok(!result.ok && "error" in result);
+  assert.equal(result.code, "RESULT_TRANSPORT_EXITED");
+  assert.equal(dispatches, 0);
+});
+
+it("accepts an already dispatched complete result drained after exit", async () => {
+  const f = fake();
+  const result = await waitForResultEnvelope(f.runtime, options, async begin => {
+    begin();
+    f.proc.emit("exit", 255, null);
+    f.stdout.write(terminal);
+    f.proc.emit("close", 255, null);
+    return { success: true };
+  });
+  assert.ok(result.ok);
+});
+
+it("blocks dispatch after a real subprocess exits while inherited pipes remain open", async () => {
+  const runtime = config();
+  let exited!: Promise<void>;
+  runtime.runner = { ...runtime.runner, spawn: () => {
+    const child = spawn(process.execPath, ["-e", `
+      require('node:child_process').spawn(process.execPath,
+        ['-e', 'setTimeout(() => process.stderr.write("late diagnostic"), 100)'],
+        { stdio: ['ignore', 1, 2] });
+      process.exit(255);
+    `]);
+    exited = new Promise(resolve => child.once("exit", () => resolve()));
+    return child;
+  } };
+  let dispatches = 0;
+  const result = await waitForResultEnvelope(runtime, options, async begin => {
+    await exited;
+    begin(); dispatches++;
+    return { success: true };
+  });
+  assert.ok(!result.ok && "error" in result);
+  assert.equal(result.code, "RESULT_TRANSPORT_EXITED");
+  assert.equal(result.diagnostics?.exitCode, 255);
+  assert.equal(result.diagnostics?.dispatchAttempted, false);
+  assert.equal(result.diagnostics?.stderr, "late diagnostic");
+  assert.equal(dispatches, 0);
+});
+
+it("preserves an independent broadcast error while exited pipes are draining", async () => {
+  const f = fake();
+  const result = await waitForResultEnvelope(f.runtime, options, async begin => {
+    begin();
+    f.proc.emit("exit", 255, null);
+    throw new Error("broadcast connection failed");
+  });
+  assert.ok(!result.ok && "broadcastFailed" in result);
+  assert.equal(result.diagnostics.code, "BROADCAST_FAILED");
+  assert.match(result.diagnostics.message, /broadcast connection failed/);
+});

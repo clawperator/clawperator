@@ -6556,7 +6556,9 @@ They do not prove that an accepted action failed or that replay is safe.
 `broadcastDispatchStatus`, `dispatchAttempted`, and `executionPosition: "unknown"`.
 `dispatchAttempted: true` means the dispatch boundary was entered, not that
 Android acknowledged or completed the action. A reader that dies during
-preflight prevents the deferred broadcast from dispatching.
+preflight prevents the deferred broadcast from dispatching, including the interval
+between process exit and output-pipe closure. Already dispatched output is drained
+before classifying closure; a complete validated result remains authoritative.
 
 Process failures include `exitCode` and `signal` when known, or
 `processErrorCode` and `originalMessage` for spawn errors. Diagnostics retain a

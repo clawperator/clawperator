@@ -2970,8 +2970,9 @@ describe("runExecution logging", () => {
 });
 
 describe("transport failure execution evidence", () => {
-  for (const afterDispatch of [false, true]) {
-    it(`never fabricates a terminal envelope or repeats dispatch (afterDispatch=${afterDispatch})`, async () => {
+  for (const phase of ["before-dispatch-close", "before-dispatch-exit", "after-dispatch"]) {
+    const afterDispatch = phase === "after-dispatch";
+    it(`never fabricates a terminal envelope or repeats dispatch (${phase})`, async () => {
       const runner = new FakeProcessRunner();
       const proc = new EventEmitter() as EventEmitter & { stdout: EventEmitter; stderr: EventEmitter; kill: () => void };
       Object.assign(proc, { stdout: new EventEmitter(), stderr: new EventEmitter(), kill: () => undefined });
@@ -3001,7 +3002,12 @@ describe("transport failure execution evidence", () => {
             if (!afterDispatch) {
               // Allow the reader's broadcast callback to park at the preflight gate.
               await new Promise(resolve => setTimeout(resolve, 10));
-              proc.emit("close", 255, null);
+              if (phase === "before-dispatch-exit") {
+                proc.emit("exit", 255, null);
+                setImmediate(() => proc.emit("close", 255, null));
+              } else {
+                proc.emit("close", 255, null);
+              }
             }
             return { ok: true, state: { screenOn: true, interactive: true, deviceLocked: false, userUnlocked: true } };
           },

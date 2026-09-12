@@ -31,6 +31,18 @@ def inspect_result(value, full_query=False, internet=False):
     return envelope
 
 
+def run_declared_series(command, prepare_internet):
+    for cycle in range(20):
+        # Repeating open after a failed dispatch can replay an uncertain mutation.
+        # Leave the remaining declared attempts unrun instead.
+        if not command(f'cycle-{cycle + 1}-open', 'open', 'com.android.settings'):
+            return
+        command(f'cycle-{cycle + 1}-query', 'query', '--visibility', 'all', '--limit', '1000', full_query=True)
+    prepare_internet()
+    for attempt in range(20):
+        command(f'internet-{attempt + 1}', 'query', '--visibility', 'all', '--limit', '1000', full_query=True, internet=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--device', required=True)
@@ -82,7 +94,8 @@ def main():
         (args.out / (stem + '.stderr')).write_bytes(proc.stderr)
         (args.out / (stem + '.logcat')).write_text(''.join(list(recent)))
         entry = {'label': label, 'elapsedMs': round((time.monotonic() - start) * 1000),
-                 'exitCode': proc.returncode, 'outputBytes': len(proc.stdout), 'success': False}
+                 'exitCode': proc.returncode, 'outputBytes': len(proc.stdout), 'success': False,
+                 'invocation': invocation}
         try:
             value = json.loads(proc.stdout)
             identity = value.get('envelope', value.get('details', {}))
@@ -97,16 +110,18 @@ def main():
         print(json.dumps(entry), flush=True)
         return entry['success']
     try:
-        for cycle in range(20):
-            command(f'cycle-{cycle + 1}-open', 'open', 'com.android.settings')
-            command(f'cycle-{cycle + 1}-query', 'query', '--visibility', 'all', '--limit', '1000', full_query=True)
-        # Explicit generic Settings intent avoids depending on R11/R12 homepage scrolling.
-        preparation = shell('am', 'start', '-a', 'android.settings.WIFI_SETTINGS')
-        (args.out / 'internet-preparation.txt').write_text(preparation)
-        time.sleep(2)
-        for attempt in range(20):
-            command(f'internet-{attempt + 1}', 'query', '--visibility', 'all', '--limit', '1000', full_query=True, internet=True)
+        def prepare_internet():
+            preparation = shell('am', 'start', '-a', 'android.settings.WIFI_SETTINGS')
+            (args.out / 'internet-preparation.txt').write_text(preparation)
+            time.sleep(2)
+        run_declared_series(command, prepare_internet)
     finally:
+        (args.out / 'summary.json').write_text(json.dumps({
+            'declaredAttempts': 60, 'completedAttempts': len(attempts),
+            'failedAttempts': sum(not entry['success'] for entry in attempts),
+            'unrunAttempts': 60 - len(attempts),
+            'independentReaderExitBeforeCleanup': logcat.poll(),
+        }, indent=2))
         logcat.terminate()
         logcat.wait(timeout=5)
         thread.join(timeout=5)

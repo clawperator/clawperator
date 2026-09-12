@@ -26,3 +26,27 @@ class ResultChecks(unittest.TestCase):
             value['envelope']['stepResults'][0]['data']['query'] = json.dumps(query)
             with self.assertRaises(AssertionError):
                 module.inspect_result(value, True, True)
+
+
+class SeriesChecks(unittest.TestCase):
+    def test_stops_after_failed_open_without_replaying_uncertain_mutation(self):
+        calls = []
+        prepared = []
+        def command(label, *args, **kwargs):
+            calls.append(label)
+            return label != 'cycle-2-open'
+        module.run_declared_series(command, lambda: prepared.append(True))
+        self.assertEqual(calls, ['cycle-1-open', 'cycle-1-query', 'cycle-2-open'])
+        self.assertEqual(prepared, [])
+
+    def test_retains_failed_read_and_completes_fixed_unique_attempts(self):
+        calls = []
+        prepared = []
+        def command(label, *args, **kwargs):
+            calls.append(label)
+            return label != 'cycle-1-query'
+        module.run_declared_series(command, lambda: prepared.append(True))
+        self.assertEqual(len(calls), 60)
+        self.assertEqual(len(set(calls)), 60)
+        self.assertEqual(prepared, [True])
+        self.assertEqual(calls[-1], 'internet-20')
