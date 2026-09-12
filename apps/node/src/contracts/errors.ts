@@ -11,10 +11,16 @@ export const ERROR_CODES = {
   COMMAND_TIMEOUT: "COMMAND_TIMEOUT",
   COMMAND_CANCELLED: "COMMAND_CANCELLED",
   CONTAINER_LOST: "CONTAINER_LOST",
-  /** Still bundle could not be fully captured or persisted; inspect the retained manifest when available. */
+  /** Evidence could not be fully captured or persisted; inspect the retained manifest when available. */
   EVIDENCE_CAPTURE_FAILED: "EVIDENCE_CAPTURE_FAILED",
   /** Choose a new evidence output directory; existing destinations are never overwritten. */
   EVIDENCE_OUTPUT_EXISTS: "EVIDENCE_OUTPUT_EXISTS",
+  /** The requested video session is unknown or invalid. */
+  EVIDENCE_SESSION_NOT_FOUND: "EVIDENCE_SESSION_NOT_FOUND",
+  /** Another video session owns the selected device lock. */
+  EVIDENCE_RECORDING_ACTIVE: "EVIDENCE_RECORDING_ACTIVE",
+  /** Verify recorder ownership and retained files before manual lock recovery. */
+  EVIDENCE_RECOVERY_REQUIRED: "EVIDENCE_RECOVERY_REQUIRED",
   // Host
   HOST_DEPENDENCY_MISSING: "HOST_DEPENDENCY_MISSING",
 
