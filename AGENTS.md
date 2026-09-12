@@ -87,8 +87,11 @@ material only where release/version management requires it.
 - `tasks/` holds temporary handoffs. Separate active tasks may have separate
   packs, including small tasks. Before retiring a pack, move durable knowledge
   to docs, skills, or code and preserve actionable follow-up.
-- For a sequence of PRs, retain completed entries marked `[DONE]` until the
-  final PR ships. Delete the pack only once the whole sequence is complete.
+- Task cleanup can run on an implementation branch once its work is complete
+  and validated; it does not require a PR, merge, or release. For a sequence of
+  PRs, retain concise `[DONE]` entries and actionable unfinished phases. Delete
+  the pack once all planned work is complete, including before the final PR
+  merges. Cleanup does not assert a merge or satisfy a merged-code prerequisite.
 
 ## Validation
 

@@ -8,8 +8,17 @@ description: Retire a completed task pack after preserving durable knowledge, fo
 Close out the requested task pack without losing information needed after
 `tasks/` is deleted. Infer the path from context; ask if it remains ambiguous.
 
-Do not retire a multi-PR pack until its final PR has shipped. Completed earlier
-phases stay marked `[DONE]` while the sequence is active.
+Cleanup can run on an implementation branch once the requested work is complete
+and validated. It does not require an open PR, merge, release, or additional
+permission to treat completed work as ready for cleanup. Include cleanup in the
+same PR as the implementation when practical.
+
+For a multi-PR pack, retire completed phases' obsolete instructions and preserve
+a concise `[DONE]` record, durable knowledge, and acceptance evidence. Keep the
+unfinished phases and their prerequisites actionable. Delete the whole pack once
+all planned work is complete and the conditions below hold, including on the
+final implementation branch before merge. Do not claim an actual merge or clear
+a dependency that requires merged code merely because cleanup has run.
 
 ## Before Deletion
 
@@ -63,6 +72,8 @@ another approval checkpoint. Verify the target resolves inside `tasks/`;
 reject `tasks/` itself, absolute paths, `..`, and symlink escapes. Inspect
 uncommitted contents so unrelated work is not lost.
 
-Delete the specific pack with `git rm -r -- <task-path>`, without force.
+Delete the specific completed pack with `git rm -r -- <task-path>`, without force.
+For partial cleanup, remove only obsolete files within the pack and update its
+remaining handoffs; do not delete unfinished work.
 Commit coherent, validated cleanup work with a Conventional Commit.
 Report what moved, what was removed, any preserved follow-up, and validation.
