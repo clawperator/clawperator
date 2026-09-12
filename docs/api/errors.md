@@ -121,7 +121,7 @@ Use these fields in order:
 
 Notes:
 
-- `errorCode` is optional on the envelope. Older APK behavior and some unclassified failures may leave it unset.
+- `errorCode` is optional on the envelope. When it is absent, inspect `error` and the failed step for details.
 - envelope `errorCode` may contain Android-emitted values such as `SERVICE_UNAVAILABLE` that are not part of Node's public `errors.ts` enum
 - per-step failures do not use the envelope `errorCode`; they usually expose the actionable code in `stepResults[i].data.error`
 - `StepResult.data` values are strings, so treat `data.error` and `data.message` as string fields
@@ -397,15 +397,15 @@ What this means for agents:
 
 ### Query hierarchy unavailable
 
-Both v0.10 Operator variants request access to Android-marked sensitive
-hierarchies. This does not guarantee that every application exposes a root.
-See [setup](../setup.md#sensitive-hierarchy-access) after an APK upgrade.
-
 `UI_TREE_UNAVAILABLE` is a failed `query_ui` capture, not a successful query with
 zero matches. The envelope and failed step carry the code; completed steps are
 preserved and subsequent actions do not run. Inspect the failed step's serialized
 `diagnostics` for service availability, the missing root, and available window
 facts. Unknown facts remain `null`. See [query_ui](actions.md#action-query-ui).
+
+The Operator requests access to Android-marked sensitive hierarchies, but an
+application can still have no accessible root. If the accessibility service is
+unavailable, follow [setup](../setup.md#sensitive-hierarchy-access) to enable it.
 A visible screenshot does not guarantee an accessible hierarchy. Do not infer
 that another window is the requested application or repeatedly retry a
 persistently unavailable screen.

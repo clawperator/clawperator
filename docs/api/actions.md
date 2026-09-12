@@ -187,12 +187,18 @@ nodes. Unavailable state stays `null`, distinct from `false`. `clickable` report
 the platform node's clickability when captured, rather than inherited ancestor
 clickability used by legacy action dispatch.
 
-`accessibilityDataSensitive` is Android's per-node accessibility-data flag,
-read at capture time on API 34+. `true` means Android reports sensitive data;
-`false` means it reports non-sensitive data; `null` means the API is unavailable,
-the node is a fallback, or the read failed. New APKs emit the field even when null.
-Older APKs may omit it within `schemaVersion: 1`; treat omission as unknown,
-never false. A filtered query only reports its returned nodes, so use an
+`accessibilityDataSensitive` reports Android's per-node accessibility-data flag
+at capture time. The flag is available on Android 14 (API 34) and later:
+
+| Value | Meaning |
+| --- | --- |
+| `true` | Android reports the node's accessibility data as sensitive. |
+| `false` | Android reports the node's accessibility data as non-sensitive. |
+| `null` | The device runs an earlier Android version, the node is a fallback, or the flag could not be read. |
+
+Queries emit this field even when it is null. When consuming a payload with the
+field absent, treat it as unknown. Queries and XML capture do not require API 34;
+only this flag does. A filtered query reports only its returned nodes, so use an
 unfiltered query to inspect root sensitivity.
 
 Raw XML emits `accessibility-data-sensitive="true"` or `"false"` when known,

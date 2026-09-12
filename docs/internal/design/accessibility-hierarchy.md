@@ -5,53 +5,40 @@ service. A visible screenshot does not guarantee an accessible root. A missing
 root must remain a failure, not a zero-match result or another window's tree.
 See [query failure behavior](../../api/actions.md#action-query-ui).
 
-## Confirmed sensitive-root filtering
+## Access and capture contract
 
-On the Android 15/API 35 emulator, Settings > Network & internet > Internet is a
-native `NetworkProviderSettings` preference/RecyclerView screen inside
-`SubSettings`. Its root reports `isAccessibilityDataSensitive=true`.
-
-A controlled diagnostic build established the cause:
-
-| Service declaration | Observation on the same Internet screen |
-| --- | --- |
-| Normal `isAccessibilityTool=false` | Active root and active/focused window root are null; the status-bar root remains readable. Clearing the accessibility cache does not help. |
-| Temporary `isAccessibilityTool=true` | Query returns 67 nodes; XML succeeds through both branch-local CLI and global CLI 0.9.5. Instrumentation confirms the root is sensitive. |
-| Original declaration restored | Query and global-CLI XML failure return. |
+Both Operator variants declare `android:isAccessibilityTool="true"` in the
+shared service configuration. Android defines
+[`isAccessibilityTool`](https://developer.android.com/reference/android/accessibilityservice/AccessibilityServiceInfo#attr_android:isAccessibilityTool)
+as identifying services used to assist users with disabilities. Clawperator uses
+this declaration for access to sensitive hierarchies and is distributed outside
+Google Play.
 
 Android 15's [AccessibilityInteractionController](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-15.0.0_r1/core/java/android/view/AccessibilityInteractionController.java)
 returns null from `getRootView()` when the root is sensitive and the request is
-not from an accessibility tool. This explains the observed failure before any
-Clawperator matching or serialization. The experiment did not establish which
-Settings code or resource marks the root sensitive.
+not from an accessibility tool. This filtering occurs before Clawperator matching
+or serialization. Selecting another window or clearing the accessibility cache
+does not provide the requested application's hierarchy.
 
-The service configuration is identical to `v0.9.5`, and root acquisition predates
-structured queries. This is an existing coverage gap, not evidence of a selector
-regression. An old release APK was not installed, so the experiment is not a
-full old-binary comparison. All temporary instrumentation and configuration were
-removed; the normal development APK was restored. Evidence is limited to API 35.
+Queries and XML capture work on supported Android versions. Native capture reads
+`AccessibilityNodeInfo.isAccessibilityDataSensitive` on Android 14 (API 34) and
+later. Below API 34, or when the read fails, the flag is unknown. `UiNode` retains
+nullable evidence; `NodeResolver` emits `accessibilityDataSensitive`, including
+explicit nulls, in schema version 1. XML emits `accessibility-data-sensitive`
+only when known. An absent JSON field also means unknown. CLI/raw/MCP preserve
+the sensitivity evidence. See the [public contract](../../api/actions.md#action-query-ui).
 
-## Supported v0.10 access
+The flag is metadata. It does not change matching, success, or logging and does
+not establish private browsing or screenshot protection. A missing service or
+root remains a capture failure; host screenshots are independent.
 
-Both Operator variants now declare `android:isAccessibilityTool="true"` in the
-shared service configuration. Android defines
-[`isAccessibilityTool`](https://developer.android.com/reference/android/accessibilityservice/AccessibilityServiceInfo#attr_android:isAccessibilityTool)
-as identifying services used to assist users with disabilities. The selected
-product decision accepts broader access and distribution outside Google Play.
-There is no separate opt-in or distribution variant.
+## Verification scope
 
-Native capture reads `AccessibilityNodeInfo.isAccessibilityDataSensitive` only
-on API 34+. `UiNode` retains nullable evidence, `NodeResolver` emits explicit
-`accessibilityDataSensitive` nulls in schema version 1, and raw XML emits
-`accessibility-data-sensitive` only when known. Failed reads and fallback nodes
-remain unknown. Old APK omission is also unknown. CLI/raw/MCP preserve the
-sensitivity evidence. It never changes matching or success and does not infer
-private browsing, screenshot protection, or a disclosure policy. See the
-[public contract](../../api/actions.md#action-query-ui).
-
-No application-specific production logic, alternative-window substitution,
-cache-clearing retry, or screenshot/OCR fallback was introduced. Existing absent
-service/root failures and independent host screenshots remain intact.
+Live verification covers Android 15 (API 35). This is the tested platform, not
+the minimum API level for queries or XML capture. The Settings > Network &
+internet > Internet screen has a sensitive root; its native content is a
+`NetworkProviderSettings` preference/RecyclerView screen inside `SubSettings`.
+Unit tests cover sensitivity reads on API 34 and unknown values on API 33.
 
 ## Regression and verification
 
