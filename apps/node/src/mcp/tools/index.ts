@@ -2,7 +2,7 @@ import type { Logger } from "../../adapters/logger.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { createSessionDefaults, type SessionDefaults } from "../session.js";
 import { getCoreMcpTools } from "./core.js";
-import { getEvidenceMcpTools } from "./evidence.js";
+import { getEvidenceMcpTools, getVideoMcpTools } from "./evidence.js";
 import { getNamedMcpTools } from "./named.js";
 
 export interface McpToolDefinition {
@@ -17,5 +17,6 @@ export function getMcpTools(logger?: Logger, session: SessionDefaults = createSe
     ...getCoreMcpTools(logger, session),
     ...getNamedMcpTools(logger, session),
     ...getEvidenceMcpTools(logger, session),
+    ...getVideoMcpTools(session),
   ];
 }

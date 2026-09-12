@@ -1,4 +1,4 @@
-# Still Evidence Bundles
+# Evidence Bundles
 
 Capture a screenshot and raw hierarchy as local files with device metadata,
 correlation IDs, timestamps, hashes, and explicit component failures. A bundle
@@ -105,7 +105,7 @@ Unavailable metadata is null with an associated error; unknown device type is
 and device properties are targeted ADB observations and are not synchronized
 with the screenshot or device clock.
 
-Each artifact includes `kind` (`screenshot`, `hierarchy`, or `capture_envelopes`),
+Each still-capture artifact includes `kind` (`screenshot`, `hierarchy`, or `capture_envelopes`),
 a bundle-relative `path`, `mimeType`, `status`, `bytes`, `sha256`, separate
 `startedAt`/`finishedAt`, and monotonic `durationMs`. Image and hierarchy entries
 also include `commandId` and `taskId` for their capture records. Failed entries
@@ -137,3 +137,106 @@ in `domain/evidence/capture.ts`. It accepts equivalent typed options. Omitting
 overrides its managed bundle root. The writer and readers share the schema in
 `contracts/evidence.ts`. Injectable capture, metadata, file, process, and clock
 dependencies support deterministic testing.
+
+## Managed video
+
+Video uses the same bundle schema and adds a persistent, bounded recording
+lifecycle. It does not change accessibility-event `record start/stop` commands.
+Install `ffprobe` and `ffmpeg` on the host before starting video; still evidence
+does not require them. Both tools and the selected device's `screenrecord`
+capabilities are checked before a recording is dispatched.
+
+```bash
+clawperator evidence video start --device <device_serial> --operator-package com.clawperator.operator.dev --output-dir /absolute/new/video-bundle --duration-seconds 30
+clawperator evidence video status --session /absolute/new/video-bundle/manifest.json
+clawperator evidence video stop --session /absolute/new/video-bundle/manifest.json
+ffprobe -v error -show_streams /absolute/new/video-bundle/video.mp4
+```
+
+Start requires an explicit device and an integer `--duration-seconds` from 1 to
+180. The duration is enforced by Android even if the host worker disappears.
+The common `--timeout` option applies only to still capture; video uses the fixed
+startup, stop, and media subprocess budgets below.
+The output directory must be absolute and new. Optional `--label` and
+`--context-json` have the same contracts as still capture. There is no automatic
+retry, wake, navigation, overlay change, audio, or application assertion.
+
+By default, the current display dimensions are scaled down to a longest edge of
+at most 1280 pixels, with both edges rounded down to positive even numbers.
+`--size WIDTHxHEIGHT` accepts positive even dimensions within 1% of the current
+display aspect ratio. Rotation is sampled before start. Rotation during recording
+is not continuously tracked or corrected. Encoder fallback to different dimensions
+fails final verification; file existence alone is never proof of usable video.
+
+The detached Node worker survives the start CLI process. Start waits at most five
+seconds for its recorder PID acknowledgement and a verified live recorder without
+an observed startup error. This confirms startup, not a decoded frame. A startup
+acknowledgement timeout returns `ok: false`, `code: "COMMAND_TIMEOUT"`, and the
+session path, and requests that the worker stop. Status remains available.
+
+| Operation | Success and exit status |
+| --- | --- |
+| Start | Exit 0, `ok: true`, `status: "recording"` after startup confirmation. Startup failures or timeout exit 1. |
+| Status | Exit 0 for a found `starting`, `recording`, `finalizing`, or `complete` session. Partial, failed, unknown, or unavailable-worker states exit 1. |
+| Stop | Exit 0 only for `complete`. It waits up to 15 seconds; pending, partial, or failed sessions exit 1. Poll status if finalization remains pending. |
+
+Responses include `sessionId`, `manifestPath`, `status`, and `ok`, plus a failure
+`code` when applicable. Status and stop use the immutable saved target and reject
+conflicting device or Operator options. Repeated stop after finalization returns
+the existing outcome without changing evidence. Concurrent stop requests write
+nonce-bound requests; only the worker publishes manifests.
+
+### Video artifacts and recovery
+
+Active video manifests have `finishedAt: null`; terminal manifests have a host UTC
+finish time. `video` contains `requestedDurationSeconds`, `hostDurationMs`,
+`mediaDurationMs`, `requestedSize`, `actualSize`, `codec`, and `stopReason`.
+Host duration uses a monotonic clock and is measured independently of the decoded
+media timeline. Idle screens can produce shorter media timelines; neither duration
+is a substitute for the other. A zero-duration idle recording remains partial,
+even if one frame decodes. Available probe metadata is retained on verification
+failure. Stop reasons are `requested`, `duration_cap`,
+`startup_failure`, or `failure` (null while recording).
+
+The worker pulls `video.partial.mp4`, probes codec, dimensions and positive media
+duration, and decodes a frame with ffmpeg. Pull, probe, and decode each have a
+10-second hard subprocess deadline. Only verified media becomes `video.mp4`.
+Failed verification retains partial bytes and errors. `encoder.stderr.txt` and
+`captures.json` retain encoder diagnostics and the host recorder receipt; neither
+is an invented Operator result. An empty stderr artifact is valid and hashed. Stderr retention is capped at
+1 MiB; truncation is reported as a partial artifact and bundle error.
+Metadata failures produce partial status even when the video itself is usable.
+
+One exclusive lock per device lives under `~/.clawperator/evidence/locks`.
+`session.json` keeps the random nonce, host PID/start identity, remote PID/start
+identity, remote path, target, deadline and recovery state separate from the
+manifest. A nonce-bound heartbeat identifies the original worker. No stored host
+PID is used to signal a process. Before sending SIGINT, the worker checks the
+remote recorder command, unique output path and process start identity.
+
+`EVIDENCE_RECORDING_ACTIVE` refuses a second session on the same device.
+`EVIDENCE_SESSION_NOT_FOUND` indicates an unknown or invalid session.
+`EVIDENCE_RECOVERY_REQUIRED` means ownership cannot be verified. Status reports
+an unavailable worker as failed while retaining its last persisted manifest and
+lock, rather than fabricating a finalized recording. Inspect `session.json`, the
+remote file and recorder identity before manual recovery; never remove a lock
+based on age alone or signal a PID without checking its identity. The device-side
+duration cap bounds a surviving recorder. No automatic stale-lock takeover occurs.
+Remote temporary media is removed only after successful pull and verification;
+failed captures retain their remote path for recovery.
+
+### Video MCP and Node API
+
+`evidence_video_start` accepts `durationSeconds`, optional `size`, `label`,
+`context`, `deviceId`, and `operatorPackage`. An explicit target configured in the
+MCP session can supply the device. It rejects output paths and unknown fields,
+allocates a bundle under `~/.clawperator/evidence/bundles`, and returns `sessionId`.
+`evidence_video_status` and `evidence_video_stop` accept only that opaque
+`sessionId`; path and target overrides are rejected. Failed and pending-stop
+results set `isError: true`.
+
+Node callers use `startVideo`, `videoStatus`, and `stopVideo` in
+`domain/evidence/video.ts`. Start accepts the equivalent typed options; status and
+stop use `{session: absoluteManifestPath}` with optional matching target fields.
+The injectable video `baseDir` is the evidence state root containing `bundles/`
+and `locks/`, unlike still capture's `baseDir`, which is its bundle root.

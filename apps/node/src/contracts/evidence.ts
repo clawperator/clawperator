@@ -8,13 +8,13 @@ const nullableString = z.string().nullable();
 const nullableNumber = z.number().finite().nullable();
 const relativePath = z.string().refine(value => value.length > 0 && !value.startsWith("/") && !value.includes("\\") && !value.split("/").includes("..") && !value.includes(":"));
 export const evidenceArtifactSchema = z.object({
-  kind: z.enum(["screenshot", "hierarchy", "capture_envelopes"]),
+  kind: z.enum(["screenshot", "hierarchy", "capture_envelopes", "video", "encoder_stderr"]),
   path: relativePath.nullable(), mimeType: z.string(), status: z.enum(["complete", "partial", "failed"]),
   bytes: z.number().int().nonnegative().nullable(), sha256: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
   startedAt: z.string().datetime(), finishedAt: z.string().datetime(), durationMs: z.number().nonnegative(),
   commandId: z.string().optional(), taskId: z.string().optional(), error: evidenceErrorSchema.optional(),
 }).strict().superRefine((artifact, context) => {
-  const hasFile = artifact.path !== null && artifact.bytes !== null && artifact.bytes > 0 && artifact.sha256 !== null;
+  const hasFile = artifact.path !== null && artifact.bytes !== null && (artifact.bytes > 0 || artifact.kind === "encoder_stderr") && artifact.sha256 !== null;
   if (artifact.status === "failed") {
     if (artifact.path !== null || artifact.bytes !== null || artifact.sha256 !== null || artifact.error === undefined) {
       context.addIssue({ code: z.ZodIssueCode.custom, message: "Failed artifacts require null file fields and an error" });
@@ -35,10 +35,16 @@ export type EvidenceDevice = z.infer<typeof evidenceDeviceSchema>;
 export const evidenceManifestSchema = z.object({
   schemaVersion: z.literal(1), evidenceId: z.string(), label: nullableString,
   context: z.record(z.unknown()), device: evidenceDeviceSchema,
-  startedAt: z.string().datetime(), finishedAt: z.string().datetime(),
-  status: z.enum(["complete", "partial", "failed"]),
+  startedAt: z.string().datetime(), finishedAt: z.string().datetime().nullable(),
+  video: z.object({ requestedDurationSeconds: z.number().int().min(1).max(180), hostDurationMs: z.number().nonnegative(),
+    mediaDurationMs: nullableNumber, requestedSize: z.string(), actualSize: nullableString, codec: nullableString, stopReason: nullableString }).strict().optional(),
+  status: z.enum(["starting", "recording", "finalizing", "complete", "partial", "failed"]),
   artifacts: z.array(evidenceArtifactSchema), errors: z.array(evidenceErrorSchema),
-}).strict();
+}).strict().superRefine((manifest, context) => {
+  const terminal = ["complete", "partial", "failed"].includes(manifest.status);
+  if (terminal !== (manifest.finishedAt !== null) || (!terminal && manifest.video === undefined))
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "Only active video manifests have a null finishedAt" });
+});
 export type EvidenceManifest = z.infer<typeof evidenceManifestSchema>;
 export interface EvidenceCaptureResult {
   ok: boolean;

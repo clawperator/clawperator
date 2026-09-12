@@ -1447,15 +1447,23 @@ COMMANDS["evidence"] = {
   name: "evidence",
   group: "Device Interaction",
   summary: "Capture a screenshot and raw hierarchy evidence bundle",
-  documentedFlags: ["--output-dir", "--label", "--context-json"],
-  supportedFlags: ["--output-dir", "--label", "--context-json"],
-  topLevelBlock: `  evidence capture --output-dir <new-directory>  Capture a still evidence bundle`,
+  documentedFlags: ["--output-dir", "--label", "--context-json", "--duration-seconds", "--size", "--session"],
+  supportedFlags: ["--output-dir", "--label", "--context-json", "--duration-seconds", "--size", "--session"],
+  topLevelBlock: `  evidence capture --output-dir <new-directory>  Capture a still evidence bundle
+  evidence video <start|status|stop>              Manage a verified screen recording`,
   help: `clawperator evidence capture - Capture local screenshot and hierarchy evidence
 
 Usage:
   clawperator evidence capture --output-dir <absolute-new-directory> [--label <text>] [--context-json <object>]
 
+  clawperator evidence video start --device <id> --output-dir <absolute-new-directory> --duration-seconds <1..180> [--size <WIDTHxHEIGHT>]
+  clawperator evidence video status --session <absolute-manifest-path>
+  clawperator evidence video stop --session <absolute-manifest-path>
+
 Options:
+  --duration-seconds <n> Required video duration cap, 1..180 seconds
+  --size <WIDTHxHEIGHT>  Positive even dimensions matching the display aspect ratio
+  --session <path>       Saved video manifest for status/stop
   --output-dir <dir>     Absolute new directory; existing paths are rejected
   --label <text>         Optional label, at most 2048 UTF-16 code units
   --context-json <json>  Optional caller-owned JSON object, at most 16 KiB UTF-8
@@ -1466,9 +1474,13 @@ Options:
 
 Captures screenshot first, then raw XML; they are not atomic or automatically settled.
 Complete capture exits 0. Partial/failed capture exits 1 and retains available evidence.
+Video requires ffprobe/ffmpeg. Start confirms a live recorder; only final verification means complete.
+Stop waits up to 15 seconds; pending/partial/failed results exit 1. Status uses the saved target.
 Existing record commands continue to record accessibility events.
 `,
   handler: async ctx => {
+    if (ctx.rest[0] === "video") return (await import("./commands/evidence.js")).cmdEvidenceVideo(ctx);
+    if (ctx.rest.some(value => ["--duration-seconds", "--size", "--session"].includes(value))) throw new UsageError("Video flags require evidence video");
     if (ctx.rest[0] !== "capture") throw new UsageError("Use evidence capture --output-dir <absolute-new-directory>");
     const outputDir = getStringOptStrict(ctx.rest, "--output-dir");
     if (outputDir === undefined) throw new UsageError("evidence capture requires --output-dir");
