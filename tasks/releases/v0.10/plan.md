@@ -2,7 +2,7 @@
 
 This coordinates the runtime-observability workstream and its release-readiness follow-ups. Implementation status does not imply publication or completion of the release gates.
 
-R1-R7, R10 and the R12 preparation implementation are merged. R6 landed in `a44ad0bf` (PR #278). The 13 September audit of that commit found a nested-scroll failure, a Settings preparation gap and intermittent result-transport failures. R11, R12 and R13 below own those follow-ups respectively. R11 is implemented and locally validated on its implementation branch, pending merge; its pack is retired. R7 merged in `48a2604c` (PR #279), and R12 preparation merged in `460e654c` (PR #280) with evidence follow-up still open. R8 is implemented and locally validated through `e041243`, pending merge. Three task packs remain active, covering hierarchy preparation evidence, result transport reliability, and the two evidence-capture phases.
+R1-R8 and R10-R13 implementations are merged. R8 landed in `13d6b5a6` (PR #283), R11 in `28b8b1fa` (PR #281), R12 in `460e654c` (PR #280), and R13 in `0c4ed5ce` (PR #282). The integrated local API 35 matrix passes with the Internet-readiness and Operator-setup follow-ups through `306b38d`; R12's pack is retired. Two task packs remain active: result transport's retained causal/release follow-up and the remaining evidence-capture work. The manual supported-image release CI gate remains required.
 
 ## Folder ownership
 
@@ -26,12 +26,12 @@ The order below minimizes shared-file conflicts. Hard dependencies are explicit;
 | R10 | [Sensitive hierarchy access](../../../docs/internal/design/accessibility-hierarchy.md) | Complete | R4 merged | [DONE] merged in `f70c89cb` (PR #275); manual release CI remains required; pack retired; [regression harness](../../../validation/sensitive-hierarchy-access/README.md) |
 | R5 | [Strict selectors PR-2](../../../docs/api/selectors.md#strict-action-selection) | Complete | R4 merged | [DONE] merged in `09987ebc` (PR #276); pack retired; [validation and limits](../../../docs/internal/design/selector-inspection.md#validation-and-compatibility) |
 | R6 | [Action-result diagnostics](../../../docs/api/actions.md#action-receipts-and-failure-evidence) | Complete | R4 and R5 merged | [DONE] merged in `a44ad0bf` (PR #278); pack retired; [validation and limits](../../../docs/internal/design/action-result-diagnostics.md#validation-and-compatibility) |
-| R11 | [Scroll container transitions](../../../docs/internal/design/action-result-diagnostics.md#scroll-eligibility-transition-validation-r11) | Complete locally | R4/R5/R6 merged | [DONE] implementation and focused API-35 proof; 460 Android / 1,479 Node tests; earlier hierarchy harness passed once, latest merged run stopped at R13 transport; pending merge, with R12/R13 and manual release CI gates retained; pack retired |
-| R13 | [Result transport reliability](../../node/result-transport-reliability/plan.md) | 1 PR, 3 phases | R6/R10 merged | Implemented locally; focused query proof on both variants; causal/release limits remain; [findings](../../../docs/internal/design/result-transport-reliability.md); [prompt](../../node/result-transport-reliability/agent-prompt.md) |
-| R12 | [Hierarchy harness preparation](../../android/hierarchy-harness-preparation/plan.md) | 1 PR | R10 merged; combined release proof also needs R11/R13 | Implementation merged in `460e654c` (PR #280); debug API 36 preparation verified; release launch timeout and API 35 proof remain open; [follow-up](../../android/hierarchy-harness-preparation/agent-prompt.md) |
+| R11 | [Scroll container transitions](../../../docs/internal/design/action-result-diagnostics.md#scroll-eligibility-transition-validation-r11) | Complete | R4/R5/R6 merged | [DONE] merged in `28b8b1fa` (PR #281); final six-case combined API 35 hierarchy matrix passed; pack retired; manual CI release gate retained |
+| R13 | [Result transport reliability](../../node/result-transport-reliability/plan.md) | Implementation complete | R6/R10 merged | Merged in `0c4ed5ce` (PR #282); final combined hierarchy matrix and 60/60 transport commands per variant passed; historical causal limits and manual release CI retained; [findings](../../../docs/internal/design/result-transport-reliability.md) |
+| R12 | [Hierarchy harness preparation](../../../validation/sensitive-hierarchy-access/README.md#integrated-r11r12r13-acceptance) | Complete | R10/R11/R13 merged | [DONE] merged in `460e654c` (PR #280); readiness/setup follow-ups locally committed through `306b38d`; all six API 35 full runs passed; pack retired |
 | R7 | [Compact snapshots](../../../docs/api/snapshot.md#compact-output-and-raw-artifacts) | Complete | R4 merged for additive XML visibility | [DONE] merged in `48a2604c` (PR #279); pack retired; [validation and limits](../../../docs/internal/design/compact-snapshots.md#validation-and-compatibility) |
-| R8 | [Still evidence PR-1](../../../docs/api/evidence.md) | Complete | None beyond merged main | [DONE] implemented and locally validated through `e041243`; pending merge; pack retained for R9; [validation and limits](../../../docs/internal/design/still-evidence.md#validation-and-observed-limits) |
-| R9 | [Managed video PR-2](../../node/evidence-capture/plan.md) | 2 | R8 merged | Waiting for R8; [prompt](../../node/evidence-capture/pr-2-prompt.md) |
+| R8 | [Still evidence PR-1](../../../docs/api/evidence.md) | Complete | None beyond merged main | [DONE] merged in `13d6b5a6` (PR #283); pack retained for R9; [validation and limits](../../../docs/internal/design/still-evidence.md#validation-and-observed-limits) |
+| R9 | [Managed video PR-2](../../node/evidence-capture/plan.md) | 2 | R8 merged | Ready after R8 merge; [prompt](../../node/evidence-capture/pr-2-prompt.md) |
 
 R3 is not a prerequisite for selectors or evidence; the raw overlay API is already merged. R7 and R8 can be developed independently of R11-R13. Prefer resolving the audit follow-ups first so their failures do not become media-layer workarounds. R1 and R8 do not depend on one another: evidence metadata collection must not call doctor as a hidden mutation or readiness gate.
 
@@ -82,11 +82,11 @@ This covers the agreed foundation and evidence gaps. It is not a promise that on
 
 ## Gates for downstream adoption
 
-**Core deterministic execution gate:** R1, R4, R5, and R6 must pass their unit and live criteria before relying on the new readiness/strict-selection/receipt contracts. R2 is merged for generated skill wrappers. The audit follow-ups R11 and R13 must resolve the known scroll/transport gaps before claiming the current build meets this gate; R12 establishes reproducible platform proof. A consumer can start repository/report development independently, but should not build workarounds for these known core failures.
+**Core deterministic execution gate:** R1, R4, R5, and R6 must pass their unit and live criteria before relying on the new readiness/strict-selection/receipt contracts. R2 is merged for generated skill wrappers. The local combined R11/R12/R13 proof now passes with the harness follow-ups through `306b38d`; the manual supported-image release gate remains required. A consumer can start repository/report development independently, but should not build workarounds for these known core failures.
 
 **Evidence integration gate:** R8 must pass before adopting its manifest as the stable report input; R9 must pass before claiming managed-video support. Existing screenshot and explicit ADB recording helpers remain usable while these APIs are developed. Reports must distinguish unavailable evidence from failed test assertions, and never equate file existence with proof.
 
-**Optional convenience:** R3 and R7 are merged. They reduce authoring/inspection overhead without being technical prerequisites for deterministic execution. R1-R7, R10 and the R12 preparation implementation are merged; R11 is complete locally pending merge, while R12 evidence and R13 remain outstanding. Consumer development and independent media implementation may proceed, but do not waive these release blockers or the required combined proof.
+**Optional convenience:** R3 and R7 are merged. They reduce authoring/inspection overhead without being technical prerequisites for deterministic execution. R1-R7 and R10-R13 implementations are merged, and local combined R11/R12/R13 proof passes. The manual supported-image release CI gate remains open. Consumer development and independent media implementation may proceed, but do not waive these release blockers or the required combined proof.
 
 ## Implementation handoff and release acceptance
 
@@ -107,7 +107,7 @@ Use `.agents/skills/task-cleanup/SKILL.md` after each complete pack's durable gu
 
 ## Required v0.10 hierarchy access gate
 
-R10 remains mandatory for v0.10. Its implementation merged in `f70c89cb`. The audit at `a44ad0bf` demonstrated sensitive query/XML access but failed the complete local harness. R11-R13 must be integrated and the full checked-in harness must pass before release readiness is claimed; a manually dispatched CI emulator run remains a release prerequisite.
+R10 remains mandatory for v0.10. Its implementation merged in `f70c89cb`. The audit at `a44ad0bf` demonstrated sensitive query/XML access but failed the complete local harness. R11-R13 are integrated and the full local API 35 matrix passes with harness follow-ups through `306b38d`; a manually dispatched CI emulator run remains a release prerequisite.
 By user direction, this slow device workflow does not run on each PR or push.
 The release must include its supported access approach,
 an automated Android 15 Internet-screen query/XML regression executed in CI,

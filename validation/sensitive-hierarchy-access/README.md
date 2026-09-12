@@ -16,17 +16,37 @@ requalified. The publisher's revision-9 archive is
 uses the corresponding API 35 arm64 image. No network connection is required.
 
 Only the selected Operator should be active on this dedicated test device.
-Install the matching APK, launch `clawperator.activity.MainActivity` in its package
-to leave the stopped state, enable its accessibility service and notification
-permissions, and allow the service to connect before starting. The harness does
-not install APKs or change accessibility or network settings. CI handles setup
-outside the harness and tests both variants sequentially.
+Use the checked-in setup helper before each variant:
+
+```sh
+python3 validation/sensitive-hierarchy-access/prepare_operator.py \
+  --device <device_serial> --operator-package com.clawperator.operator.dev \
+  --apk apps/android/app/build/outputs/apk/debug/app-debug.apk --out /tmp/hierarchy-debug-setup
+```
+
+The helper holds the device lock, disables accessibility, removes the enabled
+service list and waits for all bindings to disconnect before stopping the two
+Operator packages and installing the selected APK. It launches the selected
+Operator, enables only its service, grants notification permissions, waits for
+one healthy binding, and requires both doctor and a nonempty query to succeed.
+Binding observations are bounded by 15 seconds and 30 attempts per phase; failed
+commands are not retried. Each setup uses a new artifact directory and records
+commands, outputs, deadlines and the APK hash. CI uses this same helper for both
+variants sequentially. This explicitly replaces accessibility-service selection
+on the dedicated emulator; it does not clear application data or change network
+settings. The capture harness itself does not install APKs or change permissions.
 
 The harness uses branch-local CLI commands and a real stdio MCP session. It
 requires successful correlated envelopes, three consecutive Internet queries,
 raw/MCP query parity, the sensitive Settings root, Wi-Fi switch state/bounds/XML
-parity, a decoded PNG, and the Display & touch control screen. A loading page
-cannot satisfy readiness. A missing hierarchy fails immediately; it is never
+parity, a decoded PNG, and the Display & touch control screen. Internet readiness requires the destination's `collapsing_toolbar` labeled
+`Internet`, the `Wi-Fi` row, and `switchWidget` together. The outgoing Network &
+internet page's Airplane mode switch and the Internet loading page cannot satisfy
+readiness. At most 30 successful queries run within 15 seconds, with each process
+bounded by the remaining deadline. Query/service/transport failures fail
+immediately; no navigation is replayed. Sensitivity, unique switch/state and
+parity assertions still apply to the separate captures after readiness.
+`internet-preparation.json` retains the readiness verdict and observation count. A missing hierarchy fails immediately; it is never
 converted to zero matches or a skip. Connected-row evidence is compared when
 present. Each subprocess has a deadline; readiness is bounded. A per-device lock
 serializes cooperating harnesses. Do not run other automation on the device.
@@ -88,48 +108,85 @@ request or push trigger. Ordinary PR checks do not boot this emulator. The
 manual run remains required release evidence before shipping v0.10.
 
 
-## R12 local evidence and remaining gates
+## Integrated R11/R12/R13 acceptance
 
-The 13 September 2026 R12 checks used the source at `e1aadca2` plus this harness
-change, matching debug `0.10.0-d` and release `0.10.0` APKs, and the user-assigned
-English API 36 arm64 emulator (`BE2A.250530.026.D1`, build `13818094`). API 36 was
-explicitly accepted for this investigation; the API 35 manual release gate was
-not changed. Node build, both APK builds, 13 offline assertion/preparation tests,
-the complete `validation` suite and shell syntax checks passed.
+R11 (`28b8b1fa`, PR #281), R12 (`460e654c`, PR #280), and R13 (`0c4ed5ce`,
+PR #282) were tested together with the harness follow-ups in `76713f9` and
+`306b38d`. Runtime code was unchanged from merged `0c4ed5ce`. Matching CLI
+`0.10.0`, debug `0.10.0-d` and release `0.10.0` APKs were built locally. The
+13 September 2026 final run used a dedicated English API 35 Google Play arm64
+revision-9 emulator, build `AE3A.240806.036/12592187`, at 1080 by 2400, density 420.
+This local image is distinct from the manual Google APIs x86_64 CI image above.
 
-Debug preparation passed from fresh processes, a verified Settings `SubSettings`
-page, and the verified Settings Intelligence `SearchActivity`. All three passed
-on the first observation in 1.43, 1.81 and 2.28 seconds respectively. The homepage
-container, content container, search bar, Google row and Network & internet row
-had identical bounds and state across those runs. All three full harness runs
-then failed `Root sensitivity must be true`: this API 36 Internet root reported
-false. Later raw/MCP/XML, PNG and Display assertions were therefore not reached;
-they were not weakened or skipped to manufacture a pass.
+Two remaining harness problems were repaired:
 
-The separately installed release variant passed doctor but returned correlated
-`COMMAND_TIMEOUT` failures from Settings `open_app`: once during fresh-state
-preparation, then during each of the subpage/search fixture setups. The failure
-screenshot showed Settings, but this does not override the failed launch
-contract. No release preparation or full-harness pass is claimed. This runtime
-launch-wait limitation needs investigation before repeating release proof; it
-must not be relabeled as a transport failure without supporting evidence. A
-subsequent read-only release query returned `UI_TREE_UNAVAILABLE`, with
-`serviceAvailable: true`, `rootAvailable: false`, `windowCount: 0` and no foreground
-package. Android listed the selected release service in both bound and crashed
-services. The final Home cleanup returned `GLOBAL_ACTION_FAILED`; a successful
-Home state is not claimed. These observations do not establish the crash cause.
+- Readiness previously accepted the Airplane mode `switchWidget` on the outgoing
+  Network & internet page. The next capture could then see the Internet loading
+  page without its Wi-Fi switch. Requiring the destination toolbar and Wi-Fi row
+  fixes that premature readiness; the capture assertions remain unchanged.
+- During variant replacement Android retained two connections to the release
+  service, listed it as both bound and crashed, and reported input-method
+  bind/unbind mismatches. Doctor's handshake passed, but launch waits timed out
+  and queries had no root. A controlled complete disconnect/reconnect restored
+  the same APK's hierarchy and launch behavior. The setup helper now waits for
+  teardown before installation and verifies a healthy binding and usable query
+  after activation. This addresses the observed setup state without weakening
+  foreground-package contracts or retrying failed runtime commands.
 
-Private evidence retains all development attempts: the first debug attempt had
-an unbound, still-stopped Operator and a result timeout; the next rejected the
-API 36 fixed header using the initial API 35 predicate; the next encountered
-`RESULT_ENVELOPE_TIMEOUT` on its first preparation query. During the first state
-matrix, a concurrent local CLI rebuild invalidated debug subpage/search and
-release setup with `MODULE_NOT_FOUND`. Only those host-invalidated cases were
-repeated after the build completed, in separate output directories. These failed
-attempts remain evidence and do not become passes because later debug runs pass.
+The final fixed matrix ran once after these repairs. Each starting activity was
+observed before invoking the checked-in capture harness; subpage/search fixtures
+used strict CLI clicks. All six runs passed preparation, three repeated Internet
+queries, raw/MCP/XML state and bounds parity, PNG decoding, the unchanged Display
+scroll, its Brightness level postcondition, and Home cleanup.
 
-Remaining release proof requires the supported API 35 image, both matching
-variants, resolution of the recorded runtime failures, and the complete harness
-including R11/R13 integration. The API 36 fixed header and visible Display row
-do not reproduce the API 35 collapsing-container scenario. Keep the workflow
-manual and preserve the sensitive-root assertion.
+| Variant | Initial state | Preparation observations / seconds | Internet readiness observations | Full harness |
+| --- | --- | --- | --- | --- |
+| Debug | Fresh processes | 1 / 1.81 | 2 | Pass |
+| Debug | Restored Settings subpage | 1 / 1.90 | 3 | Pass |
+| Debug | Verified Settings Intelligence search | 1 / 2.00 | 3 | Pass |
+| Release | Fresh processes | 1 / 1.73 | 3 | Pass |
+| Release | Restored Settings subpage | 1 / 1.86 | 3 | Pass |
+| Release | Verified Settings Intelligence search | 1 / 1.81 | 3 | Pass |
+
+Homepage container, content container, search bar and Network & internet bounds
+and state were identical across all six preparations. The final fixed transport
+series then passed 20 immediate Settings open/query cycles and 20 full Internet
+queries per variant: 60/60 commands each, 120/120 total. Full query responses were
+32,345-69,786 bytes in both variants and exercised chunking. Settings processes
+were closed before each transport series so it began at the homepage. No failed
+attempt was retried within a series. Both variants ended on Home.
+
+The tested source was `306b38dfe778b075094ec7187b3d3af2166eee4c`. APK SHA-256:
+
+- Debug: `a155fd245ce1dbfa4eae95639f2e4e33a634abb91f19f07a77ed2f8e37ae1b75`.
+- Release: `1e9535d884d05079e23f50ecd5bb6e55fc56acd1baab3cf874eb582714b4861d`.
+
+Node's 1,496 tests, Android's 463 unit tests, both APK builds, all 25 focused
+hierarchy/setup/source-evidence tests, repository validation and the docs build
+passed. Docs route/link checks passed with no organization warnings. Device
+runs happened after builds completed. Evidence includes source/build identity,
+all raw command outputs, screenshots, XML, activity stacks, setup state and
+transport attempt reports. Captures remain private and untracked.
+
+### Retained failures and release limits
+
+Earlier evidence is not erased by the passing final matrix. The original API 36
+investigation passed debug preparation but failed the sensitive-root assertion;
+release also showed launch/root/cleanup failures. The initial API 35 recheck of
+`460e654c` retained R11 scroll loss, transport errors, a premature Internet capture,
+and device interruptions. Those findings motivated integrated validation.
+
+With the Internet readiness fix alone (`76713f9`), debug passed all three full
+runs and 60/60 transport commands. Release failed its fresh launch and both
+subpage/search setup launches in the stale-binding state described above. Its
+transport series was stopped for diagnosis: two completed commands failed, the
+next command was interrupted, and remaining attempts were not run. The failed
+commands and interruption are retained separately from the final post-setup-fix
+series. The controlled rebind preserved before/after evidence using the same APK.
+
+The local R11/R12/R13 acceptance is complete and R12's task pack is retired.
+A finite passing sample is not a zero-failure transport guarantee, and original
+historical transport root-cause limits remain in the
+[transport design record](../../docs/internal/design/result-transport-reliability.md).
+The manually dispatched supported-image CI workflow is still required before
+release. This work does not authorize publication or add automatic emulator jobs.

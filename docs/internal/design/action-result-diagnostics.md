@@ -181,3 +181,14 @@ passed independently. The merged API-35 live harness verified Settings
 preparation but later stopped at a query with `logcat exited before terminal
 envelope (code=255, signal=null)`. That invocation remains a failed R13 transport
 observation; the earlier successful harness invocation does not supersede it.
+
+
+### Combined hierarchy follow-up
+
+With merged R11/R12/R13 and harness fixes through `306b38d`, all six API 35
+fresh/subpage/search runs across debug and release passed the unchanged Display
+scroll and the Brightness level postcondition. Internet query/MCP/XML parity and
+PNG checks also passed in each run. See the
+[integrated acceptance record](../../../validation/sensitive-hierarchy-access/README.md#integrated-r11r12r13-acceptance)
+for complete attempt accounting and build identity. This completes local
+integration proof; the manual supported-image release CI gate remains required.

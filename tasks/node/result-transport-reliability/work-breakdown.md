@@ -63,3 +63,17 @@ repository validation and docs. Combined debug hierarchy proof passed. Release
 failed the unique Wi-Fi switch fixture on its first successful 24-node Internet
 capture, followed by two successful 68-node captures with the switch. No retry
 was made; preserve this failure and the manual CI gate. See durable evidence.
+
+
+## Subsequent combined acceptance
+
+Merged R11/R12/R13 plus harness fixes through `306b38d` passed all six
+fresh/subpage/search full hierarchy runs across debug/release, and a new fixed
+60-command transport series per variant passed 120/120 total. No runtime code
+was changed beyond merged `0c4ed5ce`. The readiness and stale-binding setup
+repairs, the earlier interrupted release series, and exact build identity are
+preserved in the [acceptance record](../../../validation/sensitive-hierarchy-access/README.md#integrated-r11r12r13-acceptance).
+The local combined-proof gap is closed. Remaining follow-up is the manual
+supported-image release CI gate and the already documented historical causal
+limits; neither authorizes replaying failed mutations or claiming zero failures
+under all conditions. R12's completed pack is retired.

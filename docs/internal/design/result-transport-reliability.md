@@ -152,3 +152,25 @@ Integrated APK SHA-256 values:
 
 - Debug: `b1a0f7c831a200ffe40ea1ce109ffb65a3474e0fdb67d2c0526df7f11a1f350d`.
 - Release: `dfd1f5f2aaf1b3b356f260d4f252345977a3f985c36c9127f1944a083c6f0699`.
+
+
+### Completed local R11/R12/R13 integration
+
+The final integrated harness at `306b38d` passed all six debug/release
+fresh/subpage/search runs on API 35, including query/MCP/XML parity, PNG and
+Display control. The fixed transport series passed 60/60 commands per variant
+with full query outputs of 32,345-69,786 bytes. Both APKs contain the runtime code
+merged in `0c4ed5ce`; no additional runtime transport change was needed.
+
+Two harness fixes completed this proof: Internet readiness now distinguishes the
+outgoing page's Airplane mode switch from the loaded Internet destination, and
+Operator variant setup waits for complete service teardown before installation,
+then verifies a healthy selected binding and nonempty query. The earlier release
+failure after the readiness fix was retained and diagnosed as unusable service
+binding state; the interrupted transport series was not presented as a pass.
+
+The [full acceptance record](../../../validation/sensitive-hierarchy-access/README.md#integrated-r11r12r13-acceptance)
+preserves all final cases, earlier failures, setup observations, source and APK
+hashes. This resolves the local combined-harness gap described above. The manual
+supported-image CI release gate and historical causal limits remain explicit;
+a finite series does not prove failure-free transport under every condition.
