@@ -2,7 +2,7 @@
 
 This coordinates the runtime-observability workstream and its release-readiness follow-ups. Implementation status does not imply publication or completion of the release gates.
 
-R1-R8 and R10-R13 implementations are merged. R8 landed in `13d6b5a6` (PR #283), R11 in `28b8b1fa` (PR #281), R12 in `460e654c` (PR #280), and R13 in `0c4ed5ce` (PR #282). The integrated local API 35 matrix passes with the Internet-readiness and Operator-setup follow-ups through `306b38d`; R12's pack is retired. Two task packs remain active: result transport's retained causal/release follow-up and the remaining evidence-capture work. The manual supported-image release CI gate remains required.
+R1-R8 and R10-R13 implementations are merged. R8 landed in `13d6b5a6` (PR #283), R11 in `28b8b1fa` (PR #281), R12 in `460e654c` (PR #280), and R13 in `0c4ed5ce` (PR #282). The integrated local API 35 matrix passes with the Internet-readiness and Operator-setup follow-ups through `306b38d`; R12's pack is retired. R9 is locally complete in `44272a4`, pending merge; the evidence-capture pack is retired. One task pack remains active for result transport's retained causal/release follow-up. The manual supported-image release CI gate remains required.
 
 ## Folder ownership
 
@@ -30,8 +30,8 @@ The order below minimizes shared-file conflicts. Hard dependencies are explicit;
 | R13 | [Result transport reliability](../../node/result-transport-reliability/plan.md) | Implementation complete | R6/R10 merged | Merged in `0c4ed5ce` (PR #282); final combined hierarchy matrix and 60/60 transport commands per variant passed; historical causal limits and manual release CI retained; [findings](../../../docs/internal/design/result-transport-reliability.md) |
 | R12 | [Hierarchy harness preparation](../../../validation/sensitive-hierarchy-access/README.md#integrated-r11r12r13-acceptance) | Complete | R10/R11/R13 merged | [DONE] merged in `460e654c` (PR #280); readiness/setup follow-ups locally committed through `306b38d`; all six API 35 full runs passed; pack retired |
 | R7 | [Compact snapshots](../../../docs/api/snapshot.md#compact-output-and-raw-artifacts) | Complete | R4 merged for additive XML visibility | [DONE] merged in `48a2604c` (PR #279); pack retired; [validation and limits](../../../docs/internal/design/compact-snapshots.md#validation-and-compatibility) |
-| R8 | [Still evidence PR-1](../../../docs/api/evidence.md) | Complete | None beyond merged main | [DONE] merged in `13d6b5a6` (PR #283); pack retained for R9; [validation and limits](../../../docs/internal/design/still-evidence.md#validation-and-observed-limits) |
-| R9 | [Managed video PR-2](../../node/evidence-capture/plan.md) | 2 | R8 merged | Ready after R8 merge; [prompt](../../node/evidence-capture/pr-2-prompt.md) |
+| R8 | [Still evidence PR-1](../../../docs/api/evidence.md) | Complete | None beyond merged main | [DONE] merged in `13d6b5a6` (PR #283); evidence pack retired; [validation and limits](../../../docs/internal/design/still-evidence.md#validation-and-observed-limits) |
+| R9 | [Managed video](../../../docs/api/evidence.md#managed-video) | Complete locally | R8 merged in `13d6b5a6` | [DONE] implemented in `44272a4`, pending merge; 1,544 Node tests, docs/debug APK builds, verified navigation and honest zero-duration idle partial; [validation and limits](../../../docs/internal/design/managed-video.md#validation-and-limits); pack retired |
 
 R3 is not a prerequisite for selectors or evidence; the raw overlay API is already merged. R7 and R8 can be developed independently of R11-R13. Prefer resolving the audit follow-ups first so their failures do not become media-layer workarounds. R1 and R8 do not depend on one another: evidence metadata collection must not call doctor as a hidden mutation or readiness gate.
 

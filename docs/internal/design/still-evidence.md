@@ -1,8 +1,9 @@
 # Still evidence capture
 
 The public contract is [Still Evidence Bundles](../../api/evidence.md). This
-implements the still-capture phase only. Managed video requires a separate
-implementation after this phase merges.
+describes the still-capture implementation. The complementary
+[managed video implementation](managed-video.md) extends its schema and artifact
+ownership without changing the still-capture contract.
 
 ## Ownership and failure boundaries
 
