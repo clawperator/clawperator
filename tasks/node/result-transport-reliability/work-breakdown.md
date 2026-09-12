@@ -4,7 +4,7 @@ Contract: [plan.md](plan.md). Coordination: [v0.10](../../releases/v0.10/plan.md
 
 ## PR-1: diagnose, repair and verify result transport
 
-Status: not started. The following phases belong to the same PR; code normalization alone is not the complete deliverable.
+Status: local implementation and declared series completed; remaining causal and release gates are explicit below. The following phases belong to the same PR; code normalization alone is not the complete deliverable.
 
 ### Phase 1: lifecycle evidence and stable errors
 
@@ -34,3 +34,25 @@ npm --prefix apps/node run test
 If Android publication changes, also build both APK variants and run `unitTest`; install those exact builds for live proof. Follow AGENTS.md for additional affected-surface checks. Live harness prerequisites and invocation are in `validation/sensitive-hierarchy-access/README.md`; R12 owns preparation, not transport recovery.
 
 Done includes verified error contracts, in-scope repairs supported by evidence, regression tests, completed declared live series, honest remaining limits, docs and local commits. Do not implement R11/R12, media tasks, publishing or an automatic emulator workflow as incidental fixes.
+
+## Recorded outcome
+
+- Phase 1: implemented and covered with controlled subprocesses, exit/signal/
+  stderr evidence, correlation, cancellation and dispatch-state checks.
+- Phase 2: fixed deferred dispatch after reader death and reproduced Android
+  chunk loss. Added publication pacing and strict framing/consumer regressions.
+  Not declared fully complete: the audit's original live exit-255 and zero-event
+  timeout causes remain unreproduced and unproven.
+- Phase 3: completed each fixed 20-cycle/20-query series on both paced variants.
+  Debug retained one initial service-unavailable open (59/60 commands); release
+  passed 60/60. Both passed all 40 full queries. No repeat-to-green series.
+  Combined hierarchy proof awaits R11/R12 integration and manual CI remains a
+  release prerequisite.
+
+Durable evidence, payload sizes, timings and build hashes:
+[Result transport reliability](../../../docs/internal/design/result-transport-reliability.md).
+The task pack remains active because these limits do not satisfy the full gate.
+
+Validation completed: Node build and 1,478 tests; both APK builds and 447
+Android unit tests; repository validation suite; docs build and route checks.
+Implementation commit: `cd3e979`. No push or release publication was performed.
