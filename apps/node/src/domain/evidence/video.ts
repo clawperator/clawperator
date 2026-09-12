@@ -11,7 +11,7 @@ import { evidenceManifestSchema, type EvidenceManifest } from "../../contracts/e
 import { validateEvidenceCaptureOptions, type EvidenceCaptureOptions } from "./capture.js";
 import { collectEvidenceMetadata } from "./metadata.js";
 import { writeEvidenceManifest } from "./manifest.js";
-import { atomicJson, checked, chooseVideoSize, fail, lockName, readState, releaseLock, sleep, terminal, verifyScreenrecordHelp, type VideoState } from "./videoSupport.js";
+import { atomicJson, checked, chooseVideoSize, fail, lockName, readState, releaseLock, sleep, terminal, verifyScreenrecordHelp, videoError, type VideoState } from "./videoSupport.js";
 
 export interface VideoStartOptions extends EvidenceCaptureOptions { durationSeconds: number; size?: string }
 export interface VideoSessionOptions { session: string; deviceId?: string; operatorPackage?: string }
@@ -53,6 +53,7 @@ export async function startVideo(options: VideoStartOptions, dependencies: Video
   try { await fs.writeFile(lockPath, JSON.stringify({ sessionId, nonce, outputDir }), { flag: "wx", mode: 0o600 }); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === "EEXIST") fail("A video session owns this device; use its status/stop or verify recovery before removing its lock", "EVIDENCE_RECORDING_ACTIVE"); throw error; }
   let workerDispatched = false;
+  let startupManifest: EvidenceManifest | undefined;
   try {
     if (options.outputDir === undefined) await fs.mkdir(dirname(outputDir), { recursive: true, mode: 0o700 });
     try { await fs.mkdir(outputDir, { mode: 0o700 }); }
@@ -62,12 +63,15 @@ export async function startVideo(options: VideoStartOptions, dependencies: Video
       video: { requestedDurationSeconds: options.durationSeconds, hostDurationMs: 0, mediaDurationMs: null, requestedSize: size, actualSize: null, codec: null, stopReason: null } };
     await atomicJson(join(outputDir, "session.json"), state);
     const manifestPath = await writeEvidenceManifest(outputDir, manifest);
+    startupManifest = manifest;
     const workerPath = dependencies.workerPath ?? fileURLToPath(new URL("./videoWorker.js", import.meta.url));
     const worker = runtime.runner.spawn(process.execPath, [workerPath, outputDir], { detached: true, stdio: "ignore", shell: false });
     let spawnError: Error | undefined;
-    worker.on("error", (error: Error) => { spawnError = error; });
+    await new Promise<void>((resolveSpawn, rejectSpawn) => {
+      worker.once("spawn", () => { workerDispatched = true; resolveSpawn(); });
+      worker.on("error", (error: Error) => { spawnError = error; rejectSpawn(error); });
+    });
     worker.unref();
-    workerDispatched = true;
     const deadline = Date.now() + 5000;
     do {
       if (spawnError) throw spawnError;
@@ -79,7 +83,18 @@ export async function startVideo(options: VideoStartOptions, dependencies: Video
     await atomicJson(join(outputDir, "stop.json"), { nonce });
     return { ok: false, status: "starting", sessionId, manifestPath, code: "COMMAND_TIMEOUT" };
   } catch (error) {
-    if (!workerDispatched) await releaseLock(state);
+    if (!workerDispatched) {
+      try {
+        if (startupManifest) {
+          startupManifest.status = "failed";
+          startupManifest.finishedAt = new Date().toISOString();
+          startupManifest.video!.stopReason = "startup_failure";
+          startupManifest.errors.push(videoError(error, "startup"));
+          const manifestPath = await writeEvidenceManifest(outputDir, startupManifest);
+          return { ok: false, status: "failed", manifestPath, sessionId, code: "EVIDENCE_CAPTURE_FAILED" };
+        }
+      } finally { await releaseLock(state); }
+    }
     throw error;
   }
 }

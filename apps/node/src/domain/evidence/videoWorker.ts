@@ -28,7 +28,7 @@ export interface VideoWorkerClock { now(): number; monotonic(): number; sleep(ms
 const systemClock: VideoWorkerClock = { now: () => Date.now(), monotonic: () => performance.now(), sleep };
 
 /** The sole session writer. Callers request stop through a nonce-bound file, never a host PID. */
-export async function runVideoWorker(outputDir: string, runner: ProcessRunner = new VideoProcessRunner(), clock: VideoWorkerClock = systemClock): Promise<void> {
+export async function runVideoWorker(outputDir: string, runner: ProcessRunner = new VideoProcessRunner(), clock: VideoWorkerClock = systemClock, readArtifact: typeof fs.readFile = fs.readFile): Promise<void> {
   const state = await readState(outputDir);
   const manifest: EvidenceManifest = evidenceManifestSchema.parse(JSON.parse(await fs.readFile(join(outputDir, "manifest.json"), "utf8")));
   const lock = JSON.parse(await fs.readFile(state.lockPath, "utf8"));
@@ -44,6 +44,8 @@ export async function runVideoWorker(outputDir: string, runner: ProcessRunner = 
   let closed = false;
   let exitCode: number | null = null;
   let processError: Error | undefined;
+  let notifyClosed!: () => void;
+  const recorderClosed = new Promise<void>(resolve => { notifyClosed = resolve; });
   let child: ReturnType<ProcessRunner["spawn"]> | undefined;
   let stopSent = false;
   let recordingStarted = false;
@@ -76,7 +78,7 @@ export async function runVideoWorker(outputDir: string, runner: ProcessRunner = 
       stderr = stderrBuffer.toString();
     });
     child.on("error", (error: Error) => { processError = error; closed = true; });
-    child.on("close", (code: number | null) => { exitCode = code; closed = true; });
+    child.on("close", (code: number | null) => { exitCode = code; closed = true; notifyClosed(); });
     const startupDeadline = clock.now() + 4000;
     while (!/^\d+\r?\n/.test(stdout) && !closed && clock.now() < startupDeadline) { await heartbeat(); await clock.sleep(50); }
     if (closed || !/^\d+\r?\n/.test(stdout)) fail(`Recorder failed to start: ${processError?.message ?? (stderr || "no PID acknowledgement")}`);
@@ -93,11 +95,20 @@ export async function runVideoWorker(outputDir: string, runner: ProcessRunner = 
     while (!closed) {
       await heartbeat();
       if (!stopSent && await stopRequested()) {
-        await verifyRemote(runner, state);
-        // Recheck identity in the same remote shell immediately before signaling.
-        const pid = state.remotePid!;
-        const signal = `test "$(cat /proc/${pid}/stat | cut -d ' ' -f 22)" = "${state.remoteStart}" && tr '\\000' '\\n' < /proc/${pid}/cmdline | grep -Fx '${state.remotePath}' >/dev/null && kill -2 ${pid}`;
-        await checked(runner, state.adbPath, ["-s", state.deviceId, "shell", "sh", "-c", `'${signal.replaceAll("'", "'\\''")}'`], 2000);
+        try {
+          await verifyRemote(runner, state);
+          if (closed) break;
+          // Recheck identity in the same remote shell immediately before signaling.
+          const pid = state.remotePid!;
+          const signal = `test "$(cat /proc/${pid}/stat | cut -d ' ' -f 22)" = "${state.remoteStart}" && tr '\\000' '\\n' < /proc/${pid}/cmdline | grep -Fx '${state.remotePath}' >/dev/null && kill -2 ${pid}`;
+          await checked(runner, state.adbPath, ["-s", state.deviceId, "shell", "sh", "-c", `'${signal.replaceAll("'", "'\\''")}'`], 2000);
+        } catch (error) {
+          // The duration cap may win while the identity check or signal is in flight.
+          // Only an observed successful close permits normal finalization; never retry a signal.
+          if (!closed) await Promise.race([recorderClosed, clock.sleep(250)]);
+          if (closed && exitCode === 0 && !processError) break;
+          throw error;
+        }
         stopSent = true;
         manifest.video!.stopReason = "requested";
         manifest.status = "finalizing";
@@ -124,32 +135,35 @@ export async function runVideoWorker(outputDir: string, runner: ProcessRunner = 
     state.recoveryRequired = child !== undefined && !processError && (!closed || (exitCode !== 0 && !(stopSent && exitCode === 130)));
     if (child && !closed) child.kill("SIGKILL"); // Only the locally owned ADB child, never a persisted PID.
   } finally {
-    clearInterval(heartbeatTimer);
-    if (manifest.video!.hostDurationMs === 0) manifest.video!.hostDurationMs = clock.monotonic() - started;
-    manifest.finishedAt = new Date().toISOString();
-    const artifact = async (kind: EvidenceArtifact["kind"], path: string, mimeType: string, error?: ReturnType<typeof videoError>) => {
-      let bytes: number | null = null, sha256: string | null = null, savedPath: string | null = null;
-      try {
-        const data = await fs.readFile(join(outputDir, path));
-        if (data.length || kind === "encoder_stderr") { bytes = data.length; sha256 = createHash("sha256").update(data).digest("hex"); savedPath = path; }
-      } catch { /* A failed pull may leave no local bytes. */ }
-      const failure = error ?? (savedPath === null ? videoError({ message: "No artifact bytes available" }) : undefined);
-      manifest.artifacts.push({ kind, path: savedPath, bytes, sha256, mimeType, status: savedPath === null ? "failed" : failure ? "partial" : "complete",
-        startedAt: manifest.startedAt, finishedAt: manifest.finishedAt!, durationMs: clock.monotonic() - started, ...(failure ? { error: failure } : {}) });
-    };
-    await fs.writeFile(join(outputDir, "encoder.stderr.txt"), stderrBuffer, { mode: 0o600 });
-    await atomicJson(join(outputDir, "captures.json"), [{ kind: "video", source: "adb_screenrecord", sessionId: state.sessionId,
-      remotePid: state.remotePid, remoteStart: state.remoteStart, exitCode, stopSent, videoVerified, errors: manifest.errors }]);
-    await artifact("video", videoVerified ? "video.mp4" : "video.partial.mp4", "video/mp4", videoVerified ? undefined : manifest.errors.at(-1));
-    const stderrError = stderrTruncated ? { ...videoError({ message: "Encoder stderr exceeded the 1 MiB retention limit" }), component: "encoder_stderr" } : undefined;
-    if (stderrError) manifest.errors.push(stderrError);
-    await artifact("encoder_stderr", "encoder.stderr.txt", "text/plain", stderrError);
-    await artifact("capture_envelopes", "captures.json", "application/json");
-    manifest.status = videoVerified && manifest.errors.length === 0 ? "complete" : manifest.artifacts.some(a => a.kind === "video" && a.path !== null) ? "partial" : "failed";
-    if (state.recoveryRequired) manifest.errors.push(videoError({ code: "EVIDENCE_RECOVERY_REQUIRED", message: `Remote recorder ownership requires manual verification; lock retained. Remote file: ${state.remotePath}` }, "recovery"));
-    await persist();
-    await writeEvidenceManifest(outputDir, manifest);
-    if (!state.recoveryRequired) await releaseLock(state);
+    try {
+      if (manifest.video!.hostDurationMs === 0) manifest.video!.hostDurationMs = clock.monotonic() - started;
+      manifest.finishedAt = new Date().toISOString();
+      const artifact = async (kind: EvidenceArtifact["kind"], path: string, mimeType: string, error?: ReturnType<typeof videoError>) => {
+        let bytes: number | null = null, sha256: string | null = null, savedPath: string | null = null;
+        let readError: unknown;
+        try {
+          const data = await readArtifact(join(outputDir, path));
+          if (data.length || kind === "encoder_stderr") { bytes = data.length; sha256 = createHash("sha256").update(data).digest("hex"); savedPath = path; }
+        } catch (caught) { readError = caught; }
+        const failure = error ?? (savedPath === null ? { ...videoError(readError ?? { message: "No artifact bytes available" }, "artifact"), component: kind } : undefined);
+        if (failure && !manifest.errors.includes(failure)) manifest.errors.push(failure);
+        manifest.artifacts.push({ kind, path: savedPath, bytes, sha256, mimeType, status: savedPath === null ? "failed" : failure ? "partial" : "complete",
+          startedAt: manifest.startedAt, finishedAt: manifest.finishedAt!, durationMs: clock.monotonic() - started, ...(failure ? { error: failure } : {}) });
+      };
+      await fs.writeFile(join(outputDir, "encoder.stderr.txt"), stderrBuffer, { mode: 0o600 });
+      await atomicJson(join(outputDir, "captures.json"), [{ kind: "video", source: "adb_screenrecord", sessionId: state.sessionId,
+        remotePid: state.remotePid, remoteStart: state.remoteStart, exitCode, stopSent, videoVerified, errors: manifest.errors }]);
+      await artifact("video", videoVerified ? "video.mp4" : "video.partial.mp4", "video/mp4", videoVerified ? undefined : manifest.errors.at(-1));
+      const stderrError = stderrTruncated ? { ...videoError({ message: "Encoder stderr exceeded the 1 MiB retention limit" }), component: "encoder_stderr" } : undefined;
+      if (stderrError) manifest.errors.push(stderrError);
+      await artifact("encoder_stderr", "encoder.stderr.txt", "text/plain", stderrError);
+      await artifact("capture_envelopes", "captures.json", "application/json");
+      manifest.status = videoVerified && manifest.artifacts.every(artifact => artifact.status === "complete") && manifest.errors.length === 0 ? "complete" : manifest.artifacts.some(a => a.kind === "video" && a.path !== null) ? "partial" : "failed";
+      if (state.recoveryRequired) manifest.errors.push(videoError({ code: "EVIDENCE_RECOVERY_REQUIRED", message: `Remote recorder ownership requires manual verification; lock retained. Remote file: ${state.remotePath}` }, "recovery"));
+      await persist();
+      await writeEvidenceManifest(outputDir, manifest);
+      if (!state.recoveryRequired) await releaseLock(state);
+    } finally { clearInterval(heartbeatTimer); }
   }
 }
 

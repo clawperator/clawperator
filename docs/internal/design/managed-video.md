@@ -114,3 +114,26 @@ replaced the caller-owned panel. The test then explicitly cleared its own panel;
 a following snapshot reported `operator_overlay_visible: "false"`. Recording,
 frames, command receipts and post-stop screenshots remain in private local
 artifacts rather than tracked source.
+
+
+## Review follow-up
+
+An independent full-branch review identified three lifecycle defects, all repaired:
+normal recorder exit during stop identity verification or signaling skipped media
+finalization; failed artifact reads could leave overall status complete; and a
+host-worker spawn error could leave an owned device lock with no worker.
+
+Stop now continues to media verification only after observing a normal recorder
+close in the race, without repeating a signal. Artifact read errors enter the
+manifest errors and every requested artifact must be complete for success.
+Heartbeats continue through artifact reads and final persistence. Host-worker
+ownership begins at the confirmed spawn event; synchronous and asynchronous spawn
+failures persist a failed startup manifest and release only the nonce-owned lock.
+Regression cases cover each failure, and the reviewer found no remaining
+actionable issues in the follow-up review.
+
+Validation after these repairs passed the Node build, 52 focused evidence tests,
+and the full 1,549-test Node suite. A fresh selected-device recording started and
+stopped successfully, retained the updated on-screen log in decoded frames, and
+passed independent artifact hash/byte-count checks. The test explicitly cleared
+its own panel afterward. The documentation build also passed.

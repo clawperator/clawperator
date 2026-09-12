@@ -32,6 +32,7 @@ export async function videoFixture(options: { failure?: string; stopped?: boolea
   if (options.stopped) await atomicJson(join(outputDir, "stop.json"), { nonce: state.nonce });
   const calls: string[][] = [];
   let child: any;
+  let identityReads = 0;
   const runner: ProcessRunner = {
     runShell: async () => { throw new Error("No host shell allowed"); },
     spawn: (_command, args) => {
@@ -43,8 +44,19 @@ export async function videoFixture(options: { failure?: string; stopped?: boolea
     },
     run: async (command, args) => {
       calls.push([command, ...args]);
+      if (args.some(a => a.endsWith("/cmdline"))) {
+        identityReads++;
+        if (options.failure === "stop-cap-race" && identityReads === 2) {
+          child.emit("close", 0);
+          return { code: 1, stdout: "", stderr: "No such process" };
+        }
+      }
       if (args.some(a => a.endsWith("/cmdline"))) return { code: 0, stderr: "", stdout: `screenrecord\0--size\0${state.size}\0--time-limit\0${1}\0${options.failure === "identity" ? "/other.mp4" : state.remotePath}\0` };
       if (args.some(a => a.endsWith("/stat"))) return { code: 0, stderr: "", stdout: "123 (screenrecord) " + [...Array(19).fill("0"), "456"].join(" ") };
+      if (args.some(a => a.includes("kill -2")) && options.failure === "stop-signal-race") {
+        child.emit("close", 0);
+        return { code: 1, stdout: "", stderr: "No such process" };
+      }
       if (args.some(a => a.includes("kill -2"))) { queueMicrotask(() => child.emit("close", 130)); return { code: 0, stdout: "", stderr: "" }; }
       if (args.includes("pull")) {
         if (options.failure === "pull") return { code: 1, stdout: "", stderr: "disconnected" };
@@ -194,6 +206,23 @@ describe("video start preflight and CLI", () => {
         await assert.rejects(startVideo({ deviceId: "test-device", durationSeconds: 10 }, { config, baseDir: root }), (e: any) => e.code === "EVIDENCE_CAPTURE_FAILED" && e.message.includes(missingTool));
         await assert.rejects(fs.stat(lock));
       }
+      runner.run = originalRun;
+      for (const synchronous of [false, true]) {
+        runner.spawn = () => {
+          const error = Object.assign(new Error("Worker spawn resource exhausted"), { code: "EAGAIN" });
+          if (synchronous) throw error;
+          const child = Object.assign(new EventEmitter(), { unref: () => undefined });
+          queueMicrotask(() => child.emit("error", error));
+          return child;
+        };
+        const result = await startVideo({ deviceId: "test-device", durationSeconds: 10 }, { config, baseDir: root });
+        assert.equal(result.status, "failed");
+        assert.equal(result.code, "EVIDENCE_CAPTURE_FAILED");
+        assert.equal((await videoStatus({ session: result.manifestPath })).status, "failed");
+        const manifest = JSON.parse(await fs.readFile(result.manifestPath, "utf8"));
+        assert.equal(manifest.errors.at(-1).code, "EAGAIN");
+        await assert.rejects(fs.stat(lock), "A known spawn failure must not reserve the device");
+      }
     } finally { await fs.rm(root, { recursive: true, force: true }); }
   });
   it("enforces a hard subprocess timeout even when SIGTERM is ignored", async () => {
@@ -242,3 +271,36 @@ it("a recorder that outlives its cap requires recovery without broad process ter
     assert.ok(!f.calls.some(a => a.some(v => /killall|pkill/.test(v))));
   } finally { await f.cleanup(); }
 });
+
+
+for (const failure of ["stop-cap-race", "stop-signal-race"]) {
+  it(`finalizes an observed normal recorder exit during ${failure}`, async () => {
+    const f = await videoFixture({ failure, stopped: true });
+    try {
+      await runVideoWorker(f.outputDir, f.runner);
+      const manifest = JSON.parse(await fs.readFile(f.path, "utf8"));
+      assert.equal(manifest.status, "complete");
+      assert.equal(manifest.video.stopReason, "duration_cap");
+      assert.ok(f.calls.some(args => args.includes("pull")));
+      assert.ok(f.calls.filter(args => args.some(arg => arg.includes("kill -2"))).length <= 1);
+      await assert.rejects(fs.stat(f.state.lockPath));
+    } finally { await f.cleanup(); }
+  });
+}
+for (const filename of ["video.mp4", "encoder.stderr.txt", "captures.json"]) {
+  it(`never reports complete when final ${filename} cannot be read`, async () => {
+    const f = await videoFixture();
+    try {
+      const readArtifact = (async (path: Parameters<typeof fs.readFile>[0]) => {
+        if (String(path).endsWith(filename)) throw Object.assign(new Error("Artifact read denied"), { code: "EACCES" });
+        return fs.readFile(path);
+      }) as typeof fs.readFile;
+      await runVideoWorker(f.outputDir, f.runner, undefined, readArtifact);
+      const manifest = JSON.parse(await fs.readFile(f.path, "utf8"));
+      assert.equal(manifest.status, filename === "video.mp4" ? "failed" : "partial");
+      assert.ok(manifest.errors.some((error: any) => error.code === "EACCES" && error.stage === "artifact"));
+      assert.equal((await videoStatus({ session: f.path })).ok, false);
+      assert.equal((await stopVideo({ session: f.path })).ok, false);
+    } finally { await f.cleanup(); }
+  });
+}

@@ -4936,7 +4936,10 @@ Failed verification retains partial bytes and errors. `encoder.stderr.txt` and
 `captures.json` retain encoder diagnostics and the host recorder receipt; neither
 is an invented Operator result. An empty stderr artifact is valid and hashed. Stderr retention is capped at
 1 MiB; truncation is reported as a partial artifact and bundle error.
-Metadata failures produce partial status even when the video itself is usable.
+Every requested artifact must be readable and complete before the bundle can
+report success. Artifact-read failures retain their underlying error; an unreadable
+video fails the bundle, while an unreadable receipt or stderr makes usable video
+partial. Metadata failures also produce partial status when the video is usable.
 
 One exclusive lock per device lives under `~/.clawperator/evidence/locks`.
 `session.json` keeps the random nonce, host PID/start identity, remote PID/start
@@ -4953,6 +4956,10 @@ lock, rather than fabricating a finalized recording. Inspect `session.json`, the
 remote file and recorder identity before manual recovery; never remove a lock
 based on age alone or signal a PID without checking its identity. The device-side
 duration cap bounds a surviving recorder. No automatic stale-lock takeover occurs.
+If recorder termination wins a race with stop, an observed normal exit still
+proceeds through pull and media verification; an uncertain failure never permits
+signaling again. A confirmed failure to spawn the host worker records a failed
+startup manifest and releases its own lock because no recorder was started.
 Remote temporary media is removed only after successful pull and verification;
 failed captures retain their remote path for recovery.
 
