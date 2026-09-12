@@ -307,10 +307,10 @@ class UiTreeManagerAndroid(
 
             // Best-effort focus before setting text.
             if (!target.isFocused) {
-                observeDispatch(target, "accessibility_action", false)
-                observeDispatch(target, "accessibility_action", target.performAction(AccessibilityNodeInfo.ACTION_FOCUS))
-                observeDispatch(target, "accessibility_action", false)
-                observeDispatch(target, "accessibility_action", target.performAction(AccessibilityNodeInfo.ACTION_CLICK))
+                observeDispatch(target, "accessibility_action", false, blocksRetry = false)
+                observeDispatch(target, "accessibility_action", target.performAction(AccessibilityNodeInfo.ACTION_FOCUS), blocksRetry = false)
+                observeDispatch(target, "accessibility_action", false, blocksRetry = false)
+                observeDispatch(target, "accessibility_action", target.performAction(AccessibilityNodeInfo.ACTION_CLICK), blocksRetry = false)
             }
 
             // Clear via ACTION_SET_TEXT with an empty CharSequence so clear=true fails
@@ -320,8 +320,7 @@ class UiTreeManagerAndroid(
                     Bundle().apply {
                         putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
                     }
-                observeDispatch(target, "accessibility_action", false)
-                val clearSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, clearArgs)
+                val clearSucceeded = dispatchTextReplacement(target, clearArgs)
                 if (!clearSucceeded) {
                     Log.d(
                         "[UiTreeManager] enter_text strategy=$name clear_failed for id=${request.uiNode.id} on ${target.debugNodeRedacted()}",
@@ -335,9 +334,7 @@ class UiTreeManagerAndroid(
                     putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, request.text)
                 }
 
-            observeDispatch(target, "accessibility_action", false)
-            val setTextSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
-            observeDispatch(target, "accessibility_action", setTextSucceeded)
+            val setTextSucceeded = dispatchTextReplacement(target, args)
             if (!setTextSucceeded) {
                 Log.d(
                     "[UiTreeManager] enter_text strategy=$name set_text_failed for id=${request.uiNode.id} on ${target.debugNodeRedacted()}",
@@ -346,6 +343,20 @@ class UiTreeManagerAndroid(
             }
 
             return TextEntryAttemptResult(submitMethod = performLegacySubmit(target, request.submit))
+        }
+
+        // A rejected set-text action can fall back to an editor session on a later attempt.
+        // Successful or uncertain mutations must never be replayed by the outer retry loop.
+        private suspend fun dispatchTextReplacement(target: AccessibilityNodeInfo, args: Bundle): Boolean {
+            observeDispatch(target, "accessibility_action", false, blocksRetry = false)
+            val accepted = try {
+                target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+            } catch (error: Exception) {
+                observeDispatch(target, "accessibility_action", false)
+                throw error
+            }
+            observeDispatch(target, "accessibility_action", accepted, blocksRetry = accepted)
+            return accepted
         }
 
         private fun performLegacySubmit(
@@ -391,10 +402,10 @@ class UiTreeManagerAndroid(
             val target = request.target
 
             if (!target.isFocused) {
-                observeDispatch(target, "accessibility_action", false)
-                observeDispatch(target, "accessibility_action", target.performAction(AccessibilityNodeInfo.ACTION_FOCUS))
-                observeDispatch(target, "accessibility_action", false)
-                observeDispatch(target, "accessibility_action", target.performAction(AccessibilityNodeInfo.ACTION_CLICK))
+                observeDispatch(target, "accessibility_action", false, blocksRetry = false)
+                observeDispatch(target, "accessibility_action", target.performAction(AccessibilityNodeInfo.ACTION_FOCUS), blocksRetry = false)
+                observeDispatch(target, "accessibility_action", false, blocksRetry = false)
+                observeDispatch(target, "accessibility_action", target.performAction(AccessibilityNodeInfo.ACTION_CLICK), blocksRetry = false)
                 // InputMethod session ownership updates asynchronously after focus changes.
                 // Stop here and let the existing UiReadiness retry rerun once the editor session
                 // catches up instead of mutating a stale or not-yet-started connection.

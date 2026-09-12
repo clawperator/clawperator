@@ -30,6 +30,11 @@ per-node sensitivity metadata from hierarchy access.
   a failed gesture outcome. Accessibility text-input APIs are recorded as
   `accessibility_action`; this field does not claim which application state
   ultimately persisted.
+- Text-entry focus preparation and rejected `ACTION_SET_TEXT` calls preserve
+  readiness retries so an asynchronous editor session can become available.
+  Accepted text replacement, partial input-connection mutation, and uncertain
+  dispatch failures block outer retries. Receipt fields still report dispatch
+  evidence independently of this retry decision.
 - Scroll comparison requires re-resolution of the same scoped container.
   Platform node identity is preferred. Without it, comparison requires a
   unique resource/class match and unchanged bounds, path, and ancestor context.

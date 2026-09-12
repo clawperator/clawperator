@@ -446,6 +446,57 @@ class UiTreeManagerAndroidTest {
             assertEquals(emptyList(), session.operations)
         }
 
+    @Test
+    fun `enter text retries focus handoff through the real manager without replaying text`() = runTest {
+        val session = FakeTextInputSession(initialText = "existing")
+        val manager = createManager(FakeTextInputConnectionSource(session))
+        val nodeInfo = editableNode(includeSetTextAction = false).apply { isFocused = false }
+        var captures = 0
+        val inspector = object : UiTreeInspector {
+            override suspend fun getCurrentUiElements() = error("unused")
+            override suspend fun getCurrentUiTree(): UiTree {
+                // Model the asynchronous focus handoff completing before the retry capture.
+                if (++captures > 1) nodeInfo.isFocused = true
+                return UiTree(uiNode(nodeInfo))
+            }
+            override suspend fun getCurrentWindowMetadata(): UiWindowMetadata? = null
+            override suspend fun getCurrentUiHierarchyDump(): String? = null
+        }
+        val formatter = java.lang.reflect.Proxy.newProxyInstance(
+            UiTreeFormatter::class.java.classLoader, arrayOf(UiTreeFormatter::class.java),
+        ) { _, _, _ -> error("unused") } as UiTreeFormatter
+        val ui = clawperator.task.runner.TaskUiScopeDefault(inspector,
+            object : UiTreeFilterer { override fun filterOnScreenOnly(uiTree: UiTree) = uiTree },
+            formatter, manager, backgroundScope)
+        val receipt = clawperator.task.runner.ActionReceipt()
+        kotlinx.coroutines.withContext(receipt + receipt.observation) {
+            ui.enterText(clawperator.task.runner.NodeMatcher(textEquals = "Field"), "hello",
+                retry = clawperator.task.runner.TaskRetry(3))
+        }
+        assertEquals(2, captures)
+        assertEquals("hello", session.text)
+        assertEquals(1, session.operations.count { it.startsWith("commitText(") })
+        assertTrue(receipt.observation.retryBlocked)
+        assertEquals("true", receipt.stepData()["dispatch_accepted"])
+    }
+
+    @Test
+    fun `successful clear blocks retry even when subsequent text replacement is rejected`() = runTest {
+        val manager = createManager()
+        val nodeInfo = editableNode()
+        Shadow.extract<ShadowAccessibilityNodeInfo>(nodeInfo).setOnPerformActionListener { action, args ->
+            action == AccessibilityNodeInfo.ACTION_SET_TEXT &&
+                args?.getCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE) == ""
+        }
+        val observer = UiDispatchObservation { _, _, _ -> }
+        val success = kotlinx.coroutines.withContext(observer) {
+            manager.setText(uiNode(nodeInfo), "hello", submit = false, clear = true)
+        }
+        assertFalse(success)
+        assertTrue(observer.retryBlocked)
+        assertEquals(listOf("", "hello"), performedSetTextValues(nodeInfo))
+    }
+
     private fun editableNode(
         includeImeEnterAction: Boolean = false,
         includeSetTextAction: Boolean = true,

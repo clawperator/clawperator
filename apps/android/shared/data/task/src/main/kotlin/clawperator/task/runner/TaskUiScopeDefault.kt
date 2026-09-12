@@ -95,7 +95,7 @@ class TaskUiScopeDefault(
             } catch (t: Throwable) {
                 if (t is kotlinx.coroutines.CancellationException) throw t
                 if (t is StrictSelectionException && t.code != "NODE_NOT_FOUND") throw t
-                if (attempt >= retry.maxAttempts || kotlin.coroutines.coroutineContext[ActionReceipt]?.dispatchAttempted == true) {
+                if (attempt >= retry.maxAttempts || kotlin.coroutines.coroutineContext[clawperator.uitree.UiDispatchObservation]?.retryBlocked == true) {
                     Log.e(TAG, "$operation failed after $attempt attempts: ${t.message}")
                     val failureData = failurePayload(t, attempt)
                     val reason =

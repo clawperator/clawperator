@@ -19,7 +19,6 @@ class ActionReceipt : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<ActionReceipt>
     private val started = TimeSource.Monotonic.markNow()
     private val data = mutableMapOf("dispatch_method" to "none", "dispatch_accepted" to "false")
-    val dispatchAttempted: Boolean get() = data["dispatch_method"] != "none"
     private var tree: UiTree? = null
     private var matched: UiNode? = null
 
