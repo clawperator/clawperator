@@ -481,6 +481,61 @@ class UiTreeManagerAndroidTest {
     }
 
     @Test
+    fun `uncertain focus preparation blocks retries in both text entry strategies`() = runTest {
+        for (failingAction in listOf(AccessibilityNodeInfo.ACTION_FOCUS, AccessibilityNodeInfo.ACTION_CLICK)) {
+            // The legacy strategy prepares focus first; the input-connection fallback prepares it second.
+            for (failingPreparation in 1..2) {
+                val session = FakeTextInputSession(initialText = "existing")
+                val manager = createManager(FakeTextInputConnectionSource(session))
+                val nodeInfo = editableNode(includeSetTextAction = false).apply { isFocused = false }
+                val failure = IllegalStateException("Focus preparation dispatched but result unavailable")
+                var actionAttempts = 0
+                var captures = 0
+                Shadow.extract<ShadowAccessibilityNodeInfo>(nodeInfo).setOnPerformActionListener { action, _ ->
+                    if (action == failingAction && ++actionAttempts == failingPreparation) {
+                        throw failure
+                    }
+                    action != AccessibilityNodeInfo.ACTION_SET_TEXT
+                }
+                val inspector = object : UiTreeInspector {
+                    override suspend fun getCurrentUiElements() = error("unused")
+                    override suspend fun getCurrentUiTree(): UiTree {
+                        captures++
+                        return UiTree(uiNode(nodeInfo))
+                    }
+                    override suspend fun getCurrentWindowMetadata(): UiWindowMetadata? = null
+                    override suspend fun getCurrentUiHierarchyDump(): String? = null
+                }
+                val formatter = java.lang.reflect.Proxy.newProxyInstance(
+                    UiTreeFormatter::class.java.classLoader, arrayOf(UiTreeFormatter::class.java),
+                ) { _, _, _ -> error("unused") } as UiTreeFormatter
+                val ui = clawperator.task.runner.TaskUiScopeDefault(
+                    inspector,
+                    object : UiTreeFilterer { override fun filterOnScreenOnly(uiTree: UiTree) = uiTree },
+                    formatter, manager, backgroundScope,
+                )
+                val receipt = clawperator.task.runner.ActionReceipt()
+                val thrown = kotlin.test.assertFailsWith<IllegalStateException> {
+                    kotlinx.coroutines.withContext(receipt + receipt.observation) {
+                        ui.enterText(
+                            clawperator.task.runner.NodeMatcher(textEquals = "Field"), "hello",
+                            retry = clawperator.task.runner.TaskRetry(3),
+                        )
+                    }
+                }
+                val scenario = "action=$failingAction preparation=$failingPreparation"
+                assertEquals(failure.message, thrown.message, scenario)
+                assertEquals(1, captures, scenario)
+                assertEquals(failingPreparation, actionAttempts, scenario)
+                assertTrue(receipt.observation.retryBlocked, scenario)
+                assertEquals("false", receipt.stepData()["dispatch_accepted"], scenario)
+                assertEquals("existing", session.text, scenario)
+                assertTrue(session.operations.isEmpty(), scenario)
+            }
+        }
+    }
+
+    @Test
     fun `successful clear blocks retry even when subsequent text replacement is rejected`() = runTest {
         val manager = createManager()
         val nodeInfo = editableNode()

@@ -307,10 +307,7 @@ class UiTreeManagerAndroid(
 
             // Best-effort focus before setting text.
             if (!target.isFocused) {
-                observeDispatch(target, "accessibility_action", false, blocksRetry = false)
-                observeDispatch(target, "accessibility_action", target.performAction(AccessibilityNodeInfo.ACTION_FOCUS), blocksRetry = false)
-                observeDispatch(target, "accessibility_action", false, blocksRetry = false)
-                observeDispatch(target, "accessibility_action", target.performAction(AccessibilityNodeInfo.ACTION_CLICK), blocksRetry = false)
+                prepareTextEntryFocus(target)
             }
 
             // Clear via ACTION_SET_TEXT with an empty CharSequence so clear=true fails
@@ -402,10 +399,7 @@ class UiTreeManagerAndroid(
             val target = request.target
 
             if (!target.isFocused) {
-                observeDispatch(target, "accessibility_action", false, blocksRetry = false)
-                observeDispatch(target, "accessibility_action", target.performAction(AccessibilityNodeInfo.ACTION_FOCUS), blocksRetry = false)
-                observeDispatch(target, "accessibility_action", false, blocksRetry = false)
-                observeDispatch(target, "accessibility_action", target.performAction(AccessibilityNodeInfo.ACTION_CLICK), blocksRetry = false)
+                prepareTextEntryFocus(target)
                 // InputMethod session ownership updates asynchronously after focus changes.
                 // Stop here and let the existing UiReadiness retry rerun once the editor session
                 // catches up instead of mutating a stale or not-yet-started connection.
@@ -524,5 +518,20 @@ class UiTreeManagerAndroid(
             val reason: String,
             val partialFailure: Boolean = false,
         ) : ReplaceTextResult
+    }
+}
+
+// Completed focus preparation permits readiness retries, but an exception leaves
+// the dispatch outcome uncertain and must prevent the outer loop from replaying it.
+private suspend fun prepareTextEntryFocus(target: AccessibilityNodeInfo) {
+    for (action in listOf(AccessibilityNodeInfo.ACTION_FOCUS, AccessibilityNodeInfo.ACTION_CLICK)) {
+        observeDispatch(target, "accessibility_action", false, blocksRetry = false)
+        val accepted = try {
+            target.performAction(action)
+        } catch (error: Exception) {
+            observeDispatch(target, "accessibility_action", false)
+            throw error
+        }
+        observeDispatch(target, "accessibility_action", accepted, blocksRetry = false)
     }
 }
