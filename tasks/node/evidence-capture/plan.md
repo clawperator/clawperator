@@ -14,13 +14,18 @@ Excluded: HTML reports, QA verdicts, uploads, permanent artifact retention servi
 
 | Item | Value |
 | --- | --- |
-| State | Not started |
+| State | PR-1 locally complete; PR-2 not started |
 | Total PRs | 2 |
 | Total phases | 2 |
-| Completed | None |
-| Remaining | 1-2 |
-| Current / Next | Phase 1 |
-| Blockers | None |
+| Completed | Phase 1 in `7c5cb8d`; pending merge |
+| Remaining | Phase 2 |
+| Current / Next | Phase 2 after PR-1 merges |
+| Blockers | PR-2 requires PR-1 merged |
+
+PR-1's shipped contract is [Still Evidence Bundles](../../../docs/api/evidence.md),
+with [implementation and validation](../../../docs/internal/design/still-evidence.md).
+The contracts below continue to govern the remaining managed-video phase; the
+current shared schema intentionally covers still evidence only.
 
 ## Sources
 
