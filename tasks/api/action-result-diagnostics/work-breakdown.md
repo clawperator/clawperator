@@ -1,10 +1,10 @@
 # Report action outcomes and failures precisely Work Breakdown
 
-Parent plan: `tasks/action-result-diagnostics/plan.md`
+Parent plan: `tasks/api/action-result-diagnostics/plan.md`
 
 ## Executive Summary
 
-1 PR(s), 1 phase(s); phase N ships in PR-N. Implementation has not started. Each phase includes its own tests and docs. One bounded implementation PR.
+One PR and one phase. Implementation has not started. Each phase includes its own tests and docs. One bounded implementation PR.
 
 ## Status
 
@@ -14,11 +14,13 @@ Parent plan: `tasks/action-result-diagnostics/plan.md`
 | Total PRs | 1 |
 | Total phases | 1 |
 | Completed | None |
-| Remaining | 1-1 |
+| Remaining | Phase 1 |
 | Current / Next | Phase 1 |
-| Blockers | Both selector-inspection PRs merged |
+| Blockers | Await both PRs in `tasks/api/selector-inspection` |
 
 ## Hard Rules
+
+- Follow the dependency and release gates in `tasks/releases/v0.10/plan.md`. Implement only the requested PR; where this pack has two PRs, merge the first before starting the second. Update both task status tables and the release row after each merged PR.
 
 - Follow the parent contract; do not invent alternative default behavior.
 - Use branch-local Node output and the matching debug Operator for implementation validation. Never repair or uninstall packages on a device used by another task.
@@ -37,7 +39,7 @@ Read these files IN THIS ORDER before writing anything.
 | Topic | Authority |
 | --- | --- |
 | Governing repository rules | `AGENTS.md` |
-| Stable task contract | `tasks/action-result-diagnostics/plan.md` |
+| Stable task contract | `tasks/api/action-result-diagnostics/plan.md` |
 | Engine | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt` |
 | UI actions | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/TaskUiScopeDefault.kt` |
 | Dispatch mechanism | `apps/android/shared/data/uitree/src/main/kotlin/clawperator/uitree/UiTreeManagerAndroid.kt` |
@@ -54,7 +56,7 @@ Read these files IN THIS ORDER before writing anything.
 
 | PR | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
-| PR-1 | Receipts and failure preservation | 1 | thinking | Both selector-inspection PRs merged |
+| PR-1 | Receipts and failure preservation | 1 | thinking | Await both PRs in `tasks/api/selector-inspection` |
 
 ## Phase 1: Receipts and failure preservation
 
@@ -93,7 +95,9 @@ Ship bounded, truthful action diagnostics.
 ### Acceptance Criteria
 
 - A wait timeout after one completed step retains both that step and one failed wait result with WAIT_TIMEOUT.
+- Missing-root diagnostics distinguish unavailable service/root/metadata, and do not make the app root a prerequisite for raw overlay actions. Existing ON_SCREEN_LOG_* failures remain unchanged.
 - Known missing root and target failures carry codes; unknown exceptions preserve text; timeout/cancellation emits one terminal result.
+- Ancestor-click and coordinate-fallback receipts name the actual dispatch target/method while retaining the matched target.
 - Click accepted without screen change remains accepted, never a fabricated verified success.
 - Lost/missing/unchanged/changed scroll evidence maps exactly to the table; loops stay bounded and strict ambiguous container dispatch count is zero.
 - Node CLI exits nonzero on failed terminal envelopes while preserving JSON and correlation IDs.

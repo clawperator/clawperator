@@ -1,10 +1,10 @@
 # Inspect and disambiguate UI selectors Work Breakdown
 
-Parent plan: `tasks/selector-inspection/plan.md`
+Parent plan: `tasks/api/selector-inspection/plan.md`
 
 ## Executive Summary
 
-2 PR(s), 2 phase(s); phase N ships in PR-N. Implementation has not started. Each phase includes its own tests and docs. Do not start PR-2 until PR-1 is merged.
+Two PRs and two phases; phase N ships in PR-N. Implementation has not started. Each phase includes its own tests and docs. Do not start PR-2 until PR-1 is merged.
 
 ## Status
 
@@ -19,6 +19,8 @@ Parent plan: `tasks/selector-inspection/plan.md`
 | Blockers | None |
 
 ## Hard Rules
+
+- Follow the dependency and release gates in `tasks/releases/v0.10/plan.md`. Implement only the requested PR; where this pack has two PRs, merge the first before starting the second. Update both task status tables and the release row after each merged PR.
 
 - Follow the parent contract; do not invent alternative default behavior.
 - Use branch-local Node output and the matching debug Operator for implementation validation. Never repair or uninstall packages on a device used by another task.
@@ -37,7 +39,7 @@ Read these files IN THIS ORDER before writing anything.
 | Topic | Authority |
 | --- | --- |
 | Governing repository rules | `AGENTS.md` |
-| Stable task contract | `tasks/selector-inspection/plan.md` |
+| Stable task contract | `tasks/api/selector-inspection/plan.md` |
 | Selector contract | `apps/node/src/contracts/selectors.ts` |
 | Validation | `apps/node/src/domain/executions/validateExecution.ts` |
 | Android matcher | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/NodeMatcher.kt` |
@@ -103,7 +105,7 @@ Ship read-only queries and the shared resolver.
 - Empty-label switches count as nodes, while missing nodes yield totalMatches 0.
 - Ancestor and descendant AND semantics isolate the intended subtree; self never satisfies relationship.
 - Unknown state stays null, checked false stays false, duplicate paths are unique within one snapshot.
-- Visibility all versus on_screen, limit truncation, malformed matcher JSON, nested predicates, invalid/missing flag values, and CLI/MCP/raw parity are covered.
+- Empty predicates, hidden descendant labels, a pruned ancestor, response overflow, visibility all versus on_screen, limit truncation, malformed matcher JSON, nested predicates, invalid/missing flag values, and CLI/MCP/raw parity are covered.
 - Raw XML remains available with additive visibility metadata; no guessed occlusion filter is introduced.
 - Human review: output accuracy matches observed evidence; scope covers the named surfaces only; important claims trace to tests or findings; schema, section order, and public help match the contract.
 
@@ -171,7 +173,7 @@ Make ambiguous actions fail before dispatch when strict is requested.
 
 ### Acceptance Criteria
 
-- Zero, one, and two target matches have the exact decision-table outcomes.
+- Zero, one, and two target matches have the action-specific decision-table outcomes. With a fake clock/tree sequence, prove a strict wait succeeds when a unique target appears later; prove strict scroll search advances while the target is absent and stops when it appears. Ambiguity always dispatches zero target actions.
 - Container ambiguity is rejected before child selection; read all permits many targets only in a unique scope.
 - A query followed by a changed tree cannot authorize a stale target; strict resolution runs again.
 - Every listed action propagates strict consistently across CLI, raw execution, and MCP; legacy omitted strict retains behavior.

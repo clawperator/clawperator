@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Let callers inspect a concise hierarchy without losing access to the unmodified raw snapshot. This pack has 1 PR(s), one phase per PR, and is not started. All implementation, tests, and public documentation ship together.
+Let callers inspect a concise hierarchy without losing access to the unmodified raw snapshot. This pack has one PR and one phase, and is not started. All implementation, tests, and public documentation ship together.
 
 ## Status
 
@@ -12,9 +12,9 @@ Let callers inspect a concise hierarchy without losing access to the unmodified 
 | Total PRs | 1 |
 | Total phases | 1 |
 | Completed | None |
-| Remaining | 1-1 |
+| Remaining | Phase 1 |
 | Current / Next | Phase 1 |
-| Blockers | selector-inspection PR-1 merged for additive XML visibility; PR-2 is not required |
+| Blockers | Await `tasks/api/selector-inspection` PR-1; PR-2 is not required |
 
 ## Goal
 
@@ -54,7 +54,7 @@ Extend only the existing surfaces named below and the explicitly named new files
 | Existing tests | `apps/node/src/test/unit/snapshotHelper.test.ts` |
 | MCP tests | `apps/node/src/test/integration/mcp.test.ts` |
 
-The inspected baseline is main commit `5d23af5`. Installed-runtime observations came from CLI/Operator 0.9.5; do not assume the checkout and device are identical. Recheck these source seams after dependency merges. New identifiers below are proposed contracts to implement, not claims about shipped behavior.
+Initial investigation used `5d23af5`; the final task audit used merged main `120c1eb`, including the shipped on-screen-log raw API. Preserve its controller-owned overlay identity, visibility metadata, canonical error codes, and strict input aliases. Installed-runtime observations came from CLI/Operator 0.9.5; do not assume the checkout and device are identical. Recheck these source seams after dependency merges. New identifiers below are proposed contracts to implement, not claims about shipped behavior.
 
 ## Deterministic Versus Judgment
 
@@ -78,9 +78,9 @@ False success, loss of original failure evidence, duplicated contract logic, and
 
 ## Output Contract
 
-Add CLI snapshot `--compact`, `--max-nodes` (1..1000, default 100), `--max-text-chars` (1..4096, default 256), `--raw-path` (nonblank host path, must not exist). max-nodes/max-text-chars require compact; raw-path is valid with either output. MCP accepts corresponding camelCase fields. Keep existing maxChars behavior for raw callers.
+Add CLI snapshot `--compact`, `--max-nodes` (1..1000, default 100), `--max-text-chars` (1..4096, default 256), `--raw-path` (nonblank host path, must not exist). max-nodes/max-text-chars require compact; raw-path is valid with either output. A file write error fails the formatting/capture command with a structured error and nonzero status, while retaining the original execution envelope; do not relabel a failed artifact write as success. MCP accepts compact/maxNodes/maxTextChars and `saveRaw?:boolean`; reject caller-provided rawPath. saveRaw writes to an exclusively created runtime-managed temporary file and returns rawArtifactPath. CLI raw-path remains caller-controlled. Preserve the existing MCP prohibition on arbitrary host output paths. Keep existing maxChars behavior for raw callers.
 
-Compact JSON has `{schemaVersion:1, commandId, taskId, rawArtifactPath?, totalNodes, returnedNodes, omittedNodes, truncated, nodes:[...]}`. Nodes retain preorder `nodePath`, `parentPath`, resourceId, className, text, contentDescription, bounds, and checked/checkable/selected/enabled/clickable/scrollable/visibleToUser states. Distinguish unknown from false; use native JSON types. Preserve hierarchy containers, including unlabeled ones, because ancestry disambiguates controls. Full-tree preorder prefix means parents precede included children. Do not drop offscreen or obscured nodes heuristically. Field truncation uses Unicode code points, marks `textTruncated` and `contentDescriptionTruncated`, and contributes to top-level truncated. Budgeting is node count plus per-field length, not a claimed exact tokenizer budget.
+Compact JSON has `{schemaVersion:1, commandId, taskId, rawArtifactPath?, totalNodes, returnedNodes, omittedNodes, truncated, nodes:[...]}`. Node paths are child-index paths rooted at "0" in this raw XML capture only, not persistent handles or guaranteed query IDs. Nodes retain preorder `nodePath`, `parentPath`, resourceId, className, text, contentDescription, bounds, and checked/checkable/selected/enabled/clickable/scrollable/visibleToUser states. Distinguish unknown from false; use native JSON types. Preserve hierarchy containers, including unlabeled ones, because ancestry disambiguates controls. Full-tree preorder prefix means parents precede included children. Do not drop offscreen or obscured nodes heuristically. Field truncation uses Unicode code points, marks `textTruncated` and `contentDescriptionTruncated`, and contributes to top-level truncated. Budgeting is node count plus per-field length, not a claimed exact tokenizer budget.
 
 Store raw XML exactly as received when raw-path is supplied, using exclusive creation. Compact projection does not overwrite the canonical envelope internally or alter the execution verdict. Present it as an additive `compact` field alongside execution metadata, omitting duplicate raw XML from the compact CLI/MCP response only. Keep raw success/failure metadata and error codes. Add one shared projection module for CLI and MCP; do not write a second selector engine. XML parser must reject DTD/external entities and handle escaped attributes. Use an existing suitable parser or add a small maintained dependency with these features verified; do not parse XML via regex.
 

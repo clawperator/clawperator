@@ -4,7 +4,7 @@ Parent plan: `tasks/node/scaffold-failure-propagation/plan.md`
 
 ## Executive Summary
 
-1 PR(s), 1 phase(s); phase N ships in PR-N. Implementation has not started. Each phase includes its own tests and docs. One bounded implementation PR.
+One PR and one phase. Implementation has not started. Each phase includes its own tests and docs. One bounded implementation PR.
 
 ## Status
 
@@ -14,11 +14,13 @@ Parent plan: `tasks/node/scaffold-failure-propagation/plan.md`
 | Total PRs | 1 |
 | Total phases | 1 |
 | Completed | None |
-| Remaining | 1-1 |
+| Remaining | Phase 1 |
 | Current / Next | Phase 1 |
 | Blockers | None |
 
 ## Hard Rules
+
+- Follow the dependency and release gates in `tasks/releases/v0.10/plan.md`. Implement only the requested PR; where this pack has two PRs, merge the first before starting the second. Update both task status tables and the release row after each merged PR.
 
 - Follow the parent contract; do not invent alternative default behavior.
 - Use branch-local Node output and the matching debug Operator for implementation validation. Never repair or uninstall packages on a device used by another task.
@@ -84,7 +86,7 @@ Ship the narrow fix with tests of generated scripts.
 
 ### Validation
 
-Run from repository root, in order. Unit/subprocess tests are the primary reproducible gate. Live checks prove device integration only and require a dedicated target with the matching debug Operator, enabled accessibility, and an unlocked screen. A skipped live check is not a pass; record its unmet prerequisite.
+Run from repository root, in order. Tests execute the real generated script against controlled child processes. No Android install or live device is required for this template-only change.
 
 ```sh
 npm --prefix apps/node ci

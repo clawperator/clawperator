@@ -20,6 +20,8 @@ Two PRs, four sequential phases. PR-1 contains Phases 1-2: render/controller pro
 
 ## Hard Rules
 
+- Release ordering and shared-file coordination are tracked in `tasks/releases/v0.10/plan.md`. PR-1 remains merged; update the R3 row when PR-2 merges.
+
 - Implement one phase at a time. Run its tests, fix failures, update findings/status, and commit before the next phase.
 - PR-2 prerequisites are satisfied by `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d` and the user's explicit continuation. Implement Phases 3-4 only; do not reimplement Phases 1-2.
 - Preserve unrelated working-tree changes. Use branch-local Node build and the debug Operator for live checks. Never use a global CLI to prove new commands.

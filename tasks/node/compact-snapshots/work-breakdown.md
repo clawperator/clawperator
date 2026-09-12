@@ -4,7 +4,7 @@ Parent plan: `tasks/node/compact-snapshots/plan.md`
 
 ## Executive Summary
 
-1 PR(s), 1 phase(s); phase N ships in PR-N. Implementation has not started. Each phase includes its own tests and docs. One bounded implementation PR.
+One PR and one phase. Implementation has not started. Each phase includes its own tests and docs. One bounded implementation PR.
 
 ## Status
 
@@ -14,11 +14,13 @@ Parent plan: `tasks/node/compact-snapshots/plan.md`
 | Total PRs | 1 |
 | Total phases | 1 |
 | Completed | None |
-| Remaining | 1-1 |
+| Remaining | Phase 1 |
 | Current / Next | Phase 1 |
-| Blockers | selector-inspection PR-1 merged for additive XML visibility; PR-2 is not required |
+| Blockers | Await `tasks/api/selector-inspection` PR-1; PR-2 is not required |
 
 ## Hard Rules
+
+- Follow the dependency and release gates in `tasks/releases/v0.10/plan.md`. Implement only the requested PR; where this pack has two PRs, merge the first before starting the second. Update both task status tables and the release row after each merged PR.
 
 - Follow the parent contract; do not invent alternative default behavior.
 - Use branch-local Node output and the matching debug Operator for implementation validation. Never repair or uninstall packages on a device used by another task.
@@ -52,7 +54,7 @@ Read these files IN THIS ORDER before writing anything.
 
 | PR | Purpose | Included phases | Agent tier | Merge gate |
 | --- | --- | --- | --- | --- |
-| PR-1 | Projection and public options | 1 | default | selector-inspection PR-1 merged for additive XML visibility; PR-2 is not required |
+| PR-1 | Projection and public options | 1 | default | Await `tasks/api/selector-inspection` PR-1; PR-2 is not required |
 
 ## Phase 1: Projection and public options
 
@@ -88,6 +90,7 @@ Ship compact snapshot formatting without changing capture semantics.
 - Raw XML output is byte-for-byte preserved in its artifact; default snapshot callers are unchanged.
 - Node-boundary truncation yields valid JSON, truthful omitted counts, and retained parent paths.
 - Malformed XML and malicious entity declarations fail explicitly; absent visibility stays null.
+- MCP rejects arbitrary rawPath, saveRaw returns a runtime-owned artifact, and default raw-mode callers stay unchanged.
 - Invalid/missing flag values, blank paths, output collisions, compact/maxChars conflict, and CLI/MCP equivalence are covered.
 - Compact output includes all retained state fields; no duplicate full XML appears in compact presentation.
 - Human review: output accuracy matches observed evidence; scope covers the named surfaces only; important claims trace to tests or findings; schema, section order, and public help match the contract.

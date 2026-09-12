@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Make generated skill scripts preserve failed child-process status and diagnostic streams. This pack has 1 PR(s), one phase per PR, and is not started. All implementation, tests, and public documentation ship together.
+Make generated skill scripts preserve failed child-process status and diagnostic streams. This pack has one PR and one phase, and is not started. All implementation, tests, and public documentation ship together.
 
 ## Status
 
@@ -12,7 +12,7 @@ Make generated skill scripts preserve failed child-process status and diagnostic
 | Total PRs | 1 |
 | Total phases | 1 |
 | Completed | None |
-| Remaining | 1-1 |
+| Remaining | Phase 1 |
 | Current / Next | Phase 1 |
 | Blockers | None |
 
@@ -52,7 +52,7 @@ Extend only the existing surfaces named below and the explicitly named new files
 | Skills runtime | `apps/node/src/domain/skills/runSkill.ts` |
 | Authoring documentation | `docs/skills/authoring.md` |
 
-The inspected baseline is main commit `5d23af5`. Installed-runtime observations came from CLI/Operator 0.9.5; do not assume the checkout and device are identical. Recheck these source seams after dependency merges. New identifiers below are proposed contracts to implement, not claims about shipped behavior.
+Initial investigation used `5d23af5`; the final task audit used merged main `120c1eb`, including the shipped on-screen-log raw API. Preserve its controller-owned overlay identity, visibility metadata, canonical error codes, and strict input aliases. Installed-runtime observations came from CLI/Operator 0.9.5; do not assume the checkout and device are identical. Recheck these source seams after dependency merges. New identifiers below are proposed contracts to implement, not claims about shipped behavior.
 
 ## Deterministic Versus Judgment
 

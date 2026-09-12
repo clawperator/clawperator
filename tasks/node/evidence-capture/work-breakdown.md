@@ -4,7 +4,7 @@ Parent plan: `tasks/node/evidence-capture/plan.md`
 
 ## Executive Summary
 
-2 PR(s), 2 phase(s); phase N ships in PR-N. Implementation has not started. Each phase includes its own tests and docs. Do not start PR-2 until PR-1 is merged.
+Two PRs and two phases; phase N ships in PR-N. Implementation has not started. Each phase includes its own tests and docs. Do not start PR-2 until PR-1 is merged.
 
 ## Status
 
@@ -19,6 +19,8 @@ Parent plan: `tasks/node/evidence-capture/plan.md`
 | Blockers | None |
 
 ## Hard Rules
+
+- Follow the dependency and release gates in `tasks/releases/v0.10/plan.md`. Implement only the requested PR; where this pack has two PRs, merge the first before starting the second. Update both task status tables and the release row after each merged PR.
 
 - Follow the parent contract; do not invent alternative default behavior.
 - Use branch-local Node output and the matching debug Operator for implementation validation. Never repair or uninstall packages on a device used by another task.
@@ -94,6 +96,8 @@ Ship screenshot/XML bundles and the shared manifest.
 ### Acceptance Criteria
 
 - Successful screenshot and XML produce complete manifest with valid relative paths, sizes, hashes, and independent timestamps.
+- MCP refuses caller output paths, allocates a managed bundle, and uses opaque video session IDs rather than arbitrary manifest paths. CLI and MCP share schema/behavior without identical path inputs.
+- With root unavailable, actual screenshot capture is attempted through the shared helper and yields partial image evidence; budget exhaustion records each unattempted component explicitly.
 - Snapshot failure with valid image produces partial bundle and nonzero exit; image failure with XML succeeds only for that component.
 - Both captures failing still produces failed manifest when destination is writable; metadata errors remain explicit.
 - Existing directory, blank path, invalid/oversized context, disk-write error, malformed PNG, and multiple unspecified devices fail deterministically.
@@ -157,6 +161,7 @@ Ship bounded, owned, verified screen recordings.
 
 - Start returns without waiting for duration cap, and status/stop work from another CLI process.
 - Concurrent session on the same device is rejected; other devices remain independent. Unknown/stale ownership never triggers broad process termination.
+- Starting/finalizing/terminal manifests validate against the same schema; all command exit/status combinations match the plan and duplicate stop requests cannot race final manifest writes.
 - Explicit stop, time cap, startup codec failure, disconnect, crash, missing ffprobe/ffmpeg, pull failure, corrupt file, and dimension fallback all yield truthful final states.
 - Actual dimensions equal requested dimensions for complete video. Valid decodable frames and positive media duration are mandatory; metadata distinguishes requested, host, and media durations.
 - Repeated stop returns the existing result without new capture; partial files are retained; event-recording commands are unchanged.

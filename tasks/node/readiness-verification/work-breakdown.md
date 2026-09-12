@@ -4,7 +4,7 @@ Parent plan: `tasks/node/readiness-verification/plan.md`
 
 ## Executive Summary
 
-1 PR(s), 1 phase(s); phase N ships in PR-N. Implementation has not started. Each phase includes its own tests and docs. One bounded implementation PR.
+One PR and one phase. Implementation has not started. Each phase includes its own tests and docs. One bounded implementation PR.
 
 ## Status
 
@@ -14,11 +14,13 @@ Parent plan: `tasks/node/readiness-verification/plan.md`
 | Total PRs | 1 |
 | Total phases | 1 |
 | Completed | None |
-| Remaining | 1-1 |
+| Remaining | Phase 1 |
 | Current / Next | Phase 1 |
 | Blockers | None |
 
 ## Hard Rules
+
+- Follow the dependency and release gates in `tasks/releases/v0.10/plan.md`. Implement only the requested PR; where this pack has two PRs, merge the first before starting the second. Update both task status tables and the release row after each merged PR.
 
 - Follow the parent contract; do not invent alternative default behavior.
 - Use branch-local Node output and the matching debug Operator for implementation validation. Never repair or uninstall packages on a device used by another task.
@@ -41,6 +43,8 @@ Read these files IN THIS ORDER before writing anything.
 | Aggregation | `apps/node/src/domain/doctor/DoctorService.ts` |
 | Critical checks | `apps/node/src/domain/doctor/criticalChecks.ts` |
 | Checks | `apps/node/src/domain/doctor/checks/readinessChecks.ts` |
+| Logger configuration | `apps/node/src/adapters/logger.ts` |
+| Logger tests | `apps/node/src/test/unit/unifiedLogger.test.ts` |
 | Report contract | `apps/node/src/contracts/doctor.ts` |
 | Existing tests | `apps/node/src/test/unit/doctor/DoctorService.test.ts` |
 | CLI tests | `apps/node/src/test/unit/doctorCommand.test.ts` |
@@ -67,11 +71,15 @@ Ship fail-closed readiness with executable regression coverage.
 ### Files or Surfaces To Change
 
 - `apps/node/src/contracts/doctor.ts`
+- `apps/node/src/contracts/errors.ts`
 - `apps/node/src/domain/doctor/`
 - `apps/node/src/cli/commands/doctor.ts`
 - `apps/node/src/test/unit/doctor/DoctorService.test.ts`
 - `apps/node/src/test/unit/doctor/readinessChecks.test.ts`
 - `apps/node/src/test/unit/doctorCommand.test.ts`
+- `apps/node/src/adapters/logger.ts`
+- `apps/node/src/test/unit/unifiedLogger.test.ts`
+- `docs/api/logging.md`
 - `docs/api/doctor.md`
 - `docs/setup.md`
 
@@ -79,7 +87,7 @@ Ship fail-closed readiness with executable regression coverage.
 
 1. Trace every early return and existing fake-runner fixture; enumerate mandatory checks for normal/full modes in one canonical definition.
 2. Implement aggregation and explicit skippedChecks. Promote selected-variant absence to failure without touching the other installation. Keep optional warnings advisory.
-3. Add fake-runner and CLI regressions covering the decision table; do not require uninstalling a real APK to prove mismatch behavior.
+3. Add the advisory shared log-destination check and fake-filesystem cases for explicit/env/default path precedence, successful append, file versus directory mismatch, and write denial. Preserve existing log contents and parseable stdout. Add fake-runner and CLI regressions covering the decision table; do not require uninstalling a real APK to prove mismatch behavior.
 4. Update authored doctor/setup guidance. Live-run doctor on a healthy explicit target and retain report fields; test unavailable states with fakes.
 
 ### Acceptance Criteria
@@ -87,6 +95,7 @@ Ship fail-closed readiness with executable regression coverage.
 - Only development APK installed while release selected: mismatch, no handshake claim, false booleans, nonzero exit.
 - Missing device, multiple unspecified devices, incompatible version, handshake failure, locked screen, and incomplete full mode each fail with recorded skips.
 - Healthy required checks plus missing optional agent tooling succeeds. --fix cannot turn stale observations into success.
+- Unwritable logs remain an advisory warning, show the attempted path and configured remedy, and do not change healthy criticalOk.
 - Existing report consumers and doctor CLI tests pass; no implicit device or package switch occurs.
 - Human review: output accuracy matches observed evidence; scope covers the named surfaces only; important claims trace to tests or findings; schema, section order, and public help match the contract.
 
