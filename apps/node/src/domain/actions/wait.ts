@@ -4,9 +4,13 @@ import type { NodeMatcher } from "../../contracts/selectors.js";
 export function buildWaitExecution(
   selector: NodeMatcher,
   waitTimeoutMs?: number,
+  strict?: boolean,
+  container?: NodeMatcher,
 ): Execution {
   const commandId = `wait-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   const actionParams: Record<string, unknown> = { matcher: selector };
+  if (strict !== undefined) actionParams.strict = strict;
+  if (container !== undefined) actionParams.container = container;
   if (waitTimeoutMs !== undefined) {
     actionParams.timeoutMs = waitTimeoutMs;
   }

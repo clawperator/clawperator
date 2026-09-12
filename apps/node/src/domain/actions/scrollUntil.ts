@@ -7,6 +7,7 @@ export function buildScrollUntilExecution(
   container: NodeMatcher | undefined,
   clickAfter: boolean,
   timeoutMs = 30000,
+  strict?: boolean,
 ): Execution {
   const actionType = clickAfter ? "scroll_and_click" : "scroll_until";
   const commandId = `scroll-until-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -22,6 +23,7 @@ export function buildScrollUntilExecution(
         type: actionType,
         params: {
           direction,
+          ...(strict !== undefined ? { strict } : {}),
           matcher,
           ...(container !== undefined ? { container } : {}),
           ...(clickAfter ? { clickAfter: true } : {}),

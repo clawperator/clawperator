@@ -1,3 +1,4 @@
+import { buildMcpSuccessResult } from "./errors.js";
 import type { ResultEnvelope, StepResult } from "../contracts/result.js";
 
 export interface StepDataExtractionSuccess {
@@ -105,4 +106,13 @@ export function extractStepDataValue(
     message: `${options.actionType} step result did not include ${options.dataKey}.`,
     step,
   };
+}
+
+/** Preserve the read value as the first content item; surface optional runtime advice separately. */
+export function buildReadSuccessResult(value: string | string[], selectionWarning?: string) {
+  const result = buildMcpSuccessResult(value);
+  if (selectionWarning !== undefined) {
+    result.content.push({ type: "text", text: JSON.stringify({ selection_warning: selectionWarning }) });
+  }
+  return result;
 }

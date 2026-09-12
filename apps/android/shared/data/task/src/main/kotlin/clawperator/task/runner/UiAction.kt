@@ -34,6 +34,8 @@ sealed interface UiAction {
         val matcher: NodeMatcher,
         val retry: TaskRetry = TaskRetryPresets.UiReadiness,
         val timeoutMs: Long? = null,
+        val strict: Boolean = false,
+        val container: NodeMatcher? = null,
     ) : UiAction
 
     data class Click(
@@ -42,6 +44,8 @@ sealed interface UiAction {
         val coordinate: Point? = null,
         val clickTypes: UiTreeClickTypes = UiTreeClickTypes.Default,
         val retry: TaskRetry = TaskRetryPresets.UiReadiness,
+        val strict: Boolean = false,
+        val container: NodeMatcher? = null,
     ) : UiAction
 
     data class ScrollAndClick(
@@ -58,6 +62,7 @@ sealed interface UiAction {
         val findFirstScrollableChild: Boolean = true,
         /** When false, scrolls until the target is visible but does not click it. */
         val clickAfter: Boolean = true,
+        val strict: Boolean = false,
     ) : UiAction
 
     data class Scroll(
@@ -68,6 +73,7 @@ sealed interface UiAction {
         val settleDelayMs: Long = 250,
         val findFirstScrollableChild: Boolean = true,
         val retry: TaskRetry = TaskRetry.None,
+        val strict: Boolean = false,
     ) : UiAction
 
     /**
@@ -96,6 +102,7 @@ sealed interface UiAction {
         val noPositionChangeThreshold: Int = 3,
         val findFirstScrollableChild: Boolean = true,
         val clickAfter: Boolean = false,
+        val strict: Boolean = false,
     ) : UiAction
 
     data class ReadText(
@@ -106,6 +113,7 @@ sealed interface UiAction {
         val validatorPattern: String? = null,
         val all: Boolean = false,
         val container: NodeMatcher? = null,
+        val strict: Boolean = false,
     ) : UiAction
 
     data class QueryUi(
@@ -156,6 +164,8 @@ sealed interface UiAction {
         val submit: Boolean = false,
         val clear: Boolean = false,
         val retry: TaskRetry = TaskRetryPresets.UiReadiness,
+        val strict: Boolean = false,
+        val container: NodeMatcher? = null,
     ) : UiAction
 
     data class Sleep(

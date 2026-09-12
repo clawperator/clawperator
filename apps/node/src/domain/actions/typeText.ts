@@ -6,6 +6,8 @@ export interface TypeTextOptions {
   text: string;
   submit?: boolean;
   clear?: boolean;
+  strict?: boolean;
+  container?: NodeMatcher;
 }
 
 export function buildTypeTextExecution(options: TypeTextOptions): Execution {
@@ -21,7 +23,10 @@ export function buildTypeTextExecution(options: TypeTextOptions): Execution {
       {
         id: "type",
         type: "enter_text",
-        params: { matcher: selector, text, submit, clear },
+        params: { matcher: selector, text, submit, clear,
+          ...(options.strict !== undefined ? { strict: options.strict } : {}),
+          ...(options.container !== undefined ? { container: options.container } : {}),
+        },
       },
     ],
     mode: "direct",

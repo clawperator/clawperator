@@ -55,6 +55,7 @@ class TaskUiScopeTest(
     override suspend fun getValidatedText(
         matcher: NodeMatcher,
         retry: TaskRetry,
+        strict: Boolean,
         validator: (String) -> Boolean,
     ): String {
         val node =
@@ -72,6 +73,8 @@ class TaskUiScopeTest(
         matcher: NodeMatcher,
         retry: TaskRetry,
         timeoutMs: Long?,
+        strict: Boolean,
+        container: NodeMatcher?,
     ): TaskUiNode {
         val node =
             findNodeByMatcher(matcher)
@@ -90,6 +93,7 @@ class TaskUiScopeTest(
     override suspend fun getText(
         matcher: NodeMatcher,
         retry: TaskRetry,
+        strict: Boolean,
     ): String {
         val node =
             findNodeByMatcher(matcher)
@@ -101,6 +105,7 @@ class TaskUiScopeTest(
     override suspend fun getAllText(
         matcher: NodeMatcher,
         retry: TaskRetry,
+        strict: Boolean,
     ): List<String> {
         // Find all matching nodes and return their non-blank labels
         return clawperator.uitree.UiTreeTraversal.findAll(currentUiTree) { uiNode ->
@@ -121,6 +126,7 @@ class TaskUiScopeTest(
         matcher: NodeMatcher,
         containerMatcher: NodeMatcher,
         retry: TaskRetry,
+        strict: Boolean,
     ): String {
         // Find the container node
         val containerNode =
@@ -162,6 +168,7 @@ class TaskUiScopeTest(
         matcher: NodeMatcher,
         containerMatcher: NodeMatcher,
         retry: TaskRetry,
+        strict: Boolean,
     ): List<String> {
         // Find the container node
         val containerNode =
@@ -200,6 +207,7 @@ class TaskUiScopeTest(
         matcher: NodeMatcher,
         containerMatcher: NodeMatcher,
         retry: TaskRetry,
+        strict: Boolean,
         validator: (String) -> Boolean,
     ): String {
         // Find the container node
@@ -247,6 +255,8 @@ class TaskUiScopeTest(
         coordinate: action.math.geometry.Point?,
         clickTypes: UiTreeClickTypes,
         retry: TaskRetry,
+        strict: Boolean,
+        container: NodeMatcher?,
     ) {
         if (coordinate != null) {
             println("[TaskUiScopeTest] Clicked coordinate: ${coordinate.shortString}")
@@ -272,6 +282,7 @@ class TaskUiScopeTest(
         settleDelay: Duration,
         retry: TaskRetry,
         findFirstScrollableChild: Boolean,
+        strict: Boolean,
     ): TaskScrollOnceResult = TaskScrollOnceResult(TaskScrollOutcome.Moved)
 
     override suspend fun scrollLoop(
@@ -284,6 +295,7 @@ class TaskUiScopeTest(
         maxDuration: Duration,
         noPositionChangeThreshold: Int,
         findFirstScrollableChild: Boolean,
+        strict: Boolean,
     ): TaskScrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.EdgeReached, scrollsExecuted = 5)
 
     override suspend fun scrollUntil(
@@ -295,6 +307,7 @@ class TaskUiScopeTest(
         settleDelay: Duration,
         retry: TaskRetry,
         findFirstScrollableChild: Boolean,
+        strict: Boolean,
     ): TaskScrollResult {
         // In test implementation, just check if the target is already there
         val targetNode = findNodeByMatcher(target)
@@ -323,6 +336,7 @@ class TaskUiScopeTest(
         settleDelay: Duration,
         retry: TaskRetry,
         findFirstScrollableChild: Boolean,
+        strict: Boolean,
     ): TaskUiNode {
         val result = scrollUntil(target, container, direction, maxSwipes, distanceRatio, settleDelay, retry, findFirstScrollableChild)
         return when (result) {
@@ -424,6 +438,8 @@ class TaskUiScopeTest(
         submit: Boolean,
         clear: Boolean,
         retry: TaskRetry,
+        strict: Boolean,
+        container: NodeMatcher?,
     ) {
         val node =
             findNodeByMatcher(matcher)

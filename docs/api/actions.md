@@ -279,6 +279,19 @@ Success condition for that payload:
 
 ## Action Reference
 
+Non-strict first-match selection adds `data.selection_warning` when duplicate
+candidates are observed, with a hint to use `--strict` (`params.strict=true`).
+This advisory field does not change action success. See
+[duplicate-selection hints](selectors.md#duplicate-selection-hints).
+
+All node-targeted actions below support optional boolean `params.strict` and an
+optional `params.container` matcher: `click`, `enter_text`, `read_text`,
+`wait_for_node`, `scroll`, `scroll_until`, and `scroll_and_click`. See
+[strict selection](selectors.md#strict-action-selection) for action-specific
+absence, ambiguity, container, and compatibility rules. Coordinate clicks cannot
+use strict mode or a container. Strict failures return string-valued
+`data.error`, `data.candidate_count`, and serialized JSON in `data.candidates`.
+
 <a id="action-click"></a>
 ### `click`
 
@@ -338,7 +351,7 @@ Semantics:
 - the flat CLI always sets a direction explicitly
 - `container` scopes the scroll to a matched scrollable container
 - `distanceRatio` and `settleDelayMs` are advanced tuning fields for raw JSON execution
-- if `findFirstScrollableChild == true` and the matched container is not itself scrollable, Android walks down to the first scrollable descendant
+- if `findFirstScrollableChild == true` and the matched container is not itself scrollable, Android walks down to the first scrollable descendant; strict mode requires that eligible descendant to be unique
 - `retry` covers container resolution and repeated UI-tree fetches during the scroll operation
 
 Success data:

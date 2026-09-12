@@ -32,6 +32,7 @@ interface TaskUiScope {
     suspend fun getValidatedText(
         matcher: NodeMatcher,
         retry: TaskRetry = TaskRetryPresets.UiReadiness,
+        strict: Boolean = false,
         validator: (String) -> Boolean,
     ): String
 
@@ -50,6 +51,8 @@ interface TaskUiScope {
         matcher: NodeMatcher,
         retry: TaskRetry = TaskRetry.None,
         timeoutMs: Long? = null,
+        strict: Boolean = false,
+        container: NodeMatcher? = null,
     ): TaskUiNode
 
     /**
@@ -73,6 +76,7 @@ interface TaskUiScope {
     suspend fun getText(
         matcher: NodeMatcher,
         retry: TaskRetry = TaskRetry.None,
+        strict: Boolean = false,
     ): String
 
     /**
@@ -89,6 +93,7 @@ interface TaskUiScope {
         matcher: NodeMatcher,
         containerMatcher: NodeMatcher,
         retry: TaskRetry = TaskRetry.None,
+        strict: Boolean = false,
     ): String
 
     /**
@@ -107,6 +112,7 @@ interface TaskUiScope {
         matcher: NodeMatcher,
         containerMatcher: NodeMatcher,
         retry: TaskRetry = TaskRetry.None,
+        strict: Boolean = false,
         validator: (String) -> Boolean,
     ): String
 
@@ -123,6 +129,7 @@ interface TaskUiScope {
     suspend fun getAllText(
         matcher: NodeMatcher,
         retry: TaskRetry = TaskRetry.None,
+        strict: Boolean = false,
     ): List<String>
 
     /**
@@ -140,6 +147,7 @@ interface TaskUiScope {
         matcher: NodeMatcher,
         containerMatcher: NodeMatcher,
         retry: TaskRetry = TaskRetry.None,
+        strict: Boolean = false,
     ): List<String>
 
     /**
@@ -156,6 +164,8 @@ interface TaskUiScope {
         coordinate: Point? = null,
         clickTypes: UiTreeClickTypes = UiTreeClickTypes.Default,
         retry: TaskRetry = TaskRetry.None,
+        strict: Boolean = false,
+        container: NodeMatcher? = null,
     )
 
     /**
@@ -181,6 +191,7 @@ interface TaskUiScope {
         settleDelay: Duration = 250.milliseconds,
         retry: TaskRetry = TaskRetryPresets.UiScroll,
         findFirstScrollableChild: Boolean = false,
+        strict: Boolean = false,
     ): TaskScrollResult
 
     /**
@@ -207,6 +218,7 @@ interface TaskUiScope {
         settleDelay: Duration = 250.milliseconds,
         retry: TaskRetry = TaskRetryPresets.UiScroll,
         findFirstScrollableChild: Boolean = false,
+        strict: Boolean = false,
     ): TaskUiNode
 
     /**
@@ -235,6 +247,7 @@ interface TaskUiScope {
         settleDelay: Duration = 250.milliseconds,
         retry: TaskRetry = TaskRetry.None,
         findFirstScrollableChild: Boolean = true,
+        strict: Boolean = false,
     ): TaskScrollOnceResult
 
     /**
@@ -261,6 +274,7 @@ interface TaskUiScope {
         maxDuration: Duration = 10.seconds,
         noPositionChangeThreshold: Int = 3,
         findFirstScrollableChild: Boolean = true,
+        strict: Boolean = false,
     ): TaskScrollLoopResult
 
     /**
@@ -293,15 +307,30 @@ interface TaskUiScope {
         clickRetry: TaskRetry = TaskRetryPresets.UiReadiness,
         findFirstScrollableChild: Boolean = true,
         clickAfter: Boolean = true,
+        strict: Boolean = false,
     ) {
-        scrollIntoView(target, container, direction, maxSwipes, distanceRatio, settleDelay, scrollRetry, findFirstScrollableChild)
+        scrollIntoView(target, container, direction, maxSwipes, distanceRatio, settleDelay, scrollRetry, findFirstScrollableChild, strict)
         if (clickAfter) {
-            click(
-                matcher = target,
+            clickScrollTarget(
+                target = target,
+                findFirstScrollableChild = findFirstScrollableChild,
                 clickTypes = clickTypes,
                 retry = clickRetry,
+                strict = strict,
+                container = container,
             )
         }
+    }
+
+    suspend fun clickScrollTarget(
+        target: NodeMatcher,
+        container: NodeMatcher? = null,
+        strict: Boolean = false,
+        findFirstScrollableChild: Boolean = true,
+        clickTypes: UiTreeClickTypes = UiTreeClickTypes.Default,
+        retry: TaskRetry = TaskRetryPresets.UiReadiness,
+    ) {
+        click(matcher = target, container = container, strict = strict, clickTypes = clickTypes, retry = retry)
     }
 
     /**
@@ -350,5 +379,7 @@ interface TaskUiScope {
         submit: Boolean = false,
         clear: Boolean = false,
         retry: TaskRetry = TaskRetry.None,
+        strict: Boolean = false,
+        container: NodeMatcher? = null,
     )
 }

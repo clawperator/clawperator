@@ -20,7 +20,7 @@ Excluded: Changing default raw snapshot output, semantic element matching in Nod
 | Completed | None |
 | Remaining | Phase 1 |
 | Current / Next | Phase 1 |
-| Blockers | Await `tasks/api/selector-inspection` PR-1; PR-2 is not required |
+| Blockers | R4 merged; R5 is not required (see `docs/internal/design/selector-inspection.md`) |
 
 ## Sources
 

@@ -37,6 +37,7 @@ export interface ActionParams {
   /** clickType: default | long_click | focus */
   clickType?: string;
   container?: NodeMatcher;
+  strict?: boolean;
   direction?: string;
   maxSwipes?: number;
   distanceRatio?: number;

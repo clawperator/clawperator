@@ -6,7 +6,7 @@ Contract: [plan.md](plan.md). Dependencies and release coordination: [v0.10 plan
 
 | PR | Purpose | Phase | Merge gate |
 | --- | --- | --- | --- |
-| PR-1 | Receipts and failure preservation | 1 | Await both PRs in `tasks/api/selector-inspection` |
+| PR-1 | Receipts and failure preservation | 1 | R4 merged; await R5 merge (strict selection is locally complete; see `docs/internal/design/selector-inspection.md`) |
 
 Implement the requested PR through its acceptance criteria, relevant checks, in-scope repairs, docs, and local commits. A dependency becoming available does not authorize the next PR. Routine implementation choices are yours; raise only decisions that change the contract or scope.
 

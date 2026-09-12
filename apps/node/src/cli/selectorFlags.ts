@@ -50,6 +50,7 @@ export const CONTAINER_SELECTOR_VALUE_FLAGS = [
 ] as const;
 
 export const CONTAINER_SELECTOR_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
+  { canonical: "--container-selector", aliases: ["--container-json"] },
   { canonical: "--container-id", aliases: ["--container-resource-id"] },
   { canonical: "--container-desc", aliases: ["--container-content-desc"] },
   { canonical: "--container-desc-contains", aliases: ["--container-content-desc-contains"] },
@@ -347,7 +348,11 @@ export function resolveContainerMatcherFromCli(rest: string[]): ContainerResult 
         },
       };
     }
-    return { ok: true, container: parsed as NodeMatcher };
+    const validated = nodeMatcherSchema.safeParse(normalizeMatcherInput(parsed));
+    if (!validated.success) return { ok: false, error: {
+      code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: validated.error.message,
+    } };
+    return { ok: true, container: validated.data };
   }
 
   // Simple --container-* flags - validate blank strings

@@ -8,7 +8,7 @@ export interface McpErrorPayload {
 
 export interface McpToolResult {
   [key: string]: unknown;
-  content: [{ type: "text"; text: string }];
+  content: [{ type: "text"; text: string }, ...Array<{ type: "text"; text: string }>];
   structuredContent?: Record<string, unknown>;
   isError?: boolean;
 }

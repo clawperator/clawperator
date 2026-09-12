@@ -1834,6 +1834,19 @@ Success condition for that payload:
 
 ## Action Reference
 
+Non-strict first-match selection adds `data.selection_warning` when duplicate
+candidates are observed, with a hint to use `--strict` (`params.strict=true`).
+This advisory field does not change action success. See
+[duplicate-selection hints](selectors.md#duplicate-selection-hints).
+
+All node-targeted actions below support optional boolean `params.strict` and an
+optional `params.container` matcher: `click`, `enter_text`, `read_text`,
+`wait_for_node`, `scroll`, `scroll_until`, and `scroll_and_click`. See
+[strict selection](selectors.md#strict-action-selection) for action-specific
+absence, ambiguity, container, and compatibility rules. Coordinate clicks cannot
+use strict mode or a container. Strict failures return string-valued
+`data.error`, `data.candidate_count`, and serialized JSON in `data.candidates`.
+
 <a id="action-click"></a>
 ### `click`
 
@@ -1893,7 +1906,7 @@ Semantics:
 - the flat CLI always sets a direction explicitly
 - `container` scopes the scroll to a matched scrollable container
 - `distanceRatio` and `settleDelayMs` are advanced tuning fields for raw JSON execution
-- if `findFirstScrollableChild == true` and the matched container is not itself scrollable, Android walks down to the first scrollable descendant
+- if `findFirstScrollableChild == true` and the matched container is not itself scrollable, Android walks down to the first scrollable descendant; strict mode requires that eligible descendant to be unique
 - `retry` covers container resolution and repeated UI-tree fetches during the scroll operation
 
 Success data:
@@ -3168,11 +3181,88 @@ clawperator query --matcher-json '{"resourceId":"row","ancestor":{"role":"list"}
 ```
 
 Queries report every match and its state, including empty-label controls. Existing
-actions retain their first-match behavior and retry defaults. Querying a unique
+actions retain their first-match behavior and retry defaults unless `strict=true`. Querying a unique
 node does not reserve it or authorize a later action against that observation.
 See [query_ui](actions.md#action-query-ui) for counts, state, per-node
 `accessibilityDataSensitive`, and path semantics. Sensitivity is observation
 metadata, not a selector predicate.
+
+## Duplicate-selection hints
+
+When a non-strict action finds multiple candidates and selects the first,
+its step data includes `selection_warning`. The warning identifies duplicate
+target or container selection and teaches `--strict` (`params.strict=true`) as
+an option for rejecting ambiguity. The action keeps its existing result and
+first-match behavior; the warning alone is not a failure.
+
+For example, a successful click can include:
+
+```json
+{
+  "selection_warning": "Multiple candidates matched; first-match selection was used. Largest candidate counts observed: target: 7. Use --strict (params.strict=true) to reject ambiguous matches."
+}
+```
+
+Counts are the largest observed for each kind of selection during that action,
+including retries and scroll searches. They are not a receipt for the final
+dispatch. Repeated observations produce one bounded warning per action. Unique
+selection and queries omit the warning. `read_text` with `all=true` intentionally
+allows multiple targets and does not warn about them; a duplicate explicit
+container still produces the hint. The same step data is available through CLI,
+raw execution, and MCP. MCP `read` preserves its scalar/list value as the first
+content item and adds the warning as a separate JSON text item when present.
+
+## Strict action selection
+
+Set `params.strict: true` in raw execution, `--strict` in the CLI, or `strict: true`
+in a named MCP tool. This applies to `click`, `enter_text`, `read_text`,
+`wait_for_node`, `scroll`, `scroll_until`, and `scroll_and_click`. Omission or
+`false` retains first-match selection. Strict must be a JSON boolean; strings,
+numbers, and null are invalid. Coordinate clicks cannot use strict mode or a
+container.
+
+All seven actions accept an optional `container` matcher. The CLI exposes
+`--container-json` and the `--container-*` shorthand flags on their corresponding
+commands. JSON and shorthand container flags are mutually exclusive. Targets
+must be strict descendants of the selected container; the container itself does
+not match. Relationships still use the enclosing structural tree. Without strict
+mode, an explicit container selects the first match.
+
+| Selection under strict mode | Result |
+| --- | --- |
+| Immediate click, text entry, or single read: zero targets after existing retries | `NODE_NOT_FOUND`; no target dispatch |
+| Single target selection: more than one candidate | `NODE_AMBIGUOUS`; no target dispatch or ambiguity retry |
+| Explicit container: zero or multiple matches | `CONTAINER_NOT_FOUND` or `CONTAINER_AMBIGUOUS`, before child selection |
+| Wait: target absent | Keep polling within the existing retry/timeout bounds |
+| Scroll search: target absent | Keep searching within the selected scroll container and existing bounds |
+| Read with `all=true`: zero or multiple targets | Existing empty/list text result; explicit container must still be unique |
+| Scroll without an explicit container | Require exactly one eligible scrollable candidate |
+
+When `findFirstScrollableChild=true` selects descendants of a non-scrollable
+wrapper, strict mode also requires a unique eligible scrollable descendant.
+Scroll target checks and the final click stay within the selected scrollable
+subtree. Each observation and dispatch resolves fresh candidates; a preceding
+query or successful search never reserves a node. A layout change that introduces
+ambiguity fails before the next dispatch. Gestures already completed earlier in
+a search are not undone.
+
+Ambiguity data includes `candidate_count` as a decimal string and `candidates` as
+serialized query-result JSON with at most 10 `NodeSummary` objects. Candidate
+strings are capped at 512 characters; total count remains exact. Paths and state
+have the same observation-only meaning as `query_ui`. Strict failures retain
+preceding results and the failed step and stop subsequent actions in the execution.
+
+```bash
+clawperator click --text "Open" --strict --container-json '{"resourceId":"row","descendant":{"textEquals":"Example"}}'
+clawperator read --role switch --all --strict --container-id "panel"
+```
+
+Use matching Node and Operator builds from v0.10 or later before adopting these
+options. Older Operators may ignore unknown fields and therefore cannot enforce
+strict selection. Existing skills can keep first-match defaults; opt in after
+inspecting candidate counts and adding observable postconditions. Successful
+selection and dispatch do not verify the application's intended result. Never
+replay a mutation after an uncertain post-dispatch result.
 
 ## Where Selectors Appear
 
@@ -3211,6 +3301,7 @@ Agent-friendly CLI aliases accepted for shorthand selectors:
 - `--resource-id` -> `--id`
 - `--content-desc` -> `--desc`
 - `--content-desc-contains` -> `--desc-contains`
+- `--container-json` -> `--container-selector`
 - `--container-resource-id` -> `--container-id`
 - `--container-content-desc` -> `--container-desc`
 - `--container-content-desc-contains` -> `--container-desc-contains`
@@ -3218,7 +3309,7 @@ Agent-friendly CLI aliases accepted for shorthand selectors:
 Container selectors follow the same pattern:
 
 1. Shorthand flags such as `--container-text`, `--container-id`, and `--container-role`
-2. Raw JSON via `--container-selector '<json>'`
+2. Raw JSON via `--container-json '<json>'` (alias of `--container-selector`)
 
 The parser resolves shorthand flags into the same `NodeMatcher` object used by raw JSON. For example:
 
@@ -3525,20 +3616,20 @@ Use this page as a command index. Detailed behavior, output shapes, and recovery
 | [`exec`](#command-exec) | Execution | `exec <json-or-file> [--validate-only] [--dry-run] [--device <id>] [--operator-package <package>]` | `--payload`, `--validate-only`, `--dry-run`, `--goal`, `--no-daemon` | [Execution payload](overview.md#execution-payload) | Execute a validated command payload |
 | [`snapshot`](#command-snapshot) | Device Interaction | `snapshot [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | [Action: snapshot](actions.md#action-snapshot) | Get current Android UI hierarchy as XML |
 | [`screenshot`](#command-screenshot) | Device Interaction | `screenshot [--device <id>] [--operator-package <pkg>] [--path <file>]` | `--path`, `--no-daemon` | [Action: take_screenshot](actions.md#action-take-screenshot) | Capture a screenshot from the device |
-| [`click`](#command-click) | Device Interaction | `click --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--coordinate`, `--long`, `--focus`, `--no-daemon` | [Action: click](actions.md#action-click) | Tap the first matching UI element |
+| [`click`](#command-click) | Device Interaction | `click --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>]` | `--strict`, `--container-json`, `--text`, `--id`, `--desc`, `--role`, `--coordinate`, `--long`, `--focus`, `--no-daemon` | [Action: click](actions.md#action-click) | Tap the first matching UI element |
 | [`open`](#command-open) | Device Interaction | `open <package-id\|url\|uri> [--device <id>] [--operator-package <pkg>]` | `--app`, `--navigation-timeout-ms`, `--skip-navigation-wait`, `--no-daemon` | [Actions: open_app / open_uri](actions.md#action-open-app) | Open an app, URL, or URI on the device |
-| [`type`](#command-type) | Device Interaction | `type <text> --role <role> \| --id <id> [--device <id>] [--operator-package <pkg>]` | `--id`, `--desc`, `--role`, `--submit`, `--clear`, `--no-daemon` | [Action: enter_text](actions.md#action-enter-text) | Type text into the first matching UI element |
+| [`type`](#command-type) | Device Interaction | `type <text> --role <role> \| --id <id> [--device <id>] [--operator-package <pkg>]` | `--strict`, `--container-json`, `--id`, `--desc`, `--role`, `--submit`, `--clear`, `--no-daemon` | [Action: enter_text](actions.md#action-enter-text) | Type text into the first matching UI element |
 | [`query`](#command-query) | Device Interaction | - | `--matcher-json`, `--text`, `--id`, `--role`, `--visibility`, `--limit`, `--no-daemon` | [Action: query_ui](actions.md#action-query-ui) | Inspect matching nodes and their current state |
-| [`read`](#command-read) | Device Interaction | `read --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon` | [Action: read_text](actions.md#action-read-text) | Read text from the first matching UI element |
-| [`wait`](#command-wait) | Device Interaction | `wait --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]` | `--text`, `--id`, `--desc`, `--role`, `--no-daemon` | [Action: wait_for_node](actions.md#action-wait-for-node) | Wait until a matching UI element appears |
+| [`read`](#command-read) | Device Interaction | `read --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>]` | `--strict`, `--container-json`, `--text`, `--id`, `--desc`, `--role`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon` | [Action: read_text](actions.md#action-read-text) | Read text from the first matching UI element |
+| [`wait`](#command-wait) | Device Interaction | `wait --text <text> \| --id <id> \| --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]` | `--strict`, `--container-json`, `--text`, `--id`, `--desc`, `--role`, `--no-daemon` | [Action: wait_for_node](actions.md#action-wait-for-node) | Wait until a matching UI element appears |
 | [`press`](#command-press) | Device Interaction | `press <back\|home\|recents> [--device <id>] [--operator-package <pkg>]` | `--key`, `--no-daemon` | [Action: press_key](actions.md#action-press-key) | Press a hardware key on the device |
 | [`back`](#command-back) | Device Interaction | `back [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | [Action: press_key](actions.md#action-press-key) | Press the Android back key |
 | [`close`](#command-close) | Device Interaction | `close <package> [--device <id>] [--operator-package <pkg>]` | `--app`, `--no-daemon` | [Action: close_app](actions.md#action-close-app) | Force-stop an Android application |
 | [`on-screen-log`](#command-on-screen-log) | Device Interaction | - | `--no-daemon` | [On-screen logs](on-screen-logs.md#cli-commands) | Show, replace, or clear a static on-device diagnostic panel |
 | [`sleep`](#command-sleep) | Device Interaction | `sleep <ms> [--device <id>] [--operator-package <pkg>]` | `--no-daemon` | [Action: sleep](actions.md#action-sleep) | Pause execution for a duration |
-| [`scroll`](#command-scroll) | Device Interaction | `scroll <down\|up\|left\|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]` | `--direction`, `--no-daemon` | [Action: scroll](actions.md#action-scroll) | Scroll the screen in a direction |
-| [`scroll-until`](#command-scroll-until) | Device Interaction | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--click`, `--direction`, `--no-daemon` | [Action: scroll_until](actions.md#action-scroll-until) | Scroll until a target element is visible |
-| [`scroll-and-click`](#command-scroll-and-click) | Device Interaction | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]` | `--text`, `--id`, `--desc`, `--role`, `--direction`, `--no-daemon` | [Action: scroll_and_click](actions.md#action-scroll-and-click) | Scroll until target is visible, then click it (alias for scroll-until --click) |
+| [`scroll`](#command-scroll) | Device Interaction | `scroll <down\|up\|left\|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]` | `--strict`, `--container-json`, `--direction`, `--no-daemon` | [Action: scroll](actions.md#action-scroll) | Scroll the screen in a direction |
+| [`scroll-until`](#command-scroll-until) | Device Interaction | `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]` | `--strict`, `--container-json`, `--text`, `--id`, `--desc`, `--role`, `--click`, `--direction`, `--no-daemon` | [Action: scroll_until](actions.md#action-scroll-until) | Scroll until a target element is visible |
+| [`scroll-and-click`](#command-scroll-and-click) | Device Interaction | `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]` | `--strict`, `--container-json`, `--text`, `--id`, `--desc`, `--role`, `--direction`, `--no-daemon` | [Action: scroll_and_click](actions.md#action-scroll-and-click) | Scroll until target is visible, then click it (alias for scroll-until --click) |
 | [`wait-for-nav`](#command-wait-for-nav) | Device Interaction | `wait-for-nav --app <package> --timeout <ms> [--device <id>] [--operator-package <pkg>]` | `--app`, `--timeout`, `--text`, `--id`, `--desc`, `--role`, `--validate-only`, `--dry-run`, `--no-daemon` | [Action: wait_for_navigation](actions.md#action-wait-for-navigation) | Wait for app or screen navigation to complete |
 | [`read-value`](#command-read-value) | Device Interaction | `read-value --label <text>` | `--label`, `--label-id`, `--label-desc`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon` | [Action: read_key_value_pair](actions.md#action-read-key-value-pair) | Read the value associated with a labeled element |
 | [`skills`](#command-skills) | Execution | `skills list` | `--app`, `--intent`, `--keyword`, `--skill-id`, `--artifact`, `--vars`, `--summary`, `--recording-context`, `--all`, `--dry-run`, `--device`, `--operator-package`, `--timeout`, `--expect-contains`, `--skip-validate`, `--ref` | [Skills CLI](../skills/cli.md) | Manage and run automation skills |
@@ -3664,7 +3755,7 @@ Tap the first matching UI element
 
 - Group: Device Interaction
 - Syntax: `click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--text`, `--id`, `--desc`, `--role`, `--coordinate`, `--long`, `--focus`, `--no-daemon`
+- Primary flags: `--strict`, `--container-json`, `--text`, `--id`, `--desc`, `--role`, `--coordinate`, `--long`, `--focus`, `--no-daemon`
 - Details: [Action: click](actions.md#action-click)
 - Action links: [`click`](actions.md#action-click)
 - Command aliases: `tap`
@@ -3688,7 +3779,7 @@ Type text into the first matching UI element
 
 - Group: Device Interaction
 - Syntax: `type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--id`, `--desc`, `--role`, `--submit`, `--clear`, `--no-daemon`
+- Primary flags: `--strict`, `--container-json`, `--id`, `--desc`, `--role`, `--submit`, `--clear`, `--no-daemon`
 - Details: [Action: enter_text](actions.md#action-enter-text)
 - Action links: [`enter_text`](actions.md#action-enter-text)
 - Command aliases: `fill`, `enter-text`, `enter_text`
@@ -3711,7 +3802,7 @@ Read text from the first matching UI element
 
 - Group: Device Interaction
 - Syntax: `read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--text`, `--id`, `--desc`, `--role`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon`
+- Primary flags: `--strict`, `--container-json`, `--text`, `--id`, `--desc`, `--role`, `--all`, `--validate-only`, `--dry-run`, `--no-daemon`
 - Details: [Action: read_text](actions.md#action-read-text)
 - Action links: [`read_text`](actions.md#action-read-text)
 - See also: [Selectors](selectors.md#selector-flag-text)
@@ -3724,7 +3815,7 @@ Wait until a matching UI element appears
 
 - Group: Device Interaction
 - Syntax: `wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]`
-- Primary flags: `--text`, `--id`, `--desc`, `--role`, `--no-daemon`
+- Primary flags: `--strict`, `--container-json`, `--text`, `--id`, `--desc`, `--role`, `--no-daemon`
 - Details: [Action: wait_for_node](actions.md#action-wait-for-node)
 - Action links: [`wait_for_node`](actions.md#action-wait-for-node)
 - Command aliases: `wait-for`, `wait_for`, `wait-for-node`, `wait_for_node`, `find`, `find-node`, `find_node`
@@ -3793,7 +3884,7 @@ Scroll the screen in a direction
 
 - Group: Device Interaction
 - Syntax: `scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--direction`, `--no-daemon`
+- Primary flags: `--strict`, `--container-json`, `--direction`, `--no-daemon`
 - Details: [Action: scroll](actions.md#action-scroll)
 - Action links: [`scroll`](actions.md#action-scroll)
 
@@ -3804,7 +3895,7 @@ Scroll until a target element is visible
 
 - Group: Device Interaction
 - Syntax: `scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--text`, `--id`, `--desc`, `--role`, `--click`, `--direction`, `--no-daemon`
+- Primary flags: `--strict`, `--container-json`, `--text`, `--id`, `--desc`, `--role`, `--click`, `--direction`, `--no-daemon`
 - Details: [Action: scroll_until](actions.md#action-scroll-until)
 - Action links: [`scroll_until`](actions.md#action-scroll-until)
 - Command aliases: `scroll_until`
@@ -3816,7 +3907,7 @@ Scroll until target is visible, then click it (alias for scroll-until --click)
 
 - Group: Device Interaction
 - Syntax: `scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]`
-- Primary flags: `--text`, `--id`, `--desc`, `--role`, `--direction`, `--no-daemon`
+- Primary flags: `--strict`, `--container-json`, `--text`, `--id`, `--desc`, `--role`, `--direction`, `--no-daemon`
 - Details: [Action: scroll_and_click](actions.md#action-scroll-and-click)
 - Action links: [`scroll_and_click`](actions.md#action-scroll-and-click)
 - Command aliases: `scroll_and_click`
@@ -5945,7 +6036,9 @@ Only the codes defined in `apps/node/src/contracts/errors.ts` are part of the pu
 | <a id="error-result-envelope-malformed"></a>`RESULT_ENVELOPE_MALFORMED` | Result envelope malformed | - |
 | <a id="error-snapshot-extraction-failed"></a>`SNAPSHOT_EXTRACTION_FAILED` | Snapshot extraction failed | - |
 | <a id="error-missing-argument"></a>`MISSING_ARGUMENT` | Missing argument | CLI Usage |
-| <a id="error-node-not-found"></a>`NODE_NOT_FOUND` | Node not found | UI & Nodes |
+| <a id="error-node-ambiguous"></a>`NODE_AMBIGUOUS` | Node ambiguous | UI & Nodes |
+| <a id="error-container-ambiguous"></a>`CONTAINER_AMBIGUOUS` | Container ambiguous | - |
+| <a id="error-node-not-found"></a>`NODE_NOT_FOUND` | Node not found | - |
 | <a id="error-node-not-clickable"></a>`NODE_NOT_CLICKABLE` | Node not clickable | - |
 | <a id="error-security-block-detected"></a>`SECURITY_BLOCK_DETECTED` | Security block detected | - |
 | <a id="error-container-not-found"></a>`CONTAINER_NOT_FOUND` | Container not found | - |
@@ -6049,7 +6142,7 @@ Notes:
 | Daemon lifecycle and proxy | `DAEMON_START_FAILED`, `DAEMON_STOP_FAILED`, `DAEMON_PROXY_ERROR` | Inspect the daemon log and metadata files under `~/.clawperator/`. For `DAEMON_PROXY_ERROR`, inspect device state before retrying because the action may already have executed |
 | Payload or flag validation | `MISSING_ARGUMENT`, `EXECUTION_VALIDATION_FAILED`, `EXECUTION_ACTION_UNSUPPORTED`, `PAYLOAD_TOO_LARGE` | Change the command or payload. Do not retry unchanged |
 | Dispatch or service availability | `RESULT_ENVELOPE_TIMEOUT`, `RESULT_ENVELOPE_MALFORMED`, `BROADCAST_FAILED`, `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `DEVICE_SHELL_UNAVAILABLE` | Run `clawperator doctor`, repair the reported issue, then retry |
-| UI lookup or gesture | `NODE_NOT_FOUND`, `NODE_NOT_CLICKABLE`, `CONTAINER_NOT_FOUND`, `CONTAINER_NOT_SCROLLABLE`, `GESTURE_FAILED`, `SECURITY_BLOCK_DETECTED` | Refresh state with `snapshot`, wait for UI readiness, or adjust selectors and scroll strategy |
+| UI lookup or gesture | `NODE_NOT_FOUND`, `NODE_AMBIGUOUS`, `NODE_NOT_CLICKABLE`, `CONTAINER_NOT_FOUND`, `CONTAINER_AMBIGUOUS`, `CONTAINER_NOT_SCROLLABLE`, `GESTURE_FAILED`, `SECURITY_BLOCK_DETECTED` | Refresh state with `snapshot`, wait for UI readiness, or adjust selectors and scroll strategy |
 | On-screen log panel | `ON_SCREEN_LOG_SERVICE_UNAVAILABLE`, `ON_SCREEN_LOG_LAYOUT_INVALID`, `ON_SCREEN_LOG_RENDER_FAILED`, `ON_SCREEN_LOG_RENDER_TIMEOUT` | Repair the Operator service or supplied layout, then issue a replacement `set_on_screen_log` or `clear_on_screen_log` action as appropriate. |
 | Recording state | `RECORDING_ALREADY_IN_PROGRESS`, `RECORDING_NOT_IN_PROGRESS`, `RECORDING_SESSION_NOT_FOUND`, `RECORDING_PULL_FAILED`, `RECORDING_PARSE_FAILED`, `RECORDING_SCHEMA_VERSION_UNSUPPORTED` | Repair recording state or use the right session before retrying |
 
@@ -6258,6 +6351,19 @@ Typical recovery:
 - complete the post-boot unlock if `userUnlocked == false`
 - rerun `clawperator doctor` and require
   `readiness.device.interactive.status == "pass"`
+
+### `NODE_AMBIGUOUS` and `CONTAINER_AMBIGUOUS`
+
+A strict action resolved multiple targets or containers. The runtime stops before
+the next dispatch and does not retry ambiguity. The failed step has `data.error`
+set to the code, `data.candidate_count` as a decimal string, and `data.candidates`
+as serialized query-result JSON containing at most 10 node summaries. Candidate
+strings are capped at 512 characters. Prior completed steps are retained and later
+steps are skipped. A search may already have performed earlier scroll gestures.
+
+Inspect the candidates with `query`, narrow the matcher or container (including
+relational predicates), and submit a new action only after deciding which node is
+intended. See [strict action selection](selectors.md#strict-action-selection).
 
 ### `NODE_NOT_FOUND`
 
@@ -7767,7 +7873,9 @@ For the underlying selector contract, see [Selectors](selectors.md).
 | `read` | Read text from a matching node, optionally returning all matches. Supports regex validation via validator and validatorPattern. |
 | `press` | Press one of the supported Android navigation keys. |
 | `wait` | Wait until a matching node appears. |
+| `scroll` | Perform one scroll in a freshly resolved container. Strict mode requires unique selection. |
 | `scroll_until` | Scroll in the given direction until a matching node is visible, optionally clicking it afterward. |
+| `scroll_and_click` | Scroll in the given direction until a matching node is visible, optionally clicking it afterward. |
 
 ## Tool Details
 
@@ -8278,6 +8386,23 @@ What the smoke script proves:
 6. it performs a selector-driven read using text discovered from the live snapshot
 
 The smoke script prefers a physical device when both a physical device and an emulator are connected. Override with `CLAWPERATOR_SMOKE_DEVICE=<device_serial>` if needed.
+
+## Strict selectors
+
+Named `click`, `type`, `read`, `wait`, `scroll`, `scroll_until`, and
+`scroll_and_click` tools accept optional boolean `strict` and optional `container`
+using the same shorthand selector shape as `selector`. `scroll` performs one
+scroll; `scroll_and_click` defaults `clickAfter` to true. Raw `execute` accepts the
+canonical `params.strict` and `params.container` fields. Query predicates remain
+unchanged. See [strict selection](selectors.md#strict-action-selection) for the
+counts, scope, failure data, and matching-Operator requirement.
+
+Non-strict duplicate selections include a discovery hint for `--strict` in
+`data.selection_warning`. Named `read` keeps its existing scalar/list value in
+the first content item and adds a second JSON text item containing
+`selection_warning` when needed. Unique reads and intentional multi-target
+read-all results keep their existing output unless the explicit container is
+ambiguous. See [duplicate-selection hints](selectors.md#duplicate-selection-hints).
 
 ---
 

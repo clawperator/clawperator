@@ -5,6 +5,7 @@ export function buildScrollExecution(
   direction: string,
   timeoutMs = 30000,
   container?: NodeMatcher,
+  strict?: boolean,
 ): Execution {
   return {
     commandId: `scroll-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -18,6 +19,7 @@ export function buildScrollExecution(
         type: "scroll",
         params: {
           direction,
+          ...(strict !== undefined ? { strict } : {}),
           ...(container !== undefined ? { container } : {}),
         },
       },

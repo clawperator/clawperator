@@ -5,7 +5,7 @@ import { LIMITS } from "../../contracts/limits.js";
 import type { ResultEnvelope } from "../../contracts/result.js";
 import { createMcpExecutionIds } from "../../mcp/executionIds.js";
 import { buildMcpErrorResult, buildMcpSuccessResult, normalizeMcpError } from "../../mcp/errors.js";
-import { extractStepDataValue, parseReadAllResult } from "../../mcp/results.js";
+import { buildReadSuccessResult, extractStepDataValue, parseReadAllResult } from "../../mcp/results.js";
 import { mapSelectorToNodeMatcher, mcpSelectorSchema } from "../../mcp/selectors.js";
 import { createSessionDefaults } from "../../mcp/session.js";
 import { applySnapshotMaxChars, applySnapshotMaxCharsToEnvelope, getCoreMcpTools } from "../../mcp/tools/core.js";
@@ -689,4 +689,16 @@ describe("MCP transport redaction", () => {
     assert.deepStrictEqual(result.structuredContent, content);
     assert.strictEqual(result.isError, true);
   });
+});
+
+it("read preserves scalar and array results while surfacing duplicate-selection advice", () => {
+  for (const value of ["first", ["first", "second"]]) {
+    const plain = buildReadSuccessResult(value);
+    assert.deepStrictEqual(plain, buildMcpSuccessResult(value));
+    const warning = "Multiple candidates matched. Use --strict (params.strict=true).";
+    const advised = buildReadSuccessResult(value, warning);
+    assert.strictEqual(advised.isError, undefined);
+    assert.deepStrictEqual(advised.content[0], plain.content[0]);
+    assert.deepStrictEqual(advised.content.slice(1), [{ type: "text", text: JSON.stringify({ selection_warning: warning }) }]);
+  }
 });

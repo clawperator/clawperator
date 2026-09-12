@@ -126,6 +126,8 @@ export async function cmdCloseApp(options: {
 
 export async function cmdActionClick(options: {
   format: OutputOptions["format"];
+  strict?: boolean;
+  container?: NodeMatcher;
   matcher?: NodeMatcher;
   coordinate?: { x: number; y: number };
   clickType?: "default" | "long_click" | "focus";
@@ -137,7 +139,7 @@ export async function cmdActionClick(options: {
   runExecutionFn?: typeof runExecution;
 }): Promise<string> {
   try {
-    const execution = buildClickExecution(options.matcher, options.clickType, options.coordinate);
+    const execution = buildClickExecution(options.matcher, options.clickType, options.coordinate, options.strict, options.container);
     return await runActionExecution(execution, options);
   } catch (e) {
     return formatError(e, options);
@@ -146,6 +148,7 @@ export async function cmdActionClick(options: {
 
 export async function cmdActionRead(options: {
   format: OutputOptions["format"];
+  strict?: boolean;
   matcher: NodeMatcher;
   readAll?: boolean;
   container?: NodeMatcher;
@@ -158,7 +161,7 @@ export async function cmdActionRead(options: {
   logger?: Logger;
 }): Promise<string> {
   try {
-    const execution = buildReadExecution(options.matcher, options.readAll, options.container);
+    const execution = buildReadExecution(options.matcher, options.readAll, options.container, options.strict);
     if (options.validateOnly || options.dryRun) {
       // Reuse exec's contract-only paths so read validation never dispatches to a device.
       return (await import("./execute.js")).cmdExecute({
@@ -181,6 +184,8 @@ export async function cmdActionRead(options: {
 
 export async function cmdActionWait(options: {
   format: OutputOptions["format"];
+  strict?: boolean;
+  container?: NodeMatcher;
   matcher: NodeMatcher;
   waitTimeoutMs?: number;
   deviceId?: string;
@@ -189,7 +194,7 @@ export async function cmdActionWait(options: {
   logger?: Logger;
 }): Promise<string> {
   try {
-    const execution = buildWaitExecution(options.matcher, options.waitTimeoutMs);
+    const execution = buildWaitExecution(options.matcher, options.waitTimeoutMs, options.strict, options.container);
     return await runActionExecution(execution, options);
   } catch (e) {
     return formatError(e, options);
@@ -198,6 +203,8 @@ export async function cmdActionWait(options: {
 
 export async function cmdActionType(options: {
   format: OutputOptions["format"];
+  strict?: boolean;
+  container?: NodeMatcher;
   matcher: NodeMatcher;
   text: string;
   submit?: boolean;
@@ -210,6 +217,8 @@ export async function cmdActionType(options: {
   try {
     const execution = buildTypeTextExecution({
       selector: options.matcher,
+      strict: options.strict,
+      container: options.container,
       text: options.text,
       submit: options.submit ?? false,
       clear: options.clear ?? false,
@@ -254,6 +263,7 @@ export async function cmdActionPressKey(options: {
 
 export async function cmdScroll(options: {
   format: OutputOptions["format"];
+  strict?: boolean;
   direction: string;
   container?: NodeMatcher;
   deviceId?: string;
@@ -263,7 +273,7 @@ export async function cmdScroll(options: {
   logger?: Logger;
 }): Promise<string> {
   try {
-    const execution = buildScrollExecution(options.direction, options.timeoutMs, options.container);
+    const execution = buildScrollExecution(options.direction, options.timeoutMs, options.container, options.strict);
     return await runActionExecution(execution, options);
   } catch (e) {
     return formatError(e, options);
@@ -272,6 +282,7 @@ export async function cmdScroll(options: {
 
 export async function cmdScrollUntil(options: {
   format: OutputOptions["format"];
+  strict?: boolean;
   direction: string;
   matcher: NodeMatcher;
   container?: NodeMatcher;
@@ -289,6 +300,7 @@ export async function cmdScrollUntil(options: {
       options.container,
       options.clickAfter,
       options.timeoutMs,
+      options.strict,
     );
     return await runActionExecution(execution, options);
   } catch (e) {

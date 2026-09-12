@@ -1495,11 +1495,11 @@ COMMANDS["click"] = {
   name: "click",
   synonyms: ["tap"],
   group: "Device Interaction",
-  flagAliases: ELEMENT_SELECTOR_FLAG_ALIASES,
-  documentedFlags: ["--text", "--id", "--desc", "--role", "--coordinate", "--long", "--focus", "--no-daemon"],
-  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--coordinate", "--long", "--focus", "--no-daemon"],
+  flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
+  documentedFlags: ["--strict", "--container-json", "--text", "--id", "--desc", "--role", "--coordinate", "--long", "--focus", "--no-daemon"],
+  supportedFlags: ["--strict", ...CONTAINER_SELECTOR_VALUE_FLAGS, "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--coordinate", "--long", "--focus", "--no-daemon"],
   summary: "Tap the first matching UI element",
-  help: HELP_CLICK,
+  help: HELP_CLICK + "\n--strict rejects ambiguous selection before dispatch. --container-json <json> scopes targets to strict descendants of the matching container.\n",
   topLevelBlock: `  click --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]
                                             Tap the first matching UI element`,
   handler: async (ctx) => {
@@ -1580,8 +1580,12 @@ COMMANDS["click"] = {
       );
     }
 
+    const containerResult = resolveContainerMatcherFromCli(rest);
+    if (!containerResult.ok) return formatError(containerResult.error, { format });
     return (await import("./commands/action.js")).cmdActionClick({
       format,
+      container: containerResult.container,
+      strict: hasFlag(rest, "--strict") ? true : undefined,
       matcher: resolvedMatcher,
       coordinate,
       clickType,
@@ -1686,11 +1690,11 @@ COMMANDS["type"] = {
   name: "type",
   synonyms: ["fill", "enter-text", "enter_text"],
   group: "Device Interaction",
-  flagAliases: ELEMENT_SELECTOR_FLAG_ALIASES,
-  documentedFlags: ["--id", "--desc", "--role", "--submit", "--clear", "--no-daemon"],
-  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--submit", "--clear", "--no-daemon"],
+  flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
+  documentedFlags: ["--strict", "--container-json", "--id", "--desc", "--role", "--submit", "--clear", "--no-daemon"],
+  supportedFlags: ["--strict", ...CONTAINER_SELECTOR_VALUE_FLAGS, "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--submit", "--clear", "--no-daemon"],
   summary: "Type text into the first matching UI element",
-  help: HELP_TYPE,
+  help: HELP_TYPE + "\n--strict rejects ambiguous selection before dispatch. --container-json <json> scopes targets to strict descendants of the matching container.\n",
   topLevelBlock: `  type <text> --role <role> | --id <id> [--device <id>] [--operator-package <pkg>]
                                             Type text into the first matching UI element`,
   handler: async (ctx) => {
@@ -1698,7 +1702,7 @@ COMMANDS["type"] = {
     // --text for type is the text-to-type, not an element selector.
     // Extract it first, then resolve the element selector from the remaining flags.
     const typeTextFlag = getOpt(rest, "--text");
-    const allSelectorValueFlags = [...ELEMENT_SELECTOR_VALUE_FLAGS];
+    const allSelectorValueFlags = [...ELEMENT_SELECTOR_VALUE_FLAGS, ...CONTAINER_SELECTOR_VALUE_FLAGS];
     const bare = barePositionalTokens(rest, allSelectorValueFlags, ["--submit", "--clear"]);
     if (typeTextFlag !== undefined && bare.length > 0) {
       return formatError(
@@ -1732,8 +1736,12 @@ COMMANDS["type"] = {
     if (!resolved.ok) {
       return formatError(resolved.error, { format });
     }
+    const containerResult = resolveContainerMatcherFromCli(rest);
+    if (!containerResult.ok) return formatError(containerResult.error, { format });
     return (await import("./commands/action.js")).cmdActionType({
       format,
+      container: containerResult.container,
+      strict: hasFlag(rest, "--strict") ? true : undefined,
       matcher: resolved.matcher,
       text: typeText,
       submit: hasFlag(rest, "--submit"),
@@ -1798,10 +1806,10 @@ COMMANDS["read"] = {
   synonyms: ["read-text", "read_text"],
   group: "Device Interaction",
   flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
-  documentedFlags: ["--text", "--id", "--desc", "--role", "--all", "--validate-only", "--dry-run", "--no-daemon"],
-  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--all", "--validate-only", "--dry-run", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--no-daemon"],
+  documentedFlags: ["--strict", "--container-json", "--text", "--id", "--desc", "--role", "--all", "--validate-only", "--dry-run", "--no-daemon"],
+  supportedFlags: ["--strict", ...CONTAINER_SELECTOR_VALUE_FLAGS, "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--all", "--validate-only", "--dry-run", "--no-daemon"],
   summary: "Read text from the first matching UI element",
-  help: HELP_READ,
+  help: HELP_READ + "\n--strict rejects ambiguous selection before dispatch. --container-json <json> scopes targets to strict descendants of the matching container.\n",
   topLevelBlock: `  read --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>]
                                             Read text from the first matching UI element`,
   handler: async (ctx) => {
@@ -1827,6 +1835,7 @@ COMMANDS["read"] = {
       format,
       matcher: resolved.matcher,
       readAll,
+      strict: hasFlag(rest, "--strict") ? true : undefined,
       container: containerResult.container,
       deviceId,
       operatorPackage,
@@ -1843,11 +1852,11 @@ COMMANDS["wait"] = {
   name: "wait",
   synonyms: ["wait-for", "wait_for", "wait-for-node", "wait_for_node", "find", "find-node", "find_node"],
   group: "Device Interaction",
-  flagAliases: ELEMENT_SELECTOR_FLAG_ALIASES,
-  documentedFlags: ["--text", "--id", "--desc", "--role", "--no-daemon"],
-  supportedFlags: ["--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--no-daemon"],
+  flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
+  documentedFlags: ["--strict", "--container-json", "--text", "--id", "--desc", "--role", "--no-daemon"],
+  supportedFlags: ["--strict", ...CONTAINER_SELECTOR_VALUE_FLAGS, "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--no-daemon"],
   summary: "Wait until a matching UI element appears",
-  help: HELP_WAIT,
+  help: HELP_WAIT + "\n--strict rejects ambiguous selection before dispatch. --container-json <json> scopes targets to strict descendants of the matching container.\n",
   topLevelBlock: `  wait --text <text> | --id <id> | --role <role> [--device <id>] [--operator-package <pkg>] [--timeout <ms>]
                                             Wait until a matching UI element appears`,
   handler: async (ctx) => {
@@ -1871,8 +1880,12 @@ COMMANDS["wait"] = {
     if (!resolved.ok) {
       return formatError(resolved.error, { format });
     }
+    const containerResult = resolveContainerMatcherFromCli(rest);
+    if (!containerResult.ok) return formatError(containerResult.error, { format });
     return (await import("./commands/action.js")).cmdActionWait({
       format,
+      container: containerResult.container,
+      strict: hasFlag(rest, "--strict") ? true : undefined,
       matcher: resolved.matcher,
       waitTimeoutMs: timeoutMs,
       deviceId,
@@ -2173,10 +2186,10 @@ COMMANDS["scroll"] = {
   name: "scroll",
   group: "Device Interaction",
   flagAliases: CONTAINER_SELECTOR_FLAG_ALIASES,
-  documentedFlags: ["--direction", "--no-daemon"],
-  supportedFlags: ["--direction", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--no-daemon"],
+  documentedFlags: ["--strict", "--container-json", "--direction", "--no-daemon"],
+  supportedFlags: ["--strict", ...CONTAINER_SELECTOR_VALUE_FLAGS, "--direction", "--no-daemon"],
   summary: "Scroll the screen in a direction",
-  help: HELP_SCROLL,
+  help: HELP_SCROLL + "\n--strict rejects ambiguous selection before dispatch. --container-json <json> scopes targets to strict descendants of the matching container.\n",
   topLevelBlock: `  scroll <down|up|left|right> [--container-id <id>] [--device <id>] [--operator-package <pkg>]
                                             Scroll the screen in a direction`,
   handler: async (ctx) => {
@@ -2211,6 +2224,7 @@ COMMANDS["scroll"] = {
     return (await import("./commands/action.js")).cmdScroll({
       format,
       direction,
+      strict: hasFlag(rest, "--strict") ? true : undefined,
       container: containerResolved.container,
       deviceId,
       operatorPackage,
@@ -2292,6 +2306,7 @@ const scrollUntilHandler = async (ctx: HandlerContext, clickAfterDefault: boolea
     direction,
     matcher: matcherResult.matcher,
     container: containerResult.container,
+    strict: hasFlag(rest, "--strict") ? true : undefined,
     clickAfter,
     deviceId,
     operatorPackage,
@@ -2306,10 +2321,10 @@ COMMANDS["scroll-until"] = {
   synonyms: ["scroll_until"],
   group: "Device Interaction",
   flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
-  documentedFlags: ["--text", "--id", "--desc", "--role", "--click", "--direction", "--no-daemon"],
-  supportedFlags: ["--click", "--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--no-daemon"],
+  documentedFlags: ["--strict", "--container-json", "--text", "--id", "--desc", "--role", "--click", "--direction", "--no-daemon"],
+  supportedFlags: ["--strict", ...CONTAINER_SELECTOR_VALUE_FLAGS, "--click", "--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--no-daemon"],
   summary: "Scroll until a target element is visible",
-  help: HELP_SCROLL_UNTIL,
+  help: HELP_SCROLL_UNTIL + "\n--strict rejects ambiguous selection before dispatch. --container-json <json> scopes targets to strict descendants of the matching container.\n",
   topLevelBlock: `  scroll-until [<direction>] --text <text> [--click] [--device <id>] [--operator-package <pkg>]
                                             Scroll until a target element is visible (optionally click it)`,
   handler: async (ctx) => scrollUntilHandler(ctx, false),
@@ -2320,10 +2335,10 @@ COMMANDS["scroll-and-click"] = {
   synonyms: ["scroll_and_click"],
   group: "Device Interaction",
   flagAliases: [...ELEMENT_SELECTOR_FLAG_ALIASES, ...CONTAINER_SELECTOR_FLAG_ALIASES],
-  documentedFlags: ["--text", "--id", "--desc", "--role", "--direction", "--no-daemon"],
-  supportedFlags: ["--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--container-text", "--container-text-contains", "--container-id", "--container-desc", "--container-desc-contains", "--container-role", "--container-selector", "--no-daemon"],
+  documentedFlags: ["--strict", "--container-json", "--text", "--id", "--desc", "--role", "--direction", "--no-daemon"],
+  supportedFlags: ["--strict", ...CONTAINER_SELECTOR_VALUE_FLAGS, "--direction", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--selector", "--no-daemon"],
   summary: "Scroll until target is visible, then click it (alias for scroll-until --click)",
-  help: HELP_SCROLL_UNTIL,
+  help: HELP_SCROLL_UNTIL + "\n--strict rejects ambiguous selection before dispatch. --container-json <json> scopes targets to strict descendants of the matching container.\n",
   topLevelBlock: `  scroll-and-click [<direction>] --text <text> [--device <id>] [--operator-package <pkg>]
                                             Scroll until target is visible, then click it`,
   handler: async (ctx) => scrollUntilHandler(ctx, true),

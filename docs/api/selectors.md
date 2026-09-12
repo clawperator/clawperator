@@ -111,11 +111,88 @@ clawperator query --matcher-json '{"resourceId":"row","ancestor":{"role":"list"}
 ```
 
 Queries report every match and its state, including empty-label controls. Existing
-actions retain their first-match behavior and retry defaults. Querying a unique
+actions retain their first-match behavior and retry defaults unless `strict=true`. Querying a unique
 node does not reserve it or authorize a later action against that observation.
 See [query_ui](actions.md#action-query-ui) for counts, state, per-node
 `accessibilityDataSensitive`, and path semantics. Sensitivity is observation
 metadata, not a selector predicate.
+
+## Duplicate-selection hints
+
+When a non-strict action finds multiple candidates and selects the first,
+its step data includes `selection_warning`. The warning identifies duplicate
+target or container selection and teaches `--strict` (`params.strict=true`) as
+an option for rejecting ambiguity. The action keeps its existing result and
+first-match behavior; the warning alone is not a failure.
+
+For example, a successful click can include:
+
+```json
+{
+  "selection_warning": "Multiple candidates matched; first-match selection was used. Largest candidate counts observed: target: 7. Use --strict (params.strict=true) to reject ambiguous matches."
+}
+```
+
+Counts are the largest observed for each kind of selection during that action,
+including retries and scroll searches. They are not a receipt for the final
+dispatch. Repeated observations produce one bounded warning per action. Unique
+selection and queries omit the warning. `read_text` with `all=true` intentionally
+allows multiple targets and does not warn about them; a duplicate explicit
+container still produces the hint. The same step data is available through CLI,
+raw execution, and MCP. MCP `read` preserves its scalar/list value as the first
+content item and adds the warning as a separate JSON text item when present.
+
+## Strict action selection
+
+Set `params.strict: true` in raw execution, `--strict` in the CLI, or `strict: true`
+in a named MCP tool. This applies to `click`, `enter_text`, `read_text`,
+`wait_for_node`, `scroll`, `scroll_until`, and `scroll_and_click`. Omission or
+`false` retains first-match selection. Strict must be a JSON boolean; strings,
+numbers, and null are invalid. Coordinate clicks cannot use strict mode or a
+container.
+
+All seven actions accept an optional `container` matcher. The CLI exposes
+`--container-json` and the `--container-*` shorthand flags on their corresponding
+commands. JSON and shorthand container flags are mutually exclusive. Targets
+must be strict descendants of the selected container; the container itself does
+not match. Relationships still use the enclosing structural tree. Without strict
+mode, an explicit container selects the first match.
+
+| Selection under strict mode | Result |
+| --- | --- |
+| Immediate click, text entry, or single read: zero targets after existing retries | `NODE_NOT_FOUND`; no target dispatch |
+| Single target selection: more than one candidate | `NODE_AMBIGUOUS`; no target dispatch or ambiguity retry |
+| Explicit container: zero or multiple matches | `CONTAINER_NOT_FOUND` or `CONTAINER_AMBIGUOUS`, before child selection |
+| Wait: target absent | Keep polling within the existing retry/timeout bounds |
+| Scroll search: target absent | Keep searching within the selected scroll container and existing bounds |
+| Read with `all=true`: zero or multiple targets | Existing empty/list text result; explicit container must still be unique |
+| Scroll without an explicit container | Require exactly one eligible scrollable candidate |
+
+When `findFirstScrollableChild=true` selects descendants of a non-scrollable
+wrapper, strict mode also requires a unique eligible scrollable descendant.
+Scroll target checks and the final click stay within the selected scrollable
+subtree. Each observation and dispatch resolves fresh candidates; a preceding
+query or successful search never reserves a node. A layout change that introduces
+ambiguity fails before the next dispatch. Gestures already completed earlier in
+a search are not undone.
+
+Ambiguity data includes `candidate_count` as a decimal string and `candidates` as
+serialized query-result JSON with at most 10 `NodeSummary` objects. Candidate
+strings are capped at 512 characters; total count remains exact. Paths and state
+have the same observation-only meaning as `query_ui`. Strict failures retain
+preceding results and the failed step and stop subsequent actions in the execution.
+
+```bash
+clawperator click --text "Open" --strict --container-json '{"resourceId":"row","descendant":{"textEquals":"Example"}}'
+clawperator read --role switch --all --strict --container-id "panel"
+```
+
+Use matching Node and Operator builds from v0.10 or later before adopting these
+options. Older Operators may ignore unknown fields and therefore cannot enforce
+strict selection. Existing skills can keep first-match defaults; opt in after
+inspecting candidate counts and adding observable postconditions. Successful
+selection and dispatch do not verify the application's intended result. Never
+replay a mutation after an uncertain post-dispatch result.
 
 ## Where Selectors Appear
 
@@ -154,6 +231,7 @@ Agent-friendly CLI aliases accepted for shorthand selectors:
 - `--resource-id` -> `--id`
 - `--content-desc` -> `--desc`
 - `--content-desc-contains` -> `--desc-contains`
+- `--container-json` -> `--container-selector`
 - `--container-resource-id` -> `--container-id`
 - `--container-content-desc` -> `--container-desc`
 - `--container-content-desc-contains` -> `--container-desc-contains`
@@ -161,7 +239,7 @@ Agent-friendly CLI aliases accepted for shorthand selectors:
 Container selectors follow the same pattern:
 
 1. Shorthand flags such as `--container-text`, `--container-id`, and `--container-role`
-2. Raw JSON via `--container-selector '<json>'`
+2. Raw JSON via `--container-json '<json>'` (alias of `--container-selector`)
 
 The parser resolves shorthand flags into the same `NodeMatcher` object used by raw JSON. For example:
 

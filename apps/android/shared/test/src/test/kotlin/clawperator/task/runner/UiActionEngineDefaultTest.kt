@@ -21,6 +21,54 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class UiActionEngineDefaultTest : ActionTest {
     @Test
+    fun `selection warnings are attached to their action only and do not change success`() = actionTest {
+        var clicks = 0
+        val uiScope = object : RecordingTaskUiScope() {
+            override suspend fun click(matcher: NodeMatcher?, coordinate: action.math.geometry.Point?, clickTypes: UiTreeClickTypes, retry: TaskRetry, strict: Boolean, container: NodeMatcher?) {
+                if (clicks++ == 0) kotlin.coroutines.coroutineContext[SelectionWarnings]!!.record(7, container = false)
+            }
+        }
+        val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+        val result = engine.execute(RecordingTaskScope(uiScope), UiActionPlan("command", "task", "test", listOf(
+            UiAction.Click("duplicates", NodeMatcher(resourceId = "target")),
+            UiAction.Click("unique", NodeMatcher(resourceId = "unique")),
+        )))
+        assertEquals(2, clicks)
+        assertTrue(result.stepResults.all { it.success })
+        assertTrue(result.stepResults.first().data.getValue("selection_warning").contains("target: 7"))
+        assertTrue(result.stepResults.first().data.getValue("selection_warning").contains("--strict"))
+        assertFalse(result.stepResults.last().data.containsKey("selection_warning"))
+        assertEquals(null, result.errorCode)
+    }
+
+    @Test
+    fun `strict failures retain preceding steps correlation and stop subsequent actions`() = actionTest {
+        var clicks = 0
+        val uiScope = object : RecordingTaskUiScope() {
+            override suspend fun queryUi(matcher: NodeMatcher?, visibility: String, limit: Int) = "{}"
+            override suspend fun click(matcher: NodeMatcher?, coordinate: action.math.geometry.Point?, clickTypes: UiTreeClickTypes, retry: TaskRetry, strict: Boolean, container: NodeMatcher?) {
+                assertTrue(strict)
+                assertEquals("scope", container?.resourceId)
+                clicks++
+                throw StrictSelectionException("NODE_AMBIGUOUS", 2, "{}")
+            }
+        }
+        val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+        val result = engine.execute(RecordingTaskScope(uiScope), UiActionPlan("command", "task", "test", listOf(
+            UiAction.QueryUi("before"),
+            UiAction.Click("ambiguous", NodeMatcher(resourceId = "target"), strict = true, container = NodeMatcher(resourceId = "scope")),
+            UiAction.Click("after", NodeMatcher(resourceId = "target")),
+        )))
+        assertEquals(1, clicks)
+        assertEquals("command", result.commandId)
+        assertEquals("task", result.taskId)
+        assertEquals("NODE_AMBIGUOUS", result.errorCode)
+        assertEquals(listOf("before", "ambiguous"), result.stepResults.map { it.id })
+        assertFalse(result.stepResults.last().success)
+        assertEquals("2", result.stepResults.last().data["candidate_count"])
+    }
+
+    @Test
     fun `unavailable query preserves completed steps and stops before later actions`() = actionTest {
         var captures = 0
         val diagnostics = clawperator.uitree.UiHierarchyDiagnostics(serviceAvailable = true, windowCount = 2)
@@ -1335,6 +1383,7 @@ class UiActionEngineDefaultTest : ActionTest {
                 override suspend fun getValidatedText(
                     matcher: NodeMatcher,
                     retry: TaskRetry,
+                    strict: Boolean,
                     validator: (String) -> Boolean,
                 ): String {
                     val value = "16.0.1"
@@ -1377,6 +1426,7 @@ class UiActionEngineDefaultTest : ActionTest {
                 override suspend fun getValidatedText(
                     matcher: NodeMatcher,
                     retry: TaskRetry,
+                    strict: Boolean,
                     validator: (String) -> Boolean,
                 ): String {
                     val value = "Settings"
@@ -1420,6 +1470,7 @@ class UiActionEngineDefaultTest : ActionTest {
                 override suspend fun getValidatedText(
                     matcher: NodeMatcher,
                     retry: TaskRetry,
+                    strict: Boolean,
                     validator: (String) -> Boolean,
                 ): String {
                     val value = "not a temperature"
@@ -1463,6 +1514,7 @@ class UiActionEngineDefaultTest : ActionTest {
                 override suspend fun getValidatedText(
                     matcher: NodeMatcher,
                     retry: TaskRetry,
+                    strict: Boolean,
                     validator: (String) -> Boolean,
                 ): String {
                     val value = "123-456"
@@ -1506,6 +1558,7 @@ class UiActionEngineDefaultTest : ActionTest {
                 override suspend fun getValidatedText(
                     matcher: NodeMatcher,
                     retry: TaskRetry,
+                    strict: Boolean,
                     validator: (String) -> Boolean,
                 ): String {
                     val value = "abc"
@@ -1553,6 +1606,7 @@ class UiActionEngineDefaultTest : ActionTest {
                     matcher: NodeMatcher,
                     containerMatcher: NodeMatcher,
                     retry: TaskRetry,
+                    strict: Boolean,
                 ): String {
                     capturedMatcher = matcher
                     capturedContainer = containerMatcher
@@ -1602,6 +1656,7 @@ class UiActionEngineDefaultTest : ActionTest {
                     matcher: NodeMatcher,
                     containerMatcher: NodeMatcher,
                     retry: TaskRetry,
+                    strict: Boolean,
                 ): String {
                     capturedContainer = containerMatcher
                     throw IllegalStateException("Container not found for: $containerMatcher")
@@ -1645,6 +1700,7 @@ class UiActionEngineDefaultTest : ActionTest {
                     matcher: NodeMatcher,
                     containerMatcher: NodeMatcher,
                     retry: TaskRetry,
+                    strict: Boolean,
                 ): String {
                     capturedContainer = containerMatcher
                     throw IllegalStateException(
@@ -1690,6 +1746,7 @@ class UiActionEngineDefaultTest : ActionTest {
                     matcher: NodeMatcher,
                     containerMatcher: NodeMatcher,
                     retry: TaskRetry,
+                    strict: Boolean,
                 ): List<String> {
                     capturedContainer = containerMatcher
                     throw IllegalStateException("Container not found for: $containerMatcher")
@@ -1735,6 +1792,7 @@ class UiActionEngineDefaultTest : ActionTest {
                     matcher: NodeMatcher,
                     containerMatcher: NodeMatcher,
                     retry: TaskRetry,
+                    strict: Boolean,
                 ): List<String> {
                     capturedMatcher = matcher
                     capturedContainer = containerMatcher
@@ -1785,6 +1843,7 @@ class UiActionEngineDefaultTest : ActionTest {
                     matcher: NodeMatcher,
                     containerMatcher: NodeMatcher,
                     retry: TaskRetry,
+                    strict: Boolean,
                     validator: (String) -> Boolean,
                 ): String {
                     val value = "20.5°C"
@@ -1830,6 +1889,7 @@ class UiActionEngineDefaultTest : ActionTest {
                     matcher: NodeMatcher,
                     containerMatcher: NodeMatcher,
                     retry: TaskRetry,
+                    strict: Boolean,
                     validator: (String) -> Boolean,
                 ): String {
                     val value = "not a temperature"
@@ -2091,6 +2151,7 @@ open class RecordingTaskUiScope(
     override suspend fun getValidatedText(
         matcher: NodeMatcher,
         retry: TaskRetry,
+        strict: Boolean,
         validator: (String) -> Boolean,
     ): String {
         val value = "22.5 C"
@@ -2104,6 +2165,8 @@ open class RecordingTaskUiScope(
         matcher: NodeMatcher,
         retry: TaskRetry,
         timeoutMs: Long?,
+        strict: Boolean,
+        container: NodeMatcher?,
     ): TaskUiNode {
         if (waitForNodeThrows != null) {
             throw waitForNodeThrows
@@ -2121,29 +2184,34 @@ open class RecordingTaskUiScope(
     override suspend fun getAllText(
         matcher: NodeMatcher,
         retry: TaskRetry,
+        strict: Boolean,
     ): List<String> = listOf("Title Text 1", "Title Text 2")
 
     override suspend fun getText(
         matcher: NodeMatcher,
         retry: TaskRetry,
+        strict: Boolean,
     ): String = "Title Text"
 
     override suspend fun getTextWithinContainer(
         matcher: NodeMatcher,
         containerMatcher: NodeMatcher,
         retry: TaskRetry,
+        strict: Boolean,
     ): String = "Title Text in Container"
 
     override suspend fun getAllTextWithinContainer(
         matcher: NodeMatcher,
         containerMatcher: NodeMatcher,
         retry: TaskRetry,
+        strict: Boolean,
     ): List<String> = listOf("Title Text 1 in Container", "Title Text 2 in Container")
 
     override suspend fun getValidatedTextWithinContainer(
         matcher: NodeMatcher,
         containerMatcher: NodeMatcher,
         retry: TaskRetry,
+        strict: Boolean,
         validator: (String) -> Boolean,
     ): String {
         val value = "22.5 C"
@@ -2169,6 +2237,8 @@ open class RecordingTaskUiScope(
         coordinate: action.math.geometry.Point?,
         clickTypes: UiTreeClickTypes,
         retry: TaskRetry,
+        strict: Boolean,
+        container: NodeMatcher?,
     ) {
         clickCalled = true
         clickCoordinate = coordinate
@@ -2181,6 +2251,7 @@ open class RecordingTaskUiScope(
         settleDelay: Duration,
         retry: TaskRetry,
         findFirstScrollableChild: Boolean,
+        strict: Boolean,
     ): TaskScrollOnceResult {
         scrollOnceCalled = true
         scrollOnceThrows?.let { throw it }
@@ -2197,6 +2268,7 @@ open class RecordingTaskUiScope(
         maxDuration: Duration,
         noPositionChangeThreshold: Int,
         findFirstScrollableChild: Boolean,
+        strict: Boolean,
     ): TaskScrollLoopResult = scrollLoopResult
 
     override suspend fun scrollUntil(
@@ -2208,6 +2280,7 @@ open class RecordingTaskUiScope(
         settleDelay: Duration,
         retry: TaskRetry,
         findFirstScrollableChild: Boolean,
+        strict: Boolean,
     ): TaskScrollResult {
         scrollIntoViewCalled = true
         return TaskScrollResult.Found(
@@ -2231,6 +2304,7 @@ open class RecordingTaskUiScope(
         settleDelay: Duration,
         retry: TaskRetry,
         findFirstScrollableChild: Boolean,
+        strict: Boolean,
     ): TaskUiNode {
         scrollIntoViewCalled = true
         return TaskUiNode(
@@ -2260,6 +2334,8 @@ open class RecordingTaskUiScope(
         submit: Boolean,
         clear: Boolean,
         retry: TaskRetry,
+        strict: Boolean,
+        container: NodeMatcher?,
     ) {
         enteredText = text
         enterTextClear = clear
