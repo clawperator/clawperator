@@ -370,6 +370,28 @@ describe("mcp stdio integration", () => {
     assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
   });
 
+  it("delegates non-object raw action params to the canonical execution validator", async () => {
+    await client.initialize();
+
+    for (const params of [null, [], "not-an-object"]) {
+      const result = await client.callTool("execute", {
+        deviceId: "non-existent",
+        timeoutMs: 1000,
+        actions: [
+          {
+            id: "clear-panel",
+            type: "clear_on_screen_log",
+            params,
+          },
+        ],
+      });
+
+      const payload = parseToolPayload(result) as { code?: string };
+      assert.strictEqual(result.isError, true);
+      assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+    }
+  });
+
   it("configure with no args returns empty session state", async () => {
     await client.initialize();
 

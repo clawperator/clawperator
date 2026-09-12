@@ -58,6 +58,29 @@ class AgentCommandParserOnScreenLogTest {
     }
 
     @Test
+    fun `parse set_on_screen_log accepts integral JSON number representations`() {
+        val action =
+            parseSet(
+                """
+                {
+                  "text": "integral numbers",
+                  "topOffsetDp": 1.0,
+                  "edgeOffsetDp": 1e3,
+                  "widthDp": 8e1,
+                  "fontSizeSp": 8.0,
+                  "ttlMs": 1e3
+                }
+                """.trimIndent(),
+            )
+
+        assertEquals(1, action.spec.topOffsetDp)
+        assertEquals(1_000, action.spec.edgeOffsetDp)
+        assertEquals(80, action.spec.widthDp)
+        assertEquals(8, action.spec.fontSizeSp)
+        assertEquals(1_000L, action.spec.ttlMs)
+    }
+
+    @Test
     fun `parse set_on_screen_log rejects invalid numeric forms and ranges`() {
         val invalidParams =
             listOf(
@@ -74,6 +97,8 @@ class AgentCommandParserOnScreenLogTest {
                 """{ "text": "number", "topOffsetDp": "8" }""",
                 """{ "text": "number", "edgeOffsetDp": 1.5 }""",
                 """{ "text": "number", "widthDp": null }""",
+                """{ "text": "number", "ttlMs": "1000" }""",
+                """{ "text": "\uFEFF" }""",
             )
 
         invalidParams.forEach(::assertSetFailure)

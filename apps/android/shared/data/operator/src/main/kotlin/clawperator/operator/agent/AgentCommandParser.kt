@@ -40,8 +40,6 @@ class AgentCommandParserDefault : AgentCommandParser {
         private const val MAX_SOURCE_LENGTH = 64
         private const val MAX_MATCHER_VALUE_LENGTH = 512
         private const val MAX_URI_LENGTH = 2048
-        private val INTEGER_LITERAL = Regex("-?(0|[1-9][0-9]*)")
-
         private val json = Json {
             ignoreUnknownKeys = true
         }
@@ -480,8 +478,15 @@ class AgentCommandParserDefault : AgentCommandParser {
     ): Int {
         val value = this[key] ?: return default
         val primitive = value as? JsonPrimitive ?: error("$key must be an integer")
-        require(!primitive.isJsonString() && INTEGER_LITERAL.matches(primitive.content)) { "$key must be an integer" }
-        return primitive.content.toIntOrNull() ?: error("$key must be an integer")
+        require(!primitive.isJsonString()) { "$key must be an integer" }
+        val number = primitive.doubleOrNull ?: error("$key must be an integer")
+        require(
+            number.isFinite() &&
+                number >= Int.MIN_VALUE.toDouble() &&
+                number <= Int.MAX_VALUE.toDouble() &&
+                number == number.toInt().toDouble(),
+        ) { "$key must be an integer" }
+        return number.toInt()
     }
 
     private fun JsonObject.longOrDefault(
@@ -506,8 +511,15 @@ class AgentCommandParserDefault : AgentCommandParser {
     ): Long {
         val value = this[key] ?: return default
         val primitive = value as? JsonPrimitive ?: error("$key must be an integer")
-        require(!primitive.isJsonString() && INTEGER_LITERAL.matches(primitive.content)) { "$key must be an integer" }
-        return primitive.content.toLongOrNull() ?: error("$key must be an integer")
+        require(!primitive.isJsonString()) { "$key must be an integer" }
+        val number = primitive.doubleOrNull ?: error("$key must be an integer")
+        require(
+            number.isFinite() &&
+                number >= Long.MIN_VALUE.toDouble() &&
+                number <= Long.MAX_VALUE.toDouble() &&
+                number == number.toLong().toDouble(),
+        ) { "$key must be an integer" }
+        return number.toLong()
     }
 
     private fun JsonObject.longRequired(key: String): Long {

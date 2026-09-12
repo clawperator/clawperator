@@ -652,18 +652,18 @@ Use this raw action to show one static, noninteractive diagnostic label owned by
 | `text` | String with `1..2048` UTF-16 code units, at least one non-whitespace character | Required. LF and TAB are allowed; other control characters are rejected. |
 | `anchor` | Exact `left` or `right` | `left`; physical display edge. |
 | `textAlign` | Exact `left` or `right` | `left`; alignment inside the panel. |
-| `topOffsetDp` | Integer `0..1000` | `8`; from the usable top edge. |
-| `edgeOffsetDp` | Integer `0..1000` | `8`; inward from the selected usable horizontal edge. |
-| `widthDp` | Integer `80..600` | `280`; full panel width including padding. |
-| `fontSizeSp` | Integer `8..24` | `12`; follows Android font scale. |
+| `topOffsetDp` | Integer-valued JSON number `0..1000` | `8`; from the usable top edge. |
+| `edgeOffsetDp` | Integer-valued JSON number `0..1000` | `8`; inward from the selected usable horizontal edge. |
+| `widthDp` | Integer-valued JSON number `80..600` | `280`; full panel width including padding. |
+| `fontSizeSp` | Integer-valued JSON number `8..24` | `12`; follows Android font scale. |
 | `textColor` | Exact `#RRGGBB` or `#AARRGGBB` | `#FFFFFFFF`. |
 | `backgroundColor` | Exact `#RRGGBB` or `#AARRGGBB` | `#B3000000`. |
-| `ttlMs` | Integer `1000..3600000` | `300000`; local stale-label expiry. |
+| `ttlMs` | Integer-valued JSON number `1000..3600000` | `300000`; local stale-label expiry. |
 
 Rules:
 
 - only the fields in this table are accepted
-- do not use named colors, floats, numeric strings, `null`, parameter aliases, or unknown keys
+- do not use named colors, fractional numbers, numeric strings, `null`, parameter aliases, or unknown keys
 - six-digit colors normalize to uppercase opaque eight-digit colors, for example `#a1b2c3` becomes `#FFA1B2C3`
 - every successful set replaces the whole existing panel using supplied values and defaults, rather than patching existing state
 - malformed input is rejected before dispatch and cannot modify a currently visible panel

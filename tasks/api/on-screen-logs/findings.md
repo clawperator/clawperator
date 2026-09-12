@@ -41,6 +41,16 @@
 | `./gradlew app:assembleDebug app:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | The review-fixed debug app and shared Android suites build and pass. | Gradle output |
 | `./scripts/docs_build.sh` | 0 | The updated cutout behavior and regenerated machine-facing documentation build successfully. | docs build output |
 | `./gradlew app:installDebug` followed by `node apps/node/dist/cli/index.js doctor --device <device_serial> --operator-package com.clawperator.operator.dev --output json` | 0 | The review-fixed debug APK installed and the selected API 35 target remained compatible, accessible, and interactive. | terminal observation |
+| `./gradlew shared:data:operator:testDebugUnitTest` | 0 | The second review regression covers both the replacement and deferred configuration-reflow draw acknowledgements. | Gradle output |
+| `npm --prefix apps/node run build && npm --prefix apps/node run test` | 0 | All 272 Node tests passed, including the Node-side Unicode whitespace regression. | npm output |
+| `./gradlew app:assembleDebug app:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | The full debug app builds and the app plus shared Android suites pass with the second review fix. | Gradle output |
+| `bash validation/on-screen-logs/test_phase2_contract.sh` | 0 | The generic raw fixtures retain their strict validation and color-normalization contract. | validation script output |
+| `./scripts/docs_build.sh` | 0 | The authored and generated documentation site remains buildable after the review fix. | docs build output |
+| `./gradlew app:installDebug` followed by branch-local `doctor` on `<device_serial>` with `com.clawperator.operator.dev` | 0 | The latest debug APK installed, and the selected API 35 emulator remained compatible, accessible, and interactive. | terminal observation |
+| `npm --prefix apps/node run build && npm --prefix apps/node run test` | 0 | All 273 Node tests passed, including the MCP regression for null, array, and scalar raw action params. | npm output |
+| `./gradlew shared:data:operator:testDebugUnitTest app:assembleDebug app:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | The final review batch leaves the full debug app and relevant Android controller suites green. | Gradle output |
+| `bash validation/on-screen-logs/test_phase2_contract.sh` | 0 | The generic raw fixtures still validate through the branch-local CLI after the final transport-boundary fix. | validation script output |
+| `./scripts/docs_build.sh` | 0 | The final authored and generated documentation site builds and validates successfully. | docs build output |
 
 ## Live Observations
 
@@ -70,6 +80,9 @@
 - Phase 2 adds strict canonical-only action handling in `apps/node/src/contracts/aliases.ts` and `apps/node/src/contracts/inputAliases.ts`, strict Node validation and structured error promotion in `apps/node/src/domain/executions/validateExecution.ts` and `apps/node/src/domain/executions/runExecution.ts`, plus Android parser/action-engine integration. These exact additional PR-1 paths are included in the review scope because they preserve the same contract across raw CLI, Serve, and MCP transport.
 - PR-1 review added `apps/node/src/mcp/tools/core.ts` to the raw-transport scope. MCP now preserves raw action-type text until the canonical validator runs, so whitespace around either on-screen-log action is rejected instead of normalized. The review fix also preserves pre-existing unrelated envelope error codes.
 - Configuration changes now defer while a replacement generation waits for its draw acknowledgement, then recompute the acknowledged replacement rather than reapplying stale state. Legacy API 29 bounds combine public `Display.getCutout()` safe insets with system bars and account for reverse-landscape left navigation. API 28 with a declared built-in cutout fails closed because a service has no public pre-attachment safe-inset query.
+- The second PR-1 review requires every configuration reflow deferred by a pending `set_on_screen_log` to receive its own draw acknowledgement within the original request deadline. The returned rendered bounds therefore always belong to an acknowledged generation. Node and Android now also use the same explicit whitespace set for required text, including U+FEFF.
+- Numeric on-screen-log fields use JSON numeric semantics on both sides of the Android boundary: finite values with no fractional component are accepted, including JSON forms such as `1.0` and `1e3`; numeric strings, nulls, and fractional values are rejected. The public documentation also states that API 21 fails closed before a window is attached, while API 22 or later is required for placement.
+- The generic MCP `execute` schema preserves raw action parameters through transport. Nulls, arrays, and scalars now reach the canonical execution validator and return `EXECUTION_VALIDATION_FAILED`, rather than becoming transport-specific `InvalidParams` errors. The caller-controlled screenshot-path safeguard remains record-gated.
 - The existing screenshot execution pipeline was not redesigned. Its same-payload ordering limitation is a documented follow-up boundary, not a reason to add a parallel transport, host-owned renderer, or temporary ingress in PR-1.
 
 ## Remaining Limitations

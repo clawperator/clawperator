@@ -267,7 +267,8 @@ class OnScreenLogPanelController internal constructor(
                     ownedWindowId = null
                     scheduleExpiry(state)
 
-                    val configurationFailure = replayPendingConfigurationChange()
+                    val configurationFailure =
+                        replayPendingConfigurationChange(acknowledgementDeadlineElapsedRealtimeMs)
                     if (configurationFailure != null) {
                         return@withContext configurationFailure
                     }
@@ -356,15 +357,104 @@ class OnScreenLogPanelController internal constructor(
     }
 
     /**
-     * Complete a configuration event deferred while a replacement generation was waiting for its
-     * draw acknowledgement. This runs only after that generation becomes the stored state.
+     * Complete configuration events deferred while a replacement generation waited for its draw
+     * acknowledgement. Every reflow created before the caller receives a rendered result is
+     * itself acknowledged within the original deadline.
      */
-    private fun replayPendingConfigurationChange(): OnScreenLogControllerResult.Failure? {
-        if (!configurationChangePending) {
-            return null
+    private suspend fun replayPendingConfigurationChange(
+        acknowledgementDeadlineElapsedRealtimeMs: Long,
+    ): OnScreenLogControllerResult.Failure? {
+        while (configurationChangePending) {
+            configurationChangePending = false
+            val failure =
+                applyDeferredConfigurationChange(acknowledgementDeadlineElapsedRealtimeMs)
+            if (failure != null) {
+                return failure
+            }
         }
-        configurationChangePending = false
-        return applyConfigurationChange()
+        return null
+    }
+
+    /**
+     * Reflow a configuration change which was deferred during [set]. The caller is still waiting
+     * for a rendered result, so retain the previous acknowledged state until this new generation
+     * has drawn too.
+     */
+    private suspend fun applyDeferredConfigurationChange(
+        acknowledgementDeadlineElapsedRealtimeMs: Long,
+    ): OnScreenLogControllerResult.Failure? {
+        val state = visibleState ?: return null
+        val currentService = service ?: return null
+        val host = windowHost ?: return null
+        val currentPanel = panelView ?: return null
+
+        return try {
+            val replacement = preparePanel(currentService, state.spec)
+            val nextGeneration = nextGeneration()
+            val replacementWindowTitle = windowTitle(nextGeneration)
+            currentPanel.apply(replacement.prepared, nextGeneration)
+            host.updateViewLayout(
+                currentPanel,
+                createLayoutParams(replacement.bounds, replacementWindowTitle),
+            )
+
+            val remainingAcknowledgementMs =
+                acknowledgementDeadlineElapsedRealtimeMs - monotonicClock.elapsedRealtimeMs()
+            if (remainingAcknowledgementMs <= 0L) {
+                removePanel(reason = "configuration_render_deadline_elapsed")
+                return OnScreenLogControllerResult.Failure(
+                    errorCode = OnScreenLogErrorCodes.RENDER_TIMEOUT,
+                    message = "The panel did not complete a draw before the acknowledgement deadline",
+                )
+            }
+
+            val acknowledged =
+                awaitDrawAcknowledgement(
+                    view = currentPanel,
+                    generation = nextGeneration,
+                    timeoutMs = remainingAcknowledgementMs,
+                )
+            if (pendingDrawAcknowledgement?.generation == nextGeneration) {
+                pendingDrawAcknowledgement = null
+                currentPanel.onGenerationDrawn = null
+            }
+            if (!acknowledged) {
+                removePanel(reason = "configuration_render_not_acknowledged")
+                return OnScreenLogControllerResult.Failure(
+                    errorCode = OnScreenLogErrorCodes.RENDER_TIMEOUT,
+                    message = "The panel did not complete a draw before the acknowledgement deadline",
+                )
+            }
+
+            val replacementState =
+                state.copy(
+                    bounds = replacement.bounds,
+                    truncated = replacement.prepared.truncated,
+                    generation = nextGeneration,
+                    windowTitle = replacementWindowTitle,
+                )
+            visibleState = replacementState
+            visibleWindowTitle = replacementState.windowTitle
+            ownedWindowId = null
+            scheduleExpiry(replacementState)
+            null
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: OnScreenLogLayoutException) {
+            Log.w("$TAG configuration_change hidden reason=${error.message}")
+            removePanel(reason = "configuration_layout_invalid")
+            OnScreenLogControllerResult.Failure(
+                errorCode = OnScreenLogErrorCodes.LAYOUT_INVALID,
+                message = "The panel no longer fits after the display configuration changed",
+            )
+        } catch (error: Throwable) {
+            Log.e(error, "$TAG configuration_change hidden after renderer failure")
+            removePanel(reason = "configuration_render_failed")
+            OnScreenLogControllerResult.Failure(
+                errorCode = OnScreenLogErrorCodes.RENDER_FAILED,
+                message = "The panel could not be redrawn after the display configuration changed",
+            )
+        }
     }
 
     private fun preparePanel(

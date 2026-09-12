@@ -35,6 +35,9 @@ class OnScreenLogContractTest {
             OnScreenLogContract.normalize(OnScreenLogSpec(text = "\n\t "))
         }
         assertFailsWith<OnScreenLogValidationException> {
+            OnScreenLogContract.normalize(OnScreenLogSpec(text = "\uFEFF"))
+        }
+        assertFailsWith<OnScreenLogValidationException> {
             OnScreenLogContract.normalize(OnScreenLogSpec(text = "valid\u0000text"))
         }
         assertFailsWith<OnScreenLogValidationException> {

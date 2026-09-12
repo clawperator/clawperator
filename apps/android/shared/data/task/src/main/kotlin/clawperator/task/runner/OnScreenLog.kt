@@ -84,6 +84,21 @@ object OnScreenLogContract {
 
     private val colorPattern = Regex("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$")
 
+    // Keep this list aligned with the explicit ECMAScript whitespace set used by the Node
+    // validator. In particular, Kotlin's Char.isWhitespace does not treat U+FEFF as whitespace.
+    private fun isContractWhitespace(character: Char): Boolean =
+        character in '\u0009'..'\u000D' ||
+            character == '\u0020' ||
+            character == '\u00A0' ||
+            character == '\u1680' ||
+            character in '\u2000'..'\u200A' ||
+            character == '\u2028' ||
+            character == '\u2029' ||
+            character == '\u202F' ||
+            character == '\u205F' ||
+            character == '\u3000' ||
+            character == '\uFEFF'
+
     fun normalize(spec: OnScreenLogSpec): NormalizedOnScreenLogSpec {
         validateText(spec.text)
         validateRange("topOffsetDp", spec.topOffsetDp, MIN_OFFSET_DP, MAX_OFFSET_DP)
@@ -127,7 +142,7 @@ object OnScreenLogContract {
         requireValidation(text.length in MIN_TEXT_LENGTH..MAX_TEXT_LENGTH) {
             "text must contain $MIN_TEXT_LENGTH..$MAX_TEXT_LENGTH UTF-16 code units"
         }
-        requireValidation(text.any { !it.isWhitespace() }) {
+        requireValidation(text.any { !isContractWhitespace(it) }) {
             "text must include at least one non-whitespace character"
         }
         requireValidation(text.none(::isForbiddenControlCharacter)) {

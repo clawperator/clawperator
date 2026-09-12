@@ -69,6 +69,41 @@ describe("set_on_screen_log validation", () => {
     }
   });
 
+  it("accepts integral JSON number representations", () => {
+    const execution = validateExecution(
+      JSON.parse(`
+        {
+          "commandId": "on-screen-log-command",
+          "taskId": "on-screen-log-task",
+          "source": "test",
+          "expectedFormat": "android-ui-automator",
+          "timeoutMs": 5000,
+          "actions": [{
+            "id": "on-screen-log-action",
+            "type": "set_on_screen_log",
+            "params": {
+              "text": "integral numbers",
+              "topOffsetDp": 1.0,
+              "edgeOffsetDp": 1e3,
+              "widthDp": 8e1,
+              "fontSizeSp": 8.0,
+              "ttlMs": 1e3
+            }
+          }]
+        }
+      `),
+    );
+
+    assert.deepStrictEqual(execution.actions[0]?.params, {
+      text: "integral numbers",
+      topOffsetDp: 1,
+      edgeOffsetDp: 1000,
+      widthDp: 80,
+      fontSizeSp: 8,
+      ttlMs: 1000,
+    });
+  });
+
   it("rejects values outside every numeric range", () => {
     const invalidCases: Array<[string, number]> = [
       ["topOffsetDp", -1],
@@ -91,6 +126,7 @@ describe("set_on_screen_log validation", () => {
   it("rejects missing, blank, too-long, and forbidden-control text", () => {
     assertValidationFailure(executionFor("set_on_screen_log", {}));
     assertValidationFailure(executionFor("set_on_screen_log", { text: " \t\n " }));
+    assertValidationFailure(executionFor("set_on_screen_log", { text: "\uFEFF" }));
     assertValidationFailure(executionFor("set_on_screen_log", { text: "x".repeat(2049) }));
     assertValidationFailure(executionFor("set_on_screen_log", { text: "line\rreturn" }));
     assertValidationFailure(executionFor("set_on_screen_log", { text: "nul\u0000byte" }));

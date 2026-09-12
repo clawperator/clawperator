@@ -219,7 +219,7 @@ class OnScreenLogPanelControllerTest {
     }
 
     @Test
-    fun `configuration change waits for a pending replacement draw before recalculating`() =
+    fun `configuration change waits for both pending replacement and reflow draws`() =
         runBlocking {
             val fixture = controllerFixture()
             render(fixture.controller, OnScreenLogSpec(text = "first label"))
@@ -246,6 +246,13 @@ class OnScreenLogPanelControllerTest {
             assertEquals(1, fixture.windowHost.updateCalls)
             fixture.windowHost.lastView?.acknowledgeDrawForTest()
 
+            // The reflow is a new generation. The set result must not claim it has rendered until
+            // its own draw acknowledgement arrives.
+            assertEquals(2, fixture.windowHost.updateCalls)
+            assertFalse(replacement.isCompleted)
+            val reflowTitle = fixture.windowHost.lastLayoutParams!!.title.toString()
+            fixture.windowHost.lastView?.acknowledgeDrawForTest()
+
             val result =
                 assertIs<OnScreenLogControllerResult.Rendered>(
                     withTimeout(1_000L) {
@@ -255,7 +262,8 @@ class OnScreenLogPanelControllerTest {
 
             assertTrue(fixture.controller.isOperatorOverlayVisible)
             assertEquals(2, fixture.windowHost.updateCalls)
-            assertTrue(fixture.windowHost.lastLayoutParams!!.title.toString() != pendingTitle)
+            assertTrue(reflowTitle != pendingTitle)
+            assertEquals(reflowTitle, fixture.windowHost.lastLayoutParams!!.title.toString())
             assertEquals(fixture.windowHost.lastLayoutParams!!.x, result.bounds.left)
             assertEquals(fixture.windowHost.lastLayoutParams!!.y, result.bounds.top)
             assertEquals(0, fixture.windowHost.removeCalls)

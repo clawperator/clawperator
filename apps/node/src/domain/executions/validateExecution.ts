@@ -35,6 +35,8 @@ const coordinateSchema = z
 
 const onScreenLogIntegerSchema = z.number().finite().int().optional();
 const onScreenLogColorPattern = /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/;
+// Keep this explicit list aligned with OnScreenLogContract.isContractWhitespace on Android.
+const onScreenLogWhitespaceOnlyPattern = /^[\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]*$/u;
 const onScreenLogAllowedParamKeys = new Set([
   "text",
   "anchor",
@@ -50,6 +52,10 @@ const onScreenLogAllowedParamKeys = new Set([
 
 function hasForbiddenOnScreenLogControlCharacter(value: string): boolean {
   return /[\u0000-\u0008\u000B-\u001F\u007F-\u009F]/u.test(value);
+}
+
+function hasOnScreenLogNonWhitespaceCharacter(value: string): boolean {
+  return !onScreenLogWhitespaceOnlyPattern.test(value);
 }
 
 function normalizeOnScreenLogColor(value: string): string {
@@ -294,7 +300,7 @@ const executionSchema = z.object({
           if (params.text.length < 1 || params.text.length > 2048) {
             addIssue(index, "set_on_screen_log params.text must contain 1..2048 UTF-16 code units", ["params", "text"]);
           }
-          if (!/\S/u.test(params.text)) {
+          if (!hasOnScreenLogNonWhitespaceCharacter(params.text)) {
             addIssue(index, "set_on_screen_log params.text must include a non-whitespace character", ["params", "text"]);
           }
           if (hasForbiddenOnScreenLogControlCharacter(params.text)) {

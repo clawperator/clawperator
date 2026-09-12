@@ -10,6 +10,10 @@ The panel belongs to the connected Operator accessibility service, not to the
 foreground app and not to a host process. It is one visible panel per Operator
 service.
 
+This feature requires Android API 22 or later. On Android API 21,
+`set_on_screen_log` fails closed with `ON_SCREEN_LOG_RENDER_FAILED` before it
+attempts to attach a window.
+
 ## Sources
 
 - Node validation: `apps/node/src/domain/executions/validateExecution.ts`
