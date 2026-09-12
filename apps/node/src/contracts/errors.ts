@@ -41,6 +41,8 @@ export const ERROR_CODES = {
   ON_SCREEN_LOG_RENDER_TIMEOUT: "ON_SCREEN_LOG_RENDER_TIMEOUT",
 
   // Doctor & Host
+  /** Daily log destination cannot be opened. Recovery: set CLAWPERATOR_LOG_DIR to a writable directory; advisory only. */
+  LOG_DIRECTORY_UNWRITABLE: "LOG_DIRECTORY_UNWRITABLE",
   NODE_TOO_OLD: "NODE_TOO_OLD",
   ADB_SERVER_FAILED: "ADB_SERVER_FAILED",
   ADB_NO_USB_PERMISSIONS: "ADB_NO_USB_PERMISSIONS",

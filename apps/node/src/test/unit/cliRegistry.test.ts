@@ -155,9 +155,9 @@ describe("flag aliases - --json sets output to json", () => {
 describe("flag aliases - --output selects output format", () => {
   it("--output json is consumed without error and output remains json", async () => {
     const { stdout, code } = await runCli(["doctor", "--output", "json", "--check-only"]);
-    assert.strictEqual(code, 0, stdout);
     const obj = JSON.parse(stdout);
     assert.strictEqual(typeof obj.criticalOk, "boolean");
+    assert.strictEqual(code, obj.criticalOk ? 0 : 1, stdout);
   });
 
   it("--output with an invalid value produces USAGE error with exit code 1", async () => {

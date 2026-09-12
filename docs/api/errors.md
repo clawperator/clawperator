@@ -266,12 +266,22 @@ If you are doing local branch validation, prefer the debug package:
 
 ### `OPERATOR_VARIANT_MISMATCH`
 
+Doctor reports this as a failed selected-package check, skips the handshake, and
+returns false readiness. It never switches packages implicitly.
+
 Use this when the device has an installed Operator APK, but it is the other known package variant than the one requested.
 
 Recovery options:
 
 - pass the installed package via `--operator-package`
 - or reinstall the intended APK variant
+
+### `LOG_DIRECTORY_UNWRITABLE`
+
+Doctor could not create or open the resolved daily log destination. Inspect
+`host.logs.writable.evidence` for `logDir`, `logPath`, and `writable=false`.
+Set `CLAWPERATOR_LOG_DIR` to a writable directory. This is advisory and does not
+fail otherwise healthy device readiness. See [Logging](logging.md).
 
 ### `BROADCAST_FAILED`
 

@@ -14,7 +14,7 @@ afterEach(() => {
 describe("cmdDoctor", () => {
   const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../../..");
 
-  it("keeps exit code 0 under --check-only even when the APK is missing", async () => {
+  it("returns nonzero under --check-only even when the APK is missing", async () => {
     const output = await cmdDoctor(
       {
         format: "json",
@@ -46,7 +46,7 @@ describe("cmdDoctor", () => {
     const parsed = JSON.parse(output);
     assert.strictEqual(parsed.criticalOk, false);
     assert.strictEqual(parsed.checks[0].code, ERROR_CODES.OPERATOR_NOT_INSTALLED);
-    assert.strictEqual(process.exitCode, 0);
+    assert.strictEqual(process.exitCode, 1);
   });
 
   it("returns a non-zero exit code without --check-only when the APK is missing", async () => {

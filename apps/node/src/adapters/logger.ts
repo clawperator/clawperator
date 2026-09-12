@@ -1,5 +1,5 @@
 import { appendFileSync, mkdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import {
   CLAWPERATOR_SKILL_RUN_ID_ENV_VAR,
   type LogEvent,
@@ -65,6 +65,22 @@ export interface CreateClawperatorLoggerOptions {
   inheritSkillRunId?: boolean;
 }
 
+const loggerDirectories = new WeakMap<ClawperatorLogger, string>();
+
+export function resolveLogDestination(logDir?: string, date = new Date()): { logDir: string; logPath: string } {
+  const configuredDir = logDir?.trim() || process.env.CLAWPERATOR_LOG_DIR?.trim() || "~/.clawperator/logs";
+  const resolvedDir = resolve(expandHomePath(configuredDir));
+  return { logDir: resolvedDir, logPath: formatLogPath(resolvedDir, date) };
+}
+
+/** Retain the attempted destination even after the logger disables its file sink. */
+export function getLoggerDestination(logger?: ClawperatorLogger): { logDir: string; logPath: string } {
+  const directory = logger === undefined ? undefined : loggerDirectories.get(logger);
+  if (directory !== undefined) return resolveLogDestination(directory);
+  const logPath = logger?.logPath();
+  return logPath === undefined ? resolveLogDestination() : { logDir: dirname(logPath), logPath };
+}
+
 /**
  * Create a unified Clawperator logger with file and terminal routing.
  *
@@ -73,11 +89,7 @@ export interface CreateClawperatorLoggerOptions {
  * Fail-open: if the log directory is unavailable, one stderr warning then file logging disabled.
  */
 export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions): ClawperatorLogger {
-  const configuredDir =
-    options?.logDir?.trim() ||
-    process.env.CLAWPERATOR_LOG_DIR?.trim() ||
-    "~/.clawperator/logs";
-  const logDir = resolve(expandHomePath(configuredDir));
+  const { logDir } = resolveLogDestination(options?.logDir);
   const threshold = normalizeLogLevel(options?.logLevel ?? process.env.CLAWPERATOR_LOG_LEVEL);
   const outputFormat = options?.outputFormat ?? "json";
   const state = { warned: false, fileDisabled: false };
@@ -130,7 +142,7 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
       }
     }
 
-    return {
+    const logger: ClawperatorLogger = {
       emit: emitEvent,
 
       child(childContext: Partial<LogEvent>): ClawperatorLogger {
@@ -145,6 +157,8 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
         return formatLogPath(logDir);
       },
     };
+    loggerDirectories.set(logger, logDir);
+    return logger;
   }
 
   const inheritedSkillRunId = options?.inheritSkillRunId === false

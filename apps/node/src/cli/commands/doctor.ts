@@ -13,6 +13,7 @@ export async function cmdDoctor(options: {
   format: OutputOptions["format"];
   fix?: boolean;
   full?: boolean;
+  /** Compatibility flag; readiness failures still exit nonzero. */
   checkOnly?: boolean;
   deviceId?: string;
   operatorPackage?: string;
@@ -28,16 +29,12 @@ export async function cmdDoctor(options: {
   const report = await service.run({ config, full: options.full, fix: options.fix, logger: options.logger });
 
   if (options.format === "json") {
-    process.exitCode = getDoctorExitCode(report, options.checkOnly);
+    process.exitCode = getDoctorExitCode(report);
     return JSON.stringify(report, null, 2);
   }
 
   // Pretty human output
-  if (options.fix) {
-    // If --fix was passed, we've already done fixes in DoctorService,
-    // so just print the report.
-  }
-  process.exitCode = getDoctorExitCode(report, options.checkOnly);
+  process.exitCode = getDoctorExitCode(report);
   return renderPrettyDoctorReport(report);
 }
 
@@ -76,10 +73,14 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
     lines.push("");
   }
 
+  for (const skipped of report.skippedChecks ?? []) {
+    lines.push(`  [SKIP] ${skipped.id}: ${skipped.reason} Blocked by: ${skipped.blockedBy.join(", ")}`);
+  }
+
   if (report.criticalOk ?? report.ok) {
-    lines.push(allOk ? "[OK] Ready to use Clawperator." : "[WARN] Critical checks passed. Address warnings before relying on the setup.");
+    lines.push(allOk ? "[OK] Ready to use Clawperator." : "[OK] Ready to use Clawperator. Advisory warnings are listed above.");
   } else {
-    lines.push("[FAIL] Critical setup checks failed.");
+    lines.push("[FAIL] Required setup verification did not complete successfully.");
   }
 
   if (report.nextActions && report.nextActions.length > 0) {
@@ -93,8 +94,8 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
   return lines.join("\n");
 }
 
-function getDoctorExitCode(report: DoctorReport, checkOnly?: boolean): number {
-  if (checkOnly) return 0;
+function getDoctorExitCode(report: DoctorReport): number {
+  // --check-only retains the same truthful readiness exit status.
   return (report.criticalOk ?? report.ok) ? 0 : 1;
 }
 

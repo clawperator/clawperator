@@ -3,7 +3,7 @@ import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConf
 import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import type { StepResult } from "../../../contracts/result.js";
-import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
+import { runExecution } from "../../executions/runExecution.js";
 import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatResultReader.js";
 import {
   buildDeviceNotInteractiveError,
@@ -94,7 +94,7 @@ export async function checkApkPresence(config: RuntimeConfig): Promise<DoctorChe
     if (hasListedPackage(alternateList.stdout, otherVariant)) {
       return {
         id: "readiness.apk.presence",
-        status: "warn",
+        status: "fail",
         code: ERROR_CODES.OPERATOR_VARIANT_MISMATCH,
         summary: `Wrong Operator variant installed.`,
         detail: `Expected ${config.operatorPackage} but found ${otherVariant}.`,
@@ -220,7 +220,15 @@ export async function runHandshake(
   if (result.ok) {
     if (result.envelope.status === "success") {
       const doctorPingStep = result.envelope.stepResults.find(step => step.actionType === "doctor_ping");
-      const interactiveEvidence = doctorPingStep?.success
+      if (doctorPingStep?.success !== true) {
+        return {
+          id: "readiness.handshake",
+          status: "fail",
+          code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
+          summary: "Handshake did not include a successful doctor_ping step.",
+        };
+      }
+      const interactiveEvidence = doctorPingStep.success
         ? (() => {
             const parsedEvidence = tryBuildInteractiveStateEvidence(doctorPingStep);
             return parsedEvidence.ok ? parsedEvidence.evidence : undefined;
@@ -400,35 +408,42 @@ function tryBuildInteractiveStateEvidence(
   }
 }
 
-export async function runSmokeTest(config: RuntimeConfig): Promise<DoctorCheckResult> {
+export async function runSmokeTest(
+  config: RuntimeConfig,
+  execute = runExecution,
+): Promise<DoctorCheckResult> {
   const commandId = `smoke-${Date.now()}`;
-  const payload = JSON.stringify({
+  const execution = {
     commandId,
     taskId: "doctor-smoke",
     source: "clawperator-doctor",
-    expectedFormat: "android-ui-automator",
+    expectedFormat: "android-ui-automator" as const,
     actions: [
       { id: "s1", type: "close_app", params: { applicationId: "com.android.settings" } },
       { id: "s2", type: "open_app", params: { applicationId: "com.android.settings" } },
-      { id: "s3", type: "snapshot_ui" },
+      { id: "s3", type: "snapshot" },
     ],
     timeoutMs: 10000,
+  };
+
+  const result = await execute(execution, {
+    deviceId: config.deviceId,
+    operatorPackage: config.operatorPackage,
+    adbPath: config.adbPath,
+    runner: config.runner,
+    logger: config.logger,
+    resultEnvelopeTimeoutMs: 12000,
   });
 
-  const result = await waitForResultEnvelope(
-    config,
-    { commandId, timeoutMs: 12000 },
-    async (beginDispatchCapture) => {
-      beginDispatchCapture();
-      return broadcastAgentCommand(config, payload);
-    }
-  );
-
-  if (result.ok) {
-    const hasSettings = result.envelope.stepResults.some(s =>
-      (s.actionType === "snapshot" || s.actionType === "snapshot_ui") && s.success
-    );
-    if (hasSettings) {
+  if (result.ok && result.envelope.status === "success") {
+    const completedSmoke = [
+      { id: "s1", types: ["close_app"] },
+      { id: "s2", types: ["open_app"] },
+      { id: "s3", types: ["snapshot", "snapshot_ui"] },
+    ].every(expected => result.envelope.stepResults.some(step =>
+      step.id === expected.id && expected.types.includes(step.actionType) && step.success
+    ));
+    if (completedSmoke) {
       return {
         id: "readiness.smoke",
         status: "pass",

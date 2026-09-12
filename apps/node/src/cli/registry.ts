@@ -544,8 +544,11 @@ Usage:
 Notes:
   - Default Operator package: com.clawperator.operator
   - Use --operator-package com.clawperator.operator.dev for local debug APKs. --receiver-package is a legacy alias (see global options).
-  - Exit code 0 means all critical checks passed, including the warning-only multi-device ambiguity case.
-  - Exit code 1 means a genuine failure such as no device, APK not installed, or handshake failure.
+  - Exit code 0 means every required check for the selected mode ran and passed.
+  - Exit code 1 means readiness is unverified, including device ambiguity, a missing selected APK, or handshake failure.
+  - --check-only uses the same readiness exit status. Missing prerequisite checks appear in skippedChecks.
+  - --fix attempts shell remediation once, then reruns checks before reporting readiness.
+  - Log-path and optional host-tool warnings do not block healthy device readiness.
   - If handshake times out, rerun with --verbose and compare the installed APK package with --operator-package.
 `;
 
@@ -3013,7 +3016,7 @@ COMMANDS["doctor"] = {
   doctor --full
                                             Full Android build + install + handshake + smoke (Stage 3)
   doctor --check-only
-                                            Keep doctor non-blocking by always exiting 0 (for CI/automation)`,
+                                            Compatibility flag; readiness failures still exit 1`,
   handler: async (ctx) => {
     const { rest, format, verbose, logger, deviceId, operatorPackage } = ctx;
     const out = { format, verbose, logger };

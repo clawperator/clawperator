@@ -19,13 +19,16 @@ describe("DoctorService", () => {
   let fakeAgentCliDir: string;
   let fakeRegistryDir: string;
   let originalPath: string | undefined;
+  let originalLogDir: string | undefined;
   let originalRegistryPath: string | undefined;
 
   beforeEach(async () => {
     originalPath = process.env.PATH;
+    originalLogDir = process.env.CLAWPERATOR_LOG_DIR;
     originalRegistryPath = process.env.CLAWPERATOR_SKILLS_REGISTRY;
     fakeAgentCliDir = await mkdtemp(join(tmpdir(), "clawperator-doctor-agent-cli-"));
     fakeRegistryDir = await mkdtemp(join(tmpdir(), "clawperator-doctor-registry-"));
+    process.env.CLAWPERATOR_LOG_DIR = join(fakeRegistryDir, "logs");
     const fakeAgentPath = join(fakeAgentCliDir, "codex");
     const registryPath = join(fakeRegistryDir, "skills", "skills-registry.json");
     await mkdir(join(fakeRegistryDir, "skills"), { recursive: true });
@@ -39,6 +42,8 @@ describe("DoctorService", () => {
   });
 
   afterEach(async () => {
+    if (originalLogDir === undefined) delete process.env.CLAWPERATOR_LOG_DIR;
+    else process.env.CLAWPERATOR_LOG_DIR = originalLogDir;
     await rm(fakeAgentCliDir, { recursive: true, force: true });
     await rm(fakeRegistryDir, { recursive: true, force: true });
     if (originalPath === undefined) {
@@ -175,12 +180,9 @@ describe("DoctorService", () => {
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
   });
 
-  it("exits cleanly with warn when multiple devices are connected and no --device is given", async () => {
-    // Regression: when checkDeviceDiscovery returns "warn" (not "fail") for
-    // MULTIPLE_DEVICES_DEVICE_ID_REQUIRED, shouldHaltOnFailure returns false and
-    // execution continues. resolveDevice then throws due to ambiguity. The catch
-    // block must finalize early; without this fix it would silently swallow the
-    // exception and run all subsequent checks without a -s flag, causing adb errors.
+  it("fails readiness when multiple devices are connected and no --device is given", async () => {
+    // A required warning must stop before any device-specific command and
+    // remain distinguishable from a verified target in both readiness fields.
     const runner = new FakeProcessRunner();
     const config = withTempBundledSkillsDir(getDefaultRuntimeConfig({ runner }), fakeRegistryDir);
 
@@ -192,14 +194,12 @@ describe("DoctorService", () => {
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     // checkDeviceDiscovery: adb devices (two devices → warn)
     runner.queueResult({ code: 0, stdout: "List of devices attached\nserial1\tdevice\nserial2\tdevice\n", stderr: "" });
-    // resolveDevice: adb devices (two devices → throws → caught → early finalize)
-    runner.queueResult({ code: 0, stdout: "List of devices attached\nserial1\tdevice\nserial2\tdevice\n", stderr: "" });
 
     const report = await new DoctorService().run({ config });
 
-    // Should exit 0: warn is not a failure for criticalOk
-    assert.strictEqual(report.criticalOk, true);
-    assert.strictEqual(report.ok, true);
+    assert.strictEqual(report.criticalOk, false);
+    assert.strictEqual(report.ok, false);
+    assert.ok(report.skippedChecks?.some(check => check.id === "readiness.handshake" && check.blockedBy.includes("device.discovery")));
 
     // Discovery check must be present as a warn
     const discovery = report.checks.find(c => c.id === "device.discovery");
@@ -216,7 +216,7 @@ describe("DoctorService", () => {
     assert.strictEqual(report.deviceId, undefined);
   });
 
-  it("warns when the release package is requested but only debug is installed", async () => {
+  it("fails when the release package is requested but only debug is installed", async () => {
     const runner = new FakeProcessRunner();
     const config = withTempBundledSkillsDir(getDefaultRuntimeConfig({ runner, operatorPackage: "com.clawperator.operator" }), fakeRegistryDir);
 
@@ -235,10 +235,13 @@ describe("DoctorService", () => {
 
     const report = await new DoctorService().run({ config });
 
-    assert.strictEqual(report.criticalOk, true);
+    assert.strictEqual(report.criticalOk, false);
+    assert.strictEqual(report.ok, false);
+    assert.strictEqual(report.operatorPackage, "com.clawperator.operator");
+    assert.ok(report.skippedChecks?.some(check => check.id === "readiness.handshake" && check.blockedBy.includes("readiness.apk.presence")));
     const apkPresence = report.checks.find(check => check.id === "readiness.apk.presence");
     assert.ok(apkPresence);
-    assert.strictEqual(apkPresence.status, "warn");
+    assert.strictEqual(apkPresence.status, "fail");
     assert.strictEqual(apkPresence.code, ERROR_CODES.OPERATOR_VARIANT_MISMATCH);
     assert.ok(!report.checks.some(check => check.id === "readiness.version.compatibility"));
     assert.ok(!report.checks.some(check => check.id === "readiness.handshake"));
@@ -313,12 +316,13 @@ describe("DoctorService", () => {
     runner.queueResult({ code: 0, stdout: "Physical density: 420\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
-    runner.queueResult({ code: 0, stdout: "1\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
 
-    await new DoctorService().run({ config, fix: true });
+    runner.queueResult({ code: 1, stdout: "", stderr: "adb unavailable after remediation" });
+    const report = await new DoctorService().run({ config, fix: true });
+    assert.strictEqual(report.ok, false);
+    assert.ok(report.checks.some(check => check.id === "host.adb.presence" && check.status === "fail"));
 
     const shellCalls = runner.calls.filter(call => call.command === "bash").map(call => call.args[1]);
     assert.deepStrictEqual(shellCalls, [

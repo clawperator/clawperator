@@ -25,6 +25,22 @@ Example path: `/home/user/.clawperator/logs/clawperator-2026-03-28.log`
 
 To change the base directory, set the `CLAWPERATOR_LOG_DIR` environment variable. See [Environment Variables](environment.md) for details.
 
+## Doctor Log Diagnostics
+
+`clawperator doctor` includes the advisory `host.logs.writable` check. Its
+`evidence` contains the resolved `logDir`, daily `logPath`, and boolean `writable`.
+It uses the logger's destination: an explicit logger directory takes precedence
+over `CLAWPERATOR_LOG_DIR`, then `~/.clawperator/logs`. Existing blank-value
+fallback behavior is unchanged. The resolved directory stays attached to the
+logger and its children even if file logging becomes disabled.
+
+Doctor creates the directory if needed and opens the daily file for append,
+then closes it without truncating or adding synthetic content. Its normal
+`doctor.check` event uses the configured logger and log-level rules. If opening
+the destination fails, the check warns with `LOG_DIRECTORY_UNWRITABLE`, the exact
+attempted path, and the `CLAWPERATOR_LOG_DIR` remedy. It does not redirect logs or
+change permissions. Otherwise healthy device readiness still succeeds.
+
 ## NDJSON Format
 
 Each line is a valid JSON object (NDJSON - Newline Delimited JSON). No wrapping array, no trailing commas. One event per line.
