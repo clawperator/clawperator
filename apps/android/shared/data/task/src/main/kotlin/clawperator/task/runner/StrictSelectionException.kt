@@ -5,9 +5,11 @@ class StrictSelectionException(
     val code: String,
     val candidateCount: Int,
     val candidates: String,
-) : IllegalStateException("$code: resolved $candidateCount candidates") {
+) : IllegalStateException("$code: strict selection is enabled (strict=true; CLI --strict); resolved $candidateCount candidates") {
     fun stepData(): Map<String, String> = mapOf(
         "error" to code,
+        "strict" to "true",
+        "message" to checkNotNull(message),
         "candidate_count" to candidateCount.toString(),
         "candidates" to candidates,
     )

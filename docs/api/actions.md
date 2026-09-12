@@ -285,7 +285,8 @@ optional `params.container` matcher: `click`, `enter_text`, `read_text`,
 [strict selection](selectors.md#strict-action-selection) for action-specific
 absence, ambiguity, container, and compatibility rules. Coordinate clicks cannot
 use strict mode or a container. Strict failures return string-valued
-`data.error`, `data.candidate_count`, and serialized JSON in `data.candidates`.
+`data.error`, `data.strict` (`"true"`), `data.message` naming `strict=true` and
+CLI `--strict`, `data.candidate_count`, and serialized JSON in `data.candidates`.
 
 <a id="action-click"></a>
 ### `click`

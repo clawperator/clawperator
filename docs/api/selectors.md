@@ -151,6 +151,9 @@ query or successful search never reserves a node. A layout change that introduce
 ambiguity fails before the next dispatch. Gestures already completed earlier in
 a search are not undone.
 
+Strict selection failures include `strict: "true"` and a `message` identifying
+`strict=true` and its CLI form, `--strict`. These describe the effective selection
+mode regardless of which transport submitted the request.
 Ambiguity data includes `candidate_count` as a decimal string and `candidates` as
 serialized query-result JSON with at most 10 `NodeSummary` objects. Candidate
 strings are capped at 512 characters; total count remains exact. Paths and state

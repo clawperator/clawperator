@@ -49,6 +49,8 @@ class StrictSelectionTest : ActionTest {
                     val error = assertFailsWith<StrictSelectionException> { operation(f.ui) }
                     assertEquals(if (count == 0) "NODE_NOT_FOUND" else "NODE_AMBIGUOUS", error.code)
                     assertEquals(count, error.candidateCount)
+                    assertEquals("true", error.stepData()["strict"])
+                    assertTrue(error.stepData().getValue("message").contains("CLI --strict"))
                     assertEquals(count, Json.parseToJsonElement(error.candidates).jsonObject.getValue("totalMatches").jsonPrimitive.int)
                     assertTrue(f.dispatches.isEmpty())
                 }

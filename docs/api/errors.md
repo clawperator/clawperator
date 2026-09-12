@@ -352,8 +352,10 @@ Typical recovery:
 
 A strict action resolved multiple targets or containers. The runtime stops before
 the next dispatch and does not retry ambiguity. The failed step has `data.error`
-set to the code, `data.candidate_count` as a decimal string, and `data.candidates`
-as serialized query-result JSON containing at most 10 node summaries. Candidate
+set to the code, `data.strict` set to `"true"`, and `data.message` identifying
+`strict=true` (CLI `--strict`) as the enabled selection mode.
+`data.candidate_count` is a decimal string, and `data.candidates` contains
+serialized query-result JSON with at most 10 node summaries. Candidate
 strings are capped at 512 characters. Prior completed steps are retained and later
 steps are skipped. A search may already have performed earlier scroll gestures.
 

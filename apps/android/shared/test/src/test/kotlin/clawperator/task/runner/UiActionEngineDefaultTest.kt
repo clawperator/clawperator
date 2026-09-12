@@ -45,6 +45,8 @@ class UiActionEngineDefaultTest : ActionTest {
         assertEquals(listOf("before", "ambiguous"), result.stepResults.map { it.id })
         assertFalse(result.stepResults.last().success)
         assertEquals("2", result.stepResults.last().data["candidate_count"])
+        assertEquals("true", result.stepResults.last().data["strict"])
+        assertTrue(result.stepResults.last().data.getValue("message").contains("strict=true; CLI --strict"))
     }
 
     @Test
