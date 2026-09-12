@@ -14,6 +14,7 @@ import clawperator.accessibilityservice.toUiAutomatorHierarchyDump
 
 class UiTreeInspectorAndroid(
     private val accessibilityServiceManager: AccessibilityServiceManager,
+    private val operatorOverlayIdentity: OperatorOverlayIdentity = OperatorOverlayIdentityNone,
 ) : UiTreeInspector {
     override suspend fun getCurrentUiElements(): List<UiTreeElement> {
         // Use the new hierarchical approach and flatten for backwards compatibility
@@ -58,34 +59,25 @@ class UiTreeInspectorAndroid(
                 emptyList()
             }
 
-        var overlayPackage: String? = null
-        for (window in windows) {
+        val windowCandidates = windows.map { window ->
             val root = try {
                 window.root
             } catch (e: Exception) {
                 null
             }
-            val packageName = root?.packageName?.toString()?.takeIf { it.isNotBlank() }
-            val benignSystemUi =
-                window.type == AccessibilityWindowInfo.TYPE_SYSTEM &&
-                    packageName == "com.android.systemui" &&
-                    !window.isActive
-            if (benignSystemUi) {
-                continue
-            }
-            val packageDiffers = foregroundPackage != null && packageName != null && packageName != foregroundPackage
-            val nonAppWindow = window.type != AccessibilityWindowInfo.TYPE_APPLICATION
-
-            if (overlayPackage == null && (packageDiffers || nonAppWindow)) {
-                overlayPackage = packageName ?: foregroundPackage
-            }
+            UiWindowMetadataCandidate(
+                id = window.id,
+                type = window.type,
+                title = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) window.title?.toString() else null,
+                packageName = root?.packageName?.toString()?.takeIf { it.isNotBlank() },
+                isActive = window.isActive,
+            )
         }
 
-        return UiWindowMetadata(
+        return buildUiWindowMetadata(
             foregroundPackage = foregroundPackage,
-            hasOverlay = overlayPackage != null,
-            overlayPackage = overlayPackage,
-            windowCount = windows.size,
+            windows = windowCandidates,
+            operatorOverlayIdentity = operatorOverlayIdentity,
         )
     }
 
@@ -192,4 +184,51 @@ class UiTreeInspectorAndroid(
         traverse(root)
         return nodes
     }
+}
+
+data class UiWindowMetadataCandidate(
+    val id: Int,
+    val type: Int,
+    val title: String?,
+    val packageName: String?,
+    val isActive: Boolean,
+)
+
+fun buildUiWindowMetadata(
+    foregroundPackage: String?,
+    windows: List<UiWindowMetadataCandidate>,
+    operatorOverlayIdentity: OperatorOverlayIdentity,
+): UiWindowMetadata {
+    var overlayPackage: String? = null
+    for (window in windows) {
+        // Resolve identity for instrumentation only. It must not alter raw overlay metadata.
+        operatorOverlayIdentity.ownsOverlayWindow(
+            OperatorOverlayWindowIdentity(
+                id = window.id,
+                type = window.type,
+                title = window.title,
+            ),
+        )
+        val benignSystemUi =
+            window.type == AccessibilityWindowInfo.TYPE_SYSTEM &&
+                window.packageName == "com.android.systemui" &&
+                !window.isActive
+        if (benignSystemUi) {
+            continue
+        }
+        val packageDiffers =
+            foregroundPackage != null && window.packageName != null && window.packageName != foregroundPackage
+        val nonAppWindow = window.type != AccessibilityWindowInfo.TYPE_APPLICATION
+
+        if (overlayPackage == null && (packageDiffers || nonAppWindow)) {
+            overlayPackage = window.packageName ?: foregroundPackage
+        }
+    }
+
+    return UiWindowMetadata(
+        foregroundPackage = foregroundPackage,
+        hasOverlay = overlayPackage != null,
+        overlayPackage = overlayPackage,
+        windowCount = windows.size,
+    )
 }

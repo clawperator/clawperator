@@ -10,12 +10,12 @@ Two PRs, four sequential phases. PR-1 proves and ships the Android renderer plus
 
 | Item | Value |
 | --- | --- |
-| State | not started |
+| State | in progress |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | none |
-| Remaining | 1-4 |
-| Current / Next | Phase 1 |
+| Completed | Phase 1 |
+| Remaining | 2-4 |
+| Current / Next | Phase 2 |
 | Blockers | no known blocker; mechanism requires live proof |
 
 ## Goal

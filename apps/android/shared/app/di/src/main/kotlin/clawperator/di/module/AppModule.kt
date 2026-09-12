@@ -128,6 +128,8 @@ import clawperator.operator.agent.AgentCommandExecutor
 import clawperator.operator.agent.AgentCommandExecutorDefault
 import clawperator.operator.agent.AgentCommandParser
 import clawperator.operator.agent.AgentCommandParserDefault
+import clawperator.operator.onscreenlog.OnScreenLogPanelController
+import clawperator.operator.onscreenlog.OnScreenLogPanelLifecycle
 import clawperator.operator.recording.RecordingEventFilter
 import clawperator.operator.recording.RecordingEventFilterDefault
 import clawperator.operator.recording.RecordingEventSink
@@ -169,6 +171,7 @@ import clawperator.task.runner.UiActionEngine
 import clawperator.task.runner.UiActionEngineDefault
 import clawperator.task.runner.UiGlobalActionDispatcher
 import clawperator.task.runner.UiGlobalActionDispatcherAndroid
+import clawperator.task.runner.OnScreenLogController
 import clawperator.trigger.TriggerManager
 import clawperator.trigger.TriggerManagerDefault
 import clawperator.uitree.UiTreeFilterer
@@ -179,6 +182,7 @@ import clawperator.uitree.UiTreeInspector
 import clawperator.uitree.UiTreeInspectorAndroid
 import clawperator.uitree.UiTreeManager
 import clawperator.uitree.UiTreeManagerAndroid
+import clawperator.uitree.OperatorOverlayIdentity
 import clawperator.urlnavigator.UrlNavigator
 import clawperator.urlnavigator.UrlNavigatorAndroid
 import clawperator.workflow.WorkflowFactory
@@ -236,6 +240,10 @@ val AppModule: Module = module {
     single<OperatorCommandStatusReporter> { OperatorCommandStatusReporterDefault(get()) }
     single<AgentCommandParser> { AgentCommandParserDefault() }
     single<AgentCommandExecutor> { AgentCommandExecutorDefault(get(), get()) }
+    single<OnScreenLogPanelController> { OnScreenLogPanelController() }
+    single<OnScreenLogController> { get<OnScreenLogPanelController>() }
+    single<OnScreenLogPanelLifecycle> { get<OnScreenLogPanelController>() }
+    single<OperatorOverlayIdentity> { get<OnScreenLogPanelController>() }
     single<RecordingManagerDefault> { RecordingManagerDefault(get(), get()) }
     single<RecordingManager> { get<RecordingManagerDefault>() }
     single<RecordingEventSink> { get<RecordingManagerDefault>() }
@@ -373,7 +381,7 @@ val AppModule: Module = module {
     single<UiTreeFormatter> { get<UiTreeFormatterDefault>() }
     single<UiTreeFormatterDefault> { UiTreeFormatterDefault() }
     single<UiTreeInspector> { get<UiTreeInspectorAndroid>() }
-    single<UiTreeInspectorAndroid> { UiTreeInspectorAndroid(get()) }
+    single<UiTreeInspectorAndroid> { UiTreeInspectorAndroid(get(), get()) }
     single<UiTreeManager> { get<UiTreeManagerAndroid>() }
     single<UiTreeManagerAndroid> { UiTreeManagerAndroid(get()) }
     single<UninstallAppManager> { UninstallAppManagerAndroid(get(), get(), get(), get()) }
