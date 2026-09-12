@@ -54,8 +54,8 @@ The manual CI workflow runs both APK variants on an API 35 Google APIs x86_64 re
 image with English locale. It checks the revision explicitly, verifies packaged
 service metadata through the compiled resource table, runs offline assertions,
 and executes the actual emulator regression. A new image requires deliberate
-requalification. The shared Android test suite uses Robolectric 4.11.1 to test
-the API-34 method; other suites retain their existing version.
+requalification. Android test suites use the shared Robolectric 4.11.1 dependency, which supports
+the API-34 method.
 
 Implementation verification uses CLI 0.10.0, development APK 0.10.0-d, and release
 APK 0.10.0 on an API 35 arm64 Google image, build AE3A.240806.036/12592187.

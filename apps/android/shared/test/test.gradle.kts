@@ -75,8 +75,7 @@ dependencies {
     implementation(libs.androidx.test.runner)
     implementation(libs.kotlin.test)
     implementation(libs.kotlin.test.junit)
-    // API 34 is required to exercise accessibility data sensitivity.
-    implementation(libs.robolectricApi34)
+    implementation(libs.robolectric)
     implementation(libs.timber)
     implementation(libs.turbine)
 }
