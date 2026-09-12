@@ -299,10 +299,12 @@ class TaskUiScopeDefault(
         strict: Boolean,
         findChild: Boolean,
         recordReceipt: Boolean = false,
+        expectedScope: TaskScrollScope? = null,
     ): UiNode? {
-        if (!strict && container == null) return actionNodes(target, tree, strict = false, allowEmpty = true, recordReceipt = recordReceipt).firstOrNull()
-        // Resolve the same eligible scroll scope on every observation, including target-only checks.
-        val selected = scrollNode(tree, container, strict, findChild) ?: return null
+        if (expectedScope == null && !strict && container == null) return actionNodes(target, tree, strict = false, allowEmpty = true, recordReceipt = recordReceipt).firstOrNull()
+        // After selection, eligibility changes do not change the target observation scope.
+        val selected = if (expectedScope != null) requireScrollScope(expectedScope, tree, strict)
+            else scrollNode(tree, container, strict, findChild) ?: return null
         val resolver = NodeResolver(tree)
         val scope = resolver.resolve(null).first { it.node === selected }
         val matches = resolver.resolve(target).filter { it.nodePath.startsWith("${scope.nodePath}.") }
@@ -643,10 +645,11 @@ class TaskUiScopeDefault(
         findFirstScrollableChild: Boolean,
         clickTypes: UiTreeClickTypes,
         retry: TaskRetry,
+        scope: TaskScrollScope?,
     ) {
         withRetry(retry, "clickScrollTarget($target)") {
             val tree = currentUiTreeFiltered()
-            val node = scrollTarget(target, tree, container, strict, findFirstScrollableChild, recordReceipt = true)
+            val node = scrollTarget(target, tree, container, strict, findFirstScrollableChild, recordReceipt = true, expectedScope = scope)
                 ?: if (strict) throw StrictSelectionException("NODE_NOT_FOUND", 0, NodeResolver(tree).encodeMatches(emptyList()))
                 else throw UiActionFailure("NODE_NOT_FOUND", "No UI node found matching criteria: $target")
             check(uiTreeManager.triggerClick(node, clickTypes)) { "Click on matching UI node failed" }
@@ -668,9 +671,9 @@ class TaskUiScopeDefault(
             maxSwipes, Duration.INFINITE, 2, findFirstScrollableChild, strict)
         if (result.terminationReason == TaskScrollTerminationReason.TargetFound) {
             val tree = currentUiTreeFiltered()
-            val found = scrollTarget(target, tree, container, strict, findFirstScrollableChild)
+            val found = scrollTarget(target, tree, container, strict, findFirstScrollableChild, expectedScope = result.scope)
                 ?: throw UiActionFailure("NODE_NOT_FOUND", "Target disappeared after scrolling")
-            return@withRetry TaskScrollResult.Found(toTaskUiNode(found))
+            return@withRetry TaskScrollResult.Found(toTaskUiNode(found), result.scope)
         }
         when (result.terminationReason) {
             TaskScrollTerminationReason.ContainerLost -> throw UiActionFailure("CONTAINER_LOST", "Scroll container disappeared")
@@ -707,7 +710,13 @@ class TaskUiScopeDefault(
         strict: Boolean,
     ): TaskScrollOnceResult = scrollOnceForTarget(container, direction, distanceRatio, settleDelay, retry, findFirstScrollableChild, strict, null).result
 
-    private data class ScrollSearchStep(val result: TaskScrollOnceResult, val targetFound: Boolean = false, val containerIdentified: Boolean = true)
+    private data class ScrollSearchStep(
+        val result: TaskScrollOnceResult,
+        val targetFound: Boolean = false,
+        val containerIdentified: Boolean = true,
+        val scrollable: Boolean = true,
+        val dispatched: Boolean = true,
+    )
 
     private suspend fun scrollOnceForTarget(
         container: NodeMatcher?,
@@ -718,21 +727,22 @@ class TaskUiScopeDefault(
         findFirstScrollableChild: Boolean,
         strict: Boolean,
         target: NodeMatcher?,
-        expectedContainer: Pair<UiTree, UiNode>? = null,
+        expectedContainer: TaskScrollScope? = null,
     ): ScrollSearchStep = withRetry(retry, "scrollOnce(dir=$direction)") {
         require(distanceRatio in 0f..1f) { "distanceRatio must be in [0,1], got $distanceRatio" }
         val tree = currentUiTreeFiltered()
-        val selected = scrollNode(tree, container, strict, findFirstScrollableChild)
-            ?: throw UiActionFailure("CONTAINER_NOT_FOUND", "No scrollable container visible")
-        if (expectedContainer != null && !sameScrollContainer(expectedContainer.first, expectedContainer.second, tree, selected)) {
-            throw UiActionFailure("CONTAINER_LOST", "The original scroll container can no longer be identified")
-        }
+        val selected = if (expectedContainer != null) requireScrollScope(expectedContainer, tree, strict)
+            else scrollNode(tree, container, strict, findFirstScrollableChild)
+                ?: throw UiActionFailure("CONTAINER_NOT_FOUND", "No scrollable container visible")
+        val scope = expectedContainer ?: TaskScrollScope(tree, selected)
         val resolvedContainerId = selected.resourceId
-        if (target != null && scrollTarget(target, tree, container, strict, findFirstScrollableChild) != null) {
-            return@withRetry ScrollSearchStep(TaskScrollOnceResult(TaskScrollOutcome.Unknown, resolvedContainerId), targetFound = true)
+        if (target != null && scrollTarget(target, tree, container, strict, findFirstScrollableChild, expectedScope = scope) != null) {
+            return@withRetry ScrollSearchStep(TaskScrollOnceResult(TaskScrollOutcome.Unknown, resolvedContainerId), targetFound = true, dispatched = false)
         }
+        if (!isScrollable(selected)) throw UiActionFailure("CONTAINER_NOT_SCROLLABLE", "Original container is no longer scrollable")
         // Record only the resolution actually used for dispatch, never a later target observation.
-        scrollNode(tree, container, strict, findFirstScrollableChild, recordReceipt = true)
+        if (expectedContainer == null) scrollNode(tree, container, strict, findFirstScrollableChild, recordReceipt = true)
+        else kotlin.coroutines.coroutineContext[ActionReceipt]?.selected(tree, selected, 1)
         val before = leadingChildSignature(selected, direction)
         val receipt = kotlin.coroutines.coroutineContext[ActionReceipt]
         receipt?.progress(scrollProgress(before, null, false, "dispatch_pending"))
@@ -749,27 +759,27 @@ class TaskUiScopeDefault(
         val rawAfter = uiTreeInspector.getCurrentUiTree()
             ?: return@withRetry result(TaskScrollOutcome.ContainerLost, null, false, "hierarchy_unavailable")
         val treeAfter = uiTreeFilterer.filterOnScreenOnly(rawAfter)
-        val after = try {
-            // A non-strict first-match dispatch does not authorize comparing a different first match.
-            scrollNode(treeAfter, container, strict = true, findFirstScrollableChild, allowMissing = true)
-        } catch (error: StrictSelectionException) {
-            if (error.code == "CONTAINER_AMBIGUOUS") {
-                return@withRetry result(TaskScrollOutcome.Unknown, null, false, "container_ambiguous")
-            }
-            null
-        } catch (error: UiActionFailure) {
-            null
-        }
-        if (after == null) return@withRetry result(TaskScrollOutcome.ContainerLost, null, false, "container_missing")
-        if (!sameScrollContainer(tree, selected, treeAfter, after)) {
-            return@withRetry result(TaskScrollOutcome.Unknown, null, false, "container_identity_changed")
+        val observation = identifyScrollScope(scope, treeAfter)
+        val after = observation.node
+        if (after == null) {
+            val unavailable = result(
+                if (observation.reason == "container_missing") TaskScrollOutcome.ContainerLost else TaskScrollOutcome.Unknown,
+                null, false, observation.reason,
+            )
+            if (strict && observation.reason == "container_ambiguous") requireScrollScope(scope, treeAfter, strict)
+            return@withRetry unavailable
         }
         val afterSignature = leadingChildSignature(after, direction)
-        when {
+        val progressResult = when {
             before == null || afterSignature == null -> result(TaskScrollOutcome.Unknown, afterSignature, false, "signature_unavailable")
             before == afterSignature -> result(TaskScrollOutcome.NoMovement, afterSignature, true, "signature_unchanged")
             else -> result(TaskScrollOutcome.Moved, afterSignature, true, "signature_changed")
         }
+        progressResult.copy(
+            scrollable = isScrollable(after),
+            targetFound = target != null && scrollTarget(target, treeAfter, container, strict,
+                findFirstScrollableChild, expectedScope = scope) != null,
+        )
     }
 
     override suspend fun scrollLoop(
@@ -803,6 +813,8 @@ class TaskUiScopeDefault(
                         terminationReason = TaskScrollTerminationReason.TargetFound,
                         scrollsExecuted = 0,
                         resolvedContainerId = null,
+                        scope = if (!strict && container == null) null else
+                            scrollNode(uiTree, container, strict, findFirstScrollableChild)?.let { TaskScrollScope(uiTree, it) },
                     )
                 }
             }
@@ -861,25 +873,26 @@ class TaskUiScopeDefault(
                     findFirstScrollableChild = findFirstScrollableChild,
                     strict = strict,
                     target = target,
-                    expectedContainer = uiTree to initialContainer,
+                    expectedContainer = TaskScrollScope(uiTree, initialContainer),
                 )
             } catch (e: IllegalStateException) {
                 if (e is StrictSelectionException && e.code != "CONTAINER_NOT_FOUND") throw e
                 if (e !is QueryHierarchyUnavailableException && e !is StrictSelectionException &&
                     (e !is UiActionFailure || e.code !in setOf("CONTAINER_NOT_FOUND", "CONTAINER_NOT_SCROLLABLE", "CONTAINER_LOST"))) throw e
-                // Container lost mid-loop (app navigated away etc.) - treat as container lost
-                Log.d("$TAG scrollLoop: container lost mid-loop, returning ContainerLost")
+                // Eligibility loss is distinct from losing the original scope.
                 return TaskScrollLoopResult(
-                    terminationReason = TaskScrollTerminationReason.ContainerLost,
+                    terminationReason = if (e is UiActionFailure && e.code == "CONTAINER_NOT_SCROLLABLE")
+                        TaskScrollTerminationReason.ContainerNotScrollable else TaskScrollTerminationReason.ContainerLost,
                     scrollsExecuted = scrollsExecuted,
                     resolvedContainerId = resolvedContainerId,
                 )
             }
 
+            if (stepResult.dispatched) scrollsExecuted++
             if (stepResult.targetFound) {
-                return TaskScrollLoopResult(TaskScrollTerminationReason.TargetFound, scrollsExecuted, resolvedContainerId)
+                return TaskScrollLoopResult(TaskScrollTerminationReason.TargetFound, scrollsExecuted, resolvedContainerId,
+                    TaskScrollScope(uiTree, initialContainer))
             }
-            scrollsExecuted++
 
             if (stepResult.result.outcome == TaskScrollOutcome.ContainerLost) {
                 return TaskScrollLoopResult(TaskScrollTerminationReason.ContainerLost, scrollsExecuted, resolvedContainerId)
@@ -887,15 +900,21 @@ class TaskUiScopeDefault(
             // Do not assert a scoped target using an ambiguous or changed comparison container.
             if (target != null && stepResult.containerIdentified) {
                 val found = try {
-                    findVisibleTargetWithGracePeriod(target, settleDelay, container, strict, findFirstScrollableChild)
+                    findVisibleTargetWithGracePeriod(target, settleDelay, container, strict, findFirstScrollableChild, TaskScrollScope(uiTree, initialContainer))
                 } catch (error: IllegalStateException) {
                     val lost = error is QueryHierarchyUnavailableException ||
-                        (error is UiActionFailure && error.code in setOf("CONTAINER_NOT_FOUND", "CONTAINER_NOT_SCROLLABLE")) ||
+                        (error is UiActionFailure && error.code in setOf("CONTAINER_NOT_FOUND", "CONTAINER_LOST")) ||
                         (error is StrictSelectionException && error.code == "CONTAINER_NOT_FOUND")
                     if (!lost) throw error
                     return TaskScrollLoopResult(TaskScrollTerminationReason.ContainerLost, scrollsExecuted, resolvedContainerId)
                 }
-                if (found != null) return TaskScrollLoopResult(TaskScrollTerminationReason.TargetFound, scrollsExecuted, resolvedContainerId)
+                if (found != null) return TaskScrollLoopResult(TaskScrollTerminationReason.TargetFound, scrollsExecuted, resolvedContainerId, TaskScrollScope(uiTree, initialContainer))
+            }
+            if (!stepResult.containerIdentified) {
+                return TaskScrollLoopResult(TaskScrollTerminationReason.ContainerLost, scrollsExecuted, resolvedContainerId)
+            }
+            if (!stepResult.scrollable) {
+                return TaskScrollLoopResult(TaskScrollTerminationReason.ContainerNotScrollable, scrollsExecuted, resolvedContainerId)
             }
             when (stepResult.result.outcome) {
                 TaskScrollOutcome.EdgeReached -> return TaskScrollLoopResult(
@@ -930,9 +949,10 @@ class TaskUiScopeDefault(
         container: NodeMatcher?,
         strict: Boolean,
         findFirstScrollableChild: Boolean,
+        scope: TaskScrollScope,
     ): UiNode? {
         val initialTree = currentUiTreeFiltered()
-        scrollTarget(target, initialTree, container, strict, findFirstScrollableChild)?.let { return it }
+        scrollTarget(target, initialTree, container, strict, findFirstScrollableChild, expectedScope = scope)?.let { return it }
 
         val pollDelay =
             (settleDelay / 2)
@@ -942,7 +962,7 @@ class TaskUiScopeDefault(
         repeat(3) {
             delay(pollDelay)
             val uiTree = currentUiTreeFiltered()
-            scrollTarget(target, uiTree, container, strict, findFirstScrollableChild)?.let { return it }
+            scrollTarget(target, uiTree, container, strict, findFirstScrollableChild, expectedScope = scope)?.let { return it }
         }
 
         return null
@@ -1046,6 +1066,34 @@ class TaskUiScopeDefault(
             put("comparable", kotlinx.serialization.json.JsonPrimitive(comparable))
             put("reason", kotlinx.serialization.json.JsonPrimitive(reason))
         }.toString()
+
+    private data class ScrollScopeObservation(val node: UiNode?, val reason: String)
+
+    private fun identifyScrollScope(scope: TaskScrollScope, tree: UiTree): ScrollScopeObservation {
+        val nodes = NodeResolver(tree).resolve(null).map { it.node }
+        val matches = nodes.filter { sameScrollContainer(scope.tree, scope.node, tree, it) }
+        if (matches.size == 1) return ScrollScopeObservation(matches.single(), "container_identified")
+        if (matches.size > 1) return ScrollScopeObservation(null, "container_ambiguous")
+        val candidates = nodes.filter { it.resourceId == scope.node.resourceId && it.className == scope.node.className }
+        return ScrollScopeObservation(null, when {
+            candidates.size > 1 -> "container_ambiguous"
+            candidates.isEmpty() -> "container_missing"
+            else -> "container_identity_changed"
+        })
+    }
+
+    private fun requireScrollScope(scope: TaskScrollScope, tree: UiTree, strict: Boolean): UiNode {
+        val observation = identifyScrollScope(scope, tree)
+        observation.node?.let { return it }
+        if (strict && observation.reason == "container_ambiguous") {
+            val resolver = NodeResolver(tree)
+            val candidates = resolver.resolve(null).filter {
+                it.node.resourceId == scope.node.resourceId && it.node.className == scope.node.className
+            }
+            throw StrictSelectionException("CONTAINER_AMBIGUOUS", candidates.size, resolver.encodeMatches(candidates))
+        }
+        throw UiActionFailure("CONTAINER_LOST", "The original scroll container can no longer be identified")
+    }
 
     private fun sameScrollContainer(beforeTree: UiTree, before: UiNode, afterTree: UiTree, after: UiNode): Boolean {
         if (before.accessibilityNodeInfo != null && after.accessibilityNodeInfo != null) {

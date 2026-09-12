@@ -48,6 +48,9 @@ data class UiNode(
      * for direct interaction (clicking, etc.).
      * Marked as @Transient to exclude from serialization.
      * This should always be non-null at runtime.
+     * Capture transfers ownership to the tree: do not recycle retained handles.
+     * They remain valid for identity checks and dispatch until the tree is released
+     * and are then garbage collected, including on platforms with node pooling.
      */
     @Transient
     @Stable
