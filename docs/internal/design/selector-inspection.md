@@ -142,7 +142,8 @@ offline tests where applicable. This independent verification preceded the runti
 Rebuilt and installed the development APK from the updated branch. Internet
 settings still returned no active accessibility root while Android window
 metadata identified an active, focused application window and screenshot capture
-showed the populated page. The platform cause remains unproven. Selecting another
+showed the populated page. The platform cause was unproven in this pass; the investigation below establishes
+sensitive-root filtering. Selecting another
 window would not establish that the returned hierarchy belongs to that screen,
 so this change does not add window fallback or automatic retries.
 
@@ -177,3 +178,56 @@ Regression tests cover retained steps, stopped sequences, canonical failure
 serialization, cancellation, absent service, and unknown versus zero windows.
 Live coverage is limited to the Android 15 emulator. The device was returned to
 Display & touch; no setting values were changed during this follow-up.
+
+
+## Internet hierarchy root cause, 2026-09-12
+
+A controlled emulator experiment established that Android accessibility-data
+sensitivity filtering causes this Internet-page failure. This supersedes the
+unresolved-cause statements in the earlier verification passes.
+
+The active activity was Settings `SubSettings`, containing
+`NetworkProviderSettings`. It is a native preference/RecyclerView screen. With
+the normal Operator declaration, runtime `isAccessibilityTool` was false. Both
+`rootInActiveWindow` and the active, focused application's `window.root` returned
+null. The status-bar window still had a readable System UI root. Explicitly
+clearing the accessibility cache did not restore the application root.
+
+Changed only the service configuration to declare
+`android:isAccessibilityTool="true"` between diagnostic builds. The same Internet
+screen then returned 67 query nodes, including the Internet heading, Wi-Fi
+control, and connected-network row. XML snapshots succeeded through both the
+branch-local CLI and the globally installed 0.9.5 CLI. Instrumentation confirmed
+`isAccessibilityTool=true` and the active root's
+`isAccessibilityDataSensitive=true`.
+
+Restoring the original declaration caused query and global-CLI XML failure to
+return on the same screen. The temporary declaration and all instrumentation
+were removed, and the normal development APK was reinstalled. This was an
+investigation, not a change to the shipped service classification.
+
+Android 15's framework implementation explains this result directly:
+[`AccessibilityInteractionController`](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-15.0.0_r1/core/java/android/view/AccessibilityInteractionController.java)
+returns null from `getRootView()` when `isVisibleToAccessibilityService` rejects
+the root. That predicate accepts accessibility-tool requests or views that are
+not accessibility-data-sensitive. The experiment observed the root as sensitive;
+it did not trace which Settings code or resource marks that root sensitive.
+
+This is a real coverage gap, not evidence of an R4 selector regression. The
+service XML is identical to the `v0.9.5` release, and the root acquisition path
+also predates R4. The global 0.9.5 CLI fails or succeeds according to the installed
+APK's declaration. An old release APK was not installed in this experiment, so
+this is not a full old-binary compatibility comparison.
+
+The demonstrated configuration change broadens access to sensitive views beyond
+this screen. Android defines
+[`isAccessibilityTool`](https://developer.android.com/reference/android/accessibilityservice/AccessibilityServiceInfo#attr_android:isAccessibilityTool)
+as identifying services used to assist users with disabilities. Deciding the
+product's service classification is separate from fixing selector resolution;
+this investigation does not change that declaration. Retries, cache clearing,
+and selecting other windows do not address the demonstrated filtering rule.
+
+Validation included rebuilding and installing each diagnostic APK, successful
+query/XML captures with the test declaration, and failure after restoration.
+Artifacts and runtime logs were retained locally outside the repository. The
+emulator was returned to Network & internet without changing network settings.
