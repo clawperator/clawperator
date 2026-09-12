@@ -1,8 +1,8 @@
 # v0.10 runtime observability implementation order
 
-This is the coordination document for seven task packs: six runtime-observability packs and the existing on-screen-log pack. It replaces the former standalone observability index. It does not schedule every unrelated task in the repository or claim that implementation has shipped.
+This coordinates six active runtime-observability task packs and the completed on-screen-log implementation. It replaces the former standalone observability index. It does not schedule every unrelated task in the repository or claim that implementation has shipped.
 
-Runtime source audit: `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d`. Handoff guidance refreshed against `d12f687` after the task packs merged in `008dcb2`; this refinement does not change runtime contracts or release dependencies. On-screen logs PR-1 (PR #266) is merged; its PR-2 is ready. The six new packs are unimplemented. There are nine remaining implementation PRs. This planning PR changes task documents only.
+Runtime source audit: `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d`. Handoff guidance refreshed against `d12f687` after the task packs merged in `008dcb2`; this refinement does not change runtime contracts or release dependencies. On-screen logs PR-1 (PR #266) is merged; its CLI implementation and proof are complete locally. Its task pack was retired with explicit user authorization before merge verification. The six other packs remain unimplemented, with eight implementation PRs remaining.
 
 ## Folder ownership
 
@@ -20,7 +20,7 @@ The order below minimizes shared-file conflicts. Hard dependencies are explicit;
 | --- | --- | --- | --- | --- |
 | R1 | [Selected Operator readiness](../../node/readiness-verification/plan.md) | 1 | None | Ready; [prompt](../../node/readiness-verification/agent-prompt.md) |
 | R2 | [Scaffold failure propagation](../../node/scaffold-failure-propagation/plan.md) | 1 | None | Ready; [prompt](../../node/scaffold-failure-propagation/agent-prompt.md) |
-| R3 | [On-screen logs PR-2](../../api/on-screen-logs/plan.md) | 3-4 | Its PR-1, merged in `120c1eb` | [DONE] implemented and validated locally; PR-2 finalization pending; [findings](../../api/on-screen-logs/findings.md#pr-2-validation-and-capture-proof) |
+| R3 | [On-screen logs CLI](../../../docs/api/on-screen-logs.md) | Complete | Raw API merged in `120c1eb` | [DONE] implemented and validated locally; pack retired; [verification and limits](../../../docs/internal/design/on-screen-logs.md) |
 | R4 | [Selector inspection PR-1](../../api/selector-inspection/plan.md) | 1 | None beyond merged main | Ready; [prompt](../../api/selector-inspection/agent-prompt.md) |
 | R5 | [Strict selectors PR-2](../../api/selector-inspection/plan.md) | 2 | R4 merged | Waiting for R4; [prompt](../../api/selector-inspection/pr-2-prompt.md) |
 | R6 | [Action-result diagnostics](../../api/action-result-diagnostics/plan.md) | 1 | R4 and R5 merged | Waiting for R5; [prompt](../../api/action-result-diagnostics/agent-prompt.md) |
@@ -69,7 +69,7 @@ This covers the agreed foundation and evidence gaps. It is not a promise that on
 
 **Evidence integration gate:** R8 must pass before adopting its manifest as the stable report input; R9 must pass before claiming managed-video support. Existing screenshot and explicit ADB recording helpers remain usable while these APIs are developed. Reports must distinguish unavailable evidence from failed test assertions, and never equate file existence with proof.
 
-**Optional convenience:** R3 and R7 reduce authoring/inspection overhead. They are planned v0.10 work, but neither is a technical prerequisite for deterministic execution. Raw on-screen logs already work through the merged API. All nine remaining PRs are the suggested scope of this release workstream, not nine mandatory blockers to beginning consumer development.
+**Optional convenience:** R3 is implemented; R7 remains planned. Both reduce authoring/inspection overhead, and neither is a technical prerequisite for deterministic execution. Raw on-screen logs already work through the merged API. The eight remaining PRs are the suggested scope of this release workstream, not eight mandatory blockers to beginning consumer development.
 
 ## Implementation handoff and release acceptance
 

@@ -260,6 +260,15 @@ means only that Android drew the requested generation.
 
 ## Verification
 
+Live verification has covered an API 35 emulator, including ten separately
+awaited set/screenshot/replace/screenshot/clear cycles, style changes, rotation,
+font scale, expiry, service restart, touch-through input, and selector isolation.
+This is the tested platform, not a restriction to API 35: placement supports
+API 22+ subject to the compatibility exceptions above. Older compatibility
+paths have unit coverage but have not been verified on live devices. Physical
+devices and secure-window capture were not part of that proof.
+
+
 Save the JSON action list from the example above to an absolute path and first
 validate it without a device:
 
