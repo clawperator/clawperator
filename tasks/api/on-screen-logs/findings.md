@@ -13,7 +13,7 @@
 | Phase | Status | Commit |
 | --- | --- | --- |
 | 1 - Android Controller and Mechanism Proof | passed | `fdb2b12` |
-| 2 - Raw Execution Contract and Public Documentation | passed | `3efc652` |
+| 2 - Raw Execution Contract and Public Documentation | passed | `3efc652`, alias follow-up `76c7be8` |
 
 ## Validation
 
@@ -29,7 +29,7 @@
 | `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` | 0 | The branch-local snapshot retained the foreground app hierarchy while the panel was shown. | ignored local interaction output |
 | `node apps/node/dist/cli/index.js exec <read-hidden-label.json> --device <device_serial> --operator-package com.clawperator.operator.dev --output json` | 1, expected | A normal `read_text` action could not match the panel-only label. | terminal envelope: `No UI node found matching criteria` |
 | `npm --prefix apps/node run build` | 0 | The branch-local Node package compiles with the two raw actions and strict validator. | npm output |
-| `npm --prefix apps/node run test` | 0 | All 272 Node tests passed, including raw validation, Serve, MCP, strict canonical action handling, and failed-envelope coverage. | npm output |
+| `npm --prefix apps/node run test` | 0 | All 272 Node tests passed, including raw validation, Serve, MCP, strict action-name and parameter handling, and failed-envelope coverage. | npm output |
 | `./gradlew app:assembleDebug app:testDebugUnitTest app:installDebug` | 0 | The debug app rebuilt, app unit tests passed, and the debug APK installed on the available emulator targets. | Gradle output |
 | `./gradlew shared:data:operator:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | Android parser, action-engine result mapping, controller, and window-metadata suites remain green. | Gradle output |
 | `bash validation/on-screen-logs/test_phase2_contract.sh` | 0 | Both generic raw fixtures validate through the branch-local CLI and normalize colors; the generic `value` alias is rejected. | validation script output |
@@ -56,6 +56,12 @@
 | `./gradlew app:assembleDebug app:testDebugUnitTest shared:data:operator:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | The final review-corrected debug app and all relevant Android unit suites build and pass. | Gradle output |
 | `./gradlew app:installDebug` followed by branch-local `doctor` on `<device_serial>` with `com.clawperator.operator.dev` | 0 | The final debug APK installed and the selected API 35 emulator was compatible, accessible, and interactive. | Gradle and doctor output |
 | `./scripts/docs_build.sh` | 0 | The final transport-specific capture guidance and regenerated machine-facing documentation build successfully. | docs build output |
+| `npm --prefix apps/node run build` | 0 | The branch-local Node package compiles with the exact on-screen-log input aliases. | npm output |
+| `npm --prefix apps/node run test` | 0 | All 274 Node tests passed, including alias normalization through raw validation, Serve, and MCP. | npm output |
+| `bash validation/on-screen-logs/test_phase2_contract.sh` | 0 | Raw CLI validation accepts both exact action aliases, returns canonical types, and still rejects the generic `value` parameter alias. | validation script output |
+| `./gradlew app:assembleDebug app:testDebugUnitTest shared:data:operator:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | The debug app and relevant Android unit suites remain green with canonical Android ingress unchanged. | Gradle output |
+| `./gradlew app:installDebug` followed by branch-local `doctor` on `<device_serial>` with `com.clawperator.operator.dev` | 0 | The debug APK installed on available targets, and the selected API 35 emulator was compatible, accessible, and interactive. | Gradle and doctor output |
+| Branch-local `exec` of `raw-action-type-aliases.json` on `<device_serial>` with `com.clawperator.operator.dev` and `--no-daemon` | 0 | `on_screen_log_set` rendered and `on_screen_log_clear` cleared the panel; returned action types were canonical. | terminal envelope |
 
 ## Live Observations
 
@@ -82,7 +88,7 @@
 - The implementation uses `TYPE_ACCESSIBILITY_OVERLAY`, a custom non-accessible View, `FLAG_NOT_TOUCHABLE`, `FLAG_NOT_FOCUSABLE`, and no `FLAG_SECURE`. It has no ticking timer, host-driven elapsed update, application-overlay fallback, or persistent state.
 - API 21 fails closed with `ON_SCREEN_LOG_RENDER_FAILED` before attempting to attach. `TYPE_ACCESSIBILITY_OVERLAY` is introduced on API 22, so raising the project minimum SDK or using a different overlay mechanism would not meet the specified contract.
 - Phase 1 deliberately does not publish `operator_overlay_visible` in snapshot data. It wires exact identity without altering raw metadata. The string-valued public output belongs to Phase 2 with the normal raw execution contract.
-- Phase 2 adds strict canonical-only action handling in `apps/node/src/contracts/aliases.ts` and `apps/node/src/contracts/inputAliases.ts`, strict Node validation and structured error promotion in `apps/node/src/domain/executions/validateExecution.ts` and `apps/node/src/domain/executions/runExecution.ts`, plus Android parser/action-engine integration. These exact additional PR-1 paths are included in the review scope because they preserve the same contract across raw CLI, Serve, and MCP transport.
+- Phase 2 uses canonical `set_on_screen_log` and `clear_on_screen_log` types for validation, Android dispatch, and result data. The Node ingress also accepts exact lower-case `on_screen_log_set` and `on_screen_log_clear`, then normalizes them before the shared validator. Case and whitespace variants remain invalid, parameter aliases remain rejected, and direct Android parser ingress stays canonical-only. These exact additional PR-1 paths are included in the review scope because they preserve the same contract across raw CLI, Serve, and MCP transport.
 - PR-1 review added `apps/node/src/mcp/tools/core.ts` to the raw-transport scope. MCP now preserves raw action-type text until the canonical validator runs, so whitespace around either on-screen-log action is rejected instead of normalized. The review fix also preserves pre-existing unrelated envelope error codes.
 - Configuration changes now defer while a replacement generation waits for its draw acknowledgement, then recompute the acknowledged replacement rather than reapplying stale state. Legacy API 29 bounds combine public `Display.getCutout()` safe insets with system bars and account for reverse-landscape left navigation. API 28 with a declared built-in cutout fails closed because a service has no public pre-attachment safe-inset query.
 - The second PR-1 review requires every configuration reflow deferred by a pending `set_on_screen_log` to receive its own draw acknowledgement within the original request deadline. The returned rendered bounds therefore always belong to an acknowledged generation. Node and Android now also use the same explicit whitespace set for required text, including U+FEFF.
