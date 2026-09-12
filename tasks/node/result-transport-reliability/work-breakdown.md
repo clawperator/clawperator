@@ -80,8 +80,35 @@ under all conditions. R12's completed pack is retired.
 
 ## PR-2: diagnose the recurring reader exit
 
-Status: dispatch-safety repairs implemented with regression coverage; bounded live verification in progress. The recurring causal reliability gate remains open. The independent `6367227a` audit reproduced exit 255 during an Internet parity query after confirmed command start, with zero received chunks. Stable public diagnostics passed; causal reliability remains unresolved. The later declared debug/release transport series passed 120/120 commands and must be retained alongside the failure.
+Status: bounded investigation, safety repairs and local verification complete; recurring post-dispatch exit-255 cause unresolved. Keep the causal reliability and release gates open. The independent `6367227a` audit reproduced exit 255 during an Internet parity query after confirmed command start, with zero received chunks. Stable public diagnostics passed; causal reliability remains unresolved. The later declared debug/release transport series passed 120/120 commands and must be retained alongside the failure.
 
 Reproduce with the checked-in hierarchy fixture and independent bounded stream/process diagnostics on the same build. Inspect logcat process lifecycle, reader startup/teardown, host cancellation and device logging separately; make only evidence-supported repairs. Capture raw failure context privately and add deterministic tests for the reproduced cause. Preserve existing codes, command IDs, strict chunk integrity and no-replay semantics. Run the original PR's relevant checks and a declared finite series plus the complete hierarchy fixture on both variants. Report unreproduced causes or remaining failures explicitly; a retry-to-green is not completion. Update durable causal findings and release status, then commit the validated scope locally.
 
 R14 is independent. Do not turn this follow-up into media implementation or automatic emulator CI; the supported-image release workflow remains manual.
+
+### PR-2 recorded outcome
+
+- [DONE] Inspected subscription timing, process lifecycle, UTF-8 framing, strict
+  reassembly and paced background publication. ADB source makes a missing remote
+  shell exit packet a plausible explanation for host exit 255, not a proven cause.
+- [DONE] Reproduced dispatch between process `exit` and pipe `close` with two
+  failing regressions and a real inherited-pipe subprocess. Blocked new dispatch
+  at exit while preserving late diagnostics and already dispatched terminal data.
+  Independent broadcast errors retain their classification.
+- [DONE] Prevented the fixed-series harness from issuing a later open after a
+  failed open; retain failed and unrun attempts instead of replaying uncertainty.
+- [DONE] Committed implementation as `b31f497e`, then ran one fixed 60-command
+  series and one complete hierarchy fixture on each matching debug/release build.
+  Both series passed 60/60, both hierarchy fixtures and Home cleanup passed.
+  One pre-repair debug hierarchy baseline also passed. No repeat-to-green runs.
+- [DONE] Node build and 1,528 tests, both APK builds and 463 Android tests,
+  repository validation, docs build and route/link checks passed.
+- [OPEN] No new live post-dispatch exit occurred under independent bounded
+  logging and shell tracing. Its cause remains unproven, as does the historical
+  zero-event timeout. A fresh failing protocol/process capture is needed for
+  causal closure. The manual supported-image CI gate remains required.
+
+Build hashes, timings, exact scope and retained evidence limits are in the
+[PR-2 findings](../../../docs/internal/design/result-transport-reliability.md#pr-2-bounded-live-results).
+Do not retire this pack or mark full reliability/release acceptance complete.
+No R14 work, remote synchronization or publication was performed.

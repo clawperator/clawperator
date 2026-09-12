@@ -125,8 +125,10 @@ zero received chunks. Its later debug/release series passed 120/120 commands.
 The earlier local combined acceptance above remains historical evidence; it
 does not erase this recurrence or satisfy the reopened causal reliability gate.
 
-PR-2's exit-to-close dispatch guard and fixed-series no-replay repair are bounded
-safety improvements. They do not explain an exit after confirmed Android start.
+PR-2's exit-to-close dispatch guard and fixed-series no-replay repair passed
+1,528 Node tests, 463 Android tests, both APK builds, validation and docs checks.
+At `b31f497e`, both matching variants passed one 60-command series and one
+complete hierarchy fixture. These are bounded safety improvements. They do not explain an exit after confirmed Android start.
 Current verification and the unresolved blocker are recorded in the
 [result transport findings](../../../docs/internal/design/result-transport-reliability.md#pr-2-recurring-reader-exit-investigation).
 The task pack remains active, and the supported-image manual CI release gate

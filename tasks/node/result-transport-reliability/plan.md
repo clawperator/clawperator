@@ -53,3 +53,14 @@ switch fixture-readiness failure. Manual CI remains outstanding.
 Independent validation of PR #285 head `6367227a` failed a debug API-35 Internet parity query with `RESULT_TRANSPORT_EXITED`, exit 255, empty stderr and broadcast sent. The reader saw a correlated Android command-start event but no result chunks. Correlation and execution-position-unknown diagnostics were preserved correctly. Thus code normalization works, but the original exit-255 symptom is no longer merely historical/unreproduced.
 
 Fixed 60-command series then passed on both variants. Retain both facts; neither series erases the integrated-harness failure. Diagnose the reader exit with bounded independent host/device observations, distinguish process termination from publication loss and service failure, and add regression coverage for any demonstrated cause. Do not assume Android chunk pacing fixes early reader exit or add automatic mutation replay. Update the existing pack rather than creating a duplicate transport workstream.
+
+## PR-2 bounded outcome
+
+Dispatch safety is repaired for the demonstrated process-exit/pipe-close race,
+and the declared-series harness stops after a failed open to avoid replaying an
+uncertain mutation. Both matching variants passed their single 60-command series
+and complete hierarchy fixture after local commit `b31f497e`. Regression and
+build checks passed. The recurring post-dispatch exit did not reproduce, so its
+cause remains unresolved and the pack stays active. See the
+[durable PR-2 record](../../../docs/internal/design/result-transport-reliability.md#pr-2-recurring-reader-exit-investigation)
+for evidence, causal limits and the remaining manual release gate.

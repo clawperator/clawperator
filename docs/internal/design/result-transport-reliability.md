@@ -230,3 +230,72 @@ remaining attempts as unrun. Previously the next cycle could issue the same
 mutation despite an uncertain outcome. Read-only query failures remain recorded
 and are never replaced with successful retries. Offline tests cover both paths;
 `summary.json` records failures, unrun counts and independent-reader exit state.
+
+### PR-2 bounded live results
+
+On 13 September 2026 the baseline debug full hierarchy fixture passed once
+before the repair. The repaired source was committed as
+`b31f497e57d9e40454fb03d4b53e8128df17d682` before the final live series. It used
+the branch-local CLI 0.10.0 and locally built debug 0.10.0-d / release 0.10.0
+APKs, with only the selected service active. The explicit test device was an
+English API-35 arm64 emulator, build `AE3A.240806.036/12592187`, 1080 by 2400,
+density 420. ADB was 37.0.1-15733141. No other device or shared ADB-server state
+was changed.
+
+| Repaired variant | Immediate open/query commands | Full Internet queries | Complete hierarchy fixture | Failed / unrun series attempts |
+| --- | --- | --- | --- | --- |
+| Debug | 40/40 | 20/20 | Pass once, including Home cleanup | 0 / 0 |
+| Release | 40/40 | 20/20 | Pass once, including Home cleanup | 0 / 0 |
+
+Each series was declared before running and was run once. All 40 queries per
+variant used `--visibility all --limit 1000`. Settings query output was 69,785
+bytes; Internet output ranged from 32,347 to 34,360 bytes. Debug Settings/query
+durations were 413-560 ms and Internet 335-409 ms; release was 402-601 ms and
+328-413 ms respectively. Both complete hierarchy runs passed homepage readiness
+in one observation and Internet readiness in three, then verified repeated
+queries, raw/MCP/XML parity, PNG decoding and the unchanged Display scroll and
+Brightness level postcondition. This is one complete run per repaired variant,
+not a new six-starting-state acceptance matrix.
+
+Private evidence retains all command arguments, stdout/stderr, exit status,
+command/task correlation, output sizes, elapsed times, source identity, built
+JavaScript hashes, APK hashes, setup checks and artifact assertions. Bounded
+independent readers retained up to 5,000 stdout lines and 100 stderr lines;
+before/after process lists, accessibility state, buffer sizes and a 5,000-record
+device-buffer dump were captured separately. Final runs enabled `ADB_TRACE=shell`.
+The fixed-series harness also kept its existing per-attempt independent tails.
+All independent readers were alive before intentional cleanup. The observed
+logd, adbd and selected Operator process identities were unchanged across each
+run. No live transport failure or service failure occurred in these declared
+PR-2 attempts. Instrumentation may affect timing; these observations do not
+prove that an unobserved short interruption is impossible.
+
+Locally built APK SHA-256:
+
+- Debug: `a155fd245ce1dbfa4eae95639f2e4e33a634abb91f19f07a77ed2f8e37ae1b75`.
+- Release: `7671fbc6e36a9c23926febe7e712a0d2c6f0f1c2dbfa36132f3a61503952d131`.
+
+Validation passed: Node build and 1,528 tests; both APK builds and 463 Android
+unit tests; repository validation including the fixed-series offline checks;
+and docs generation with route/link checks and no organization warnings. The
+two intentionally failing pre-repair race regressions and real-process timing
+trace remain in the private evidence alongside the passing runs. Initial build
+invocation/setup failures were retained separately from completed validations.
+
+### Remaining causal blocker
+
+The bounded PR-2 investigation and safety repairs are complete, but the recurring
+post-dispatch exit-255 cause remains unresolved. None of the new live attempts
+reproduced that failure, so there is no failing shell-protocol trace to compare
+with independent device logging and process state. The audit's command-start
+observation rules out presenting the pre-dispatch race repair as its root-cause
+fix. Publication loss and the historical zero-event timeout remain separate
+causal limits; integrity checks and pacing were not weakened or changed.
+
+Further causal closure needs a fresh failing attempt with host shell-protocol
+completion/disconnect evidence and simultaneous independent device/process
+observations, without redispatching an uncertain mutation. Keep the R13 pack
+active and the causal reliability gate open. The manually dispatched supported
+CI image remains a separate release prerequisite; these local passes do not
+satisfy it. No automatic emulator workflow, R14 implementation, push, merge or
+publication is part of PR-2.
