@@ -183,8 +183,17 @@ describe("video start preflight and CLI", () => {
       await assert.rejects(startVideo({ deviceId: "test-device", durationSeconds: 10 }, { config, baseDir: root }), (e: any) => e.code === "EVIDENCE_RECORDING_ACTIVE");
       assert.equal(await fs.readFile(lock, "utf8"), "existing ownership");
       assert.ok(calls.some(a => a.includes("--help")));
-      runner.run = async () => ({ code: 127, stdout: "", stderr: "missing prerequisite" });
-      await assert.rejects(startVideo({ deviceId: "test-device", durationSeconds: 10 }, { config, baseDir: root }));
+      await fs.unlink(lock);
+      await assert.rejects(startVideo({ deviceId: "test-device", durationSeconds: 10, outputDir: root }, { config, baseDir: root }), (e: any) => e.code === "EVIDENCE_OUTPUT_EXISTS");
+      await assert.rejects(fs.stat(lock));
+      const originalRun = runner.run;
+      for (const missingTool of ["ffprobe", "ffmpeg"]) {
+        runner.run = async (command, args) => command === missingTool
+          ? { code: 127, stdout: "", stderr: "missing prerequisite" }
+          : originalRun(command, args);
+        await assert.rejects(startVideo({ deviceId: "test-device", durationSeconds: 10 }, { config, baseDir: root }), (e: any) => e.code === "EVIDENCE_CAPTURE_FAILED" && e.message.includes(missingTool));
+        await assert.rejects(fs.stat(lock));
+      }
     } finally { await fs.rm(root, { recursive: true, force: true }); }
   });
   it("enforces a hard subprocess timeout even when SIGTERM is ignored", async () => {
