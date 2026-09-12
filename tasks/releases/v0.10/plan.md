@@ -2,7 +2,7 @@
 
 This coordinates four active runtime-observability task packs and the completed readiness, scaffold-failure, and on-screen-log implementations. It replaces the former standalone observability index. It does not schedule every unrelated task in the repository or claim that implementation has shipped.
 
-Runtime source audit: `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d`. Handoff guidance refreshed against `d12f687` after the task packs merged in `008dcb2`; this refinement does not change runtime contracts or release dependencies. On-screen logs raw API (PR #266, `120c1eb`) and CLI (PR #270, `dd66a25`) are merged. Its task pack was retired with explicit user authorization. R1 merged in `cfc90af` (PR #271); its single-PR task pack was retired by explicit cleanup request. R2 is implemented and validated in `ebba364` and awaits review/merge; its single-PR pack was retired by explicit cleanup request. Four other packs remain unimplemented, with six implementation PRs remaining after R2.
+R4 implementation: `31ef1c2`, based on merged main `654d333`. R1 merged in `cfc90af` (PR #271). R2 merged in `654d333` (PR #272). On-screen logs raw API (PR #266, `120c1eb`) and CLI (PR #270, `dd66a25`) are merged. Their single-PR packs were retired by explicit cleanup requests. R4 is implemented and validated in `31ef1c2`, with review/merge pending. Four feature packs remain open, with five implementation PRs remaining after R4.
 
 ## Folder ownership
 
@@ -19,9 +19,9 @@ The order below minimizes shared-file conflicts. Hard dependencies are explicit;
 | Order / ID | Implementation | Phase(s) | Hard dependency | Current state |
 | --- | --- | --- | --- | --- |
 | R1 | [Selected Operator readiness](../../../docs/api/doctor.md) | Complete | None | [DONE] merged in `cfc90af` (PR #271); pack retired; [verification and limits](../../../docs/internal/design/doctor-readiness.md) |
-| R2 | [Scaffold failure propagation](../../../docs/skills/authoring.md) | Complete | None | [DONE] implemented and validated in `ebba364`; review/merge pending; pack retired; [verification](../../../docs/internal/design/skill-scaffold-execution.md) |
+| R2 | [Scaffold failure propagation](../../../docs/skills/authoring.md) | Complete | None | [DONE] merged in `654d333` (PR #272); pack retired; [verification](../../../docs/internal/design/skill-scaffold-execution.md) |
 | R3 | [On-screen logs CLI](../../../docs/api/on-screen-logs.md) | Complete | Raw API merged in `120c1eb` | [DONE] merged in `dd66a25` (PR #270); pack retired; [verification and limits](../../../docs/internal/design/on-screen-logs.md) |
-| R4 | [Selector inspection PR-1](../../api/selector-inspection/plan.md) | 1 | None beyond merged main | Ready; [prompt](../../api/selector-inspection/agent-prompt.md) |
+| R4 | [Selector inspection PR-1](../../api/selector-inspection/plan.md) | 1 | None beyond merged main | [DONE] implemented and validated in `31ef1c2`; review/merge pending; [verification and limits](../../../docs/internal/design/selector-inspection.md) |
 | R5 | [Strict selectors PR-2](../../api/selector-inspection/plan.md) | 2 | R4 merged | Waiting for R4; [prompt](../../api/selector-inspection/pr-2-prompt.md) |
 | R6 | [Action-result diagnostics](../../api/action-result-diagnostics/plan.md) | 1 | R4 and R5 merged | Waiting for R5; [prompt](../../api/action-result-diagnostics/agent-prompt.md) |
 | R7 | [Compact snapshots](../../node/compact-snapshots/plan.md) | 1 | R4 merged for additive XML visibility | Waiting for R4; [prompt](../../node/compact-snapshots/agent-prompt.md) |
@@ -69,7 +69,7 @@ This covers the agreed foundation and evidence gaps. It is not a promise that on
 
 **Evidence integration gate:** R8 must pass before adopting its manifest as the stable report input; R9 must pass before claiming managed-video support. Existing screenshot and explicit ADB recording helpers remain usable while these APIs are developed. Reports must distinguish unavailable evidence from failed test assertions, and never equate file existence with proof.
 
-**Optional convenience:** R3 is implemented; R7 remains planned. Both reduce authoring/inspection overhead, and neither is a technical prerequisite for deterministic execution. Raw on-screen logs already work through the merged API. R1 is merged. R2 awaits review/merge, and six further implementation PRs remain. This is the suggested scope of the release workstream, not a requirement to finish every PR before beginning consumer development.
+**Optional convenience:** R3 is implemented; R7 remains planned. Both reduce authoring/inspection overhead, and neither is a technical prerequisite for deterministic execution. Raw on-screen logs already work through the merged API. R1 and R2 are merged. R4 is implemented and awaits review/merge, and five further implementation PRs remain. This is the suggested scope of the release workstream, not a requirement to finish every PR before beginning consumer development.
 
 ## Implementation handoff and release acceptance
 

@@ -15,6 +15,9 @@ Implement the requested PR through its acceptance criteria, relevant checks, in-
 
 Ship read-only queries and the shared resolver.
 
+Status: [DONE] implemented and validated in `31ef1c2` on
+`feat/selector-inspection-r4`. Review/merge remains pending. PR-2 is not implemented.
+
 ### Work
 
 - Add shared predicate/resolver and NodeSummary serialization. Use platform state/hints; add capture fields to UiNode only when needed. Preserve semantics of existing fields.
@@ -65,6 +68,48 @@ node apps/node/dist/cli/index.js doctor --device "$DEVICE_ID" --operator-package
 node apps/node/dist/cli/index.js open com.android.settings --device "$DEVICE_ID" --operator-package com.clawperator.operator.dev
 node apps/node/dist/cli/index.js query --device "$DEVICE_ID" --operator-package com.clawperator.operator.dev --visibility all --limit 100
 ```
+
+### PR-1 validation evidence (2026-09-12)
+
+- Node build and prescribed `npm --prefix apps/node run test`: 306 passed.
+  Focused selector, query, execution, CLI, MCP, and transport files: 345 passed.
+- Android `:app:assembleDebug` and `testDebugUnitTest`: passed. Reports contain
+  397 tests, zero failures/errors, and four existing skips. New parser tests live
+  in the active `src/test/kotlin` source set and were verified in XML reports.
+- Matching 0.10.0 debug Operator installed on the explicitly selected Android
+  15/API 35 arm64 emulator. Doctor passed all critical checks.
+- Docs build and route checks passed, with no organization warnings;
+  `git diff --check` passed.
+- Settings overview query returned an intact roughly 42 KB JSON string with
+  136 total matches, 100 returned, and truthful truncation. Its initially broken
+  logcat delivery led to bounded, correlated, checksummed envelope transport,
+  covered by Android and Node regression tests without mutation replay.
+- Display & touch yielded 63 all-visibility versus 55 on-screen nodes, preserving
+  original paths. Raw queries verified combined relationships, zero matches,
+  one-node truncation, and six fresh snapshot IDs. The Dark theme switch's seven
+  state fields and bounds matched XML; screenshot inspection showed it off.
+  The real MCP stdio tool returned the same state with an ancestor predicate.
+  A raw empty-text plus role query counted 14 blank-label nodes and returned five
+  under its requested limit on the final installed build.
+- Offline duplicate-tree fixtures prove empty-label counts, false versus null,
+  self exclusion, hidden-descendant and pruned-ancestor behavior, repeated-filter
+  path stability, and the 256 KiB UTF-8 response guard. Legacy raw empty text
+  alongside a meaningful role/resource constraint remains valid.
+- An extra flat-unit run found 19 unrelated failures in `skills.test.ts`.
+  All 19 failing test names reproduced in an unchanged archive of base `654d333`.
+  They concern missing SkillResult `result` fields and pretty output/banner
+  expectations. Preserve this validation debt for the skill workstream; it is
+  not an R4 regression.
+- Local captures, parsed XML comparisons, raw/MCP results, and baseline failure
+  comparison are in `/tmp/r4-live/`; build/test logs use `/tmp/r4-*.log`.
+  Captures remain outside Git. Durable findings are in
+  [selector inspection design](../../../docs/internal/design/selector-inspection.md).
+- The emulator's Internet page exposed a null active accessibility root while
+  screenshots remained available. Both query and XML snapshot failed truthfully.
+  Display & touch supplied the state comparison; richer root diagnostics remain
+  R6 scope. Live compatibility beyond API 35 remains unproven.
+- Existing sibling skill consumers were inspected; no selector migration or
+  skill version change was required. R5 retains its PR-1 merge gate.
 
 ## PR-2: Strict action resolution
 

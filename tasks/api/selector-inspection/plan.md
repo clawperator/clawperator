@@ -14,13 +14,13 @@ Excluded: Pixel-based occlusion detection, choosing the last or largest node heu
 
 | Item | Value |
 | --- | --- |
-| State | Not started |
+| State | PR-1 implemented and validated in `31ef1c2`; review/merge pending |
 | Total PRs | 2 |
 | Total phases | 2 |
-| Completed | None |
-| Remaining | 1-2 |
-| Current / Next | Phase 1 |
-| Blockers | None |
+| Completed | Phase 1 [DONE] |
+| Remaining | Phase 2 |
+| Current / Next | Phase 2 after PR-1 merges |
+| Blockers | PR-2 requires PR-1 merged |
 
 ## Sources
 
