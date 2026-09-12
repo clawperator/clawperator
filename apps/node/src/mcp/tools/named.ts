@@ -123,7 +123,7 @@ export function getNamedMcpTools(
   return [
     {
       name: "query_ui",
-      description: "Inspect fresh UI nodes, including blank labels and state. Omit matcher for all eligible nodes. Paths are observation-local, never action handles; visibility is not an occlusion guarantee.",
+      description: "Inspect fresh UI nodes, including blank labels and state. Omit matcher for all eligible nodes. Paths are observation-local, never action handles; visibility is not an occlusion guarantee. Does not wait for navigation; use wait for the destination before querying.",
       inputSchema: buildCommonExecutionSchema({
         matcher: nodeMatcherJsonSchema,
         visibility: { type: "string", enum: ["on_screen", "all"], default: "on_screen" },

@@ -21,6 +21,52 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class UiActionEngineDefaultTest : ActionTest {
     @Test
+    fun `unavailable query preserves completed steps and stops before later actions`() = actionTest {
+        var captures = 0
+        val diagnostics = clawperator.uitree.UiHierarchyDiagnostics(serviceAvailable = true, windowCount = 2)
+        val uiScope = object : RecordingTaskUiScope() {
+            override suspend fun queryUi(matcher: NodeMatcher?, visibility: String, limit: Int): String {
+                captures++
+                if (captures == 2) throw QueryHierarchyUnavailableException(diagnostics)
+                return "{}"
+            }
+        }
+        val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+        val plan = UiActionPlan("command", "task", "test", listOf(
+            UiAction.QueryUi("before"), UiAction.QueryUi("missing"), UiAction.QueryUi("after"),
+        ))
+        val result = engine.execute(RecordingTaskScope(uiScope), plan)
+        assertEquals(2, captures)
+        assertEquals("command", result.commandId)
+        assertEquals("task", result.taskId)
+        assertEquals("UI_TREE_UNAVAILABLE", result.errorCode)
+        assertEquals(listOf("before", "missing"), result.stepResults.map { it.id })
+        assertTrue(result.stepResults.first().success)
+        val failed = result.stepResults.last()
+        assertFalse(failed.success)
+        assertEquals("query_ui", failed.actionType)
+        assertEquals(result.errorCode, failed.data["errorCode"])
+        assertEquals(result.error, failed.data["error"])
+        assertEquals(null, failed.data["query"])
+        val evidence = kotlinx.serialization.json.Json.decodeFromString<clawperator.uitree.UiHierarchyDiagnostics>(failed.data.getValue("diagnostics"))
+        assertEquals(diagnostics, evidence)
+        assertTrue(failed.data.getValue("diagnostics").contains("\"foregroundPackage\":null"))
+    }
+
+    @Test
+    fun `query cancellation still propagates`() = actionTest {
+        val uiScope = object : RecordingTaskUiScope() {
+            override suspend fun queryUi(matcher: NodeMatcher?, visibility: String, limit: Int): String {
+                throw kotlinx.coroutines.CancellationException("cancelled")
+            }
+        }
+        val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+        assertFailsWith<kotlinx.coroutines.CancellationException> {
+            engine.execute(RecordingTaskScope(uiScope), UiActionPlan("command", "task", "test", listOf(UiAction.QueryUi("query"))))
+        }
+    }
+
+    @Test
     fun `query returns intact data and overflow is a structured failed step`() =
         actionTest {
             val matcher = NodeMatcher(descendant = NodePredicate(textEquals = "Unique"))

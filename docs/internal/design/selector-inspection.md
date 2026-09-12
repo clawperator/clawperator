@@ -70,8 +70,8 @@ Live Settings evidence includes:
 
 The Internet page intermittently exposed no active accessibility root while a
 screenshot remained available. Query and XML snapshot reported failure rather
-than zero matches. No recovery was added; richer hierarchy failure diagnostics
-remain a separate release task. Live proof is for API 35 only; offline tests do
+than zero matches. No hierarchy recovery was added. The follow-up below adds typed query failure
+diagnostics; broader action diagnostics remain a separate release task. Live proof is for API 35 only; offline tests do
 not establish device compatibility on other API levels.
 
 The standard Node test command passes. An additional run of flat unit-test files
@@ -103,7 +103,7 @@ branch was not established.
 | Large result transport | Settings overview with all visibility returned all 136 nodes and 57,377 UTF-8 bytes of intact `data.query`, without truncation or malformed-envelope failure. |
 | Recovery | Leaving the Internet page with `press back` restored successful queries on Network & internet (58 nodes). |
 
-### Reproduced gaps and follow-up
+### Gaps observed before the query failure fix
 
 1. **Visible screen without an accessible hierarchy.** Navigate through Settings,
    Network & internet, then Internet. Three consecutive queries returned canonical
@@ -134,4 +134,46 @@ queries succeeded; this was a local filesystem restriction, not a query failure.
 This pass did not live-test the 256 KiB overflow boundary, unavailable-state nulls,
 transport corruption or missing chunks, other Android versions, physical devices,
 or other apps. Those behaviors remain covered only by the previously recorded
-offline tests where applicable. No runtime fix is included in this verification.
+offline tests where applicable. This independent verification preceded the runtime fix described below.
+
+
+## Query failure follow-up, 2026-09-12
+
+Rebuilt and installed the development APK from the updated branch. Internet
+settings still returned no active accessibility root while Android window
+metadata identified an active, focused application window and screenshot capture
+showed the populated page. The platform cause remains unproven. Selecting another
+window would not establish that the returned hierarchy belongs to that screen,
+so this change does not add window fallback or automatic retries.
+
+A missing query tree now raises a typed failure. The engine preserves completed
+steps, adds the failed query step, and stops before subsequent actions. The
+canonical envelope carries `UI_TREE_UNAVAILABLE`; failed-step data contains the
+same `errorCode`, human-readable `error`, and string-encoded `diagnostics` JSON.
+Service and window evidence is collected without requiring a root. Unknown
+values remain null. Cancellation still propagates, and existing non-throwing
+failed-step sequence policy is unchanged. General action exception handling,
+wait failures, and other R6 diagnostics remain separate work.
+
+Live verification through the CLI and named MCP returned the same failed
+query identity and stable code, with `serviceAvailable=true`,
+`rootAvailable=false`, `windowCount=2`, and `foregroundPackage=null`. A raw
+three-step execution retained a completed sleep and failed query, omitted the
+later query, and preserved command/task correlation. Screenshot capture still
+succeeded. These diagnostics fix the generic failure report; they do not make
+the Internet hierarchy accessible.
+
+After returning to Settings, clicked Display & touch, then used a bounded
+`wait` with a `listitem` predicate, recycler-view ancestor, and switch descendant.
+The following query with that same selector returned one row. This verifies the
+supported navigation-readiness workflow. Queries remain single observations,
+including when a destination is still loading; no implicit settling was added.
+CLI help, MCP descriptions, and public action documentation now state this.
+
+Validation: Android debug build and full debug unit tests passed (402 tests,
+zero failures/errors, four existing skips). Node build and the standard suite
+passed (306 tests), along with 53 focused query, transport, and MCP helper tests.
+Regression tests cover retained steps, stopped sequences, canonical failure
+serialization, cancellation, absent service, and unknown versus zero windows.
+Live coverage is limited to the Android 15 emulator. The device was returned to
+Display & touch; no setting values were changed during this follow-up.

@@ -47,7 +47,18 @@ class UiActionEngineDefault(
             val stepResults = mutableListOf<UiActionStepResult>()
 
             for (action in plan.actions) {
-                val stepResult = executeSingle(taskScope, action)
+                val stepResult = try {
+                    executeSingle(taskScope, action)
+                } catch (error: QueryHierarchyUnavailableException) {
+                    stepResults += UiActionStepResult(action.id, "query_ui", success = false, data = error.stepData())
+                    return@withContext UiActionExecutionResult(
+                        commandId = plan.commandId,
+                        taskId = plan.taskId,
+                        stepResults = stepResults,
+                        errorCode = "UI_TREE_UNAVAILABLE",
+                        error = error.message,
+                    )
+                }
                 stepResults += stepResult
             }
 

@@ -12,6 +12,28 @@ import kotlin.test.assertTrue
 
 class ResultEnvelopeTransportTest {
     @Test
+    fun `query failure emits canonical failed envelope with retained steps and stable code`() {
+        val result = clawperator.task.runner.UiActionExecutionResult(
+            commandId = "command",
+            taskId = "task",
+            stepResults = listOf(
+                clawperator.task.runner.UiActionStepResult("before", "query_ui", data = mapOf("query" to "{}")),
+                clawperator.task.runner.UiActionStepResult("missing", "query_ui", success = false, data = mapOf("errorCode" to "UI_TREE_UNAVAILABLE")),
+            ),
+            errorCode = "UI_TREE_UNAVAILABLE",
+            error = "Hierarchy unavailable",
+        )
+        val line = buildCanonicalSuccessLine("command", "task", result)
+        val envelope = Json.decodeFromString<ClawperatorResultEnvelope>(line.substringAfter("$CLAWPERATOR_RESULT_PREFIX "))
+        assertEquals("failed", envelope.status)
+        assertEquals(result.commandId, envelope.commandId)
+        assertEquals(result.taskId, envelope.taskId)
+        assertEquals(result.errorCode, envelope.errorCode)
+        assertEquals(result.error, envelope.error)
+        assertEquals(listOf("before", "missing"), envelope.stepResults.map { it.id })
+    }
+
+    @Test
     fun `small canonical results remain unchanged`() {
         val line = buildCanonicalFailureLine("command", "task", "not available")
         assertEquals(listOf(line), resultEnvelopeLogLines(line, "command", "task"))

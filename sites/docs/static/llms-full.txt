@@ -1668,6 +1668,23 @@ shared with existing node-targeted actions.
 | `visibility` | `"on_screen"` | `"on_screen"` or `"all"` |
 | `limit` | `100` | Integer from `1` through `1000` |
 
+Queries do not wait for navigation to settle. After a navigation action, use
+`clawperator wait` with the expected destination selector (MCP: `wait`; raw:
+`wait_for_node`), then query. Zero matches describe that capture only; they do not
+prove that a destination has finished loading. A wait is also a separate capture,
+so callers must still inspect the subsequent query result.
+
+If Android supplies no hierarchy, the envelope fails with
+`errorCode="UI_TREE_UNAVAILABLE"`. Completed steps and the failed `query_ui` step
+are retained, and later actions do not run. Failed-step data contains `errorCode`,
+a human-readable `error`, and serialized JSON `diagnostics` with
+`serviceAvailable`, `rootAvailable`, `windowCount`, and `foregroundPackage`.
+Unknown facts are `null`; `rootAvailable` is `false` for the failed capture.
+No `data.query` is emitted. A screenshot can remain available when accessibility
+hierarchy access is unavailable. This error does not identify the platform cause
+or promise that retrying will expose a restricted screen. Named MCP returns the
+same error code and envelope.
+
 Zero, one, or multiple matches all succeed. `data.query` is a serialized JSON
 string with this shape:
 
@@ -5872,6 +5889,7 @@ Only the codes defined in `apps/node/src/contracts/errors.ts` are part of the pu
 
 | Code | Derived label | Notes |
 | --- | --- | --- |
+| <a id="error-ui-tree-unavailable"></a>`UI_TREE_UNAVAILABLE` | Ui tree unavailable | query_ui could not capture an accessibility hierarchy. See failed-step diagnostics. |
 | <a id="error-host-dependency-missing"></a>`HOST_DEPENDENCY_MISSING` | Host dependency missing | Host |
 | <a id="error-adb-not-found"></a>`ADB_NOT_FOUND` | Adb not found | Setup & Connectivity |
 | <a id="error-no-devices"></a>`NO_DEVICES` | No devices | - |
@@ -6245,6 +6263,17 @@ What this means for agents:
 - [Devices](devices.md)
 - [Doctor](doctor.md)
 - [Operator App Troubleshooting](../troubleshooting/operator.md)
+
+### Query hierarchy unavailable
+
+`UI_TREE_UNAVAILABLE` is a failed `query_ui` capture, not a successful query with
+zero matches. The envelope and failed step carry the code; completed steps are
+preserved and subsequent actions do not run. Inspect the failed step's serialized
+`diagnostics` for service availability, the missing root, and available window
+facts. Unknown facts remain `null`. See [query_ui](actions.md#action-query-ui).
+A visible screenshot does not guarantee an accessible hierarchy. Do not infer
+that another window is the requested application or repeatedly retry a
+persistently unavailable screen.
 
 ---
 
@@ -7685,7 +7714,7 @@ For the underlying selector contract, see [Selectors](selectors.md).
 | `snapshot` | Capture the current Android UI hierarchy as XML. |
 | `execute` | Run a validated Clawperator execution payload over the canonical execution engine. |
 | `configure` | Store per-session defaults for deviceId, operatorPackage, and timeoutMs. |
-| `query_ui` | Inspect fresh UI nodes, including blank labels and state. Omit matcher for all eligible nodes. Paths are observation-local, never action handles; visibility is not an occlusion guarantee. |
+| `query_ui` | Inspect fresh UI nodes, including blank labels and state. Omit matcher for all eligible nodes. Paths are observation-local, never action handles; visibility is not an occlusion guarantee. Does not wait for navigation; use wait for the destination before querying. |
 | `open` | Open an Android application by package id or launch a URI. |
 | `click` | Click a matching node or absolute screen coordinate. |
 | `type` | Type text into a matching field, optionally clearing first or submitting after. |

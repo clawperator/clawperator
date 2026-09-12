@@ -3,6 +3,8 @@
  * Aligned with 0.1.0 Error Taxonomy in docs/node-api-design.md
  */
 export const ERROR_CODES = {
+  /** query_ui could not capture an accessibility hierarchy. See failed-step diagnostics. */
+  UI_TREE_UNAVAILABLE: "UI_TREE_UNAVAILABLE",
   // Host
   HOST_DEPENDENCY_MISSING: "HOST_DEPENDENCY_MISSING",
 

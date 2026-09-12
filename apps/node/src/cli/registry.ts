@@ -1766,6 +1766,8 @@ Visibility defaults to on_screen; limit defaults to 100. data.query contains
 serialized JSON with totalMatches, truncation and node states, including blank labels.
 Paths and snapshot IDs describe one observation and cannot be used as action targets.
 Platform visibility does not prove visual non-occlusion.
+Queries do not wait for navigation to settle. Use wait with the expected selector
+before querying a destination screen. A zero count describes only that capture.
 
 Example:
   clawperator query --matcher-json '{"resourceId":"row","descendant":{"textEquals":"Display"}}'

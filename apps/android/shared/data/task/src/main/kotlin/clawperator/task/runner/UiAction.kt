@@ -238,4 +238,6 @@ data class UiActionExecutionResult(
     val commandId: String,
     val taskId: String,
     val stepResults: List<UiActionStepResult>,
+    val errorCode: String? = null,
+    val error: String? = null,
 )

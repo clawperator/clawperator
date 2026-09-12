@@ -48,7 +48,7 @@ data class CanonicalStepResult(
 private val json = Json { encodeDefaults = false }
 
 /**
- * Build the single-line canonical terminal log message for a successful result.
+ * Build the canonical terminal log message for a completed execution, including typed failures.
  */
 fun buildCanonicalSuccessLine(
     commandId: String,
@@ -67,9 +67,10 @@ fun buildCanonicalSuccessLine(
     val envelope = ClawperatorResultEnvelope(
         commandId = commandId,
         taskId = taskId,
-        status = "success",
+        status = if (result.errorCode == null) "success" else "failed",
         stepResults = stepResults,
-        error = null,
+        error = result.error,
+        errorCode = result.errorCode,
     )
     return CLAWPERATOR_RESULT_PREFIX + " " + json.encodeToString(envelope)
 }

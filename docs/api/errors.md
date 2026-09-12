@@ -394,3 +394,14 @@ What this means for agents:
 - [Devices](devices.md)
 - [Doctor](doctor.md)
 - [Operator App Troubleshooting](../troubleshooting/operator.md)
+
+### Query hierarchy unavailable
+
+`UI_TREE_UNAVAILABLE` is a failed `query_ui` capture, not a successful query with
+zero matches. The envelope and failed step carry the code; completed steps are
+preserved and subsequent actions do not run. Inspect the failed step's serialized
+`diagnostics` for service availability, the missing root, and available window
+facts. Unknown facts remain `null`. See [query_ui](actions.md#action-query-ui).
+A visible screenshot does not guarantee an accessible hierarchy. Do not infer
+that another window is the requested application or repeatedly retry a
+persistently unavailable screen.

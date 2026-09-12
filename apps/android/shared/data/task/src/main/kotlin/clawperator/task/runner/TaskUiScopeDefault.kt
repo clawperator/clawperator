@@ -36,7 +36,8 @@ class TaskUiScopeDefault(
         visibility: String,
         limit: Int,
     ): String {
-        val raw = uiTreeInspector.getCurrentUiTree() ?: error("UI tree not available")
+        val raw = uiTreeInspector.getCurrentUiTree()
+            ?: throw QueryHierarchyUnavailableException(uiTreeInspector.getUnavailableHierarchyDiagnostics())
         val capturedAt = queryCaptureTimestamp()
         val visible = uiTreeFilterer.filterOnScreenOnly(raw)
         return NodeResolver(visible).query(matcher, visibility, limit, capturedAt = capturedAt)

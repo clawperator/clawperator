@@ -131,6 +131,23 @@ shared with existing node-targeted actions.
 | `visibility` | `"on_screen"` | `"on_screen"` or `"all"` |
 | `limit` | `100` | Integer from `1` through `1000` |
 
+Queries do not wait for navigation to settle. After a navigation action, use
+`clawperator wait` with the expected destination selector (MCP: `wait`; raw:
+`wait_for_node`), then query. Zero matches describe that capture only; they do not
+prove that a destination has finished loading. A wait is also a separate capture,
+so callers must still inspect the subsequent query result.
+
+If Android supplies no hierarchy, the envelope fails with
+`errorCode="UI_TREE_UNAVAILABLE"`. Completed steps and the failed `query_ui` step
+are retained, and later actions do not run. Failed-step data contains `errorCode`,
+a human-readable `error`, and serialized JSON `diagnostics` with
+`serviceAvailable`, `rootAvailable`, `windowCount`, and `foregroundPackage`.
+Unknown facts are `null`; `rootAvailable` is `false` for the failed capture.
+No `data.query` is emitted. A screenshot can remain available when accessibility
+hierarchy access is unavailable. This error does not identify the platform cause
+or promise that retrying will expose a restricted screen. Named MCP returns the
+same error code and envelope.
+
 Zero, one, or multiple matches all succeed. `data.query` is a serialized JSON
 string with this shape:
 
