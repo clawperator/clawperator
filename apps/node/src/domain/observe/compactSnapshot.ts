@@ -57,6 +57,24 @@ export function projectCompactSnapshot(xml: string, ids: Pick<ResultEnvelope, "c
   let totalNodes = 0;
   let fieldTruncated = false;
   const parser = new SaxesParser({ xmlns: false });
+  const preservedLabels: Record<string, string> = {};
+  parser.on("attribute", attribute => {
+    if (stack.length === 0 || nodes.length >= maxNodes || (attribute.name !== "text" && attribute.name !== "content-desc")) return;
+    // Saxes positions index the original JS string. The closing quote has just
+    // been consumed; a matching literal quote cannot occur inside its value.
+    const end = parser.position - 1;
+    const quote = xml[end];
+    const start = xml.lastIndexOf(quote, end - 1) + 1;
+    const rawValue = xml.slice(start, end);
+    if (!/[\t\r\n]/.test(rawValue)) return;
+    // Android emits literal whitespace in attributes. Character references
+    // preserve it through XML normalization while the parser still decodes
+    // entities and validates the value. Never rewrite the saved raw document.
+    const escapedValue = rawValue.replace(/[\t\r\n]/g, character => `&#${character.charCodeAt(0)};`);
+    const valueParser = new SaxesParser({ xmlns: false });
+    valueParser.on("opentag", tag => { preservedLabels[attribute.name] = tag.attributes.value; });
+    valueParser.write(`<node value=${quote}${escapedValue}${quote}/>`).close();
+  });
   parser.on("doctype", () => { throw new Error("DTD declarations are prohibited"); });
   const rejectHierarchyText = (text: string) => {
     if (text.trim()) throw new Error("Unexpected hierarchy text");
@@ -76,7 +94,8 @@ export function projectCompactSnapshot(xml: string, ids: Pick<ResultEnvelope, "c
     stack.push({ path: nodePath, children: 0 });
     totalNodes++;
     if (nodes.length >= maxNodes) return;
-    const attrs = tag.attributes;
+    const attrs = { ...tag.attributes, ...preservedLabels };
+    for (const name of Object.keys(preservedLabels)) delete preservedLabels[name];
     const state = (key: string) => attrs[key] === "true" ? true : attrs[key] === "false" ? false : null;
     const field = (key: string) => {
       if (attrs[key] === undefined) return { value: null, truncated: false };

@@ -34,6 +34,29 @@ describe("compact snapshot", () => {
     assert.equal(result.nodes[2].text, "");
     assert.equal(result.nodes[2].checked, true);
   });
+  it("preserves literal label whitespace, entities, and code point budgets", async () => {
+    const text = "First\nSecond\tcolumn\r\n😀&\"end";
+    const description = "Description\rline\nnext\t'é";
+    const raw = `<hierarchy><!-- text="ignored\nvalue" -->
+<node text="First\nSecond\tcolumn\r\n😀&amp;&quot;end" content-desc='Description\rline\nnext\t&apos;é'/>
+<node text="plain" content-desc="&#10;&#9;&#13;&amp;#10;"/></hierarchy>`;
+    const result = projectCompactSnapshot(raw, ids);
+    assert.equal(result.nodes[0].text, text);
+    assert.equal(result.nodes[0].contentDescription, description);
+    assert.equal(result.nodes[1].text, "plain");
+    assert.equal(result.nodes[1].contentDescription, "\n\t\r&#10;");
+    assert.equal(result.truncated, false);
+    const limited = projectCompactSnapshot(raw, ids, { maxTextChars: 7 });
+    assert.equal(limited.nodes[0].text, "First\nS");
+    assert.equal(limited.nodes[0].textTruncated, true);
+    const cli = JSON.parse(await cmdObserveSnapshot({ format: "json", compact: true,
+      tryDaemonExecutionFn: async () => ({ ok: true, envelope: envelope(raw), deviceId: "test-device", terminalSource: "clawperator_result" }),
+    }));
+    const presentation = await presentSnapshot(envelope(raw), { compact: true });
+    const mcp = buildSnapshotSuccessResult({ envelope: presentation.envelope }, presentation);
+    assert.deepEqual(cli.compact, mcp.structuredContent!.compact);
+    assert.equal(cli.compact.nodes[0].text, text);
+  });
   it("counts the full tree but returns a whole-node preorder prefix and Unicode code points", () => {
     const result = projectCompactSnapshot(xml, ids, { maxNodes: 2, maxTextChars: 5 });
     assert.equal(result.returnedNodes, 2);

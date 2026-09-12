@@ -13,6 +13,12 @@ this opt-in presentation requires no sibling skill migration or version bump.
 The saxes parser rejects malformed XML. A doctype event always throws before
 projection can finish, so internal and external DTD/entity declarations cannot
 be used. Built-in and numeric attribute entities are decoded by the parser.
+Android emits literal attribute whitespace. For returned text and description
+fields, SAX attribute events locate the original quoted value using parser
+positions. Values containing tabs or line breaks are parsed again with those
+characters encoded as numeric references, preserving exact label whitespace
+without changing raw XML or bypassing document validation.
+
 Parsing continues beyond the returned node limit to validate the whole document
 and count omitted nodes. The iterative stack follows XML child order rather
 than trusting Android's `index` attribute, which may contain gaps.

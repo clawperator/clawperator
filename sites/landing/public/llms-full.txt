@@ -4206,7 +4206,8 @@ Each node retains:
   persistent handles or guaranteed query IDs. They cannot target actions.
 - `resourceId`, `className`, `text`, `contentDescription`, and `bounds`: decoded
   strings, or null when absent. Bounds retain XML's `[x1,y1][x2,y2]` string form.
-  Empty strings remain distinct from absent attributes.
+  Empty strings remain distinct from absent attributes. Text and descriptions
+  preserve literal newlines, carriage returns, and tabs from the snapshot.
 - `checked`, `checkable`, `selected`, `enabled`, `clickable`, `scrollable`,
   `visibleToUser`, and `accessibilityDataSensitive`: native booleans, or null
   when unavailable or not a recognized boolean value.
