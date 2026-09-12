@@ -47,7 +47,6 @@ plugins:
         'skills/skill-development-workflow.md': 'skills/development.md'
         'skills/skill-authoring-guidelines.md': 'skills/authoring.md'
         'skills/device-prep-and-runtime-tips.md': 'skills/runtime.md'
-        'skills/blocked-terms-policy.md': 'skills/authoring.md'
 
 nav:
   - Docs Home: index.md

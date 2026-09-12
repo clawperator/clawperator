@@ -1487,24 +1487,6 @@ Confirm:
 - per-skill validation succeeds without hand-editing file paths
 - `validate --all` succeeds after generated indexes are refreshed in repos that own them
 
-## Blocked Terms
-
-Repository policy reserves the local blocked-terms file at:
-
-```text
-~/.clawperator/blocked-terms.txt
-```
-
-Important boundary:
-
-- this path is part of the repo's safety guidance and related skills docs
-- the current `apps/node/src/domain/skills/*` implementation does not read or enforce blocked terms during `skills run`, `skills validate`, or `skills new`
-
-So for authoring:
-
-- treat blocked terms as local Git hygiene
-- do not assume the Node skill runtime will reject sensitive strings automatically
-
 ## Practical Authoring Rules
 
 - keep `skill.json` and the registry in sync

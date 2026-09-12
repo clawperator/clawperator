@@ -238,9 +238,35 @@ When multiple devices are connected (physical + emulator), be explicit about whi
 - Use placeholders in examples:
   - `<device_id>`, `<device_serial>`, `<person_name>`, `<local_user>`
 - Never shorten `Clawperator` to `Claw` in code, docs, comments, or commit messages. `Claw` is reserved for OpenClaw or OpenClaw-like agents and is not an acceptable shorthand for this project.
-- If local blocked-terms policy is enabled, keep it in the user-scoped config dir:
-  - `~/.clawperator/blocked-terms.txt`
-- Before release or force-push events, run a blocked-term scan and verify clean history.
+
+### Local Blocked-Term Policy
+
+Use the user-scoped file `~/.clawperator/blocked-terms.txt` to prevent local
+commits from containing private or otherwise prohibited terms. The file accepts
+one term per non-empty line. Lines whose first non-whitespace character is `#`
+are comments.
+
+- The tracked hooks require `core.hooksPath` to be `.githooks`.
+- `.githooks/pre-commit` scans staged content in added, copied, modified, and
+  renamed files.
+- `.githooks/commit-msg` scans the final commit message after attribution
+  trailers are removed.
+- Matching is case-insensitive. Identifier-like terms match complete
+  identifiers; phrases and punctuation-containing terms match literal text.
+- Set `CLAWPERATOR_BLOCKED_TERMS_FILE` only when the terms file must live at a
+  different local path.
+- A missing terms file allows the commit. An unreadable configured path blocks
+  it to avoid an accidental bypass.
+- Do not use `--no-verify`, which bypasses the protection.
+
+Verify the configuration and regression coverage with:
+
+```bash
+git config --get core.hooksPath
+./validation/test_blocked_terms_policy.sh
+```
+
+Before release or force-push events, run a blocked-term scan and verify clean history.
 
 ## Coding and Commit Conventions
 - Use Conventional Commits (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`).

@@ -22,6 +22,14 @@ fi
 # shellcheck source=/dev/null
 source "$policy_file"
 
+blocked_terms_policy_file="$repo_root/validation/blocked_terms_policy.sh"
+if [[ ! -f "$blocked_terms_policy_file" ]]; then
+  echo "blocked-terms policy file not found: $blocked_terms_policy_file" >&2
+  exit 1
+fi
+# shellcheck source=/dev/null
+source "$blocked_terms_policy_file"
+
 lines=()
 while IFS= read -r line || [[ -n "$line" ]]; do
   if is_forbidden_attribution_line "$line"; then
@@ -45,3 +53,5 @@ done
     printf '%s\n' "$line"
   done
 } > "$message_file"
+
+blocked_terms_policy_scan_commit_message "$message_file"

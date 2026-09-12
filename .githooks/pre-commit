@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+policy_file="$repo_root/validation/blocked_terms_policy.sh"
+if [[ ! -f "$policy_file" ]]; then
+  echo "[blocked-terms] policy file not found: $policy_file" >&2
+  exit 1
+fi
+# shellcheck source=/dev/null
+source "$policy_file"
+
+blocked_terms_policy_scan_staged_content
