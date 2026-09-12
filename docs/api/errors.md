@@ -233,7 +233,11 @@ Recovery:
 
 The on-screen log actions can return these exact per-step failure codes. When
 one of these codes is the first failed step, Node also copies it to
-`envelope.errorCode` during result reconciliation.
+`envelope.errorCode` during result reconciliation. The
+[`on-screen-log set` and `clear` commands](on-screen-logs.md#cli-commands)
+return the same execution errors. CLI syntax failures use structured `USAGE`
+errors; canonical panel validation uses `EXECUTION_VALIDATION_FAILED`.
+Neither command replays a mutation after an uncertain daemon dispatch.
 
 | Code | Meaning | Recovery |
 | --- | --- | --- |

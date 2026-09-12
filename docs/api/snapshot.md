@@ -246,6 +246,8 @@ Fields to note:
   successful Android snapshot. It reports only whether the Operator-owned
   on-screen log panel is visible. It does not replace `has_overlay`,
   `overlay_package`, or `window_count`, which retain their raw runtime meaning.
+  This is also the visibility check after the [CLI set/clear commands](on-screen-logs.md#cli-commands);
+  it does not verify screenshot pixels.
 - `terminalSource: "clawperator_result"` and `isCanonicalTerminal: true`
   are outer-envelope fields added by the terminal output layer; they are not
   part of the `envelope` sub-object.

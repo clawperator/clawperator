@@ -253,7 +253,8 @@ Then `runExecution()` applies full execution validation. See [Actions](actions.m
 to the canonical action types. It does not provide separate panel endpoints,
 accept case or whitespace variants, or translate on-screen log parameter
 aliases. See [On-screen logs](on-screen-logs.md) for the raw payload contract
-and result fields.
+and result fields. The `on-screen-log set` and `clear` CLI commands are
+conveniences over these same actions, not additional HTTP routes.
 
 Representative serve-layer `400` wrappers for this route:
 

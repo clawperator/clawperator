@@ -291,6 +291,8 @@ Validation boundary:
 
 Use [Actions](actions.md) for canonical action types and params, and
 [On-screen logs](on-screen-logs.md) for the panel-specific raw contract.
+The `on-screen-log set` and `clear` conveniences are CLI commands; MCP clients
+continue to use `execute` with the same canonical action parameters.
 
 <a id="mcp-tool-configure"></a>
 ### `configure`

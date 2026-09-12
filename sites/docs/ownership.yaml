@@ -135,6 +135,9 @@ command_details:
   mcp:
     href: mcp.md
     label: MCP server
+  on-screen-log:
+    href: on-screen-logs.md#cli-commands
+    label: On-screen logs
   logs:
     href: logging.md#the-clawperator-logs-command
     label: Logging

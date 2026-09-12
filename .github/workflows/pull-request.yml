@@ -155,3 +155,11 @@ jobs:
 
       - name: Run install validation suite
         run: CLAWPERATOR_INSTALL_SKIP_NODE_TESTS=1 bash validation/install/test_install.sh
+
+      - name: Run on-screen log CLI proof harness tests
+        run: bash validation/on-screen-logs/test_cli_contract_proof.sh
+
+      - name: Build and run on-screen log public command tests
+        run: |
+          npm --prefix apps/node run build
+          node --test apps/node/dist/test/unit/onScreenLogCommand.test.js

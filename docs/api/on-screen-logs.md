@@ -25,9 +25,9 @@ attempts to attach a window.
 
 ## Raw Actions
 
-Use canonical lower-case action names in stored execution payloads. There is no
-separate CLI convenience command, HTTP endpoint, or MCP tool for this feature.
-Existing generic execution transports carry the same raw action list.
+Use canonical lower-case action names in stored execution payloads. The CLI
+commands below map to the same actions. There is no separate HTTP endpoint or
+MCP tool; existing generic execution transports carry the same raw action list.
 
 | Canonical action | Exact Node input alias | Purpose | Parameters |
 | --- | --- | --- | --- |
@@ -80,6 +80,66 @@ table and validation limits.
   ]
 }
 ```
+
+## CLI Commands
+
+`on-screen-log set` shows or fully replaces the panel. `on-screen-log clear`
+removes it, including when it is already hidden. Both use the canonical action
+validator and the normal mutation execution path.
+
+```bash
+clawperator on-screen-log set --text "FLOW-001: Observe settings" --anchor right --text-align left --top-offset-dp 24 --edge-offset-dp 12 --width-dp 280 --font-size-sp 12 --text-color '#FFFFFFFF' --background-color '#B3000000' --ttl-ms 300000 --device <device_serial>
+clawperator on-screen-log clear --device <device_serial>
+```
+
+| Set flag | Raw field |
+| --- | --- |
+| `--text` (required) | `text` |
+| `--anchor` | `anchor` |
+| `--text-align` | `textAlign` |
+| `--top-offset-dp` | `topOffsetDp` |
+| `--edge-offset-dp` | `edgeOffsetDp` |
+| `--width-dp` | `widthDp` |
+| `--font-size-sp` | `fontSizeSp` |
+| `--text-color` | `textColor` |
+| `--background-color` | `backgroundColor` |
+| `--ttl-ms` | `ttlMs` |
+
+The [raw parameter limits and defaults](actions.md#action-set-on-screen-log)
+apply unchanged. Omitted flags remain omitted until canonical defaults apply;
+zero offsets are preserved. Numeric flags accept a complete integral JSON
+number token, including `12.0` and `1e3`. Blank, hexadecimal, fractional,
+nonfinite, and suffix-bearing tokens such as `12px` are rejected before dispatch.
+Text preserves whitespace and newlines within the API's validation limits.
+
+Clear accepts only common execution/output options. Both commands reject extra
+positional arguments, unknown flags, and missing values. Set also rejects
+repeated panel flags. Syntax errors return structured errors with nonzero status;
+canonical parameter violations return `EXECUTION_VALIDATION_FAILED`.
+
+Common options include `--device`, `--operator-package`, `--timeout`,
+`--output json|pretty`, and `--no-daemon`, before or after the command.
+For local debug builds, pass `--operator-package com.clawperator.operator.dev`.
+JSON is the default and wraps the normal execution result under `envelope`;
+step data uses exactly the string-valued keys below. The host `logs` command
+is unchanged.
+
+Both commands permit direct fallback only when the daemon has not dispatched.
+An uncertain post-dispatch result is never automatically replayed; explicit
+`--no-daemon` runs the same validated payload directly.
+
+For visible capture, await each command separately:
+
+```bash
+clawperator on-screen-log set --text "FLOW-001: Before" --device <device_serial>
+clawperator screenshot --path <absolute_before_png> --device <device_serial>
+clawperator on-screen-log set --text "FLOW-001: After" --anchor right --device <device_serial>
+clawperator screenshot --path <absolute_after_png> --device <device_serial>
+clawperator on-screen-log clear --device <device_serial>
+```
+
+Inspect the images independently. Successful draw acknowledgement does not
+promise that a compositor capture includes that generation.
 
 ## Replacement and Lifetime
 

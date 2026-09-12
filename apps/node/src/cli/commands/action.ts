@@ -10,7 +10,8 @@ import { buildScrollExecution } from "../../domain/actions/scroll.js";
 import { buildScrollUntilExecution } from "../../domain/actions/scrollUntil.js";
 import { buildCloseAppExecution } from "../../domain/actions/closeApp.js";
 import { buildSleepExecution } from "../../domain/actions/sleep.js";
-import type { Execution } from "../../contracts/execution.js";
+import { buildOnScreenLogExecution } from "../../domain/actions/onScreenLog.js";
+import type { ActionParams, Execution } from "../../contracts/execution.js";
 import type { NodeMatcher } from "../../contracts/selectors.js";
 import type { OutputOptions } from "../output.js";
 import { formatError, formatRunExecutionResultForCli } from "../output.js";
@@ -27,6 +28,20 @@ interface ActionCommandOptions {
   logger?: Logger;
   tryDaemonExecutionFn?: typeof tryDaemonExecution;
   runExecutionFn?: typeof runExecution;
+}
+
+export async function cmdOnScreenLog(options: ActionCommandOptions & {
+  operation: "set" | "clear";
+  params?: ActionParams;
+}): Promise<string> {
+  try {
+    return await runActionExecution(
+      buildOnScreenLogExecution(options.operation, options.params, options.timeoutMs),
+      options,
+    );
+  } catch (error) {
+    return formatError(error, options);
+  }
 }
 
 async function runActionExecution(execution: Execution, options: ActionCommandOptions): Promise<string> {

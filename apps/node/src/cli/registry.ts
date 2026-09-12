@@ -1946,6 +1946,117 @@ COMMANDS["close"] = {
   handler: async (ctx) => closeHandler(ctx),
 };
 
+export const ON_SCREEN_LOG_FLAGS = {
+  "--text": "text",
+  "--anchor": "anchor",
+  "--text-align": "textAlign",
+  "--top-offset-dp": "topOffsetDp",
+  "--edge-offset-dp": "edgeOffsetDp",
+  "--width-dp": "widthDp",
+  "--font-size-sp": "fontSizeSp",
+  "--text-color": "textColor",
+  "--background-color": "backgroundColor",
+  "--ttl-ms": "ttlMs",
+} as const;
+
+const ON_SCREEN_LOG_NUMERIC_FLAGS = new Set([
+  "--top-offset-dp", "--edge-offset-dp", "--width-dp", "--font-size-sp", "--ttl-ms",
+]);
+
+export function parseOnScreenLogArgs(rest: string[]): {
+  operation: "set" | "clear";
+  params?: import("../contracts/execution.js").ActionParams;
+} {
+  const operation = rest[0];
+  if (operation !== "set" && operation !== "clear") {
+    throw new UsageError("on-screen-log requires the subcommand set or clear");
+  }
+  const params: Record<string, string | number> = {};
+  const seen = new Set<string>();
+  for (let i = 1; i < rest.length; i += 1) {
+    const flag = rest[i];
+    if (operation === "clear" || !Object.hasOwn(ON_SCREEN_LOG_FLAGS, flag)) {
+      throw new UsageError(`Unexpected argument for on-screen-log ${operation}: ${flag}`);
+    }
+    if (seen.has(flag)) {
+      throw new UsageError(`${flag} must be supplied only once`);
+    }
+    seen.add(flag);
+    let value = rest[++i];
+    if (value === "--") value = rest[++i];
+    else if (value?.startsWith("--")) {
+      throw new UsageError(`${flag} requires a value`);
+    }
+    if (value === undefined) throw new UsageError(`${flag} requires a value`);
+    const field = ON_SCREEN_LOG_FLAGS[flag as keyof typeof ON_SCREEN_LOG_FLAGS];
+    if (ON_SCREEN_LOG_NUMERIC_FLAGS.has(flag)) {
+      // Parse the complete decimal token; range/default rules belong to the executor.
+      if (!/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(value)
+          || !Number.isFinite(Number(value)) || !Number.isInteger(Number(value))) {
+        throw new UsageError(`${flag} requires a finite integral decimal number`);
+      }
+      params[field] = Number(value);
+    } else {
+      params[field] = value;
+    }
+  }
+  if (operation === "set" && params.text === undefined) {
+    throw new UsageError("on-screen-log set requires --text");
+  }
+  return operation === "set" ? { operation, params } : { operation };
+}
+
+const HELP_ON_SCREEN_LOG = `clawperator on-screen-log set|clear
+
+Usage:
+  clawperator on-screen-log set --text <text> [panel options] [common options]
+  clawperator on-screen-log clear [common options]
+
+Panel options (set only, each at most once):
+  --text <text>                  Required plain text, 1-2048 UTF-16 code units
+  --anchor <left|right>          Physical horizontal edge (default left)
+  --text-align <left|right>      Alignment inside the panel (default left)
+  --top-offset-dp <number>       0-1000, default 8
+  --edge-offset-dp <number>      0-1000, default 8
+  --width-dp <number>            80-600, default 280, including padding
+  --font-size-sp <number>        8-24, default 12
+  --text-color <hex>             #RRGGBB or #AARRGGBB, default #FFFFFFFF
+  --background-color <hex>       #RRGGBB or #AARRGGBB, default #B3000000
+  --ttl-ms <number>              1000-3600000, default 300000
+
+Common options:
+  --device <id> --operator-package <pkg> --timeout <ms>
+  --output <json|pretty> --no-daemon
+
+Examples:
+  clawperator on-screen-log set --text "FLOW-001: Observe settings" --anchor right
+  clawperator on-screen-log clear
+
+Notes:
+  - Numeric tokens use integral decimal/exponent syntax; zero offsets are preserved.
+  - Set replaces all text/style; omitted fields reset to defaults. Clear is idempotent.
+  - rendered=true acknowledges a draw, not screenshot pixels.
+  - Await separate set, screenshot, replacement, screenshot, and clear executions for capture.
+  - An uncertain dispatch is never automatically replayed.
+`;
+
+COMMANDS["on-screen-log"] = {
+  name: "on-screen-log",
+  group: "Device Interaction",
+  summary: "Show, replace, or clear a static on-device diagnostic panel",
+  topLevelBlock: "  on-screen-log set|clear [--device <id>] [--operator-package <pkg>]     Show, replace, or clear an on-device diagnostic panel",
+  help: HELP_ON_SCREEN_LOG,
+  subtopics: { set: HELP_ON_SCREEN_LOG, clear: HELP_ON_SCREEN_LOG },
+  documentedFlags: [...Object.keys(ON_SCREEN_LOG_FLAGS), "--no-daemon"],
+  supportedFlags: rest => rest[0] === "set" ? [...Object.keys(ON_SCREEN_LOG_FLAGS), "--no-daemon"] : ["--no-daemon"],
+  handler: async ({ rest, format, deviceId, operatorPackage, timeoutMs, noDaemon, logger }) => {
+    const parsed = parseOnScreenLogArgs(rest);
+    return (await import("./commands/action.js")).cmdOnScreenLog({
+      ...parsed, format, deviceId, operatorPackage, timeoutMs, noDaemon, logger,
+    });
+  },
+};
+
 COMMANDS["sleep"] = {
   name: "sleep",
   group: "Device Interaction",
