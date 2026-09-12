@@ -88,3 +88,29 @@ Android debug APK build, and the documentation build (32 navigation pages and
 confirmed that the zero-duration observation is retained alongside the partial
 status. The supported-image manual release CI and separate runtime release gates
 remain outside this feature's completion claim.
+
+
+## On-screen log recording verification
+
+A follow-up on the same dedicated API 36 emulator verified the merged on-screen
+log API against actual video pixels. The panel was initially absent. A separate
+`on-screen-log set` displayed a purple, right-anchored BEFORE label before video
+start. While recording, separate acknowledged set commands replaced it with a
+blue, left-anchored UPDATED label and then a green, right-anchored FINAL label.
+All three generations appeared with the intended text, color and position in the
+decoded MP4 frames. No recorder-side overlay composition or API change was needed.
+
+The owned recording stopped successfully with verified 574x1280 H.264 media.
+Artifact hashes and byte counts matched the saved files. Host capture lasted
+approximately 10.26 seconds; the media timeline was 6.716 seconds and contained
+six frames. The final update appeared in the last decoded frame at 6.704 seconds.
+One-second sampling omitted that final generation, so validation inspected the
+original decoded frames rather than relying only on a resampled contact sheet.
+This retains the documented idle-encoder timing limitation.
+
+After stop, a separate screenshot still showed the green FINAL panel and snapshot
+metadata reported `operator_overlay_visible: "true"`. Capture had not cleared or
+replaced the caller-owned panel. The test then explicitly cleared its own panel;
+a following snapshot reported `operator_overlay_visible: "false"`. Recording,
+frames, command receipts and post-stop screenshots remain in private local
+artifacts rather than tracked source.
