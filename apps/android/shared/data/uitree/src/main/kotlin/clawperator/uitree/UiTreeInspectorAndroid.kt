@@ -230,5 +230,6 @@ fun buildUiWindowMetadata(
         hasOverlay = overlayPackage != null,
         overlayPackage = overlayPackage,
         windowCount = windows.size,
+        operatorOverlayVisible = operatorOverlayIdentity.isOperatorOverlayVisible,
     )
 }

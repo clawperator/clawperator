@@ -12,8 +12,8 @@
 
 | Phase | Status | Commit |
 | --- | --- | --- |
-| 1 - Android Controller and Mechanism Proof | passed | recorded by the pending Phase 1 commit |
-| 2 - Raw Execution Contract and Public Documentation | pending | - |
+| 1 - Android Controller and Mechanism Proof | passed | `fdb2b12` |
+| 2 - Raw Execution Contract and Public Documentation | passed | pending Phase 2 commit |
 
 ## Validation
 
@@ -28,6 +28,15 @@
 | `ffprobe -v error -show_entries format=duration,size .../on-screen-log-phase1.mp4` | 0 | The pulled recording finalized and was playable: 4.952756 seconds, 1,641,686 bytes. Extracted frames were visually inspected. | ignored local Phase 1 output |
 | `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` | 0 | The branch-local snapshot retained the foreground app hierarchy while the panel was shown. | ignored local interaction output |
 | `node apps/node/dist/cli/index.js exec <read-hidden-label.json> --device <device_serial> --operator-package com.clawperator.operator.dev --output json` | 1, expected | A normal `read_text` action could not match the panel-only label. | terminal envelope: `No UI node found matching criteria` |
+| `npm --prefix apps/node run build` | 0 | The branch-local Node package compiles with the two raw actions and strict validator. | npm output |
+| `npm --prefix apps/node run test` | 0 | All 271 Node tests passed, including raw validation, Serve, MCP, and failed-envelope coverage. | npm output |
+| `./gradlew app:assembleDebug app:testDebugUnitTest app:installDebug` | 0 | The debug app rebuilt, app unit tests passed, and the debug APK installed on the available emulator targets. | Gradle output |
+| `./gradlew shared:data:operator:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | Android parser, action-engine result mapping, controller, and window-metadata suites remain green. | Gradle output |
+| `bash validation/on-screen-logs/test_phase2_contract.sh` | 0 | Both generic raw fixtures validate through the branch-local CLI and normalize colors; the generic `value` alias is rejected. | validation script output |
+| `./scripts/docs_build.sh` | 0 | Authored API pages, navigation, generated docs, and machine-facing documentation build successfully. | docs build output |
+| `node apps/node/dist/cli/index.js doctor --device <device_serial> --operator-package com.clawperator.operator.dev --output json` | 0 | The selected debug Operator was compatible, accessible, interactive, and ready for raw execution. | terminal observation |
+| `node apps/node/dist/cli/index.js exec <raw-set-screenshot-clear.json> --device <device_serial> --operator-package com.clawperator.operator.dev --no-daemon --output json` | 0 | The default raw set, screenshot, and clear actions returned their exact normal result shapes. | ignored local Phase 2 screenshots and terminal output |
+| Separate raw set, screenshot, replacement, screenshot, clear, and expiry executions with explicit `<device_serial>` | 0 except expected hidden-label lookup | Visible capture, replacement, raw snapshot metadata, clear, expiry, and selector isolation were observed on the debug Operator. | ignored local Phase 2 screenshots and terminal output |
 
 ## Live Observations
 
@@ -41,6 +50,11 @@
 - The draw acknowledgement was sufficient to order the immediate observed screenshots on this API 35 target. This is evidence for the tested sequence only. It remains a draw callback, not a compositor or capture-frame guarantee.
 - Android's standalone `uiautomator dump` temporarily replaced the active accessibility-service environment and destroyed the debug service during exploratory testing. The repeatable harness deliberately uses the branch-local `snapshot` path, `dumpsys`, screenshots, and screen recording instead. No claim depends on that disruptive tool.
 - When only the panel was visible, this target's service window list omitted the panel and preserved raw snapshot metadata as `has_overlay=false`, `window_count=2`. When the keyboard was present, it correctly reported the unrelated input-method overlay. This is why Phase 2 must add a separately identified controller-owned visibility field without changing existing raw metadata semantics.
+- Phase 2 raw set with only `text` returned the required defaults and acknowledgement: `visible=true`, `rendered=true`, `truncated=false`, left/left alignment, `8` dp offsets, `280` dp width, `12` sp text, normalized defaults, `300000` ms TTL, and observed bounds `[21,157][756,236]` on the selected API 35 target.
+- A raw snapshot while the baseline panel was visible returned `operator_overlay_visible=true` while preserving the raw metadata values `has_overlay=false` and `window_count=2`. A normal raw `read_text` lookup for the displayed label returned no UI node, so the panel text did not enter the app hierarchy.
+- The raw custom replacement returned normalized colors `#FFA1B2C3` and `#7F0A0B0C`, right/right alignment, and bounds `[198,199][1038,290]`. The separate full-display screenshot visibly contained only the replacement label on the physical right, with its custom text and background colors.
+- A raw clear returned exactly `visible=false` without `rendered`. A separate raw panel with `ttlMs=1000` returned rendered successfully; after two seconds, a raw snapshot reported `operator_overlay_visible=false`, proving local generation-scoped expiry without host-driven updates.
+- The required single raw payload ordering set -> screenshot -> clear returned a successful screenshot path but its resulting image had no panel. Source inspection and this live result agree: the existing Node screenshot capture finalizes after the Android action list returns, so clear has already run. Separate raw executions set -> screenshot -> clear captured both the baseline and replacement labels correctly. This timing limitation is documented rather than hidden.
 
 ## Decisions and Deviations
 
@@ -49,10 +63,14 @@
 - The implementation uses `TYPE_ACCESSIBILITY_OVERLAY`, a custom non-accessible View, `FLAG_NOT_TOUCHABLE`, `FLAG_NOT_FOCUSABLE`, and no `FLAG_SECURE`. It has no ticking timer, host-driven elapsed update, application-overlay fallback, or persistent state.
 - API 21 fails closed with `ON_SCREEN_LOG_RENDER_FAILED` before attempting to attach. `TYPE_ACCESSIBILITY_OVERLAY` is introduced on API 22, so raising the project minimum SDK or using a different overlay mechanism would not meet the specified contract.
 - Phase 1 deliberately does not publish `operator_overlay_visible` in snapshot data. It wires exact identity without altering raw metadata. The string-valued public output belongs to Phase 2 with the normal raw execution contract.
+- Phase 2 adds strict canonical-only action handling in `apps/node/src/contracts/aliases.ts` and `apps/node/src/contracts/inputAliases.ts`, strict Node validation and structured error promotion in `apps/node/src/domain/executions/validateExecution.ts` and `apps/node/src/domain/executions/runExecution.ts`, plus Android parser/action-engine integration. These exact additional PR-1 paths are included in the review scope because they preserve the same contract across raw CLI, Serve, and MCP transport.
+- The existing screenshot execution pipeline was not redesigned. Its same-payload ordering limitation is a documented follow-up boundary, not a reason to add a parallel transport, host-owned renderer, or temporary ingress in PR-1.
 
 ## Remaining Limitations
 
 - Live interaction and capture proof ran only on the selected API 35 emulator. API 21 has a unit-tested fail-closed path; API 22 through API 34 were not live-tested.
 - The API 21-22 view path uses an invisible left-to-right mark per paragraph to preserve physical alignment. The API 22 behavior is covered by a Robolectric test but not a device capture.
 - The mechanism is proven for the tested screenshot and recording sequence, not as a general compositor-synchronization guarantee.
-- Phase 2 will add raw actions, Android action dispatch, public result data, transport tests, and documentation. It must preserve this Phase 1 behavior and must not add the PR-2 CLI convenience command.
+- The Phase 2 live proof used the branch-local raw CLI and one API 35 emulator. Serve and MCP transport coverage uses local test doubles through the same Node executor, not a real remote client/device run.
+- A single raw execution that orders `set_on_screen_log`, `take_screenshot`, and `clear_on_screen_log` cannot currently guarantee that the output file contains the label because host screenshot capture finalizes after Android completes the list. PR-1 documents and proves the separate-execution workaround. Any interleaved capture redesign requires a separate design decision and is out of scope for PR-1.
+- PR-2 remains blocked until PR-1 merges and the user explicitly requests continuation. No CLI convenience command was started.

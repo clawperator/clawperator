@@ -41,6 +41,8 @@ export const CANONICAL_ACTION_TYPES = [
   "press_key",
   "wait_for_navigation",
   "read_key_value_pair",
+  "set_on_screen_log",
+  "clear_on_screen_log",
 ] as const;
 
 export type CanonicalActionType = (typeof CANONICAL_ACTION_TYPES)[number];
@@ -50,9 +52,7 @@ export type CanonicalActionType = (typeof CANONICAL_ACTION_TYPES)[number];
  * Returns canonical type or throws if unknown.
  */
 export function normalizeActionType(input: string): CanonicalActionType {
-  const normalized = input.trim().toLowerCase();
-  const canonical =
-    ACTION_ALIAS_TO_CANONICAL[normalized] ?? normalized;
+  const canonical = getCanonicalActionType(input);
   if (!CANONICAL_ACTION_TYPES.includes(canonical as CanonicalActionType)) {
     throw new Error(`Unsupported action type: ${input}`);
   }
@@ -61,5 +61,14 @@ export function normalizeActionType(input: string): CanonicalActionType {
 
 export function getCanonicalActionType(input: string): string {
   const normalized = input.trim().toLowerCase();
-  return ACTION_ALIAS_TO_CANONICAL[normalized] ?? normalized;
+  const canonical = ACTION_ALIAS_TO_CANONICAL[normalized] ?? normalized;
+  if (
+    (canonical === "set_on_screen_log" || canonical === "clear_on_screen_log") &&
+    input !== canonical
+  ) {
+    // These raw actions are intentionally canonical-only. Do not let the general
+    // convenience normalizer turn case or whitespace variants into valid ingress.
+    return input;
+  }
+  return canonical;
 }

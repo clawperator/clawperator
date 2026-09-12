@@ -129,11 +129,19 @@ function normalizeExecutionActionInput(input: unknown): unknown {
   }
 
   const normalized = { ...input };
+  let canonicalActionType: string | undefined;
   if (typeof normalized.type === "string") {
-    normalized.type = getCanonicalActionType(normalized.type);
+    canonicalActionType = getCanonicalActionType(normalized.type);
+    normalized.type = canonicalActionType;
   }
   if ("params" in normalized) {
-    normalized.params = normalizeActionParamsInput(normalized.params);
+    // The on-screen log actions deliberately have no parameter aliases. Their
+    // schema is a strict public boundary, so generic conveniences such as
+    // `value` -> `text` must be rejected instead of silently accepted.
+    normalized.params =
+      canonicalActionType === "set_on_screen_log" || canonicalActionType === "clear_on_screen_log"
+        ? normalized.params
+        : normalizeActionParamsInput(normalized.params);
   }
   return normalized;
 }

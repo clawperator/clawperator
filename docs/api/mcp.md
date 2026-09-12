@@ -284,8 +284,12 @@ Validation boundary:
 - MCP only enforces `actions` presence plus `id` and `type` on each element
 - the full action contract is enforced later by `validateExecution()`
 - MCP rejects caller-controlled `take_screenshot` `path` values so an MCP client cannot choose arbitrary host write locations
+- `set_on_screen_log` and `clear_on_screen_log` use their exact lower-case
+  canonical names and strict parameter objects when passed through this generic
+  tool; MCP does not expose separate panel tools or translate aliases for them
 
-Use [Actions](actions.md) for canonical action types and params.
+Use [Actions](actions.md) for canonical action types and params, and
+[On-screen logs](on-screen-logs.md) for the panel-specific raw contract.
 
 <a id="mcp-tool-configure"></a>
 ### `configure`

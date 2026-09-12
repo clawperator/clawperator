@@ -1,0 +1,16 @@
+{
+  "commandId": "on-screen-log-invalid-value-alias",
+  "taskId": "on-screen-log-invalid-value-alias",
+  "source": "validation",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 30000,
+  "actions": [
+    {
+      "id": "invalid-set",
+      "type": "set_on_screen_log",
+      "params": {
+        "value": "This generic alias is not accepted"
+      }
+    }
+  ]
+}

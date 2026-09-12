@@ -53,6 +53,12 @@ type BroadcastFn = (beginDispatchCapture: () => void) => Promise<BroadcastResult
 
 const SNAPSHOT_ACTION_TYPE = "snapshot";
 const LEGACY_ANDROID_SNAPSHOT_ACTION_TYPE = "snapshot_ui";
+const ON_SCREEN_LOG_RUNTIME_ERROR_CODES = new Set<string>([
+  ERROR_CODES.ON_SCREEN_LOG_SERVICE_UNAVAILABLE,
+  ERROR_CODES.ON_SCREEN_LOG_LAYOUT_INVALID,
+  ERROR_CODES.ON_SCREEN_LOG_RENDER_FAILED,
+  ERROR_CODES.ON_SCREEN_LOG_RENDER_TIMEOUT,
+]);
 
 function isSnapshotActionType(actionType: string): boolean {
   return actionType === SNAPSHOT_ACTION_TYPE || actionType === LEGACY_ANDROID_SNAPSHOT_ACTION_TYPE;
@@ -250,6 +256,14 @@ export function reconcileEnvelopeStatusAfterPostProcessing(envelope: ResultEnvel
     const errKey = firstFailed.data?.error;
     const detail = errKey !== undefined && errKey !== "" ? `: ${errKey}` : "";
     envelope.error = `Step ${firstFailed.id} (${firstFailed.actionType}) failed${detail}`;
+    if (
+      typeof errKey === "string" &&
+      ON_SCREEN_LOG_RUNTIME_ERROR_CODES.has(errKey)
+    ) {
+      envelope.errorCode = errKey;
+    } else {
+      delete envelope.errorCode;
+    }
     delete envelope.hint;
   } else {
     envelope.status = "success";

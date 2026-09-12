@@ -317,6 +317,39 @@ describe("mcp stdio integration", () => {
     assert.ok(payload.envelope);
   });
 
+  it("carries strict set_on_screen_log fields through the execute tool", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("execute", {
+      deviceId: "non-existent",
+      timeoutMs: 1000,
+      actions: [
+        {
+          id: "set-panel",
+          type: "set_on_screen_log",
+          params: {
+            text: "FLOW-001: Observe settings",
+            anchor: "right",
+            textAlign: "left",
+            topOffsetDp: 0,
+            edgeOffsetDp: 12,
+            widthDp: 320,
+            fontSizeSp: 16,
+            textColor: "#a1b2c3",
+            backgroundColor: "#7f0a0b0c",
+            ttlMs: 12000,
+          },
+        },
+      ],
+    });
+
+    // The generic MCP action schema leaves field validation to the canonical executor. A
+    // device-resolution error therefore proves these exact raw fields passed that boundary.
+    const payload = parseToolPayload(result) as { code?: string };
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(payload.code, "DEVICE_NOT_FOUND");
+  });
+
   it("configure with no args returns empty session state", async () => {
     await client.initialize();
 

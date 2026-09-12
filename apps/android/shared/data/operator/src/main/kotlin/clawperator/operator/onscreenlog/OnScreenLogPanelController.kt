@@ -18,6 +18,7 @@ import clawperator.task.runner.OnScreenLogBounds
 import clawperator.task.runner.OnScreenLogContract
 import clawperator.task.runner.OnScreenLogController
 import clawperator.task.runner.OnScreenLogControllerResult
+import clawperator.task.runner.OnScreenLogErrorCodes
 import clawperator.task.runner.OnScreenLogGeometry
 import clawperator.task.runner.OnScreenLogLayoutException
 import clawperator.task.runner.OnScreenLogPanelGeometry
@@ -75,10 +76,6 @@ class OnScreenLogPanelController internal constructor(
     companion object {
         private const val TAG = "[OnScreenLogPanel]"
         private const val WINDOW_TITLE_PREFIX = "clawperator.on_screen_log"
-        private const val ERROR_SERVICE_UNAVAILABLE = "ON_SCREEN_LOG_SERVICE_UNAVAILABLE"
-        private const val ERROR_LAYOUT_INVALID = "ON_SCREEN_LOG_LAYOUT_INVALID"
-        private const val ERROR_RENDER_FAILED = "ON_SCREEN_LOG_RENDER_FAILED"
-        private const val ERROR_RENDER_TIMEOUT = "ON_SCREEN_LOG_RENDER_TIMEOUT"
     }
 
     private val operationMutex = Mutex()
@@ -188,7 +185,7 @@ class OnScreenLogPanelController internal constructor(
             val normalized = OnScreenLogContract.normalize(spec)
             if (drawAcknowledgementTimeoutMs <= 0L) {
                 return@withLock OnScreenLogControllerResult.Failure(
-                    errorCode = ERROR_RENDER_TIMEOUT,
+                    errorCode = OnScreenLogErrorCodes.RENDER_TIMEOUT,
                     message = "No execution time remains for draw acknowledgement",
                 )
             }
@@ -200,17 +197,17 @@ class OnScreenLogPanelController internal constructor(
                 withContext(Dispatchers.Main.immediate) {
                     val currentService = service
                         ?: return@withContext OnScreenLogControllerResult.Failure(
-                            errorCode = ERROR_SERVICE_UNAVAILABLE,
+                            errorCode = OnScreenLogErrorCodes.SERVICE_UNAVAILABLE,
                             message = "The Operator accessibility service is not connected",
                         )
                     val host = windowHost
                         ?: return@withContext OnScreenLogControllerResult.Failure(
-                            errorCode = ERROR_SERVICE_UNAVAILABLE,
+                            errorCode = OnScreenLogErrorCodes.SERVICE_UNAVAILABLE,
                             message = "The Operator accessibility window manager is unavailable",
                         )
                     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP_MR1) {
                         return@withContext OnScreenLogControllerResult.Failure(
-                            errorCode = ERROR_RENDER_FAILED,
+                            errorCode = OnScreenLogErrorCodes.RENDER_FAILED,
                             message = "Accessibility overlay windows require Android API 22 or later",
                         )
                     }
@@ -220,7 +217,7 @@ class OnScreenLogPanelController internal constructor(
                             preparePanel(currentService, normalized)
                         } catch (error: OnScreenLogLayoutException) {
                             return@withContext OnScreenLogControllerResult.Failure(
-                                errorCode = ERROR_LAYOUT_INVALID,
+                                errorCode = OnScreenLogErrorCodes.LAYOUT_INVALID,
                                 message = error.message ?: "Panel does not fit the usable display bounds",
                             )
                         }
@@ -245,7 +242,7 @@ class OnScreenLogPanelController internal constructor(
                         Log.e(error, "$TAG add_or_update failed generation=$nextGeneration")
                         removePanel(reason = "render_attach_failed")
                         return@withContext OnScreenLogControllerResult.Failure(
-                            errorCode = ERROR_RENDER_FAILED,
+                            errorCode = OnScreenLogErrorCodes.RENDER_FAILED,
                             message = "The panel window could not be attached or updated",
                         )
                     }
@@ -255,7 +252,7 @@ class OnScreenLogPanelController internal constructor(
                     if (remainingAcknowledgementMs <= 0L) {
                         removePanel(reason = "render_deadline_elapsed")
                         return@withContext OnScreenLogControllerResult.Failure(
-                            errorCode = ERROR_RENDER_TIMEOUT,
+                            errorCode = OnScreenLogErrorCodes.RENDER_TIMEOUT,
                             message = "The panel did not complete a draw before the acknowledgement deadline",
                         )
                     }
@@ -273,7 +270,7 @@ class OnScreenLogPanelController internal constructor(
                     if (!acknowledged) {
                         removePanel(reason = "render_not_acknowledged")
                         return@withContext OnScreenLogControllerResult.Failure(
-                            errorCode = ERROR_RENDER_TIMEOUT,
+                            errorCode = OnScreenLogErrorCodes.RENDER_TIMEOUT,
                             message = "The panel did not complete a draw before the acknowledgement deadline",
                         )
                     }
@@ -308,7 +305,7 @@ class OnScreenLogPanelController internal constructor(
                     removePanel(reason = "render_failed")
                 }
                 OnScreenLogControllerResult.Failure(
-                    errorCode = ERROR_RENDER_FAILED,
+                    errorCode = OnScreenLogErrorCodes.RENDER_FAILED,
                     message = "The panel renderer failed before acknowledgement",
                 )
             }

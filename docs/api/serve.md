@@ -247,6 +247,12 @@ Operator package resolution:
 
 Then `runExecution()` applies full execution validation. See [Actions](actions.md), [Selectors](selectors.md), and [API Overview](overview.md).
 
+`/execute` is also the generic HTTP transport for `set_on_screen_log` and
+`clear_on_screen_log`. Send their exact canonical action names inside
+`execution.actions`; this route does not provide separate panel endpoints or
+translate their action or parameter aliases. See [On-screen logs](on-screen-logs.md)
+for the raw payload contract and result fields.
+
 Representative serve-layer `400` wrappers for this route:
 
 ```json

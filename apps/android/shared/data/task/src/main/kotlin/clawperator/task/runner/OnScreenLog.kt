@@ -161,6 +161,14 @@ object OnScreenLogContract {
     }
 }
 
+/** Stable action-result codes shared by the parser, renderer, and public execution result. */
+object OnScreenLogErrorCodes {
+    const val SERVICE_UNAVAILABLE = "ON_SCREEN_LOG_SERVICE_UNAVAILABLE"
+    const val LAYOUT_INVALID = "ON_SCREEN_LOG_LAYOUT_INVALID"
+    const val RENDER_FAILED = "ON_SCREEN_LOG_RENDER_FAILED"
+    const val RENDER_TIMEOUT = "ON_SCREEN_LOG_RENDER_TIMEOUT"
+}
+
 /** Inclusive-exclusive physical screen rectangle in pixels. */
 data class OnScreenLogBounds(
     val left: Int,
@@ -265,4 +273,21 @@ interface OnScreenLogController {
     ): OnScreenLogControllerResult
 
     suspend fun clear(): OnScreenLogControllerResult
+}
+
+/**
+ * Test/default implementation for action-engine construction outside the Operator dependency
+ * graph. Production binds the service-owned implementation from the Operator module.
+ */
+object OnScreenLogControllerNoOp : OnScreenLogController {
+    override suspend fun set(
+        spec: OnScreenLogSpec,
+        drawAcknowledgementTimeoutMs: Long,
+    ): OnScreenLogControllerResult =
+        OnScreenLogControllerResult.Failure(
+            errorCode = OnScreenLogErrorCodes.SERVICE_UNAVAILABLE,
+            message = "The Operator accessibility service is not connected",
+        )
+
+    override suspend fun clear(): OnScreenLogControllerResult = OnScreenLogControllerResult.Cleared
 }

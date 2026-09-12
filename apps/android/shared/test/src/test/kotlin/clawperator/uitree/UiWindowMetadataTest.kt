@@ -53,6 +53,7 @@ class UiWindowMetadataTest {
             )
 
         assertTrue(metadata.hasOverlay)
+        assertTrue(metadata.operatorOverlayVisible)
         assertEquals("com.clawperator.operator.dev", metadata.overlayPackage)
         assertEquals(3, metadata.windowCount)
         assertEquals(listOf(2), resolvedWindowIds)

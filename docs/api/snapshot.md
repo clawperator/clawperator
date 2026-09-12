@@ -163,7 +163,8 @@ Important limits on what to infer:
 Current runtime note:
 
 - Android-side code currently also emits keys such as `actual_format`, `foreground_package`, `has_overlay`, `overlay_package`, and `window_count`
-- those keys are not documented as Node-guaranteed success fields in the current Node contract
+- `operator_overlay_visible` is the separately documented status field for an Operator-owned on-screen log panel; see [On-screen logs](on-screen-logs.md)
+- the other Android metadata keys are not documented as Node-guaranteed success fields in the current Node contract
 - agents should rely on `data.text` first and treat other snapshot metadata as opportunistic runtime data
 
 ## Realistic XML Fragment
@@ -219,6 +220,7 @@ because it produces reproducible results that any device can create and run.
           "actual_format": "hierarchy_xml",
           "foreground_package": "com.android.settings",
           "has_overlay": "false",
+          "operator_overlay_visible": "false",
           "window_count": "2",
           "text": "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n<hierarchy rotation=\"0\">...</hierarchy>"
         }
@@ -240,6 +242,10 @@ Fields to note:
   agent may read them opportunistically (for example, confirming
   `foreground_package` before proceeding), but must not depend on them being
   present in all environments or versions.
+- `operator_overlay_visible` is always the string `"true"` or `"false"` on a
+  successful Android snapshot. It reports only whether the Operator-owned
+  on-screen log panel is visible. It does not replace `has_overlay`,
+  `overlay_package`, or `window_count`, which retain their raw runtime meaning.
 - `terminalSource: "clawperator_result"` and `isCanonicalTerminal: true`
   are outer-envelope fields added by the terminal output layer; they are not
   part of the `envelope` sub-object.

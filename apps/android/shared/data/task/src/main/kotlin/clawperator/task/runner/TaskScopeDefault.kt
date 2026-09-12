@@ -289,6 +289,7 @@ class TaskScopeDefault(
                         "has_overlay" to windowMetadata?.hasOverlay,
                         "overlay_package" to windowMetadata?.overlayPackage,
                         "window_count" to windowMetadata?.windowCount,
+                        "operator_overlay_visible" to windowMetadata?.operatorOverlayVisible,
                         "truncated" to "false", // TODO: Implement truncation detection
                         "elapsed_ms" to totalElapsedMs,
                         "attempt" to attempt,
@@ -300,6 +301,7 @@ class TaskScopeDefault(
                     hasOverlay = windowMetadata?.hasOverlay ?: false,
                     overlayPackage = windowMetadata?.overlayPackage,
                     windowCount = windowMetadata?.windowCount,
+                    operatorOverlayVisible = windowMetadata?.operatorOverlayVisible ?: false,
                 )
             } catch (t: Throwable) {
                 if (t is kotlinx.coroutines.CancellationException) throw t

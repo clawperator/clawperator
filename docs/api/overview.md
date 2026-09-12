@@ -117,7 +117,7 @@ Success conditions for a valid payload before dispatch:
 - `expectedFormat` is exactly `"android-ui-automator"`
 - `timeoutMs` is between `1000` and `120000` milliseconds
 - `actions` is non-empty
-- every `actions[i].type` is a supported canonical action type after alias normalization
+- every `actions[i].type` is a supported canonical action type after alias normalization, except `set_on_screen_log` and `clear_on_screen_log`, which require exact canonical spelling
 - on a live execution path, `commandId` and `taskId` are echoed back in the result envelope for correlation
 
 ## Input Normalization
@@ -133,7 +133,7 @@ Accepted top-level execution key aliases:
 | `expected_format` | `expectedFormat` |
 | `timeout_ms` | `timeoutMs` |
 
-For action-type aliases and parameter aliases such as `package` -> `applicationId`, `url` -> `uri`, and `selector` -> `matcher`, use [Actions](actions.md). For raw matcher-field aliases such as `resource_id` and `content_desc`, use [Selectors](selectors.md).
+For action-type aliases and parameter aliases such as `package` -> `applicationId`, `url` -> `uri`, and `selector` -> `matcher`, use [Actions](actions.md). `set_on_screen_log` and `clear_on_screen_log` intentionally do not accept action or parameter aliases. For raw matcher-field aliases such as `resource_id` and `content_desc`, use [Selectors](selectors.md).
 
 Verification pattern:
 
