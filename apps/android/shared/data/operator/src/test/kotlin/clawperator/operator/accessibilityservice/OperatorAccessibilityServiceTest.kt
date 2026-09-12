@@ -29,11 +29,28 @@ import org.koin.dsl.module
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
+import org.robolectric.shadows.ShadowAccessibilityService
 import org.robolectric.util.ReflectionHelpers
 
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, application = Application::class)
 class OperatorAccessibilityServiceTest {
+    // Lifecycle tests call onServiceConnected directly, without a system service connection.
+    @Implements(AccessibilityService::class)
+    class ConfiguredServiceShadow : ShadowAccessibilityService() {
+        private var configuredServiceInfo: AccessibilityServiceInfo? = null
+
+        @Implementation
+        fun getServiceInfo(): AccessibilityServiceInfo? = configuredServiceInfo
+
+        @Implementation
+        fun setServiceInfo(info: AccessibilityServiceInfo) {
+            configuredServiceInfo = info
+        }
+    }
+
     @Test
     fun `throwing diagnostic hook is swallowed by wrapper`() {
         runRecordingDiagnosticHook(
@@ -71,7 +88,7 @@ class OperatorAccessibilityServiceTest {
     }
 
     @Test
-    @Config(sdk = [33], manifest = Config.NONE, application = Application::class)
+    @Config(sdk = [33, 34], manifest = Config.NONE, application = Application::class, shadows = [ConfiguredServiceShadow::class])
     fun `onServiceConnected owns panel lifecycle through service destruction`() {
         withServiceKoin(debug = true) { manager, panelLifecycle ->
             val service = Robolectric.buildService(OperatorAccessibilityService::class.java).create().get()
@@ -93,7 +110,7 @@ class OperatorAccessibilityServiceTest {
     }
 
     @Test
-    @Config(sdk = [32], manifest = Config.NONE, application = Application::class)
+    @Config(sdk = [32], manifest = Config.NONE, application = Application::class, shadows = [ConfiguredServiceShadow::class])
     fun `pre api33 service still loads and connects without ime editor flag`() {
         withServiceKoin(debug = true) { manager, _ ->
             val service = Robolectric.buildService(OperatorAccessibilityService::class.java).create().get()
