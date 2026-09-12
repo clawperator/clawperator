@@ -1,74 +1,28 @@
-# Report action outcomes and failures precisely Work Breakdown
+# Report action outcomes and failures precisely Implementation
 
-Parent plan: `tasks/api/action-result-diagnostics/plan.md`
+Contract: [plan.md](plan.md). Dependencies and release coordination: [v0.10 plan](../../releases/v0.10/plan.md).
 
-## Executive Summary
+## PR Scope
 
-One PR and one phase. Implementation has not started. Each phase includes its own tests and docs. One bounded implementation PR.
+| PR | Purpose | Phase | Merge gate |
+| --- | --- | --- | --- |
+| PR-1 | Receipts and failure preservation | 1 | Await both PRs in `tasks/api/selector-inspection` |
 
-## Status
+Implement the requested PR through its acceptance criteria, relevant checks, in-scope repairs, docs, and local commits. A dependency becoming available does not authorize the next PR. Routine implementation choices are yours; raise only decisions that change the contract or scope.
 
-| Item | Value |
-| --- | --- |
-| State | Not started |
-| Total PRs | 1 |
-| Total phases | 1 |
-| Completed | None |
-| Remaining | Phase 1 |
-| Current / Next | Phase 1 |
-| Blockers | Await both PRs in `tasks/api/selector-inspection` |
-
-## Hard Rules
-
-- Follow the dependency and release gates in `tasks/releases/v0.10/plan.md`. Implement only the requested PR; where this pack has two PRs, merge the first before starting the second. Update both task status tables and the release row after each merged PR.
-
-- Follow the parent contract; do not invent alternative default behavior.
-- Use branch-local Node output and the matching debug Operator for implementation validation. Never repair or uninstall packages on a device used by another task.
-- Commit one logical phase with its tests and authored docs. Do not defer tests to another phase.
-- Use the docs-author and docs-build skills for public changes. Do not hand-edit generated pages.
-- When affected skill consumers require migration, coordinate changes and version bumps in the sibling skills repository with its active owner, and run its smoke checks per AGENTS.md. Do not silently expand this checkout into unrelated skill edits.
-- Keep fixtures generic, using `com.example.fixture`, neutral labels, and caller-provided device IDs. Never copy application-specific research assets into this repository.
-- Preserve commandId/taskId and explicit device/operator selection through every path. Do not add autonomous recovery or app-specific policy.
-- Record plan deviations before committing. Stop for material contract changes; continue for equivalent internal implementation choices.
-- Inspect existing tests listed below before editing. Where the affected path lacks coverage, add the specified regression cases in the same phase.
-
-## Required Reading
-
-Read these files IN THIS ORDER before writing anything.
-
-| Topic | Authority |
-| --- | --- |
-| Governing repository rules | `AGENTS.md` |
-| Stable task contract | `tasks/api/action-result-diagnostics/plan.md` |
-| Engine | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/UiActionEngine.kt` |
-| UI actions | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/TaskUiScopeDefault.kt` |
-| Dispatch mechanism | `apps/android/shared/data/uitree/src/main/kotlin/clawperator/uitree/UiTreeManagerAndroid.kt` |
-| Envelope publication | `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/agent/AgentCommandExecutorDefault.kt` |
-| Envelope contract | `apps/node/src/contracts/result.ts` |
-| Node parser | `apps/node/src/adapters/android-bridge/envelopeParser.ts` |
-| Existing tests | `apps/android/shared/test/src/test/kotlin/clawperator/task/runner/UiActionEngineDefaultTest.kt` |
-| Node exit tests | `apps/node/src/test/unit/cliExitCode.test.ts` |
-| Public docs authoring workflow | `.agents/skills/docs-author/SKILL.md` |
-| Existing public contract exemplar (match its examples and caveats) | `docs/api/navigation.md` |
-| Generated docs workflow | `.agents/skills/docs-build/SKILL.md` |
-
-## PR / Phase Plan
-
-| PR | Purpose | Included phases | Agent tier | Merge gate |
-| --- | --- | --- | --- | --- |
-| PR-1 | Receipts and failure preservation | 1 | thinking | Await both PRs in `tasks/api/selector-inspection` |
-
-## Phase 1: Receipts and failure preservation
-
-### Agent Tier
-
-thinking
-
-### Goal
+## PR-1: Receipts and failure preservation
 
 Ship bounded, truthful action diagnostics.
 
-### Files or Surfaces To Change
+### Work
+
+- Rebase onto merged selector work. Trace current thrown-failure and returned-failure behavior before editing; preserve ordering policy and capture completed steps on thrown failures.
+- Thread actual resolution/dispatch receipts through UI manager and task engine; use the selector NodeSummary serializer.
+- Replace misleading scroll classifications and update every consumer of TaskScrollOutcome and termination reasons. Cover changed behavior with regression tests.
+- Use generic fixtures for a wrapper click with no postcondition, duplicate layered containers, missing progress signatures, and disappearing containers. Live verify unique click plus wait and scroll plus before/after observation.
+- Update result/action/error docs with explicit action-versus-assertion semantics and compatibility notes for new scroll enum values. Audit sibling skill consumers only for affected contracts; if a consumer requires changes, update its version and smoke checks in lockstep per AGENTS.md.
+
+### Affected Sources
 
 - `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/`
 - `apps/android/shared/data/uitree/src/main/kotlin/clawperator/uitree/UiTreeManagerAndroid.kt`
@@ -84,15 +38,7 @@ Ship bounded, truthful action diagnostics.
 - `docs/api/errors.md`
 - `docs/api/overview.md`
 
-### Steps
-
-1. Rebase onto merged selector work. Trace current thrown-failure and returned-failure behavior before editing; preserve ordering policy and capture completed steps on thrown failures.
-2. Thread actual resolution/dispatch receipts through UI manager and task engine; use the selector NodeSummary serializer.
-3. Replace misleading scroll classifications and update every consumer of TaskScrollOutcome and termination reasons. Add missing unit tests beside behavior changes.
-4. Use generic fixtures for a wrapper click with no postcondition, duplicate layered containers, missing progress signatures, and disappearing containers. Live verify unique click plus wait and scroll plus before/after observation.
-5. Update result/action/error docs with explicit action-versus-assertion semantics and compatibility notes for new scroll enum values. Audit sibling skill consumers only for affected contracts; if a consumer requires changes, update its version and smoke checks in lockstep per AGENTS.md.
-
-### Acceptance Criteria
+### Acceptance Evidence
 
 - A wait timeout after one completed step retains both that step and one failed wait result with WAIT_TIMEOUT.
 - Missing-root diagnostics distinguish unavailable service/root/metadata, and do not make the app root a prerequisite for raw overlay actions. Existing ON_SCREEN_LOG_* failures remain unchanged.
@@ -101,20 +47,12 @@ Ship bounded, truthful action diagnostics.
 - Click accepted without screen change remains accepted, never a fabricated verified success.
 - Lost/missing/unchanged/changed scroll evidence maps exactly to the table; loops stay bounded and strict ambiguous container dispatch count is zero.
 - Node CLI exits nonzero on failed terminal envelopes while preserving JSON and correlation IDs.
-- Human review: output accuracy matches observed evidence; scope covers the named surfaces only; important claims trace to tests or findings; schema, section order, and public help match the contract.
 
-### Validation
+### Live Entry Points
 
-Run from repository root, in order. Unit/subprocess tests are the primary reproducible gate. Live checks prove device integration only and require a dedicated target with the matching debug Operator, enabled accessibility, and an unlocked screen. A skipped live check is not a pass; record its unmet prerequisite.
+Use these for the device proof described above, after building the matching tools. They do not replace the acceptance assertions.
 
 ```sh
-./gradlew :app:assembleDebug
-./gradlew testDebugUnitTest
-npm --prefix apps/node ci
-npm --prefix apps/node run build
-npm --prefix apps/node run test
-./scripts/docs_build.sh
-git diff --check
 # Set DEVICE_ID to a dedicated, connected test target before these commands.
 : "${DEVICE_ID:?Select a dedicated test device}"
 ANDROID_SERIAL="$DEVICE_ID" ./gradlew :app:installDebug
@@ -122,12 +60,21 @@ adb -s "$DEVICE_ID" shell monkey -p com.clawperator.operator.dev -c android.inte
 node apps/node/dist/cli/index.js doctor --device "$DEVICE_ID" --operator-package com.clawperator.operator.dev
 ```
 
-### Expected Commit
+## Validation and Completion
 
-```text
-fix(runtime): preserve precise action outcome evidence
+Use AGENTS.md for shared validation policy. Build Node before tests that consume dist. Relevant checks for this pack are:
+
+```sh
+./gradlew :app:assembleDebug
+./gradlew testDebugUnitTest
+npm --prefix apps/node run build
+npm --prefix apps/node run test
+./scripts/docs_build.sh
+git diff --check
 ```
 
-## Execution Findings
+Live verification requires a dedicated, explicitly selected device, an unlocked screen, enabled accessibility, and the matching debug Operator. Offline tests prove the stated contracts; device checks prove integration and pixels. Record unavailable live evidence rather than treating it as passed.
 
-Create `findings.md` at the start of the first phase, before source edits. Use these sections in order: Environment and Versions; Reproduction Inputs; Observed Results (command, exit code, JSON fields, artifact paths); Source Mapping; Decisions and Deviations; Validation (case, expected, actual, pass/fail/blocked); Remaining Work. Append phase-specific results before its commit. Do not paste sensitive or application-specific captures. Keep raw local evidence outside tracked files and use generic reproduction fixtures in tests.
+Use `.agents/skills/docs-author/SKILL.md` for the named public docs and `.agents/skills/docs-build/SKILL.md` for regeneration. Run checks for each behavior change; repeat successful checks only after new changes or an unresolved integration concern.
+
+Keep concise findings with versions, reproduction inputs, observed results/artifact paths, decisions, and remaining limitations. Preserve private captures outside tracked files. Update progress and commit validated logical units. Completion includes correcting in-scope failures, not merely producing a first implementation.

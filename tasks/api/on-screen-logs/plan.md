@@ -87,10 +87,6 @@ Relevant existing tests include `apps/node/src/test/unit/validateExecution.test.
 
 Platform references: [overlay type](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#TYPE_ACCESSIBILITY_OVERLAY), [touch-through rules](https://developer.android.com/about/versions/12/behavior-changes-all#untrusted-touch-events), [accessibility service](https://developer.android.com/reference/android/accessibilityservice/AccessibilityService). PR-1 proved the mechanism on one API 35 emulator. Older versions and other devices are not covered by that live proof; PR-2 must record its own matrix without implying broader coverage.
 
-## Deterministic Versus Judgment
-
-Apply the field defaults, validation rules, state table, and PR boundaries below verbatim. Do not design an elapsed clock or infer metadata from text. Implementation choices about Kotlin class placement and test doubles are allowed within existing module dependencies. If live proof contradicts the overlay mechanism or prevents isolation from app selectors, record the evidence and stop before broadening the design.
-
 ## Decision Rules
 
 ### Renderer

@@ -2,7 +2,7 @@
 
 This is the coordination document for seven task packs: six runtime-observability packs and the existing on-screen-log pack. It replaces the former standalone observability index. It does not schedule every unrelated task in the repository or claim that implementation has shipped.
 
-Source audit: `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d` on main. On-screen logs PR-1 (PR #266) is merged; its PR-2 is ready. The six new packs are unimplemented. There are nine remaining implementation PRs. This planning PR changes task documents only.
+Runtime source audit: `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d`. Handoff guidance refreshed against `d12f687` after the task packs merged in `008dcb2`; this refinement does not change runtime contracts or release dependencies. On-screen logs PR-1 (PR #266) is merged; its PR-2 is ready. The six new packs are unimplemented. There are nine remaining implementation PRs. This planning PR changes task documents only.
 
 ## Folder ownership
 
@@ -73,7 +73,7 @@ This covers the agreed foundation and evidence gaps. It is not a promise that on
 
 ## Implementation handoff and release acceptance
 
-For a selected row, read AGENTS.md, that pack's plan, and its work breakdown in the specified order. Complete only the requested PR, with tests and docs in the same phase as behavior, then update its findings and status. Use the on-screen-log PR-2 prompt where linked. For another pack, its work breakdown is the handoff; a PR-specific prompt can be generated with `.agents/skills/task-create-impl-prompt/SKILL.md` without redesigning the task.
+For a selected row, use that pack's plan for the contract and its work breakdown for scope, progress, and acceptance; consult source pointers as needed. Complete the requested PR through implementation, relevant validation, repairs, docs, status, and local commits. Dependencies define rollout order, not an approval pause within an authorized PR. Use the on-screen-log PR-2 prompt where linked. For another pack, its work breakdown is the handoff; a PR-specific prompt can be generated with `.agents/skills/task-create-impl-prompt/SKILL.md` without redesigning the task.
 
 Before merging each implementation PR:
 

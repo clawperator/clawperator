@@ -1,8 +1,14 @@
 # Inspect and disambiguate UI selectors
 
-## Executive Summary
+## Goal and Scope
 
-Provide structured node-state inspection and opt-in strict, relationally scoped actions using one Android resolver. This pack has two PRs, one phase per PR, and is not started. Merge PR-1 before starting PR-2.
+Provide structured node-state inspection and opt-in strict, relationally scoped actions using one Android resolver.
+
+Raw hierarchies can contain duplicate containers with identical IDs and bounds. Text reads discard blank labels, so read --all count is not node count. First-match action selection conceals ambiguity.
+
+Typed node query; ancestor/descendant constraints; state fields; strict selection for node-targeted actions; CLI/raw execution/MCP parity.
+
+Excluded: Pixel-based occlusion detection, choosing the last or largest node heuristically, persistent node handles, autonomous retry strategy, and changing legacy first-match defaults.
 
 ## Status
 
@@ -16,34 +22,7 @@ Provide structured node-state inspection and opt-in strict, relationally scoped 
 | Current / Next | Phase 1 |
 | Blockers | None |
 
-## Goal
-
-Provide structured node-state inspection and opt-in strict, relationally scoped actions using one Android resolver.
-
-## Why Now
-
-Raw hierarchies can contain duplicate containers with identical IDs and bounds. Text reads discard blank labels, so read --all count is not node count. First-match action selection conceals ambiguity.
-
-## In Scope
-
-Typed node query; ancestor/descendant constraints; state fields; strict selection for node-targeted actions; CLI/raw execution/MCP parity.
-
-## Out of Scope
-
-Pixel-based occlusion detection, choosing the last or largest node heuristically, persistent node handles, autonomous retry strategy, and changing legacy first-match defaults.
-
-## Existing Artifact Scope
-
-Extend only the existing surfaces named below and the explicitly named new files. Preserve unrelated commands, skills, and documentation. Do not edit other active task packs or implement their work incidentally.
-
-## Surfaces and Ownership
-
-| Surface | Owner |
-| --- | --- |
-| Resolution and state | Android tree/task layers |
-| Validation and presentation | Node contracts, CLI, MCP |
-
-## Source Of Truth
+## Sources
 
 | Topic | Authority |
 | --- | --- |
@@ -58,13 +37,9 @@ Extend only the existing surfaces named below and the explicitly named new files
 | Existing Android tests | `apps/android/shared/test/src/test/kotlin/clawperator/task/runner/NodeMatcherTest.kt` |
 | Node tests | `apps/node/src/test/unit/selectorFlags.test.ts` |
 
-Initial investigation used `5d23af5`; the final task audit used merged main `120c1eb`, including the shipped on-screen-log raw API. Preserve its controller-owned overlay identity, visibility metadata, canonical error codes, and strict input aliases. Installed-runtime observations came from CLI/Operator 0.9.5; do not assume the checkout and device are identical. Recheck these source seams after dependency merges. New identifiers below are proposed contracts to implement, not claims about shipped behavior.
+Initial investigation used `5d23af5`; the final task audit used merged main `120c1eb`, including the shipped on-screen-log raw API. Preserve its controller-owned overlay identity, visibility metadata, canonical error codes, and strict input aliases. Installed-runtime observations came from CLI/Operator 0.9.5; do not assume the checkout and device are identical. Recheck affected seams after dependency merges. New identifiers below are proposed contracts to implement, not claims about shipped behavior.
 
-## Deterministic Versus Judgment
-
-Apply the output contract and decision rules verbatim. Implementation structure and explanatory prose permit judgment. If a required platform capability is unavailable, record evidence and stop the affected phase; do not silently change the public contract. Routine internal refactors may proceed within scope with findings recorded.
-
-## Decision Rules
+## Behavior and Decisions
 
 | Request | Behavior |
 | --- | --- |
@@ -80,22 +55,16 @@ Apply the output contract and decision rules verbatim. Implementation structure 
 | strict omitted or false | Preserve existing selection and retry defaults |
 | Platform reports visible | Report platform visibility; never promise visual non-occlusion |
 
-## Failure Modes To Prevent
-
-Confusing text count with node count; treating bounds as visual occlusion proof; silently selecting another node; returning persistent-looking handles; query/action resolution drift.
-
-## Output Contract
-
 Add leaf type `NodePredicate` with today's six scalar matcher fields. Extend `NodeMatcher` with optional `ancestor:NodePredicate` and `descendant:NodePredicate`; relationships mean any strict ancestor/descendant in the captured tree, never self. A supplied predicate must contain at least one nonblank recognized field; reject empty ancestor/descendant objects. An omitted query matcher means match all; an explicit empty matcher is invalid. All supplied predicates combine with AND. Reject nested relationship objects and unknown fields. Preserve current role/text case rules. Resolve ancestor relationships against the original structural tree so structural ancestors are retained. Descendant predicates are evaluated among descendants eligible under the request visibility (on_screen for actions, query visibility for queries); hidden stale labels must not unexpectedly select an otherwise visible container. Preserve the existing on-screen eligibility rule, including ancestor pruning, rather than changing filtering behavior implicitly.
 
 Add raw action `query_ui` with params `{matcher?, visibility?:"on_screen"|"all", limit?:number}`. Defaults: on_screen and 100; limit 1..1000. Results use existing string-valued step data: `data.query` is serialized JSON `{schemaVersion:1, snapshotId, capturedAt, totalMatches, returnedCount, truncated, nodes:[NodeSummary]}`. snapshotId is observation-local; capturedAt is APK UTC capture time. Nodes are preorder, each with `nodePath` (child-index path rooted at "0"), `parentPath` (null at root), `resourceId`, `className`, `role`, `label`, `contentDescription`, `bounds:{left,top,right,bottom}`, `visibleToUser`, `onScreen`, `enabled`, `clickable`, `checkable`, `checked`, `selected`, `scrollable`. Preserve null for unavailable state; never turn unknown checked into false. totalMatches is before limit. `onScreen` uses the same source-owned eligibility rule as actions. Query and action candidate resolution share a resolver, not a Node reimplementation. Paths never become action targets or stable cross-capture IDs. Add XML `visible-to-user` state to the existing hierarchy dumper without changing raw hierarchy structure.
 
 PR-1 exposes `clawperator query` and MCP `query_ui`, the raw action, and relational matchers. Existing simple CLI selector flags still work; add `--matcher-json` (mutually exclusive with simple selector flags), `--visibility`, and `--limit`. PR-2 adds `params.strict?:boolean` to the listed raw actions, CLI `--strict` and `--container-json`, and matching MCP schemas for click, enter_text, read_text, wait_for_node, scroll, scroll_until, scroll_and_click. Apply strict to explicitly supplied container and target resolvers; read_text with all=true intentionally permits many target matches but still enforces unique explicit container. For scroll without an explicit container, strict requires one eligible scrollable candidate. Coordinate click with strict is invalid. For actions that do not currently consume params.container, wire that existing field through parser, action model, and task scope in PR-2. Container scoping searches strict descendants. Explicit container selection with legacy strict=false preserves first-match behavior. A container predicate may use ancestor/descendant constraints from PR-1. Scroll-loop target checks must stay within the selected container. Fresh resolution at dispatch is mandatory; changed counts fail instead of reusing an earlier query result. No new persistent accessibility references cross the bridge. Query payloads exceeding 256 KiB of UTF-8 serialized data.query fail explicitly with PAYLOAD_TOO_LARGE (a new response-side guard, not the existing request validator); do not cut serialized JSON to fit. NodeSummary path numbering follows the captured UiNode tree; raw XML is a separate capture and has no guaranteed shared node identity. Preserve original raw-tree child paths before filtering, so paths cannot shift simply because a sibling was ineligible.
 
-## Idempotency
+## Repeatability
 
 Queries are read-only, with fresh observation IDs/timestamps. Strict selection is a dispatch guard, not an idempotency guarantee for the underlying action. Never replay mutations after uncertain post-dispatch loss.
 
-## Durable Follow-Up
+## Durable Outputs
 
-Publish the contract in the authored docs named in the phase. Keep regression fixtures and tests in the source tree. Use `.agents/skills/task-cleanup/SKILL.md` only after all PRs are complete and durable guidance has migrated; do not delete this pack between PRs.
+The work breakdown names the authored docs and regression coverage that ship with this contract. Keep implementation findings here only until the pack is complete; migrate lasting guidance before retiring it.
