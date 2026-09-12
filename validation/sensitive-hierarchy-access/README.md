@@ -60,8 +60,11 @@ metadata, XML, and screenshots; keep it outside Git on personal devices.
 expected API, original and launched activity stacks (including foreground package
 when available), deadline, observation count and elapsed time. Each numbered
 command retains its arguments, stdout/stderr, exit status and stage/timeout
-context. Source commit, working diff, CLI version and installed-package metadata
-are also captured. `failure.json` distinguishes prerequisites, preparation,
+context. Source commit, the repository-wide tracked diff against HEAD (including
+staged and unstaged changes and binary patches), a NUL-delimited inventory of
+non-ignored untracked files, CLI version and installed-package metadata are also
+captured. Untracked file contents and ignored build outputs are not archived;
+commit source files before collecting release evidence. `failure.json` distinguishes prerequisites, preparation,
 Internet navigation, capture/parity and Display control failures. The original
 failure remains in `failure.txt`; `failure-screenshot.json` and `cleanup.json`
 record secondary attempts without replacing it. Use a new output directory for

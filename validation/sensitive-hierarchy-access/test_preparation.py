@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
-from run import homepage_at_top, main, prepare_settings
+from run import homepage_at_top, main, prepare_settings, record_source
 
 
 def result(nodes=None, error=None):
@@ -20,6 +20,43 @@ def homepage():
                  visibleToUser=True, onScreen=True, scrollable=scrollable)
             for resource, label, scrollable in [('settings_homepage_container', '', True),
                 ('main_content_scrollable_container', '', True), ('title', 'Network & internet', False)]]
+
+
+class SourceEvidenceTest(unittest.TestCase):
+    def test_staged_harness_runtime_changes_and_untracked_files_are_recorded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def git(*args):
+                return subprocess.check_output(['git', *args], cwd=root, text=True)
+            git('init', '-q')
+            paths = ['validation/sensitive-hierarchy-access/run.py',
+                     'apps/node/src/runtime.ts', 'apps/android/runtime.kt']
+            for name in paths:
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('original\n')
+            git('add', '.')
+            git('-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+                'commit', '-qm', 'fixture')
+            (root / paths[0]).write_text('staged harness\n')
+            git('add', paths[0])
+            (root / paths[1]).write_text('unstaged Node runtime\n')
+            (root / paths[2]).write_text('staged Android runtime\n')
+            git('add', paths[2])
+            untracked = 'apps/node/src/new runtime.ts'
+            (root / untracked).write_text('new source\n')
+            outputs = []
+            def run(command):
+                output = subprocess.check_output(command, cwd=root, text=True)
+                outputs.append(output)
+                return output
+            record_source(run)
+            self.assertEqual(outputs[0].strip(), git('rev-parse', 'HEAD').strip())
+            for name in paths:
+                self.assertIn(name, outputs[1])
+            for content in ('+staged harness', '+unstaged Node runtime', '+staged Android runtime'):
+                self.assertIn(content, outputs[1])
+            self.assertEqual(outputs[2].split('\0')[:-1], [untracked])
 
 
 class PreparationTest(unittest.TestCase):

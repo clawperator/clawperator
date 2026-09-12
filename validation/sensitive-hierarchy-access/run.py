@@ -142,6 +142,13 @@ def prepare_settings(run, cli, device, evidence, clock=time.monotonic, sleep=tim
         evidence['elapsedSeconds'] = clock() - started
 
 
+def record_source(run):
+    """Record tracked source relative to HEAD and inventory non-ignored untracked files."""
+    run(['git', 'rev-parse', 'HEAD'])
+    run(['git', 'diff', '--no-ext-diff', '--no-textconv', '--binary', 'HEAD', '--'])
+    run(['git', 'ls-files', '--others', '--exclude-standard', '-z'])
+
+
 def best_effort(action):
     """Retain secondary failures without replacing the original verdict."""
     try:
@@ -196,8 +203,7 @@ def main():
         envelope(cli('wait', '--text', text, '--timeout', '15000'))
 
     try:
-        run(['git', 'rev-parse', 'HEAD'])
-        run(['git', 'diff', '--', 'validation/sensitive-hierarchy-access'])
+        record_source(run)
         run(['node', 'apps/node/dist/cli/index.js', '--version'])
         assert run(['adb', '-s', args.device, 'shell', 'getprop', 'ro.build.version.sdk']).strip() == args.api, f'Expected API {args.api}'
         locale = run(['adb', '-s', args.device, 'shell', 'getprop', 'persist.sys.locale']).strip()
