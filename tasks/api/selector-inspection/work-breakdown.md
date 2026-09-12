@@ -48,10 +48,11 @@ Temporary device captures and build logs are not required handoff artifacts.
 
 ### Gap dispositions
 
-- **Defer, parked by user:** sensitive Internet hierarchy access. Confirmed cause,
+- **Separate required v0.10 task, R10:** sensitive Internet hierarchy access. Confirmed cause,
   configuration experiment, and concrete next step are preserved in
   [accessibility hierarchy availability](../../../docs/internal/design/accessibility-hierarchy.md).
-  This is outside R4/R5 and does not authorize a service declaration change.
+  Implementation belongs to [R10](../../android/sensitive-hierarchy-access/plan.md),
+  outside R4/R5; its plan owns the selected declaration and sensitivity metadata.
 - **Defer to skill workstream:** 19 failures in an extra flat `skills.test.ts` run
   reproduced by name on unchanged base `654d333`. Investigate missing SkillResult
   `result` fields and pretty-output/banner expectations, then rerun that file.

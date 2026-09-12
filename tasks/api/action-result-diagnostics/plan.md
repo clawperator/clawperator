@@ -30,7 +30,8 @@ failed query, and root-independent service/window diagnostics. Reuse and extend
 these foundations after the merge gates; do not duplicate them. General action
 exceptions and timeout/cancellation evidence still need the work below. The
 [sensitive-root access issue](../../../docs/internal/design/accessibility-hierarchy.md)
-is parked separately and does not expand this task into service reclassification.
+is required for v0.10 under [R10](../../android/sensitive-hierarchy-access/plan.md)
+and does not expand R6 into service reclassification.
 
 ## Sources
 

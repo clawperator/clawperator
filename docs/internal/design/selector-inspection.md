@@ -66,5 +66,5 @@ Queries capture once. Callers needing a destination node after navigation should
 use a bounded wait before querying and inspect the subsequent query result.
 A query does not promise a settled screen or reserve a target for an action.
 
-For the independently confirmed sensitive-root coverage gap and parked follow-up,
+For the independently confirmed sensitive-root coverage gap and required v0.10 follow-up,
 see [Accessibility hierarchy availability](accessibility-hierarchy.md).

@@ -31,17 +31,26 @@ regression. An old release APK was not installed, so the experiment is not a
 full old-binary comparison. All temporary instrumentation and configuration were
 removed; the normal development APK was restored. Evidence is limited to API 35.
 
-## Parked follow-up
+## Required v0.10 follow-up
 
-Status: explicitly deferred by the user, outside the selector inspection PR.
-The normal service declaration remains unchanged.
+Status: required for v0.10 by user direction; the earlier deferral is superseded.
+Implementation remains separate from selector inspection. The normal service
+declaration is unchanged until the supported approach is implemented.
 
-When resumed, first decide the intended service classification and supported
-access path for sensitive screens. Android defines
+The selected v0.10 approach is to enable `android:isAccessibilityTool="true"` in
+both Operator variants. The user accepts broader access and states the APK will
+not be distributed through Google Play. Android defines
 [`isAccessibilityTool`](https://developer.android.com/reference/android/accessibilityservice/AccessibilityServiceInfo#attr_android:isAccessibilityTool)
-as identifying services used to assist users with disabilities. Changing it
-broadens sensitive-view access beyond this one page and is a product decision,
-not a selector implementation detail. Then implement the chosen approach with
-explicit-device query/XML verification, a normal-screen control, and a check of
-the resulting service declaration. Do not treat retries, cache clearing, or
-another window's hierarchy as a solution to the demonstrated filtering rule.
+as identifying services used to assist users with disabilities. The declaration
+change is planned, not yet implemented in the normal APK.
+
+The same work will expose per-node `accessibilityDataSensitive` in structured
+queries and `accessibility-data-sensitive` in XML, based on Android's API-34+
+node flag. Unknown values must remain unknown, including on older Android or
+older APKs. This reports platform evidence, not a private-browsing verdict or a
+claim that content is safe to disclose. Browser-mode correctness needs separate
+application-specific evidence. No automatic redaction or refusal is implied.
+
+Implementation must verify both variants, upgrades, query/XML metadata parity,
+a normal-screen control, and genuine failure behavior. Retries, cache clearing,
+and another window's hierarchy do not solve the demonstrated filtering rule.

@@ -82,7 +82,8 @@ is available. Public behavior is documented in
 [query_ui](../../../docs/api/actions.md#action-query-ui). Preserve this behavior
 while adding strict actions; broader failure preservation remains R6 scope.
 
-The separate sensitive-root access issue is explicitly parked; see
+The separate sensitive-root access issue is required for v0.10 as
+[R10](../../android/sensitive-hierarchy-access/plan.md); see
 [its durable findings and next step](../../../docs/internal/design/accessibility-hierarchy.md).
 PR-1 is treated as landed for cleanup at the user's direction; this is not a
 claim about remote merge status. Its implementation prompt is retired. Keep the
