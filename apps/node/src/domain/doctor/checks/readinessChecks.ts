@@ -3,7 +3,7 @@ import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConf
 import { type DoctorCheckResult } from "../../../contracts/doctor.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import type { StepResult } from "../../../contracts/result.js";
-import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
+import { runExecution } from "../../executions/runExecution.js";
 import { waitForResultEnvelope } from "../../../adapters/android-bridge/logcatResultReader.js";
 import {
   buildDeviceNotInteractiveError,
@@ -410,30 +410,30 @@ function tryBuildInteractiveStateEvidence(
 
 export async function runSmokeTest(
   config: RuntimeConfig,
-  waitForEnvelope = waitForResultEnvelope,
+  execute = runExecution,
 ): Promise<DoctorCheckResult> {
   const commandId = `smoke-${Date.now()}`;
-  const payload = JSON.stringify({
+  const execution = {
     commandId,
     taskId: "doctor-smoke",
     source: "clawperator-doctor",
-    expectedFormat: "android-ui-automator",
+    expectedFormat: "android-ui-automator" as const,
     actions: [
       { id: "s1", type: "close_app", params: { applicationId: "com.android.settings" } },
       { id: "s2", type: "open_app", params: { applicationId: "com.android.settings" } },
-      { id: "s3", type: "snapshot_ui" },
+      { id: "s3", type: "snapshot" },
     ],
     timeoutMs: 10000,
-  });
+  };
 
-  const result = await waitForEnvelope(
-    config,
-    { commandId, timeoutMs: 12000 },
-    async (beginDispatchCapture) => {
-      beginDispatchCapture();
-      return broadcastAgentCommand(config, payload);
-    }
-  );
+  const result = await execute(execution, {
+    deviceId: config.deviceId,
+    operatorPackage: config.operatorPackage,
+    adbPath: config.adbPath,
+    runner: config.runner,
+    logger: config.logger,
+    resultEnvelopeTimeoutMs: 12000,
+  });
 
   if (result.ok && result.envelope.status === "success") {
     const completedSmoke = [

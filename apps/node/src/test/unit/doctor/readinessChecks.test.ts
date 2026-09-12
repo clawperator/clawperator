@@ -1,3 +1,6 @@
+import { EventEmitter } from "node:events";
+import { runExecution } from "../../../domain/executions/runExecution.js";
+import type { Execution } from "../../../contracts/execution.js";
 import { describe, it } from "node:test";
 import assert from "node:assert";
 import { checkApkPresence, checkDeviceInteractiveState, runHandshake, runSmokeTest } from "../../../domain/doctor/checks/readinessChecks.js";
@@ -349,6 +352,7 @@ describe("readiness execution completeness", () => {
                 : steps.map((step, index) => ({ ...step, success: !(scenario === "failed-step" && index === 0) }));
             const result = await runSmokeTest(config, async () => ({
                 ok: true as const,
+                deviceId: "test-device",
                 envelope: {
                     commandId: "test-command", taskId: "test-task",
                     status: scenario === "terminal-failure" ? "failed" as const : "success" as const,
@@ -374,6 +378,57 @@ describe("readiness execution completeness", () => {
             }));
             assert.equal(result.status, "fail");
             assert.equal(result.code, ERROR_CODES.RESULT_ENVELOPE_MALFORMED);
+        });
+    }
+});
+
+
+describe("doctor smoke execution pipeline", () => {
+    for (const closeSucceeds of [true, false]) {
+        it(`requires a successful host close before normalizing runtime rejection: ${closeSucceeds}`, async () => {
+            const runner = new FakeProcessRunner();
+            const stdout = new EventEmitter();
+            const logcatProcess = Object.assign(new EventEmitter(), {
+                stdout, stderr: new EventEmitter(), kill() {},
+            });
+            runner.spawn = () => logcatProcess;
+            let execution: Execution;
+            let broadcast = false;
+            runner.run = async (command, args) => {
+                runner.calls.push({ command, args });
+                const action = args.join(" ");
+                if (action.endsWith("devices")) return { code: 0, stdout: "List of devices attached\ntest-device\tdevice\n", stderr: "" };
+                if (action.includes("pm list packages")) return { code: 0, stdout: "package:com.clawperator.operator.dev\n", stderr: "" };
+                if (action.includes("am force-stop")) return { code: closeSucceeds ? 0 : 1, stdout: "", stderr: "" };
+                assert.ok(action.includes("am broadcast"), action);
+                broadcast = true;
+                setTimeout(() => stdout.emit("data", Buffer.from(`D/TaskScopeDefault: [TaskScope] UI Hierarchy [commandId=${execution.commandId}]:\nD/TaskScopeDefault: <hierarchy>\nD/TaskScopeDefault: <node package="com.android.settings" />\nD/TaskScopeDefault: </hierarchy>\n[Clawperator-Result] ${JSON.stringify({
+                    commandId: execution.commandId, taskId: execution.taskId, status: "success", error: null,
+                    stepResults: [
+                        { id: "s1", actionType: "close_app", success: false, data: { error: "UNSUPPORTED_RUNTIME_CLOSE" } },
+                        { id: "s2", actionType: "open_app", success: true, data: {} },
+                        { id: "s3", actionType: "snapshot_ui", success: true, data: {} },
+                    ],
+                })}\n`)), 0);
+                return { code: 0, stdout: "Broadcast completed", stderr: "" };
+            };
+            const config = getDefaultRuntimeConfig({ runner, deviceId: "test-device", operatorPackage: "com.clawperator.operator.dev", adbPath: "test-adb" });
+            const result = await runSmokeTest(config, (input, options) => {
+                execution = input as Execution;
+                assert.equal(options?.deviceId, config.deviceId);
+                assert.equal(options?.operatorPackage, config.operatorPackage);
+                assert.equal(options?.adbPath, config.adbPath);
+                assert.equal(options?.runner, runner);
+                return runExecution(input, {
+                    ...options, logcatBroadcastDelayMs: 0,
+                    ensureInteractiveAutomationReadyFn: async () => ({ ok: true, state: {
+                        screenOn: true, interactive: true, deviceLocked: false, userUnlocked: true,
+                    } }),
+                });
+            });
+            assert.equal(result.status, closeSucceeds ? "pass" : "fail");
+            assert.equal(broadcast, closeSucceeds);
+            assert.ok(runner.calls.some(call => call.args.join(" ") === "-s test-device shell am force-stop com.android.settings"));
         });
     }
 });
