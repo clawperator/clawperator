@@ -3986,6 +3986,8 @@ Fields to note:
   successful Android snapshot. It reports only whether the Operator-owned
   on-screen log panel is visible. It does not replace `has_overlay`,
   `overlay_package`, or `window_count`, which retain their raw runtime meaning.
+  This is also the visibility check after the [CLI set/clear commands](on-screen-logs.md#cli-commands);
+  it does not verify screenshot pixels.
 - `terminalSource: "clawperator_result"` and `isCanonicalTerminal: true`
   are outer-envelope fields added by the terminal output layer; they are not
   part of the `envelope` sub-object.
@@ -5911,7 +5913,11 @@ Recovery:
 
 The on-screen log actions can return these exact per-step failure codes. When
 one of these codes is the first failed step, Node also copies it to
-`envelope.errorCode` during result reconciliation.
+`envelope.errorCode` during result reconciliation. The
+[`on-screen-log set` and `clear` commands](on-screen-logs.md#cli-commands)
+return the same execution errors. CLI syntax failures use structured `USAGE`
+errors; canonical panel validation uses `EXECUTION_VALIDATION_FAILED`.
+Neither command replays a mutation after an uncertain daemon dispatch.
 
 | Code | Meaning | Recovery |
 | --- | --- | --- |
@@ -6313,7 +6319,8 @@ Then `runExecution()` applies full execution validation. See [Actions](actions.m
 to the canonical action types. It does not provide separate panel endpoints,
 accept case or whitespace variants, or translate on-screen log parameter
 aliases. See [On-screen logs](on-screen-logs.md) for the raw payload contract
-and result fields.
+and result fields. The `on-screen-log set` and `clear` CLI commands are
+conveniences over these same actions, not additional HTTP routes.
 
 Representative serve-layer `400` wrappers for this route:
 
@@ -7619,6 +7626,8 @@ Validation boundary:
 
 Use [Actions](actions.md) for canonical action types and params, and
 [On-screen logs](on-screen-logs.md) for the panel-specific raw contract.
+The `on-screen-log set` and `clear` conveniences are CLI commands; MCP clients
+continue to use `execute` with the same canonical action parameters.
 
 <a id="mcp-tool-configure"></a>
 ### `configure`

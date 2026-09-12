@@ -7,7 +7,7 @@ Contract: [plan.md](plan.md). Release coordination: [v0.10 plan](../../releases/
 | PR | Outcome | Phases | Dependency | Status |
 | --- | --- | --- | --- | --- |
 | PR-1 | Renderer and raw actions | 1-2 | None | [DONE] merged in `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d` |
-| PR-2 | CLI convenience and public-interface proof | 3-4 | PR-1 merged | Ready; not started |
+| PR-2 | CLI convenience and public-interface proof | 3-4 | PR-1 merged | [DONE] implemented and validated locally; finalization pending |
 
 PR-1 implementation and device evidence are retained in [findings.md](findings.md); use the merged source as authority. PR-2 is the final PR in this pack. Complete its CLI, regression coverage, live proof, documentation, in-scope repairs, and local commits. Phase 4 consumes Phase 3's commands; there is no approval pause between them.
 
@@ -19,7 +19,7 @@ PR-1 implementation and device evidence are retained in [findings.md](findings.m
 - `docs/api/on-screen-logs.md` and `apps/node/src/domain/executions/runExecution.ts`: existing raw API and screenshot-ordering limitation.
 - `validation/on-screen-logs/`: existing raw/controller proof fixtures; they do not establish new CLI behavior.
 
-## Phase 3: CLI Convenience
+## Phase 3: CLI Convenience [DONE]
 
 ### Goal
 
@@ -59,7 +59,7 @@ node apps/node/dist/cli/index.js on-screen-log clear --device <device_serial> --
 
 Also run set/clear with `--no-daemon`, custom colors, zero offsets, and invalid/missing values. Capture raw stdout/status in the validation artifact.
 
-## Phase 4: Cross-Surface Regression and Handoff
+## Phase 4: Cross-Surface Regression and Handoff [DONE]
 
 ### Goal
 
@@ -109,3 +109,5 @@ The new harness/tests must be implemented in Phase 4 before these commands can p
 ## Completion
 
 Use AGENTS.md for shared build/device rules and the docs-author/docs-build skills for public docs. Run the relevant Node checks after Phase 3 changes and again only when subsequent changes warrant it. Phase 4's Android checks and live evidence cover integration with the merged renderer. Retain meaningful evidence in findings, update PR-2 progress and the release row, and commit validated logical units. Preserve real limitations and complete unaffected work if a device gate is unavailable. Keep the pack until PR-2 finalization.
+
+PR-2 local completion: see [findings.md](findings.md#pr-2-validation-and-capture-proof) for the final validation matrix, inspected media, in-scope harness repairs, and platform limits. Preserve this pack until finalization; no publication or merge was performed.

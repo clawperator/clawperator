@@ -4,19 +4,19 @@
 
 Add an optional, noninteractive diagnostic panel to the Android Operator, controlled through the existing execution API. Callers supply static text, placement, and colors. This is a generic Clawperator feature owned by Action Launcher.
 
-Two PRs, four sequential phases. PR-1 proves and ships the Android renderer plus raw execution actions; PR-2 adds CLI convenience and completes validation/documentation. PR-1 merged in `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d` (PR #266). PR-2 is explicitly requested and ready to start; no PR-2 implementation has begun. The renderer and raw API below are shipped source contracts; the CLI convenience surface remains proposed PR-2 work.
+Two PRs, four sequential phases. PR-1 proves and ships the Android renderer plus raw execution actions; PR-2 adds CLI convenience and completes validation/documentation. PR-1 merged in `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d` (PR #266). PR-2 is implemented and validated locally on `on-screen-prompt-pr2`; finalization remains pending. The renderer and raw API below are shipped source contracts; the CLI convenience surface is implemented in this branch.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | PR-1 merged; PR-2 ready |
+| State | PR-1 merged; PR-2 implemented and validated locally |
 | Total PRs | 2 |
 | Total phases | 4 |
-| Completed | Phases 1-2 |
-| Remaining | 3-4 |
-| Current / Next | Phase 3: CLI convenience |
-| Blockers | None; prerequisite merge and continuation are satisfied |
+| Completed | Phases 1-4 |
+| Remaining | PR-2 finalization; keep this pack |
+| Current / Next | Review/finalize PR-2 |
+| Blockers | None for the tested API 35 target; platform coverage limits are in findings.md |
 
 ## Goal
 
@@ -166,7 +166,7 @@ Successful set includes `visible="true"`, `rendered="true"`, `truncated="true"|"
 
 Known failures use structured codes: `ON_SCREEN_LOG_SERVICE_UNAVAILABLE`, `ON_SCREEN_LOG_LAYOUT_INVALID`, `ON_SCREEN_LOG_RENDER_FAILED`, and `ON_SCREEN_LOG_RENDER_TIMEOUT`. Node schema failures retain `EXECUTION_VALIDATION_FAILED`. Preserve existing shared readiness failures when dispatch is blocked before the action. Android failures must reach failed step data/errorCode as supported by the current envelope pipeline; never success with an embedded error string.
 
-Proposed CLI in PR-2:
+CLI implemented in PR-2:
 
 ```sh
 clawperator on-screen-log set --text "FLOW-001: Settings persist" --anchor right --text-align left --top-offset-dp 24 --edge-offset-dp 12 --width-dp 280 --font-size-sp 12 --text-color '#FFFFFFFF' --background-color '#B3000000' --ttl-ms 300000 --device <device_serial>

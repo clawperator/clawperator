@@ -115,6 +115,7 @@ describe("on-screen-log command", () => {
     for (const rest of [["on-screen-log"], ["on-screen-log", "set"], ["on-screen-log", "clear"]]) {
       assert.match(resolveHelpFromRegistry(rest, COMMANDS), /--ttl-ms/);
     }
+    assert.match(resolveHelpFromRegistry([], COMMANDS), /on-screen-log set\|clear/);
     assert.doesNotMatch(COMMANDS.logs.help, /--ttl-ms|on-screen-log set/);
   });
 

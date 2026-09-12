@@ -20,7 +20,7 @@ The order below minimizes shared-file conflicts. Hard dependencies are explicit;
 | --- | --- | --- | --- | --- |
 | R1 | [Selected Operator readiness](../../node/readiness-verification/plan.md) | 1 | None | Ready; [prompt](../../node/readiness-verification/agent-prompt.md) |
 | R2 | [Scaffold failure propagation](../../node/scaffold-failure-propagation/plan.md) | 1 | None | Ready; [prompt](../../node/scaffold-failure-propagation/agent-prompt.md) |
-| R3 | [On-screen logs PR-2](../../api/on-screen-logs/plan.md) | 3-4 | Its PR-1, merged in `120c1eb` | Ready; [initial prompt](../../api/on-screen-logs/agent-prompt.md) |
+| R3 | [On-screen logs PR-2](../../api/on-screen-logs/plan.md) | 3-4 | Its PR-1, merged in `120c1eb` | [DONE] implemented and validated locally; PR-2 finalization pending; [findings](../../api/on-screen-logs/findings.md#pr-2-validation-and-capture-proof) |
 | R4 | [Selector inspection PR-1](../../api/selector-inspection/plan.md) | 1 | None beyond merged main | Ready; [prompt](../../api/selector-inspection/agent-prompt.md) |
 | R5 | [Strict selectors PR-2](../../api/selector-inspection/plan.md) | 2 | R4 merged | Waiting for R4; [prompt](../../api/selector-inspection/pr-2-prompt.md) |
 | R6 | [Action-result diagnostics](../../api/action-result-diagnostics/plan.md) | 1 | R4 and R5 merged | Waiting for R5; [prompt](../../api/action-result-diagnostics/agent-prompt.md) |

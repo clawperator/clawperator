@@ -3,7 +3,7 @@
 ## Environment
 
 - PR-1 landed as `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d` (PR #266). Pre-squash references below are historical; use the landed commit as the prerequisite for PR-2.
-- Task-pack reconciliation after merge: source/docs inspection only. No build, device proof, or test execution was repeated during this documentation update. PR-2 is now requested but has not started.
+- Task-pack reconciliation after merge: source/docs inspection only. No build, device proof, or test execution was repeated during this documentation update. That reconciliation preceded the PR-2 implementation documented below.
 - Source revision at Phase 1 start: `5d23af58e6b383e9ed56e65e757db61bffb386e0` on branch `on-screen-prompt`.
 - PR-1 Node validation used the branch-local build under `apps/node/`; no global CLI was used.
 - Debug Operator: `com.clawperator.operator.dev`, rebuilt from this branch and installed for the proof.
@@ -16,8 +16,8 @@
 | --- | --- | --- |
 | 1 - Android Controller and Mechanism Proof | merged | `120c1eb` (historical phase commit `fdb2b12`) |
 | 2 - Raw Execution Contract and Public Documentation | merged | `120c1eb` (historical `3efc652`, alias follow-up `76c7be8`, and review fixes) |
-| 3 - CLI Convenience | not started; ready | prerequisite and continuation satisfied |
-| 4 - Cross-Surface Regression and Handoff | not started | after Phase 3 commit |
+| 3 - CLI Convenience | [DONE] locally implemented and validated | `22d0378`; top-level help follow-up in the proof commit |
+| 4 - Cross-Surface Regression and Handoff | [DONE] locally validated; finalization pending | PR-2 proof/status commit |
 
 ## Validation
 
@@ -111,4 +111,128 @@
 - The mechanism is proven for the tested screenshot and recording sequence, not as a general compositor-synchronization guarantee.
 - The Phase 2 live proof used the branch-local raw CLI and one API 35 emulator. Serve and MCP transport coverage uses local test doubles through the same Node executor, not a real remote client/device run.
 - A single raw execution that orders `set_on_screen_log`, `take_screenshot`, and `clear_on_screen_log` cannot currently guarantee that the output file contains the label because host screenshot capture finalizes after Android completes the list. PR-1 documents and proves the separate-execution workaround. Any interleaved capture redesign requires a separate design decision and is out of scope for both PRs in this task pack.
-- PR-1 is merged and PR-2 continuation is explicitly requested. The CLI convenience command and final CLI/live matrix remain unimplemented. The PR-2 agent must append its own evidence rather than treating the historical PR-1 checks as Phase 3/4 completion.
+- PR-2 completion and its separate live evidence are recorded below. The preceding validation rows are historical PR-1 evidence.
+
+
+## PR-2 Validation and Capture Proof
+
+Implemented on `on-screen-prompt-pr2` on 2026-09-12. The prerequisite check
+`git merge-base --is-ancestor 120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d HEAD`
+returned 0. CLI implementation/docs were committed as `22d0378`; the final
+proof commit includes the harness, CI coverage, a top-level help registration
+repair, and these status updates. Both phases are complete locally. Keep the
+pack for finalization; nothing was pushed, published, or merged.
+
+### Scope and Test Results
+
+- `on-screen-log set` and `clear` construct canonical actions and use
+  `runActionExecution`. Validation/defaults remain shared, raw aliases remain
+  unchanged, and returned step data remains string-valued without echoed text.
+- Public parser coverage includes missing/repeated/unknown flags, clear rejecting
+  panel options, positional/subcommand errors, whitespace/text limits, whole
+  decimal/exponent numeric tokens, zero offsets, colors, help, JSON/pretty
+  output, timeout/device/package forwarding, and global/local option placement.
+- Both actions have actual daemon-proxy regressions for pre-dispatch fallback,
+  lost acknowledgement, and malformed responses. Each uncertain case records
+  one POST and zero direct replays. Explicit no-daemon coverage uses the same
+  validated payload.
+
+| Check / invocation | Exit | Evidence and result |
+| --- | --- | --- |
+| `npm --prefix apps/node run build` then `npm --prefix apps/node run test` | 0 | 280 tests pass in the package's existing test selection. |
+| `node --test apps/node/dist/test/unit/onScreenLogValidation.test.js apps/node/dist/test/unit/onScreenLogCommand.test.js apps/node/dist/test/unit/cliRegistry.test.js apps/node/dist/test/unit/cliHelp.test.js apps/node/dist/test/unit/cliExitCode.test.js` | 0 | 210 focused public-interface tests pass. Explicit invocation is needed because the existing shell glob omits root-level unit files; CI explicitly includes the new command test. |
+| `./gradlew app:assembleDebug app:testDebugUnitTest shared:data:operator:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | Debug build and relevant Android unit suites pass; Gradle reports its existing deprecation notice. |
+| Branch-local `operator setup --apk <absolute_debug_apk> --device <device_serial> --operator-package com.clawperator.operator.dev` | 0 | Matching debug APK installed on the selected target; permissions and package verification succeeded. |
+| Branch-local `doctor --device <device_serial> --operator-package com.clawperator.operator.dev` | 0 | Ready API 35 debug target. |
+| `bash validation/on-screen-logs/test_overlay_mechanism_proof.sh` | 0 | Existing mechanism harness checks pass. |
+| `bash validation/on-screen-logs/test_raw_execution_contract.sh` | 0 | Existing raw fixtures and exact aliases retain their validation contract. |
+| `bash validation/on-screen-logs/test_cli_contract_proof.sh` | 0 | Fake executables prove parsing, per-case failure propagation, capture order, malformed output, missing assets, cleanup failure, and restoration after interruption with settings already changed. |
+| `bash validation/on-screen-logs/run_cli_contract_proof.sh --device <device_serial> --output-dir <absolute_output_dir>` | 0 | Final isolated matrix completed; 30 full-display PNGs inspected, including 20 images from ten separate five-command cycles. |
+| Separate branch-local daemon/default and `--no-daemon` set/clear invocations | 0 | Explicit debug package/device, zero offsets, custom colors, timeout, global/local options, and pretty output work; daemon status confirms the branch-local entry path. |
+| Supplemental read/wait/click using overlay-only text | 1, expected | Read/click reported no matching UI node; wait reported its 1000 ms node timeout. |
+| Supplemental interaction/video sequence | 0 | Touch through panel opened the real search field; keyboard retained separate overlay metadata; replacement and clear captured. |
+| `ffprobe` and frame extraction for `pr2-cli-proof.mp4` | 0 | H.264, 1080x2400, 10.670378 seconds, 3,211,671 bytes; decoded frames inspected for both labels and clear. |
+| `./scripts/docs_build.sh` | 0 | 31 navigation pages, 366 generated-doc links and 24 machine-facing routes validate; no docs organization warnings. |
+| `git diff --check` | 0 | No whitespace errors. |
+
+### Retained Local Evidence
+
+Artifacts are ignored and were not uploaded. Commands include the actual local
+target and paths in artifact files; committed examples use placeholders.
+
+- [Final case results](../../../validation/on-screen-logs/artifacts/pr2/matrix-complete/results.tsv),
+  [capture manifest](../../../validation/on-screen-logs/artifacts/pr2/matrix-complete/captures.tsv),
+  [visual review](../../../validation/on-screen-logs/artifacts/pr2/matrix-complete/visual-review.json),
+  and [restored settings](../../../validation/on-screen-logs/artifacts/pr2/matrix-complete/settings-restoration.tsv).
+- [Cycle contact sheet](../../../validation/on-screen-logs/artifacts/pr2/matrix-complete/cycle-contact.png)
+  and [style contact sheet](../../../validation/on-screen-logs/artifacts/pr2/matrix-complete/style-contact.png)
+  aid review; all original full-display PNGs remain alongside them.
+- [Playable video](../../../validation/on-screen-logs/artifacts/pr2/interaction/pr2-cli-proof.mp4),
+  [decoded video frames](../../../validation/on-screen-logs/artifacts/pr2/interaction/video-contact.png),
+  and [supplemental command results](../../../validation/on-screen-logs/artifacts/pr2/interaction/video-results.json).
+- Test/build logs, setup/doctor JSON, exact per-case `.command` files, and the
+  local supplemental drivers are under the same artifact root.
+
+### Observed Matrix
+
+The dedicated target was the API 35 emulator at 1080x2400 and 420 dpi. The other
+connected emulator was not used. No physical device was connected.
+
+- Defaults returned exactly the documented string-valued keys and bounds
+  `[21,157][756,236]`. Zero offsets returned `[0,136][735,215]`.
+- All four anchor/alignment combinations were visible. At 24 dp top and 12 dp
+  edge offsets, left bounds were `[32,199][505,278]` and right bounds were
+  `[575,199][1048,278]` for 180 dp width. This agrees with a 136 px top inset
+  plus 63 px requested offset, applied once. Six-digit and eight-digit colors
+  normalized to `#FFA1B2C3` and `#7F0A0B0C` and were visibly distinct from defaults.
+- Multiline text wrapped within 80 dp. The long 24 sp example returned
+  `truncated="true"` and visibly ended with an ellipsis at the bottom.
+- Invalid layout returned `ON_SCREEN_LOG_LAYOUT_INVALID`. Clear twice returned
+  exactly `visible="false"`. A 1000 ms TTL expired. A replacement with a longer
+  TTL remained visible after the predecessor's 10000 ms expiry deadline.
+- An existing panel survived rotation to landscape, verified by physical input
+  orientation, snapshot visibility, and the full 2400x1080 screenshot. Font
+  scale 1.5 enlarged the text. Service disconnect/reconnect started hidden.
+  Rotation policy, rotation, font scale, enabled services, and accessibility
+  state were restored and read back; cleanup returned hidden.
+- Each of ten cycles separately awaited set A, screenshot A, replacement B,
+  screenshot B, and clear. Every expected A/B label was visible; no stale or
+  missing label was found in the 20 successful-cycle images. There were no
+  hidden retries or capture sleeps.
+- Before/during/after inspection retained Settings foreground selection and
+  `[0,0][1080,2400]` app bounds while only the panel changed. Overlay-only text
+  was absent from the app hierarchy and could not satisfy read/wait/click.
+- A tap at `(450,650)` inside the panel opened Settings search and the real
+  text field. That intentional navigation selected Settings Intelligence;
+  the keyboard remained `has_overlay="true"` with its own input-method package
+  while `operator_overlay_visible="true"`. Clearing the panel did not hide or
+  relabel the keyboard. Returning to Settings was awaited before checking the
+  final foreground and bounds.
+- Video visibly shows a left blue panel, touch-through interaction, a right
+  pale panel with replacement text, then no panel after clear. Draw success
+  remains a draw callback acknowledgement, not an atomic compositor/capture promise.
+
+### Repairs, Limits, and Finalization
+
+- The first live harness run failed because adb dropped an empty settings
+  value while disabling the sole accessibility service. The harness now deletes
+  the key for an empty list, verifies the resulting state, restores every saved
+  setting before cleanup clear, and has a stateful fake-device regression.
+- A subsequent run stopped during cycle 4 because a concurrent docs build
+  replaced Node dependencies via `npm ci`. The failure propagated and cleanup
+  succeeded. This was a proof-orchestration error, not a panel failure; the final
+  matrix ran without a concurrent rebuild. Both aborted runs remain in artifacts.
+- An exploratory video driver initially used an Android class name as a role;
+  the supported role is `textfield`. A later immediate snapshot observed the
+  navigation transition. The final driver uses the correct role and awaits
+  foreground navigation; its entire sequence exits 0. These are driver repairs,
+  not changes to selectors or screenshot interleaving.
+- API 35 is the only PR-2 live platform. Older API/cutout paths retain PR-1 unit
+  coverage and documented fail-closed limits, without new device claims. Secure
+  windows, physical devices, and other OS versions were not tested. Serve/MCP
+  remain covered through the existing executor tests, not a new live remote client.
+- Durable contracts are in code/tests and `docs/api/on-screen-logs.md`; the
+  reproducible harness and its cleanup regressions belong in `validation/`.
+  No in-scope blocker remains. Keep this pack until PR-2 finalization. Timers,
+  inferred metadata, capture interleaving redesign, publication, and other packs
+  remain outside this change.

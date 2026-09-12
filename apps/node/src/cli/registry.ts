@@ -2044,6 +2044,7 @@ COMMANDS["on-screen-log"] = {
   name: "on-screen-log",
   group: "Device Interaction",
   summary: "Show, replace, or clear a static on-device diagnostic panel",
+  topLevelBlock: "  on-screen-log set|clear [--device <id>] [--operator-package <pkg>]     Show, replace, or clear an on-device diagnostic panel",
   help: HELP_ON_SCREEN_LOG,
   subtopics: { set: HELP_ON_SCREEN_LOG, clear: HELP_ON_SCREEN_LOG },
   documentedFlags: [...Object.keys(ON_SCREEN_LOG_FLAGS), "--no-daemon"],
