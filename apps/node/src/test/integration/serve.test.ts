@@ -204,7 +204,7 @@ describe("serve API integration", () => {
     assert.strictEqual(body.error.code, "DEVICE_NOT_FOUND");
   });
 
-  test("POST /execute carries strict set_on_screen_log fields to the canonical executor", async () => {
+  test("POST /execute normalizes exact on-screen-log action aliases through the canonical executor", async () => {
     const executionInput = {
       commandId: "test-on-screen-log-serve",
       taskId: "test-task",
@@ -214,7 +214,7 @@ describe("serve API integration", () => {
       actions: [
         {
           id: "set-panel",
-          type: "set_on_screen_log",
+          type: "on_screen_log_set",
           params: {
             text: "FLOW-001: Observe settings",
             anchor: "right",
@@ -227,6 +227,10 @@ describe("serve API integration", () => {
             backgroundColor: "#7f0a0b0c",
             ttlMs: 12000,
           },
+        },
+        {
+          id: "clear-panel",
+          type: "on_screen_log_clear",
         },
       ],
     };

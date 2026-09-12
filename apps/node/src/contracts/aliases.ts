@@ -18,7 +18,16 @@ const ACTION_ALIAS_TO_CANONICAL: Record<string, string> = {
   text_entry: "enter_text",
   input_text: "enter_text",
   key_press: "press_key",
+  on_screen_log_set: "set_on_screen_log",
+  on_screen_log_clear: "clear_on_screen_log",
 };
+
+const ON_SCREEN_LOG_EXACT_INPUT_TYPES = new Set([
+  "set_on_screen_log",
+  "clear_on_screen_log",
+  "on_screen_log_set",
+  "on_screen_log_clear",
+]);
 
 // NOTE: "doctor_ping" is intentionally absent. It is an internal diagnostic action
 // used only by `clawperator doctor` via broadcastAgentCommand, not the agent-facing API.
@@ -64,10 +73,11 @@ export function getCanonicalActionType(input: string): string {
   const canonical = ACTION_ALIAS_TO_CANONICAL[normalized] ?? normalized;
   if (
     (canonical === "set_on_screen_log" || canonical === "clear_on_screen_log") &&
-    input !== canonical
+    !ON_SCREEN_LOG_EXACT_INPUT_TYPES.has(input)
   ) {
-    // These raw actions are intentionally canonical-only. Do not let the general
-    // convenience normalizer turn case or whitespace variants into valid ingress.
+    // These raw actions accept only their exact canonical names and their two
+    // explicit aliases. Do not let generic normalization accept case or whitespace
+    // variants at the public ingress boundary.
     return input;
   }
   return canonical;

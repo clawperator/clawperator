@@ -317,7 +317,7 @@ describe("mcp stdio integration", () => {
     assert.ok(payload.envelope);
   });
 
-  it("carries strict set_on_screen_log fields through the execute tool", async () => {
+  it("normalizes exact on-screen-log action aliases through the execute tool", async () => {
     await client.initialize();
 
     const result = await client.callTool("execute", {
@@ -326,7 +326,7 @@ describe("mcp stdio integration", () => {
       actions: [
         {
           id: "set-panel",
-          type: "set_on_screen_log",
+          type: "on_screen_log_set",
           params: {
             text: "FLOW-001: Observe settings",
             anchor: "right",
@@ -339,6 +339,10 @@ describe("mcp stdio integration", () => {
             backgroundColor: "#7f0a0b0c",
             ttlMs: 12000,
           },
+        },
+        {
+          id: "clear-panel",
+          type: "on_screen_log_clear",
         },
       ],
     });

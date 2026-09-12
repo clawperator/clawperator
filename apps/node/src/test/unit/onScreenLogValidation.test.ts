@@ -171,15 +171,31 @@ describe("set_on_screen_log validation", () => {
     assertValidationFailure(executionFor("set_on_screen_log", { text: "retry", retry: { maxAttempts: 2 } }));
     assertValidationFailure(executionFor("set_on_screen_log", { text: "alias", text_align: "right" }));
     assertValidationFailure(executionFor("set_on_screen_log", { value: "generic parameter alias" }));
+    assertValidationFailure(executionFor("on_screen_log_set", { value: "generic parameter alias" }));
   });
 
-  it("does not add an action-type alias", () => {
+  it("normalizes the exact on-screen-log action aliases to canonical types", () => {
+    assert.strictEqual(normalizeActionType("on_screen_log_set"), "set_on_screen_log");
+    assert.strictEqual(normalizeActionType("on_screen_log_clear"), "clear_on_screen_log");
+
+    const set = validateExecution(executionFor("on_screen_log_set", { text: "alias set" }));
+    const clear = validateExecution(executionFor("on_screen_log_clear"));
+
+    assert.strictEqual(set.actions[0]?.type, "set_on_screen_log");
+    assert.strictEqual(clear.actions[0]?.type, "clear_on_screen_log");
+  });
+
+  it("rejects non-exact on-screen-log action names", () => {
     assert.throws(() => normalizeActionType("on_screen_log"));
     assert.throws(() => normalizeActionType("SET_ON_SCREEN_LOG"));
     assert.throws(() => normalizeActionType(" clear_on_screen_log "));
+    assert.throws(() => normalizeActionType(" on_screen_log_set "));
+    assert.throws(() => normalizeActionType("ON_SCREEN_LOG_CLEAR"));
     assertValidationFailure(executionFor("on_screen_log", { text: "not canonical" }));
     assertValidationFailure(executionFor("SET_ON_SCREEN_LOG", { text: "not canonical" }));
     assertValidationFailure(executionFor(" clear_on_screen_log "));
+    assertValidationFailure(executionFor(" on_screen_log_set ", { text: "not exact" }));
+    assertValidationFailure(executionFor("ON_SCREEN_LOG_CLEAR"));
   });
 
   it("preserves the existing enter_text text limit", () => {
