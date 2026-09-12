@@ -2,7 +2,7 @@
 
 This coordinates the runtime-observability workstream and its release-readiness follow-ups. Implementation status does not imply publication or completion of the release gates.
 
-R1-R6 and R10 are merged. R6 landed in `a44ad0bf` (PR #278). The 13 September audit of that commit found a nested-scroll failure, a Settings preparation gap and intermittent result-transport failures. R11, R12 and R13 below own those follow-ups respectively. Five task packs remain active, covering six planned implementation PRs including the two evidence phases.
+R1-R6 and R10 are merged. R6 landed in `a44ad0bf` (PR #278). The 13 September audit of that commit found a nested-scroll failure, a Settings preparation gap and intermittent result-transport failures. R11, R12 and R13 below own those follow-ups respectively. R7 is implemented and locally validated in `5c1126d`; its pack is retired and its PR is pending merge. Four task packs remain active, covering five planned implementation PRs including the two evidence phases.
 
 ## Folder ownership
 
@@ -29,7 +29,7 @@ The order below minimizes shared-file conflicts. Hard dependencies are explicit;
 | R11 | [Scroll container transitions](../../android/scroll-container-transitions/plan.md) | 1 PR | R4/R5/R6 merged | Planned; audit finding #1; [prompt](../../android/scroll-container-transitions/agent-prompt.md) |
 | R13 | [Result transport reliability](../../node/result-transport-reliability/plan.md) | 1 PR, 3 phases | R6/R10 merged | Planned; audit finding #4; [prompt](../../node/result-transport-reliability/agent-prompt.md) |
 | R12 | [Hierarchy harness preparation](../../android/hierarchy-harness-preparation/plan.md) | 1 PR | R10 merged; combined release proof also needs R11/R13 | Implemented locally; debug API 36 preparation verified; release launch timeout and API 35 proof remain open; [follow-up](../../android/hierarchy-harness-preparation/agent-prompt.md) |
-| R7 | [Compact snapshots](../../node/compact-snapshots/plan.md) | 1 | R4 merged for additive XML visibility | Ready on merged R4; [prompt](../../node/compact-snapshots/agent-prompt.md) |
+| R7 | [Compact snapshots](../../../docs/api/snapshot.md#compact-output-and-raw-artifacts) | Complete | R4 merged for additive XML visibility | [DONE] implemented and locally validated in `5c1126d`; pending merge; pack retired; [validation and limits](../../../docs/internal/design/compact-snapshots.md#validation-and-compatibility) |
 | R8 | [Still evidence PR-1](../../node/evidence-capture/plan.md) | 1 | None beyond merged main | Ready; [prompt](../../node/evidence-capture/agent-prompt.md) |
 | R9 | [Managed video PR-2](../../node/evidence-capture/plan.md) | 2 | R8 merged | Waiting for R8; [prompt](../../node/evidence-capture/pr-2-prompt.md) |
 
@@ -86,7 +86,7 @@ This covers the agreed foundation and evidence gaps. It is not a promise that on
 
 **Evidence integration gate:** R8 must pass before adopting its manifest as the stable report input; R9 must pass before claiming managed-video support. Existing screenshot and explicit ADB recording helpers remain usable while these APIs are developed. Reports must distinguish unavailable evidence from failed test assertions, and never equate file existence with proof.
 
-**Optional convenience:** R3 is implemented; R7 remains planned. They reduce authoring/inspection overhead without being technical prerequisites for deterministic execution. R1-R6 and R10 are merged; R11-R13 are outstanding follow-ups. Consumer development and independent media implementation may proceed, but do not waive these release blockers or the required combined proof.
+**Optional convenience:** R3 is implemented; R7 is locally complete pending merge. They reduce authoring/inspection overhead without being technical prerequisites for deterministic execution. R1-R6 and R10 are merged; R11-R13 are outstanding follow-ups. Consumer development and independent media implementation may proceed, but do not waive these release blockers or the required combined proof.
 
 ## Implementation handoff and release acceptance
 

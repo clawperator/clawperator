@@ -275,6 +275,14 @@ describe("mcp stdio integration", () => {
     assert.ok(Array.isArray(payload.devices));
   });
 
+  it("rejects compact snapshot option conflicts and caller-controlled raw paths over stdio", async () => {
+    await client.initialize();
+    for (const args of [{ compact: true, maxChars: 100 }, { maxNodes: 20 }, { maxTextChars: 10 },
+      { rawPath: "/tmp/caller-controlled.xml" }, { compact: true, maxNodes: 1001 }, { saveRaw: "yes" }]) {
+      assertInvalidParams(await client.requestTool("snapshot", args));
+    }
+  });
+
   it("calls snapshot over the stdio protocol", async () => {
     await client.initialize();
 
