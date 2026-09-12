@@ -1,6 +1,6 @@
 # v0.10 runtime observability implementation order
 
-This coordinates five active runtime-observability task packs and the completed readiness, scaffold-failure, and on-screen-log implementations. It replaces the former standalone observability index. It does not schedule every unrelated task in the repository or claim that implementation has shipped.
+This coordinates four active runtime-observability task packs and the completed readiness, scaffold-failure, and on-screen-log implementations. It replaces the former standalone observability index. It does not schedule every unrelated task in the repository or claim that implementation has shipped.
 
 R1 merged in `cfc90af` (PR #271), R2 in `654d333` (PR #272), and R3 raw API/CLI in `120c1eb` / `dd66a25`. R4 merged in `8cab7adb` (PR #273), including query failure preservation and cleanup. R10 sensitive hierarchy access is implemented and locally validated on its implementation branch, pending merge and manual release CI. Four feature packs remain open, with five implementation PRs remaining after R10.
 
@@ -32,7 +32,9 @@ The order below minimizes shared-file conflicts. Hard dependencies are explicit;
 
 R3 is not a prerequisite for selectors or evidence; the raw overlay API is already merged. R7 and R8 can land before R6 if useful. R1 and R8 do not depend on one another: evidence metadata collection must not call doctor as a hidden mutation or readiness gate.
 
-R10 keeps its ID to avoid renumbering existing handoffs; it can run after R4 independently of R5-R9.
+R10 is locally complete independently of R5-R9. Preserve its sensitivity metadata
+when integrating those implementations. Its shared Robolectric prerequisite
+(PR #274, `fc70c17d`) is included on the implementation branch.
 
 ## Shared-file coordination
 
@@ -41,6 +43,7 @@ R10 keeps its ID to avoid renumbering existing handoffs; it can run after R4 ind
 - R7 consumes raw XML plus R4's additive visibility attribute. It must not implement a separate selector engine, reuse observation paths as persistent handles, or strip the overlay metadata introduced by PR #266.
 - R8 may extract the existing targeted screenshot helper if required to preserve image capture when the app hierarchy is absent. Keep it shared with normal screenshots; do not redesign action-list interleaving or implement R6 incidentally. Rebase after other changes to runExecution.ts.
 - Preserve PR #266's strict raw-action aliases, ON_SCREEN_LOG_* errors, controller-owned window identity, and separate-execution screenshot guidance in every affected PR.
+- [Repository test consolidation](../../../docs/internal/design/test-execution.md) is a separate-PR follow-up. Preserve the explicit query/MCP checks until central discovery includes them; do not add automatic emulator runs to PR checks.
 - Existing `tasks/node/skill-preflight-metadata`, doctor SDK-install findings, recording-export follow-up, and I/O optimization work remain separate. None is a prerequisite here; coordinate shared files without absorbing their scope.
 
 ## Coverage and boundaries

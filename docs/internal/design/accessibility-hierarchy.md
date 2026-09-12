@@ -54,8 +54,8 @@ The manual CI workflow runs both APK variants on an API 35 Google APIs x86_64 re
 image with English locale. It checks the revision explicitly, verifies packaged
 service metadata through the compiled resource table, runs offline assertions,
 and executes the actual emulator regression. A new image requires deliberate
-requalification. Android test suites use the shared Robolectric 4.11.1 dependency, which supports
-the API-34 method.
+requalification. Android test suites use the shared Robolectric 4.11.1
+dependency, which supports the API-34 method.
 
 Implementation verification uses CLI 0.10.0, development APK 0.10.0-d, and release
 APK 0.10.0 on an API 35 arm64 Google image, build AE3A.240806.036/12592187.
@@ -72,8 +72,8 @@ Acceptance completed on the implementation branch:
 | Isolated same-code APK with `isAccessibilityTool=false` | Harness failed at Internet `query_ui` with `UI_TREE_UNAVAILABLE`, `serviceAvailable=true`, `rootAvailable=false`; correlation and failed step retained |
 | Screenshot with unavailable hierarchy | Independent failure PNG decoded successfully |
 | Packaged declaration and manifest binding | Both intended APKs passed; false-declaration APK was rejected |
-| Android build and unit tests | Both variants built; full `testDebugUnitTest` passed; final changed shared suite passed |
-| Node build and standard tests | 306 tests passed |
+| Android build and unit tests | Both variants built and all `testDebugUnitTest` tasks passed with shared Robolectric 4.11.1 |
+| Node build and standard tests | 306 tests passed; the default command does not discover every test file |
 | Focused query/MCP tests | 94 tests passed, including sensitivity transport and older-payload compatibility |
 | Offline harness fixtures | Five tests passed for hierarchy/state/XML failures and old-payload handling |
 | Authored docs | Full docs build and route validation passed |
@@ -98,3 +98,16 @@ job runs only through `workflow_dispatch`, by user direction to avoid slow PR
 checks. It has no PR or push trigger; local validation does not claim a remote
 CI result. No runtime skill consumes a strict NodeSummary schema requiring a
 migration for this additive field.
+
+## Deferred validation and transport work
+
+The [repository test runner follow-up](test-execution.md) owns test consolidation
+and the shell-dependent Node discovery gap. R10's focused query/MCP checks were
+run explicitly; its acceptance does not establish coverage of every Node test.
+
+The MCP transport sanitizer removes path-named fields, including `nodePath` and
+`parentPath`, from the parsed query object. The serialized query inside the raw
+envelope retains them. The live harness compares application content, state,
+bounds, and sensitivity; it does not claim parsed observation-path parity.
+A separate MCP transport change should distinguish observation paths from host
+filesystem paths and test both field preservation and host-path sanitization.
