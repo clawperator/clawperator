@@ -1,8 +1,8 @@
 # v0.10 runtime observability implementation order
 
-This coordinates five active runtime-observability task packs and the completed readiness and on-screen-log implementations. It replaces the former standalone observability index. It does not schedule every unrelated task in the repository or claim that implementation has shipped.
+This coordinates four active runtime-observability task packs and the completed readiness, scaffold-failure, and on-screen-log implementations. It replaces the former standalone observability index. It does not schedule every unrelated task in the repository or claim that implementation has shipped.
 
-Runtime source audit: `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d`. Handoff guidance refreshed against `d12f687` after the task packs merged in `008dcb2`; this refinement does not change runtime contracts or release dependencies. On-screen logs raw API (PR #266, `120c1eb`) and CLI (PR #270, `dd66a25`) are merged. Its task pack was retired with explicit user authorization. R1 merged in `cfc90af` (PR #271); its single-PR task pack was retired by explicit cleanup request. R2 is implemented on the current branch and awaits review/merge. Four other packs remain unimplemented, with six implementation PRs remaining after R2.
+Runtime source audit: `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d`. Handoff guidance refreshed against `d12f687` after the task packs merged in `008dcb2`; this refinement does not change runtime contracts or release dependencies. On-screen logs raw API (PR #266, `120c1eb`) and CLI (PR #270, `dd66a25`) are merged. Its task pack was retired with explicit user authorization. R1 merged in `cfc90af` (PR #271); its single-PR task pack was retired by explicit cleanup request. R2 is implemented and validated in `ebba364` and awaits review/merge; its single-PR pack was retired by explicit cleanup request. Four other packs remain unimplemented, with six implementation PRs remaining after R2.
 
 ## Folder ownership
 
@@ -19,7 +19,7 @@ The order below minimizes shared-file conflicts. Hard dependencies are explicit;
 | Order / ID | Implementation | Phase(s) | Hard dependency | Current state |
 | --- | --- | --- | --- | --- |
 | R1 | [Selected Operator readiness](../../../docs/api/doctor.md) | Complete | None | [DONE] merged in `cfc90af` (PR #271); pack retired; [verification and limits](../../../docs/internal/design/doctor-readiness.md) |
-| R2 | [Scaffold failure propagation](../../node/scaffold-failure-propagation/plan.md) | 1 | None | [DONE] implementation validated; review/merge pending; [prompt](../../node/scaffold-failure-propagation/agent-prompt.md) |
+| R2 | [Scaffold failure propagation](../../../docs/skills/authoring.md) | Complete | None | [DONE] implemented and validated in `ebba364`; review/merge pending; pack retired; [verification](../../../docs/internal/design/skill-scaffold-execution.md) |
 | R3 | [On-screen logs CLI](../../../docs/api/on-screen-logs.md) | Complete | Raw API merged in `120c1eb` | [DONE] merged in `dd66a25` (PR #270); pack retired; [verification and limits](../../../docs/internal/design/on-screen-logs.md) |
 | R4 | [Selector inspection PR-1](../../api/selector-inspection/plan.md) | 1 | None beyond merged main | Ready; [prompt](../../api/selector-inspection/agent-prompt.md) |
 | R5 | [Strict selectors PR-2](../../api/selector-inspection/plan.md) | 2 | R4 merged | Waiting for R4; [prompt](../../api/selector-inspection/pr-2-prompt.md) |
@@ -28,7 +28,7 @@ The order below minimizes shared-file conflicts. Hard dependencies are explicit;
 | R8 | [Still evidence PR-1](../../node/evidence-capture/plan.md) | 1 | None beyond merged main | Ready; [prompt](../../node/evidence-capture/agent-prompt.md) |
 | R9 | [Managed video PR-2](../../node/evidence-capture/plan.md) | 2 | R8 merged | Waiting for R8; [prompt](../../node/evidence-capture/pr-2-prompt.md) |
 
-R3 is not a prerequisite for selectors or evidence; the raw overlay API is already merged. R7 and R8 can land before R6 if useful. R2 is isolated enough to implement independently. R1 and R8 do not depend on one another: evidence metadata collection must not call doctor as a hidden mutation or readiness gate.
+R3 is not a prerequisite for selectors or evidence; the raw overlay API is already merged. R7 and R8 can land before R6 if useful. R1 and R8 do not depend on one another: evidence metadata collection must not call doctor as a hidden mutation or readiness gate.
 
 ## Shared-file coordination
 
@@ -73,7 +73,7 @@ This covers the agreed foundation and evidence gaps. It is not a promise that on
 
 ## Implementation handoff and release acceptance
 
-For a selected row, use that pack's plan for the contract and its work breakdown for scope, progress, and acceptance; consult source pointers as needed. Complete the requested PR through implementation, relevant validation, repairs, docs, status, and local commits. Dependencies define rollout order, not an approval pause within an authorized PR. Each row links a short PR-specific prompt. These are convenient entry points, not another specification: the plan owns the contract and the work breakdown owns execution scope and evidence. Pending-PR prompts retain their merge gates. An agent can also start from an instruction such as "Implement R2 from tasks/releases/v0.10/plan.md through validation and local commits." Naming the row establishes authorization; the release table alone does not authorize implementing every row. Use `.agents/skills/task-create-impl-prompt/SKILL.md` when a different handoff is needed.
+For a selected row, use that pack's plan for the contract and its work breakdown for scope, progress, and acceptance; consult source pointers as needed. Complete the requested PR through implementation, relevant validation, repairs, docs, status, and local commits. Dependencies define rollout order, not an approval pause within an authorized PR. Each pending implementation row links a short PR-specific prompt. These are convenient entry points, not another specification: the plan owns the contract and the work breakdown owns execution scope and evidence. Pending-PR prompts retain their merge gates. An agent can also start from an instruction such as "Implement R4 from tasks/releases/v0.10/plan.md through validation and local commits." Naming the row establishes authorization; the release table alone does not authorize implementing every row. Use `.agents/skills/task-create-impl-prompt/SKILL.md` when a different handoff is needed.
 
 Before merging each implementation PR:
 
