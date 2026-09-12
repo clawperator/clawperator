@@ -211,7 +211,7 @@ describe("mcp stdio integration", () => {
     assert.ok(Array.isArray(tools));
     assert.deepStrictEqual(
       tools.map(tool => tool.name),
-      ["devices", "snapshot", "execute", "configure", "query_ui", "open", "click", "type", "read", "press", "wait", "scroll", "scroll_until", "scroll_and_click"],
+      ["devices", "snapshot", "execute", "configure", "query_ui", "open", "click", "type", "read", "press", "wait", "scroll", "scroll_until", "scroll_and_click", "evidence_capture"],
     );
 
     const execute = tools.find((tool) => tool.name === "execute");
@@ -280,6 +280,14 @@ describe("mcp stdio integration", () => {
     for (const args of [{ compact: true, maxChars: 100 }, { maxNodes: 20 }, { maxTextChars: 10 },
       { rawPath: "/tmp/caller-controlled.xml" }, { compact: true, maxNodes: 1001 }, { saveRaw: "yes" }]) {
       assertInvalidParams(await client.requestTool("snapshot", args));
+    }
+  });
+
+  it("rejects evidence output paths and invalid context over stdio", async () => {
+    await client.initialize();
+    for (const args of [{ outputDir: "/tmp/forbidden" }, { rawPath: "/tmp/forbidden" },
+      { context: [] }, { context: null }, { context: { text: "x".repeat(16384) } }, { label: "x".repeat(2049) }]) {
+      assertInvalidParams(await client.requestTool("evidence_capture", args));
     }
   });
 

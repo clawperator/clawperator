@@ -11,6 +11,10 @@ export const ERROR_CODES = {
   COMMAND_TIMEOUT: "COMMAND_TIMEOUT",
   COMMAND_CANCELLED: "COMMAND_CANCELLED",
   CONTAINER_LOST: "CONTAINER_LOST",
+  /** Still bundle could not be fully captured or persisted; inspect the retained manifest when available. */
+  EVIDENCE_CAPTURE_FAILED: "EVIDENCE_CAPTURE_FAILED",
+  /** Choose a new evidence output directory; existing destinations are never overwritten. */
+  EVIDENCE_OUTPUT_EXISTS: "EVIDENCE_OUTPUT_EXISTS",
   // Host
   HOST_DEPENDENCY_MISSING: "HOST_DEPENDENCY_MISSING",
 
