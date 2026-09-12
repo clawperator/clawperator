@@ -1,6 +1,6 @@
 # Make result transport failures typed and diagnosable
 
-R13, follow-up to R6/R10 integration. Status: planned. One implementation PR containing investigation, in-scope fixes and evidence.
+R13, follow-up to R6/R10 integration. Status: implemented locally with focused evidence; reliability/release gates remain open. One implementation PR containing investigation, in-scope fixes and evidence.
 
 ## Outcome and observations
 
@@ -34,3 +34,16 @@ Between failures, doctor, open and ten consecutive full release Settings queries
 R6/R10 are merged. This PR can begin independently of R11/R12. Full regression success needs their fixes; focused transport proof must not require falsely marking their failures passed. Keep any new reusable reliability harness under `validation/`; wire offline checks into existing test discovery and live checks into explicit/manual validation only.
 
 Document public codes in `docs/api/errors.md` and durable causal findings, reproduction and limits in `docs/internal/design/result-transport-reliability.md`. Use docs-author/docs-build skills. Choosing exact new code names is an implementation decision subject to the existing error taxonomy, not an unresolved user approval.
+
+## Local implementation outcome
+
+Stable lifecycle codes, dispatch-after-exit prevention, bounded diagnostics and
+Android chunk pacing are implemented. See the [durable findings and complete
+attempt accounting](../../../docs/internal/design/result-transport-reliability.md).
+The original debug publication reproduced three transport failures. Paced debug
+had 59/60 successful commands (one service-startup failure); paced release had
+60/60. Both variants completed all 40 full queries without transport failure.
+The original live exit-255 and zero-event timeout causes remain unproven; the
+reliability phase and release gates are not marked complete. After integration
+with main, combined debug hierarchy proof passed; release retained a Wi-Fi
+switch fixture-readiness failure. Manual CI remains outstanding.

@@ -881,6 +881,11 @@ Execution-related events:
 | `clawperator:result` | `{ "deviceId": "<serial>", "envelope": <ResultEnvelope> }` |
 | `clawperator:execution` | `{ "deviceId": "<serial>", "input": <unknown>, "result": <RunExecutionResult> }` |
 
+Host transport failures appear in `clawperator:execution` with `result.ok: false`
+and structured error diagnostics. They do not emit a synthetic
+`clawperator:result` envelope. Subscribe to execution events to observe every
+host outcome, including failures before a terminal Android result is available.
+
 Use `/events` when:
 
 - you want push-style result observation instead of polling

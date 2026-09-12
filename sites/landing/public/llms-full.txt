@@ -6207,6 +6207,10 @@ Only the codes defined in `apps/node/src/contracts/errors.ts` are part of the pu
 | <a id="error-execution-action-unsupported"></a>`EXECUTION_ACTION_UNSUPPORTED` | Execution action unsupported | - |
 | <a id="error-execution-conflict-in-flight"></a>`EXECUTION_CONFLICT_IN_FLIGHT` | Execution conflict in flight | - |
 | <a id="error-result-envelope-timeout"></a>`RESULT_ENVELOPE_TIMEOUT` | Result envelope timeout | - |
+| <a id="error-result-transport-spawn-failed"></a>`RESULT_TRANSPORT_SPAWN_FAILED` | Result transport spawn failed | - |
+| <a id="error-result-transport-exited"></a>`RESULT_TRANSPORT_EXITED` | Result transport exited | - |
+| <a id="error-result-transport-cancelled"></a>`RESULT_TRANSPORT_CANCELLED` | Result transport cancelled | - |
+| <a id="error-result-transport-failed"></a>`RESULT_TRANSPORT_FAILED` | Result transport failed | - |
 | <a id="error-result-envelope-malformed"></a>`RESULT_ENVELOPE_MALFORMED` | Result envelope malformed | - |
 | <a id="error-snapshot-artifact-write-failed"></a>`SNAPSHOT_ARTIFACT_WRITE_FAILED` | Snapshot artifact write failed | Raw XML could not be written to a new host artifact. The execution envelope is retained. |
 | <a id="error-snapshot-extraction-failed"></a>`SNAPSHOT_EXTRACTION_FAILED` | Snapshot extraction failed | - |
@@ -6377,6 +6381,40 @@ Recovery:
 
 - add the missing argument or flag
 - rerun the command
+
+### Result transport failures
+
+These errors describe the host's inability to obtain a terminal Android result.
+They do not prove that an accepted action failed or that replay is safe.
+
+| Code | Meaning |
+| --- | --- |
+| `RESULT_TRANSPORT_SPAWN_FAILED` | The result reader process could not start. A missing ADB executable retains `ADB_NOT_FOUND`. |
+| `RESULT_TRANSPORT_EXITED` | The reader closed before a complete correlated terminal result. |
+| `RESULT_TRANSPORT_CANCELLED` | The host cancelled its result wait. This does not cancel an already dispatched Android action. |
+| `RESULT_TRANSPORT_FAILED` | Fallback for an unclassified host transport failure; error prose is never a code. |
+| `RESULT_ENVELOPE_MALFORMED` | Correlated framing, chunk metadata, ordering, size, checksum or envelope parsing failed. |
+
+`details` preserves `commandId`, `taskId`, `deviceId`, `operatorPackage`,
+`broadcastDispatchStatus`, `dispatchAttempted`, and `executionPosition: "unknown"`.
+`dispatchAttempted: true` means the dispatch boundary was entered, not that
+Android acknowledged or completed the action. A reader that dies during
+preflight prevents the deferred broadcast from dispatching.
+
+Process failures include `exitCode` and `signal` when known, or
+`processErrorCode` and `originalMessage` for spawn errors. Diagnostics retain a
+stderr tail of at most 8,192 characters and bounded correlated log lines.
+Partial chunk diagnostics
+report received/expected chunks and bytes; incomplete chunks are not action
+receipts. MCP preserves classification and correlation while applying its
+existing raw-stderr redaction.
+
+CLI execution failures exit nonzero. Serve returns a non-success HTTP status
+and the same structured execution failure; daemon routing does not retry an
+uncertain dispatch. SSE subscribers must consume `clawperator:execution` for
+host failures. Such failures no longer synthesize a `clawperator:result`
+terminal Android envelope. Inspect observed application state before deciding
+whether another mutation is appropriate.
 
 ### `RESULT_ENVELOPE_TIMEOUT`
 
@@ -7486,6 +7524,11 @@ Execution-related events:
 | --- | --- |
 | `clawperator:result` | `{ "deviceId": "<serial>", "envelope": <ResultEnvelope> }` |
 | `clawperator:execution` | `{ "deviceId": "<serial>", "input": <unknown>, "result": <RunExecutionResult> }` |
+
+Host transport failures appear in `clawperator:execution` with `result.ok: false`
+and structured error diagnostics. They do not emit a synthetic
+`clawperator:result` envelope. Subscribe to execution events to observe every
+host outcome, including failures before a terminal Android result is available.
 
 Use `/events` when:
 

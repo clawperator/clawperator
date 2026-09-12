@@ -89,3 +89,14 @@ describe("large query result transport", () => {
     stdout.destroy(); stderr.destroy();
   });
 });
+
+it("reports missing chunk progress and rejects truncated metadata and size mismatch", () => {
+  const frames = chunks();
+  const reader = new ResultEnvelopeTransport(commandId);
+  reader.consume(frame(frames[0]));
+  assert.deepEqual(reader.diagnostics(), { receivedChunks: 1, receivedBytes: 1024,
+    expectedChunks: frames.length, expectedBytes: Buffer.byteLength(canonical) });
+  assert.throws(() => reader.consume(frame(frames[1]).slice(0, -10)), /Malformed/);
+  const invalid = { ...frames[0], byteLength: 1, count: 1 };
+  assert.throws(() => new ResultEnvelopeTransport(commandId).consume(frame(invalid)), /chunk data/);
+});
