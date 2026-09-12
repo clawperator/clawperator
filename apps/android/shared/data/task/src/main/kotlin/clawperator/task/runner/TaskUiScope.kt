@@ -310,7 +310,8 @@ interface TaskUiScope {
         clickAfter: Boolean = true,
         strict: Boolean = false,
     ) {
-        scrollIntoView(target, container, direction, maxSwipes, distanceRatio, settleDelay, scrollRetry, findFirstScrollableChild, strict)
+        val result = scrollUntil(target, container, direction, maxSwipes, distanceRatio, settleDelay, scrollRetry, findFirstScrollableChild, strict)
+        if (result !is TaskScrollResult.Found) throw UiActionFailure("NODE_NOT_FOUND", "Target node not found after scrolling: $target")
         if (clickAfter) {
             clickScrollTarget(
                 target = target,
@@ -319,6 +320,7 @@ interface TaskUiScope {
                 retry = clickRetry,
                 strict = strict,
                 container = container,
+                scope = result.scope,
             )
         }
     }
@@ -330,6 +332,7 @@ interface TaskUiScope {
         findFirstScrollableChild: Boolean = true,
         clickTypes: UiTreeClickTypes = UiTreeClickTypes.Default,
         retry: TaskRetry = TaskRetryPresets.UiReadiness,
+        scope: TaskScrollScope? = null,
     ) {
         click(matcher = target, container = container, strict = strict, clickTypes = clickTypes, retry = retry)
     }

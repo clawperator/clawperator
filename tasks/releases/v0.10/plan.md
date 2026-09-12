@@ -2,7 +2,7 @@
 
 This coordinates the runtime-observability workstream and its release-readiness follow-ups. Implementation status does not imply publication or completion of the release gates.
 
-R1-R6 and R10 are merged. R6 landed in `a44ad0bf` (PR #278). The 13 September audit of that commit found a nested-scroll failure, a Settings preparation gap and intermittent result-transport failures. R11, R12 and R13 below own those follow-ups respectively. Five task packs remain active, covering six planned implementation PRs including the two evidence phases.
+R1-R6 and R10 are merged. R6 landed in `a44ad0bf` (PR #278). The 13 September audit of that commit found a nested-scroll failure, a Settings preparation gap and intermittent result-transport failures. R11, R12 and R13 below own those follow-ups respectively. R11 is implemented and locally validated on its implementation branch, pending merge; its pack is retired. Four task packs remain active, covering five planned implementation PRs including the two evidence phases.
 
 ## Folder ownership
 
@@ -26,7 +26,7 @@ The order below minimizes shared-file conflicts. Hard dependencies are explicit;
 | R10 | [Sensitive hierarchy access](../../../docs/internal/design/accessibility-hierarchy.md) | Complete | R4 merged | [DONE] merged in `f70c89cb` (PR #275); manual release CI remains required; pack retired; [regression harness](../../../validation/sensitive-hierarchy-access/README.md) |
 | R5 | [Strict selectors PR-2](../../../docs/api/selectors.md#strict-action-selection) | Complete | R4 merged | [DONE] merged in `09987ebc` (PR #276); pack retired; [validation and limits](../../../docs/internal/design/selector-inspection.md#validation-and-compatibility) |
 | R6 | [Action-result diagnostics](../../../docs/api/actions.md#action-receipts-and-failure-evidence) | Complete | R4 and R5 merged | [DONE] merged in `a44ad0bf` (PR #278); pack retired; [validation and limits](../../../docs/internal/design/action-result-diagnostics.md#validation-and-compatibility) |
-| R11 | [Scroll container transitions](../../android/scroll-container-transitions/plan.md) | 1 PR | R4/R5/R6 merged | Planned; audit finding #1; [prompt](../../android/scroll-container-transitions/agent-prompt.md) |
+| R11 | [Scroll container transitions](../../../docs/internal/design/action-result-diagnostics.md#scroll-eligibility-transition-validation-r11) | Complete locally | R4/R5/R6 merged | [DONE] implementation and focused API-35 proof; 454 Android / 1,461 Node tests; unchanged hierarchy harness passed once; pending merge, with R12/R13 and manual release CI gates retained; pack retired |
 | R13 | [Result transport reliability](../../node/result-transport-reliability/plan.md) | 1 PR, 3 phases | R6/R10 merged | Planned; audit finding #4; [prompt](../../node/result-transport-reliability/agent-prompt.md) |
 | R12 | [Hierarchy harness preparation](../../android/hierarchy-harness-preparation/plan.md) | 1 PR | R10 merged; combined release proof also needs R11/R13 | Planned; audit finding #2; [prompt](../../android/hierarchy-harness-preparation/agent-prompt.md) |
 | R7 | [Compact snapshots](../../node/compact-snapshots/plan.md) | 1 | R4 merged for additive XML visibility | Ready on merged R4; [prompt](../../node/compact-snapshots/agent-prompt.md) |
@@ -86,7 +86,7 @@ This covers the agreed foundation and evidence gaps. It is not a promise that on
 
 **Evidence integration gate:** R8 must pass before adopting its manifest as the stable report input; R9 must pass before claiming managed-video support. Existing screenshot and explicit ADB recording helpers remain usable while these APIs are developed. Reports must distinguish unavailable evidence from failed test assertions, and never equate file existence with proof.
 
-**Optional convenience:** R3 is implemented; R7 remains planned. They reduce authoring/inspection overhead without being technical prerequisites for deterministic execution. R1-R6 and R10 are merged; R11-R13 are outstanding follow-ups. Consumer development and independent media implementation may proceed, but do not waive these release blockers or the required combined proof.
+**Optional convenience:** R3 is implemented; R7 remains planned. They reduce authoring/inspection overhead without being technical prerequisites for deterministic execution. R1-R6 and R10 are merged; R11 is complete locally pending merge, while R12/R13 remain outstanding. Consumer development and independent media implementation may proceed, but do not waive these release blockers or the required combined proof.
 
 ## Implementation handoff and release acceptance
 

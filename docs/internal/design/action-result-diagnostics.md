@@ -40,6 +40,20 @@ per-node sensitivity metadata from hierarchy access.
   unique resource/class match and unchanged bounds, path, and ancestor context.
   Paths alone are never handles or proof of identity. Ambiguity is `unknown`;
   disappearance is `container_lost`. No current path emits `edge_reached`.
+  Re-observation searches all visible nodes for the original identity, independently
+  of their current scrollable flag. It never substitutes an eligible descendant.
+- A `TaskScrollScope` retains the initial tree and node only within the operation;
+  it is not serialized as a reusable handle. The loop passes it through final
+  target confirmation and click. An observed target remains valid within this
+  scope after eligibility loss. Absent targets end with `CONTAINER_NOT_SCROLLABLE`
+  after bounded observation; true disappearance, replacement, or unresolved
+  identity ends the search with `CONTAINER_LOST` (strict ambiguity keeps
+  `CONTAINER_AMBIGUOUS`). Standalone scrolls retain
+  measured progress even when the identifiable container stops being scrollable.
+  Strict target ambiguity still fails before any click. Legacy global target
+  matching remains available before scope selection, but cannot override a
+  completed scoped search. A gesture that reveals the target counts toward
+  `scrolls_executed` even when no further capture or gesture is needed.
 - Progress hashes use bounded leading-child observations and their immediate
   descendants. They indicate change in the measured evidence, not exhaustive
   visual equivalence. No raw text is included in the serialized signatures.
@@ -94,3 +108,62 @@ or coordinate display string; no sibling migration/version change was needed.
 New consumers must accept the additive outcomes, prefer `data.errorCode` over
 message matching, and parse receipt JSON fields explicitly. The legacy
 snapshot-specific `SNAPSHOT_HIERARCHY_UNAVAILABLE` code is preserved.
+
+
+### Scroll eligibility transition validation (R11)
+
+On 13 September 2026, the baseline at `e1aadca2` reproduced the Android 15 / API 35
+Settings failure with both default selection and a strict explicit outer-container
+selector. In each case, `Display & touch` was initially off screen; an accepted
+scroll revealed it while the outer container remained present but became
+non-scrollable. The action incorrectly failed with `CONTAINER_LOST` and
+`container_identity_changed`.
+
+The R11 implementation was validated with the matching debug Operator `0.10.0-d`
+and branch-local Node CLI `0.10.0` on a dedicated English API-35 emulator:
+
+- `./gradlew :app:assembleDebug unitTest`: 454 tests, no failures, errors, or skips.
+- Node build followed by `npm --prefix apps/node run test`: 1,461 tests, no
+  failures or skips. An earlier run was interrupted by another local CLI rebuild;
+  the final suite ran without concurrent rebuilds.
+- `./scripts/docs_build.sh`: routes, links, generated contracts, and organization
+  checks passed.
+- Default and strict explicit outer-container `scroll-until down --text
+  'Display & touch' --click` both passed from a verified homepage top with the
+  target initially off screen. A separate `Brightness level` wait and query
+  verified the destination. These checks passed again with the final APK.
+- Raw `scroll_until` found the target with `scrolls_executed: "1"`; raw
+  `scroll_until` with strict outer selection and `clickAfter: true` also reached
+  the verified destination. Captures and receipts remained correlated.
+- A standalone scroll reported `moved` with comparable signatures while the
+  original outer container became non-scrollable. A raw search for an absent
+  target returned `CONTAINER_NOT_SCROLLABLE` after exactly one accepted gesture;
+  its after-query showed the original outer scope still present and non-scrollable.
+- One unchanged `validation/sensitive-hierarchy-access/run.py` invocation passed
+  from a freshly closed Settings app. It retained all Internet query, raw/MCP/XML
+  parity, PNG, and Display control assertions. No inner-container workaround or
+  harness preparation change was used.
+
+Deterministic fixtures additionally cover present-but-nonscrollable scopes,
+missing targets, targets outside the original scope, delayed target appearance,
+platform replacement despite identical resource IDs/bounds/paths, strict target
+and container ambiguity, cancellation, and no extra gesture or click after scope
+loss. Exhausted raw searches cannot use a later global wait to override their
+scoped result. Existing moved/no-movement, unavailable hierarchy, and receipt
+regressions remain enabled.
+
+Device attempts and captures are retained outside version control. The baseline
+follow-up query timed out. Two broad pre-scenario queries on the final build also
+timed out, and one on-screen pre-scenario query returned
+`RESULT_ENVELOPE_MALFORMED`. Those failures remain R13 evidence; later successful
+checks do not erase them. An initial check ran before the reinstalled service was
+ready, and a supplemental raw payload was rejected locally for its omitted
+`expectedFormat`; both were corrected before their successful checks. No uncertain
+mutation was replayed to recover evidence.
+
+This is local R11 acceptance, not release readiness. The one clean-start harness
+pass does not establish R12's restored-search preparation contract or R13's
+repeated reliability contract, and does not replace R10's manual CI gate. No
+release-variant, physical-device, or cross-OEM transition proof is claimed.
+Sibling runtime skills use the existing scroll actions and explicit containers;
+no new wire values or skill migration/version changes were needed.

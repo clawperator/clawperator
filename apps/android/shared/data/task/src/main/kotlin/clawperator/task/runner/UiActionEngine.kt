@@ -410,7 +410,7 @@ class UiActionEngineDefault(
         taskScope: TaskScope,
         action: UiAction.ScrollUntil,
     ): UiActionStepResult {
-        val initialResult =
+        val result =
             taskScope.ui {
                 scrollLoop(
                     target = action.matcher,
@@ -424,40 +424,6 @@ class UiActionEngineDefault(
                     findFirstScrollableChild = action.findFirstScrollableChild,
                     strict = action.strict,
                 )
-            }
-
-        val result =
-            if (
-                !action.strict && action.container == null &&
-                action.matcher != null &&
-                (initialResult.terminationReason == TaskScrollTerminationReason.EdgeReached ||
-                    initialResult.terminationReason == TaskScrollTerminationReason.MaxScrollsReached ||
-                    initialResult.terminationReason == TaskScrollTerminationReason.MaxDurationReached ||
-                    initialResult.terminationReason == TaskScrollTerminationReason.NoPositionChange)
-            ) {
-                val targetVisibleAfterLoop =
-                    try {
-                        taskScope.ui {
-                            waitForNode(
-                                matcher = action.matcher,
-                                retry = TaskRetryPresets.UiReadiness,
-                                strict = action.strict,
-                                container = action.container,
-                            )
-                        }
-                        true
-                    } catch (e: IllegalStateException) {
-                        if (e is StrictSelectionException && e.code != "NODE_NOT_FOUND") throw e
-                        false
-                    }
-
-                if (targetVisibleAfterLoop) {
-                    initialResult.copy(terminationReason = TaskScrollTerminationReason.TargetFound)
-                } else {
-                    initialResult
-                }
-            } else {
-                initialResult
             }
 
         val containerError = result.terminationReason == TaskScrollTerminationReason.ContainerNotFound ||
@@ -486,6 +452,7 @@ class UiActionEngineDefault(
                     retry = TaskRetryPresets.UiReadiness,
                     strict = action.strict,
                     container = action.container,
+                    scope = result.scope,
                 )
             }
         }
