@@ -113,7 +113,9 @@ clawperator query --matcher-json '{"resourceId":"row","ancestor":{"role":"list"}
 Queries report every match and its state, including empty-label controls. Existing
 actions retain their first-match behavior and retry defaults. Querying a unique
 node does not reserve it or authorize a later action against that observation.
-See [query_ui](actions.md#action-query-ui) for counts, state, and path semantics.
+See [query_ui](actions.md#action-query-ui) for counts, state, per-node
+`accessibilityDataSensitive`, and path semantics. Sensitivity is observation
+metadata, not a selector predicate.
 
 ## Where Selectors Appear
 

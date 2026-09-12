@@ -304,14 +304,8 @@ curl -fsSL https://clawperator.com/operator.apk -o ~/.clawperator/downloads/oper
 
 Canonical public APK URL: `https://clawperator.com/operator.apk`
 
-Important compatibility note:
-
-- refresh the APK from that stable URL before reinstalling when you need recent
-  runtime fixes
-- older APKs do not include the newer `open_app` foreground wait behavior or
-  the tagged snapshot log marker used for reliable `snapshot` extraction
-- keep the installed CLI and APK on current matching releases; `clawperator doctor`
-  reports version compatibility before you trust a device run
+Keep the CLI and Operator APK on matching releases. Run `clawperator doctor`
+to check version compatibility and device readiness before issuing UI commands.
 
 ```bash
 clawperator operator setup --apk ~/.clawperator/downloads/operator.apk
@@ -528,6 +522,30 @@ inspect `help` on the actual target. This recipe's read-only capability checks
 were verified on an API 35 emulator. That emulator printed the supported commands
 but returned a nonzero status for `help`; the role-holder read returned zero.
 Role assignment and physical-device behavior are not part of the readiness proof.
+
+## Sensitive hierarchy access
+
+The Operator can read views Android marks as accessibility-data sensitive.
+Both development and release APKs declare `android:isAccessibilityTool="true"`.
+Android [defines this declaration](https://developer.android.com/reference/android/accessibilityservice/AccessibilityServiceInfo#attr_android:isAccessibilityTool)
+as identifying services used to assist users with disabilities. Clawperator is
+distributed outside Google Play.
+
+Install the matching APK using `clawperator operator setup --apk <apk_path>`
+with the explicit device and Operator package. Wait for setup to succeed before
+issuing UI commands. If the accessibility service is unavailable, enable the
+selected Operator in Android accessibility settings and run `clawperator doctor`.
+If it is already enabled but remains unavailable, turn it off and back on, then
+rerun doctor.
+
+Queries and XML snapshots work on supported Android versions. The
+[per-node sensitivity flag](api/actions.md#action-query-ui) is available on
+Android 14 (API 34) and later. On earlier versions, queries report
+`accessibilityDataSensitive: null` and XML omits `accessibility-data-sensitive`.
+This API requirement applies to the flag, not to queries or XML capture.
+
+Applications can still have no accessible hierarchy. Sensitivity metadata does
+not change screenshot capture, redaction, or logging behavior.
 
 ---
 
@@ -1712,7 +1730,8 @@ string with this shape:
     "checkable": true,
     "checked": false,
     "selected": false,
-    "scrollable": false
+    "scrollable": false,
+    "accessibilityDataSensitive": false
   }]
 }
 ```
@@ -1722,6 +1741,27 @@ string with this shape:
 nodes. Unavailable state stays `null`, distinct from `false`. `clickable` reports
 the platform node's clickability when captured, rather than inherited ancestor
 clickability used by legacy action dispatch.
+
+`accessibilityDataSensitive` reports Android's per-node accessibility-data flag
+at capture time. The flag is available on Android 14 (API 34) and later:
+
+| Value | Meaning |
+| --- | --- |
+| `true` | Android reports the node's accessibility data as sensitive. |
+| `false` | Android reports the node's accessibility data as non-sensitive. |
+| `null` | The device runs an earlier Android version, the node is a fallback, or the flag could not be read. |
+
+Queries emit this field even when it is null. When consuming a payload with the
+field absent, treat it as unknown. Queries and XML capture do not require API 34;
+only this flag does. A filtered query reports only its returned nodes, so use an
+unfiltered query to inspect root sensitivity.
+
+Raw XML emits `accessibility-data-sensitive="true"` or `"false"` when known,
+and omits the attribute when unknown. XML and queries capture independently;
+compare stable fixture nodes, not observation paths. Sensitivity does not change
+matching, success, redaction, or export behavior. It does not establish private
+browsing, screenshot protection, password status, or whether content is safe to
+share. Verify browser-mode indicators and behavior separately.
 
 Nodes are in preorder. Paths use child indices in the captured `UiNode` tree,
 rooted at `"0"`, and retain their original indices across visibility filtering.
@@ -3130,7 +3170,9 @@ clawperator query --matcher-json '{"resourceId":"row","ancestor":{"role":"list"}
 Queries report every match and its state, including empty-label controls. Existing
 actions retain their first-match behavior and retry defaults. Querying a unique
 node does not reserve it or authorize a later action against that observation.
-See [query_ui](actions.md#action-query-ui) for counts, state, and path semantics.
+See [query_ui](actions.md#action-query-ui) for counts, state, per-node
+`accessibilityDataSensitive`, and path semantics. Sensitivity is observation
+metadata, not a selector predicate.
 
 ## Where Selectors Appear
 
@@ -5990,7 +6032,7 @@ Use these fields in order:
 
 Notes:
 
-- `errorCode` is optional on the envelope. Older APK behavior and some unclassified failures may leave it unset.
+- `errorCode` is optional on the envelope. When it is absent, inspect `error` and the failed step for details.
 - envelope `errorCode` may contain Android-emitted values such as `SERVICE_UNAVAILABLE` that are not part of Node's public `errors.ts` enum
 - per-step failures do not use the envelope `errorCode`; they usually expose the actionable code in `stepResults[i].data.error`
 - `StepResult.data` values are strings, so treat `data.error` and `data.message` as string fields
@@ -6271,6 +6313,10 @@ zero matches. The envelope and failed step carry the code; completed steps are
 preserved and subsequent actions do not run. Inspect the failed step's serialized
 `diagnostics` for service availability, the missing root, and available window
 facts. Unknown facts remain `null`. See [query_ui](actions.md#action-query-ui).
+
+The Operator requests access to Android-marked sensitive hierarchies, but an
+application can still have no accessible root. If the accessibility service is
+unavailable, follow [setup](../setup.md#sensitive-hierarchy-access) to enable it.
 A visible screenshot does not guarantee an accessible hierarchy. Do not infer
 that another window is the requested application or repeatedly retry a
 persistently unavailable screen.
@@ -8032,7 +8078,9 @@ Success includes a parsed `query` object and the original correlated result
 envelope whose `data.query` remains a JSON string. Zero matches succeed. See
 [query_ui](actions.md#action-query-ui) for NodeSummary fields, null state,
 visibility, truncation, the 256 KiB response limit, and observation-local paths.
-The tool does not convert paths into action targets.
+The parsed result preserves per-node `accessibilityDataSensitive`, including
+null or an absent field. Treat either as unknown. The field reports Android
+node metadata, not a private-mode verdict. The tool does not convert paths into action targets.
 
 ### `read`
 

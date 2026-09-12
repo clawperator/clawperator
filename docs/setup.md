@@ -214,14 +214,8 @@ curl -fsSL https://clawperator.com/operator.apk -o ~/.clawperator/downloads/oper
 
 Canonical public APK URL: `https://clawperator.com/operator.apk`
 
-Important compatibility note:
-
-- refresh the APK from that stable URL before reinstalling when you need recent
-  runtime fixes
-- older APKs do not include the newer `open_app` foreground wait behavior or
-  the tagged snapshot log marker used for reliable `snapshot` extraction
-- keep the installed CLI and APK on current matching releases; `clawperator doctor`
-  reports version compatibility before you trust a device run
+Keep the CLI and Operator APK on matching releases. Run `clawperator doctor`
+to check version compatibility and device readiness before issuing UI commands.
 
 ```bash
 clawperator operator setup --apk ~/.clawperator/downloads/operator.apk
@@ -438,3 +432,27 @@ inspect `help` on the actual target. This recipe's read-only capability checks
 were verified on an API 35 emulator. That emulator printed the supported commands
 but returned a nonzero status for `help`; the role-holder read returned zero.
 Role assignment and physical-device behavior are not part of the readiness proof.
+
+## Sensitive hierarchy access
+
+The Operator can read views Android marks as accessibility-data sensitive.
+Both development and release APKs declare `android:isAccessibilityTool="true"`.
+Android [defines this declaration](https://developer.android.com/reference/android/accessibilityservice/AccessibilityServiceInfo#attr_android:isAccessibilityTool)
+as identifying services used to assist users with disabilities. Clawperator is
+distributed outside Google Play.
+
+Install the matching APK using `clawperator operator setup --apk <apk_path>`
+with the explicit device and Operator package. Wait for setup to succeed before
+issuing UI commands. If the accessibility service is unavailable, enable the
+selected Operator in Android accessibility settings and run `clawperator doctor`.
+If it is already enabled but remains unavailable, turn it off and back on, then
+rerun doctor.
+
+Queries and XML snapshots work on supported Android versions. The
+[per-node sensitivity flag](api/actions.md#action-query-ui) is available on
+Android 14 (API 34) and later. On earlier versions, queries report
+`accessibilityDataSensitive: null` and XML omits `accessibility-data-sensitive`.
+This API requirement applies to the flag, not to queries or XML capture.
+
+Applications can still have no accessible hierarchy. Sensitivity metadata does
+not change screenshot capture, redaction, or logging behavior.

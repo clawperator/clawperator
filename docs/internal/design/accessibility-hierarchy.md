@@ -5,52 +5,96 @@ service. A visible screenshot does not guarantee an accessible root. A missing
 root must remain a failure, not a zero-match result or another window's tree.
 See [query failure behavior](../../api/actions.md#action-query-ui).
 
-## Confirmed sensitive-root filtering
+## Access and capture contract
 
-On the Android 15/API 35 emulator, Settings > Network & internet > Internet is a
-native `NetworkProviderSettings` preference/RecyclerView screen inside
-`SubSettings`. Its root reports `isAccessibilityDataSensitive=true`.
-
-A controlled diagnostic build established the cause:
-
-| Service declaration | Observation on the same Internet screen |
-| --- | --- |
-| Normal `isAccessibilityTool=false` | Active root and active/focused window root are null; the status-bar root remains readable. Clearing the accessibility cache does not help. |
-| Temporary `isAccessibilityTool=true` | Query returns 67 nodes; XML succeeds through both branch-local CLI and global CLI 0.9.5. Instrumentation confirms the root is sensitive. |
-| Original declaration restored | Query and global-CLI XML failure return. |
+Both Operator variants declare `android:isAccessibilityTool="true"` in the
+shared service configuration. Android defines
+[`isAccessibilityTool`](https://developer.android.com/reference/android/accessibilityservice/AccessibilityServiceInfo#attr_android:isAccessibilityTool)
+as identifying services used to assist users with disabilities. Clawperator uses
+this declaration for access to sensitive hierarchies and is distributed outside
+Google Play.
 
 Android 15's [AccessibilityInteractionController](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-15.0.0_r1/core/java/android/view/AccessibilityInteractionController.java)
 returns null from `getRootView()` when the root is sensitive and the request is
-not from an accessibility tool. This explains the observed failure before any
-Clawperator matching or serialization. The experiment did not establish which
-Settings code or resource marks the root sensitive.
+not from an accessibility tool. This filtering occurs before Clawperator matching
+or serialization. Selecting another window or clearing the accessibility cache
+does not provide the requested application's hierarchy.
 
-The service configuration is identical to `v0.9.5`, and root acquisition predates
-structured queries. This is an existing coverage gap, not evidence of a selector
-regression. An old release APK was not installed, so the experiment is not a
-full old-binary comparison. All temporary instrumentation and configuration were
-removed; the normal development APK was restored. Evidence is limited to API 35.
+Queries and XML capture work on supported Android versions. Native capture reads
+`AccessibilityNodeInfo.isAccessibilityDataSensitive` on Android 14 (API 34) and
+later. Below API 34, or when the read fails, the flag is unknown. `UiNode` retains
+nullable evidence; `NodeResolver` emits `accessibilityDataSensitive`, including
+explicit nulls, in schema version 1. XML emits `accessibility-data-sensitive`
+only when known. An absent JSON field also means unknown. CLI/raw/MCP preserve
+the sensitivity evidence. See the [public contract](../../api/actions.md#action-query-ui).
 
-## Required v0.10 follow-up
+The flag is metadata. It does not change matching, success, or logging and does
+not establish private browsing or screenshot protection. A missing service or
+root remains a capture failure; host screenshots are independent.
 
-Status: required for v0.10 by user direction; the earlier deferral is superseded.
-Implementation remains separate from selector inspection. The normal service
-declaration is unchanged until the supported approach is implemented.
+## Verification scope
 
-The selected v0.10 approach is to enable `android:isAccessibilityTool="true"` in
-both Operator variants. The user accepts broader access and states the APK will
-not be distributed through Google Play. Android defines
-[`isAccessibilityTool`](https://developer.android.com/reference/android/accessibilityservice/AccessibilityServiceInfo#attr_android:isAccessibilityTool)
-as identifying services used to assist users with disabilities. The declaration
-change is planned, not yet implemented in the normal APK.
+Live verification covers Android 15 (API 35). This is the tested platform, not
+the minimum API level for queries or XML capture. The Settings > Network &
+internet > Internet screen has a sensitive root; its native content is a
+`NetworkProviderSettings` preference/RecyclerView screen inside `SubSettings`.
+Unit tests cover sensitivity reads on API 34 and unknown values on API 33.
 
-The same work will expose per-node `accessibilityDataSensitive` in structured
-queries and `accessibility-data-sensitive` in XML, based on Android's API-34+
-node flag. Unknown values must remain unknown, including on older Android or
-older APKs. This reports platform evidence, not a private-browsing verdict or a
-claim that content is safe to disclose. Browser-mode correctness needs separate
-application-specific evidence. No automatic redaction or refusal is implied.
+## Regression and verification
 
-Implementation must verify both variants, upgrades, query/XML metadata parity,
-a normal-screen control, and genuine failure behavior. Retries, cache clearing,
-and another window's hierarchy do not solve the demonstrated filtering rule.
+The [device harness](../../../validation/sensitive-hierarchy-access/README.md)
+uses branch-local CLI, raw execution, and a real named MCP call. It checks three
+consecutive Internet queries, sensitive Settings root identity, Wi-Fi control
+state/bounds/sensitivity against XML, a decoded screenshot, and a normal Display
+& touch control screen. Loading content cannot satisfy readiness. Missing roots
+fail immediately; all navigation and subprocess waits are bounded. The harness
+leaves the device on Home and never changes network settings.
+
+The manual CI workflow runs both APK variants on an API 35 Google APIs x86_64 revision-9
+image with English locale. It checks the revision explicitly, verifies packaged
+service metadata through the compiled resource table, runs offline assertions,
+and executes the actual emulator regression. A new image requires deliberate
+requalification. Android test suites use the shared Robolectric 4.11.1 dependency, which supports
+the API-34 method.
+
+Implementation verification uses CLI 0.10.0, development APK 0.10.0-d, and release
+APK 0.10.0 on an API 35 arm64 Google image, build AE3A.240806.036/12592187.
+Evidence remains outside Git. APK inspection covers AAPT's version-qualified
+service resource and release path shortening, including the manifest binding.
+
+Acceptance completed on the implementation branch:
+
+| Check | Outcome |
+| --- | --- |
+| Development upgrade, then connected service | Full Internet/CLI/raw/MCP/XML/screenshot/control harness passed |
+| Release variant after fresh binding | Full harness passed |
+| Restored development APK after fresh binding | Full harness passed, starting from a retained Internet subpage |
+| Isolated same-code APK with `isAccessibilityTool=false` | Harness failed at Internet `query_ui` with `UI_TREE_UNAVAILABLE`, `serviceAvailable=true`, `rootAvailable=false`; correlation and failed step retained |
+| Screenshot with unavailable hierarchy | Independent failure PNG decoded successfully |
+| Packaged declaration and manifest binding | Both intended APKs passed; false-declaration APK was rejected |
+| Android build and unit tests | Both variants built; full `testDebugUnitTest` passed; final changed shared suite passed |
+| Node build and standard tests | 306 tests passed |
+| Focused query/MCP tests | 94 tests passed, including sensitivity transport and older-payload compatibility |
+| Offline harness fixtures | Five tests passed for hierarchy/state/XML failures and old-payload handling |
+| Authored docs | Full docs build and route validation passed |
+
+The negative-control source edit was restored, both intended APKs rebuilt, and
+the intended development APK reinstalled. The temporary release installation
+was removed and the original development service selection restored. No network
+settings were changed. These results prove local acceptance; a manually dispatched GitHub run remains
+release evidence, not a check on every pull request.
+
+The development upgrade briefly disconnected the service and then reconnected
+without a manual re-enable. The release install encountered a stale/crashed
+Android binding; disabling the selected service, stopping its process, and
+re-enabling it restored navigation. Setup guidance describes re-enabling a
+service that remains unavailable. These are observed lifecycle limits, not
+permission to replay failed mutations inside capture.
+
+The local emulator proves the Android filtering rule and capture contract. It
+does not establish universal OEM/version support, a physical-device result,
+Google Play eligibility, or private-browser behavior. The GitHub-hosted x86_64
+job runs only through `workflow_dispatch`, by user direction to avoid slow PR
+checks. It has no PR or push trigger; local validation does not claim a remote
+CI result. No runtime skill consumes a strict NodeSummary schema requiring a
+migration for this additive field.

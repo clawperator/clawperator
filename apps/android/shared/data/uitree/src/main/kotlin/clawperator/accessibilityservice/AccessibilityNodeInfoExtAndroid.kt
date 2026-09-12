@@ -6,6 +6,7 @@ import action.math.geometry.toRect
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
+import android.os.Build
 import android.view.accessibility.AccessibilityNodeInfo
 import clawperator.uitree.UiNode
 import clawperator.uitree.UiNodeId
@@ -347,6 +348,7 @@ private fun AccessibilityNodeInfo.mapToUiNode(
             isEnabled = isEnabled,
             isVisible = isVisibleToUser,
             resourceId = resourceId,
+            accessibilityDataSensitive = readAccessibilityDataSensitive(),
             hints = enhancedHints,
             children = children,
             accessibilityNodeInfo = this,
@@ -689,6 +691,8 @@ private fun appendUiAutomatorNodeXml(
             "bounds" to boundsText,
         )
 
+    node.readAccessibilityDataSensitive()?.let { attrs["accessibility-data-sensitive"] = it.toString() }
+
     out.append(indent).append("<node")
     attrs.forEach { (key, value) ->
         out.append(' ')
@@ -733,4 +737,16 @@ private fun escapeXmlAttr(value: String): String =
                 else -> append(ch)
             }
         }
+    }
+
+/** Read only platform evidence; older platforms and failed reads remain unknown. */
+fun AccessibilityNodeInfo.readAccessibilityDataSensitive(): Boolean? =
+    if (Build.VERSION.SDK_INT >= 34) {
+        try {
+            isAccessibilityDataSensitive
+        } catch (_: Exception) {
+            null
+        }
+    } else {
+        null
     }

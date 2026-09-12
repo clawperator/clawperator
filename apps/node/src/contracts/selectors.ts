@@ -40,6 +40,8 @@ export interface NodeSummary {
   checked: boolean | null;
   selected: boolean | null;
   scrollable: boolean | null;
+  /** Android API 34+ evidence. Older APK omission is unknown, never false. */
+  accessibilityDataSensitive?: boolean | null;
 }
 
 export interface NodeQueryResult {

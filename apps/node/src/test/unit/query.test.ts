@@ -7,6 +7,7 @@ import { validateExecution } from "../../domain/executions/validateExecution.js"
 import { resolveElementMatcherFromCli, hasElementSelectorFlag } from "../../cli/selectorFlags.js";
 import { cmdQuery } from "../../cli/commands/action.js";
 import { getNamedMcpTools } from "../../mcp/tools/named.js";
+import { buildMcpSuccessResult } from "../../mcp/errors.js";
 import { mapSelectorToNodeMatcher, mcpSelectorSchema } from "../../mcp/selectors.js";
 
 const matcher = { resourceId: "row", ancestor: { role: "list" }, descendant: { textEquals: "Unique" } };
@@ -61,8 +62,17 @@ describe("query and relational selector contracts", () => {
     }
   });
 
+  it("preserves true false null and older APK omission through MCP transport", () => {
+    const nodes = [true, false, null, undefined].map(value =>
+      value === undefined ? { label: "" } : { label: "", accessibilityDataSensitive: value });
+    const result = buildMcpSuccessResult({ query: { schemaVersion: 1, nodes } });
+    const payload = JSON.parse((result.content[0] as { text: string }).text);
+    assert.deepEqual(payload.query.nodes, nodes);
+    assert.equal(payload.query.nodes[3].accessibilityDataSensitive ?? null, null);
+  });
+
   it("forwards canonical query data and target options without modifying response JSON", async () => {
-    const query = JSON.stringify({ schemaVersion: 1, snapshotId: "capture", capturedAt: "2026-01-01T00:00:00Z", totalMatches: 0, returnedCount: 0, truncated: false, nodes: [] });
+    const query = JSON.stringify({ schemaVersion: 1, snapshotId: "capture", capturedAt: "2026-01-01T00:00:00Z", totalMatches: 4, returnedCount: 4, truncated: false, nodes: [true, false, null, undefined].map(value => value === undefined ? {} : { accessibilityDataSensitive: value }) });
     let dispatched = false;
     const response = await cmdQuery({
       format: "json", matcher, visibility: "all", limit: 7,

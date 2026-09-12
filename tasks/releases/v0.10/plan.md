@@ -2,7 +2,7 @@
 
 This coordinates five active runtime-observability task packs and the completed readiness, scaffold-failure, and on-screen-log implementations. It replaces the former standalone observability index. It does not schedule every unrelated task in the repository or claim that implementation has shipped.
 
-R1 merged in `cfc90af` (PR #271), R2 in `654d333` (PR #272), and R3 raw API/CLI in `120c1eb` / `dd66a25`. R4 merged in `8cab7adb` (PR #273), including query failure preservation and cleanup. Five feature packs remain open, with six implementation PRs remaining. R10 sensitive hierarchy access is explicitly required for v0.10; its earlier parked status is superseded.
+R1 merged in `cfc90af` (PR #271), R2 in `654d333` (PR #272), and R3 raw API/CLI in `120c1eb` / `dd66a25`. R4 merged in `8cab7adb` (PR #273), including query failure preservation and cleanup. R10 sensitive hierarchy access is implemented and locally validated on its implementation branch, pending merge and manual release CI. Four feature packs remain open, with five implementation PRs remaining after R10.
 
 ## Folder ownership
 
@@ -23,7 +23,7 @@ The order below minimizes shared-file conflicts. Hard dependencies are explicit;
 | R2 | [Scaffold failure propagation](../../../docs/skills/authoring.md) | Complete | None | [DONE] merged in `654d333` (PR #272); pack retired; [verification](../../../docs/internal/design/skill-scaffold-execution.md) |
 | R3 | [On-screen logs CLI](../../../docs/api/on-screen-logs.md) | Complete | Raw API merged in `120c1eb` | [DONE] merged in `dd66a25` (PR #270); pack retired; [verification and limits](../../../docs/internal/design/on-screen-logs.md) |
 | R4 | [Selector inspection PR-1](../../api/selector-inspection/plan.md) | 1 | None beyond merged main | [DONE] merged in `8cab7adb` (PR #273); cleanup complete; [validation and limits](../../api/selector-inspection/work-breakdown.md#pr-1-validation-and-handoff) |
-| R10 | [Sensitive hierarchy access](../../android/sensitive-hierarchy-access/plan.md) | 1 | R4 merged | Required for v0.10; enable accessibility-tool declaration and report node sensitivity; [work breakdown](../../android/sensitive-hierarchy-access/work-breakdown.md) |
+| R10 | [Sensitive hierarchy access](../../../docs/internal/design/accessibility-hierarchy.md) | Complete | R4 merged | [DONE] implemented and locally validated; pending merge/manual release CI; pack retired; [regression harness](../../../validation/sensitive-hierarchy-access/README.md) |
 | R5 | [Strict selectors PR-2](../../api/selector-inspection/plan.md) | 2 | R4 merged | Ready on merged R4; [prompt](../../api/selector-inspection/pr-2-prompt.md) |
 | R6 | [Action-result diagnostics](../../api/action-result-diagnostics/plan.md) | 1 | R4 and R5 merged | Waiting for R5; [prompt](../../api/action-result-diagnostics/agent-prompt.md) |
 | R7 | [Compact snapshots](../../node/compact-snapshots/plan.md) | 1 | R4 merged for additive XML visibility | Ready on merged R4; [prompt](../../node/compact-snapshots/agent-prompt.md) |
@@ -74,7 +74,7 @@ This covers the agreed foundation and evidence gaps. It is not a promise that on
 
 **Evidence integration gate:** R8 must pass before adopting its manifest as the stable report input; R9 must pass before claiming managed-video support. Existing screenshot and explicit ADB recording helpers remain usable while these APIs are developed. Reports must distinguish unavailable evidence from failed test assertions, and never equate file existence with proof.
 
-**Optional convenience:** R3 is implemented; R7 remains planned. Both reduce authoring/inspection overhead, and neither is a technical prerequisite for deterministic execution. Raw on-screen logs already work through the merged API. R1 and R2 are merged. R4 implementation and cleanup are complete, and six further implementation PRs remain. This is the suggested scope of the release workstream, not a requirement to finish every PR before beginning consumer development.
+**Optional convenience:** R3 is implemented; R7 remains planned. Both reduce authoring/inspection overhead, and neither is a technical prerequisite for deterministic execution. Raw on-screen logs already work through the merged API. R1 and R2 are merged. R4 implementation and cleanup are complete. R10 implementation and local acceptance are complete pending merge/manual release CI, and five further implementation PRs remain. This is the suggested scope of the release workstream, not a requirement to finish every PR before beginning consumer development.
 
 ## Implementation handoff and release acceptance
 
@@ -95,7 +95,10 @@ Use `.agents/skills/task-cleanup/SKILL.md` after each complete pack's durable gu
 
 ## Required v0.10 hierarchy access gate
 
-R10 is mandatory for v0.10. The release must include its supported access approach,
+R10 remains mandatory for v0.10. Its implementation and local acceptance are
+complete; merge and a manually dispatched CI emulator run remain release prerequisites.
+By user direction, this slow device workflow does not run on each PR or push.
+The release must include its supported access approach,
 an automated Android 15 Internet-screen query/XML regression executed in CI,
 per-node sensitivity metadata, variant/upgrade verification,
 and documentation. Improved
