@@ -15,8 +15,8 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
 /**
- * Debug-only validation fixture. It accepts a fixed scenario name rather than caller-controlled
- * panel content, so it cannot become a second command ingress.
+ * Debug-only validation fixture with fixed scenarios. The manifest requires DUMP permission
+ * so only privileged callers such as ADB shell can change the shared diagnostic panel.
  */
 class OnScreenLogProofActivity :
     Activity(),
