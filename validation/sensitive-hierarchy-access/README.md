@@ -16,11 +16,25 @@ requalified. The publisher's revision-9 archive is
 uses the corresponding API 35 arm64 image. No network connection is required.
 
 Only the selected Operator should be active on this dedicated test device.
-Install the matching APK, launch `clawperator.activity.MainActivity` in its package
-to leave the stopped state, enable its accessibility service and notification
-permissions, and allow the service to connect before starting. The harness does
-not install APKs or change accessibility or network settings. CI handles setup
-outside the harness and tests both variants sequentially.
+Use the checked-in setup helper before each variant:
+
+```sh
+python3 validation/sensitive-hierarchy-access/prepare_operator.py \
+  --device <device_serial> --operator-package com.clawperator.operator.dev \
+  --apk apps/android/app/build/outputs/apk/debug/app-debug.apk --out /tmp/hierarchy-debug-setup
+```
+
+The helper holds the device lock, disables accessibility, removes the enabled
+service list and waits for all bindings to disconnect before stopping the two
+Operator packages and installing the selected APK. It launches the selected
+Operator, enables only its service, grants notification permissions, waits for
+one healthy binding, and requires both doctor and a nonempty query to succeed.
+Binding observations are bounded by 15 seconds and 30 attempts per phase; failed
+commands are not retried. Each setup uses a new artifact directory and records
+commands, outputs, deadlines and the APK hash. CI uses this same helper for both
+variants sequentially. This explicitly replaces accessibility-service selection
+on the dedicated emulator; it does not clear application data or change network
+settings. The capture harness itself does not install APKs or change permissions.
 
 The harness uses branch-local CLI commands and a real stdio MCP session. It
 requires successful correlated envelopes, three consecutive Internet queries,
