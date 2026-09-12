@@ -107,6 +107,7 @@ export const ERROR_CODES = {
   // Internal / Other
   /** ADB broadcast dispatch to the Operator package failed. */
   BROADCAST_FAILED: "BROADCAST_FAILED",
+  /** Request size limit or Android query_ui response exceeding 256 KiB. */
   PAYLOAD_TOO_LARGE: "PAYLOAD_TOO_LARGE",
   DOCTOR_FAILED: "DOCTOR_FAILED",
 } as const;

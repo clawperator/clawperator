@@ -12,6 +12,12 @@ import kotlin.time.Duration.Companion.seconds
  * Provides methods for UI inspection and interaction with retry support.
  */
 interface TaskUiScope {
+    suspend fun queryUi(
+        matcher: NodeMatcher? = null,
+        visibility: String = "on_screen",
+        limit: Int = 100,
+    ): String
+
     /**
      * Gets the text content of a UI element that matches the specified NodeMatcher criteria and validates it.
      * Retries according to the retry configuration until a matching element is found, text extracted,

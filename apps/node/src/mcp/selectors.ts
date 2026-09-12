@@ -1,10 +1,13 @@
 import { z } from "zod";
+import { nodePredicateSchema } from "../domain/executions/validateExecution.js";
 import type { NodeMatcher } from "../contracts/selectors.js";
 import { isNodeMatcherEmpty } from "../contracts/selectors.js";
 
 const optionalNonEmptyTrimmedSelectorString = z.string().trim().min(1).optional();
 
 export const mcpSelectorSchema = z.object({
+  ancestor: nodePredicateSchema.optional(),
+  descendant: nodePredicateSchema.optional(),
   id: optionalNonEmptyTrimmedSelectorString,
   role: optionalNonEmptyTrimmedSelectorString,
   text: optionalNonEmptyTrimmedSelectorString,
@@ -23,6 +26,8 @@ export function mapSelectorToNodeMatcher(
   fieldName = "selector"
 ): NodeMatcher {
   const matcher: NodeMatcher = {
+    ...(selector.ancestor !== undefined ? { ancestor: selector.ancestor } : {}),
+    ...(selector.descendant !== undefined ? { descendant: selector.descendant } : {}),
     ...(selector.id !== undefined ? { resourceId: selector.id } : {}),
     ...(selector.role !== undefined ? { role: selector.role } : {}),
     ...(selector.text !== undefined ? { textEquals: selector.text } : {}),

@@ -1,4 +1,6 @@
 
+import { ResultEnvelopeTransport } from "./resultEnvelopeTransport.js";
+import { StringDecoder } from "node:string_decoder";
 import type { RuntimeConfig } from "./runtimeConfig.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
 import { RESULT_ENVELOPE_PREFIX } from "../../contracts/result.js";
@@ -143,6 +145,8 @@ export async function waitForResultEnvelope(
     const snapshotLogLines: string[] = [];
     let broadcastStatus: BroadcastStatus = "not_sent";
     let pending = "";
+    const decoder = new StringDecoder("utf8");
+    const transport = new ResultEnvelopeTransport(commandId);
     let settled = false;
     let stderrBuffer = "";
     let timeoutId: NodeJS.Timeout | undefined;
@@ -298,7 +302,7 @@ export async function waitForResultEnvelope(
     };
 
     proc.stdout?.on("data", (chunk: Buffer) => {
-      pending += chunk.toString();
+      pending += decoder.write(chunk);
       const lines = pending.split("\n");
       pending = lines.pop() ?? "";
       for (const line of lines) {
@@ -329,13 +333,20 @@ export async function waitForResultEnvelope(
             }
           }
         }
-        if (
-          broadcastStatus !== "sent"
-          || !line.includes(RESULT_ENVELOPE_PREFIX)
-          || !envelopeLineReferencesCommand(line, commandId)
-        ) continue;
+        if (broadcastStatus !== "sent") continue;
+        let terminalLine: string | null;
+        try {
+          terminalLine = transport.consume(parseLogcatLine(line)?.message ?? line);
+        } catch (error) {
+          flush();
+          finalize({ ok: false, code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
+            error: error instanceof Error ? error.message : "Malformed result transport" });
+          return;
+        }
+        if (terminalLine === null || !terminalLine.includes(RESULT_ENVELOPE_PREFIX)
+          || !envelopeLineReferencesCommand(terminalLine, commandId)) continue;
 
-        const parsed = parseTerminalEnvelope(line, commandId);
+        const parsed = parseTerminalEnvelope(terminalLine, commandId);
         if (parsed === "malformed") {
           flush();
           finalize({

@@ -2,6 +2,7 @@ package clawperator.operator.agent
 
 import action.math.geometry.Point
 import clawperator.task.runner.UiAction
+import clawperator.task.runner.NodePredicate
 import clawperator.task.runner.NodeMatcher
 import clawperator.task.runner.OnScreenLogAnchor
 import clawperator.task.runner.OnScreenLogContract
@@ -232,6 +233,21 @@ class AgentCommandParserDefault : AgentCommandParser {
                     clear = params.booleanOrDefaultStrict("clear", false),
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
                 )
+            "query_ui" -> {
+                require(params.keys.all { it in setOf("matcher", "visibility", "limit") }) { "query_ui has unknown params" }
+                val visibility = if ("visibility" in params) params.strictStringRequired("visibility", 16) else "on_screen"
+                require(visibility in setOf("on_screen", "all")) { "visibility must be on_screen or all" }
+                val limit =
+                    if ("limit" in params) {
+                        val value = params["limit"] as? JsonPrimitive
+                        require(value != null && !value.isString) { "limit must be an integer" }
+                        value.intOrNull ?: error("limit must be an integer")
+                    } else {
+                        100
+                    }
+                require(limit in 1..1000) { "limit must be between 1 and 1000" }
+                UiAction.QueryUi(id, params.parseMatcherOrNull("matcher"), visibility, limit)
+            }
             "snapshot", "snapshot_ui" ->
                 UiAction.SnapshotUi(
                     id = id,
@@ -390,27 +406,47 @@ class AgentCommandParserDefault : AgentCommandParser {
         parseMatcherOrNull(key) ?: error("$key is required")
 
     private fun JsonObject.parseMatcherOrNull(key: String): NodeMatcher? {
-        val matcherObject = this[key]?.jsonObject ?: return null
+        if (key !in this) return null
+        val matcherObject = this[key] as? JsonObject ?: error("$key must be an object")
+        val leafKeys = setOf("resourceId", "role", "textEquals", "textContains", "contentDescEquals", "contentDescContains")
+        require(matcherObject.keys.all { it in leafKeys || it == "ancestor" || it == "descendant" }) { "$key has unknown matcher fields" }
 
-        val resourceId = matcherObject.stringOrNullWithMax("resourceId", MAX_MATCHER_VALUE_LENGTH)
-        val role = matcherObject.stringOrNullWithMax("role", MAX_MATCHER_VALUE_LENGTH)
-        val textEquals = matcherObject.stringOrNullWithMax("textEquals", MAX_MATCHER_VALUE_LENGTH)
-        val textContains = matcherObject.stringOrNullWithMax("textContains", MAX_MATCHER_VALUE_LENGTH)
-        val contentDescEquals = matcherObject.stringOrNullWithMax("contentDescEquals", MAX_MATCHER_VALUE_LENGTH)
-        val contentDescContains = matcherObject.stringOrNullWithMax("contentDescContains", MAX_MATCHER_VALUE_LENGTH)
+        fun predicate(
+            obj: JsonObject,
+            name: String,
+            requireNonblank: Boolean = true,
+        ): NodePredicate {
+            require(obj.isNotEmpty() && obj.keys.all { it in leafKeys }) { "$name must contain only scalar predicate fields" }
 
-        require(
-            resourceId != null || role != null || textEquals != null || textContains != null ||
-                contentDescEquals != null || contentDescContains != null,
-        ) { "$key must include at least one matcher field" }
+            fun value(field: String): String? {
+                if (field !in obj) return null
+                return obj.strictStringRequired(field, MAX_MATCHER_VALUE_LENGTH)
+            }
+            val predicate = NodePredicate(value("resourceId"), value("role"), value("textEquals"), value("textContains"), value("contentDescEquals"), value("contentDescContains"))
+            require(!requireNonblank || obj.values.any { (it as JsonPrimitive).content.isNotBlank() }) {
+                "$name must include at least one nonblank field"
+            }
+            return predicate
+        }
 
+        fun relationship(name: String): NodePredicate? {
+            if (name !in matcherObject) return null
+            return predicate(matcherObject[name] as? JsonObject ?: error("$name must be an object"), name)
+        }
+        val scalarFields = JsonObject(matcherObject.filterKeys { it in leafKeys })
+        val scalar = if (scalarFields.isEmpty()) NodePredicate() else predicate(scalarFields, key, requireNonblank = false)
+        val ancestor = relationship("ancestor")
+        val descendant = relationship("descendant")
+        require(scalarFields.values.any { (it as JsonPrimitive).content.isNotBlank() } || ancestor != null || descendant != null) { "$key must include at least one matcher field" }
         return NodeMatcher(
-            resourceId = resourceId,
-            role = role,
-            textEquals = textEquals,
-            textContains = textContains,
-            contentDescEquals = contentDescEquals,
-            contentDescContains = contentDescContains,
+            scalar.resourceId,
+            scalar.role,
+            scalar.textEquals,
+            scalar.textContains,
+            scalar.contentDescEquals,
+            scalar.contentDescContains,
+            ancestor,
+            descendant,
         )
     }
 

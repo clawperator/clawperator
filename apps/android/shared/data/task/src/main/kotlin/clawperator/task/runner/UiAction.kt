@@ -108,6 +108,13 @@ sealed interface UiAction {
         val container: NodeMatcher? = null,
     ) : UiAction
 
+    data class QueryUi(
+        override val id: String,
+        val matcher: NodeMatcher? = null,
+        val visibility: String = "on_screen",
+        val limit: Int = 100,
+    ) : UiAction
+
     data class SnapshotUi(
         override val id: String,
         val retry: TaskRetry = TaskRetryPresets.UiReadiness,

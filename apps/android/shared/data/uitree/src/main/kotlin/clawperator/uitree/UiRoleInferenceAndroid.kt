@@ -112,10 +112,13 @@ object UiRoleInference {
     fun extractHints(node: AccessibilityNodeInfo): Map<String, String> {
         val hints = mutableMapOf<String, String>()
 
+        hints["clickable"] = node.isClickable.toString()
+        hints["checkable"] = node.isCheckable.toString()
+
         // State hints
-        if (node.isChecked) hints["checked"] = "true"
-        if (node.isSelected) hints["selected"] = "true"
-        if (node.isScrollable) hints["scrollable"] = "true"
+        hints["checked"] = node.isChecked.toString()
+        hints["selected"] = node.isSelected.toString()
+        hints["scrollable"] = node.isScrollable.toString()
         if (node.isHeading) hints["heading"] = "true"
 
         // Layout hints

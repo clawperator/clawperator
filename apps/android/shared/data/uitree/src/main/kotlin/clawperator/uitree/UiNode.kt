@@ -37,6 +37,9 @@ data class UiNode(
     val hints: Map<String, String> = emptyMap(),
     /** Child nodes in the hierarchy */
     val children: List<UiNode> = emptyList(),
+    /** Original capture path retained by visibility filtering; never an action handle. */
+    @Transient
+    val sourcePath: String? = null,
     /**
      * Direct reference to the live Android AccessibilityNodeInfo object.
      * This field provides immediate access to the underlying accessibility node

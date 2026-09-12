@@ -67,6 +67,10 @@ command_details:
     href: actions.md#action-enter-text
     label: "Action: enter_text"
     action: enter_text
+  query:
+    href: actions.md#action-query-ui
+    label: "Action: query_ui"
+    action: query_ui
   read:
     href: actions.md#action-read-text
     label: "Action: read_text"

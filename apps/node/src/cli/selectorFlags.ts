@@ -6,6 +6,8 @@
  * a CLI rest-args array, returning a resolved NodeMatcher or a structured
  * error.
  */
+import { normalizeMatcherInput } from "../contracts/inputAliases.js";
+import { nodeMatcherSchema } from "../domain/executions/validateExecution.js";
 import type { NodeMatcher } from "../contracts/selectors.js";
 import { ERROR_CODES } from "../contracts/errors.js";
 import type { ClawperatorError } from "../contracts/errors.js";
@@ -30,6 +32,7 @@ export const ELEMENT_SELECTOR_VALUE_FLAGS = [
 ] as const;
 
 export const ELEMENT_SELECTOR_FLAG_ALIASES: readonly CliFlagAliasSpec[] = [
+  { canonical: "--selector", aliases: ["--matcher-json"] },
   { canonical: "--id", aliases: ["--resource-id"] },
   { canonical: "--desc", aliases: ["--content-desc"] },
   { canonical: "--desc-contains", aliases: ["--content-desc-contains"] },
@@ -222,7 +225,11 @@ export function resolveElementMatcherFromCli(rest: string[]): MatcherResult {
         },
       };
     }
-    return { ok: true, matcher: parsed as NodeMatcher };
+    const validated = nodeMatcherSchema.safeParse(normalizeMatcherInput(parsed));
+    if (!validated.success) return { ok: false, error: {
+      code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: validated.error.message,
+    } };
+    return { ok: true, matcher: validated.data };
   }
 
   // Simple flags path - validate blank strings

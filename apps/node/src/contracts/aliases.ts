@@ -43,6 +43,7 @@ export const CANONICAL_ACTION_TYPES = [
   "scroll",
   "scroll_until",
   "read_text",
+  "query_ui",
   "enter_text",
   "snapshot",
   "take_screenshot",

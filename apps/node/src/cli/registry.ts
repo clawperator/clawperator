@@ -1746,6 +1746,51 @@ COMMANDS["type"] = {
   },
 };
 
+COMMANDS["query"] = {
+  name: "query",
+  group: "Device Interaction",
+  flagAliases: ELEMENT_SELECTOR_FLAG_ALIASES,
+  documentedFlags: ["--matcher-json", "--text", "--id", "--role", "--visibility", "--limit", "--no-daemon"],
+  supportedFlags: ["--selector", "--text", "--text-contains", "--id", "--desc", "--desc-contains", "--role", "--visibility", "--limit", "--no-daemon"],
+  summary: "Inspect matching nodes and their current state",
+  help: `clawperator query - Inspect matching UI nodes
+
+Usage:
+  clawperator query [--matcher-json <json> | --text <text> | --id <id> | --role <role>]
+                    [--visibility <on_screen|all>] [--limit <1..1000>]
+                    [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--no-daemon]
+
+Omit the matcher to query all eligible nodes. --matcher-json cannot be combined
+with simple selector flags. --text-contains, --desc and --desc-contains also work.
+Visibility defaults to on_screen; limit defaults to 100. data.query contains
+serialized JSON with totalMatches, truncation and node states, including blank labels.
+Paths and snapshot IDs describe one observation and cannot be used as action targets.
+Platform visibility does not prove visual non-occlusion.
+
+Example:
+  clawperator query --matcher-json '{"resourceId":"row","descendant":{"textEquals":"Display"}}'
+`,
+  topLevelBlock: "  query [--matcher-json <json>] [--visibility <on_screen|all>] [--limit <n>]  Inspect node state",
+  handler: async (ctx) => {
+    const { rest, format, logger, deviceId, operatorPackage, timeoutMs, noDaemon } = ctx;
+    const resolved = resolveElementMatcherFromCli(rest);
+    if (!resolved.ok) return formatError(resolved.error, { format });
+    const visibility = getStringOptStrict(rest, "--visibility", ["--visibility", "--limit"]);
+    if (visibility !== undefined && visibility !== "on_screen" && visibility !== "all") {
+      throw new UsageError("--visibility must be on_screen or all");
+    }
+    const rawLimit = getStringOptStrict(rest, "--limit", ["--visibility", "--limit"]);
+    if (rawLimit !== undefined && (!/^\d+$/.test(rawLimit) || Number(rawLimit) < 1 || Number(rawLimit) > 1000)) {
+      throw new UsageError("--limit must be an integer from 1 to 1000");
+    }
+    return (await import("./commands/action.js")).cmdQuery({
+      matcher: hasElementSelectorFlag(rest) ? resolved.matcher : undefined,
+      visibility, limit: rawLimit === undefined ? undefined : Number(rawLimit),
+      format, logger, deviceId, operatorPackage, timeoutMs, noDaemon,
+    });
+  },
+};
+
 COMMANDS["read"] = {
   name: "read",
   synonyms: ["read-text", "read_text"],

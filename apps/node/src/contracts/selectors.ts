@@ -1,7 +1,7 @@
 /**
  * Node matcher / selector contract (aligns with Android NodeMatcher).
  */
-export interface NodeMatcher {
+export interface NodePredicate {
   resourceId?: string;
   role?: string;
   textEquals?: string;
@@ -10,24 +10,44 @@ export interface NodeMatcher {
   contentDescContains?: string;
 }
 
-export function isNodeMatcherEmpty(m: NodeMatcher): boolean {
-  return (
-    (m.resourceId == null || m.resourceId === "") &&
-    (m.role == null || m.role === "") &&
-    (m.textEquals == null || m.textEquals === "") &&
-    (m.textContains == null || m.textContains === "") &&
-    (m.contentDescEquals == null || m.contentDescEquals === "") &&
-    (m.contentDescContains == null || m.contentDescContains === "")
-  );
+export interface NodeMatcher extends NodePredicate {
+  ancestor?: NodePredicate;
+  descendant?: NodePredicate;
 }
 
-export function nodeMatcherToParams(m: NodeMatcher): Record<string, string> {
-  const out: Record<string, string> = {};
-  if (m.resourceId) out.resourceId = m.resourceId;
-  if (m.role) out.role = m.role;
-  if (m.textEquals) out.textEquals = m.textEquals;
-  if (m.textContains) out.textContains = m.textContains;
-  if (m.contentDescEquals) out.contentDescEquals = m.contentDescEquals;
-  if (m.contentDescContains) out.contentDescContains = m.contentDescContains;
-  return out;
+export function isNodeMatcherEmpty(m: NodeMatcher): boolean {
+  return !Object.values(m).some(value => value !== undefined && value !== null && value !== "");
+}
+
+export function nodeMatcherToParams(m: NodeMatcher): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(m).filter(([, value]) => value !== undefined));
+}
+
+export interface NodeSummary {
+  nodePath: string;
+  parentPath: string | null;
+  resourceId: string | null;
+  className: string;
+  role: string;
+  label: string;
+  contentDescription: string | null;
+  bounds: { left: number; top: number; right: number; bottom: number };
+  visibleToUser: boolean | null;
+  onScreen: boolean;
+  enabled: boolean | null;
+  clickable: boolean | null;
+  checkable: boolean | null;
+  checked: boolean | null;
+  selected: boolean | null;
+  scrollable: boolean | null;
+}
+
+export interface NodeQueryResult {
+  schemaVersion: 1;
+  snapshotId: string;
+  capturedAt: string;
+  totalMatches: number;
+  returnedCount: number;
+  truncated: boolean;
+  nodes: NodeSummary[];
 }

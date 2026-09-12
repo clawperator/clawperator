@@ -10,6 +10,8 @@ export interface ActionParams {
   durationMs?: number;
   path?: string;
   matcher?: NodeMatcher;
+  visibility?: "on_screen" | "all";
+  limit?: number;
   coordinate?: { x: number; y: number };
   text?: string;
   /** set_on_screen_log: physical screen edge */

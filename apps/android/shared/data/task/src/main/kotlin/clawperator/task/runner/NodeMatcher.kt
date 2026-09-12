@@ -11,6 +11,22 @@ data class NodeMatcher(
     val textContains: String? = null,
     val contentDescEquals: String? = null,
     val contentDescContains: String? = null,
+    val ancestor: NodePredicate? = null,
+    val descendant: NodePredicate? = null,
+) {
+    /**
+     * Checks scalar fields only. Tree relationships are evaluated by NodeResolver.
+     */
+    fun matches(node: TaskUiNode): Boolean = NodePredicate(resourceId, role, textEquals, textContains, contentDescEquals, contentDescContains).matches(node)
+}
+
+data class NodePredicate(
+    val resourceId: String? = null,
+    val role: String? = null,
+    val textEquals: String? = null,
+    val textContains: String? = null,
+    val contentDescEquals: String? = null,
+    val contentDescContains: String? = null,
 ) {
     /**
      * Checks if this matcher matches the given TaskUiNode.

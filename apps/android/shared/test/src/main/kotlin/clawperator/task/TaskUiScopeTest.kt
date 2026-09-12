@@ -28,6 +28,13 @@ import kotlin.time.Duration
 class TaskUiScopeTest(
     private var currentUiTree: UiTree,
 ) : TaskUiScope {
+    override suspend fun queryUi(
+        matcher: NodeMatcher?,
+        visibility: String,
+        limit: Int,
+    ): String = error("Query not configured in test")
+
+
     /**
      * Updates the current UI tree state for testing scenario progression.
      */

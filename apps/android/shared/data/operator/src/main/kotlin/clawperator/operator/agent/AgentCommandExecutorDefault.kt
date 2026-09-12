@@ -62,8 +62,8 @@ class AgentCommandExecutorDefault(
                                     taskId = command.taskId,
                                     result = result.value,
                                 )
-                                // Log full line as single message (action.log.Log uses stack-derived tag, not first arg)
-                                Log.i(canonicalLine)
+                                // Preserve one logical canonical result while keeping each logcat record bounded.
+                                resultEnvelopeLogLines(canonicalLine, command.commandId, command.taskId).forEach { Log.i(it) }
                             } catch (e: Throwable) {
                                 Log.e(e, "$CLAWPERATOR_RESULT_TAG buildCanonicalSuccessLine failed commandId=${command.commandId}")
                             }
@@ -79,7 +79,7 @@ class AgentCommandExecutorDefault(
                                     taskId = command.taskId,
                                     reason = result.reason,
                                 )
-                                Log.i(canonicalLine)
+                                resultEnvelopeLogLines(canonicalLine, command.commandId, command.taskId).forEach { Log.i(it) }
                             } catch (e: Throwable) {
                                 Log.e(e, "$CLAWPERATOR_RESULT_TAG buildCanonicalFailureLine failed commandId=${command.commandId}")
                             }
@@ -97,7 +97,7 @@ class AgentCommandExecutorDefault(
                     taskId = command.taskId,
                     reason = reason,
                 )
-                Log.i(canonicalLine)
+                resultEnvelopeLogLines(canonicalLine, command.commandId, command.taskId).forEach { Log.i(it) }
             } catch (canonicalError: Throwable) {
                 Log.e(canonicalError, "$CLAWPERATOR_RESULT_TAG buildCanonicalFailureLine failed commandId=${command.commandId}")
             }

@@ -23,7 +23,9 @@ The raw selector object shared by `matcher`, `container`, `expectedNode`, and `l
   "textEquals": "optional string",
   "textContains": "optional string",
   "contentDescEquals": "optional string",
-  "contentDescContains": "optional string"
+  "contentDescContains": "optional string",
+  "ancestor": { "resourceId": "optional structural ancestor ID" },
+  "descendant": { "textEquals": "optional descendant label" }
 }
 ```
 
@@ -41,11 +43,11 @@ Stable field anchors:
 | Field | Match behavior |
 | --- | --- |
 | `resourceId` | exact Android resource ID match |
-| `role` | exact accessibility role match |
+| `role` | case-insensitive exact semantic role match |
 | `textEquals` | exact visible-text match |
-| `textContains` | substring visible-text match |
+| `textContains` | case-insensitive substring label match |
 | `contentDescEquals` | exact content-description match |
-| `contentDescContains` | substring content-description match |
+| `contentDescContains` | case-insensitive substring content-description match |
 
 Rules enforced by Node:
 
@@ -53,7 +55,7 @@ Rules enforced by Node:
 - multiple fields combine into one object, so the runtime receives all of them together
 - empty matcher objects are invalid
 - each matcher string value must be at most `512` characters (`LIMITS.MAX_MATCHER_VALUE_LENGTH`)
-- blank strings are rejected before or during validation depending on how the matcher was built
+- simple CLI selector flags reject blank values; raw predicates require at least one nonblank field
 - selector objects are strict in execution validation, so unknown keys are rejected
 - common input aliases are normalized before that strict validation runs, including `id`/`resource_id`, `text`, `text_contains`, `content_desc`, `description`, and `accessibility_label`
 - when the shared CLI parser sees no selector flags at all, it returns an empty matcher object and the command decides whether selectors are required for that command
@@ -82,8 +84,36 @@ Concrete payload example:
 
 Success condition for that selector object:
 
-- the object uses only the six supported matcher keys
+- the object uses only the six scalar matcher keys and optional `ancestor` / `descendant` predicates
 - at least one value is non-empty
+
+## Relational Matching
+
+`NodePredicate` contains the six scalar fields above. A `NodeMatcher` may also
+contain `ancestor` and `descendant`, each a non-empty `NodePredicate`. All supplied
+fields and relationships combine with AND. Relationship predicates cannot contain
+nested relationships or unknown fields, and require at least one nonblank field.
+Other supplied scalar strings retain their exact matching semantics, including
+`{"role":"switch","textEquals":""}` for empty labels. A relationship alone is a
+valid matcher. Exact text and description comparisons remain case-sensitive;
+roles and substring comparisons ignore case. Labels use text when available,
+otherwise content description, otherwise an empty string.
+
+`ancestor` means any strict ancestor in the original captured structural tree.
+`descendant` means any strict descendant eligible under the request visibility.
+Self never satisfies either relationship. Actions use `on_screen` eligibility;
+queries choose `on_screen` or `all`. Hidden stale descendant labels therefore
+cannot select an otherwise visible container during an action. Structural
+ancestors remain available when resolving within a selected container.
+
+```bash
+clawperator query --matcher-json '{"resourceId":"row","ancestor":{"role":"list"},"descendant":{"textEquals":"Display"}}'
+```
+
+Queries report every match and its state, including empty-label controls. Existing
+actions retain their first-match behavior and retry defaults. Querying a unique
+node does not reserve it or authorize a later action against that observation.
+See [query_ui](actions.md#action-query-ui) for counts, state, and path semantics.
 
 ## Where Selectors Appear
 
@@ -114,10 +144,11 @@ Example execution fragment:
 For most commands, the CLI offers two equivalent ways to build a `NodeMatcher`:
 
 1. Shorthand flags such as `--text`, `--text-contains`, `--id`, `--desc`, `--desc-contains`, and `--role`
-2. Raw JSON via `--selector '<json>'`
+2. Raw JSON via `--matcher-json '<json>'` (alias of `--selector`)
 
 Agent-friendly CLI aliases accepted for shorthand selectors:
 
+- `--matcher-json` -> `--selector`
 - `--resource-id` -> `--id`
 - `--content-desc` -> `--desc`
 - `--content-desc-contains` -> `--desc-contains`
@@ -176,6 +207,7 @@ practical stable selectors available.
 
 Stable CLI flag anchors:
 
+- <a id="selector-flag-matcher-json"></a>`--matcher-json`
 - <a id="selector-flag-selector"></a>`--selector`
 - <a id="selector-flag-text"></a>`--text`
 - <a id="selector-flag-text-contains"></a>`--text-contains`

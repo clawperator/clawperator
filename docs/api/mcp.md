@@ -159,6 +159,8 @@ Selector-taking MCP tools accept this object shape:
 | `textContains` | `textContains` | Substring match on visible text |
 | `desc` | `contentDescEquals` | Exact content description |
 | `descContains` | `contentDescContains` | Substring match on content description |
+| `ancestor` | `ancestor` | Non-empty canonical NodePredicate for a strict ancestor |
+| `descendant` | `descendant` | Non-empty canonical NodePredicate for an eligible strict descendant |
 
 Rules:
 
@@ -460,6 +462,29 @@ Example call:
 ```
 
 <a id="mcp-tool-read"></a>
+### `query_ui`
+
+Inspect structured node state with optional `matcher`, `visibility`, and `limit`,
+plus the common `deviceId`, `operatorPackage`, and `timeoutMs` options. `matcher`
+uses the canonical NodeMatcher keys (`resourceId`, `textEquals`, and so on),
+including canonical `ancestor` and `descendant` predicates. Omit it to match all
+eligible nodes. Visibility defaults to `on_screen`; limit defaults to 100 and
+accepts integers from 1 through 1000.
+
+```json
+{
+  "matcher": {"resourceId": "row", "descendant": {"textEquals": "Display"}},
+  "visibility": "all",
+  "limit": 25
+}
+```
+
+Success includes a parsed `query` object and the original correlated result
+envelope whose `data.query` remains a JSON string. Zero matches succeed. See
+[query_ui](actions.md#action-query-ui) for NodeSummary fields, null state,
+visibility, truncation, the 256 KiB response limit, and observation-local paths.
+The tool does not convert paths into action targets.
+
 ### `read`
 
 Read text from one node or all matches. Supports regex validation to filter results at the runtime boundary.

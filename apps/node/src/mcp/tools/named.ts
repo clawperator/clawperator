@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { buildQueryExecution } from "../../domain/actions/query.js";
+import { queryParamsSchema } from "../../domain/executions/validateExecution.js";
+import { nodeMatcherJsonSchema } from "../schemas.js";
 import type { Logger } from "../../adapters/logger.js";
 import { buildClickExecution } from "../../domain/actions/click.js";
 import { buildOpenAppExecution } from "../../domain/actions/openApp.js";
@@ -26,6 +29,8 @@ import {
   parseToolArguments,
   runExecutionTool,
 } from "./common.js";
+
+const queryArgsSchema = executionToolOptionsSchema.merge(queryParamsSchema).strict();
 
 const coordinateSchema = z.object({
   x: z.number().int().nonnegative(),
@@ -116,6 +121,31 @@ export function getNamedMcpTools(
   session: SessionDefaults = createSessionDefaults(),
 ): McpToolDefinition[] {
   return [
+    {
+      name: "query_ui",
+      description: "Inspect fresh UI nodes, including blank labels and state. Omit matcher for all eligible nodes. Paths are observation-local, never action handles; visibility is not an occlusion guarantee.",
+      inputSchema: buildCommonExecutionSchema({
+        matcher: nodeMatcherJsonSchema,
+        visibility: { type: "string", enum: ["on_screen", "all"], default: "on_screen" },
+        limit: { type: "integer", minimum: 1, maximum: 1000, default: 100 },
+      }),
+      handler: async (args) => {
+        const opts = mergeWithSessionDefaults(parseToolArguments(queryArgsSchema, args), session);
+        const execution = applyMcpExecutionMetadata(buildQueryExecution({
+          matcher: opts.matcher, visibility: opts.visibility, limit: opts.limit,
+        }), "query_ui", opts.timeoutMs);
+        return await runExecutionTool(execution, opts, logger, result => {
+          const extracted = extractStepDataValue(result.envelope, {
+            actionType: "query_ui", dataKey: "query", errorKey: "error",
+          });
+          if (!extracted.ok) return buildMcpErrorResult({
+            code: extracted.error, message: extracted.message, envelope: result.envelope,
+            deviceId: result.deviceId, terminalSource: result.terminalSource,
+          });
+          return buildSuccessResult({ ...buildExecutionSuccessPayload(result), query: JSON.parse(extracted.value) });
+        });
+      },
+    },
     {
       name: "open",
       description: "Open an Android application by package id or launch a URI.",

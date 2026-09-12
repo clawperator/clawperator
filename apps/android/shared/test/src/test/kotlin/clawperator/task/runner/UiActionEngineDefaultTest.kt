@@ -21,6 +21,39 @@ import kotlin.time.Duration.Companion.milliseconds
 
 class UiActionEngineDefaultTest : ActionTest {
     @Test
+    fun `query returns intact data and overflow is a structured failed step`() =
+        actionTest {
+            val matcher = NodeMatcher(descendant = NodePredicate(textEquals = "Unique"))
+            var overflow = false
+            val uiScope =
+                object : RecordingTaskUiScope() {
+                    override suspend fun queryUi(
+                        matcher: NodeMatcher?,
+                        visibility: String,
+                        limit: Int,
+                    ): String {
+                        assertEquals("Unique", matcher?.descendant?.textEquals)
+                        assertEquals("all", visibility)
+                        assertEquals(7, limit)
+                        if (overflow) throw QueryPayloadTooLargeException()
+                        return "{\"schemaVersion\":1}"
+                    }
+                }
+            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+            val plan = UiActionPlan("query-command", "query-task", "test", listOf(UiAction.QueryUi("query", matcher, "all", 7)))
+            val success = engine.execute(RecordingTaskScope(uiScope), plan)
+            assertEquals("query-command", success.commandId)
+            assertEquals("query-task", success.taskId)
+            assertEquals("{\"schemaVersion\":1}", success.stepResults.single().data["query"])
+            overflow = true
+            val failed = engine.execute(RecordingTaskScope(uiScope), plan).stepResults.single()
+            assertFalse(failed.success)
+            assertEquals("PAYLOAD_TOO_LARGE", failed.data["error"])
+            assertEquals(null, failed.data["query"])
+        }
+
+
+    @Test
     fun `execute runs generic action list and returns step data`() =
         actionTest {
             val uiScope = RecordingTaskUiScope()
@@ -1994,6 +2027,12 @@ open class RecordingTaskUiScope(
     private val scrollLoopResult: TaskScrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.EdgeReached, scrollsExecuted = 3),
     private val waitForNodeThrows: Exception? = null,
 ) : TaskUiScope {
+    override suspend fun queryUi(
+        matcher: NodeMatcher?,
+        visibility: String,
+        limit: Int,
+    ): String = error("Query not configured in test")
+
     var scrollIntoViewCalled: Boolean = false
     var scrollOnceCalled: Boolean = false
     var clickCalled: Boolean = false

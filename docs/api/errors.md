@@ -304,10 +304,13 @@ Recovery:
 ### `PAYLOAD_TOO_LARGE`
 
 Use this when a CLI, Serve, or execution payload exceeds a configured size
-limit before dispatch.
+limit before dispatch. Android also returns this code in a failed `query_ui`
+step when serialized UTF-8 `data.query` exceeds 256 KiB. The query result is not
+partially serialized or cut to fit.
 
 Recovery:
 
+- for `query_ui`, lower `limit` or narrow `matcher`
 - split long action lists into smaller executions
 - move large inline data into files or skill artifacts where the command
   supports that pattern

@@ -5,26 +5,29 @@ import { getCanonicalActionType } from "../../contracts/aliases.js";
 import type { ActionParams, Execution } from "../../contracts/execution.js";
 import { normalizeExecutionInput } from "../../contracts/inputAliases.js";
 
-const nodeMatcherSchema = z
-  .object({
-    resourceId: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
-    role: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
-    textEquals: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
-    textContains: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
-    contentDescEquals: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
-    contentDescContains: z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional(),
-  })
-  .strict()
-  .refine(
-    (m) =>
-      (m.resourceId ?? "") !== "" ||
-      (m.role ?? "") !== "" ||
-      (m.textEquals ?? "") !== "" ||
-      (m.textContains ?? "") !== "" ||
-      (m.contentDescEquals ?? "") !== "" ||
-      (m.contentDescContains ?? "") !== "",
-    { message: "Matcher must have at least one field" }
-  );
+export const nodePredicateFields = {
+  resourceId: selectorString(), role: selectorString(), textEquals: selectorString(),
+  textContains: selectorString(), contentDescEquals: selectorString(), contentDescContains: selectorString(),
+};
+
+function selectorString() {
+  return z.string().max(LIMITS.MAX_MATCHER_VALUE_LENGTH).optional();
+}
+
+const hasPredicateField = (value: object) => Object.values(value).some(entry =>
+  typeof entry === "string" ? entry.trim().length > 0 : entry !== undefined);
+export const nodePredicateSchema = z.object(nodePredicateFields).strict().refine(hasPredicateField, "Predicate must have at least one nonblank field");
+export const nodeMatcherSchema = z.object({
+  ...nodePredicateFields,
+  ancestor: nodePredicateSchema.optional(),
+  descendant: nodePredicateSchema.optional(),
+}).strict().refine(hasPredicateField, "Matcher must have at least one nonblank field");
+
+export const queryParamsSchema = z.object({
+  matcher: nodeMatcherSchema.optional(),
+  visibility: z.enum(["on_screen", "all"]).optional(),
+  limit: z.number().int().min(1).max(1000).optional(),
+}).strict();
 
 const coordinateSchema = z
   .object({
@@ -124,6 +127,7 @@ const setOnScreenLogParamsSchema = z.object({
 const clearOnScreenLogParamsSchema = z.object({}).strict();
 
 function paramsSchemaForAction(actionType: string) {
+  if (actionType === "query_ui") return queryParamsSchema.optional();
   if (actionType === "set_on_screen_log") {
     return setOnScreenLogParamsSchema.optional();
   }
@@ -152,6 +156,7 @@ const supportedTypes = [
   "scroll",
   "scroll_until",
   "read_text",
+  "query_ui",
   "enter_text",
   "snapshot",
   "take_screenshot",
