@@ -73,6 +73,15 @@ class NodeDiscoveryTests(unittest.TestCase):
             result = subprocess.run(command + ['--unit'], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn('Running 3 Node test files', result.stdout)
+            # Add a test in a new source area after the first run. No runner edits.
+            new_test = root / 'dist/new-feature/deep/future.test.js'
+            new_test.parent.mkdir(parents=True)
+            new_test.write_text('console.log("future test executed"); process.exit(7);')
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Running 5 Node test files', result.stdout)
+            self.assertIn('future test executed', result.stdout)
+            new_test.unlink()
             path.write_text('process.exit(7);')
             self.assertNotEqual(subprocess.run(command, capture_output=True).returncode, 0)
 

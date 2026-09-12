@@ -30,6 +30,26 @@ building. `npm --prefix apps/node run test:unit` limits discovery to
 explicit file discovery, independent of shell glob expansion. Do not run another
 Node build concurrently with tests: the build replaces `dist/`.
 
+## Adding tests
+
+No runner changes are needed when adding Node or Android test files:
+
+- Node: add `*.test.ts` anywhere under `apps/node/src/`. TypeScript includes the
+  whole source tree, and the runner recursively discovers the compiled
+  `*.test.js` files under `dist/`, including new directories. The narrower
+  `test:unit` command only includes `src/test/unit/` and `src/cli/`.
+- Android: add JUnit tests to a module's standard `src/test/java/` or
+  `src/test/kotlin/` source set. Gradle discovers the test classes; the runner
+  does not enumerate files or modules. New Android modules must be registered
+  in `settings.gradle.kts` as usual. The root `unitTest` task dynamically includes
+  every subproject's `testDebugUnitTest` task.
+- Android instrumented tests belong in `src/androidTest/` and are discovered
+  by the explicit `instrumentation` suite. They remain excluded from the default
+  off-device run.
+
+New test frameworks or build variants may need suite configuration. File
+additions within these conventions do not.
+
 ## Device tests
 
 Device tests never run by default. Select a suite and pass an explicit serial:
