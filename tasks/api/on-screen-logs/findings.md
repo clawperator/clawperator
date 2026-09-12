@@ -2,8 +2,10 @@
 
 ## Environment
 
+- PR-1 landed as `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d` (PR #266). Pre-squash references below are historical; use the landed commit as the prerequisite for PR-2.
+- Task-pack reconciliation after merge: source/docs inspection only. No build, device proof, or test execution was repeated during this documentation update. PR-2 is now requested but has not started.
 - Source revision at Phase 1 start: `5d23af58e6b383e9ed56e65e757db61bffb386e0` on branch `on-screen-prompt`.
-- Node validation will use the branch-local build under `apps/node/`; no global CLI is used.
+- PR-1 Node validation used the branch-local build under `apps/node/`; no global CLI was used.
 - Debug Operator: `com.clawperator.operator.dev`, rebuilt from this branch and installed for the proof.
 - Selected target: disposable Android emulator, API 35, 1080x2400 px, 420 dpi, initial font scale `1.0`.
 - Capture methods: `adb exec-out screencap -p` and finalized `adb shell screenrecord`, both with an explicit `<device_serial>`. The retained artifacts are ignored local validation output.
@@ -12,8 +14,10 @@
 
 | Phase | Status | Commit |
 | --- | --- | --- |
-| 1 - Android Controller and Mechanism Proof | passed | `fdb2b12` |
-| 2 - Raw Execution Contract and Public Documentation | passed | `3efc652`, alias follow-up `76c7be8` |
+| 1 - Android Controller and Mechanism Proof | merged | `120c1eb` (historical phase commit `fdb2b12`) |
+| 2 - Raw Execution Contract and Public Documentation | merged | `120c1eb` (historical `3efc652`, alias follow-up `76c7be8`, and review fixes) |
+| 3 - CLI Convenience | not started; ready | prerequisite and continuation satisfied |
+| 4 - Cross-Surface Regression and Handoff | not started | after Phase 3 commit |
 
 ## Validation
 
@@ -74,7 +78,7 @@
 - At font scale `1.3` in landscape, the panel remained physical-right at `(1633,137)` with size `735x90` on the `2400x1080` logical display. Returning to portrait re-evaluated the same logical right panel at `(313,199)` with size `735x90` and a new generation title. The emulator was restored to font scale `1.0`, portrait rotation, and its initial rotation-policy setting after the proof.
 - The draw acknowledgement was sufficient to order the immediate observed screenshots on this API 35 target. This is evidence for the tested sequence only. It remains a draw callback, not a compositor or capture-frame guarantee.
 - Android's standalone `uiautomator dump` temporarily replaced the active accessibility-service environment and destroyed the debug service during exploratory testing. The repeatable harness deliberately uses the branch-local `snapshot` path, `dumpsys`, screenshots, and screen recording instead. No claim depends on that disruptive tool.
-- When only the panel was visible, this target's service window list omitted the panel and preserved raw snapshot metadata as `has_overlay=false`, `window_count=2`. When the keyboard was present, it correctly reported the unrelated input-method overlay. This is why Phase 2 must add a separately identified controller-owned visibility field without changing existing raw metadata semantics.
+- When only the panel was visible, this target's service window list omitted the panel and preserved raw snapshot metadata as `has_overlay=false`, `window_count=2`. When the keyboard was present, it correctly reported the unrelated input-method overlay. This motivated the separately identified controller-owned visibility field added in Phase 2 without changing existing raw metadata semantics.
 - Phase 2 raw set with only `text` returned the required defaults and acknowledgement: `visible=true`, `rendered=true`, `truncated=false`, left/left alignment, `8` dp offsets, `280` dp width, `12` sp text, normalized defaults, `300000` ms TTL, and observed bounds `[21,157][756,236]` on the selected API 35 target.
 - A raw snapshot while the baseline panel was visible returned `operator_overlay_visible=true` while preserving the raw metadata values `has_overlay=false` and `window_count=2`. A normal raw `read_text` lookup for the displayed label returned no UI node, so the panel text did not enter the app hierarchy.
 - The raw custom replacement returned normalized colors `#FFA1B2C3` and `#7F0A0B0C`, right/right alignment, and bounds `[198,199][1038,290]`. The separate full-display screenshot visibly contained only the replacement label on the physical right, with its custom text and background colors.
@@ -87,7 +91,7 @@
 - The proof access is a debug-source-set Activity at `apps/android/shared/data/operator/src/debug/`. It accepts only four fixed scenario names and fixed panel content, is absent from release builds, and does not expose a receiver, a raw action, a hidden release command, or a caller-controlled production ingress.
 - The implementation uses `TYPE_ACCESSIBILITY_OVERLAY`, a custom non-accessible View, `FLAG_NOT_TOUCHABLE`, `FLAG_NOT_FOCUSABLE`, and no `FLAG_SECURE`. It has no ticking timer, host-driven elapsed update, application-overlay fallback, or persistent state.
 - API 21 fails closed with `ON_SCREEN_LOG_RENDER_FAILED` before attempting to attach. `TYPE_ACCESSIBILITY_OVERLAY` is introduced on API 22, so raising the project minimum SDK or using a different overlay mechanism would not meet the specified contract.
-- Phase 1 deliberately does not publish `operator_overlay_visible` in snapshot data. It wires exact identity without altering raw metadata. The string-valued public output belongs to Phase 2 with the normal raw execution contract.
+- At the Phase 1 boundary, the implementation deliberately did not publish `operator_overlay_visible` in snapshot data. It wires exact identity without altering raw metadata. Phase 2 subsequently shipped the string-valued public output with the normal raw execution contract.
 - Phase 2 uses canonical `set_on_screen_log` and `clear_on_screen_log` types for validation, Android dispatch, and result data. The Node ingress also accepts exact lower-case `on_screen_log_set` and `on_screen_log_clear`, then normalizes them before the shared validator. Case and whitespace variants remain invalid, parameter aliases remain rejected, and direct Android parser ingress stays canonical-only. These exact additional PR-1 paths are included in the review scope because they preserve the same contract across raw CLI, Serve, and MCP transport.
 - PR-1 review added `apps/node/src/mcp/tools/core.ts` to the raw-transport scope. MCP now preserves raw action-type text until the canonical validator runs, so whitespace around either on-screen-log action is rejected instead of normalized. The review fix also preserves pre-existing unrelated envelope error codes.
 - Configuration changes now defer while a replacement generation waits for its draw acknowledgement, then recompute the acknowledged replacement rather than reapplying stale state. Legacy API 29 bounds combine public `Display.getCutout()` safe insets with system bars and account for reverse-landscape left navigation. API 28 with a declared built-in cutout fails closed because a service has no public pre-attachment safe-inset query.
@@ -106,5 +110,5 @@
 - Android 9 (API 28) devices that declare a built-in display cutout reject panel placement with `ON_SCREEN_LOG_LAYOUT_INVALID` rather than place a panel using unverified safe-area geometry. API 29 compatibility behavior has unit coverage but no live device proof.
 - The mechanism is proven for the tested screenshot and recording sequence, not as a general compositor-synchronization guarantee.
 - The Phase 2 live proof used the branch-local raw CLI and one API 35 emulator. Serve and MCP transport coverage uses local test doubles through the same Node executor, not a real remote client/device run.
-- A single raw execution that orders `set_on_screen_log`, `take_screenshot`, and `clear_on_screen_log` cannot currently guarantee that the output file contains the label because host screenshot capture finalizes after Android completes the list. PR-1 documents and proves the separate-execution workaround. Any interleaved capture redesign requires a separate design decision and is out of scope for PR-1.
-- PR-2 remains blocked until PR-1 merges and the user explicitly requests continuation. No CLI convenience command was started.
+- A single raw execution that orders `set_on_screen_log`, `take_screenshot`, and `clear_on_screen_log` cannot currently guarantee that the output file contains the label because host screenshot capture finalizes after Android completes the list. PR-1 documents and proves the separate-execution workaround. Any interleaved capture redesign requires a separate design decision and is out of scope for both PRs in this task pack.
+- PR-1 is merged and PR-2 continuation is explicitly requested. The CLI convenience command and final CLI/live matrix remain unimplemented. The PR-2 agent must append its own evidence rather than treating the historical PR-1 checks as Phase 3/4 completion.

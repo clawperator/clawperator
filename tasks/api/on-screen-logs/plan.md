@@ -4,19 +4,19 @@
 
 Add an optional, noninteractive diagnostic panel to the Android Operator, controlled through the existing execution API. Callers supply static text, placement, and colors. This is a generic Clawperator feature owned by Action Launcher.
 
-Two PRs, four sequential phases. PR-1 proves and ships the Android renderer plus raw execution actions; PR-2 adds CLI convenience and completes validation/documentation. PR-2 must wait for PR-1 to merge. Implementation has not started. This task pack specifies proposed behavior, not existing capability.
+Two PRs, four sequential phases. PR-1 proves and ships the Android renderer plus raw execution actions; PR-2 adds CLI convenience and completes validation/documentation. PR-1 merged in `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d` (PR #266). PR-2 is explicitly requested and ready to start; no PR-2 implementation has begun. The renderer and raw API below are shipped source contracts; the CLI convenience surface remains proposed PR-2 work.
 
 ## Status
 
 | Item | Value |
 | --- | --- |
-| State | in progress |
+| State | PR-1 merged; PR-2 ready |
 | Total PRs | 2 |
 | Total phases | 4 |
 | Completed | Phases 1-2 |
 | Remaining | 3-4 |
-| Current / Next | PR-2 after PR-1 merge and explicit continuation |
-| Blockers | PR-2 waits for PR-1 merge and explicit continuation |
+| Current / Next | Phase 3: CLI convenience |
+| Blockers | None; prerequisite merge and continuation are satisfied |
 
 ## Goal
 
@@ -47,7 +47,7 @@ Device automation produces useful visual evidence, but images and recordings lac
 
 ## Existing Artifact Scope
 
-N/A - new task artifact and new feature. Preserve existing command names, host `logs` behavior, screenshot contracts, and raw window metadata meaning. Modify only the integration seams required for the panel; do not refactor unrelated action infrastructure.
+PR-1 already added the renderer, raw actions, aliases, snapshot visibility field, docs page, and proof fixtures. PR-2 extends that implementation with CLI convenience and final proof. Preserve existing command names, host `logs` behavior, screenshot contracts, and raw window metadata meaning. Modify only the integration seams required for the panel; do not refactor unrelated action infrastructure.
 
 ## Surfaces and Ownership
 
@@ -69,6 +69,10 @@ Paths are relative to the repository root. Verify current source before editing.
 | --- | --- |
 | Execution fields and validation | `apps/node/src/contracts/execution.ts`, `apps/node/src/domain/executions/validateExecution.ts`, `apps/node/src/contracts/aliases.ts` |
 | Error/result shape | `apps/node/src/contracts/errors.ts`, `apps/node/src/contracts/result.ts` |
+| Landed renderer | `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/onscreenlog/OnScreenLogPanelController.kt`, `OnScreenLogPanelView.kt` in the same directory |
+| Shared panel contract | `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/OnScreenLog.kt` |
+| Exact owned-window identity | `apps/android/shared/data/uitree/src/main/kotlin/clawperator/uitree/OperatorOverlayIdentity.kt` |
+| Node alias normalization | `apps/node/src/contracts/inputAliases.ts` |
 | CLI and daemon | `apps/node/src/cli/registry.ts`, `apps/node/src/cli/commands/action.ts`, `apps/node/src/cli/daemonProxy.ts` |
 | Capture and dispatch | `apps/node/src/domain/executions/runExecution.ts` |
 | Existing transport routes | `apps/node/src/cli/commands/serve.ts`, `apps/node/src/mcp/tools/core.ts` |
@@ -81,7 +85,7 @@ Paths are relative to the repository root. Verify current source before editing.
 
 Relevant existing tests include `apps/node/src/test/unit/validateExecution.test.ts`, `cliRegistry.test.ts`, `cliHelp.test.ts`, `cliExitCode.test.ts`, `daemon/actionProxy.test.ts`; Android `OperatorAccessibilityServiceTest.kt`, `UiActionEngineDefaultTest.kt`, and `UiTreeInspectorAndroidTest.kt`. Locate them before edits. Add tests for all new controller/geometry logic in the same phase as that logic.
 
-Platform references: [overlay type](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#TYPE_ACCESSIBILITY_OVERLAY), [touch-through rules](https://developer.android.com/about/versions/12/behavior-changes-all#untrusted-touch-events), [accessibility service](https://developer.android.com/reference/android/accessibilityservice/AccessibilityService). The APIs support the proposed mechanism; capture behavior and interaction invariants still require device proof.
+Platform references: [overlay type](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#TYPE_ACCESSIBILITY_OVERLAY), [touch-through rules](https://developer.android.com/about/versions/12/behavior-changes-all#untrusted-touch-events), [accessibility service](https://developer.android.com/reference/android/accessibilityservice/AccessibilityService). PR-1 proved the mechanism on one API 35 emulator. Older versions and other devices are not covered by that live proof; PR-2 must record its own matrix without implying broader coverage.
 
 ## Deterministic Versus Judgment
 
@@ -91,13 +95,13 @@ Apply the field defaults, validation rules, state table, and PR boundaries below
 
 ### Renderer
 
-Use `TYPE_ACCESSIBILITY_OVERLAY` from the connected service with `FLAG_NOT_TOUCHABLE` and `FLAG_NOT_FOCUSABLE`. Use one small custom-drawn View with no accessible text descendants, marked not important for accessibility. Draw plain text yourself so application matchers cannot find the panel's labels. Do not create an Activity or request SYSTEM_ALERT_WINDOW. Do not set FLAG_SECURE on the panel.
+Use `TYPE_ACCESSIBILITY_OVERLAY` from the connected service with `FLAG_NOT_TOUCHABLE` and `FLAG_NOT_FOCUSABLE`. Use one small custom-drawn View with no accessible text descendants, marked not important for accessibility. Draw plain text yourself so application matchers cannot find the panel's labels. Do not create a production Activity or request SYSTEM_ALERT_WINDOW. PR-1 includes a debug-only fixed-scenario proof Activity in `apps/android/shared/data/operator/src/debug/`; it is absent from release builds and must not become production ingress. Do not set FLAG_SECURE on the panel.
 
 All window mutations occur on the Android main thread. Keep state in the service lifetime, not a command object. Service disconnection/destruction removes the window and cancels pending callbacks. Process restart starts hidden; do not persist panel state.
 
 ### Raw API
 
-Add canonical actions `set_on_screen_log` and `clear_on_screen_log`. These use the normal execution envelope, action IDs, and explicit target selection. At the Node input boundary, accept the exact lower-case aliases `on_screen_log_set` and `on_screen_log_clear`, then normalize them to their canonical types before validation and dispatch. Reject case and whitespace variants. `clear_on_screen_log` accepts omitted params or `{}` only. `set_on_screen_log` accepts only these fields:
+The merged canonical actions are `set_on_screen_log` and `clear_on_screen_log`. These use the normal execution envelope, action IDs, and explicit target selection. At the Node input boundary, accept the exact lower-case aliases `on_screen_log_set` and `on_screen_log_clear`, then normalize them to their canonical types before validation and dispatch. Reject case and whitespace variants. `clear_on_screen_log` accepts omitted params or `{}` only. `set_on_screen_log` accepts only these fields:
 
 | Field | Type / accepted range | Default / meaning |
 | --- | --- | --- |
@@ -112,11 +116,11 @@ Add canonical actions `set_on_screen_log` and `clear_on_screen_log`. These use t
 | `backgroundColor` | same color grammar | `#B3000000`; background scrim |
 | `ttlMs` | integer 1000-3600000 | 300000; local stale-label expiry, not a visible timer |
 
-Normalize 6-digit colors to opaque 8-digit uppercase form. Do not accept named colors, floats, numeric strings, null, unknown keys, or NaN/infinity. Validate on Node and Android; malformed direct ingress must not mutate current state. Do not loosen other action schemas when adding these fields. Text is plain text, never markup or interpolation.
+Normalize 6-digit colors to opaque 8-digit uppercase form. Numeric fields use JSON numeric semantics: accept finite numbers with no fractional component, including `1.0` and `1e3` when within the field range. Reject fractional numbers, numeric strings, null, unknown keys, NaN/infinity, and named colors. Validate on Node and Android; malformed direct ingress must not mutate current state. Do not loosen other action schemas when adding these fields. Text is plain text, never markup or interpolation.
 
 ### Placement and overflow
 
-The usable rectangle is the current default-display window bounds inset by system bars and display cutouts, ignoring temporary bar visibility. Keep the coordinate basis unchanged when the keyboard appears; the panel may overlap the keyboard area and does not move automatically. Use the supported compatibility path for the existing minimum Android version; do not increase minSdk.
+The usable rectangle is the current default-display window bounds inset by system bars and display cutouts, ignoring temporary bar visibility. Keep the coordinate basis unchanged when the keyboard appears; the panel may overlap the keyboard area and does not move automatically. Use the supported compatibility path for the existing minimum Android version; do not increase minSdk. The shipped controller fails closed on API 21 with `ON_SCREEN_LOG_RENDER_FAILED`; accessibility-overlay placement requires API 22+. On API 28 with a declared built-in display cutout, fail with `ON_SCREEN_LOG_LAYOUT_INVALID` because pre-attachment safe insets are unavailable. API 29 uses public display cutout safe insets. Preserve these tested compatibility paths in PR-2.
 
 Convert dp/sp only on Android. Panel x is usable-left + edge offset for left anchor, or usable-right - edge offset - width for right anchor. Panel y is usable-top + top offset. Insets must be applied exactly once; prove this live. Fixed internal padding: 8dp on each edge. Soft-wrap text within the padded width. Height is content height, limited to remaining usable height.
 
@@ -140,7 +144,7 @@ On rotation/display-configuration change, re-evaluate the same logical geometry.
 
 Use Android's monotonic clock for expiry, starting at the acknowledged draw of the new generation. No clock updates, timestamp formatting, or elapsed-time UI. This cleanup timer is independent of the execution timeout. Use a generation token so an old expiry/draw callback cannot affect newer content.
 
-Set succeeds only after the requested generation completes a draw callback, bounded by the execution deadline and at most 2000ms after dispatch to the UI thread. This is a draw acknowledgement, not proof that a compositor frame or screenshot contains the content. Return `rendered=true` only under that precise meaning. Do not acknowledge merely because `addView` returned. Do not add host sleeps as a substitute for acknowledgement. Subsequent screenshot ordering must be validated experimentally.
+Set succeeds only after the requested generation completes a draw callback, bounded by the execution deadline and at most 2000ms after dispatch to the UI thread. This is a draw acknowledgement, not proof that a compositor frame or screenshot contains the content. Return `rendered=true` only under that precise meaning. Do not acknowledge merely because `addView` returned. Do not add host sleeps as a substitute for acknowledgement. PR-1 verified separate-execution captures on API 35. The host captures screenshot pixels after the Android action list returns: never combine set, screenshot, and clear in one payload when visible-label evidence is required. Use separate set -> screenshot -> replace -> screenshot -> clear executions, each awaited. The existing combined fixtures prove schema/ordering limitations, not visible-label capture. MCP must omit screenshot params.path and use the returned runtime-managed path; raw CLI and Serve may choose paths. Screenshot pipeline redesign is outside both PRs.
 
 ### Window metadata and inspection
 
@@ -173,16 +177,16 @@ clawperator on-screen-log set --text "FLOW-001: Settings persist" --anchor right
 clawperator on-screen-log clear --device <device_serial>
 ```
 
-Flags map exactly to camelCase raw fields. Existing output-format, timeout, device, Operator-package, and no-daemon conventions apply. Default JSON wraps the same execution result. No new named MCP tool or serve endpoint; their execute routes accept the new actions.
+Flags map exactly to camelCase raw fields. Require `--text` for set. Clear accepts only common execution/output options, with no panel flags or positional text. Reject repeated panel flags, unknown flags, invalid subcommands, missing values, and extra positional arguments. Convert the entire numeric flag token to a JSON number before shared validation; accept decimal/exponent numeric syntax only when finite and integral, and reject empty, hexadecimal, fractional, and partially parsed tokens such as `12px`. Do not use prefix-only parseInt parsing. Preserve `0` offsets and pass omitted fields through as omitted so the canonical validator/Android defaults remain authoritative. Existing output-format, timeout, device, Operator-package, and no-daemon conventions apply. Default JSON wraps the same execution result. No new named MCP tool or serve endpoint; their execute routes accept the new actions.
 
 Live acceptance must show full-display screenshot and playable video containing updated text, left/right placement and colors, continued app interaction, unchanged app bounds/foreground selection, and cleanup. Record capture limitations honestly; do not change secure-window behavior.
 
 ## Idempotency
 
-Set is replacement, not append. Omitted style fields reset to defaults even after a previous customized set. Repeating a successful set renews TTL but does not accumulate views. Clear is idempotent. No background restoration after process/service restart. An uncertain transport result remains uncertain; use the existing post-dispatch fallback policy.
+Set is replacement, not append. Omitted style fields reset to defaults even after a previous customized set. Repeating a successful set renews TTL but does not accumulate views. Clear is idempotent. No background restoration after process/service restart. An uncertain transport result remains uncertain; set/clear use `allowPostDispatchFallback:false` through the common action execution path. A proven pre-dispatch fallback is allowed; a lost acknowledgement after dispatch must not replay set or clear.
 
 ## Durable Follow-Up
 
-Author `docs/api/on-screen-logs.md`; update `docs/api/actions.md`, `docs/api/snapshot.md`, `docs/api/errors.md`, and CLI generated-source registrations. Describe transport availability in `docs/api/serve.md` and `docs/api/mcp.md` only as existing execute-route support. Wire the page into docs source-map/navigation and regenerate using repository skills.
+Extend the PR-1 authored `docs/api/on-screen-logs.md` with CLI usage; preserve its raw API and capture limitations. Update `docs/api/actions.md`, `docs/api/snapshot.md`, `docs/api/errors.md`, and CLI generated-source registrations. Describe transport availability in `docs/api/serve.md` and `docs/api/mcp.md` only as existing execute-route support. Preserve the existing page registration/navigation and regenerate using repository skills; update generated CLI references from their source.
 
 Store lifecycle/clock/geometry invariants in source comments and tests. Keep the multi-PR task pack until both PRs finish; use `.agents/skills/task-cleanup/SKILL.md` before deleting it. Timing widgets and automatic metadata are future ideas, not incomplete requirements of this task.
