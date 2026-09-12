@@ -25,8 +25,14 @@ outside the harness and tests both variants sequentially.
 The harness uses branch-local CLI commands and a real stdio MCP session. It
 requires successful correlated envelopes, three consecutive Internet queries,
 raw/MCP query parity, the sensitive Settings root, Wi-Fi switch state/bounds/XML
-parity, a decoded PNG, and the Display & touch control screen. A loading page
-cannot satisfy readiness. A missing hierarchy fails immediately; it is never
+parity, a decoded PNG, and the Display & touch control screen. Internet readiness requires the destination's `collapsing_toolbar` labeled
+`Internet`, the `Wi-Fi` row, and `switchWidget` together. The outgoing Network &
+internet page's Airplane mode switch and the Internet loading page cannot satisfy
+readiness. At most 30 successful queries run within 15 seconds, with each process
+bounded by the remaining deadline. Query/service/transport failures fail
+immediately; no navigation is replayed. Sensitivity, unique switch/state and
+parity assertions still apply to the separate captures after readiness.
+`internet-preparation.json` retains the readiness verdict and observation count. A missing hierarchy fails immediately; it is never
 converted to zero matches or a skip. Connected-row evidence is compared when
 present. Each subprocess has a deadline; readiness is bounded. A per-device lock
 serializes cooperating harnesses. Do not run other automation on the device.

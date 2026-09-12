@@ -142,6 +142,44 @@ def prepare_settings(run, cli, device, evidence, clock=time.monotonic, sleep=tim
         evidence['elapsedSeconds'] = clock() - started
 
 
+def internet_destination_ready(nodes):
+    """The outgoing Network page also has switchWidget (Airplane mode)."""
+    return (any(node.get('resourceId') == 'com.android.settings:id/collapsing_toolbar'
+                and node.get('label') == 'Internet' for node in nodes)
+            and any(node.get('label') == 'Wi-Fi' for node in nodes)
+            and any(node.get('resourceId') == 'com.android.settings:id/switchWidget' for node in nodes))
+
+
+def prepare_internet(cli, evidence, clock=time.monotonic, sleep=time.sleep):
+    """Observe the destination without replaying navigation or retrying failed queries."""
+    started = clock()
+    deadline = started + 15
+    evidence.update(status='running', deadlineSeconds=15, maxObservations=30, observations=0)
+
+    def remaining():
+        seconds = deadline - clock()
+        assert seconds > 0, 'Internet destination did not become ready within 15 seconds'
+        return seconds
+
+    try:
+        for attempt in range(30):
+            nodes = query(cli('query', '--visibility', 'all', '--limit', '1000',
+                              process_timeout=remaining()))
+            evidence['observations'] = attempt + 1
+            remaining()
+            if internet_destination_ready(nodes):
+                evidence.update(status='passed', postcondition='Internet toolbar, Wi-Fi row and switch present')
+                return
+            if attempt < 29:
+                sleep(min(0.25, remaining()))
+        raise AssertionError('Internet destination unavailable after 30 observations')
+    except Exception as error:
+        evidence.update(status='failed', error=str(error))
+        raise
+    finally:
+        evidence['elapsedSeconds'] = clock() - started
+
+
 def record_source(run):
     """Record tracked source relative to HEAD and inventory non-ignored untracked files."""
     run(['git', 'rev-parse', 'HEAD'])
@@ -171,6 +209,7 @@ def main():
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     count = 0
     stage = 'prerequisites'
+    internet_preparation = {'status': 'not_started'}
     preparation = {'status': 'not_started', 'device': args.device, 'operatorPackage': args.operator_package, 'expectedApi': args.api}
 
     def run(command, timeout=45):
@@ -220,14 +259,9 @@ def main():
         envelope(cli('scroll-until', 'up', '--text', 'Network & internet', '--click'))
         wait('Internet')
         envelope(cli('click', '--text', 'Internet'))
-        # A loading page can precede the sensitive root. Never accept it as the fixture.
-        deadline = time.monotonic() + 15
-        while True:
-            ready = query(cli('query', '--visibility', 'all', '--limit', '1000'))
-            if any(n['resourceId'] == 'com.android.settings:id/switchWidget' for n in ready):
-                break
-            assert time.monotonic() < deadline, 'Internet hierarchy did not expose Wi-Fi within 15 seconds'
-            time.sleep(0.25)
+        stage = 'internet-readiness'
+        prepare_internet(cli, internet_preparation)
+        (args.out / 'internet-preparation.json').write_text(json.dumps(internet_preparation, indent=2))
         stage = 'internet-capture-parity'
         captures = [query(cli('query', '--visibility', 'all', '--limit', '1000')) for _ in range(3)]
         for nodes in captures:
@@ -267,6 +301,7 @@ def main():
         (args.out / 'failure-screenshot.json').write_text(json.dumps(screenshot_result))
         raise
     finally:
+        (args.out / 'internet-preparation.json').write_text(json.dumps(internet_preparation, indent=2))
         (args.out / 'preparation.json').write_text(json.dumps(preparation, indent=2))
         stage = 'cleanup'
         cleanup = best_effort(lambda: envelope(cli('press', 'home')))
