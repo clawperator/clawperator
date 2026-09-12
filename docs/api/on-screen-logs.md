@@ -25,18 +25,20 @@ attempts to attach a window.
 
 ## Raw Actions
 
-Use the exact lower-case action names inside a normal execution payload. There
-is no separate CLI convenience command, HTTP endpoint, or MCP tool for this
-feature. Existing generic execution transports carry the same raw action list.
+Use canonical lower-case action names in stored execution payloads. There is no
+separate CLI convenience command, HTTP endpoint, or MCP tool for this feature.
+Existing generic execution transports carry the same raw action list.
 
-| Action | Purpose | Parameters |
-| --- | --- | --- |
-| `set_on_screen_log` | Show or replace the current panel. | `text` is required. All other fields are optional. |
-| `clear_on_screen_log` | Remove the current panel. | Omit `params` or use exactly `{}`. |
+| Canonical action | Exact Node input alias | Purpose | Parameters |
+| --- | --- | --- | --- |
+| `set_on_screen_log` | `on_screen_log_set` | Show or replace the current panel. | `text` is required. All other fields are optional. |
+| `clear_on_screen_log` | `on_screen_log_clear` | Remove the current panel. | Omit `params` or use exactly `{}`. |
 
-These action names are canonical-only. Do not change case, add whitespace, or
-use an alias. Their parameter objects are strict and do not translate generic
-keys such as `value` to `text`.
+At the Node execution boundary, the two aliases above normalize to their
+canonical types before validation and dispatch. Result `actionType` values stay
+canonical. Do not change case or add surrounding whitespace to either a
+canonical type or an alias. Their parameter objects are strict and do not
+translate generic keys such as `value` to `text`.
 
 See [Actions](actions.md#action-set-on-screen-log) for the complete parameter
 table and validation limits.
