@@ -37,6 +37,8 @@ okio = "3.9.1"
 orgJson = "20240303"
 processPhoenix = "2.1.2"
 robolectric="4.10"
+# API 34 support for hierarchy tests; service lifecycle fixtures use the default version.
+robolectricApi34 = "4.11.1"
 testRunner = "1.5.2"
 testRules = "1.5.0"
 timber = "5.0.1"
@@ -104,6 +106,7 @@ okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 org_json = { module = "org.json:json", version.ref = "orgJson" }
 process_phoenix = { module = "com.jakewharton:process-phoenix", version.ref = "processPhoenix" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+robolectricApi34 = { module = "org.robolectric:robolectric", version.ref = "robolectricApi34" }
 timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 
