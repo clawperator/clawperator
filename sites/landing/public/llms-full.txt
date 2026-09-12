@@ -1969,7 +1969,9 @@ Success and progress data:
   `comparable`, and `reason`. Available signatures are bounded SHA-256 hashes;
   raw node text is not included. Missing signatures are `null`.
 - Comparison re-resolves the same scoped container. Ambiguous or changed identity
-  is not comparable, even if the screen appears to have moved.
+  is not comparable, even if the screen appears to have moved. A container that
+  remains identifiable but stops reporting `scrollable` can still produce
+  comparable progress; eligibility loss alone is not `container_lost`.
 
 | `scroll_outcome` | Observation | Step success |
 | --- | --- | --- |
@@ -2030,7 +2032,10 @@ Semantics:
 - Android defaults omitted `direction` to `down`, `distanceRatio` to `0.7`, `settleDelayMs` to `250`, `maxScrolls` to `20`, `maxDurationMs` to `10000`, `noPositionChangeThreshold` to `3`, and `findFirstScrollableChild` to `true`
 - `maxScrolls` is the hard cap on how many scroll steps Android will attempt
 - `maxDurationMs` is checked against monotonic elapsed time before each gesture; the current gesture and bounded settle/target checks may finish after that threshold, while the command timeout cancels execution
-- `noPositionChangeThreshold` stops the loop after that many consecutive `no_movement`, `unknown`, or rejected gestures; container loss terminates with `CONTAINER_LOST`
+- `noPositionChangeThreshold` stops the loop after that many consecutive `no_movement`, signature-only `unknown`, or rejected gestures; loss of the original container identity terminates with `CONTAINER_LOST`
+- after choosing a scroll container, target observations and the requested click stay within that original container's descendants, including for legacy unscoped searches; an exhausted search cannot be changed to success by a target outside that scope
+- an identifiable container that stops reporting `scrollable` still allows a revealed target to satisfy the search and the requested click to run once; if the target remains absent after bounded observation, the search terminates with `CONTAINER_NOT_SCROLLABLE` without scrolling a different container
+- initially visible targets retain legacy unscoped matching when neither strict selection nor a container is requested
 
 Success data:
 
@@ -2081,6 +2086,7 @@ Semantics:
 - unlike raw `scroll_until`, this action is optimized for “scroll to target, then click target”
 - `maxSwipes` is the safety cap on how many swipes Android performs before failing
 - scroll and view refresh remain bounded by `maxSwipes`; mutations are not replayed after a post-dispatch failure
+- target observation, eligibility transitions, and final click scoping follow the same rules as [`scroll_until`](#action-scroll-until)
 - `clickRetry` applies only to the final click after the target is visible
 - setting `clickAfter: false` is accepted in raw `exec` JSON and makes Android stop after revealing the target, but the flat CLI does not emit that variant for `scroll_and_click`
 
@@ -6358,6 +6364,10 @@ Only the codes defined in `apps/node/src/contracts/errors.ts` are part of the pu
 | <a id="error-execution-action-unsupported"></a>`EXECUTION_ACTION_UNSUPPORTED` | Execution action unsupported | - |
 | <a id="error-execution-conflict-in-flight"></a>`EXECUTION_CONFLICT_IN_FLIGHT` | Execution conflict in flight | - |
 | <a id="error-result-envelope-timeout"></a>`RESULT_ENVELOPE_TIMEOUT` | Result envelope timeout | - |
+| <a id="error-result-transport-spawn-failed"></a>`RESULT_TRANSPORT_SPAWN_FAILED` | Result transport spawn failed | - |
+| <a id="error-result-transport-exited"></a>`RESULT_TRANSPORT_EXITED` | Result transport exited | - |
+| <a id="error-result-transport-cancelled"></a>`RESULT_TRANSPORT_CANCELLED` | Result transport cancelled | - |
+| <a id="error-result-transport-failed"></a>`RESULT_TRANSPORT_FAILED` | Result transport failed | - |
 | <a id="error-result-envelope-malformed"></a>`RESULT_ENVELOPE_MALFORMED` | Result envelope malformed | - |
 | <a id="error-snapshot-artifact-write-failed"></a>`SNAPSHOT_ARTIFACT_WRITE_FAILED` | Snapshot artifact write failed | Raw XML could not be written to a new host artifact. The execution envelope is retained. |
 | <a id="error-snapshot-extraction-failed"></a>`SNAPSHOT_EXTRACTION_FAILED` | Snapshot extraction failed | - |
@@ -6528,6 +6538,40 @@ Recovery:
 
 - add the missing argument or flag
 - rerun the command
+
+### Result transport failures
+
+These errors describe the host's inability to obtain a terminal Android result.
+They do not prove that an accepted action failed or that replay is safe.
+
+| Code | Meaning |
+| --- | --- |
+| `RESULT_TRANSPORT_SPAWN_FAILED` | The result reader process could not start. A missing ADB executable retains `ADB_NOT_FOUND`. |
+| `RESULT_TRANSPORT_EXITED` | The reader closed before a complete correlated terminal result. |
+| `RESULT_TRANSPORT_CANCELLED` | The host cancelled its result wait. This does not cancel an already dispatched Android action. |
+| `RESULT_TRANSPORT_FAILED` | Fallback for an unclassified host transport failure; error prose is never a code. |
+| `RESULT_ENVELOPE_MALFORMED` | Correlated framing, chunk metadata, ordering, size, checksum or envelope parsing failed. |
+
+`details` preserves `commandId`, `taskId`, `deviceId`, `operatorPackage`,
+`broadcastDispatchStatus`, `dispatchAttempted`, and `executionPosition: "unknown"`.
+`dispatchAttempted: true` means the dispatch boundary was entered, not that
+Android acknowledged or completed the action. A reader that dies during
+preflight prevents the deferred broadcast from dispatching.
+
+Process failures include `exitCode` and `signal` when known, or
+`processErrorCode` and `originalMessage` for spawn errors. Diagnostics retain a
+stderr tail of at most 8,192 characters and bounded correlated log lines.
+Partial chunk diagnostics
+report received/expected chunks and bytes; incomplete chunks are not action
+receipts. MCP preserves classification and correlation while applying its
+existing raw-stderr redaction.
+
+CLI execution failures exit nonzero. Serve returns a non-success HTTP status
+and the same structured execution failure; daemon routing does not retry an
+uncertain dispatch. SSE subscribers must consume `clawperator:execution` for
+host failures. Such failures no longer synthesize a `clawperator:result`
+terminal Android envelope. Inspect observed application state before deciding
+whether another mutation is appropriate.
 
 ### `RESULT_ENVELOPE_TIMEOUT`
 
@@ -7637,6 +7681,11 @@ Execution-related events:
 | --- | --- |
 | `clawperator:result` | `{ "deviceId": "<serial>", "envelope": <ResultEnvelope> }` |
 | `clawperator:execution` | `{ "deviceId": "<serial>", "input": <unknown>, "result": <RunExecutionResult> }` |
+
+Host transport failures appear in `clawperator:execution` with `result.ok: false`
+and structured error diagnostics. They do not emit a synthetic
+`clawperator:result` envelope. Subscribe to execution events to observe every
+host outcome, including failures before a terminal Android result is available.
 
 Use `/events` when:
 

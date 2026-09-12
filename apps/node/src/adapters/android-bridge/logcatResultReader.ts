@@ -11,6 +11,7 @@ import { formatCommandLine } from "./adbClient.js";
 
 export interface LogcatResultOptions {
   commandId: string;
+  taskId?: string;
   timeoutMs: number;
   broadcastDelayMs?: number;
   cancelSignal?: AbortSignal;
@@ -22,7 +23,7 @@ export type LogcatResult =
   | { ok: true; envelope: ResultEnvelope; terminalSource: TerminalSource; snapshotLogLines?: string[] }
   | { ok: false; timeout: true; diagnostics: TimeoutDiagnostics }
   | { ok: false; broadcastFailed: true; diagnostics: BroadcastDiagnostics }
-  | { ok: false; error: string; code?: string };
+  | { ok: false; error: string; code: string; diagnostics?: Record<string, unknown> };
 
 interface ParsedLogcatLine {
   tag: string | null;
@@ -167,11 +168,24 @@ export async function waitForResultEnvelope(
       message: commandLine,
     });
 
-    const proc = config.runner.spawn(config.adbPath, args);
+    let proc: ReturnType<RuntimeConfig["runner"]["spawn"]>;
+    const diagnostics = (extra: Record<string, unknown> = {}) => ({
+      commandId, taskId: options.taskId, deviceId: config.deviceId,
+      operatorPackage: config.operatorPackage, broadcastDispatchStatus: broadcastStatus,
+      dispatchAttempted: dispatchCaptureStarted,
+      executionPosition: "unknown", stdoutObserved,
+      stderr: stderrBuffer, lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
+      transport: transport.diagnostics(), ...extra,
+    });
+    const remember = (line: string) => {
+      correlatedLines.push(line.slice(0, 2048));
+      if (correlatedLines.length > lastCorrelatedLines) correlatedLines.shift();
+    };
 
     const finalize = (result: LogcatResult) => {
       if (settled) return;
       settled = true;
+      flush();
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId);
       }
@@ -185,6 +199,10 @@ export async function waitForResultEnvelope(
         clearTimeout(signalBroadcastMaxTimer);
       }
       cancelSignal?.removeEventListener("abort", abortHandler);
+      if (!result.ok) {
+        if ("error" in result) result.diagnostics = diagnostics(result.diagnostics);
+        else result.diagnostics.details = diagnostics();
+      }
       resolve(result);
     };
 
@@ -197,26 +215,29 @@ export async function waitForResultEnvelope(
     };
 
     const abortHandler = () => {
-      flush();
       finalize({
         ok: false,
-        error: "logcat result wait canceled before broadcast dispatch",
-        code: ERROR_CODES.BROADCAST_FAILED,
+        error: "Logcat result wait canceled",
+        code: ERROR_CODES.RESULT_TRANSPORT_CANCELLED,
       });
     };
 
-    if (cancelSignal?.aborted) {
-      abortHandler();
+    try {
+      proc = config.runner.spawn(config.adbPath, args);
+    } catch (error) {
+      const cause = error as NodeJS.ErrnoException;
+      finalize({ ok: false, code: cause.code === "ENOENT" ? ERROR_CODES.ADB_NOT_FOUND : ERROR_CODES.RESULT_TRANSPORT_SPAWN_FAILED,
+        error: `logcat spawn failed: ${cause.message ?? String(error)}`,
+        diagnostics: { processErrorCode: cause.code, originalMessage: cause.message ?? String(error) } });
       return;
     }
-    cancelSignal?.addEventListener("abort", abortHandler, { once: true });
+
 
     const startTimeout = () => {
       if (timeoutId !== undefined) {
         return;
       }
       timeoutId = setTimeout(() => {
-        flush();
         const diagnostics: TimeoutDiagnostics = {
           code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
           message: `No [Clawperator-Result] envelope within ${timeoutMs}ms`,
@@ -237,6 +258,8 @@ export async function waitForResultEnvelope(
     };
 
     const beginDispatchCapture = () => {
+      // A deferred preflight callback must never dispatch after its reader has died.
+      if (settled) throw new Error("Result reader settled before broadcast dispatch");
       if (dispatchCaptureStarted) {
         return;
       }
@@ -263,6 +286,7 @@ export async function waitForResultEnvelope(
       (async () => {
         try {
           const result = await onBroadcast(beginDispatchCapture);
+          if (settled) return;
           if (!result.success) {
             const combined = (result.stderr ?? result.stdout ?? "unknown").trim();
             const isMissingPackage = combined.includes("Target package not found") || combined.includes("does not exist");
@@ -277,7 +301,6 @@ export async function waitForResultEnvelope(
               deviceId: config.deviceId,
               operatorPackage: config.operatorPackage,
             };
-            flush();
             finalize({ ok: false, broadcastFailed: true, diagnostics });
             return;
           }
@@ -285,6 +308,7 @@ export async function waitForResultEnvelope(
             beginDispatchCapture();
           }
         } catch (e) {
+          if (settled) return;
           const err = String(e).trim();
           broadcastStatus = `error: ${err}`;
           const diagnostics: BroadcastDiagnostics = {
@@ -295,20 +319,20 @@ export async function waitForResultEnvelope(
             deviceId: config.deviceId,
             operatorPackage: config.operatorPackage,
           };
-          flush();
           finalize({ ok: false, broadcastFailed: true, diagnostics });
         }
       })();
     };
 
-    proc.stdout?.on("data", (chunk: Buffer) => {
-      pending += decoder.write(chunk);
+    const consumeOutput = (text: string) => {
+      if (settled) return;
+      pending += text;
       const lines = pending.split("\n");
       pending = lines.pop() ?? "";
       for (const line of lines) {
         const snapshotMarker = parseSnapshotMarker(line);
         if (snapshotMarker !== null) {
-          correlatedLines.push(line);
+          remember(line);
           activeSnapshotTag = snapshotMarker.tag;
           activeSnapshotCaptured = snapshotMarker.commandId === commandId
             || (snapshotMarker.legacy && dispatchCaptureStarted);
@@ -316,7 +340,7 @@ export async function waitForResultEnvelope(
             snapshotLogLines.push(line);
           }
         } else if (activeSnapshotTag !== null) {
-          correlatedLines.push(line);
+          remember(line);
           const parsed = parseLogcatLine(line);
           if (parsed !== null && parsed.tag === activeSnapshotTag) {
             if (shouldEndSnapshotBlock(line, activeSnapshotTag)) {
@@ -334,11 +358,11 @@ export async function waitForResultEnvelope(
           }
         }
         if (broadcastStatus !== "sent") continue;
+        if (line.includes(commandId)) remember(line);
         let terminalLine: string | null;
         try {
           terminalLine = transport.consume(parseLogcatLine(line)?.message ?? line);
         } catch (error) {
-          flush();
           finalize({ ok: false, code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
             error: error instanceof Error ? error.message : "Malformed result transport" });
           return;
@@ -348,17 +372,15 @@ export async function waitForResultEnvelope(
 
         const parsed = parseTerminalEnvelope(terminalLine, commandId);
         if (parsed === "malformed") {
-          flush();
           finalize({
             ok: false,
             error: "Logcat emitted a malformed JSON envelope",
             code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
-          } as any);
+          });
           return;
         }
 
         if (parsed) {
-          flush();
           finalize({
             ok: true,
             envelope: parsed.envelope,
@@ -386,13 +408,15 @@ export async function waitForResultEnvelope(
           startBroadcast();
         }, SIGNAL_BROADCAST_REPLAY_DRAIN_MS);
       }
-    });
+    };
+    proc.stdout?.on("data", (chunk: Buffer) => consumeOutput(decoder.write(chunk)));
 
     proc.stderr?.on("data", (chunk: Buffer) => {
-      stderrBuffer += chunk.toString();
+      stderrBuffer = (stderrBuffer + chunk.toString()).slice(-8192);
     });
 
-    proc.on("error", (error: Error) => {
+    proc.on("error", (error: NodeJS.ErrnoException) => {
+      if (settled) return;
       if ((error as any).code === "ENOENT") {
         config.logger?.emit({
           ts: new Date().toISOString(),
@@ -405,7 +429,8 @@ export async function waitForResultEnvelope(
           ok: false,
           error: `ADB command not found at path: ${config.adbPath}`,
           code: ERROR_CODES.ADB_NOT_FOUND,
-        } as any);
+          diagnostics: { processErrorCode: error.code, originalMessage: error.message },
+        });
       } else {
         config.logger?.emit({
           ts: new Date().toISOString(),
@@ -414,11 +439,14 @@ export async function waitForResultEnvelope(
           deviceId: config.deviceId,
           message: `${commandLine} error=${error.message} stdout=[redacted] stderr=[redacted]`,
         });
-        finalize({ ok: false, error: `logcat spawn failed: ${error.message}` });
+        finalize({ ok: false, code: ERROR_CODES.RESULT_TRANSPORT_SPAWN_FAILED, error: `logcat spawn failed: ${error.message}`,
+          diagnostics: { processErrorCode: error.code, originalMessage: error.message } });
       }
     });
 
     proc.on("close", (code: number | null, signal: string | null) => {
+      if (settled) return;
+      consumeOutput(decoder.end() + (pending.length > 0 ? "\n" : ""));
       if (settled) return;
       const base = `logcat exited before terminal envelope (code=${code ?? "null"}, signal=${signal ?? "null"})`;
       const stderr = stderrBuffer.trim();
@@ -429,9 +457,15 @@ export async function waitForResultEnvelope(
         deviceId: config.deviceId,
         message: `${commandLine} code=${code ?? "null"} signal=${signal ?? "null"} stdout=[redacted] stderr=${JSON.stringify(stderr)}`,
       });
-      finalize({ ok: false, error: stderr ? `${base}: ${stderr}` : base });
+      finalize({ ok: false, code: ERROR_CODES.RESULT_TRANSPORT_EXITED, error: stderr ? `${base}: ${stderr}` : base,
+        diagnostics: { exitCode: code, signal, originalMessage: base } });
     });
 
+    if (cancelSignal?.aborted) {
+      abortHandler();
+      return;
+    }
+    cancelSignal?.addEventListener("abort", abortHandler, { once: true });
     broadcastStartTimer = setTimeout(startBroadcast, broadcastDelayMs);
   });
 }

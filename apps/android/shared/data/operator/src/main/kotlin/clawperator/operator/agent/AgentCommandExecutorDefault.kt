@@ -37,10 +37,10 @@ class AgentCommandExecutorDefault(
 
         val journal = ActionExecutionJournal()
         var terminalPublished = false
-        fun publish(canonicalLine: String) {
+        suspend fun publish(canonicalLine: String) {
             if (terminalPublished) return
             terminalPublished = true
-            resultEnvelopeLogLines(canonicalLine, command.commandId, command.taskId).forEach { Log.i(it) }
+            publishResultEnvelope(canonicalLine, command.commandId, command.taskId)
         }
         return try {
             // Timeout intentionally includes queue wait + execution time.

@@ -1,5 +1,10 @@
 package clawperator.operator.agent
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
@@ -67,5 +72,59 @@ class ResultEnvelopeTransportTest {
                 .getValue("sha256")
                 .jsonPrimitive.content,
         )
+    }
+    @Test
+    fun `publication spaces large records without replay or reordering`() = runBlocking {
+        val line = "x".repeat(70000)
+        val expected = resultEnvelopeLogLines(line, "command", "task")
+        val events = mutableListOf<String>()
+        publishResultEnvelope(line, "command", "task", { events += it }, { events += "pause" })
+        assertEquals(expected, events.filter { it != "pause" })
+        assertEquals(expected.size - 1, events.count { it == "pause" })
+        events.forEachIndexed { index, event ->
+            if (index % 2 == 1) assertEquals("pause", event)
+        }
+        events.clear()
+        publishResultEnvelope("small", "command", "task", { events += it }, { events += "pause" })
+        assertEquals(listOf("small"), events)
+    }
+
+    @Test
+    fun `publication frees the caller thread and finishes after cancellation`() = runBlocking {
+        val callerThread = Thread.currentThread()
+        val paused = CompletableDeferred<Unit>()
+        val resumePublication = CompletableDeferred<Unit>()
+        val lines = mutableListOf<String>()
+        val canonical = "x".repeat(70000)
+        val publisher = launch {
+            publishResultEnvelope(canonical, "command", "task", {
+                assertTrue(Thread.currentThread() !== callerThread)
+                lines += it
+            }, {
+                paused.complete(Unit)
+                resumePublication.await()
+            })
+        }
+        withTimeout(5000) {
+            paused.await()
+            // This coroutine shares the caller thread with publisher. It must be
+            // able to run while publication is waiting between records.
+            publisher.cancel()
+            resumePublication.complete(Unit)
+            publisher.join()
+        }
+        assertEquals(resultEnvelopeLogLines(canonical, "command", "task"), lines)
+    }
+
+    @Test
+    fun `already cancelled command still publishes every terminal record`() = runBlocking {
+        val canonical = "x".repeat(70000)
+        val lines = mutableListOf<String>()
+        val publisher = launch {
+            cancel()
+            publishResultEnvelope(canonical, "command", "task", { lines += it }, {})
+        }
+        publisher.join()
+        assertEquals(resultEnvelopeLogLines(canonical, "command", "task"), lines)
     }
 }

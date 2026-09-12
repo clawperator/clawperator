@@ -316,24 +316,21 @@ private fun AccessibilityNodeInfo.mapToUiNode(
         val children = mutableListOf<UiNode>()
         for (i in 0 until this.childCount) {
             this.getChild(i)?.let { childNode ->
-                try {
-                    val childUiNode =
-                        childNode.mapToUiNode(
-                            windowId = windowId,
-                            indexPath = currentIndexPath,
-                            siblingIndex = i,
-                            screenWidth = screenWidth,
-                            screenHeight = screenHeight,
-                            includeContentHash = includeContentHash,
-                            parentClassName = className,
-                            parentResourceId = resourceId,
-                        )
-                    children.add(childUiNode)
-                } finally {
-                    // Recycle child node to prevent memory leaks
-                    @Suppress("DEPRECATION")
-                    childNode.recycle()
-                }
+                // The captured tree retains this handle for identity checks and dispatch.
+                // Recycling clears it on API 32 and earlier; let it be garbage collected
+                // with the tree instead of returning a still-referenced handle to the pool.
+                children.add(
+                    childNode.mapToUiNode(
+                        windowId = windowId,
+                        indexPath = currentIndexPath,
+                        siblingIndex = i,
+                        screenWidth = screenWidth,
+                        screenHeight = screenHeight,
+                        includeContentHash = includeContentHash,
+                        parentClassName = className,
+                        parentResourceId = resourceId,
+                    ),
+                )
             }
         }
 

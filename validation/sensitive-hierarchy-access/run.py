@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Serialized API-35 English Settings capture regression; artifacts are private."""
+"""Serialized English Settings capture regression; artifacts are private."""
 import argparse
 import fcntl
 import hashlib
@@ -83,43 +83,129 @@ def decode_png(path):
     assert len(decoded) == height * stride and all(decoded[y * stride] <= 4 for y in range(height))
 
 
+SETTINGS_PACKAGE = 'com.android.settings'
+SETTINGS_PROCESSES = ('com.google.android.settings.intelligence', SETTINGS_PACKAGE)
+
+
+def homepage_at_top(nodes, api='35'):
+    """Require the real expanded homepage and its first navigation row on screen."""
+    visible = [node for node in nodes if node.get('visibleToUser') is True and node.get('onScreen') is True]
+    def unique_id(resource_id):
+        return [node for node in visible if node.get('resourceId') == SETTINGS_PACKAGE + ':id/' + resource_id]
+    homepage = unique_id('settings_homepage_container')
+    content = unique_id('main_content_scrollable_container')
+    network = [node for node in visible if node.get('label') == 'Network & internet']
+    if len(homepage) != 1 or len(content) != 1 or len(network) != 1:
+        return False
+    if api == '35':
+        return homepage[0].get('scrollable') is True
+    # API 36 has a fixed header, not the API-35 collapsing outer scroll scope.
+    google = [node for node in visible if node.get('label') == 'Google']
+    return len(google) == 1 and len(unique_id('search_action_bar')) == 1
+
+
+def prepare_settings(run, cli, device, evidence, clock=time.monotonic, sleep=time.sleep, api='35'):
+    """Reset known navigation processes once, then verify; never replay failed commands."""
+    started = clock()
+    deadline = started + 60
+    evidence.update(status='running', deadlineSeconds=60, maxObservations=5, observations=0)
+
+    def remaining():
+        seconds = deadline - clock()
+        assert seconds > 0, 'Settings preparation deadline exhausted (60 seconds)'
+        return min(45, seconds)
+
+    def adb(*command):
+        return run(['adb', '-s', device, 'shell', *command], timeout=remaining())
+
+    try:
+        evidence['initialActivities'] = adb('dumpsys', 'activity', 'activities')
+        for package in SETTINGS_PROCESSES:
+            adb('am', 'force-stop', package)
+        envelope(cli('open', SETTINGS_PACKAGE, process_timeout=remaining()))
+        evidence['launchedActivities'] = adb('dumpsys', 'activity', 'activities')
+        for attempt in range(5):
+            nodes = query(cli('query', '--visibility', 'all', '--limit', '1000',
+                              process_timeout=remaining()))
+            evidence['observations'] = attempt + 1
+            remaining()
+            if homepage_at_top(nodes, api):
+                evidence.update(status='passed', postcondition='Settings homepage at start; Network & internet visible')
+                return
+            if attempt < 4:
+                sleep(min(0.25, remaining()))
+        raise AssertionError('Settings homepage/top selectors unavailable after 5 observations')
+    except Exception as error:
+        evidence.update(status='failed', error=str(error))
+        raise
+    finally:
+        evidence['elapsedSeconds'] = clock() - started
+
+
+def record_source(run):
+    """Record tracked source relative to HEAD and inventory non-ignored untracked files."""
+    run(['git', 'rev-parse', 'HEAD'])
+    run(['git', 'diff', '--no-ext-diff', '--no-textconv', '--binary', 'HEAD', '--'])
+    run(['git', 'ls-files', '--others', '--exclude-standard', '-z'])
+
+
+def best_effort(action):
+    """Retain secondary failures without replacing the original verdict."""
+    try:
+        action()
+        return {'passed': True}
+    except Exception as error:
+        return {'passed': False, 'error': str(error)}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--device', required=True)
     parser.add_argument('--operator-package', required=True)
     parser.add_argument('--out', required=True, type=Path)
+    parser.add_argument('--api', choices=('35', '36'), default='35', help='Expected device API (release gate: 35)')
     args = parser.parse_args()
     args.out = args.out.resolve()
     args.out.mkdir(parents=True, exist_ok=True)
     lock = open(Path(tempfile.gettempdir()) / ('clawperator-device-' + hashlib.sha256(args.device.encode()).hexdigest() + '.lock'), 'w')
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     count = 0
+    stage = 'prerequisites'
+    preparation = {'status': 'not_started', 'device': args.device, 'operatorPackage': args.operator_package, 'expectedApi': args.api}
 
     def run(command, timeout=45):
         nonlocal count
         count += 1
         name = args.out / f'{count:02d}'
         name.with_suffix('.command.json').write_text(json.dumps(command))
+        name.with_suffix('.context.json').write_text(json.dumps({'stage': stage, 'timeoutSeconds': timeout,
+            'device': args.device, 'operatorPackage': args.operator_package}))
         try:
             completed = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=timeout)
         except subprocess.TimeoutExpired as error:
             for suffix, output in (('.stdout', error.stdout), ('.stderr', error.stderr)):
                 name.with_suffix(suffix).write_text(output.decode(errors='replace') if isinstance(output, bytes) else output or '')
             raise AssertionError(f'Command exceeded {timeout}s; see {name}.command.json/.stdout/.stderr') from error
+        except OSError as error:
+            name.with_suffix('.stderr').write_text(str(error))
+            raise AssertionError(f'Command could not start; see {name}.stderr') from error
+        name.with_suffix('.exit.json').write_text(json.dumps({'returncode': completed.returncode}))
         name.with_suffix('.stdout').write_text(completed.stdout)
         name.with_suffix('.stderr').write_text(completed.stderr)
         assert completed.returncode == 0, f'{command[:4]} failed; see {name}.stdout/.stderr'
         return completed.stdout
 
-    def cli(*command):
+    def cli(*command, process_timeout=45):
         return json.loads(run(['node', 'apps/node/dist/cli/index.js', *command, '--device', args.device,
-                               '--operator-package', args.operator_package, '--no-daemon', '--timeout', '15000']))
+                               '--operator-package', args.operator_package, '--no-daemon', '--timeout', '15000'], timeout=process_timeout))
 
     def wait(text):
         envelope(cli('wait', '--text', text, '--timeout', '15000'))
 
     try:
-        assert run(['adb', '-s', args.device, 'shell', 'getprop', 'ro.build.version.sdk']).strip() == '35'
+        record_source(run)
+        run(['node', 'apps/node/dist/cli/index.js', '--version'])
+        assert run(['adb', '-s', args.device, 'shell', 'getprop', 'ro.build.version.sdk']).strip() == args.api, f'Expected API {args.api}'
         locale = run(['adb', '-s', args.device, 'shell', 'getprop', 'persist.sys.locale']).strip()
         if not locale:
             locale = run(['adb', '-s', args.device, 'shell', 'getprop', 'ro.product.locale']).strip()
@@ -127,15 +213,10 @@ def main():
         run(['adb', '-s', args.device, 'shell', 'getprop', 'ro.build.fingerprint'])
         run(['adb', '-s', args.device, 'shell', 'dumpsys', 'accessibility'])
         run(['adb', '-s', args.device, 'shell', 'dumpsys', 'package', args.operator_package])
-        envelope(cli('open', 'com.android.settings'))
-        # Launch may restore a subpage. Back is bounded and never changes network state.
-        for _ in range(5):
-            nodes = query(cli('query', '--visibility', 'all', '--limit', '1000'))
-            if any(n['label'] == 'Search settings' for n in nodes):
-                break
-            envelope(cli('back'))
-        else:
-            raise AssertionError('Settings landing page unavailable')
+        stage = 'preparation'
+        prepare_settings(run, cli, args.device, preparation, api=args.api)
+        (args.out / 'preparation.json').write_text(json.dumps(preparation, indent=2))
+        stage = 'internet-navigation'
         envelope(cli('scroll-until', 'up', '--text', 'Network & internet', '--click'))
         wait('Internet')
         envelope(cli('click', '--text', 'Internet'))
@@ -147,6 +228,7 @@ def main():
                 break
             assert time.monotonic() < deadline, 'Internet hierarchy did not expose Wi-Fi within 15 seconds'
             time.sleep(0.25)
+        stage = 'internet-capture-parity'
         captures = [query(cli('query', '--visibility', 'all', '--limit', '1000')) for _ in range(3)]
         for nodes in captures:
             internet(nodes)
@@ -168,6 +250,7 @@ def main():
         screenshot = args.out / 'internet.png'
         envelope(cli('screenshot', '--path', str(screenshot)))
         decode_png(screenshot)
+        stage = 'display-control'
         envelope(cli('back'))
         envelope(cli('back'))
         envelope(cli('scroll-until', 'down', '--text', 'Display & touch', '--click'))
@@ -178,17 +261,17 @@ def main():
         (args.out / 'result.json').write_text(json.dumps({'passed': True, 'queries': 5, 'control': 'Display & touch'}))
     except Exception as error:
         (args.out / 'failure.txt').write_text(str(error))
-        try:
-            cli('screenshot', '--path', str(args.out / 'failure.png'))
-        except Exception:
-            pass
+        (args.out / 'failure.json').write_text(json.dumps({'stage': stage, 'error': str(error)}))
+        stage = 'failure-evidence'
+        screenshot_result = best_effort(lambda: envelope(cli('screenshot', '--path', str(args.out / 'failure.png'))))
+        (args.out / 'failure-screenshot.json').write_text(json.dumps(screenshot_result))
         raise
     finally:
-        # Leave Settings closed on Home, including after a hierarchy assertion failure.
-        try:
-            envelope(cli('press', 'home'))
-        except Exception:
-            pass
+        (args.out / 'preparation.json').write_text(json.dumps(preparation, indent=2))
+        stage = 'cleanup'
+        cleanup = best_effort(lambda: envelope(cli('press', 'home')))
+        (args.out / 'cleanup.json').write_text(json.dumps(cleanup))
+        lock.close()
 
 
 if __name__ == '__main__':

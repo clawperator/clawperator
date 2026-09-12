@@ -222,6 +222,40 @@ Recovery:
 - add the missing argument or flag
 - rerun the command
 
+### Result transport failures
+
+These errors describe the host's inability to obtain a terminal Android result.
+They do not prove that an accepted action failed or that replay is safe.
+
+| Code | Meaning |
+| --- | --- |
+| `RESULT_TRANSPORT_SPAWN_FAILED` | The result reader process could not start. A missing ADB executable retains `ADB_NOT_FOUND`. |
+| `RESULT_TRANSPORT_EXITED` | The reader closed before a complete correlated terminal result. |
+| `RESULT_TRANSPORT_CANCELLED` | The host cancelled its result wait. This does not cancel an already dispatched Android action. |
+| `RESULT_TRANSPORT_FAILED` | Fallback for an unclassified host transport failure; error prose is never a code. |
+| `RESULT_ENVELOPE_MALFORMED` | Correlated framing, chunk metadata, ordering, size, checksum or envelope parsing failed. |
+
+`details` preserves `commandId`, `taskId`, `deviceId`, `operatorPackage`,
+`broadcastDispatchStatus`, `dispatchAttempted`, and `executionPosition: "unknown"`.
+`dispatchAttempted: true` means the dispatch boundary was entered, not that
+Android acknowledged or completed the action. A reader that dies during
+preflight prevents the deferred broadcast from dispatching.
+
+Process failures include `exitCode` and `signal` when known, or
+`processErrorCode` and `originalMessage` for spawn errors. Diagnostics retain a
+stderr tail of at most 8,192 characters and bounded correlated log lines.
+Partial chunk diagnostics
+report received/expected chunks and bytes; incomplete chunks are not action
+receipts. MCP preserves classification and correlation while applying its
+existing raw-stderr redaction.
+
+CLI execution failures exit nonzero. Serve returns a non-success HTTP status
+and the same structured execution failure; daemon routing does not retry an
+uncertain dispatch. SSE subscribers must consume `clawperator:execution` for
+host failures. Such failures no longer synthesize a `clawperator:result`
+terminal Android envelope. Inspect observed application state before deciding
+whether another mutation is appropriate.
+
 ### `RESULT_ENVELOPE_TIMEOUT`
 
 Use this when Node dispatched the command but did not receive a valid `[Clawperator-Result]` envelope before the execution timeout expired.

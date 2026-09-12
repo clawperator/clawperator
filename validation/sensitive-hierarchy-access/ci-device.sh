@@ -14,6 +14,7 @@ for variant in debug release; do
   package=com.clawperator.operator
   if [[ "$variant" == debug ]]; then package=com.clawperator.operator.dev; fi
   timeout 120s adb -s "$serial" install -r "apps/android/app/build/outputs/apk/$variant/app-$variant.apk"
+  timeout 20s adb -s "$serial" shell am start -n "$package/clawperator.activity.MainActivity"
   adb -s "$serial" shell settings put secure enabled_accessibility_services "$package/clawperator.operator.accessibilityservice.OperatorAccessibilityService"
   node apps/node/dist/cli/index.js grant-device-permissions --device "$serial" --operator-package "$package"
   ready=false

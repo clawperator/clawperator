@@ -7,6 +7,7 @@ sealed interface TaskScrollResult {
     /** Target node was found and scrolled into view */
     data class Found(
         val node: TaskUiNode,
+        val scope: TaskScrollScope? = null,
     ) : TaskScrollResult
 
     /** Scrolling was exhausted without finding the target */
@@ -58,6 +59,9 @@ enum class TaskScrollTerminationReason {
     ContainerLost,
 }
 
+/** An observation retained only for identity checks within one scroll operation. */
+data class TaskScrollScope(val tree: clawperator.uitree.UiTree, val node: clawperator.uitree.UiNode)
+
 /**
  * Full result of a [TaskUiScope.scrollLoop] bounded scroll loop.
  */
@@ -65,4 +69,5 @@ data class TaskScrollLoopResult(
     val terminationReason: TaskScrollTerminationReason,
     val scrollsExecuted: Int,
     val resolvedContainerId: String? = null,
+    val scope: TaskScrollScope? = null,
 )

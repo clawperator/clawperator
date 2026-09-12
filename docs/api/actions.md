@@ -411,7 +411,9 @@ Success and progress data:
   `comparable`, and `reason`. Available signatures are bounded SHA-256 hashes;
   raw node text is not included. Missing signatures are `null`.
 - Comparison re-resolves the same scoped container. Ambiguous or changed identity
-  is not comparable, even if the screen appears to have moved.
+  is not comparable, even if the screen appears to have moved. A container that
+  remains identifiable but stops reporting `scrollable` can still produce
+  comparable progress; eligibility loss alone is not `container_lost`.
 
 | `scroll_outcome` | Observation | Step success |
 | --- | --- | --- |
@@ -472,7 +474,10 @@ Semantics:
 - Android defaults omitted `direction` to `down`, `distanceRatio` to `0.7`, `settleDelayMs` to `250`, `maxScrolls` to `20`, `maxDurationMs` to `10000`, `noPositionChangeThreshold` to `3`, and `findFirstScrollableChild` to `true`
 - `maxScrolls` is the hard cap on how many scroll steps Android will attempt
 - `maxDurationMs` is checked against monotonic elapsed time before each gesture; the current gesture and bounded settle/target checks may finish after that threshold, while the command timeout cancels execution
-- `noPositionChangeThreshold` stops the loop after that many consecutive `no_movement`, `unknown`, or rejected gestures; container loss terminates with `CONTAINER_LOST`
+- `noPositionChangeThreshold` stops the loop after that many consecutive `no_movement`, signature-only `unknown`, or rejected gestures; loss of the original container identity terminates with `CONTAINER_LOST`
+- after choosing a scroll container, target observations and the requested click stay within that original container's descendants, including for legacy unscoped searches; an exhausted search cannot be changed to success by a target outside that scope
+- an identifiable container that stops reporting `scrollable` still allows a revealed target to satisfy the search and the requested click to run once; if the target remains absent after bounded observation, the search terminates with `CONTAINER_NOT_SCROLLABLE` without scrolling a different container
+- initially visible targets retain legacy unscoped matching when neither strict selection nor a container is requested
 
 Success data:
 
@@ -523,6 +528,7 @@ Semantics:
 - unlike raw `scroll_until`, this action is optimized for “scroll to target, then click target”
 - `maxSwipes` is the safety cap on how many swipes Android performs before failing
 - scroll and view refresh remain bounded by `maxSwipes`; mutations are not replayed after a post-dispatch failure
+- target observation, eligibility transitions, and final click scoping follow the same rules as [`scroll_until`](#action-scroll-until)
 - `clickRetry` applies only to the final click after the target is visible
 - setting `clickAfter: false` is accepted in raw `exec` JSON and makes Android stop after revealing the target, but the flat CLI does not emit that variant for `scroll_and_click`
 
