@@ -13,7 +13,7 @@
 | Phase | Status | Commit |
 | --- | --- | --- |
 | 1 - Android Controller and Mechanism Proof | passed | `fdb2b12` |
-| 2 - Raw Execution Contract and Public Documentation | passed | pending Phase 2 commit |
+| 2 - Raw Execution Contract and Public Documentation | passed | `3efc652` |
 
 ## Validation
 
@@ -29,7 +29,7 @@
 | `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` | 0 | The branch-local snapshot retained the foreground app hierarchy while the panel was shown. | ignored local interaction output |
 | `node apps/node/dist/cli/index.js exec <read-hidden-label.json> --device <device_serial> --operator-package com.clawperator.operator.dev --output json` | 1, expected | A normal `read_text` action could not match the panel-only label. | terminal envelope: `No UI node found matching criteria` |
 | `npm --prefix apps/node run build` | 0 | The branch-local Node package compiles with the two raw actions and strict validator. | npm output |
-| `npm --prefix apps/node run test` | 0 | All 271 Node tests passed, including raw validation, Serve, MCP, and failed-envelope coverage. | npm output |
+| `npm --prefix apps/node run test` | 0 | All 272 Node tests passed, including raw validation, Serve, MCP, strict canonical action handling, and failed-envelope coverage. | npm output |
 | `./gradlew app:assembleDebug app:testDebugUnitTest app:installDebug` | 0 | The debug app rebuilt, app unit tests passed, and the debug APK installed on the available emulator targets. | Gradle output |
 | `./gradlew shared:data:operator:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | Android parser, action-engine result mapping, controller, and window-metadata suites remain green. | Gradle output |
 | `bash validation/on-screen-logs/test_phase2_contract.sh` | 0 | Both generic raw fixtures validate through the branch-local CLI and normalize colors; the generic `value` alias is rejected. | validation script output |
@@ -37,6 +37,10 @@
 | `node apps/node/dist/cli/index.js doctor --device <device_serial> --operator-package com.clawperator.operator.dev --output json` | 0 | The selected debug Operator was compatible, accessible, interactive, and ready for raw execution. | terminal observation |
 | `node apps/node/dist/cli/index.js exec <raw-set-screenshot-clear.json> --device <device_serial> --operator-package com.clawperator.operator.dev --no-daemon --output json` | 0 | The default raw set, screenshot, and clear actions returned their exact normal result shapes. | ignored local Phase 2 screenshots and terminal output |
 | Separate raw set, screenshot, replacement, screenshot, clear, and expiry executions with explicit `<device_serial>` | 0 except expected hidden-label lookup | Visible capture, replacement, raw snapshot metadata, clear, expiry, and selector isolation were observed on the debug Operator. | ignored local Phase 2 screenshots and terminal output |
+| `./gradlew shared:data:operator:testDebugUnitTest` | 0 | The review regression tests cover a configuration change while a replacement draw is pending and legacy left-navigation/cutout bounds. | Gradle output |
+| `./gradlew app:assembleDebug app:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | The review-fixed debug app and shared Android suites build and pass. | Gradle output |
+| `./scripts/docs_build.sh` | 0 | The updated cutout behavior and regenerated machine-facing documentation build successfully. | docs build output |
+| `./gradlew app:installDebug` followed by `node apps/node/dist/cli/index.js doctor --device <device_serial> --operator-package com.clawperator.operator.dev --output json` | 0 | The review-fixed debug APK installed and the selected API 35 target remained compatible, accessible, and interactive. | terminal observation |
 
 ## Live Observations
 
@@ -64,12 +68,15 @@
 - API 21 fails closed with `ON_SCREEN_LOG_RENDER_FAILED` before attempting to attach. `TYPE_ACCESSIBILITY_OVERLAY` is introduced on API 22, so raising the project minimum SDK or using a different overlay mechanism would not meet the specified contract.
 - Phase 1 deliberately does not publish `operator_overlay_visible` in snapshot data. It wires exact identity without altering raw metadata. The string-valued public output belongs to Phase 2 with the normal raw execution contract.
 - Phase 2 adds strict canonical-only action handling in `apps/node/src/contracts/aliases.ts` and `apps/node/src/contracts/inputAliases.ts`, strict Node validation and structured error promotion in `apps/node/src/domain/executions/validateExecution.ts` and `apps/node/src/domain/executions/runExecution.ts`, plus Android parser/action-engine integration. These exact additional PR-1 paths are included in the review scope because they preserve the same contract across raw CLI, Serve, and MCP transport.
+- PR-1 review added `apps/node/src/mcp/tools/core.ts` to the raw-transport scope. MCP now preserves raw action-type text until the canonical validator runs, so whitespace around either on-screen-log action is rejected instead of normalized. The review fix also preserves pre-existing unrelated envelope error codes.
+- Configuration changes now defer while a replacement generation waits for its draw acknowledgement, then recompute the acknowledged replacement rather than reapplying stale state. Legacy API 29 bounds combine public `Display.getCutout()` safe insets with system bars and account for reverse-landscape left navigation. API 28 with a declared built-in cutout fails closed because a service has no public pre-attachment safe-inset query.
 - The existing screenshot execution pipeline was not redesigned. Its same-payload ordering limitation is a documented follow-up boundary, not a reason to add a parallel transport, host-owned renderer, or temporary ingress in PR-1.
 
 ## Remaining Limitations
 
 - Live interaction and capture proof ran only on the selected API 35 emulator. API 21 has a unit-tested fail-closed path; API 22 through API 34 were not live-tested.
 - The API 21-22 view path uses an invisible left-to-right mark per paragraph to preserve physical alignment. The API 22 behavior is covered by a Robolectric test but not a device capture.
+- Android 9 (API 28) devices that declare a built-in display cutout reject panel placement with `ON_SCREEN_LOG_LAYOUT_INVALID` rather than place a panel using unverified safe-area geometry. API 29 compatibility behavior has unit coverage but no live device proof.
 - The mechanism is proven for the tested screenshot and recording sequence, not as a general compositor-synchronization guarantee.
 - The Phase 2 live proof used the branch-local raw CLI and one API 35 emulator. Serve and MCP transport coverage uses local test doubles through the same Node executor, not a real remote client/device run.
 - A single raw execution that orders `set_on_screen_log`, `take_screenshot`, and `clear_on_screen_log` cannot currently guarantee that the output file contains the label because host screenshot capture finalizes after Android completes the list. PR-1 documents and proves the separate-execution workaround. Any interleaved capture redesign requires a separate design decision and is out of scope for PR-1.

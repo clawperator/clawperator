@@ -226,4 +226,27 @@ describe("on-screen log execution failures", () => {
     assert.strictEqual(envelope.status, "failed");
     assert.strictEqual(envelope.errorCode, undefined);
   });
+
+  it("preserves an existing envelope error code for unrelated failed steps", () => {
+    const envelope: ResultEnvelope = {
+      commandId: "existing-action-command",
+      taskId: "existing-action-task",
+      status: "failed",
+      errorCode: "SERVICE_UNAVAILABLE",
+      stepResults: [
+        {
+          id: "click",
+          actionType: "click",
+          success: false,
+          data: { error: ERROR_CODES.NODE_NOT_FOUND },
+        },
+      ],
+      error: "Accessibility service is not available",
+    };
+
+    reconcileEnvelopeStatusAfterPostProcessing(envelope);
+
+    assert.strictEqual(envelope.status, "failed");
+    assert.strictEqual(envelope.errorCode, "SERVICE_UNAVAILABLE");
+  });
 });

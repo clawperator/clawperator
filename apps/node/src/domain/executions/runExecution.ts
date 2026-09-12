@@ -261,8 +261,6 @@ export function reconcileEnvelopeStatusAfterPostProcessing(envelope: ResultEnvel
       ON_SCREEN_LOG_RUNTIME_ERROR_CODES.has(errKey)
     ) {
       envelope.errorCode = errKey;
-    } else {
-      delete envelope.errorCode;
     }
     delete envelope.hint;
   } else {

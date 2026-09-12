@@ -9,7 +9,9 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.Display
 import android.view.Gravity
+import android.view.Surface
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityWindowInfo
@@ -86,6 +88,7 @@ class OnScreenLogPanelController internal constructor(
     private var visibleState: VisiblePanelState? = null
     private var expiryRunnable: Runnable? = null
     private var pendingDrawAcknowledgement: PendingDrawAcknowledgement? = null
+    private var configurationChangePending = false
     private var generationCounter = 0L
     private val controllerWindowNonce = UUID.randomUUID().toString()
 
@@ -140,39 +143,14 @@ class OnScreenLogPanelController internal constructor(
 
     override fun onConfigurationChanged() {
         runOnMain {
-            val state = visibleState ?: return@runOnMain
-            val currentService = service ?: return@runOnMain
-            val host = windowHost ?: return@runOnMain
-            val currentPanel = panelView ?: return@runOnMain
-
-            try {
-                val replacement = preparePanel(currentService, state.spec)
-                val nextGeneration = nextGeneration()
-                cancelExpiry()
-                currentPanel.apply(replacement.prepared, nextGeneration)
-                host.updateViewLayout(
-                    currentPanel,
-                    createLayoutParams(replacement.bounds, windowTitle(nextGeneration)),
-                )
-                val replacementState =
-                    state.copy(
-                        bounds = replacement.bounds,
-                        truncated = replacement.prepared.truncated,
-                        generation = nextGeneration,
-                        windowTitle = windowTitle(nextGeneration),
-                    )
-                visibleState = replacementState
-                visibleWindowTitle = replacementState.windowTitle
-                ownedWindowId = null
-                currentPanel.invalidate()
-                scheduleExpiry(replacementState)
-            } catch (error: OnScreenLogLayoutException) {
-                Log.w("$TAG configuration_change hidden reason=${error.message}")
-                removePanel(reason = "configuration_layout_invalid")
-            } catch (error: Throwable) {
-                Log.e(error, "$TAG configuration_change hidden after renderer failure")
-                removePanel(reason = "configuration_render_failed")
+            // A set keeps the previous visible state until its generation draws. Reapplying that
+            // state while the replacement waits for a draw would overwrite the replacement and
+            // leave its acknowledgement waiting for a generation that can no longer draw.
+            if (pendingDrawAcknowledgement != null) {
+                configurationChangePending = true
+                return@runOnMain
             }
+            applyConfigurationChange()
         }
     }
 
@@ -288,10 +266,21 @@ class OnScreenLogPanelController internal constructor(
                     visibleWindowTitle = state.windowTitle
                     ownedWindowId = null
                     scheduleExpiry(state)
+
+                    val configurationFailure = replayPendingConfigurationChange()
+                    if (configurationFailure != null) {
+                        return@withContext configurationFailure
+                    }
+                    val renderedState =
+                        visibleState
+                            ?: return@withContext OnScreenLogControllerResult.Failure(
+                                errorCode = OnScreenLogErrorCodes.RENDER_FAILED,
+                                message = "The panel disappeared before the render result was finalized",
+                            )
                     OnScreenLogControllerResult.Rendered(
-                        spec = normalized,
-                        bounds = replacement.bounds,
-                        truncated = replacement.prepared.truncated,
+                        spec = renderedState.spec,
+                        bounds = renderedState.bounds,
+                        truncated = renderedState.truncated,
                     )
                 }
             } catch (cancelled: CancellationException) {
@@ -318,6 +307,65 @@ class OnScreenLogPanelController internal constructor(
                 OnScreenLogControllerResult.Cleared
             }
         }
+
+    /** Recalculate the stored logical panel after a configuration change on the Android main thread. */
+    private fun applyConfigurationChange(): OnScreenLogControllerResult.Failure? {
+        val state = visibleState ?: return null
+        val currentService = service ?: return null
+        val host = windowHost ?: return null
+        val currentPanel = panelView ?: return null
+
+        return try {
+            val replacement = preparePanel(currentService, state.spec)
+            val nextGeneration = nextGeneration()
+            cancelExpiry()
+            currentPanel.apply(replacement.prepared, nextGeneration)
+            val replacementWindowTitle = windowTitle(nextGeneration)
+            host.updateViewLayout(
+                currentPanel,
+                createLayoutParams(replacement.bounds, replacementWindowTitle),
+            )
+            val replacementState =
+                state.copy(
+                    bounds = replacement.bounds,
+                    truncated = replacement.prepared.truncated,
+                    generation = nextGeneration,
+                    windowTitle = replacementWindowTitle,
+                )
+            visibleState = replacementState
+            visibleWindowTitle = replacementState.windowTitle
+            ownedWindowId = null
+            currentPanel.invalidate()
+            scheduleExpiry(replacementState)
+            null
+        } catch (error: OnScreenLogLayoutException) {
+            Log.w("$TAG configuration_change hidden reason=${error.message}")
+            removePanel(reason = "configuration_layout_invalid")
+            OnScreenLogControllerResult.Failure(
+                errorCode = OnScreenLogErrorCodes.LAYOUT_INVALID,
+                message = "The panel no longer fits after the display configuration changed",
+            )
+        } catch (error: Throwable) {
+            Log.e(error, "$TAG configuration_change hidden after renderer failure")
+            removePanel(reason = "configuration_render_failed")
+            OnScreenLogControllerResult.Failure(
+                errorCode = OnScreenLogErrorCodes.RENDER_FAILED,
+                message = "The panel could not be redrawn after the display configuration changed",
+            )
+        }
+    }
+
+    /**
+     * Complete a configuration event deferred while a replacement generation was waiting for its
+     * draw acknowledgement. This runs only after that generation becomes the stored state.
+     */
+    private fun replayPendingConfigurationChange(): OnScreenLogControllerResult.Failure? {
+        if (!configurationChangePending) {
+            return null
+        }
+        configurationChangePending = false
+        return applyConfigurationChange()
+    }
 
     private fun preparePanel(
         service: AccessibilityService,
@@ -438,6 +486,7 @@ class OnScreenLogPanelController internal constructor(
         cancelExpiry()
         pendingDrawAcknowledgement?.complete(false)
         pendingDrawAcknowledgement = null
+        configurationChangePending = false
 
         val view = panelView
         if (view != null) {
@@ -539,6 +588,73 @@ internal interface OnScreenLogDisplayAreaProvider {
     fun currentUsableBounds(service: AccessibilityService): OnScreenLogBounds?
 }
 
+/** Insets from an outer edge of a legacy default display, in physical pixels. */
+internal data class OnScreenLogEdgeInsets(
+    val left: Int = 0,
+    val top: Int = 0,
+    val right: Int = 0,
+    val bottom: Int = 0,
+) {
+    init {
+        require(left >= 0 && top >= 0 && right >= 0 && bottom >= 0) {
+            "display insets must not be negative"
+        }
+    }
+}
+
+internal enum class OnScreenLogNavigationBarSide {
+    Left,
+    Right,
+    Bottom,
+}
+
+/**
+ * Mirrors the framework's pre-R navigation-bar placement rule without assuming a right-side bar
+ * in reverse landscape. A missing framework policy is unsafe to guess, so the caller fails
+ * closed instead.
+ */
+internal fun resolveLegacyNavigationBarSide(
+    isLandscape: Boolean,
+    navigationBarWidthPx: Int,
+    navigationBarCanMove: Boolean?,
+    rotation: Int,
+): OnScreenLogNavigationBarSide? {
+    require(navigationBarWidthPx >= 0) { "navigation bar width must not be negative" }
+    if (!isLandscape || navigationBarWidthPx == 0) {
+        return OnScreenLogNavigationBarSide.Bottom
+    }
+    val canMove = navigationBarCanMove ?: return null
+    if (!canMove) {
+        return OnScreenLogNavigationBarSide.Bottom
+    }
+    return if (rotation == Surface.ROTATION_270) {
+        OnScreenLogNavigationBarSide.Left
+    } else {
+        OnScreenLogNavigationBarSide.Right
+    }
+}
+
+/** Combine legacy system-bar and display-cutout insets without applying overlapping edges twice. */
+internal fun resolveLegacyUsableBounds(
+    displayWidthPx: Int,
+    displayHeightPx: Int,
+    systemBarInsets: OnScreenLogEdgeInsets,
+    displayCutoutInsets: OnScreenLogEdgeInsets,
+): OnScreenLogBounds? {
+    if (displayWidthPx <= 0 || displayHeightPx <= 0) {
+        return null
+    }
+    val left = maxOf(systemBarInsets.left, displayCutoutInsets.left)
+    val top = maxOf(systemBarInsets.top, displayCutoutInsets.top)
+    val right = displayWidthPx - maxOf(systemBarInsets.right, displayCutoutInsets.right)
+    val bottom = displayHeightPx - maxOf(systemBarInsets.bottom, displayCutoutInsets.bottom)
+    return if (right > left && bottom > top) {
+        OnScreenLogBounds(left = left, top = top, right = right, bottom = bottom)
+    } else {
+        null
+    }
+}
+
 internal class AndroidOnScreenLogDisplayAreaProvider : OnScreenLogDisplayAreaProvider {
     override fun currentUsableBounds(service: AccessibilityService): OnScreenLogBounds? {
         val windowManager = service.getSystemService(Context.WINDOW_SERVICE) as? WindowManager ?: return null
@@ -569,21 +685,70 @@ internal class AndroidOnScreenLogDisplayAreaProvider : OnScreenLogDisplayAreaPro
     private fun legacyUsableBounds(
         service: AccessibilityService,
         windowManager: WindowManager,
-    ): OnScreenLogBounds {
+    ): OnScreenLogBounds? {
         val metrics = android.util.DisplayMetrics()
-        windowManager.defaultDisplay.getRealMetrics(metrics)
+        val display = windowManager.defaultDisplay
+        display.getRealMetrics(metrics)
+        val systemBars = legacySystemBarInsets(service, display) ?: return null
+        val displayCutoutInsets = legacyDisplayCutoutInsets(service, display) ?: return null
+        return resolveLegacyUsableBounds(
+            displayWidthPx = metrics.widthPixels,
+            displayHeightPx = metrics.heightPixels,
+            systemBarInsets = systemBars,
+            displayCutoutInsets = displayCutoutInsets,
+        )
+    }
+
+    private fun legacySystemBarInsets(
+        service: AccessibilityService,
+        display: Display,
+    ): OnScreenLogEdgeInsets? {
         val statusBarHeight = systemDimensionPx(service, "status_bar_height")
         val navigationBarHeight = systemDimensionPx(service, "navigation_bar_height")
         val navigationBarWidth = systemDimensionPx(service, "navigation_bar_width")
-        val navigationOnSide =
-            service.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE &&
-                navigationBarWidth > 0
-        return OnScreenLogBounds(
-            left = 0,
-            top = statusBarHeight,
-            right = metrics.widthPixels - if (navigationOnSide) navigationBarWidth else 0,
-            bottom = metrics.heightPixels - if (navigationOnSide) 0 else navigationBarHeight,
-        )
+        val navigationSide =
+            resolveLegacyNavigationBarSide(
+                isLandscape = service.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE,
+                navigationBarWidthPx = navigationBarWidth,
+                navigationBarCanMove = systemBoolean(service, "config_navBarCanMove"),
+                rotation = display.rotation,
+            ) ?: return null
+        return when (navigationSide) {
+            OnScreenLogNavigationBarSide.Left ->
+                OnScreenLogEdgeInsets(left = navigationBarWidth, top = statusBarHeight)
+            OnScreenLogNavigationBarSide.Right ->
+                OnScreenLogEdgeInsets(top = statusBarHeight, right = navigationBarWidth)
+            OnScreenLogNavigationBarSide.Bottom ->
+                OnScreenLogEdgeInsets(top = statusBarHeight, bottom = navigationBarHeight)
+        }
+    }
+
+    private fun legacyDisplayCutoutInsets(
+        service: AccessibilityService,
+        display: Display,
+    ): OnScreenLogEdgeInsets? =
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
+                display.cutout?.let { cutout ->
+                    OnScreenLogEdgeInsets(
+                        left = cutout.safeInsetLeft,
+                        top = cutout.safeInsetTop,
+                        right = cutout.safeInsetRight,
+                        bottom = cutout.safeInsetBottom,
+                    )
+                } ?: OnScreenLogEdgeInsets()
+            Build.VERSION.SDK_INT == Build.VERSION_CODES.P && hasDeclaredBuiltInDisplayCutout(service) ->
+                // Android 9 exposes DisplayCutout only from a WindowInsets instance. The service
+                // has no public display-level query before an overlay is attached, so do not
+                // attach potentially unsafe geometry just to discover the inset.
+                null
+            else -> OnScreenLogEdgeInsets()
+        }
+
+    private fun hasDeclaredBuiltInDisplayCutout(service: AccessibilityService): Boolean {
+        val resourceId =
+            service.resources.getIdentifier("config_mainBuiltInDisplayCutout", "string", "android")
+        return resourceId > 0 && service.resources.getString(resourceId).isNotBlank()
     }
 
     private fun systemDimensionPx(
@@ -592,6 +757,14 @@ internal class AndroidOnScreenLogDisplayAreaProvider : OnScreenLogDisplayAreaPro
     ): Int {
         val resourceId = service.resources.getIdentifier(name, "dimen", "android")
         return if (resourceId > 0) service.resources.getDimensionPixelSize(resourceId) else 0
+    }
+
+    private fun systemBoolean(
+        service: AccessibilityService,
+        name: String,
+    ): Boolean? {
+        val resourceId = service.resources.getIdentifier(name, "bool", "android")
+        return if (resourceId > 0) service.resources.getBoolean(resourceId) else null
     }
 }
 

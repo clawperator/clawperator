@@ -105,6 +105,12 @@ selected usable side.
 physical-pixel rectangle in `[left,top][right,bottom]` form after those
 conversions.
 
+On Android 10 (API 29), the controller reads the default display's public
+cutout safe insets. On Android 9 (API 28), a service cannot obtain those
+insets from a public display-level API before an overlay is attached. If the
+framework declares a built-in cutout on API 28, `set_on_screen_log` fails with
+`ON_SCREEN_LOG_LAYOUT_INVALID` rather than attach with unknown unsafe geometry.
+
 The panel accepts multiline text. If it cannot fit in the remaining usable
 vertical area, Android truncates the text when at least one complete line fits
 and returns `truncated: "true"`. If even one complete line plus padding cannot

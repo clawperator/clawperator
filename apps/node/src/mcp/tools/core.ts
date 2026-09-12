@@ -31,7 +31,10 @@ const snapshotArgsSchema = executionToolOptionsSchema.extend({
 
 const executionActionSchema = z.object({
   id: z.string().trim().min(1),
-  type: z.string().trim().min(1),
+  // Keep the raw type for the canonical execution validator. In particular,
+  // the on-screen-log actions must reject whitespace and case variants rather
+  // than having this transport normalize them first.
+  type: z.string().min(1).refine((value) => value.trim().length > 0),
   params: z.record(z.unknown()).optional(),
 }).strict();
 

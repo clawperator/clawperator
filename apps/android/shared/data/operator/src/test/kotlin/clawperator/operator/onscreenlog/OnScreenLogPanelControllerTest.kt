@@ -5,6 +5,7 @@ import android.app.Application
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.view.Surface
 import android.view.WindowManager
 import android.view.View
 import android.view.accessibility.AccessibilityEvent
@@ -18,6 +19,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -217,6 +219,74 @@ class OnScreenLogPanelControllerTest {
     }
 
     @Test
+    fun `configuration change waits for a pending replacement draw before recalculating`() =
+        runBlocking {
+            val fixture = controllerFixture()
+            render(fixture.controller, OnScreenLogSpec(text = "first label"))
+            fixture.displayAreaProvider.bounds = OnScreenLogBounds(0, 0, 2_200, 1_080)
+            fixture.windowHost.acknowledgeDraws = false
+
+            val replacement =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    fixture.controller.set(
+                        OnScreenLogSpec(
+                            text = "replacement label",
+                            anchor = clawperator.task.runner.OnScreenLogAnchor.Right,
+                            widthDp = 100,
+                        ),
+                    )
+                }
+
+            assertEquals(1, fixture.windowHost.updateCalls)
+            val pendingTitle = fixture.windowHost.lastLayoutParams!!.title.toString()
+
+            fixture.controller.onConfigurationChanged()
+
+            // The old state must not overwrite the pending replacement generation.
+            assertEquals(1, fixture.windowHost.updateCalls)
+            fixture.windowHost.lastView?.acknowledgeDrawForTest()
+
+            val result =
+                assertIs<OnScreenLogControllerResult.Rendered>(
+                    withTimeout(1_000L) {
+                        replacement.await()
+                    },
+                )
+
+            assertTrue(fixture.controller.isOperatorOverlayVisible)
+            assertEquals(2, fixture.windowHost.updateCalls)
+            assertTrue(fixture.windowHost.lastLayoutParams!!.title.toString() != pendingTitle)
+            assertEquals(fixture.windowHost.lastLayoutParams!!.x, result.bounds.left)
+            assertEquals(fixture.windowHost.lastLayoutParams!!.y, result.bounds.top)
+            assertEquals(0, fixture.windowHost.removeCalls)
+        }
+
+    @Test
+    fun `legacy usable bounds preserve a left navigation bar and display cutout`() {
+        assertEquals(
+            OnScreenLogNavigationBarSide.Left,
+            resolveLegacyNavigationBarSide(
+                isLandscape = true,
+                navigationBarWidthPx = 96,
+                navigationBarCanMove = true,
+                rotation = Surface.ROTATION_270,
+            ),
+        )
+
+        val bounds =
+            assertNotNull(
+                resolveLegacyUsableBounds(
+                    displayWidthPx = 2_400,
+                    displayHeightPx = 1_080,
+                    systemBarInsets = OnScreenLogEdgeInsets(left = 96, top = 84),
+                    displayCutoutInsets = OnScreenLogEdgeInsets(left = 120),
+                ),
+            )
+
+        assertEquals(OnScreenLogBounds(120, 84, 2_400, 1_080), bounds)
+    }
+
+    @Test
     @Config(sdk = [Build.VERSION_CODES.LOLLIPOP])
     fun `api 21 rejects unsupported accessibility overlay without attaching a window`() {
         val fixture = controllerFixture()
@@ -348,7 +418,7 @@ class OnScreenLogPanelControllerTest {
     }
 
     private class RecordingWindowHost(
-        private val acknowledgeDraws: Boolean,
+        var acknowledgeDraws: Boolean,
     ) : OnScreenLogWindowHost {
         var addCalls = 0
         var updateCalls = 0

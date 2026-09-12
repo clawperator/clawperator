@@ -350,6 +350,26 @@ describe("mcp stdio integration", () => {
     assert.strictEqual(payload.code, "DEVICE_NOT_FOUND");
   });
 
+  it("rejects padded on-screen-log action types instead of normalizing them", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("execute", {
+      deviceId: "non-existent",
+      timeoutMs: 1000,
+      actions: [
+        {
+          id: "set-panel",
+          type: " set_on_screen_log ",
+          params: { text: "strict canonical action" },
+        },
+      ],
+    });
+
+    const payload = parseToolPayload(result) as { code?: string };
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+  });
+
   it("configure with no args returns empty session state", async () => {
     await client.initialize();
 
