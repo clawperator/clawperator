@@ -1,4 +1,6 @@
 code_derived:
+  # api/evidence.md is authored in docs/ and registered in mkdocs.yml; its bundle
+  # contract and partial-failure guidance are not generated from command metadata.
   # api/mcp.md is authored in docs/ because it includes parameter-level guidance,
   # client configuration, and verification flow that cannot be derived from code alone.
   - output: api/cli.md

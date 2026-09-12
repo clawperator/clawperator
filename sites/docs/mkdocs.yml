@@ -60,6 +60,7 @@ nav:
       - Selectors: api/selectors.md
       - CLI Reference: api/cli.md
       - Snapshot Format: api/snapshot.md
+      - Still Evidence: api/evidence.md
       - Devices: api/devices.md
       - Doctor: api/doctor.md
       - Timeouts: api/timeouts.md

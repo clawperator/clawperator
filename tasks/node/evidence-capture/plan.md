@@ -14,13 +14,18 @@ Excluded: HTML reports, QA verdicts, uploads, permanent artifact retention servi
 
 | Item | Value |
 | --- | --- |
-| State | Not started |
+| State | PR-1 locally complete; PR-2 not started |
 | Total PRs | 2 |
 | Total phases | 2 |
-| Completed | None |
-| Remaining | 1-2 |
-| Current / Next | Phase 1 |
-| Blockers | None |
+| Completed | Phase 1 through `e041243`; pending merge |
+| Remaining | Phase 2 |
+| Current / Next | Phase 2 after PR-1 merges |
+| Blockers | PR-2 requires PR-1 merged |
+
+PR-1's shipped contract is [Still Evidence Bundles](../../../docs/api/evidence.md),
+with [implementation and validation](../../../docs/internal/design/still-evidence.md).
+The contracts below continue to govern the remaining managed-video phase; the
+current shared schema intentionally covers still evidence only.
 
 ## Sources
 
@@ -51,11 +56,10 @@ Initial investigation used `5d23af5`; the final task audit used merged main `120
 | Device disconnect or worker crash | Preserve partial files and structured failure; do not claim complete |
 | Caller supplies an original action failure | Preserve as opaque context; never replace its verdict with capture status |
 
-PR-1 adds `clawperator evidence capture --output-dir <new-directory> [--label <text>] [--context-json <object>]` and MCP `evidence_capture`; standard explicit device/operator flags apply. CLI output-dir must be absolute and newly created. MCP rejects outputDir and caller-chosen host paths; create a unique bundle beneath the server-owned evidence root, default `~/.clawperator/evidence/bundles`, with an injectable baseDir for tests. Request both screenshot and raw snapshot; run sequentially in that order, attempt both even if one fails. Do not retry the original action. The shared Node domain function accepts the equivalent typed arguments. Capture primitives are reused; do not duplicate screenshot transport. Audit the current screenshot path for an application-root prerequisite: evidence screenshots must still be attempted when the app hierarchy is unavailable. If necessary, narrowly extract the existing targeted ADB PNG capture into one shared helper used by normal screenshots and evidence, without altering raw execution ordering. An unavailable Operator can still yield partial screenshot-only evidence; never invent a successful snapshot. Resolve the device once and use it throughout. Read metadata with explicitly targeted ADB; unavailable metadata is null with an associated error.
-
-Use `manifest.json`, `screenshot.png`, `hierarchy.xml`, and `captures.json` (original capture envelopes). Manifest schema version 1: `{schemaVersion,evidenceId,label,context,device:{serial,operatorPackage,cliVersion,operatorVersion,apiLevel,androidVersion,manufacturer,model,deviceType,display:{width,height,density,rotation}},startedAt,finishedAt,status,artifacts,errors}`. deviceType is emulator when ro.kernel.qemu or ro.boot.qemu is "1", physical when a successfully read value is "0", and unknown otherwise; retain the queried property evidence. Prefer current display override dimensions over physical dimensions when present. Timestamps are host UTC ISO strings; each artifact adds individual capture-start/end timestamps and durationMs from monotonic time. Entries: `{kind,path,mimeType,status,bytes,sha256,startedAt,finishedAt,durationMs,commandId?,taskId?,error?}`. Failed entries have null path/hash/bytes and an error; preserve any incomplete file under an explicitly partial path. Path values are relative to the bundle root; no base64 media. Optional label defaults to null and is at most 2048 UTF-16 code units; optional context defaults to {}. Context is caller-owned JSON, capped at 16 KiB UTF-8, including optional original commandId/taskId/stepId. Reject non-object JSON and unsafe/blank output paths. Do not mix caller timestamps with capture timestamps. A screenshot and hierarchy are sequential, never described as atomic or automatically settled. The caller owns wait/assertion policy.
-
-Write the manifest atomically, retain capture errors and available artifacts, and return `{ok,status,manifestPath,evidenceId}`; ok=true only for complete still capture. Partial/failed capture exits nonzero but leaves a readable manifest when the destination was writable. Define EVIDENCE_CAPTURE_FAILED and EVIDENCE_OUTPUT_EXISTS consistently. Do not downgrade an original test result, delete successful evidence on partial failure, or report empty/corrupt PNG as complete. Verify PNG structure/dimensions via a decoder or validated PNG parser, not extension alone. Metadata collection failures also yield partial status, even when both capture artifacts succeeded. All artifacts and metadata are local and may contain screen content; no upload is performed. No new raw Android action is required.
+PR-1 is complete. Its canonical still-capture contract and schema are documented in
+[Still Evidence Bundles](../../../docs/api/evidence.md); preserve those contracts
+when extending them for video. Implementation boundaries and acceptance evidence
+live in [Still evidence capture](../../../docs/internal/design/still-evidence.md).
 
 PR-2 adds `evidence video start --output-dir <new-directory> --duration-seconds <1..180> [--size <WIDTHxHEIGHT>]`, `evidence video status --session <manifest-path>`, and `evidence video stop --session <manifest-path>`, with equivalent MCP tools/domain methods. Use MCP tool names evidence_video_start, evidence_video_status, and evidence_video_stop. Start shares label/context metadata fields; returns recording only after bounded startup confirmation, or structured startup failure. Maximum duration is mandatory to bound orphan processes. Verify supported duration/options using the selected device screenrecord help; if the device cannot honor the requested duration, fail rather than silently clamp it. Start requires this explicit device; status and stop use the immutable saved target, and reject conflicting supplied target flags. Existing `record start/stop` continues to mean accessibility-event recording.
 

@@ -260,6 +260,21 @@ Caller-provided `rawPath` is rejected; MCP cannot choose arbitrary host paths.
 
 When `maxChars` is applied, the returned `envelope` is truncated consistently with the top-level `snapshot` field, so MCP clients do not receive a second full-copy XML payload through `content` or `structuredContent`.
 
+<a id="mcp-tool-evidence-capture"></a>
+### `evidence_capture`
+
+Capture a local screenshot/raw-hierarchy bundle. Accepts common `deviceId`,
+`operatorPackage`, and `timeoutMs` arguments, plus optional `label` (at most
+2048 UTF-16 code units) and `context` (JSON object, at most 16 KiB UTF-8).
+`outputDir` and other caller-chosen host paths are rejected.
+
+The server creates a unique bundle under `~/.clawperator/evidence/bundles` and
+returns `{ok,status,manifestPath,evidenceId}` in both content forms. Only complete
+capture has `ok: true`. Partial/failed captures set `isError: true` and retain
+`manifestPath` when writable. The opaque caller context remains separate from
+capture status. See [Still Evidence Bundles](evidence.md) for metadata, artifact
+validation, partial files, deadlines, and the schema.
+
 <a id="mcp-tool-execute"></a>
 ### `execute`
 

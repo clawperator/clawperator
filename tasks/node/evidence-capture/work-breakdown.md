@@ -11,53 +11,25 @@ Contract: [plan.md](plan.md). Dependencies and release coordination: [v0.10 plan
 
 Implement the requested PR through its acceptance criteria, relevant checks, in-scope repairs, docs, and local commits. A dependency becoming available does not authorize the next PR. Routine implementation choices are yours; raise only decisions that change the contract or scope.
 
-## PR-1: Still evidence bundles
+## PR-1: Still evidence bundles [DONE]
 
-Ship screenshot/XML bundles and the shared manifest.
+Implemented and locally validated through `e041243`; pending merge. The pack remains
+active for PR-2. Do not start managed video until PR-1 has merged.
 
-### Work
-
-- Trace existing screenshot and snapshot primitives and preserve their canonical envelopes. Add an injected capture/metadata/file seam for deterministic tests, with one shared manifest writer.
-- Implement exclusive destination creation, sequential independent captures, metadata collection, and atomic manifest persistence. Preserve all component errors.
-- Wire Node domain, CLI and MCP through the same implementation. Use docs-author to register the authored evidence page through the source manifest; regenerate rather than hand-editing staging.
-- Add temporary-directory tests using valid tiny PNG fixtures and malformed/empty variants. Live-capture an unlocked Settings screen, open the PNG, parse hierarchy XML, and verify correlation/timestamps against captures.json.
-
-### Affected Sources
-
-- `apps/node/src/contracts/evidence.ts`
-- `apps/node/src/domain/evidence/`
-- `apps/node/src/cli/commands/evidence.ts`
-- `apps/node/src/cli/registry.ts`
-- `apps/node/src/mcp/tools/evidence.ts`
-- `apps/node/src/mcp/tools/index.ts`
-- `apps/node/src/contracts/errors.ts`
-- `apps/node/src/test/unit/evidenceCapture.test.ts`
-- `apps/node/src/test/integration/mcp.test.ts`
-- `docs/api/evidence.md`
-- `docs/api/snapshot.md`
-- `docs/api/mcp.md`
-- `sites/docs/source-map.yaml`
-- `sites/docs/mkdocs.yml`
-
-### Acceptance Evidence
-
-- Successful screenshot and XML produce complete manifest with valid relative paths, sizes, hashes, and independent timestamps.
-- MCP refuses caller output paths, allocates a managed bundle, and uses opaque video session IDs rather than arbitrary manifest paths. CLI and MCP share schema/behavior without identical path inputs.
-- With root unavailable, actual screenshot capture is attempted through the shared helper and yields partial image evidence; budget exhaustion records each unattempted component explicitly.
-- Snapshot failure with valid image produces partial bundle and nonzero exit; image failure with XML succeeds only for that component.
-- Both captures failing still produces failed manifest when destination is writable; metadata errors remain explicit.
-- Existing directory, blank path, invalid/oversized context, disk-write error, malformed PNG, and multiple unspecified devices fail deterministically.
-- CLI/MCP output and errors agree; original caller failure remains intact; no HTML report or automatic recovery is introduced.
-
-### Live Entry Points
-
-Use these for the device proof described above, after building the matching tools. They do not replace the acceptance assertions.
-
-```sh
-: "${DEVICE_ID:?Select a test device}"
-CAPTURE_ROOT="$(mktemp -d)"
-node apps/node/dist/cli/index.js evidence capture --device "$DEVICE_ID" --operator-package com.clawperator.operator.dev --output-dir "$CAPTURE_ROOT/still" --label "Settings observation"
-```
+- Screenshot/XML bundles, exclusive destinations, correlated manifests, device
+  metadata, per-component timings, file validation/hashes, and partial failures
+  are implemented through the shared Node domain, CLI, and MCP.
+- Complete Node suite: 1,498 passed; reviewed-revision focused checks: 155 passed. Debug APK
+  and documentation builds passed, as did independent live CLI/MCP artifact
+  verification on the dedicated Android 16 / API 36 emulator.
+- Readiness probing does not wake or navigate the device; screenshot deadline
+  cancellation preserves `COMMAND_TIMEOUT` and partial bytes. These follow-ups
+  passed offline regression checks; sleeping/locked live behavior was not re-tested.
+- Public contract: [Still Evidence Bundles](../../../docs/api/evidence.md).
+- Durable design, live evidence, and the separate initial app-open timeout:
+  [Still evidence capture](../../../docs/internal/design/still-evidence.md).
+- Existing raw screenshot/snapshot skill consumers require no migration. No
+  managed-video commands or lifecycle state were implemented.
 
 ## PR-2: Managed video lifecycle
 
