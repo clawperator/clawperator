@@ -2,7 +2,7 @@
 
 This coordinates four active runtime-observability task packs and the completed readiness, scaffold-failure, and on-screen-log implementations. It replaces the former standalone observability index. It does not schedule every unrelated task in the repository or claim that implementation has shipped.
 
-R4 implementation: `31ef1c2`, based on merged main `654d333`. R1 merged in `cfc90af` (PR #271). R2 merged in `654d333` (PR #272). On-screen logs raw API (PR #266, `120c1eb`) and CLI (PR #270, `dd66a25`) are merged. Their single-PR packs were retired by explicit cleanup requests. R4 is implemented and validated in `31ef1c2`, with review/merge pending. Four feature packs remain open, with five implementation PRs remaining after R4.
+R4 implementation: `31ef1c2` plus query failure preservation in `cc4aafc`, based on merged main `654d333`. R1 merged in `cfc90af` (PR #271). R2 merged in `654d333` (PR #272). On-screen logs raw API (PR #266, `120c1eb`) and CLI (PR #270, `dd66a25`) are merged. Their single-PR packs were retired by explicit cleanup requests. R4 is implemented and validated through `cc4aafc`; its completed instructions are retired under the user's assumption that this PR has landed. Actual remote merge status is not asserted. Four feature packs remain open, with five implementation PRs remaining after R4.
 
 ## Folder ownership
 
@@ -21,7 +21,7 @@ The order below minimizes shared-file conflicts. Hard dependencies are explicit;
 | R1 | [Selected Operator readiness](../../../docs/api/doctor.md) | Complete | None | [DONE] merged in `cfc90af` (PR #271); pack retired; [verification and limits](../../../docs/internal/design/doctor-readiness.md) |
 | R2 | [Scaffold failure propagation](../../../docs/skills/authoring.md) | Complete | None | [DONE] merged in `654d333` (PR #272); pack retired; [verification](../../../docs/internal/design/skill-scaffold-execution.md) |
 | R3 | [On-screen logs CLI](../../../docs/api/on-screen-logs.md) | Complete | Raw API merged in `120c1eb` | [DONE] merged in `dd66a25` (PR #270); pack retired; [verification and limits](../../../docs/internal/design/on-screen-logs.md) |
-| R4 | [Selector inspection PR-1](../../api/selector-inspection/plan.md) | 1 | None beyond merged main | [DONE] implemented and validated in `31ef1c2`; review/merge pending; [verification and limits](../../../docs/internal/design/selector-inspection.md) |
+| R4 | [Selector inspection PR-1](../../api/selector-inspection/plan.md) | 1 | None beyond merged main | [DONE] through `cc4aafc`; cleanup complete (assume landed); [validation and limits](../../api/selector-inspection/work-breakdown.md#pr-1-validation-and-handoff) |
 | R5 | [Strict selectors PR-2](../../api/selector-inspection/plan.md) | 2 | R4 merged | Waiting for R4; [prompt](../../api/selector-inspection/pr-2-prompt.md) |
 | R6 | [Action-result diagnostics](../../api/action-result-diagnostics/plan.md) | 1 | R4 and R5 merged | Waiting for R5; [prompt](../../api/action-result-diagnostics/agent-prompt.md) |
 | R7 | [Compact snapshots](../../node/compact-snapshots/plan.md) | 1 | R4 merged for additive XML visibility | Waiting for R4; [prompt](../../node/compact-snapshots/agent-prompt.md) |
@@ -69,7 +69,7 @@ This covers the agreed foundation and evidence gaps. It is not a promise that on
 
 **Evidence integration gate:** R8 must pass before adopting its manifest as the stable report input; R9 must pass before claiming managed-video support. Existing screenshot and explicit ADB recording helpers remain usable while these APIs are developed. Reports must distinguish unavailable evidence from failed test assertions, and never equate file existence with proof.
 
-**Optional convenience:** R3 is implemented; R7 remains planned. Both reduce authoring/inspection overhead, and neither is a technical prerequisite for deterministic execution. Raw on-screen logs already work through the merged API. R1 and R2 are merged. R4 is implemented and awaits review/merge, and five further implementation PRs remain. This is the suggested scope of the release workstream, not a requirement to finish every PR before beginning consumer development.
+**Optional convenience:** R3 is implemented; R7 remains planned. Both reduce authoring/inspection overhead, and neither is a technical prerequisite for deterministic execution. Raw on-screen logs already work through the merged API. R1 and R2 are merged. R4 implementation and cleanup are complete, and five further implementation PRs remain. This is the suggested scope of the release workstream, not a requirement to finish every PR before beginning consumer development.
 
 ## Implementation handoff and release acceptance
 
@@ -86,3 +86,11 @@ Before merging each implementation PR:
 At workstream completion, run the combined Node suite, relevant Android unit/build checks, docs build, and affected live harnesses against the same final CLI/Operator build. Verify the new CLI help, strict/query results, compact XML projection, still bundle, video lifecycle, and overlay interaction together. Record supported device/API combinations accurately. This is acceptance for the workstream, not authority to bump versions, publish packages/APKs, or deploy a release; those use the repository's release workflows when authorized.
 
 Use `.agents/skills/task-cleanup/SKILL.md` after each complete pack's durable guidance is in source/docs. Remove or mark its completed release row before deleting its task directory so links do not go stale. Keep this coordination document until the workstream is complete and its release decisions have durable homes.
+
+
+## Parked outside this release sequence
+
+Sensitive-root accessibility coverage is explicitly deferred by the user.
+[Confirmed findings and the next decision](../../../docs/internal/design/accessibility-hierarchy.md)
+are preserved separately. R4 delivers truthful query failures; neither R5 nor R6
+implicitly authorizes changing the Operator's service classification.

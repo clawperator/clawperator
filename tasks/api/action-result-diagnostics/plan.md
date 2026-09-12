@@ -22,6 +22,16 @@ Excluded: Generic screenshot-based assertions, hidden retries, agent recovery, e
 | Current / Next | Phase 1 |
 | Blockers | Await both PRs in `tasks/api/selector-inspection` |
 
+## Existing query failure behavior
+
+R4 already introduces `UI_TREE_UNAVAILABLE` for a missing query hierarchy,
+`UiActionExecutionResult.errorCode`/`error`, retained completed steps plus a
+failed query, and root-independent service/window diagnostics. Reuse and extend
+these foundations after the merge gates; do not duplicate them. General action
+exceptions and timeout/cancellation evidence still need the work below. The
+[sensitive-root access issue](../../../docs/internal/design/accessibility-hierarchy.md)
+is parked separately and does not expand this task into service reclassification.
+
 ## Sources
 
 | Topic | Authority |
