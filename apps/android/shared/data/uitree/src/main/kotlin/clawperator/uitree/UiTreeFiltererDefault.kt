@@ -14,19 +14,21 @@ class UiTreeFiltererDefault(
 
     override fun filterOnScreenOnly(uiTree: UiTree): UiTree {
         val filteredRoot = filterOnScreenOnly(uiTree.root)
-        return uiTree.copy(root = filteredRoot)
+        return uiTree.copy(root = filteredRoot, sourceRoot = uiTree.sourceRoot ?: uiTree.root)
     }
 
     fun filterOnScreenOnly(uiNode: UiNode): UiNode {
         val frame = currentWindowFrame
         // Always keep the root but filter its descendants. If the root itself were off-screen,
         // the children would be, too — but keeping the root keeps the type invariant.
-        return filterNode(uiNode, frame) ?: uiNode.copy(children = emptyList())
+        return filterNode(uiNode, frame, uiNode.sourcePath ?: "0")
+            ?: uiNode.copy(children = emptyList(), sourcePath = uiNode.sourcePath ?: "0")
     }
 
     private fun filterNode(
         node: UiNode,
         frame: WindowFrame,
+        path: String,
     ): UiNode? {
         // Normalize and test visibility
         val nb = node.bounds.normalize()
@@ -41,10 +43,10 @@ class UiTreeFiltererDefault(
         if (!onScreen) return null
 
         // Filter children recursively
-        val keptChildren = node.children.mapNotNull { child -> filterNode(child, frame) }
+        val keptChildren = node.children.mapIndexedNotNull { index, child -> filterNode(child, frame, child.sourcePath ?: "$path.$index") }
 
         // Preserve everything else, just swap children
-        return node.copy(children = keptChildren)
+        return node.copy(children = keptChildren, sourcePath = path)
     }
 
     // Some OEMs/apps report swapped or negative edges; normalize to a well-formed rect

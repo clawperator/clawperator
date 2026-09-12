@@ -70,6 +70,7 @@ scroll_and_click
 scroll
 scroll_until
 read_text
+query_ui
 enter_text
 snapshot
 take_screenshot
@@ -116,6 +117,102 @@ The on-screen log actions have a deliberately narrow input-alias rule:
 - At the Node input boundary, exact lower-case `on_screen_log_set` and `on_screen_log_clear` normalize to those canonical types before validation and dispatch.
 - Case changes and surrounding whitespace are rejected for both canonical types and aliases.
 - Their `params` objects accept only the fields documented below and do not translate generic keys such as `value` to `text`.
+
+<a id="action-query-ui"></a>
+## `query_ui`
+
+Read-only structured inspection from one fresh Android tree capture. The CLI is
+`clawperator query`; the named MCP tool is `query_ui`. All use the Android resolver
+shared with existing node-targeted actions.
+
+| Parameter | Default | Contract |
+| --- | --- | --- |
+| `matcher` | omitted | Optional [NodeMatcher](selectors.md); omit to match all eligible nodes. An explicit empty object is invalid. |
+| `visibility` | `"on_screen"` | `"on_screen"` or `"all"` |
+| `limit` | `100` | Integer from `1` through `1000` |
+
+Queries do not wait for navigation to settle. After a navigation action, use
+`clawperator wait` with the expected destination selector (MCP: `wait`; raw:
+`wait_for_node`), then query. Zero matches describe that capture only; they do not
+prove that a destination has finished loading. A wait is also a separate capture,
+so callers must still inspect the subsequent query result.
+
+If Android supplies no hierarchy, the envelope fails with
+`errorCode="UI_TREE_UNAVAILABLE"`. Completed steps and the failed `query_ui` step
+are retained, and later actions do not run. Failed-step data contains `errorCode`,
+a human-readable `error`, and serialized JSON `diagnostics` with
+`serviceAvailable`, `rootAvailable`, `windowCount`, and `foregroundPackage`.
+Unknown facts are `null`; `rootAvailable` is `false` for the failed capture.
+No `data.query` is emitted. A screenshot can remain available when accessibility
+hierarchy access is unavailable. This error does not identify the platform cause
+or promise that retrying will expose a restricted screen. Named MCP returns the
+same error code and envelope.
+
+Zero, one, or multiple matches all succeed. `data.query` is a serialized JSON
+string with this shape:
+
+```json
+{
+  "schemaVersion": 1,
+  "snapshotId": "observation-local-id",
+  "capturedAt": "2026-01-01T00:00:00Z",
+  "totalMatches": 1,
+  "returnedCount": 1,
+  "truncated": false,
+  "nodes": [{
+    "nodePath": "0.2",
+    "parentPath": "0",
+    "resourceId": "example:id/switch",
+    "className": "android.widget.Switch",
+    "role": "switch",
+    "label": "",
+    "contentDescription": null,
+    "bounds": {"left": 10, "top": 30, "right": 110, "bottom": 130},
+    "visibleToUser": true,
+    "onScreen": true,
+    "enabled": true,
+    "clickable": true,
+    "checkable": true,
+    "checked": false,
+    "selected": false,
+    "scrollable": false
+  }]
+}
+```
+
+`totalMatches` counts nodes before the limit, including nodes with blank labels.
+`returnedCount` is the array length. `truncated` means the limit omitted whole
+nodes. Unavailable state stays `null`, distinct from `false`. `clickable` reports
+the platform node's clickability when captured, rather than inherited ancestor
+clickability used by legacy action dispatch.
+
+Nodes are in preorder. Paths use child indices in the captured `UiNode` tree,
+rooted at `"0"`, and retain their original indices across visibility filtering.
+The root's `parentPath` is `null`. Paths and snapshot IDs are observation-local;
+they are neither stable cross-capture IDs nor valid action targets. `capturedAt`
+is the APK's UTC timestamp immediately after tree capture. XML is a separate
+capture with no guaranteed shared node identity.
+
+`visibleToUser` is the platform flag. `onScreen` follows the existing action
+eligibility rule: positive normalized bounds, platform visibility, screen
+intersection, and ancestor pruning. The existing root-retention exception remains:
+the root is retained even when ineligible, with its descendants pruned. Neither
+flag proves visual non-occlusion. `all` includes offscreen and hidden captured
+nodes; their `onScreen` value still reports the same action eligibility.
+
+A UTF-8 `data.query` payload above 256 KiB fails with `PAYLOAD_TOO_LARGE`; JSON is
+never cut to fit. Reduce `limit` or narrow the matcher. This response guard is
+separate from the execution request size limit. Raw XML snapshots remain
+available and add `visible-to-user` without restructuring the hierarchy.
+
+```bash
+clawperator query --device <device_serial> --operator-package com.clawperator.operator.dev --visibility all --limit 100
+clawperator query --matcher-json '{"descendant":{"textEquals":"Display"}}'
+```
+
+`--matcher-json` and `--selector` name the same JSON input and are mutually
+exclusive with simple selector flags (`--text`, `--text-contains`, `--id`, `--desc`,
+`--desc-contains`, `--role`). Omitting all selector flags matches all eligible nodes.
 
 ## Full Payload Example
 

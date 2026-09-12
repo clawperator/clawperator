@@ -48,6 +48,19 @@ class UiTreeInspectorAndroid(
             }
     }
 
+    override suspend fun getUnavailableHierarchyDiagnostics(): UiHierarchyDiagnostics {
+        val service = accessibilityServiceManager.currentAccessibilityService
+            ?: return UiHierarchyDiagnostics(serviceAvailable = false)
+        val windows = try {
+            service.windows
+        } catch (error: Exception) {
+            null
+        }
+        // The failed capture established that the active root was unavailable. Window count
+        // remains useful evidence, but another window's package is not the foreground package.
+        return UiHierarchyDiagnostics(serviceAvailable = true, windowCount = windows?.size)
+    }
+
     override suspend fun getCurrentWindowMetadata(): UiWindowMetadata? {
         val service = accessibilityServiceManager.currentAccessibilityService ?: return null
         val activeRoot = service.rootInActiveWindow ?: return null

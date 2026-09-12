@@ -211,7 +211,7 @@ describe("mcp stdio integration", () => {
     assert.ok(Array.isArray(tools));
     assert.deepStrictEqual(
       tools.map(tool => tool.name),
-      ["devices", "snapshot", "execute", "configure", "open", "click", "type", "read", "press", "wait", "scroll_until"],
+      ["devices", "snapshot", "execute", "configure", "query_ui", "open", "click", "type", "read", "press", "wait", "scroll_until"],
     );
 
     const execute = tools.find((tool) => tool.name === "execute");

@@ -11,60 +11,56 @@ Contract: [plan.md](plan.md). Dependencies and release coordination: [v0.10 plan
 
 Implement the requested PR through its acceptance criteria, relevant checks, in-scope repairs, docs, and local commits. A dependency becoming available does not authorize the next PR. Routine implementation choices are yours; raise only decisions that change the contract or scope.
 
-## PR-1: Structured inspection and relational resolution
+## PR-1: Structured inspection and relational resolution [DONE]
 
-Ship read-only queries and the shared resolver.
+Implementation: `31ef1c2`; query failure follow-up: `cc4aafc`.
+Cleanup treats this PR as landed at the user's direction; actual remote merge
+status is not asserted here. Completed implementation instructions are retired.
 
-### Work
+### PR-1 validation and handoff
 
-- Add shared predicate/resolver and NodeSummary serialization. Use platform state/hints; add capture fields to UiNode only when needed. Preserve semantics of existing fields.
-- Add raw query action through both validators, Kotlin parser/model/engine, CLI registry/dispatch/help, and MCP registration. Existing actions must still work on legacy defaults.
-- Build generic nested-tree fixtures with identical IDs/bounds, separate unique descendants, empty-label switches, and offscreen nodes. Verify source order and captured state.
-- Publish query/relationship semantics. Live-query Settings with an explicit target; compare selected query states with XML and a screenshot.
+Validated revision: runtime implementation through `cc4aafc`; subsequent changes
+are documentation only.
 
-### Affected Sources
+- Node build and standard suite: 306 passed. Initial broad focused suite: 345
+  passed; query/transport/MCP follow-up suite: 53 passed.
+- Android debug build and full debug unit suite: 402 tests, zero failures/errors,
+  four existing skips. Parser tests run from active `src/test/kotlin` sources.
+- Docs build, route checks, and diff checks passed.
+- Matching development APK on an Android 15/API 35 arm64 emulator: structured
+  counts/limits, blank labels, original visibility paths, fresh capture IDs,
+  combined relationships, CLI/raw/MCP parity, and large result transport passed.
+  Dark theme switch bounds and seven state fields matched XML and screenshot;
+  a relational click changed state and was restored. A bounded wait followed by
+  a relational query found the destination row.
+- Offline fixtures cover duplicate identity/bounds, unknown versus false,
+  relationship self exclusion, hidden descendants, pruned ancestors, repeated
+  filtering, malformed inputs, and the UTF-8 response guard. Failure tests and
+  live execution verify retained steps, terminal correlation, skipped later
+  actions, and cancellation propagation.
+- No sibling skill migration was needed. Live compatibility beyond API 35 and
+  live overflow/corruption cases remain unproven; their offline checks passed.
 
-- `apps/node/src/contracts/selectors.ts`
-- `apps/node/src/contracts/execution.ts`
-- `apps/node/src/contracts/errors.ts`
-- `apps/node/src/domain/executions/validateExecution.ts`
-- `apps/node/src/cli/registry.ts`
-- `apps/node/src/cli/selectorFlags.ts`
-- `apps/node/src/cli/commands/action.ts`
-- `apps/node/src/domain/actions/`
-- `apps/node/src/mcp/selectors.ts`
-- `apps/node/src/mcp/tools/named.ts`
-- `apps/android/shared/data/task/src/main/kotlin/clawperator/task/runner/`
-- `apps/android/shared/data/uitree/src/main/kotlin/clawperator/uitree/`
-- `apps/android/shared/data/uitree/src/main/kotlin/clawperator/accessibilityservice/AccessibilityNodeInfoExtAndroid.kt`
-- `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/agent/AgentCommandParser.kt`
-- `apps/node/src/test/unit/selectorFlags.test.ts`
-- `apps/android/shared/test/src/test/kotlin/clawperator/task/runner/NodeMatcherTest.kt`
-- `docs/api/selectors.md`
-- `docs/api/actions.md`
-- `docs/api/mcp.md`
+Durable rationale: [selector inspection design](../../../docs/internal/design/selector-inspection.md).
+Public contracts are in [actions](../../../docs/api/actions.md#action-query-ui),
+[selectors](../../../docs/api/selectors.md), and [MCP](../../../docs/api/mcp.md).
+Temporary device captures and build logs are not required handoff artifacts.
 
-### Acceptance Evidence
+### Gap dispositions
 
-- Empty-label switches count as nodes, while missing nodes yield totalMatches 0.
-- Ancestor and descendant AND semantics isolate the intended subtree; self never satisfies relationship.
-- Unknown state stays null, checked false stays false, duplicate paths are unique within one snapshot.
-- Empty predicates, hidden descendant labels, a pruned ancestor, response overflow, visibility all versus on_screen, limit truncation, malformed matcher JSON, nested predicates, invalid/missing flag values, and CLI/MCP/raw parity are covered.
-- Raw XML remains available with additive visibility metadata; no guessed occlusion filter is introduced.
-
-### Live Entry Points
-
-Use these for the device proof described above, after building the matching tools. They do not replace the acceptance assertions.
-
-```sh
-# Set DEVICE_ID to a dedicated, connected test target before these commands.
-: "${DEVICE_ID:?Select a dedicated test device}"
-ANDROID_SERIAL="$DEVICE_ID" ./gradlew :app:installDebug
-adb -s "$DEVICE_ID" shell monkey -p com.clawperator.operator.dev -c android.intent.category.LAUNCHER 1
-node apps/node/dist/cli/index.js doctor --device "$DEVICE_ID" --operator-package com.clawperator.operator.dev
-node apps/node/dist/cli/index.js open com.android.settings --device "$DEVICE_ID" --operator-package com.clawperator.operator.dev
-node apps/node/dist/cli/index.js query --device "$DEVICE_ID" --operator-package com.clawperator.operator.dev --visibility all --limit 100
-```
+- **Defer, parked by user:** sensitive Internet hierarchy access. Confirmed cause,
+  configuration experiment, and concrete next step are preserved in
+  [accessibility hierarchy availability](../../../docs/internal/design/accessibility-hierarchy.md).
+  This is outside R4/R5 and does not authorize a service declaration change.
+- **Defer to skill workstream:** 19 failures in an extra flat `skills.test.ts` run
+  reproduced by name on unchanged base `654d333`. Investigate missing SkillResult
+  `result` fields and pretty-output/banner expectations, then rerun that file.
+  These are not failures in the standard suite or selector regressions.
+- **Accept:** queries observe once; callers use bounded waits for navigation.
+  Public docs and live verification cover this intended behavior.
+- **Delivered:** typed `UI_TREE_UNAVAILABLE` for queries, retained prior steps,
+  failed query identity, and service/window diagnostics. General action failures
+  and timeout evidence remain R6 work; reuse the existing result fields.
 
 ## PR-2: Strict action resolution
 

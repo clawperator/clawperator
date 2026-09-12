@@ -20,7 +20,8 @@ object EnvelopeErrorCodes {
 
 /**
  * Canonical terminal envelope shape for Node API strict mode.
- * Emit exactly one line per command: `[Clawperator-Result] <json>`.
+ * One logical result per command: `[Clawperator-Result] <json>`.
+ * Large results use bounded transport chunks and are reassembled before parsing.
  *
  * [error] is a human-readable description of the failure reason.
  * [errorCode] is a stable, enumerated code agents can branch on reliably.
@@ -47,7 +48,7 @@ data class CanonicalStepResult(
 private val json = Json { encodeDefaults = false }
 
 /**
- * Build the single-line canonical terminal log message for a successful result.
+ * Build the canonical terminal log message for a completed execution, including typed failures.
  */
 fun buildCanonicalSuccessLine(
     commandId: String,
@@ -66,9 +67,10 @@ fun buildCanonicalSuccessLine(
     val envelope = ClawperatorResultEnvelope(
         commandId = commandId,
         taskId = taskId,
-        status = "success",
+        status = if (result.errorCode == null) "success" else "failed",
         stepResults = stepResults,
-        error = null,
+        error = result.error,
+        errorCode = result.errorCode,
     )
     return CLAWPERATOR_RESULT_PREFIX + " " + json.encodeToString(envelope)
 }

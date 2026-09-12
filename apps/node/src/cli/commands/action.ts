@@ -295,3 +295,14 @@ export async function cmdScrollUntil(options: {
     return formatError(e, options);
   }
 }
+
+export async function cmdQuery(options: ActionCommandOptions & import("../../domain/actions/query.js").QueryOptions): Promise<string> {
+  try {
+    const { buildQueryExecution } = await import("../../domain/actions/query.js");
+    return await runActionExecution(buildQueryExecution({
+      matcher: options.matcher, visibility: options.visibility, limit: options.limit,
+    }, options.timeoutMs), options);
+  } catch (error) {
+    return formatError(error, options);
+  }
+}

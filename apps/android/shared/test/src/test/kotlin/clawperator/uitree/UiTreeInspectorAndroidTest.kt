@@ -27,6 +27,32 @@ class UiTreeInspectorAndroidTest {
     }
 
     @Test
+    @Config(sdk = [Build.VERSION_CODES.Q])
+    fun `window diagnostics preserve zero and unknown without selecting a root`() = kotlinx.coroutines.runBlocking {
+        var unavailable = false
+        val service = object : TestAccessibilityService(context) {
+            override fun getWindows(): List<android.view.accessibility.AccessibilityWindowInfo> {
+                if (unavailable) throw IllegalStateException("Window access unavailable")
+                return emptyList()
+            }
+        }
+        val manager = clawperator.accessibilityservice.AccessibilityServiceManagerAndroid()
+        manager.setCurrentAccessibilityService(service, true)
+        val inspector = UiTreeInspectorAndroid(manager)
+        assertEquals(UiHierarchyDiagnostics(serviceAvailable = true, windowCount = 0), inspector.getUnavailableHierarchyDiagnostics())
+        unavailable = true
+        assertEquals(UiHierarchyDiagnostics(serviceAvailable = true), inspector.getUnavailableHierarchyDiagnostics())
+    }
+
+    @Test
+    @Config(sdk = [Build.VERSION_CODES.Q])
+    fun `unavailable service diagnostics distinguish absence from unknown windows`() = kotlinx.coroutines.runBlocking {
+        val inspector = UiTreeInspectorAndroid(clawperator.accessibilityservice.AccessibilityServiceManagerAndroid())
+        assertEquals(null, inspector.getCurrentUiTree())
+        assertEquals(UiHierarchyDiagnostics(serviceAvailable = false), inspector.getUnavailableHierarchyDiagnostics())
+    }
+
+    @Test
     @Config(sdk = [Build.VERSION_CODES.R])
     fun `getScreenDimensionsFromService returns dimensions using WindowMetrics on API 30+`() {
         val service = TestAccessibilityService(context)

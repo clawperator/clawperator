@@ -5,6 +5,9 @@ interface UiTreeInspector {
 
     suspend fun getCurrentUiTree(): UiTree?
 
+    /** Best-effort evidence after a capture returned no root; never selects another window. */
+    suspend fun getUnavailableHierarchyDiagnostics(): UiHierarchyDiagnostics = UiHierarchyDiagnostics()
+
     suspend fun getCurrentWindowMetadata(): UiWindowMetadata?
 
     /**
@@ -12,3 +15,11 @@ interface UiTreeInspector {
      */
     suspend fun getCurrentUiHierarchyDump(): String?
 }
+
+@kotlinx.serialization.Serializable
+data class UiHierarchyDiagnostics(
+    val serviceAvailable: Boolean? = null,
+    val rootAvailable: Boolean = false,
+    val windowCount: Int? = null,
+    val foregroundPackage: String? = null,
+)

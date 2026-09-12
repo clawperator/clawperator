@@ -304,10 +304,13 @@ Recovery:
 ### `PAYLOAD_TOO_LARGE`
 
 Use this when a CLI, Serve, or execution payload exceeds a configured size
-limit before dispatch.
+limit before dispatch. Android also returns this code in a failed `query_ui`
+step when serialized UTF-8 `data.query` exceeds 256 KiB. The query result is not
+partially serialized or cut to fit.
 
 Recovery:
 
+- for `query_ui`, lower `limit` or narrow `matcher`
 - split long action lists into smaller executions
 - move large inline data into files or skill artifacts where the command
   supports that pattern
@@ -391,3 +394,14 @@ What this means for agents:
 - [Devices](devices.md)
 - [Doctor](doctor.md)
 - [Operator App Troubleshooting](../troubleshooting/operator.md)
+
+### Query hierarchy unavailable
+
+`UI_TREE_UNAVAILABLE` is a failed `query_ui` capture, not a successful query with
+zero matches. The envelope and failed step carry the code; completed steps are
+preserved and subsequent actions do not run. Inspect the failed step's serialized
+`diagnostics` for service availability, the missing root, and available window
+facts. Unknown facts remain `null`. See [query_ui](actions.md#action-query-ui).
+A visible screenshot does not guarantee an accessible hierarchy. Do not infer
+that another window is the requested application or repeatedly retry a
+persistently unavailable screen.

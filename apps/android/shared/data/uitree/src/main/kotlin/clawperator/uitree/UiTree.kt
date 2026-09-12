@@ -14,4 +14,7 @@ data class UiTree(
     val root: UiNode,
     /** Window identifier from the accessibility service */
     val windowId: Int = -1,
+    /** Structural context retained when filtering or selecting a subtree. */
+    @kotlinx.serialization.Transient
+    val sourceRoot: UiNode? = null,
 )

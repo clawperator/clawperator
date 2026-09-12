@@ -47,7 +47,18 @@ class UiActionEngineDefault(
             val stepResults = mutableListOf<UiActionStepResult>()
 
             for (action in plan.actions) {
-                val stepResult = executeSingle(taskScope, action)
+                val stepResult = try {
+                    executeSingle(taskScope, action)
+                } catch (error: QueryHierarchyUnavailableException) {
+                    stepResults += UiActionStepResult(action.id, "query_ui", success = false, data = error.stepData())
+                    return@withContext UiActionExecutionResult(
+                        commandId = plan.commandId,
+                        taskId = plan.taskId,
+                        stepResults = stepResults,
+                        errorCode = "UI_TREE_UNAVAILABLE",
+                        error = error.message,
+                    )
+                }
                 stepResults += stepResult
             }
 
@@ -77,6 +88,7 @@ class UiActionEngineDefault(
                 is UiAction.Scroll -> executeScroll(taskScope, action)
                 is UiAction.ScrollUntil -> executeScrollUntil(taskScope, action)
                 is UiAction.ReadText -> executeReadText(taskScope, action)
+                is UiAction.QueryUi -> executeQueryUi(taskScope, action)
                 is UiAction.SnapshotUi -> executeSnapshotUi(taskScope, action)
                 is UiAction.SetOnScreenLog -> executeSetOnScreenLog(action)
                 is UiAction.ClearOnScreenLog -> executeClearOnScreenLog(action)
@@ -650,6 +662,17 @@ class UiActionEngineDefault(
             throw e
         }
     }
+
+    private suspend fun executeQueryUi(
+        taskScope: TaskScope,
+        action: UiAction.QueryUi,
+    ): UiActionStepResult =
+        try {
+            val query = taskScope.ui { queryUi(action.matcher, action.visibility, action.limit) }
+            UiActionStepResult(action.id, "query_ui", data = mapOf("query" to query))
+        } catch (error: QueryPayloadTooLargeException) {
+            UiActionStepResult(action.id, "query_ui", success = false, data = mapOf("error" to "PAYLOAD_TOO_LARGE", "message" to error.message.orEmpty()))
+        }
 
     private suspend fun executeSnapshotUi(
         taskScope: TaskScope,

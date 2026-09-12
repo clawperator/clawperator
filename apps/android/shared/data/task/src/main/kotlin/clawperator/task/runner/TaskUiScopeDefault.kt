@@ -31,6 +31,18 @@ class TaskUiScopeDefault(
     private val uiTreeManager: UiTreeManager,
     private val coroutineScopeIo: CoroutineScope,
 ) : TaskUiScope {
+    override suspend fun queryUi(
+        matcher: NodeMatcher?,
+        visibility: String,
+        limit: Int,
+    ): String {
+        val raw = uiTreeInspector.getCurrentUiTree()
+            ?: throw QueryHierarchyUnavailableException(uiTreeInspector.getUnavailableHierarchyDiagnostics())
+        val capturedAt = queryCaptureTimestamp()
+        val visible = uiTreeFilterer.filterOnScreenOnly(raw)
+        return NodeResolver(visible).query(matcher, visibility, limit, capturedAt = capturedAt)
+    }
+
     companion object {
         private const val TAG = "[TaskUiScope]"
         private const val DEBUG_SCROLL_LOGGING = false // Set to true for detailed scroll debugging
@@ -207,19 +219,7 @@ class TaskUiScopeDefault(
         uiTree: UiTree,
     ): List<UiNode> =
         withContext(coroutineScopeIo.coroutineContext) {
-            UiTreeTraversal.findAll(uiTree) { uiNode ->
-                val taskUiNode =
-                    TaskUiNode(
-                        resourceId = uiNode.resourceId,
-                        label = uiNode.label,
-                        contentDescription = uiNode.contentDescription,
-                        clickable = uiNode.isClickable,
-                        role = uiNode.role.name.lowercase(),
-                        bounds = uiNode.bounds,
-                        debugPath = uiNode.id.value,
-                    )
-                matcher.matches(taskUiNode)
-            }
+            NodeResolver(uiTree).resolve(matcher).map { it.node }
         }
 
     override suspend fun waitForNode(
@@ -349,7 +349,7 @@ class TaskUiScopeDefault(
                     ?: throw IllegalStateException("Container not found for: $containerMatcher")
 
             // Create a sub-tree rooted at the container to search within
-            val subTree = UiTree(root = containerNode, windowId = uiTree.windowId)
+            val subTree = uiTree.copy(root = containerNode)
 
             // Search for target within the container's subtree
             val uiNode =
@@ -386,7 +386,7 @@ class TaskUiScopeDefault(
                     ?: throw IllegalStateException("Container not found for: $containerMatcher")
 
             // Create a sub-tree rooted at the container to search within
-            val subTree = UiTree(root = containerNode, windowId = uiTree.windowId)
+            val subTree = uiTree.copy(root = containerNode)
 
             // Search for target within the container's subtree
             val uiNode =
@@ -428,7 +428,7 @@ class TaskUiScopeDefault(
                     ?: throw IllegalStateException("Container not found for: $containerMatcher")
 
             // Create a sub-tree rooted at the container to search within
-            val subTree = UiTree(root = containerNode, windowId = uiTree.windowId)
+            val subTree = uiTree.copy(root = containerNode)
 
             // Search for all targets within the container's subtree
             val uiNodes = findAllNodesByMatcher(matcher, subTree)
@@ -1215,22 +1215,10 @@ class TaskUiScopeDefault(
 
             // Find the container using the NodeMatcher
             val container =
-                UiTreeTraversal.findFirst(uiTree) { uiNode ->
-                    val taskUiNode =
-                        TaskUiNode(
-                            resourceId = uiNode.resourceId,
-                            label = uiNode.label,
-                            contentDescription = uiNode.contentDescription,
-                            clickable = uiNode.isClickable,
-                            role = uiNode.role.name.lowercase(),
-                            bounds = uiNode.bounds,
-                            debugPath = uiNode.id.value,
-                        )
-                    target.matches(taskUiNode)
-                } ?: throw IllegalStateException("No UI node found matching criteria: $target")
+                NodeResolver(uiTree).resolve(target).firstOrNull()?.node ?: throw IllegalStateException("No UI node found matching criteria: $target")
 
             // Create a temporary sub-tree rooted at the container to search within
-            val subTree = UiTree(root = container, windowId = uiTree.windowId)
+            val subTree = uiTree.copy(root = container)
             val state = subTree.inferOnOffState()
 
             if (state == ToggleState.Unknown) {
@@ -1346,21 +1334,10 @@ class TaskUiScopeDefault(
 
         // Find the container
         val container =
-            UiTreeTraversal.findFirst(uiTree) { uiNode ->
-                val taskUiNode =
-                    TaskUiNode(
-                        resourceId = uiNode.resourceId,
-                        label = uiNode.label,
-                        clickable = uiNode.isClickable,
-                        role = uiNode.role.name.lowercase(),
-                        bounds = uiNode.bounds,
-                        debugPath = uiNode.id.value,
-                    )
-                containerMatcher.matches(taskUiNode)
-            } ?: return null
+            NodeResolver(uiTree).resolve(containerMatcher).firstOrNull()?.node ?: return null
 
         // Create a temporary sub-tree rooted at the container to search within
-        val subTree = UiTree(root = container, windowId = uiTree.windowId)
+        val subTree = uiTree.copy(root = container)
 
         // Find the exact button to click
         return UiTreeTraversal.findFirst(subTree) { uiNode ->
@@ -1459,20 +1436,7 @@ private fun flattenUiNodeSubtree(node: UiNode): List<UiNode> {
 private fun findNodeByMatcherForKeyValue(
     matcher: NodeMatcher,
     uiTree: UiTree,
-): UiNode? =
-    UiTreeTraversal.findAll(uiTree) { uiNode ->
-        val taskUiNode =
-            TaskUiNode(
-                resourceId = uiNode.resourceId,
-                label = uiNode.label,
-                contentDescription = uiNode.contentDescription,
-                clickable = uiNode.isClickable,
-                role = uiNode.role.name.lowercase(),
-                bounds = uiNode.bounds,
-                debugPath = uiNode.id.value,
-            )
-        matcher.matches(taskUiNode)
-    }.firstOrNull()
+): UiNode? = NodeResolver(uiTree).resolve(matcher).firstOrNull()?.node
 
 private fun UiRole.isKeyValueRowBoundary(): Boolean =
     this == UiRole.Row || this == UiRole.ListItem || this == UiRole.Card

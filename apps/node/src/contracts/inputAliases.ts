@@ -96,12 +96,13 @@ function remapObjectKeys(
   return output;
 }
 
-function normalizeMatcherInput(input: unknown): unknown {
+export function normalizeMatcherInput(input: unknown): unknown {
   if (!isPlainObject(input)) {
     return input;
   }
 
-  return remapObjectKeys(input, MATCHER_KEY_ALIASES);
+  return remapObjectKeys(input, MATCHER_KEY_ALIASES, (key, value) =>
+    key === "ancestor" || key === "descendant" ? normalizeMatcherInput(value) : value);
 }
 
 function normalizeActionParamsInput(input: unknown): unknown {
