@@ -1,39 +1,50 @@
-# PR-1 Implementation Prompt
+# PR-2 Implementation Prompt
 
-You are implementing `tasks/api/on-screen-logs` PR-1 only.
+You are implementing `tasks/api/on-screen-logs` PR-2 only.
 
-Goal: implement Phase 1 (Android controller and mechanism proof) and Phase 2 (raw execution contract and public documentation). The result is a generic Action Launcher-owned Clawperator feature. Keep all examples, fixtures, documentation, and implementation independent of external projects.
+Prerequisite: PR-1 merged in `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d` (PR #266), and PR-2 is explicitly requested. Verify that commit is an ancestor of your checkout. Use an isolated implementation branch/worktree if this tasking worktree is still in use; preserve unrelated task packs and user changes.
+
+Goal: complete Phase 3 (CLI Convenience) and Phase 4 (Cross-Surface Regression and Handoff), one at a time. Expose `on-screen-log set` and `on-screen-log clear` as thin wrappers around the merged raw actions, then prove the complete public interface. Do not reimplement the renderer or raw API.
 
 ## Context-Building Order
 
 1. Read `AGENTS.md`.
 2. Read `tasks/api/on-screen-logs/plan.md`.
-3. Read the execution summary, hard rules, required reading, findings format, and PR/phase table in `tasks/api/on-screen-logs/work-breakdown.md`.
-4. Confirm PR-1 contains only Phases 1-2 and PR-2 is the stop boundary.
-5. Read only Phases 1-2 and their source-of-truth files, in the specified order. Do not read later phase details except to confirm the boundary.
+3. Read the summary, status, hard rules, required reading, findings format, and PR/phase table in `tasks/api/on-screen-logs/work-breakdown.md`.
+4. Confirm PR-2 includes only Phases 3-4 and is the final PR. Read those phase sections and their directly referenced source files. Phases 1-2 are completed history, not work to repeat.
+5. Read `tasks/api/on-screen-logs/findings.md` and `docs/api/on-screen-logs.md`, distinguishing prior live proof from work you must validate now.
+6. Verify the current registry, `cli/commands/action.ts`, canonical validator, and daemon proxy against source before editing. Read the shipped controller only as needed for a directly implicated regression.
+
+## Hard Boundary
+
+Implement PR-2 only. Do not implement other task packs, named MCP tools, new Serve endpoints, screenshot-pipeline redesign, a video API, timing widgets, metadata inference, or a broader logging system. Do not start, scaffold, partially prepare, validate, or review follow-on work outside Phases 3-4. Keep all content generic to Clawperator and Action Launcher.
+
+Preserve PR-1's strict raw schema, exact Node input aliases, string-valued result fields, API-level limitations, and caller-text semantics. Use the canonical validator for defaults and colors. Set/clear must use the existing mutation path with `allowPostDispatchFallback:false`; uncertainty after dispatch must not replay a command or renew its TTL.
+
+Capture label evidence using separate awaited executions: set, screenshot, replacement set, screenshot, clear. Combined PR-1 set/screenshot/clear fixtures prove schema and a known ordering limitation, not visible-label capture. Keep that limitation documented. Use the public CLI for Phase 4 proof rather than only the debug proof Activity.
 
 ## Execution
 
-Implement the two phases one at a time. For each phase, run its validation, fix failures, update findings and only that phase's status, and commit before proceeding. Use branch-local Node tools and the debug Operator; preserve unrelated working-tree changes. Follow the parameter defaults, replacement semantics, geometry, expiry, and draw-acknowledgement contract exactly. No ticking timer or host-driven elapsed updates.
+For each phase, in order:
 
-Do not start, scaffold, partially implement, validate, or review Phase 3 or Phase 4. In particular, do not implement the CLI convenience command. Raw execution is sufficient for PR-1. Do not add temporary production ingress for the proof.
+1. Implement only that phase, including its regression tests and authored docs.
+2. Run that phase's validation with branch-local Node tools. Live proof requires the matching debug Operator, an explicit dedicated device, and enabled accessibility. Do not replace an APK on another agent's device.
+3. Fix failures; record exact results and remaining limitations in findings. Historical PR-1 test results cannot stand in for your validation. Do not mark unavailable live gates passed.
+4. Update only the current PR-2 phase's status and commit narrowly with the specified conventional message before moving to the next phase.
 
-Use `.agents/skills/docs-author/SKILL.md` and `.agents/skills/docs-build/SKILL.md` for public documentation. Verify current code before editing; documentation is not evidence that a runtime path works. Tests belong in the same phase as new behavior. If the overlay mechanism cannot meet the interaction, isolation, or capture criteria, record the evidence and stop for a design decision rather than weakening the criteria.
+Use `.agents/skills/docs-author/SKILL.md` and `.agents/skills/docs-build/SKILL.md` for public docs. Restore device settings and clear the panel after proof. Retain screenshots/videos in ignored local artifacts; do not upload them.
 
-After both phases are implemented, validated, and committed, run `$review-swarm-loop` for PR-1 only. Scope it to the changed files in these path groups:
+After both phases are validated and committed, run `$review-swarm-loop` for PR-2 only, scoped to changed durable files in these explicit path groups:
 
-- `apps/android/shared/data/operator/`
-- `apps/android/shared/data/task/`
-- `apps/android/shared/data/uitree/`
-- `apps/android/shared/app/di/`
-- `apps/android/shared/test/`
-- `apps/node/src/contracts/`
-- `apps/node/src/domain/executions/`
-- `apps/node/src/mcp/tools/core.ts` and `apps/node/src/cli/commands/serve.ts`, only if modified for raw transport support
-- `apps/node/src/test/`
+- `apps/node/src/cli/registry.ts`, `apps/node/src/cli/commands/action.ts`, `apps/node/src/cli/daemonProxy.ts`
+- `apps/node/src/domain/actions/onScreenLog.ts`
+- `apps/node/src/test/unit/onScreenLogCommand.test.ts`, `apps/node/src/test/unit/cliRegistry.test.ts`, `apps/node/src/test/unit/cliHelp.test.ts`, `apps/node/src/test/unit/cliExitCode.test.ts`, `apps/node/src/test/unit/daemon/`
 - `validation/on-screen-logs/`
-- `docs/api/` and the corresponding changed generated docs/navigation files under `sites/docs/`
+- `docs/api/on-screen-logs.md` and directly changed API caveat pages: `docs/api/actions.md`, `docs/api/snapshot.md`, `docs/api/errors.md`, `docs/api/serve.md`, `docs/api/mcp.md`
+- Generated outputs changed by the docs workflow under `sites/docs/.build/`, `sites/docs/static/llms-full.txt`, and `sites/landing/public/llms-full.txt`
 
-Resolve the actual changed paths before review. If implementing the chosen controller requires another module, record its exact path in findings and include that PR-1 path in the review scope. Never include later-PR CLI convenience work. Fix actionable findings in the main agent, validate each fix, commit each successful pass, and repeat until no material findings remain. Record findings requiring PR-2 work as out of scope instead of implementing them.
+Do not review unrelated tasking files or all of PR-1 again. If Phase 4 requires a directly implicated regression fix in an existing Android/Node source file outside that list, record the exact path and reason in findings and add only that changed file and its tests to the PR-2 review scope. A wider redesign requires a separate task.
 
-Stop after PR-1 is validated, committed, and review-clean. Report observed live results, remaining limitations, and that PR-2 waits for PR-1 merge and explicit continuation. Do not merge, push, or begin PR-2 automatically.
+Fix actionable review findings in the main agent, validate each fix pass, commit each successful pass, and repeat until no material PR-2 findings remain. Record out-of-scope findings as follow-up without implementing them.
+
+Stop after PR-2 is validated, committed, and the scoped review loop clears. Report commits, proof results, and limitations. Keep this multi-PR task pack for finalization; do not run task-cleanup, push, or merge without the active workflow's authorization.
