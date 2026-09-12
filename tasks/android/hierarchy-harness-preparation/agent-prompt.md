@@ -1,9 +1,13 @@
-# PR-1 implementation prompt
+# R12 remaining validation prompt
 
-Implement `tasks/android/hierarchy-harness-preparation` PR-1 (R12): establish deterministic Settings regression preparation. Scope includes all PR-1 phases in [work-breakdown.md](work-breakdown.md); [plan.md](plan.md) owns the behavior and source pointers.
+R12 harness implementation and debug API 36 preparation proof are complete
+locally. Read [plan.md](plan.md), [work-breakdown.md](work-breakdown.md), and the
+[harness evidence](../../../validation/sensitive-hierarchy-access/README.md#r12-local-evidence-and-remaining-gates)
+before continuing. Do not reimplement preparation or erase failed attempts.
 
-The prerequisite runtime implementations are already merged in main through `a44ad0bf`. Verify current source and use the pack's distinction between independent implementation and combined release validation. Preserve strict selection, correlation and the prohibition on replay after uncertain mutation dispatch as applicable.
-
-Complete implementation, relevant regression and live checks, in-scope repairs, docs/status updates and narrow local commits. Record specific unproven evidence or external blockers honestly; do not mark a passing retry as erasing a failed run.
-
-Stop at this pack's PR-1 boundary. Do not absorb adjacent task packs or media work. This prompt does not authorize pushing, merging or publishing a release.
+Resolve or coordinate the recorded release Settings `open_app` timeout, then
+complete release starting-state checks and the API 35 combined/manual gate with
+matching builds. Keep runtime repairs within their owning scope, preserve the
+sensitivity and Display assertions, and never replay uncertain mutations to
+obtain a passing result. Retire the pack when its remaining evidence is resolved
+or explicitly reassigned. This does not authorize pushing or publication.

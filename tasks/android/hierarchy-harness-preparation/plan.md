@@ -1,6 +1,6 @@
 # Make hierarchy regression preparation deterministic
 
-R12, follow-up to R10. Status: planned. One implementation PR.
+R12, follow-up to R10. Status: implemented locally; debug API 36 preparation verified; release/API 35 proof remains blocked. One implementation PR.
 
 ## Outcome and observed failure
 
@@ -25,3 +25,15 @@ This is harness preparation, not a reason to weaken `open_app` success or sensit
 - `validation/sensitive-hierarchy-access/README.md`: durable starting-state, allowed-mutation and failure-stage documentation.
 
 R10 is merged. Preparation can be implemented and validated independently of R11/R13. A complete integrated harness pass requires their runtime defects to be resolved; retain those failures without marking preparation itself broken when its postcondition passed. Coordinate edits to this harness with both packs. Use the docs-author skill if public authored docs change.
+
+## Implementation status (13 September 2026)
+
+The user authorized the assigned API 36 emulator in place of API 35 for this
+investigation. Bounded preparation, failure staging, CI Operator launch setup,
+regression tests and durable documentation are implemented. See the
+[validation record](../../../validation/sensitive-hierarchy-access/README.md#r12-local-evidence-and-remaining-gates).
+Debug fresh/subpage/search states reached identical verified homepage anchors.
+The full runs failed the unchanged sensitivity assertion on API 36. Release
+launches returned correlated `COMMAND_TIMEOUT`; release starting-state proof and
+the original API 35 release gate remain unproven. Keep this pack for those
+specific follow-ups; do not repeat uncertain mutations or weaken assertions.
