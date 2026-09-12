@@ -1,8 +1,8 @@
 # v0.10 runtime observability implementation order
 
-This coordinates six active runtime-observability task packs and the completed on-screen-log implementation. It replaces the former standalone observability index. It does not schedule every unrelated task in the repository or claim that implementation has shipped.
+This coordinates five active runtime-observability task packs and the completed readiness and on-screen-log implementations. It replaces the former standalone observability index. It does not schedule every unrelated task in the repository or claim that implementation has shipped.
 
-Runtime source audit: `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d`. Handoff guidance refreshed against `d12f687` after the task packs merged in `008dcb2`; this refinement does not change runtime contracts or release dependencies. On-screen logs raw API (PR #266, `120c1eb`) and CLI (PR #270, `dd66a25`) are merged. Its task pack was retired with explicit user authorization. R1 is implemented and validated locally; review and merge remain. Five other packs remain unimplemented, with seven implementation PRs remaining after R1.
+Runtime source audit: `120c1eb782bbed67e1cb1fbe7c2080fdb302ff5d`. Handoff guidance refreshed against `d12f687` after the task packs merged in `008dcb2`; this refinement does not change runtime contracts or release dependencies. On-screen logs raw API (PR #266, `120c1eb`) and CLI (PR #270, `dd66a25`) are merged. Its task pack was retired with explicit user authorization. R1 is implemented and validated in open PR #271; its single-PR task pack was retired by explicit cleanup request, and review and merge remain. Five other packs remain unimplemented, with seven implementation PRs remaining after R1.
 
 ## Folder ownership
 
@@ -18,7 +18,7 @@ The order below minimizes shared-file conflicts. Hard dependencies are explicit;
 
 | Order / ID | Implementation | Phase(s) | Hard dependency | Current state |
 | --- | --- | --- | --- | --- |
-| R1 | [Selected Operator readiness](../../node/readiness-verification/plan.md) | 1 | None | Implemented and validated locally; awaiting review/merge; [scope and evidence](../../node/readiness-verification/work-breakdown.md) |
+| R1 | [Selected Operator readiness](../../../docs/api/doctor.md) | Complete | None | [DONE] implementation validated; PR #271 awaits review/merge; pack retired; [verification and limits](../../../docs/internal/design/doctor-readiness.md) |
 | R2 | [Scaffold failure propagation](../../node/scaffold-failure-propagation/plan.md) | 1 | None | Ready; [prompt](../../node/scaffold-failure-propagation/agent-prompt.md) |
 | R3 | [On-screen logs CLI](../../../docs/api/on-screen-logs.md) | Complete | Raw API merged in `120c1eb` | [DONE] merged in `dd66a25` (PR #270); pack retired; [verification and limits](../../../docs/internal/design/on-screen-logs.md) |
 | R4 | [Selector inspection PR-1](../../api/selector-inspection/plan.md) | 1 | None beyond merged main | Ready; [prompt](../../api/selector-inspection/agent-prompt.md) |
@@ -73,7 +73,7 @@ This covers the agreed foundation and evidence gaps. It is not a promise that on
 
 ## Implementation handoff and release acceptance
 
-For a selected row, use that pack's plan for the contract and its work breakdown for scope, progress, and acceptance; consult source pointers as needed. Complete the requested PR through implementation, relevant validation, repairs, docs, status, and local commits. Dependencies define rollout order, not an approval pause within an authorized PR. Each row links a short PR-specific prompt. These are convenient entry points, not another specification: the plan owns the contract and the work breakdown owns execution scope and evidence. Pending-PR prompts retain their merge gates. An agent can also start from an instruction such as "Implement R1 from tasks/releases/v0.10/plan.md through validation and local commits." Naming the row establishes authorization; the release table alone does not authorize implementing every row. Use `.agents/skills/task-create-impl-prompt/SKILL.md` when a different handoff is needed.
+For a selected row, use that pack's plan for the contract and its work breakdown for scope, progress, and acceptance; consult source pointers as needed. Complete the requested PR through implementation, relevant validation, repairs, docs, status, and local commits. Dependencies define rollout order, not an approval pause within an authorized PR. Each row links a short PR-specific prompt. These are convenient entry points, not another specification: the plan owns the contract and the work breakdown owns execution scope and evidence. Pending-PR prompts retain their merge gates. An agent can also start from an instruction such as "Implement R2 from tasks/releases/v0.10/plan.md through validation and local commits." Naming the row establishes authorization; the release table alone does not authorize implementing every row. Use `.agents/skills/task-create-impl-prompt/SKILL.md` when a different handoff is needed.
 
 Before merging each implementation PR:
 
