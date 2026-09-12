@@ -20,7 +20,7 @@ class TaskRunnerDefault(
     ): TaskResult<T> =
         try {
             val result =
-                withContext(coroutineScopeMain.coroutineContext + TaskStatusElement(status)) {
+                withContext(coroutineScopeMain.coroutineContext.minusKey(kotlinx.coroutines.Job) + TaskStatusElement(status)) {
                     coroutineScope {
                         taskScope.block()
                     }

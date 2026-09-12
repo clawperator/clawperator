@@ -2,17 +2,15 @@
  * Scroll action result types for agent consumption.
  */
 
-/**
- * Outcome of a single `scroll` action.
- *
- * - `moved`        - gesture dispatched and content moved (leading-child signature changed)
- * - `edge_reached` - gesture dispatched but signature unchanged; container is at its limit
- * - `gesture_failed` - accessibility service rejected the gesture
- *
- * `edge_reached` is not an error. It is the expected terminal state when paginating
- * a finite list and should be treated as success in agent loops.
- */
-export type ScrollOutcome = "moved" | "edge_reached" | "gesture_failed";
+/** Observed progress only. edge_reached is reserved for instrumented platform boundaries. */
+export type ScrollOutcome = "moved" | "no_movement" | "unknown" | "container_lost" | "edge_reached" | "gesture_failed";
+
+export interface ScrollProgress {
+  beforeSignature: string | null;
+  afterSignature: string | null;
+  comparable: boolean;
+  reason: string;
+}
 
 /**
  * Reason a `scroll_until` loop terminated.
@@ -32,4 +30,5 @@ export type ScrollTerminationReason =
   | "MAX_DURATION_REACHED"
   | "NO_POSITION_CHANGE"
   | "CONTAINER_NOT_FOUND"
-  | "CONTAINER_NOT_SCROLLABLE";
+  | "CONTAINER_NOT_SCROLLABLE"
+  | "CONTAINER_LOST";

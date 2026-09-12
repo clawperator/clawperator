@@ -26,6 +26,55 @@ Define the canonical `ExecutionAction.type` values, the exact parameters each ac
 | CLI coverage is narrower than raw JSON | Some advanced fields in `ActionParams` are accepted only through `clawperator exec` JSON, not through flat CLI flags. |
 | Runtime details are not always Node guarantees | When this page calls out Android-returned success keys, treat them as current runtime behavior verified from Android code, not as a stricter Node-side schema guarantee. |
 
+## Action receipts and failure evidence
+
+An accepted click, text operation, or scroll dispatch is evidence of the Android
+attempt. It does not verify navigation, persisted state, or any application
+postcondition. Follow it with a wait, query, read, or snapshot that checks the
+specific expected state. A wait for a label already present before the click
+cannot prove navigation.
+
+With the v0.10 Operator, selector-targeted click, text, and scroll actions add
+these string-valued fields to `data`:
+
+| Field | Meaning |
+| --- | --- |
+| `target` | Serialized [NodeSummary](selectors.md) for the actual dispatch node, from that attempt's capture. Omitted when no target was resolved. |
+| `matched_target` | Originally selected NodeSummary when click fallback dispatches to an ancestor or uses a coordinate gesture. |
+| `candidate_count` | Base-10 count from the selector resolution used for dispatch. |
+| `dispatch_method` | `accessibility_action` for Android accessibility operations (including service text-input APIs), `coordinate_gesture` for a gesture, or `none` before dispatch. |
+| `dispatch_accepted` | `"true"` or `"false"`. Gesture acceptance is recorded when Android accepts dispatch, before the asynchronous completion callback. |
+| `elapsed_ms` | Base-10 elapsed milliseconds from the Android monotonic clock, including resolution and settling. |
+
+Coordinate clicks report `coordinate` as serialized JSON `{ "x": 100, "y": 200 }`
+and omit `target` and `candidate_count`. A failed pre-dispatch action reports
+`dispatch_method: "none"` and `dispatch_accepted: "false"`. Receipts do not add a
+copy of the entered text. For bounded scroll searches, the receipt describes the
+last dispatch; `scrolls_executed` counts the loop's gestures. If the target is
+already visible, no dispatch is claimed.
+
+Thrown action failures stop the sequence and retain all completed steps plus
+one failed step with its original `id` and `actionType`. Failed-step `errorCode`
+and top-level `errorCode` identify the failure; `error` preserves its message.
+Command timeout or cancellation retains collected evidence and emits one terminal
+result. Cancellation still stops execution. Existing actions that *return* a
+failed step continue to subsequent actions; Node still reports the execution as
+failed. Returned failed steps add `data.errorCode` while retaining their legacy
+`data.error` code. This sequence policy is unchanged.
+
+Missing application hierarchies include serialized `diagnostics` JSON with
+`serviceAvailable`, `rootAvailable`, `windowCount`, and `foregroundPackage`.
+Unavailable service/window metadata is `null`; a known missing root is `false`.
+These observations do not require an application root or select another window.
+Raw on-screen log actions remain usable without an application hierarchy.
+
+Migration: receipts require the matching v0.10 Operator. Parse JSON fields
+explicitly; `StepResult.data` remains a string map. Coordinate receipt consumers
+must parse the new JSON object rather than the older coordinate display string.
+Handle the new scroll outcomes below instead of assuming unchanged content is an
+edge. No mutation is replayed to obtain a receipt or recover from a failed
+post-dispatch observation.
+
 ## Retry Object Shape
 
 Several actions accept `retry`, `scrollRetry`, or `clickRetry` objects in raw `clawperator exec` JSON. Node accepts these fields as part of `ActionParams`, and Android parses them into a retry policy with these keys:
@@ -352,11 +401,30 @@ Semantics:
 - `container` scopes the scroll to a matched scrollable container
 - `distanceRatio` and `settleDelayMs` are advanced tuning fields for raw JSON execution
 - if `findFirstScrollableChild == true` and the matched container is not itself scrollable, Android walks down to the first scrollable descendant; strict mode requires that eligible descendant to be unique
-- `retry` covers container resolution and repeated UI-tree fetches during the scroll operation
+- `retry` covers pre-dispatch container resolution; an exception after dispatch does not replay the gesture
 
-Success data:
+Success and progress data:
 
-- no Node-guaranteed success keys
+- `scroll_outcome`, `direction`, `distance_ratio`, `settle_delay_ms`, and optional
+  `resolved_container` retain their existing names; dispatch receipts are described above.
+- `progress` is serialized JSON with `beforeSignature`, `afterSignature`,
+  `comparable`, and `reason`. Available signatures are bounded SHA-256 hashes;
+  raw node text is not included. Missing signatures are `null`.
+- Comparison re-resolves the same scoped container. Ambiguous or changed identity
+  is not comparable, even if the screen appears to have moved.
+
+| `scroll_outcome` | Observation | Step success |
+| --- | --- | --- |
+| `moved` | Comparable signatures changed | `true` |
+| `no_movement` | Comparable signatures are unchanged | `true` |
+| `unknown` | Missing signatures or an ambiguous/incomparable container | `true` |
+| `container_lost` | Container or hierarchy disappeared after the gesture | `false` |
+| `gesture_failed` | Gesture was rejected or did not complete successfully | `false` |
+| `edge_reached` | Reserved for explicitly instrumented platform boundary evidence; the current runtime does not emit it | n/a |
+
+An accepted gesture may later be cancelled by Android. In that case
+`dispatch_accepted` remains `"true"`, while `scroll_outcome` is `gesture_failed`.
+Neither `no_movement` nor `unknown` proves the container is at an edge.
 
 Common failures:
 
@@ -403,8 +471,8 @@ Semantics:
 - the flat CLI exposes only the core controls; advanced tuning requires raw JSON via `clawperator exec`
 - Android defaults omitted `direction` to `down`, `distanceRatio` to `0.7`, `settleDelayMs` to `250`, `maxScrolls` to `20`, `maxDurationMs` to `10000`, `noPositionChangeThreshold` to `3`, and `findFirstScrollableChild` to `true`
 - `maxScrolls` is the hard cap on how many scroll steps Android will attempt
-- `maxDurationMs` is the wall-clock cap for the full loop
-- `noPositionChangeThreshold` stops the loop after that many consecutive non-moving scrolls
+- `maxDurationMs` is checked against monotonic elapsed time before each gesture; the current gesture and bounded settle/target checks may finish after that threshold, while the command timeout cancels execution
+- `noPositionChangeThreshold` stops the loop after that many consecutive `no_movement`, `unknown`, or rejected gestures; container loss terminates with `CONTAINER_LOST`
 
 Success data:
 
@@ -454,7 +522,7 @@ Semantics:
 - this is the canonical action type produced by `scroll-until --click` and `scroll-and-click`
 - unlike raw `scroll_until`, this action is optimized for “scroll to target, then click target”
 - `maxSwipes` is the safety cap on how many swipes Android performs before failing
-- `scrollRetry` applies to scrolling and view refresh between swipes
+- scroll and view refresh remain bounded by `maxSwipes`; mutations are not replayed after a post-dispatch failure
 - `clickRetry` applies only to the final click after the target is visible
 - setting `clickAfter: false` is accepted in raw `exec` JSON and makes Android stop after revealing the target, but the flat CLI does not emit that variant for `scroll_and_click`
 

@@ -128,6 +128,16 @@ class NodeResolver(
         return encoded
     }
 
+    fun encodeNode(node: UiNode): String? {
+        val candidate = resolve(null, "all").firstOrNull {
+            it.node === node || (node.accessibilityNodeInfo != null && it.node.accessibilityNodeInfo == node.accessibilityNodeInfo)
+                || (node.sourcePath != null && it.nodePath == node.sourcePath)
+        } ?: return null
+        return queryJson.parseToJsonElement(encodeMatches(listOf(candidate))).let {
+            (it as kotlinx.serialization.json.JsonObject)["nodes"] as kotlinx.serialization.json.JsonArray
+        }.first().toString()
+    }
+
     private fun UiNode.asTaskUiNode() =
         TaskUiNode(
             resourceId = resourceId,

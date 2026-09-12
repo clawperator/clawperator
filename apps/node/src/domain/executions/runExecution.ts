@@ -247,7 +247,10 @@ export function injectServiceUnavailableHint(envelope: ResultEnvelope, deviceId:
  * Does not alter Android-only failure envelopes that have no steps (e.g. service unavailable).
  */
 export function reconcileEnvelopeStatusAfterPostProcessing(envelope: ResultEnvelope): void {
-  if (envelope.stepResults.length === 0) {
+  // A typed runtime terminal failure is authoritative even if cancellation occurred
+  // between steps. Host post-processing must not erase its code, message, or verdict.
+  if (envelope.stepResults.length === 0 ||
+      (envelope.status === "failed" && typeof envelope.errorCode === "string" && envelope.errorCode.length > 0)) {
     return;
   }
   const firstFailed = envelope.stepResults.find(s => !s.success);
@@ -256,10 +259,10 @@ export function reconcileEnvelopeStatusAfterPostProcessing(envelope: ResultEnvel
     const errKey = firstFailed.data?.error;
     const detail = errKey !== undefined && errKey !== "" ? `: ${errKey}` : "";
     envelope.error = `Step ${firstFailed.id} (${firstFailed.actionType}) failed${detail}`;
-    if (
-      typeof errKey === "string" &&
-      ON_SCREEN_LOG_RUNTIME_ERROR_CODES.has(errKey)
-    ) {
+    const stepCode = firstFailed.data?.errorCode;
+    if (typeof stepCode === "string" && stepCode.length > 0) {
+      envelope.errorCode = stepCode;
+    } else if (typeof errKey === "string" && ON_SCREEN_LOG_RUNTIME_ERROR_CODES.has(errKey)) {
       envelope.errorCode = errKey;
     }
     delete envelope.hint;

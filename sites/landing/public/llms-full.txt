@@ -1466,7 +1466,7 @@ Branch in this order:
 
 1. If the CLI returned a top-level object with `code` and no `envelope`, treat it as a host-side failure. Do not retry unchanged.
 2. If `envelope.status == "failed"` and `envelope.errorCode` is present, branch on `envelope.errorCode`.
-3. If `envelope.status == "failed"` and `envelope.stepResults` contains a failed step, branch on the first `stepResults[i].success == false` and inspect `stepResults[i].data.error`.
+3. If `envelope.status == "failed"` and `envelope.stepResults` contains a failed step, branch on the first `stepResults[i].success == false` and inspect `stepResults[i].data.errorCode`, falling back to the legacy `data.error` code.
 4. If `envelope.status == "success"` and every `stepResults[i].success == true`, treat the command as successful.
 5. If the top-level object is `{ ok: true, validated: true, ... }` or `{ ok: true, dryRun: true, ... }`, treat it as a pre-dispatch contract success, not a device execution result.
 
@@ -1481,10 +1481,13 @@ Exact machine-checkable success condition for most CLI device commands:
 
 ## How `status` and `stepResults` Relate
 
-- If any `stepResults[].success` is `false`, Node reconciles `status` to `"failed"` and sets `error` from the first failed step.
-- If all steps succeed, Node reconciles `status` to `"success"`, clears top-level error state, and removes `hint`.
+- A typed runtime terminal failure is authoritative. Node preserves its status, error code, original message, and collected steps, including a timeout between steps.
+- Otherwise, if any `stepResults[].success` is `false`, Node reconciles `status` to `"failed"` and sets `error` from the first failed step.
+- Otherwise, if all steps succeed, Node reconciles `status` to `"success"`, clears top-level error state, and removes `hint`.
+- Thrown failures stop the sequence and retain prior steps plus the failed step. Returned failed steps preserve the existing continue-sequence policy.
+- [Action receipts](actions.md#action-receipts-and-failure-evidence) report dispatch acceptance. Verify application postconditions with separate observations.
 - A top-level failure can also arrive with zero steps, for example when Android returns a failure envelope before a normal step list exists, such as `SERVICE_UNAVAILABLE`.
-- Execution timeout is different: `runExecution()` returns a top-level host-side error object such as `RESULT_ENVELOPE_TIMEOUT`, not a zero-step success-wrapper envelope.
+- Android command timeout returns a failed envelope with `COMMAND_TIMEOUT` and collected steps. If Node cannot obtain that terminal envelope, the host may instead return `RESULT_ENVELOPE_TIMEOUT`; that transport uncertainty does not prove whether a mutation occurred.
 - Node may modify step data after the runtime returns. Examples:
   - `snapshot` success steps get `data.text` attached from extracted log output
   - missing snapshot text is converted into `SNAPSHOT_EXTRACTION_FAILED`
@@ -1580,6 +1583,55 @@ Define the canonical `ExecutionAction.type` values, the exact parameters each ac
 | `StepResult.data` is a string map | Node may attach known keys such as `text`, `path`, `warn`, `application_id`, `error`, or `message`, but most actions do not have a richer static success schema. |
 | CLI coverage is narrower than raw JSON | Some advanced fields in `ActionParams` are accepted only through `clawperator exec` JSON, not through flat CLI flags. |
 | Runtime details are not always Node guarantees | When this page calls out Android-returned success keys, treat them as current runtime behavior verified from Android code, not as a stricter Node-side schema guarantee. |
+
+## Action receipts and failure evidence
+
+An accepted click, text operation, or scroll dispatch is evidence of the Android
+attempt. It does not verify navigation, persisted state, or any application
+postcondition. Follow it with a wait, query, read, or snapshot that checks the
+specific expected state. A wait for a label already present before the click
+cannot prove navigation.
+
+With the v0.10 Operator, selector-targeted click, text, and scroll actions add
+these string-valued fields to `data`:
+
+| Field | Meaning |
+| --- | --- |
+| `target` | Serialized [NodeSummary](selectors.md) for the actual dispatch node, from that attempt's capture. Omitted when no target was resolved. |
+| `matched_target` | Originally selected NodeSummary when click fallback dispatches to an ancestor or uses a coordinate gesture. |
+| `candidate_count` | Base-10 count from the selector resolution used for dispatch. |
+| `dispatch_method` | `accessibility_action` for Android accessibility operations (including service text-input APIs), `coordinate_gesture` for a gesture, or `none` before dispatch. |
+| `dispatch_accepted` | `"true"` or `"false"`. Gesture acceptance is recorded when Android accepts dispatch, before the asynchronous completion callback. |
+| `elapsed_ms` | Base-10 elapsed milliseconds from the Android monotonic clock, including resolution and settling. |
+
+Coordinate clicks report `coordinate` as serialized JSON `{ "x": 100, "y": 200 }`
+and omit `target` and `candidate_count`. A failed pre-dispatch action reports
+`dispatch_method: "none"` and `dispatch_accepted: "false"`. Receipts do not add a
+copy of the entered text. For bounded scroll searches, the receipt describes the
+last dispatch; `scrolls_executed` counts the loop's gestures. If the target is
+already visible, no dispatch is claimed.
+
+Thrown action failures stop the sequence and retain all completed steps plus
+one failed step with its original `id` and `actionType`. Failed-step `errorCode`
+and top-level `errorCode` identify the failure; `error` preserves its message.
+Command timeout or cancellation retains collected evidence and emits one terminal
+result. Cancellation still stops execution. Existing actions that *return* a
+failed step continue to subsequent actions; Node still reports the execution as
+failed. Returned failed steps add `data.errorCode` while retaining their legacy
+`data.error` code. This sequence policy is unchanged.
+
+Missing application hierarchies include serialized `diagnostics` JSON with
+`serviceAvailable`, `rootAvailable`, `windowCount`, and `foregroundPackage`.
+Unavailable service/window metadata is `null`; a known missing root is `false`.
+These observations do not require an application root or select another window.
+Raw on-screen log actions remain usable without an application hierarchy.
+
+Migration: receipts require the matching v0.10 Operator. Parse JSON fields
+explicitly; `StepResult.data` remains a string map. Coordinate receipt consumers
+must parse the new JSON object rather than the older coordinate display string.
+Handle the new scroll outcomes below instead of assuming unchanged content is an
+edge. No mutation is replayed to obtain a receipt or recover from a failed
+post-dispatch observation.
 
 ## Retry Object Shape
 
@@ -1907,11 +1959,30 @@ Semantics:
 - `container` scopes the scroll to a matched scrollable container
 - `distanceRatio` and `settleDelayMs` are advanced tuning fields for raw JSON execution
 - if `findFirstScrollableChild == true` and the matched container is not itself scrollable, Android walks down to the first scrollable descendant; strict mode requires that eligible descendant to be unique
-- `retry` covers container resolution and repeated UI-tree fetches during the scroll operation
+- `retry` covers pre-dispatch container resolution; an exception after dispatch does not replay the gesture
 
-Success data:
+Success and progress data:
 
-- no Node-guaranteed success keys
+- `scroll_outcome`, `direction`, `distance_ratio`, `settle_delay_ms`, and optional
+  `resolved_container` retain their existing names; dispatch receipts are described above.
+- `progress` is serialized JSON with `beforeSignature`, `afterSignature`,
+  `comparable`, and `reason`. Available signatures are bounded SHA-256 hashes;
+  raw node text is not included. Missing signatures are `null`.
+- Comparison re-resolves the same scoped container. Ambiguous or changed identity
+  is not comparable, even if the screen appears to have moved.
+
+| `scroll_outcome` | Observation | Step success |
+| --- | --- | --- |
+| `moved` | Comparable signatures changed | `true` |
+| `no_movement` | Comparable signatures are unchanged | `true` |
+| `unknown` | Missing signatures or an ambiguous/incomparable container | `true` |
+| `container_lost` | Container or hierarchy disappeared after the gesture | `false` |
+| `gesture_failed` | Gesture was rejected or did not complete successfully | `false` |
+| `edge_reached` | Reserved for explicitly instrumented platform boundary evidence; the current runtime does not emit it | n/a |
+
+An accepted gesture may later be cancelled by Android. In that case
+`dispatch_accepted` remains `"true"`, while `scroll_outcome` is `gesture_failed`.
+Neither `no_movement` nor `unknown` proves the container is at an edge.
 
 Common failures:
 
@@ -1958,8 +2029,8 @@ Semantics:
 - the flat CLI exposes only the core controls; advanced tuning requires raw JSON via `clawperator exec`
 - Android defaults omitted `direction` to `down`, `distanceRatio` to `0.7`, `settleDelayMs` to `250`, `maxScrolls` to `20`, `maxDurationMs` to `10000`, `noPositionChangeThreshold` to `3`, and `findFirstScrollableChild` to `true`
 - `maxScrolls` is the hard cap on how many scroll steps Android will attempt
-- `maxDurationMs` is the wall-clock cap for the full loop
-- `noPositionChangeThreshold` stops the loop after that many consecutive non-moving scrolls
+- `maxDurationMs` is checked against monotonic elapsed time before each gesture; the current gesture and bounded settle/target checks may finish after that threshold, while the command timeout cancels execution
+- `noPositionChangeThreshold` stops the loop after that many consecutive `no_movement`, `unknown`, or rejected gestures; container loss terminates with `CONTAINER_LOST`
 
 Success data:
 
@@ -2009,7 +2080,7 @@ Semantics:
 - this is the canonical action type produced by `scroll-until --click` and `scroll-and-click`
 - unlike raw `scroll_until`, this action is optimized for “scroll to target, then click target”
 - `maxSwipes` is the safety cap on how many swipes Android performs before failing
-- `scrollRetry` applies to scrolling and view refresh between swipes
+- scroll and view refresh remain bounded by `maxSwipes`; mutations are not replayed after a post-dispatch failure
 - `clickRetry` applies only to the final click after the target is visible
 - setting `clickAfter: false` is accepted in raw `exec` JSON and makes Android stop after revealing the target, but the flat CLI does not emit that variant for `scroll_and_click`
 
@@ -5934,6 +6005,29 @@ failures.
 - Execution validation: `apps/node/src/domain/executions/validateExecution.ts`
 - CLI formatting: `apps/node/src/cli/output.ts`
 
+## Runtime action diagnostics
+
+Prefer top-level `errorCode`, then failed-step `data.errorCode`. For older or
+returned-step failures, `data.error` can still contain the code. Thrown failures
+preserve the original message in `data.error` and top-level `error`, the failed
+step identity, and preceding steps.
+
+| Code | Meaning |
+| --- | --- |
+| `UI_TREE_UNAVAILABLE` | An action could not obtain an application hierarchy; inspect `data.diagnostics` for root-independent service/window facts. |
+| `SNAPSHOT_HIERARCHY_UNAVAILABLE` | Snapshot hierarchy capture failed; retains this more specific existing snapshot code and adds diagnostics. |
+| `WAIT_TIMEOUT` | The node wait's own time budget expired. |
+| `ACTION_FAILED` | An otherwise unclassified action exception; the original message is retained. |
+| `COMMAND_TIMEOUT` | Android's command budget expired, including queue wait. Collected steps are retained. |
+| `COMMAND_CANCELLED` | Execution was cancelled; collected steps are retained and cancellation propagates. |
+| `CONTAINER_LOST` | The original scroll container disappeared or could no longer be identified during a bounded search. |
+
+Existing selector, gesture, and `ON_SCREEN_LOG_*` codes remain available. A
+failed returned step still permits subsequent steps to execute; a thrown failure
+stops the sequence. [Action receipts](actions.md#action-receipts-and-failure-evidence)
+describe dispatch evidence, not a verified application outcome. Do not replay an
+uncertain mutation automatically.
+
 ## Two Failure Shapes
 
 Clawperator surfaces failures in two main shapes.
@@ -6022,7 +6116,13 @@ Only the codes defined in `apps/node/src/contracts/errors.ts` are part of the pu
 
 | Code | Derived label | Notes |
 | --- | --- | --- |
-| <a id="error-ui-tree-unavailable"></a>`UI_TREE_UNAVAILABLE` | Ui tree unavailable | query_ui could not capture an accessibility hierarchy. See failed-step diagnostics. |
+| <a id="error-ui-tree-unavailable"></a>`UI_TREE_UNAVAILABLE` | Ui tree unavailable | An action could not capture an application hierarchy. See failed-step diagnostics. |
+| <a id="error-snapshot-hierarchy-unavailable"></a>`SNAPSHOT_HIERARCHY_UNAVAILABLE` | Snapshot hierarchy unavailable | - |
+| <a id="error-wait-timeout"></a>`WAIT_TIMEOUT` | Wait timeout | - |
+| <a id="error-action-failed"></a>`ACTION_FAILED` | Action failed | - |
+| <a id="error-command-timeout"></a>`COMMAND_TIMEOUT` | Command timeout | - |
+| <a id="error-command-cancelled"></a>`COMMAND_CANCELLED` | Command cancelled | - |
+| <a id="error-container-lost"></a>`CONTAINER_LOST` | Container lost | - |
 | <a id="error-host-dependency-missing"></a>`HOST_DEPENDENCY_MISSING` | Host dependency missing | Host |
 | <a id="error-adb-not-found"></a>`ADB_NOT_FOUND` | Adb not found | Setup & Connectivity |
 | <a id="error-no-devices"></a>`NO_DEVICES` | No devices | - |

@@ -30,6 +30,14 @@ class UiTreeManagerAndroid(
     private val inputConnectionSource: TextInputConnectionSource =
         accessibilityServiceManager as? TextInputConnectionSource ?: NoOpTextInputConnectionSource
 
+    private suspend fun dispatch(target: Any?, method: String, action: suspend () -> Boolean): Boolean {
+        observeDispatch(target, method, false)
+        return action().also {
+            // Gesture acceptance is observed at dispatchGesture, before its asynchronous callback.
+            if (method != "coordinate_gesture") observeDispatch(target, method, it)
+        }
+    }
+
     override suspend fun triggerClick(
         uiNode: UiNode,
         clickTypes: UiTreeClickTypes,
@@ -67,8 +75,8 @@ class UiTreeManagerAndroid(
         for (clickType in clickTypes.ordered) {
             val success =
                 when (clickType) {
-                    UiTreeClickType.Click -> service.dispatchSingleTap(x, y)
-                    UiTreeClickType.LongClick -> service.dispatchLongPress(x, y)
+                    UiTreeClickType.Click -> dispatch(null, "coordinate_gesture") { service.dispatchSingleTap(x, y) }
+                    UiTreeClickType.LongClick -> dispatch(null, "coordinate_gesture") { service.dispatchLongPress(x, y) }
                     UiTreeClickType.Focus -> {
                         Log.w("[UiTreeManager] Focus click type is not supported for raw coordinates at ($x,$y)")
                         false
@@ -139,7 +147,7 @@ class UiTreeManagerAndroid(
         val startY = bounds.top + (bounds.height() * startYRatio)
         val endY = bounds.top + (bounds.height() * endYRatio)
 
-        return service.dispatchSwipe(centerX, startY, centerX, endY, durationMs)
+        return dispatch(accessibilityNodeInfo, "coordinate_gesture") { service.dispatchSwipe(centerX, startY, centerX, endY, durationMs) }
     }
 
     override suspend fun swipeWithinHorizontal(
@@ -159,7 +167,7 @@ class UiTreeManagerAndroid(
         val startX = bounds.left + (bounds.width() * startXRatio)
         val endX = bounds.left + (bounds.width() * endXRatio)
 
-        return service.dispatchSwipe(startX, centerY, endX, centerY, durationMs)
+        return dispatch(accessibilityNodeInfo, "coordinate_gesture") { service.dispatchSwipe(startX, centerY, endX, centerY, durationMs) }
     }
 
     // --- Click type implementations ---
@@ -174,7 +182,7 @@ class UiTreeManagerAndroid(
     ): Boolean {
         // 1) Try ACTION_CLICK on clickable ancestor
         accessibilityNodeInfo.firstClickableAncestorOrSelf()?.let { clickable ->
-            if (clickable.isEnabled && clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+            if (clickable.isEnabled && dispatch(clickable, "accessibility_action") { clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK) }) {
                 Log.d("[UiTreeManager] Clicked via ACTION_CLICK on ${clickable.debugNode()} for id=${uiNode.id}")
                 return true
             }
@@ -185,7 +193,7 @@ class UiTreeManagerAndroid(
         if (!bounds.isEmpty) {
             val cx = bounds.exactCenterX()
             val cy = bounds.exactCenterY()
-            val ok = service.dispatchSingleTap(cx, cy)
+            val ok = dispatch(accessibilityNodeInfo, "coordinate_gesture") { service.dispatchSingleTap(cx, cy) }
             Log.d("[UiTreeManager] Clicked via gesture at ($cx,$cy) for id=${uiNode.id} -> $ok")
             return ok
         }
@@ -203,7 +211,7 @@ class UiTreeManagerAndroid(
     ): Boolean {
         // 1) Try ACTION_LONG_CLICK on clickable ancestor
         accessibilityNodeInfo.firstClickableAncestorOrSelf()?.let { clickable ->
-            if (clickable.isEnabled && clickable.performAction(AccessibilityNodeInfo.ACTION_LONG_CLICK)) {
+            if (clickable.isEnabled && dispatch(clickable, "accessibility_action") { clickable.performAction(AccessibilityNodeInfo.ACTION_LONG_CLICK) }) {
                 Log.d("[UiTreeManager] Long-clicked via ACTION_LONG_CLICK on ${clickable.debugNode()} for id=${uiNode.id}")
                 return true
             }
@@ -214,7 +222,7 @@ class UiTreeManagerAndroid(
         if (!bounds.isEmpty) {
             val cx = bounds.exactCenterX()
             val cy = bounds.exactCenterY()
-            val ok = service.dispatchLongPress(cx, cy)
+            val ok = dispatch(accessibilityNodeInfo, "coordinate_gesture") { service.dispatchLongPress(cx, cy) }
             Log.d("[UiTreeManager] Long-clicked via gesture at ($cx,$cy) for id=${uiNode.id} -> $ok")
             return ok
         }
@@ -232,13 +240,13 @@ class UiTreeManagerAndroid(
         val target = accessibilityNodeInfo.firstFocusableAncestorOrSelf() ?: accessibilityNodeInfo
 
         // Try ACTION_FOCUS first
-        if (target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)) {
+        if (dispatch(target, "accessibility_action") { target.performAction(AccessibilityNodeInfo.ACTION_FOCUS) }) {
             Log.d("[UiTreeManager] Focused via ACTION_FOCUS on ${target.debugNode()} for id=${uiNode.id}")
             return true
         }
 
         // Try ACTION_SELECT as fallback
-        if (target.performAction(AccessibilityNodeInfo.ACTION_SELECT)) {
+        if (dispatch(target, "accessibility_action") { target.performAction(AccessibilityNodeInfo.ACTION_SELECT) }) {
             Log.d("[UiTreeManager] Selected via ACTION_SELECT on ${target.debugNode()} for id=${uiNode.id}")
             return true
         }
@@ -299,8 +307,10 @@ class UiTreeManagerAndroid(
 
             // Best-effort focus before setting text.
             if (!target.isFocused) {
-                target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-                target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                observeDispatch(target, "accessibility_action", false)
+                observeDispatch(target, "accessibility_action", target.performAction(AccessibilityNodeInfo.ACTION_FOCUS))
+                observeDispatch(target, "accessibility_action", false)
+                observeDispatch(target, "accessibility_action", target.performAction(AccessibilityNodeInfo.ACTION_CLICK))
             }
 
             // Clear via ACTION_SET_TEXT with an empty CharSequence so clear=true fails
@@ -310,6 +320,7 @@ class UiTreeManagerAndroid(
                     Bundle().apply {
                         putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
                     }
+                observeDispatch(target, "accessibility_action", false)
                 val clearSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, clearArgs)
                 if (!clearSucceeded) {
                     Log.d(
@@ -324,7 +335,9 @@ class UiTreeManagerAndroid(
                     putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, request.text)
                 }
 
+            observeDispatch(target, "accessibility_action", false)
             val setTextSucceeded = target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+            observeDispatch(target, "accessibility_action", setTextSucceeded)
             if (!setTextSucceeded) {
                 Log.d(
                     "[UiTreeManager] enter_text strategy=$name set_text_failed for id=${request.uiNode.id} on ${target.debugNodeRedacted()}",
@@ -378,8 +391,10 @@ class UiTreeManagerAndroid(
             val target = request.target
 
             if (!target.isFocused) {
-                target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-                target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                observeDispatch(target, "accessibility_action", false)
+                observeDispatch(target, "accessibility_action", target.performAction(AccessibilityNodeInfo.ACTION_FOCUS))
+                observeDispatch(target, "accessibility_action", false)
+                observeDispatch(target, "accessibility_action", target.performAction(AccessibilityNodeInfo.ACTION_CLICK))
                 // InputMethod session ownership updates asynchronously after focus changes.
                 // Stop here and let the existing UiReadiness retry rerun once the editor session
                 // catches up instead of mutating a stale or not-yet-started connection.
@@ -398,8 +413,9 @@ class UiTreeManagerAndroid(
                 return null
             }
 
+            observeDispatch(target, "accessibility_action", false)
             when (val replaceResult = replaceText(session, request)) {
-                ReplaceTextResult.Success -> Unit
+                ReplaceTextResult.Success -> observeDispatch(target, "accessibility_action", true)
                 is ReplaceTextResult.Unavailable -> {
                     if (replaceResult.partialFailure) {
                         logPartialFailure(request, replaceResult.reason)

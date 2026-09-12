@@ -58,7 +58,7 @@ class TaskRunnerManagerDefault(
                 val startTime = currentTime
 
                 val ctx =
-                    coroutineScopeMain.coroutineContext +
+                    coroutineScopeMain.coroutineContext.minusKey(kotlinx.coroutines.Job) +
                         ReentrancyElement(this)
 
                 val result =

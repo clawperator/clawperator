@@ -44,35 +44,42 @@ class UiActionEngineDefault(
         plan: UiActionPlan,
     ): UiActionExecutionResult =
         withContext(TaskStatusElement(currentTaskStatus(), plan.commandId)) {
-            val stepResults = mutableListOf<UiActionStepResult>()
+            val stepResults = kotlin.coroutines.coroutineContext[ActionExecutionJournal]?.steps
+                ?: mutableListOf<UiActionStepResult>()
 
             for (action in plan.actions) {
+                val warnings = SelectionWarnings()
+                val receipt = ActionReceipt()
+                val recordsDispatch = action is UiAction.Click || action is UiAction.EnterText ||
+                    action is UiAction.Scroll || action is UiAction.ScrollUntil || action is UiAction.ScrollAndClick
+                fun evidence() = warnings.stepData() + if (recordsDispatch) receipt.stepData() else emptyMap()
                 val stepResult = try {
-                    val warnings = SelectionWarnings()
-                    val result = withContext(warnings) { executeSingle(taskScope, action) }
-                    result.copy(data = result.data + warnings.stepData())
-                } catch (error: StrictSelectionException) {
-                    val type = when (action) {
-                        is UiAction.Click -> "click"
-                        is UiAction.EnterText -> "enter_text"
-                        is UiAction.ReadText -> "read_text"
-                        is UiAction.WaitForNode -> "wait_for_node"
-                        is UiAction.Scroll -> "scroll"
-                        is UiAction.ScrollUntil -> "scroll_until"
-                        is UiAction.ScrollAndClick -> "scroll_and_click"
-                        else -> error("Unexpected strict action")
+                    val result = withContext(warnings + receipt + receipt.observation) { executeSingle(taskScope, action) }
+                    val failureCode = if (!result.success && !result.data.containsKey("errorCode")) {
+                        // Returned failures already use data.error as a machine-readable code.
+                        mapOf("errorCode" to (result.data["error"] ?: "ACTION_FAILED"))
+                    } else {
+                        emptyMap()
                     }
-                    stepResults += UiActionStepResult(action.id, type, success = false, data = error.stepData())
-                    return@withContext UiActionExecutionResult(plan.commandId, plan.taskId, stepResults, error.code, error.message)
-                } catch (error: QueryHierarchyUnavailableException) {
-                    stepResults += UiActionStepResult(action.id, "query_ui", success = false, data = error.stepData())
-                    return@withContext UiActionExecutionResult(
-                        commandId = plan.commandId,
-                        taskId = plan.taskId,
-                        stepResults = stepResults,
-                        errorCode = "UI_TREE_UNAVAILABLE",
-                        error = error.message,
-                    )
+                    result.copy(data = result.data + failureCode + evidence())
+                } catch (error: Exception) {
+                    val code = when (error) {
+                        is StrictSelectionException -> error.code
+                        is QueryHierarchyUnavailableException -> error.code
+                        is UiActionFailure -> error.code
+                        is kotlinx.coroutines.TimeoutCancellationException -> "COMMAND_TIMEOUT"
+                        is kotlinx.coroutines.CancellationException -> "COMMAND_CANCELLED"
+                        else -> "ACTION_FAILED"
+                    }
+                    val details = when (error) {
+                        is StrictSelectionException -> error.stepData()
+                        is QueryHierarchyUnavailableException -> error.stepData()
+                        else -> emptyMap()
+                    }
+                    stepResults += UiActionStepResult(action.id, action.wireType(), success = false,
+                        data = evidence() + details + mapOf("errorCode" to code, "error" to error.message.orEmpty()))
+                    if (error is kotlinx.coroutines.CancellationException) throw error
+                    return@withContext UiActionExecutionResult(plan.commandId, plan.taskId, stepResults.toList(), code, error.message)
                 }
                 stepResults += stepResult
             }
@@ -373,43 +380,29 @@ class UiActionEngineDefault(
                 put("distance_ratio", action.distanceRatio.toString())
                 put("settle_delay_ms", action.settleDelayMs.toString())
                 result.resolvedContainerId?.let { put("resolved_container", it) }
+                result.progress?.let { put("progress", it) }
             }
             when (result.outcome) {
-                TaskScrollOutcome.Moved, TaskScrollOutcome.EdgeReached ->
+                TaskScrollOutcome.Moved, TaskScrollOutcome.EdgeReached, TaskScrollOutcome.NoMovement, TaskScrollOutcome.Unknown ->
                     UiActionStepResult(
                         id = action.id,
                         actionType = "scroll",
                         success = true,
                         data = baseData,
                     )
-                TaskScrollOutcome.GestureFailed ->
+                TaskScrollOutcome.GestureFailed, TaskScrollOutcome.ContainerLost ->
                     UiActionStepResult(
                         id = action.id,
                         actionType = "scroll",
                         success = false,
-                        data = baseData + mapOf("error" to "GESTURE_FAILED"),
+                        data = baseData + mapOf("error" to if (result.outcome == TaskScrollOutcome.ContainerLost) "CONTAINER_LOST" else "GESTURE_FAILED"),
                     )
             }
-        } catch (e: IllegalStateException) {
-            if (e is StrictSelectionException) throw e
-            val message = e.message ?: ""
-            val errorCode =
-                when {
-                    message.contains("Scrollable container not found") -> "CONTAINER_NOT_SCROLLABLE"
-                    else -> "CONTAINER_NOT_FOUND"
-                }
-            Log.w("$TAG executeScroll: $errorCode - ${e.message}")
-            UiActionStepResult(
-                id = action.id,
-                actionType = "scroll",
-                success = false,
-                data =
-                    mapOf(
-                        "error" to errorCode,
-                        "direction" to action.direction.name.lowercase(),
-                        "settle_delay_ms" to action.settleDelayMs.toString(),
-                    ),
-            )
+        } catch (e: UiActionFailure) {
+            if (e.code !in setOf("CONTAINER_NOT_FOUND", "CONTAINER_NOT_SCROLLABLE")) throw e
+            UiActionStepResult(action.id, "scroll", success = false,
+                data = mapOf("error" to e.code, "errorCode" to e.code, "message" to e.message.orEmpty(),
+                    "direction" to action.direction.name.lowercase(), "settle_delay_ms" to action.settleDelayMs.toString()))
         }
     }
 
@@ -644,7 +637,11 @@ class UiActionEngineDefault(
                 )
             }
         } catch (e: IllegalStateException) {
-            if (e is StrictSelectionException) throw e
+            if (e is UiActionFailure && action.container != null && e.code in setOf("CONTAINER_NOT_FOUND", "NODE_NOT_FOUND")) {
+                return UiActionStepResult(action.id, "read_text", success = false,
+                    data = mapOf("error" to e.code, "errorCode" to e.code, "message" to e.message.orEmpty()))
+            }
+            if (e is StrictSelectionException || e is UiActionFailure || e is QueryHierarchyUnavailableException) throw e
             val msg = e.message ?: ""
             // All validators should return VALIDATOR_MISMATCH on validation failure.
             // NOTE: This extraction depends on the exact message format from getValidatedText.
@@ -1009,6 +1006,9 @@ private fun UiTreeClickTypes.toWireValue(): String =
 private fun TaskScrollOutcome.toWireValue(): String =
     when (this) {
         TaskScrollOutcome.Moved -> "moved"
+        TaskScrollOutcome.NoMovement -> "no_movement"
+        TaskScrollOutcome.Unknown -> "unknown"
+        TaskScrollOutcome.ContainerLost -> "container_lost"
         TaskScrollOutcome.EdgeReached -> "edge_reached"
         TaskScrollOutcome.GestureFailed -> "gesture_failed"
     }
@@ -1024,3 +1024,29 @@ private fun TaskScrollTerminationReason.toWireValue(): String =
         TaskScrollTerminationReason.ContainerNotScrollable -> "CONTAINER_NOT_SCROLLABLE"
         TaskScrollTerminationReason.ContainerLost -> "CONTAINER_LOST"
     }
+
+/** Canonical names also cover failures before an action returns its normal result. */
+private fun UiAction.wireType(): String = when (this) {
+    is UiAction.OpenUri -> "open_uri"
+    is UiAction.OpenApp -> "open_app"
+    is UiAction.CloseApp -> "close_app"
+    is UiAction.WaitForNode -> "wait_for_node"
+    is UiAction.Click -> "click"
+    is UiAction.ScrollAndClick -> "scroll_and_click"
+    is UiAction.Scroll -> "scroll"
+    is UiAction.ScrollUntil -> "scroll_until"
+    is UiAction.ReadText -> "read_text"
+    is UiAction.QueryUi -> "query_ui"
+    is UiAction.SnapshotUi -> "snapshot_ui"
+    is UiAction.SetOnScreenLog -> "set_on_screen_log"
+    is UiAction.ClearOnScreenLog -> "clear_on_screen_log"
+    is UiAction.StartRecording -> "start_recording"
+    is UiAction.StopRecording -> "stop_recording"
+    is UiAction.TakeScreenshot -> "take_screenshot"
+    is UiAction.EnterText -> "enter_text"
+    is UiAction.Sleep -> "sleep"
+    is UiAction.DoctorPing -> "doctor_ping"
+    is UiAction.PressKey -> "press_key"
+    is UiAction.WaitForNavigation -> "wait_for_navigation"
+    is UiAction.ReadKeyValuePair -> "read_key_value_pair"
+}

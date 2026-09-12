@@ -14,6 +14,29 @@ failures.
 - Execution validation: `apps/node/src/domain/executions/validateExecution.ts`
 - CLI formatting: `apps/node/src/cli/output.ts`
 
+## Runtime action diagnostics
+
+Prefer top-level `errorCode`, then failed-step `data.errorCode`. For older or
+returned-step failures, `data.error` can still contain the code. Thrown failures
+preserve the original message in `data.error` and top-level `error`, the failed
+step identity, and preceding steps.
+
+| Code | Meaning |
+| --- | --- |
+| `UI_TREE_UNAVAILABLE` | An action could not obtain an application hierarchy; inspect `data.diagnostics` for root-independent service/window facts. |
+| `SNAPSHOT_HIERARCHY_UNAVAILABLE` | Snapshot hierarchy capture failed; retains this more specific existing snapshot code and adds diagnostics. |
+| `WAIT_TIMEOUT` | The node wait's own time budget expired. |
+| `ACTION_FAILED` | An otherwise unclassified action exception; the original message is retained. |
+| `COMMAND_TIMEOUT` | Android's command budget expired, including queue wait. Collected steps are retained. |
+| `COMMAND_CANCELLED` | Execution was cancelled; collected steps are retained and cancellation propagates. |
+| `CONTAINER_LOST` | The original scroll container disappeared or could no longer be identified during a bounded search. |
+
+Existing selector, gesture, and `ON_SCREEN_LOG_*` codes remain available. A
+failed returned step still permits subsequent steps to execute; a thrown failure
+stops the sequence. [Action receipts](actions.md#action-receipts-and-failure-evidence)
+describe dispatch evidence, not a verified application outcome. Do not replay an
+uncertain mutation automatically.
+
 ## Two Failure Shapes
 
 Clawperator surfaces failures in two main shapes.

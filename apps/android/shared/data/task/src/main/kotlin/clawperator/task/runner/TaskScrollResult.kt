@@ -13,19 +13,12 @@ sealed interface TaskScrollResult {
     data object NotFoundExhausted : TaskScrollResult
 }
 
-/**
- * Outcome of a single standalone scroll gesture (see [TaskUiScope.scrollOnce]).
- *
- * Distinguishes between three states:
- * - [Moved]: the gesture was dispatched and leading-child signature changed - content moved.
- * - [EdgeReached]: the gesture was dispatched but signature was unchanged - container is at its limit.
- * - [GestureFailed]: the accessibility service rejected the gesture dispatch.
- *
- * [EdgeReached] is not an error condition. It is the expected terminal state when paginating
- * a finite list and should be treated as a successful no-op result in agent loops.
- */
+/** Observed progress after one gesture; unchanged content does not prove an edge. */
 enum class TaskScrollOutcome {
     Moved,
+    NoMovement,
+    Unknown,
+    ContainerLost,
     EdgeReached,
     GestureFailed,
 }
@@ -40,6 +33,7 @@ enum class TaskScrollOutcome {
 data class TaskScrollOnceResult(
     val outcome: TaskScrollOutcome,
     val resolvedContainerId: String? = null,
+    val progress: String? = null,
 )
 
 /**

@@ -6,6 +6,11 @@ export type TerminalSource = "clawperator_result";
 /**
  * Result envelope contract: [Clawperator-Result] terminal envelope.
  */
+/** Receipt JSON fields (target/matched_target/coordinate/progress) remain serialized strings.
+ * Dispatch acceptance never asserts an application postcondition.
+ */
+export type DispatchMethod = "accessibility_action" | "coordinate_gesture" | "none";
+
 export type StepResultData = Record<string, string>;
 
 export interface StepResult {

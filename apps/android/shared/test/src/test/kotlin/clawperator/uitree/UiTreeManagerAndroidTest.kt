@@ -7,6 +7,7 @@ import clawperator.accessibilityservice.NoOpTextInputConnectionSource
 import clawperator.accessibilityservice.TextInputConnectionSource
 import clawperator.accessibilityservice.TextInputEditorInfo
 import clawperator.accessibilityservice.TextInputSession
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -23,6 +24,54 @@ import org.robolectric.shadows.ShadowAccessibilityNodeInfo
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class UiTreeManagerAndroidTest {
+    class ReceiptService : android.accessibilityservice.AccessibilityService() {
+        override fun onAccessibilityEvent(event: android.view.accessibility.AccessibilityEvent?) {}
+        override fun onInterrupt() {}
+    }
+
+    @Test
+    fun `click receipt names accepted ancestor and never asserts screen change`() = runTest {
+        val service = org.robolectric.Robolectric.buildService(ReceiptService::class.java).create().get()
+        val services = clawperator.accessibilityservice.AccessibilityServiceManagerAndroid().apply {
+            setCurrentAccessibilityService(service, true)
+        }
+        val parent = AccessibilityNodeInfo.obtain().apply { isClickable = true; isEnabled = true }
+        val child = AccessibilityNodeInfo.obtain()
+        Shadow.extract<ShadowAccessibilityNodeInfo>(parent).addChild(child)
+        Shadow.extract<ShadowAccessibilityNodeInfo>(parent).setOnPerformActionListener { _, _ -> true }
+        val observations = mutableListOf<Triple<Any?, String, Boolean>>()
+        val observer = UiDispatchObservation { target, method, accepted -> observations += Triple(target, method, accepted) }
+        val accepted = kotlinx.coroutines.withContext(observer) {
+            UiTreeManagerAndroid(services).triggerClick(uiNode(child), UiTreeClickTypes.Default)
+        }
+        assertTrue(accepted)
+        assertEquals(Triple(parent, "accessibility_action", true), observations.last())
+    }
+
+    @Test
+    fun `gesture fallback records acceptance before completion or cancellation`() = runTest {
+        val service = org.robolectric.Robolectric.buildService(ReceiptService::class.java).create().get()
+        val services = clawperator.accessibilityservice.AccessibilityServiceManagerAndroid().apply {
+            setCurrentAccessibilityService(service, true)
+        }
+        val shadow = Shadow.extract<org.robolectric.shadows.ShadowAccessibilityService>(service)
+        shadow.setCanDispatchGestures(true)
+        val child = AccessibilityNodeInfo.obtain().apply {
+            setBoundsInScreen(android.graphics.Rect(0, 0, 100, 100))
+        }
+        val observations = mutableListOf<Triple<Any?, String, Boolean>>()
+        val observer = UiDispatchObservation { target, method, accepted -> observations += Triple(target, method, accepted) }
+        val action = async(observer) {
+            UiTreeManagerAndroid(services).triggerClick(uiNode(child), UiTreeClickTypes.Default)
+        }
+        testScheduler.runCurrent()
+        assertEquals(Triple(child, "coordinate_gesture", true), observations.last())
+        val dispatched = shadow.gesturesDispatched.single()
+        dispatched.callback().onCompleted(dispatched.description())
+        assertTrue(action.await())
+        assertEquals(1, shadow.gesturesDispatched.size)
+    }
+
     @Test
     fun `setText clear true performs empty set then text set`() =
         runTest {

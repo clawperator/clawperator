@@ -543,6 +543,7 @@ suspend fun AccessibilityService.dispatchSingleTap(
     val stroke = GestureDescription.StrokeDescription(path, 0L, 120L) // 120ms for better OEM compatibility
     val gesture = GestureDescription.Builder().addStroke(stroke).build()
 
+    val observation = kotlin.coroutines.coroutineContext[clawperator.uitree.UiDispatchObservation]
     return suspendCancellableCoroutine { cont ->
         val cb =
             object : AccessibilityService.GestureResultCallback() {
@@ -555,6 +556,7 @@ suspend fun AccessibilityService.dispatchSingleTap(
                 }
             }
         val accepted = dispatchGesture(gesture, cb, null)
+        observation?.accepted(accepted)
         if (!accepted) cont.resume(false)
     }
 }
@@ -567,6 +569,7 @@ suspend fun AccessibilityService.dispatchLongPress(
     val stroke = GestureDescription.StrokeDescription(path, 0L, 650L) // 650ms for long press
     val gesture = GestureDescription.Builder().addStroke(stroke).build()
 
+    val observation = kotlin.coroutines.coroutineContext[clawperator.uitree.UiDispatchObservation]
     return suspendCancellableCoroutine { cont ->
         val cb =
             object : AccessibilityService.GestureResultCallback() {
@@ -579,6 +582,7 @@ suspend fun AccessibilityService.dispatchLongPress(
                 }
             }
         val accepted = dispatchGesture(gesture, cb, null)
+        observation?.accepted(accepted)
         if (!accepted) cont.resume(false)
     }
 }
@@ -598,6 +602,7 @@ suspend fun AccessibilityService.dispatchSwipe(
     val stroke = GestureDescription.StrokeDescription(path, 0L, durationMs)
     val gesture = GestureDescription.Builder().addStroke(stroke).build()
 
+    val observation = kotlin.coroutines.coroutineContext[clawperator.uitree.UiDispatchObservation]
     return suspendCancellableCoroutine { cont ->
         val cb =
             object : AccessibilityService.GestureResultCallback() {
@@ -610,6 +615,7 @@ suspend fun AccessibilityService.dispatchSwipe(
                 }
             }
         val accepted = dispatchGesture(gesture, cb, null)
+        observation?.accepted(accepted)
         if (!accepted) cont.resume(false)
     }
 }

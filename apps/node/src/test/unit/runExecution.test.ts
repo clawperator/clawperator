@@ -378,7 +378,6 @@ describe("reconcileEnvelopeStatusAfterPostProcessing", () => {
       status: "failed",
       stepResults: [{ id: "close-1", actionType: "close_app", success: true, data: { application_id: "com.example" } }],
       error: "stale",
-      errorCode: "X",
       hint: "stale",
     };
     reconcileEnvelopeStatusAfterPostProcessing(envelope);
@@ -386,6 +385,20 @@ describe("reconcileEnvelopeStatusAfterPostProcessing", () => {
     assert.strictEqual(envelope.error, null);
     assert.strictEqual(envelope.errorCode, undefined);
     assert.strictEqual(envelope.hint, undefined);
+  });
+
+  it("preserves runtime timeout verdict and original text even between steps", () => {
+    for (const failedStep of [false, true]) {
+      const envelope: ResultEnvelope = {
+        commandId: "command", taskId: "task", status: "failed", errorCode: "COMMAND_TIMEOUT", error: "Original timeout",
+        stepResults: [{ id: "before", actionType: "sleep", success: true, data: {} }],
+      };
+      if (failedStep) envelope.stepResults.push({ id: "wait", actionType: "wait_for_node", success: false,
+        data: { errorCode: "COMMAND_TIMEOUT", error: "Interrupted wait" } });
+      const expected = structuredClone(envelope);
+      reconcileEnvelopeStatusAfterPostProcessing(envelope);
+      assert.deepStrictEqual(envelope, expected);
+    }
   });
 
   it("no-ops when stepResults is empty", () => {

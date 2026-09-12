@@ -7,6 +7,9 @@ import clawperator.task.runner.TaskRunnerManager
 import clawperator.task.runner.TaskStatusSink
 import clawperator.task.runner.UiActionEngine
 import clawperator.task.runner.UiActionExecutionResult
+import clawperator.task.runner.ActionExecutionJournal
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -32,6 +35,13 @@ class AgentCommandExecutorDefault(
             )
         }
 
+        val journal = ActionExecutionJournal()
+        var terminalPublished = false
+        fun publish(canonicalLine: String) {
+            if (terminalPublished) return
+            terminalPublished = true
+            resultEnvelopeLogLines(canonicalLine, command.commandId, command.taskId).forEach { Log.i(it) }
+        }
         return try {
             // Timeout intentionally includes queue wait + execution time.
             // This bounds end-to-end latency per command under contention.
@@ -44,11 +54,13 @@ class AgentCommandExecutorDefault(
                     )
 
                     val result =
-                        taskRunnerManager.run(statusSink) {
-                            uiActionEngine.execute(
-                                taskScope = this,
-                                plan = command.toPlan(),
-                            )
+                        withContext(journal) {
+                            taskRunnerManager.run(statusSink) {
+                                uiActionEngine.execute(
+                                    taskScope = this,
+                                    plan = command.toPlan(),
+                                )
+                            }
                         }
 
                     when (result) {
@@ -63,7 +75,7 @@ class AgentCommandExecutorDefault(
                                     result = result.value,
                                 )
                                 // Preserve one logical canonical result while keeping each logcat record bounded.
-                                resultEnvelopeLogLines(canonicalLine, command.commandId, command.taskId).forEach { Log.i(it) }
+                                publish(canonicalLine)
                             } catch (e: Throwable) {
                                 Log.e(e, "$CLAWPERATOR_RESULT_TAG buildCanonicalSuccessLine failed commandId=${command.commandId}")
                             }
@@ -78,8 +90,10 @@ class AgentCommandExecutorDefault(
                                     commandId = command.commandId,
                                     taskId = command.taskId,
                                     reason = result.reason,
+                                    errorCode = "ACTION_FAILED",
+                                    steps = journal.steps.toList(),
                                 )
-                                resultEnvelopeLogLines(canonicalLine, command.commandId, command.taskId).forEach { Log.i(it) }
+                                publish(canonicalLine)
                             } catch (e: Throwable) {
                                 Log.e(e, "$CLAWPERATOR_RESULT_TAG buildCanonicalFailureLine failed commandId=${command.commandId}")
                             }
@@ -89,18 +103,22 @@ class AgentCommandExecutorDefault(
                     result
                 }
             }
-        } catch (e: TimeoutCancellationException) {
-            val reason = "Agent command timed out after ${command.timeoutMs}ms"
+        } catch (e: CancellationException) {
+            val timedOut = e is TimeoutCancellationException
+            val reason = if (timedOut) "Agent command timed out after ${command.timeoutMs}ms" else "Agent command cancelled"
             try {
                 val canonicalLine = buildCanonicalFailureLine(
                     commandId = command.commandId,
                     taskId = command.taskId,
                     reason = reason,
+                    errorCode = if (timedOut) "COMMAND_TIMEOUT" else "COMMAND_CANCELLED",
+                    steps = journal.steps.toList(),
                 )
-                resultEnvelopeLogLines(canonicalLine, command.commandId, command.taskId).forEach { Log.i(it) }
+                publish(canonicalLine)
             } catch (canonicalError: Throwable) {
                 Log.e(canonicalError, "$CLAWPERATOR_RESULT_TAG buildCanonicalFailureLine failed commandId=${command.commandId}")
             }
+            if (!timedOut) throw e
             TaskResult.Failed(reason = reason, cause = e)
         }
     }

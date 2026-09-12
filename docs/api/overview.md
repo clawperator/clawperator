@@ -321,7 +321,7 @@ Branch in this order:
 
 1. If the CLI returned a top-level object with `code` and no `envelope`, treat it as a host-side failure. Do not retry unchanged.
 2. If `envelope.status == "failed"` and `envelope.errorCode` is present, branch on `envelope.errorCode`.
-3. If `envelope.status == "failed"` and `envelope.stepResults` contains a failed step, branch on the first `stepResults[i].success == false` and inspect `stepResults[i].data.error`.
+3. If `envelope.status == "failed"` and `envelope.stepResults` contains a failed step, branch on the first `stepResults[i].success == false` and inspect `stepResults[i].data.errorCode`, falling back to the legacy `data.error` code.
 4. If `envelope.status == "success"` and every `stepResults[i].success == true`, treat the command as successful.
 5. If the top-level object is `{ ok: true, validated: true, ... }` or `{ ok: true, dryRun: true, ... }`, treat it as a pre-dispatch contract success, not a device execution result.
 
@@ -336,10 +336,13 @@ Exact machine-checkable success condition for most CLI device commands:
 
 ## How `status` and `stepResults` Relate
 
-- If any `stepResults[].success` is `false`, Node reconciles `status` to `"failed"` and sets `error` from the first failed step.
-- If all steps succeed, Node reconciles `status` to `"success"`, clears top-level error state, and removes `hint`.
+- A typed runtime terminal failure is authoritative. Node preserves its status, error code, original message, and collected steps, including a timeout between steps.
+- Otherwise, if any `stepResults[].success` is `false`, Node reconciles `status` to `"failed"` and sets `error` from the first failed step.
+- Otherwise, if all steps succeed, Node reconciles `status` to `"success"`, clears top-level error state, and removes `hint`.
+- Thrown failures stop the sequence and retain prior steps plus the failed step. Returned failed steps preserve the existing continue-sequence policy.
+- [Action receipts](actions.md#action-receipts-and-failure-evidence) report dispatch acceptance. Verify application postconditions with separate observations.
 - A top-level failure can also arrive with zero steps, for example when Android returns a failure envelope before a normal step list exists, such as `SERVICE_UNAVAILABLE`.
-- Execution timeout is different: `runExecution()` returns a top-level host-side error object such as `RESULT_ENVELOPE_TIMEOUT`, not a zero-step success-wrapper envelope.
+- Android command timeout returns a failed envelope with `COMMAND_TIMEOUT` and collected steps. If Node cannot obtain that terminal envelope, the host may instead return `RESULT_ENVELOPE_TIMEOUT`; that transport uncertainty does not prove whether a mutation occurred.
 - Node may modify step data after the runtime returns. Examples:
   - `snapshot` success steps get `data.text` attached from extracted log output
   - missing snapshot text is converted into `SNAPSHOT_EXTRACTION_FAILED`

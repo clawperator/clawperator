@@ -448,7 +448,7 @@ class TaskRegressionFixesTest : ActionTest {
             assertTrue(
                 events.any { event ->
                     event is TaskEvent.Log &&
-                        event.message.contains("failure_point=set_text_failed") &&
+                        event.message.contains("failure_point=ACTION_FAILED") &&
                         event.message.contains("clear=true") &&
                         event.message.contains("submit=false")
                 },
