@@ -1,52 +1,53 @@
 # Repository test execution
 
-## Current entry points
+Run `./validation/test_all.sh` from any working directory to run all off-device
+suites. The runner builds Node once before its consumers, prints a result for
+each selected suite, and exits nonzero if any suite fails or cannot run. A failed
+Node build blocks Node-dependent suites; independent suites still run. Within a
+suite, a failing command stops that suite.
 
-There is no repository-wide test runner. Test commands are split between the
-Android Gradle tasks, Node package scripts, Python eval tests, and validation
-harnesses. CI repeats those commands in separate jobs.
+Install Node dependencies with `npm --prefix apps/node ci` first. Prerequisites
+are Node 24+, Python 3.11+, uv, JDK 17, and the Android SDK configured for Gradle.
+The runner does not install host tools. Gradle and uv may download dependencies.
 
-- `./gradlew unitTest` runs debug unit tests across Android modules.
-- `npm --prefix apps/node run build` builds Node; its tests consume `dist/`.
-- `npm --prefix apps/node run test` uses shell-expanded patterns that do not
-  reliably discover every test file.
-- `.github/workflows/pull-request.yml` contains additional Python and validation
-  commands that are not included in either command above.
-- `scripts/test_all` and `scripts/test_all_local` cover Android only. Their final
-  successful `echo` can mask a failed test command.
+Select one or more suites with repeated `--suite` options:
 
-On the R10 branch, comparing the built test inventory with the Node test
-command's `/bin/sh` expansion found 68 test files and only 13 selected files.
-The 55 omitted files included `query.test.js`. These are file counts, not test
-case counts, and should be remeasured on the implementation branch. A passing
-standard Node suite is not evidence that all Node tests passed.
+| Suite | Coverage |
+| --- | --- |
+| `android` | Debug unit tests across all Android modules via `unitTest` |
+| `node` | Every built `*.test.js` under `apps/node/dist`, discovered recursively |
+| `evals` | All pytest tests under `evals/harness`, including mocked live-eval tests |
+| `validation` | Runner regression tests, sensitive-hierarchy assertion tests, blocked-term policy, installer and fake-adb doctor tests, and on-screen-log contract/proof harness tests |
 
-The R10 checks explicitly ran `query.test.js`, `mcpHelpers.test.js`, and
-`integration/mcp.test.js` in addition to the standard command. The manual
-sensitive-hierarchy workflow includes those explicit checks.
+For example, `./validation/test_all.sh --suite node --suite validation` builds
+Node once and runs both suites. Pull-request CI uses these same definitions in
+separate jobs. Documentation builds and commit-message checks remain separate
+CI checks; they are not test suites.
 
-## Separate PR follow-up
+`npm --prefix apps/node test` runs the complete built Node test inventory without
+building. `npm --prefix apps/node run test:unit` limits discovery to
+`dist/test/unit` and `dist/cli`. Both commands require a fresh Node build and use
+explicit file discovery, independent of shell glob expansion. Do not run another
+Node build concurrently with tests: the build replaces `dist/`.
 
-Consolidate test execution in a separate PR because discovery fixes affect all
-surfaces and can expose existing failures unrelated to sensitive hierarchy
-access. Keep this work outside R10.
+## Device tests
 
-1. Inventory Android, Node, Python, and validation tests against CI. Classify
-   off-device tests separately from tests requiring a device or external service.
-2. Add a canonical runner under `validation/`, with off-device suites as the
-   default and suite selection for CI jobs. Build Node before testing and use
-   explicit recursive discovery independent of shell glob behavior.
-3. Report each suite's result and return nonzero when a selected suite fails or
-   a required prerequisite is missing. Verify this using injected failures;
-   later successful commands must not overwrite failure status.
-4. Make existing wrappers and CI jobs delegate to the same suite definitions.
-   Document one local command and the prerequisites for each optional suite.
-5. Require explicit opt-in and a selected device for device tests. Keep the
-   sensitive-hierarchy emulator workflow manual-only; do not add emulator startup
-   to routine pull-request checks.
-6. Run the complete discovered off-device set, triage newly exposed failures,
-   and record any unresolved failures explicitly before claiming full coverage.
+Device tests never run by default. Select a suite and pass an explicit serial:
 
-Until consolidation is complete, choose checks from the owning surface and
-invoke relevant flat Node test files explicitly. The repository's existing
-validation requirements still apply.
+```bash
+./validation/test_all.sh --suite instrumentation --device <device_serial>
+./validation/test_all.sh --suite mcp-device --device <device_serial>
+```
+
+`instrumentation` runs Gradle's debug connected Android tests using
+`ANDROID_SERIAL`. `mcp-device` builds Node and runs the MCP stdio smoke harness
+against the selected connected device. Install and enable the matching Operator
+first; the MCP harness defaults to `com.clawperator.operator.dev`. Set
+`CLAWPERATOR_OPERATOR_PACKAGE` for explicit release validation. Device suites
+can interact with the screen and require adb and a ready device.
+
+The sensitive-hierarchy API 35 emulator proof remains in the manually dispatched
+`sensitive-hierarchy.yml` workflow. Its APK and device prerequisites are described
+in `validation/sensitive-hierarchy-access/README.md`. Other scenario-specific
+smoke and proof scripts remain explicit developer tools; the default runner does
+not start emulators, install APKs, run live skills, or contact agent services.

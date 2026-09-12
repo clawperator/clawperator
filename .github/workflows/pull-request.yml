@@ -70,7 +70,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Run unit tests
-        run: ./gradlew unitTest
+        run: ./validation/test_all.sh --suite android
 
       - name: Upload test results on failure
         if: failure()
@@ -99,11 +99,8 @@ jobs:
       - name: Install Node dependencies
         run: npm --prefix apps/node ci
 
-      - name: Build Node package
-        run: npm --prefix apps/node run build
-
       - name: Run Node tests
-        run: npm --prefix apps/node run test
+        run: ./validation/test_all.sh --suite node
 
       - name: Upload test results on failure
         if: failure()
@@ -130,7 +127,7 @@ jobs:
         run: python -m pip install --upgrade uv
 
       - name: Run eval harness tests
-        run: uv run --project evals --extra dev pytest evals/harness/test_agents.py evals/harness/test_artifacts.py evals/harness/test_claude.py evals/harness/test_rescore.py evals/harness/test_scorer.py -v
+        run: ./validation/test_all.sh --suite evals
 
   validation-tests:
     name: Run Validation Tests
@@ -150,16 +147,5 @@ jobs:
       - name: Install Node dependencies
         run: npm --prefix apps/node ci
 
-      - name: Make validation scripts executable
-        run: chmod +x validation/install/*.sh validation/test_doctor.sh
-
-      - name: Run install validation suite
-        run: CLAWPERATOR_INSTALL_SKIP_NODE_TESTS=1 bash validation/install/test_install.sh
-
-      - name: Run on-screen log CLI proof harness tests
-        run: bash validation/on-screen-logs/test_cli_contract_proof.sh
-
-      - name: Build and run on-screen log public command tests
-        run: |
-          npm --prefix apps/node run build
-          node --test apps/node/dist/test/unit/onScreenLogCommand.test.js
+      - name: Run validation suite
+        run: ./validation/test_all.sh --suite validation
