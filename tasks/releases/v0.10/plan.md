@@ -1,8 +1,8 @@
 # v0.10 runtime observability implementation order
 
-This coordinates four active runtime-observability task packs and the completed readiness, scaffold-failure, and on-screen-log implementations. It replaces the former standalone observability index. It does not schedule every unrelated task in the repository or claim that implementation has shipped.
+This coordinates two active runtime-observability task packs and the completed readiness, scaffold-failure, and on-screen-log implementations. It replaces the former standalone observability index. It does not schedule every unrelated task in the repository or claim that implementation has shipped.
 
-R1 merged in `cfc90af` (PR #271), R2 in `654d333` (PR #272), and R3 raw API/CLI in `120c1eb` / `dd66a25`. R4 merged in `8cab7adb` (PR #273), including query failure preservation and cleanup. R10 sensitive hierarchy access merged in `f70c89cb` (PR #275); manual release CI remains required. R5 is locally complete on its implementation branch. Three feature packs remain open, with four implementation PRs remaining after R5.
+R1 merged in `cfc90af` (PR #271), R2 in `654d333` (PR #272), and R3 raw API/CLI in `120c1eb` / `dd66a25`. R4 merged in `8cab7adb` (PR #273), including query failure preservation and cleanup. R10 sensitive hierarchy access merged in `f70c89cb` (PR #275); manual release CI remains required. R5 merged in `09987ebc` (PR #276). R6 is implemented and locally validated in `aba6430` on its implementation branch. Two feature packs remain open, with three implementation PRs remaining after R6.
 
 ## Folder ownership
 
@@ -24,8 +24,8 @@ The order below minimizes shared-file conflicts. Hard dependencies are explicit;
 | R3 | [On-screen logs CLI](../../../docs/api/on-screen-logs.md) | Complete | Raw API merged in `120c1eb` | [DONE] merged in `dd66a25` (PR #270); pack retired; [verification and limits](../../../docs/internal/design/on-screen-logs.md) |
 | R4 | [Selector inspection PR-1](../../../docs/internal/design/selector-inspection.md) | 1 | None beyond merged main | [DONE] merged in `8cab7adb` (PR #273); cleanup complete; [validation and limits](../../../docs/internal/design/selector-inspection.md#validation-and-compatibility) |
 | R10 | [Sensitive hierarchy access](../../../docs/internal/design/accessibility-hierarchy.md) | Complete | R4 merged | [DONE] merged in `f70c89cb` (PR #275); manual release CI remains required; pack retired; [regression harness](../../../validation/sensitive-hierarchy-access/README.md) |
-| R5 | [Strict selectors PR-2](../../../docs/api/selectors.md#strict-action-selection) | Complete | R4 merged | [DONE] implemented and locally validated; pending merge; pack retired; [validation and limits](../../../docs/internal/design/selector-inspection.md#validation-and-compatibility) |
-| R6 | [Action-result diagnostics](../../api/action-result-diagnostics/plan.md) | 1 | R4 and R5 merged | Waiting for R5 merge; [prompt](../../api/action-result-diagnostics/agent-prompt.md) |
+| R5 | [Strict selectors PR-2](../../../docs/api/selectors.md#strict-action-selection) | Complete | R4 merged | [DONE] merged in `09987ebc` (PR #276); pack retired; [validation and limits](../../../docs/internal/design/selector-inspection.md#validation-and-compatibility) |
+| R6 | [Action-result diagnostics](../../../docs/api/actions.md#action-receipts-and-failure-evidence) | Complete | R4 and R5 merged | [DONE] implemented and locally validated in `aba6430`; pending merge; pack retired; [validation and limits](../../../docs/internal/design/action-result-diagnostics.md#validation-and-compatibility) |
 | R7 | [Compact snapshots](../../node/compact-snapshots/plan.md) | 1 | R4 merged for additive XML visibility | Ready on merged R4; [prompt](../../node/compact-snapshots/agent-prompt.md) |
 | R8 | [Still evidence PR-1](../../node/evidence-capture/plan.md) | 1 | None beyond merged main | Ready; [prompt](../../node/evidence-capture/agent-prompt.md) |
 | R9 | [Managed video PR-2](../../node/evidence-capture/plan.md) | 2 | R8 merged | Waiting for R8; [prompt](../../node/evidence-capture/pr-2-prompt.md) |
@@ -43,7 +43,7 @@ when integrating those implementations. Its shared Robolectric prerequisite
 - R7 consumes raw XML plus R4's additive visibility attribute. It must not implement a separate selector engine, reuse observation paths as persistent handles, or strip the overlay metadata introduced by PR #266.
 - R8 may extract the existing targeted screenshot helper if required to preserve image capture when the app hierarchy is absent. Keep it shared with normal screenshots; do not redesign action-list interleaving or implement R6 incidentally. Rebase after other changes to runExecution.ts.
 - Preserve PR #266's strict raw-action aliases, ON_SCREEN_LOG_* errors, controller-owned window identity, and separate-execution screenshot guidance in every affected PR.
-- [Repository test consolidation](../../../docs/internal/design/test-execution.md) is a separate-PR follow-up. Preserve the explicit query/MCP checks until central discovery includes them; do not add automatic emulator runs to PR checks.
+- [Repository test consolidation](../../../docs/internal/design/test-execution.md) merged in `39352855`; central discovery now includes query/MCP tests; do not add automatic emulator runs to PR checks.
 - Existing `tasks/node/skill-preflight-metadata`, doctor SDK-install findings, recording-export follow-up, and I/O optimization work remain separate. None is a prerequisite here; coordinate shared files without absorbing their scope.
 
 ## Coverage and boundaries
@@ -77,7 +77,7 @@ This covers the agreed foundation and evidence gaps. It is not a promise that on
 
 **Evidence integration gate:** R8 must pass before adopting its manifest as the stable report input; R9 must pass before claiming managed-video support. Existing screenshot and explicit ADB recording helpers remain usable while these APIs are developed. Reports must distinguish unavailable evidence from failed test assertions, and never equate file existence with proof.
 
-**Optional convenience:** R3 is implemented; R7 remains planned. Both reduce authoring/inspection overhead, and neither is a technical prerequisite for deterministic execution. Raw on-screen logs already work through the merged API. R1 and R2 are merged. R4 implementation and cleanup are complete. R10 merged in `f70c89cb`; manual release CI remains required, R5 is locally complete pending merge, and four further implementation PRs remain. This is the suggested scope of the release workstream, not a requirement to finish every PR before beginning consumer development.
+**Optional convenience:** R3 is implemented; R7 remains planned. Both reduce authoring/inspection overhead, and neither is a technical prerequisite for deterministic execution. Raw on-screen logs already work through the merged API. R1 and R2 are merged. R4 implementation and cleanup are complete. R10 merged in `f70c89cb`; manual release CI remains required, R5 is merged, R6 is locally complete pending merge, and three further implementation PRs remain. This is the suggested scope of the release workstream, not a requirement to finish every PR before beginning consumer development.
 
 ## Implementation handoff and release acceptance
 

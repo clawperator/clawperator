@@ -86,12 +86,13 @@ fun buildCanonicalFailureLine(
     taskId: String,
     reason: String,
     errorCode: String? = null,
+    steps: List<clawperator.task.runner.UiActionStepResult> = emptyList(),
 ): String {
     val envelope = ClawperatorResultEnvelope(
         commandId = commandId,
         taskId = taskId,
         status = "failed",
-        stepResults = emptyList(),
+        stepResults = steps.map { CanonicalStepResult(it.id, it.actionType, it.success, it.data) },
         error = reason,
         errorCode = errorCode,
     )

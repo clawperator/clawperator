@@ -583,27 +583,14 @@ class UiActionEngineDefaultTest : ActionTest {
         }
 
     @Test
-    fun `execute press_key throws when accessibility service is unavailable`() =
-        actionTest {
-            val taskScope = RecordingTaskScope(RecordingTaskUiScope())
-            val engine =
-                UiActionEngineDefault(
-                    DeveloperOptionsManagerMock(),
-                    UiGlobalActionDispatcherMock(error = IllegalStateException("OperatorAccessibilityService is not running - cannot execute press_key")),
-                )
-
-            assertFailsWith<IllegalStateException> {
-                engine.execute(
-                    taskScope = taskScope,
-                    plan = UiActionPlan(
-                        commandId = "cmd-key",
-                        taskId = "task-key",
-                        source = "test",
-                        actions = listOf(UiAction.PressKey(id = "k1", key = UiSystemKey.BACK)),
-                    ),
-                )
-            }
-        }
+    fun `execute press_key preserves typed service failure`() = actionTest {
+        val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(),
+            UiGlobalActionDispatcherMock(error = UiActionFailure("SERVICE_UNAVAILABLE", "Service unavailable")))
+        val result = engine.execute(RecordingTaskScope(RecordingTaskUiScope()),
+            UiActionPlan("command", "task", "test", listOf(UiAction.PressKey("key", UiSystemKey.BACK))))
+        assertEquals("SERVICE_UNAVAILABLE", result.errorCode)
+        assertEquals("Service unavailable", result.stepResults.single().data["error"])
+    }
 
     @Test
     fun `execute press_key returns success result when global action succeeds`() =
@@ -739,7 +726,7 @@ class UiActionEngineDefaultTest : ActionTest {
     @Test
     fun `execute scroll returns container_not_found when scrollOnce throws no scrollable container`() =
         actionTest {
-            val uiScope = RecordingTaskUiScope(scrollOnceThrows = IllegalStateException("No scrollable container visible"))
+            val uiScope = RecordingTaskUiScope(scrollOnceThrows = UiActionFailure("CONTAINER_NOT_FOUND", "No scrollable container visible"))
             val taskScope = RecordingTaskScope(uiScope)
             val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
 
@@ -763,7 +750,7 @@ class UiActionEngineDefaultTest : ActionTest {
     @Test
     fun `execute scroll returns container_not_scrollable when scrollOnce throws not scrollable`() =
         actionTest {
-            val uiScope = RecordingTaskUiScope(scrollOnceThrows = IllegalStateException("Scrollable container not found for matcher"))
+            val uiScope = RecordingTaskUiScope(scrollOnceThrows = UiActionFailure("CONTAINER_NOT_SCROLLABLE", "Scrollable container not found for matcher"))
             val taskScope = RecordingTaskScope(uiScope)
             val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
 
@@ -1347,34 +1334,64 @@ class UiActionEngineDefaultTest : ActionTest {
         }
 
     @Test
-    fun `execute read_key_value_pair rethrows unexpected runtime failures`() =
-        actionTest {
-            val uiScope = RecordingTaskUiScope().apply {
-                readKeyValuePairThrows = IllegalStateException("UI tree not available")
+    fun `unknown failures retain prior steps original text and stop the sequence`() = actionTest {
+        val uiScope = RecordingTaskUiScope().apply { readKeyValuePairThrows = IllegalStateException("Original failure") }
+        val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+        val result = engine.execute(RecordingTaskScope(uiScope), UiActionPlan("command", "task", "test", listOf(
+            UiAction.Sleep("before", 0),
+            UiAction.ReadKeyValuePair("failed", NodeMatcher(textEquals = "Label")),
+            UiAction.Sleep("after", 0),
+        )))
+        assertEquals("ACTION_FAILED", result.errorCode)
+        assertEquals("Original failure", result.error)
+        assertEquals(listOf("before", "failed"), result.stepResults.map { it.id })
+        assertEquals("read_key_value_pair", result.stepResults.last().actionType)
+        assertEquals("ACTION_FAILED", result.stepResults.last().data["errorCode"])
+    }
+
+    @Test
+    fun `wait timeout retains completed step and failed wait`() = actionTest {
+        val uiScope = object : RecordingTaskUiScope() {
+            override suspend fun waitForNode(matcher: NodeMatcher, retry: TaskRetry, timeoutMs: Long?, strict: Boolean, container: NodeMatcher?): TaskUiNode {
+                throw UiActionFailure("WAIT_TIMEOUT", "Wait expired")
             }
-            val taskScope = RecordingTaskScope(uiScope)
-            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
-
-            val error =
-                assertFailsWith<IllegalStateException> {
-                    engine.execute(
-                        taskScope = taskScope,
-                        plan = UiActionPlan(
-                            commandId = "cmd",
-                            taskId = "task",
-                            source = "test",
-                            actions = listOf(
-                                UiAction.ReadKeyValuePair(
-                                    id = "kvp-runtime",
-                                    labelMatcher = NodeMatcher(textEquals = "Android version"),
-                                ),
-                            ),
-                        ),
-                    )
-                }
-
-            assertEquals("UI tree not available", error.message)
         }
+        val result = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+            .execute(RecordingTaskScope(uiScope), UiActionPlan("command", "task", "test", listOf(
+                UiAction.Sleep("before", 0), UiAction.WaitForNode("wait", NodeMatcher(textEquals = "Missing")), UiAction.Sleep("after", 0))))
+        assertEquals("WAIT_TIMEOUT", result.errorCode)
+        assertEquals(listOf("before", "wait"), result.stepResults.map { it.id })
+        assertEquals("wait_for_node", result.stepResults.last().actionType)
+    }
+
+    @Test
+    fun `cancellation propagates while preserving completed and interrupted steps`() = actionTest {
+        val journal = ActionExecutionJournal()
+        val uiScope = object : RecordingTaskUiScope() {
+            override suspend fun waitForNode(matcher: NodeMatcher, retry: TaskRetry, timeoutMs: Long?, strict: Boolean, container: NodeMatcher?): TaskUiNode {
+                kotlinx.coroutines.awaitCancellation()
+            }
+        }
+        val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+        kotlinx.coroutines.withContext(journal) {
+            val timedOut = kotlinx.coroutines.withTimeoutOrNull(100) {
+                engine.execute(RecordingTaskScope(uiScope), UiActionPlan("command", "task", "test", listOf(
+                    UiAction.Sleep("before", 0), UiAction.WaitForNode("wait", NodeMatcher(textEquals = "Missing")), UiAction.Sleep("after", 0))))
+            }
+            assertEquals(null, timedOut)
+        }
+        assertEquals(listOf("before", "wait"), journal.steps.map { it.id })
+        assertEquals("COMMAND_TIMEOUT", journal.steps.last().data["errorCode"])
+    }
+
+    @Test
+    fun `returned failed steps continue the sequence without a terminal exception code`() = actionTest {
+        val result = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
+            .execute(RecordingTaskScope(RecordingTaskUiScope()), UiActionPlan("command", "task", "test", listOf(
+                UiAction.CloseApp("failed", "com.example.app"), UiAction.Sleep("after", 0))))
+        assertEquals(listOf(false, true), result.stepResults.map { it.success })
+        assertEquals(null, result.errorCode)
+    }
 
     @Test
     fun `execute read_text with version validator succeeds`() =

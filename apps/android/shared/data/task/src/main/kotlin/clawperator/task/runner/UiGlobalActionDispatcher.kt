@@ -13,7 +13,7 @@ class UiGlobalActionDispatcherAndroid(
 ) : UiGlobalActionDispatcher {
     override fun perform(key: UiSystemKey): Boolean {
         val service = accessibilityServiceManager.currentAccessibilityService
-            ?: error("OperatorAccessibilityService is not running - cannot execute press_key")
+            ?: throw UiActionFailure("SERVICE_UNAVAILABLE", "OperatorAccessibilityService is not running - cannot execute press_key")
 
         val globalAction =
             when (key) {

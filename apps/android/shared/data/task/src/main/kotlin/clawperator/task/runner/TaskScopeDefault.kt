@@ -254,8 +254,8 @@ class TaskScopeDefault(
                 val snapshotTimingEnabled = isSnapshotTimingEnabled()
                 val snapshotStartNs = if (snapshotTimingEnabled) SystemClock.elapsedRealtimeNanos() else 0L
                 val hierarchyDump = uiTreeInspector.getCurrentUiHierarchyDump()
-                    ?: throw IllegalStateException(
-                        "SNAPSHOT_HIERARCHY_UNAVAILABLE: UI hierarchy dump not available; accessibility service may not be ready",
+                    ?: throw QueryHierarchyUnavailableException(
+                        uiTreeInspector.getUnavailableHierarchyDiagnostics(), "SNAPSHOT_HIERARCHY_UNAVAILABLE",
                     )
                 val hierarchyReadyNs = if (snapshotTimingEnabled) SystemClock.elapsedRealtimeNanos() else 0L
                 val commandId = currentTaskCommandId() ?: "unknown"

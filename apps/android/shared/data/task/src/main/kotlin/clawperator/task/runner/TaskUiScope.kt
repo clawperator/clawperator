@@ -236,8 +236,9 @@ interface TaskUiScope {
      *        use its first scrollable descendant.
      * @return [TaskScrollOnceResult] containing the [TaskScrollOutcome] and the resolved container's
      *         resourceId (when available). Outcome is [TaskScrollOutcome.Moved] if content shifted,
-     *         [TaskScrollOutcome.EdgeReached] if at limit, [TaskScrollOutcome.GestureFailed] if the
-     *         gesture was rejected.
+     *         [TaskScrollOutcome.NoMovement] for unchanged comparable evidence, [TaskScrollOutcome.Unknown]
+     *         for incomparable evidence, [TaskScrollOutcome.ContainerLost] for a lost container,
+     *         and [TaskScrollOutcome.GestureFailed] if the gesture failed. None proves an edge.
      * @throws Exception if the container cannot be found or is not scrollable.
      */
     suspend fun scrollOnce(

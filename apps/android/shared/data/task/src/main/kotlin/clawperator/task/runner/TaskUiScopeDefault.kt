@@ -95,7 +95,7 @@ class TaskUiScopeDefault(
             } catch (t: Throwable) {
                 if (t is kotlinx.coroutines.CancellationException) throw t
                 if (t is StrictSelectionException && t.code != "NODE_NOT_FOUND") throw t
-                if (attempt >= retry.maxAttempts) {
+                if (attempt >= retry.maxAttempts || kotlin.coroutines.coroutineContext[clawperator.uitree.UiDispatchObservation]?.retryBlocked == true) {
                     Log.e(TAG, "$operation failed after $attempt attempts: ${t.message}")
                     val failureData = failurePayload(t, attempt)
                     val reason =
@@ -188,13 +188,13 @@ class TaskUiScopeDefault(
 
             val uiTreeRaw =
                 uiTreeInspector.getCurrentUiTree()
-                    ?: throw IllegalStateException("UI tree not available")
+                    ?: throw QueryHierarchyUnavailableException(uiTreeInspector.getUnavailableHierarchyDiagnostics())
 
             val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
 
             val uiNode =
                 actionNodes(matcher, uiTree, strict, null).firstOrNull()
-                    ?: throw IllegalStateException("No UI node found matching criteria: $matcher")
+                    ?: throw UiActionFailure("NODE_NOT_FOUND", "No UI node found matching criteria: $matcher")
 
             val text = uiNode.label
             if (text.isBlank()) {
@@ -250,14 +250,17 @@ class TaskUiScopeDefault(
         container: NodeMatcher? = null,
         allowEmpty: Boolean = false,
         allowMany: Boolean = false,
+        recordReceipt: Boolean = false,
     ): List<UiNode> {
         val resolver = NodeResolver(tree)
         val scope = container?.let {
             selectCandidates(resolver, resolver.resolve(it), strict, container = true).firstOrNull()
-                ?: throw IllegalStateException("Container not found for $it")
+                ?: throw UiActionFailure("CONTAINER_NOT_FOUND", "Container not found for $it")
         }
         val matches = resolver.resolve(matcher).filter { scope == null || it.nodePath.startsWith("${scope.nodePath}.") }
-        return selectCandidates(resolver, matches, strict, allowEmpty = allowEmpty, allowMany = allowMany).map { it.node }
+        val selected = selectCandidates(resolver, matches, strict, allowEmpty = allowEmpty, allowMany = allowMany)
+        if (recordReceipt) selected.firstOrNull()?.let { kotlin.coroutines.coroutineContext[ActionReceipt]?.selected(tree, it.node, matches.size) }
+        return selected.map { it.node }
     }
 
     private suspend fun scrollNode(
@@ -266,21 +269,27 @@ class TaskUiScopeDefault(
         strict: Boolean,
         findChild: Boolean,
         allowMissing: Boolean = false,
+        recordReceipt: Boolean = false,
     ): UiNode? {
         val resolver = NodeResolver(tree)
         val scope = container?.let {
             selectCandidates(resolver, resolver.resolve(it), strict, container = true).firstOrNull()
-                ?: if (allowMissing && !strict) return null else throw IllegalStateException("Container not found for $it")
+                ?: if (allowMissing && !strict) return null else throw UiActionFailure("CONTAINER_NOT_FOUND", "Container not found for $it")
         }
-        if (scope != null && isScrollable(scope.node)) return scope.node
-        if (scope != null && !findChild) throw IllegalStateException("Scrollable container not found for $container")
+        if (scope != null && isScrollable(scope.node)) {
+            if (recordReceipt) kotlin.coroutines.coroutineContext[ActionReceipt]?.selected(tree, scope.node, resolver.resolve(container).size)
+            return scope.node
+        }
+        if (scope != null && !findChild) throw UiActionFailure("CONTAINER_NOT_SCROLLABLE", "Scrollable container not found for $container")
         val scrollables = resolver.resolve(null).filter {
             isScrollable(it.node) && (scope == null || it.nodePath.startsWith("${scope.nodePath}."))
         }
         if (!strict && scope != null && scrollables.isEmpty() && !allowMissing) {
-            throw IllegalStateException("Scrollable container not found for $container")
+            throw UiActionFailure("CONTAINER_NOT_SCROLLABLE", "Scrollable container not found for $container")
         }
-        return selectCandidates(resolver, scrollables, strict, container = true).firstOrNull()?.node
+        val selected = selectCandidates(resolver, scrollables, strict, container = true).firstOrNull()?.node
+        if (recordReceipt) selected?.let { kotlin.coroutines.coroutineContext[ActionReceipt]?.selected(tree, it, scrollables.size) }
+        return selected
     }
 
     private suspend fun scrollTarget(
@@ -289,14 +298,17 @@ class TaskUiScopeDefault(
         container: NodeMatcher?,
         strict: Boolean,
         findChild: Boolean,
+        recordReceipt: Boolean = false,
     ): UiNode? {
-        if (!strict && container == null) return actionNodes(target, tree, strict = false, allowEmpty = true).firstOrNull()
+        if (!strict && container == null) return actionNodes(target, tree, strict = false, allowEmpty = true, recordReceipt = recordReceipt).firstOrNull()
         // Resolve the same eligible scroll scope on every observation, including target-only checks.
         val selected = scrollNode(tree, container, strict, findChild) ?: return null
         val resolver = NodeResolver(tree)
         val scope = resolver.resolve(null).first { it.node === selected }
         val matches = resolver.resolve(target).filter { it.nodePath.startsWith("${scope.nodePath}.") }
-        return selectCandidates(resolver, matches, strict, allowEmpty = true).firstOrNull()?.node
+        val selectedTarget = selectCandidates(resolver, matches, strict, allowEmpty = true).firstOrNull()?.node
+        if (recordReceipt) selectedTarget?.let { kotlin.coroutines.coroutineContext[ActionReceipt]?.selected(tree, it, matches.size) }
+        return selectedTarget
     }
 
     override suspend fun waitForNode(
@@ -306,25 +318,19 @@ class TaskUiScopeDefault(
         strict: Boolean,
         container: NodeMatcher?,
     ): TaskUiNode {
-        var lastSelectionFailure: StrictSelectionException? = null
         val operation: suspend () -> TaskUiNode = {
             withRetry(retry, "waitForNode($matcher)") {
                 Log.d("$TAG Waiting for node matching: $matcher")
 
                 val uiTreeRaw =
                     uiTreeInspector.getCurrentUiTree()
-                        ?: throw IllegalStateException("UI tree not available")
+                        ?: throw QueryHierarchyUnavailableException(uiTreeInspector.getUnavailableHierarchyDiagnostics())
 
                 val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
 
                 val uiNode =
-                    try {
-                        actionNodes(matcher, uiTree, strict, container).firstOrNull()
-                    } catch (error: StrictSelectionException) {
-                        lastSelectionFailure = error
-                        throw error
-                    }
-                        ?: throw IllegalStateException("No UI node found matching criteria: $matcher")
+                    actionNodes(matcher, uiTree, strict, container).firstOrNull()
+                        ?: throw UiActionFailure("NODE_NOT_FOUND", "No UI node found matching criteria: $matcher")
 
                 val taskUiNode =
                     TaskUiNode(
@@ -342,12 +348,8 @@ class TaskUiScopeDefault(
         }
 
         return if (timeoutMs != null) {
-            try {
-                kotlinx.coroutines.withTimeout(timeoutMs) { operation() }
-            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-                lastSelectionFailure?.let { throw it }
-                throw IllegalStateException("Timeout waiting for node matching: $matcher (timeoutMs=$timeoutMs)")
-            }
+            kotlinx.coroutines.withTimeoutOrNull(timeoutMs) { operation() }
+                ?: throw UiActionFailure("WAIT_TIMEOUT", "Timeout waiting for node matching: $matcher (timeoutMs=$timeoutMs)")
         } else {
             operation()
         }
@@ -362,7 +364,7 @@ class TaskUiScopeDefault(
 
             val uiTreeRaw =
                 uiTreeInspector.getCurrentUiTree()
-                    ?: throw IllegalStateException("UI tree not available")
+                    ?: throw QueryHierarchyUnavailableException(uiTreeInspector.getUnavailableHierarchyDiagnostics())
 
             val uiTreeFiltered = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
             resolveKeyValuePair(uiTreeFiltered, labelMatcher)
@@ -378,13 +380,13 @@ class TaskUiScopeDefault(
 
             val uiTreeRaw =
                 uiTreeInspector.getCurrentUiTree()
-                    ?: throw IllegalStateException("UI tree not available")
+                    ?: throw QueryHierarchyUnavailableException(uiTreeInspector.getUnavailableHierarchyDiagnostics())
 
             val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
 
             val uiNode =
                 actionNodes(matcher, uiTree, strict, null).firstOrNull()
-                    ?: throw IllegalStateException("No UI node found matching criteria: $matcher")
+                    ?: throw UiActionFailure("NODE_NOT_FOUND", "No UI node found matching criteria: $matcher")
 
             val text = uiNode.label
             if (text.isBlank()) {
@@ -405,7 +407,7 @@ class TaskUiScopeDefault(
 
             val uiTreeRaw =
                 uiTreeInspector.getCurrentUiTree()
-                    ?: throw IllegalStateException("UI tree not available")
+                    ?: throw QueryHierarchyUnavailableException(uiTreeInspector.getUnavailableHierarchyDiagnostics())
 
             val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
 
@@ -428,12 +430,12 @@ class TaskUiScopeDefault(
 
             val uiTreeRaw =
                 uiTreeInspector.getCurrentUiTree()
-                    ?: throw IllegalStateException("UI tree not available")
+                    ?: throw QueryHierarchyUnavailableException(uiTreeInspector.getUnavailableHierarchyDiagnostics())
 
             val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
 
             val uiNode = actionNodes(matcher, uiTree, strict, containerMatcher).firstOrNull()
-                ?: throw IllegalStateException("No UI node found matching criteria: $matcher")
+                ?: throw UiActionFailure("NODE_NOT_FOUND", "No UI node found matching criteria: $matcher")
 
             val text = uiNode.label
             if (text.isBlank()) {
@@ -456,12 +458,12 @@ class TaskUiScopeDefault(
 
             val uiTreeRaw =
                 uiTreeInspector.getCurrentUiTree()
-                    ?: throw IllegalStateException("UI tree not available")
+                    ?: throw QueryHierarchyUnavailableException(uiTreeInspector.getUnavailableHierarchyDiagnostics())
 
             val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
 
             val uiNode = actionNodes(matcher, uiTree, strict, containerMatcher).firstOrNull()
-                ?: throw IllegalStateException("No UI node found matching criteria: $matcher")
+                ?: throw UiActionFailure("NODE_NOT_FOUND", "No UI node found matching criteria: $matcher")
 
             val text = uiNode.label
             if (text.isBlank()) {
@@ -489,7 +491,7 @@ class TaskUiScopeDefault(
 
             val uiTreeRaw =
                 uiTreeInspector.getCurrentUiTree()
-                    ?: throw IllegalStateException("UI tree not available")
+                    ?: throw QueryHierarchyUnavailableException(uiTreeInspector.getUnavailableHierarchyDiagnostics())
 
             val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
 
@@ -521,12 +523,11 @@ class TaskUiScopeDefault(
             )
         },
         failurePayload = { throwable, attempt ->
-            val failurePoint =
-                when {
-                    throwable.message?.contains("not found") == true -> "not_found"
-                    throwable.message?.contains("Click") == true && throwable.message?.contains("failed") == true -> "not_clickable"
-                    throwable.message?.contains("UI tree not available") == true -> "stale_node"
-                    else -> "timeout"
+            val failurePoint = when (throwable) {
+                    is UiActionFailure -> throwable.code
+                    is QueryHierarchyUnavailableException -> throwable.code
+                    is StrictSelectionException -> throwable.code
+                    else -> "ACTION_FAILED"
                 }
             payload(
                 "matcher" to matcher?.toString(),
@@ -539,9 +540,10 @@ class TaskUiScopeDefault(
         require(coordinate == null || (!strict && container == null)) { "coordinate click cannot use strict or container" }
         if (coordinate != null) {
             Log.d("$TAG Clicking coordinate: ${coordinate.shortString}")
+            kotlin.coroutines.coroutineContext[ActionReceipt]?.coordinate(coordinate.x.toDouble(), coordinate.y.toDouble())
             val clickSuccessful = uiTreeManager.clickAt(coordinate.x.toFloat(), coordinate.y.toFloat(), clickTypes)
             if (!clickSuccessful) {
-                throw IllegalStateException("Click at coordinate ${coordinate.shortString} failed")
+                throw UiActionFailure("GESTURE_FAILED", "Click at coordinate ${coordinate.shortString} failed")
             }
             Log.d("$TAG Successfully clicked coordinate ${coordinate.shortString}")
             return@withRetry Unit
@@ -552,17 +554,17 @@ class TaskUiScopeDefault(
 
         val uiTreeRaw =
             uiTreeInspector.getCurrentUiTree()
-                ?: throw IllegalStateException("UI tree not available")
+                ?: throw QueryHierarchyUnavailableException(uiTreeInspector.getUnavailableHierarchyDiagnostics())
 
         val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
 
         val uiNode =
-            actionNodes(targetMatcher, uiTree, strict, container).firstOrNull()
-                ?: throw IllegalStateException("No UI node found matching criteria: $targetMatcher")
+            actionNodes(targetMatcher, uiTree, strict, container, recordReceipt = true).firstOrNull()
+                ?: throw UiActionFailure("NODE_NOT_FOUND", "No UI node found matching criteria: $targetMatcher")
 
         val clickSuccessful = uiTreeManager.triggerClick(uiNode, clickTypes)
         if (!clickSuccessful) {
-            throw IllegalStateException("Click on matching UI node failed")
+            throw UiActionFailure("ACTION_FAILED", "Click on matching UI node failed")
         }
 
         Log.d("$TAG Successfully clicked matching node")
@@ -591,12 +593,11 @@ class TaskUiScopeDefault(
             )
         },
         failurePayload = { throwable, attempt ->
-            val failurePoint =
-                when {
-                    throwable.message?.contains("not found") == true -> "not_found"
-                    throwable.message?.contains("set text") == true -> "set_text_failed"
-                    throwable.message?.contains("UI tree not available") == true -> "stale_node"
-                    else -> "timeout"
+            val failurePoint = when (throwable) {
+                    is UiActionFailure -> throwable.code
+                    is QueryHierarchyUnavailableException -> throwable.code
+                    is StrictSelectionException -> throwable.code
+                    else -> "ACTION_FAILED"
                 }
             payload(
                 "matcher" to matcher.toString(),
@@ -612,13 +613,13 @@ class TaskUiScopeDefault(
 
         val uiTreeRaw =
             uiTreeInspector.getCurrentUiTree()
-                ?: throw IllegalStateException("UI tree not available")
+                ?: throw QueryHierarchyUnavailableException(uiTreeInspector.getUnavailableHierarchyDiagnostics())
 
         val uiTree = uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
 
         val uiNode =
-            actionNodes(matcher, uiTree, strict, container).firstOrNull()
-                ?: throw IllegalStateException("No UI node found matching criteria: $matcher")
+            actionNodes(matcher, uiTree, strict, container, recordReceipt = true).firstOrNull()
+                ?: throw UiActionFailure("NODE_NOT_FOUND", "No UI node found matching criteria: $matcher")
 
         val setTextSuccessful =
             uiTreeManager.setText(
@@ -628,7 +629,7 @@ class TaskUiScopeDefault(
                 clear = clear,
             )
         if (!setTextSuccessful) {
-            throw IllegalStateException("Failed to set text on matching UI node")
+            throw UiActionFailure("ACTION_FAILED", "Failed to set text on matching UI node")
         }
 
         Log.d("$TAG Successfully entered text into matching node")
@@ -645,9 +646,9 @@ class TaskUiScopeDefault(
     ) {
         withRetry(retry, "clickScrollTarget($target)") {
             val tree = currentUiTreeFiltered()
-            val node = scrollTarget(target, tree, container, strict, findFirstScrollableChild)
+            val node = scrollTarget(target, tree, container, strict, findFirstScrollableChild, recordReceipt = true)
                 ?: if (strict) throw StrictSelectionException("NODE_NOT_FOUND", 0, NodeResolver(tree).encodeMatches(emptyList()))
-                else throw IllegalStateException("No UI node found matching criteria: $target")
+                else throw UiActionFailure("NODE_NOT_FOUND", "No UI node found matching criteria: $target")
             check(uiTreeManager.triggerClick(node, clickTypes)) { "Click on matching UI node failed" }
         }
     }
@@ -662,123 +663,22 @@ class TaskUiScopeDefault(
         retry: TaskRetry,
         findFirstScrollableChild: Boolean,
         strict: Boolean,
-    ): TaskScrollResult {
-        var containerResolution = "exact"
-
-        return withRetry(
-            retry = retry,
-            operation = "scrollUntil(target=$target)",
-            successPayload = { result, elapsedMs, attempt ->
-                val swipesUsed =
-                    when (result) {
-                        is TaskScrollResult.Found -> 0 // TODO: Track actual swipes used - requires refactoring loop counter
-                        TaskScrollResult.NotFoundExhausted -> maxSwipes
-                    }
-                payload(
-                    "target_matcher" to target.toString(),
-                    "container_matcher" to (container?.toString() ?: "auto"),
-                    "swipes_used" to swipesUsed,
-                    "direction" to direction.toString(),
-                    "axis" to
-                        when (direction) {
-                            TaskScrollDirection.Left, TaskScrollDirection.Right -> "horizontal"
-                            else -> "vertical"
-                        },
-                    "container_resolution" to containerResolution,
-                    "elapsed_ms" to elapsedMs,
-                    "attempt" to attempt,
-                )
-            },
-            failurePayload = { throwable, attempt ->
-                val failurePoint =
-                    when {
-                        throwable.message?.contains("container not found") == true -> "container_not_found"
-                        throwable.message?.contains("not found") == true -> "target_not_found"
-                        else -> "max_swipes_exceeded"
-                    }
-                payload(
-                    "target_matcher" to target.toString(),
-                    "container_matcher" to (container?.toString() ?: "auto"),
-                    "failure_point" to failurePoint,
-                    "container_resolution" to containerResolution,
-                    "attempt" to attempt,
-                )
-            },
-        ) {
-            // Validate parameters
-            require(distanceRatio in 0f..1f) { "distanceRatio must be in [0,1], got $distanceRatio" }
-            require(maxSwipes > 0) { "maxSwipes must be > 0, got $maxSwipes" }
-
-            Log.d("$TAG Starting scrollUntil: target=$target, dir=$direction, max=$maxSwipes")
-
-            var uiTree = currentUiTreeFiltered()
-            var stuckCount = 0
-
-            repeat(maxSwipes + 1) { swipeIndex ->
-                // Refresh UI tree each pass
-                uiTree = currentUiTreeFiltered()
-
-                // Re-resolve container from the fresh tree (critical: avoid stale nodes)
-                val freshScrollNode =
-                    scrollNode(uiTree, container, strict, findFirstScrollableChild) ?: throw IllegalStateException("No scrollable container visible")
-
-                // 1) Try find target without scrolling
-                Log.d("$TAG scrollUntil searching for target at swipe=$swipeIndex")
-                if (DEBUG_SCROLL_LOGGING) {
-                    logUiTree(uiTree, "Pre-scroll UI tree (swipe=$swipeIndex)")
-                }
-
-                scrollTarget(target, uiTree, container, strict, findFirstScrollableChild)?.let { found ->
-                    val taskNode = toTaskUiNode(found)
-                    Log.d("$TAG scrollUntil ✅ found at swipe=$swipeIndex: $taskNode")
-                    return@withRetry TaskScrollResult.Found(taskNode)
-                }
-
-                if (swipeIndex == maxSwipes) {
-                    Log.d("$TAG scrollUntil ❌ not found after $maxSwipes swipes")
-                    return@withRetry TaskScrollResult.NotFoundExhausted
-                }
-
-                // 2) Prepare signature to detect progress
-                val sigBefore = leadingChildSignature(freshScrollNode, direction)
-
-                // 3) Perform swipe
-                val ok = gestureSwipeWithin(freshScrollNode, direction, distanceRatio)
-                if (!ok) {
-                    Log.d("$TAG scrollUntil gesture failed; backing off and continuing")
-                    delay(settleDelay)
-                    return@repeat // Continue to next iteration instead of throwing
-                }
-
-                delay(settleDelay)
-
-                // 4) Refresh tree and re-resolve container for progress check
-                val uiTreeAfter = currentUiTreeFiltered()
-                val scrollNodeAfter =
-                    scrollNode(uiTreeAfter, container, strict, findFirstScrollableChild, allowMissing = true)
-                        ?: return@withRetry TaskScrollResult.NotFoundExhausted
-
-                if (DEBUG_SCROLL_LOGGING) {
-                    logUiTree(uiTreeAfter, "Post-scroll UI tree (swipe=${swipeIndex + 1})")
-                }
-
-                // 5) Check progress using fresh container
-                val sigAfter = leadingChildSignature(scrollNodeAfter, direction)
-                if (sigBefore != null && sigAfter == sigBefore) {
-                    stuckCount++
-                    Log.d("$TAG scrollUntil ⚠️ no movement (stuck=$stuckCount)")
-                    if (stuckCount >= 2) {
-                        Log.d("$TAG scrollUntil 🛑 exhausted scrolling (no further movement)")
-                        return@withRetry TaskScrollResult.NotFoundExhausted
-                    }
-                } else {
-                    stuckCount = 0
-                }
-            }
-
-            Log.d("$TAG scrollUntil ❌ not found after $maxSwipes swipes")
-            TaskScrollResult.NotFoundExhausted
+    ): TaskScrollResult = withRetry(retry, "scrollUntil($target)") {
+        val result = scrollLoop(target, container, direction, distanceRatio, settleDelay,
+            maxSwipes, Duration.INFINITE, 2, findFirstScrollableChild, strict)
+        if (result.terminationReason == TaskScrollTerminationReason.TargetFound) {
+            val tree = currentUiTreeFiltered()
+            val found = scrollTarget(target, tree, container, strict, findFirstScrollableChild)
+                ?: throw UiActionFailure("NODE_NOT_FOUND", "Target disappeared after scrolling")
+            return@withRetry TaskScrollResult.Found(toTaskUiNode(found))
         }
+        when (result.terminationReason) {
+            TaskScrollTerminationReason.ContainerLost -> throw UiActionFailure("CONTAINER_LOST", "Scroll container disappeared")
+            TaskScrollTerminationReason.ContainerNotFound -> throw UiActionFailure("CONTAINER_NOT_FOUND", "Scroll container not found")
+            TaskScrollTerminationReason.ContainerNotScrollable -> throw UiActionFailure("CONTAINER_NOT_SCROLLABLE", "Container is not scrollable")
+            else -> Unit
+        }
+        TaskScrollResult.NotFoundExhausted
     }
 
     override suspend fun scrollIntoView(
@@ -794,7 +694,7 @@ class TaskUiScopeDefault(
     ): TaskUiNode =
         when (val result = scrollUntil(target, container, direction, maxSwipes, distanceRatio, settleDelay, retry, findFirstScrollableChild, strict)) {
             is TaskScrollResult.Found -> result.node
-            TaskScrollResult.NotFoundExhausted -> throw IllegalStateException("Target node not found after scrolling: $target")
+            TaskScrollResult.NotFoundExhausted -> throw UiActionFailure("NODE_NOT_FOUND", "Target node not found after scrolling: $target")
         }
 
     override suspend fun scrollOnce(
@@ -807,7 +707,7 @@ class TaskUiScopeDefault(
         strict: Boolean,
     ): TaskScrollOnceResult = scrollOnceForTarget(container, direction, distanceRatio, settleDelay, retry, findFirstScrollableChild, strict, null).result
 
-    private data class ScrollSearchStep(val result: TaskScrollOnceResult, val targetFound: Boolean = false)
+    private data class ScrollSearchStep(val result: TaskScrollOnceResult, val targetFound: Boolean = false, val containerIdentified: Boolean = true)
 
     private suspend fun scrollOnceForTarget(
         container: NodeMatcher?,
@@ -818,80 +718,59 @@ class TaskUiScopeDefault(
         findFirstScrollableChild: Boolean,
         strict: Boolean,
         target: NodeMatcher?,
-    ): ScrollSearchStep =
-        withRetry(
-            retry = retry,
-            operation = "scrollOnce(dir=$direction)",
-            successPayload = { result, elapsedMs, attempt ->
-                payload(
-                    "direction" to direction.toString(),
-                    "outcome" to result.result.outcome.name.lowercase(),
-                    "elapsed_ms" to elapsedMs,
-                    "attempt" to attempt,
-                )
-            },
-            failurePayload = { throwable, attempt ->
-                val failurePoint =
-                    when {
-                        throwable.message?.contains("No scrollable container") == true ||
-                            throwable.message?.contains("Container not found") == true -> "container_not_found"
-                        throwable.message?.contains("Scrollable container not found") == true -> "container_not_scrollable"
-                        else -> "unknown"
-                    }
-                payload(
-                    "direction" to direction.toString(),
-                    "failure_point" to failurePoint,
-                    "attempt" to attempt,
-                )
-            },
-        ) {
-            require(distanceRatio in 0f..1f) { "distanceRatio must be in [0,1], got $distanceRatio" }
-
-            val uiTree = currentUiTreeFiltered()
-
-            // Resolve container
-            val scrollNode =
-                scrollNode(uiTree, container, strict, findFirstScrollableChild) ?: throw IllegalStateException("No scrollable container visible")
-
-            val resolvedContainerId = scrollNode.resourceId
-            if (target != null && scrollTarget(target, uiTree, container, strict, findFirstScrollableChild) != null) {
-                return@withRetry ScrollSearchStep(TaskScrollOnceResult(TaskScrollOutcome.EdgeReached, resolvedContainerId), targetFound = true)
-            }
-
-            // Capture signature before gesture
-            val sigBefore = leadingChildSignature(scrollNode, direction)
-
-            // Dispatch gesture
-            val gestureOk = gestureSwipeWithin(scrollNode, direction, distanceRatio)
-            if (!gestureOk) {
-                Log.d("$TAG scrollOnce: gesture rejected by OS")
-                return@withRetry ScrollSearchStep(TaskScrollOnceResult(TaskScrollOutcome.GestureFailed, resolvedContainerId))
-            }
-
-            // Wait for settle
-            delay(settleDelay)
-
-            // Re-read tree and re-resolve container for signature comparison
-            val uiTreeAfter = currentUiTreeFiltered()
-            val scrollNodeAfter =
-                scrollNode(uiTreeAfter, container, strict, findFirstScrollableChild, allowMissing = true)
-
-            if (scrollNodeAfter == null) {
-                // Container disappeared after gesture; treat as edge_reached since we cannot compare
-                Log.d("$TAG scrollOnce: container lost after gesture; treating as edge_reached")
-                return@withRetry ScrollSearchStep(TaskScrollOnceResult(TaskScrollOutcome.EdgeReached, resolvedContainerId))
-            }
-
-            val sigAfter = leadingChildSignature(scrollNodeAfter, direction)
-
-            if (sigBefore == null || sigAfter == null || sigAfter == sigBefore) {
-                Log.d("$TAG scrollOnce: signature unchanged - edge_reached")
-                ScrollSearchStep(TaskScrollOnceResult(TaskScrollOutcome.EdgeReached, resolvedContainerId))
-            } else {
-                Log.d("$TAG scrollOnce: signature changed - moved")
-                ScrollSearchStep(TaskScrollOnceResult(TaskScrollOutcome.Moved, resolvedContainerId))
-            }
+        expectedContainer: Pair<UiTree, UiNode>? = null,
+    ): ScrollSearchStep = withRetry(retry, "scrollOnce(dir=$direction)") {
+        require(distanceRatio in 0f..1f) { "distanceRatio must be in [0,1], got $distanceRatio" }
+        val tree = currentUiTreeFiltered()
+        val selected = scrollNode(tree, container, strict, findFirstScrollableChild)
+            ?: throw UiActionFailure("CONTAINER_NOT_FOUND", "No scrollable container visible")
+        if (expectedContainer != null && !sameScrollContainer(expectedContainer.first, expectedContainer.second, tree, selected)) {
+            throw UiActionFailure("CONTAINER_LOST", "The original scroll container can no longer be identified")
         }
+        val resolvedContainerId = selected.resourceId
+        if (target != null && scrollTarget(target, tree, container, strict, findFirstScrollableChild) != null) {
+            return@withRetry ScrollSearchStep(TaskScrollOnceResult(TaskScrollOutcome.Unknown, resolvedContainerId), targetFound = true)
+        }
+        // Record only the resolution actually used for dispatch, never a later target observation.
+        scrollNode(tree, container, strict, findFirstScrollableChild, recordReceipt = true)
+        val before = leadingChildSignature(selected, direction)
+        val receipt = kotlin.coroutines.coroutineContext[ActionReceipt]
+        receipt?.progress(scrollProgress(before, null, false, "dispatch_pending"))
+        fun result(outcome: TaskScrollOutcome, after: String?, comparable: Boolean, reason: String): ScrollSearchStep {
+            val progress = scrollProgress(before, after, comparable, reason)
+            receipt?.progress(progress)
+            return ScrollSearchStep(TaskScrollOnceResult(outcome, resolvedContainerId, progress),
+                containerIdentified = reason !in setOf("container_ambiguous", "container_identity_changed"))
+        }
+        if (!gestureSwipeWithin(selected, direction, distanceRatio)) {
+            return@withRetry result(TaskScrollOutcome.GestureFailed, null, false, "gesture_failed")
+        }
+        delay(settleDelay)
+        val rawAfter = uiTreeInspector.getCurrentUiTree()
+            ?: return@withRetry result(TaskScrollOutcome.ContainerLost, null, false, "hierarchy_unavailable")
+        val treeAfter = uiTreeFilterer.filterOnScreenOnly(rawAfter)
+        val after = try {
+            // A non-strict first-match dispatch does not authorize comparing a different first match.
+            scrollNode(treeAfter, container, strict = true, findFirstScrollableChild, allowMissing = true)
+        } catch (error: StrictSelectionException) {
+            if (error.code == "CONTAINER_AMBIGUOUS") {
+                return@withRetry result(TaskScrollOutcome.Unknown, null, false, "container_ambiguous")
+            }
+            null
+        } catch (error: UiActionFailure) {
+            null
+        }
+        if (after == null) return@withRetry result(TaskScrollOutcome.ContainerLost, null, false, "container_missing")
+        if (!sameScrollContainer(tree, selected, treeAfter, after)) {
+            return@withRetry result(TaskScrollOutcome.Unknown, null, false, "container_identity_changed")
+        }
+        val afterSignature = leadingChildSignature(after, direction)
+        when {
+            before == null || afterSignature == null -> result(TaskScrollOutcome.Unknown, afterSignature, false, "signature_unavailable")
+            before == afterSignature -> result(TaskScrollOutcome.NoMovement, afterSignature, true, "signature_unchanged")
+            else -> result(TaskScrollOutcome.Moved, afterSignature, true, "signature_changed")
+        }
+    }
 
     override suspend fun scrollLoop(
         target: NodeMatcher?,
@@ -914,6 +793,7 @@ class TaskUiScopeDefault(
 
         // Target checks also resolve the container and must preserve structured container failures.
         val resolvedContainerId: String?
+        val initialContainer: UiNode
         try {
             if (target != null) {
                 val visibleTarget = scrollTarget(target, uiTree, container, strict, findFirstScrollableChild)
@@ -927,14 +807,15 @@ class TaskUiScopeDefault(
                 }
             }
 
-            val scrollNode = scrollNode(uiTree, container, strict, findFirstScrollableChild) ?: throw IllegalStateException("No scrollable container visible")
+            val scrollNode = scrollNode(uiTree, container, strict, findFirstScrollableChild) ?: throw UiActionFailure("CONTAINER_NOT_FOUND", "No scrollable container visible")
             resolvedContainerId = scrollNode.resourceId
+            initialContainer = scrollNode
         } catch (e: IllegalStateException) {
             if (e is StrictSelectionException) throw e
-            val reason = when {
-                e.message?.contains("Scrollable container not found") == true ->
-                    TaskScrollTerminationReason.ContainerNotScrollable
-                else -> TaskScrollTerminationReason.ContainerNotFound
+            val reason = when ((e as? UiActionFailure)?.code) {
+                "CONTAINER_NOT_SCROLLABLE" -> TaskScrollTerminationReason.ContainerNotScrollable
+                "CONTAINER_NOT_FOUND" -> TaskScrollTerminationReason.ContainerNotFound
+                else -> throw e
             }
             Log.w("$TAG scrollLoop: $reason - ${e.message}")
             return TaskScrollLoopResult(
@@ -980,9 +861,12 @@ class TaskUiScopeDefault(
                     findFirstScrollableChild = findFirstScrollableChild,
                     strict = strict,
                     target = target,
+                    expectedContainer = uiTree to initialContainer,
                 )
             } catch (e: IllegalStateException) {
-            if (e is StrictSelectionException) throw e
+                if (e is StrictSelectionException && e.code != "CONTAINER_NOT_FOUND") throw e
+                if (e !is QueryHierarchyUnavailableException && e !is StrictSelectionException &&
+                    (e !is UiActionFailure || e.code !in setOf("CONTAINER_NOT_FOUND", "CONTAINER_NOT_SCROLLABLE", "CONTAINER_LOST"))) throw e
                 // Container lost mid-loop (app navigated away etc.) - treat as container lost
                 Log.d("$TAG scrollLoop: container lost mid-loop, returning ContainerLost")
                 return TaskScrollLoopResult(
@@ -997,43 +881,28 @@ class TaskUiScopeDefault(
             }
             scrollsExecuted++
 
+            if (stepResult.result.outcome == TaskScrollOutcome.ContainerLost) {
+                return TaskScrollLoopResult(TaskScrollTerminationReason.ContainerLost, scrollsExecuted, resolvedContainerId)
+            }
+            // Do not assert a scoped target using an ambiguous or changed comparison container.
+            if (target != null && stepResult.containerIdentified) {
+                val found = try {
+                    findVisibleTargetWithGracePeriod(target, settleDelay, container, strict, findFirstScrollableChild)
+                } catch (error: IllegalStateException) {
+                    val lost = error is QueryHierarchyUnavailableException ||
+                        (error is UiActionFailure && error.code in setOf("CONTAINER_NOT_FOUND", "CONTAINER_NOT_SCROLLABLE")) ||
+                        (error is StrictSelectionException && error.code == "CONTAINER_NOT_FOUND")
+                    if (!lost) throw error
+                    return TaskScrollLoopResult(TaskScrollTerminationReason.ContainerLost, scrollsExecuted, resolvedContainerId)
+                }
+                if (found != null) return TaskScrollLoopResult(TaskScrollTerminationReason.TargetFound, scrollsExecuted, resolvedContainerId)
+            }
             when (stepResult.result.outcome) {
-                TaskScrollOutcome.EdgeReached -> {
-                    if (target != null) {
-                        if (findVisibleTargetWithGracePeriod(target, settleDelay, container, strict, findFirstScrollableChild) != null) {
-                            Log.d("$TAG scrollLoop: TARGET_FOUND at edge after $scrollsExecuted scrolls")
-                            return TaskScrollLoopResult(
-                                terminationReason = TaskScrollTerminationReason.TargetFound,
-                                scrollsExecuted = scrollsExecuted,
-                                resolvedContainerId = resolvedContainerId,
-                            )
-                        }
-                    }
-                    Log.d("$TAG scrollLoop: EDGE_REACHED after $scrollsExecuted scrolls")
-                    return TaskScrollLoopResult(
-                        terminationReason = TaskScrollTerminationReason.EdgeReached,
-                        scrollsExecuted = scrollsExecuted,
-                        resolvedContainerId = resolvedContainerId,
-                    )
-                }
-                TaskScrollOutcome.GestureFailed -> {
-                    // Gesture failures count as no movement
-                    noMovementCount++
-                    Log.d("$TAG scrollLoop: gesture_failed (noMovement=$noMovementCount)")
-                }
-                TaskScrollOutcome.Moved -> {
-                    noMovementCount = 0
-                    if (target != null) {
-                        if (findVisibleTargetWithGracePeriod(target, settleDelay, container, strict, findFirstScrollableChild) != null) {
-                            Log.d("$TAG scrollLoop: TARGET_FOUND after $scrollsExecuted scrolls")
-                            return TaskScrollLoopResult(
-                                terminationReason = TaskScrollTerminationReason.TargetFound,
-                                scrollsExecuted = scrollsExecuted,
-                                resolvedContainerId = resolvedContainerId,
-                            )
-                        }
-                    }
-                }
+                TaskScrollOutcome.EdgeReached -> return TaskScrollLoopResult(
+                    TaskScrollTerminationReason.EdgeReached, scrollsExecuted, resolvedContainerId)
+                TaskScrollOutcome.ContainerLost -> error("Container loss was handled before target observation")
+                TaskScrollOutcome.NoMovement, TaskScrollOutcome.Unknown, TaskScrollOutcome.GestureFailed -> noMovementCount++
+                TaskScrollOutcome.Moved -> noMovementCount = 0
             }
 
             // No-movement threshold
@@ -1051,7 +920,7 @@ class TaskUiScopeDefault(
     private suspend fun currentUiTreeFiltered(): UiTree {
         val uiTreeRaw =
             uiTreeInspector.getCurrentUiTree()
-                ?: throw IllegalStateException("UI tree not available")
+                ?: throw QueryHierarchyUnavailableException(uiTreeInspector.getUnavailableHierarchyDiagnostics())
         return uiTreeFilterer.filterOnScreenOnly(uiTreeRaw)
     }
 
@@ -1162,12 +1031,34 @@ class TaskUiScopeDefault(
         val leading3 = container.children.take(3)
         if (leading3.isEmpty()) return null
 
-        return when (direction) {
-            TaskScrollDirection.Down, TaskScrollDirection.Up ->
-                leading3.joinToString("|") { "${it.resourceId ?: it.id.value}@y=${it.bounds.top}" }
-            TaskScrollDirection.Left, TaskScrollDirection.Right ->
-                leading3.joinToString("|") { "${it.resourceId ?: it.id.value}@x=${it.bounds.left}" }
+        val evidence = leading3.joinToString("|") { node ->
+            "${node.resourceId}:${node.className}:${node.bounds}:${node.label}:${node.contentDescription}:" +
+                node.children.take(20).joinToString { "${it.resourceId}:${it.label}:${it.bounds}" }
         }
+        return java.security.MessageDigest.getInstance("SHA-256").digest(evidence.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+    }
+
+    private fun scrollProgress(before: String?, after: String?, comparable: Boolean, reason: String): String =
+        kotlinx.serialization.json.buildJsonObject {
+            put("beforeSignature", before?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull)
+            put("afterSignature", after?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull)
+            put("comparable", kotlinx.serialization.json.JsonPrimitive(comparable))
+            put("reason", kotlinx.serialization.json.JsonPrimitive(reason))
+        }.toString()
+
+    private fun sameScrollContainer(beforeTree: UiTree, before: UiNode, afterTree: UiTree, after: UiNode): Boolean {
+        if (before.accessibilityNodeInfo != null && after.accessibilityNodeInfo != null) {
+            return before.accessibilityNodeInfo == after.accessibilityNodeInfo
+        }
+        // Snapshot paths alone are never identity. Without platform identity require a unique
+        // resource/class candidate in each observation and unchanged structural context.
+        if (before.resourceId == null || before.resourceId != after.resourceId || before.className != after.className) return false
+        fun candidates(tree: UiTree) = NodeResolver(tree).resolve(NodeMatcher(resourceId = before.resourceId))
+        val old = candidates(beforeTree).singleOrNull() ?: return false
+        val fresh = candidates(afterTree).singleOrNull() ?: return false
+        return old.nodePath == fresh.nodePath && before.bounds == after.bounds &&
+            old.ancestors.map { it.resourceId to it.className } == fresh.ancestors.map { it.resourceId to it.className }
     }
 
     private fun toTaskUiNode(uiNode: UiNode): TaskUiNode =
@@ -1235,7 +1126,7 @@ class TaskUiScopeDefault(
 
             // Find the container using the NodeMatcher
             val container =
-                NodeResolver(uiTree).resolve(target).firstOrNull()?.node ?: throw IllegalStateException("No UI node found matching criteria: $target")
+                NodeResolver(uiTree).resolve(target).firstOrNull()?.node ?: throw UiActionFailure("NODE_NOT_FOUND", "No UI node found matching criteria: $target")
 
             // Create a temporary sub-tree rooted at the container to search within
             val subTree = uiTree.copy(root = container)

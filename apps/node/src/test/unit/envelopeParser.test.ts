@@ -184,3 +184,24 @@ describe("parseTerminalEnvelope", () => {
     }
   });
 });
+
+for (const errorCode of ["WAIT_TIMEOUT", "ACTION_FAILED", "UI_TREE_UNAVAILABLE", "COMMAND_TIMEOUT"]) {
+  it(`preserves R6 ${errorCode} evidence and string-valued receipts through parser and CLI output`, async () => {
+    const { formatRunExecutionResultForCli } = await import("../../cli/output.js");
+    const { shouldCliStdoutForceExitCode1 } = await import("../../cli/stdoutExitCode.js");
+    const envelope: import("../../contracts/result.js").ResultEnvelope = {
+      commandId: "command", taskId: "task", status: "failed" as const, errorCode, error: "Original failure",
+      stepResults: [
+        { id: "before", actionType: "click", success: true, data: { target: '{"resourceId":"wrapper"}',
+          matched_target: '{"resourceId":"label"}', candidate_count: "1", dispatch_method: "accessibility_action",
+          dispatch_accepted: "true", elapsed_ms: "12" } },
+        { id: "failed", actionType: "wait_for_node", success: false, data: { errorCode, error: "Original failure" } },
+      ],
+    };
+    const parsed = parseResultEnvelope(`${RESULT_ENVELOPE_PREFIX} ${JSON.stringify(envelope)}`, "command");
+    assert.deepStrictEqual(parsed, envelope);
+    const output = formatRunExecutionResultForCli({ ok: true, envelope, deviceId: "test-device", terminalSource: "clawperator_result" }, { format: "json" });
+    assert.deepStrictEqual(JSON.parse(output).envelope, envelope);
+    assert.strictEqual(shouldCliStdoutForceExitCode1(output, false), true);
+  });
+}

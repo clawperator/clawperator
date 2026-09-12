@@ -7,6 +7,7 @@ import clawperator.accessibilityservice.NoOpTextInputConnectionSource
 import clawperator.accessibilityservice.TextInputConnectionSource
 import clawperator.accessibilityservice.TextInputEditorInfo
 import clawperator.accessibilityservice.TextInputSession
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -23,6 +24,54 @@ import org.robolectric.shadows.ShadowAccessibilityNodeInfo
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [33])
 class UiTreeManagerAndroidTest {
+    class ReceiptService : android.accessibilityservice.AccessibilityService() {
+        override fun onAccessibilityEvent(event: android.view.accessibility.AccessibilityEvent?) {}
+        override fun onInterrupt() {}
+    }
+
+    @Test
+    fun `click receipt names accepted ancestor and never asserts screen change`() = runTest {
+        val service = org.robolectric.Robolectric.buildService(ReceiptService::class.java).create().get()
+        val services = clawperator.accessibilityservice.AccessibilityServiceManagerAndroid().apply {
+            setCurrentAccessibilityService(service, true)
+        }
+        val parent = AccessibilityNodeInfo.obtain().apply { isClickable = true; isEnabled = true }
+        val child = AccessibilityNodeInfo.obtain()
+        Shadow.extract<ShadowAccessibilityNodeInfo>(parent).addChild(child)
+        Shadow.extract<ShadowAccessibilityNodeInfo>(parent).setOnPerformActionListener { _, _ -> true }
+        val observations = mutableListOf<Triple<Any?, String, Boolean>>()
+        val observer = UiDispatchObservation { target, method, accepted -> observations += Triple(target, method, accepted) }
+        val accepted = kotlinx.coroutines.withContext(observer) {
+            UiTreeManagerAndroid(services).triggerClick(uiNode(child), UiTreeClickTypes.Default)
+        }
+        assertTrue(accepted)
+        assertEquals(Triple(parent, "accessibility_action", true), observations.last())
+    }
+
+    @Test
+    fun `gesture fallback records acceptance before completion or cancellation`() = runTest {
+        val service = org.robolectric.Robolectric.buildService(ReceiptService::class.java).create().get()
+        val services = clawperator.accessibilityservice.AccessibilityServiceManagerAndroid().apply {
+            setCurrentAccessibilityService(service, true)
+        }
+        val shadow = Shadow.extract<org.robolectric.shadows.ShadowAccessibilityService>(service)
+        shadow.setCanDispatchGestures(true)
+        val child = AccessibilityNodeInfo.obtain().apply {
+            setBoundsInScreen(android.graphics.Rect(0, 0, 100, 100))
+        }
+        val observations = mutableListOf<Triple<Any?, String, Boolean>>()
+        val observer = UiDispatchObservation { target, method, accepted -> observations += Triple(target, method, accepted) }
+        val action = async(observer) {
+            UiTreeManagerAndroid(services).triggerClick(uiNode(child), UiTreeClickTypes.Default)
+        }
+        testScheduler.runCurrent()
+        assertEquals(Triple(child, "coordinate_gesture", true), observations.last())
+        val dispatched = shadow.gesturesDispatched.single()
+        dispatched.callback().onCompleted(dispatched.description())
+        assertTrue(action.await())
+        assertEquals(1, shadow.gesturesDispatched.size)
+    }
+
     @Test
     fun `setText clear true performs empty set then text set`() =
         runTest {
@@ -396,6 +445,112 @@ class UiTreeManagerAndroidTest {
             assertFalse(result)
             assertEquals(emptyList(), session.operations)
         }
+
+    @Test
+    fun `enter text retries focus handoff through the real manager without replaying text`() = runTest {
+        val session = FakeTextInputSession(initialText = "existing")
+        val manager = createManager(FakeTextInputConnectionSource(session))
+        val nodeInfo = editableNode(includeSetTextAction = false).apply { isFocused = false }
+        var captures = 0
+        val inspector = object : UiTreeInspector {
+            override suspend fun getCurrentUiElements() = error("unused")
+            override suspend fun getCurrentUiTree(): UiTree {
+                // Model the asynchronous focus handoff completing before the retry capture.
+                if (++captures > 1) nodeInfo.isFocused = true
+                return UiTree(uiNode(nodeInfo))
+            }
+            override suspend fun getCurrentWindowMetadata(): UiWindowMetadata? = null
+            override suspend fun getCurrentUiHierarchyDump(): String? = null
+        }
+        val formatter = java.lang.reflect.Proxy.newProxyInstance(
+            UiTreeFormatter::class.java.classLoader, arrayOf(UiTreeFormatter::class.java),
+        ) { _, _, _ -> error("unused") } as UiTreeFormatter
+        val ui = clawperator.task.runner.TaskUiScopeDefault(inspector,
+            object : UiTreeFilterer { override fun filterOnScreenOnly(uiTree: UiTree) = uiTree },
+            formatter, manager, backgroundScope)
+        val receipt = clawperator.task.runner.ActionReceipt()
+        kotlinx.coroutines.withContext(receipt + receipt.observation) {
+            ui.enterText(clawperator.task.runner.NodeMatcher(textEquals = "Field"), "hello",
+                retry = clawperator.task.runner.TaskRetry(3))
+        }
+        assertEquals(2, captures)
+        assertEquals("hello", session.text)
+        assertEquals(1, session.operations.count { it.startsWith("commitText(") })
+        assertTrue(receipt.observation.retryBlocked)
+        assertEquals("true", receipt.stepData()["dispatch_accepted"])
+    }
+
+    @Test
+    fun `uncertain focus preparation blocks retries in both text entry strategies`() = runTest {
+        for (failingAction in listOf(AccessibilityNodeInfo.ACTION_FOCUS, AccessibilityNodeInfo.ACTION_CLICK)) {
+            // The legacy strategy prepares focus first; the input-connection fallback prepares it second.
+            for (failingPreparation in 1..2) {
+                val session = FakeTextInputSession(initialText = "existing")
+                val manager = createManager(FakeTextInputConnectionSource(session))
+                val nodeInfo = editableNode(includeSetTextAction = false).apply { isFocused = false }
+                val failure = IllegalStateException("Focus preparation dispatched but result unavailable")
+                var actionAttempts = 0
+                var captures = 0
+                Shadow.extract<ShadowAccessibilityNodeInfo>(nodeInfo).setOnPerformActionListener { action, _ ->
+                    if (action == failingAction && ++actionAttempts == failingPreparation) {
+                        throw failure
+                    }
+                    action != AccessibilityNodeInfo.ACTION_SET_TEXT
+                }
+                val inspector = object : UiTreeInspector {
+                    override suspend fun getCurrentUiElements() = error("unused")
+                    override suspend fun getCurrentUiTree(): UiTree {
+                        captures++
+                        return UiTree(uiNode(nodeInfo))
+                    }
+                    override suspend fun getCurrentWindowMetadata(): UiWindowMetadata? = null
+                    override suspend fun getCurrentUiHierarchyDump(): String? = null
+                }
+                val formatter = java.lang.reflect.Proxy.newProxyInstance(
+                    UiTreeFormatter::class.java.classLoader, arrayOf(UiTreeFormatter::class.java),
+                ) { _, _, _ -> error("unused") } as UiTreeFormatter
+                val ui = clawperator.task.runner.TaskUiScopeDefault(
+                    inspector,
+                    object : UiTreeFilterer { override fun filterOnScreenOnly(uiTree: UiTree) = uiTree },
+                    formatter, manager, backgroundScope,
+                )
+                val receipt = clawperator.task.runner.ActionReceipt()
+                val thrown = kotlin.test.assertFailsWith<IllegalStateException> {
+                    kotlinx.coroutines.withContext(receipt + receipt.observation) {
+                        ui.enterText(
+                            clawperator.task.runner.NodeMatcher(textEquals = "Field"), "hello",
+                            retry = clawperator.task.runner.TaskRetry(3),
+                        )
+                    }
+                }
+                val scenario = "action=$failingAction preparation=$failingPreparation"
+                assertEquals(failure.message, thrown.message, scenario)
+                assertEquals(1, captures, scenario)
+                assertEquals(failingPreparation, actionAttempts, scenario)
+                assertTrue(receipt.observation.retryBlocked, scenario)
+                assertEquals("false", receipt.stepData()["dispatch_accepted"], scenario)
+                assertEquals("existing", session.text, scenario)
+                assertTrue(session.operations.isEmpty(), scenario)
+            }
+        }
+    }
+
+    @Test
+    fun `successful clear blocks retry even when subsequent text replacement is rejected`() = runTest {
+        val manager = createManager()
+        val nodeInfo = editableNode()
+        Shadow.extract<ShadowAccessibilityNodeInfo>(nodeInfo).setOnPerformActionListener { action, args ->
+            action == AccessibilityNodeInfo.ACTION_SET_TEXT &&
+                args?.getCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE) == ""
+        }
+        val observer = UiDispatchObservation { _, _, _ -> }
+        val success = kotlinx.coroutines.withContext(observer) {
+            manager.setText(uiNode(nodeInfo), "hello", submit = false, clear = true)
+        }
+        assertFalse(success)
+        assertTrue(observer.retryBlocked)
+        assertEquals(listOf("", "hello"), performedSetTextValues(nodeInfo))
+    }
 
     private fun editableNode(
         includeImeEnterAction: Boolean = false,
