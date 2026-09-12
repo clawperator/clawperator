@@ -4,7 +4,7 @@
 
 Make generated skill scripts preserve failed child-process status and diagnostic streams.
 
-The current generated catch block prints stdout and exits zero whenever stdout is nonempty, masking failed executions. Existing scaffold tests cover generation and command resolution but not this failure case.
+The previous generated catch block printed stdout and exited zero whenever stdout was nonempty, masking failed executions. The updated template preserves child streams and status, with subprocess regression coverage.
 
 Generated run.js error handling, subprocess regression tests, and aligned authoring guidance.
 
@@ -14,12 +14,12 @@ Excluded: Rewriting existing user skills, changing the SkillResult protocol, and
 
 | Item | Value |
 | --- | --- |
-| State | Not started |
+| State | Implemented and validated; review/merge pending |
 | Total PRs | 1 |
 | Total phases | 1 |
-| Completed | None |
-| Remaining | Phase 1 |
-| Current / Next | Phase 1 |
+| Completed | Phase 1 implementation and validation |
+| Remaining | Review and merge |
+| Current / Next | Review and merge |
 | Blockers | None |
 
 ## Sources

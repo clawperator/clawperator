@@ -985,7 +985,7 @@ Notes on those literals:
 - `taskId` is the literal `skillId`
 - `commandId` is `${skillId}-${Date.now()}`
 - the default `operatorPackage` fallback inside the scaffolded script is `com.clawperator.operator`
-- the child `execFileSync()` timeout inside scaffolded `run.js` is `120000`
+- the child process timeout inside scaffolded `run.js` is `120000`
 - the scaffolded script includes local `resolveClawperatorBin()` and
   `resolveOperatorPackage()` helpers instead of requiring `skills/utils/common.js`
 - the local command resolver honors `CLAWPERATOR_BIN`, checks
@@ -1013,11 +1013,15 @@ Important boundary:
   global `clawperator` binary
 - the scaffolded script has no repo-level `skills/utils/common.js` dependency
 
-Current scaffold behavior on nested `clawperator exec` failure is also worth knowing:
+Generated scripts forward child stdout and stderr once, including successful
+stderr, and preserve numeric nonzero exit codes. Printable output, including
+valid JSON, never changes a failed process into success. Signals, timeouts,
+spawn failures, and unusable exit statuses produce exit code `1` with available
+output and a concise stderr reason. Successful stdout is forwarded unchanged.
 
-- if `execFileSync()` of the resolved Clawperator command throws but produced
-  stdout, the scaffolded script writes that stdout and exits `0`
-- only failures with no stdout fall through to `stderr` plus `exit 1`
+This behavior applies to newly generated scripts. Existing skills are not
+silently regenerated; update older wrappers that convert child failures into
+exit code `0` when adopting this behavior.
 
 ## Structured Skill Result Contract
 

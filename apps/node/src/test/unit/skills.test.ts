@@ -2535,6 +2535,72 @@ describe("compileArtifact", () => {
 });
 
 describe("scaffoldSkill", () => {
+  it("generated scripts preserve child streams and failure status", async () => {
+    const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-scaffold-status-"));
+    try {
+      const registryPath = join(tempRoot, "skills", "skills-registry.json");
+      await mkdir(dirname(registryPath), { recursive: true });
+      await copyFile(TEST_REGISTRY_PATH, registryPath);
+      const result = await scaffoldSkill("com.example.demo.child-status", registryPath);
+      if (!result.ok) assert.fail(result.message);
+      const runJsPath = join(result.skillPath, "scripts", "run.js");
+      const fakeCliPath = join(tempRoot, "fake child.js");
+      const preloadPath = join(tempRoot, "preload.cjs");
+      // Inject only the child runner for bounded timeout and impossible-status
+      // cases; every case still executes the real generated script.
+      await writeFile(preloadPath, `
+const childProcess = require("node:child_process");
+const original = childProcess.spawnSync;
+childProcess.spawnSync = (command, args, options) => {
+  require("node:assert").strictEqual(options.timeout, 120000);
+  if (process.env.SCAFFOLD_CASE === "unusable") {
+    return { status: null, signal: null, stdout: Buffer.from("partial"), stderr: Buffer.from("diagnostic") };
+  }
+  return original(command, args, {
+    ...options,
+    ...(process.env.SCAFFOLD_CASE === "timeout" ? { timeout: 500 } : {}),
+  });
+};
+`);
+      const cases = [
+        { name: "success", source: 'process.stdout.write(" unchanged\\n"); process.stderr.write("warning\\n");', code: 0, stdout: " unchanged\n", stderr: "warning\n" },
+        { name: "json failure", source: 'process.stdout.write(\'{"ok":false}\\n\'); process.stderr.write("failure\\n"); process.exitCode = 7;', code: 7, stdout: '{"ok":false}\n', stderr: "failure\n" },
+        { name: "text failure", source: 'process.stdout.write("not JSON"); process.stderr.write("diagnostic"); process.exitCode = 3;', code: 3, stdout: "not JSON", stderr: "diagnostic" },
+        { name: "empty stdout", source: 'process.stderr.write("failure"); process.exitCode = 9;', code: 9, stdout: "", stderr: "failure" },
+        { name: "signal", source: 'require("node:fs").writeSync(1, "partial"); require("node:fs").writeSync(2, "diagnostic"); process.kill(process.pid, "SIGTERM");', code: 1, stdout: "partial", stderr: /diagnosticclawperator execution failed: terminated by signal SIGTERM\n$/ },
+        { name: "timeout", source: 'require("node:fs").writeSync(1, "partial"); require("node:fs").writeSync(2, "diagnostic"); setInterval(() => {}, 1000);', code: 1, stdout: "partial", stderr: /diagnosticclawperator execution failed: .*ETIMEDOUT\n$/ },
+        { name: "missing", source: "", code: 1, stdout: "", stderr: /clawperator execution failed: .*ENOENT\n$/ },
+        { name: "unusable", source: "", code: 1, stdout: "partial", stderr: "diagnosticclawperator execution failed: unusable child exit status\n" },
+      ];
+      for (const scenario of cases) {
+        await writeFile(fakeCliPath, scenario.source);
+        const executionResult = await runNodeFile(runJsPath, ["test-device", "com.clawperator.operator.dev"], {
+          env: {
+            ...process.env,
+            NODE_OPTIONS: `--require="${preloadPath}"`,
+            SCAFFOLD_CASE: scenario.name,
+            CLAWPERATOR_BIN: scenario.name === "missing" ? join(tempRoot, "missing") : fakeCliPath,
+          },
+        });
+        assert.strictEqual(executionResult.code, scenario.code, scenario.name + executionResult.stderr);
+        assert.strictEqual(executionResult.stdout, scenario.stdout, scenario.name);
+        if (typeof scenario.stderr === "string") {
+          assert.strictEqual(executionResult.stderr, scenario.stderr, scenario.name);
+        } else {
+          assert.match(executionResult.stderr, scenario.stderr, scenario.name);
+        }
+      }
+      const missingDevice = await runNodeFile(runJsPath, [], {
+        env: { ...process.env, CLAWPERATOR_BIN: fakeCliPath },
+      });
+      assert.strictEqual(missingDevice.code, 1);
+      assert.strictEqual(missingDevice.stdout, "");
+      assert.match(missingDevice.stderr, /Usage: node run.js/);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it("creates a new skill folder and registry entry", async () => {
     const tempRoot = await mkdtemp(join(tmpdir(), "clawperator-skill-scaffold-"));
     const registryDir = join(tempRoot, "skills");

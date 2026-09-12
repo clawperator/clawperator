@@ -49,3 +49,29 @@ The generated-script subprocess tests need no Android device.
 Use `.agents/skills/docs-author/SKILL.md` for the named public docs and `.agents/skills/docs-build/SKILL.md` for regeneration. Run checks for each behavior change; repeat successful checks only after new changes or an unresolved integration concern.
 
 Keep concise findings with versions, reproduction inputs, observed results/artifact paths, decisions, and remaining limitations. Preserve private captures outside tracked files. Update progress and commit validated logical units. Completion includes correcting in-scope failures, not merely producing a first implementation.
+
+## Implementation evidence
+
+Phase 1 is implemented and validated on `fix/scaffold-failure-propagation`.
+Review and merge remain; the pack is retained until cleanup.
+
+- Generated `run.js` uses `spawnSync`, forwards Buffer output without decoding,
+  and sets `process.exitCode` so pending stream writes can finish. Numeric child
+  failures retain their status; runner errors, signals, and unusable statuses
+  fail with a concise reason. The child timeout remains 120000 ms.
+- Real generated-script subprocess tests cover success with both streams,
+  JSON failure with exit 7, non-JSON failure, empty stdout failure, SIGTERM,
+  ENOENT, timeout, unusable status, and missing device arguments. Existing
+  quoted command/backslash and local CLI resolution regressions also pass.
+  The timeout case injects a 500 ms child-runner timeout through a test preload
+  that asserts the production timeout; no public timeout option was added.
+- Node build passed. Package tests: 306 passed. Focused `scaffoldSkill` tests
+  in `dist/test/unit/skills.test.js`: 24 passed. The focused run is explicit
+  because the package test selection does not include this root-level file.
+- `./scripts/docs_build.sh` passed route and inner-page link validation with
+  no organization warnings. `git diff --check` passed.
+- Public authoring guidance and tracked generated docs describe the new
+  status/stream contract and manual migration for older generated wrappers.
+  No existing runtime skill was modified or regenerated, and no SkillResult
+  protocol changed. No sibling skill version bump or device proof is needed
+  for this generation-only change.
