@@ -18,15 +18,15 @@ The order below minimizes shared-file conflicts. Hard dependencies are explicit;
 
 | Order / ID | Implementation | Phase(s) | Hard dependency | Current state |
 | --- | --- | --- | --- | --- |
-| R1 | [Selected Operator readiness](../../node/readiness-verification/plan.md) | 1 | None | Ready |
-| R2 | [Scaffold failure propagation](../../node/scaffold-failure-propagation/plan.md) | 1 | None | Ready |
+| R1 | [Selected Operator readiness](../../node/readiness-verification/plan.md) | 1 | None | Ready; [prompt](../../node/readiness-verification/agent-prompt.md) |
+| R2 | [Scaffold failure propagation](../../node/scaffold-failure-propagation/plan.md) | 1 | None | Ready; [prompt](../../node/scaffold-failure-propagation/agent-prompt.md) |
 | R3 | [On-screen logs PR-2](../../api/on-screen-logs/plan.md) | 3-4 | Its PR-1, merged in `120c1eb` | Ready; [initial prompt](../../api/on-screen-logs/agent-prompt.md) |
-| R4 | [Selector inspection PR-1](../../api/selector-inspection/plan.md) | 1 | None beyond merged main | Ready |
-| R5 | [Strict selectors PR-2](../../api/selector-inspection/plan.md) | 2 | R4 merged | Waiting for R4 |
-| R6 | [Action-result diagnostics](../../api/action-result-diagnostics/plan.md) | 1 | R4 and R5 merged | Waiting for R5 |
-| R7 | [Compact snapshots](../../node/compact-snapshots/plan.md) | 1 | R4 merged for additive XML visibility | Waiting for R4 |
-| R8 | [Still evidence PR-1](../../node/evidence-capture/plan.md) | 1 | None beyond merged main | Ready |
-| R9 | [Managed video PR-2](../../node/evidence-capture/plan.md) | 2 | R8 merged | Waiting for R8 |
+| R4 | [Selector inspection PR-1](../../api/selector-inspection/plan.md) | 1 | None beyond merged main | Ready; [prompt](../../api/selector-inspection/agent-prompt.md) |
+| R5 | [Strict selectors PR-2](../../api/selector-inspection/plan.md) | 2 | R4 merged | Waiting for R4; [prompt](../../api/selector-inspection/pr-2-prompt.md) |
+| R6 | [Action-result diagnostics](../../api/action-result-diagnostics/plan.md) | 1 | R4 and R5 merged | Waiting for R5; [prompt](../../api/action-result-diagnostics/agent-prompt.md) |
+| R7 | [Compact snapshots](../../node/compact-snapshots/plan.md) | 1 | R4 merged for additive XML visibility | Waiting for R4; [prompt](../../node/compact-snapshots/agent-prompt.md) |
+| R8 | [Still evidence PR-1](../../node/evidence-capture/plan.md) | 1 | None beyond merged main | Ready; [prompt](../../node/evidence-capture/agent-prompt.md) |
+| R9 | [Managed video PR-2](../../node/evidence-capture/plan.md) | 2 | R8 merged | Waiting for R8; [prompt](../../node/evidence-capture/pr-2-prompt.md) |
 
 R3 is not a prerequisite for selectors or evidence; the raw overlay API is already merged. R7 and R8 can land before R6 if useful. R2 is isolated enough to implement independently. R1 and R8 do not depend on one another: evidence metadata collection must not call doctor as a hidden mutation or readiness gate.
 
@@ -73,7 +73,7 @@ This covers the agreed foundation and evidence gaps. It is not a promise that on
 
 ## Implementation handoff and release acceptance
 
-For a selected row, use that pack's plan for the contract and its work breakdown for scope, progress, and acceptance; consult source pointers as needed. Complete the requested PR through implementation, relevant validation, repairs, docs, status, and local commits. Dependencies define rollout order, not an approval pause within an authorized PR. Use the on-screen-log PR-2 prompt where linked. For another pack, its work breakdown is the handoff; a PR-specific prompt can be generated with `.agents/skills/task-create-impl-prompt/SKILL.md` without redesigning the task.
+For a selected row, use that pack's plan for the contract and its work breakdown for scope, progress, and acceptance; consult source pointers as needed. Complete the requested PR through implementation, relevant validation, repairs, docs, status, and local commits. Dependencies define rollout order, not an approval pause within an authorized PR. Each row links a short PR-specific prompt. These are convenient entry points, not another specification: the plan owns the contract and the work breakdown owns execution scope and evidence. Pending-PR prompts retain their merge gates. An agent can also start from an instruction such as "Implement R1 from tasks/releases/v0.10/plan.md through validation and local commits." Naming the row establishes authorization; the release table alone does not authorize implementing every row. Use `.agents/skills/task-create-impl-prompt/SKILL.md` when a different handoff is needed.
 
 Before merging each implementation PR:
 
