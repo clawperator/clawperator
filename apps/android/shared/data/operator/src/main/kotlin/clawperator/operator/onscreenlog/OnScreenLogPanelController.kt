@@ -392,6 +392,9 @@ class OnScreenLogPanelController internal constructor(
             val replacement = preparePanel(currentService, state.spec)
             val nextGeneration = nextGeneration()
             val replacementWindowTitle = windowTitle(nextGeneration)
+            // The currently stored state is still the previous acknowledged generation while
+            // this reflow waits. Its expiry must not remove the new in-flight view.
+            cancelExpiry()
             currentPanel.apply(replacement.prepared, nextGeneration)
             host.updateViewLayout(
                 currentPanel,

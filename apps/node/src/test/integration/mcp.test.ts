@@ -392,6 +392,26 @@ describe("mcp stdio integration", () => {
     }
   });
 
+  it("returns canonical validation errors for malformed generic action params", async () => {
+    await client.initialize();
+
+    const result = await client.callTool("execute", {
+      deviceId: "non-existent",
+      timeoutMs: 1000,
+      actions: [
+        {
+          id: "open-app",
+          type: "open_app",
+          params: { applicationId: 1 },
+        },
+      ],
+    });
+
+    const payload = parseToolPayload(result) as { code?: string };
+    assert.strictEqual(result.isError, true);
+    assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
+  });
+
   it("configure with no args returns empty session state", async () => {
     await client.initialize();
 

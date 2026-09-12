@@ -51,6 +51,11 @@
 | `./gradlew shared:data:operator:testDebugUnitTest app:assembleDebug app:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | The final review batch leaves the full debug app and relevant Android controller suites green. | Gradle output |
 | `bash validation/on-screen-logs/test_phase2_contract.sh` | 0 | The generic raw fixtures still validate through the branch-local CLI after the final transport-boundary fix. | validation script output |
 | `./scripts/docs_build.sh` | 0 | The final authored and generated documentation site builds and validates successfully. | docs build output |
+| `./gradlew shared:data:operator:testDebugUnitTest` | 0 | The final review regression proves that an expiry due during a pending deferred reflow cannot remove the in-flight generation. | Gradle output |
+| `npm --prefix apps/node run build && npm --prefix apps/node run test` | 0 | All 274 Node tests passed, including MCP and canonical-validator regressions for malformed generic action parameters. | npm output |
+| `./gradlew app:assembleDebug app:testDebugUnitTest shared:data:operator:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | The final review-corrected debug app and all relevant Android unit suites build and pass. | Gradle output |
+| `./gradlew app:installDebug` followed by branch-local `doctor` on `<device_serial>` with `com.clawperator.operator.dev` | 0 | The final debug APK installed and the selected API 35 emulator was compatible, accessible, and interactive. | Gradle and doctor output |
+| `./scripts/docs_build.sh` | 0 | The final transport-specific capture guidance and regenerated machine-facing documentation build successfully. | docs build output |
 
 ## Live Observations
 
@@ -83,6 +88,9 @@
 - The second PR-1 review requires every configuration reflow deferred by a pending `set_on_screen_log` to receive its own draw acknowledgement within the original request deadline. The returned rendered bounds therefore always belong to an acknowledged generation. Node and Android now also use the same explicit whitespace set for required text, including U+FEFF.
 - Numeric on-screen-log fields use JSON numeric semantics on both sides of the Android boundary: finite values with no fractional component are accepted, including JSON forms such as `1.0` and `1e3`; numeric strings, nulls, and fractional values are rejected. The public documentation also states that API 21 fails closed before a window is attached, while API 22 or later is required for placement.
 - The generic MCP `execute` schema preserves raw action parameters through transport. Nulls, arrays, and scalars now reach the canonical execution validator and return `EXECUTION_VALIDATION_FAILED`, rather than becoming transport-specific `InvalidParams` errors. The caller-controlled screenshot-path safeguard remains record-gated.
+- The canonical validator now skips semantic checks whenever an action's parameter object fails its structural schema. This prevents malformed generic values from reaching legacy string operations and guarantees the normal `EXECUTION_VALIDATION_FAILED` result instead of a raw runtime exception.
+- A deferred configuration reflow cancels the previous acknowledged generation's expiry before it awaits its own draw. Once acknowledged, it reschedules the same absolute expiry deadline for the new generation. This prevents an old expiry from removing a new in-flight view without extending the requested TTL.
+- Screenshot-path guidance distinguishes transports: raw CLI and Serve may use caller-selected paths, while MCP rejects a caller-controlled path and returns its runtime-managed path when `params.path` is omitted. The docs also distinguish canonical action validation errors from MCP tool-shape `InvalidParams` errors.
 - The existing screenshot execution pipeline was not redesigned. Its same-payload ordering limitation is a documented follow-up boundary, not a reason to add a parallel transport, host-owned renderer, or temporary ingress in PR-1.
 
 ## Remaining Limitations

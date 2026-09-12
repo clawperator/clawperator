@@ -2712,12 +2712,17 @@ Android action list has returned its result envelope. A single action list that
 orders `set_on_screen_log`, `take_screenshot`, and `clear_on_screen_log` can
 therefore write a screenshot after the clear has already removed the panel.
 
-To capture a visible panel with the current generic transport, use separate raw
+To capture a visible panel with the raw CLI or Serve transport, use separate
 executions in this order:
 
 1. `set_on_screen_log`
 2. `take_screenshot` with the caller-selected absolute path
 3. `clear_on_screen_log`
+
+The MCP `execute` tool rejects caller-controlled `take_screenshot` paths. For
+MCP, omit `params.path` and use the runtime-managed `data.path` returned in the
+result envelope if that path is useful to the MCP client. The same ordering
+limit still applies to separate executions.
 
 This is a capture-ordering limit of the existing screenshot pipeline, not a
 stronger rendering acknowledgement. The panel's `rendered: "true"` result still
@@ -2750,8 +2755,10 @@ On a successful run, check all of these exact result paths:
 - the clear step has `success == true` and `data.visible == "false"`
 
 If capture pixels matter, run a separate raw `take_screenshot` execution while
-the panel remains visible, then inspect the caller-selected output file. Do not
-use a successful draw acknowledgement as proof of screenshot inclusion.
+the panel remains visible. The raw CLI and Serve transports can use a
+caller-selected output file; MCP must omit `params.path` and returns its
+runtime-managed path in step data. Do not use a successful draw acknowledgement
+as proof of screenshot inclusion.
 
 ## Failure Modes
 
@@ -2789,9 +2796,12 @@ Use the same JSON action objects with these existing execution surfaces:
 - `POST /execute` in the [Serve API](serve.md#endpoint-post-execute)
 - the MCP [`execute`](mcp.md#mcp-tool-execute) tool
 
-The actions are validated before Android dispatch. Invalid input returns
-`EXECUTION_VALIDATION_FAILED`; it cannot change an existing panel. Runtime
-failures are described in [Errors](errors.md#on-screen-log-panel-failures).
+After a transport accepts an action object, canonical action validation happens
+before Android dispatch. Invalid action names, parameter types, ranges, colors,
+and strict object shapes return `EXECUTION_VALIDATION_FAILED`; they cannot
+change an existing panel. MCP can instead return transport `InvalidParams` for
+malformed tool shape, such as missing `actions` or blank action `id` or `type`.
+Runtime failures are described in [Errors](errors.md#on-screen-log-panel-failures).
 
 ## Related Pages
 

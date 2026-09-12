@@ -6,7 +6,7 @@ import type { ResultEnvelope } from "../../contracts/result.js";
 import { reconcileEnvelopeStatusAfterPostProcessing } from "../../domain/executions/runExecution.js";
 import { validateExecution } from "../../domain/executions/validateExecution.js";
 
-function executionFor(type: string, params?: Record<string, unknown>): Record<string, unknown> {
+function executionFor(type: string, params?: unknown): Record<string, unknown> {
   return {
     commandId: "on-screen-log-command",
     taskId: "on-screen-log-task",
@@ -204,6 +204,23 @@ describe("clear_on_screen_log validation", () => {
       ...executionFor("clear_on_screen_log"),
       actions: [{ id: "clear", type: "clear_on_screen_log", params: null }],
     });
+  });
+});
+
+describe("raw action parameter validation", () => {
+  it("returns structured validation failures for malformed generic parameters", () => {
+    const malformedCases: Array<[string, unknown]> = [
+      ["open_app", { applicationId: 1 }],
+      ["start_recording", { sessionId: 1 }],
+      ["open_uri", { uri: 1 }],
+      ["scroll", { direction: 1 }],
+      ["press_key", { key: 1 }],
+      ["wait_for_navigation", { expectedPackage: 1, timeoutMs: 1 }],
+    ];
+
+    for (const [type, params] of malformedCases) {
+      assertValidationFailure(executionFor(type, params));
+    }
   });
 });
 

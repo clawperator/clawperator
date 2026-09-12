@@ -123,6 +123,20 @@ const setOnScreenLogParamsSchema = z.object({
 
 const clearOnScreenLogParamsSchema = z.object({}).strict();
 
+function paramsSchemaForAction(actionType: string) {
+  if (actionType === "set_on_screen_log") {
+    return setOnScreenLogParamsSchema.optional();
+  }
+  if (actionType === "clear_on_screen_log") {
+    return clearOnScreenLogParamsSchema.optional();
+  }
+  return actionParamsSchema.optional();
+}
+
+function hasStructurallyValidActionParams(actionType: string, params: unknown): boolean {
+  return paramsSchemaForAction(actionType).safeParse(params).success;
+}
+
 // NOTE: "doctor_ping" is intentionally excluded. It is an internal diagnostic action
 // used only by `clawperator doctor`, which bypasses validateExecution and dispatches
 // directly via broadcastAgentCommand. It is not part of the public agent-facing API.
@@ -154,12 +168,7 @@ const actionSchema = z.object({
   type: z.string().max(64).transform((s) => getCanonicalActionType(s)),
   params: z.unknown().optional(),
 }).strict().superRefine((action, ctx) => {
-  const paramsSchema =
-    action.type === "set_on_screen_log"
-      ? setOnScreenLogParamsSchema.optional()
-      : action.type === "clear_on_screen_log"
-        ? clearOnScreenLogParamsSchema.optional()
-        : actionParamsSchema.optional();
+  const paramsSchema = paramsSchemaForAction(action.type);
   const parsedParams = paramsSchema.safeParse(action.params);
   if (parsedParams.success) {
     return;
@@ -212,6 +221,12 @@ const executionSchema = z.object({
   };
 
   execution.actions.forEach((action, index) => {
+    // The action-level refinement already reports structural parameter errors. Do not run
+    // semantic checks on malformed raw values, where legacy checks may assume strings or
+    // objects and otherwise throw instead of returning EXECUTION_VALIDATION_FAILED.
+    if (!hasStructurallyValidActionParams(action.type, action.params)) {
+      return;
+    }
     const params = action.params as ActionParams | undefined;
     switch (action.type) {
       case "open_app":

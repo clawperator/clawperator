@@ -270,6 +270,47 @@ class OnScreenLogPanelControllerTest {
         }
 
     @Test
+    fun `deferred reflow cancels the prior generation expiry until it is acknowledged`() =
+        runBlocking {
+            val fixture = controllerFixture()
+            render(fixture.controller, OnScreenLogSpec(text = "first label", ttlMs = 5_000L))
+            fixture.displayAreaProvider.bounds = OnScreenLogBounds(0, 0, 2_200, 1_080)
+            fixture.windowHost.acknowledgeDraws = false
+
+            val replacement =
+                async(start = CoroutineStart.UNDISPATCHED) {
+                    fixture.controller.set(
+                        OnScreenLogSpec(
+                            text = "replacement label",
+                            anchor = clawperator.task.runner.OnScreenLogAnchor.Right,
+                            ttlMs = 1_000L,
+                        ),
+                    )
+                }
+
+            fixture.controller.onConfigurationChanged()
+            fixture.windowHost.lastView?.acknowledgeDrawForTest()
+
+            // The first replacement generation has an expiry, but the pending reflow must cancel
+            // it before waiting. Only the reflow draw timeout may remain scheduled here.
+            assertEquals(1, fixture.scheduler.scheduledCount())
+            fixture.clock.nowMs = 1_000L
+            fixture.scheduler.runScheduledWithDelay(1_000L)
+            assertTrue(fixture.controller.isOperatorOverlayVisible)
+            assertFalse(replacement.isCompleted)
+
+            fixture.windowHost.lastView?.acknowledgeDrawForTest()
+            assertIs<OnScreenLogControllerResult.Rendered>(
+                withTimeout(1_000L) {
+                    replacement.await()
+                },
+            )
+
+            // The reflow reuses the original absolute TTL and schedules only its own expiry.
+            assertEquals(1, fixture.scheduler.scheduledCount())
+        }
+
+    @Test
     fun `legacy usable bounds preserve a left navigation bar and display cutout`() {
         assertEquals(
             OnScreenLogNavigationBarSide.Left,
@@ -487,6 +528,16 @@ class OnScreenLogPanelControllerTest {
         fun onlyScheduledRunnable(): Runnable {
             assertEquals(1, scheduled.size)
             return scheduled.keys.single()
+        }
+
+        fun scheduledCount(): Int = scheduled.size
+
+        fun runScheduledWithDelay(delayMs: Long) {
+            scheduled
+                .filterValues { it == delayMs }
+                .keys
+                .toList()
+                .forEach(::run)
         }
 
         fun run(runnable: Runnable) {
