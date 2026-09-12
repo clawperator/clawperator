@@ -63,7 +63,7 @@ export async function videoFixture(options: { failure?: string; stopped?: boolea
         await fs.writeFile(args.at(-1)!, Buffer.from("fake media bytes"));
       }
       if (command === "ffprobe") return { code: 0, stderr: "", stdout: JSON.stringify({ streams: [{ codec_name: "h264", width: options.failure === "dimensions" ? 640 : 720, height: 1280, duration: options.failure === "idle-zero" ? "0.000000" : "0.25" }] }) };
-      if (command === "ffmpeg") return options.failure === "decode" ? { code: 1, stderr: "corrupt frame", stdout: "" } : { code: 0, stderr: "", stdout: "0, 0, 0, 1, 1024, d41d8cd98f00b204e9800998ecf8427e" };
+      if (command === "ffmpeg") return options.failure === "decode" ? { code: 1, stderr: "corrupt frame", stdout: "" } : { code: 0, stderr: "", stdout: "frame=6\nprogress=end\n" };
       return { code: 0, stderr: "", stdout: "" };
     },
   };
@@ -304,3 +304,101 @@ for (const filename of ["video.mp4", "encoder.stderr.txt", "captures.json"]) {
     } finally { await f.cleanup(); }
   });
 }
+
+it("requires EOF and positive decoded frames and rejects error diagnostics even with exit zero", async () => {
+  const f = await videoFixture();
+  const original = f.runner.run;
+  try {
+    for (const output of [
+      { code: 0, stdout: "frame=0\nprogress=end\n", stderr: "" },
+      { code: 0, stdout: "frame=4\nprogress=continue\n", stderr: "" },
+      { code: 0, stdout: "frame=4\nprogress=end\n", stderr: "corrupt decoded frame" },
+      { code: null, stdout: "frame=4\nprogress=continue\n", stderr: "Video subprocess timed out" },
+    ]) {
+      f.runner.run = async (command, args, options) => command === "ffmpeg" ? output : original(command, args, options);
+      await assert.rejects(verifyVideo(f.runner, "video.partial.mp4", f.state.size));
+    }
+  } finally { await f.cleanup(); }
+});
+
+it("kills output overflow without retaining subsequent chunks", async () => {
+  const result = await new VideoProcessRunner().run(process.execPath,
+    ["-e", "const b=Buffer.alloc(1024*1024,120);setInterval(()=>{process.stdout.write(b);process.stderr.write(b)},1)"], { timeoutMs: 5000 });
+  assert.equal(result.code, null);
+  assert.match(result.stderr, /output exceeded 16 MiB/);
+  assert.ok(Buffer.byteLength(result.stdout) <= 16 * 1024 * 1024);
+});
+
+for (const failure of ["late-decode", "decode-timeout"]) it(`preserves partial evidence, verdict and immutable CLI/MCP stop after ${failure}`, async () => {
+  const f = await videoFixture();
+  const original = f.runner.run;
+  try {
+    f.runner.run = async (command, args, options) => {
+      if (command !== "ffmpeg") return original(command, args, options);
+      assert.equal(options?.timeoutMs, 120000);
+      assert.ok(!args.includes("-frames:v"));
+      assert.deepEqual(args.slice(args.indexOf("-map"), args.indexOf("-map") + 2), ["-map", "0:v:0"]);
+      assert.ok(args.includes("passthrough"));
+      return { code: failure === "late-decode" ? 1 : null, stdout: "frame=42\nprogress=continue\n",
+        stderr: failure === "late-decode" ? "Invalid NAL unit at tail" : "Video subprocess timed out" };
+    };
+    await runVideoWorker(f.outputDir, f.runner);
+    const before = await fs.readFile(f.path, "utf8");
+    const manifest = JSON.parse(before);
+    assert.equal(manifest.status, "partial");
+    assert.equal(manifest.context.originalVerdict, "failed");
+    assert.equal(manifest.video.codec, "h264");
+    assert.equal(manifest.video.actualSize, f.state.size);
+    assert.equal(manifest.video.mediaDurationMs, 250);
+    assert.match(manifest.errors[0].message, /Full video decode failed/);
+    assert.equal(await fs.readFile(join(f.outputDir, "video.partial.mp4"), "utf8"), "fake media bytes");
+    await assert.rejects(fs.stat(join(f.outputDir, "video.mp4")));
+    await assert.rejects(fs.stat(f.state.lockPath));
+    assert.equal(f.calls.filter(args => args.includes("pull")).length, 1);
+    assert.ok(!f.calls.some(args => args.includes("rm")));
+    for (const operation of ["status", "stop", "stop"]) {
+      const cli = spawnSync(process.execPath, ["dist/cli/index.js", "evidence", "video", operation, "--session", f.path], { encoding: "utf8" });
+      assert.equal(cli.status, 1);
+      assert.equal(JSON.parse(cli.stdout).status, "partial");
+      assert.equal(JSON.parse(cli.stdout).code, "EVIDENCE_CAPTURE_FAILED");
+    }
+    assert.equal(await fs.readFile(f.path, "utf8"), before);
+    // Relocate the completed fixture into the MCP-owned bundle root.
+    const managed = join(f.outputDir, "bundles", f.state.sessionId);
+    await fs.mkdir(managed, { recursive: true });
+    await fs.copyFile(f.path, join(managed, "manifest.json"));
+    await atomicJson(join(managed, "session.json"), { ...f.state, outputDir: managed, managed: true });
+    for (const tool of getVideoMcpTools(undefined, { baseDir: f.outputDir }).filter(tool => !tool.name.endsWith("start"))) {
+      const result = await tool.handler({ sessionId: f.state.sessionId });
+      assert.equal(result.isError, true);
+      assert.equal(result.structuredContent?.status, "partial");
+    }
+    assert.equal(await fs.readFile(join(managed, "manifest.json"), "utf8"), before);
+  } finally { await f.cleanup(); }
+});
+
+it("keeps heartbeats alive during full decoding and final artifact persistence", async () => {
+  const f = await videoFixture();
+  const original = f.runner.run;
+  try {
+    const checkHeartbeat = async () => {
+      const before = JSON.parse(await fs.readFile(join(f.outputDir, "heartbeat.json"), "utf8"));
+      await new Promise(resolve => setTimeout(resolve, 1100));
+      const after = JSON.parse(await fs.readFile(join(f.outputDir, "heartbeat.json"), "utf8"));
+      assert.ok(after.updatedAt > before.updatedAt);
+      assert.equal(after.nonce, f.state.nonce);
+      assert.equal((await videoStatus({ session: f.path })).status, "finalizing");
+      await fs.stat(f.state.lockPath);
+    };
+    f.runner.run = async (command, args, options) => {
+      if (command === "ffmpeg") await checkHeartbeat();
+      return original(command, args, options);
+    };
+    const readArtifact = (async (path: Parameters<typeof fs.readFile>[0]) => {
+      if (String(path).endsWith("video.mp4")) await checkHeartbeat();
+      return fs.readFile(path);
+    }) as typeof fs.readFile;
+    await runVideoWorker(f.outputDir, f.runner, undefined, readArtifact);
+    assert.equal((await videoStatus({ session: f.path })).status, "complete");
+  } finally { await f.cleanup(); }
+});

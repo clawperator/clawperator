@@ -2,7 +2,7 @@
 
 This coordinates the runtime-observability workstream and its release-readiness follow-ups. Implementation status does not imply publication or completion of the release gates.
 
-R1-R8 and R10-R13 implementations are merged. R8 landed in `13d6b5a6` (PR #283), R11 in `28b8b1fa` (PR #281), R12 in `460e654c` (PR #280), and R13 in `0c4ed5ce` (PR #282). The integrated local API 35 matrix passes with the Internet-readiness and Operator-setup follow-ups through `306b38d`; R12's pack is retired. R9 is locally complete in `44272a4`, pending merge; the evidence-capture pack is retired. One task pack remains active for result transport's retained causal/release follow-up. The manual supported-image release CI gate remains required.
+R1-R8 and R10-R13 implementations are merged. R8 landed in `13d6b5a6` (PR #283), R11 in `28b8b1fa` (PR #281), R12 in `460e654c` (PR #280), and R13 in `0c4ed5ce` (PR #282). The integrated local API 35 matrix passes with the Internet-readiness and Operator-setup follow-ups through `306b38d`; R12's pack is retired. R9 merged in `6fc6c191` (PR #285); R14 full-stream verification is locally complete, pending merge; the evidence-capture pack is retired. One task pack remains active for result transport's retained causal/release follow-up. The manual supported-image release CI gate remains required.
 
 ## Folder ownership
 
@@ -31,7 +31,8 @@ The order below minimizes shared-file conflicts. Hard dependencies are explicit;
 | R12 | [Hierarchy harness preparation](../../../validation/sensitive-hierarchy-access/README.md#integrated-r11r12r13-acceptance) | Complete | R10/R11/R13 merged | [DONE] merged in `460e654c` (PR #280); readiness/setup follow-ups locally committed through `306b38d`; all six API 35 full runs passed; pack retired |
 | R7 | [Compact snapshots](../../../docs/api/snapshot.md#compact-output-and-raw-artifacts) | Complete | R4 merged for additive XML visibility | [DONE] merged in `48a2604c` (PR #279); pack retired; [validation and limits](../../../docs/internal/design/compact-snapshots.md#validation-and-compatibility) |
 | R8 | [Still evidence PR-1](../../../docs/api/evidence.md) | Complete | None beyond merged main | [DONE] merged in `13d6b5a6` (PR #283); evidence pack retired; [validation and limits](../../../docs/internal/design/still-evidence.md#validation-and-observed-limits) |
-| R9 | [Managed video](../../../docs/api/evidence.md#managed-video) | Complete locally | R8 merged in `13d6b5a6` | [DONE] implemented in `44272a4`, pending merge; 1,549 Node tests, docs/debug APK builds, verified navigation and honest zero-duration idle partial; [validation and limits](../../../docs/internal/design/managed-video.md#validation-and-limits); pack retired |
+| R9 | [Managed video](../../../docs/api/evidence.md#managed-video) | Complete | R8 merged in `13d6b5a6` | [DONE] merged in `6fc6c191` (PR #285); 1,549 Node tests, docs/debug APK builds, verified navigation and honest zero-duration idle partial; [validation and limits](../../../docs/internal/design/managed-video.md#validation-and-limits); pack retired |
+| R14 | [Full-stream video verification](../../../docs/internal/design/managed-video.md#full-stream-verification-r14) | Complete locally | R9 merged in `6fc6c191` (PR #285) | [DONE] implementation and acceptance complete, pending merge; 1,554 Node tests, validation/docs/debug APK builds, corrupt-late worker proof, VFR and 180-second budgets, independently decoded live navigation; audit handoff left unchanged |
 
 R3 is not a prerequisite for selectors or evidence; the raw overlay API is already merged. R7 and R8 can be developed independently of R11-R13. Prefer resolving the audit follow-ups first so their failures do not become media-layer workarounds. R1 and R8 do not depend on one another: evidence metadata collection must not call doctor as a hidden mutation or readiness gate.
 
@@ -72,7 +73,7 @@ R11, R12 and R13 have no new implementation merge dependencies on one another. S
 | Log-path friction | R1 | Shared path resolution and advisory write diagnostics; healthy actuation is not blocked by file logging |
 | Verbose/truncated snapshots | R7 | Whole-node projection, explicit counts/state, unmodified raw artifact, valid JSON, and MCP-owned output paths |
 | Screenshot evidence bundles | R8 | Correlation, hashes, per-component times, readable images, and partial-failure manifests |
-| Video evidence | R9 | Owned lifecycle, bounded recording, dimension checks, decodable media, and distinct wall/media durations |
+| Video evidence | R9 plus R14 | Owned lifecycle, bounded full-stream decoding including the tail, dimension checks, retained failed media, and distinct wall/media durations |
 | On-screen context and style | Merged overlay PR-1 plus R3 | Public CLI parity, touch/selector isolation, cleanup, and repeated image/video proof |
 | Final reports, suite verdicts, fixtures, crash checks, and recovery policy | Downstream consumer | Build reports and assertions from these primitives; not additional Clawperator core tasks |
 | Agent-assisted recovery | Deliberately later and caller-owned | Preserve original failed verdict; no hidden retries or planning inside Clawperator |
@@ -84,7 +85,7 @@ This covers the agreed foundation and evidence gaps. It is not a promise that on
 
 **Core deterministic execution gate:** R1, R4, R5, and R6 must pass their unit and live criteria before relying on the new readiness/strict-selection/receipt contracts. R2 is merged for generated skill wrappers. The local combined R11/R12/R13 proof now passes with the harness follow-ups through `306b38d`; the manual supported-image release gate remains required. A consumer can start repository/report development independently, but should not build workarounds for these known core failures.
 
-**Evidence integration gate:** R8 must pass before adopting its manifest as the stable report input; R9 must pass before claiming managed-video support. Existing screenshot and explicit ADB recording helpers remain usable while these APIs are developed. Reports must distinguish unavailable evidence from failed test assertions, and never equate file existence with proof.
+**Evidence integration gate:** R8 must pass before adopting its manifest as the stable report input; R9 and R14 must pass before claiming fully verified managed-video support. R9 is merged; R14 is locally validated and still requires merge. Existing screenshot and explicit ADB recording helpers remain usable while these APIs are developed. Reports must distinguish unavailable evidence from failed test assertions, and never equate file existence with proof.
 
 **Optional convenience:** R3 and R7 are merged. They reduce authoring/inspection overhead without being technical prerequisites for deterministic execution. R1-R7 and R10-R13 implementations are merged, and local combined R11/R12/R13 proof passes. The manual supported-image release CI gate remains open. Consumer development and independent media implementation may proceed, but do not waive these release blockers or the required combined proof.
 

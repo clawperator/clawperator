@@ -14,6 +14,7 @@ export class VideoProcessRunner extends NodeProcessRunner {
         finish({ code: null, stdout, stderr: "Video subprocess timed out", error: new Error("Video subprocess timed out") });
       }, options?.timeoutMs ?? 10000);
       const collect = (chunk: Buffer, errorStream: boolean) => {
+        if (settled) return;
         bytes += chunk.length;
         if (bytes > 16 * 1024 * 1024) {
           child.kill("SIGKILL");

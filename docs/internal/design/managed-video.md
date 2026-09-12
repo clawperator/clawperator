@@ -33,8 +33,9 @@ or concurrent stop requests. Atomic nonce-bound request files avoid multiple
 callers racing manifest publication.
 
 Media verification requires positive probed duration, exact requested dimensions,
-and an actual decoded frame checksum. The video is renamed only after these
-checks. Encoder stderr (including an empty successful stream) and host capture
+and full decoding of the selected first video stream through EOF, with a positive
+frame count and no decoder error diagnostics. The video is renamed only after
+these checks. Encoder stderr (including an empty successful stream) and host capture
 receipts are hashed artifacts. Retained stderr is capped and truncation is an
 explicit partial failure. Remote cleanup follows successful pull and verification;
 otherwise the recovery state preserves its unique path.
@@ -137,3 +138,78 @@ and the full 1,549-test Node suite. A fresh selected-device recording started an
 stopped successfully, retained the updated on-screen log in decoded frames, and
 passed independent artifact hash/byte-count checks. The test explicitly cleared
 its own panel afterward. The documentation build also passed.
+
+
+## Full-stream verification (R14)
+
+R9 merged in PR #285 (`6fc6c191`); its opening-frame checksum could accept a
+recording damaged later in the stream. R14 replaces that check with full ffmpeg
+decoding to a null output. `-map 0:v:0` matches the probed stream, `-xerror` and
+`-err_detect explode` make decoding damage fatal, and error-level stderr is also
+rejected even if the process returns zero. A final `progress=end` report must
+contain a positive frame count. Missing EOF, timeout, or exhausted output budget
+cannot authorize promotion. Probe metadata is saved before decoding starts.
+
+`-fps_mode passthrough` and `-enc_time_base -1` retain the source timebase. Without
+that output timing, valid sparse VFR input can trigger duplicate-DTS diagnostics
+in the null muxer. We prevent the verifier from inventing those errors rather
+than ignoring decoder diagnostics. No expected frame count is derived from
+average frame rate or wall time, and no decoded pixels are retained by Node.
+
+The decode deadline is fixed at 120 seconds, including process startup, regardless
+of probed duration. Decoder threads are capped at two and output threads at one;
+ffmpeg's maximum individual allocation is 256 MiB, not an aggregate RSS cap.
+All video subprocess stdout/stderr capture remains capped at 16 MiB combined.
+Progress emits at a 60-second interval plus completion. A deadline or overflow
+sends SIGKILL to the owned subprocess; collection stops after settlement. Pull
+and probe retain their individual 10-second deadlines. Stop's 15-second caller
+wait can return pending while the worker continues verification with heartbeats;
+repeated stop does not restart decoding or recording.
+
+The generated real-codec regression in
+`validation/video-stream-verification/test-video-stream.mjs` corrupts the AVCC
+NAL length in a packet after 2.5 seconds of a three-second H.264 MP4. Probe and
+opening-frame decoding still succeed, but full verification fails. The worker
+fixture uses those real bytes and real ffmpeg, faking only recorder transport:
+partial bytes/hash, codec, size, duration, caller verdict, and diagnostics survive;
+no promoted file or recapture occurs, and repeated stop is immutable. Other
+fixtures cover a truncated tail, valid CFR, and valid bursty VFR. Unit tests cover
+missing EOF/frames, zero duration, timeouts, output overflow, exit-zero diagnostics,
+CLI/MCP partial status, stop races, artifact read failures, and heartbeats through
+decode and final artifact persistence.
+
+At the 180-second recording cap, 60-fps H.264 fixtures fully decoded at 720x1280,
+1280x720, and 1920x1080 in approximately 5.0, 6.5, and 10.3 seconds respectively
+on the validation host. The harness enforces the production deadline and runs in
+the shared validation suite and PR CI with ffmpeg installed. This measures the
+default maximum in both orientations and one explicit full-HD size; it does not
+guarantee arbitrary dimensions, higher frame rates, other codecs, or slower hosts.
+The requested size contract is unchanged and budget overruns remain partial.
+
+
+Live R14 validation used only the assigned Android 16 / API 36 emulator, CLI
+0.10.0, and the matching locally built debug Operator 0.10.0-d. The recording
+reached its 60-second cap and finalized complete at 576x1280 with 60,571.956 ms
+of probed media duration and approximately 60,287.6 ms of host duration. An
+independent full `framemd5` decode succeeded for all 116 frames; the last frame
+started at 44.920589 seconds and held through the remaining media timeline.
+Inspected opening, middle, and final decoded frames showed the Settings list,
+Display & touch page, and return to the list. Artifact hashes/byte counts matched,
+the original failed caller verdict remained unchanged, and two terminal stop
+calls returned complete without changing the manifest.
+
+A subsequent Network & internet click returned `NODE_NOT_FOUND` on the scrolled
+Settings list. That failed action was retained and does not count as navigation
+proof or justify a recapture. An initial start was denied access to local lock
+storage before recorder startup; after that host permission was available, the
+single recording above ran. No shared ADB-server operations or other devices
+were used. Private media, snapshots, action failures, and decoder output remain
+outside Git.
+
+Final R14 validation passed all 1,554 Node tests with no skips, the complete
+validation suite (including real-codec fixtures), the matching debug APK build,
+and the documentation build (32 navigation pages and 394 generated-doc links,
+no organization warnings). An initial Node test invocation overlapped a validation
+build that replaced `dist/`; it was discarded, then the full suite passed after
+the build completed. The separate R13 and manual supported-image release gates
+are unchanged; media verification does not establish result-transport readiness.
