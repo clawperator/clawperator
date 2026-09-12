@@ -270,11 +270,19 @@ async function createTempValidationSkillRepo(options: {
   };
 }
 
-before(() => {
+const originalLogDir = process.env.CLAWPERATOR_LOG_DIR;
+let testLogDir: string;
+
+before(async () => {
+  testLogDir = await mkdtemp(join(tmpdir(), "clawperator-skills-test-logs-"));
+  process.env.CLAWPERATOR_LOG_DIR = testLogDir;
   process.env.CLAWPERATOR_SKILLS_REGISTRY = TEST_REGISTRY_PATH;
 });
 
-after(() => {
+after(async () => {
+  if (originalLogDir === undefined) delete process.env.CLAWPERATOR_LOG_DIR;
+  else process.env.CLAWPERATOR_LOG_DIR = originalLogDir;
+  await rm(testLogDir, { recursive: true, force: true });
   if (ORIGINAL_REGISTRY_PATH === undefined) {
     delete process.env.CLAWPERATOR_SKILLS_REGISTRY;
   } else {
@@ -5466,6 +5474,7 @@ const [alpha = "", beta = ""] = process.argv.slice(2);
 console.log("[Clawperator-Skill-Result]");
 console.log(JSON.stringify({
   contractVersion: "1.0.0",
+  result: null,
   skillId: "${skillId}",
   goal: { kind: "set" },
   inputs: { alpha, beta },
@@ -5555,6 +5564,7 @@ for (let index = 0; index < args.length; index += 1) {
 console.log("[Clawperator-Skill-Result]");
 console.log(JSON.stringify({
   contractVersion: "1.0.0",
+  result: null,
   skillId: "${skillId}",
   goal: { kind: "set" },
   inputs: {
@@ -5621,6 +5631,7 @@ for (let index = 0; index < args.length; index += 1) {
 console.log("[Clawperator-Skill-Result]");
 console.log(JSON.stringify({
   contractVersion: "1.0.0",
+  result: null,
   skillId: "${skillId}",
   goal: { kind: "set" },
   inputs: {
@@ -5681,6 +5692,7 @@ for (const arg of args) {
 console.log("[Clawperator-Skill-Result]");
 console.log(JSON.stringify({
   contractVersion: "1.0.0",
+  result: null,
   skillId: "${skillId}",
   goal: { kind: "set" },
   inputs: {
@@ -5729,6 +5741,7 @@ console.log(JSON.stringify({
 console.log("[Clawperator-Skill-Result]");
 console.log(JSON.stringify({
   contractVersion: "1.0.0",
+  result: null,
   skillId: "${skillId}",
   goal: { kind: "set" },
   inputs: {
@@ -5776,6 +5789,7 @@ console.log(JSON.stringify({
 console.log("[Clawperator-Skill-Result]");
 console.log(JSON.stringify({
   contractVersion: "1.0.0",
+  result: null,
   skillId: "${skillId}",
   goal: { kind: "set" },
   inputs: {
@@ -5824,6 +5838,7 @@ console.log(JSON.stringify({
 console.log("[Clawperator-Skill-Result]");
 console.log(JSON.stringify({
   contractVersion: "1.0.0",
+  result: null,
   skillId: "${skillId}",
   goal: { kind: "set" },
   inputs: {
@@ -5871,6 +5886,7 @@ console.log(JSON.stringify({
 console.log("[Clawperator-Skill-Result]");
 console.log(JSON.stringify({
   contractVersion: "1.0.0",
+  result: null,
   skillId: "${skillId}",
   goal: { kind: "set" },
   inputs: {
@@ -5919,6 +5935,7 @@ console.log(JSON.stringify({
 console.log("[Clawperator-Skill-Result]");
 console.log(JSON.stringify({
   contractVersion: "1.0.0",
+  result: null,
   skillId: "${skillId}",
   goal: { kind: "echo" },
   inputs: {
@@ -5965,6 +5982,7 @@ console.log(JSON.stringify({
 console.log("[Clawperator-Skill-Result]");
 console.log(JSON.stringify({
   contractVersion: "1.0.0",
+  result: null,
   skillId: "${skillId}",
   goal: { kind: "echo" },
   inputs: {
@@ -6034,6 +6052,7 @@ for (let index = 0; index < args.length; index += 1) {
 console.log("[Clawperator-Skill-Result]");
 console.log(JSON.stringify({
   contractVersion: "1.0.0",
+  result: null,
   skillId: "${skillId}",
   goal: { kind: "set" },
   inputs: {
@@ -6108,6 +6127,7 @@ for (let index = 0; index < args.length; index += 1) {
 console.log("[Clawperator-Skill-Result]");
 console.log(JSON.stringify({
   contractVersion: "1.0.0",
+  result: null,
   skillId: "${skillId}",
   goal: { kind: "set" },
   inputs: {
@@ -6184,6 +6204,7 @@ for (let index = 0; index < args.length; index += 1) {
 console.log("[Clawperator-Skill-Result]");
 console.log(JSON.stringify({
   contractVersion: "1.0.0",
+  result: null,
   skillId: "${skillId}",
   goal: { kind: "set" },
   inputs: {
@@ -6778,7 +6799,7 @@ console.log(JSON.stringify({
     const stderrLines = stderr.split(/\r?\n/).filter((line) => line.length > 0);
     assert.ok(stderrLines[0]?.startsWith(`[Clawperator] v${version}  APK: OK (com.clawperator.operator.dev)`), stderrLines[0]);
     assert.ok(stderrLines[0]?.includes(`Logs: ${logPath}`), stderrLines[0]);
-    assert.ok(stderrLines[0]?.includes(`Hint: tail -f ${logPath}`), stderrLines[0]);
+    assert.ok(stderrLines[0]?.includes(`Hint: tail -f '${logPath}'`), stderrLines[0]);
     assert.ok(stderrLines[0]?.includes("Docs: https://docs.clawperator.com/llms.txt"), stderrLines[0]);
     const contents = await readFile(logPath, "utf8");
     const events = parseLogEvents(contents);
@@ -6851,7 +6872,7 @@ console.log(JSON.stringify({
       assert.strictEqual(code, 0, stdout);
       const lines = stderr.split(/\r?\n/).filter((line) => line.length > 0);
       assert.ok(lines[0]?.includes(`Logs: ${expectedLogPath}`), lines[0]);
-      assert.ok(lines[0]?.includes(`Hint: tail -f ${expectedLogPath}`), lines[0]);
+      assert.ok(lines[0]?.includes(`Hint: tail -f '${expectedLogPath}'`), lines[0]);
     } finally {
       await rm(tempLogDir, { recursive: true, force: true });
     }
@@ -6876,7 +6897,7 @@ console.log(JSON.stringify({
     const firstLine = stderr.split(/\r?\n/, 1)[0] ?? "";
     assert.match(firstLine, /Wrong Operator variant installed/);
     assert.match(firstLine, /Expected com\.clawperator\.operator but found com\.clawperator\.operator\.dev/);
-    assert.match(firstLine, /Use --operator-package com\.clawperator\.operator\.dev/);
+    assert.match(firstLine, /APK: FAIL/);
   });
 
   it("CLI skills run preserves adb failure details in the pretty banner", async () => {
