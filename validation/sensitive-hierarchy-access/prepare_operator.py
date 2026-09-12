@@ -17,13 +17,23 @@ SERVICE = '/clawperator.operator.accessibilityservice.OperatorAccessibilityServi
 
 def binding_matches(output, service=None):
     fields = {}
+    pending_field = None
     for line in output.splitlines():
         key, separator, value = line.strip().partition(':')
         if separator and key in ('Bound services', 'Binding services', 'Enabled services', 'Crashed services'):
             # This fixture supports a single Android user, not ambiguous mixed-user dumps.
-            if key in fields:
+            if key in fields or pending_field is not None:
                 return False
-            fields[key] = value
+            fields[key] = value.strip()
+            if not fields[key].endswith('}'):
+                pending_field = key
+        elif pending_field is not None:
+            # Android prints additional bound connections on continuation lines.
+            fields[pending_field] += line.strip()
+            if fields[pending_field].endswith('}'):
+                pending_field = None
+    if pending_field is not None:
+        return False
     if fields.get('Binding services') != '{}' or fields.get('Crashed services') != '{}':
         return False
     if service is None:

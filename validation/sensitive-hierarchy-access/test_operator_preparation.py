@@ -31,6 +31,21 @@ class OperatorPreparationTest(unittest.TestCase):
             self.assertFalse(binding_matches(output, selected))
         self.assertFalse(binding_matches(connected()))
 
+    def test_multiline_duplicate_connections_do_not_satisfy_readiness(self):
+        selected = PACKAGES[0] + SERVICE
+        duplicate = state(enabled='{{' + selected + '}}',
+                          bound='{Service[label=Operator],\n'
+                                '                     Service[label=Operator]}')
+        self.assertFalse(binding_matches(duplicate, selected))
+        runner = Mock(side_effect=[duplicate, connected()])
+        wait_for_binding(runner, 'test-device', selected, clock=lambda: 0, sleep=lambda _: None)
+        self.assertEqual(runner.call_count, 2)
+
+    def test_unterminated_bound_services_are_not_ready(self):
+        output = connected().replace('Bound services:{Service[label=Operator]}',
+                                     'Bound services:{Service[label=Operator],')
+        self.assertFalse(binding_matches(output, PACKAGES[0] + SERVICE))
+
     def test_teardown_precedes_install_and_queries_require_verified_binding(self):
         events = []
         states = iter([state(), connected()])
