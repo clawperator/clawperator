@@ -1,3 +1,8 @@
+---
+name: site-extract-landing
+description: Extract rendered Clawperator landing-page Markdown through Cloudflare Browser Rendering.
+---
+
 # Site Extract Landing
 
 Extract the fully rendered markdown content of `https://clawperator.com` using Cloudflare's Browser Rendering API. This is useful for Generative Engine Optimization (GEO) audits and ensuring the site is correctly perceived by AI agents.

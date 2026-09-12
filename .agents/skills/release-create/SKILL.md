@@ -1,6 +1,6 @@
 ---
 name: release-create
-description: Validates a Clawperator release candidate, creates and pushes an annotated git tag for a specific version and commit, inspects the resulting GitHub Actions release workflows, and prepares the follow-up published-version docs update.
+description: Create a Clawperator release from a committed version by validating and pushing its release tag.
 ---
 
 Use this skill after the release code version has already been committed to the repository. Keep code-version bumping separate.

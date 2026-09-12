@@ -1,6 +1,6 @@
 ---
 name: release-set-code-version-number
-description: Updates the unreleased Clawperator code version on code-facing surfaces only, runs local validation, and auto-commits the change.
+description: Bump and locally commit the unreleased Clawperator code version without changing published-version docs.
 ---
 
 Use this skill to bump the repo's next unreleased code version without changing public release-facing docs or website content.
@@ -46,11 +46,10 @@ Confirm the bump only touched code-facing surfaces and did not leak into public 
 
 ## Required Validation
 
-After the script runs, verify:
-1. `npm --prefix apps/node run build`
-2. `npm --prefix apps/node run test`
-
-Never ignore a failing test. If it fails locally, the bump is incomplete.
+The script runs Node dependency installation, build, and tests before committing.
+Inspect that result rather than repeating the same checks after an unchanged
+successful run. If the audit requires a follow-up edit, rebuild and rerun the
+affected tests. A failed validation leaves the bump incomplete.
 
 ## Commit Behavior
 

@@ -1,6 +1,6 @@
 ---
 name: geo-verify-public-surfaces
-description: Verify the live crawl-facing GEO surfaces for clawperator.com and docs.clawperator.com, then summarize the findings for the user. Use when an agent needs to check robots.txt, llms.txt, llms-full.txt, sitemap endpoints, markdown entrypoints, redirect aliases, anti-indexing headers, and Cloudflare anti-bot behavior after deployment.
+description: Verify live Clawperator machine-facing routes, headers, redirects, and bot access after deployment.
 ---
 
 # GEO Verify Public Surfaces

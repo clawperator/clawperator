@@ -1,6 +1,6 @@
 ---
 name: evals-live-run
-description: Run repeatable live-device skill evals and direct orchestrated-skill debug flows for Clawperator, including the Solax cold-start proving harness and retained-log skill debugging.
+description: Run or debug Clawperator live-device skill evals, including orchestrated cold-start proving.
 ---
 
 # Evals Live Run

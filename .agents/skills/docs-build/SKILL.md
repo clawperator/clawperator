@@ -1,95 +1,49 @@
 ---
 name: docs-build
-description: Build the Clawperator public docs site from authored markdown and code-derived inputs. Use when you need to assemble sites/docs/.build/, run the MkDocs build, generate llms-full.txt, or validate the docs pipeline.
+description: Build or regenerate the Clawperator docs site and llms-full.txt from canonical sources.
 ---
 
 # Docs Build
 
-Compile the public docs site from authored markdown and code-derived inputs.
-Treat `sites/docs/.build/` as generated staging output, not an authored surface.
+Run the complete pipeline from the repository root:
 
-This skill is for the build pipeline only. For authoring or updating documentation
-content, use the `docs-author` skill.
+```bash
+./scripts/docs_build.sh
+```
 
-## Source of Truth Contract
+The script builds Node, assembles `sites/docs/.build/`, runs MkDocs, generates
+`llms-full.txt`, copies static root files, and validates routes. It also reports
+warning-only organization checks. There is no need to run assembly separately
+before a normal build.
 
-`docs/` is the authored public docs tree. `apps/node/src/` is the source of
-truth for CLI/API behavior. Repo-local agent workflow instructions live in
-`.agents/skills/**/SKILL.md`. `source-map.yaml` only describes code-derived
-page generation and marker expansion.
+## Source Boundaries
 
-When you find an error in a generated page:
-1. Identify whether it comes from authored docs or code-derived output.
-2. Fix the authored source in `docs/`, the code source in `apps/node/src/`, or
-   the relevant repo-local skill doc in `.agents/skills/` if the issue is
-   actually agent-workflow guidance rather than public-site content.
-3. Re-run the docs build workflow.
-4. Commit the source fix and the regenerated output together.
+`docs/` owns authored pages; `apps/node/src/` owns CLI/API behavior.
+`sites/docs/static/` owns static root files. `sites/docs/.build/` and
+`sites/docs/site/` are generated: fix the source or generator and rebuild.
+Commit source fixes and tracked generated changes together.
 
-Historical docs policy:
-- Do not preserve stale planning docs, completed release checklists, or superseded roadmaps just for history.
-- If a doc is no longer an active source of truth, delete it after migrating any remaining actionable content elsewhere.
-- Treat stale public-doc pages as defects, not archive material.
+For content work, use `docs-author`. For pipeline or routing changes, consult
+[references/repo-docs.md](references/repo-docs.md), `sites/docs/mkdocs.yml`,
+and `sites/docs/source-map.yaml` as relevant. Command detail links are owned
+by `sites/docs/ownership.yaml`.
 
-## Workflow
+## Targeted Diagnostics
 
-Helper scripts for this skill live in the skill directory, not in the repo root.
-When this file refers to `scripts/...`, resolve that path relative to the skill
-directory first.
+Use only the helper relevant to the failure, then rerun the complete build
+after a fix:
 
-1. Confirm the repo roots exist:
-   - Clawperator repo: current working tree
-   - Public docs site: `sites/docs/`
-2. Read `sites/docs/mkdocs.yml` and `sites/docs/source-map.yaml` before editing docs build logic.
-3. Run the deterministic assembly step:
-   - `.agents/skills/docs-build/scripts/assemble.py`
-4. If you need to inspect the generated CLI or marker output directly, run the relevant helper:
-   - `.agents/skills/docs-build/scripts/generate_cli_reference.py`
-   - `.agents/skills/docs-build/scripts/generate_error_table.py`
-   - `.agents/skills/docs-build/scripts/generate_selector_table.py`
-5. Validate the assembled docs and built site:
-   - `./scripts/docs_build.sh`
-   - The build also runs warning-only docs organization checks for anchors, compatibility
-     aliases, and generated command detail links.
-6. If the build fails, fix the underlying source or generator and rerun the build.
+- `scripts/assemble.py`: staging assembly.
+- `scripts/generate_cli_reference.py`: CLI reference.
+- `scripts/generate_error_table.py`: error markers.
+- `scripts/generate_selector_table.py`: selector markers.
+- `scripts/generate_mcp_tool_summary.py`: MCP summary.
+- `scripts/generate_llms_full.py`: machine-facing full docs.
+- `scripts/validate_docs_organization.py`: warning-only organization checks.
 
-## Removing Docs
+These paths are relative to this skill directory. Keep navigation and output
+paths stable unless the requested change requires moving them. For deleted
+pages, remove nav, source-map entries, and incoming links before regeneration.
 
-When a source doc should be deleted because it is stale or no longer useful,
-remove all of its public-doc references in the same change:
-
-1. Delete the source doc.
-2. Remove its nav entry from `sites/docs/mkdocs.yml`.
-3. Remove any `source-map.yaml` entry that points at it.
-4. Remove any index or landing-page links that point to it.
-5. Regenerate the docs build.
-
-Do not leave deleted docs referenced in the docs site manifest or navigation.
-
-## Churn Policy
-
-- Prefer minimal edits to existing authored pages.
-- Do not reorder navigation or rename output files unless the docs organization changes.
-- Do not rewrap paragraphs just to change formatting.
-- If a user explicitly wants stale docs removed, prefer deletion plus link cleanup over adding "historical note" text.
-
-## Node API Rules
-
-- Use `apps/node/src/cli/registry.ts` and command modules as the source of truth for CLI coverage and flags.
-- Use `apps/node/src/contracts/**/*.ts` and related domain code for API contracts, errors, and result envelopes.
-- If the repo has buildable CLI output, prefer extracting help text from the actual CLI over freehand summaries.
-- Narrative pages may summarize the API, but reference details must stay anchored to code.
-
-## Source Map Rules
-
-- `sites/docs/source-map.yaml` only defines code-derived pages and marker expansions.
-- Add new code-derived pages or markers there before generating them.
-
-## Resources
-
-- `.agents/skills/docs-build/scripts/assemble.py`
-  - Deterministic docs staging assembly.
-- `.agents/skills/docs-build/scripts/generate_llms_full.py`
-  - Build the primary `llms-full.txt` artifact from `mkdocs.yml` and `.build/`.
-- `.agents/skills/docs-build/scripts/validate_docs_organization.py`
-  - Warning-only checks for docs organization drift. These warnings do not fail the build.
+Finish when the pipeline passes and the generated diff reflects the intended
+source change. Report relevant warnings and unresolved failures accurately.

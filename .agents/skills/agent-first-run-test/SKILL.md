@@ -1,6 +1,6 @@
 ---
 name: agent-first-run-test
-description: Run zero-shot Android app exploration with Clawperator when no prewritten skill exists, especially for blind install tests, unfamiliar app flows, first-run automation, or documenting the observe-decide-act loop and reusable skill extraction in markdown.
+description: Explore an unfamiliar Android app with branch-local Clawperator and record evidence from a first-run test.
 ---
 
 # Agent First Run Test
@@ -13,7 +13,7 @@ Show how an agent can use Clawperator to automate an unfamiliar Android app with
 
 The agent should:
 - inspect the live UI tree
-- choose the best matcher from the current snapshot
+- choose a selector from the current snapshot
 - execute one action
 - re-observe
 - repeat until the task is complete or blocked
@@ -53,7 +53,10 @@ Write durable markdown files under `/runs/agent-first-run-test/{date-time}-{mode
 
 Use a single run folder per session, with a timestamped name and the model name in the directory name.
 
-If the session produces a reusable workflow, create the resulting skill folder under `.agents/skills/` and note the skill name plus touched files in `execution-log.md`.
+If the exploration reveals a reusable workflow, capture it in `skill-draft.md`.
+Create a runtime package only when requested, in the skills repo or a user-local
+skill location appropriate to its privacy scope. `.agents/skills/` here is for
+repository maintenance workflows.
 
 ## Exploration Loop
 
@@ -81,7 +84,9 @@ Use two clear modes in copy and notes:
 - Explore mode: unknown app, live inspection, one-step loops, zero-shot automation.
 - Skill mode: known flow, reusable skill, faster and more reliable execution.
 
-If you package an exploration into a reusable skill, say that the skill is private and user-specific because it reflects that user's app version, account state, regional UI variant, and navigation path.
+When packaging is requested, distinguish reusable app behavior from account,
+regional, or device-specific details. Parameterize private values; do not infer
+permission to publish from permission to explore.
 
 ## Completion
 

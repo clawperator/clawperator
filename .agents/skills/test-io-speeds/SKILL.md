@@ -1,6 +1,6 @@
 ---
 name: test-io-speeds
-description: Measure Clawperator snapshot and daemon I/O latency on Android devices. Use when comparing emulator versus physical-device performance, timing repeated snapshot calls, validating release versus debug APK behavior, or producing performance findings for specific apps/screens.
+description: Measure Clawperator snapshot and daemon latency for selected Android devices and app screens.
 ---
 
 # Test I/O Speeds
@@ -24,10 +24,10 @@ Ask for or infer these inputs:
 - output directory for local artifacts, defaulting to
   `~/.clawperator/timings/YYYY-MM-DD/<device_serial>`
 
-When both an emulator and a physical device are connected, run the full timing
-set on both. Use the emulator as the primary baseline and the physical device
-as a transport/device comparison. Always pass `--device <device_serial>` so the
-two runs cannot target the wrong device.
+Use the requested devices. For a requested emulator-versus-physical comparison,
+run the timing set on both with the emulator as baseline. For a single-device
+measurement, do not expand the run to every connected device. Always pass
+`--device <device_serial>`.
 
 If the caller does not specify apps, use this default app list:
 
@@ -35,10 +35,9 @@ If the caller does not specify apps, use this default app list:
 - YouTube: `com.google.android.youtube`
 - Google Play Store: `com.android.vending`
 
-If the caller wants other apps measured, ask them to provide an app list with
-`id`, `name`, and `packageName` for each app, then pass it with `--apps-file`
-or `--apps-json`. App IDs must be safe filename segments because they are used
-for local artifact names.
+For other requested apps, resolve `id`, `name`, and `packageName` from the
+request and device. Ask only if the target is ambiguous. Pass the list with
+`--apps-file` or `--apps-json`; app IDs must be safe filename segments.
 
 The harness first closes each target app through branch-local Clawperator
 `close <package>`, then opens it through `open <package>`. Do not hardcode
@@ -88,8 +87,7 @@ launch activity from a clean app start.
 
 6. Run the harness from the repo root.
 
-   If both an emulator and a physical device are available, run this command
-   once for the emulator serial and once for the physical serial.
+   For a requested device comparison, run once for each selected serial.
 
    ```bash
    node .agents/skills/test-io-speeds/scripts/measure-snapshot-latency.mjs \

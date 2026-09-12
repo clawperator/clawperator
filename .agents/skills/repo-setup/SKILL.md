@@ -1,6 +1,6 @@
 ---
 name: repo-setup
-description: Configure local repository defaults that should be applied once per clone, including enabling tracked git hooks for commit message sanitization.
+description: Enable the repository's tracked Git hooks for a new clone or repair its hook configuration.
 ---
 
 # Repo Setup

@@ -1,6 +1,6 @@
 ---
 name: test-recording-validate
-description: Validate the recording API end-to-end by running a full workflow (start, execute Play Store search skill, stop, pull, parse) and verifying the output artifacts.
+description: Smoke-test recording start, Play Store interaction, stop, pull, and parsing with artifact validation.
 ---
 
 # Test Recording Validate
