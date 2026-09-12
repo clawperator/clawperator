@@ -1516,7 +1516,7 @@ Define the canonical `ExecutionAction.type` values, the exact parameters each ac
 
 | Rule | Meaning |
 | --- | --- |
-| Canonical action names only | Stored payloads should use canonical types such as `open_uri`, `wait_for_node`, and `take_screenshot`. Input aliases are normalized before validation except for the canonical-only on-screen log actions. |
+| Canonical action names only | Stored payloads should use canonical types such as `open_uri`, `wait_for_node`, and `take_screenshot`. Input aliases are normalized before validation. The on-screen log aliases are exact input values, while their parameter keys remain canonical-only. |
 | Canonical payload keys still win | Node accepts common input aliases such as snake_case top-level keys, `package` for `applicationId`, `url` for `uri`, `selector` for `matcher`, and `value` for `text`, but the normalized payload always uses the canonical field names. The on-screen log actions intentionally reject these parameter aliases. |
 | `params` is optional at the schema level | Action-specific validation then decides whether it is actually required. |
 | Selectors live on a separate page | `matcher`, `container`, `expectedNode`, and `labelMatcher` all use the [Selectors](selectors.md) `NodeMatcher` contract. |
@@ -1592,6 +1592,8 @@ Input aliases normalized by Node before validation:
 | `screenshot`, `capture_screenshot` | `take_screenshot` |
 | `type_text`, `text_entry`, `input_text` | `enter_text` |
 | `key_press` | `press_key` |
+| `on_screen_log_set` | `set_on_screen_log` |
+| `on_screen_log_clear` | `clear_on_screen_log` |
 
 Common payload-key aliases also accepted on input:
 
@@ -1606,9 +1608,11 @@ Common payload-key aliases also accepted on input:
 - open_app fields: `skip_navigation_wait`, `navigation_timeout_ms`
 - label selector fields: `label_matcher`, `label_selector`
 
-The two on-screen log actions are exceptions to the generic input-alias rules:
+The on-screen log actions have a deliberately narrow input-alias rule:
 
-- `set_on_screen_log` and `clear_on_screen_log` must use those exact lower-case names, without aliases, case changes, or surrounding whitespace.
+- Stored payloads and result `actionType` values use canonical `set_on_screen_log` and `clear_on_screen_log`.
+- At the Node input boundary, exact lower-case `on_screen_log_set` and `on_screen_log_clear` normalize to those canonical types before validation and dispatch.
+- Case changes and surrounding whitespace are rejected for both canonical types and aliases.
 - Their `params` objects accept only the fields documented below and do not translate generic keys such as `value` to `text`.
 
 ## Full Payload Example
