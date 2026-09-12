@@ -227,7 +227,11 @@ Parameters:
 | `deviceId` | no | Explicit target device |
 | `operatorPackage` | no | Explicit operator package |
 | `timeoutMs` | no | Execution timeout; defaults to `30000` |
-| `maxChars` | no | Truncate the returned XML to this many characters. Minimum `1`. |
+| `maxChars` | no | Raw mode only; truncate XML to this many characters. Minimum `1`. |
+| `compact` | no | Return a bounded structural JSON projection; default `false` |
+| `maxNodes` | no | Requires compact; integer `1..1000`, default `100` |
+| `maxTextChars` | no | Requires compact; integer `1..4096` Unicode code points per field, default `256` |
+| `saveRaw` | no | Save exact XML in a new runtime-owned temporary file; default `false` |
 
 Example call:
 
@@ -246,6 +250,13 @@ Success payload includes:
 - `deviceId`
 - `terminalSource`
 - `envelope`
+
+The fields above describe raw mode. With `compact: true`, `compact` replaces the
+top-level `snapshot` and snapshot `data.text` in the envelope copy. Node paths,
+state fields, counts, and errors follow the [compact snapshot contract](snapshot.md#compact-output-and-raw-artifacts).
+`compact` and `maxChars` cannot be combined. `saveRaw: true` returns
+`rawArtifactPath` inside `compact` in compact mode, or top-level in raw mode.
+Caller-provided `rawPath` is rejected; MCP cannot choose arbitrary host paths.
 
 When `maxChars` is applied, the returned `envelope` is truncated consistently with the top-level `snapshot` field, so MCP clients do not receive a second full-copy XML payload through `content` or `structuredContent`.
 

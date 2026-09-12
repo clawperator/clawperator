@@ -1009,137 +1009,24 @@ class UiActionEngineDefaultTest : ActionTest {
         }
 
     @Test
-    fun `execute scroll_until normalizes to target_found when target is visible after loop`() =
-        actionTest {
-            val uiScope = RecordingTaskUiScope(
-                scrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.EdgeReached, scrollsExecuted = 2),
+    fun `execute scroll_until does not replace exhausted scoped search with a global target wait`() = actionTest {
+        for (scrolls in listOf(0, 2)) for (reason in listOf(TaskScrollTerminationReason.EdgeReached, TaskScrollTerminationReason.MaxScrollsReached,
+            TaskScrollTerminationReason.MaxDurationReached, TaskScrollTerminationReason.NoPositionChange)) {
+            val uiScope = RecordingTaskUiScope(scrollLoopResult = TaskScrollLoopResult(reason, scrollsExecuted = scrolls))
+            val result = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock()).execute(
+                taskScope = RecordingTaskScope(uiScope),
+                plan = UiActionPlan(commandId = "scoped-search", taskId = "scoped-search", source = "test",
+                    actions = listOf(UiAction.ScrollUntil(id = "search", matcher = NodeMatcher(textEquals = "Target"), clickAfter = true))),
             )
-            val taskScope = RecordingTaskScope(uiScope)
-            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
-
-            val result =
-                engine.execute(
-                    taskScope = taskScope,
-                    plan = UiActionPlan(
-                        commandId = "cmd-su-post-loop-target",
-                        taskId = "task-su-post-loop-target",
-                        source = "test",
-                        actions = listOf(
-                            UiAction.ScrollUntil(
-                                id = "su-post-loop-target",
-                                matcher = NodeMatcher(textEquals = "Battery"),
-                                clickAfter = true,
-                            ),
-                        ),
-                    ),
-                )
-
-            val stepResult = result.stepResults.single()
-            assertEquals("scroll_until", stepResult.actionType)
-            assertEquals(true, stepResult.success)
-            assertEquals("TARGET_FOUND", stepResult.data["termination_reason"])
-            assertEquals("2", stepResult.data["scrolls_executed"])
-            assertEquals(true, uiScope.clickCalled)
+            val step = result.stepResults.single()
+            assertFalse(step.success)
+            assertEquals(mapOf(TaskScrollTerminationReason.EdgeReached to "EDGE_REACHED",
+                TaskScrollTerminationReason.MaxScrollsReached to "MAX_SCROLLS_REACHED",
+                TaskScrollTerminationReason.MaxDurationReached to "MAX_DURATION_REACHED",
+                TaskScrollTerminationReason.NoPositionChange to "NO_POSITION_CHANGE")[reason], step.data["termination_reason"])
+            assertFalse(uiScope.clickCalled)
         }
-
-    @Test
-    fun `execute scroll_until normalizes to target_found when target visible after max_scrolls_reached`() =
-        actionTest {
-            val uiScope = RecordingTaskUiScope(
-                scrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.MaxScrollsReached, scrollsExecuted = 20),
-            )
-            val taskScope = RecordingTaskScope(uiScope)
-            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
-
-            val result =
-                engine.execute(
-                    taskScope = taskScope,
-                    plan = UiActionPlan(
-                        commandId = "cmd-su-maxscrolls-visible",
-                        taskId = "task-su-maxscrolls-visible",
-                        source = "test",
-                        actions = listOf(
-                            UiAction.ScrollUntil(
-                                id = "su-maxscrolls-visible",
-                                matcher = NodeMatcher(textEquals = "About phone"),
-                                clickAfter = true,
-                            ),
-                        ),
-                    ),
-                )
-
-            val stepResult = result.stepResults.single()
-            assertEquals("scroll_until", stepResult.actionType)
-            assertEquals(true, stepResult.success)
-            assertEquals("TARGET_FOUND", stepResult.data["termination_reason"])
-            assertEquals(true, uiScope.clickCalled)
-        }
-
-    @Test
-    fun `execute scroll_until normalizes to target_found when target visible after max_duration_reached`() =
-        actionTest {
-            val uiScope = RecordingTaskUiScope(
-                scrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.MaxDurationReached, scrollsExecuted = 10),
-            )
-            val taskScope = RecordingTaskScope(uiScope)
-            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
-
-            val result =
-                engine.execute(
-                    taskScope = taskScope,
-                    plan = UiActionPlan(
-                        commandId = "cmd-su-maxduration-visible",
-                        taskId = "task-su-maxduration-visible",
-                        source = "test",
-                        actions = listOf(
-                            UiAction.ScrollUntil(
-                                id = "su-maxduration-visible",
-                                matcher = NodeMatcher(textEquals = "About phone"),
-                                clickAfter = true,
-                            ),
-                        ),
-                    ),
-                )
-
-            val stepResult = result.stepResults.single()
-            assertEquals("scroll_until", stepResult.actionType)
-            assertEquals(true, stepResult.success)
-            assertEquals("TARGET_FOUND", stepResult.data["termination_reason"])
-            assertEquals(true, uiScope.clickCalled)
-        }
-
-    @Test
-    fun `execute scroll_until normalizes to target_found when target visible after no_position_change`() =
-        actionTest {
-            val uiScope = RecordingTaskUiScope(
-                scrollLoopResult = TaskScrollLoopResult(TaskScrollTerminationReason.NoPositionChange, scrollsExecuted = 5),
-            )
-            val taskScope = RecordingTaskScope(uiScope)
-            val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
-
-            val result =
-                engine.execute(
-                    taskScope = taskScope,
-                    plan = UiActionPlan(
-                        commandId = "cmd-su-noposchange-visible",
-                        taskId = "task-su-noposchange-visible",
-                        source = "test",
-                        actions = listOf(
-                            UiAction.ScrollUntil(
-                                id = "su-noposchange-visible",
-                                matcher = NodeMatcher(textEquals = "About phone"),
-                                clickAfter = true,
-                            ),
-                        ),
-                    ),
-                )
-
-            val stepResult = result.stepResults.single()
-            assertEquals("scroll_until", stepResult.actionType)
-            assertEquals(true, stepResult.success)
-            assertEquals("TARGET_FOUND", stepResult.data["termination_reason"])
-            assertEquals(true, uiScope.clickCalled)
-        }
+    }
     @Test
     fun `execute wait_for_navigation returns success on resolution`() =
         actionTest {

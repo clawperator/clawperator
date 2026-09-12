@@ -44,4 +44,6 @@ The original debug publication reproduced three transport failures. Paced debug
 had 59/60 successful commands (one service-startup failure); paced release had
 60/60. Both variants completed all 40 full queries without transport failure.
 The original live exit-255 and zero-event timeout causes remain unproven; the
-reliability phase and combined R11/R12/manual CI gates are not marked complete.
+reliability phase and release gates are not marked complete. After integration
+with main, combined debug hierarchy proof passed; release retained a Wi-Fi
+switch fixture-readiness failure. Manual CI remains outstanding.

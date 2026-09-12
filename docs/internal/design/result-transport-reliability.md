@@ -95,8 +95,8 @@ uncertainty semantics, not their original live root causes. Those causal limits,
 the debug startup failure and the finite sample prevent claiming a completely
 resolved reliability gate or a zero-flake transport.
 
-R11/R12 are not integrated into this worktree. The combined hierarchy regression
-and manual CI release gate remain outstanding; this focused fixture deliberately
+R11/R12 were not integrated for the original series above. The combined hierarchy
+regression and manual CI release gate were outstanding at that point; this focused fixture deliberately
 uses the Settings Internet intent and does not waive homepage/scroll assertions.
 No runtime skill contract changed, and no sibling skill migration is required.
 
@@ -129,3 +129,26 @@ containing 20 full Settings queries returned one successful 641,390-byte CLI
 result; every query contained nonempty, untruncated nodes. This checks live
 chunk reassembly; caller-thread responsiveness and cancellation are covered by
 the controlled unit tests. The release variant was not rerun for this follow-up.
+
+### Integration with main for PR review
+
+Merged `origin/main` at `28b8b1fa` into the branch containing the reviewed
+background-publication fix `be5f85ac`. This brings R7, R11 and R12 together.
+The integrated code passed 1,496 Node tests, 463 Android unit tests, both APK
+builds, repository validation and the docs build.
+
+On the same explicit API-35 emulator, each selected service was launched and
+passed doctor before its single combined hierarchy run. Debug passed the full
+checked-in regression, including five query comparisons, XML/MCP parity, PNG
+decoding and Display & touch. Release stopped at `Missing unique Wi-Fi switch`:
+the first captured Internet query returned a successful, correlated 24-node
+hierarchy without the switch; the next two captures returned 68 nodes with the
+switch. No transport failure occurred in those three captures. The failed run
+is retained, without retrying to obtain a passing result or weakening the
+fixture. Release readiness remains open for that fixture transition and manual
+CI; original historical transport-cause limits also remain.
+
+Integrated APK SHA-256 values:
+
+- Debug: `b1a0f7c831a200ffe40ea1ce109ffb65a3474e0fdb67d2c0526df7f11a1f350d`.
+- Release: `dfd1f5f2aaf1b3b356f260d4f252345977a3f985c36c9127f1944a083c6f0699`.

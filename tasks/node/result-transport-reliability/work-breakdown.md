@@ -46,8 +46,8 @@ Done includes verified error contracts, in-scope repairs supported by evidence, 
 - Phase 3: completed each fixed 20-cycle/20-query series on both paced variants.
   Debug retained one initial service-unavailable open (59/60 commands); release
   passed 60/60. Both passed all 40 full queries. No repeat-to-green series.
-  Combined hierarchy proof awaits R11/R12 integration and manual CI remains a
-  release prerequisite.
+  Subsequent combined proof is recorded below; manual CI remains a release
+  prerequisite.
 
 Durable evidence, payload sizes, timings and build hashes:
 [Result transport reliability](../../../docs/internal/design/result-transport-reliability.md).
@@ -56,3 +56,10 @@ The task pack remains active because these limits do not satisfy the full gate.
 Validation completed: Node build and 1,478 tests; both APK builds and 447
 Android unit tests; repository validation suite; docs build and route checks.
 Implementation commit: `cd3e979`. No push or release publication was performed.
+
+PR integration: merged main at `28b8b1fa` with background publication `be5f85ac`.
+The integrated build passed 1,496 Node / 463 Android tests, both APK builds,
+repository validation and docs. Combined debug hierarchy proof passed. Release
+failed the unique Wi-Fi switch fixture on its first successful 24-node Internet
+capture, followed by two successful 68-node captures with the switch. No retry
+was made; preserve this failure and the manual CI gate. See durable evidence.

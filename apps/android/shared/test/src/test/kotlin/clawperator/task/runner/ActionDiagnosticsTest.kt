@@ -62,6 +62,128 @@ class ActionDiagnosticsTest : ActionTest {
         }
     }
 
+    private fun nestedTree(scroll: Boolean, target: Boolean = false, outside: Boolean = false,
+        reference: Any? = null, duplicateTarget: Boolean = false): UiTree {
+        val targets = if (target) List(if (duplicateTarget) 2 else 1) { node("target") } else emptyList()
+        val inner = node("inner", children = listOf(node("row")) + if (outside) emptyList() else targets, scroll = true)
+        val outer = node("outer", children = listOf(inner), scroll = scroll).copy(accessibilityNodeInfo = reference)
+        return UiTree(node("root", children = listOf(outer) + if (outside) targets else emptyList()))
+    }
+
+    @Test fun `revealed target survives eligibility loss for strict and legacy searches and clicks once`() = actionTest {
+        for (strict in listOf(false, true)) {
+            val reference = Any()
+            val before = nestedTree(true, reference = reference)
+            val after = nestedTree(false, target = true, reference = reference)
+            val fixture = Fixture(listOf(before, before, after), backgroundScope)
+            fixture.ui.clickAfterScroll(NodeMatcher(resourceId = "target"),
+                container = if (strict) NodeMatcher(resourceId = "outer") else null,
+                strict = strict, settleDelay = Duration.ZERO, scrollRetry = TaskRetry.None, clickRetry = TaskRetry.None)
+            assertEquals(2, fixture.dispatches, "Exactly one scroll and one click")
+        }
+    }
+
+    @Test fun `loop counts accepted gesture when its observation reveals target`() = actionTest {
+        val before = nestedTree(true)
+        val fixture = Fixture(listOf(before, before, nestedTree(false, target = true)), backgroundScope)
+        val result = fixture.ui.scrollLoop(NodeMatcher(resourceId = "target"), settleDelay = Duration.ZERO)
+        assertEquals(TaskScrollTerminationReason.TargetFound, result.terminationReason)
+        assertEquals(1, result.scrollsExecuted)
+        assertEquals("outer", result.scope!!.node.resourceId)
+        assertEquals(1, fixture.dispatches)
+    }
+
+    @Test fun `absent or outside target after eligibility loss stops without switching to inner container`() = actionTest {
+        for (strict in listOf(false, true)) for (outside in listOf(false, true)) {
+            val before = nestedTree(true)
+            val after = nestedTree(false, target = outside, outside = outside)
+            val fixture = Fixture(listOf(before, before, after), backgroundScope)
+            val result = fixture.ui.scrollLoop(NodeMatcher(resourceId = "target"),
+                container = if (strict) NodeMatcher(resourceId = "outer") else null,
+                strict = strict, settleDelay = Duration.ZERO)
+            assertEquals(TaskScrollTerminationReason.ContainerNotScrollable, result.terminationReason)
+            assertEquals(1, result.scrollsExecuted)
+            assertEquals(1, fixture.dispatches)
+        }
+    }
+
+    @Test fun `standalone scroll compares original scope even when it stops being scrollable`() = actionTest {
+        val reference = Any()
+        val fixture = Fixture(listOf(nestedTree(true, reference = reference),
+            nestedTree(false, target = true, reference = reference)), backgroundScope)
+        val result = fixture.ui.scrollOnce(settleDelay = Duration.ZERO)
+        assertEquals(TaskScrollOutcome.Moved, result.outcome)
+        assertEquals(true, Json.parseToJsonElement(result.progress!!).jsonObject["comparable"]!!.jsonPrimitive.boolean)
+        assertEquals(1, fixture.dispatches)
+    }
+
+    @Test fun `platform replacement with identical resource bounds and path cannot reveal scoped target`() = actionTest {
+        val before = nestedTree(true, reference = Any())
+        val after = nestedTree(false, target = true, reference = Any())
+        val fixture = Fixture(listOf(before, before, after), backgroundScope)
+        val result = fixture.ui.scrollLoop(NodeMatcher(resourceId = "target"), settleDelay = Duration.ZERO)
+        assertEquals(TaskScrollTerminationReason.ContainerLost, result.terminationReason)
+        assertEquals(1, fixture.dispatches)
+    }
+
+    @Test fun `strict revealed target ambiguity does not trigger click or another gesture`() = actionTest {
+        val before = nestedTree(true)
+        val fixture = Fixture(listOf(before, before, nestedTree(false, target = true, duplicateTarget = true)), backgroundScope)
+        val error = assertFailsWith<StrictSelectionException> {
+            fixture.ui.clickAfterScroll(NodeMatcher(resourceId = "target"), NodeMatcher(resourceId = "outer"),
+                strict = true, settleDelay = Duration.ZERO, scrollRetry = TaskRetry.None)
+        }
+        assertEquals("NODE_AMBIGUOUS", error.code)
+        assertEquals(1, fixture.dispatches)
+    }
+
+    @Test fun `original scope must still exist at click time`() = actionTest {
+        val reference = Any()
+        val before = nestedTree(true, reference = reference)
+        val after = nestedTree(false, target = true, reference = reference)
+        val fixture = Fixture(listOf(before, before, after, after,
+            nestedTree(false, target = true, reference = Any())), backgroundScope)
+        val error = assertFailsWith<UiActionFailure> {
+            fixture.ui.clickAfterScroll(NodeMatcher(resourceId = "target"), settleDelay = Duration.ZERO,
+                scrollRetry = TaskRetry.None, clickRetry = TaskRetry.None)
+        }
+        assertEquals("CONTAINER_LOST", error.code)
+        assertEquals(1, fixture.dispatches)
+    }
+
+    @Test fun `target can arrive during grace observation after eligibility loss`() = actionTest {
+        val before = nestedTree(true)
+        val fixture = Fixture(listOf(before, before, nestedTree(false), nestedTree(false),
+            nestedTree(false, target = true)), backgroundScope)
+        val result = fixture.ui.scrollLoop(NodeMatcher(resourceId = "target"), settleDelay = Duration.ZERO)
+        assertEquals(TaskScrollTerminationReason.TargetFound, result.terminationReason)
+        assertEquals(1, fixture.dispatches)
+    }
+
+    @Test fun `eligibility loss before dispatch is present not lost and dispatches nothing`() = actionTest {
+        val fixture = Fixture(listOf(nestedTree(true), nestedTree(false)), backgroundScope)
+        val result = fixture.ui.scrollLoop(NodeMatcher(resourceId = "target"), settleDelay = Duration.ZERO)
+        assertEquals(TaskScrollTerminationReason.ContainerNotScrollable, result.terminationReason)
+        assertEquals(0, fixture.dispatches)
+    }
+
+    @Test fun `target outside original scope never satisfies search while original remains scrollable`() = actionTest {
+        val before = nestedTree(true)
+        val fixture = Fixture(listOf(before, before, nestedTree(true, target = true, outside = true)), backgroundScope)
+        val result = fixture.ui.scrollLoop(NodeMatcher(resourceId = "target"), maxScrolls = 2,
+            noPositionChangeThreshold = 5, settleDelay = Duration.ZERO)
+        assertEquals(TaskScrollTerminationReason.MaxScrollsReached, result.terminationReason)
+        assertEquals(2, fixture.dispatches)
+    }
+
+    @Test fun `cancellation during post gesture settlement never dispatches another gesture`() = actionTest {
+        val fixture = Fixture(listOf(nestedTree(true)), backgroundScope)
+        assertNull(withTimeoutOrNull(20) {
+            fixture.ui.scrollLoop(NodeMatcher(resourceId = "target"), settleDelay = 100.milliseconds)
+        })
+        assertEquals(1, fixture.dispatches)
+    }
+
     @Test fun `gesture rejection is distinct and does not read a post gesture tree`() = actionTest {
         val fixture = Fixture(listOf(tree()), backgroundScope, accepted = false)
         val result = fixture.ui.scrollOnce(settleDelay = Duration.ZERO)
