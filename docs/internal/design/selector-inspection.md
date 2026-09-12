@@ -137,3 +137,13 @@ unchanged `654d333`, involving missing SkillResult `result` fields and pretty
 output/banner expectations. This remains a separate skill workstream follow-up:
 repair those expectations/contracts and rerun that file. It is not part of the
 standard Node suite or evidence of a strict-selector regression.
+
+## Discovering strict selection
+
+Non-strict duplicate selection records a bounded `selection_warning` in step
+data. `SelectionWarnings` is a coroutine-context collector created for each
+engine action, so retries and scroll captures share that action's observations
+without leaking into another action or execution. It records only the largest
+target/container counts and names `--strict` / `params.strict=true`. It does not
+change dispatch, success, or error policy. Intentional read-all targets and queries
+do not warn. Strict failures retain their existing compact error data.

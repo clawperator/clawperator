@@ -224,7 +224,7 @@ class TaskUiScopeDefault(
             NodeResolver(uiTree).resolve(matcher).map { it.node }
         }
 
-    private fun selectCandidates(
+    private suspend fun selectCandidates(
         resolver: NodeResolver,
         candidates: List<NodeResolver.Candidate>,
         strict: Boolean,
@@ -237,10 +237,13 @@ class TaskUiScopeDefault(
             val suffix = if (candidates.isEmpty()) "NOT_FOUND" else "AMBIGUOUS"
             throw StrictSelectionException("${prefix}_$suffix", candidates.size, resolver.encodeMatches(candidates))
         }
+        if (!strict && !allowMany && candidates.size > 1) {
+            kotlin.coroutines.coroutineContext[SelectionWarnings]?.record(candidates.size, container)
+        }
         return candidates
     }
 
-    private fun actionNodes(
+    private suspend fun actionNodes(
         matcher: NodeMatcher,
         tree: UiTree,
         strict: Boolean,
@@ -257,7 +260,7 @@ class TaskUiScopeDefault(
         return selectCandidates(resolver, matches, strict, allowEmpty = allowEmpty, allowMany = allowMany).map { it.node }
     }
 
-    private fun scrollNode(
+    private suspend fun scrollNode(
         tree: UiTree,
         container: NodeMatcher?,
         strict: Boolean,
@@ -280,14 +283,14 @@ class TaskUiScopeDefault(
         return selectCandidates(resolver, scrollables, strict, container = true).firstOrNull()?.node
     }
 
-    private fun scrollTarget(
+    private suspend fun scrollTarget(
         target: NodeMatcher,
         tree: UiTree,
         container: NodeMatcher?,
         strict: Boolean,
         findChild: Boolean,
     ): UiNode? {
-        if (!strict && container == null) return NodeResolver(tree).resolve(target).firstOrNull()?.node
+        if (!strict && container == null) return actionNodes(target, tree, strict = false, allowEmpty = true).firstOrNull()
         // Resolve the same eligible scroll scope on every observation, including target-only checks.
         val selected = scrollNode(tree, container, strict, findChild) ?: return null
         val resolver = NodeResolver(tree)

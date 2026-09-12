@@ -693,3 +693,10 @@ scroll; `scroll_and_click` defaults `clickAfter` to true. Raw `execute` accepts 
 canonical `params.strict` and `params.container` fields. Query predicates remain
 unchanged. See [strict selection](selectors.md#strict-action-selection) for the
 counts, scope, failure data, and matching-Operator requirement.
+
+Non-strict duplicate selections include a discovery hint for `--strict` in
+`data.selection_warning`. Named `read` keeps its existing scalar/list value in
+the first content item and adds a second JSON text item containing
+`selection_warning` when needed. Unique reads and intentional multi-target
+read-all results keep their existing output unless the explicit container is
+ambiguous. See [duplicate-selection hints](selectors.md#duplicate-selection-hints).

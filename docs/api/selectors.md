@@ -117,6 +117,31 @@ See [query_ui](actions.md#action-query-ui) for counts, state, per-node
 `accessibilityDataSensitive`, and path semantics. Sensitivity is observation
 metadata, not a selector predicate.
 
+## Duplicate-selection hints
+
+When a non-strict action finds multiple candidates and selects the first,
+its step data includes `selection_warning`. The warning identifies duplicate
+target or container selection and teaches `--strict` (`params.strict=true`) as
+an option for rejecting ambiguity. The action keeps its existing result and
+first-match behavior; the warning alone is not a failure.
+
+For example, a successful click can include:
+
+```json
+{
+  "selection_warning": "Multiple candidates matched; first-match selection was used. Largest candidate counts observed: target: 7. Use --strict (params.strict=true) to reject ambiguous matches."
+}
+```
+
+Counts are the largest observed for each kind of selection during that action,
+including retries and scroll searches. They are not a receipt for the final
+dispatch. Repeated observations produce one bounded warning per action. Unique
+selection and queries omit the warning. `read_text` with `all=true` intentionally
+allows multiple targets and does not warn about them; a duplicate explicit
+container still produces the hint. The same step data is available through CLI,
+raw execution, and MCP. MCP `read` preserves its scalar/list value as the first
+content item and adds the warning as a separate JSON text item when present.
+
 ## Strict action selection
 
 Set `params.strict: true` in raw execution, `--strict` in the CLI, or `strict: true`
@@ -151,9 +176,6 @@ query or successful search never reserves a node. A layout change that introduce
 ambiguity fails before the next dispatch. Gestures already completed earlier in
 a search are not undone.
 
-Strict selection failures include `strict: "true"` and a `message` identifying
-`strict=true` and its CLI form, `--strict`. These describe the effective selection
-mode regardless of which transport submitted the request.
 Ambiguity data includes `candidate_count` as a decimal string and `candidates` as
 serialized query-result JSON with at most 10 `NodeSummary` objects. Candidate
 strings are capped at 512 characters; total count remains exact. Paths and state

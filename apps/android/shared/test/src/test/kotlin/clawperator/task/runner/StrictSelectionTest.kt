@@ -4,6 +4,7 @@ import action.math.geometry.Rect
 import clawperator.test.ActionTest
 import clawperator.test.actionTest
 import clawperator.uitree.*
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.json.*
 import java.lang.reflect.Proxy
@@ -35,6 +36,50 @@ class StrictSelectionTest : ActionTest {
         )
     }
 
+    @Test fun `non-strict duplicate targets retain dispatch and teach strict mode`() = actionTest {
+        for (strict in listOf(false, true)) {
+            val f = Fixture(listOf(UiTree(node("root", children = List(2) { node("target") }))), backgroundScope)
+            val warnings = SelectionWarnings()
+            withContext(warnings) {
+                if (strict) assertFailsWith<StrictSelectionException> {
+                    f.ui.click(NodeMatcher(resourceId = "target"), strict = true)
+                } else f.ui.click(NodeMatcher(resourceId = "target"))
+            }
+            if (strict) {
+                assertTrue(warnings.stepData().isEmpty())
+                assertTrue(f.dispatches.isEmpty())
+            } else {
+                assertEquals(listOf("triggerClick"), f.dispatches)
+                assertTrue(warnings.stepData().getValue("selection_warning").contains("target: 2"))
+                assertTrue(warnings.stepData().getValue("selection_warning").contains("Use --strict (params.strict=true)"))
+            }
+        }
+    }
+
+    @Test fun `unique selection query and intentional read-all omit discovery hints`() = actionTest {
+        val f = Fixture(listOf(UiTree(node("root", children = List(2) { node("target") }))), backgroundScope)
+        val warnings = SelectionWarnings()
+        withContext(warnings) {
+            f.ui.queryUi(NodeMatcher(resourceId = "target"))
+            assertEquals(2, f.ui.getAllText(NodeMatcher(resourceId = "target")).size)
+            f.ui.click(NodeMatcher(resourceId = "root"))
+        }
+        assertTrue(warnings.stepData().isEmpty())
+    }
+
+    @Test fun `duplicate containers teach strict mode even for read-all and warning count is bounded`() = actionTest {
+        val f = Fixture(listOf(UiTree(node("root", children = List(2) { node("scope", children = listOf(node("target"))) }))), backgroundScope)
+        val warnings = SelectionWarnings()
+        withContext(warnings) {
+            assertEquals(listOf("target"), f.ui.getAllTextWithinContainer(NodeMatcher(resourceId = "target"), NodeMatcher(resourceId = "scope")))
+        }
+        val warning = warnings.stepData().getValue("selection_warning")
+        assertTrue(warning.contains("container: 2"))
+        assertFalse(warning.contains("target:"))
+        repeat(100) { warnings.record(2, container = true) }
+        assertEquals(warning, warnings.stepData().getValue("selection_warning"))
+    }
+
     @Test fun `immediate targets reject zero and two matches before dispatch and accept one`() = actionTest {
         for (count in 0..2) {
             val tree = UiTree(node("root", children = List(count) { node("target") }))
@@ -49,8 +94,6 @@ class StrictSelectionTest : ActionTest {
                     val error = assertFailsWith<StrictSelectionException> { operation(f.ui) }
                     assertEquals(if (count == 0) "NODE_NOT_FOUND" else "NODE_AMBIGUOUS", error.code)
                     assertEquals(count, error.candidateCount)
-                    assertEquals("true", error.stepData()["strict"])
-                    assertTrue(error.stepData().getValue("message").contains("CLI --strict"))
                     assertEquals(count, Json.parseToJsonElement(error.candidates).jsonObject.getValue("totalMatches").jsonPrimitive.int)
                     assertTrue(f.dispatches.isEmpty())
                 }

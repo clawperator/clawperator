@@ -13,7 +13,7 @@ import { buildWaitExecution } from "../../domain/actions/wait.js";
 import { buildScrollExecution } from "../../domain/actions/scroll.js";
 import { buildScrollUntilExecution } from "../../domain/actions/scrollUntil.js";
 import { buildMcpErrorResult } from "../errors.js";
-import { extractStepDataValue, parseReadAllResult } from "../results.js";
+import { buildReadSuccessResult, extractStepDataValue, parseReadAllResult } from "../results.js";
 import { nonWhitespaceStringJsonSchema, selectorJsonSchema } from "../schemas.js";
 import { createSessionDefaults, type SessionDefaults } from "../session.js";
 import { mcpSelectorSchema } from "../selectors.js";
@@ -316,10 +316,10 @@ export function getNamedMcpTools(
                 terminalSource: result.terminalSource,
               });
             }
-            return buildSuccessResult(parsedReadAll.values);
+            return buildReadSuccessResult(parsedReadAll.values, extracted.step.data?.selection_warning);
           }
 
-          return buildSuccessResult(extracted.value);
+          return buildReadSuccessResult(extracted.value, extracted.step.data?.selection_warning);
         });
       },
     },

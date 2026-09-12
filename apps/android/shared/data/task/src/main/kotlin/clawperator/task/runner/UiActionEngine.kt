@@ -48,7 +48,9 @@ class UiActionEngineDefault(
 
             for (action in plan.actions) {
                 val stepResult = try {
-                    executeSingle(taskScope, action)
+                    val warnings = SelectionWarnings()
+                    val result = withContext(warnings) { executeSingle(taskScope, action) }
+                    result.copy(data = result.data + warnings.stepData())
                 } catch (error: StrictSelectionException) {
                     val type = when (action) {
                         is UiAction.Click -> "click"
