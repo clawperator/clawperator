@@ -115,7 +115,7 @@ node "$DIR/run.js" "$@"
 function buildScriptTemplate(skillId: string, applicationId: string): string {
   return `#!/usr/bin/env node
 
-const { execFileSync } = require("node:child_process");
+const { spawnSync } = require("node:child_process");
 const { existsSync } = require("node:fs");
 const { extname, resolve } = require("node:path");
 
@@ -258,39 +258,36 @@ const execution = {
   ]
 };
 
-try {
-  const stdout = execFileSync(
-    resolvedClawperatorBin.cmd,
-    [
-      ...resolvedClawperatorBin.args,
-      "exec",
-      "--device",
-      deviceId,
-      "--operator-package",
-      operatorPackage,
-      "--execution",
-      JSON.stringify(execution),
-    ],
-    {
-      encoding: "utf8",
-      timeout: 120000,
-      stdio: ["ignore", "pipe", "pipe"],
-    }
-  );
-
-  process.stdout.write(stdout);
-} catch (err) {
-  const stdout = err?.stdout?.toString?.("utf8") ?? "";
-  const stderr = err?.stderr?.toString?.("utf8") ?? "";
-
-  if (stdout) {
-    process.stdout.write(stdout);
-    process.exit(0);
+const child = spawnSync(
+  resolvedClawperatorBin.cmd,
+  [
+    ...resolvedClawperatorBin.args,
+    "exec",
+    "--device",
+    deviceId,
+    "--operator-package",
+    operatorPackage,
+    "--execution",
+    JSON.stringify(execution),
+  ],
+  {
+    timeout: 120000,
+    stdio: ["ignore", "pipe", "pipe"],
   }
+);
 
-  console.error(stderr || err.message || "clawperator execution failed");
-  process.exit(1);
+if (child.stdout) process.stdout.write(child.stdout);
+if (child.stderr) process.stderr.write(child.stderr);
+
+if (child.error || child.signal || !Number.isInteger(child.status) || child.status < 0) {
+  const reason = child.error?.message
+    ?? (child.signal ? "terminated by signal " + child.signal : "unusable child exit status");
+  console.error("clawperator execution failed: " + reason);
+  process.exitCode = 1;
+} else {
+  process.exitCode = child.status;
 }
+
 `;
 }
 
