@@ -79,6 +79,16 @@ class NodeResolver(
     ): String {
         require(limit in 1..1000)
         val matches = resolve(matcher, visibility)
+        return encodeMatches(matches, limit, snapshotId, capturedAt, Int.MAX_VALUE)
+    }
+
+    fun encodeMatches(
+        matches: List<Candidate>,
+        limit: Int = 10,
+        snapshotId: String = UUID.randomUUID().toString(),
+        capturedAt: String = queryCaptureTimestamp(),
+        maxStringLength: Int = 512,
+    ): String {
         val nodes =
             matches.take(limit).map { candidate ->
                 val node = candidate.node
@@ -86,11 +96,11 @@ class NodeResolver(
                 NodeSummary(
                     nodePath = candidate.nodePath,
                     parentPath = candidate.nodePath.substringBeforeLast('.', "").ifEmpty { null },
-                    resourceId = node.resourceId,
-                    className = node.className,
+                    resourceId = node.resourceId?.take(maxStringLength),
+                    className = node.className.take(maxStringLength),
                     role = node.role.name.lowercase(),
-                    label = node.label,
-                    contentDescription = node.contentDescription,
+                    label = node.label.take(maxStringLength),
+                    contentDescription = node.contentDescription?.take(maxStringLength),
                     bounds = NodeBounds(node.bounds.left, node.bounds.top, node.bounds.right, node.bounds.bottom),
                     visibleToUser = node.isVisible.takeIf { stateAvailable },
                     onScreen = candidate.nodePath in eligible,

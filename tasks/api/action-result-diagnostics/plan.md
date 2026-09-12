@@ -20,7 +20,7 @@ Excluded: Generic screenshot-based assertions, hidden retries, agent recovery, e
 | Completed | None |
 | Remaining | Phase 1 |
 | Current / Next | Phase 1 |
-| Blockers | Await both PRs in `tasks/api/selector-inspection` |
+| Blockers | R4 merged; await R5 merge (strict selection is locally complete; see `docs/internal/design/selector-inspection.md`) |
 
 ## Existing query failure behavior
 

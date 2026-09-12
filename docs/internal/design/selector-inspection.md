@@ -10,8 +10,9 @@ Android owns selection. `NodeResolver` indexes the original captured tree in
 preorder and resolves candidates from the existing `UiTreeFilterer` projection.
 `UiTree.sourceRoot` preserves structural ancestry, and filtered `UiNode.sourcePath`
 values retain the original child indices. Both are transient capture metadata.
-Subtree callers retain the enclosing tree with `copy(root = container)` so an
-ancestor outside that container can still satisfy a relationship. Filtering a
+Scoped actions resolve the enclosing tree and restrict target candidate paths to
+strict descendants of the selected container. An ancestor outside that container
+can still satisfy a relationship. Filtering a
 projection again must preserve its paths.
 
 Do not key identity by resource ID, bounds, or `UiNodeId`: fixtures deliberately
@@ -68,3 +69,71 @@ A query does not promise a settled screen or reserve a target for an action.
 
 For the independently confirmed sensitive-root coverage gap and required v0.10 follow-up,
 see [Accessibility hierarchy availability](accessibility-hierarchy.md).
+
+## Strict action dispatch
+
+`TaskUiScopeDefault` applies one cardinality policy to candidates returned by
+`NodeResolver`. Container uniqueness is checked before target selection. Strict
+container failures and ambiguity are terminal, while absent immediate targets
+retain existing retries. A strict wait retains its most recent typed missing
+selection if its timeout expires during a retry delay. Read-all counts nodes for
+scope enforcement but retains legacy filtering of blank text in its text result.
+
+Scroll searches re-resolve their scrollable scope and target on every capture,
+including the capture immediately preceding a swipe. A target that appears there
+ends the search without a gesture; ambiguity prevents that gesture. The final
+click resolves the scope and target again. No observation path or accessibility
+reference crosses executions. Tests use duplicate IDs and bounds to prevent an
+accidental identity shortcut.
+
+`StrictSelectionException` carries a code, exact count, and bounded serialized
+candidate summaries. The engine retains prior steps and the failed step and
+stops later actions. This is specific to strict selection; R6 still owns general
+failure preservation and action receipts. Existing raw on-screen-log behavior,
+query failures, visibility, and per-node sensitivity metadata are preserved.
+
+Legacy omitted/false strict keeps first-match defaults. Explicit containers now
+scope targets to strict descendants, including search checks and the final click.
+Consumers must use matching v0.10 Node and Operator builds: an older parser can
+ignore these new fields. No replay is authorized by a failed or missing transport
+result.
+
+## Validation and compatibility
+
+R4 was merged in `8cab7adb`. Its verification covered Node build/306 standard
+tests, query and transport/MCP coverage, Android builds/unit tests, docs, and live
+API 35 query/XML state parity, relational navigation, and large canonical results.
+Its sensitivity follow-up is documented in
+[accessibility hierarchy availability](accessibility-hierarchy.md).
+
+R5 local acceptance on 2026-09-12 used branch-local Node/Operator v0.10.0:
+
+- Android debug build and all debug unit tests: 421 tests, zero failures/errors.
+- Node build and standard suite: 306 passed. Explicit selector, query, MCP helper,
+  and execution-validation suite: 197 passed. The standard suite includes stdio
+  MCP integration; retain explicit flat-file checks until test discovery is
+  consolidated.
+- Docs build, generated routes, and diff whitespace checks passed.
+- Android 15/API 35 arm64 emulator, matching development APK: queried the unique
+  Settings Internet row, performed a strict click within its explicit recycler
+  container, then verified the Internet toolbar with a strict wait and query.
+  A screenshot confirmed the destination. A broad title click returned
+  `NODE_AMBIGUOUS` with seven candidates. Final-build MCP and raw executions
+  confirmed preserved preceding query results, skipped later actions, exact
+  correlation, and scoped unique navigation. Private evidence was retained in
+  temporary local files, including `r5-final-live.json` and `r5-internet.png`.
+- Offline dispatch spies cover zero/one/two targets, duplicate containers, scope
+  self-exclusion, blank labels/read-all, delayed waits, bounded scroll progress,
+  fresh pre-gesture checks, changed containers, and changed final-click targets.
+  Duplicate-container proof is fixture-based; the live screen is not claimed to
+  contain duplicate containers.
+- The sibling runtime skills' offline entrypoint passed 83 tests. Existing
+  container-based replay callers target children of their category/pager scopes;
+  no payload or version migration was required. Their authenticated physical
+  device scenarios were not run. Other Android versions remain unproven live.
+
+The earlier extra flat `skills.test.ts` run had 19 failures reproducible on
+unchanged `654d333`, involving missing SkillResult `result` fields and pretty
+output/banner expectations. This remains a separate skill workstream follow-up:
+repair those expectations/contracts and rerun that file. It is not part of the
+standard Node suite or evidence of a strict-selector regression.

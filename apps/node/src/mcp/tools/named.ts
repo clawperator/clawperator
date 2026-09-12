@@ -10,6 +10,7 @@ import { buildTypeTextExecution } from "../../domain/actions/typeText.js";
 import { buildReadExecution } from "../../domain/actions/read.js";
 import { buildPressKeyExecution } from "../../domain/actions/pressKey.js";
 import { buildWaitExecution } from "../../domain/actions/wait.js";
+import { buildScrollExecution } from "../../domain/actions/scroll.js";
 import { buildScrollUntilExecution } from "../../domain/actions/scrollUntil.js";
 import { buildMcpErrorResult } from "../errors.js";
 import { extractStepDataValue, parseReadAllResult } from "../results.js";
@@ -56,7 +57,12 @@ const clickArgsSchema = executionToolOptionsSchema.extend({
   selector: mcpSelectorSchema.optional(),
   coordinate: coordinateSchema.optional(),
   clickType: z.enum(["default", "long_click", "focus"]).optional(),
+  strict: z.boolean().optional(),
+  container: mcpSelectorSchema.optional(),
 }).strict().superRefine((value, ctx) => {
+  if (value.coordinate !== undefined && (value.strict === true || value.container !== undefined)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "coordinate click cannot use strict or container", path: ["coordinate"] });
+  }
   const hasSelector = value.selector !== undefined;
   const hasCoordinate = value.coordinate !== undefined;
   if (hasSelector === hasCoordinate) {
@@ -73,6 +79,8 @@ const typeArgsSchema = executionToolOptionsSchema.extend({
   text: z.string().min(1),
   submit: z.boolean().optional(),
   clear: z.boolean().optional(),
+  strict: z.boolean().optional(),
+  container: mcpSelectorSchema.optional(),
 }).strict();
 
 const readArgsSchema = executionToolOptionsSchema.extend({
@@ -81,6 +89,7 @@ const readArgsSchema = executionToolOptionsSchema.extend({
   container: mcpSelectorSchema.optional(),
   validator: z.literal("regex").optional(),
   validatorPattern: z.string().trim().min(1).optional(),
+  strict: z.boolean().optional(),
 }).strict().superRefine((value, ctx) => {
   if (value.validator === "regex" && value.validatorPattern === undefined) {
     ctx.addIssue({
@@ -97,6 +106,14 @@ const pressArgsSchema = executionToolOptionsSchema.extend({
 
 const waitArgsSchema = executionToolOptionsSchema.extend({
   selector: mcpSelectorSchema,
+  strict: z.boolean().optional(),
+  container: mcpSelectorSchema.optional(),
+}).strict();
+
+const scrollArgsSchema = executionToolOptionsSchema.extend({
+  direction: z.enum(["down", "up", "left", "right"]),
+  container: mcpSelectorSchema.optional(),
+  strict: z.boolean().optional(),
 }).strict();
 
 const scrollUntilArgsSchema = executionToolOptionsSchema.extend({
@@ -104,6 +121,7 @@ const scrollUntilArgsSchema = executionToolOptionsSchema.extend({
   direction: z.enum(["down", "up", "left", "right"]),
   container: mcpSelectorSchema.optional(),
   clickAfter: z.boolean().optional(),
+  strict: z.boolean().optional(),
 }).strict();
 
 const coordinateJsonSchema = {
@@ -178,12 +196,17 @@ export function getNamedMcpTools(
       inputSchema: {
         ...buildCommonExecutionSchema({
           selector: selectorJsonSchema,
+          strict: { type: "boolean" },
+          container: selectorJsonSchema,
           coordinate: coordinateJsonSchema,
           clickType: { type: "string", enum: ["default", "long_click", "focus"] },
         }),
         oneOf: [
           { required: ["selector"], not: { required: ["coordinate"] } },
-          { required: ["coordinate"], not: { required: ["selector"] } },
+          { required: ["coordinate"], not: { anyOf: [
+            { required: ["selector"] }, { required: ["container"] },
+            { required: ["strict"], properties: { strict: { const: true } } },
+          ] } },
         ],
       },
       handler: async (args) => {
@@ -193,7 +216,7 @@ export function getNamedMcpTools(
         const matcher = opts.selector !== undefined ? mapRequiredSelector(opts.selector, "selector") : undefined;
 
         const execution = applyMcpExecutionMetadata(
-          buildClickExecution(matcher, opts.clickType ?? "default", opts.coordinate),
+          buildClickExecution(matcher, opts.clickType ?? "default", opts.coordinate, opts.strict, mapOptionalSelector(opts.container, "container")),
           "click",
           opts.timeoutMs,
         );
@@ -208,6 +231,8 @@ export function getNamedMcpTools(
       description: "Type text into a matching field, optionally clearing first or submitting after.",
       inputSchema: buildCommonExecutionSchema({
         selector: selectorJsonSchema,
+        strict: { type: "boolean" },
+        container: selectorJsonSchema,
         text: { type: "string", minLength: 1 },
         submit: { type: "boolean" },
         clear: { type: "boolean" },
@@ -223,6 +248,8 @@ export function getNamedMcpTools(
           text: opts.text,
           submit: opts.submit,
           clear: opts.clear,
+          strict: opts.strict,
+          container: mapOptionalSelector(opts.container, "container"),
         }), "type", opts.timeoutMs);
 
         return await runExecutionTool(execution, opts, logger, (result) => {
@@ -235,6 +262,7 @@ export function getNamedMcpTools(
       description: "Read text from a matching node, optionally returning all matches. Supports regex validation via validator and validatorPattern.",
       inputSchema: buildCommonExecutionSchema({
         selector: selectorJsonSchema,
+        strict: { type: "boolean" },
         all: { type: "boolean" },
         container: selectorJsonSchema,
         validator: { type: "string", enum: ["regex"] },
@@ -252,6 +280,7 @@ export function getNamedMcpTools(
           buildReadExecution({
             selector,
             readAll: opts.all,
+            strict: opts.strict,
             container,
             validator: opts.validator,
             validatorPattern: opts.validatorPattern,
@@ -320,13 +349,15 @@ export function getNamedMcpTools(
       description: "Wait until a matching node appears.",
       inputSchema: buildCommonExecutionSchema({
         selector: selectorJsonSchema,
+        strict: { type: "boolean" },
+        container: selectorJsonSchema,
       }, ["selector"]),
       handler: async (args) => {
         const parsed = parseToolArguments(waitArgsSchema, args);
         const opts = mergeWithSessionDefaults(parsed, session);
 
         const selector = mapRequiredSelector(opts.selector, "selector");
-        const waitExecution = buildWaitExecution(selector, opts.timeoutMs);
+        const waitExecution = buildWaitExecution(selector, opts.timeoutMs, opts.strict, mapOptionalSelector(opts.container, "container"));
 
         const execution = applyMcpExecutionMetadata(
           waitExecution,
@@ -340,10 +371,27 @@ export function getNamedMcpTools(
       },
     },
     {
+      name: "scroll",
+      description: "Perform one scroll in a freshly resolved container. Strict mode requires unique selection.",
+      inputSchema: buildCommonExecutionSchema({
+        direction: { type: "string", enum: ["down", "up", "left", "right"] },
+        container: selectorJsonSchema,
+        strict: { type: "boolean" },
+      }, ["direction"]),
+      handler: async (args) => {
+        const opts = mergeWithSessionDefaults(parseToolArguments(scrollArgsSchema, args), session);
+        const execution = applyMcpExecutionMetadata(buildScrollExecution(
+          opts.direction, opts.timeoutMs, mapOptionalSelector(opts.container, "container"), opts.strict,
+        ), "scroll", opts.timeoutMs);
+        return runExecutionTool(execution, opts, logger, result => buildSuccessResult(buildExecutionSuccessPayload(result)));
+      },
+    },
+    {
       name: "scroll_until",
       description: "Scroll in the given direction until a matching node is visible, optionally clicking it afterward.",
       inputSchema: buildCommonExecutionSchema({
         selector: selectorJsonSchema,
+        strict: { type: "boolean" },
         direction: { type: "string", enum: ["down", "up", "left", "right"] },
         container: selectorJsonSchema,
         clickAfter: { type: "boolean" },
@@ -362,7 +410,40 @@ export function getNamedMcpTools(
           container,
           opts.clickAfter ?? false,
           opts.timeoutMs ?? 30_000,
+          opts.strict,
         ), "scroll_until", opts.timeoutMs ?? 30_000);
+
+        return await runExecutionTool(execution, opts, logger, (result) => {
+          return buildSuccessResult(buildExecutionSuccessPayload(result));
+        });
+      },
+    },
+    {
+      name: "scroll_and_click",
+      description: "Scroll in the given direction until a matching node is visible, optionally clicking it afterward.",
+      inputSchema: buildCommonExecutionSchema({
+        selector: selectorJsonSchema,
+        strict: { type: "boolean" },
+        direction: { type: "string", enum: ["down", "up", "left", "right"] },
+        container: selectorJsonSchema,
+        clickAfter: { type: "boolean" },
+      }, ["selector", "direction"]),
+      handler: async (args) => {
+        const parsed = parseToolArguments(scrollUntilArgsSchema, args);
+        const opts = mergeWithSessionDefaults(parsed, session);
+
+        const selector = mapRequiredSelector(opts.selector, "selector");
+
+        const container = mapOptionalSelector(opts.container, "container");
+
+        const execution = applyMcpExecutionMetadata(buildScrollUntilExecution(
+          opts.direction,
+          selector,
+          container,
+          opts.clickAfter ?? true,
+          opts.timeoutMs ?? 30_000,
+          opts.strict,
+        ), "scroll_and_click", opts.timeoutMs ?? 30_000);
 
         return await runExecutionTool(execution, opts, logger, (result) => {
           return buildSuccessResult(buildExecutionSuccessPayload(result));

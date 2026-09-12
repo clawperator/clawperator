@@ -129,11 +129,14 @@ class AgentCommandParserDefault : AgentCommandParser {
                     matcher = params.parseMatcherRequired("matcher"),
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
                     timeoutMs = params.longOrNull("timeoutMs")?.coerceIn(1L, 120_000L),
+                    strict = params.parseStrictSelection(),
+                    container = params.parseMatcherOrNull("container"),
                 )
             "click" ->
                 {
                     val matcher = params.parseMatcherOrNull("matcher")
                     val coordinate = params.parsePointOrNull("coordinate")
+                    require(coordinate == null || (!params.parseStrictSelection() && "container" !in params)) { "coordinate click cannot use strict or container" }
                     require(matcher != null || coordinate != null) { "click requires matcher or coordinate" }
                     require(!(matcher != null && coordinate != null)) { "click matcher and coordinate are mutually exclusive" }
                     UiAction.Click(
@@ -142,6 +145,8 @@ class AgentCommandParserDefault : AgentCommandParser {
                         coordinate = coordinate,
                         clickTypes = params.parseClickTypes(),
                         retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
+                        strict = params.parseStrictSelection(),
+                        container = params.parseMatcherOrNull("container"),
                     )
                 }
             "scroll_and_click" ->
@@ -158,6 +163,7 @@ class AgentCommandParserDefault : AgentCommandParser {
                     clickRetry = params.parseRetryOrDefault(key = "clickRetry", defaultRetry = TaskRetryPresets.UiReadiness),
                     findFirstScrollableChild = params.booleanOrDefault("findFirstScrollableChild", true),
                     clickAfter = params.booleanOrDefault("clickAfter", true),
+                    strict = params.parseStrictSelection(),
                 )
             "scroll" ->
                 UiAction.Scroll(
@@ -168,6 +174,7 @@ class AgentCommandParserDefault : AgentCommandParser {
                     settleDelayMs = params.longOrDefault("settleDelayMs", 250L).coerceIn(0L, 10_000L),
                     findFirstScrollableChild = params.booleanOrDefault("findFirstScrollableChild", true),
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetry.None),
+                    strict = params.parseStrictSelection(),
                 )
             "scroll_until" ->
                 UiAction.ScrollUntil(
@@ -183,6 +190,7 @@ class AgentCommandParserDefault : AgentCommandParser {
                     noPositionChangeThreshold = params.intOrDefault("noPositionChangeThreshold", 3).coerceIn(1, 20),
                     findFirstScrollableChild = params.booleanOrDefault("findFirstScrollableChild", true),
                     clickAfter = params.booleanOrDefault("clickAfter", false),
+                    strict = params.parseStrictSelection(),
                 )
             "wait_for_navigation" -> {
                 val expectedPackage = params.stringOrNullWithMax("expectedPackage", MAX_MATCHER_VALUE_LENGTH)
@@ -222,6 +230,7 @@ class AgentCommandParserDefault : AgentCommandParser {
                     validatorPattern = validatorPattern,
                     all = params.booleanOrDefault("all", false),
                     container = params.parseMatcherOrNull("container"),
+                    strict = params.parseStrictSelection(),
                 )
             }
             "enter_text", "type_text" ->
@@ -232,6 +241,8 @@ class AgentCommandParserDefault : AgentCommandParser {
                     submit = params.booleanOrDefault("submit", false),
                     clear = params.booleanOrDefaultStrict("clear", false),
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
+                    strict = params.parseStrictSelection(),
+                    container = params.parseMatcherOrNull("container"),
                 )
             "query_ui" -> {
                 require(params.keys.all { it in setOf("matcher", "visibility", "limit") }) { "query_ui has unknown params" }
@@ -573,6 +584,12 @@ class AgentCommandParserDefault : AgentCommandParser {
         key: String,
         default: Boolean,
     ): Boolean = booleanOrNull(key) ?: default
+
+    private fun JsonObject.parseStrictSelection(): Boolean {
+        val value = this["strict"] ?: return false
+        require(value is JsonPrimitive && !value.isString) { "strict must be a boolean" }
+        return value.booleanOrNull ?: error("strict must be a boolean")
+    }
 
     private fun JsonObject.booleanOrDefaultStrict(
         key: String,

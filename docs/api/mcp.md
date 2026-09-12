@@ -683,3 +683,13 @@ What the smoke script proves:
 6. it performs a selector-driven read using text discovered from the live snapshot
 
 The smoke script prefers a physical device when both a physical device and an emulator are connected. Override with `CLAWPERATOR_SMOKE_DEVICE=<device_serial>` if needed.
+
+## Strict selectors
+
+Named `click`, `type`, `read`, `wait`, `scroll`, `scroll_until`, and
+`scroll_and_click` tools accept optional boolean `strict` and optional `container`
+using the same shorthand selector shape as `selector`. `scroll` performs one
+scroll; `scroll_and_click` defaults `clickAfter` to true. Raw `execute` accepts the
+canonical `params.strict` and `params.container` fields. Query predicates remain
+unchanged. See [strict selection](selectors.md#strict-action-selection) for the
+counts, scope, failure data, and matching-Operator requirement.

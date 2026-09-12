@@ -49,6 +49,19 @@ class UiActionEngineDefault(
             for (action in plan.actions) {
                 val stepResult = try {
                     executeSingle(taskScope, action)
+                } catch (error: StrictSelectionException) {
+                    val type = when (action) {
+                        is UiAction.Click -> "click"
+                        is UiAction.EnterText -> "enter_text"
+                        is UiAction.ReadText -> "read_text"
+                        is UiAction.WaitForNode -> "wait_for_node"
+                        is UiAction.Scroll -> "scroll"
+                        is UiAction.ScrollUntil -> "scroll_until"
+                        is UiAction.ScrollAndClick -> "scroll_and_click"
+                        else -> error("Unexpected strict action")
+                    }
+                    stepResults += UiActionStepResult(action.id, type, success = false, data = error.stepData())
+                    return@withContext UiActionExecutionResult(plan.commandId, plan.taskId, stepResults, error.code, error.message)
                 } catch (error: QueryHierarchyUnavailableException) {
                     stepResults += UiActionStepResult(action.id, "query_ui", success = false, data = error.stepData())
                     return@withContext UiActionExecutionResult(
@@ -261,7 +274,7 @@ class UiActionEngineDefault(
     ): UiActionStepResult {
         val node =
             taskScope.ui {
-                waitForNode(action.matcher, action.retry, action.timeoutMs)
+                waitForNode(action.matcher, action.retry, action.timeoutMs, action.strict, action.container)
             }
 
         return UiActionStepResult(
@@ -286,6 +299,8 @@ class UiActionEngineDefault(
                 coordinate = action.coordinate,
                 clickTypes = action.clickTypes,
                 retry = action.retry,
+                strict = action.strict,
+                container = action.container,
             )
         }
         return UiActionStepResult(
@@ -315,6 +330,7 @@ class UiActionEngineDefault(
                 scrollRetry = action.scrollRetry,
                 clickRetry = action.clickRetry,
                 findFirstScrollableChild = action.findFirstScrollableChild,
+                strict = action.strict,
                 clickAfter = action.clickAfter,
             )
         }
@@ -345,6 +361,7 @@ class UiActionEngineDefault(
                         distanceRatio = action.distanceRatio,
                         settleDelay = action.settleDelayMs.milliseconds,
                         retry = action.retry,
+                        strict = action.strict,
                         findFirstScrollableChild = action.findFirstScrollableChild,
                     )
                 }
@@ -372,6 +389,7 @@ class UiActionEngineDefault(
                     )
             }
         } catch (e: IllegalStateException) {
+            if (e is StrictSelectionException) throw e
             val message = e.message ?: ""
             val errorCode =
                 when {
@@ -409,11 +427,13 @@ class UiActionEngineDefault(
                     maxDuration = action.maxDurationMs.milliseconds,
                     noPositionChangeThreshold = action.noPositionChangeThreshold,
                     findFirstScrollableChild = action.findFirstScrollableChild,
+                    strict = action.strict,
                 )
             }
 
         val result =
             if (
+                !action.strict && action.container == null &&
                 action.matcher != null &&
                 (initialResult.terminationReason == TaskScrollTerminationReason.EdgeReached ||
                     initialResult.terminationReason == TaskScrollTerminationReason.MaxScrollsReached ||
@@ -426,10 +446,13 @@ class UiActionEngineDefault(
                             waitForNode(
                                 matcher = action.matcher,
                                 retry = TaskRetryPresets.UiReadiness,
+                                strict = action.strict,
+                                container = action.container,
                             )
                         }
                         true
-                    } catch (_: IllegalStateException) {
+                    } catch (e: IllegalStateException) {
+                        if (e is StrictSelectionException && e.code != "NODE_NOT_FOUND") throw e
                         false
                     }
 
@@ -461,10 +484,13 @@ class UiActionEngineDefault(
             action.matcher != null
         ) {
             taskScope.ui {
-                click(
-                    matcher = action.matcher,
+                clickScrollTarget(
+                    target = action.matcher,
+                    findFirstScrollableChild = action.findFirstScrollableChild,
                     clickTypes = action.clickTypes,
                     retry = TaskRetryPresets.UiReadiness,
+                    strict = action.strict,
+                    container = action.container,
                 )
             }
         }
@@ -505,11 +531,12 @@ class UiActionEngineDefault(
                                 matcher = action.matcher,
                                 containerMatcher = container,
                                 retry = action.retry,
+                                strict = action.strict,
                             )
                         }
                     } else {
                         taskScope.ui {
-                            getAllText(matcher = action.matcher, retry = action.retry)
+                            getAllText(matcher = action.matcher, retry = action.retry, strict = action.strict)
                         }
                     }
 
@@ -542,12 +569,14 @@ class UiActionEngineDefault(
                                     matcher = action.matcher,
                                     containerMatcher = container,
                                     retry = action.retry,
+                                    strict = action.strict,
                                 )
                                 UiTextValidator.Temperature ->
                                     getValidatedTextWithinContainer(
                                         matcher = action.matcher,
                                         containerMatcher = container,
                                         retry = action.retry,
+                                        strict = action.strict,
                                         validator = TaskValidators.TemperatureValidator,
                                     )
                                 UiTextValidator.Version ->
@@ -555,6 +584,7 @@ class UiActionEngineDefault(
                                         matcher = action.matcher,
                                         containerMatcher = container,
                                         retry = action.retry,
+                                        strict = action.strict,
                                         validator = TaskValidators.VersionValidator,
                                     )
                                 UiTextValidator.Regex -> {
@@ -563,6 +593,7 @@ class UiActionEngineDefault(
                                         matcher = action.matcher,
                                         containerMatcher = container,
                                         retry = action.retry,
+                                        strict = action.strict,
                                         validator = { it.matches(regex) },
                                     )
                                 }
@@ -572,17 +603,19 @@ class UiActionEngineDefault(
                         // Non-container read (original behavior with validator support)
                         taskScope.ui {
                             when (action.validator) {
-                                null -> getText(matcher = action.matcher, retry = action.retry)
+                                null -> getText(matcher = action.matcher, retry = action.retry, strict = action.strict)
                                 UiTextValidator.Temperature ->
                                     getValidatedText(
                                         matcher = action.matcher,
                                         retry = action.retry,
+                                        strict = action.strict,
                                         validator = TaskValidators.TemperatureValidator,
                                     )
                                 UiTextValidator.Version ->
                                     getValidatedText(
                                         matcher = action.matcher,
                                         retry = action.retry,
+                                        strict = action.strict,
                                         validator = TaskValidators.VersionValidator,
                                     )
                                 UiTextValidator.Regex -> {
@@ -590,6 +623,7 @@ class UiActionEngineDefault(
                                     getValidatedText(
                                         matcher = action.matcher,
                                         retry = action.retry,
+                                        strict = action.strict,
                                         validator = { it.matches(regex) },
                                     )
                                 }
@@ -608,6 +642,7 @@ class UiActionEngineDefault(
                 )
             }
         } catch (e: IllegalStateException) {
+            if (e is StrictSelectionException) throw e
             val msg = e.message ?: ""
             // All validators should return VALIDATOR_MISMATCH on validation failure.
             // NOTE: This extraction depends on the exact message format from getValidatedText.
@@ -881,6 +916,8 @@ class UiActionEngineDefault(
                 submit = action.submit,
                 clear = action.clear,
                 retry = action.retry,
+                strict = action.strict,
+                container = action.container,
             )
         }
         return UiActionStepResult(

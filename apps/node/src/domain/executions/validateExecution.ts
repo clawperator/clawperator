@@ -79,6 +79,7 @@ const actionParamsSchema = z.object({
   clear: z.boolean().optional(),
   clickType: z.string().optional(),
   container: nodeMatcherSchema.optional(),
+  strict: z.boolean().optional(),
   direction: z.string().optional(),
   maxSwipes: z.number().optional(),
   distanceRatio: z.number().optional(),
@@ -233,6 +234,13 @@ const executionSchema = z.object({
       return;
     }
     const params = action.params as ActionParams | undefined;
+    const selectionActions = ["click", "enter_text", "read_text", "wait_for_node", "scroll", "scroll_until", "scroll_and_click"];
+    if (params?.strict !== undefined && !selectionActions.includes(action.type)) {
+      addIssue(index, "strict is only supported by node-targeted actions", ["params", "strict"]);
+    }
+    if (action.type === "click" && params?.coordinate !== undefined && (params.strict === true || params.container !== undefined)) {
+      addIssue(index, "coordinate click cannot use strict or container", ["params", "coordinate"]);
+    }
     switch (action.type) {
       case "open_app":
       case "close_app":

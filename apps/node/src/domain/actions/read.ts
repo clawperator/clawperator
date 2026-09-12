@@ -3,6 +3,7 @@ import type { NodeMatcher } from "../../contracts/selectors.js";
 
 export interface ReadOptions {
   selector: NodeMatcher;
+  strict?: boolean;
   readAll?: boolean;
   container?: NodeMatcher;
   validator?: string;
@@ -17,13 +18,15 @@ export function buildReadExecution(
   selectorOrOptions: NodeMatcher | ReadOptions,
   readAll?: boolean,
   container?: NodeMatcher,
+  strict?: boolean,
 ): Execution {
   const options: ReadOptions = isReadOptions(selectorOrOptions)
     ? selectorOrOptions
-    : { selector: selectorOrOptions, readAll, container };
+    : { selector: selectorOrOptions, readAll, container, strict };
 
   const commandId = `read-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   const params: Record<string, unknown> = { matcher: options.selector };
+  if (options.strict !== undefined) params.strict = options.strict;
   if (options.readAll) {
     params.all = true;
   }
