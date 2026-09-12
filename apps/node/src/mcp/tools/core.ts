@@ -1,3 +1,4 @@
+import { presentSnapshot, validateSnapshotPresentationOptions } from "../../domain/observe/compactSnapshot.js";
 import { z } from "zod";
 import type { Logger } from "../../adapters/logger.js";
 import type { ExecutionAction } from "../../contracts/execution.js";
@@ -6,7 +7,7 @@ import { LIMITS } from "../../contracts/limits.js";
 import type { ResultEnvelope, StepResult } from "../../contracts/result.js";
 import { listDevices } from "../../domain/devices/listDevices.js";
 import { buildSnapshotExecution } from "../../domain/observe/snapshot.js";
-import { buildMcpErrorResult } from "../errors.js";
+import { buildMcpErrorResult, type McpToolResult } from "../errors.js";
 import { extractStepDataValue } from "../results.js";
 import { createSessionDefaults, type SessionDefaults } from "../session.js";
 import type { McpToolDefinition } from "./index.js";
@@ -26,6 +27,10 @@ import {
 const emptyArgsSchema = z.object({}).strict();
 
 const snapshotArgsSchema = executionToolOptionsSchema.extend({
+  compact: z.boolean().optional(),
+  maxNodes: z.number().int().min(1).max(1000).optional(),
+  maxTextChars: z.number().int().min(1).max(4096).optional(),
+  saveRaw: z.boolean().optional(),
   maxChars: z.number().int().positive().optional(),
 }).strict();
 
@@ -121,6 +126,26 @@ export function applySnapshotMaxCharsToEnvelope(
   };
 }
 
+/** Only shared snapshot presentation may supply these runtime-owned output fields. */
+export function buildSnapshotSuccessResult(payload: Record<string, unknown>, presentation: Awaited<ReturnType<typeof presentSnapshot>>): McpToolResult {
+  const sanitized = buildSuccessResult(payload).structuredContent ?? {};
+  const output = { ...sanitized,
+    ...(presentation.compact !== undefined ? { compact: presentation.compact } : {}),
+    ...("rawArtifactPath" in presentation && presentation.rawArtifactPath !== undefined
+      ? { rawArtifactPath: presentation.rawArtifactPath } : {}),
+  };
+  return { content: [{ type: "text" as const, text: JSON.stringify(output) }], structuredContent: output };
+}
+
+function buildSnapshotPresentationError(error: unknown, result: { deviceId: string; terminalSource: string }): McpToolResult {
+  const failure = buildMcpErrorResult({ ...(error as object), ...result });
+  // This path is produced only by presentSnapshot after an exclusive write.
+  const rawArtifactPath = (error as { rawArtifactPath?: string }).rawArtifactPath;
+  if (rawArtifactPath === undefined) return failure;
+  const payload = { ...failure.structuredContent, rawArtifactPath };
+  return { isError: true, content: [{ type: "text", text: JSON.stringify(payload) }], structuredContent: payload };
+}
+
 function buildSessionStatePayload(session: SessionDefaults): { session: SessionDefaults } {
   const current: SessionDefaults = {};
   if (session.deviceId !== undefined) {
@@ -160,10 +185,16 @@ export function getCoreMcpTools(
       name: "snapshot",
       description: "Capture the current Android UI hierarchy as XML.",
       inputSchema: buildCommonExecutionSchema({
+        compact: { type: "boolean" },
+        maxNodes: { type: "integer", minimum: 1, maximum: 1000 },
+        maxTextChars: { type: "integer", minimum: 1, maximum: 4096 },
+        saveRaw: { type: "boolean" },
         maxChars: { type: "integer", minimum: 1 },
       }),
       handler: async (args) => {
         const parsed = parseToolArguments(snapshotArgsSchema, args);
+        try { validateSnapshotPresentationOptions(parsed); }
+        catch (error) { return buildValidationResult((error as { message: string }).message); }
         const opts = mergeWithSessionDefaults(parsed, session);
 
         const execution = applyMcpExecutionMetadata(
@@ -172,7 +203,7 @@ export function getCoreMcpTools(
           opts.timeoutMs,
         );
 
-        return await runExecutionTool(execution, opts, logger, (result) => {
+        return await runExecutionTool(execution, opts, logger, async (result) => {
           const extracted = extractStepDataValue(result.envelope, {
             actionType: "snapshot",
             dataKey: "text",
@@ -189,20 +220,29 @@ export function getCoreMcpTools(
             });
           }
 
+          let presentation;
+          try {
+            presentation = await presentSnapshot(result.envelope, parsed);
+          } catch (error) {
+            return buildSnapshotPresentationError(error, { deviceId: result.deviceId, terminalSource: result.terminalSource });
+          }
+          if (parsed.compact) {
+            return buildSnapshotSuccessResult({ ...buildExecutionSuccessPayload(result), ...presentation }, presentation);
+          }
           const { snapshot, truncated, envelope } = applySnapshotMaxCharsToEnvelope(
             result.envelope,
             extracted.step,
             extracted.value,
             parsed.maxChars,
           );
-          return buildSuccessResult({
+          return buildSnapshotSuccessResult({
             ...buildExecutionSuccessPayload({
               ...result,
               envelope,
             }),
             snapshot,
             ...(truncated ? { truncated } : {}),
-          });
+          }, presentation);
         });
       },
     },

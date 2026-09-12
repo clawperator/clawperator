@@ -172,3 +172,12 @@ repeated reliability contract, and does not replace R10's manual CI gate. No
 release-variant, physical-device, or cross-OEM transition proof is claimed.
 Sibling runtime skills use the existing scroll actions and explicit containers;
 no new wire values or skill migration/version changes were needed.
+
+
+After reviewing the node-lifetime fix in `5e73d6c0` and merging upstream through
+`460e654c`, validation passed 460 Android tests, 1,479 Node tests, 14 hierarchy
+preparation tests, and the docs build. API 31/32 platform-identity regressions
+passed independently. The merged API-35 live harness verified Settings
+preparation but later stopped at a query with `logcat exited before terminal
+envelope (code=255, signal=null)`. That invocation remains a failed R13 transport
+observation; the earlier successful harness invocation does not supersede it.

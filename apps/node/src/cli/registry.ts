@@ -583,6 +583,10 @@ Usage:
   clawperator snapshot [--device <id>] [--operator-package <pkg>]
 
 Options:
+  --compact             Return a bounded JSON hierarchy projection
+  --max-nodes <n>       Compact node limit: 1..1000 (default: 100)
+  --max-text-chars <n>  Compact per-field code point limit: 1..4096 (default: 256)
+  --raw-path <file>     Save exact XML to a new host file (must not exist)
   --output <json|pretty> Output format (default: json)
   --timeout <ms>         Max time to wait for snapshot (default: 30000ms)
   --no-daemon            Force direct execution instead of daemon proxy
@@ -1443,8 +1447,8 @@ COMMANDS["snapshot"] = {
   name: "snapshot",
   synonyms: ["snapshot-ui", "snapshot_ui"],
   group: "Device Interaction",
-  documentedFlags: ["--no-daemon"],
-  supportedFlags: ["--no-daemon"],
+  documentedFlags: ["--no-daemon", "--compact", "--max-nodes", "--max-text-chars", "--raw-path"],
+  supportedFlags: ["--no-daemon", "--compact", "--max-nodes", "--max-text-chars", "--raw-path"],
   summary: "Get current Android UI hierarchy as XML",
   help: HELP_SNAPSHOT,
   topLevelBlock: `  snapshot [--device <id>] [--operator-package <pkg>]                     Get current Android UI hierarchy as XML`,
@@ -1452,7 +1456,26 @@ COMMANDS["snapshot"] = {
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs, noDaemon } = ctx;
     const invalidTimeout = getInvalidTimeoutResult(timeoutMs, { format });
     if (invalidTimeout) return invalidTimeout;
+    const readBudget = (flag: string): number | undefined => {
+      const value = getStringOptStrict(rest, flag);
+      if (value === undefined) return undefined;
+      if (!/^[0-9]+$/.test(value)) throw new UsageError(`${flag} requires an integer`);
+      return Number(value);
+    };
+    const presentationOptions = {
+      compact: hasFlag(rest, "--compact"),
+      maxNodes: readBudget("--max-nodes"),
+      maxTextChars: readBudget("--max-text-chars"),
+      rawPath: getStringOptStrict(rest, "--raw-path"),
+    };
+    const { validateSnapshotPresentationOptions } = await import("../domain/observe/compactSnapshot.js");
+    try {
+      validateSnapshotPresentationOptions(presentationOptions);
+    } catch (error) {
+      throw new UsageError((error as { message: string }).message);
+    }
     return (await import("./commands/observe.js")).cmdObserveSnapshot({
+      ...presentationOptions,
       format,
       deviceId,
       operatorPackage,
