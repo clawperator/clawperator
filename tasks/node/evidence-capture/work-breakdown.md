@@ -13,15 +13,18 @@ Implement the requested PR through its acceptance criteria, relevant checks, in-
 
 ## PR-1: Still evidence bundles [DONE]
 
-Implemented and locally validated in `7c5cb8d`; pending merge. The pack remains
+Implemented and locally validated through `e041243`; pending merge. The pack remains
 active for PR-2. Do not start managed video until PR-1 has merged.
 
 - Screenshot/XML bundles, exclusive destinations, correlated manifests, device
   metadata, per-component timings, file validation/hashes, and partial failures
   are implemented through the shared Node domain, CLI, and MCP.
-- Complete Node suite: 1,498 passed; final focused checks: 151 passed. Debug APK
+- Complete Node suite: 1,498 passed; reviewed-revision focused checks: 155 passed. Debug APK
   and documentation builds passed, as did independent live CLI/MCP artifact
   verification on the dedicated Android 16 / API 36 emulator.
+- Readiness probing does not wake or navigate the device; screenshot deadline
+  cancellation preserves `COMMAND_TIMEOUT` and partial bytes. These follow-ups
+  passed offline regression checks; sleeping/locked live behavior was not re-tested.
 - Public contract: [Still Evidence Bundles](../../../docs/api/evidence.md).
 - Durable design, live evidence, and the separate initial app-open timeout:
   [Still evidence capture](../../../docs/internal/design/still-evidence.md).

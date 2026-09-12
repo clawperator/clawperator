@@ -8,7 +8,7 @@ implementation after this phase merges.
 
 `domain/evidence/capture.ts` coordinates one selected device, an exclusive new
 bundle, screenshot then hierarchy, metadata, capture receipts, and the atomic
-manifest writer. It neither replays a caller action nor runs doctor. Caller
+manifest writer. It neither replays a caller action nor runs doctor remediation. Caller
 context is copied before asynchronous capture and never interpreted as a verdict.
 
 `domain/observe/captureScreenshot.ts` is shared with normal screenshot execution
@@ -17,11 +17,14 @@ serial, with bounded process lifetime and output size. Evidence invokes that hos
 primitive independently of Operator readiness or application-root availability.
 Its receipt is explicitly host-owned; no Android result envelope is invented.
 The hierarchy uses the normal snapshot execution and retains the original result
-and any Operator overlay metadata in `captures.json`.
+and any Operator overlay metadata in `captures.json`. Its readiness probe uses
+`doctor_ping` to read device state without wake or Home input. Sleeping or locked
+devices retain screenshot evidence while hierarchy reports `DEVICE_NOT_INTERACTIVE`.
 
 The budget runner caches the initial device inventory for the nested execution
 preflight, bounds subsequent calls by the deadline, and kills only child processes
-created by this capture. A component with no remaining usable budget is recorded
+created by this capture. Deadline cancellation records `COMMAND_TIMEOUT` before
+terminating screenshot capture and retains any received partial image bytes. A component with no remaining usable budget is recorded
 as timed out without dispatch. File validation and manifest persistence remain
 possible after the device-work budget expires. Metadata queries are read-only,
 explicitly targeted, and bounded by the same deadline. Package names are restricted
@@ -65,11 +68,11 @@ also created a complete bundle beneath the server-owned evidence root and retain
 the caller's original verdict.
 
 An initial, separate app-open attempt returned `RESULT_ENVELOPE_TIMEOUT`. It was
-not replayed by evidence capture, relabeled as success, or treated as an R8 fix.
+not replayed by evidence capture, relabeled as success, or treated as an evidence-capture fix.
 The screen retained Settings search state. These are bounded observations, not a
 claim of complete release readiness or a fix for separate preparation/transport
 workstreams. Both installed Operator variants were enabled at observation time;
-R8 explicitly targeted the debug variant and does not change accessibility setup.
+Evidence capture explicitly targeted the debug variant and does not change accessibility setup.
 
 Offline regression coverage includes root-unavailable and missing-Operator
 failures, independent capture attempts, exhausted and remaining budgets, exclusive
@@ -86,3 +89,8 @@ passed independent hash/XML/correlation checks. Normal screenshot capture throug
 the extracted helper also returned a successful canonical envelope and a decoded
 1344 by 2992 PNG. Existing raw screenshot/snapshot skill consumers retain their
 contracts, so no sibling skill migration or version bump is required.
+
+The subsequent readiness and cancellation fixes passed a Node build and 155
+focused evidence/execution/observe/MCP tests. Coverage includes sleeping, locked,
+and interactive probe results and overall-deadline cancellation with partial bytes.
+These follow-ups were not re-tested on a live sleeping or locked device.
