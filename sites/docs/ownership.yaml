@@ -49,6 +49,9 @@ command_details:
     href: actions.md#action-snapshot
     label: "Action: snapshot"
     action: snapshot
+  evidence:
+    href: evidence.md
+    label: Still evidence bundles
   screenshot:
     href: actions.md#action-take-screenshot
     label: "Action: take_screenshot"

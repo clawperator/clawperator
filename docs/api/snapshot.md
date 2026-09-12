@@ -586,6 +586,8 @@ Operationally:
 
 ## Related Pages
 
+- [Still Evidence Bundles](evidence.md): save screenshot, raw XML, metadata, and correlated capture receipts together
+
 - [API Overview](overview.md)
 - [Actions](actions.md)
 - [Selectors](selectors.md)

@@ -1443,6 +1443,52 @@ Notes:
 
 // Device Interaction commands
 
+COMMANDS["evidence"] = {
+  name: "evidence",
+  group: "Device Interaction",
+  summary: "Capture a screenshot and raw hierarchy evidence bundle",
+  documentedFlags: ["--output-dir", "--label", "--context-json"],
+  supportedFlags: ["--output-dir", "--label", "--context-json"],
+  topLevelBlock: `  evidence capture --output-dir <new-directory>  Capture a still evidence bundle`,
+  help: `clawperator evidence capture - Capture local screenshot and hierarchy evidence
+
+Usage:
+  clawperator evidence capture --output-dir <absolute-new-directory> [--label <text>] [--context-json <object>]
+
+Options:
+  --output-dir <dir>     Absolute new directory; existing paths are rejected
+  --label <text>         Optional label, at most 2048 UTF-16 code units
+  --context-json <json>  Optional caller-owned JSON object, at most 16 KiB UTF-8
+  --device <id>          Explicit target device
+  --operator-package <pkg>  Selected Operator package
+  --timeout <ms>         Overall capture budget: 1000..120000 (default: 30000)
+  --output <json|pretty> Output format (default: json)
+
+Captures screenshot first, then raw XML; they are not atomic or automatically settled.
+Complete capture exits 0. Partial/failed capture exits 1 and retains available evidence.
+Existing record commands continue to record accessibility events.
+`,
+  handler: async ctx => {
+    if (ctx.rest[0] !== "capture") throw new UsageError("Use evidence capture --output-dir <absolute-new-directory>");
+    const outputDir = getStringOptStrict(ctx.rest, "--output-dir");
+    if (outputDir === undefined) throw new UsageError("evidence capture requires --output-dir");
+    const contextJson = getStringOptStrict(ctx.rest, "--context-json");
+    let context: Record<string, unknown> | undefined;
+    if (contextJson !== undefined) {
+      try { context = JSON.parse(contextJson); }
+      catch { throw new UsageError("--context-json must be a JSON object"); }
+    }
+    const labelIndex = ctx.rest.indexOf("--label");
+    const label = labelIndex >= 0 && ctx.rest[labelIndex + 1] === "" ? "" : getStringOptStrict(ctx.rest, "--label");
+    const options = { outputDir, context, label, deviceId: ctx.deviceId,
+      operatorPackage: ctx.operatorPackage, timeoutMs: ctx.timeoutMs, logger: ctx.logger, format: ctx.format };
+    const { validateEvidenceCaptureOptions } = await import("../domain/evidence/capture.js");
+    try { validateEvidenceCaptureOptions(options); }
+    catch (error) { throw new UsageError((error as { message: string }).message); }
+    return (await import("./commands/evidence.js")).cmdEvidenceCapture(options);
+  },
+};
+
 COMMANDS["snapshot"] = {
   name: "snapshot",
   synonyms: ["snapshot-ui", "snapshot_ui"],
