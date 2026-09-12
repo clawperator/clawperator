@@ -18,8 +18,8 @@ Define the canonical `ExecutionAction.type` values, the exact parameters each ac
 
 | Rule | Meaning |
 | --- | --- |
-| Canonical action names only | Stored payloads should use canonical types such as `open_uri`, `wait_for_node`, and `take_screenshot`. Input aliases are normalized before validation. |
-| Canonical payload keys still win | Node accepts common input aliases such as snake_case top-level keys, `package` for `applicationId`, `url` for `uri`, `selector` for `matcher`, and `value` for `text`, but the normalized payload always uses the canonical field names. |
+| Canonical action names only | Stored payloads should use canonical types such as `open_uri`, `wait_for_node`, and `take_screenshot`. Input aliases are normalized before validation. The on-screen log aliases are exact input values, while their parameter keys remain canonical-only. |
+| Canonical payload keys still win | Node accepts common input aliases such as snake_case top-level keys, `package` for `applicationId`, `url` for `uri`, `selector` for `matcher`, and `value` for `text`, but the normalized payload always uses the canonical field names. The on-screen log actions intentionally reject these parameter aliases. |
 | `params` is optional at the schema level | Action-specific validation then decides whether it is actually required. |
 | Selectors live on a separate page | `matcher`, `container`, `expectedNode`, and `labelMatcher` all use the [Selectors](selectors.md) `NodeMatcher` contract. |
 | `StepResult.data` is a string map | Node may attach known keys such as `text`, `path`, `warn`, `application_id`, `error`, or `message`, but most actions do not have a richer static success schema. |
@@ -77,6 +77,8 @@ sleep
 press_key
 wait_for_navigation
 read_key_value_pair
+set_on_screen_log
+clear_on_screen_log
 ```
 
 Input aliases normalized by Node before validation:
@@ -92,6 +94,8 @@ Input aliases normalized by Node before validation:
 | `screenshot`, `capture_screenshot` | `take_screenshot` |
 | `type_text`, `text_entry`, `input_text` | `enter_text` |
 | `key_press` | `press_key` |
+| `on_screen_log_set` | `set_on_screen_log` |
+| `on_screen_log_clear` | `clear_on_screen_log` |
 
 Common payload-key aliases also accepted on input:
 
@@ -105,6 +109,13 @@ Common payload-key aliases also accepted on input:
 - navigation fields: `expected_package`, `expected_node`, `timeout_ms`
 - open_app fields: `skip_navigation_wait`, `navigation_timeout_ms`
 - label selector fields: `label_matcher`, `label_selector`
+
+The on-screen log actions have a deliberately narrow input-alias rule:
+
+- Stored payloads and result `actionType` values use canonical `set_on_screen_log` and `clear_on_screen_log`.
+- At the Node input boundary, exact lower-case `on_screen_log_set` and `on_screen_log_clear` normalize to those canonical types before validation and dispatch.
+- Case changes and surrounding whitespace are rejected for both canonical types and aliases.
+- Their `params` objects accept only the fields documented below and do not translate generic keys such as `value` to `text`.
 
 ## Full Payload Example
 
@@ -634,6 +645,86 @@ Example:
 }
 ```
 
+<a id="action-set-on-screen-log"></a>
+### `set_on_screen_log`
+
+Use this raw action to show one static, noninteractive diagnostic label owned by the connected Operator accessibility service. It has no flat CLI convenience command. See [On-screen logs](on-screen-logs.md) for lifecycle, capture, and transport details.
+
+| Field | Valid values | Default / meaning |
+| --- | --- | --- |
+| Required | `text` | Static plain-text label. |
+| `text` | String with `1..2048` UTF-16 code units, at least one non-whitespace character | Required. LF and TAB are allowed; other control characters are rejected. |
+| `anchor` | Exact `left` or `right` | `left`; physical display edge. |
+| `textAlign` | Exact `left` or `right` | `left`; alignment inside the panel. |
+| `topOffsetDp` | Integer-valued JSON number `0..1000` | `8`; from the usable top edge. |
+| `edgeOffsetDp` | Integer-valued JSON number `0..1000` | `8`; inward from the selected usable horizontal edge. |
+| `widthDp` | Integer-valued JSON number `80..600` | `280`; full panel width including padding. |
+| `fontSizeSp` | Integer-valued JSON number `8..24` | `12`; follows Android font scale. |
+| `textColor` | Exact `#RRGGBB` or `#AARRGGBB` | `#FFFFFFFF`. |
+| `backgroundColor` | Exact `#RRGGBB` or `#AARRGGBB` | `#B3000000`. |
+| `ttlMs` | Integer-valued JSON number `1000..3600000` | `300000`; local stale-label expiry. |
+
+Rules:
+
+- only the fields in this table are accepted
+- do not use named colors, fractional numbers, numeric strings, `null`, parameter aliases, or unknown keys
+- six-digit colors normalize to uppercase opaque eight-digit colors, for example `#a1b2c3` becomes `#FFA1B2C3`
+- every successful set replaces the whole existing panel using supplied values and defaults, rather than patching existing state
+- malformed input is rejected before dispatch and cannot modify a currently visible panel
+
+Success data has the exact string-valued keys `visible`, `rendered`, `truncated`, `anchor`, `text_align`, `top_offset_dp`, `edge_offset_dp`, `width_dp`, `font_size_sp`, `text_color`, `background_color`, `ttl_ms`, and `bounds`. The result does not echo caller text.
+
+Common failures:
+
+- `EXECUTION_VALIDATION_FAILED` before dispatch for malformed raw input
+- `ON_SCREEN_LOG_SERVICE_UNAVAILABLE`, `ON_SCREEN_LOG_LAYOUT_INVALID`, `ON_SCREEN_LOG_RENDER_FAILED`, or `ON_SCREEN_LOG_RENDER_TIMEOUT` from the runtime
+
+Example:
+
+```json
+{
+  "id": "set-panel",
+  "type": "set_on_screen_log",
+  "params": {
+    "text": "FLOW-001: Observe settings",
+    "anchor": "right",
+    "textAlign": "left",
+    "topOffsetDp": 0,
+    "edgeOffsetDp": 12,
+    "widthDp": 320,
+    "fontSizeSp": 16,
+    "textColor": "#a1b2c3",
+    "backgroundColor": "#7f0a0b0c",
+    "ttlMs": 12000
+  }
+}
+```
+
+<a id="action-clear-on-screen-log"></a>
+### `clear_on_screen_log`
+
+Remove the current Operator-owned on-screen log panel. It accepts omitted `params` or exactly `{}`. Any other value, including `null` or a nonempty object, is rejected.
+
+Success data is exactly:
+
+```json
+{
+  "visible": "false"
+}
+```
+
+Clear succeeds while the panel is already hidden. It does not include a `rendered` field.
+
+Example:
+
+```json
+{
+  "id": "clear-panel",
+  "type": "clear_on_screen_log",
+  "params": {}
+}
+```
+
 <a id="action-take-screenshot"></a>
 ### `take_screenshot`
 
@@ -889,13 +980,17 @@ Example:
 | `scroll-until` | `scroll_until` or `scroll_and_click` | `--click` switches to `scroll_and_click` |
 | `scroll-and-click` | `scroll_and_click` | alias that implies click-after |
 
+`set_on_screen_log` and `clear_on_screen_log` deliberately have no flat CLI command. Use them only in a raw `clawperator exec` payload or through an existing generic execute transport.
+
 ## Result Data You Can Rely On
 
-| Action type | Success keys Node guarantees |
+| Action type | Success keys exposed by the current execution runtime |
 | --- | --- |
 | `snapshot` | `data.text`; optional `data.warn` |
 | `take_screenshot` | `data.path` |
 | `close_app` | `data.application_id` when Node pre-flight succeeded |
+| `set_on_screen_log` | `visible`, `rendered`, `truncated`, normalized style values, and `bounds`; all values are strings and caller text is omitted |
+| `clear_on_screen_log` | `visible` with value `"false"` |
 | all others | no fixed success keys guaranteed by Node |
 
 Concrete success example for `take_screenshot`:

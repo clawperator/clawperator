@@ -92,6 +92,7 @@ __pycache__/
 
 # Local recording artifacts
 tmp/
+validation/on-screen-logs/artifacts/
 evals/runs/
 .venv/
 /.worktrees

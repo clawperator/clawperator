@@ -139,6 +139,7 @@ Notes:
 | Payload or flag validation | `MISSING_ARGUMENT`, `EXECUTION_VALIDATION_FAILED`, `EXECUTION_ACTION_UNSUPPORTED`, `PAYLOAD_TOO_LARGE` | Change the command or payload. Do not retry unchanged |
 | Dispatch or service availability | `RESULT_ENVELOPE_TIMEOUT`, `RESULT_ENVELOPE_MALFORMED`, `BROADCAST_FAILED`, `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `DEVICE_SHELL_UNAVAILABLE` | Run `clawperator doctor`, repair the reported issue, then retry |
 | UI lookup or gesture | `NODE_NOT_FOUND`, `NODE_NOT_CLICKABLE`, `CONTAINER_NOT_FOUND`, `CONTAINER_NOT_SCROLLABLE`, `GESTURE_FAILED`, `SECURITY_BLOCK_DETECTED` | Refresh state with `snapshot`, wait for UI readiness, or adjust selectors and scroll strategy |
+| On-screen log panel | `ON_SCREEN_LOG_SERVICE_UNAVAILABLE`, `ON_SCREEN_LOG_LAYOUT_INVALID`, `ON_SCREEN_LOG_RENDER_FAILED`, `ON_SCREEN_LOG_RENDER_TIMEOUT` | Repair the Operator service or supplied layout, then issue a replacement `set_on_screen_log` or `clear_on_screen_log` action as appropriate. |
 | Recording state | `RECORDING_ALREADY_IN_PROGRESS`, `RECORDING_NOT_IN_PROGRESS`, `RECORDING_SESSION_NOT_FOUND`, `RECORDING_PULL_FAILED`, `RECORDING_PARSE_FAILED`, `RECORDING_SCHEMA_VERSION_UNSUPPORTED` | Repair recording state or use the right session before retrying |
 
 ## Key Cases
@@ -227,6 +228,23 @@ Recovery:
 - if `hint` mentions no correlated Android log lines, treat it as a compatibility or accessibility diagnostic path rather than a generic retry
 - confirm the accessibility service and operator package are healthy
 - increase timeout only if the action legitimately needs more wall-clock time
+
+### On-screen log panel failures
+
+The on-screen log actions can return these exact per-step failure codes. When
+one of these codes is the first failed step, Node also copies it to
+`envelope.errorCode` during result reconciliation.
+
+| Code | Meaning | Recovery |
+| --- | --- | --- |
+| `ON_SCREEN_LOG_SERVICE_UNAVAILABLE` | The Operator-owned panel controller is not available. | Repair or restart the expected Operator accessibility service, then rerun the action. |
+| `ON_SCREEN_LOG_LAYOUT_INVALID` | Android rejected the resolved panel geometry or layout. | Inspect the requested offsets and width. Retry with an in-range replacement payload. |
+| `ON_SCREEN_LOG_RENDER_FAILED` | The controller could not install or replace the panel. | Retry with a replacement `set_on_screen_log` payload after confirming the service is healthy. |
+| `ON_SCREEN_LOG_RENDER_TIMEOUT` | Android did not acknowledge a draw before the controller deadline. | Treat visibility as unconfirmed. Inspect a new `snapshot` and retry only if needed. |
+
+`rendered: "true"` means Android acknowledged a panel draw. It does not prove
+that a later compositor capture, screenshot, or external screen recorder will
+include the panel.
 
 ### `OPERATOR_NOT_INSTALLED`
 

@@ -1,0 +1,20 @@
+{
+  "commandId": "on-screen-log-action-type-aliases",
+  "taskId": "on-screen-log-action-type-aliases",
+  "source": "validation",
+  "expectedFormat": "android-ui-automator",
+  "timeoutMs": 30000,
+  "actions": [
+    {
+      "id": "set-with-alias",
+      "type": "on_screen_log_set",
+      "params": {
+        "text": "FLOW-003: Alias ingress"
+      }
+    },
+    {
+      "id": "clear-with-alias",
+      "type": "on_screen_log_clear"
+    }
+  ]
+}

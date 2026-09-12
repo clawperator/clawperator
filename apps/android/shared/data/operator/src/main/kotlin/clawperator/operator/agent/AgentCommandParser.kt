@@ -3,6 +3,10 @@ package clawperator.operator.agent
 import action.math.geometry.Point
 import clawperator.task.runner.UiAction
 import clawperator.task.runner.NodeMatcher
+import clawperator.task.runner.OnScreenLogAnchor
+import clawperator.task.runner.OnScreenLogContract
+import clawperator.task.runner.OnScreenLogSpec
+import clawperator.task.runner.OnScreenLogTextAlign
 import clawperator.task.runner.TaskRetry
 import clawperator.task.runner.TaskRetryPresets
 import clawperator.task.runner.TaskScrollDirection
@@ -36,7 +40,6 @@ class AgentCommandParserDefault : AgentCommandParser {
         private const val MAX_SOURCE_LENGTH = 64
         private const val MAX_MATCHER_VALUE_LENGTH = 512
         private const val MAX_URI_LENGTH = 2048
-
         private val json = Json {
             ignoreUnknownKeys = true
         }
@@ -85,8 +88,14 @@ class AgentCommandParserDefault : AgentCommandParser {
         val id = actionJson.stringRequired("id", MAX_ID_LENGTH)
         val type = actionJson.stringRequired("type", 64)
         val params: JsonObject = actionJson["params"]?.jsonObject ?: JsonObject(emptyMap())
+        val normalizedType = type.lowercase()
+        if (
+            normalizedType == "set_on_screen_log" || normalizedType == "clear_on_screen_log"
+        ) {
+            require(type == normalizedType) { "unsupported action type at index=$index: $type" }
+        }
 
-        return when (type.lowercase()) {
+        return when (normalizedType) {
             "open_uri" ->
                 UiAction.OpenUri(
                     id = id,
@@ -228,6 +237,15 @@ class AgentCommandParserDefault : AgentCommandParser {
                     id = id,
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
                 )
+            "set_on_screen_log" ->
+                UiAction.SetOnScreenLog(
+                    id = id,
+                    spec = params.parseOnScreenLogSpec(),
+                )
+            "clear_on_screen_log" -> {
+                require(params.isEmpty()) { "clear_on_screen_log accepts omitted params or {} only" }
+                UiAction.ClearOnScreenLog(id = id)
+            }
             "start_recording" ->
                 UiAction.StartRecording(
                     id = id,
@@ -270,6 +288,56 @@ class AgentCommandParserDefault : AgentCommandParser {
             "regex" -> UiTextValidator.Regex
             else -> error("unsupported validator: $raw")
         }
+    }
+
+    private fun JsonObject.parseOnScreenLogSpec(): OnScreenLogSpec {
+        val allowedKeys =
+            setOf(
+                "text",
+                "anchor",
+                "textAlign",
+                "topOffsetDp",
+                "edgeOffsetDp",
+                "widthDp",
+                "fontSizeSp",
+                "textColor",
+                "backgroundColor",
+                "ttlMs",
+            )
+        val unexpectedKeys = keys - allowedKeys
+        require(unexpectedKeys.isEmpty()) {
+            "set_on_screen_log accepts only: ${allowedKeys.sorted().joinToString(", ")}; " +
+                "unexpected: ${unexpectedKeys.sorted().joinToString(", ")}"
+        }
+
+        val spec =
+            OnScreenLogSpec(
+                text = strictStringRequired("text", OnScreenLogContract.MAX_TEXT_LENGTH),
+                anchor =
+                    when (strictStringOrNull("anchor") ?: "left") {
+                        "left" -> OnScreenLogAnchor.Left
+                        "right" -> OnScreenLogAnchor.Right
+                        else -> error("anchor must be left or right")
+                    },
+                textAlign =
+                    when (strictStringOrNull("textAlign") ?: "left") {
+                        "left" -> OnScreenLogTextAlign.Left
+                        "right" -> OnScreenLogTextAlign.Right
+                        else -> error("textAlign must be left or right")
+                    },
+                topOffsetDp = strictIntOrDefault("topOffsetDp", OnScreenLogContract.DEFAULT_TOP_OFFSET_DP),
+                edgeOffsetDp = strictIntOrDefault("edgeOffsetDp", OnScreenLogContract.DEFAULT_EDGE_OFFSET_DP),
+                widthDp = strictIntOrDefault("widthDp", OnScreenLogContract.DEFAULT_WIDTH_DP),
+                fontSizeSp = strictIntOrDefault("fontSizeSp", OnScreenLogContract.DEFAULT_FONT_SIZE_SP),
+                textColor = strictStringOrNull("textColor") ?: OnScreenLogContract.DEFAULT_TEXT_COLOR,
+                backgroundColor = strictStringOrNull("backgroundColor") ?: OnScreenLogContract.DEFAULT_BACKGROUND_COLOR,
+                ttlMs = strictLongOrDefault("ttlMs", OnScreenLogContract.DEFAULT_TTL_MS),
+            )
+        val normalized = OnScreenLogContract.normalize(spec)
+        return spec.copy(
+            textColor = normalized.textColor,
+            backgroundColor = normalized.backgroundColor,
+        )
     }
 
     private fun JsonObject.parseDirection(): TaskScrollDirection {
@@ -369,6 +437,22 @@ class AgentCommandParserDefault : AgentCommandParser {
         return primitive.content
     }
 
+    private fun JsonObject.strictStringRequired(
+        key: String,
+        maxLen: Int,
+    ): String {
+        val value = strictStringOrNull(key) ?: error("$key is required")
+        require(value.length <= maxLen) { "$key exceeds max length of $maxLen" }
+        return value
+    }
+
+    private fun JsonObject.strictStringOrNull(key: String): String? {
+        val value = this[key] ?: return null
+        val primitive = value as? JsonPrimitive ?: error("$key must be a string")
+        require(primitive.isJsonString()) { "$key must be a string" }
+        return primitive.content
+    }
+
     private fun JsonObject.stringOrNullWithMax(key: String, maxLen: Int): String? {
         val value = stringOrNull(key) ?: return null
         require(value.length <= maxLen) { "$key exceeds max length of $maxLen" }
@@ -388,6 +472,23 @@ class AgentCommandParserDefault : AgentCommandParser {
 
     private fun JsonObject.intOrNull(key: String): Int? = (this[key] as? JsonPrimitive)?.intOrNull
 
+    private fun JsonObject.strictIntOrDefault(
+        key: String,
+        default: Int,
+    ): Int {
+        val value = this[key] ?: return default
+        val primitive = value as? JsonPrimitive ?: error("$key must be an integer")
+        require(!primitive.isJsonString()) { "$key must be an integer" }
+        val number = primitive.doubleOrNull ?: error("$key must be an integer")
+        require(
+            number.isFinite() &&
+                number >= Int.MIN_VALUE.toDouble() &&
+                number <= Int.MAX_VALUE.toDouble() &&
+                number == number.toInt().toDouble(),
+        ) { "$key must be an integer" }
+        return number.toInt()
+    }
+
     private fun JsonObject.longOrDefault(
         key: String,
         default: Long,
@@ -403,6 +504,23 @@ class AgentCommandParserDefault : AgentCommandParser {
     }
 
     private fun JsonObject.longOrNull(key: String): Long? = (this[key] as? JsonPrimitive)?.longOrNull
+
+    private fun JsonObject.strictLongOrDefault(
+        key: String,
+        default: Long,
+    ): Long {
+        val value = this[key] ?: return default
+        val primitive = value as? JsonPrimitive ?: error("$key must be an integer")
+        require(!primitive.isJsonString()) { "$key must be an integer" }
+        val number = primitive.doubleOrNull ?: error("$key must be an integer")
+        require(
+            number.isFinite() &&
+                number >= Long.MIN_VALUE.toDouble() &&
+                number <= Long.MAX_VALUE.toDouble() &&
+                number == number.toLong().toDouble(),
+        ) { "$key must be an integer" }
+        return number.toLong()
+    }
 
     private fun JsonObject.longRequired(key: String): Long {
         return longOrNull(key) ?: error("$key is required")
@@ -430,4 +548,7 @@ class AgentCommandParserDefault : AgentCommandParser {
     }
 
     private fun JsonObject.booleanOrNull(key: String): Boolean? = (this[key] as? JsonPrimitive)?.booleanOrNull
+
+    private fun JsonPrimitive.isJsonString(): Boolean = toString().startsWith('"')
+
 }

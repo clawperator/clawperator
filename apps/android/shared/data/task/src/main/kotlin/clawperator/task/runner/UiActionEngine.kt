@@ -22,6 +22,7 @@ class UiActionEngineDefault(
     private val globalActionDispatcher: UiGlobalActionDispatcher,
     private val deviceState: DeviceState,
     private val recordingManager: RecordingManager = RecordingManagerNoOp,
+    private val onScreenLogController: OnScreenLogController = OnScreenLogControllerNoOp,
 ) : UiActionEngine {
     constructor(
         developerOptionsManager: DeveloperOptionsManager,
@@ -77,6 +78,8 @@ class UiActionEngineDefault(
                 is UiAction.ScrollUntil -> executeScrollUntil(taskScope, action)
                 is UiAction.ReadText -> executeReadText(taskScope, action)
                 is UiAction.SnapshotUi -> executeSnapshotUi(taskScope, action)
+                is UiAction.SetOnScreenLog -> executeSetOnScreenLog(action)
+                is UiAction.ClearOnScreenLog -> executeClearOnScreenLog(action)
                 is UiAction.StartRecording -> executeStartRecording(action)
                 is UiAction.StopRecording -> executeStopRecording(action)
                 is UiAction.TakeScreenshot -> executeTakeScreenshot(taskScope, action)
@@ -668,10 +671,94 @@ class UiActionEngineDefault(
                         put("has_overlay", snapshotResult.hasOverlay.toString())
                         snapshotResult.overlayPackage?.let { put("overlay_package", it) }
                         snapshotResult.windowCount?.let { put("window_count", it.toString()) }
+                        put("operator_overlay_visible", snapshotResult.operatorOverlayVisible.toString())
                     }
                 },
         )
     }
+
+    private suspend fun executeSetOnScreenLog(
+        action: UiAction.SetOnScreenLog,
+    ): UiActionStepResult =
+        when (val result = onScreenLogController.set(action.spec)) {
+            is OnScreenLogControllerResult.Rendered ->
+                UiActionStepResult(
+                    id = action.id,
+                    actionType = "set_on_screen_log",
+                    data =
+                        mapOf(
+                            "visible" to "true",
+                            "rendered" to "true",
+                            "truncated" to result.truncated.toString(),
+                            "anchor" to result.spec.anchor.wireValue,
+                            "text_align" to result.spec.textAlign.wireValue,
+                            "top_offset_dp" to result.spec.topOffsetDp.toString(),
+                            "edge_offset_dp" to result.spec.edgeOffsetDp.toString(),
+                            "width_dp" to result.spec.widthDp.toString(),
+                            "font_size_sp" to result.spec.fontSizeSp.toString(),
+                            "text_color" to result.spec.textColor,
+                            "background_color" to result.spec.backgroundColor,
+                            "ttl_ms" to result.spec.ttlMs.toString(),
+                            "bounds" to result.bounds.toWireValue(),
+                        ),
+                )
+            is OnScreenLogControllerResult.Failure ->
+                UiActionStepResult(
+                    id = action.id,
+                    actionType = "set_on_screen_log",
+                    success = false,
+                    data =
+                        mapOf(
+                            "error" to result.errorCode,
+                            "message" to result.message,
+                        ),
+                )
+            OnScreenLogControllerResult.Cleared ->
+                UiActionStepResult(
+                    id = action.id,
+                    actionType = "set_on_screen_log",
+                    success = false,
+                    data =
+                        mapOf(
+                            "error" to OnScreenLogErrorCodes.RENDER_FAILED,
+                            "message" to "The panel controller cleared instead of rendering",
+                        ),
+                )
+        }
+
+    private suspend fun executeClearOnScreenLog(
+        action: UiAction.ClearOnScreenLog,
+    ): UiActionStepResult =
+        when (val result = onScreenLogController.clear()) {
+            OnScreenLogControllerResult.Cleared ->
+                UiActionStepResult(
+                    id = action.id,
+                    actionType = "clear_on_screen_log",
+                    data = mapOf("visible" to "false"),
+                )
+            is OnScreenLogControllerResult.Failure ->
+                UiActionStepResult(
+                    id = action.id,
+                    actionType = "clear_on_screen_log",
+                    success = false,
+                    data =
+                        mapOf(
+                            "error" to result.errorCode,
+                            "message" to result.message,
+                        ),
+                )
+            is OnScreenLogControllerResult.Rendered ->
+                UiActionStepResult(
+                    id = action.id,
+                    actionType = "clear_on_screen_log",
+                    success = false,
+                    data =
+                        mapOf(
+                            "error" to OnScreenLogErrorCodes.RENDER_FAILED,
+                            "message" to "The panel controller rendered instead of clearing",
+                        ),
+                )
+        }
 
     private suspend fun executeStartRecording(action: UiAction.StartRecording): UiActionStepResult =
         when (val outcome = recordingManager.startRecording(action.sessionId)) {

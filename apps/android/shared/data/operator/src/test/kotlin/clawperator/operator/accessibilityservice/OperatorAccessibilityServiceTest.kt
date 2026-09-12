@@ -5,10 +5,12 @@ import action.coroutine.CoroutineScopes
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.Application
+import android.content.res.Configuration
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import clawperator.accessibilityservice.AccessibilityServiceManagerAndroid
 import clawperator.operator.recording.RecordingEventFilter
+import clawperator.operator.onscreenlog.OnScreenLogPanelLifecycle
 import clawperator.routine.RoutineId
 import clawperator.routine.RoutineManager
 import clawperator.routine.RoutineRun
@@ -16,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -58,7 +61,7 @@ class OperatorAccessibilityServiceTest {
     @Test
     @Config(sdk = [33], manifest = Config.NONE, application = Application::class)
     fun `onCreateInputMethod returns custom accessibility ime on api33`() {
-        withServiceKoin(debug = true) {
+        withServiceKoin(debug = true) { _, _ ->
             val service = Robolectric.buildService(OperatorAccessibilityService::class.java).create().get()
 
             val inputMethod = service.onCreateInputMethod()
@@ -69,8 +72,8 @@ class OperatorAccessibilityServiceTest {
 
     @Test
     @Config(sdk = [33], manifest = Config.NONE, application = Application::class)
-    fun `onServiceConnected enables ime editor flag and registers current service`() {
-        withServiceKoin(debug = true) { manager ->
+    fun `onServiceConnected owns panel lifecycle through service destruction`() {
+        withServiceKoin(debug = true) { manager, panelLifecycle ->
             val service = Robolectric.buildService(OperatorAccessibilityService::class.java).create().get()
             service.serviceInfo = AccessibilityServiceInfo()
 
@@ -78,16 +81,21 @@ class OperatorAccessibilityServiceTest {
 
             assertTrue((service.serviceInfo.flags and AccessibilityServiceInfo.FLAG_INPUT_METHOD_EDITOR) != 0)
             assertSame(service, manager.currentAccessibilityServiceFlow.value)
+            assertSame(service, panelLifecycle.attachedService)
+
+            service.onConfigurationChanged(Configuration())
+            assertEquals(1, panelLifecycle.configurationChanges)
 
             service.onDestroy()
             assertSame(null, manager.currentAccessibilityServiceFlow.value)
+            assertEquals(1, panelLifecycle.detachCalls)
         }
     }
 
     @Test
     @Config(sdk = [32], manifest = Config.NONE, application = Application::class)
     fun `pre api33 service still loads and connects without ime editor flag`() {
-        withServiceKoin(debug = true) { manager ->
+        withServiceKoin(debug = true) { manager, _ ->
             val service = Robolectric.buildService(OperatorAccessibilityService::class.java).create().get()
             service.serviceInfo = AccessibilityServiceInfo()
 
@@ -103,7 +111,7 @@ class OperatorAccessibilityServiceTest {
 
     private fun withServiceKoin(
         debug: Boolean,
-        block: (AccessibilityServiceManagerAndroid) -> Unit,
+        block: (AccessibilityServiceManagerAndroid, RecordingOnScreenLogPanelLifecycle) -> Unit,
     ) {
         stopKoin()
 
@@ -116,6 +124,7 @@ class OperatorAccessibilityServiceTest {
             )
         val routineManager = NoOpRoutineManager()
         val recordingEventFilter = NoOpRecordingEventFilter()
+        val panelLifecycle = RecordingOnScreenLogPanelLifecycle()
 
         try {
             startKoin {
@@ -126,10 +135,11 @@ class OperatorAccessibilityServiceTest {
                         single { coroutineScopes }
                         single<RoutineManager> { routineManager }
                         single<RecordingEventFilter> { recordingEventFilter }
+                        single<OnScreenLogPanelLifecycle> { panelLifecycle }
                     },
                 )
             }
-            block(manager)
+            block(manager, panelLifecycle)
         } finally {
             stopKoin()
         }
@@ -155,5 +165,24 @@ class OperatorAccessibilityServiceTest {
             service: AccessibilityService,
             event: KeyEvent,
         ) = Unit
+    }
+
+    private class RecordingOnScreenLogPanelLifecycle : OnScreenLogPanelLifecycle {
+        var attachedService: AccessibilityService? = null
+        var detachCalls = 0
+        var configurationChanges = 0
+
+        override fun attach(service: AccessibilityService) {
+            attachedService = service
+        }
+
+        override fun detach() {
+            detachCalls += 1
+            attachedService = null
+        }
+
+        override fun onConfigurationChanged() {
+            configurationChanges += 1
+        }
     }
 }

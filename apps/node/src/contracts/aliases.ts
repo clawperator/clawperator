@@ -18,7 +18,16 @@ const ACTION_ALIAS_TO_CANONICAL: Record<string, string> = {
   text_entry: "enter_text",
   input_text: "enter_text",
   key_press: "press_key",
+  on_screen_log_set: "set_on_screen_log",
+  on_screen_log_clear: "clear_on_screen_log",
 };
+
+const ON_SCREEN_LOG_EXACT_INPUT_TYPES = new Set([
+  "set_on_screen_log",
+  "clear_on_screen_log",
+  "on_screen_log_set",
+  "on_screen_log_clear",
+]);
 
 // NOTE: "doctor_ping" is intentionally absent. It is an internal diagnostic action
 // used only by `clawperator doctor` via broadcastAgentCommand, not the agent-facing API.
@@ -41,6 +50,8 @@ export const CANONICAL_ACTION_TYPES = [
   "press_key",
   "wait_for_navigation",
   "read_key_value_pair",
+  "set_on_screen_log",
+  "clear_on_screen_log",
 ] as const;
 
 export type CanonicalActionType = (typeof CANONICAL_ACTION_TYPES)[number];
@@ -50,9 +61,7 @@ export type CanonicalActionType = (typeof CANONICAL_ACTION_TYPES)[number];
  * Returns canonical type or throws if unknown.
  */
 export function normalizeActionType(input: string): CanonicalActionType {
-  const normalized = input.trim().toLowerCase();
-  const canonical =
-    ACTION_ALIAS_TO_CANONICAL[normalized] ?? normalized;
+  const canonical = getCanonicalActionType(input);
   if (!CANONICAL_ACTION_TYPES.includes(canonical as CanonicalActionType)) {
     throw new Error(`Unsupported action type: ${input}`);
   }
@@ -61,5 +70,15 @@ export function normalizeActionType(input: string): CanonicalActionType {
 
 export function getCanonicalActionType(input: string): string {
   const normalized = input.trim().toLowerCase();
-  return ACTION_ALIAS_TO_CANONICAL[normalized] ?? normalized;
+  const canonical = ACTION_ALIAS_TO_CANONICAL[normalized] ?? normalized;
+  if (
+    (canonical === "set_on_screen_log" || canonical === "clear_on_screen_log") &&
+    !ON_SCREEN_LOG_EXACT_INPUT_TYPES.has(input)
+  ) {
+    // These raw actions accept only their exact canonical names and their two
+    // explicit aliases. Do not let generic normalization accept case or whitespace
+    // variants at the public ingress boundary.
+    return input;
+  }
+  return canonical;
 }

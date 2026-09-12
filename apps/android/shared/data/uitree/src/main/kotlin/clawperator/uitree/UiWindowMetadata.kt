@@ -5,4 +5,5 @@ data class UiWindowMetadata(
     val hasOverlay: Boolean = false,
     val overlayPackage: String? = null,
     val windowCount: Int = 0,
+    val operatorOverlayVisible: Boolean = false,
 )

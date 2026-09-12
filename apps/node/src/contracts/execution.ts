@@ -12,6 +12,24 @@ export interface ActionParams {
   matcher?: NodeMatcher;
   coordinate?: { x: number; y: number };
   text?: string;
+  /** set_on_screen_log: physical screen edge */
+  anchor?: "left" | "right";
+  /** set_on_screen_log: physical text alignment within the panel */
+  textAlign?: "left" | "right";
+  /** set_on_screen_log: distance from the usable top edge, in dp */
+  topOffsetDp?: number;
+  /** set_on_screen_log: distance inward from the selected usable edge, in dp */
+  edgeOffsetDp?: number;
+  /** set_on_screen_log: complete panel width, including padding, in dp */
+  widthDp?: number;
+  /** set_on_screen_log: text size in sp */
+  fontSizeSp?: number;
+  /** set_on_screen_log: #RRGGBB or #AARRGGBB */
+  textColor?: string;
+  /** set_on_screen_log: #RRGGBB or #AARRGGBB */
+  backgroundColor?: string;
+  /** set_on_screen_log: stale-label expiry in milliseconds */
+  ttlMs?: number;
   submit?: boolean;
   clear?: boolean;
   /** clickType: default | long_click | focus */
@@ -29,6 +47,7 @@ export interface ActionParams {
   /** scroll_and_click: when false, scroll until visible but do not click */
   clickAfter?: boolean;
   validator?: string;
+  validatorPattern?: string;
   /** read_text: when true, return all matches */
   all?: boolean;
   /** press_key: back | home | recents */

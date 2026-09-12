@@ -2,6 +2,7 @@ package clawperator.task.runner
 
 import action.developeroptions.DeveloperOptionsManager
 import action.devicestate.DeviceState
+import action.devicestate.DeviceStateMock
 import action.math.geometry.Rect
 import clawperator.test.ActionTest
 import clawperator.test.actionTest
@@ -322,6 +323,7 @@ class UiActionEngineDefaultTest : ActionTest {
                             hasOverlay = true,
                             overlayPackage = "com.android.permissioncontroller",
                             windowCount = 2,
+                            operatorOverlayVisible = true,
                         ),
                 )
             val engine = UiActionEngineDefault(DeveloperOptionsManagerMock(), UiGlobalActionDispatcherMock())
@@ -345,6 +347,7 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals("true", stepResult.data["has_overlay"])
             assertEquals("com.android.permissioncontroller", stepResult.data["overlay_package"])
             assertEquals("2", stepResult.data["window_count"])
+            assertEquals("true", stepResult.data["operator_overlay_visible"])
         }
 
     @Test
@@ -1784,6 +1787,145 @@ class UiActionEngineDefaultTest : ActionTest {
             assertEquals("VALIDATOR_MISMATCH", stepResult.data["error"])
             assertEquals("not a temperature", stepResult.data["raw_text"])
         }
+
+    @Test
+    fun `execute set_on_screen_log returns acknowledged result data without text`() =
+        actionTest {
+            val normalized =
+                NormalizedOnScreenLogSpec(
+                    text = "Sensitive caller label",
+                    anchor = OnScreenLogAnchor.Right,
+                    textAlign = OnScreenLogTextAlign.Left,
+                    topOffsetDp = 0,
+                    edgeOffsetDp = 12,
+                    widthDp = 320,
+                    fontSizeSp = 16,
+                    textColor = "#FFA1B2C3",
+                    backgroundColor = "#7F0A0B0C",
+                    ttlMs = 12_000L,
+                )
+            val controller =
+                OnScreenLogControllerFake(
+                    setResult =
+                        OnScreenLogControllerResult.Rendered(
+                            spec = normalized,
+                            bounds = OnScreenLogBounds(left = 700, top = 16, right = 1020, bottom = 82),
+                            truncated = false,
+                        ),
+                )
+            val engine =
+                UiActionEngineDefault(
+                    developerOptionsManager = DeveloperOptionsManagerMock(),
+                    globalActionDispatcher = UiGlobalActionDispatcherMock(),
+                    deviceState = DeviceStateMock(),
+                    onScreenLogController = controller,
+                )
+
+            val result =
+                engine.execute(
+                    taskScope = TaskScopeNoOp(),
+                    plan =
+                        UiActionPlan(
+                            commandId = "on-screen-log-set",
+                            taskId = "on-screen-log-task",
+                            source = "test",
+                            actions = listOf(UiAction.SetOnScreenLog(id = "set", spec = OnScreenLogSpec(text = "caller input"))),
+                        ),
+                )
+
+            val step = result.stepResults.single()
+            assertTrue(step.success)
+            assertEquals("set_on_screen_log", step.actionType)
+            assertEquals(
+                mapOf(
+                    "visible" to "true",
+                    "rendered" to "true",
+                    "truncated" to "false",
+                    "anchor" to "right",
+                    "text_align" to "left",
+                    "top_offset_dp" to "0",
+                    "edge_offset_dp" to "12",
+                    "width_dp" to "320",
+                    "font_size_sp" to "16",
+                    "text_color" to "#FFA1B2C3",
+                    "background_color" to "#7F0A0B0C",
+                    "ttl_ms" to "12000",
+                    "bounds" to "[700,16][1020,82]",
+                ),
+                step.data,
+            )
+            assertFalse(step.data.containsKey("text"))
+            assertEquals("caller input", controller.setSpecs.single().text)
+        }
+
+    @Test
+    fun `execute set_on_screen_log maps every structured controller failure`() =
+        actionTest {
+            for (errorCode in listOf(
+                OnScreenLogErrorCodes.SERVICE_UNAVAILABLE,
+                OnScreenLogErrorCodes.LAYOUT_INVALID,
+                OnScreenLogErrorCodes.RENDER_FAILED,
+                OnScreenLogErrorCodes.RENDER_TIMEOUT,
+            )) {
+                val engine =
+                    UiActionEngineDefault(
+                        developerOptionsManager = DeveloperOptionsManagerMock(),
+                        globalActionDispatcher = UiGlobalActionDispatcherMock(),
+                        deviceState = DeviceStateMock(),
+                        onScreenLogController =
+                            OnScreenLogControllerFake(
+                                setResult = OnScreenLogControllerResult.Failure(errorCode, "failure for $errorCode"),
+                            ),
+                    )
+
+                val result =
+                    engine.execute(
+                        taskScope = TaskScopeNoOp(),
+                        plan =
+                            UiActionPlan(
+                                commandId = "on-screen-log-failure",
+                                taskId = "on-screen-log-task",
+                                source = "test",
+                                actions = listOf(UiAction.SetOnScreenLog(id = "set", spec = OnScreenLogSpec(text = "label"))),
+                            ),
+                    )
+
+                val step = result.stepResults.single()
+                assertFalse(step.success)
+                assertEquals(errorCode, step.data["error"])
+                assertEquals("failure for $errorCode", step.data["message"])
+            }
+        }
+
+    @Test
+    fun `execute clear_on_screen_log reports hidden without a rendered field`() =
+        actionTest {
+            val engine =
+                UiActionEngineDefault(
+                    developerOptionsManager = DeveloperOptionsManagerMock(),
+                    globalActionDispatcher = UiGlobalActionDispatcherMock(),
+                    deviceState = DeviceStateMock(),
+                    onScreenLogController = OnScreenLogControllerFake(clearResult = OnScreenLogControllerResult.Cleared),
+                )
+
+            val result =
+                engine.execute(
+                    taskScope = TaskScopeNoOp(),
+                    plan =
+                        UiActionPlan(
+                            commandId = "on-screen-log-clear",
+                            taskId = "on-screen-log-task",
+                            source = "test",
+                            actions = listOf(UiAction.ClearOnScreenLog(id = "clear")),
+                        ),
+                )
+
+            val step = result.stepResults.single()
+            assertTrue(step.success)
+            assertEquals("clear_on_screen_log", step.actionType)
+            assertEquals(mapOf("visible" to "false"), step.data)
+            assertFalse(step.data.containsKey("rendered"))
+        }
 }
 
 private class RecordingTaskScope(
@@ -2078,4 +2220,21 @@ private class UiGlobalActionDispatcherMock(
         error?.let { throw it }
         return result
     }
+}
+
+private class OnScreenLogControllerFake(
+    var setResult: OnScreenLogControllerResult = OnScreenLogControllerResult.Cleared,
+    var clearResult: OnScreenLogControllerResult = OnScreenLogControllerResult.Cleared,
+) : OnScreenLogController {
+    val setSpecs = mutableListOf<OnScreenLogSpec>()
+
+    override suspend fun set(
+        spec: OnScreenLogSpec,
+        drawAcknowledgementTimeoutMs: Long,
+    ): OnScreenLogControllerResult {
+        setSpecs += spec
+        return setResult
+    }
+
+    override suspend fun clear(): OnScreenLogControllerResult = clearResult
 }
