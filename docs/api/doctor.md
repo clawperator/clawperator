@@ -24,9 +24,9 @@ Flags:
 | --- | --- | --- |
 | `--device` | adb serial | targets one device explicitly |
 | `--operator-package` | package name string | overrides the default operator package for package checks, launch, and handshake |
-| `--fix` | flag | executes shell-type remediation steps during finalization |
+| `--fix` | flag | attempts shell remediation once, then reruns checks before reporting readiness |
 | `--full` | flag | adds Java/build/install/launch/smoke checks |
-| `--check-only` | flag | forces exit code `0` regardless of failures |
+| `--check-only` | flag | accepted for compatibility; uses the same readiness exit status as plain doctor |
 | `--output` | `json`, `pretty` | selects the output renderer; use `--output json` when you want to request JSON explicitly |
 | `--format` | `json`, `pretty` | alias for `--output` |
 
@@ -73,6 +73,7 @@ Defaults:
       "evidence": {}
     }
   ],
+  "skippedChecks": [],
   "nextActions": ["optional command or instruction"]
 }
 ```
@@ -81,32 +82,24 @@ Field meaning:
 
 | Field | Meaning |
 | --- | --- |
-| `ok` | currently the same value as `criticalOk`; true only when all critical checks avoided `fail` |
-| `criticalOk` | true when every critical check status is not `fail` |
+| `ok` | currently the same value as `criticalOk`; true only when every required check for the selected mode ran and passed |
+| `criticalOk` | true when every required check for the selected mode has status `pass` |
 | `deviceId` | resolved device serial, if doctor could determine one |
 | `operatorPackage` | package used for doctor checks |
 | `checks` | ordered list of `DoctorCheckResult` entries |
+| `skippedChecks` | required checks omitted because prerequisite verification stopped; entries contain `id`, `reason`, and `blockedBy` check IDs; empty on success |
 | `nextActions` | deduplicated shell commands or manual instructions collected from failing/warning checks, plus a success hint when everything passed |
 
 ## How `nextActions` Is Built
 
-`DoctorService.finalize()` builds `nextActions` in this order:
+The report lists deduplicated shell commands and manual guidance from non-passing
+checks. When all checks pass, it includes the setup documentation and a suggested
+snapshot command. An empty `nextActions` list does not prove readiness.
 
-1. If all checks passed, add:
-   - `Docs: https://docs.clawperator.com/getting-started/first-time-setup/`
-   - `Try: clawperator snapshot --device <resolved_device>` or the placeholder form if no device was resolved
-2. For each non-pass check with `fix.steps`:
-   - if `--fix` was not used, append each shell or manual step value
-   - if `--fix` was used, execute `shell` steps best-effort and append only `manual` step values
-3. For each non-pass check with `deviceGuidance`, append:
-   - `On device, open <screen> and follow the listed steps.`
-4. Deduplicate the final list.
-
-Machine-checkable implication:
-
-- `nextActions` is remediation guidance, not proof of success
-- with `--fix`, `nextActions` can be less complete because attempted shell steps are omitted even if execution failed
-- always gate on `criticalOk` and `checks[]`, not on whether `nextActions` is empty
+With `--fix`, doctor attempts shell steps once and then reruns the selected mode
+without another automatic repair pass. The returned checks, skipped checks, and
+next actions describe that fresh verification. Failed repairs remain failures
+unless the new checks independently verify readiness.
 
 <a id="doctor-check-result-contract"></a>
 ## `DoctorCheckResult` Contract
@@ -131,11 +124,13 @@ Each entry in `checks[]` has:
 
 ## Passing JSON Example
 
+Excerpt; advisory checks are omitted.
+
 ```json
 {
   "ok": true,
   "criticalOk": true,
-  "deviceId": "emulator-5554",
+  "deviceId": "<device_serial>",
   "operatorPackage": "com.clawperator.operator.dev",
   "checks": [
     {
@@ -152,11 +147,16 @@ Each entry in `checks[]` has:
       }
     },
     {
+      "id": "host.adb.server",
+      "status": "pass",
+      "summary": "adb server is healthy."
+    },
+    {
       "id": "device.discovery",
       "status": "pass",
-      "summary": "Device emulator-5554 is connected and reachable.",
+      "summary": "Device <device_serial> is connected and reachable.",
       "evidence": {
-        "serial": "emulator-5554"
+        "serial": "<device_serial>"
       }
     },
     {
@@ -202,18 +202,19 @@ Each entry in `checks[]` has:
       }
     }
   ],
+  "skippedChecks": [],
   "nextActions": [
     "Docs: https://docs.clawperator.com/getting-started/first-time-setup/",
-    "Try: clawperator snapshot --device emulator-5554"
+    "Try: clawperator snapshot --device <device_serial>"
   ]
 }
 ```
 
 Success conditions:
 
-- exit code is `0` unless `--check-only` changed it
+- exit code is `0`
 - `criticalOk == true`
-- every critical check has `status != "fail"`
+- every required check for the selected mode ran with `status == "pass"`
 
 ## Failing JSON Example
 
@@ -221,7 +222,7 @@ Success conditions:
 {
   "ok": false,
   "criticalOk": false,
-  "deviceId": "emulator-5554",
+  "deviceId": "<device_serial>",
   "operatorPackage": "com.clawperator.operator.dev",
   "checks": [
     {
@@ -245,18 +246,18 @@ Success conditions:
 
 Failure conditions:
 
-- exit code is `1` unless `--check-only` was passed
+- exit code is `1`, including with `--check-only`
 - `criticalOk == false`
-- at least one critical check has `status == "fail"`
+- at least one required check failed, warned, or was not run
 
 ## Warning JSON Example
 
-The main advisory-only case in current code is multiple connected devices without `--device`:
+Multiple connected devices without `--device` retain a warning diagnostic but fail readiness. This report excerpt shows the discovery result and one skipped check:
 
 ```json
 {
-  "ok": true,
-  "criticalOk": true,
+  "ok": false,
+  "criticalOk": false,
   "checks": [
     {
       "id": "device.discovery",
@@ -265,8 +266,15 @@ The main advisory-only case in current code is multiple connected devices withou
       "summary": "Multiple devices connected.",
       "detail": "Specify --device to target a single device.",
       "evidence": {
-        "devices": ["emulator-5554", "R58N12345AB"]
+        "devices": ["<device_serial>", "<other_device_serial>"]
       }
+    }
+  ],
+  "skippedChecks": [
+    {
+      "id": "readiness.handshake",
+      "reason": "Required check was not run because prerequisite verification did not complete.",
+      "blockedBy": ["device.discovery"]
     }
   ]
 }
@@ -274,7 +282,7 @@ The main advisory-only case in current code is multiple connected devices withou
 
 Meaning:
 
-- the host environment is usable, so `criticalOk` stays `true`
+- `ok` and `criticalOk` are `false`; the command exits `1`
 - doctor still cannot continue into device-specific checks without an explicit target
 - the next deterministic step is to rerun doctor with `--device <serial>`
 
@@ -284,6 +292,7 @@ Doctor runs checks in this order:
 
 | Order | Check IDs | When they run |
 | --- | --- | --- |
+| 0 (advisory) | `host.logs.writable` | first; probes the daily log destination without truncating it |
 | 1 | `host.node.version`, `host.adb.presence` | always |
 | 1 (advisory) | `host.skill-agent-cli.default`, `host.skill-agent-cli.skills`, `host.bundled-skills.staleness` | after `host.adb.presence` passes; advisory only, never halt on failure |
 | 1 | `host.adb.server` | after `host.adb.presence` passes |
@@ -294,16 +303,17 @@ Doctor runs checks in this order:
 | 6 | `device.capability` | after device resolution |
 | 7 | `readiness.apk.presence` | after device capability |
 | 8 | `readiness.version.compatibility` | only if APK presence passed |
-| 9 | `readiness.settings.dev_options`, `readiness.settings.usb_debugging` | after device capability and APK presence checks; these still run even when version compatibility was skipped |
+| 9 | `readiness.settings.dev_options`, `readiness.settings.usb_debugging` | after version compatibility passes |
 | 10 | `readiness.handshake` | only if APK presence passed and version compatibility passed |
 | 11 | `readiness.device.interactive` | only if handshake passed |
 | 12 | `readiness.smoke` | only with `--full`, and only if handshake and interactive-state checks passed |
 
 Halting rule:
 
-- doctor stops early only when a critical check returns `status == "fail"`
-- warnings do not halt
-- a `device.discovery` warning for `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` causes early finalization later because no device can be resolved for subsequent device-specific checks
+- doctor stops the required sequence when a required check does not pass
+- omitted required checks appear in `skippedChecks`, with the blocking check ID
+- optional host-agent, log-path, and settings warnings remain advisory
+- normal mode does not require or list full-only checks as skipped
 
 ## Critical Vs Advisory
 
@@ -335,7 +345,7 @@ Advisory behavior:
 Important special case:
 
 - `device.discovery` with `MULTIPLE_DEVICES_DEVICE_ID_REQUIRED` is a `warn`, not a `fail`
-- even so, you still cannot proceed to device-specific execution without passing `--device`
+- readiness is false because the selected target has not been verified; pass `--device` and rerun doctor
 
 ## Exit Codes
 
@@ -343,32 +353,35 @@ Important special case:
 
 | Condition | Exit code |
 | --- | --- |
-| `--check-only` passed | `0` |
-| otherwise and `(report.criticalOk ?? report.ok) == true` | `0` |
+| all required checks pass, with or without `--check-only` | `0` |
 | otherwise | `1` |
 
 Machine-checkable success gate:
 
 - require exit code `0`
 - require `criticalOk == true`
-- also require that you either resolved one device or intentionally handled the `device.discovery` multi-device warning before issuing device commands
+- require the reported device and Operator package to be the intended target
 
 ## `--fix` Behavior
 
-`--fix` does not change the report shape. It changes how doctor handles `fix.steps` during finalization:
+`--fix` attempts shell remediation steps once. It never changes the selected
+Operator package, uninstalls an alternate variant, or assigns default application
+roles. Manual steps remain caller-owned. After any shell attempt, doctor reruns
+the selected mode, including prerequisites, version verification, and handshake
+when reachable. The returned report contains only the fresh check results.
 
-- `shell` steps are executed best-effort through the runtime shell runner
-- `manual` steps are still only reported
-- when `--fix` is active, attempted `shell` steps are omitted from `nextActions` whether they succeeded or failed
-- when `--fix` is not active, `shell` and `manual` steps are both copied into `nextActions`
-- failed auto-fix attempts are intentionally swallowed so diagnostics remain deterministic
+A shell command exiting successfully is not proof of readiness. The new checks
+must pass. If prerequisites still fail, downstream checks remain explicitly
+skipped, and the command exits `1`. Another repair attempt requires a new call.
 
-Use `--fix` when:
+### Migration from earlier doctor behavior
 
-- you want unattended recovery loops for shell-based remediations
-- you still plan to rerun `doctor` afterward to verify `criticalOk == true`
-
-Do not treat `--fix` alone as success. The success gate remains the follow-up report.
+`--check-only` no longer forces exit `0`. Callers that need to collect a failed
+report should explicitly handle a nonzero status and inspect its JSON. A missing
+selected APK with an alternate variant installed now has status `fail` and code
+`OPERATOR_VARIANT_MISMATCH`. Multiple unselected devices retain their warning
+code but now produce `ok=false` and `criticalOk=false`. Consumers must allow the
+additive `skippedChecks` field. No device or package is switched implicitly.
 
 ## Pretty Output
 
@@ -377,6 +390,7 @@ Pretty output is grouped into:
 - critical checks
 - advisory checks
 - count of additional passed non-critical checks
+- skipped required checks and their blocking IDs
 - final summary line
 - `Next actions:` section
 
@@ -393,6 +407,7 @@ For a failing check, pretty output includes:
 
 | Check ID | Statuses seen in current code | Typical codes | What it verifies |
 | --- | --- | --- | --- |
+| `host.logs.writable` | `pass`, `warn` | `LOG_DIRECTORY_UNWRITABLE` | actual daily log file can be opened for append; evidence includes `logDir`, `logPath`, `writable`; advisory only |
 | `host.node.version` | `pass`, `fail` | `NODE_TOO_OLD` | Node.js major version is at least 24 |
 | `host.adb.presence` | `pass`, `fail` | `ADB_NOT_FOUND` | adb exists and can report a version |
 | `host.adb.server` | `pass`, `fail` | `ADB_SERVER_FAILED` | adb server can start |
@@ -405,13 +420,13 @@ For a failing check, pretty output includes:
 | `build.android.install` | `pass`, `fail` | `ANDROID_INSTALL_FAILED` | `./gradlew :app:installDebug` succeeds |
 | `build.android.launch` | `pass`, `fail` | `ANDROID_APP_LAUNCH_FAILED` | Operator main activity launches |
 | `device.capability` | `pass`, `fail` | `DEVICE_SHELL_UNAVAILABLE` or no explicit code | shell access, SDK version, screen size, and density are readable |
-| `readiness.apk.presence` | `pass`, `warn`, `fail` | `DEVICE_SHELL_UNAVAILABLE`, `OPERATOR_VARIANT_MISMATCH`, `OPERATOR_NOT_INSTALLED` | requested operator package is installed |
+| `readiness.apk.presence` | `pass`, `fail` | `DEVICE_SHELL_UNAVAILABLE`, `OPERATOR_VARIANT_MISMATCH`, `OPERATOR_NOT_INSTALLED` | requested operator package is installed |
 | `readiness.version.compatibility` | `pass`, `fail` | `VERSION_INCOMPATIBLE`, `APK_VERSION_UNREADABLE`, `APK_VERSION_INVALID`, `CLI_VERSION_INVALID` | CLI and installed APK are compatible |
 | `readiness.settings.dev_options` | `pass`, `warn` | `DEVICE_DEV_OPTIONS_DISABLED` | developer options setting is enabled |
 | `readiness.settings.usb_debugging` | `pass`, `warn` | `DEVICE_USB_DEBUGGING_DISABLED` | USB debugging setting is enabled |
-| `readiness.handshake` | `pass`, `fail` | `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `RESULT_ENVELOPE_TIMEOUT`, `BROADCAST_FAILED`, `OPERATOR_NOT_INSTALLED` | Node can dispatch and receive a valid result envelope |
+| `readiness.handshake` | `pass`, `fail` | `DEVICE_ACCESSIBILITY_NOT_RUNNING`, `RESULT_ENVELOPE_TIMEOUT`, `BROADCAST_FAILED`, `OPERATOR_NOT_INSTALLED` | Node receives a successful result envelope containing a successful `doctor_ping` step |
 | `readiness.device.interactive` | `pass`, `fail` | `DEVICE_NOT_INTERACTIVE`, or the underlying probe failure code if state could not be verified | the target is awake enough for interactive automation, with evidence fields `deviceLocked`, `screenOn`, and `userUnlocked` |
-| `readiness.smoke` | `pass`, `fail` | `SMOKE_OPEN_SETTINGS_FAILED` | smoke execution can open Settings and produce at least one successful `snapshot` step |
+| `readiness.smoke` | `pass`, `fail` | `SMOKE_OPEN_SETTINGS_FAILED` | smoke execution returns terminal success and successful close, open, and snapshot steps with the requested IDs |
 
 ## Common Failure Recovery
 
@@ -528,7 +543,7 @@ Recommended doctor loop:
 
 1. Run `clawperator doctor [--device <serial>] [--operator-package <pkg>]`.
 2. Require exit code `0` and `criticalOk == true` before treating the environment as ready.
-3. If `criticalOk == false`, iterate through `checks[]` in order and branch on the first critical `fail`.
+3. If `criticalOk == false`, iterate through `checks[]` in order and inspect the first non-passing required check and `skippedChecks`.
 4. If `fix.steps[].kind == "shell"` and you trust the environment, either execute them yourself or rerun doctor with `--fix`.
 5. If `deviceGuidance` is present, surface `deviceGuidance.screen` and `deviceGuidance.steps[]` to the human operator.
 6. Rerun `doctor` after remediation and require `criticalOk == true`.

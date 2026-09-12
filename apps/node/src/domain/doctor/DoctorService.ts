@@ -28,8 +28,9 @@ import {
   runAndroidInstall,
   runAndroidLaunch
 } from "./checks/buildChecks.js";
-import { isCriticalDoctorCheck } from "./criticalChecks.js";
+import { isCriticalDoctorCheck, requiredDoctorCheckIds, type RequiredDoctorCheckId } from "./criticalChecks.js";
 import type { Logger } from "../../adapters/logger.js";
+import { checkLogDestination } from "./checks/logChecks.js";
 
 export interface RunDoctorOptions {
   config: RuntimeConfig;
@@ -39,6 +40,7 @@ export interface RunDoctorOptions {
 }
 
 export interface DoctorServiceDeps {
+  checkLogDestination?: typeof checkLogDestination;
   runHandshake?: typeof runHandshake;
   checkDeviceInteractiveState?: typeof checkDeviceInteractiveState;
   runSmokeTest?: typeof runSmokeTest;
@@ -52,118 +54,68 @@ export class DoctorService {
   constructor(private readonly deps: DoctorServiceDeps = {}) {}
 
   async run(options: RunDoctorOptions): Promise<DoctorReport> {
-    const config = options.logger === undefined ? options.config : { ...options.config, logger: options.logger };
-    const { full } = options;
+    const config = { ...options.config, logger: options.logger ?? options.config.logger };
     const checks: DoctorCheckResult[] = [];
+    checks.push(await (this.deps.checkLogDestination ?? checkLogDestination)(config.logger));
+    let handshake: DoctorCheckResult | undefined;
+    const runners: Record<RequiredDoctorCheckId, () => Promise<DoctorCheckResult>> = {
+      "host.node.version": checkNodeVersion,
+      "host.adb.presence": () => checkAdbPresence(config),
+      "host.adb.server": () => checkAdbServer(config),
+      "host.java.version": () => checkJavaVersion(config),
+      "build.android.assemble": () => runAndroidBuild(config),
+      "device.discovery": async () => {
+        const discovery = await checkDeviceDiscovery(config);
+        if (discovery.status === "pass" && config.deviceId === undefined) {
+          try {
+            config.deviceId = (await resolveDevice(config)).deviceId;
+          } catch (error) {
+            return {
+              ...discovery,
+              status: "fail",
+              summary: "Device selection could not be verified.",
+              detail: error instanceof Error ? error.message : String(error),
+            };
+          }
+        }
+        return discovery;
+      },
+      "build.android.install": () => runAndroidInstall(config),
+      "build.android.launch": () => runAndroidLaunch(config),
+      "device.capability": () => checkDeviceCapabilities(config),
+      "readiness.apk.presence": () => checkApkPresence(config),
+      "readiness.version.compatibility": () => checkVersionCompatibility(config),
+      "readiness.handshake": async () => {
+        handshake = await (this.deps.runHandshake ?? runHandshake)(config);
+        return handshake;
+      },
+      "readiness.device.interactive": async () => {
+        const state = extractInteractiveStateFromEvidence(handshake?.evidence);
+        if (state !== undefined) return buildDeviceInteractiveStateCheckFromState(state);
+        return (this.deps.checkDeviceInteractiveState ?? checkDeviceInteractiveState)(config);
+      },
+      "readiness.smoke": () => (this.deps.runSmokeTest ?? runSmokeTest)(config),
+    };
 
-    // 1. Host Checks
-    const nodeVersion = await checkNodeVersion();
-    checks.push(nodeVersion);
-    if (this.shouldHaltOnFailure(nodeVersion)) return this.finalize(checks, config, options.fix);
-
-    const adbPresence = await checkAdbPresence(config);
-    checks.push(adbPresence);
-    if (this.shouldHaltOnFailure(adbPresence)) return this.finalize(checks, config, options.fix);
-
-    const defaultOrchestratedSkillAgentCli = await checkDefaultOrchestratedSkillAgentCli(config);
-    checks.push(defaultOrchestratedSkillAgentCli);
-
-    const installedOrchestratedSkillAgentCli = await checkInstalledOrchestratedSkillAgentCliAvailability(config);
-    checks.push(installedOrchestratedSkillAgentCli);
-
-    const bundledSkillsStaleness = await checkBundledSkillsStaleness(config, {
-      installedDir: (config as RuntimeConfigWithDoctorOverrides).bundledSkillsDir,
-    });
-    checks.push(bundledSkillsStaleness);
-
-    const adbServer = await checkAdbServer(config);
-    checks.push(adbServer);
-    if (this.shouldHaltOnFailure(adbServer)) return this.finalize(checks, config, options.fix);
-
-    if (full) {
-      const javaVersion = await checkJavaVersion(config);
-      checks.push(javaVersion);
-      if (this.shouldHaltOnFailure(javaVersion)) return this.finalize(checks, config, options.fix);
-
-      const build = await runAndroidBuild(config);
-      checks.push(build);
-      if (this.shouldHaltOnFailure(build)) return this.finalize(checks, config, options.fix);
-    }
-
-    // 2. Device Discovery
-    const discovery = await checkDeviceDiscovery(config);
-    checks.push(discovery);
-    if (this.shouldHaltOnFailure(discovery)) return this.finalize(checks, config, options.fix);
-
-    // After discovery, ensure we have a deviceId in config for subsequent checks.
-    // If discovery returned a warn (e.g. MULTIPLE_DEVICES_DEVICE_ID_REQUIRED) rather
-    // than a fail, execution reaches here with config.deviceId still unset. Attempt
-    // to resolve; if that also fails there is no target device and all subsequent
-    // device-specific checks would run without -s, producing adb ambiguity errors.
-    // Finalize early in that case — the discovery warn already tells the user what to do.
-    if (!config.deviceId) {
-      try {
-        const resolved = await resolveDevice(config);
-        config.deviceId = resolved.deviceId;
-      } catch {
-        return this.finalize(checks, config, options.fix);
+    for (const id of requiredDoctorCheckIds(options.full)) {
+      const check = await runners[id]();
+      checks.push(check);
+      if (check.status !== "pass") break;
+      if (id === "host.adb.presence") {
+        checks.push(await checkDefaultOrchestratedSkillAgentCli(config));
+        checks.push(await checkInstalledOrchestratedSkillAgentCliAvailability(config));
+        checks.push(await checkBundledSkillsStaleness(config, {
+          installedDir: (config as RuntimeConfigWithDoctorOverrides).bundledSkillsDir,
+        }));
+      }
+      if (id === "readiness.version.compatibility") {
+        checks.push(...await checkSettings(config));
       }
     }
-
-    if (full) {
-      const install = await runAndroidInstall(config);
-      checks.push(install);
-      if (this.shouldHaltOnFailure(install)) return this.finalize(checks, config, options.fix);
-
-      const launch = await runAndroidLaunch(config);
-      checks.push(launch);
-      if (this.shouldHaltOnFailure(launch)) return this.finalize(checks, config, options.fix);
-    }
-
-    // 3. Device Capabilities
-    checks.push(await checkDeviceCapabilities(config));
-
-    // 4. APK Presence
-    const apkPresence = await checkApkPresence(config);
-    checks.push(apkPresence);
-
-    let versionCompatibilityPassed = false;
-    if (apkPresence.status === "pass") {
-      const versionCompatibility = await checkVersionCompatibility(config);
-      checks.push(versionCompatibility);
-      if (this.shouldHaltOnFailure(versionCompatibility)) return this.finalize(checks, config, options.fix);
-      versionCompatibilityPassed = versionCompatibility.status === "pass";
-    }
-
-    // 5. Android Settings
-    const settingsResults = await checkSettings(config);
-    checks.push(...settingsResults);
-
-    // 6. Handshake
-    if (apkPresence.status === "pass" && versionCompatibilityPassed) {
-      const handshake = await (this.deps.runHandshake ?? runHandshake)(config);
-      checks.push(handshake);
-      if (this.shouldHaltOnFailure(handshake)) return this.finalize(checks, config, options.fix);
-
-      const handshakeInteractiveState = extractInteractiveStateFromEvidence(handshake.evidence);
-      const interactiveState = handshakeInteractiveState
-        ? buildDeviceInteractiveStateCheckFromState(handshakeInteractiveState)
-        : await (this.deps.checkDeviceInteractiveState ?? checkDeviceInteractiveState)(config);
-      checks.push(interactiveState);
-      if (this.shouldHaltOnFailure(interactiveState)) return this.finalize(checks, config, options.fix);
-    }
-
-    // 7. Smoke Test (Only if full)
-    if (full && apkPresence.status === "pass" && versionCompatibilityPassed) {
-      const smoke = await (this.deps.runSmokeTest ?? runSmokeTest)(config);
-      checks.push(smoke);
-      if (this.shouldHaltOnFailure(smoke)) return this.finalize(checks, config, options.fix);
-    }
-
-    return this.finalize(checks, config, options.fix);
+    return this.finalize(checks, config, options);
   }
 
-  private async finalize(checks: DoctorCheckResult[], config: RuntimeConfig, autoFix?: boolean): Promise<DoctorReport> {
+  private async finalize(checks: DoctorCheckResult[], config: RuntimeConfig, options: RunDoctorOptions): Promise<DoctorReport> {
     const logger = config.logger;
     for (const check of checks) {
       logger?.emit({
@@ -175,13 +127,19 @@ export class DoctorService {
       });
     }
 
-    const criticalOk = checks
-      .filter(check => isCriticalDoctorCheck(check))
-      .every(check => check.status !== "fail");
+    const requiredIds = requiredDoctorCheckIds(options.full);
+    const blockedBy = checks.filter(check => isCriticalDoctorCheck(check) && check.status !== "pass").map(check => check.id);
+    const skippedChecks = requiredIds.filter(id => !checks.some(check => check.id === id)).map(id => ({
+      id,
+      reason: "Required check was not run because prerequisite verification did not complete.",
+      blockedBy: [...blockedBy],
+    }));
+    const criticalOk = requiredIds.every(id => checks.some(check => check.id === id && check.status === "pass"));
     const ok = criticalOk;
     const allOk = checks.every(check => check.status === "pass");
 
     const nextActions: string[] = [];
+    let remediationAttempted = false;
     if (criticalOk && allOk) {
       nextActions.push("Docs: https://docs.clawperator.com/getting-started/first-time-setup/");
       nextActions.push(
@@ -196,7 +154,8 @@ export class DoctorService {
       if (check.fix) {
         for (const step of check.fix.steps) {
           if (step.kind === "shell") {
-            if (autoFix) {
+            if (options.fix) {
+              remediationAttempted = true;
               try {
                 await config.runner.runShell(step.value);
               } catch {
@@ -215,18 +174,20 @@ export class DoctorService {
       }
     }
 
+    if (remediationAttempted) {
+      // One remediation pass only. Report fresh prerequisites and handshake.
+      return this.run({ ...options, config, fix: false });
+    }
+
     return {
       ok,
       criticalOk,
       deviceId: config.deviceId,
       operatorPackage: config.operatorPackage,
       checks,
+      skippedChecks,
       nextActions: nextActions.length > 0 ? [...new Set(nextActions)] : undefined,
     };
-  }
-
-  private shouldHaltOnFailure(check: DoctorCheckResult): boolean {
-    return check.status === "fail" && isCriticalDoctorCheck(check);
   }
 }
 

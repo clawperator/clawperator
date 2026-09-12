@@ -4,7 +4,7 @@
 
 Ensure doctor success proves readiness of the selected device and Operator package.
 
-A variant mismatch can currently be a warning while handshake is omitted and criticalOk remains true. DoctorService.finalize checks only failures among checks that happened to run.
+Before R1, a variant mismatch could remain a warning while handshake was omitted and criticalOk stayed true. Aggregation checked only failures among checks that happened to run. The local implementation now requires completed verification for the selected mode.
 
 Readiness aggregation, explicit prerequisite skips, variant mismatch severity, CLI exit codes, resolved log-destination diagnostics, and generic preparation guidance.
 
@@ -14,12 +14,12 @@ Excluded: Automatic package switching, uninstalling another variant, changing de
 
 | Item | Value |
 | --- | --- |
-| State | Not started |
+| State | Implemented and validated locally; awaiting PR merge |
 | Total PRs | 1 |
 | Total phases | 1 |
-| Completed | None |
-| Remaining | Phase 1 |
-| Current / Next | Phase 1 |
+| Completed | Phase 1 implementation, regressions, live proof, and docs |
+| Remaining | PR review and merge |
+| Current / Next | Review local implementation |
 | Blockers | None |
 
 ## Sources
@@ -53,3 +53,7 @@ Expose an advisory `host.logs.writable` check using the same resolved destinatio
 ## Durable Outputs
 
 The work breakdown names the authored docs and regression coverage that ship with this contract. Keep implementation findings here only until the pack is complete; migrate lasting guidance before retiring it.
+
+## Implementation Evidence
+
+See [work-breakdown.md](work-breakdown.md#completed-local-validation) for validation and platform limits.

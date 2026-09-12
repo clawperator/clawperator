@@ -69,3 +69,49 @@ Live verification requires a dedicated, explicitly selected device, an unlocked 
 Use `.agents/skills/docs-author/SKILL.md` for the named public docs and `.agents/skills/docs-build/SKILL.md` for regeneration. Run checks for each behavior change; repeat successful checks only after new changes or an unresolved integration concern.
 
 Keep concise findings with versions, reproduction inputs, observed results/artifact paths, decisions, and remaining limitations. Preserve private captures outside tracked files. Update progress and commit validated logical units. Completion includes correcting in-scope failures, not merely producing a first implementation.
+
+## Completed Local Validation
+
+R1 is implemented on `fix/selected-operator-readiness`; review and merge remain.
+
+- Required check execution and aggregation use one normal/full-mode definition.
+  Non-passing prerequisites stop the sequence and record skipped required IDs.
+- Selected-variant mismatch fails without switching packages. Missing or failed
+  ping steps cannot pass handshake; smoke requires terminal success and all
+  requested steps. Optional host-agent, settings, and logging warnings remain
+  advisory.
+- `--fix` makes at most one shell-remediation pass, then returns fresh checks.
+  `--check-only` now preserves readiness failure exit status; migration guidance
+  is in `docs/api/doctor.md` and CLI help.
+- Logger destination resolution is shared with the append/open diagnostic and
+  preserves the attempted path after file logging is disabled.
+- Node build and configured package test command passed: 304 tests, no failures
+  or skips. Focused doctor CLI, registry, logger, and operator-remediation
+  selection passed: 89 tests, no failures or skips.
+- `bash validation/test_doctor.sh` passed six scenarios, including release
+  selection with only debug installed and global flags before/after the command.
+- `./gradlew :app:assembleDebug` passed. The installed debug APK and the local
+  build had identical SHA-256 hashes. No Android source change was needed.
+- `./scripts/docs_build.sh` passed route and inner-page link validation; the
+  organization check emitted no warnings. Standard dependency/tool notices
+  remain unrelated to this change.
+- API 35 emulator, CLI `0.10.0`, Operator `0.10.0-d`: explicitly targeted normal
+  doctor passed version, handshake, and interactive-state checks with
+  `ok=true`, `criticalOk=true`, and `skippedChecks=[]`. An existing bundled-skills
+  advisory remained non-blocking. A second run with a regular file used as the
+  log directory preserved that file, warned with `LOG_DIRECTORY_UNWRITABLE`,
+  reported the attempted destination, and still passed readiness.
+- Local evidence files are `healthy.json`, `healthy.stderr`,
+  `unwritable-logs.json`, and `unwritable-logs.stderr` in the private proof
+  directory. No private device report is tracked.
+- Role help and browser-role readback were inspected without changing roles.
+  On this emulator, help printed the command list with nonzero status; readback
+  succeeded. Role assignment, physical devices, and other Android versions are
+  not live-verified. Full-mode failure/completeness contracts and unavailable
+  device states were tested with fakes, not destructive device changes.
+- No sibling runtime skill references doctor, `criticalOk`, or `--check-only`;
+  no affected skill migration or version bump was needed. Broader runtime-skill
+  behavior is outside this PR's compatibility proof.
+
+The pack remains until merge verification and authorized cleanup. R2 and later
+implementation rows are not part of this change.

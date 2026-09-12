@@ -27,5 +27,6 @@ export interface DoctorReport {
   deviceId?: string;
   operatorPackage?: string;
   checks: DoctorCheckResult[];
+  skippedChecks?: Array<{ id: string; reason: string; blockedBy: string[] }>;
   nextActions?: string[];
 }

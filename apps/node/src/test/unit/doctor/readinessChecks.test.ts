@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert";
-import { checkApkPresence, checkDeviceInteractiveState, runHandshake } from "../../../domain/doctor/checks/readinessChecks.js";
+import { checkApkPresence, checkDeviceInteractiveState, runHandshake, runSmokeTest } from "../../../domain/doctor/checks/readinessChecks.js";
 import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
@@ -333,4 +333,47 @@ describe("checkDeviceInteractiveState", () => {
         assert.strictEqual(result.code, ERROR_CODES.RESULT_ENVELOPE_MALFORMED);
         assert.strictEqual(result.summary, "Could not verify whether the device is interactive.");
     });
+});
+
+
+describe("readiness execution completeness", () => {
+    const steps = [
+        { id: "s1", actionType: "close_app", success: true, data: {} },
+        { id: "s2", actionType: "open_app", success: true, data: {} },
+        { id: "s3", actionType: "snapshot_ui", success: true, data: {} },
+    ];
+    for (const scenario of ["complete", "terminal-failure", "missing-step", "failed-step"] as const) {
+        it(`requires all smoke steps and terminal success: ${scenario}`, async () => {
+            const config = getDefaultRuntimeConfig({ runner: new FakeProcessRunner() });
+            const stepResults = scenario === "missing-step" ? steps.slice(1)
+                : steps.map((step, index) => ({ ...step, success: !(scenario === "failed-step" && index === 0) }));
+            const result = await runSmokeTest(config, async () => ({
+                ok: true as const,
+                envelope: {
+                    commandId: "test-command", taskId: "test-task",
+                    status: scenario === "terminal-failure" ? "failed" as const : "success" as const,
+                    stepResults,
+                },
+                terminalSource: "clawperator_result" as const,
+            }));
+            assert.equal(result.status, scenario === "complete" ? "pass" : "fail");
+        });
+    }
+
+    for (const missing of [true, false]) {
+        it(`rejects a ${missing ? "missing" : "failed"} handshake step despite terminal success`, async () => {
+            const runner = new FakeProcessRunner();
+            runner.queueResult({ code: 0, stdout: "", stderr: "" });
+            const result = await runHandshake(getDefaultRuntimeConfig({ runner }), async () => ({
+                ok: true as const,
+                envelope: {
+                    commandId: "test-command", taskId: "test-task", status: "success" as const,
+                    stepResults: missing ? [] : [{ id: "h1", actionType: "doctor_ping", success: false, data: {} }],
+                },
+                terminalSource: "clawperator_result" as const,
+            }));
+            assert.equal(result.status, "fail");
+            assert.equal(result.code, ERROR_CODES.RESULT_ENVELOPE_MALFORMED);
+        });
+    }
 });

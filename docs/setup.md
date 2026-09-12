@@ -304,7 +304,7 @@ behavior, and `--fix` semantics are owned by [Doctor](api/doctor.md#doctor-repor
 ### Doctor flags
 
 - `doctor --fix` can execute shell-type remediation steps from failed checks.
-- `doctor --check-only` always exits `0` regardless of failures. Do not use it as the setup gate.
+- `doctor --check-only` uses the same readiness exit status as plain doctor: `0` only when required checks pass, otherwise `1`. Inspect `skippedChecks` when prerequisites prevent verification.
 
 See [Doctor](api/doctor.md) for the full report contract and [Errors](api/errors.md) for recovery by code.
 
@@ -407,3 +407,34 @@ See [Logging](api/logging.md) for complete documentation.
 - [Environment Variables](api/environment.md)
 - [Troubleshooting](troubleshooting/operator.md)
 - [Logging](api/logging.md)
+
+## Caller-Controlled Default Application Preparation
+
+Some flows require a default browser before automation starts. Doctor verifies
+the selected Operator; it does not assign Android application roles or choose a
+default application. Provision roles separately on a dedicated test device.
+
+Inspect the shell capabilities and read the current role holder first:
+
+```bash
+DEVICE_ID=<device_serial>
+APPLICATION_ID=<application_id>
+adb -s "$DEVICE_ID" shell cmd role help
+adb -s "$DEVICE_ID" shell cmd role get-role-holders --user 0 android.app.role.BROWSER
+```
+
+Only if the device supports these commands and changing that default is intended,
+assign the role and read it back:
+
+```bash
+adb -s "$DEVICE_ID" shell cmd role add-role-holder --user 0 android.app.role.BROWSER "$APPLICATION_ID"
+adb -s "$DEVICE_ID" shell cmd role get-role-holders --user 0 android.app.role.BROWSER
+```
+
+A nonzero assignment status or a readback that does not contain the intended
+application is preparation failure. Do not continue on the strength of command
+acceptance alone. Shell role capabilities vary by Android version and device;
+inspect `help` on the actual target. This recipe's read-only capability checks
+were verified on an API 35 emulator. That emulator printed the supported commands
+but returned a nonzero status for `help`; the role-holder read returned zero.
+Role assignment and physical-device behavior are not part of the readiness proof.

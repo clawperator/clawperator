@@ -25,7 +25,9 @@ ln -s "$(which cp)" "$TMP_BIN/cp"
 
 # Run doctor from source with poisoned path
 export PATH="$TMP_BIN"
-export HOME="/tmp"
+export CLAWPERATOR_LOG_DIR="$TMP_DIR/logs"
+export CLAWPERATOR_SKILLS_REGISTRY="$TMP_DIR/skills-registry.json"
+node -e 'require("node:fs").writeFileSync(process.argv[1], JSON.stringify({schemaVersion:"1.0",skills:[]}))' "$CLAWPERATOR_SKILLS_REGISTRY"
 
 set +e
 node "$REPO_ROOT/apps/node/dist/cli/index.js" doctor > "$TMP_DIR/out1.json"
@@ -47,7 +49,7 @@ fi
 
 # Reset environments for other scenarios
 export PATH="$ORIGINAL_PATH"
-export HOME="$TMP_DIR"
+
 
 echo "=== Scenario 2: NO_DEVICE (Fake ADB) ==="
 TMP_BIN2="$TMP_DIR/bin2"
@@ -108,7 +110,7 @@ else
   exit 1
 fi
 
-if grep -q '"id": "readiness.handshake"' "$TMP_DIR/out3.json"; then
+if node -e 'const r = require(process.argv[1]); process.exit(r.checks.some(c => c.id === "readiness.handshake") ? 0 : 1)' "$TMP_DIR/out3.json"; then
   echo "[Error] Handshake should be skipped when the APK is missing."
   cat "$TMP_DIR/out3.json"
   exit 1
@@ -124,8 +126,8 @@ node "$REPO_ROOT/apps/node/dist/cli/index.js" doctor --check-only > "$TMP_DIR/ou
 EXIT_CODE=$?
 set -e
 
-if [ "$EXIT_CODE" -ne 0 ]; then
-  echo "[Error] Doctor --check-only should always exit 0."
+if [ "$EXIT_CODE" -ne 1 ]; then
+  echo "[Error] Doctor --check-only must exit 1 when readiness fails."
   exit 1
 fi
 
@@ -174,12 +176,40 @@ else
   exit 1
 fi
 
-if grep -q '"id": "readiness.handshake"' "$TMP_DIR/out5.json"; then
+if node -e 'const r = require(process.argv[1]); process.exit(r.checks.some(c => c.id === "readiness.handshake") ? 0 : 1)' "$TMP_DIR/out5.json"; then
   echo "[Error] Handshake should be skipped when the APK version mismatches."
   cat "$TMP_DIR/out5.json"
   exit 1
 else
   echo "[Success] Handshake skipped when APK version mismatches."
 fi
+
+echo "=== Scenario 6: VARIANT_MISMATCH (Fake ADB) ==="
+export FAKE_ADB_SCENARIO="VARIANT_MISMATCH"
+for placement in before after; do
+  if [ "$placement" = before ]; then
+    arguments=(--device test-device-1 --operator-package com.clawperator.operator doctor --check-only)
+  else
+    arguments=(doctor --check-only --device test-device-1 --operator-package com.clawperator.operator)
+  fi
+  set +e
+  node "$REPO_ROOT/apps/node/dist/cli/index.js" "${arguments[@]}" > "$TMP_DIR/mismatch-$placement.json"
+  EXIT_CODE=$?
+  set -e
+  if [ "$EXIT_CODE" -ne 1 ]; then
+    echo "[Error] Selected variant mismatch must exit 1."
+    exit 1
+  fi
+  node -e '
+    const assert = require("node:assert/strict");
+    const report = require(process.argv[1]);
+    assert.equal(report.ok, false);
+    assert.equal(report.criticalOk, false);
+    assert.equal(report.operatorPackage, "com.clawperator.operator");
+    assert.ok(report.checks.some(c => c.code === "OPERATOR_VARIANT_MISMATCH" && c.status === "fail"));
+    assert.ok(!report.checks.some(c => c.id === "readiness.handshake"));
+    assert.ok(report.skippedChecks.some(c => c.id === "readiness.handshake" && c.blockedBy.includes("readiness.apk.presence")));
+  ' "$TMP_DIR/mismatch-$placement.json"
+done
 
 echo "=== All integration tests passed successfully! ==="
