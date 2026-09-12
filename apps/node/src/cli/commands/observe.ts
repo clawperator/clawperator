@@ -1,13 +1,14 @@
+import { presentSnapshot, validateSnapshotPresentationOptions, type SnapshotPresentationOptions } from "../../domain/observe/compactSnapshot.js";
 import { buildSnapshotExecution } from "../../domain/observe/snapshot.js";
 import { buildScreenshotExecution } from "../../domain/observe/screenshot.js";
 import { runExecution } from "../../domain/executions/runExecution.js";
 import type { OutputOptions } from "../output.js";
-import { formatError, formatRunExecutionResultForCli } from "../output.js";
+import { formatError, formatSuccess, formatRunExecutionResultForCli } from "../output.js";
 import type { Logger } from "../../adapters/logger.js";
 import { tryDaemonExecution } from "../daemonProxy.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
 
-export async function cmdObserveSnapshot(options: {
+export async function cmdObserveSnapshot(options: SnapshotPresentationOptions & {
   format: OutputOptions["format"];
   deviceId?: string;
   operatorPackage?: string;
@@ -18,6 +19,7 @@ export async function cmdObserveSnapshot(options: {
   runExecutionFn?: typeof runExecution;
 }): Promise<string> {
   try {
+    validateSnapshotPresentationOptions(options);
     const execution = validateExecution(buildSnapshotExecution({ timeoutMs: options.timeoutMs }));
     validatePayloadSize(JSON.stringify(execution));
     const tryDaemonExecutionFn = options.tryDaemonExecutionFn ?? tryDaemonExecution;
@@ -35,6 +37,15 @@ export async function cmdObserveSnapshot(options: {
       warn: message => process.stderr.write(message),
       logger: options.logger,
     });
+    if (result.ok && result.envelope.status === "success" && (options.compact || options.rawPath !== undefined)) {
+      try {
+        const presentation = await presentSnapshot(result.envelope, options);
+        return formatSuccess({ ...presentation, deviceId: result.deviceId, terminalSource: result.terminalSource,
+          isCanonicalTerminal: result.terminalSource === "clawperator_result" }, options);
+      } catch (error) {
+        return formatError({ ...(error as object), deviceId: result.deviceId, terminalSource: result.terminalSource }, options);
+      }
+    }
     return formatRunExecutionResultForCli(result, options);
   } catch (e) {
     return formatError(e, options);

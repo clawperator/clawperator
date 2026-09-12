@@ -18,6 +18,11 @@ export function shouldCliStdoutForceExitCode1(result: string, usageParseError: b
     if (obj === null || typeof obj !== "object" || Array.isArray(obj)) {
       return false;
     }
+    // Snapshot presentation can fail after a successful capture. Retain the
+    // canonical envelope without letting its verdict hide a host-side failure.
+    if (obj.code === "SNAPSHOT_ARTIFACT_WRITE_FAILED" || obj.code === "SNAPSHOT_EXTRACTION_FAILED") {
+      return true;
+    }
     if ("envelope" in obj) {
       const envelope = obj.envelope;
       if (envelope !== null && typeof envelope === "object" && !Array.isArray(envelope)) {

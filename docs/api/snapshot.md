@@ -28,7 +28,7 @@ The built-in `clawperator snapshot` command constructs a one-step execution with
 - `commandId` is generated as `snapshot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 - `taskId` equals the generated `commandId`
 
-For CLI `snapshot`, machine-checkable success means:
+For default raw CLI `snapshot`, machine-checkable success means:
 
 - exit code `0`
 - top-level JSON has `envelope`
@@ -56,6 +56,73 @@ Example one-step payload from the `clawperator snapshot` builder:
 }
 ```
 
+## Compact Output and Raw Artifacts
+
+Use compact output to bound the hierarchy returned to an agent while retaining
+containers, state, and ancestry:
+
+```bash
+clawperator snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --compact --max-nodes 20 --raw-path ./hierarchy.xml
+```
+
+| CLI option | Behavior |
+| --- | --- |
+| `--compact` | Opt in to a JSON projection; default raw output is unchanged |
+| `--max-nodes <n>` | Requires compact; integer `1..1000`, default `100` |
+| `--max-text-chars <n>` | Requires compact; integer `1..4096`, default `256` Unicode code points per text/description field |
+| `--raw-path <file>` | Nonblank host path, valid with either mode; parent must exist and file must not exist |
+
+Compact success adds `compact` alongside `envelope`, `deviceId`, and terminal
+metadata. Only snapshot `data.text` is omitted from the returned envelope copy;
+other step metadata, including `operator_overlay_visible`, remains. The canonical
+execution envelope is unchanged internally.
+
+`compact` contains `schemaVersion: 1`, the capture's `commandId` and `taskId`,
+optional `rawArtifactPath`, `totalNodes`, `returnedNodes`, `omittedNodes`,
+`truncated`, and a `nodes` array. The full XML is parsed and counted even when
+only a prefix is returned. `truncated` is true when nodes are omitted or a
+returned text/description field is shortened.
+
+Each node retains:
+
+- `nodePath` and `parentPath`: XML child-index paths such as `0`, `0.0`, and
+  `0.0.1`; root nodes have a null parent. These describe this capture only, not
+  persistent handles or guaranteed query IDs. They cannot target actions.
+- `resourceId`, `className`, `text`, `contentDescription`, and `bounds`: decoded
+  strings, or null when absent. Bounds retain XML's `[x1,y1][x2,y2]` string form.
+  Empty strings remain distinct from absent attributes.
+- `checked`, `checkable`, `selected`, `enabled`, `clickable`, `scrollable`,
+  `visibleToUser`, and `accessibilityDataSensitive`: native booleans, or null
+  when unavailable or not a recognized boolean value.
+- `textTruncated` and `contentDescriptionTruncated`: explicit booleans. Text
+  limits count Unicode code points, preserving supplementary characters.
+
+Nodes are a whole-node preorder prefix, so included parents precede children.
+Unlabeled containers and offscreen nodes are retained in that order; Node does
+not perform semantic matching or visibility filtering. Unknown XML attributes
+remain available in the raw artifact but are not projected.
+
+`--raw-path` exclusively creates a file containing the exact extracted XML
+string, before compact parsing. It never overwrites an existing file. In raw
+mode, `rawArtifactPath` is top-level; in compact mode, it is inside `compact`.
+An artifact write failure returns `SNAPSHOT_ARTIFACT_WRITE_FAILED`. Malformed XML,
+DTD declarations, external entities, or a non-hierarchy document return
+`SNAPSHOT_EXTRACTION_FAILED`. Both errors exit nonzero and retain the original
+execution envelope. If parsing fails after saving, the error also returns the
+saved `rawArtifactPath`. A successful capture verdict does not imply that
+formatting or artifact writing succeeded.
+
+[MCP snapshot](mcp.md#mcp-tool-snapshot) uses the same projection with
+`compact`, `maxNodes`, and `maxTextChars`. It accepts `saveRaw: true` to create
+an exclusive runtime-owned temporary file; caller-provided `rawPath` is rejected.
+Compact mode cannot be combined with MCP `maxChars`. Raw MCP `maxChars` behavior
+is unchanged. Temporary artifacts are host-local and subject to host temporary
+file cleanup; copy evidence you need to retain.
+
+These limits bound nodes and fields, not exact tokens or bytes. Projection does
+not reduce Android capture cost. A full compact projection can exceed raw XML
+size for short or sparse nodes; choose a node limit appropriate to the task.
+
 ## How Snapshot Data Flows
 
 The current flow is:
@@ -77,7 +144,7 @@ Debugging details that matter when extraction goes wrong:
 
 Important boundaries:
 
-- Node does not parse the XML into a typed object. It treats the hierarchy as opaque text.
+- Raw mode treats the hierarchy as opaque text. Opt-in compact mode parses a presentation copy after capture.
 - When multiple snapshots exist in one execution, Node attaches the most recent extracted snapshot to the most recent successful `snapshot` step, walking backward through both lists.
 - If no successful `snapshot` steps exist, extraction output is ignored.
 - Node only reads logcat for snapshot extraction when the result envelope already contains at least one snapshot step.
@@ -85,7 +152,7 @@ Important boundaries:
 
 ## Envelope Placement
 
-Successful `snapshot` data lives inside the step result, not in a separate top-level field:
+In default raw CLI output, successful `snapshot` XML lives inside the step result:
 
 ```json
 {
