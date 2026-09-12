@@ -21,18 +21,18 @@
 | --- | --- | --- | --- |
 | `./gradlew app:assembleDebug app:testDebugUnitTest` | 0 | The complete debug app builds and its app unit tests pass. | Gradle output |
 | `./gradlew shared:data:operator:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | Controller, lifecycle, panel-view, geometry, and raw-window-metadata tests pass with the surrounding Android suites. | Gradle output |
-| `./validation/on-screen-logs/test_phase1_proof.sh` | 0 | The opt-in proof harness parses and contains no raw-action ingress. | validation script output |
+| `./validation/on-screen-logs/test_overlay_mechanism_proof.sh` | 0 | The opt-in proof harness parses and contains no raw-action ingress. | validation script output |
 | `./scripts/clawperator_grant_android_permissions.sh --debug --serial <device_serial>` | 0 | The selected debug Operator accessibility service was enabled. | terminal observation |
 | `./gradlew :app:processReleaseMainManifest` followed by a release-manifest search | 0 | The debug-only proof Activity is absent from the release manifest. | Gradle output |
-| `./validation/on-screen-logs/run_phase1_proof.sh --device <device_serial> --output-dir <absolute_output_dir>` | 0 | Reproducible screenshot, active-window, accessibility-state, and screen-recording proof completed and cleared the panel. | ignored local Phase 1 output |
-| `ffprobe -v error -show_entries format=duration,size .../on-screen-log-phase1.mp4` | 0 | The pulled recording finalized and was playable: 4.952756 seconds, 1,641,686 bytes. Extracted frames were visually inspected. | ignored local Phase 1 output |
+| `./validation/on-screen-logs/run_overlay_mechanism_proof.sh --device <device_serial> --output-dir <absolute_output_dir>` | 0 | Reproducible screenshot, active-window, accessibility-state, and screen-recording proof completed and cleared the panel. | ignored local overlay-mechanism proof output |
+| `ffprobe -v error -show_entries format=duration,size .../on-screen-log-overlay-proof.mp4` | 0 | The pulled recording finalized and was playable: 4.952756 seconds, 1,641,686 bytes. Extracted frames were visually inspected. | ignored local overlay-mechanism proof output |
 | `node apps/node/dist/cli/index.js snapshot --device <device_serial> --operator-package com.clawperator.operator.dev --output json` | 0 | The branch-local snapshot retained the foreground app hierarchy while the panel was shown. | ignored local interaction output |
 | `node apps/node/dist/cli/index.js exec <read-hidden-label.json> --device <device_serial> --operator-package com.clawperator.operator.dev --output json` | 1, expected | A normal `read_text` action could not match the panel-only label. | terminal envelope: `No UI node found matching criteria` |
 | `npm --prefix apps/node run build` | 0 | The branch-local Node package compiles with the two raw actions and strict validator. | npm output |
 | `npm --prefix apps/node run test` | 0 | All 272 Node tests passed, including raw validation, Serve, MCP, strict action-name and parameter handling, and failed-envelope coverage. | npm output |
 | `./gradlew app:assembleDebug app:testDebugUnitTest app:installDebug` | 0 | The debug app rebuilt, app unit tests passed, and the debug APK installed on the available emulator targets. | Gradle output |
 | `./gradlew shared:data:operator:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | Android parser, action-engine result mapping, controller, and window-metadata suites remain green. | Gradle output |
-| `bash validation/on-screen-logs/test_phase2_contract.sh` | 0 | Both generic raw fixtures validate through the branch-local CLI and normalize colors; the generic `value` alias is rejected. | validation script output |
+| `bash validation/on-screen-logs/test_raw_execution_contract.sh` | 0 | Both generic raw fixtures validate through the branch-local CLI and normalize colors; the generic `value` alias is rejected. | validation script output |
 | `./scripts/docs_build.sh` | 0 | Authored API pages, navigation, generated docs, and machine-facing documentation build successfully. | docs build output |
 | `node apps/node/dist/cli/index.js doctor --device <device_serial> --operator-package com.clawperator.operator.dev --output json` | 0 | The selected debug Operator was compatible, accessible, interactive, and ready for raw execution. | terminal observation |
 | `node apps/node/dist/cli/index.js exec <raw-set-screenshot-clear.json> --device <device_serial> --operator-package com.clawperator.operator.dev --no-daemon --output json` | 0 | The default raw set, screenshot, and clear actions returned their exact normal result shapes. | ignored local Phase 2 screenshots and terminal output |
@@ -44,12 +44,12 @@
 | `./gradlew shared:data:operator:testDebugUnitTest` | 0 | The second review regression covers both the replacement and deferred configuration-reflow draw acknowledgements. | Gradle output |
 | `npm --prefix apps/node run build && npm --prefix apps/node run test` | 0 | All 272 Node tests passed, including the Node-side Unicode whitespace regression. | npm output |
 | `./gradlew app:assembleDebug app:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | The full debug app builds and the app plus shared Android suites pass with the second review fix. | Gradle output |
-| `bash validation/on-screen-logs/test_phase2_contract.sh` | 0 | The generic raw fixtures retain their strict validation and color-normalization contract. | validation script output |
+| `bash validation/on-screen-logs/test_raw_execution_contract.sh` | 0 | The generic raw fixtures retain their strict validation and color-normalization contract. | validation script output |
 | `./scripts/docs_build.sh` | 0 | The authored and generated documentation site remains buildable after the review fix. | docs build output |
 | `./gradlew app:installDebug` followed by branch-local `doctor` on `<device_serial>` with `com.clawperator.operator.dev` | 0 | The latest debug APK installed, and the selected API 35 emulator remained compatible, accessible, and interactive. | terminal observation |
 | `npm --prefix apps/node run build && npm --prefix apps/node run test` | 0 | All 273 Node tests passed, including the MCP regression for null, array, and scalar raw action params. | npm output |
 | `./gradlew shared:data:operator:testDebugUnitTest app:assembleDebug app:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | The final review batch leaves the full debug app and relevant Android controller suites green. | Gradle output |
-| `bash validation/on-screen-logs/test_phase2_contract.sh` | 0 | The generic raw fixtures still validate through the branch-local CLI after the final transport-boundary fix. | validation script output |
+| `bash validation/on-screen-logs/test_raw_execution_contract.sh` | 0 | The generic raw fixtures still validate through the branch-local CLI after the final transport-boundary fix. | validation script output |
 | `./scripts/docs_build.sh` | 0 | The final authored and generated documentation site builds and validates successfully. | docs build output |
 | `./gradlew shared:data:operator:testDebugUnitTest` | 0 | The final review regression proves that an expiry due during a pending deferred reflow cannot remove the in-flight generation. | Gradle output |
 | `npm --prefix apps/node run build && npm --prefix apps/node run test` | 0 | All 274 Node tests passed, including MCP and canonical-validator regressions for malformed generic action parameters. | npm output |
@@ -58,7 +58,7 @@
 | `./scripts/docs_build.sh` | 0 | The final transport-specific capture guidance and regenerated machine-facing documentation build successfully. | docs build output |
 | `npm --prefix apps/node run build` | 0 | The branch-local Node package compiles with the exact on-screen-log input aliases. | npm output |
 | `npm --prefix apps/node run test` | 0 | All 274 Node tests passed, including alias normalization through raw validation, Serve, and MCP. | npm output |
-| `bash validation/on-screen-logs/test_phase2_contract.sh` | 0 | Raw CLI validation accepts both exact action aliases, returns canonical types, and still rejects the generic `value` parameter alias. | validation script output |
+| `bash validation/on-screen-logs/test_raw_execution_contract.sh` | 0 | Raw CLI validation accepts both exact action aliases, returns canonical types, and still rejects the generic `value` parameter alias. | validation script output |
 | `./gradlew app:assembleDebug app:testDebugUnitTest shared:data:operator:testDebugUnitTest shared:test:testDebugUnitTest` | 0 | The debug app and relevant Android unit suites remain green with canonical Android ingress unchanged. | Gradle output |
 | `./gradlew app:installDebug` followed by branch-local `doctor` on `<device_serial>` with `com.clawperator.operator.dev` | 0 | The debug APK installed on available targets, and the selected API 35 emulator was compatible, accessible, and interactive. | Gradle and doctor output |
 | Branch-local `exec` of `raw-action-type-aliases.json` on `<device_serial>` with `com.clawperator.operator.dev` and `--no-daemon` | 0 | `on_screen_log_set` rendered and `on_screen_log_clear` cleared the panel; returned action types were canonical. | terminal envelope |
