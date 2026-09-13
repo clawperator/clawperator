@@ -26,21 +26,28 @@ publication. Preserve the selected scope when another row becomes unblocked.
    state. Distinguish permission denied, listener disconnected, query failure,
    session missing/expired, ambiguous target and unsupported action. Handle older
    APKs truthfully. Existing UI commands must not gain a new notification-access
-   prerequisite. Verify readiness behavior before adding diagnostic checks.
+   prerequisite. Implement the plan's observation-only readiness classification in
+   host preflight and Android ingress/execution. Bypass UI readiness and shade
+   dismissal only for all-read lists; preserve existing readiness for mixed lists
+   and mutations. Add tests before claiming background observation support.
 2. Add awaitable listener snapshots and lifecycle handling. Include ongoing/group
    notifications, bounded text/results, revision-scoped action descriptors and
    generic progress. Maintain any cache actually reused; do not expose the
    presentation manager's incomplete state. No read-induced cancellation.
 3. Add media-session discovery, lifetime-scoped handles, metadata and position
    calculation, and explicit play/pause requests with separate dispatch and
-   observation evidence. Handle permission revocation and destroyed controllers.
+   observation evidence. Preserve original update/query clock timestamps and stale
+   report age. Pin the resolved controller through each action and wait; handle
+   permission revocation, destroyed controllers and same-package replacement.
 4. Wire Android parsing/execution, strict Node validation, typed helpers, CLI and
-   `/execute` parity. Add bounded optional postcondition waits without mutation
-   replay. Preserve envelope/result-reader behavior and remove incidental content
+   HTTP `/execute` and generic MCP `execute` parity. Add bounded optional
+   postcondition waits without mutation replay. Preserve envelope/result-reader behavior and remove incidental content
    logs on paths carrying these new payloads.
 5. Add focused automated coverage and a generic controllable Android fixture under
-   `validation/notifications-media/`, wired into CI following repository harness
-   conventions. The fixture must actually publish notifications and media state;
+   `validation/notifications-media/`. Run offline fixture/contract tests automatically
+   in normal CI; provide an explicit/manual live emulator workflow, consistent
+   with the existing release approach. Do not schedule live emulator runs on every
+   PR or push. The fixture must actually publish notifications and media state;
    no private accounts or external app dependencies for deterministic regression.
 6. Complete live N1 proof and docs in this PR. Record sanitized evidence, exact
    source/build versions, platform versions, outcomes and known limitations in
@@ -48,24 +55,48 @@ publication. Preserve the selected scope when another row becomes unblocked.
 
 N1 acceptance cases:
 
+- Screen-off and keyguard-locked observation-only lists return notification/media
+  evidence without waking/unlocking, closing the shade or accessing a foreground
+  window. Verify device state before/after, including an open-shade case. Exercise
+  unavailable accessibility with a connected notification listener. Preserve
+  permission/disconnection errors rather than treating access limits as empty data.
+- Mixed UI/read lists in both orders retain whole-execution readiness, never
+  dispatch a partial read prefix when readiness fails, and preserve action order
+  when ready. UI-only behavior is unchanged; unsupported actions cannot obtain the
+  exemption. Test the host and Android ingress paths, including generic MCP use.
 - Existing notifications are visible immediately after listener connection;
   posting, update, removal, disconnect/reconnect and process restart give fresh
   results. Empty list is distinguishable from unavailable access. Ongoing/group
   entries survive; app filters and truncation are truthful.
 - Two sessions, including two from one package, demonstrate ambiguity errors and
   exact selection. No sessions, expired IDs and unavailable metadata are explicit.
+  Destroy the selected session between app resolution, dispatch and wait, then
+  create another for the same package; never control or confirm against replacement.
 - Fixture positions advance at 1x and 2x, stay fixed while paused/buffering, and
   remain unknown when position/update time is invalid. Exercise duration bounds
   and wall-clock changes without corrupting monotonic estimates.
+- Stop actual fixture playback and stop state publication while its last report
+  remains PLAYING. Repeated queries preserve the original update timestamp and
+  unchanged reported position with increasing report age, even if estimates advance.
+  Independent fixture progress evidence must show the stall; no API response or
+  postcondition wait may label extrapolation as proven playback. Also test unchanged
+  reports while actual playback continues: missing updates alone do not prove a stall.
 - Pause/play affects only the selected session. Capability rejection, ignored
   command, wait timeout and already-satisfied state yield truthful receipts.
-- Raw execution, typed helper, CLI and HTTP agree on values/errors. Preserve
-  commandId/taskId, nonzero failure exits and JSON errors. Cover valid, invalid,
+- Raw execution, typed helper, CLI, HTTP and generic MCP execute agree on
+  values/errors. Preserve commandId/taskId, nonzero CLI failure exits, JSON errors and MCP structured error
+  status/details. Exercise actual MCP tool dispatch, not only the shared helper.
+  Cover valid, invalid,
   blank/missing values, conflicting selectors and global/local flag placement
   where supported. Large results and uncertain transport must not replay controls.
 - Verify at least one real video player and one real audio player on an explicit
   device. Record actual session support and compare reported/estimated positions
   with visible playback; do not turn lack of support into fabricated success.
+
+N1 is independently useful for downstream screen-off/PiP investigation. Consumers
+do not need N2 dismissal/buttons/seeking to resume that work. This pack provides
+player-reported observations; downstream visual/window persistence assertions and
+application-specific regression policy remain outside its scope.
 
 ## N2 - Notification mutations, seeking and combined proof
 
@@ -79,7 +110,8 @@ N1 acceptance cases:
 3. Add seeking with finite nonnegative integer millisecond validation, advertised
    seek capability, known-duration bounds and explicit tolerance for optional
    observation waits. Keep dispatch receipt even when confirmation fails.
-4. Extend the same fixture, Node/Android tests, CLI/help, typed helpers and docs.
+4. Extend the same fixture, Node/Android tests, CLI/help, typed helpers, MCP
+   coverage and docs.
    Prove one complete flow: list notifications/sessions, read position, pause,
    seek, play, invoke a fixture button and dismiss a fixture notification.
 5. Record integrated acceptance on matching final builds and refresh the release
@@ -93,14 +125,13 @@ Show mutation side effects in the fixture/player, not just process exit status.
 
 ## Validation and prerequisites
 
-For each changed feature PR, use branch-local tools and the repository's checks:
+For each changed feature PR, run these checks from the repository root using
+branch-local tools:
 
 ```sh
 npm --prefix apps/node run build && npm --prefix apps/node run test
-cd apps/android
 ./gradlew :app:assembleDebug
 ./gradlew :app:testDebugUnitTest
-cd ../..
 ./scripts/docs_build.sh
 ```
 

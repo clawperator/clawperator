@@ -25,8 +25,8 @@ Release coordination: [v0.11 plan](../releases/v0.11/plan.md).
   are generic progress, not media timestamps. Do not use UI scraping, shell
   keyevents, or dumpsys parsing as hidden fallbacks.
 - Expose CLI commands, typed Node helpers, and canonical execution actions usable
-  through the existing HTTP `/execute` route. Dedicated HTTP routes are not
-  required. Preserve the terminal envelope and commandId/taskId correlation.
+  through the existing HTTP `/execute` route and generic MCP `execute` tool.
+  Dedicated HTTP routes and named MCP tools are not required. Preserve the terminal envelope and commandId/taskId correlation.
 - Keep the existing string-valued step-data wire contract. Define versioned JSON
   payloads within it and validate/decode them in typed Node helpers. Do not change
   all existing result consumers to accommodate this feature.
@@ -35,6 +35,25 @@ Release coordination: [v0.11 plan](../releases/v0.11/plan.md).
   PendingIntents, or serialized platform tokens. Keep sensitive payloads out of
   incidental service/action debug logs; canonical result transport remains the
   intentional delivery path.
+
+## Observation without UI readiness
+
+N1 must support executions containing only `list_notifications`,
+`list_media_sessions` and `get_media_status` with the screen off or keyguard locked,
+without waking the display, dismissing keyguard, closing the notification shade,
+or requiring an accessible foreground window. Keep device/APK/transport and
+notification-access prerequisites; an accessibility service must not be required
+solely to execute these reads. Check both host preflight and Android ingress/task
+execution rather than bypassing only the Node readiness call.
+
+Classify validated canonical actions explicitly. The initial exemption applies
+only when every action is one of these three reads. Mixed UI/read executions and
+all other executions retain existing whole-execution interactive readiness before
+agent dispatch; do not split, reorder or partially dispatch their read steps.
+Existing host preflight behavior (including close_app) is not made transactional
+by this change. Use a separate observation-only execution when screen-off evidence
+is needed. New mutation commands retain interactive readiness in this release;
+background control is not required to satisfy the observation use case.
 
 ## Public surface
 
@@ -59,6 +78,13 @@ blank values and ambiguity with actionable errors listing candidates. Do not
 choose the first/most recent/playing session implicitly. Use a distinct
 `mediaSessionId` execution parameter to avoid confusing existing recording IDs.
 
+Resolve a target once per single-session action and pin that exact controller/token
+through dispatch, observation and any postcondition wait. An `--app` resolution
+must never be rerun to follow a replacement session. If the pinned session dies,
+fail with session-expired evidence even if the same package now exposes another
+session. For multi-action executions, each explicit action resolves its own target;
+callers needing identity across actions must reuse the discovered session ID.
+
 Session IDs are opaque, stable for a session during the Operator process lifetime,
 and invalidated on session destruction or process restart. Notification keys are
 system keys. Action handles include a notification revision and expire when that
@@ -74,11 +100,21 @@ an incomplete generic action invocation.
 
 Media status includes state, title/artist when supplied, durationMs, supported
 controls, reportedPositionMs, estimatedPositionMs, playbackSpeed, observation time
-and position update age. Unknown values remain null with a reason, never zero.
+and position update age. Preserve both the original player position-update
+elapsed-realtime timestamp and the query observation elapsed-realtime timestamp,
+with their clock domain explicit; never replace the former with query time.
+Unknown values remain null with a reason, never zero.
 Only extrapolate valid reported positions in explicitly advancing playback states
 using device elapsed realtime and speed. Do not advance paused/buffering state;
 clamp estimates to zero and known duration. Missing/invalid update timestamps
 cannot establish an estimate. Label estimates as estimates, not frame accuracy.
+Repeated fresh queries may contain unchanged, stale player reports. Advancing
+estimates from a last reported PLAYING state are never evidence of actual continued
+playback. Expose unchanged update timestamps/position and increasing report age;
+do not turn a successful query or estimate into a playback-progress assertion.
+Postcondition waits establish reported player state/position only. Actual playback
+progress needs independent fixture/player evidence. PiP window persistence needs
+its own visual/window assertion and is not established by media state.
 Document that some apps, live streams, ads and remote playback expose incomplete
 or app-defined timelines; a visible video need not expose a usable media session.
 
@@ -114,6 +150,14 @@ Verified against checkout `7cdb31d4`; recheck relevant behavior when implementin
 - `apps/node/src/contracts/{execution,aliases,result,errors}.ts` and
   `apps/node/src/domain/executions/validateExecution.ts`: action allowlist,
   strict parameter validation, payload/error contracts and compatibility.
+- `apps/node/src/domain/executions/runExecution.ts`: currently performs interactive
+  readiness before ordinary dispatch; add the explicit observation-only exemption.
+- `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/runtime/OperatorCommandReceiver.kt`:
+  currently requires accessibility and closes the notification shade before action
+  parsing. Remove these dependencies/side effects for observation-only commands.
+- `apps/node/src/mcp/tools/core.ts`, `tools/common.ts`, `errors.ts` and integration
+  tests: generic execute delegates raw actions to canonical validation; prove new
+  payload/error parity through MCP rather than assuming delegation is sufficient.
 - `apps/node/src/cli/registry.ts`, command modules and `commands/serve.ts`:
   public entry points, help and HTTP execution parity.
 - `apps/node/src/domain/device/grantPermissions.ts` and

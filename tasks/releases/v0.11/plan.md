@@ -28,6 +28,11 @@ Bias toward these two feature PRs plus the required release lifecycle changes.
 Do not create separate infrastructure, platform, CLI, documentation or test PRs
 for components of N1/N2. V1 may fold into the final feature PR when the integrated
 base and release evidence are ready; do not duplicate already completed work.
+N1 alone unblocks downstream screen-off/PiP observation work; N2 is not a
+prerequisite for those consumers. Player-reported state and estimated position do
+not establish real playback progress or PiP-window persistence. Keep independent
+fixture progress and downstream visual/window assertions separate.
+
 Code-version timing must account for any still-active 0.10 release workflow; do
 not bump the shared version during this planning change.
 
@@ -35,6 +40,13 @@ not bump the shared version during this planning change.
 
 - N1/N2 complete their declared offline and live evidence. Re-run combined checks
   only when needed to verify the final integrated source/build, not as a ritual.
+- Screen-off/locked notification/media reads meet the observation-only readiness
+  contract without UI side effects. Mixed/UI lists retain existing readiness;
+  stale player reports and session replacement races have explicit evidence.
+- Offline tests run automatically; live emulator proof uses an explicit/manual
+  workflow, not an every-PR/push emulator job. Retain its result as release evidence.
+- Generic MCP execute preserves the same action payloads and structured errors as
+  CLI, typed helpers and HTTP execution; dedicated named tools are not required.
 - Notification read, selected-session timestamp, pause/seek/play, button invocation
   and dismissal work through the canonical execution path. Errors distinguish
   access, connection, unsupported behavior, expired references and uncertainty.
