@@ -1,18 +1,23 @@
 # Safe query consumption and empty-matcher guidance
 
+Deliver a runnable Node query example that validates results before making
+completeness claims, plus actionable empty-matcher guidance. Done means the
+example and CLI regression checks pass, live query behavior is verified, docs
+and task status are updated, and validated changes are committed. See
+[work-breakdown.md](work-breakdown.md) for delivery and validation.
+
 Status: [TODO]. Priority P2 in the [v0.10.x plan](../../releases/v0.10.x/plan.md).
 
-## Outcome and evidence
+## Evidence
 
-Give Node consumers a minimal, validated query-consumption example. The usage
-runner successfully consumed `stepResults[].data.query` after a second JSON
-parse but had to discover the checks itself. Its empty matcher was a caller
+The usage runner successfully consumed `stepResults[].data.query` after a second
+JSON parse but had to discover the checks itself. Its empty matcher was a caller
 mistake; all-node query works by omitting the matcher.
 
 At `626a169d`, `StepResultData` is intentionally string-valued and
 `NodeQueryResult` already defines the typed query shape. CLI help and
 `docs/api/actions.md` already describe omitted matchers and serialized output.
-Build on that material rather than duplicate it or claim it is absent.
+Extend that existing material.
 
 ## Scope and decisions
 
@@ -37,7 +42,7 @@ an alternate query protocol. Do not broaden into arbitrary SDK redesign.
 - `apps/node/src/cli/selectorFlags.ts` and `cli/registry.ts`: validation and help.
 - `apps/node/src/test/unit/{query,selectorFlags}.test.ts`: regression owners.
 - Extend the query section of `docs/api/actions.md` with the tested example and
-  links to `docs/api/selectors.md` using docs-author. Keep the runnable source in
+  links to `docs/api/selectors.md`. Keep the runnable source in
   an appropriate existing example location, or a narrowly named examples folder.
 
 ## Acceptance

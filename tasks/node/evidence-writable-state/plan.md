@@ -1,11 +1,16 @@
 # Writable evidence video state
 
+Make video recording usable with a writable state override while preserving
+exclusive ownership of each device across processes and roots. Done means the
+configuration and lifecycle checks below pass, restricted-host live evidence is
+recorded, docs and task status are updated, and validated changes are committed.
+See [work-breakdown.md](work-breakdown.md) for delivery and validation.
+
 Status: [TODO]. Priority P1 in the [v0.10.x plan](../../releases/v0.10.x/plan.md).
 
-## Outcome and evidence
+## Evidence
 
-Support sandboxed video lifecycle operations with an explicit writable state
-location and actionable permission failures. In the 0.10.0 usage run, writable
+In the 0.10.0 usage run, writable
 `--output-dir` and `CLAWPERATOR_LOG_DIR` did not prevent EPERM at the default
 home evidence directory; recording succeeded once that path was accessible.
 This is host integration friction, not a demonstrated Android recording defect.
@@ -47,7 +52,7 @@ to `apps/node/src/` where shortened above.
 
 Update `docs/api/evidence.md`, `docs/api/errors.md` if codes change, and
 `docs/internal/design/still-evidence.md` with configuration, ownership and
-recovery policy using docs-author. Doctor changes are optional only if necessary
+recovery policy. Doctor changes are optional only if necessary
 to explain a prerequisite that video preflight cannot report adequately.
 
 ## Acceptance

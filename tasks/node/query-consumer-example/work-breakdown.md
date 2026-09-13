@@ -1,16 +1,25 @@
-# Work breakdown
+# Delivery and validation
 
 One PR, independent of the other new packs. The scoped walkthrough can link to
-this example when available, but neither pack needs to wait to begin.
+this example when available; neither pack needs to wait to begin.
 
-1. Inspect actual CLI output and current validators. Add the runnable example,
-   focused tests for its decision boundaries and the actionable empty-matcher
-   diagnostic. Keep public envelope semantics unchanged.
-2. Cover valid/invalid/missing matcher values, supported global/command-local
-   placement, exit status and structured JSON. Build Node then run Node tests.
-3. On a connected explicit device with a matching development Operator, execute
-   the example via the branch-local CLI against a known screen, including a
-   deliberately limited/truncated query. Verify it refuses completeness claims.
-4. Update canonical docs and run `./scripts/docs_build.sh` using docs-build.
-   Record any missing live prerequisite, fix in-scope failures, update statuses,
-   and commit validated logical units. Stop before SDK or transport redesign.
+Use actual CLI output and existing validators to implement the
+[plan's runnable example and empty-matcher diagnostic](plan.md), preserving
+public envelope semantics.
+
+## Required checks
+
+- Test the example's acceptance cases and CLI valid/invalid/missing matcher
+  values, supported global/command-local placement, exits and structured JSON.
+  Run `npm --prefix apps/node run build && npm --prefix apps/node run test`.
+- Execute the example through the branch-local CLI on an explicit connected
+  device with a matching development Operator and known screen. Include a
+  deliberately limited/truncated query; verify refusal of completeness claims.
+- Update the canonical docs named in the plan with
+  `.agents/skills/docs-author/SKILL.md`; regenerate with docs-build and run
+  `./scripts/docs_build.sh`.
+
+Record verification outcomes and any missing live prerequisite in task status;
+keep the tested example and its usage guidance in the permanent locations named
+in the plan. Fix in-scope failures and commit validated logical units. SDK or
+transport redesign and publication are outside this pack.

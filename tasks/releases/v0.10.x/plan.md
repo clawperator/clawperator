@@ -1,9 +1,14 @@
 # v0.10.x physical-device reliability priorities
 
+Prioritize reliable physical-device evidence and sandboxed recording for the
+0.10.x patch series. Each selected pack is complete when its implementation,
+required evidence, documentation and local commits are complete. Publication
+has separate gates below.
+
 Status: planning complete; implementation and patch publication not started.
-This is a new patch-series queue, not a reopening of the retired 0.10.0 release
-pack. Baseline inspected: `626a169d`, code version 0.10.1. Reconcile current
-versions, tags and work in flight before choosing a patch release number.
+This queue follows the retired 0.10.0 release pack. Baseline inspected:
+`626a169d`, code version 0.10.1. Reconcile current versions, tags and work in
+flight before choosing a patch release number.
 
 ## Evidence and prioritization
 
@@ -21,8 +26,8 @@ Use the sanitized findings in each pack when those local repositories are absent
 | 3 | P2 | [Scoped selection diagnostics and deterministic assertions](../../node/scoped-selection-guidance/plan.md) | Reduce repeated ambiguity/overlap discovery mistakes; existing scoped behavior passed; independent | [TODO] |
 | 4 | P2 | [Safe query consumption](../../node/query-consumer-example/plan.md) | Reduce repeated decoding/validation and empty-matcher mistakes; independent | [TODO] |
 
-Priorities express delivery order, not artificial merge gates. Prefer one PR per
-pack with behavior, regressions and docs together. Rows 1 and 2 are the primary
+Use this delivery order; prefer one PR per pack containing behavior, regressions
+and docs. Dependencies are listed in the table. Rows 1 and 2 are the primary
 patch objectives; rows 3 and 4 can ship in a subsequent patch and should not delay
 a validated reliability fix. Do not describe consumer navigation mistakes,
 strict ambiguity rejection or emulator ANRs as confirmed runtime regressions.
@@ -53,12 +58,17 @@ not establish live acceptance; unavailable live cases remain explicitly open.
 Use branch-local builds and the matching development Operator during work;
 verify the matching release Operator for an eventual release candidate.
 
-The current request authorizes these task packs and local planning commits,
-not feature implementation, pushing or publication. Later implementation follows
-the named pack through validation, docs, status and logical local commits.
-Release execution requires a separate instruction and the release-orchestrator
-skill, including release notes, applicable acceptance gates and distribution
-verification. Do not invent a date or publish a patch from this plan alone.
+Requests to author or revise this plan authorize planning edits and local
+commits. A review-only request remains read-only.
+An instruction to implement a named pack authorizes its full scope through
+validation, repair, docs, status and local commits. Follow any explicit review
+boundary in that instruction. Push only when the user or active workflow
+requests it.
+
+Publication requires release-execution authorization and
+`.agents/skills/release-orchestrator/SKILL.md`, including release notes,
+applicable acceptance gates and distribution verification. This plan alone does
+not authorize publication or establish a release date.
 
 Before retiring completed packs, preserve durable behavior and sanitized evidence
 in the docs named by each pack. Update these links and retain actionable release

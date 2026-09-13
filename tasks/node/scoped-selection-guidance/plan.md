@@ -1,12 +1,17 @@
 # Scoped selection diagnostics and deterministic assertions
 
+Enable consumers to resolve ambiguous targets and overlapping scroll containers
+using observable scope and strict selectors. Done means the walkthrough is live
+verified, any demonstrated presentation gaps are fixed and tested, docs and task
+status are updated, and validated changes are committed. See
+[work-breakdown.md](work-breakdown.md) for delivery and validation.
+
 Status: [TODO]. Priority P2 in the [v0.10.x plan](../../releases/v0.10.x/plan.md).
 
-## Outcome and evidence
+## Evidence
 
-Make ambiguous selection and overlapping scroll containers straightforward to
-diagnose while preserving strict selection. The 0.10.0 usage run correctly
-rejected duplicate labels with `NODE_AMBIGUOUS`. Two same-ID, same-bounds lists
+The 0.10.0 usage run correctly rejected duplicate labels with `NODE_AMBIGUOUS`.
+Two same-ID, same-bounds lists
 also caused an unscoped scroll to track the wrong container and report
 `NO_POSITION_CHANGE`; strict ancestor-scoped scrolling subsequently returned
 `TARGET_FOUND` after four scrolls and the corrected domain assertions passed.

@@ -1,12 +1,16 @@
 # Physical-device evidence classification
 
+Allow physical devices with absent emulator flags to produce complete still and
+video evidence when all required components succeed. Done means the policy and
+regressions below pass, live evidence establishes both physical and emulator
+behavior, docs and task status are updated, and validated changes are committed.
+See [work-breakdown.md](work-breakdown.md) for delivery and validation.
+
 Status: [TODO]. Priority P1 in the [v0.10.x plan](../../releases/v0.10.x/plan.md).
 
-## Outcome and evidence
+## Evidence
 
-Allow a physical device with successfully read system properties but absent
-emulator flags to produce complete still/video evidence when all other required
-components succeed. Published 0.10.0 marked both bundles partial with
+Published 0.10.0 marked still and video bundles partial with
 `EVIDENCE_CAPTURE_FAILED`, stage `metadata`, component `deviceType`, despite
 verified media and hierarchies. Source inspection at `626a169d` confirms this:
 `collectEvidenceMetadata` collapses failed reads to empty strings and requires
@@ -36,7 +40,7 @@ to still and video; no Android or consumer workaround is required.
 - `apps/node/src/test/unit/evidenceCapture.test.ts`, `evidenceVideo.test.ts` and
   `evidenceWorker.test.ts`: existing fixtures and lifecycle coverage.
 - Update `docs/api/evidence.md` and `docs/internal/design/still-evidence.md`
-  using `.agents/skills/docs-author/SKILL.md`; record the inference and limits.
+  to record the inference and limits.
 
 ## Acceptance
 

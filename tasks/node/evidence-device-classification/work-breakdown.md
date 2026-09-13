@@ -1,20 +1,23 @@
-# Work breakdown
+# Delivery and validation
 
-One implementation PR; no dependency on other new packs.
+One implementation PR; independent of the other new packs. Implement the
+[plan's policy and acceptance cases](plan.md), including status propagation to
+both evidence paths. Video-root changes are outside this pack.
 
-1. Add focused metadata regressions and implement the classification/read-outcome
-   policy in plan.md. Verify status propagation to both evidence paths.
-2. Update canonical docs in the same change. Run
-   `npm --prefix apps/node run build && npm --prefix apps/node run test`, then
-   `./scripts/docs_build.sh` with the docs-build skill.
-3. Check connected devices before selecting explicit targets. Use the branch-local
-   CLI and matching `com.clawperator.operator.dev` APK. Capture a still and a short
-   video on physical hardware with absent flags, then inspect manifests, hashes,
-   hierarchy and decoded video. Verify emulator classification separately.
-   Prerequisites: ready Operator, writable output/state and ffmpeg/ffprobe.
-4. Record sanitized source/version and observed outcomes in permanent docs;
-   distinguish unit evidence from any unavailable live matrix rows. Fix in-scope
-   failures, update pack/release status, and commit validated logical units.
+## Required checks
 
-Stop after this scope. Do not publish or implement video-root changes. Missing
-live prerequisites leave live acceptance unproven, not passed.
+- Run `npm --prefix apps/node run build && npm --prefix apps/node run test`.
+- Update the canonical docs named in the plan with
+  `.agents/skills/docs-author/SKILL.md`; regenerate with docs-build and run
+  `./scripts/docs_build.sh`.
+- Check connected devices and select explicit physical and emulator targets.
+  Use the branch-local CLI and matching `com.clawperator.operator.dev` APK.
+  On physical hardware with absent flags, capture a still and short video;
+  inspect manifests, terminal exits, hashes, hierarchy and decoded video.
+  Verify emulator classification separately. Prerequisites: ready Operator,
+  writable output/state and ffmpeg/ffprobe.
+
+Record sanitized source/version and observed outcomes in the permanent docs
+named in the plan. Fix in-scope failures, update pack/release status and commit
+validated logical units. Missing live prerequisites leave acceptance open;
+record exactly which rows remain unproven. Publication is outside this pack.
