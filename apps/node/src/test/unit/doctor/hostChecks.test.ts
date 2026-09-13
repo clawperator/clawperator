@@ -1,6 +1,6 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert";
-import { chmod, cp, mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdtemp, realpath, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -30,7 +30,7 @@ describe("Doctor: hostChecks", () => {
     });
 
     async function makeTempRoot(prefix: string): Promise<string> {
-        const root = await mkdtemp(join(tmpdir(), prefix));
+        const root = await realpath(await mkdtemp(join(tmpdir(), prefix)));
         tempRoots.push(root);
         return root;
     }

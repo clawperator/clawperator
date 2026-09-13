@@ -15,14 +15,11 @@ import {
 import { isOrchestratedHarnessScriptPath, resolveRepoRelativeSkillPath } from "../../skills/pathUtils.js";
 import { readSkillManifestMetadata } from "../../skills/skillManifest.js";
 import {
-  inspectManagedBundledSkillDirectory,
-  inspectManagedBundledSkillLink,
   listPackagedBundledSkills,
+  resolveBundledSkillDiscoveryGroups,
+  inspectBundledSkillDiscoveryEntry,
   resolveBundledSkillsInstalledDir,
   resolvePackagedBundledSkillsSourceDir,
-  resolveClaudeSkillsDir,
-  resolveCodexSkillsDir,
-  resolveAgentsSkillsDir,
 } from "../../skills/copyBundledSkills.js";
 import { getCliVersion } from "../../version/compatibility.js";
 
@@ -125,61 +122,20 @@ interface BrokenAgentDiscoveryEntry {
   actualTarget?: string;
 }
 
-interface BundledSkillDiscoveryCheckTarget {
-  dirLabel: string;
-  discoveryDir: string;
-  kind: "symlink" | "copy";
-}
-
 async function findBrokenAgentDiscoveryEntries(
   installedDir: string,
   expectedSkills: string[],
   options: CheckBundledSkillsStalenessOptions
 ): Promise<BrokenAgentDiscoveryEntry[]> {
-  const discoveryDirs: BundledSkillDiscoveryCheckTarget[] = [
-    {
-      dirLabel: "claude",
-      discoveryDir: resolveClaudeSkillsDir({
-        claudeSkillsDir: options.claudeSkillsDir,
-        homeDir: options.homeDir,
-      }),
-      kind: "symlink",
-    },
-    {
-      dirLabel: "codex",
-      discoveryDir: resolveCodexSkillsDir({
-        codexSkillsDir: options.codexSkillsDir,
-        codexHome: options.codexHome,
-        homeDir: options.homeDir,
-        env: options.env,
-      }),
-      kind: "symlink",
-    },
-    {
-      dirLabel: "agents",
-      discoveryDir: resolveAgentsSkillsDir({
-        agentsSkillsDir: options.agentsSkillsDir,
-        homeDir: options.homeDir,
-      }),
-      kind: "copy",
-    },
-  ];
+  const discoveryGroups = await resolveBundledSkillDiscoveryGroups(options);
 
   const brokenEntries: BrokenAgentDiscoveryEntry[] = [];
 
-  for (const { dirLabel, discoveryDir, kind } of discoveryDirs) {
+  for (const group of discoveryGroups) {
+    const discoveryDir = group.dir;
+    const dirLabel = group.aliases.map(alias => alias.label).join(",");
     for (const skillName of expectedSkills) {
-      const inspection = kind === "copy"
-        ? await inspectManagedBundledSkillDirectory(
-          join(discoveryDir, skillName),
-          installedDir,
-          skillName
-        )
-        : await inspectManagedBundledSkillLink(
-          join(discoveryDir, skillName),
-          installedDir,
-          skillName
-        );
+      const inspection = await inspectBundledSkillDiscoveryEntry(group, installedDir, skillName);
       if (inspection.status === "ok") {
         continue;
       }
