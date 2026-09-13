@@ -162,7 +162,7 @@ class NotificationMediaService(private val context: Context) {
                             .put("postTime", sbn.postTime).put("ongoing", sbn.isOngoing).put("clearable", sbn.isClearable)
                             .put("groupKey", nullable(sbn.groupKey)).put("groupSummary", notification.flags and Notification.FLAG_GROUP_SUMMARY != 0)
                             .put("actions", buttons).put("actionsTruncated", (notification.actions?.size ?: 0) > 20)
-                            .put("textTruncated", listOfNotNull(title, text).any { it.length > maxTextChars })
+                            .put("textTruncated", (listOfNotNull(title, text) + notification.actions.orEmpty().take(20).mapNotNull { it.title?.toString() }).any { it.length > maxTextChars })
                             .put("progress", if (notification.extras.containsKey(Notification.EXTRA_PROGRESS)) JSONObject()
                                 .put("value", notification.extras.getInt(Notification.EXTRA_PROGRESS))
                                 .put("max", notification.extras.getInt(Notification.EXTRA_PROGRESS_MAX))

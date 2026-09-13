@@ -131,4 +131,33 @@ class NotificationMediaServiceTest {
         }
     }
 
+    @Test fun truncatedButtonTitleSetsNotificationTextFlag() = runTest {
+        val notification = (if (android.os.Build.VERSION.SDK_INT >= 26) Notification.Builder(context, "fixture") else Notification.Builder(context))
+            .setContentTitle("A").setContentText("B")
+            .addAction(android.R.drawable.ic_media_play, "Long button label", null)
+            .build()
+        shadowOf(listener).addActiveNotification("test.player", 1, notification)
+        val payload = JSONObject(service.execute("list_notifications", "test.player", null, 25, 1, 0))
+        val item = payload.getJSONArray("notifications").getJSONObject(0)
+        assertTrue(item.getBoolean("textTruncated"))
+        assertEquals("L", item.getJSONArray("actions").getJSONObject(0).getString("title"))
+        assertEquals(false, item.getBoolean("actionsTruncated"))
+    }
+
+    @Test fun concurrentRevisionReadsShareOneHandle() {
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(8)
+        try {
+            val ready = java.util.concurrent.CyclicBarrier(8)
+            val results = (1..8).map {
+                executor.submit<String> {
+                    ready.await(5, java.util.concurrent.TimeUnit.SECONDS)
+                    listener.revisionFor("same-notification")
+                }
+            }.map { it.get(5, java.util.concurrent.TimeUnit.SECONDS) }
+            assertEquals(1, results.toSet().size)
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
 }

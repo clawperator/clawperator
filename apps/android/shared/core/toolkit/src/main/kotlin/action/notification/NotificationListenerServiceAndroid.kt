@@ -3,6 +3,7 @@ package action.notification
 import action.coroutine.CoroutineScopes
 import action.log.Log
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -18,8 +19,8 @@ import android.service.notification.NotificationListenerService as AndroidNotifi
  */
 class NotificationListenerService : AndroidNotificationListenerService() {
     companion object {
-        var isListenerConnected = false
-        var connectedInstance: NotificationListenerService? = null
+        @Volatile var isListenerConnected = false
+        @Volatile var connectedInstance: NotificationListenerService? = null
             private set
 
         const val Tag = "[NotificationListener]"
@@ -37,7 +38,8 @@ class NotificationListenerService : AndroidNotificationListenerService() {
     private val coroutineScopeMain: CoroutineScope get() = coroutineScopes.main
     private val coroutineScopeIo: CoroutineScope get() = coroutineScopes.io
 
-    private val revisions = mutableMapOf<String, String>()
+    // Before API 24, listener callbacks may arrive on Binder threads while reads run on main.
+    private val revisions = ConcurrentHashMap<String, String>()
     fun revisionFor(key: String): String = revisions.getOrPut(key) { UUID.randomUUID().toString() }
 
     private var commandReceiver: BroadcastReceiver? = null

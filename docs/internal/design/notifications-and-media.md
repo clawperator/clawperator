@@ -64,7 +64,7 @@ locked/off and control proofs also passed on API 35. Temporary emulator PINs wer
 removed and accessibility settings restored; no personal credential was changed.
 
 Final debug Operator SHA-256:
-`ce65d625081b5aa085adf6363d0b8f3c8329cdf3b523b9020433c11643fca5fe`.
+`f06c0a3b7a99ff4ebc5c8013394c1302c748144162daa18d2ff6c8e41523bf69`.
 Independent fixture APK SHA-256:
 `0af5c8282c3dfef05ddaa14f7bef3d1ea82d928071d7b71718c3901aa11d23bc`.
 The standalone fixture survives Operator process death and records actual player
@@ -123,3 +123,12 @@ The PR review also verified that API 24-26 may return
 `No shell command implementation.` with exit status zero. Provisioning recognizes
 that response and uses the legacy grant through API 26; API 27+ missing-command
 responses remain failures. Regression tests cover both behaviors.
+
+The independent PR review also found unreported button-label truncation and
+unsynchronized listener state on API 21-23. Button labels now contribute to
+textTruncated. Revision handles use ConcurrentHashMap and the connection fields
+are volatile; compiled Kotlin uses API-21-compatible putIfAbsent. New offline
+regressions cover truncation and concurrent revision reads. The reviewer confirmed
+all findings resolved with no new issues. Post-fix validation passed 20 focused
+Node tests, toolkit/operator Android tests and debug assembly, plus the complete
+locked/off lifecycle/control harness on the final API 36 APK above.
