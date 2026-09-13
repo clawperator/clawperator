@@ -226,6 +226,12 @@ export function resolveElementMatcherFromCli(rest: string[]): MatcherResult {
         },
       };
     }
+    if (Object.keys(parsed).length === 0) {
+      return { ok: false, error: {
+        code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+        message: "--selector (--matcher-json) must not be empty. For all-node discovery, use query without a matcher; other actions require a non-empty selector.",
+      } };
+    }
     const validated = nodeMatcherSchema.safeParse(normalizeMatcherInput(parsed));
     if (!validated.success) return { ok: false, error: {
       code: ERROR_CODES.EXECUTION_VALIDATION_FAILED, message: validated.error.message,
