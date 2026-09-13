@@ -31,6 +31,9 @@ public class MediaProofActivity extends Activity {
     static int notificationRevision = 0;
     static int playCommands = 0;
     static int pauseCommands = 0;
+    static int seekCommands = 0;
+    static int buttonCommands = 0;
+    static android.app.PendingIntent lastButton;
     static Context app;
     static final Handler handler = new Handler(android.os.Looper.getMainLooper());
     static long samples = 0;
@@ -46,6 +49,7 @@ public class MediaProofActivity extends Activity {
             JSONObject data = new JSONObject().put("actualPositionMs", player.getCurrentPosition())
                 .put("actualPlaying", player.isPlaying()).put("sampleCount", ++samples)
                 .put("playCommands", playCommands).put("pauseCommands", pauseCommands)
+                .put("seekCommands", seekCommands).put("buttonCommands", buttonCommands)
                 .put("notificationRevision", notificationRevision)
                 .put("userUnlocked", Build.VERSION.SDK_INT < 24 || ((android.os.UserManager) app.getSystemService(Context.USER_SERVICE)).isUserUnlocked())
                 .put("observedElapsedMs", SystemClock.elapsedRealtime())
@@ -90,7 +94,14 @@ public class MediaProofActivity extends Activity {
                     if ("replace".equals(commandMode)) { replaceSession(); return; }
                     player.pause(); report();
                 }
-                @Override public void onSeekTo(long position) { player.seekTo((int) position); report(); }
+                @Override public void onSeekTo(long position) {
+                    seekCommands++;
+                    if ("ignore".equals(commandMode)) return;
+                    if ("replace-seek".equals(commandMode)) { replaceSession(); return; }
+                    if (Build.VERSION.SDK_INT >= 26) player.seekTo(position, MediaPlayer.SEEK_CLOSEST);
+                    else player.seekTo((int) position);
+                    report();
+                }
             });
             session.setMetadata(new MediaMetadata.Builder().putString(MediaMetadata.METADATA_KEY_TITLE, "Controlled video fixture")
                 .putLong(MediaMetadata.METADATA_KEY_DURATION, player.getDuration()).build());
@@ -108,12 +119,17 @@ public class MediaProofActivity extends Activity {
     }
     static void postNotification(int id, String text, boolean summary) {
         Notification.Builder builder = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(app, "media-proof") : new Notification.Builder(app);
+        int mutability = "input".equals(text) ? (Build.VERSION.SDK_INT >= 31 ? android.app.PendingIntent.FLAG_MUTABLE : 0) : android.app.PendingIntent.FLAG_IMMUTABLE;
         android.app.PendingIntent button = android.app.PendingIntent.getBroadcast(app, id,
-            new Intent(app, Control.class).putExtra("operation", "normal"), android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
+            new Intent(app, Control.class).putExtra("operation", "button"), mutability | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
+        lastButton = button;
+        Notification.Action.Builder action = new Notification.Action.Builder(android.R.drawable.ic_media_play, "Fixture button", button);
+        if ("input".equals(text)) action.addRemoteInput(new android.app.RemoteInput.Builder("reply").setLabel("Reply").build());
+        if ("authentication".equals(text) && Build.VERSION.SDK_INT >= 31) action.setAuthenticationRequired(true);
         ((NotificationManager) app.getSystemService(Context.NOTIFICATION_SERVICE)).notify(id,
             builder.setSmallIcon(android.R.drawable.ic_media_play).setContentTitle("Fixture revision " + (++notificationRevision))
                 .setContentText(text).setGroup("fixture-group").setGroupSummary(summary).setProgress(100, 42, false)
-                .addAction(android.R.drawable.ic_media_play, "Fixture button", button).build());
+                .addAction(action.build()).build());
     }
     static void replaceSession() {
         session.release();
@@ -125,7 +141,14 @@ public class MediaProofActivity extends Activity {
         @Override public void onReceive(Context context, Intent intent) {
             if (player == null) return;
             String operation = intent.getStringExtra("operation");
-            if ("post".equals(operation) || "update".equals(operation)) { postNotification(8124, operation, false); }
+            if ("button".equals(operation)) { buttonCommands++; }
+            else if ("input".equals(operation) || "authentication".equals(operation)) { postNotification(8124, operation, false); }
+            else if ("cancel-button".equals(operation)) { if (lastButton != null) lastButton.cancel(); }
+            else if ("replace-on-seek".equals(operation)) { commandMode = "replace-seek"; }
+            else if ("duration-unknown".equals(operation)) { session.setMetadata(new MediaMetadata.Builder().putString(MediaMetadata.METADATA_KEY_TITLE, "Unknown duration").build()); }
+            else if ("duration-zero".equals(operation)) { session.setMetadata(new MediaMetadata.Builder().putLong(MediaMetadata.METADATA_KEY_DURATION, 0).build()); }
+            else if ("duration-normal".equals(operation)) { session.setMetadata(new MediaMetadata.Builder().putLong(MediaMetadata.METADATA_KEY_DURATION, player.getDuration()).build()); }
+            else if ("post".equals(operation) || "update".equals(operation)) { postNotification(8124, operation, false); }
             else if ("group".equals(operation)) { postNotification(8125, "summary", true); }
             else if ("remove".equals(operation)) { ((NotificationManager) app.getSystemService(Context.NOTIFICATION_SERVICE)).cancel(8124); }
             else if ("many".equals(operation)) {

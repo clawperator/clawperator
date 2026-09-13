@@ -395,6 +395,9 @@ describe("mcp stdio integration", () => {
     for (const action of [
       { id: "a", type: "get_media_status", params: { applicationId: "p", mediaSessionId: "s" } },
       { id: "a", type: "list_notifications", params: { limit: 101 } },
+      { id: "a", type: "media_seek", params: { mediaSessionId: "s", positionMs: -1 } },
+      { id: "a", type: "dismiss_notification", params: { notificationKey: " " } },
+      { id: "a", type: "invoke_notification_action", params: { notificationKey: "k" } },
       { id: "a", type: "media_play", params: { mediaSessionId: "s", waitTimeoutMs: -1 } },
     ]) {
       const result = await client.callTool("execute", { deviceId: "non-existent", actions: [action] });

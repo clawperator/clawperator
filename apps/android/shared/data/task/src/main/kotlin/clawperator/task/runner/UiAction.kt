@@ -17,6 +17,10 @@ sealed interface UiAction {
         val limit: Int = 25,
         val maxTextChars: Int = 256,
         val waitTimeoutMs: Long = 0,
+        val notificationKey: String? = null,
+        val actionId: String? = null,
+        val positionMs: Long? = null,
+        val positionToleranceMs: Long = 1000,
     ) : UiAction
 
     data class OpenUri(

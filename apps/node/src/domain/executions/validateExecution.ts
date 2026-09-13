@@ -149,7 +149,7 @@ function hasStructurallyValidActionParams(actionType: string, params: unknown): 
 // used only by `clawperator doctor`, which bypasses validateExecution and dispatches
 // directly via broadcastAgentCommand. It is not part of the public agent-facing API.
 const supportedTypes = [
-  "list_notifications", "list_media_sessions", "get_media_status", "media_pause", "media_play",
+  "list_notifications", "list_media_sessions", "get_media_status", "media_pause", "media_play", "dismiss_notification", "invoke_notification_action", "media_seek",
   "open_app",
   "open_uri",
   "close_app",

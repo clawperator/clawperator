@@ -179,4 +179,141 @@ class NotificationMediaServiceTest {
         assertEquals(1, shadowOf(controller).callbacks.size)
     }
 
+    private fun postButton(input: Boolean = false): Pair<String, android.app.PendingIntent> {
+        val intent = android.app.PendingIntent.getBroadcast(context, 1, android.content.Intent("fixture.button"), android.app.PendingIntent.FLAG_IMMUTABLE)
+        val action = Notification.Action.Builder(android.R.drawable.ic_media_play, "Button", intent)
+        if (input) action.addRemoteInput(android.app.RemoteInput.Builder("reply").build())
+        val notification = (if (android.os.Build.VERSION.SDK_INT >= 26) Notification.Builder(context, "fixture") else Notification.Builder(context))
+            .addAction(action.build()).build()
+        return shadowOf(listener).addActiveNotification("test.player", 7, notification) to intent
+    }
+    private suspend fun buttonHandle() = query("list_notifications").getJSONArray("notifications").getJSONObject(0)
+        .getJSONArray("actions").getJSONObject(0).getString("actionId")
+    private suspend fun mutation(type: String, key: String, handle: String? = null) =
+        JSONObject(service.execute(type, null, null, 25, 256, 0, notificationKey = key, actionId = handle))
+
+    @Test fun dismissalChecksExistenceClearabilityAndObservedRemoval() = runTest {
+        val (key, _) = postButton()
+        val result = mutation("dismiss_notification", key)
+        assertTrue(result.getBoolean("dispatched"))
+        assertTrue(result.getBoolean("removalObserved"))
+        assertEquals("NOTIFICATION_EXPIRED", assertFailsWith<NotificationMediaException> { mutation("dismiss_notification", key) }.code)
+        val ongoing = Notification.Builder(context).setOngoing(true).build()
+        val ongoingKey = shadowOf(listener).addActiveNotification("test.player", 8, ongoing)
+        val error = assertFailsWith<NotificationMediaException> { mutation("dismiss_notification", ongoingKey) }
+        assertEquals("NOTIFICATION_NOT_DISMISSIBLE", error.code)
+        assertEquals(false, error.dispatched)
+    }
+    @Test fun buttonsRejectUnadvertisedRemovedCanceledAndInputActions() = runTest {
+        val (key, intent) = postButton()
+        assertEquals("NOTIFICATION_ACTION_EXPIRED", assertFailsWith<NotificationMediaException> { mutation("invoke_notification_action", key, "unknown:0") }.code)
+        val handle = buttonHandle()
+        assertTrue(mutation("invoke_notification_action", key, handle).getBoolean("dispatched"))
+        intent.cancel()
+        val canceled = assertFailsWith<NotificationMediaException> { mutation("invoke_notification_action", key, handle) }
+        assertEquals("NOTIFICATION_ACTION_CANCELLED", canceled.code)
+        assertEquals(false, canceled.dispatched)
+        listener.cancelNotification(key)
+        assertEquals("NOTIFICATION_EXPIRED", assertFailsWith<NotificationMediaException> { mutation("invoke_notification_action", key, handle) }.code)
+        val (inputKey, _) = postButton(input = true)
+        assertEquals("NOTIFICATION_ACTION_INPUT_UNSUPPORTED", assertFailsWith<NotificationMediaException> { mutation("invoke_notification_action", inputKey, buttonHandle()) }.code)
+    }
+    @Test fun handlesCannotSurviveListenerReplacementOrServiceRestart() = runTest {
+        val (key, _) = postButton()
+        val handle = buttonHandle()
+        val replacement = Robolectric.buildService(NotificationListenerService::class.java).get()
+        shadowOf(replacement).addActiveNotification("test.player", 7, Notification.Builder(context).build())
+        connected.set(null, replacement)
+        assertEquals("NOTIFICATION_ACTION_EXPIRED", assertFailsWith<NotificationMediaException> { mutation("invoke_notification_action", key, handle) }.code)
+        connected.set(null, listener)
+        service = NotificationMediaService(context)
+        assertEquals("NOTIFICATION_ACTION_EXPIRED", assertFailsWith<NotificationMediaException> { mutation("invoke_notification_action", key, handle) }.code)
+    }
+    @Test fun seekValidatesCapabilitiesAndDurationWithoutTreatingOldPositionsAsConfirmation() = runTest {
+        val controller = controller("seek")
+        val id = query("list_media_sessions").getJSONArray("sessions").getJSONObject(0).getString("mediaSessionId")
+        suspend fun seek(position: Long) = JSONObject(service.execute("media_seek", null, id, 25, 256, 0, positionMs = position))
+        assertEquals("MEDIA_ACTION_UNSUPPORTED", assertFailsWith<NotificationMediaException> { seek(10) }.code)
+        val state = PlaybackState.Builder().setActions(PlaybackState.ACTION_SEEK_TO).setState(PlaybackState.STATE_PAUSED, 1000, 0f, 1).build()
+        shadowOf(controller).callbacks.single().onPlaybackStateChanged(state)
+        val unknown = seek(1000)
+        assertTrue(unknown.getBoolean("dispatched"))
+        assertEquals(false, unknown.getBoolean("targetPositionObserved"))
+        assertEquals(1000L, unknown.getJSONObject("session").getLong("reportedPositionMs"))
+        for (duration in listOf(0L, 1000L)) {
+            shadowOf(controller).setMetadata(android.media.MediaMetadata.Builder().putLong(android.media.MediaMetadata.METADATA_KEY_DURATION, duration).build())
+            assertTrue(seek(duration).getBoolean("dispatched"))
+            val error = assertFailsWith<NotificationMediaException> { seek(duration + 1) }
+            assertEquals("MEDIA_POSITION_OUT_OF_RANGE", error.code)
+            assertEquals(false, error.dispatched)
+        }
+        assertEquals("MEDIA_POSITION_INVALID", assertFailsWith<NotificationMediaException> { seek(-1) }.code)
+    }
+
+    @Test fun canceledSeekWaitRetainsDispatchReceiptAndOriginalReport() = runTest {
+        val controller = controller("canceled-seek")
+        val id = query("list_media_sessions").getJSONArray("sessions").getJSONObject(0).getString("mediaSessionId")
+        shadowOf(controller).callbacks.single().onPlaybackStateChanged(
+            PlaybackState.Builder().setActions(PlaybackState.ACTION_SEEK_TO).setState(PlaybackState.STATE_PLAYING, 1000, 1f, 1).build(),
+        )
+        var dispatchCount = 0
+        assertFailsWith<kotlinx.coroutines.TimeoutCancellationException> {
+            kotlinx.coroutines.withTimeout(100) {
+                service.execute("media_seek", null, id, 25, 256, 30000, { dispatchCount++ }, positionMs = 10000, positionToleranceMs = 0)
+            }
+        }
+        assertEquals(1, dispatchCount)
+        val after = query("get_media_status", id = id).getJSONObject("session")
+        assertEquals(1000L, after.getLong("reportedPositionMs"))
+        assertEquals(1L, after.getLong("positionUpdatedElapsedMs"))
+    }
+
+    @Test fun listingNeverReassignsAnExistingAdvertisedHandle() = runTest {
+        val (key, _) = postButton()
+        val original = buttonHandle()
+        val again = buttonHandle()
+        assertTrue(original != again)
+        assertTrue(mutation("invoke_notification_action", key, original).getBoolean("dispatched"))
+        assertTrue(mutation("invoke_notification_action", key, again).getBoolean("dispatched"))
+        // Simulate a new platform snapshot arriving before the listener revision callback.
+        listener.cancelNotification(key)
+        val replacement = android.app.PendingIntent.getBroadcast(context, 2, android.content.Intent("replacement.button"), android.app.PendingIntent.FLAG_IMMUTABLE)
+        shadowOf(listener).addActiveNotification("test.player", 7, Notification.Builder(context).addAction(android.R.drawable.ic_media_play, "Button", replacement).build())
+        val updated = buttonHandle()
+        assertTrue(updated != original && updated != again)
+        assertEquals("NOTIFICATION_ACTION_EXPIRED", assertFailsWith<NotificationMediaException> { mutation("invoke_notification_action", key, original) }.code)
+        assertTrue(mutation("invoke_notification_action", key, updated).getBoolean("dispatched"))
+    }
+
+    @Test @Config(sdk = [28]) fun dataOnlyRemoteInputIsAdvertisedAndRejected() = runTest {
+        val intent = android.app.PendingIntent.getBroadcast(context, 3, android.content.Intent("image.button"), android.app.PendingIntent.FLAG_IMMUTABLE)
+        val action = Notification.Action.Builder(android.R.drawable.ic_media_play, "Image", intent)
+            .addRemoteInput(android.app.RemoteInput.Builder("image").setAllowFreeFormInput(false).setAllowDataType("image/png", true).build()).build()
+        val key = shadowOf(listener).addActiveNotification("test.player", 9, Notification.Builder(context, "fixture").addAction(action).build())
+        val item = query("list_notifications").getJSONArray("notifications").getJSONObject(0).getJSONArray("actions").getJSONObject(0)
+        assertTrue(item.getBoolean("requiresInput"))
+        assertEquals("NOTIFICATION_ACTION_INPUT_UNSUPPORTED", assertFailsWith<NotificationMediaException> { mutation("invoke_notification_action", key, item.getString("actionId")) }.code)
+    }
+
+    @org.robolectric.annotation.Implements(android.service.notification.NotificationListenerService::class)
+    class RefusingCancellationShadow : org.robolectric.shadows.ShadowService() {
+        var notifications = emptyArray<android.service.notification.StatusBarNotification>()
+        @org.robolectric.annotation.Implementation
+        protected fun getActiveNotifications() = notifications
+        @org.robolectric.annotation.Implementation
+        protected fun cancelNotification(key: String) { /* A void platform call can leave the key active. */ }
+    }
+
+    @Test @Config(shadows = [RefusingCancellationShadow::class])
+    fun refusedCancellationIsDispatchedButNeverConfirmedRemoved() = runTest {
+        val notification = android.service.notification.StatusBarNotification("test.player", "test.player", 7, null, 0, 0, 0,
+            Notification.Builder(context).build(), android.os.Process.myUserHandle(), 1)
+        org.robolectric.shadow.api.Shadow.extract<RefusingCancellationShadow>(listener).notifications = arrayOf(notification)
+        val key = notification.key
+        val result = mutation("dismiss_notification", key)
+        assertTrue(result.getBoolean("dispatched"))
+        assertEquals(false, result.getBoolean("removalObserved"))
+        assertEquals(1, query("list_notifications").getInt("total"))
+    }
+
 }

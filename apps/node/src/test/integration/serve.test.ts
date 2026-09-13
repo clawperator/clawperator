@@ -182,6 +182,25 @@ describe("serve API integration", () => {
     assert.strictEqual(body.error.details?.path, "actions.0.params.key");
   });
 
+  test("POST /execute rejects invalid N2 mutations before device resolution", async () => {
+    for (const action of [
+      { id: "a", type: "dismiss_notification", params: { notificationKey: " " } },
+      { id: "a", type: "invoke_notification_action", params: { notificationKey: "k" } },
+      { id: "a", type: "media_seek", params: { mediaSessionId: "s", positionMs: -1 } },
+    ]) {
+      const response = await fetch(`http://localhost:${port}/execute`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId: "non-existent", execution: {
+          commandId: "invalid-mutation", taskId: "test-task", source: "test-suite",
+          expectedFormat: "android-ui-automator", timeoutMs: 1000, actions: [action],
+        } }),
+      });
+      assert.strictEqual(response.status, 400);
+      const body = await response.json() as { error: { code: string } };
+      assert.strictEqual(body.error.code, "EXECUTION_VALIDATION_FAILED");
+    }
+  });
+
   test("POST /execute accepts key_press alias and reaches device resolution", async () => {
     const executionInput = {
       commandId: "test-key-press-alias",

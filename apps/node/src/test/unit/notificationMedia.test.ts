@@ -9,7 +9,7 @@ describe("notification/media contract", () => {
   it("exempts only nonempty validated observation-only lists", () => {
     const actions = ["list_notifications", "list_media_sessions", "get_media_status"].map(type => ({ id: type, type }));
     assert.equal(isBackgroundObservation(actions), true);
-    for (const type of ["media_pause", "media_play", "snapshot", "doctor_ping", "unknown", "LIST_NOTIFICATIONS"]) {
+    for (const type of ["media_pause", "media_play", "media_seek", "dismiss_notification", "invoke_notification_action", "snapshot", "doctor_ping", "unknown", "LIST_NOTIFICATIONS"]) {
       assert.equal(isBackgroundObservation([...actions, { id: "x", type }]), false);
       assert.equal(isBackgroundObservation([{ id: "x", type }, ...actions]), false);
     }
@@ -85,6 +85,12 @@ import { fileURLToPath } from "node:url";
 it("CLI rejects missing, blank, conflicting and invalid service values with JSON and nonzero exits", () => {
   const cli = fileURLToPath(new URL("../../cli/index.js", import.meta.url));
   for (const args of [
+    ["notifications", "dismiss"], ["notifications", "dismiss", " "],
+    ["notifications", "action", "key"], ["notifications", "action", "key", "--action"],
+    ["notifications", "action", "key", "--action", " "], ["notifications", "dismiss", "key", "--action", "a"],
+    ["media", "seek", "--session", "s"], ["media", "seek", "--session", "s", "--position-ms"],
+    ...["-1", "1.5", "NaN", "Infinity", "9007199254740992", " "].map(value => ["media", "seek", "--session", "s", "--position-ms", value]),
+    ["media", "seek", "--session", "s", "--position-ms", "0", "--position-tolerance-ms", "60001"],
     ["media", "status"], ["media", "status", "--session"],
     ["media", "status", "--session", " "], ["media", "status", "--app", "p", "--session", "s"],
     ["media", "play", "--app", "p", "--wait-timeout-ms", "-1"],
@@ -140,5 +146,62 @@ it("uses the legacy grant on Android versions before the notification shell impl
     for (const stdout of ["null", String(output), String(api), ""]) runner.queueResult({ code: 0, stdout, stderr: "" });
     assert.deepEqual(await grantNotificationListenerPermission(getDefaultRuntimeConfig({ runner }), "com.test.operator"), { ok: true, alreadyEnabled: false });
     assert.deepEqual(runner.calls.at(-1)?.args.slice(0, 5), ["shell", "settings", "put", "secure", "enabled_notification_listeners"]);
+  }
+});
+
+
+it("validates all N2 mutations strictly and preserves their canonical payloads", () => {
+  for (const [type, params] of [
+    ["dismiss_notification", { notificationKey: "key", waitTimeoutMs: 100 }],
+    ["invoke_notification_action", { notificationKey: "key", actionId: "revision:0" }],
+    ["media_seek", { mediaSessionId: "s", positionMs: 0, positionToleranceMs: 0, waitTimeoutMs: 30000 }],
+    ["media_seek", { applicationId: "p", positionMs: Number.MAX_SAFE_INTEGER }],
+  ] as const) {
+    assert.deepEqual(buildNotificationMediaExecution(type, params).actions[0].params, params);
+  }
+  for (const positionMs of [-1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1, "1", null]) {
+    assert.throws(() => buildNotificationMediaExecution("media_seek", { mediaSessionId: "s", positionMs } as never));
+  }
+  for (const [type, params] of [
+    ["dismiss_notification", {}], ["dismiss_notification", { notificationKey: " " }],
+    ["dismiss_notification", { notificationKey: "k", applicationId: "p" }],
+    ["invoke_notification_action", { notificationKey: "k", actionId: "a", waitTimeoutMs: 1 }],
+    ["invoke_notification_action", { notificationKey: "k", actionId: "" }],
+    ["media_seek", { positionMs: 1 }], ["media_seek", { mediaSessionId: "s", applicationId: "p", positionMs: 1 }],
+    ["media_seek", { mediaSessionId: "s", positionMs: 1, positionToleranceMs: -1 }],
+  ] as const) assert.throws(() => buildNotificationMediaExecution(type, params));
+});
+
+it("valid N2 CLI values reach device selection with either global flag placement", () => {
+  const cli = fileURLToPath(new URL("../../cli/index.js", import.meta.url));
+  for (const args of [
+    ["notifications", "dismiss", "key", "--wait-timeout-ms", "0"],
+    ["notifications", "action", "key", "--action", "revision:0"],
+    ["media", "seek", "--session", "s", "--position-ms", "1000", "--position-tolerance-ms", "50"],
+  ]) for (const first of [true, false]) {
+    const global = ["--device", "non-existent-test-device", "--output", "json", "--no-daemon"];
+    const result = spawnSync(process.execPath, [cli, ...(first ? [...global, ...args] : [...args, ...global])], { encoding: "utf8" });
+    assert.notEqual(result.status, 0);
+    assert.match(JSON.parse(result.stdout).code, /DEVICE/);
+  }
+});
+
+it("never replays N2 mutations when the transport loses their receipt", async () => {
+  for (const [type, params] of [
+    ["media_seek", { mediaSessionId: "s", positionMs: 1000 }],
+    ["dismiss_notification", { notificationKey: "k" }],
+    ["invoke_notification_action", { notificationKey: "k", actionId: "a" }],
+  ] as const) {
+    const runner = new FakeProcessRunner();
+    runner.spawn = (() => Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), kill() {} })) as FakeProcessRunner["spawn"];
+    for (const stdout of ["List of devices attached\ntest-device\tdevice\n", "package:com.test.operator\n", "0", "Broadcast completed: result=0"]) {
+      runner.queueResult({ code: 0, stdout, stderr: "" });
+    }
+    const result = await runExecution(buildNotificationMediaExecution(type, params), {
+      deviceId: "test-device", operatorPackage: "com.test.operator", runner, logcatBroadcastDelayMs: 0, resultEnvelopeTimeoutMs: 30,
+      ensureInteractiveAutomationReadyFn: async () => ({ ok: true } as never),
+    });
+    assert.equal(result.ok, false);
+    assert.equal(runner.calls.filter(call => call.args.some(arg => arg.includes("am broadcast"))).length, 1);
   }
 });

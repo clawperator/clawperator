@@ -54,12 +54,13 @@ class UiActionEngineDefault(
                 val warnings = SelectionWarnings()
                 val receipt = ActionReceipt()
                 var serviceDispatched = false
-                val isMediaControl = action is UiAction.NotificationMedia && action.type in setOf("media_play", "media_pause")
+                val isMediaControl = action is UiAction.NotificationMedia && action.type in setOf("media_play", "media_pause", "media_seek", "dismiss_notification", "invoke_notification_action")
                 val recordsDispatch = action is UiAction.Click || action is UiAction.EnterText ||
                     action is UiAction.Scroll || action is UiAction.ScrollUntil || action is UiAction.ScrollAndClick
                 fun evidence() = warnings.stepData() +
                     (if (recordsDispatch) receipt.stepData() else emptyMap()) +
-                    (if (isMediaControl) mapOf("dispatched" to serviceDispatched.toString()) else emptyMap())
+                    (if (isMediaControl && action is UiAction.NotificationMedia) mapOf("dispatched" to serviceDispatched.toString(), "waitTimeoutMs" to action.waitTimeoutMs.toString()) +
+                        (if (action.type == "media_seek") mapOf("requestedPositionMs" to action.positionMs.toString(), "positionToleranceMs" to action.positionToleranceMs.toString()) else emptyMap()) else emptyMap())
                 val stepResult = try {
                     val result = withContext(warnings + receipt + receipt.observation) { executeSingle(taskScope, action) { serviceDispatched = true } }
                     val failureCode = if (!result.success && !result.data.containsKey("errorCode")) {
@@ -112,7 +113,7 @@ class UiActionEngineDefault(
                 is UiAction.NotificationMedia -> {
                     try {
                         val service = notificationMediaService ?: throw NotificationMediaException("NOTIFICATION_SERVICE_UNAVAILABLE", "Service is unavailable")
-                        UiActionStepResult(action.id, action.type, data = mapOf("payload" to service.execute(action.type, action.applicationId, action.mediaSessionId, action.limit, action.maxTextChars, action.waitTimeoutMs, onServiceDispatch)))
+                        UiActionStepResult(action.id, action.type, data = mapOf("payload" to service.execute(action.type, action.applicationId, action.mediaSessionId, action.limit, action.maxTextChars, action.waitTimeoutMs, onServiceDispatch, action.notificationKey, action.actionId, action.positionMs, action.positionToleranceMs)))
                     } catch (error: NotificationMediaException) {
                         UiActionStepResult(action.id, action.type, success = false, data = mapOf("errorCode" to error.code, "error" to error.message.orEmpty(), "dispatched" to error.dispatched.toString(), "waitTimeoutMs" to action.waitTimeoutMs.toString()))
                     }

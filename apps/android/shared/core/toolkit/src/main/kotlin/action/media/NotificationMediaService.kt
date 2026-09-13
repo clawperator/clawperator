@@ -1,6 +1,7 @@
 package action.media
 
 import action.notification.NotificationListenerService
+import android.app.PendingIntent
 import android.app.Notification
 import android.content.ComponentName
 import android.content.Context
@@ -31,7 +32,23 @@ class NotificationMediaService(private val context: Context) {
         var destroyed: Boolean = false,
         var reportedState: PlaybackState? = null,
         var hasPlayerReport: Boolean = false,
+        var reportSequence: Long = 0,
     )
+    private data class AdvertisedAction(val listener: NotificationListenerService, val key: String, val revision: String, val postTime: Long, val index: Int, val action: Notification.Action)
+    private val advertisedActions = object : LinkedHashMap<String, AdvertisedAction>() {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, AdvertisedAction>?): Boolean = size > 2000
+    }
+    private fun notifications(listener: NotificationListenerService): Array<android.service.notification.StatusBarNotification> {
+        try {
+            return listener.activeNotifications
+                ?: throw NotificationMediaException("NOTIFICATION_QUERY_FAILED", "Android did not return a notification snapshot.")
+        } catch (error: SecurityException) {
+            throw error
+        } catch (error: RuntimeException) {
+            throw NotificationMediaException("NOTIFICATION_QUERY_FAILED", "Android could not query active notifications.")
+        }
+    }
+
     private val sessions = mutableMapOf<MediaSession.Token, Session>()
     private val destroyedTokens = mutableSetOf<MediaSession.Token>()
     private val sessionManager = context.getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
@@ -62,6 +79,7 @@ class NotificationMediaService(private val context: Context) {
                 val session = Session(UUID.randomUUID().toString(), controller)
                 val callback = object : MediaController.Callback() {
                     override fun onPlaybackStateChanged(state: PlaybackState?) {
+                        session.reportSequence++
                         session.reportedState = state
                         session.hasPlayerReport = true
                     }
@@ -92,6 +110,12 @@ class NotificationMediaService(private val context: Context) {
             throw NotificationMediaException("MEDIA_SESSION_EXPIRED", "Selected session is no longer active; a replacement session was not selected.", dispatched)
         }
     }
+
+    private fun requiresInput(action: Notification.Action): Boolean =
+        !action.remoteInputs.isNullOrEmpty() || (Build.VERSION.SDK_INT >= 26 && !action.dataOnlyRemoteInputs.isNullOrEmpty())
+
+    private fun requiresAuthentication(action: Notification.Action): Boolean =
+        Build.VERSION.SDK_INT >= 31 && action.isAuthenticationRequired
 
     private fun nullable(value: Any?): Any = value ?: JSONObject.NULL
 
@@ -150,30 +174,33 @@ class NotificationMediaService(private val context: Context) {
             .put("evidence", if (session.hasPlayerReport) "player_report" else "platform_query")
     }
 
-    suspend fun execute(type: String, applicationId: String?, sessionId: String?, limit: Int, maxTextChars: Int, waitTimeoutMs: Long, onDispatch: () -> Unit = {}): String = withContext(Dispatchers.Main.immediate) {
+    suspend fun execute(type: String, applicationId: String?, sessionId: String?, limit: Int, maxTextChars: Int, waitTimeoutMs: Long, onDispatch: () -> Unit = {}, notificationKey: String? = null, actionId: String? = null, positionMs: Long? = null, positionToleranceMs: Long = 1000): String = withContext(Dispatchers.Main.immediate) {
         var dispatched = false
         try {
             val payload = JSONObject().put("schemaVersion", 1)
             when (type) {
                 "list_notifications" -> {
-                    val notifications = requireListener().activeNotifications
-                        ?: throw NotificationMediaException("NOTIFICATION_QUERY_FAILED", "Android did not return a notification snapshot.")
+                    val listener = requireListener()
+                    val notifications = notifications(listener)
                     val filtered = notifications.filter { applicationId == null || it.packageName == applicationId }.sortedBy { it.key }
                     val items = JSONArray()
                     filtered.take(limit).forEach { sbn ->
                         val notification = sbn.notification
                         val title = notification.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
                         val text = notification.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
-                        val revision = requireListener().revisionFor(sbn.key)
+                        val revision = listener.revisionFor(sbn.key)
                         val buttons = JSONArray()
                         var textTruncated = listOfNotNull(title, text).any { it.length > maxTextChars }
                         notification.actions?.take(20)?.forEachIndexed { index, action ->
                             val actionTitle = action.title?.toString()
                             if (actionTitle != null && actionTitle.length > maxTextChars) textTruncated = true
-                            buttons.put(JSONObject().put("actionId", "$revision:$index")
+                            // Never reassign a published handle, even if a platform update precedes its listener callback.
+                            val handle = UUID.randomUUID().toString()
+                            advertisedActions[handle] = AdvertisedAction(listener, sbn.key, revision, sbn.postTime, index, action)
+                            buttons.put(JSONObject().put("actionId", handle)
                                 .put("title", nullable(actionTitle?.take(maxTextChars)))
-                                .put("requiresInput", !action.remoteInputs.isNullOrEmpty())
-                                .put("requiresAuthentication", if (Build.VERSION.SDK_INT >= 31) action.isAuthenticationRequired else false))
+                                .put("requiresInput", requiresInput(action))
+                                .put("requiresAuthentication", requiresAuthentication(action)))
                         }
                         items.put(JSONObject().put("key", sbn.key).put("applicationId", sbn.packageName)
                             .put("title", nullable(title?.take(maxTextChars))).put("text", nullable(text?.take(maxTextChars)))
@@ -188,6 +215,56 @@ class NotificationMediaService(private val context: Context) {
                     }
                     payload.put("notifications", items).put("truncated", filtered.size > limit).put("total", filtered.size)
                 }
+                "dismiss_notification", "invoke_notification_action" -> {
+                    val listener = requireListener()
+                    val notification = notifications(listener).singleOrNull { it.key == notificationKey }
+                        ?: throw NotificationMediaException("NOTIFICATION_EXPIRED", "Notification key is no longer active; list notifications again.")
+                    payload.put("notificationKey", notificationKey)
+                    if (type == "dismiss_notification") {
+                        if (!notification.isClearable) throw NotificationMediaException("NOTIFICATION_NOT_DISMISSIBLE", "Notification is not clearable.")
+                        dispatched = true
+                        onDispatch()
+                        listener.cancelNotification(notification.key)
+                        val deadline = SystemClock.elapsedRealtime() + waitTimeoutMs
+                        var removed: Boolean
+                        do {
+                            if (requireListener() !== listener) throw NotificationMediaException("NOTIFICATION_LISTENER_DISCONNECTED", "Listener changed after cancellation dispatch.", true)
+                            removed = notifications(listener).none { it.key == notificationKey }
+                            if (removed || SystemClock.elapsedRealtime() >= deadline) break
+                            delay(50)
+                        } while (true)
+                        payload.put("dispatched", true).put("removalObserved", removed).put("waitTimeoutMs", waitTimeoutMs)
+                    } else {
+                        val advertised = advertisedActions[actionId]
+                        val current = advertised?.let { notification.notification.actions?.getOrNull(it.index) }
+                        if (advertised == null || advertised.listener !== listener || advertised.key != notificationKey ||
+                            advertised.revision != listener.revisionFor(notification.key) || advertised.postTime != notification.postTime ||
+                            current == null || current.actionIntent != advertised.action.actionIntent || current.title?.toString() != advertised.action.title?.toString()) {
+                            throw NotificationMediaException("NOTIFICATION_ACTION_EXPIRED", "Action handle no longer matches the advertised notification revision; list notifications again.")
+                        }
+                        if (requiresInput(current) || requiresInput(advertised.action)) {
+                            throw NotificationMediaException("NOTIFICATION_ACTION_INPUT_UNSUPPORTED", "RemoteInput actions are not supported.")
+                        }
+                        if (requiresAuthentication(current) || requiresAuthentication(advertised.action)) {
+                            throw NotificationMediaException("NOTIFICATION_ACTION_AUTHENTICATION_UNSUPPORTED", "Authentication-required actions are not supported.")
+                        }
+                        val intent = advertised.action.actionIntent
+                            ?: throw NotificationMediaException("NOTIFICATION_ACTION_EXPIRED", "Action has no PendingIntent.")
+                        // Send the exact advertised intent once. Android may race after validation.
+                        try {
+                            intent.send()
+                        } catch (error: PendingIntent.CanceledException) {
+                            throw NotificationMediaException("NOTIFICATION_ACTION_CANCELLED", "The advertised PendingIntent was canceled; it was not dispatched.")
+                        } catch (error: RuntimeException) {
+                            dispatched = true
+                            onDispatch()
+                            throw error
+                        }
+                        dispatched = true
+                        onDispatch()
+                        payload.put("dispatched", true).put("actionId", actionId)
+                    }
+                }
                 "list_media_sessions" -> {
                     val filtered = activeSessions().filter { applicationId == null || it.controller.packageName == applicationId }.sortedBy { it.id }
                     payload.put("sessions", JSONArray(filtered.take(limit).map { status(it, maxTextChars) }))
@@ -198,6 +275,39 @@ class NotificationMediaService(private val context: Context) {
                     if (type == "get_media_status") {
                         ensurePinned(session)
                         payload.put("session", status(session, maxTextChars))
+                    } else if (type == "media_seek") {
+                        val position = positionMs ?: throw NotificationMediaException("MEDIA_POSITION_INVALID", "positionMs is required.")
+                        if (position !in 0..9007199254740991L || positionToleranceMs !in 0..60000) {
+                            throw NotificationMediaException("MEDIA_POSITION_INVALID", "Invalid position or tolerance.")
+                        }
+                        if ((currentState(session)?.actions ?: 0L) and PlaybackState.ACTION_SEEK_TO == 0L) {
+                            throw NotificationMediaException("MEDIA_ACTION_UNSUPPORTED", "Player does not advertise seek.")
+                        }
+                        val metadata = session.controller.metadata
+                        val duration = metadata?.takeIf { it.containsKey(MediaMetadata.METADATA_KEY_DURATION) }
+                            ?.getLong(MediaMetadata.METADATA_KEY_DURATION)?.takeIf { it >= 0 }
+                        if (duration != null && position > duration) throw NotificationMediaException("MEDIA_POSITION_OUT_OF_RANGE", "positionMs exceeds the known duration ($duration ms).")
+                        ensurePinned(session)
+                        val reportSequence = session.reportSequence
+                        val dispatchedElapsedMs = SystemClock.elapsedRealtime()
+                        dispatched = true
+                        onDispatch()
+                        session.controller.transportControls.seekTo(position)
+                        val deadline = SystemClock.elapsedRealtime() + waitTimeoutMs
+                        fun positionObserved(): Boolean {
+                            val report = session.reportedState ?: return false
+                            return session.reportSequence > reportSequence && report.lastPositionUpdateTime >= dispatchedElapsedMs && report.lastPositionUpdateTime <= SystemClock.elapsedRealtime() &&
+                                report.position >= 0 && kotlin.math.abs(report.position - position) <= positionToleranceMs
+                        }
+                        while (true) {
+                            ensurePinned(session, true)
+                            if (positionObserved() || waitTimeoutMs == 0L) break
+                            if (SystemClock.elapsedRealtime() >= deadline) throw NotificationMediaException("MEDIA_POSTCONDITION_TIMEOUT", "Seek dispatched, but no new player position report matched the requested tolerance before timeout.", true)
+                            delay(50)
+                        }
+                        payload.put("dispatched", true).put("waitTimeoutMs", waitTimeoutMs)
+                            .put("requestedPositionMs", position).put("positionToleranceMs", positionToleranceMs)
+                            .put("targetPositionObserved", positionObserved()).put("session", status(session, maxTextChars))
                     } else {
                         val pause = type == "media_pause"
                         val action = if (pause) PlaybackState.ACTION_PAUSE else PlaybackState.ACTION_PLAY
@@ -237,6 +347,10 @@ class NotificationMediaService(private val context: Context) {
             throw NotificationMediaException(error.code, error.message.orEmpty(), dispatched || error.dispatched)
         } catch (error: SecurityException) {
             throw NotificationMediaException("NOTIFICATION_ACCESS_DENIED", "Android denied notification/media access.", dispatched)
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (error: RuntimeException) {
+            throw NotificationMediaException("NOTIFICATION_MEDIA_OPERATION_FAILED", "Android notification/media operation failed; consult dispatch evidence before taking another action.", dispatched)
         }
     }
 }
