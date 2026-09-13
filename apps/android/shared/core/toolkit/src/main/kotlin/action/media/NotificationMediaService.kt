@@ -33,6 +33,8 @@ class NotificationMediaService(private val context: Context) {
         var reportedState: PlaybackState? = null,
         var hasPlayerReport: Boolean = false,
         var reportSequence: Long = 0,
+        var reportReceivedElapsedMs: Long? = null,
+        val observers: MutableSet<(PlaybackState?) -> Unit> = mutableSetOf(),
     )
     private data class AdvertisedAction(val listener: NotificationListenerService, val key: String, val revision: String, val postTime: Long, val index: Int, val action: Notification.Action)
     private val advertisedActions = object : LinkedHashMap<String, AdvertisedAction>() {
@@ -82,6 +84,8 @@ class NotificationMediaService(private val context: Context) {
                         session.reportSequence++
                         session.reportedState = state
                         session.hasPlayerReport = true
+                        session.reportReceivedElapsedMs = SystemClock.elapsedRealtime()
+                        session.observers.toList().forEach { it(state) }
                     }
                     override fun onSessionDestroyed() {
                         session.destroyed = true
@@ -122,6 +126,22 @@ class NotificationMediaService(private val context: Context) {
     private fun currentState(session: Session): PlaybackState? =
         if (session.hasPlayerReport) session.reportedState else session.controller.playbackState
 
+    private fun playbackStateName(state: PlaybackState?): String = when (state?.state) {
+        PlaybackState.STATE_NONE -> "none"
+        PlaybackState.STATE_STOPPED -> "stopped"
+        PlaybackState.STATE_PAUSED -> "paused"
+        PlaybackState.STATE_PLAYING -> "playing"
+        PlaybackState.STATE_FAST_FORWARDING -> "fast_forwarding"
+        PlaybackState.STATE_REWINDING -> "rewinding"
+        PlaybackState.STATE_BUFFERING -> "buffering"
+        PlaybackState.STATE_ERROR -> "error"
+        PlaybackState.STATE_CONNECTING -> "connecting"
+        PlaybackState.STATE_SKIPPING_TO_PREVIOUS -> "skipping_to_previous"
+        PlaybackState.STATE_SKIPPING_TO_NEXT -> "skipping_to_next"
+        PlaybackState.STATE_SKIPPING_TO_QUEUE_ITEM -> "skipping_to_queue_item"
+        else -> "unknown"
+    }
+
     private fun status(session: Session, maxTextChars: Int): JSONObject {
         val controller = session.controller
         // Android may extrapolate getPlaybackState() and replace its update time.
@@ -137,21 +157,6 @@ class NotificationMediaService(private val context: Context) {
         } else {
             PlaybackPosition(null, state?.position?.takeIf { it >= 0 }, null, null, "original_player_report_unavailable")
         }
-        val stateName = when (state?.state) {
-            PlaybackState.STATE_NONE -> "none"
-            PlaybackState.STATE_STOPPED -> "stopped"
-            PlaybackState.STATE_PAUSED -> "paused"
-            PlaybackState.STATE_PLAYING -> "playing"
-            PlaybackState.STATE_FAST_FORWARDING -> "fast_forwarding"
-            PlaybackState.STATE_REWINDING -> "rewinding"
-            PlaybackState.STATE_BUFFERING -> "buffering"
-            PlaybackState.STATE_ERROR -> "error"
-            PlaybackState.STATE_CONNECTING -> "connecting"
-            PlaybackState.STATE_SKIPPING_TO_PREVIOUS -> "skipping_to_previous"
-            PlaybackState.STATE_SKIPPING_TO_NEXT -> "skipping_to_next"
-            PlaybackState.STATE_SKIPPING_TO_QUEUE_ITEM -> "skipping_to_queue_item"
-            else -> "unknown"
-        }
         val controls = JSONArray()
         val actions = state?.actions ?: 0L
         if (actions and PlaybackState.ACTION_PLAY != 0L) controls.put("play")
@@ -160,7 +165,15 @@ class NotificationMediaService(private val context: Context) {
         val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)
         val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST)
         return JSONObject().put("mediaSessionId", session.id).put("applicationId", controller.packageName)
-            .put("state", stateName)
+            .put("state", playbackStateName(state))
+            .put("playerReportSequence", session.reportSequence)
+            .put("playerReportReceivedElapsedMs", nullable(session.reportReceivedElapsedMs))
+            .put("bufferedPositionMs", nullable(state?.bufferedPosition?.takeIf { it >= 0 }))
+            .put("playbackType", when (controller.playbackInfo?.playbackType) {
+                MediaController.PlaybackInfo.PLAYBACK_TYPE_LOCAL -> "local"
+                MediaController.PlaybackInfo.PLAYBACK_TYPE_REMOTE -> "remote"
+                else -> "unknown"
+            })
             .put("title", nullable(title?.take(maxTextChars))).put("artist", nullable(artist?.take(maxTextChars)))
             .put("textTruncated", listOfNotNull(title, artist).any { it.length > maxTextChars })
             .put("durationMs", nullable(duration)).put("supportedControls", controls)
@@ -174,7 +187,7 @@ class NotificationMediaService(private val context: Context) {
             .put("evidence", if (session.hasPlayerReport) "player_report" else "platform_query")
     }
 
-    suspend fun execute(type: String, applicationId: String?, sessionId: String?, limit: Int, maxTextChars: Int, waitTimeoutMs: Long, onDispatch: () -> Unit = {}, notificationKey: String? = null, actionId: String? = null, positionMs: Long? = null, positionToleranceMs: Long = 1000): String = withContext(Dispatchers.Main.immediate) {
+    suspend fun execute(type: String, applicationId: String?, sessionId: String?, limit: Int, maxTextChars: Int, waitTimeoutMs: Long, onDispatch: () -> Unit = {}, notificationKey: String? = null, actionId: String? = null, positionMs: Long? = null, positionToleranceMs: Long = 1000, durationMs: Long = 0): String = withContext(Dispatchers.Main.immediate) {
         var dispatched = false
         try {
             val payload = JSONObject().put("schemaVersion", 1)
@@ -275,6 +288,45 @@ class NotificationMediaService(private val context: Context) {
                     if (type == "get_media_status") {
                         ensurePinned(session)
                         payload.put("session", status(session, maxTextChars))
+                    } else if (type == "observe_media") {
+                        require(durationMs in 1..30000) { "durationMs must be in [1, 30000]" }
+                        val started = SystemClock.elapsedRealtime()
+                        val initial = status(session, maxTextChars)
+                        val startingSequence = session.reportSequence
+                        val samples = JSONArray()
+                        val observer: (PlaybackState?) -> Unit = { report ->
+                            if (samples.length() < 64) {
+                                samples.put(JSONObject()
+                                    .put("playerReportSequence", session.reportSequence)
+                                    .put("playerReportReceivedElapsedMs", nullable(session.reportReceivedElapsedMs))
+                                    .put("state", playbackStateName(report))
+                                    .put("reportedPositionMs", nullable(report?.position?.takeIf { it >= 0 }))
+                                    .put("positionUpdatedElapsedMs", nullable(report?.lastPositionUpdateTime))
+                                    .put("playbackSpeed", nullable(report?.playbackSpeed?.takeIf { it.isFinite() })))
+                            }
+                        }
+                        session.observers.add(observer)
+                        try {
+                            // Delay in bounded intervals so expiry/permission loss is detected promptly.
+                            var remaining = durationMs
+                            while (remaining > 0) {
+                                val interval = minOf(remaining, 100L)
+                                delay(interval)
+                                remaining = minOf(remaining - interval, durationMs - (SystemClock.elapsedRealtime() - started))
+                                ensurePinned(session)
+                            }
+                            val final = status(session, maxTextChars)
+                            val count = session.reportSequence - startingSequence
+                            payload.put("initialSession", initial).put("session", final)
+                                .put("samples", samples).put("newPlayerReportCount", count)
+                                .put("truncated", count > samples.length())
+                                .put("reportedPositionDeltaMs", if (!initial.isNull("reportedPositionMs") && !final.isNull("reportedPositionMs"))
+                                    final.getLong("reportedPositionMs") - initial.getLong("reportedPositionMs") else JSONObject.NULL)
+                                .put("durationMs", durationMs).put("startedElapsedMs", started)
+                                .put("endedElapsedMs", SystemClock.elapsedRealtime())
+                        } finally {
+                            session.observers.remove(observer)
+                        }
                     } else if (type == "media_seek") {
                         val position = positionMs ?: throw NotificationMediaException("MEDIA_POSITION_INVALID", "positionMs is required.")
                         if (position !in 0..9007199254740991L || positionToleranceMs !in 0..60000) {

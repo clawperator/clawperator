@@ -403,3 +403,29 @@ Live API 21 compatibility, release-package acceptance and V1-V3 release work
 remain prerequisites owned by the release plan. This batch does not claim every
 OEM/Doze policy or third-party player's behavior, Direct Boot support, physical
 YouTube seeking, or PiP-window persistence.
+
+## Bounded report observation
+
+observe_media shares background readiness with get_media_status and pins the same
+session for the whole interval. Per-observation callbacks are removed in finally,
+including cancellation and expiry. Store at most 64 compact callback records but
+count every callback; retain initial/final status independently. No unbounded
+history or replay is introduced. Callback receipt time and the per-handle report
+sequence expose transport freshness separately from the publisher's position time.
+The public contract and interpretation limits live in docs/api/media.md.
+
+Validated on the API 26 emulator with the matching debug Operator: a locked,
+screen-off two-second observation received 18 reports and 1849 ms reported
+position change. A one-second stalled interval received zero reports and zero
+reported change while estimates advanced. Independent player state and wake
+counters passed. A 30-second observation completed in 30002 ms, counted 181
+callbacks and retained 64 with truncation. Typed Node and HTTP observation also
+passed. These are fixture results, not physical-device, browser-specific or live
+remote-playback validation. Reproduce the bounded observation cases through
+validation/notifications-media/run.py and http-helper-observe.mjs, which are wired
+into the existing manual live workflow.
+
+The implementation passed 1661 Node tests, the Android debug build and app,
+toolkit and operator unit tests, and the documentation build. Regression coverage
+includes strict ingress and CLI flags, null/repeated callbacks, retained sample
+bounds, cancellation cleanup, session expiry and older status payload decoding.

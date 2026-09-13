@@ -97,7 +97,7 @@ class AgentCommandParserDefault : AgentCommandParser {
         }
 
         return when (normalizedType) {
-            "list_notifications", "list_media_sessions", "get_media_status", "media_pause", "media_play", "media_seek", "dismiss_notification", "invoke_notification_action" -> {
+            "list_notifications", "list_media_sessions", "get_media_status", "observe_media", "media_pause", "media_play", "media_seek", "dismiss_notification", "invoke_notification_action" -> {
                 require(type == normalizedType) { "Service action type must be canonical" }
                 val listing = type == "list_notifications" || type == "list_media_sessions"
                 val controlling = type == "media_pause" || type == "media_play"
@@ -105,6 +105,7 @@ class AgentCommandParserDefault : AgentCommandParser {
                 val allowed = if (listing) setOf("applicationId", "limit", "maxTextChars")
                     else if (type == "dismiss_notification") setOf("notificationKey", "waitTimeoutMs")
                     else if (type == "invoke_notification_action") setOf("notificationKey", "actionId")
+                    else if (type == "observe_media") setOf("applicationId", "mediaSessionId", "durationMs")
                     else if (type == "media_seek") setOf("applicationId", "mediaSessionId", "positionMs", "waitTimeoutMs", "positionToleranceMs")
                     else if (controlling) setOf("applicationId", "mediaSessionId", "waitTimeoutMs")
                     else setOf("applicationId", "mediaSessionId")
@@ -127,7 +128,9 @@ class AgentCommandParserDefault : AgentCommandParser {
                 require(position == null || position in 0..9007199254740991L) { "positionMs must be a nonnegative safe integer" }
                 val tolerance = params.strictLongOrDefault("positionToleranceMs", 1000)
                 require(tolerance in 0..60000) { "positionToleranceMs must be in [0, 60000]" }
-                UiAction.NotificationMedia(id, type, app, session, limit, textLimit, wait, key, actionId, position, tolerance)
+                val duration = if (type == "observe_media") params.strictLongOrDefault("durationMs", -1) else 0
+                require(type != "observe_media" || duration in 1..30000) { "durationMs must be in [1, 30000]" }
+                UiAction.NotificationMedia(id, type, app, session, limit, textLimit, wait, key, actionId, position, tolerance, duration)
             }
 
             "open_uri" ->

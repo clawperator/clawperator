@@ -65,4 +65,19 @@ class NotificationMediaParserTest {
         assertTrue(parse("""{"id":"a","type":"list_notifications","params":{"limit":"1"}}""").isFailure)
         assertTrue(parse("""{"id":"a","type":"media_play","params":{"mediaSessionId":"s","waitTimeoutMs":30001}}""").isFailure)
     }
+    @Test fun observationIsStrictAndUsesBackgroundReadiness() {
+        for (duration in listOf("1", "30000")) {
+            val result = parse("""{"id":"a","type":"observe_media","params":{"applicationId":"p","durationMs":$duration}}""").getOrThrow()
+            assertTrue(result.actions.isBackgroundObservation())
+            assertTrue(result.actions.isBackgroundServiceExecution())
+        }
+        for (params in listOf("{}", """{"mediaSessionId":"s"}""", """{"durationMs":1}""",
+            """{"mediaSessionId":"s","applicationId":"p","durationMs":1}""",
+            """{"mediaSessionId":"s","durationMs":1,"waitTimeoutMs":0}""")) {
+            assertTrue(parse("""{"id":"a","type":"observe_media","params":$params}""").isFailure)
+        }
+        for (duration in listOf("0", "-1", "30001", "1.5", "null", "\"1\"", "\" \"")) {
+            assertTrue(parse("""{"id":"a","type":"observe_media","params":{"mediaSessionId":"s","durationMs":$duration}}""").isFailure)
+        }
+    }
 }
