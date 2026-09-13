@@ -914,6 +914,12 @@ clawperator click --id ":id/power_button"`}</code>
             <span className="dot" aria-hidden="true">
               ·
             </span>
+            <a href="https://github.com/clawperator/clawperator/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">
+              release notes
+            </a>
+            <span className="dot" aria-hidden="true">
+              ·
+            </span>
             <a href="https://github.com/clawperator/clawperator" target="_blank" rel="noreferrer">
               github
             </a>
@@ -922,12 +928,6 @@ clawperator click --id ":id/power_button"`}</code>
             </span>
             <a href="https://www.npmjs.com/package/clawperator" target="_blank" rel="noreferrer">
               npm
-            </a>
-            <span className="dot" aria-hidden="true">
-              ·
-            </span>
-            <a href="https://github.com/clawperator/clawperator/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">
-              release notes
             </a>
           </nav>
           <p className="footer-tagline">
