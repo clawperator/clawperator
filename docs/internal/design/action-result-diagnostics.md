@@ -210,9 +210,12 @@ requiring a runtime change:
   removes sensitive path/command fields, but does not remove selection warnings,
   counts, or JSON-encoded candidate, target, and progress data. Successful `read`
   intentionally keeps its value first and warning in a second content item.
-- `resolved_container` alone cannot distinguish same-ID lists. Decode the selected
-  `target` and use its observation-local parent chain from discovery, together with
-  the explicit ancestor matcher. Paths are not durable identity or action handles.
+- `resolved_container` alone cannot distinguish same-ID lists. Action receipts
+  encode `target` from a fresh tree; its `nodePath` and `parentPath` cannot be
+  joined to an earlier discovery query's paths. Follow parent chains only within
+  one query capture to choose the explicit ancestor matcher. Verify the result
+  with fresh scoped queries and app-state assertions. Paths are not durable
+  identity or action handles.
 
 Live verification used an Android 15 / API 35 emulator, source baseline `e96e7584`,
 branch-local CLI `0.10.1`, and a freshly built/installed development Operator

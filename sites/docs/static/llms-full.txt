@@ -3753,10 +3753,13 @@ clawperator scroll-until down --device <device_serial> --operator-package com.cl
 Inspect `resolved_container`, `scrolls_executed`, `termination_reason`, and the
 available JSON-encoded `progress` and selected `target` evidence in the step data.
 `resolved_container` is an ID, so it cannot distinguish these same-ID lists by
-itself. Relate the target summary to the observed ancestor chain and the explicit
-container matcher. `TARGET_FOUND` establishes that the search observed its target
-in the selected scope. `NO_POSITION_CHANGE`
-can reflect tracking the wrong overlapping container; it does not by itself prove
+itself. The action captures a fresh tree: do not join its target's `nodePath` or
+`parentPath` to paths from an earlier discovery query. Use the observed ancestor
+matcher to scope the action, then use fresh scoped queries and app-state assertions
+to verify the result. Follow parent chains only within a single query capture.
+`TARGET_FOUND` establishes that the search observed its target in the selected
+scope. `NO_POSITION_CHANGE` can reflect tracking the wrong overlapping container;
+it does not by itself prove
 that the intended pane cannot scroll. Rediscover the scope before another attempt.
 Strict selection rejects duplicate containers with `CONTAINER_AMBIGUOUS`.
 
