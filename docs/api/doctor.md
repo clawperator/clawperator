@@ -1,5 +1,8 @@
 # Doctor
 
+For a complete discovery, strict selection, scroll, assertion, and capture workflow,
+see [scoped selection walkthrough](scoped-selection.md).
+
 ## Purpose
 
 Define the `clawperator doctor` report contract, the exact check sequence, critical-versus-advisory behavior, exit-code rules, and the remediation fields an agent can execute directly.
