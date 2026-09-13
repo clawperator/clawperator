@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { lstat, readdir, readFile } from "node:fs/promises";
+import { cp, lstat, readdir, readFile, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 // Exact complete file-tree fingerprints from first-party bundled-skills history
@@ -38,8 +38,8 @@ const knownLegacyFingerprints: Record<string, string[]> = {
   ]
 };
 
-export async function isKnownLegacyBundledSkill(path: string, skillName: string): Promise<boolean> {
-  if (!Object.hasOwn(knownLegacyFingerprints, skillName)) return false;
+async function knownLegacyFingerprint(path: string, skillName: string): Promise<string | undefined> {
+  if (!Object.hasOwn(knownLegacyFingerprints, skillName)) return undefined;
   const known = knownLegacyFingerprints[skillName];
   const files: string[][] = [];
   async function visit(directory: string, prefix: string): Promise<boolean> {
@@ -59,11 +59,52 @@ export async function isKnownLegacyBundledSkill(path: string, skillName: string)
     return true;
   }
   try {
-    if (!await visit(path, "")) return false;
+    if (!await visit(path, "")) return undefined;
     files.sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
-    return known.includes(createHash("sha256").update(JSON.stringify(files)).digest("hex"));
+    const fingerprint = createHash("sha256").update(JSON.stringify(files)).digest("hex");
+    return known.includes(fingerprint) ? fingerprint : undefined;
   } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") return false;
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") return undefined;
     throw error;
+  }
+}
+
+
+export async function isKnownLegacyBundledSkill(path: string, skillName: string): Promise<boolean> {
+  return await knownLegacyFingerprint(path, skillName) !== undefined;
+}
+
+export async function moveLegacyBundledSkillToBackup(
+  originalPath: string,
+  backupPath: string,
+  skillName: string,
+  renameDirectory: typeof rename = rename
+): Promise<void> {
+  const fingerprint = await knownLegacyFingerprint(originalPath, skillName);
+  if (fingerprint === undefined) throw new Error(`Legacy skill changed during installation: ${originalPath}`);
+  try {
+    await renameDirectory(originalPath, backupPath);
+    return;
+  } catch (error) {
+    if (!(typeof error === "object" && error !== null && "code" in error && error.code === "EXDEV")) throw error;
+  }
+
+  // rename cannot cross filesystems. Keep the original until the backup and
+  // the still-existing source both match the exact tree we identified above.
+  try {
+    await cp(originalPath, backupPath, { recursive: true, force: false, errorOnExist: true, dereference: false });
+    if (await knownLegacyFingerprint(backupPath, skillName) !== fingerprint
+      || await knownLegacyFingerprint(originalPath, skillName) !== fingerprint) {
+      throw new Error("Legacy skill content changed or backup verification failed");
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Legacy backup failed; original preserved at ${originalPath}; backup path: ${backupPath}: ${message}`);
+  }
+  try {
+    await rm(originalPath, { recursive: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Verified legacy backup is at ${backupPath}, but removing ${originalPath} failed: ${message}`);
   }
 }

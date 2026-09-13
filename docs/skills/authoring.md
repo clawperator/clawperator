@@ -148,6 +148,9 @@ Current command behavior:
   version are moved to a unique timestamped directory under
   `~/.clawperator/bundled-skills-backups/` before replacement. Modified files,
   extra files, and symlinks inside unmarked copies prevent automatic migration.
+  When discovery and backup directories are on different filesystems, the updater
+  copies and verifies the backup before removing the original. A copy or
+  verification failure preserves the original and reports the backup path.
 - install and update return `discoveryGroups` with each physical `dir`, logical
   `aliases` (`label` and `dir`), and selected `representation` (`copy` or `symlink`).
   `migrations` records each `originalPath` and `backupPath`; it is empty when no

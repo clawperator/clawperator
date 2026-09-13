@@ -1,8 +1,8 @@
-import { access, cp, lstat, mkdir, mkdtemp, realpath, rename, readdir, readFile, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
-import { isKnownLegacyBundledSkill } from "./legacyBundledSkills.js";
+import { access, cp, lstat, mkdir, mkdtemp, realpath, readdir, readFile, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { isKnownLegacyBundledSkill, moveLegacyBundledSkillToBackup } from "./legacyBundledSkills.js";
 import { constants } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, parse, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getCliVersion } from "../version/compatibility.js";
 import { DEFAULT_BUNDLED_SKILLS_DIR } from "./skillsConfig.js";
@@ -114,25 +114,41 @@ export interface BundledSkillDiscoveryGroup {
 
 // Resolve existing ancestors too, so Doctor can plan missing discovery directories
 // without creating them. Resolve dangling directory aliases through their targets.
-async function resolvePhysicalPath(path: string, seen = new Set<string>()): Promise<string> {
-  path = resolve(path);
-  if (seen.has(path)) throw new Error(`Discovery directory symlink cycle: ${path}`);
-  seen.add(path);
-  try {
-    return await realpath(path);
-  } catch (error) {
-    if (!isMissingPathError(error)) throw error;
-    const entry = await lstat(path).catch(error => {
+async function resolvePhysicalPath(path: string): Promise<string> {
+  const absolutePath = resolve(path);
+  let current = parse(absolutePath).root;
+  let pending = absolutePath.slice(current.length).split(sep);
+  let followedLinks = 0;
+  while (pending.length > 0) {
+    const component = pending.shift()!;
+    if (component === "" || component === ".") continue;
+    if (component === "..") {
+      // The filesystem must enter the preceding directory before it can leave
+      // it. Collapsing an absent directory here would hide a dangling alias.
+      if (!(await stat(current)).isDirectory()) {
+        throw new Error(`Discovery directory traverses a non-directory: ${current}`);
+      }
+      current = dirname(current);
+      continue;
+    }
+    const candidate = join(current, component);
+    const entry = await lstat(candidate).catch(error => {
       if (!isMissingPathError(error)) throw error;
       return undefined;
     });
     if (entry?.isSymbolicLink()) {
-      return resolvePhysicalPath(resolve(dirname(path), await readlink(path)), seen);
+      if (++followedLinks > 40) throw new Error(`Discovery directory has a symlink cycle or too many links: ${path}`);
+      const target = await readlink(candidate);
+      const root = isAbsolute(target) ? parse(target).root : "";
+      if (root !== "") current = root;
+      // Expand links before processing '..', matching filesystem traversal even
+      // when a link target or a child directory does not exist yet.
+      pending = [...target.slice(root.length).split(sep), ...pending];
+    } else {
+      current = entry === undefined ? candidate : await realpath(candidate);
     }
-    const parent = dirname(path);
-    if (parent === path) throw error;
-    return join(await resolvePhysicalPath(parent, seen), basename(path));
   }
+  return current;
 }
 
 export async function resolveBundledSkillDiscoveryGroups(options: CopyBundledSkillsOptions): Promise<BundledSkillDiscoveryGroup[]> {
@@ -639,11 +655,7 @@ export async function copyBundledSkills(
       await mkdir(backupRoot, { recursive: true });
       const backupDir = await mkdtemp(join(backupRoot, new Date().toISOString().replace(/[:.]/g, "-") + "-"));
       const backupPath = join(backupDir, basename(originalPath));
-      // Recheck immediately before moving an unmarked directory out of shared space.
-      if (!await isKnownLegacyBundledSkill(originalPath, basename(originalPath))) {
-        throw new Error(`Legacy skill changed during installation: ${originalPath}`);
-      }
-      await rename(originalPath, backupPath);
+      await moveLegacyBundledSkillToBackup(originalPath, backupPath, basename(originalPath));
       migrations.push({ originalPath, backupPath });
     }
 
