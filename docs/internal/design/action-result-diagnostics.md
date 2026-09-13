@@ -193,3 +193,72 @@ PNG checks also passed in each run. See the
 for complete attempt accounting and build identity. This completes local
 integration proof on the stated local image. The GitHub regression is optional
 under the current release requirements.
+
+## Scoped-selection presentation audit and live walkthrough
+
+The [scoped selection walkthrough](../../api/scoped-selection.md) is the canonical
+consumer workflow for duplicate labels, overlapping lists, destination assertions,
+and evidence status. The September 2026 audit found no dropped selection diagnostic
+requiring a runtime change:
+
+- `SelectionWarnings` accumulates the largest duplicate counts per action.
+  `UiActionEngineDefault` attaches warnings to returned successes, returned failures,
+  and caught exceptions. Strict failures retain candidate count and candidates.
+- CLI action commands pass through `formatRunExecutionResultForCli`; JSON and
+  pretty formats serialize the envelope without summarizing its step data.
+- MCP execution success/failure paths retain the envelope. Transport sanitization
+  removes sensitive path/command fields, but does not remove selection warnings,
+  counts, or JSON-encoded candidate, target, and progress data. Successful `read`
+  intentionally keeps its value first and warning in a second content item.
+- `resolved_container` alone cannot distinguish same-ID lists. Decode the selected
+  `target` and use its observation-local parent chain from discovery, together with
+  the explicit ancestor matcher. Paths are not durable identity or action handles.
+
+Live verification used an Android 15 / API 35 emulator, source baseline `e96e7584`,
+branch-local CLI `0.10.1`, and a freshly built/installed development Operator
+`0.10.1-d`. A temporary native fixture (`com.example.scopedselection`) placed two
+full-size ScrollViews with the same `list` ID under distinct `background_pane` and
+`detail_pane` ancestors. The detail pane overlaid the background. Both lists were
+reported on screen with identical bounds. Each contained an `Open` button; only
+the detail list contained the initially offscreen `Target item`. The fixture and
+raw per-attempt output, exits, APKs, query captures, and bundle remain local,
+outside version control.
+
+Observed and asserted:
+
+- Full discovery returned 100 nodes without truncation. Duplicate-label and
+  shared-list queries each returned two matches; the ancestor-scoped list query
+  returned exactly one. Parent chains identified the distinct panes.
+- Default CLI read returned `Open` and a warning containing `target: 2` (exit 0).
+  Strict read returned `NODE_AMBIGUOUS`, count 2, and candidates (exit 1).
+  Ancestor-scoped strict read succeeded (exit 0).
+- Strict scrolling with only the shared list ID returned `CONTAINER_AMBIGUOUS`
+  before dispatch (exit 1). Strict ancestor-scoped scrolling returned
+  `TARGET_FOUND` after one scroll, candidate count 1, the detail list target,
+  and comparable changed progress signatures (exit 0).
+- A separate scoped click, bounded destination wait, and unique query all passed.
+  The screenshot visibly showed `Detail destination ready`; the capture manifest
+  was `complete`, with verified PNG/XML and CLI/APK metadata (exit 0).
+- On a reset fixture, an absent-label bounded wait retained `container: 2` in its
+  warning on failure. Unscoped scrolling tracked the background list and returned
+  `NO_POSITION_CHANGE` after three scrolls with the warning preserved (exit 1).
+  This demonstrates a scope-selection mistake, not a scoped-scroll defect.
+- Live stdio MCP read preserved its scalar value and warning in separate content
+  items. Strict MCP read retained `NODE_AMBIGUOUS` in the error envelope; a failed
+  read under the duplicate container retained its selection warning.
+
+Attempt accounting: the first doctor check after installation found the service
+not running; `doctor --fix` restored readiness and passed. A host log-write warning
+was resolved for subsequent runs by selecting a writable log directory. Initial
+fixture `Open` buttons overlapped system chrome and were reported off screen, so
+an initial read returned `NODE_NOT_FOUND`. Moving those fixture rows below the
+chrome produced the duplicate eligible targets used above. These preparation
+failures remain in local evidence; they are not runtime regressions or successful
+acceptance attempts.
+
+Node and Android runtime sources were unchanged. The branch-local Node build,
+matching debug APK build, and complete docs pipeline passed. No new runtime test
+suite or sibling skill migration was required. No physical-device, cross-OEM,
+release-Operator, induced ANR, or live partial-bundle validation is claimed here;
+partial-bundle interpretation follows the existing evidence contract. Publication
+and the independent result-transport investigation retain their separate gates.

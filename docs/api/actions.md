@@ -1,5 +1,8 @@
 # Actions
 
+For a complete discovery, strict selection, scroll, assertion, and capture workflow,
+see [scoped selection walkthrough](scoped-selection.md).
+
 ## Purpose
 
 Define the canonical `ExecutionAction.type` values, the exact parameters each action accepts, which values are validated by Node, and what success and failure data an agent can rely on.
