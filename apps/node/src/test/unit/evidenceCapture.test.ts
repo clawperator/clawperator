@@ -378,6 +378,8 @@ describe("evidence metadata classification", () => {
     ["[ro.kernel.qemu]: [unexpected]", "unknown"],
     ["[ro.kernel.qemu]: [0]\n[ro.boot.qemu]: [unexpected]", "unknown"],
     ["malformed", "unknown"],
+    ["[bad key]: [value]", "unknown"],
+    ["[persist.example.multiline]: [unclosed\n[ro.kernel.qemu]: [0]", "unknown"],
     ["[ro.kernel.qemu]: [1", "unknown"],
     ["[ro.kernel.qemu]: [0]\n[ro.kernel.qemu]: [1]", "unknown"],
   ] as const) {
@@ -392,6 +394,25 @@ describe("evidence metadata classification", () => {
         assert.equal(shouldCliStdoutForceExitCode1(output, false), expected === "unknown");
       } finally { await f.cleanup(); }
     });
+  }
+  for (const newline of ["\n", "\r\n"]) {
+    for (const value of ["first\n[second]", "first]\nsecond"]) {
+      for (const flag of ["0", "1"]) {
+        it(`preserves bracketed multiline values with ${JSON.stringify(newline)} and flag ${flag}`, async () => {
+          const f = await fixture();
+          try {
+            f.runner.properties += `[persist.example.multiline]: [${value}]\n[ro.kernel.qemu]: [${flag}]\n`;
+            f.runner.properties = f.runner.properties.replaceAll("\n", newline);
+            const result = await captureEvidence({ outputDir: f.outputDir }, f.dependencies);
+            const manifest = await manifestAt(result.manifestPath);
+            assert.equal(result.status, "complete");
+            assert.equal(manifest.device.deviceType, flag === "1" ? "emulator" : "physical");
+            assert.equal(manifest.device.deviceTypeProperties["ro.kernel.qemu"], flag);
+            assert.deepEqual(manifest.errors, []);
+          } finally { await f.cleanup(); }
+        });
+      }
+    }
   }
   for (const mode of ["empty", "nonzero", "throw", "exhausted"] as const) {
     it(`keeps ${mode} property reads unknown`, async () => {

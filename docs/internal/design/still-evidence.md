@@ -51,8 +51,10 @@ APIs, uploads, report generation, or video lifecycle scaffolding.
 Still capture and video start share `collectEvidenceMetadata`. A failed read is
 distinct from a successful property inventory with absent emulator flags. The
 inventory parser accepts bracketed Android properties, including multiline boot
-history values and CRLF output; empty, malformed, or duplicate-key inventories
-cannot establish a device type. Parsed nonempty flag values remain in the
+history values, bracketed continuation lines, and CRLF output. Complete property
+headers delimit entries; the final bracket before the next header or end of
+output closes a value. Empty, malformed, or duplicate-key inventories cannot
+establish a device type. Parsed nonempty flag values remain in the
 manifest, with null for absent or empty flags.
 
 For a usable inventory, either emulator flag equal to `"1"` wins, even against
@@ -91,6 +93,13 @@ status for physical, emulator, and unknown classifications. Video acceptance use
 writable default state; restricted-host state overrides and combined acceptance
 with the writable-state pack remain separate work. Private captures and logs
 remain outside tracked files.
+
+A subsequent code review identified valid multiline values containing brackets
+that the initial parser rejected. Regression coverage now includes continuation
+lines starting with `[` and intermediate lines ending with `]`, under LF and
+CRLF, with both physical and emulator flags. After the parser correction, live
+metadata collection again returned physical with absent flags and emulator with
+explicit flags, with no metadata errors on either target.
 
 ## Validation and observed limits
 

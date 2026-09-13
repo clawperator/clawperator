@@ -16,18 +16,24 @@ export async function collectEvidenceMetadata(config: RuntimeConfig, remaining: 
   };
   const properties = await read(["shell", "getprop"]);
   const inventory = new Map<string, string>();
-  let inventoryUsable = properties !== null && properties.trim().length > 0;
-  // Android properties such as boot history can contain embedded newlines.
-  const entry = /^\[([^\[\]\s]+)\]: \[((?:[^\n]|\n(?!\[))*?)\]\r?$/gm;
-  let parsedEnd = 0;
-  for (const match of (properties ?? "").matchAll(entry)) {
-    if (properties!.slice(parsedEnd, match.index).trim().length > 0 || inventory.has(match[1])) {
+  const inventoryText = properties ?? "";
+  const headers = [...inventoryText.matchAll(/^\[([^\]\r\n]*)\]: \[/gm)];
+  let inventoryUsable = properties !== null && headers.length > 0;
+  if (inventoryText.slice(0, headers[0]?.index).trim().length > 0) inventoryUsable = false;
+  // Values may contain newlines and brackets. Only a complete property header
+  // starts the next entry; its final bracket closes the preceding value.
+  for (let index = 0; index < headers.length; index++) {
+    const header = headers[index];
+    const name = header[1];
+    const valueStart = header.index + header[0].length;
+    const valueEnd = headers[index + 1]?.index ?? inventoryText.length;
+    const framedValue = inventoryText.slice(valueStart, valueEnd).replace(/(?:\r?\n)+$/, "");
+    if (!/^[^\[\]\s]+$/.test(name) || !framedValue.endsWith("]") || inventory.has(name)) {
       inventoryUsable = false;
+      continue;
     }
-    inventory.set(match[1], match[2]);
-    parsedEnd = match.index + match[0].length;
+    inventory.set(name, framedValue.slice(0, -1));
   }
-  if ((properties ?? "").slice(parsedEnd).trim().length > 0) inventoryUsable = false;
   const property = (name: string): string | null => {
     const value = inventory.get(name);
     return value !== undefined && value.length > 0 ? value : null;
