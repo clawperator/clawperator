@@ -1,17 +1,17 @@
 ---
-name: dev-take-task-to-completion
-description: Finish an implemented task through task cleanup, code simplification, local Astra review, and GitHub PR creation.
+name: dev-take-task-to-completion-review-loop
+description: Finish an implemented task through task cleanup, code simplification, local Astra reviews until clean, and GitHub PR creation.
 ---
 
-# Dev Take Task to Completion
+# Dev Take Task to Completion - Review Loop
 
 Take the current implemented task to an up-to-date GitHub PR. Run task cleanup,
-code simplification, local review, and PR creation in that order. Default to
-reviewing until clean; use one review pass only when the user explicitly asks
-for single-pass review. This workflow is written for GPT-6 Astra.
+code simplification, local review, and PR creation in that order. Run the review loop until clean. This workflow is written for GPT-6 Astra.
+It takes no arguments; infer the task from the current conversation and
+repository. The review workflow is fixed.
 
 Completion means the requested work and closeout changes are validated and
-committed, the selected review mode has finished, and the PR contains the final
+committed, the review stage has finished, and the PR contains the final
 branch HEAD. Report a concrete blocker if any required stage cannot finish.
 
 ## Scope and Dependencies
@@ -51,18 +51,15 @@ the PR, publish a release, force-push, or push directly to `main` or `prod`.
    work or silently include it. If the current branch is `main` or `prod`,
    establish a task branch containing the intended changes before proceeding.
 
-   Run `$pr-code-review-codex-loop` by default, or `$pr-code-review-codex` for
-   an explicit single-pass request. Review the full branch change with the
-   selected skill's fresh, read-only GPT-6 Astra subagent and stable resolved
-   base; the calling agent fixes and validates confirmed issues.
+   Run `$pr-code-review-codex-loop` on the full branch change against a stable
+   resolved base. Each pass uses a fresh, read-only GPT-6 Astra reviewing
+   subagent; the calling agent fixes and validates confirmed issues.
 
-   - Default mode requires `CLEAN` for the unchanged, committed target.
-   - Single-pass mode accepts `CLEAN` or `FIXES_APPLIED` after required
-     validation and commits. For `FIXES_APPLIED`, retain the reviewed HEAD and
-     final HEAD and report that the fixes have not received a fresh review.
-   - `RETRY_REQUIRED` needs a fresh review of the stable target. `BLOCKED`,
-     incomplete validation, or a loop limit reached before clean stops PR
-     creation; report the unfinished work.
+   Require `CLEAN` for the unchanged, committed target before PR creation.
+   Continue after validated fixes so a fresh reviewer inspects them. Follow
+   the loop skill's recovery and stopping rules; a blocker or an incomplete
+   review is not a clean result. Report unfinished work if the loop cannot
+   finish.
 
 4. **Create the PR.** Run `$pr-create`, using branch-total context to author its
    required title/body JSON. Include meaningful validation and the actual
@@ -70,11 +67,10 @@ the PR, publish a release, force-push, or push directly to `main` or `prod`.
    and rerun the skill instead of treating its preflight stop as completion.
 
    If its fresh fetch requires another merge, validate the resulting changes
-   and repeat the selected review mode before pushing. Any other change after
-   the accepted review outcome also requires validation and a fresh selected
-   review; the single-pass skill's own validated fixes are already covered by
-   its `FIXES_APPLIED` outcome. If the comparison base changes, explicitly
-   establish the updated full-branch scope for the new review.
+   and rerun the review loop before pushing. Any other change after the clean
+   outcome also requires validation and a fresh review loop. If the comparison
+   base changes, explicitly establish the updated full-branch scope for the
+   new loop.
 
    Push the final branch HEAD even when an upstream already exists. If the
    branch already has a PR, update that PR to describe the final scope rather
@@ -84,6 +80,5 @@ the PR, publish a release, force-push, or push directly to `main` or `prod`.
 ## Finish
 
 Report cleanup and preserved follow-up, simplifications, validation, review
-mode and outcome, final commit, and PR URL. Distinguish a clean review from a
-single pass with fixes applied. Keep the summary concise and identify any
+outcome, final commit, and PR URL. Include the review pass count. Keep the summary concise and identify any
 unfinished stage without claiming completion.
