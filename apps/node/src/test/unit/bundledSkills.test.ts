@@ -864,6 +864,25 @@ describe("bundled discovery directory aliases", () => {
     });
   }
 
+  it("regroups newly created case-variant discovery directories before choosing ownership", async () => {
+    const root = await makeTempRoot();
+    const sourceDir = await createSourceSkill(root, "clawperator-upgrade");
+    const options = {
+      sourceDir, homeDir: join(root, "home"), env: {},
+      claudeSkillsDir: join(root, "Shared"), agentsSkillsDir: join(root, "shared"),
+    };
+    const first = await copyBundledSkills(options);
+    assert.ok(first.ok, JSON.stringify(first));
+    const claudePhysicalDir = await realpath(options.claudeSkillsDir);
+    const agentsPhysicalDir = await realpath(options.agentsSkillsDir);
+    const sharedFilesystemEntry = claudePhysicalDir === agentsPhysicalDir;
+    assert.equal(first.discoveryGroups.length, sharedFilesystemEntry ? 2 : 3);
+    assert.equal(first.discoveryGroups[0].representation, sharedFilesystemEntry ? "copy" : "symlink");
+    assert.equal((await lstat(join(options.claudeSkillsDir, "clawperator-upgrade"))).isDirectory(), sharedFilesystemEntry);
+    assert.equal((await checkBundledSkillsStaleness(getDefaultRuntimeConfig(), options)).status, "pass");
+    assert.deepEqual(await copyBundledSkills(options), first);
+  });
+
   it("keeps symlinks when only Claude and Codex alias one directory", async () => {
     const root = await makeTempRoot();
     const sourceDir = await createSourceSkill(root, "clawperator-upgrade");

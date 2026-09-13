@@ -166,6 +166,17 @@ export async function resolveBundledSkillDiscoveryGroups(options: CopyBundledSki
   return [...groups.values()];
 }
 
+async function assertDiscoveryStorageSeparation(
+  groups: BundledSkillDiscoveryGroup[], installedDir: string, sourceDir: string
+): Promise<void> {
+  const storageDirs = [await resolvePhysicalPath(installedDir), await resolvePhysicalPath(sourceDir)];
+  for (const group of groups) {
+    if (storageDirs.some(path => path === group.dir || path.startsWith(group.dir + "/") || group.dir.startsWith(path + "/"))) {
+      throw new Error(`Discovery directory overlaps bundled skill storage: ${group.dir}`);
+    }
+  }
+}
+
 export async function inspectBundledSkillDiscoveryEntry(group: BundledSkillDiscoveryGroup, installedDir: string, skillName: string) {
   return group.representation === "copy"
     ? inspectManagedBundledSkillDirectory(join(group.dir, skillName), installedDir, skillName)
@@ -619,20 +630,18 @@ export async function copyBundledSkills(
         message: `No packaged bundled-skills with SKILL.md were found in ${sourceDir}`,
       };
     }
-    const discoveryGroups = await resolveBundledSkillDiscoveryGroups(options);
-    const symlinkDiscoveryDirs = discoveryGroups.filter(group => group.representation === "symlink");
-    const managedCopyDiscoveryDirs = discoveryGroups.filter(group => group.representation === "copy");
-    const physicalInstallDir = await resolvePhysicalPath(installedDir);
-    const physicalSourceDir = await resolvePhysicalPath(sourceDir);
-    for (const group of discoveryGroups) {
-      if ([physicalInstallDir, physicalSourceDir].some(path => path === group.dir || path.startsWith(group.dir + "/") || group.dir.startsWith(path + "/"))) {
-        throw new Error(`Discovery directory overlaps bundled skill storage: ${group.dir}`);
-      }
-    }
+    const plannedDiscoveryGroups = await resolveBundledSkillDiscoveryGroups(options);
+    await assertDiscoveryStorageSeparation(plannedDiscoveryGroups, installedDir, sourceDir);
     await ensureDirectory(installedDir);
-    for (const { dir } of discoveryGroups) {
+    for (const { dir } of plannedDiscoveryGroups) {
       await ensureDirectory(dir);
     }
+    // On case-insensitive filesystems, absent paths with different spellings can
+    // become the same directory. Choose ownership only after all roots exist.
+    const discoveryGroups = await resolveBundledSkillDiscoveryGroups(options);
+    await assertDiscoveryStorageSeparation(discoveryGroups, installedDir, sourceDir);
+    const symlinkDiscoveryDirs = discoveryGroups.filter(group => group.representation === "symlink");
+    const managedCopyDiscoveryDirs = discoveryGroups.filter(group => group.representation === "copy");
 
     const legacyEntries: string[] = [];
     for (const skillName of skills) {
