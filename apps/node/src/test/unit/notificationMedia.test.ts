@@ -7,7 +7,7 @@ import { cmdDoctor } from "../../cli/commands/doctor.js";
 afterEach(() => { process.exitCode = undefined; });
 describe("notification/media contract", () => {
   it("exempts only nonempty validated observation-only lists", () => {
-    const actions = ["list_notifications", "list_media_sessions", "get_media_status"].map(type => ({ id: type, type }));
+    const actions = ["list_notifications", "list_media_sessions", "get_media_status", "observe_media"].map(type => ({ id: type, type }));
     assert.equal(isBackgroundObservation(actions), true);
     for (const type of ["media_pause", "media_play", "media_seek", "dismiss_notification", "invoke_notification_action", "snapshot", "doctor_ping", "unknown", "LIST_NOTIFICATIONS"]) {
       assert.equal(isBackgroundObservation([...actions, { id: "x", type }]), false);
@@ -46,6 +46,7 @@ it("dispatches each service read/control and mixed lists without interactive rea
     buildNotificationMediaExecution("list_notifications"),
     buildNotificationMediaExecution("list_media_sessions"),
     buildNotificationMediaExecution("get_media_status", { mediaSessionId: "s" }),
+    buildNotificationMediaExecution("observe_media", { mediaSessionId: "s", durationMs: 1 }),
     buildNotificationMediaExecution("media_pause", { mediaSessionId: "s" }),
     buildNotificationMediaExecution("media_play", { mediaSessionId: "s" }),
     buildNotificationMediaExecution("media_seek", { mediaSessionId: "s", positionMs: 0 }),
@@ -115,6 +116,9 @@ it("CLI rejects missing, blank, conflicting and invalid service values with JSON
     ["media", "seek", "--session", "s"], ["media", "seek", "--session", "s", "--position-ms"],
     ...["-1", "1.5", "NaN", "Infinity", "9007199254740992", " "].map(value => ["media", "seek", "--session", "s", "--position-ms", value]),
     ["media", "seek", "--session", "s", "--position-ms", "0", "--position-tolerance-ms", "60001"],
+    ["media", "observe", "--session", "s"],
+    ["media", "observe", "--session", "s", "--duration-ms"],
+    ...["0", "-1", "30001", "1.5", "NaN", "Infinity", " "].map(value => ["media", "observe", "--session", "s", "--duration-ms", value]),
     ["media", "status"], ["media", "status", "--session"],
     ["media", "status", "--session", " "], ["media", "status", "--app", "p", "--session", "s"],
     ["media", "play", "--app", "p", "--wait-timeout-ms", "-1"],
@@ -206,6 +210,7 @@ it("validates all N2 mutations strictly and preserves their canonical payloads",
 it("valid N2 CLI values reach device selection with either global flag placement", () => {
   const cli = fileURLToPath(new URL("../../cli/index.js", import.meta.url));
   for (const args of [
+    ["media", "observe", "--session", "s", "--duration-ms", "30000"],
     ["notifications", "dismiss", "key", "--wait-timeout-ms", "0"],
     ["notifications", "action", "key", "--action", "revision:0"],
     ["media", "seek", "--session", "s", "--position-ms", "1000", "--position-tolerance-ms", "50"],
@@ -238,7 +243,7 @@ it("never replays N2 mutations when the transport loses their receipt", async ()
 });
 
 it("allows only complete read/media-control executions on the background service path", () => {
-  const eligible = ["list_notifications", "list_media_sessions", "get_media_status", "media_pause", "media_play", "media_seek"].map(type => ({ id: type, type }));
+  const eligible = ["list_notifications", "list_media_sessions", "get_media_status", "observe_media", "media_pause", "media_play", "media_seek"].map(type => ({ id: type, type }));
   for (const action of eligible) assert.equal(isBackgroundServiceExecution([action]), true);
   assert.equal(isBackgroundServiceExecution(eligible), true);
   assert.equal(isBackgroundServiceExecution([]), false);
@@ -246,4 +251,35 @@ it("allows only complete read/media-control executions on the background service
     const action = { id: "other", type };
     for (const actions of [[action], [action, ...eligible], [...eligible, action]]) assert.equal(isBackgroundServiceExecution(actions), false);
   }
+});
+
+it("bounds observation and preserves explicit execution timeouts", () => {
+  for (const durationMs of [1, 30000]) {
+    const execution = buildNotificationMediaExecution("observe_media", { applicationId: "p", durationMs });
+    assert.equal(execution.timeoutMs, durationMs + 10000);
+    assert.equal(isBackgroundObservation(execution.actions), true);
+  }
+  assert.equal(buildNotificationMediaExecution("observe_media", { mediaSessionId: "s", durationMs: 30000 }, 1000).timeoutMs, 1000);
+  for (const params of [{ mediaSessionId: "s" }, { durationMs: 1 }, { applicationId: " ", durationMs: 1 },
+    { applicationId: "p", mediaSessionId: "s", durationMs: 1 }, { mediaSessionId: "s", durationMs: 1, waitTimeoutMs: 0 },
+    ...[null, "1", NaN, Infinity, 0, -1, 1.5, 30001].map(durationMs => ({ mediaSessionId: "s", durationMs }))]) {
+    assert.throws(() => buildNotificationMediaExecution("observe_media", params as never));
+  }
+});
+
+import { decodeNotificationMediaPayload } from "../../domain/notifications/service.js";
+it("decodes observation evidence without dropping samples and still accepts older status", () => {
+  const session = { mediaSessionId: "s", applicationId: "p", state: "playing", title: null, artist: null,
+    durationMs: null, reportedPositionMs: null, estimatedPositionMs: 10, positionUpdatedElapsedMs: null,
+    positionUpdateAgeMs: null, positionUnknownReason: "original_player_report_unavailable", observedElapsedMs: 10,
+    playbackSpeed: 1, clock: "android_elapsed_realtime", evidence: "platform_query", supportedControls: [], textTruncated: false };
+  const base = { schemaVersion: 1, observedElapsedMs: 20, deviceState: { screenOn: false, deviceLocked: true, userUnlocked: true } };
+  assert.deepEqual(decodeNotificationMediaPayload(JSON.stringify({ ...base, session })), { ...base, session });
+  const updated = { ...session, playerReportSequence: 1, playerReportReceivedElapsedMs: 15, bufferedPositionMs: 100, playbackType: "remote" };
+  const observation = { ...base, initialSession: session, session: updated, durationMs: 10, startedElapsedMs: 10,
+    endedElapsedMs: 20, newPlayerReportCount: 1, truncated: false, reportedPositionDeltaMs: null,
+    samples: [{ playerReportSequence: 1, playerReportReceivedElapsedMs: 15, state: "playing", reportedPositionMs: 10,
+      positionUpdatedElapsedMs: 14, playbackSpeed: 1 }] };
+  assert.deepEqual(decodeNotificationMediaPayload(JSON.stringify(observation)), observation);
+  assert.throws(() => decodeNotificationMediaPayload(JSON.stringify({ ...observation, samples: [{}] })));
 });

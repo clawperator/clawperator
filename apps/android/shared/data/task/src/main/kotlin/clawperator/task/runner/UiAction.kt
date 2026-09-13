@@ -21,6 +21,7 @@ sealed interface UiAction {
         val actionId: String? = null,
         val positionMs: Long? = null,
         val positionToleranceMs: Long = 1000,
+        val durationMs: Long = 0,
     ) : UiAction
 
     data class OpenUri(
@@ -267,12 +268,12 @@ data class UiActionExecutionResult(
 )
 
 fun List<UiAction>.isBackgroundObservation(): Boolean = isNotEmpty() && all {
-    it is UiAction.NotificationMedia && it.type in setOf("list_notifications", "list_media_sessions", "get_media_status")
+    it is UiAction.NotificationMedia && it.type in setOf("list_notifications", "list_media_sessions", "get_media_status", "observe_media")
 }
 
 /** Whole validated executions that need neither accessibility nor an awake/unlocked screen. */
 fun List<UiAction>.isBackgroundServiceExecution(): Boolean = isNotEmpty() && all {
     it is UiAction.NotificationMedia && it.type in setOf(
-        "list_notifications", "list_media_sessions", "get_media_status", "media_pause", "media_play", "media_seek",
+        "list_notifications", "list_media_sessions", "get_media_status", "observe_media", "media_pause", "media_play", "media_seek",
     )
 }

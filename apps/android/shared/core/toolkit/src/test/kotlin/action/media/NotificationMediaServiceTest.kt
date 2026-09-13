@@ -10,6 +10,8 @@ import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.async
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -81,16 +83,63 @@ class NotificationMediaServiceTest {
         shadowOf(controller).setPlaybackState(playing(5000, 5000))
         val initial = query("list_media_sessions").getJSONArray("sessions").getJSONObject(0)
         assertEquals("platform_query", initial.getString("evidence"))
+        assertEquals(0L, initial.getLong("playerReportSequence"))
+        assertTrue(initial.isNull("playerReportReceivedElapsedMs"))
         assertTrue(initial.isNull("reportedPositionMs"))
         assertTrue(initial.isNull("positionUpdatedElapsedMs"))
         shadowOf(controller).callbacks.single().onPlaybackStateChanged(playing(1000, 1))
         shadowOf(controller).setPlaybackState(playing(9000, 9000))
         repeat(2) {
             val status = query("get_media_status", id = initial.getString("mediaSessionId")).getJSONObject("session")
+            assertEquals(1L, status.getLong("playerReportSequence"))
+            assertTrue(!status.isNull("playerReportReceivedElapsedMs"))
             assertEquals("player_report", status.getString("evidence"))
             assertEquals(1000L, status.getLong("reportedPositionMs"))
             assertEquals(1L, status.getLong("positionUpdatedElapsedMs"))
         }
+    }
+    @Test fun observationCountsCallbacksAndBoundsSamplesIncludingNullReports() = runTest {
+        val controller = controller("observe")
+        val id = query("list_media_sessions").getJSONArray("sessions").getJSONObject(0).getString("mediaSessionId")
+        val observation = async(start = CoroutineStart.UNDISPATCHED) {
+            JSONObject(service.execute("observe_media", null, id, 25, 256, 0, durationMs = 100))
+        }
+        val callback = shadowOf(controller).callbacks.single()
+        repeat(70) { index ->
+            callback.onPlaybackStateChanged(PlaybackState.Builder().setState(PlaybackState.STATE_PLAYING, index.toLong(), 1f, 1).setBufferedPosition(500).build())
+        }
+        callback.onPlaybackStateChanged(null)
+        val result = observation.await()
+        assertEquals(71, result.getInt("newPlayerReportCount"))
+        assertEquals(64, result.getJSONArray("samples").length())
+        assertTrue(result.getBoolean("truncated"))
+        assertEquals(0, result.getJSONObject("initialSession").getInt("playerReportSequence"))
+        assertEquals(71, result.getJSONObject("session").getInt("playerReportSequence"))
+        assertTrue(result.getJSONObject("session").isNull("reportedPositionMs"))
+        val quiet = JSONObject(service.execute("observe_media", null, id, 25, 256, 0, durationMs = 1))
+        assertEquals(0, quiet.getInt("newPlayerReportCount"))
+        assertEquals(0, quiet.getJSONArray("samples").length())
+    }
+    @Test fun observationCleansUpOnCancellationAndRejectsExpiredSession() = runTest {
+        val controller = controller("observe-cancel")
+        val id = query("list_media_sessions").getJSONArray("sessions").getJSONObject(0).getString("mediaSessionId")
+        val canceled = async(start = CoroutineStart.UNDISPATCHED) {
+            service.execute("observe_media", null, id, 25, 256, 0, durationMs = 30000)
+        }
+        canceled.cancel()
+        canceled.join()
+        val sessionsField = NotificationMediaService::class.java.getDeclaredField("sessions").apply { isAccessible = true }
+        val session = (sessionsField.get(service) as Map<*, *>).values.single()!!
+        val observersField = session.javaClass.getDeclaredField("observers").apply { isAccessible = true }
+        assertTrue((observersField.get(session) as Set<*>).isEmpty())
+        val expired = async(start = CoroutineStart.UNDISPATCHED) {
+            assertFailsWith<NotificationMediaException> {
+                service.execute("observe_media", null, id, 25, 256, 0, durationMs = 100)
+            }.code
+        }
+        shadowOf(controller).callbacks.single().onSessionDestroyed()
+        assertEquals("MEDIA_SESSION_EXPIRED", expired.await())
+        assertTrue((observersField.get(session) as Set<*>).isEmpty())
     }
     @Test fun ambiguityExpiryAndUnsupportedControlsRemainDistinct() = runTest {
         val first = controller("one")
