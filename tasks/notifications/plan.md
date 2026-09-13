@@ -55,6 +55,40 @@ by this change. Use a separate observation-only execution when screen-off eviden
 is needed. New mutation commands retain interactive readiness in this release;
 background control is not required to satisfy the observation use case.
 
+## Readiness and diagnostic contract
+
+Add `doctor --capability background-observation` in N1. Preserve the existing
+interactive doctor behavior as the default (and accept `--capability interactive`).
+Include the selected capability in structured output. Background readiness checks
+host/device transport, compatible Operator, service command round-trip, notification
+access and connected listener; an empty notification/session list is valid evidence
+of a working query. Screen-on/keyguard/accessibility/app-window readiness are not
+required checks for this capability. Report available device-state evidence without
+turning it into an interactive gate. Do not return success from permission settings
+alone, and do not hide transport, binding, version or access errors.
+
+The background diagnostic must not invoke wake/Home, shade dismissal, app launch,
+UI smoke, logcat clearing or automatic setup/remediation. Reject `--full`/`--fix`
+with this capability before side effects; retain their default interactive behavior.
+Its successful exit means background observations are available, not that UI
+automation or actual playback works. Document this distinction in doctor/setup
+help and docs. Default doctor's interactive failure must not veto service reads.
+No CLI/helper/HTTP/MCP wrapper may add that global gate to observation-only actions.
+
+Keep interactive readiness cache policy unchanged for existing actions, but do not
+read or populate that cache to establish background readiness. Test cold, warm and
+expired caches; a previous interactive success is not current device-state evidence.
+Ordinary screen lock after first unlock is supported. Before first unlock after
+reboot, report real unavailable prerequisites explicitly if Android prevents
+service access; full Direct Boot support is outside this release. Do not confuse
+`userUnlocked` (credential storage available) with an unlocked keyguard.
+
+Existing app `OperatorRepositoryDefault.isReady` combines window readiness with a
+loaded app list. It is a presentation signal, not proof of background capability;
+service queries/diagnostics must work with that signal false. Existing interactive
+skill orchestration retains its readiness policy; this release does not claim all
+UI skills work screen-off. Consumers use the direct observation API/MCP execution.
+
 ## Public surface
 
 All commands retain normal device selection, operator package, timeout and JSON
@@ -150,6 +184,17 @@ Verified against checkout `7cdb31d4`; recheck relevant behavior when implementin
 - `apps/node/src/contracts/{execution,aliases,result,errors}.ts` and
   `apps/node/src/domain/executions/validateExecution.ts`: action allowlist,
   strict parameter validation, payload/error contracts and compatibility.
+- `apps/node/src/domain/doctor/checks/deviceInteractivity.ts`: interactive predicate,
+  doctor_ping probing, automatic wake/Home attempts and eight-second success cache.
+- `apps/node/src/domain/doctor/criticalChecks.ts`, `DoctorService.ts` and
+  `apps/node/src/cli/commands/doctor.ts`: interactivity is currently critical,
+  checks stop on the first non-pass, and report readiness controls exit status.
+  Add capability selection without weakening default interactive semantics.
+- `apps/node/src/cli/commands/skills.ts`: interactive skill-target preparation also
+  calls the wake/readiness helper; it must not be reused for observation entry points.
+- `apps/android/shared/app/app-adapter/src/main/kotlin/clawperator/state/operator/OperatorRepositoryDefault.kt`:
+  app UI readiness depends on window readiness and app-list loading; keep the
+  background service path independent.
 - `apps/node/src/domain/executions/runExecution.ts`: currently performs interactive
   readiness before ordinary dispatch; add the explicit observation-only exemption.
 - `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/runtime/OperatorCommandReceiver.kt`:

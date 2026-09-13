@@ -40,6 +40,10 @@ not bump the shared version during this planning change.
 
 - N1/N2 complete their declared offline and live evidence. Re-run combined checks
   only when needed to verify the final integrated source/build, not as a ritual.
+- N1's mandatory locked/off readiness matrix passes, including a cold/expired
+  interactive cache, absent accessibility and listener recovery. Background doctor
+  reports its own capability with correct exits and no UI/remediation side effects;
+  default interactive doctor semantics remain intact.
 - Screen-off/locked notification/media reads meet the observation-only readiness
   contract without UI side effects. Mixed/UI lists retain existing readiness;
   stale player reports and session replacement races have explicit evidence.

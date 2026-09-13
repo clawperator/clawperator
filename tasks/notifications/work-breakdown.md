@@ -98,6 +98,58 @@ do not need N2 dismissal/buttons/seeking to resume that work. This pack provides
 player-reported observations; downstream visual/window persistence assertions and
 application-specific regression policy remain outside its scope.
 
+## N1 mandatory locked/off readiness matrix
+
+Implement the capability-specific doctor contract alongside the read APIs in N1.
+Extend existing `test/unit/doctor/{deviceInteractivity,DoctorService,readinessPolicy,readinessChecks}.test.ts`,
+`doctorCommand.test.ts`, `runExecution.test.ts`, MCP integration tests and Android
+ingress tests rather than testing only a new standalone helper.
+
+| State / scenario | Required evidence |
+| --- | --- |
+| Screen on, keyguard unlocked, user previously unlocked | All three observation actions and background doctor succeed; baseline values retained |
+| Screen off, user previously unlocked, without secure keyguard | Reads/diagnostic succeed; no wake or foreground change |
+| Screen on, secure keyguard locked after first unlock | Reads/diagnostic succeed without credential entry or keyguard dismissal |
+| Screen off, secure keyguard locked after first unlock | Same success, with screen and keyguard state preserved |
+| No accessible foreground window / app UI isReady false | Reads/diagnostic complete without UI-window dependency |
+| Accessibility service unavailable, notification listener connected | Reads/background doctor succeed; default interactive diagnostic still reflects unavailable UI prerequisites |
+| Notification access revoked / listener disconnected | Specific non-success, never empty-list success, no wake or remediation |
+| User not yet unlocked after reboot | Explicit unavailable prerequisite when platform prevents access; no fabricated ordinary-lock success or automatic unlock |
+| Screen off during repeated reads, then on and relocked | Each observation is fresh and preserves current state; no warm-cache dependency |
+| Selected Operator process restart while locked/off | Recover and query once Android reconnects the listener without opening the app; until then return explicit unavailability, not stale cache |
+
+Run each supported locked/off observation case with an empty interactive cache,
+a recently populated cache, and after its current eight-second TTL expires. Use
+fake time for automated cache tests; the live series must include queries beyond
+the TTL with no intervening UI command. Cover each read action singly and a list
+containing all three. Run the public CLI and generic MCP path live for locked/off
+cases, and cover typed helper/HTTP parity through integration tests. Negative
+cases must include mixed lists in both action orders and existing UI-only calls;
+retain their interactive preflight behavior, not a new no-wake promise for UI work.
+
+Instrument automated tests to fail on wakeup/Home keyevents, keyguard/shade
+operations, app launch, UI tree acquisition, interactive readiness invocation,
+logcat clearing or remediation in the observation/diagnostic path. A zero exit
+code alone is insufficient. Verify structured reports and process/MCP failure
+semantics for both doctor capabilities, malformed capability values and rejected
+background `--full`/`--fix` combinations before side effects.
+
+For live tests, prepare notifications/player and grant access before locking.
+Use a controlled emulator for secure-lock setup; do not change a personal device's
+credential. Observe power/keyguard state with independent non-waking evidence
+before, during and after the series. Endpoint checks alone could miss a transient
+wake-and-sleep; retain timestamped state transitions or equivalent continuous
+fixture/system evidence. Do not use the existing interactive doctor/readiness
+helper as the observer. Record actual screenOn/deviceLocked/userUnlocked values,
+matching build/variant, timeout/error outcomes and all attempts. Never interpret
+shell success or the absence of a foreground hierarchy as proof the screen stayed
+off. Do not wake/open the app to make a failing observation test pass.
+
+This is ordinary screen-off/lock support with reachable adb and a previously
+provisioned Operator, not a claim of Direct Boot, disconnected-device or arbitrary
+Doze/OEM process-policy support. Record platform restrictions precisely. A bounded
+listener-reconnection failure remains an unmet gate for the supported test setup.
+
 ## N2 - Notification mutations, seeking and combined proof
 
 1. Implement dismissal with clearability checks and removal observation. Distinguish
