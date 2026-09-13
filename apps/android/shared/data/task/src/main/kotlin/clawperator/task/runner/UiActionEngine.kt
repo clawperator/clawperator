@@ -113,7 +113,7 @@ class UiActionEngineDefault(
                 is UiAction.NotificationMedia -> {
                     try {
                         val service = notificationMediaService ?: throw NotificationMediaException("NOTIFICATION_SERVICE_UNAVAILABLE", "Service is unavailable")
-                        UiActionStepResult(action.id, action.type, data = mapOf("payload" to service.execute(action.type, action.applicationId, action.mediaSessionId, action.limit, action.maxTextChars, action.waitTimeoutMs, onServiceDispatch, action.notificationKey, action.actionId, action.positionMs, action.positionToleranceMs)))
+                        UiActionStepResult(action.id, action.type, data = mapOf("payload" to service.execute(action.type, action.applicationId, action.mediaSessionId, action.limit, action.maxTextChars, action.waitTimeoutMs, onServiceDispatch, action.notificationKey, action.actionId, action.positionMs, action.positionToleranceMs, action.durationMs)))
                     } catch (error: NotificationMediaException) {
                         UiActionStepResult(action.id, action.type, success = false, data = mapOf("errorCode" to error.code, "error" to error.message.orEmpty(), "dispatched" to error.dispatched.toString(), "waitTimeoutMs" to action.waitTimeoutMs.toString()))
                     }

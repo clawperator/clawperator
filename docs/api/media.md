@@ -3,6 +3,7 @@
 ```sh
 clawperator media list
 clawperator media status --session <id>
+clawperator media observe --session <id> --duration-ms 10000
 clawperator media pause --session <id> --wait-timeout-ms 2000
 clawperator media play --session <id> --wait-timeout-ms 2000
 ```
@@ -16,7 +17,7 @@ and cannot be targeted (`MEDIA_SESSION_EXPIRED`). Reactivating the same Android
 session restores its existing handle and retained original report. The selected
 controller is pinned throughout each action.
 
-List/status and pause/play/seek work while the display is off or keyguard locked
+List/status/observe and pause/play/seek work while the display is off or keyguard locked
 without waking it or requiring accessibility. Executions may mix these media
 controls with notification/media reads. Adding a UI action or notification
 mutation retains whole-execution interactive readiness. Notification access and a connected
@@ -26,6 +27,7 @@ listener are required. Players without active sessions cannot be controlled here
 | --- | --- |
 | list_media_sessions | Optional applicationId, limit (1-100, default 25), maxTextChars (1-1024, default 256) |
 | get_media_status | Exactly one applicationId or mediaSessionId |
+| observe_media | Exactly one applicationId or mediaSessionId; required durationMs (integer 1-30000) |
 | media_pause / media_play | Exactly one applicationId or mediaSessionId; optional waitTimeoutMs (0-30000, default 0) |
 | media_seek | Exactly one applicationId or mediaSessionId; required positionMs; optional waitTimeoutMs and positionToleranceMs (see below) |
 
@@ -111,3 +113,69 @@ a wait fails with MEDIA_SESSION_EXPIRED. The command never follows its replaceme
 or repeats an uncertain control. Original player reports remain separate from
 estimates, including across temporary inactivity. Report confirmation is not
 independent proof of actual playback; verify the player when that matters.
+
+## Observing reports over time
+
+`media observe --session <id> --duration-ms 10000` collects playback-state callbacks
+for a requested ten seconds and returns one result at the end. Duration is
+configurable from 1 to 30000 milliseconds; it is not a refresh interval. The
+player determines when callbacks arrive. Use `media status` for an immediate
+snapshot. Observation does not issue play/pause/seek or force fresh reports.
+
+The canonical action is `observe_media` with `durationMs` and exactly one target.
+Missing, blank, fractional or out-of-range durations and unrelated parameters are
+rejected. CLI and typed helpers default the execution timeout to durationMs plus
+10000 milliseconds; an explicit timeout remains authoritative and can end the
+action early. Raw `/execute` and MCP callers must budget their execution timeout.
+Session expiry or inactivity fails with MEDIA_SESSION_EXPIRED without following a
+replacement. Cancellation, timeout or permission loss fails the action rather
+than returning a completed observation. Partial samples are not returned on failure.
+
+The schemaVersion 1 payload adds these fields to the usual observedElapsedMs and
+deviceState (the latter describes the end of observation):
+
+- initialSession and session: starting and ending status for the pinned handle.
+- startedElapsedMs, endedElapsedMs and durationMs: actual monotonic boundaries
+  and requested duration. Scheduling can make the actual interval longer.
+- samples: the first 64 playback-state callbacks received during the interval,
+  in receipt order. Empty means no callback arrived. Initial/final status are
+  separate from this array. Each sample contains playerReportSequence,
+  playerReportReceivedElapsedMs, state (the same readable values as status),
+  reportedPositionMs, positionUpdatedElapsedMs and playbackSpeed. Null callback
+  state is retained as unknown with null position/timing/speed fields; a negative position is null.
+  Sample update timestamps preserve the published value, including invalid zero
+  or future values; receipt time is the Operator's own clock reading.
+- newPlayerReportCount: all callbacks received, including identical/null reports
+  and callbacks omitted after the retention limit. truncated signals omitted samples.
+- reportedPositionDeltaMs: final minus initial reported position, or null if
+  either is unknown. It can be negative after seeking or a timeline change and
+  does not measure rendered media or distance played.
+
+Status/list/control results also expose playerReportSequence (zero before the
+first callback), playerReportReceivedElapsedMs (null before the first callback),
+bufferedPositionMs (null for absent state or a negative published value), and
+playbackType (`local`, `remote`, or `unknown`). Buffer zero is the value published
+by Android and does not prove the buffer is empty. Receipt time differs from the
+player's positionUpdatedElapsedMs: receiving a report does not refresh its
+published update timestamp. Sequence numbers belong to one handle in one
+Operator process; repeated reads do not increment them. The Node decoder accepts
+older status payloads without these additive fields.
+
+Fresh reports are evidence that the session publisher sent updates, not proof of
+audible audio or rendered frames. No reports is also not proof of stalled playback.
+Use independent player/output evidence when testing background playback.
+
+### Agent workflow
+
+For a one-off reading, use `media status --app <package>`. For a test interval,
+first use `media list --app <package>` and select a mediaSessionId, then call
+`media observe --session <id> --duration-ms 10000`. Pinning the discovered handle
+ensures a replacement session cannot satisfy the test. An ambiguous package
+requires explicit session selection; an expired handle requires rediscovery.
+
+Read newPlayerReportCount and reportedPositionDeltaMs first, then inspect samples
+for pauses, buffering, seeks or unknown values. Zero callbacks is a successful
+observation with insufficient evidence of fresh reports, not a playback failure.
+Use initialSession/session for context and truncation to detect incomplete sample
+history. Keep independent output assertions separate. Do not pause/play merely
+to manufacture a fresh report during a background-playback test.
