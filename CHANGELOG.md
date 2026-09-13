@@ -4,6 +4,34 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.11.0] - 2026-09-13
+
+This release added background notification observation and media controls across the Node API, Android Operator, and public documentation, including safe read-only use while a device is locked or its screen is off.
+
+### 🤖 Node API & CLI
+
+- **Added:** Added notification listing plus media discovery, status, pause, and play through CLI, typed helpers, HTTP, and generic MCP, with locked/off read-only operation and background Doctor checks.
+- **Added:** Added notification dismissal, revision-bound button invocation, and capability-checked media seeking with strict bounds, dispatch evidence, and explicit permission, connection, replacement, and timeout errors.
+- **Added:** Allowed media pause, play, seek, and mixed notification/media reads to use the non-waking service path while locked or screen-off, while retaining interactive-readiness requirements for notification mutations and UI actions.
+
+### 📚 Documentation & Website
+
+- **Added:** Documented notification listing and media discovery/control contracts, locked/off read-only behavior, background readiness, setup, and the related HTTP and MCP usage.
+- **Added:** Documented notification dismissal, action-button invocation, media seeking boundaries, confirmation behavior, and error contracts.
+- **Added:** Documented locked-screen media pause, play, seek, and mixed-read behavior alongside the retained mutation and interactive-readiness boundaries.
+
+### 📱 Android Operator APK
+
+- **Added:** Added Android notification-listener and media-session support for background notification observation and media discovery, status, pause, and play without accessibility for read-only operations.
+- **Added:** Added Android handling for notification dismissal, revision-bound action buttons, and bounded media seeking with effect confirmation and explicit failure outcomes.
+- **Added:** Allowed Android media controls and mixed reads to run without waking a locked or screen-off device while preserving interactive gating and no-replay behavior for mutations.
+
+Pull requests:
+- [chore(release): complete 0.10.1 follow-up](https://github.com/clawperator/clawperator/pull/301)
+- [feat(notifications): add background observation and media controls](https://github.com/clawperator/clawperator/pull/302)
+- [feat(notifications): add dismissal, buttons, and media seeking](https://github.com/clawperator/clawperator/pull/303)
+- [feat(media): allow playback controls while locked or screen off](https://github.com/clawperator/clawperator/pull/304)
+
 ## [0.10.1] - 2026-09-13
 
 This release hardened evidence capture and bundled-skill discovery while adding a validated query consumer and live-verified guidance for scoped UI interaction.
