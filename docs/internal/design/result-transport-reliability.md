@@ -215,7 +215,8 @@ startup timer could start a new broadcast after exit.
 The reader now marks process death on `exit`. Both broadcast startup and the
 dispatch boundary refuse new work from that point. It drains pipes until
 `close` or the configured wait deadline, so late stderr, a complete already
-dispatched terminal result, and specific integrity errors retain their authority. A rejected deferred callback
+dispatched terminal result, and specific integrity errors retain their authority.
+A rejected deferred callback
 does not replace the reader's exit failure with `BROADCAST_FAILED`. Controlled
 real-process and event-order tests cover the race; execution/SSE coverage checks
 zero dispatch, correlation and no invented terminal envelope.
@@ -297,8 +298,9 @@ completion/disconnect evidence and simultaneous independent device/process
 observations, without redispatching an uncertain mutation. Keep the R13 pack
 active and the causal reliability gate open. The manually dispatched supported
 CI image remains a separate release prerequisite; these local passes do not
-satisfy it. No automatic emulator workflow, R14 implementation, push, merge or
-publication is part of PR-2.
+satisfy it. No automatic emulator workflow, R14 implementation or release publication
+is added by PR-2. Subsequent user-authorized review and PR preparation are
+recorded below.
 
 ### Review repair: bounded draining after exit
 
@@ -319,3 +321,64 @@ Regression coverage exercises startup, deferred preflight and post-dispatch
 exit without pipe closure, retained stderr/signal, stream cleanup, final buffered
 success and malformed framing. This bounds the demonstrated hang without
 extending the configured deadline or claiming a cause for the live audit exit.
+
+### Clean review and latest-main integration
+
+The drain repair was committed in `308d42eb`. A fresh independent sub-agent
+review of committed `21c58729` against main `0b571d76` found no actionable
+issues and passed 25 reader/transport tests plus four harness checks. This
+clean review was a required gate before opening the PR. The branch incorporates
+the latest upstream Android overlay-permission and video-verification changes;
+no new R14 implementation belongs to this branch's diff.
+
+The integrated build passed all 1,565 Node tests and repository validation,
+including the full-stream media fixtures from upstream. Matching debug/release
+APKs built successfully and all 463 Android tests passed. Android source did
+not change between the two upstream merges, so those exact APKs were retained.
+
+Two host-validation setup problems remain in private attempt accounting: a
+temporary isolation wrapper initially retained child logcat pipes, and an
+explicit package environment override conflicted with an environment-default
+test. The interrupted run and the one failed environment assertion were not
+reported as passes. The wrapper was corrected to execute ADB directly, its
+identified orphan readers on the assigned device were stopped, and the clean
+full run used the normal environment. Neither problem required runtime changes.
+
+The final declared live series used runtime source `21c58729`; the private
+source-diff record also retains pending documentation-only notes. Each variant
+ran once with 20 immediate open/query cycles and 20 full Internet queries.
+All 120 commands delivered correlated canonical envelopes, with no reader exit,
+malformed transport or timeout. The fixture verdicts were not all successful:
+
+| Variant | Fixture checks passed | Canonical envelopes received | Retained first Internet-query failure | Complete hierarchy fixture |
+| --- | --- | --- | --- | --- |
+| Debug | 59/60 | 60/60 | Android returned `UI_TREE_UNAVAILABLE`, with service available but no root | Pass, including Home cleanup |
+| Release | 59/60 | 60/60 | Successful query captured a 24-node loading screen without the fixture's sensitive root | Pass, including Home cleanup |
+
+Both series completed all declared attempts without replaying a failed mutation.
+The failed debug action and failed release fixture assertion remain failures;
+neither series was repeated to obtain a green report. The independent reviewer
+matched the debug failure's command-start and terminal records against CLI
+output and found no new reader-code issue. The release failure also retains a
+successful canonical envelope and its actual loading-screen hierarchy. These
+observations establish delivery, not a repair or causal explanation of Settings
+hierarchy availability. Accepted full-query responses ranged from 32,345 to
+69,785 bytes. Independent observers stayed alive through both series.
+
+A debug hierarchy invocation started while the series still owned the device
+lock and failed before issuing commands. That host scheduling error is retained
+separately; the subsequent serialized invocation completed the entire fixture.
+Release completed its single full hierarchy invocation. Both successful runs
+include repeated queries, raw/MCP/XML parity, PNG decoding, Display scroll and
+Home cleanup. No device or shared ADB-server reset was used.
+
+Final matching APK SHA-256:
+
+- Debug: `d70263154b535d57b08d0c6935f6bfa43dbe539ece863c84011e5e84ebc99415`.
+- Release: `e8df33b54cca7fa4b2614f62b15ded395c76f7c08e19673217351d67bd03f515`.
+
+The clean code review supports these bounded lifecycle repairs. The historical
+post-dispatch exit cause, these retained fixture failures, and the manual
+supported-image CI prerequisite prevent claiming complete reliability or release
+acceptance. PR creation is authorized; release publication is not part of this
+work.

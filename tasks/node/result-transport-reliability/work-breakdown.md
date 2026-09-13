@@ -111,4 +111,29 @@ R14 is independent. Do not turn this follow-up into media implementation or auto
 Build hashes, timings, exact scope and retained evidence limits are in the
 [PR-2 findings](../../../docs/internal/design/result-transport-reliability.md#pr-2-bounded-live-results).
 Do not retire this pack or mark full reliability/release acceptance complete.
-No R14 work, remote synchronization or publication was performed.
+The initial local phase performed no R14 work, remote synchronization or
+publication. Subsequent user-authorized review integrated upstream main for PR
+creation; the causal and manual release gates remain open.
+
+### PR review gate
+
+- [DONE] The first delegated review found unbounded pre-dispatch draining when
+  inherited pipes remain open. Independently reproduced and fixed in `308d42eb`
+  using the configured wait budget and explicit pipe cleanup.
+- [DONE] Merged main through `0b571d76` and obtained a fresh clean independent
+  code review on `21c58729`; no actionable findings remain in that reviewed diff.
+- [DONE] Integrated Node build and 1,565 tests, 463 Android tests, both APK builds
+  and repository validation passed. Initial host-wrapper/environment failures
+  remain in private attempt accounting.
+
+The clean code review does not close the historical post-dispatch exit cause
+or the manual supported-image release gate. Final live outcomes are recorded
+in the durable findings; failed attempts remain failures.
+
+Final integrated live verification at `21c58729`: both fixed series delivered
+60/60 canonical envelopes, but each passed 59/60 fixture checks. Debug retained
+one authoritative `UI_TREE_UNAVAILABLE`; release retained one successful query
+of the loading screen without the expected sensitive root. Neither series was
+repeated. Both complete hierarchy fixtures and Home cleanup passed; a preceding
+debug invocation rejected by the device lock before commands remains recorded.
+See the [review/integration record](../../../docs/internal/design/result-transport-reliability.md#clean-review-and-latest-main-integration).
