@@ -9,11 +9,13 @@ ffprobe and ffmpeg; it does not use macOS-specific APIs.
 ## Ownership and persistence
 
 `domain/evidence/video.ts` validates requests, checks host/device capabilities,
-reads metadata, acquires an exclusive device lock, and starts a detached Node
+reads metadata, preflights storage, acquires a fixed per-user host device lock, and starts a detached Node
 worker. The worker is packaged beside the domain modules in `dist/` and owns all
 manifest writes after startup. Output directories are exclusive. UUIDs generate
 remote paths, and only validated dimensions/durations enter the remote script.
 Caller labels and context never become shell commands.
+[Writable evidence roots and ownership](still-evidence.md#writable-evidence-roots-and-video-ownership)
+define root configuration, lock placement and upgrade/recovery limits.
 
 `videoWorker.ts` uses the PID emitted by a shell that immediately execs
 screenrecord. It verifies the exact command arguments and `/proc` start identity

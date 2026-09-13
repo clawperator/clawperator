@@ -207,6 +207,7 @@ Bundled host-agent skills are installed separately from runtime skills:
 - `~/.clawperator/bundled-skills/` is the canonical first-party bundled-skill store
 - `~/.claude/skills/` and the Codex skills dir receive Clawperator-managed symlinks into that store
 - `~/.agents/skills/` receives Clawperator-managed real directory copies with a `.clawperator-managed` marker so generic agents can scan them without following symlinks outside their configured root
+- discovery directories that alias `~/.agents/skills/` share its managed copies, including Claude Code or Codex; see [bundled-skill installation](skills/authoring.md) for legacy migration and backup behavior
 - runtime skills from `~/.clawperator/skills/` are not mirrored into shared agent discovery directories
 
 Canonical public next step after install:
@@ -1563,6 +1564,9 @@ Agent-side success test:
 
 # Actions
 
+For a complete discovery, strict selection, scroll, assertion, and capture workflow,
+see [scoped selection walkthrough](scoped-selection.md).
+
 ## Purpose
 
 Define the canonical `ExecutionAction.type` values, the exact parameters each action accepts, which values are validated by Node, and what success and failure data an agent can rely on.
@@ -1843,6 +1847,50 @@ available and add `visible-to-user` without restructuring the hierarchy.
 clawperator query --device <device_serial> --operator-package com.clawperator.operator.dev --visibility all --limit 100
 clawperator query --matcher-json '{"descendant":{"textEquals":"Display"}}'
 ```
+
+### Runnable Node consumer
+
+From a repository checkout, build and run the tested
+[query consumer example](https://github.com/clawperator/clawperator/blob/main/apps/node/src/examples/query-consumer.ts):
+
+```bash
+npm --prefix apps/node ci
+npm --prefix apps/node run build
+node apps/node/dist/examples/query-consumer.js --device <device_serial> --operator-package com.clawperator.operator.dev --visibility all --limit 1000
+```
+
+The example invokes the CLI built in that checkout. It accepts query flags and
+omits the matcher by default for all-node discovery. An explicit
+`--matcher-json '{}'` (or `--selector '{}'`) is invalid; remove that flag and its
+value to discover all eligible nodes. Other node-targeted actions still require
+an appropriate [selector](selectors.md).
+
+Before returning an inventory, the consumer checks the process exit, signal and
+spawn error; canonical terminal evidence; successful envelope and every step;
+and exactly one `query_ui` step with ID `query`. It parses that step's string
+`data.query`, validates schema version 1 and node field types, checks count
+consistency, and rejects truncation. `consumeQuery(output, queryStepId)` can
+select an explicitly named step when adapting the local example to a multi-step
+response. It is example-local validation, not an exported SDK accessor.
+
+Success prints `commandId`, `taskId`, the decoded `query`, and the original
+process output in `diagnostics`. Failure exits with code 1 and prints a message
+and the original output to stderr, including any available envelope and IDs.
+Preserve those diagnostics when investigating failures. Unknown nullable states
+remain null; an omitted `accessibilityDataSensitive` remains unknown.
+
+To observe refusal of a partial inventory on a screen with multiple nodes:
+
+```bash
+node apps/node/dist/examples/query-consumer.js --device <device_serial> --operator-package com.clawperator.operator.dev --visibility all --limit 1
+```
+
+A truncated inventory cannot prove absence or uniqueness. Increase the limit
+(up to 1000) or narrow the matcher, recognizing that a filtered result only
+covers that filter. Even a complete result describes one capture and its
+visibility scope, not future state or completion of navigation. Zero matches
+are valid for that capture. The original response remains available on both
+success and failure; the canonical envelope and string payload are unchanged.
 
 `--matcher-json` and `--selector` name the same JSON input and are mutually
 exclusive with simple selector flags (`--text`, `--text-contains`, `--id`, `--desc`,
@@ -3159,6 +3207,9 @@ Runtime failures are described in [Errors](errors.md#on-screen-log-panel-failure
 
 # Selectors
 
+For a complete discovery, strict selection, scroll, assertion, and capture workflow,
+see [scoped selection walkthrough](scoped-selection.md).
+
 ## Purpose
 
 Define the `NodeMatcher` contract used across execution payloads, explain how CLI selector flags map into that contract, and document the mutual-exclusion rules that prevent ambiguous selector input.
@@ -3212,7 +3263,8 @@ Rules enforced by Node:
 
 - a matcher may contain one field or several fields
 - multiple fields combine into one object, so the runtime receives all of them together
-- empty matcher objects are invalid
+- empty matcher objects are invalid; for all-node discovery, use `query` without
+  `--matcher-json` / `--selector` (see the [safe query consumer](actions.md#runnable-node-consumer))
 - each matcher string value must be at most `512` characters (`LIMITS.MAX_MATCHER_VALUE_LENGTH`)
 - simple CLI selector flags reject blank values; raw predicates require at least one nonblank field
 - selector objects are strict in execution validation, so unknown keys are rejected
@@ -3683,6 +3735,148 @@ clawperator read-value --label "Battery"
 - [Actions](actions.md)
 - [Errors](errors.md)
 - [API Overview](overview.md)
+
+---
+
+# Resolve ambiguous targets and verify the result
+
+Use observed structure to select a target, then verify the destination separately
+from the action receipt. This walkthrough applies to apps with duplicate labels
+or overlapping panes, including lists with the same resource ID and bounds.
+App navigation and the meaning of a successful test remain the caller's decisions.
+
+## Check readiness and discover candidates
+
+Select one device and the matching Operator explicitly. In a development checkout,
+use the built CLI with `node apps/node/dist/cli/index.js` in place of `clawperator`.
+The examples use a generic fixture package; replace its IDs and labels with values
+observed in your app. Replace `<device_serial>` before running the commands.
+
+```bash
+clawperator doctor --device <device_serial> --operator-package com.clawperator.operator.dev
+clawperator query --device <device_serial> --operator-package com.clawperator.operator.dev --text Open --visibility all --limit 100
+clawperator query --device <device_serial> --operator-package com.clawperator.operator.dev --visibility all --limit 200
+```
+
+Inspect the terminal envelope and each step's success before decoding the
+JSON string in `data.query`. Check `totalMatches`, `returnedCount`, and `truncated`;
+a truncated query cannot establish uniqueness. The unfiltered capture lets you
+follow each candidate's `parentPath` through the `nodePath` values in that same
+capture to find a distinguishing ancestor. A filtered query may omit ancestors.
+Paths are observation-local, not reusable selectors. See the
+[query contract](actions.md#action-query-ui) for state and decoding details.
+
+Two `Open` candidates can both report `onScreen: true`, even when one is behind
+another pane. `visibleToUser`, on-screen bounds, matching bounds, and preorder do
+not establish visual non-occlusion or which pane is topmost. Inspect the hierarchy
+and screenshot, and use the app's observed context to choose the intended pane.
+If the observed structure offers no unique selector, stop rather than guessing.
+
+## Require a unique target
+
+A non-strict single read can expose the default selection warning without clicking:
+
+```bash
+clawperator read --device <device_serial> --operator-package com.clawperator.operator.dev --text Open
+clawperator read --device <device_serial> --operator-package com.clawperator.operator.dev --text Open --strict
+clawperator read --device <device_serial> --operator-package com.clawperator.operator.dev --strict --matcher-json '{"textEquals":"Open","ancestor":{"resourceId":"com.example.scopedselection:id/detail_pane"}}'
+```
+
+For duplicate labels, the first call retains first-match behavior and includes
+`data.selection_warning`. Its counts are the largest observed across that action's
+attempts. The second rejects ambiguity with `NODE_AMBIGUOUS`; inspect its candidate
+evidence. The third requires one target under the observed detail ancestor.
+Re-query when the app changes: a previously unique observation does not reserve a
+node for the next action. See [strict selection](selectors.md#strict-action-selection).
+
+Warnings can coexist with failed steps. Preserve them along with the failure code,
+not just successful results. CLI JSON and pretty output preserve the full envelope.
+MCP execution tools retain envelope diagnostics; successful MCP `read` returns the
+value first and optional warning as a separate JSON text content item. Consume all
+content items. Structured fields encoded inside step data remain JSON strings.
+
+## Select the intended scroll container
+
+First query the shared list ID and inspect both ancestor chains. Add the observed
+ancestor to the container matcher, then confirm that the resulting query returns
+exactly one node:
+
+```bash
+clawperator query --device <device_serial> --operator-package com.clawperator.operator.dev --id com.example.scopedselection:id/list --visibility all
+clawperator query --device <device_serial> --operator-package com.clawperator.operator.dev --matcher-json '{"resourceId":"com.example.scopedselection:id/list","ancestor":{"resourceId":"com.example.scopedselection:id/detail_pane"}}'
+clawperator scroll-until down --device <device_serial> --operator-package com.clawperator.operator.dev --text 'Target item' --strict --container-json '{"resourceId":"com.example.scopedselection:id/list","ancestor":{"resourceId":"com.example.scopedselection:id/detail_pane"}}'
+```
+
+Inspect `resolved_container`, `scrolls_executed`, `termination_reason`, and the
+available JSON-encoded `progress` and selected `target` evidence in the step data.
+`resolved_container` is an ID, so it cannot distinguish these same-ID lists by
+itself. The action captures a fresh tree: do not join its target's `nodePath` or
+`parentPath` to paths from an earlier discovery query. Use the observed ancestor
+matcher to scope the action, then use fresh scoped queries and app-state assertions
+to verify the result. Follow parent chains only within a single query capture.
+`TARGET_FOUND` establishes that the search observed its target in the selected
+scope. `NO_POSITION_CHANGE` can reflect tracking the wrong overlapping container;
+it does not by itself prove
+that the intended pane cannot scroll. Rediscover the scope before another attempt.
+Strict selection rejects duplicate containers with `CONTAINER_AMBIGUOUS`.
+
+The flat CLI supports direction, target, container, strict mode, and `--timeout`.
+It has no `--max-scrolls` flag. Advanced bounded tuning uses raw `exec` action
+parameters such as `maxScrolls` and `maxDurationMs`; see
+[`scroll_until`](actions.md#action-scroll-until). Do not add blind sleep loops or
+coordinate fallbacks to recover from an unexplained result.
+
+## Wait, assert, then capture
+
+Click the observed target within the same selected scope, then wait for a
+unique destination-only marker:
+
+```bash
+clawperator click --device <device_serial> --operator-package com.clawperator.operator.dev --text 'Target item' --strict --container-json '{"resourceId":"com.example.scopedselection:id/list","ancestor":{"resourceId":"com.example.scopedselection:id/detail_pane"}}'
+clawperator wait --device <device_serial> --operator-package com.clawperator.operator.dev --text 'Detail destination ready' --strict --timeout 5000
+clawperator query --device <device_serial> --operator-package com.clawperator.operator.dev --text 'Detail destination ready'
+clawperator evidence capture --device <device_serial> --operator-package com.clawperator.operator.dev --output-dir /absolute/new/bundle --label 'Scoped destination' --context-json '{"originalVerdict":"passed"}'
+```
+
+Require a successful wait and assert the query's intended label, uniqueness, and
+relevant state. Set `originalVerdict` from those assertions; the literal `passed`
+above is appropriate only after they pass. Include the original command ID in the
+context when retaining evidence for a particular action. Use a fresh absolute
+bundle directory whose parent exists.
+
+Keep these facts separate:
+
+| Evidence | What it establishes |
+| --- | --- |
+| Accepted dispatch receipt | Android accepted the action, without proving its effect. |
+| Destination wait | The requested readiness marker appeared within the bound. |
+| App-state assertion | The observed state satisfies the caller's actual test. |
+| Verified PNG/XML | The captured artifact is usable, without proving the test. |
+| Manifest `complete` | All required bundle components succeeded. |
+| Manifest `partial` | A usable capture exists but another component failed; exit is nonzero. |
+
+A partial manifest with usable screenshot and hierarchy can result from missing
+metadata. Retain those artifacts and the manifest errors while preserving the
+original test verdict. A complete bundle can equally document a failed test.
+See [evidence status](evidence.md#result-and-exit-status).
+
+For example, an empty input may omit its clear button. Assert the input's observed
+value before deciding that a missing clear control is a failure. A bookmark shown
+in one folder does not prove it was saved to the intended folder: verify folder
+context and the entry together. These are app-state assumptions for the agent to
+resolve, not new runtime navigation rules.
+
+## Bound unresponsive-app investigation
+
+Doctor checks device/Operator readiness; a passing doctor does not prove that the
+target app responds or that its current page is ready. After a bounded wait or
+query failure, retain the exact terminal code and available evidence. Make one
+bounded diagnostic capture when available. If it visibly shows an Android
+application-not-responding dialog, classify that observation as an app ANR;
+a timeout alone is not proof of one. If the capture also fails, record the state
+as unconfirmed and stop the attempt. Do not automatically dismiss the dialog,
+repeat an uncertain mutation, or infer a Clawperator regression from an ANR.
+See [doctor](doctor.md) and [timeouts](timeouts.md).
 
 ---
 
@@ -4837,11 +5031,19 @@ The manifest contains `schemaVersion: 1`, `evidenceId`, `label`, opaque `context
 - `serial`, `operatorPackage`, `cliVersion`, and `operatorVersion`;
 - `apiLevel`, `androidVersion`, `manufacturer`, and `model`;
 - `deviceType`: `emulator` if either `ro.kernel.qemu` or `ro.boot.qemu` is `"1"`,
-  `physical` if a successfully read value is `"0"` and neither is `"1"`, or
-  `unknown` otherwise; `deviceTypeProperties` retains both property observations;
+  including conflicting `"0"`/`"1"` indicators. A successfully read, parseable
+  property inventory is inferred to be `physical` when both flags are absent,
+  empty, or `"0"`. Unexpected nonempty values without a `"1"`, malformed or
+  empty inventories, and failed or timed-out reads produce `unknown`.
+  `deviceTypeProperties` retains nonempty raw values, with null for absent or
+  empty flags;
 - `display.width`, `height`, `density`, and `rotation`. Current `wm` overrides
   take precedence over physical dimensions/density. Rotation uses the primary
   display's input viewport or the older `SurfaceOrientation` value (`0..3`).
+
+Still and video capture use the same classification policy. Emulator flags are
+a heuristic, not hardware attestation. Unknown classification remains a metadata
+failure; this policy does not change historical manifests.
 
 Unavailable metadata is null with an associated error; unknown device type is
 `unknown`. Missing metadata makes otherwise usable evidence partial. Geometry
@@ -4870,7 +5072,8 @@ MCP `evidence_capture` accepts the common `deviceId`, `operatorPackage`, and
 `timeoutMs` fields, plus optional `label` and `context` (an object, not a JSON
 string). It rejects `outputDir`, raw paths, and unknown parameters. Each request
 allocates a new bundle beneath the server-owned
-`~/.clawperator/evidence/bundles` directory and returns its `manifestPath`.
+`~/.clawperator/evidence/bundles` directory by default and returns its `manifestPath`.
+See [storage configuration](#evidence-storage-configuration) to change this root.
 Partial/failed results also set MCP `isError: true` while preserving that path.
 See [MCP Server](mcp.md#mcp-tool-evidence-capture).
 
@@ -4880,6 +5083,39 @@ in `domain/evidence/capture.ts`. It accepts equivalent typed options. Omitting
 overrides its managed bundle root. The writer and readers share the schema in
 `contracts/evidence.ts`. Injectable capture, metadata, file, process, and clock
 dependencies support deterministic testing.
+
+## Evidence storage configuration
+
+Set `CLAWPERATOR_EVIDENCE_DIR` to a writable evidence root when the default
+`~/.clawperator/evidence` is unavailable. Managed still and video bundles use
+`<evidence_root>/bundles/<session_id>`. The setting applies to Node and MCP
+callers and CLI video state preflight. CLI `--output-dir` remains a separate,
+absolute new bundle directory; it is not interpreted relative to this root.
+The HTTP `serve` API does not expose evidence endpoints.
+
+An omitted variable retains the default. Empty or whitespace-only values fail
+with `EXECUTION_VALIDATION_FAILED`. Relative roots resolve against the caller's
+working directory once at request entry. Detached workers use the absolute
+output and ownership paths saved in `session.json`.
+
+```bash
+export CLAWPERATOR_EVIDENCE_DIR=/absolute/writable/evidence
+clawperator evidence video start --device <device_serial> --operator-package com.clawperator.operator.dev --output-dir /absolute/new/video-bundle --duration-seconds 30
+```
+
+Video checks root, lock-directory and bundle writes before spawning its worker.
+`EVIDENCE_STORAGE_UNWRITABLE` includes `path`, `causeCode`, `message`, and
+`recovery` in CLI/Node and MCP errors. Select writable state and output paths,
+and permit access to the fixed host lock directory below. No permissions are
+changed. A failed preflight starts no recorder and releases any acquired device
+lock. It may leave newly created empty directories; use a new bundle directory
+on retry. Later filesystem failures can still prevent manifest persistence.
+`CLAWPERATOR_LOG_DIR` remains an independent logging setting.
+
+Absolute manifest-path status/stop continues to work after changing or unsetting
+the root, even if its new value is invalid. MCP session-ID lookup requires the
+root containing that managed bundle; configure a new MCP process with the same
+root to resume it. Changing the root does not migrate or delete old bundles.
 
 ## Managed video
 
@@ -4971,7 +5207,23 @@ report success. Artifact-read failures retain their underlying error; an unreada
 video fails the bundle, while an unreadable receipt or stderr makes usable video
 partial. Metadata failures also produce partial status when the video is usable.
 
-One exclusive lock per device lives under `~/.clawperator/evidence/locks`.
+One exclusive lock per device and OS user lives in a fixed host directory:
+`/tmp/clawperator-evidence-locks-<uid>` on POSIX, or
+`<OS-account-home>/AppData/Local/Temp/clawperator-evidence-locks` on Windows.
+It is independent of `CLAWPERATOR_EVIDENCE_DIR`, `HOME`, `TMPDIR`, and `TEMP`.
+POSIX requires a real directory owned by the current user with no group/other
+permissions. A different evidence root cannot bypass an existing device lock.
+The lock filename hashes the device serial; exclusive file creation arbitrates
+simultaneous starts, and its contents identify the session, nonce and absolute
+bundle path. Separate devices can record independently. This is same-host,
+same-user coordination; separate hosts/users and external recorders do not share
+it. Do not delete the lock directory or run temporary-file cleanup against it
+while recordings or unresolved recovery state remain.
+
+Before upgrading from a version using root-local locks, stop its recordings and
+resolve retained ownership using that version's saved manifests. Mixed-version
+recorders do not share the new lock location. Existing manifest-path status/stop
+remains readable and uses its saved ownership path.
 `session.json` keeps the random nonce, host PID/start identity, remote PID/start
 identity, remote path, target, deadline and recovery state separate from the
 manifest. A nonce-bound heartbeat identifies the original worker. No stored host
@@ -4998,7 +5250,8 @@ failed captures retain their remote path for recovery.
 `evidence_video_start` accepts `durationSeconds`, optional `size`, `label`,
 `context`, `deviceId`, and `operatorPackage`. An explicit target configured in the
 MCP session can supply the device. It rejects output paths and unknown fields,
-allocates a bundle under `~/.clawperator/evidence/bundles`, and returns `sessionId`.
+allocates a bundle under the configured evidence root
+(`~/.clawperator/evidence/bundles` by default), and returns `sessionId`.
 `evidence_video_status` and `evidence_video_stop` accept only that opaque
 `sessionId`; path and target overrides are rejected. Failed and pending-stop
 results set `isError: true`.
@@ -5006,8 +5259,9 @@ results set `isError: true`.
 Node callers use `startVideo`, `videoStatus`, and `stopVideo` in
 `domain/evidence/video.ts`. Start accepts the equivalent typed options; status and
 stop use `{session: absoluteManifestPath}` with optional matching target fields.
-The injectable video `baseDir` is the evidence state root containing `bundles/`
-and `locks/`, unlike still capture's `baseDir`, which is its bundle root.
+The injectable video `baseDir` overrides the evidence root containing `bundles/`;
+it cannot move the device lock. Still capture's existing `baseDir` dependency
+continues to mean its bundle root.
 
 ---
 
@@ -5410,6 +5664,9 @@ Seeking and notification buttons are not currently available.
 ---
 
 # Doctor
+
+For a complete discovery, strict selection, scroll, assertion, and capture workflow,
+see [scoped selection walkthrough](scoped-selection.md).
 
 ## Purpose
 
@@ -6533,6 +6790,16 @@ stops the sequence. [Action receipts](actions.md#action-receipts-and-failure-evi
 describe dispatch evidence, not a verified application outcome. Do not replay an
 uncertain mutation automatically.
 
+## Evidence storage failures
+
+`EVIDENCE_STORAGE_UNWRITABLE` means an evidence destination or the fixed host
+video lock directory failed a required filesystem operation. CLI/Node and MCP
+errors include the absolute `path`, underlying `causeCode` (or null), `message`,
+and a `recovery` action. Choose a writable `CLAWPERATOR_EVIDENCE_DIR` and new
+output directory, and ensure the host lock directory is accessible. Video
+preflight fails before any recorder is spawned; no permission changes or
+stale-owner takeover occurs. See [evidence storage configuration](evidence.md#evidence-storage-configuration).
+
 ## Two Failure Shapes
 
 Clawperator surfaces failures in two main shapes.
@@ -6638,6 +6905,7 @@ Only the codes defined in `apps/node/src/contracts/errors.ts` are part of the pu
 | <a id="error-command-cancelled"></a>`COMMAND_CANCELLED` | Command cancelled | - |
 | <a id="error-container-lost"></a>`CONTAINER_LOST` | Container lost | - |
 | <a id="error-evidence-capture-failed"></a>`EVIDENCE_CAPTURE_FAILED` | Evidence capture failed | Evidence could not be fully captured or persisted; inspect the retained manifest when available. |
+| <a id="error-evidence-storage-unwritable"></a>`EVIDENCE_STORAGE_UNWRITABLE` | Evidence storage unwritable | Evidence storage is not writable; inspect path and recovery before retrying. |
 | <a id="error-evidence-output-exists"></a>`EVIDENCE_OUTPUT_EXISTS` | Evidence output exists | Choose a new evidence output directory; existing destinations are never overwritten. |
 | <a id="error-evidence-session-not-found"></a>`EVIDENCE_SESSION_NOT_FOUND` | Evidence session not found | The requested video session is unknown or invalid. |
 | <a id="error-evidence-recording-active"></a>`EVIDENCE_RECORDING_ACTIVE` | Evidence recording active | Another video session owns the selected device lock. |
@@ -11456,7 +11724,9 @@ Authoring skills are a separate category of AI agent programs that live in
 `.agents/skills/` in source form and install separately into
 `~/.clawperator/bundled-skills/` plus host-agent discovery directories. Claude
 Code and Codex receive symlinks into the canonical store. Generic agents
-receive managed real directory copies under `~/.agents/skills/`.
+receive managed real directory copies under `~/.agents/skills/`. When discovery
+directories resolve to the same physical location as the generic agents directory,
+all consumers share its managed copies.
 
 Installer-facing discovery is deliberately split:
 
@@ -12315,14 +12585,31 @@ Current command behavior:
 - `clawperator bundled-skills install` copies packaged first-party bundled skills
   into `~/.clawperator/bundled-skills/`, recreates discovery symlinks for
   Claude Code and Codex, and refreshes managed directory copies under
-  `~/.agents/skills/`
+  `~/.agents/skills/`. Discovery directories are resolved to physical paths first;
+  aliases of the same directory share one representation. Any group containing
+  the generic agents location uses managed copies for all consumers.
 - `clawperator bundled-skills update` runs the same copy-and-wire flow but
   reports the result as an update rather than a first install
 - rerunning either command repairs legacy Clawperator-managed symlinks under
   `~/.agents/skills/` by replacing them with managed real directories
 - the installer refuses to overwrite a non-Clawperator entry in any shared
   discovery directory; generic agents directories are considered
-  Clawperator-managed only when they contain `.clawperator-managed`
+  Clawperator-managed when they contain the valid `.clawperator-managed` marker.
+  Unmarked directories that exactly match a known first-party bundled skill
+  version are moved to a unique timestamped directory under
+  `~/.clawperator/bundled-skills-backups/` before replacement. Modified files,
+  extra files, and symlinks inside unmarked copies prevent automatic migration.
+  When discovery and backup directories are on different filesystems, the updater
+  copies and verifies the backup before removing the original. A copy or
+  verification failure preserves the original and reports the backup path.
+- install and update return `discoveryGroups` with each physical `dir`, logical
+  `aliases` (`label` and `dir`), and selected `representation` (`copy` or `symlink`).
+  `migrations` records each `originalPath` and `backupPath`; it is empty when no
+  backups were needed. Existing `agentDiscoveryDirs` fields remain available.
+- before reporting success, install and update verify every discovery entry
+  using Doctor's ownership check. A failed check returns
+  `BUNDLED_SKILLS_INSTALL_FAILED` with the entry path, representation, and issue;
+  completed migrations are included in the error explanation
 - `clawperator bundled-skills list` reports installed skill names and the
   absolute `SKILL.md` path for each installed bundled skill
 - the current packaged install set contains
@@ -12336,6 +12623,8 @@ Current doctor behavior:
   `pass` with `Bundled-skills not yet installed.`
 - if the installed bundled-skills state exists but is stale, incomplete, or
   malformed, doctor reports `warn`
+- Doctor resolves the same directory aliases as the installer and accepts managed
+  copies for Claude Code or Codex when their directory aliases the agents location.
 - current warning conditions include:
   - `version.txt` is missing, empty, unreadable, or does not match the current
     CLI version

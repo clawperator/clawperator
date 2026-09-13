@@ -117,6 +117,7 @@ Bundled host-agent skills are installed separately from runtime skills:
 - `~/.clawperator/bundled-skills/` is the canonical first-party bundled-skill store
 - `~/.claude/skills/` and the Codex skills dir receive Clawperator-managed symlinks into that store
 - `~/.agents/skills/` receives Clawperator-managed real directory copies with a `.clawperator-managed` marker so generic agents can scan them without following symlinks outside their configured root
+- discovery directories that alias `~/.agents/skills/` share its managed copies, including Claude Code or Codex; see [bundled-skill installation](skills/authoring.md) for legacy migration and backup behavior
 - runtime skills from `~/.clawperator/skills/` are not mirrored into shared agent discovery directories
 
 Canonical public next step after install:

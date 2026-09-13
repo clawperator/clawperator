@@ -1,3 +1,4 @@
+import { videoLockRoot, preflightDirectory } from "../../domain/evidence/storage.js";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
@@ -177,7 +178,7 @@ describe("video start preflight and CLI", () => {
         calls.push([command, ...args]);
         const action = args.slice(args[0] === "-s" ? 2 : 0).join(" ");
         let stdout = "", stderr = "";
-        if (action === "devices") stdout = "List of devices attached\ntest-device\tdevice\n";
+        if (action === "devices") stdout = "List of devices attached\npreflight-test-device\tdevice\n";
         if (action === "shell screenrecord --help") stderr = "--size --time-limit Default is 180.";
         if (action === "shell getprop") stdout = "[ro.build.version.sdk]: [36]\n[ro.build.version.release]: [16]\n[ro.product.model]: [test]\n[ro.product.manufacturer]: [test]\n[ro.kernel.qemu]: [1]\n";
         if (action === "shell wm size") stdout = "Physical size: 720x1280";
@@ -188,22 +189,26 @@ describe("video start preflight and CLI", () => {
       },
     };
     try {
-      await fs.mkdir(join(root, "locks"));
-      const lock = join(root, "locks", lockName("test-device"));
+      await preflightDirectory(videoLockRoot(), true);
+      const lock = join(videoLockRoot(), lockName("preflight-test-device"));
       await fs.writeFile(lock, "existing ownership");
-      const config = getDefaultRuntimeConfig({ runner, deviceId: "test-device", operatorPackage: "com.example.operator" });
-      await assert.rejects(startVideo({ deviceId: "test-device", durationSeconds: 10 }, { config, baseDir: root }), (e: any) => e.code === "EVIDENCE_RECORDING_ACTIVE");
+      const config = getDefaultRuntimeConfig({ runner, deviceId: "preflight-test-device", operatorPackage: "com.example.operator" });
+      await assert.rejects(startVideo({ deviceId: "preflight-test-device", durationSeconds: 10 }, { config, baseDir: root }), (e: any) => e.code === "EVIDENCE_RECORDING_ACTIVE");
       assert.equal(await fs.readFile(lock, "utf8"), "existing ownership");
       assert.ok(calls.some(a => a.includes("--help")));
       await fs.unlink(lock);
-      await assert.rejects(startVideo({ deviceId: "test-device", durationSeconds: 10, outputDir: root }, { config, baseDir: root }), (e: any) => e.code === "EVIDENCE_OUTPUT_EXISTS");
+      await assert.rejects(startVideo({ deviceId: "preflight-test-device", durationSeconds: 10, outputDir: root }, { config, baseDir: root }), (e: any) => e.code === "EVIDENCE_OUTPUT_EXISTS");
       await assert.rejects(fs.stat(lock));
+      const missingOutput = join(root, "missing-parent", "output");
+      await assert.rejects(startVideo({ deviceId: "preflight-test-device", durationSeconds: 10, outputDir: missingOutput }, { config, baseDir: root }),
+        (e: any) => e.code === "EVIDENCE_STORAGE_UNWRITABLE" && e.path === missingOutput && typeof e.recovery === "string");
+      await assert.rejects(fs.stat(lock), "Output preflight failure must release its acquired ownership");
       const originalRun = runner.run;
       for (const missingTool of ["ffprobe", "ffmpeg"]) {
         runner.run = async (command, args) => command === missingTool
           ? { code: 127, stdout: "", stderr: "missing prerequisite" }
           : originalRun(command, args);
-        await assert.rejects(startVideo({ deviceId: "test-device", durationSeconds: 10 }, { config, baseDir: root }), (e: any) => e.code === "EVIDENCE_CAPTURE_FAILED" && e.message.includes(missingTool));
+        await assert.rejects(startVideo({ deviceId: "preflight-test-device", durationSeconds: 10 }, { config, baseDir: root }), (e: any) => e.code === "EVIDENCE_CAPTURE_FAILED" && e.message.includes(missingTool));
         await assert.rejects(fs.stat(lock));
       }
       runner.run = originalRun;
@@ -215,7 +220,7 @@ describe("video start preflight and CLI", () => {
           queueMicrotask(() => child.emit("error", error));
           return child;
         };
-        const result = await startVideo({ deviceId: "test-device", durationSeconds: 10 }, { config, baseDir: root });
+        const result = await startVideo({ deviceId: "preflight-test-device", durationSeconds: 10 }, { config, baseDir: root });
         assert.equal(result.status, "failed");
         assert.equal(result.code, "EVIDENCE_CAPTURE_FAILED");
         assert.equal((await videoStatus({ session: result.manifestPath })).status, "failed");

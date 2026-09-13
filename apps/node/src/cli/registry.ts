@@ -383,7 +383,10 @@ Usage:
 
 Notes:
   - Re-copies packaged first-party bundled skills into ~/.clawperator/bundled-skills/
-  - Recreates Claude Code and Codex discovery symlinks
+  - Groups discovery directory aliases by physical path
+  - Uses managed copies for groups containing ~/.agents/skills/; otherwise uses symlinks
+  - Backs up exact known legacy first-party copies before migration
+  - Verifies discovery ownership before reporting success
   - Refreshes generic agents discovery copies in ~/.agents/skills/
   - Safe to run multiple times
 `;
@@ -1849,7 +1852,8 @@ Usage:
                     [--visibility <on_screen|all>] [--limit <1..1000>]
                     [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--no-daemon]
 
-Omit the matcher to query all eligible nodes. --matcher-json cannot be combined
+Omit the matcher to query all eligible nodes; --matcher-json '{}' is invalid.
+--matcher-json cannot be combined
 with simple selector flags. --text-contains, --desc and --desc-contains also work.
 Visibility defaults to on_screen; limit defaults to 100. data.query contains
 serialized JSON with totalMatches, truncation and node states, including blank labels.
@@ -2889,7 +2893,7 @@ Notes:
   bundled-skills install
                                             Copy and wire packaged bundled skills for Claude Code, Codex, and generic agent runtimes
   bundled-skills update
-                                            Refresh installed bundled skills and recreate discovery symlinks`,
+                                            Refresh installed bundled skills and repair discovery entries`,
   handler: async (ctx) => {
     const { rest, format } = ctx;
     const out = { format, env: process.env };

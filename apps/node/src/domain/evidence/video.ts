@@ -1,7 +1,7 @@
+import { evidenceRoot, videoLockRoot, preflightDirectory, storageError, acquireVideoLock } from "./storage.js";
 import { VideoProcessRunner } from "./videoProcessRunner.js";
 import * as fs from "node:fs/promises";
 import { join, dirname, basename, isAbsolute, resolve } from "node:path";
-import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { getDefaultRuntimeConfig, type RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
@@ -17,7 +17,7 @@ export interface VideoStartOptions extends EvidenceCaptureOptions { durationSeco
 export interface VideoSessionOptions { session: string; deviceId?: string; operatorPackage?: string }
 export interface VideoDependencies { baseDir?: string; config?: RuntimeConfig; workerPath?: string }
 export interface VideoResult { ok: boolean; status: EvidenceManifest["status"]; manifestPath: string; sessionId: string; code?: string; recoveryRequired?: boolean }
-export const evidenceRoot = (dependencies: VideoDependencies = {}) => dependencies.baseDir ?? join(homedir(), ".clawperator", "evidence");
+export { evidenceRoot } from "./storage.js";
 export function validateVideoStart(options: VideoStartOptions): void {
   validateEvidenceCaptureOptions(options);
   if (options.deviceId === undefined) fail("Video start requires an explicit deviceId", "EXECUTION_VALIDATION_FAILED");
@@ -26,6 +26,7 @@ export function validateVideoStart(options: VideoStartOptions): void {
 }
 export async function startVideo(options: VideoStartOptions, dependencies: VideoDependencies = {}): Promise<VideoResult> {
   validateVideoStart(options);
+  const root = evidenceRoot(dependencies);
   const context = JSON.parse(JSON.stringify(options.context ?? {}));
   const config = dependencies.config ?? getDefaultRuntimeConfig({ deviceId: options.deviceId, operatorPackage: resolveOperatorPackageForRequest(options.operatorPackage), adbPath: process.env.ADB_PATH });
   validateEvidenceCaptureOptions({ operatorPackage: config.operatorPackage });
@@ -42,22 +43,23 @@ export async function startVideo(options: VideoStartOptions, dependencies: Video
   const rotated = display.rotation % 2 === 1;
   const size = chooseVideoSize((rotated ? display.height : display.width) ?? 0, (rotated ? display.width : display.height) ?? 0, options.size);
   const sessionId = randomUUID(), nonce = randomUUID();
-  const root = evidenceRoot(dependencies);
-  await fs.mkdir(join(root, "locks"), { recursive: true, mode: 0o700 });
-  const lockPath = join(root, "locks", lockName(runtime.deviceId));
+  await preflightDirectory(root);
+  const lockRoot = videoLockRoot();
+  await preflightDirectory(lockRoot, true);
+  const lockPath = join(lockRoot, lockName(runtime.deviceId));
   const outputDir = options.outputDir === undefined ? join(root, "bundles", sessionId) : resolve(options.outputDir);
   const state: VideoState = { sessionId, nonce, deviceId: runtime.deviceId, operatorPackage: runtime.operatorPackage, adbPath: runtime.adbPath,
     outputDir, lockPath, managed: options.outputDir === undefined, durationSeconds: options.durationSeconds, size,
     hostPid: null, hostStartedAt: null, remotePid: null, remoteStart: null, remotePath: `/data/local/tmp/clawperator-video-${sessionId}.mp4`,
     deadline: Date.now() + options.durationSeconds * 1000 + 5000, updatedAt: Date.now(), recoveryRequired: false };
-  try { await fs.writeFile(lockPath, JSON.stringify({ sessionId, nonce, outputDir }), { flag: "wx", mode: 0o600 }); }
-  catch (error) { if ((error as NodeJS.ErrnoException).code === "EEXIST") fail("A video session owns this device; use its status/stop or verify recovery before removing its lock", "EVIDENCE_RECORDING_ACTIVE"); throw error; }
+  await acquireVideoLock(lockPath, { sessionId, nonce, outputDir });
   let workerDispatched = false;
   let startupManifest: EvidenceManifest | undefined;
   try {
-    if (options.outputDir === undefined) await fs.mkdir(dirname(outputDir), { recursive: true, mode: 0o700 });
+    if (options.outputDir === undefined) await preflightDirectory(dirname(outputDir));
     try { await fs.mkdir(outputDir, { mode: 0o700 }); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === "EEXIST") fail("Evidence output directory already exists", "EVIDENCE_OUTPUT_EXISTS"); throw error; }
+    catch (error) { if ((error as NodeJS.ErrnoException).code === "EEXIST") fail("Evidence output directory already exists", "EVIDENCE_OUTPUT_EXISTS"); storageError(error, outputDir); }
+    await preflightDirectory(outputDir);
     const manifest: EvidenceManifest = { schemaVersion: 1, evidenceId: sessionId, label: options.label ?? null, context, device: metadata.device,
       startedAt: new Date().toISOString(), finishedAt: null, status: "starting", artifacts: [], errors: metadata.errors,
       video: { requestedDurationSeconds: options.durationSeconds, hostDurationMs: 0, mediaDurationMs: null, requestedSize: size, actualSize: null, codec: null, stopReason: null } };

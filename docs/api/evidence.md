@@ -94,11 +94,19 @@ The manifest contains `schemaVersion: 1`, `evidenceId`, `label`, opaque `context
 - `serial`, `operatorPackage`, `cliVersion`, and `operatorVersion`;
 - `apiLevel`, `androidVersion`, `manufacturer`, and `model`;
 - `deviceType`: `emulator` if either `ro.kernel.qemu` or `ro.boot.qemu` is `"1"`,
-  `physical` if a successfully read value is `"0"` and neither is `"1"`, or
-  `unknown` otherwise; `deviceTypeProperties` retains both property observations;
+  including conflicting `"0"`/`"1"` indicators. A successfully read, parseable
+  property inventory is inferred to be `physical` when both flags are absent,
+  empty, or `"0"`. Unexpected nonempty values without a `"1"`, malformed or
+  empty inventories, and failed or timed-out reads produce `unknown`.
+  `deviceTypeProperties` retains nonempty raw values, with null for absent or
+  empty flags;
 - `display.width`, `height`, `density`, and `rotation`. Current `wm` overrides
   take precedence over physical dimensions/density. Rotation uses the primary
   display's input viewport or the older `SurfaceOrientation` value (`0..3`).
+
+Still and video capture use the same classification policy. Emulator flags are
+a heuristic, not hardware attestation. Unknown classification remains a metadata
+failure; this policy does not change historical manifests.
 
 Unavailable metadata is null with an associated error; unknown device type is
 `unknown`. Missing metadata makes otherwise usable evidence partial. Geometry
@@ -127,7 +135,8 @@ MCP `evidence_capture` accepts the common `deviceId`, `operatorPackage`, and
 `timeoutMs` fields, plus optional `label` and `context` (an object, not a JSON
 string). It rejects `outputDir`, raw paths, and unknown parameters. Each request
 allocates a new bundle beneath the server-owned
-`~/.clawperator/evidence/bundles` directory and returns its `manifestPath`.
+`~/.clawperator/evidence/bundles` directory by default and returns its `manifestPath`.
+See [storage configuration](#evidence-storage-configuration) to change this root.
 Partial/failed results also set MCP `isError: true` while preserving that path.
 See [MCP Server](mcp.md#mcp-tool-evidence-capture).
 
@@ -137,6 +146,39 @@ in `domain/evidence/capture.ts`. It accepts equivalent typed options. Omitting
 overrides its managed bundle root. The writer and readers share the schema in
 `contracts/evidence.ts`. Injectable capture, metadata, file, process, and clock
 dependencies support deterministic testing.
+
+## Evidence storage configuration
+
+Set `CLAWPERATOR_EVIDENCE_DIR` to a writable evidence root when the default
+`~/.clawperator/evidence` is unavailable. Managed still and video bundles use
+`<evidence_root>/bundles/<session_id>`. The setting applies to Node and MCP
+callers and CLI video state preflight. CLI `--output-dir` remains a separate,
+absolute new bundle directory; it is not interpreted relative to this root.
+The HTTP `serve` API does not expose evidence endpoints.
+
+An omitted variable retains the default. Empty or whitespace-only values fail
+with `EXECUTION_VALIDATION_FAILED`. Relative roots resolve against the caller's
+working directory once at request entry. Detached workers use the absolute
+output and ownership paths saved in `session.json`.
+
+```bash
+export CLAWPERATOR_EVIDENCE_DIR=/absolute/writable/evidence
+clawperator evidence video start --device <device_serial> --operator-package com.clawperator.operator.dev --output-dir /absolute/new/video-bundle --duration-seconds 30
+```
+
+Video checks root, lock-directory and bundle writes before spawning its worker.
+`EVIDENCE_STORAGE_UNWRITABLE` includes `path`, `causeCode`, `message`, and
+`recovery` in CLI/Node and MCP errors. Select writable state and output paths,
+and permit access to the fixed host lock directory below. No permissions are
+changed. A failed preflight starts no recorder and releases any acquired device
+lock. It may leave newly created empty directories; use a new bundle directory
+on retry. Later filesystem failures can still prevent manifest persistence.
+`CLAWPERATOR_LOG_DIR` remains an independent logging setting.
+
+Absolute manifest-path status/stop continues to work after changing or unsetting
+the root, even if its new value is invalid. MCP session-ID lookup requires the
+root containing that managed bundle; configure a new MCP process with the same
+root to resume it. Changing the root does not migrate or delete old bundles.
 
 ## Managed video
 
@@ -228,7 +270,23 @@ report success. Artifact-read failures retain their underlying error; an unreada
 video fails the bundle, while an unreadable receipt or stderr makes usable video
 partial. Metadata failures also produce partial status when the video is usable.
 
-One exclusive lock per device lives under `~/.clawperator/evidence/locks`.
+One exclusive lock per device and OS user lives in a fixed host directory:
+`/tmp/clawperator-evidence-locks-<uid>` on POSIX, or
+`<OS-account-home>/AppData/Local/Temp/clawperator-evidence-locks` on Windows.
+It is independent of `CLAWPERATOR_EVIDENCE_DIR`, `HOME`, `TMPDIR`, and `TEMP`.
+POSIX requires a real directory owned by the current user with no group/other
+permissions. A different evidence root cannot bypass an existing device lock.
+The lock filename hashes the device serial; exclusive file creation arbitrates
+simultaneous starts, and its contents identify the session, nonce and absolute
+bundle path. Separate devices can record independently. This is same-host,
+same-user coordination; separate hosts/users and external recorders do not share
+it. Do not delete the lock directory or run temporary-file cleanup against it
+while recordings or unresolved recovery state remain.
+
+Before upgrading from a version using root-local locks, stop its recordings and
+resolve retained ownership using that version's saved manifests. Mixed-version
+recorders do not share the new lock location. Existing manifest-path status/stop
+remains readable and uses its saved ownership path.
 `session.json` keeps the random nonce, host PID/start identity, remote PID/start
 identity, remote path, target, deadline and recovery state separate from the
 manifest. A nonce-bound heartbeat identifies the original worker. No stored host
@@ -255,7 +313,8 @@ failed captures retain their remote path for recovery.
 `evidence_video_start` accepts `durationSeconds`, optional `size`, `label`,
 `context`, `deviceId`, and `operatorPackage`. An explicit target configured in the
 MCP session can supply the device. It rejects output paths and unknown fields,
-allocates a bundle under `~/.clawperator/evidence/bundles`, and returns `sessionId`.
+allocates a bundle under the configured evidence root
+(`~/.clawperator/evidence/bundles` by default), and returns `sessionId`.
 `evidence_video_status` and `evidence_video_stop` accept only that opaque
 `sessionId`; path and target overrides are rejected. Failed and pending-stop
 results set `isError: true`.
@@ -263,5 +322,6 @@ results set `isError: true`.
 Node callers use `startVideo`, `videoStatus`, and `stopVideo` in
 `domain/evidence/video.ts`. Start accepts the equivalent typed options; status and
 stop use `{session: absoluteManifestPath}` with optional matching target fields.
-The injectable video `baseDir` is the evidence state root containing `bundles/`
-and `locks/`, unlike still capture's `baseDir`, which is its bundle root.
+The injectable video `baseDir` overrides the evidence root containing `bundles/`;
+it cannot move the device lock. Still capture's existing `baseDir` dependency
+continues to mean its bundle root.
