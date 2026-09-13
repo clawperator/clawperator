@@ -26,6 +26,7 @@ Android/Node/CLI/doctor and generic MCP support is implemented in 3c7d88f2
 and follow-up hardening commits on the N1 branch. API 36 live proof covers real
 browser video/audio, secure locked/off reads, actual accessibility removal,
 notification lifecycle, process recovery and explicit pre-first-unlock errors.
+API 26 also passed the complete fixture, locked/off, lifecycle and ingress proof.
 API 35 has earlier live coverage; API 21/28 service branches pass offline tests.
 See [durable evidence and limits](../../docs/internal/design/notifications-and-media.md).
 N1 is locally complete for PR review, not merged or released. Live API 21 binding

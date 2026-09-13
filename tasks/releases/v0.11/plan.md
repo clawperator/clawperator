@@ -10,7 +10,7 @@ completion or trigger publication merely by existing.
 Status: N1 implemented and locally validated for PR review; N2 and release
 execution remain pending. The feature branch retains code version 0.10.1.
 Reconcile main, release tags and published state during release preparation.
-Live N1 coverage is API 35/36; API 21/28 service tests are offline. V1 should
+Live N1 coverage is API 26/35/36; API 21/28 service tests are offline. V1 should
 retain or close the unverified live API 21 binding limitation explicitly.
 
 Feature contract: [notifications plan](../../notifications/plan.md).

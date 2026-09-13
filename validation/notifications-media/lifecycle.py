@@ -66,6 +66,20 @@ def main():
             assert time.monotonic() < deadline, 'Listener did not recover without opening the Operator'
             time.sleep(0.5)
 
+    api = int(adb('getprop', 'ro.build.version.sdk').strip())
+
+    def set_listener_allowed(allowed):
+        if api >= 27:
+            adb('cmd', 'notification', 'allow_listener' if allowed else 'disallow_listener', LISTENER)
+        else:
+            # NotificationManager's shell grant implementation starts in API 27.
+            current = adb('settings', 'get', 'secure', 'enabled_notification_listeners').strip()
+            components = [item for item in current.split(':') if item not in ('', 'null', LISTENER)]
+            if allowed:
+                components.append(LISTENER)
+            adb('settings', 'put', 'secure', 'enabled_notification_listeners', ':'.join(components))
+        time.sleep(0.5)
+
     before = sample()
     assert not before['screenOn'] and before['deviceLocked'], before
     try:
@@ -86,13 +100,13 @@ def main():
         assert len(json.dumps(large, ensure_ascii=False, separators=(',', ':')).encode()) <= 64000
         assert large['total'] >= len(large['notifications']) >= 2
         assert payload(cli('notifications', 'list', '--app', FIXTURE, '--limit', '1'))['truncated']
-        adb('cmd', 'notification', 'disallow_listener', LISTENER)
+        set_listener_allowed(False)
         try:
             cli('notifications', 'list', '--app', FIXTURE, error='NOTIFICATION_ACCESS_DENIED')
             cli('media', 'list', '--app', FIXTURE, error='NOTIFICATION_ACCESS_DENIED')
             mcp_error('-', 'NOTIFICATION_ACCESS_DENIED')
         finally:
-            adb('cmd', 'notification', 'allow_listener', LISTENER)
+            set_listener_allowed(True)
         reconnected = wait_notifications()
         assert reconnected, 'Existing notifications disappeared after listener reconnection'
         old_session = payload(cli('media', 'list', '--app', FIXTURE))['sessions'][0]['mediaSessionId']

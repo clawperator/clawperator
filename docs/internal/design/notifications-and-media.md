@@ -113,7 +113,7 @@ unbind services; the final harness clears and restores the enabled-service list.
 An initial shade setup raced keyguard dismissal; setup now settles before opening
 the shade. These failed attempts are not counted as passing evidence.
 
-Live platform coverage is API 35/36, with API 21/28 service behavior tested offline.
+Live platform coverage is API 26/35/36, with API 21/28 service behavior tested offline.
 No live API 21 listener-binding claim is made. Old-image/OEM compatibility and
 arbitrary Doze/process restrictions remain limits to consider during release
 verification. Direct Boot service operation is not supported. N2 notification
@@ -142,3 +142,31 @@ preserves the handle, evidence kind, position and update timestamp, followed by
 the complete locked/off lifecycle/control sequence. The fresh reviewer confirmed
 the fix with no additional findings. Toolkit/operator unit tests and both debug
 APK builds passed.
+
+## API 26 live verification
+
+The same final Operator and fixture APKs were installed on an explicitly selected
+Android 8.0 API 26 emulator. Branch-local operator setup succeeded using the
+legacy notification-listener grant after the platform returned
+`No shell command implementation.`. POST_NOTIFICATIONS was correctly skipped as
+unavailable on this platform. The live lifecycle harness now uses the legacy
+setting for revoke/regrant through API 26 and the shell API on newer platforms.
+
+The complete fixture run passed: actual pause/play, 1x/2x positions, buffering and
+unknown positions, stale reports with stalled/moving actual playback, temporary
+inactivity/reactivation, ambiguity, unsupported controls, ignored commands and
+replacement during confirmation. CLI, typed helper, HTTP and generic MCP returned
+consistent observations and errors.
+
+Secure locked/on-off, accessibility-unbound, expired-cache and relocked cases all
+passed with unchanged power-transition counters during each observation series.
+Notification post/update/removal, revision and truncation checks, access
+revocation/regrant, and Operator process recovery while locked/off passed.
+SystemUI independently confirmed open-shade preservation; direct Android mixed/UI
+commands failed before dispatch when accessibility was unavailable. Temporary
+credentials were removed and accessibility settings restored.
+
+This image reports `ro.crypto.state=unsupported`; encrypted-storage behavior
+before the first unlock after reboot was not exercised here. That prerequisite
+has separate API 36 evidence above. Real browser video/audio compatibility was
+verified on API 36; the API 26 media proof uses the independent MediaPlayer fixture.
