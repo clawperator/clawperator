@@ -45,6 +45,15 @@ async function createSourceSkills(root: string, skillNames: string[]): Promise<s
   return sourceDir;
 }
 
+async function createLegacySkillFixture(skillName = "clawperator-upgrade", consumer = ".claude") {
+  const root = await makeTempRoot();
+  const homeDir = join(root, "home");
+  const sourceDir = resolvePackagedBundledSkillsSourceDir({ env: {} });
+  const legacyPath = join(homeDir, consumer, "skills", skillName);
+  await cp(join(sourceDir, skillName), legacyPath, { recursive: true });
+  return { root, homeDir, sourceDir, skillName, legacyPath };
+}
+
 async function assertManagedAgentsCopy(agentsSkillsDir: string, skillName: string, expectedSkillMarkdown: string): Promise<void> {
   const copyPath = join(agentsSkillsDir, skillName);
   assert.equal((await lstat(copyPath)).isDirectory(), true);
@@ -987,12 +996,7 @@ describe("bundled discovery directory aliases", () => {
   });
 
   it("backs up exact unmarked first-party copies once and leaves Doctor clean", async () => {
-    const root = await makeTempRoot();
-    const homeDir = join(root, "home");
-    const sourceDir = resolvePackagedBundledSkillsSourceDir({ env: {} });
-    const skillName = "clawperator-upgrade";
-    const legacyPath = join(homeDir, ".agents", "skills", skillName);
-    await cp(join(sourceDir, skillName), legacyPath, { recursive: true });
+    const { homeDir, sourceDir, skillName } = await createLegacySkillFixture("clawperator-upgrade", ".agents");
     await mkdir(join(homeDir, ".claude"), { recursive: true });
     await symlink(join(homeDir, ".agents", "skills"), join(homeDir, ".claude", "skills"), directorySymlinkType);
     const options = { homeDir, sourceDir, env: {}, cliVersion: "1.2.3" };
@@ -1007,12 +1011,7 @@ describe("bundled discovery directory aliases", () => {
   });
 
   it("migrates a historical first-party version whose content differs from the package", async () => {
-    const root = await makeTempRoot();
-    const homeDir = join(root, "home");
-    const sourceDir = resolvePackagedBundledSkillsSourceDir({ env: {} });
-    const skillName = "clawperator-skill-author-by-agent-discovery";
-    const legacyPath = join(homeDir, ".claude", "skills", skillName);
-    await cp(join(sourceDir, skillName), legacyPath, { recursive: true });
+    const { homeDir, sourceDir, legacyPath } = await createLegacySkillFixture("clawperator-skill-author-by-agent-discovery");
     const oldMarkdown = (await readFile(join(legacyPath, "SKILL.md"), "utf8"))
       .replace("# Clawperator Skill Author By Agent Discovery", "# Skill Author By Agent Discovery");
     await writeFile(join(legacyPath, "SKILL.md"), oldMarkdown);
@@ -1024,11 +1023,7 @@ describe("bundled discovery directory aliases", () => {
   });
 
   it("preflights all conflicts before backing up a recognized legacy copy", async () => {
-    const root = await makeTempRoot();
-    const homeDir = join(root, "home");
-    const sourceDir = resolvePackagedBundledSkillsSourceDir({ env: {} });
-    const legacyPath = join(homeDir, ".claude", "skills", "clawperator-upgrade");
-    await cp(join(sourceDir, "clawperator-upgrade"), legacyPath, { recursive: true });
+    const { homeDir, sourceDir, legacyPath } = await createLegacySkillFixture();
     await mkdir(join(homeDir, ".codex", "skills", "clawperator-upgrade"), { recursive: true });
     const result = await copyBundledSkills({ homeDir, sourceDir, env: {} });
     assert.equal(result.ok, false);
@@ -1038,11 +1033,7 @@ describe("bundled discovery directory aliases", () => {
 
   for (const modification of ["edited", "extra", "symlink"]) {
     it(`preserves a legacy-looking skill with ${modification} content`, async () => {
-      const root = await makeTempRoot();
-      const homeDir = join(root, "home");
-      const sourceDir = resolvePackagedBundledSkillsSourceDir({ env: {} });
-      const legacyPath = join(homeDir, ".claude", "skills", "clawperator-upgrade");
-      await cp(join(sourceDir, "clawperator-upgrade"), legacyPath, { recursive: true });
+      const { homeDir, sourceDir, legacyPath } = await createLegacySkillFixture();
       if (modification === "edited") await writeFile(join(legacyPath, "SKILL.md"), "user edits");
       if (modification === "extra") await writeFile(join(legacyPath, "notes.txt"), "user notes");
       if (modification === "symlink") {
@@ -1071,12 +1062,8 @@ describe("legacy bundled skill backups across filesystems", () => {
   const crossDeviceError = () => Object.assign(new Error("Cross-device link"), { code: "EXDEV" });
 
   it("verifies the backup before removing the original when rename returns EXDEV", async () => {
-    const root = await makeTempRoot();
-    const sourceDir = resolvePackagedBundledSkillsSourceDir({ env: {} });
-    const originalPath = join(root, "original");
+    const { root, skillName, legacyPath: originalPath } = await createLegacySkillFixture();
     const backupPath = join(root, "backup");
-    const skillName = "clawperator-upgrade";
-    await cp(join(sourceDir, skillName), originalPath, { recursive: true });
     const markdown = await readFile(join(originalPath, "SKILL.md"), "utf8");
     await moveLegacyBundledSkillToBackup(originalPath, backupPath, skillName, async () => { throw crossDeviceError(); });
     assert.equal(await readFile(join(backupPath, "SKILL.md"), "utf8"), markdown);
@@ -1084,11 +1071,8 @@ describe("legacy bundled skill backups across filesystems", () => {
   });
 
   it("preserves the original when the cross-filesystem backup cannot be written", async () => {
-    const root = await makeTempRoot();
-    const sourceDir = resolvePackagedBundledSkillsSourceDir({ env: {} });
-    const originalPath = join(root, "original");
+    const { root, legacyPath: originalPath } = await createLegacySkillFixture();
     const backupPath = join(root, "backup");
-    await cp(join(sourceDir, "clawperator-upgrade"), originalPath, { recursive: true });
     await writeFile(backupPath, "existing backup");
     await assert.rejects(moveLegacyBundledSkillToBackup(originalPath, backupPath, "clawperator-upgrade", async () => { throw crossDeviceError(); }), /original preserved/);
     assert.equal((await lstat(originalPath)).isDirectory(), true);
@@ -1096,11 +1080,8 @@ describe("legacy bundled skill backups across filesystems", () => {
   });
 
   it("preserves source changes detected during the cross-filesystem fallback", async () => {
-    const root = await makeTempRoot();
-    const sourceDir = resolvePackagedBundledSkillsSourceDir({ env: {} });
-    const originalPath = join(root, "original");
+    const { root, legacyPath: originalPath } = await createLegacySkillFixture();
     const backupPath = join(root, "backup");
-    await cp(join(sourceDir, "clawperator-upgrade"), originalPath, { recursive: true });
     await assert.rejects(moveLegacyBundledSkillToBackup(originalPath, backupPath, "clawperator-upgrade", async () => {
       await writeFile(join(originalPath, "SKILL.md"), "user edits during migration");
       throw crossDeviceError();

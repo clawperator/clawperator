@@ -3,6 +3,7 @@ import assert from "node:assert";
 import { cmdInstall } from "../../cli/commands/install.js";
 import type { OperatorRemediateResult } from "../../cli/commands/operatorRemediate.js";
 import type { HostSetupResult } from "../../domain/host/hostSetup.js";
+import type { CopyBundledSkillsSuccess } from "../../domain/skills/copyBundledSkills.js";
 
 function makeOperatorRemediationResult(
   overrides: Partial<OperatorRemediateResult> = {},
@@ -54,6 +55,17 @@ function makeHostSetupResult(overrides: Partial<HostSetupResult> = {}): HostSetu
   };
 }
 
+function makeBundledSkillsResult(): CopyBundledSkillsSuccess {
+  return {
+    ok: true,
+    skills: ["clawperator-agent-orientation"],
+    installedDir: "/tmp/bundled-skills",
+    discoveryGroups: [],
+    migrations: [],
+    agentDiscoveryDirs: [{ label: "codex", dir: "/tmp/codex/skills" }],
+  };
+}
+
 describe("cmdInstall", () => {
   afterEach(() => {
     process.exitCode = undefined;
@@ -73,14 +85,7 @@ describe("cmdInstall", () => {
           registryPath: "/tmp/skills/skills/skills-registry.json",
           message: "Skills synced to /tmp/skills (ref: main)",
         }),
-        copyBundledSkillsImpl: async () => ({
-          ok: true,
-          skills: ["clawperator-agent-orientation"],
-          installedDir: "/tmp/bundled-skills",
-          discoveryGroups: [],
-          migrations: [],
-          agentDiscoveryDirs: [{ label: "codex", dir: "/tmp/codex/skills" }],
-        }),
+        copyBundledSkillsImpl: async () => makeBundledSkillsResult(),
         setupHostImpl: async (options) => {
           setupHostCalls.push(options as unknown as Record<string, unknown>);
           return makeHostSetupResult();
@@ -152,14 +157,7 @@ describe("cmdInstall", () => {
           registryPath: "/tmp/skills/skills/skills-registry.json",
           message: "Skills synced to /tmp/skills (ref: main)",
         }),
-        copyBundledSkillsImpl: async () => ({
-          ok: true,
-          skills: ["clawperator-agent-orientation"],
-          installedDir: "/tmp/bundled-skills",
-          discoveryGroups: [],
-          migrations: [],
-          agentDiscoveryDirs: [{ label: "codex", dir: "/tmp/codex/skills" }],
-        }),
+        copyBundledSkillsImpl: async () => makeBundledSkillsResult(),
         setupHostImpl: async () => makeHostSetupResult(),
       },
     );
@@ -195,14 +193,7 @@ describe("cmdInstall", () => {
           registryPath: "/tmp/skills/skills/skills-registry.json",
           message: "Skills synced to /tmp/skills (ref: main)",
         }),
-        copyBundledSkillsImpl: async () => ({
-          ok: true,
-          skills: ["clawperator-agent-orientation"],
-          installedDir: "/tmp/bundled-skills",
-          discoveryGroups: [],
-          migrations: [],
-          agentDiscoveryDirs: [{ label: "codex", dir: "/tmp/codex/skills" }],
-        }),
+        copyBundledSkillsImpl: async () => makeBundledSkillsResult(),
         setupHostImpl: async () => makeHostSetupResult(),
       },
     );
@@ -239,14 +230,7 @@ describe("cmdInstall", () => {
           registryPath: "/tmp/skills/skills/skills-registry.json",
           message: "Skills synced to /tmp/skills (ref: main)",
         }),
-        copyBundledSkillsImpl: async () => ({
-          ok: true,
-          skills: ["clawperator-agent-orientation"],
-          installedDir: "/tmp/bundled-skills",
-          discoveryGroups: [],
-          migrations: [],
-          agentDiscoveryDirs: [{ label: "codex", dir: "/tmp/codex/skills" }],
-        }),
+        copyBundledSkillsImpl: async () => makeBundledSkillsResult(),
         setupHostImpl: async () => makeHostSetupResult(),
       },
     );
@@ -306,14 +290,7 @@ describe("cmdInstall", () => {
           registryPath: "/tmp/skills/skills/skills-registry.json",
           message: "Skills synced to /tmp/skills (ref: main)",
         }),
-        copyBundledSkillsImpl: async () => ({
-          ok: true,
-          skills: ["clawperator-agent-orientation"],
-          installedDir: "/tmp/bundled-skills",
-          discoveryGroups: [],
-          migrations: [],
-          agentDiscoveryDirs: [{ label: "codex", dir: "/tmp/codex/skills" }],
-        }),
+        copyBundledSkillsImpl: async () => makeBundledSkillsResult(),
         setupHostImpl: async () => makeHostSetupResult(),
       },
     );
@@ -376,14 +353,7 @@ describe("cmdInstall", () => {
           registryPath: "/tmp/skills/skills/skills-registry.json",
           message: "Skills synced to /tmp/skills (ref: main)",
         }),
-        copyBundledSkillsImpl: async () => ({
-          ok: true,
-          skills: ["clawperator-agent-orientation"],
-          installedDir: "/tmp/bundled-skills",
-          discoveryGroups: [],
-          migrations: [],
-          agentDiscoveryDirs: [{ label: "codex", dir: "/tmp/codex/skills" }],
-        }),
+        copyBundledSkillsImpl: async () => makeBundledSkillsResult(),
         setupHostImpl: async () => makeHostSetupResult(),
       },
     );
@@ -405,14 +375,7 @@ describe("cmdInstall", () => {
           registryPath: "/tmp/skills/skills/skills-registry.json",
           message: "Skills synced to /tmp/skills (ref: main)",
         }),
-        copyBundledSkillsImpl: async () => ({
-          ok: true,
-          skills: ["clawperator-agent-orientation"],
-          installedDir: "/tmp/bundled-skills",
-          discoveryGroups: [],
-          migrations: [],
-          agentDiscoveryDirs: [{ label: "codex", dir: "/tmp/codex/skills" }],
-        }),
+        copyBundledSkillsImpl: async () => makeBundledSkillsResult(),
         setupHostImpl: async () => makeHostSetupResult({
           status: "warn",
           message: "Host setup completed with a shared-agent bridge warning; continuing.",
@@ -440,14 +403,7 @@ describe("cmdInstall", () => {
           registryPath: "/tmp/skills/skills/skills-registry.json",
           message: "Skills synced to /tmp/skills (ref: main)",
         }),
-        copyBundledSkillsImpl: async () => ({
-          ok: true,
-          skills: ["clawperator-agent-orientation"],
-          installedDir: "/tmp/bundled-skills",
-          discoveryGroups: [],
-          migrations: [],
-          agentDiscoveryDirs: [{ label: "codex", dir: "/tmp/codex/skills" }],
-        }),
+        copyBundledSkillsImpl: async () => makeBundledSkillsResult(),
         setupHostImpl: async () => makeHostSetupResult({
           ok: false,
           status: "failed",
@@ -486,14 +442,7 @@ describe("cmdInstall", () => {
           registryPath: "/tmp/skills/skills/skills-registry.json",
           message: "Skills synced to /tmp/skills (ref: main)",
         }),
-        copyBundledSkillsImpl: async () => ({
-          ok: true,
-          skills: ["clawperator-agent-orientation"],
-          installedDir: "/tmp/bundled-skills",
-          discoveryGroups: [],
-          migrations: [],
-          agentDiscoveryDirs: [{ label: "codex", dir: "/tmp/codex/skills" }],
-        }),
+        copyBundledSkillsImpl: async () => makeBundledSkillsResult(),
         setupHostImpl: async () => makeHostSetupResult({
           ok: false,
           status: "failed",
