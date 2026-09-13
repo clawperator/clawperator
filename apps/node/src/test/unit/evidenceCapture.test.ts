@@ -22,13 +22,14 @@ const xml = '<hierarchy><node text="Settings" visible-to-user="true" accessibili
 const png = PNG.sync.write({ width: 2, height: 2, data: Buffer.alloc(16, 255) } as PNG);
 class CaptureRunner implements ProcessRunner {
   calls: string[][] = [];
+  properties = '[ro.build.version.release]: [16]\n[ro.build.version.sdk]: [36]\n[ro.product.manufacturer]: [Example]\n[ro.product.model]: [Example phone]\n';
   inventory = "List of devices attached\ntest-device\tdevice\n";
   async run(_command: string, args: string[]) {
     this.calls.push(args);
     let stdout = "";
     const command = args.slice(args[0] === "-s" ? 2 : 0).join(" ");
     if (command === "devices") stdout = this.inventory;
-    if (command === "shell getprop") stdout = '[ro.build.version.release]: [16]\n[ro.build.version.sdk]: [36]\n[ro.product.manufacturer]: [Example]\n[ro.product.model]: [Example phone]\n[ro.kernel.qemu]: [1]\n';
+    if (command === "shell getprop") stdout = this.properties;
     if (command === "shell wm size") stdout = 'Physical size: 200x400\nOverride size: 100x200\n';
     if (command === "shell wm density") stdout = 'Physical density: 400\nOverride density: 200\n';
     if (command === "shell dumpsys input") stdout = 'SurfaceOrientation: 1\n';
@@ -67,8 +68,8 @@ describe("still evidence capture", () => {
       assert.equal(manifest.label, ""); assert.deepEqual(manifest.context, context);
       assert.equal(manifest.device.serial, "test-device");
       assert.deepEqual(manifest.device.display, { width: 100, height: 200, density: 200, rotation: 1 });
-      assert.equal(manifest.device.deviceType, "emulator");
-      assert.equal(manifest.device.deviceTypeProperties["ro.kernel.qemu"], "1");
+      assert.equal(manifest.device.deviceType, "physical");
+      assert.equal(manifest.device.deviceTypeProperties["ro.kernel.qemu"], null);
       assert.deepEqual(manifest.artifacts.map(value => value.kind), ["screenshot", "hierarchy", "capture_envelopes"]);
       for (const artifact of manifest.artifacts) {
         assert.equal(artifact.status, "complete");
@@ -358,4 +359,82 @@ describe("still evidence capture", () => {
     try { await assert.rejects(expired.run("adb", ["shell", "something"]), { code: "COMMAND_TIMEOUT" }); }
     finally { expired.close(); }
   });
+});
+
+describe("evidence metadata classification", () => {
+  for (const [flags, expected] of [
+    ["", "physical"],
+    ["[persist.sys.boot.reason.history]: [reboot,123\nreboot,456]", "physical"],
+    ["[persist.sys.boot.reason.history]: [reboot,123\r\nreboot,456]\r\n[ro.boot.qemu]: [1]\r\n", "emulator"],
+    ["[ro.kernel.qemu]: []", "physical"],
+    ["[ro.kernel.qemu]: [0]", "physical"],
+    ["[ro.boot.qemu]: [0]", "physical"],
+    ["[ro.kernel.qemu]: [0]\n[ro.boot.qemu]: [0]", "physical"],
+    ["[ro.kernel.qemu]: [1]", "emulator"],
+    ["[ro.boot.qemu]: [1]", "emulator"],
+    ["[ro.kernel.qemu]: [0]\n[ro.boot.qemu]: [1]", "emulator"],
+    ["[ro.kernel.qemu]: [1]\n[ro.boot.qemu]: [0]", "emulator"],
+    ["[ro.kernel.qemu]: [unexpected]\n[ro.boot.qemu]: [1]", "emulator"],
+    ["[ro.kernel.qemu]: [unexpected]", "unknown"],
+    ["[ro.kernel.qemu]: [0]\n[ro.boot.qemu]: [unexpected]", "unknown"],
+    ["malformed", "unknown"],
+    ["[bad key]: [value]", "unknown"],
+    ["[ro.kernel.qemu]: 1]", "unknown"],
+    ["[ro.kernel.qemu]:[1]", "unknown"],
+    ["[ro.kernel.qemu] : [1]", "unknown"],
+    ["[persist.example]: broken]\n[ro.kernel.qemu]: [0]", "unknown"],
+    ["[persist.example.multiline]: [unclosed\n[ro.kernel.qemu]: [0]", "unknown"],
+    ["[ro.kernel.qemu]: [1", "unknown"],
+    ["[ro.kernel.qemu]: [0]\n[ro.kernel.qemu]: [1]", "unknown"],
+  ] as const) {
+    it(`classifies ${JSON.stringify(flags)} as ${expected} through still capture`, async () => {
+      const f = await fixture();
+      try {
+        f.runner.properties += flags;
+        const output = await cmdEvidenceCapture({ outputDir: f.outputDir, format: "json" }, f.dependencies);
+        const result = JSON.parse(output), manifest = await manifestAt(result.manifestPath);
+        assert.equal(manifest.device.deviceType, expected);
+        assert.equal(result.status, expected === "unknown" ? "partial" : "complete");
+        assert.equal(shouldCliStdoutForceExitCode1(output, false), expected === "unknown");
+      } finally { await f.cleanup(); }
+    });
+  }
+  for (const newline of ["\n", "\r\n"]) {
+    for (const value of ["first\n[second]", "first]\nsecond"]) {
+      for (const flag of ["0", "1"]) {
+        it(`preserves bracketed multiline values with ${JSON.stringify(newline)} and flag ${flag}`, async () => {
+          const f = await fixture();
+          try {
+            f.runner.properties += `[persist.example.multiline]: [${value}]\n[ro.kernel.qemu]: [${flag}]\n`;
+            f.runner.properties = f.runner.properties.replaceAll("\n", newline);
+            const result = await captureEvidence({ outputDir: f.outputDir }, f.dependencies);
+            const manifest = await manifestAt(result.manifestPath);
+            assert.equal(result.status, "complete");
+            assert.equal(manifest.device.deviceType, flag === "1" ? "emulator" : "physical");
+            assert.equal(manifest.device.deviceTypeProperties["ro.kernel.qemu"], flag);
+            assert.deepEqual(manifest.errors, []);
+          } finally { await f.cleanup(); }
+        });
+      }
+    }
+  }
+  for (const mode of ["empty", "nonzero", "throw", "exhausted"] as const) {
+    it(`keeps ${mode} property reads unknown`, async () => {
+      const f = await fixture();
+      try {
+        const run = f.runner.run.bind(f.runner);
+        f.runner.run = async (command, args) => {
+          if (args.includes("getprop")) {
+            if (mode === "throw") throw new Error("read timed out");
+            return { stdout: mode === "empty" ? "" : f.runner.properties, stderr: "", code: mode === "nonzero" ? 1 : 0 };
+          }
+          return run(command, args);
+        };
+        const data = await collectEvidenceMetadata(f.config, () => mode === "exhausted" ? 0 : 5000);
+        assert.equal(data.device.deviceType, "unknown");
+        assert.ok(data.errors.some(error => error.component === "deviceType"));
+        if (mode === "exhausted") assert.equal(f.runner.calls.length, 0);
+      } finally { await f.cleanup(); }
+    });
+  }
 });

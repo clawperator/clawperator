@@ -9,7 +9,8 @@ import { promisify } from "node:util";
 
 const execute = promisify(execFile);
 
-it("real detached worker survives its initiating process and concurrent stops finalize once", { skip: process.platform === "win32" ? "Executable fixtures use POSIX shebangs" : false }, async () => {
+for (const [flags, deviceType] of [["", "physical"], ["\\n[ro.kernel.qemu]: [1]", "emulator"], ["\\n[ro.kernel.qemu]: [unexpected]", "unknown"]] as const) {
+it(`classification ${deviceType}: real detached worker survives its initiating process and concurrent stops finalize once`, { skip: process.platform === "win32" ? "Executable fixtures use POSIX shebangs" : false }, async () => {
   const root = await fs.mkdtemp(join(tmpdir(), "video-worker-process-test-"));
   const binary = async (name: string, body: string) => {
     const path = join(root, name);
@@ -22,7 +23,7 @@ const args=process.argv.slice(2);const action=args.slice(args[0]==='-s'?2:0).joi
 const read=()=>JSON.parse(fs.readFileSync(path.join(root,'recorder.json'),'utf8'));
 if(action==='devices') console.log('List of devices attached\\ntest-device\\tdevice');
 else if(action==='shell screenrecord --help') console.error('--size --time-limit Default is 180.');
-else if(action==='shell getprop') console.log('[ro.build.version.sdk]: [36]\\n[ro.build.version.release]: [16]\\n[ro.product.model]: [test]\\n[ro.product.manufacturer]: [test]\\n[ro.kernel.qemu]: [1]');
+else if(action==='shell getprop') console.log('[ro.build.version.sdk]: [36]\\n[ro.build.version.release]: [16]\\n[ro.product.model]: [test]\\n[ro.product.manufacturer]: [test]${flags}');
 else if(action==='shell wm size') console.log('Physical size: 720x1280');
 else if(action==='shell wm density') console.log('Physical density: 320');
 else if(action==='shell dumpsys input') console.log('SurfaceOrientation: 0');
@@ -51,14 +52,23 @@ else {console.error('Unexpected fake adb operation: '+action);process.exit(1)}
     const started = JSON.parse((await execute(process.execPath, [parent, root], { env, timeout: 8000 })).stdout);
     assert.equal(started.status, "recording");
     manifestPath = started.manifestPath;
-    const cli = (operation: string) => execute(process.execPath, ["dist/cli/index.js", "evidence", "video", operation, "--session", manifestPath!], { env, timeout: 17000 });
+    const cli = (operation: string) => execute(process.execPath, ["dist/cli/index.js", "evidence", "video", operation, "--session", manifestPath!], { env, timeout: 17000 }).then(result => ({ ...result, exitCode: 0 })).catch(error => {
+      if (deviceType !== "unknown" || error.code !== 1) throw error;
+      return { stdout: error.stdout as string, exitCode: error.code as number };
+    });
     assert.equal(JSON.parse((await cli("status")).stdout).status, "recording");
     const stopped = await Promise.all([cli("stop"), cli("stop")]);
-    for (const result of stopped) assert.equal(JSON.parse(result.stdout).status, "complete");
+    for (const result of stopped) {
+      assert.equal(JSON.parse(result.stdout).status, deviceType === "unknown" ? "partial" : "complete");
+      assert.equal(result.exitCode, deviceType === "unknown" ? 1 : 0);
+    }
     const original = await fs.readFile(manifestPath!, "utf8");
+    assert.equal(JSON.parse(original).device.deviceType, deviceType);
+    assert.deepEqual(JSON.parse(original).device.deviceTypeProperties, { "ro.kernel.qemu": deviceType === "physical" ? null : deviceType === "emulator" ? "1" : "unexpected", "ro.boot.qemu": null });
+    assert.equal(JSON.parse(original).errors.some((error: { component?: string }) => error.component === "deviceType"), deviceType === "unknown");
     assert.equal(JSON.parse(original).video.stopReason, "requested");
     assert.ok(JSON.parse(original).video.hostDurationMs < 9000, "Explicit stop must finish before the cap");
-    assert.equal(JSON.parse((await cli("stop")).stdout).status, "complete");
+    assert.equal(JSON.parse((await cli("stop")).stdout).status, deviceType === "unknown" ? "partial" : "complete");
     assert.equal(await fs.readFile(manifestPath!, "utf8"), original);
     assert.equal((await fs.readdir(join(root, "locks"))).length, 0);
   } finally {
@@ -69,3 +79,5 @@ else {console.error('Unexpected fake adb operation: '+action);process.exit(1)}
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+}

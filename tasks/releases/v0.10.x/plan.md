@@ -5,8 +5,8 @@ Prioritize reliable physical-device evidence and sandboxed recording for the
 required evidence, documentation and local commits are complete. Publication
 has separate gates below.
 
-Status: item 4 implemented and locally validated; patch publication not started.
-Other items retain their individually recorded status.
+Status: items 1 and 4 implemented and locally validated; patch publication not
+started. Other items retain their individually recorded status.
 This queue follows the retired 0.10.0 release pack. Baseline inspected:
 `626a169d`, code version 0.10.1. Reconcile current versions, tags and work in
 flight before choosing a patch release number.
@@ -22,7 +22,7 @@ Use the sanitized findings in each pack when those local repositories are absent
 
 | Order | Priority | Task / PR | Reason and dependency | Status |
 | --- | --- | --- | --- | --- |
-| 1 | P1 | [Physical-device evidence classification](../../node/evidence-device-classification/plan.md) | Confirmed partial-bundle failure for otherwise valid physical captures; no feature dependency | [TODO] |
+| 1 | P1 | [Physical-device evidence classification](../../../docs/internal/design/still-evidence.md#physical-device-classification-validation) | Physical still/video completion and emulator classification verified; no feature dependency | [DONE] locally; not merged or published |
 | 2 | P1 | [Writable video state](../../node/evidence-writable-state/plan.md) | Confirmed sandbox integration failure; retain cross-root device ownership; independent implementation, use row 1 for integrated complete-bundle proof | [TODO] |
 | 3 | P2 | [Scoped selection diagnostics and deterministic assertions](../../node/scoped-selection-guidance/plan.md) | Reduce repeated ambiguity/overlap discovery mistakes; existing scoped behavior passed; independent | [TODO] |
 | 4 | P2 | [Safe query consumption](../../../docs/api/actions.md#runnable-node-consumer) | Runnable validated consumer and empty-matcher guidance; independent | [DONE] locally; not published |
