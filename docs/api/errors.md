@@ -244,12 +244,12 @@ between process exit and output-pipe closure. Already dispatched output is drain
 before classifying closure; a complete validated result remains authoritative.
 Draining keeps the existing result deadline, or starts the configured wait budget
 at exit if dispatch never began. If output pipes remain open at that deadline,
+`RESULT_TRANSPORT_EXITED` includes `outputDrainIncomplete: true`, the observed
+exit status and collected diagnostics; the host closes its remaining pipe handles.
+
 `stdoutObserved` reports whether any reader stdout bytes arrived, including
 bytes first received after broadcast dispatch. It does not prove receipt of a
 terminal result; use the correlated events and chunk diagnostics separately.
-
-`RESULT_TRANSPORT_EXITED` includes `outputDrainIncomplete: true`, the observed
-exit status and collected diagnostics; the host closes its remaining pipe handles.
 
 Process failures include `exitCode` and `signal` when known, or
 `processErrorCode` and `originalMessage` for spawn errors. Diagnostics retain a
