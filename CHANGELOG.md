@@ -4,6 +4,104 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.10.0] - 2026-09-13
+
+This release changes doctor exit status, explicit selector scoping, scroll result values, and host-failure SSE reporting; callers should apply the migration notes below. It adds structured UI queries, compact snapshots, verified still and video evidence, on-screen diagnostics, and richer action and transport evidence.
+
+### 🤖 Node API & CLI
+
+- **Added:** Added configurable emulator storage through CLI and Serve, with G/GB validation and a 12G default for newly provisioned Google Play AVDs.
+- **Added:** Exposed validated on-screen log set/clear actions through raw execution, Serve, and MCP.
+- **Added:** Added `on-screen-log set` and `on-screen-log clear` CLI commands with strict flags and no replay after uncertain dispatch.
+- **Added:** Added structured `query` / `query_ui` inspection with counts, bounded node results, nullable platform state, observation-local paths, and ancestor/descendant matching.
+- **Added:** Exposed Android-marked node sensitivity through queries and MCP, retaining unknown values where the platform cannot report it.
+- **Added:** Added opt-in strict action selection and duplicate-match warnings, with bounded candidate summaries for ambiguous targets and containers.
+- **Added:** Added opt-in compact CLI/MCP snapshots with node and text budgets, ancestry and visibility metadata, and exact raw XML artifacts.
+- **Added:** Added still-evidence capture through CLI and MCP, producing correlated PNG/XML artifacts, hashes, device metadata, timings, and a manifest while retaining partial failures.
+- **Added:** Added managed video start/status/stop through Node, CLI, and MCP, with detached sessions, duration caps, exclusive device ownership, and verified media before completion.
+- **Added:** Added bounded, correlated result-reader lifecycle diagnostics to failures, host logs, and MCP without copying raw UI contents.
+- **Breaking:** **Changed:** `doctor --check-only` now exits 1 when readiness is unverified. Diagnostic collectors must preserve JSON output even on nonzero exit; readiness requires the selected Operator and completed required checks.
+- **Breaking:** **Changed:** Explicit action containers now restrict targets to descendants. Review existing container selectors; strict enforcement requires the matching 0.10 Operator.
+- **Breaking:** **Changed:** Preserved completed and failed action steps, typed errors, correlation IDs, and dispatch receipts across failures and timeouts. Accept the new scroll outcomes `no_movement`, `unknown`, and `container_lost`, prefer `data.errorCode`, and parse JSON receipt fields; dispatch acceptance does not prove an application state change.
+- **Breaking:** **Changed:** Serve host transport failures now appear only in `clawperator:execution`; SSE consumers must stop relying on synthetic `clawperator:result` envelopes for those failures.
+- **Changed:** Unified Node test execution with automatic discovery so the package test command includes previously omitted suites.
+- **Fixed:** Generated skill wrappers now preserve child exit codes and both output streams; signals, timeouts, and spawn failures exit 1. Regenerate or manually migrate existing wrappers.
+- **Fixed:** Required full-stream video decoding before evidence completion, rejecting recordings with damaged later packets while retaining partial artifacts and recovery metadata.
+- **Fixed:** Prevented dispatch after result-reader exit and bounded inherited-pipe draining while retaining buffered canonical results, integrity errors, and dispatch uncertainty without replay.
+- **Fixed:** Corrected `stdoutObserved` diagnostics when output first arrived after fallback dispatch.
+
+### 📚 Documentation & Website
+
+- **Added:** Documented emulator storage configuration in the Serve API.
+- **Added:** Added snapshot latency and performance guidance, including daemon/Serve usage and emulator comparisons.
+- **Added:** Added on-screen log action contracts, overlay behavior, selector isolation, and capture limits.
+- **Added:** Documented on-screen log CLI usage and verification limits.
+- **Added:** Added guidance for concise agent instructions, preserving exact contracts, user-requested values, and observable completion evidence.
+- **Added:** Documented structured queries, relational selectors, hierarchy failures, and observation-local node paths.
+- **Added:** Documented sensitive hierarchy access and nullable sensitivity metadata.
+- **Added:** Documented strict selection, duplicate warnings, explicit container scoping, and matching-Operator requirements.
+- **Added:** Documented compact snapshot budgets, raw XML artifacts, formatting failures, and MCP behavior.
+- **Added:** Documented still-evidence manifests, artifact verification, and partial-failure handling.
+- **Added:** Documented managed video lifecycle, ownership, duration limits, verified completion, and recovery.
+- **Added:** Documented correlated transport diagnostics and their limits: Android publication markers report logging writes, not host delivery acknowledgement.
+- **Changed:** Tightened emulator setup copy in the machine-readable landing page.
+- **Changed:** Refined the landing-page hero and setup wording and added an introductory video.
+- **Changed:** Removed local Git blocked-term policy details from runtime skill-authoring documentation.
+- **Changed:** Updated doctor readiness, exit-code, remediation, and logging guidance.
+- **Changed:** Documented migration for existing generated skill wrappers that previously concealed child failures.
+- **Changed:** Documented action dispatch receipts, retained failure evidence, typed errors, and observed scroll outcomes.
+- **Changed:** Documented scroll-container eligibility transitions and the retained descendant scope.
+- **Changed:** Documented transport failure codes and the SSE host-failure migration.
+- **Changed:** Documented full-stream video verification and its resource limits.
+- **Changed:** Clarified result-reader exit handling, bounded draining, and preserved transport uncertainty.
+- **Changed:** Corrected transport diagnostics guidance and retained the limits of the historical failure investigation.
+
+### 📱 Android Operator APK
+
+- **Added:** Added opt-in snapshot timing diagnostics.
+- **Added:** Added a service-owned, touch-through diagnostic overlay with explicit geometry, expiry, draw acknowledgement, and selector isolation.
+- **Added:** Added shared structured UI inspection and relational matching, with correlated chunk transport for large results and explicit missing-hierarchy failures.
+- **Added:** Declared both Operator variants as accessibility tools to expose Android-marked sensitive hierarchy content on Android 15+, with per-node sensitivity metadata.
+- **Added:** Added strict scoped action selection with ambiguity rejection and duplicate-match warnings.
+- **Added:** Added correlated publication-start, completed-write, and failed-write diagnostic markers.
+- **Changed:** Upgraded Robolectric to 4.11.1 and added API 34 accessibility lifecycle test coverage.
+- **Breaking:** **Changed:** Preserved action evidence through failure, cancellation, and timeout; added dispatch receipts and observed scroll outcomes without treating unchanged content as proof of an edge.
+- **Fixed:** Guarded snapshot timing checks when Android logging was unavailable in tests.
+- **Fixed:** Kept the original scroll container identifiable after it stopped being scrollable, and retained accessibility node handles for reliable identity and dispatch on older Android versions.
+- **Fixed:** Paced result chunks off the main thread and protected terminal publication from cancellation.
+- **Fixed:** Restricted the exported debug overlay proof activity to callers with `android.permission.DUMP`.
+
+Pull requests:
+- [feat(emulator): configure AVD storage size](https://github.com/clawperator/clawperator/pull/262)
+- [feat(skill, docs): add I/O speed testing skill and performance guidance](https://github.com/clawperator/clawperator/pull/263)
+- [feat(landing): tighten hero copy and add intro video](https://github.com/clawperator/clawperator/pull/264)
+- [feat(landing): strengthen hero copy above the fold](https://github.com/clawperator/clawperator/pull/265)
+- [feat(on-screen-logs): add diagnostic overlay actions](https://github.com/clawperator/clawperator/pull/266)
+- [docs(tasks): prepare v0.10 runtime observability handoffs](https://github.com/clawperator/clawperator/pull/267)
+- [docs: simplify agent skills and task guidance for Astra](https://github.com/clawperator/clawperator/pull/268)
+- [docs(tasks): streamline v0.10 handoffs for capable agents](https://github.com/clawperator/clawperator/pull/269)
+- [feat(on-screen-logs): add set and clear CLI commands](https://github.com/clawperator/clawperator/pull/270)
+- [fix(doctor): require verified selected Operator readiness](https://github.com/clawperator/clawperator/pull/271)
+- [fix(skills): preserve generated script failures and output](https://github.com/clawperator/clawperator/pull/272)
+- [feat(selectors): add structured UI inspection and relational matching](https://github.com/clawperator/clawperator/pull/273)
+- [build(android): upgrade Robolectric to 4.11.1](https://github.com/clawperator/clawperator/pull/274)
+- [feat(android): restore sensitive hierarchy access](https://github.com/clawperator/clawperator/pull/275)
+- [feat(selectors): add strict scoped selection and duplicate hints](https://github.com/clawperator/clawperator/pull/276)
+- [test: unify repository test execution and automatic discovery](https://github.com/clawperator/clawperator/pull/277)
+- [feat(runtime)!: preserve action evidence and report dispatch receipts](https://github.com/clawperator/clawperator/pull/278)
+- [feat(snapshot): add bounded compact output and raw XML artifacts](https://github.com/clawperator/clawperator/pull/279)
+- [fix(validation): verify Settings preparation before hierarchy capture](https://github.com/clawperator/clawperator/pull/280)
+- [fix(android): preserve scroll scope across eligibility transitions](https://github.com/clawperator/clawperator/pull/281)
+- [fix(runtime): harden result transport and terminal publication](https://github.com/clawperator/clawperator/pull/282)
+- [feat(evidence): capture verified screenshot and hierarchy bundles](https://github.com/clawperator/clawperator/pull/283)
+- [fix(validation): stabilize integrated hierarchy acceptance](https://github.com/clawperator/clawperator/pull/284)
+- [feat(evidence): add managed video recording with verified media](https://github.com/clawperator/clawperator/pull/285)
+- [fix(android): restrict debug overlay proof to privileged callers](https://github.com/clawperator/clawperator/pull/286)
+- [fix(evidence): verify full video streams before completing evidence](https://github.com/clawperator/clawperator/pull/287)
+- [fix(runtime): prevent dispatch and hangs after result-reader exit](https://github.com/clawperator/clawperator/pull/288)
+- [fix(runtime): correct result-reader diagnostics and retain failure evidence](https://github.com/clawperator/clawperator/pull/289)
+- [feat(runtime): add correlated result transport diagnostics](https://github.com/clawperator/clawperator/pull/290)
+
 ## [0.9.5] - 2026-05-01
 
 This release improved skill-run log discoverability and added direct public Markdown setup entrypoints for Clawperator's agent onboarding surfaces.

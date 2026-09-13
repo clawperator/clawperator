@@ -127,6 +127,15 @@ retains build identity and attempt accounting. The later reader-exit recurrence
 remains in the transport findings alongside passing series. Media verification
 and retirement of implementation plans do not close outstanding release gates.
 
+### Release-owner disposition for 0.10.0
+
+On 13 September 2026, the release owner explicitly approved shipping 0.10.0
+with the historical post-dispatch reader-exit investigation deferred. The
+original cause remains unresolved; passing local suites and finite live series
+do not establish failure-free transport. Preserve the recorded failures and
+continue the investigation separately without replaying uncertain mutations.
+This disposition satisfies requirement 1 above for this release only.
+
 ### Local verification on 13 September 2026
 
 `./validation/test_all.sh` completed once with exit 0 against source
