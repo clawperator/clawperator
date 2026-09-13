@@ -1,5 +1,5 @@
 import { probeUserUnlockState } from "../device/userUnlockState.js";
-import { isBackgroundObservation } from "../../contracts/notifications.js";
+import { isBackgroundServiceExecution } from "../../contracts/notifications.js";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -652,13 +652,13 @@ async function performExecution(
       };
     }
 
-    if (isBackgroundObservation(execution.actions)) {
+    if (isBackgroundServiceExecution(execution.actions)) {
       const userState = await probeUserUnlockState(config);
       if (userState?.userUnlocked === false) {
         cancelEarlyResultWaiter();
         return { execution, result: { ok: false, deviceId, error: {
           code: ERROR_CODES.DEVICE_USER_NOT_UNLOCKED,
-          message: "Android user storage is not unlocked after boot. Unlock the selected user once before notification/media observation; no unlock was attempted.",
+          message: "Android user storage is not unlocked after boot. Unlock the selected user once before notification/media operations; no unlock was attempted.",
           details: userState,
         } } };
       }

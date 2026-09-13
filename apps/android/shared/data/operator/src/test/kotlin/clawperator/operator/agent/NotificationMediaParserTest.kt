@@ -2,6 +2,7 @@ package clawperator.operator.agent
 
 import clawperator.task.runner.UiAction
 import clawperator.task.runner.isBackgroundObservation
+import clawperator.task.runner.isBackgroundServiceExecution
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -37,6 +38,24 @@ class NotificationMediaParserTest {
             "dismiss_notification" to """{"notificationKey":" "}""",
             "invoke_notification_action" to """{"notificationKey":"k","actionId":"a","waitTimeoutMs":1}""",
         )) assertTrue(parse("""{"id":"a","type":"$type","params":$params}""").isFailure)
+    }
+    @Test fun serviceExecutionsAllowControlsButRejectAnyInteractiveAction() {
+        val read = """{"id":"read","type":"list_notifications"}"""
+        for (type in listOf("media_pause", "media_play", "media_seek")) {
+            val position = if (type == "media_seek") ",\"positionMs\":0" else ""
+            val control = """{"id":"control","type":"$type","params":{"mediaSessionId":"s"$position}}"""
+            for (actions in listOf(control, "$read,$control", "$control,$read")) {
+                assertTrue(parse(actions).getOrThrow().actions.isBackgroundServiceExecution())
+                for (interactive in listOf(
+                    """{"id":"ui","type":"sleep","params":{"durationMs":1}}""",
+                    """{"id":"ui","type":"dismiss_notification","params":{"notificationKey":"k"}}""",
+                    """{"id":"ui","type":"invoke_notification_action","params":{"notificationKey":"k","actionId":"a"}}""",
+                )) {
+                    assertFalse(parse("$actions,$interactive").getOrThrow().actions.isBackgroundServiceExecution())
+                    assertFalse(parse("$interactive,$actions").getOrThrow().actions.isBackgroundServiceExecution())
+                }
+            }
+        }
     }
     @Test fun rejectsMissingBlankConflictingAndInvalidParams() {
         for (params in listOf("{}", """{"mediaSessionId":""}""", """{"applicationId":" "}""", """{"applicationId":"p","mediaSessionId":"s"}""", """{"mediaSessionId":42}""")) {

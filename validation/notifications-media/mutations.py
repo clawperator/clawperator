@@ -46,6 +46,15 @@ def main():
         assert result.returncode == 0 and envelope['status'] == 'success', value
         return json.loads(envelope['stepResults'][0]['data']['payload'])
 
+    def wait_for_session():
+        deadline = time.monotonic() + 10
+        sessions = cli('media', 'list', '--app', PACKAGE)['sessions']
+        while not sessions:
+            assert time.monotonic() < deadline, 'Fixture session was not published after launch/recovery'
+            time.sleep(.2)
+            sessions = cli('media', 'list', '--app', PACKAGE)['sessions']
+        return sessions[0]['mediaSessionId']
+
     def active_notification_keys():
         dump = adb('shell', 'dumpsys', 'notification', '--noredact')
         assert 'Notification List:' in dump, 'Missing independent active notification section'
@@ -68,7 +77,7 @@ def main():
         adb('shell', 'am', 'force-stop', PACKAGE)
         adb('shell', 'am', 'start', '-n', PACKAGE + '/clawperator.operator.debug.MediaProofActivity')
         time.sleep(2)
-        session_id = cli('media', 'list', '--app', PACKAGE)['sessions'][0]['mediaSessionId']
+        session_id = wait_for_session()
         control('post')
         original = button()
         cli('media', 'status', '--session', session_id)
@@ -123,7 +132,7 @@ def main():
             time.sleep(.5)
         assert adb('shell', 'pidof', OPERATOR).strip() != old_pid
         action(stale, error='NOTIFICATION_ACTION_EXPIRED')
-        session_id = cli('media', 'list', '--app', PACKAGE)['sessions'][0]['mediaSessionId']
+        session_id = wait_for_session()
         cli('media', 'pause', '--session', session_id, '--wait-timeout-ms', '2000')
         duration = cli('media', 'status', '--session', session_id)['session']['durationMs']
         assert isinstance(duration, int) and duration > 0

@@ -540,3 +540,15 @@ test assertion about coroutine exception object identity failed; it was correcte
 to check propagated type/message, and the failed attempt remains in private
 accounting. No natural recurrence was captured, and no causal or release gate
 is closed by these checks.
+
+
+### Release-owner disposition for 0.11.0
+
+On 13 September 2026, the release owner deferred the unresolved historical
+reader-exit investigation until more information becomes available. This known
+limitation is not a blocker to 0.11.0; the decision does not establish a root
+cause or claim that result delivery is failure-free. Existing structured errors,
+dispatch uncertainty and the prohibition on replaying uncertain mutations remain
+unchanged. Resume the separate transport investigation when new natural-failure
+evidence provides a useful diagnostic lead, preserving the original failures and
+independent host/device observations.

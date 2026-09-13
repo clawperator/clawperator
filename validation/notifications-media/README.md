@@ -88,3 +88,30 @@ whole-execution readiness, exact advertised-intent handles, canceled/input
 buttons, refused cancellations, seek cancellation and transport non-replay.
 The existing manual live workflow includes `mutations.py`; no automatic emulator
 job is added.
+
+## Locked media controls (N3)
+
+The secure lock matrix also pauses, seeks and resumes the same session in locked
+on/off states, with accessibility unbound and after the readiness-cache interval.
+Independent MediaPlayer samples must show actual pause/play and seek within
+100 ms, exactly one callback per control, and unchanged screen-transition counters.
+The locked-transports.mjs harness runs typed helpers and mixed read/control lists
+through HTTP and generic MCP, checking session identity and actual effects.
+Ignored seeks and replacement during confirmation remain explicit failures with
+dispatch evidence. Direct Android ingress preserves the open shade for service
+controls while rejecting UI/notification-mutation lists before any prefix.
+
+Run run.py with --secure-lock --controls, then mutations.py and ingress-shade.py
+on each explicit emulator. Run first-unlock.py on a controlled encrypted emulator;
+it also checks that media controls fail before first unlock. The replacement
+proof ends its selected session; the later, separate control regression starts a
+fresh fixture after temporary-credential cleanup. Keep the branch-local dist/
+unchanged while a live harness is running; rebuilding it can interrupt a child CLI
+before it produces JSON. Session discovery polls boundedly after fixture launch;
+notification transport setup allows repost callbacks to settle before acquiring
+a fresh handle. The lit lock screen is prepared separately for each transport
+series so a legacy keyguard sleep timer does not expire during a long run; those
+setup transitions happen before the measured controls. Independent sample reads
+may retry at most three times after a read error, retaining failed-read evidence.
+Neither setup repair retries a mutation. Offline CI stays
+automatic; live CI stays manual.

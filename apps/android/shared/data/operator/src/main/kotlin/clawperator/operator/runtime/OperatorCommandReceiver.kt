@@ -14,7 +14,7 @@ import clawperator.operator.agent.AgentCommandParser
 import clawperator.operator.agent.EnvelopeErrorCodes
 import clawperator.operator.agent.buildCanonicalFailureLine
 import clawperator.task.runner.TaskResult
-import clawperator.task.runner.isBackgroundObservation
+import clawperator.task.runner.isBackgroundServiceExecution
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -45,7 +45,7 @@ class OperatorCommandReceiver :
                 }
 
                 val parsedCommand = agentCommandParser.parse(payload)
-                val background = parsedCommand.getOrNull()?.actions?.isBackgroundObservation() == true
+                val background = parsedCommand.getOrNull()?.actions?.isBackgroundServiceExecution() == true
                 val accessibilityService = if (background) null else accessibilityServiceManager.currentAccessibilityService
                 if (!background && accessibilityService == null) {
                     val reason = "Accessibility service is not available"

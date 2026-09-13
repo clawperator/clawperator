@@ -23,8 +23,8 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     evidence = []
 
-    def run(command, *, raw=False):
-        result = subprocess.run(command, cwd=ROOT, text=True, capture_output=True, timeout=90)
+    def run(command, *, raw=False, timeout=90):
+        result = subprocess.run(command, cwd=ROOT, text=True, capture_output=True, timeout=timeout)
         if result.returncode:
             raise RuntimeError(f'{command[0]} failed: {result.stdout}\n{result.stderr}')
         return result.stdout if raw else json.loads(result.stdout)
@@ -140,9 +140,16 @@ def main():
         evidence.append({'unchangedReportWithActualProgress': {'before': moving_before, 'after': moving_after}})
         run(['node', 'validation/notifications-media/http-helper-observe.mjs', args.device, session_id, str(args.output / 'http-helper.json')], raw=True)
         if args.secure_lock:
-            run(['python3', 'validation/notifications-media/lock-matrix.py', '--device', args.device, '--session', session_id, '--output', str(args.output / 'locked')], raw=True)
+            run(['python3', 'validation/notifications-media/lock-matrix.py', '--device', args.device, '--session', session_id, '--output', str(args.output / 'locked')], raw=True, timeout=180)
             session_id = json.loads((args.output / 'locked' / 'lifecycle.json').read_text())['mediaSessionId']
         if args.controls:
+            if args.secure_lock:
+                # Locked replacement proof deliberately leaves a controller with no callbacks.
+                # Start a fresh fixture only after credential cleanup, outside that proof.
+                adb('shell', 'am', 'force-stop', PACKAGE)
+                adb('shell', 'am', 'start', '-n', PACKAGE + '/clawperator.operator.debug.MediaProofActivity')
+                time.sleep(2)
+                session_id = payload(cli('media', 'list', '--app', PACKAGE))['sessions'][0]['mediaSessionId']
             control('resume')
             control('second')
             sessions = payload(cli('media', 'list', '--app', PACKAGE))['sessions']
