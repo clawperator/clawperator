@@ -476,3 +476,50 @@ retained denied host-process access and still completed all three device
 observations. Both APKs built; Android runtime source was unchanged and its
 unit suite was not rerun in this follow-up. The initial restricted Gradle-cache
 access failure remains in private accounting before the authorized build.
+
+
+### Correlated reader and publication diagnostics
+
+The reader keeps a bounded, metadata-only timeline in memory for each command.
+It records process creation and confirmed spawn separately, first stdout/stderr,
+broadcast callback entry, dispatch, deadline start/expiry, exit, close, settlement,
+and cleanup requests/results. Times are monotonic milliseconds since the wait
+began, with a wall-clock start timestamp for cross-process comparison. Output
+counters and last-output times update without adding per-chunk events. The
+32-event limit has an explicit dropped-event counter. Stream metadata uses
+`stdoutBytes`, `stderrBytes`, `lastStdoutElapsedMs` and `lastStderrElapsedMs`,
+so MCP preserves it while continuing to remove raw stdout/stderr fields.
+
+The failure response includes `details.reader`. The existing host logger writes
+`result_reader.failure` at warning level on failure and preserves late exit/close
+observations separately. Command/task/device identities accompany those events;
+the JSON message contains Operator package, settlement code, chunk progress and
+reader metadata.
+This does not copy UI contents, raw stderr or command payloads into new logs.
+Timeline logger failures do not change the result. Existing user-selected log thresholds
+still apply. A host killed before settlement may never flush this in-memory
+record; absence of the log is not evidence that the reader never started.
+
+Compare event order before drawing a causal conclusion. An `exit` before
+`cleanup_requested` was observed before this reader requested termination; it
+does not identify an external initiator. An exit after cleanup may reflect that
+request, but ordering alone does not prove causality. The returned failure is
+an immutable settlement-time snapshot, while late lifecycle log events may
+show the subsequent exit and pipe closure. No deadline or dispatch behavior is
+changed, and no uncertain execution is replayed.
+
+Android emits `[Clawperator-Publication]` followed by a single JSON object with
+`commandId`, `taskId`, `event`, `byteLength`, `recordCount`, `chunkCount`,
+`writtenRecords`, and monotonic `elapsedMs`. Events are `started`,
+`writes_completed`, or `write_failed`. A small unchunked result has one record
+and zero chunks. Identifiers are JSON-escaped; no result payload or exception
+message is copied into these markers. `writtenRecords` counts logging calls
+that returned. Diagnostic-write exceptions cannot block canonical publication,
+and canonical-write exceptions retain their existing failure behavior.
+
+`writes_completed` means only that publication writes returned. It is not a
+logd or host delivery acknowledgement. The result reader may stop on the last
+result record before that marker arrives, so use the independent observer or
+bounded device-buffer capture when checking publication completion. These
+markers share logcat's loss characteristics; missing markers are inconclusive.
+The historical cause and manual supported-image release gate remain open.

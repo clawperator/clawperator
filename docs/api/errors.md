@@ -251,6 +251,22 @@ exit status and collected diagnostics; the host closes its remaining pipe handle
 bytes first received after broadcast dispatch. It does not prove receipt of a
 terminal result; use the correlated events and chunk diagnostics separately.
 
+`details.reader` adds a metadata-only lifecycle snapshot: host/reader PIDs,
+wall-clock `startedAt`, monotonic elapsed times, `stdoutBytes`, `stderrBytes`,
+`lastStdoutElapsedMs`, `lastStderrElapsedMs`, and at most 32 events with a `droppedEvents` count. Missing
+reader PID or stream output time is `null`. Events distinguish dispatch,
+process exit/close, settlement and cleanup requests; a cleanup request is not
+proof that a signal was delivered. No stdout/stderr contents or UI payloads
+are added to this timeline.
+
+A failed reader emits `result_reader.failure` through the existing host logger
+at warning level, with command/task/device correlation and the snapshot in its
+JSON `message`. Later process events emit `result_reader.exit` and
+`result_reader.close` at warning level for failed waits and debug level for
+successful waits. The returned snapshot is taken at settlement; later logger
+records can therefore contain exit/close evidence it lacks. Existing log-level
+and file-routing settings apply. The reader does not wait longer for logging.
+
 Process failures include `exitCode` and `signal` when known, or
 `processErrorCode` and `originalMessage` for spawn errors. Diagnostics retain a
 stderr tail of at most 8,192 characters and bounded correlated log lines.
