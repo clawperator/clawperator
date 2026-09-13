@@ -10,10 +10,12 @@ completion or trigger publication merely by existing.
 Status: N1 implemented and locally validated for PR review; N2 and release
 execution remain pending. The feature branch retains code version 0.10.1.
 Reconcile main, release tags and published state during release preparation.
-Live N1 coverage is API 26/35/36; API 21/28 service tests are offline. V1 should
-retain or close the unverified live API 21 binding limitation explicitly.
+Live N1 coverage is API 26/35/36; API 21/28 service tests are offline. V1 must provision a live API 21 image and verify listener binding, reads and
+pause/play with the matching build, or obtain an explicit release-scope
+disposition. Offline coverage does not satisfy that live compatibility gate.
 
-Feature contract: [notifications plan](../../notifications/plan.md).
+Remaining N2 contract: [notifications plan](../../notifications/plan.md).
+Delivered N1 behavior/evidence: [permanent design record](../../../docs/internal/design/notifications-and-media.md).
 Execution details: [work breakdown](../../notifications/work-breakdown.md).
 
 ## Grouped delivery
@@ -36,13 +38,13 @@ not establish real playback progress or PiP-window persistence. Keep independent
 fixture progress and downstream visual/window assertions separate.
 
 Code-version timing must account for any still-active 0.10 release workflow; do
-not bump the shared version during this planning change.
+perform the version bump only during release preparation.
 
 ## Release acceptance
 
 - N1/N2 complete their declared offline and live evidence. Re-run combined checks
   only when needed to verify the final integrated source/build, not as a ritual.
-- N1's mandatory locked/off readiness matrix passes, including a cold/expired
+- Preserve the [validated background readiness behavior](../../../docs/internal/design/notifications-and-media.md#service-boundary-and-readiness), including a cold/expired
   interactive cache, absent accessibility and listener recovery. Background doctor
   reports its own capability with correct exits and no UI/remediation side effects;
   default interactive doctor semantics remain intact.
@@ -74,9 +76,9 @@ not bump the shared version during this planning change.
 
 ## Release execution and scope
 
-The current request creates this pack; no package publication or main push occurs
-as part of authoring. A later instruction naming a feature row authorizes that row;
-an instruction to implement the feature pack authorizes N1/N2. Explicit release
+Feature implementation and task cleanup do not authorize package publication or
+a main push. N1 is locally complete; an instruction to implement the remaining
+feature pack authorizes N2. Explicit release
 execution uses `.agents/skills/release-orchestrator/SKILL.md` with 0.11.0 and 0.11.1.
 Use its version, release-note, creation, verification and published-version skills
 instead of duplicating their procedures here. The release CHANGELOG entry must be
