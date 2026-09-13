@@ -1,7 +1,8 @@
-import { access, cp, lstat, mkdir, readdir, readFile, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { access, cp, lstat, mkdir, mkdtemp, realpath, readdir, readFile, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { isKnownLegacyBundledSkill, moveLegacyBundledSkillToBackup } from "./legacyBundledSkills.js";
 import { constants } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, parse, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getCliVersion } from "../version/compatibility.js";
 import { DEFAULT_BUNDLED_SKILLS_DIR } from "./skillsConfig.js";
@@ -21,6 +22,8 @@ export interface CopyBundledSkillsSuccess {
   skills: string[];
   installedDir: string;
   agentDiscoveryDirs: BundledSkillDiscoveryDirEntry[];
+  discoveryGroups: BundledSkillDiscoveryGroup[];
+  migrations: Array<{ originalPath: string; backupPath: string }>;
 }
 
 export interface CopyBundledSkillsError {
@@ -103,17 +106,81 @@ function resolveAgentDiscoveryDirs(options: CopyBundledSkillsOptions): BundledSk
   ];
 }
 
-function resolveSymlinkDiscoveryDirs(options: CopyBundledSkillsOptions): BundledSkillDiscoveryDirEntry[] {
-  return [
-    { label: "claude", dir: resolveClaudeSkillsDir(options) },
-    { label: "codex", dir: resolveCodexSkillsDir(options) },
-  ];
+export interface BundledSkillDiscoveryGroup {
+  dir: string;
+  aliases: BundledSkillDiscoveryDirEntry[];
+  representation: "symlink" | "copy";
 }
 
-function resolveManagedCopyDiscoveryDirs(options: CopyBundledSkillsOptions): BundledSkillDiscoveryDirEntry[] {
-  return [
-    { label: "agents", dir: resolveAgentsSkillsDir(options) },
-  ];
+// Resolve existing ancestors too, so Doctor can plan missing discovery directories
+// without creating them. Resolve dangling directory aliases through their targets.
+async function resolvePhysicalPath(path: string): Promise<string> {
+  const absolutePath = resolve(path);
+  let current = parse(absolutePath).root;
+  let pending = absolutePath.slice(current.length).split(sep);
+  let followedLinks = 0;
+  while (pending.length > 0) {
+    const component = pending.shift()!;
+    if (component === "" || component === ".") continue;
+    if (component === "..") {
+      // The filesystem must enter the preceding directory before it can leave
+      // it. Collapsing an absent directory here would hide a dangling alias.
+      if (!(await stat(current)).isDirectory()) {
+        throw new Error(`Discovery directory traverses a non-directory: ${current}`);
+      }
+      current = dirname(current);
+      continue;
+    }
+    const candidate = join(current, component);
+    const entry = await lstat(candidate).catch(error => {
+      if (!isMissingPathError(error)) throw error;
+      return undefined;
+    });
+    if (entry?.isSymbolicLink()) {
+      if (++followedLinks > 40) throw new Error(`Discovery directory has a symlink cycle or too many links: ${path}`);
+      const target = await readlink(candidate);
+      const root = isAbsolute(target) ? parse(target).root : "";
+      if (root !== "") current = root;
+      // Expand links before processing '..', matching filesystem traversal even
+      // when a link target or a child directory does not exist yet.
+      pending = [...target.slice(root.length).split(sep), ...pending];
+    } else {
+      current = entry === undefined ? candidate : await realpath(candidate);
+    }
+  }
+  return current;
+}
+
+export async function resolveBundledSkillDiscoveryGroups(options: CopyBundledSkillsOptions): Promise<BundledSkillDiscoveryGroup[]> {
+  const groups = new Map<string, BundledSkillDiscoveryGroup>();
+  for (const alias of resolveAgentDiscoveryDirs(options)) {
+    const dir = await resolvePhysicalPath(alias.dir);
+    let group = groups.get(dir);
+    if (!group) {
+      group = { dir, aliases: [], representation: "symlink" };
+      groups.set(dir, group);
+    }
+    group.aliases.push(alias);
+    if (alias.label === "agents") group.representation = "copy";
+  }
+  return [...groups.values()];
+}
+
+async function assertDiscoveryStorageSeparation(
+  groups: BundledSkillDiscoveryGroup[], installedDir: string, sourceDir: string
+): Promise<void> {
+  const storageDirs = [await resolvePhysicalPath(installedDir), await resolvePhysicalPath(sourceDir)];
+  for (const group of groups) {
+    if (storageDirs.some(path => path === group.dir || path.startsWith(group.dir + "/") || group.dir.startsWith(path + "/"))) {
+      throw new Error(`Discovery directory overlaps bundled skill storage: ${group.dir}`);
+    }
+  }
+}
+
+export async function inspectBundledSkillDiscoveryEntry(group: BundledSkillDiscoveryGroup, installedDir: string, skillName: string) {
+  return group.representation === "copy"
+    ? inspectManagedBundledSkillDirectory(join(group.dir, skillName), installedDir, skillName)
+    : inspectManagedBundledSkillLink(join(group.dir, skillName), installedDir, skillName);
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -533,8 +600,7 @@ export async function copyBundledSkills(
   const sourceDir = resolvePackagedBundledSkillsSourceDir(options);
   const installedDir = resolveBundledSkillsInstalledDir(options);
   const agentDiscoveryDirs = resolveAgentDiscoveryDirs(options);
-  const symlinkDiscoveryDirs = resolveSymlinkDiscoveryDirs(options);
-  const managedCopyDiscoveryDirs = resolveManagedCopyDiscoveryDirs(options);
+  const migrations: Array<{ originalPath: string; backupPath: string }> = [];
 
   let sourceStat;
   try {
@@ -564,18 +630,42 @@ export async function copyBundledSkills(
         message: `No packaged bundled-skills with SKILL.md were found in ${sourceDir}`,
       };
     }
+    const plannedDiscoveryGroups = await resolveBundledSkillDiscoveryGroups(options);
+    await assertDiscoveryStorageSeparation(plannedDiscoveryGroups, installedDir, sourceDir);
     await ensureDirectory(installedDir);
-    for (const { dir } of agentDiscoveryDirs) {
+    for (const { dir } of plannedDiscoveryGroups) {
       await ensureDirectory(dir);
     }
+    // On case-insensitive filesystems, absent paths with different spellings can
+    // become the same directory. Choose ownership only after all roots exist.
+    const discoveryGroups = await resolveBundledSkillDiscoveryGroups(options);
+    await assertDiscoveryStorageSeparation(discoveryGroups, installedDir, sourceDir);
+    const symlinkDiscoveryDirs = discoveryGroups.filter(group => group.representation === "symlink");
+    const managedCopyDiscoveryDirs = discoveryGroups.filter(group => group.representation === "copy");
 
+    const legacyEntries: string[] = [];
     for (const skillName of skills) {
+      for (const group of discoveryGroups) {
+        const path = join(group.dir, skillName);
+        if (await isKnownLegacyBundledSkill(path, skillName)) legacyEntries.push(path);
+      }
       for (const { dir } of symlinkDiscoveryDirs) {
+        if (legacyEntries.includes(join(dir, skillName))) continue;
         await assertManagedSymlinkWritable(join(dir, skillName), installedDir, skillName);
       }
       for (const { dir } of managedCopyDiscoveryDirs) {
+        if (legacyEntries.includes(join(dir, skillName))) continue;
         await assertManagedDirectoryCopyWritable(join(dir, skillName), installedDir, skillName);
       }
+    }
+
+    for (const originalPath of legacyEntries) {
+      const backupRoot = join(dirname(installedDir), "bundled-skills-backups");
+      await mkdir(backupRoot, { recursive: true });
+      const backupDir = await mkdtemp(join(backupRoot, new Date().toISOString().replace(/[:.]/g, "-") + "-"));
+      const backupPath = join(backupDir, basename(originalPath));
+      await moveLegacyBundledSkillToBackup(originalPath, backupPath, basename(originalPath));
+      migrations.push({ originalPath, backupPath });
     }
 
     for (const skillName of skills) {
@@ -599,6 +689,12 @@ export async function copyBundledSkills(
     for (const { dir } of managedCopyDiscoveryDirs) {
       await removeStaleBundledSkillCopies(dir, activeSkills, installedDir);
     }
+    for (const group of discoveryGroups) {
+      for (const skillName of skills) {
+        const inspection = await inspectBundledSkillDiscoveryEntry(group, installedDir, skillName);
+        if (!inspection.ok) throw new Error(`Post-install verification failed: ${join(group.dir, skillName)} (${group.representation}, ${inspection.status})`);
+      }
+    }
     await writeFile(join(installedDir, VERSION_FILENAME), `${options.cliVersion ?? getCliVersion()}\n`, "utf8");
 
     return {
@@ -606,13 +702,15 @@ export async function copyBundledSkills(
       skills,
       installedDir,
       agentDiscoveryDirs,
+      discoveryGroups,
+      migrations,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {
       ok: false,
       code: "BUNDLED_SKILLS_INSTALL_FAILED",
-      message,
+      message: migrations.length ? `${message}; completed migrations: ${JSON.stringify(migrations)}` : message,
     };
   }
 }
