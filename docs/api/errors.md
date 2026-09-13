@@ -37,6 +37,16 @@ stops the sequence. [Action receipts](actions.md#action-receipts-and-failure-evi
 describe dispatch evidence, not a verified application outcome. Do not replay an
 uncertain mutation automatically.
 
+## Notification and media controls
+
+See [notifications](notifications.md) for expired keys/actions, non-dismissible
+notifications, canceled PendingIntents, unsupported input/authentication and
+listener access/query failures. See [media seeking](media.md#seeking) for invalid
+or out-of-range positions, unsupported controls, expired/ambiguous sessions and
+postcondition timeouts. These controls retain dispatch evidence on failed waits
+and execution cancellation. A missing receipt remains transport uncertainty;
+never infer that an action was not sent or automatically replay it.
+
 ## Evidence storage failures
 
 `EVIDENCE_STORAGE_UNWRITABLE` means an evidence destination or the fixed host

@@ -7,38 +7,42 @@ Target release: **0.11.0**. Next unreleased code version after publication:
 notification/media workstream and release readiness; it does not assert release
 completion or trigger publication merely by existing.
 
-Status: N1 implemented and locally validated for PR review; N2 and release
-execution remain pending. The feature branch retains code version 0.10.1.
+Status: N1 merged as 45d9667a821379a2385137d788a7eb4f13986c7b (PR #302).
+N2 is implemented and validated locally in bf85701e, ready for one feature PR;
+its merge and V1-V3 release execution remain pending. Current main already has code version 0.11.0 from 917d5a83.
 Reconcile main, release tags and published state during release preparation.
 Live N1 coverage is API 26/35/36; API 21/28 service tests are offline. V1 must provision a live API 21 image and verify listener binding, reads and
 pause/play with the matching build, or obtain an explicit release-scope
 disposition. Offline coverage does not satisfy that live compatibility gate.
 
-Remaining N2 contract: [notifications plan](../../notifications/plan.md).
-Delivered N1 behavior/evidence: [permanent design record](../../../docs/internal/design/notifications-and-media.md).
-Execution details: [work breakdown](../../notifications/work-breakdown.md).
+Delivered contracts: [notifications](../../../docs/api/notifications.md) and
+[media](../../../docs/api/media.md). Permanent N1/N2 behavior and sanitized
+acceptance evidence: [design record](../../../docs/internal/design/notifications-and-media.md).
+Reproduction: [independent fixture](../../../validation/notifications-media/README.md).
+The completed notifications task pack is retired on the N2 implementation branch;
+that cleanup does not claim the feature PR is merged.
 
 ## Grouped delivery
 
 | Stage | Scope / PR | Dependency | Status |
 | --- | --- | --- | --- |
-| N1 | Fresh notification reads; media discovery/status/pause/play; Android + Node + CLI/HTTP execution + tests + docs | Current main | [DONE] Local implementation/validation; PR merge pending |
-| N2 | Notification dismiss/buttons; media seek; matching tests/docs and integrated live acceptance | N1 service boundary/contracts; merge N1 first | [TODO] |
-| V1 | Release preparation PR: reconcile/bump code to 0.11.0, release notes, final acceptance evidence and task cleanup | N1/N2 integrated | [TODO] |
+| N1 | Fresh notification reads; media discovery/status/pause/play; Android + Node + CLI/HTTP execution + tests + docs | Current main | [DONE] Merged in PR #302 (45d9667a) |
+| N2 | Notification dismiss/buttons; media seek; matching tests/docs and integrated live acceptance | Merged N1 service boundary/contracts | [DONE] Local implementation and API 26/36 acceptance in bf85701e; PR merge pending |
+| V1 | Release preparation PR: reconcile existing 0.11.0 code, release notes, release-package/final acceptance evidence and task cleanup | N1/N2 merged | [TODO] |
 | V2 | Tag/publish 0.11.0 and verify distribution | V1 merged and inherited release gates resolved | [TODO] |
 | V3 | Post-publication follow-up PR: public version surfaces and next unreleased code version, in separate logical commits | Successful V2 verification | [TODO] |
 
 Bias toward these two feature PRs plus the required release lifecycle changes.
 Do not create separate infrastructure, platform, CLI, documentation or test PRs
-for components of N1/N2. V1 may fold into the final feature PR when the integrated
-base and release evidence are ready; do not duplicate already completed work.
+for components of N1/N2. Keep V1-V3 separate from the N2 feature batch and do not
+duplicate completed version bumps or feature acceptance.
 N1 alone unblocks downstream screen-off/PiP observation work; N2 is not a
 prerequisite for those consumers. Player-reported state and estimated position do
 not establish real playback progress or PiP-window persistence. Keep independent
 fixture progress and downstream visual/window assertions separate.
 
-Code-version timing must account for any still-active 0.10 release workflow; do
-perform the version bump only during release preparation.
+Code-version reconciliation remains V1 work. Main already has 0.11.0; do not
+repeat the completed bump or change published-version claims during feature work.
 
 ## Release acceptance
 
@@ -77,8 +81,7 @@ perform the version bump only during release preparation.
 ## Release execution and scope
 
 Feature implementation and task cleanup do not authorize package publication or
-a main push. N1 is locally complete; an instruction to implement the remaining
-feature pack authorizes N2. Explicit release
+a main push. N1 is merged; N2 feature implementation does not authorize V1-V3. Explicit release
 execution uses `.agents/skills/release-orchestrator/SKILL.md` with 0.11.0 and 0.11.1.
 Use its version, release-note, creation, verification and published-version skills
 instead of duplicating their procedures here. The release CHANGELOG entry must be
@@ -90,8 +93,6 @@ though they may share a follow-up PR. Preserve truthful status for locally
 implemented, merged, published and verified work. No invented release date, PR
 number or validation result belongs in this plan.
 
-Before retiring completed feature packs, move stable contracts and evidence to
-`docs/api/notifications.md`, `docs/api/media.md` and
-`docs/internal/design/notifications-and-media.md`, and update this plan's links.
+Feature contracts and evidence now live in the permanent references above.
 Retain actionable release steps until publication and version follow-up finish;
 then use task-cleanup to retire the coordination plan without losing open work.

@@ -1,8 +1,9 @@
 # Notification and media observation
 
 N1 introduces notification listing, media session listing/status, explicit play
-and pause, and the `background-observation` doctor capability. N2 notification
-mutations and seeking remain pending. Public contracts live in
+and pause, and the `background-observation` doctor capability. N1 merged in
+45d9667a821379a2385137d788a7eb4f13986c7b (PR #302). N2 adds notification
+dismissal/buttons and media seeking on that merged base. Public contracts live in
 [notifications](../../api/notifications.md) and [media](../../api/media.md).
 
 ## Service boundary and readiness
@@ -24,7 +25,7 @@ Doze or OEM process-policy support.
 Notification snapshots use the connected listener's activeNotifications, including
 ongoing/group entries; the presentation manager's historical cache is not reused.
 Listener access denial and disconnection are distinct errors. Notification action
-handles are revision-scoped descriptors only. No content is logged outside the
+handles are opaque, revision-scoped references to exact advertised PendingIntents. No content is logged outside the
 canonical result transport by the changed Android execution path.
 
 Media handles map Android tokens to controllers for the lifetime of this Operator
@@ -116,8 +117,7 @@ the shade. These failed attempts are not counted as passing evidence.
 Live platform coverage is API 26/35/36, with API 21/28 service behavior tested offline.
 No live API 21 listener-binding claim is made. Old-image/OEM compatibility and
 arbitrary Doze/process restrictions remain limits to consider during release
-verification. Direct Boot service operation is not supported. N2 notification
-mutations/seeking and downstream PiP-window assertions remain separate work.
+verification. Direct Boot service operation is not supported. Downstream PiP-window assertions remain separate work. N2 evidence follows below.
 
 The PR review also verified that API 24-26 may return
 `No shell command implementation.` with exit status zero. Provisioning recognizes
@@ -170,3 +170,108 @@ This image reports `ro.crypto.state=unsupported`; encrypted-storage behavior
 before the first unlock after reboot was not exercised here. That prerequisite
 has separate API 36 evidence above. Real browser video/audio compatibility was
 verified on API 36; the API 26 media proof uses the independent MediaPlayer fixture.
+
+## N2 mutation invariants
+
+All three new actions use the canonical Android execution path and retain
+whole-execution interactive readiness. They do not extend the background read
+allowlist. Node validation, typed parameters/payload decoding, CLI, HTTP `/execute`
+and generic MCP `execute` share the canonical action contract.
+
+Dismissal checks a fresh listener snapshot and isClearable, dispatches cancellation
+once, then reports whether a fresh snapshot actually omits the key. Optional
+polling stops at its deadline and returns removalObserved=false when the key
+remains. Query failure, listener replacement and permission loss after dispatch
+remain errors with dispatch evidence, not empty snapshots or confirmed removal.
+
+Button listings retain bounded process-local references to the exact advertised
+PendingIntent and listener, revision, post time and action index. Each listing
+issues fresh opaque handles; a published handle is never reassigned. Validation
+checks the current snapshot/revision and sends the original PendingIntent. This
+also protects a listing that sees a new platform snapshot before a delayed
+listener callback. Input/authentication requirements on either the advertised or
+current action are rejected. Canceled PendingIntents report dispatched=false;
+other platform dispatch failures conservatively preserve dispatch uncertainty.
+Android can still race between validation and sending. No retry or replacement
+button selection follows that race.
+
+Seek pins one controller, validates seek support and duration bounds, and issues
+one absolute-position request. Missing/negative duration is unknown; zero permits
+only zero. Positive waits require a new callback sequence and an original player
+update time between dispatch and observation, with the reported position within
+the requested absolute tolerance. Old PLAYING reports and platform extrapolation
+cannot confirm a seek. Timeouts/cancellation retain dispatch and requested
+position/wait/tolerance evidence. Inactivity/replacement ends a current command;
+only separate future actions can select again. Original reports remain retained
+across temporary inactivity until destruction.
+
+N2 is additive to runtime skills. Inspection of the sibling runtime skill sources
+found no consumers of the notification/media action contracts that require a
+version change. No app-specific skill or release-version change belongs to this
+batch.
+
+## N2 integrated acceptance
+
+Validated on 2026-09-13 at implementation commit
+`bf85701e51b69b9daa9d7f458e393c9602b2eb1e`, based on origin/main
+`3042ece4d1a2733ff3222aac9fac4a2baa6f5066`, which includes the merged N1 commit.
+The matching branch-local CLI is 0.11.0; the debug Operator is 0.11.0-d
+(versionCode 1100900). These versions were already on main and were not bumped
+by N2. Feature completion does not assert merge or publication.
+
+Operator APK SHA-256:
+`4824e0cd8b613744512cdf2180274417c387fbfcc8c5f06ae6d7101e55e19765`.
+Independent fixture APK SHA-256:
+`abdf0551fcecf5bb105f62bbda9e5bc9a6ea54f2f9cb084e265faa4e07f13cfc`.
+
+API 36 and API 26 emulators were selected explicitly after connectivity/API
+checks and tested sequentially with those APKs. API 35 was available but was not
+needed for additional N2 coverage. API 26 setup successfully used legacy
+notification-access provisioning; POST_NOTIFICATIONS was skipped as unavailable.
+
+| Case | Observed result |
+| --- | --- |
+| Complete fixture flow, both platforms | Discover notifications/sessions, read status, pause, seek to 20000 ms, play, invoke one button, dismiss. Independent MediaPlayer position matched the seek within 100 ms; actualPlaying changed on pause/play; the button counter increased by exactly one. |
+| Dismissal, both platforms | Cancellation was dispatched and subsequent removal observed. Android's active notification section independently contained the key before dispatch and omitted it afterward. Reusing the removed key failed; ongoing/non-clearable notifications failed before dispatch. Offline simulated OS refusal retained dispatched=true with removalObserved=false. |
+| Button references, both platforms | Notification update and actual Operator process death invalidated old handles. Tests verified the process ID changed rather than trusting a kill request. Canceled PendingIntents returned NOTIFICATION_ACTION_CANCELLED with dispatched=false; removed keys returned NOTIFICATION_EXPIRED. |
+| Unsupported buttons | RemoteInput was advertised and rejected on API 26/36. Authentication-required buttons were advertised and rejected on API 36; API 26 has no equivalent flag. Offline API 28 additionally covers data-only RemoteInput. |
+| Seek bounds, both platforms | Requests beyond reported duration failed before dispatch. Zero duration accepted zero and rejected one; unknown duration accepted a valid absolute seek. Unsupported sessions and ambiguous package selection returned distinct errors. |
+| Ignored seek, both platforms | One seek callback arrived in the fixture while its independent position remained unchanged. A zero-tolerance wait timed out with dispatched=true. No second dispatch occurred. |
+| Command timeout, both platforms | A 1000 ms execution budget ended a 30000 ms seek wait with COMMAND_TIMEOUT; requested position, wait, tolerance and dispatched=true survived in step evidence. The fixture counted one request. |
+| Stale PLAYING report, both platforms | With original reports frozen and actual playback paused, an ignored seek could not be confirmed by extrapolation. The wait timed out and the original report timestamp remained unchanged. |
+| Replacement during seek, both platforms | A same-package replacement expired the pinned session after one dispatch. The old handle stayed expired; the command never targeted the replacement. |
+| Typed helper, HTTP and MCP, both platforms | Each path sought to 15000 ms, invoked a button and dismissed a notification. Independent samples showed position 15000, paused playback and exactly one new seek/button callback per path. Stale button errors were preserved. HTTP retained explicit command/task IDs; MCP returned the canonical correlated envelope with its generated IDs. |
+| Locked/off regression, both platforms | N1 actual playback, stale reports, inactivity/reactivation, secure on/off, absent accessibility, expired cache, relocking, permission revocation/regrant and listener process recovery passed on the matching builds. Read-only CLI/MCP and background doctor did not change independent power-event counters. |
+| Direct Android ingress, both platforms | All N2 mutations, each mixed with a read in both orders, failed with SERVICE_UNAVAILABLE and no steps while accessibility was unbound. Open-shade read preservation and prior UI-only rejection still passed. |
+
+All 1658 Node tests passed after a branch-local build. The requested Android debug
+assembly and app unit tests passed, as did the full unitTest aggregate (501 test
+cases, no failures/errors), including API 21/28 service tests. Normal CI owns
+these offline checks. The existing workflow_dispatch-only live workflow includes
+the integrated N2 harness; no PR/push emulator job was added.
+
+Temporary emulator credentials were removed and accessibility settings restored
+by the lock/ingress harnesses. Local raw evidence remains outside Git. Committed
+records omit device serials, user identifiers, account content and machine paths.
+
+Fixture corrections worth retaining: RemoteInput PendingIntents must be mutable
+on recent Android; notification archives must be excluded from active-removal
+assertions; process death must be observed; and duration bounds must use the
+player's reported metadata. The same nominal 60-second file reported 60023 ms on
+API 26, so assuming 60000 would misclassify a valid seek as out of range.
+
+## Remaining release and player limits
+
+N2 feature acceptance is complete locally. Live API 21 listener binding, reads and
+pause/play remain an explicit V1 follow-up; API 26/36 evidence and offline tests
+do not waive it. Release-package validation with com.clawperator.operator,
+release notes, transport-release gates, publication and version follow-up remain
+owned by the v0.11 release plan. This batch used the development package only.
+
+Real browser compatibility remains supported by the separate N1 evidence above;
+N2 seeking/buttons were proven with the independent fixture, not every third-party
+player. Advertised seek support may still be ignored, rounded or reported slowly.
+A confirmation is a player report, not independent evidence of playback progress
+or PiP persistence. Authentication/replies, Direct Boot service operation,
+restricted profiles, arbitrary OEM/Doze behavior and downstream PiP-window
+assertions remain outside N2.

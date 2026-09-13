@@ -17,7 +17,7 @@ session restores its existing handle and retained original report. The selected
 controller is pinned throughout each action.
 
 List/status work while the display is off or keyguard locked without waking it.
-Pause/play retain normal interactive readiness. Notification access and a connected
+Pause/play/seek retain normal interactive readiness. Notification access and a connected
 listener are required. Players without active sessions cannot be controlled here.
 
 | Action | Parameters |
@@ -25,6 +25,7 @@ listener are required. Players without active sessions cannot be controlled here
 | list_media_sessions | Optional applicationId, limit (1-100, default 25), maxTextChars (1-1024, default 256) |
 | get_media_status | Exactly one applicationId or mediaSessionId |
 | media_pause / media_play | Exactly one applicationId or mediaSessionId; optional waitTimeoutMs (0-30000, default 0) |
+| media_seek | Exactly one applicationId or mediaSessionId; required positionMs; optional waitTimeoutMs and positionToleranceMs (see below) |
 
 Use these actions through CLI, typed `runNotificationMedia`, HTTP `/execute`, or
 generic MCP `execute`. Canonical `data.payload` is a JSON string with
@@ -65,4 +66,46 @@ MEDIA_POSTCONDITION_TIMEOUT retains dispatched=true. Expired sessions, unsupport
 controls and ambiguity return MEDIA_SESSION_EXPIRED, MEDIA_ACTION_UNSUPPORTED or
 MEDIA_SESSION_AMBIGUOUS. Never replay a mutation after uncertain transport.
 
-Seeking and notification buttons are not currently available.
+## Seeking
+
+```sh
+clawperator media seek --session <id> --position-ms 20000 --wait-timeout-ms 2000 --position-tolerance-ms 100
+```
+
+`media_seek` requires exactly one `mediaSessionId` or `applicationId`, and
+`positionMs`. Position must be a finite nonnegative integer no greater than
+9007199254740991 (JavaScript's maximum safe integer). Missing, blank, fractional,
+negative and unsafe positions are rejected before dispatch. Unknown parameters
+and conflicting selectors are rejected on both Node and Android ingress.
+
+The selected player must advertise seek. If durationMs is known and nonnegative,
+positionMs must be no greater than it: zero duration permits only position zero.
+Missing or negative duration is unknown and imposes no upper bound beyond the
+safe-integer limit. The service never silently clamps the requested position.
+A player can still reject or ignore a supported request.
+
+Optional `waitTimeoutMs` is 0-30000 (default 0); optional `positionToleranceMs` is
+0-60000 (default 1000). Both must be integers. With no wait the result reports
+dispatch and a fresh session observation. With a positive wait, confirmation
+requires a new playback-state callback after dispatch, a valid original update
+time at or after dispatch and no later than observation, and a nonnegative
+reported position within the absolute tolerance. A previous report, platform
+query or extrapolated estimate cannot satisfy the wait. A player that reports
+infrequently, rounds positions or seeks only to keyframes may need a larger
+tolerance or may time out even when it moves.
+
+The schemaVersion 1 payload contains dispatched, requestedPositionMs,
+positionToleranceMs, waitTimeoutMs, targetPositionObserved, session,
+observedElapsedMs and deviceState. The same parameters and payload work through
+typed helpers, HTTP `/execute` and generic MCP `execute`. MEDIA_POSITION_OUT_OF_RANGE
+means the requested position exceeds known duration; MEDIA_ACTION_UNSUPPORTED
+means seek is not advertised. Invalid direct service values use
+MEDIA_POSITION_INVALID; ingress rejects malformed parameters during validation.
+
+MEDIA_POSTCONDITION_TIMEOUT, execution timeout/cancellation and session expiry
+retain dispatched, requestedPositionMs, positionToleranceMs and waitTimeoutMs in
+string-valued step evidence. A session that becomes inactive or is replaced during
+a wait fails with MEDIA_SESSION_EXPIRED. The command never follows its replacement
+or repeats an uncertain control. Original player reports remain separate from
+estimates, including across temporary inactivity. Report confirmation is not
+independent proof of actual playback; verify the player when that matters.
