@@ -2,7 +2,8 @@ package action.notification
 
 import action.coroutine.CoroutineScopes
 import action.log.Log
-import action.string.quote
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -18,7 +19,9 @@ import android.service.notification.NotificationListenerService as AndroidNotifi
  */
 class NotificationListenerService : AndroidNotificationListenerService() {
     companion object {
-        var isListenerConnected = false
+        @Volatile var isListenerConnected = false
+        @Volatile var connectedInstance: NotificationListenerService? = null
+            private set
 
         const val Tag = "[NotificationListener]"
 
@@ -34,6 +37,10 @@ class NotificationListenerService : AndroidNotificationListenerService() {
     private val coroutineScopes: CoroutineScopes by inject()
     private val coroutineScopeMain: CoroutineScope get() = coroutineScopes.main
     private val coroutineScopeIo: CoroutineScope get() = coroutineScopes.io
+
+    // Before API 24, listener callbacks may arrive on Binder threads while reads run on main.
+    private val revisions = ConcurrentHashMap<String, String>()
+    fun revisionFor(key: String): String = revisions.getOrPut(key) { UUID.randomUUID().toString() }
 
     private var commandReceiver: BroadcastReceiver? = null
 
@@ -55,6 +62,7 @@ class NotificationListenerService : AndroidNotificationListenerService() {
     override fun onListenerConnected() {
         logi("onListenerConnected()")
         isListenerConnected = true
+        connectedInstance = this
 
         if (config.isTrackingEnabled) {
             queryActiveNotifications()
@@ -67,17 +75,21 @@ class NotificationListenerService : AndroidNotificationListenerService() {
         logi("onListenerDisconnected()")
         postAllNotificationsRemoved()
         isListenerConnected = false
+        connectedInstance = null
+        revisions.clear()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        log("onNotificationPosted() - ${sbn.packageName} - ${sbn.notification?.tickerText ?: "No ticker"}")
+        revisions[sbn.key] = UUID.randomUUID().toString()
+        log("onNotificationPosted() - ${sbn.packageName} - event")
         if (config.isTrackingEnabled) {
             postNewNotification(sbn)
         }
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        log("onNotificationRemoved() - ${sbn.packageName} - ${sbn.notification?.tickerText ?: "No ticker"}")
+        revisions.remove(sbn.key)
+        log("onNotificationRemoved() - ${sbn.packageName} - event")
         postNotificationRemoved(sbn)
     }
 
@@ -95,6 +107,11 @@ class NotificationListenerService : AndroidNotificationListenerService() {
         // Note: If the host app registered additional receivers via registerNotificationEventReceiver(),
         // those need to be unregistered separately using unregisterNotificationEventReceiver()
         (manager as? NotificationListenerServiceManagerAndroid)?.cleanup()
+        if (connectedInstance === this) {
+            connectedInstance = null
+            revisions.clear()
+            isListenerConnected = false
+        }
         super.onDestroy()
     }
 
@@ -107,12 +124,6 @@ class NotificationListenerService : AndroidNotificationListenerService() {
             try {
                 val notifications = getActiveNotifications()
                 log("queryActiveNotifications() - Found ${notifications.size} notifications")
-                if (notifications.isNotEmpty()) {
-                    notifications.forEachIndexed { index, it ->
-                        val data = it.toNotificationData()
-                        log(" notification[$index]: applicationId:${data.applicationId.quote()}, title:${data.title.quote()}, text:${data.text.quote()}")
-                    }
-                }
                 withContext(coroutineScopeMain.coroutineContext) {
                     onNotificationsQueried(notifications)
                 }

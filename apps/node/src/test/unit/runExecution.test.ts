@@ -3029,3 +3029,22 @@ describe("transport failure execution evidence", () => {
     });
   }
 });
+
+
+it("blocks both mixed observation/UI orders before any action dispatch", async () => {
+  const read = { id: "read", type: "list_notifications" };
+  const ui = { id: "ui", type: "snapshot" };
+  for (const actions of [[read, ui], [ui, read], [ui]]) {
+    const runner = new FakeProcessRunner();
+    runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device\tdevice\n", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "package:com.test.operator\n", stderr: "" });
+    runner.spawn = (() => Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), kill() {} })) as FakeProcessRunner["spawn"];
+    let readinessCalls = 0;
+    await assert.rejects(runExecution({ commandId: "mixed", taskId: "mixed", source: "test", expectedFormat: "android-ui-automator", timeoutMs: 1000, actions }, {
+      deviceId: "test-device", operatorPackage: "com.test.operator", runner, logcatBroadcastDelayMs: 0,
+      ensureInteractiveAutomationReadyFn: async () => { readinessCalls++; throw new Error("interactive prerequisite unavailable"); },
+    }), /interactive prerequisite unavailable/);
+    assert.equal(readinessCalls, 1);
+    assert.equal(runner.calls.some(call => call.args.includes("broadcast")), false);
+  }
+});

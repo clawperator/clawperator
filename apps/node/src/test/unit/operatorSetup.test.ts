@@ -69,7 +69,7 @@ describe("setupOperator - domain", () => {
     runner.queueResult({ code: 1, stdout: "", stderr: "Not a changeable permission type" });
     // grantNotificationListenerPermission: still called
     runner.queueResult({ code: 0, stdout: "null", stderr: "" });
-    // set enabled_notification_listeners
+    // cmd notification allow_listener
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     // grantDevicePermissions completes without verification after permission failure
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
@@ -159,7 +159,7 @@ describe("setupOperator - domain", () => {
     runner.queueResult({ code: 1, stdout: "", stderr: "Not a changeable permission type" });
     // grantNotificationListenerPermission: read current (no existing)
     runner.queueResult({ code: 0, stdout: "null", stderr: "" });
-    // set enabled_notification_listeners
+    // cmd notification allow_listener
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     // verification: pm list packages
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator", stderr: "" });
@@ -189,6 +189,7 @@ describe("setupOperator - domain", () => {
     runner.queueResult({ code: 1, stdout: "", stderr: "Not a changeable permission type" });
     // grantNotificationListenerPermission: already enabled
     runner.queueResult({ code: 0, stdout: "com.clawperator.operator.dev/action.notification.NotificationListenerService", stderr: "" });
+    runner.queueResult({ code: 0, stdout: "", stderr: "" });
     // verification: pm list packages
     runner.queueResult({ code: 0, stdout: "package:com.clawperator.operator.dev", stderr: "" });
 
@@ -227,7 +228,7 @@ describe("setupOperator - domain", () => {
     runner.queueResult({ code: 1, stdout: "", stderr: "Not a changeable permission type" });
     // grantNotificationListenerPermission: already enabled
     runner.queueResult({ code: 0, stdout: "com.clawperator.operator/action.notification.NotificationListenerService", stderr: "" });
-    // set enabled_notification_listeners
+    // cmd notification allow_listener
     runner.queueResult({ code: 0, stdout: "", stderr: "" });
     // verification: pm list returns nothing
     runner.queueResult({ code: 0, stdout: "", stderr: "" });

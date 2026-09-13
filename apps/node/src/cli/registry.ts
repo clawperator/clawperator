@@ -3148,14 +3148,54 @@ COMMANDS["logs"] = {
   },
 };
 
+// Notification/media controls share the canonical action path, including daemon/MCP.
+for (const name of ["notifications", "media"] as const) {
+  const flags = ["--app", "--session", "--limit", "--max-text-chars", "--wait-timeout-ms"];
+  COMMANDS[name] = {
+    name, group: "Observation", documentedFlags: flags, supportedFlags: flags,
+    summary: name === "notifications" ? "Inspect active notifications" : "Inspect and control media sessions",
+    help: name === "notifications"
+      ? "clawperator notifications list [--app <package>] [--limit <1-100>] [--max-text-chars <1-1024>]\nReads work while locked/off without waking the device."
+      : "clawperator media list [--app <package>]\nclawperator media status <--session <id>|--app <package>>\nclawperator media <pause|play> <--session <id>|--app <package>> [--wait-timeout-ms <0-30000>]\nList/status work while locked/off; controls retain interactive readiness. Estimates are not proof of playback.",
+    topLevelBlock: `  ${name} ${name === "media" ? "<list|status|pause|play>" : "list"}\n                                            Inspect notifications or media sessions`,
+    handler: async ctx => {
+      const { rest } = ctx;
+      const operation = rest[0];
+      const types: Record<string, import("../contracts/notifications.js").NotificationMediaAction> = name === "notifications"
+        ? { list: "list_notifications" }
+        : { list: "list_media_sessions", status: "get_media_status", pause: "media_pause", play: "media_play" };
+      const type = types[operation];
+      if (type === undefined) throw new UsageError(`Use ${name} ${Object.keys(types).join("|")}; for example clawperator ${name} list.`);
+      const seenFlags = new Set<string>();
+      for (let index = 1; index < rest.length; index++) {
+        const flag = rest[index];
+        if (!flags.includes(flag) || seenFlags.has(flag)) throw new UsageError(`Unexpected or repeated argument '${flag}'.`);
+        seenFlags.add(flag);
+        getStringOptStrict(rest, flag);
+        index += rest[index + 1] === "--" ? 2 : 1;
+      }
+      const params: import("../contracts/execution.js").ActionParams = {};
+      for (const [flag, key] of [["--app", "applicationId"], ["--session", "mediaSessionId"]] as const) {
+        const value = getStringOptStrict(rest, flag);
+        if (value !== undefined) params[key] = value;
+      }
+      for (const [flag, key] of [["--limit", "limit"], ["--max-text-chars", "maxTextChars"], ["--wait-timeout-ms", "waitTimeoutMs"]] as const) {
+        const value = getStringOptStrict(rest, flag);
+        if (value !== undefined) params[key] = value.trim() === "" ? NaN : Number(value);
+      }
+      return (await import("./commands/action.js")).cmdNotificationMedia({ ...ctx, type, params });
+    },
+  };
+}
+
 // doctor
 COMMANDS["doctor"] = {
   name: "doctor",
   group: "Setup",
-  documentedFlags: ["--fix", "--full", "--check-only"],
-  supportedFlags: ["--fix", "--full", "--check-only"],
+  documentedFlags: ["--fix", "--full", "--check-only", "--capability"],
+  supportedFlags: ["--fix", "--full", "--check-only", "--capability"],
   summary: "Run environment and runtime checks",
-  help: HELP_DOCTOR,
+  help: HELP_DOCTOR + "\nUse --capability background-observation for non-waking notification/media readiness. Default: interactive. Background mode rejects --full and --fix.",
   topLevelBlock: `  doctor
                                             Run environment and runtime checks (Stage 3). Use --output json for explicit JSON; --format json is also accepted.
   doctor --fix
@@ -3174,6 +3214,7 @@ COMMANDS["doctor"] = {
       fix: hasFlag(rest, "--fix"),
       full: hasFlag(rest, "--full"),
       checkOnly: hasFlag(rest, "--check-only"),
+      capability: getStringOptStrict(rest, "--capability"),
       deviceId,
       operatorPackage,
       logger,
