@@ -32,8 +32,13 @@ class NotificationMediaService(private val context: Context) {
 
     private fun requireListener(): NotificationListenerService {
         val component = ComponentName(context, NotificationListenerService::class.java)
-        val allowed = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
-            ?.split(':')?.mapNotNull(ComponentName::unflattenFromString)?.contains(component) == true
+        val allowed = if (Build.VERSION.SDK_INT >= 27) {
+            (context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager)
+                .isNotificationListenerAccessGranted(component)
+        } else {
+            Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+                ?.split(':')?.mapNotNull(ComponentName::unflattenFromString)?.contains(component) == true
+        }
         if (!allowed) throw NotificationMediaException("NOTIFICATION_ACCESS_DENIED", "Enable notification access for the selected Operator.")
         return NotificationListenerService.connectedInstance
             ?: throw NotificationMediaException("NOTIFICATION_LISTENER_DISCONNECTED", "Notification listener is not connected; wait for Android to reconnect it.")

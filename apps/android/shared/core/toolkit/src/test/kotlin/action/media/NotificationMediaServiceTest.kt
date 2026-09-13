@@ -31,7 +31,7 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28])
+@Config(sdk = [21, 28])
 class NotificationMediaServiceTest {
     private lateinit var context: Context
     private lateinit var listener: NotificationListenerService
@@ -44,6 +44,8 @@ class NotificationMediaServiceTest {
         listener = Robolectric.buildService(NotificationListenerService::class.java).get()
         connected.set(null, listener)
         Settings.Secure.putString(context.contentResolver, "enabled_notification_listeners", ComponentName(context, NotificationListenerService::class.java).flattenToString())
+        if (android.os.Build.VERSION.SDK_INT >= 27) shadowOf(context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager)
+            .setNotificationListenerAccessGranted(ComponentName(context, NotificationListenerService::class.java), true)
         service = NotificationMediaService(context)
     }
     @After fun cleanup() {
@@ -61,7 +63,7 @@ class NotificationMediaServiceTest {
 
     @Test fun snapshotsReflectPostingRemovalFiltersAndBounds() = runTest {
         assertEquals(0, query("list_notifications").getJSONArray("notifications").length())
-        val notification = Notification.Builder(context, "fixture").setContentTitle("fixture").setOngoing(true).setGroup("group").setGroupSummary(true).build()
+        val notification = (if (android.os.Build.VERSION.SDK_INT >= 26) Notification.Builder(context, "fixture") else Notification.Builder(context)).setContentTitle("fixture").setOngoing(true).setGroup("group").setGroupSummary(true).build()
         val key = shadowOf(listener).addActiveNotification("test.player", 1, notification)
         shadowOf(listener).addActiveNotification("test.other", 2, notification)
         val filtered = query("list_notifications", app = "test.player")
@@ -104,7 +106,29 @@ class NotificationMediaServiceTest {
     @Test fun denialAndDisconnectionNeverBecomeEmptySuccess() = runTest {
         connected.set(null, null)
         assertEquals("NOTIFICATION_LISTENER_DISCONNECTED", assertFailsWith<NotificationMediaException> { query("list_notifications") }.code)
-        Settings.Secure.putString(context.contentResolver, "enabled_notification_listeners", "")
+        if (android.os.Build.VERSION.SDK_INT >= 27) {
+            shadowOf(context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager)
+                .setNotificationListenerAccessGranted(ComponentName(context, NotificationListenerService::class.java), false)
+        } else Settings.Secure.putString(context.contentResolver, "enabled_notification_listeners", "")
         assertEquals("NOTIFICATION_ACCESS_DENIED", assertFailsWith<NotificationMediaException> { query("list_media_sessions") }.code)
     }
+    @Test fun resolvedSessionCannotBeReplacedBeforeDispatch() = runTest {
+        val first = controller("original")
+        val original = query("list_media_sessions").getJSONArray("sessions").getJSONObject(0).getString("mediaSessionId")
+        // Resolve exactly as an application selector does, then simulate destruction
+        // before the final dispatch guard. The replacement has the same package.
+        val select = NotificationMediaService::class.java.getDeclaredMethod("select", String::class.java, String::class.java).apply { isAccessible = true }
+        val pinned = select.invoke(service, "test.player", null)
+        shadowOf(first).callbacks.toList().forEach { it.onSessionDestroyed() }
+        controller("replacement")
+        val replacement = query("list_media_sessions").getJSONArray("sessions").getJSONObject(0).getString("mediaSessionId")
+        assertTrue(original != replacement)
+        val guard = NotificationMediaService::class.java.declaredMethods.single { it.name == "ensurePinned" }.apply { isAccessible = true }
+        for (dispatched in listOf(false, true)) {
+            val error = assertFailsWith<java.lang.reflect.InvocationTargetException> { guard.invoke(service, pinned, dispatched) }.cause as NotificationMediaException
+            assertEquals("MEDIA_SESSION_EXPIRED", error.code)
+            assertEquals(dispatched, error.dispatched)
+        }
+    }
+
 }

@@ -51,6 +51,8 @@ it("dispatches service observations without calling interactive readiness", asyn
   }) as FakeProcessRunner["spawn"];
   runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device\tdevice\n", stderr: "" });
   runner.queueResult({ code: 0, stdout: "package:com.test.operator\n", stderr: "" });
+  runner.queueResult({ code: 0, stdout: "0", stderr: "" });
+  runner.queueResult({ code: 0, stdout: "RUNNING_UNLOCKED", stderr: "" });
   runner.queueResult({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" }, () => {
     setTimeout(() => { stream.stdout.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify(envelope)}\n`)); }, 5);
   });
@@ -97,5 +99,28 @@ it("CLI rejects missing, blank, conflicting and invalid service values with JSON
       const error = JSON.parse(result.stdout);
       assert.match(error.code, /USAGE|INVALID|VALIDATION/);
     }
+  }
+});
+
+it("returns an explicit pre-unlock error without dispatch, wake or remediation", async () => {
+  const runner = new FakeProcessRunner();
+  runner.spawn = (() => Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), kill() {} })) as FakeProcessRunner["spawn"];
+  for (const stdout of ["List of devices attached\ntest-device\tdevice\n", "package:com.test.operator", "0", "RUNNING_LOCKED"]) {
+    runner.queueResult({ code: 0, stdout, stderr: "" });
+  }
+  const result = await runExecution(buildNotificationMediaExecution("list_notifications"), { deviceId: "test-device", operatorPackage: "com.test.operator", runner, logcatBroadcastDelayMs: 0 });
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.error.code, "DEVICE_USER_NOT_UNLOCKED");
+  assert.equal(runner.calls.some(call => /broadcast|WAKEUP|HOME|doctor_ping|settings put/.test(call.args.join(" "))), false);
+});
+
+import { probeUserUnlockState } from "../../domain/device/userUnlockState.js";
+it("leaves unavailable or unsupported unlock probes to the runtime", async () => {
+  for (const state of ["Unknown command: get-started-user-state", "", "STOPPING"]) {
+    const runner = new FakeProcessRunner();
+    runner.queueResult({ code: 0, stdout: "0", stderr: "" });
+    runner.queueResult({ code: 0, stdout: state, stderr: "" });
+    assert.equal(await probeUserUnlockState(getDefaultRuntimeConfig({ runner })), undefined);
+    assert.equal(runner.calls.length, 2);
   }
 });

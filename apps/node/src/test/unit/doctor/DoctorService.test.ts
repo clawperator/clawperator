@@ -580,6 +580,8 @@ it("background diagnostics use only host checks and service reads, preserving de
       else if (args.includes("devices")) stdout = "List of devices attached\ntest-device\tdevice\n";
       else if (text.includes("pm list packages")) stdout = "package:com.test.operator";
       else if (text.includes("dumpsys package")) stdout = `versionName=${getCliVersion()}\nversionCode=1`;
+      else if (args.includes("get-current-user")) stdout = "0";
+      else if (args.includes("get-started-user-state")) stdout = "RUNNING_UNLOCKED";
       else if (text.includes("am broadcast")) {
         const execution = JSON.parse(text.match(/\{.*\}/)![0]);
         const type = execution.actions[0].type;
