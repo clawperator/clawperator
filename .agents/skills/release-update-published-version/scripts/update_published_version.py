@@ -112,7 +112,7 @@ def update_compatibility_versioned_apk_downloads(path: Path, version: str) -> bo
 
     # Update the version badge at the top of the page
     # Pattern matches: **Current release: [X.Y.Z](https://github.com/clawperator/clawperator/releases/tag/vX.Y.Z)**
-    badge_pattern = r'(\*\*Current release: \[)[0-9]+\.[0-9]+\.[0-9]+(\]\(https://github\.com/clawperator/clawperator/releases/tag/v)[0-9]+\.[0-9]+\.[0-9]+(\]\)\*\*)'
+    badge_pattern = r'(\*\*Current release: \[)[0-9]+\.[0-9]+\.[0-9]+(\]\(https://github\.com/clawperator/clawperator/releases/tag/v)[0-9]+\.[0-9]+\.[0-9]+(\)\*\*)'
     badge_repl = f"\\g<1>{version}\\g<2>{version}\\g<3>"
     content, replacements = re.subn(badge_pattern, badge_repl, content, flags=re.MULTILINE)
     changed = changed or replacements > 0
@@ -185,7 +185,7 @@ def main() -> None:
     docs_index_path = repo_root / "docs" / "index.md"
     if replace_required(
         docs_index_path,
-        r'(\*\*Current release: \[)[0-9]+\.[0-9]+\.[0-9]+(\]\(https://github\.com/clawperator/clawperator/releases/tag/v)[0-9]+\.[0-9]+\.[0-9]+(\]\)\*\*)',
+        r'(\*\*Current release: \[)[0-9]+\.[0-9]+\.[0-9]+(\]\(https://github\.com/clawperator/clawperator/releases/tag/v)[0-9]+\.[0-9]+\.[0-9]+(\)\*\*)',
         f"\\g<1>{version}\\g<2>{version}\\g<3>",
         fatal=False,
     ):
