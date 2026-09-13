@@ -42,15 +42,20 @@ const seek = z.object({
   positionToleranceMs: z.number().int().min(0).max(60000).optional(),
 }).strict().refine(value => (value.applicationId !== undefined) !== (value.mediaSessionId !== undefined),
   "Provide exactly one of applicationId or mediaSessionId.");
+const observation = z.object({
+  ...target,
+  durationMs: z.number({ required_error: observeUsage, invalid_type_error: observeUsage })
+    .int(observeUsage).min(1, observeUsage).max(30000, observeUsage),
+}).strict().refine(
+  value => (value.applicationId !== undefined) !== (value.mediaSessionId !== undefined),
+  `Provide exactly one of applicationId or mediaSessionId. ${observeUsage}`,
+);
 export function notificationMediaParamsSchema(type: string): z.ZodTypeAny | undefined {
   if (type === "list_notifications" || type === "list_media_sessions") return listing.optional();
   if (type === "dismiss_notification") return dismissal;
   if (type === "invoke_notification_action") return notificationAction;
   if (type === "media_seek") return seek;
-  if (type === "observe_media") return z.object({ ...target, durationMs: z.number({ required_error: observeUsage, invalid_type_error: observeUsage }).int(observeUsage).min(1, observeUsage).max(30000, observeUsage) }).strict().refine(
-    value => (value.applicationId !== undefined) !== (value.mediaSessionId !== undefined),
-    `Provide exactly one of applicationId or mediaSessionId. ${observeUsage}`,
-  );
+  if (type === "observe_media") return observation;
   if (type === "get_media_status") return selected;
   if (type === "media_pause" || type === "media_play") return control;
   return undefined;
