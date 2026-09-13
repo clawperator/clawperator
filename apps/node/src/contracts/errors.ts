@@ -13,6 +13,8 @@ export const ERROR_CODES = {
   CONTAINER_LOST: "CONTAINER_LOST",
   /** Evidence could not be fully captured or persisted; inspect the retained manifest when available. */
   EVIDENCE_CAPTURE_FAILED: "EVIDENCE_CAPTURE_FAILED",
+  /** Evidence storage is not writable; inspect path and recovery before retrying. */
+  EVIDENCE_STORAGE_UNWRITABLE: "EVIDENCE_STORAGE_UNWRITABLE",
   /** Choose a new evidence output directory; existing destinations are never overwritten. */
   EVIDENCE_OUTPUT_EXISTS: "EVIDENCE_OUTPUT_EXISTS",
   /** The requested video session is unknown or invalid. */

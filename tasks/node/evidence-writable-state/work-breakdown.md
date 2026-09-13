@@ -1,38 +1,24 @@
-# Delivery and validation
+# Remaining integration validation
 
-One implementation PR. Independent of metadata repair for development; use its
-integrated result when asserting complete physical-device bundles.
+- [DONE] Writable root configuration, fixed per-user host ownership and storage
+  preflight, lifecycle/worker compatibility, process-race regressions and docs.
+- [DONE] Restricted physical-device CLI start/status/stop, same/different-root
+  exclusion, fresh recording after release, duration-cap completion, and managed
+  MCP start/status/stop through separate processes. Video decoding and hashes
+  passed. CLI/MCP still artifacts were also retained.
+- [TODO] After integrating the independent
+  [device-classification fix](../evidence-device-classification/plan.md), repeat
+  restricted physical still/video capture and cross-root exclusion on the combined
+  revision. Require complete manifests, CLI exit 0 and MCP results without
+  `isError`; retain source/CLI/APK identity, media verification and artifact hashes.
+  Current bundles are metadata-only partial and cannot satisfy this combined gate.
 
-Choose and document an atomic ownership mechanism satisfying the
-[plan's cross-root exclusion contract](plan.md) before enabling the override.
-Implement root resolution, caller/worker propagation and permission preflight
-with that mechanism. Keep metadata failures distinct from ownership failures.
+The implementation has no dependency on the first pack's merge. This retained
+handoff owns only the combined acceptance check; do not implement classification
+or publish a release from this pack. The HTTP `serve` API has no evidence routes;
+use CLI and MCP for the existing evidence surfaces.
 
-## Dependencies and concurrency
-
-Can start and merge independently of metadata repair. Implement atomic cross-root
-ownership before enabling the override. Before pack 1 is integrated, lifecycle
-and locking checks can pass while bundles retain the known metadata-only partial
-verdict; do not claim complete-bundle acceptance from those runs. After both
-fixes are integrated, verify the combined restricted-host scenario. Coordinate
-evidence code/tests and docs with pack 1; see the
-[release coordination rules](../../releases/v0.10.x/plan.md#dependencies-and-concurrent-work).
-
-## Required checks
-
-- Add deterministic process/race regressions for the plan's acceptance matrix,
-  including same-device starts under different roots. Run
-  `npm --prefix apps/node run build && npm --prefix apps/node run test`.
-- Update the canonical docs named in the plan with
-  `.agents/skills/docs-author/SKILL.md`; regenerate with docs-build and run
-  `./scripts/docs_build.sh`.
-- On an explicit connected device with the matching development Operator, use
-  the branch-local CLI to start/status/stop from a restricted writable workspace.
-  Use separate processes and roots to verify the second owner is rejected,
-  inspect the resulting video, then confirm a fresh recording after clean stop.
-  Requires ffmpeg/ffprobe and an environment reproducing denied home writes.
-
-Record sanitized evidence and ownership rationale in the permanent docs named
-in the plan. Fix in-scope failures, update pack/release status and commit
-validated logical units. Identify untested restrictions or races as open
-acceptance. Unrelated host changes and publication are outside this pack.
+Once combined validation passes, update the
+[permanent evidence record](../../../docs/internal/design/still-evidence.md#writable-state-validation-and-remaining-integration-gate),
+update the [release queue](../../releases/v0.10.x/plan.md), and retire this pack
+with task-cleanup. Independent transport and publication gates remain applicable.

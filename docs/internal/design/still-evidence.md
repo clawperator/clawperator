@@ -43,8 +43,7 @@ itself. Each terminal attempt requires a new directory.
 MCP exposes only domain-created manifest paths and never accepts caller output
 paths. Managed bundles default to the evidence bundle root under the user's
 Clawperator state directory. Node tests inject their own root, process/capture
-providers, metadata readers, clock, and file operations. There are no macOS-only
-APIs, uploads, report generation, or video lifecycle scaffolding.
+providers, metadata readers, clock, and file operations. There are no uploads or report generation in the still-capture path.
 
 ## Validation and observed limits
 
@@ -95,3 +94,94 @@ The subsequent readiness and cancellation fixes passed a Node build and 155
 focused evidence/execution/observe/MCP tests. Coverage includes sleeping, locked,
 and interactive probe results and overall-deadline cancellation with partial bytes.
 These follow-ups were not re-tested on a live sleeping or locked device.
+
+
+## Writable evidence roots and video ownership
+
+`domain/evidence/storage.ts` resolves `CLAWPERATOR_EVIDENCE_DIR` once before
+asynchronous request work. Managed captures share its `bundles/` convention;
+legacy still-test `baseDir` injection remains a bundle directory. Video workers
+and manifest-path lifecycle calls use persisted absolute paths and do not
+re-resolve the caller's environment. MCP opaque-ID lookup uses the configured
+root. `serve.ts` has no evidence routes, so the task's requested HTTP lookup
+check is not an existing surface; MCP is the managed lookup owner.
+
+Video ownership uses exclusive file creation in a fixed per-OS-user directory,
+independent of home/environment overrides and the chosen bundle root. On POSIX
+this is `/tmp/clawperator-evidence-locks-<uid>`; Windows uses the OS account's
+`AppData/Local/Temp/clawperator-evidence-locks`, derived from `os.userInfo()`.
+POSIX rejects symlinks, foreign owners and group/other permissions on that
+directory. The directory is not automatically removed or relocated. Its device
+serial hash keys a nonce/session/absolute-output record. Two starts racing from
+different roots still arbitrate the same exclusive creation. Workers retain
+the existing nonce, heartbeat and remote process identity checks. Neither age
+nor a stale heartbeat permits takeover, deletion, or a signal to a saved host
+PID. Failed lock persistence before dispatch cleans up its own acquired file;
+known startup failures release ownership, while uncertain worker/recorder death
+retains recovery state and artifacts.
+
+Root, ownership-directory and fresh output-directory probes exercise creation,
+reading, rename and deletion before recorder dispatch. Storage failures expose
+`EVIDENCE_STORAGE_UNWRITABLE` with the failing absolute path and recovery action.
+Output collision remains `EVIDENCE_OUTPUT_EXISTS`. No root migration, log
+relocation or permission adjustment occurs. Preflight establishes current access,
+not a guarantee against later permission changes, capacity exhaustion or external
+file deletion. Host temporary-file cleanup must preserve active/recovery locks.
+Separate hosts/users and mixed versions with older root-local locks are outside
+this ownership boundary; stop and recover old-version sessions before upgrading.
+
+The existing screen/snapshot contracts and runtime skill inputs are unchanged;
+no sibling skill version bump is needed.
+
+
+### Writable-state validation and remaining integration gate
+
+On 2026-09-13, the dedicated implementation worktree based on `e96e7584` built
+Node CLI 0.10.1 and the matching 0.10.1-d development APK. The APK was installed
+on the explicitly selected physical Android 16 / API 36 device. A macOS sandbox
+explicitly denied writes under the real default home evidence root; an independent
+write probe returned `EPERM`. Without the override, CLI start returned exit 1
+with `EVIDENCE_STORAGE_UNWRITABLE`, the default root path and recovery action.
+No recorder was dispatched by that failure.
+
+With a writable override and separate explicit output directory, start returned
+exit 0 and `recording`. Separate CLI processes using the same root and a different
+root both returned exit 1 with `EVIDENCE_RECORDING_ACTIVE`. Status returned exit
+0 from a new environment with an empty evidence-root variable; manifest-path stop
+still finalized the owned session. Its lock was removed, and a new recording
+using the second root started successfully and finalized at its eight-second cap.
+
+The first recording retained 572x1280 H.264 video with three decoded frames,
+about 6.94 seconds of host time and 4.04 seconds of media time. Extracted original
+frames were opened and showed both BEFORE and UPDATED on-screen-log markers.
+The second retained the same geometry, three frames, about 9.13 seconds of host
+time and 1.23 seconds of media time. Independent ffprobe inspection succeeded;
+the worker's full decode checks passed, and every artifact's bytes and SHA-256
+matched the saved manifest.
+
+A separate MCP stdio start used a managed override directory under the same
+sandbox. The initiating MCP process closed, and new MCP processes found and
+stopped the session using only its ID and the same root. Its verified video
+retained about 5.20 seconds of host time and 1.90 seconds of media time. CLI and
+managed MCP still captures also persisted all requested artifacts. The temporary
+on-screen log was cleared after verification. Private media and command logs
+remain in ignored worktree artifacts, not committed fixtures.
+
+All five bundles truthfully remained `partial`: their only error was the existing
+`metadata` / `deviceType` classification failure. CLI terminal status/stop and
+still capture returned exit 1; MCP terminal/capture responses set `isError: true`.
+This proves restricted-host storage, lifecycle, ownership and usable media, not
+complete-bundle acceptance. After the independent device-classification fix is
+integrated, repeat restricted physical CLI/MCP still and video capture, require
+complete manifests, and retain the same cross-root exclusion check before patch
+publication. No release or transport gate is waived by this implementation.
+
+The Node build and full suite passed (1,597 tests, no skips); 32 focused lifecycle
+checks then passed after extending relative/default-root and output-preflight
+regressions. Offline coverage includes simultaneous same-root and different-root
+starts, independent devices, default and relative roots with spaces, blank and
+unwritable state, known worker startup failure, stale heartbeat/nonce rejection,
+changed-environment lifecycle, and managed MCP capture/error propagation.
+The documentation build passed with no organization warnings. Windows live
+operation and filesystem cleanup/reboot recovery were not exercised; retained
+ownership always requires manual verification before removal.

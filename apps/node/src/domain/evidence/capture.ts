@@ -1,7 +1,7 @@
 import { writeEvidenceManifest } from "./manifest.js";
 import * as fs from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
-import { homedir } from "node:os";
+import { evidenceRoot, storageError } from "./storage.js";
 import { isAbsolute, join, parse, resolve } from "node:path";
 import { PNG } from "pngjs";
 import { type EvidenceArtifact, type EvidenceCaptureResult, type EvidenceError } from "../../contracts/evidence.js";
@@ -76,6 +76,8 @@ function verifyPng(buffer: Buffer): void {
 
 export async function captureEvidence(options: EvidenceCaptureOptions, dependencies: EvidenceCaptureDependencies = {}): Promise<EvidenceCaptureResult> {
   validateEvidenceCaptureOptions(options);
+  const root = evidenceRoot();
+  const managedRoot = dependencies.baseDir === undefined ? join(root, "bundles") : resolve(dependencies.baseDir);
   // Snapshot caller data before asynchronous work; its verdict remains opaque.
   const context = JSON.parse(JSON.stringify(options.context ?? {})) as Record<string, unknown>;
   const files = dependencies.files ?? fs;
@@ -93,14 +95,14 @@ export async function captureEvidence(options: EvidenceCaptureOptions, dependenc
     const target = await resolveDevice(runtime);
     runtime.deviceId = target.deviceId;
     if (options.outputDir === undefined) {
-      const baseDir = dependencies.baseDir ?? join(homedir(), ".clawperator", "evidence", "bundles");
-      await files.mkdir(baseDir, { recursive: true, mode: 0o700 });
-      outputDir = join(resolve(baseDir), evidenceId);
+      try { await files.mkdir(managedRoot, { recursive: true, mode: 0o700 }); }
+      catch (error) { storageError(error, managedRoot); }
+      outputDir = join(managedRoot, evidenceId);
     } else outputDir = options.outputDir;
     try { await files.mkdir(outputDir, { mode: 0o700 }); }
     catch (error) {
       if ((error as NodeJS.ErrnoException).code === "EEXIST") throw { code: "EVIDENCE_OUTPUT_EXISTS", message: "Evidence output directory already exists" };
-      throw { code: "EVIDENCE_CAPTURE_FAILED", message: "Could not create evidence output directory" };
+      storageError(error, outputDir);
     }
     const artifacts: EvidenceArtifact[] = [];
     const errors: EvidenceError[] = [];
