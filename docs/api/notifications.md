@@ -35,9 +35,10 @@ indeterminate flag, not a playback timestamp. Use [media status](media.md).
 
 Observation-only execution lists may contain list_notifications,
 list_media_sessions and get_media_status in any order. They bypass interactive
-readiness and do not need accessibility or an app window. Mixed lists retain
-normal whole-execution interactive readiness. Use separate read-only executions
-when observing screen-off behavior. Before first unlock after reboot, a supported Android user-state probe returns
+readiness and do not need accessibility or an app window. Lists may also include
+media_pause, media_play and media_seek without waking or unlocking the device.
+Any list containing a UI action, dismissal or notification button retains normal
+whole-execution interactive readiness; no prefix runs if readiness fails. Before first unlock after reboot, a supported Android user-state probe returns
 DEVICE_USER_NOT_UNLOCKED before dispatch. Unlock the user once during setup; reads
 do not unlock it. An unsupported probe leaves platform/runtime failures authoritative.
 

@@ -3035,11 +3035,11 @@ it("blocks both mixed observation/UI orders before any action dispatch", async (
   const read = { id: "read", type: "list_notifications" };
   const ui = { id: "ui", type: "snapshot" };
   const mutations = [
-    { id: "mutation", type: "media_seek", params: { mediaSessionId: "s", positionMs: 0 } },
     { id: "mutation", type: "dismiss_notification", params: { notificationKey: "k" } },
     { id: "mutation", type: "invoke_notification_action", params: { notificationKey: "k", actionId: "a" } },
   ];
-  for (const actions of [[read, ui], [ui, read], [ui], ...mutations.flatMap(mutation => [[read, mutation], [mutation, read], [mutation]])]) {
+  const control = { id: "control", type: "media_play", params: { mediaSessionId: "s" } };
+  for (const actions of [[read, ui], [ui, read], [ui], [control, ui], [ui, control], ...mutations.flatMap(mutation => [[read, mutation], [mutation, read], [control, mutation], [mutation, control], [mutation]])]) {
     const runner = new FakeProcessRunner();
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator\n", stderr: "" });

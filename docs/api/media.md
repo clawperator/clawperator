@@ -16,8 +16,10 @@ and cannot be targeted (`MEDIA_SESSION_EXPIRED`). Reactivating the same Android
 session restores its existing handle and retained original report. The selected
 controller is pinned throughout each action.
 
-List/status work while the display is off or keyguard locked without waking it.
-Pause/play/seek retain normal interactive readiness. Notification access and a connected
+List/status and pause/play/seek work while the display is off or keyguard locked
+without waking it or requiring accessibility. Executions may mix these media
+controls with notification/media reads. Adding a UI action or notification
+mutation retains whole-execution interactive readiness. Notification access and a connected
 listener are required. Players without active sessions cannot be controlled here.
 
 | Action | Parameters |
