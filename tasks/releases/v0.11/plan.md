@@ -8,7 +8,8 @@ notification/media workstream and release readiness; it does not assert release
 completion or trigger publication merely by existing.
 
 Status: planning complete; N1, N2 and release execution not started. The inspected
-base is `7cdb31d4`, whose Node code version is 0.10.0. Reconcile current main,
+feature baseline was `7cdb31d4`; origin/main has since been merged, bringing
+the Node code version to 0.10.1. Reconcile current main,
 release tags and published state when implementation/release execution begins.
 
 Feature contract: [notifications plan](../../notifications/plan.md).
@@ -60,13 +61,15 @@ not bump the shared version during this planning change.
   supported-player limits. Do not substitute a debug-only run for release proof.
 - Generated help/docs and any affected sibling runtime skills match the final
   contract. Public published-version claims remain unchanged until release is live.
-- Reconcile outstanding [v0.10 release gates](../v0.10/plan.md) with current code
-  and evidence. That plan still records result-transport causal and supported-image
-  manual CI gates; current main includes a later reader-exit repair. Neither the
-  old status text nor a new commit title proves resolution. Preserve any unresolved
-  applicable gate for 0.11 and reference its owning pack/design doc; do not silently
-  waive it or duplicate its implementation in the notification pack. This is a
-  publication prerequisite, not a blocker to starting N1.
+- Reconcile the [permanent release acceptance record](../../../docs/internal/release-reference.md#v010-acceptance-requirements)
+  and [remaining transport investigation](../../node/result-transport-reliability/plan.md)
+  with current code and evidence. The v0.10 task plan is retired; its release-owner
+  disposition deferred the historical reader-exit cause for 0.10.0 only. Do not
+  automatically carry that approval into 0.11 or treat the cause as resolved.
+  Resolve applicable gates through evidence or an explicit 0.11 release-scope
+  decision, preserving the limits in permanent docs. Do not duplicate transport
+  implementation in this feature pack. This is a publication prerequisite, not a
+  blocker to starting N1.
 
 ## Release execution and scope
 
