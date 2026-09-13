@@ -38,8 +38,9 @@ Observation-only execution lists may contain list_notifications,
 list_media_sessions and get_media_status in any order. They bypass interactive
 readiness and do not need accessibility or an app window. Mixed lists retain
 normal whole-execution interactive readiness. Use separate read-only executions
-when observing screen-off behavior. Before first unlock after reboot, platform
-service availability can differ from an ordinary locked screen.
+when observing screen-off behavior. Before first unlock after reboot, a supported Android user-state probe returns
+DEVICE_USER_NOT_UNLOCKED before dispatch. Unlock the user once during setup; reads
+do not unlock it. An unsupported probe leaves platform/runtime failures authoritative.
 
 Errors include NOTIFICATION_ACCESS_DENIED, NOTIFICATION_LISTENER_DISCONNECTED,
 NOTIFICATION_QUERY_FAILED and NOTIFICATION_SERVICE_UNAVAILABLE. Inspect the

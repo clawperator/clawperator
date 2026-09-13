@@ -566,3 +566,8 @@ in JSON output. Failure returns a nonzero exit; an empty successful query is rea
 This mode rejects --full and --fix before side effects. Default doctor (or explicit
 --capability interactive) retains interactive readiness requirements. An interactive
 doctor failure alone does not veto [background observations](notifications.md).
+
+Before first unlock after reboot, the background query check reports
+`DEVICE_USER_NOT_UNLOCKED` when Android exposes the locked user state. This is
+distinct from an ordinary keyguard lock after the user has unlocked once. No
+automatic unlock or permission repair occurs.

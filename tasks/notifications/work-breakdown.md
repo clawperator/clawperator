@@ -6,7 +6,7 @@ Contract: [plan.md](plan.md). Release: [v0.11](../releases/v0.11/plan.md).
 
 | PR | Outcome | Dependency | Status |
 | --- | --- | --- | --- |
-| N1 | Notification reads and media discovery/status/pause/play, end to end | Current main; no v0.10 publication prerequisite | [IN PROGRESS] Core implementation and locked/off proof; remaining acceptance below |
+| N1 | Notification reads and media discovery/status/pause/play, end to end | Current main; no v0.10 publication prerequisite | [DONE] Implemented and locally validated; compatibility limits below |
 | N2 | Notification dismissal/buttons and media seeking; integrated acceptance | N1 contracts and service boundary | [TODO] |
 
 Prefer these two coherent feature PRs, each with tests and docs. Do not split
@@ -14,7 +14,7 @@ Android, Node, tests and documentation into separate PRs. N2 may be developed on
 N1's committed branch while review runs; merge N1 first and reconcile N2 with the
 merged base. No merge gate is needed between internal stages of one PR.
 
-The current task is authoring this pack only. A subsequent instruction to implement
+An instruction to implement
 N1 or N2 authorizes that complete row through validation, docs, status and local
 commits. An instruction to implement this whole pack authorizes both feature rows;
 finish sequentially without routine approval pauses. It does not authorize remote
@@ -22,11 +22,15 @@ publication. Preserve the selected scope when another row becomes unblocked.
 
 ## N1 implementation checkpoint
 
-Core Android/Node/CLI/doctor and generic MCP support is implemented. Controlled
-pause/play, stale callback evidence, screen-off and secure-lock observations,
-accessibility unavailable and expired-cache scenarios have passed on API 35.
-See [durable evidence and remaining gates](../../docs/internal/design/notifications-and-media.md).
-N1 remains in progress until every acceptance gate is resolved; N2 is untouched.
+Android/Node/CLI/doctor and generic MCP support is implemented in 3c7d88f2
+and follow-up hardening commits on the N1 branch. API 36 live proof covers real
+browser video/audio, secure locked/off reads, actual accessibility removal,
+notification lifecycle, process recovery and explicit pre-first-unlock errors.
+API 35 has earlier live coverage; API 21/28 service branches pass offline tests.
+See [durable evidence and limits](../../docs/internal/design/notifications-and-media.md).
+N1 is locally complete for PR review, not merged or released. Live API 21 binding
+has not been verified; retain that compatibility limitation in V1 verification.
+N2 is untouched.
 
 ## N1 - Reliable reads and core media controls
 
@@ -210,8 +214,7 @@ actual PendingIntent effects and player support. Missing device/SDK/app access
 leaves the corresponding gate unproven; record it instead of claiming completion.
 Keep private notification text, account details and device identifiers out of Git.
 
-No runtime build is needed for this planning-only change. Future implementation
-must run the appropriate checks above. Do not rerun passing checks without a
+Implementation must run the appropriate checks above. Do not rerun passing checks without a
 change, failure or unresolved concern that warrants it.
 
 ## Completion and cleanup

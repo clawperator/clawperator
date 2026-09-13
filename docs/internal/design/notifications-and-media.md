@@ -55,67 +55,66 @@ still requires successful execution and is not a claim of a connected listener.
 
 ## Local validation record
 
-Validated on 2026-09-13, based on 626a169d5cb3cb3435e65a8e525f887873954c4e,
-in the N1 implementation worktree. Branch-local Node and debug Operator versions
-are 0.10.1 and 0.10.1-d (1001900); the release version bump is a later release step.
-The live target was an explicit Android API 35 Pixel emulator, previously unlocked.
-No personal device credential was changed. Secure-lock proof used a temporary
-emulator PIN, removed in cleanup, and restored accessibility afterward.
+Validated on 2026-09-13 from the N1 branch based on
+626a169d5cb3cb3435e65a8e525f887873954c4e, including implementation commit 3c7d88f2
+and permission/first-unlock hardening commit d1d7b1cc. Branch-local versions
+remain 0.10.1 and 0.10.1-d (1001900); release versioning belongs to V1.
+The final live target was the explicitly selected API 36 emulator. Earlier
+locked/off and control proofs also passed on API 35. Temporary emulator PINs were
+removed and accessibility settings restored; no personal credential was changed.
 
-The passing callback/stale-report and locked/off series used debug APK SHA-256
-b993fabc3248b4541d51ebfe96dd03b9fe910c41f09e24cd914c5dc44a453738.
-The expanded control-race and locked/on-off proof also passed with debug APK
-b87f81315045d7ec163a1471c61725321ed55e3f1b8c3c421c8ed4ee806b4911.
-Final session-lifecycle hardening and the extended harness passed with debug APK
-51d07cc7b0871614786c53d992a4f81f1d71ab4b7362a93fda104f267f876819.
-The full Node suite passed 1,580 tests; the subsequently added background-doctor
-regression passed with its existing suite (14 tests). Android assembly, app unit
-tests, parser tests and toolkit tests passed. Docs routes and generated links passed.
+Final debug Operator SHA-256:
+`ce65d625081b5aa085adf6363d0b8f3c8329cdf3b523b9020433c11643fca5fe`.
+Independent fixture APK SHA-256:
+`0af5c8282c3dfef05ddaa14f7bef3d1ea82d928071d7b71718c3901aa11d23bc`.
+The standalone fixture survives Operator process death and records actual player
+position, screen/keyguard state, power-event counters and control dispatch counts.
 
 | Case | Evidence and outcome |
 | --- | --- |
-| Actual pause/play | MediaPlayer's independently sampled actualPlaying changed false/true after explicit commands |
-| Stale PLAYING report | Actual position remained 5675 ms; original callback position/time stayed fixed, report age increased during repeated queries |
-| Nonsecure screen off | 13.38 seconds of repeated reads; screenOn false; screen-on event counter remained 1; independent sample count advanced 59 to 185 |
-| Secure screen off | CLI reads, background doctor and MCP three-action execution succeeded; deviceLocked true and screenOn false throughout |
-| Accessibility disabled | The same locked/off CLI, doctor and MCP reads succeeded with the listener connected |
-| Beyond readiness-cache TTL | Repeated after nine seconds without UI operations; screen-on counter remained 2 across the locked series |
-| HTTP and typed-helper parity | Live read execution and typed decoder agreed on session identity, original reported position/time and screen-off state; HTTP retained commandId/taskId |
-| Generic MCP parity | Actual stdio execute dispatched all three reads; successful canonical steps and screen-off values preserved |
-| Background doctor | Actual notification/media probes passed and reported screenOn=false, deviceLocked=true, userUnlocked=true |
-| Unavailable listener | Returned NOTIFICATION_LISTENER_DISCONNECTED, not empty-list success, following the force-stop experiment |
-| Secure screen on and relocked off | CLI, background doctor and MCP passed with accessibility disabled; screen/keyguard state retained |
-| Session/control races | Two same-package sessions produced ambiguity; exact selection worked; unsupported/expired handles failed specifically; ignored pause timed out with dispatched=true; replacement during pause wait returned MEDIA_SESSION_EXPIRED with dispatched=true |
-| Offline platform tests | Robolectric API 28 verifies notification snapshots, original callback preservation despite altered query values, permission errors, ambiguity and destroyed-token exclusion |
-| Mixed execution policy | Automated runExecution test rejects both action orders and UI-only input before broadcast when readiness fails |
+| Real video | The supplied YouTube video played in Chrome after unmuting. Pause/play confirmed player state. Paused API position 108676 ms matched visible elapsed time 1:48; duration was 205861 ms. |
+| Real audio | Native browser audio played a generated 120-second WAV. Paused API position 36199 ms matched HTMLAudioElement.currentTime 36.14 seconds; resume showed 36.61 seconds and paused=false. Both real-player modes used Chrome; this is not a claim about every third-party player. |
+| Actual fixture pause/play | Independent actualPlaying changed false/true. Already-paused requests returned dispatched=true and targetStateObserved=true with exactly one additional callback. |
+| Position states | Live 1x/2x playback progressed; buffering estimates remained fixed; invalid position/update time stayed unknown. Offline math tests cover duration clamps, negative/nonfinite speed and invalid monotonic time. Wall-clock time is not an input. |
+| Stale report, stalled player | Original callback position/time stayed fixed and report age increased while independent actual position stalled. |
+| Stale report, moving player | Actual playback resumed without new reports; the original report timestamp remained unchanged. Missing updates alone do not prove a stall. |
+| Locked/off matrix | All three reads, background doctor and generic MCP passed for nonsecure off, secure on/off, expired cache and relocked states. Independent sample counts advanced without power-transition counters changing during observation. |
+| Accessibility unavailable | Clearing the enabled-service list actually unbound accessibility. Locked/off reads and background doctor still succeeded. |
+| Open shade | SystemUI mExpandedVisible remained true before/after CLI reads and direct read ingress, without acquiring an accessibility hierarchy. |
+| Mixed/UI ingress | With accessibility unbound, direct Android mixed lists in both orders and UI-only input returned SERVICE_UNAVAILABLE with no steps. Host regression tests reject both orders before broadcasting when readiness fails. |
+| Notification lifecycle | Existing/ongoing/group notifications, progress, post/update/removal, revision changes, empty results, filtering and bounded/truncated results passed. |
+| Permission and reconnection | Revocation returned NOTIFICATION_ACCESS_DENIED through CLI and MCP. Regrant restored existing notifications. Killing only the Operator while locked/off recovered the listener without opening the app; old session handles expired. |
+| Before first unlock | After a controlled reboot, CLI reads, background doctor and MCP returned DEVICE_USER_NOT_UNLOCKED. Android user state remained RUNNING_LOCKED until explicit test cleanup. |
+| Transport parity | Live HTTP /execute and typed decoding preserved report values and command/task correlation; generic MCP preserved successful read payloads and permission/expired-session errors. |
+| Session/control races | Same-package sessions were ambiguous; exact selection worked. Ignored pause timed out with dispatched=true. Replacement during the wait failed with MEDIA_SESSION_EXPIRED. Offline tests pin a resolved session across destruction before dispatch and after dispatch, excluding the replacement. |
+| Offline platform coverage | Robolectric API 21 and 28 cover snapshots, callback preservation, permission denial/disconnection, destroyed-token exclusion and pinned-session guards. |
 
-Retain raw local evidence privately. Committed examples contain no device serials,
-account content or machine paths. The reproducible harness lives in
-validation/notifications-media. Normal PR CI runs offline Node/Android tests;
-notification-media live CI is workflow_dispatch only.
+Final validation passed all 1,583 Node tests, the full Android unitTest aggregate,
+Operator/fixture debug assembly, and documentation generation with 34 navigation
+pages, 399 generated-doc links and no organization warnings.
 
-## Failed attempts and remaining acceptance
+Raw local evidence is private; committed examples exclude serials, account content
+and machine paths. Reproduction is in validation/notifications-media. Offline
+checks run in normal CI; the live workflow is manual only.
 
-All attempts matter; a later pass does not turn an earlier failure into a pass.
-Initial setup exposed a stale settings-only listener grant. Early fixture controls
-needed transport flags and correct shell quoting. The first stale-report assertion
-then exposed Android's query extrapolation; the callback implementation fixes that
-case. A force-stop experiment disconnected both listener and accessibility; setup
-was restored before later positive tests. This does not prove unattended process
-restart/reconnection while locked. One screen-on baseline preceded its deliberate setup wake broadcast; the harness
-now waits for the independently acknowledged transition before recording baseline
-counters, and the full sequence passed afterward. One browser screenshot attempt overlapped a
-Node rebuild and failed before dispatch; it was retried after build completion.
+## Corrections and compatibility limits
 
-The supplied YouTube URL was opened in the browser, with successful open_uri
-receipts. Hierarchy queries repeatedly returned no foreground root/windows and
-screenshots showed a blank app area after browser restart. An explicit browser
-launch through adb test setup also produced no accessible foreground hierarchy. Real browser video
-playback is unproven. The generated MP4 fixture is independent local playback
-proof, not real-browser compatibility or a second audio-player compatibility test.
+Testing exposed and fixed a settings-only permission grant, platform query
+extrapolation, and stale permission settings after revocation. API 27+ now uses
+NotificationManager.isNotificationListenerAccessGranted rather than trusting the
+saved setting. Earlier APIs retain their compatible setting-based check.
+A first-unlock guard uses read-only Android user-state probes; unsupported probes
+leave runtime errors authoritative. It never wakes or unlocks the device.
 
-N1 is not yet fully accepted. Outstanding gates include real video/audio-player
-comparison, the lowest supported API image, process restart/reconnect and first
-unlock behavior, open-shade preservation, comprehensive notification update/reconnection lifecycle coverage,
-and remaining pre-dispatch session-race permutations. Preserve these gates in the
-active task pack; do not label N1 release-ready from the passing subset above.
+Initial browser attempts on API 35 rendered blank; the supplied video and native
+audio were successfully verified on the selected API 36 emulator. The initial
+accessibility-off harness changed only the global switch, which did not reliably
+unbind services; the final harness clears and restores the enabled-service list.
+An initial shade setup raced keyguard dismissal; setup now settles before opening
+the shade. These failed attempts are not counted as passing evidence.
+
+Live platform coverage is API 35/36, with API 21/28 service behavior tested offline.
+No live API 21 listener-binding claim is made. Old-image/OEM compatibility and
+arbitrary Doze/process restrictions remain limits to consider during release
+verification. Direct Boot service operation is not supported. N2 notification
+mutations/seeking and downstream PiP-window assertions remain separate work.

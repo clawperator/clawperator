@@ -7,10 +7,11 @@ Target release: **0.11.0**. Next unreleased code version after publication:
 notification/media workstream and release readiness; it does not assert release
 completion or trigger publication merely by existing.
 
-Status: planning complete; N1, N2 and release execution not started. The inspected
-feature baseline was `7cdb31d4`; origin/main has since been merged, bringing
-the Node code version to 0.10.1. Reconcile current main,
-release tags and published state when implementation/release execution begins.
+Status: N1 implemented and locally validated for PR review; N2 and release
+execution remain pending. The feature branch retains code version 0.10.1.
+Reconcile main, release tags and published state during release preparation.
+Live N1 coverage is API 35/36; API 21/28 service tests are offline. V1 should
+retain or close the unverified live API 21 binding limitation explicitly.
 
 Feature contract: [notifications plan](../../notifications/plan.md).
 Execution details: [work breakdown](../../notifications/work-breakdown.md).
@@ -19,7 +20,7 @@ Execution details: [work breakdown](../../notifications/work-breakdown.md).
 
 | Stage | Scope / PR | Dependency | Status |
 | --- | --- | --- | --- |
-| N1 | Fresh notification reads; media discovery/status/pause/play; Android + Node + CLI/HTTP execution + tests + docs | Current main | [TODO] |
+| N1 | Fresh notification reads; media discovery/status/pause/play; Android + Node + CLI/HTTP execution + tests + docs | Current main | [DONE] Local implementation/validation; PR merge pending |
 | N2 | Notification dismiss/buttons; media seek; matching tests/docs and integrated live acceptance | N1 service boundary/contracts; merge N1 first | [TODO] |
 | V1 | Release preparation PR: reconcile/bump code to 0.11.0, release notes, final acceptance evidence and task cleanup | N1/N2 integrated | [TODO] |
 | V2 | Tag/publish 0.11.0 and verify distribution | V1 merged and inherited release gates resolved | [TODO] |
