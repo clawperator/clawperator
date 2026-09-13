@@ -57,7 +57,15 @@ def main():
         time.sleep(2)
         read = {'id': 'read', 'type': 'list_notifications'}
         ui = {'id': 'ui', 'type': 'snapshot_ui'}
-        for actions in [[read], [read, ui], [ui, read], [ui]]:
+        mutations = [
+            {'id': 'mutation', 'type': 'media_seek', 'params': {'mediaSessionId': session, 'positionMs': 0}},
+            {'id': 'mutation', 'type': 'dismiss_notification', 'params': {'notificationKey': 'test-key'}},
+            {'id': 'mutation', 'type': 'invoke_notification_action', 'params': {'notificationKey': 'test-key', 'actionId': 'test-action'}},
+        ]
+        cases = [[read], [read, ui], [ui, read], [ui]]
+        for mutation in mutations:
+            cases.extend([[mutation], [read, mutation], [mutation, read]])
+        for actions in cases:
             command_id = 'ingress-' + str(uuid.uuid4())
             command = {'commandId': command_id, 'taskId': 'ingress-proof', 'source': 'clawperator', 'expectedFormat': 'android-ui-automator', 'timeoutMs': 3000, 'actions': actions}
             adb('am', 'broadcast', '-a', 'app.clawperator.operator.ACTION_AGENT_COMMAND', '-p', OPERATOR, '--es', 'payload', json.dumps(command), '--receiver-foreground')

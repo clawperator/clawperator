@@ -15,6 +15,29 @@ class NotificationMediaParserTest {
         assertFalse(parse("""{"id":"b","type":"sleep","params":{"durationMs":1}},$read""").getOrThrow().actions.isBackgroundObservation())
         assertTrue(parse("""{"id":"a","type":"LIST_NOTIFICATIONS"}""").isFailure)
     }
+    @Test fun newMutationsAreStrictAndNeverBackgroundReads() {
+        for ((type, params) in listOf(
+            "dismiss_notification" to """{"notificationKey":"key"}""",
+            "invoke_notification_action" to """{"notificationKey":"key","actionId":"revision:0"}""",
+            "media_seek" to """{"mediaSessionId":"s","positionMs":0,"positionToleranceMs":0}""",
+        )) {
+            val mutation = """{"id":"b","type":"$type","params":$params}"""
+            val read = """{"id":"a","type":"list_notifications"}"""
+            for (actions in listOf(mutation, "$read,$mutation", "$mutation,$read")) {
+                assertFalse(parse(actions).getOrThrow().actions.isBackgroundObservation())
+            }
+        }
+        for (position in listOf("-1", "1.5", "9007199254740992", "null", "\"1\"")) {
+            assertTrue(parse("""{"id":"a","type":"media_seek","params":{"mediaSessionId":"s","positionMs":$position}}""").isFailure)
+        }
+        for ((type, params) in listOf(
+            "media_seek" to """{"mediaSessionId":"s"}""",
+            "media_seek" to """{"mediaSessionId":"s","positionMs":0,"positionToleranceMs":60001}""",
+            "dismiss_notification" to "{}",
+            "dismiss_notification" to """{"notificationKey":" "}""",
+            "invoke_notification_action" to """{"notificationKey":"k","actionId":"a","waitTimeoutMs":1}""",
+        )) assertTrue(parse("""{"id":"a","type":"$type","params":$params}""").isFailure)
+    }
     @Test fun rejectsMissingBlankConflictingAndInvalidParams() {
         for (params in listOf("{}", """{"mediaSessionId":""}""", """{"applicationId":" "}""", """{"applicationId":"p","mediaSessionId":"s"}""", """{"mediaSessionId":42}""")) {
             assertTrue(parse("""{"id":"a","type":"get_media_status","params":$params}""").isFailure)

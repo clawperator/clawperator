@@ -4,6 +4,10 @@
 import type { NodeMatcher } from "./selectors.js";
 
 export interface ActionParams {
+  notificationKey?: string;
+  actionId?: string;
+  positionMs?: number;
+  positionToleranceMs?: number;
   mediaSessionId?: string;
   maxTextChars?: number;
   waitTimeoutMs?: number;

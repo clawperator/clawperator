@@ -758,7 +758,7 @@ describe("runExecution", () => {
       assert.strictEqual(result.error.details, undefined);
       assert.strictEqual(result.error.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
     }
-    assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
+    assert.ok(!runner.calls.some(call => call.args.some(arg => arg.includes("am broadcast"))));
     assert.deepStrictEqual(
       runner.calls.map(call => call.args.join(" ")),
       [
@@ -810,7 +810,7 @@ describe("runExecution", () => {
       assert.strictEqual(result.error.details, undefined);
       assert.strictEqual(result.error.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
     }
-    assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
+    assert.ok(!runner.calls.some(call => call.args.some(arg => arg.includes("am broadcast"))));
   });
 
   it("preserves non-interactive-preflight diagnostics for transport or probe failures", async () => {
@@ -858,7 +858,7 @@ describe("runExecution", () => {
       });
       assert.strictEqual(result.deviceId, "test-device-1");
     }
-    assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
+    assert.ok(!runner.calls.some(call => call.args.some(arg => arg.includes("am broadcast"))));
   });
 
   it("cancels the early logcat waiter when readiness preflight throws", async () => {
@@ -906,7 +906,7 @@ describe("runExecution", () => {
     );
 
     assert.strictEqual(logcatKilled, true);
-    assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
+    assert.ok(!runner.calls.some(call => call.args.some(arg => arg.includes("am broadcast"))));
   });
 
   it("continues after the shared readiness helper wakes a sleeping device", async () => {
@@ -1243,7 +1243,7 @@ describe("runExecution", () => {
         },
       ]);
     }
-    assert.ok(!runner.calls.some(call => call.args.includes("broadcast")));
+    assert.ok(!runner.calls.some(call => call.args.some(arg => arg.includes("am broadcast"))));
   });
 
   it("emits a terminal result event for close_app-only fast-path executions", async () => {
@@ -3034,7 +3034,12 @@ describe("transport failure execution evidence", () => {
 it("blocks both mixed observation/UI orders before any action dispatch", async () => {
   const read = { id: "read", type: "list_notifications" };
   const ui = { id: "ui", type: "snapshot" };
-  for (const actions of [[read, ui], [ui, read], [ui]]) {
+  const mutations = [
+    { id: "mutation", type: "media_seek", params: { mediaSessionId: "s", positionMs: 0 } },
+    { id: "mutation", type: "dismiss_notification", params: { notificationKey: "k" } },
+    { id: "mutation", type: "invoke_notification_action", params: { notificationKey: "k", actionId: "a" } },
+  ];
+  for (const actions of [[read, ui], [ui, read], [ui], ...mutations.flatMap(mutation => [[read, mutation], [mutation, read], [mutation]])]) {
     const runner = new FakeProcessRunner();
     runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device\tdevice\n", stderr: "" });
     runner.queueResult({ code: 0, stdout: "package:com.test.operator\n", stderr: "" });
@@ -3045,6 +3050,6 @@ it("blocks both mixed observation/UI orders before any action dispatch", async (
       ensureInteractiveAutomationReadyFn: async () => { readinessCalls++; throw new Error("interactive prerequisite unavailable"); },
     }), /interactive prerequisite unavailable/);
     assert.equal(readinessCalls, 1);
-    assert.equal(runner.calls.some(call => call.args.includes("broadcast")), false);
+    assert.equal(runner.calls.some(call => call.args.some(arg => arg.includes("am broadcast"))), false);
   }
 });

@@ -26,9 +26,10 @@ const notificationSchema = z.object({
 });
 const base = { schemaVersion: z.literal(1), observedElapsedMs: z.number(), deviceState: z.object({ screenOn: z.boolean(), deviceLocked: z.boolean(), userUnlocked: z.boolean() }) };
 export const notificationMediaPayloadSchema = z.union([
+  z.object({ ...base, notificationKey: z.string(), dispatched: z.boolean(), actionId: z.string().optional(), removalObserved: z.boolean().optional(), waitTimeoutMs: z.number().optional() }),
   z.object({ ...base, notifications: z.array(notificationSchema), truncated: z.boolean(), total: z.number() }),
   z.object({ ...base, sessions: z.array(sessionSchema), truncated: z.boolean(), total: z.number() }),
-  z.object({ ...base, session: sessionSchema, dispatched: z.boolean().optional(), waitTimeoutMs: z.number().optional(), targetStateObserved: z.boolean().optional() }),
+  z.object({ ...base, session: sessionSchema, dispatched: z.boolean().optional(), waitTimeoutMs: z.number().optional(), targetStateObserved: z.boolean().optional(), requestedPositionMs: z.number().optional(), positionToleranceMs: z.number().optional(), targetPositionObserved: z.boolean().optional() }),
 ]);
 export type MediaStatus = z.infer<typeof sessionSchema>;
 export type NotificationSnapshot = z.infer<typeof notificationSchema>;

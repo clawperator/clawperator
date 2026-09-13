@@ -97,11 +97,15 @@ class AgentCommandParserDefault : AgentCommandParser {
         }
 
         return when (normalizedType) {
-            "list_notifications", "list_media_sessions", "get_media_status", "media_pause", "media_play" -> {
+            "list_notifications", "list_media_sessions", "get_media_status", "media_pause", "media_play", "media_seek", "dismiss_notification", "invoke_notification_action" -> {
                 require(type == normalizedType) { "Service action type must be canonical" }
                 val listing = type == "list_notifications" || type == "list_media_sessions"
                 val controlling = type == "media_pause" || type == "media_play"
+                val notificationMutation = type == "dismiss_notification" || type == "invoke_notification_action"
                 val allowed = if (listing) setOf("applicationId", "limit", "maxTextChars")
+                    else if (type == "dismiss_notification") setOf("notificationKey", "waitTimeoutMs")
+                    else if (type == "invoke_notification_action") setOf("notificationKey", "actionId")
+                    else if (type == "media_seek") setOf("applicationId", "mediaSessionId", "positionMs", "waitTimeoutMs", "positionToleranceMs")
                     else if (controlling) setOf("applicationId", "mediaSessionId", "waitTimeoutMs")
                     else setOf("applicationId", "mediaSessionId")
                 require(params.keys.all { it in allowed }) { "$type has unknown params" }
@@ -110,12 +114,20 @@ class AgentCommandParserDefault : AgentCommandParser {
                 }
                 val app = identifier("applicationId", 512)
                 val session = identifier("mediaSessionId", 128)
-                require(listing || ((app != null) != (session != null))) { "Provide exactly one applicationId or mediaSessionId" }
+                require(listing || notificationMutation || ((app != null) != (session != null))) { "Provide exactly one applicationId or mediaSessionId" }
                 val limit = params.strictIntOrDefault("limit", 25)
                 val textLimit = params.strictIntOrDefault("maxTextChars", 256)
                 val wait = params.strictLongOrDefault("waitTimeoutMs", 0)
                 require(limit in 1..100 && textLimit in 1..1024 && wait in 0..30000) { "Service action bounds exceeded" }
-                UiAction.NotificationMedia(id, type, app, session, limit, textLimit, wait)
+                val key = identifier("notificationKey", 4096)
+                val actionId = identifier("actionId", 128)
+                require(!notificationMutation || key != null) { "notificationKey is required" }
+                require(type != "invoke_notification_action" || actionId != null) { "actionId is required" }
+                val position = if (type == "media_seek") params.strictLongOrDefault("positionMs", -1) else null
+                require(position == null || position in 0..9007199254740991L) { "positionMs must be a nonnegative safe integer" }
+                val tolerance = params.strictLongOrDefault("positionToleranceMs", 1000)
+                require(tolerance in 0..60000) { "positionToleranceMs must be in [0, 60000]" }
+                UiAction.NotificationMedia(id, type, app, session, limit, textLimit, wait, key, actionId, position, tolerance)
             }
 
             "open_uri" ->
