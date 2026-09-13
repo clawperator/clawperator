@@ -1,3 +1,4 @@
+import { notificationMediaParamsSchema } from "../../contracts/notifications.js";
 import { z } from "zod";
 import { LIMITS } from "../../contracts/limits.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -128,6 +129,8 @@ const setOnScreenLogParamsSchema = z.object({
 const clearOnScreenLogParamsSchema = z.object({}).strict();
 
 function paramsSchemaForAction(actionType: string) {
+  const serviceSchema = notificationMediaParamsSchema(actionType);
+  if (serviceSchema !== undefined) return serviceSchema;
   if (actionType === "query_ui") return queryParamsSchema.optional();
   if (actionType === "set_on_screen_log") {
     return setOnScreenLogParamsSchema.optional();
@@ -146,6 +149,7 @@ function hasStructurallyValidActionParams(actionType: string, params: unknown): 
 // used only by `clawperator doctor`, which bypasses validateExecution and dispatches
 // directly via broadcastAgentCommand. It is not part of the public agent-facing API.
 const supportedTypes = [
+  "list_notifications", "list_media_sessions", "get_media_status", "media_pause", "media_play",
   "open_app",
   "open_uri",
   "close_app",

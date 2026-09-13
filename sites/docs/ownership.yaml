@@ -12,6 +12,12 @@ concepts:
     path: skills/cli.md
 
 command_details:
+  notifications:
+    href: notifications.md
+    label: Notifications
+  media:
+    href: media.md
+    label: Media sessions
   operator:
     href: ../setup.md#setup-step-install-operator-apk
     label: Setup

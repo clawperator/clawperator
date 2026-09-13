@@ -137,22 +137,30 @@ export async function grantNotificationListenerPermission(
   }
 
   const current = currentResult.stdout.trim();
-  const alreadyEnabled = current.includes(svc);
-
-  if (alreadyEnabled) {
-    return { ok: true, alreadyEnabled: true };
+  const alreadyEnabled = current.split(":").includes(svc);
+  // Notify NotificationManager even when the secure setting already lists the
+  // component. A settings-only grant can leave Android's listener unbound.
+  const grant = await runAdb(config, ["shell", "cmd", "notification", "allow_listener", svc]);
+  const grantOutput = grant.stdout + grant.stderr;
+  // Older Android images predate NotificationManager's shell grant command.
+  const commandUnavailable = /unknown command|can't find service|not found|no shell command implementation/i.test(grantOutput);
+  if (commandUnavailable) {
+    const sdk = await runAdb(config, ["shell", "getprop", "ro.build.version.sdk"]);
+    const api = Number(sdk.stdout.trim());
+    if (sdk.code === 0 && Number.isInteger(api) && api >= 21 && api <= 26) {
+      if (alreadyEnabled) return { ok: true, alreadyEnabled };
+      const value = current && current !== "null" ? `${current}:${svc}` : svc;
+      const legacy = await runAdb(config, ["shell", "settings", "put", "secure", "enabled_notification_listeners", value]);
+      return legacy.code === 0 && !/exception|error/i.test(legacy.stdout + legacy.stderr)
+        ? { ok: true, alreadyEnabled: false }
+        : { ok: false, alreadyEnabled: false, error: legacy.stderr || legacy.stdout || "Could not grant notification access" };
+    }
   }
-
-  const newValue = !current || current === "null" ? svc : `${current}:${svc}`;
-
-  const setResult = await runAdb(config, [
-    "shell", "settings", "put", "secure", "enabled_notification_listeners", newValue,
-  ]);
-  if (setResult.code !== 0) {
-    return { ok: false, alreadyEnabled: false, error: setResult.stderr || "Could not set enabled_notification_listeners" };
+  if (grant.code !== 0 || commandUnavailable || /exception|error|invalid listener/i.test(grantOutput)) {
+    return { ok: false, alreadyEnabled, error: grant.stderr || grant.stdout || "Could not grant notification access; enable it in Android notification access settings." };
   }
+  return { ok: true, alreadyEnabled };
 
-  return { ok: true, alreadyEnabled: false };
 }
 
 export async function grantDevicePermissions(

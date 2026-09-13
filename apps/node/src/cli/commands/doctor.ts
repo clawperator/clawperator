@@ -1,3 +1,5 @@
+import { runBackgroundObservationDoctor } from "../../domain/doctor/backgroundObservation.js";
+import { formatError } from "../output.js";
 /**
  * Doctor diagnostics for Clawperator.
  * Checks host, device, and readiness state for end-to-end automation.
@@ -10,6 +12,7 @@ import type { OutputOptions } from "../output.js";
 import type { Logger } from "../../adapters/logger.js";
 
 export async function cmdDoctor(options: {
+  capability?: string;
   format: OutputOptions["format"];
   fix?: boolean;
   full?: boolean;
@@ -19,6 +22,12 @@ export async function cmdDoctor(options: {
   operatorPackage?: string;
   logger?: Logger;
 }, deps: { doctorService?: Pick<DoctorService, "run"> } = {}): Promise<string> {
+  const capability = options.capability ?? "interactive";
+  if (!["interactive", "background-observation"].includes(capability) ||
+      (capability === "background-observation" && (options.full || options.fix))) {
+    process.exitCode = 1;
+    return formatError({ code: "INVALID_ARGUMENT", message: "Use doctor --capability interactive or background-observation. Background mode does not allow --full or --fix." }, options);
+  }
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
     operatorPackage: options.operatorPackage ?? process.env.CLAWPERATOR_OPERATOR_PACKAGE,
@@ -26,7 +35,9 @@ export async function cmdDoctor(options: {
   });
 
   const service = deps.doctorService ?? new DoctorService();
-  const report = await service.run({ config, full: options.full, fix: options.fix, logger: options.logger });
+  const report = capability === "background-observation"
+    ? await runBackgroundObservationDoctor(config)
+    : { ...await service.run({ config, full: options.full, fix: options.fix, logger: options.logger }), capability: "interactive" as const };
 
   if (options.format === "json") {
     process.exitCode = getDoctorExitCode(report);
@@ -40,13 +51,13 @@ export async function cmdDoctor(options: {
 
 function renderPrettyDoctorReport(report: DoctorReport): string {
   const lines: string[] = [];
-  const criticalChecks = report.checks.filter(isCriticalDoctorCheck);
-  const advisoryChecks = report.checks.filter(check => !isCriticalDoctorCheck(check) && check.status !== "pass");
-  const passedChecks = report.checks.filter(check => check.status === "pass" && !isCriticalDoctorCheck(check));
+  const criticalChecks = report.capability === "background-observation" ? report.checks : report.checks.filter(isCriticalDoctorCheck);
+  const advisoryChecks = report.capability === "background-observation" ? [] : report.checks.filter(check => !isCriticalDoctorCheck(check) && check.status !== "pass");
+  const passedChecks = report.capability === "background-observation" ? [] : report.checks.filter(check => check.status === "pass" && !isCriticalDoctorCheck(check));
   const allOk = report.checks.every(check => check.status === "pass");
 
   lines.push("");
-  lines.push("Clawperator Doctor Diagnostics");
+  lines.push(`Clawperator Doctor Diagnostics (${report.capability ?? "interactive"})`);
   lines.push("");
   lines.push(`  Device:           ${report.deviceId ?? "(auto-detect)"}`);
   lines.push(`  Operator package: ${report.operatorPackage ?? "(default)"}`);
@@ -78,7 +89,7 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
   }
 
   if (report.criticalOk ?? report.ok) {
-    lines.push(allOk ? "[OK] Ready to use Clawperator." : "[OK] Ready to use Clawperator. Advisory warnings are listed above.");
+    lines.push(allOk ? `[OK] Ready for ${report.capability ?? "interactive"}.` : "[OK] Ready to use Clawperator. Advisory warnings are listed above.");
   } else {
     lines.push("[FAIL] Required setup verification did not complete successfully.");
   }

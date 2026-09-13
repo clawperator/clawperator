@@ -70,7 +70,7 @@ class TaskRunnerManagerDefault(
 
                 val duration = currentTime - startTime
                 when (result) {
-                    is TaskResult.Success -> Log.d("$TAG Task completed successfully in ${duration}ms with value: ${result.value}")
+                    is TaskResult.Success -> Log.d("$TAG Task completed successfully in ${duration}ms successfully")
                     is TaskResult.Failed -> Log.e("$TAG Task failed after ${duration}ms: ${result.reason}", result.cause)
                 }
 

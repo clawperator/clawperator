@@ -4,6 +4,9 @@
 import type { NodeMatcher } from "./selectors.js";
 
 export interface ActionParams {
+  mediaSessionId?: string;
+  maxTextChars?: number;
+  waitTimeoutMs?: number;
   applicationId?: string;
   sessionId?: string;
   uri?: string;

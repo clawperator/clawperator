@@ -390,6 +390,19 @@ describe("mcp stdio integration", () => {
     assert.strictEqual(payload.code, "EXECUTION_VALIDATION_FAILED");
   });
 
+  it("preserves notification/media validation errors through generic execute", async () => {
+    await client.initialize();
+    for (const action of [
+      { id: "a", type: "get_media_status", params: { applicationId: "p", mediaSessionId: "s" } },
+      { id: "a", type: "list_notifications", params: { limit: 101 } },
+      { id: "a", type: "media_play", params: { mediaSessionId: "s", waitTimeoutMs: -1 } },
+    ]) {
+      const result = await client.callTool("execute", { deviceId: "non-existent", actions: [action] });
+      assert.strictEqual(result.isError, true);
+      assert.strictEqual((parseToolPayload(result) as { code: string }).code, "EXECUTION_VALIDATION_FAILED");
+    }
+  });
+
   it("delegates non-object raw action params to the canonical execution validator", async () => {
     await client.initialize();
 

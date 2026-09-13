@@ -9,6 +9,16 @@ import clawperator.uitree.UiTreeClickTypes
 sealed interface UiAction {
     val id: String
 
+    data class NotificationMedia(
+        override val id: String,
+        val type: String,
+        val applicationId: String? = null,
+        val mediaSessionId: String? = null,
+        val limit: Int = 25,
+        val maxTextChars: Int = 256,
+        val waitTimeoutMs: Long = 0,
+    ) : UiAction
+
     data class OpenUri(
         override val id: String,
         val uri: String,
@@ -251,3 +261,7 @@ data class UiActionExecutionResult(
     val errorCode: String? = null,
     val error: String? = null,
 )
+
+fun List<UiAction>.isBackgroundObservation(): Boolean = isNotEmpty() && all {
+    it is UiAction.NotificationMedia && it.type in setOf("list_notifications", "list_media_sessions", "get_media_status")
+}

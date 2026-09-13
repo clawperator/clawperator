@@ -22,6 +22,7 @@ export interface DoctorCheckResult {
 }
 
 export interface DoctorReport {
+  capability?: "interactive" | "background-observation";
   ok: boolean;
   criticalOk?: boolean;
   deviceId?: string;
