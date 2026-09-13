@@ -90,6 +90,9 @@ project(":shared:app:di").projectDir = file("apps/android/shared/app/di")
 include(":shared:test")
 project(":shared:test").projectDir = file("apps/android/shared/test")
 
+include(":notification-media-fixture")
+project(":notification-media-fixture").projectDir = file("validation/notifications-media/fixture")
+
 fun renameBuildFileToModuleName(project: ProjectDescriptor) {
     project.buildFileName = "${project.name}.gradle.kts"
     project.children.forEach { child -> renameBuildFileToModuleName(child) }

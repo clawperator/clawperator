@@ -27,6 +27,10 @@ public class MediaProofActivity extends Activity {
     static MediaPlayer player;
     static boolean publish = true;
     static String commandMode = "normal";
+    static float speed = 1f;
+    static int notificationRevision = 0;
+    static int playCommands = 0;
+    static int pauseCommands = 0;
     static Context app;
     static final Handler handler = new Handler(android.os.Looper.getMainLooper());
     static long samples = 0;
@@ -37,17 +41,21 @@ public class MediaProofActivity extends Activity {
         if (publish) session.setPlaybackState(new PlaybackState.Builder()
             .setActions(PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE | PlaybackState.ACTION_SEEK_TO)
             .setState(player.isPlaying() ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED,
-                player.getCurrentPosition(), 1f, SystemClock.elapsedRealtime()).build());
+                player.getCurrentPosition(), speed, SystemClock.elapsedRealtime()).build());
         try {
             JSONObject data = new JSONObject().put("actualPositionMs", player.getCurrentPosition())
                 .put("actualPlaying", player.isPlaying()).put("sampleCount", ++samples)
+                .put("playCommands", playCommands).put("pauseCommands", pauseCommands)
+                .put("notificationRevision", notificationRevision)
+                .put("userUnlocked", Build.VERSION.SDK_INT < 24 || ((android.os.UserManager) app.getSystemService(Context.USER_SERVICE)).isUserUnlocked())
                 .put("observedElapsedMs", SystemClock.elapsedRealtime())
                 .put("screenOn", ((android.os.PowerManager) app.getSystemService(Context.POWER_SERVICE)).isInteractive())
                 .put("deviceLocked", ((android.app.KeyguardManager) app.getSystemService(Context.KEYGUARD_SERVICE)).isKeyguardLocked())
                 .put("screenOnEvents", screenOnEvents).put("screenOffEvents", screenOffEvents);
-            try (FileOutputStream out = app.openFileOutput("media-proof.json", Context.MODE_PRIVATE)) {
+            try (FileOutputStream out = app.openFileOutput("media-proof.next", Context.MODE_PRIVATE)) {
                 out.write(data.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
             }
+            if (!new File(app.getFilesDir(), "media-proof.next").renameTo(new File(app.getFilesDir(), "media-proof.json"))) throw new IllegalStateException("Could not publish fixture sample");
         } catch (Exception error) { throw new IllegalStateException(error); }
     }
     @Override public void onCreate(Bundle state) {
@@ -75,8 +83,9 @@ public class MediaProofActivity extends Activity {
             session = new MediaSession(this, "notification-media-proof");
             session.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
             session.setCallback(new MediaSession.Callback() {
-                @Override public void onPlay() { player.start(); report(); }
+                @Override public void onPlay() { playCommands++; player.start(); report(); }
                 @Override public void onPause() {
+                    pauseCommands++;
                     if ("ignore".equals(commandMode)) return;
                     if ("replace".equals(commandMode)) { replaceSession(); return; }
                     player.pause(); report();
@@ -97,6 +106,15 @@ public class MediaProofActivity extends Activity {
                 .setContentText("An ongoing notification visible to service reads").setOngoing(true).build());
         } catch (Exception error) { throw new IllegalStateException(error); }
     }
+    static void postNotification(int id, String text, boolean summary) {
+        Notification.Builder builder = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(app, "media-proof") : new Notification.Builder(app);
+        android.app.PendingIntent button = android.app.PendingIntent.getBroadcast(app, id,
+            new Intent(app, Control.class).putExtra("operation", "normal"), android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT);
+        ((NotificationManager) app.getSystemService(Context.NOTIFICATION_SERVICE)).notify(id,
+            builder.setSmallIcon(android.R.drawable.ic_media_play).setContentTitle("Fixture revision " + (++notificationRevision))
+                .setContentText(text).setGroup("fixture-group").setGroupSummary(summary).setProgress(100, 42, false)
+                .addAction(android.R.drawable.ic_media_play, "Fixture button", button).build());
+    }
     static void replaceSession() {
         session.release();
         session = new MediaSession(app, "replacement-proof");
@@ -107,7 +125,18 @@ public class MediaProofActivity extends Activity {
         @Override public void onReceive(Context context, Intent intent) {
             if (player == null) return;
             String operation = intent.getStringExtra("operation");
-            if ("ignore".equals(operation) || "normal".equals(operation) || "replace-on-pause".equals(operation)) {
+            if ("post".equals(operation) || "update".equals(operation)) { postNotification(8124, operation, false); }
+            else if ("group".equals(operation)) { postNotification(8125, "summary", true); }
+            else if ("remove".equals(operation)) { ((NotificationManager) app.getSystemService(Context.NOTIFICATION_SERVICE)).cancel(8124); }
+            else if ("many".equals(operation)) {
+                char[] chars = new char[1024]; java.util.Arrays.fill(chars, 'x');
+                for (int id = 8200; id < 8240; id++) postNotification(id, new String(chars), false);
+            }
+            else if ("clear".equals(operation)) { ((NotificationManager) app.getSystemService(Context.NOTIFICATION_SERVICE)).cancelAll(); }
+            else if ("speed-two".equals(operation) && Build.VERSION.SDK_INT >= 23) { speed = 2f; player.setPlaybackParams(new android.media.PlaybackParams().setSpeed(speed)); publish = true; }
+            else if ("buffering".equals(operation)) { player.pause(); publish = false; session.setPlaybackState(new PlaybackState.Builder().setState(PlaybackState.STATE_BUFFERING, player.getCurrentPosition(), 1f, SystemClock.elapsedRealtime()).build()); }
+            else if ("unknown".equals(operation)) { publish = false; session.setPlaybackState(new PlaybackState.Builder().setState(PlaybackState.STATE_PLAYING, PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1f, 0).build()); }
+            else if ("ignore".equals(operation) || "normal".equals(operation) || "replace-on-pause".equals(operation)) {
                 commandMode = "replace-on-pause".equals(operation) ? "replace" : operation;
             }
             else if ("remove-second".equals(operation)) { if (second != null) second.release(); second = null; }

@@ -28,9 +28,6 @@ android {
     }
 
     sourceSets {
-        getByName("debug") {
-            java.srcDir(rootProject.file("validation/notifications-media/android"))
-        }
         getByName("main") {
             java.srcDirs("src/main/kotlin")
         }

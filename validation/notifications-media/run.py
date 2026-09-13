@@ -9,7 +9,8 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-PACKAGE = 'com.clawperator.operator.dev'
+PACKAGE = 'com.clawperator.fixture.media'
+OPERATOR = 'com.clawperator.operator.dev'
 
 
 def main():
@@ -34,7 +35,7 @@ def main():
         return run(['adb', '-s', args.device, *command], raw=True)
 
     def cli(*command, expected_error=None):
-        result = subprocess.run(['node', 'apps/node/dist/cli/index.js', *command, '--device', args.device, '--operator-package', PACKAGE, '--no-daemon'], cwd=ROOT, text=True, capture_output=True, timeout=90)
+        result = subprocess.run(['node', 'apps/node/dist/cli/index.js', *command, '--device', args.device, '--operator-package', OPERATOR, '--no-daemon'], cwd=ROOT, text=True, capture_output=True, timeout=90)
         value = json.loads(result.stdout)
         evidence.append({'command': list(command), 'exitCode': result.returncode, 'result': value})
         if expected_error is None:
@@ -57,6 +58,7 @@ def main():
         adb('shell', 'am', 'broadcast', '--receiver-foreground', '-n', PACKAGE + '/clawperator.operator.debug.MediaProofActivity$Control', '--es', 'operation', operation)
 
     try:
+        adb('shell', 'am', 'force-stop', PACKAGE)
         # Caller must install the matching debug APK and provision permissions first.
         with tempfile.TemporaryDirectory() as folder:
             media = Path(folder) / 'proof.mp4'
@@ -73,6 +75,31 @@ def main():
         assert sample()['actualPlaying'] is False
         payload(cli('media', 'play', '--session', session_id, '--wait-timeout-ms', '2000'))
         assert sample()['actualPlaying'] is True
+        # Compare real progression at two speeds before freezing callback reports.
+        for operation, expected_speed in [('resume', 1), ('speed-two', 2)]:
+            control(operation)
+            start = sample()
+            time.sleep(1.2)
+            end = sample()
+            state = payload(cli('media', 'status', '--session', session_id))['session']
+            assert state['playbackSpeed'] == expected_speed, state
+            assert end['actualPositionMs'] != start['actualPositionMs'], (start, end)
+            evidence.append({'speed': expected_speed, 'before': start, 'after': end})
+        control('buffering')
+        buffered = payload(cli('media', 'status', '--session', session_id))['session']
+        time.sleep(1)
+        buffered_later = payload(cli('media', 'status', '--session', session_id))['session']
+        assert buffered['state'] == 'buffering' and buffered['estimatedPositionMs'] == buffered_later['estimatedPositionMs']
+        control('unknown')
+        unknown = payload(cli('media', 'status', '--session', session_id))['session']
+        assert unknown['reportedPositionMs'] is None and unknown['estimatedPositionMs'] is None, unknown
+        control('resume')
+        payload(cli('media', 'pause', '--session', session_id, '--wait-timeout-ms', '2000'))
+        pauses = sample()['pauseCommands']
+        already = payload(cli('media', 'pause', '--session', session_id, '--wait-timeout-ms', '2000'))
+        time.sleep(0.2)
+        assert already['dispatched'] and already['targetStateObserved'] and sample()['pauseCommands'] == pauses + 1
+        payload(cli('media', 'play', '--session', session_id, '--wait-timeout-ms', '2000'))
         control('stall')
         deadline = time.monotonic() + 10
         while sample()['actualPlaying']:
@@ -96,9 +123,18 @@ def main():
         assert after['screenOn'] is False and after['screenOnEvents'] == before['screenOnEvents'], (before, after)
         assert after['actualPositionMs'] == actual['actualPositionMs'], (actual, after)
         evidence.append({'independentFixtureBefore': before, 'independentFixtureAfter': after})
+        control('unpublished-play')
+        moving_before = sample()
+        time.sleep(1.2)
+        moving_after = sample()
+        unchanged = payload(cli('media', 'status', '--session', session_id))['session']
+        assert moving_after['actualPlaying'] and moving_after['actualPositionMs'] != moving_before['actualPositionMs']
+        assert unchanged['positionUpdatedElapsedMs'] == first['positionUpdatedElapsedMs']
+        evidence.append({'unchangedReportWithActualProgress': {'before': moving_before, 'after': moving_after}})
         run(['node', 'validation/notifications-media/http-helper-observe.mjs', args.device, session_id, str(args.output / 'http-helper.json')], raw=True)
         if args.secure_lock:
             run(['python3', 'validation/notifications-media/lock-matrix.py', '--device', args.device, '--session', session_id, '--output', str(args.output / 'locked')], raw=True)
+            session_id = json.loads((args.output / 'locked' / 'lifecycle.json').read_text())['mediaSessionId']
         if args.controls:
             control('resume')
             control('second')

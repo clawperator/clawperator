@@ -9,7 +9,8 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-PACKAGE = 'com.clawperator.operator.dev'
+PACKAGE = 'com.clawperator.fixture.media'
+OPERATOR = 'com.clawperator.operator.dev'
 
 
 def main():
@@ -34,7 +35,7 @@ def main():
 
     def cli(*command):
         result = run(['node', 'apps/node/dist/cli/index.js', *command, '--device', args.device,
-                      '--operator-package', PACKAGE, '--no-daemon'])
+                      '--operator-package', OPERATOR, '--no-daemon'])
         value = json.loads(result.stdout)
         records.append({'command': command, 'exitCode': result.returncode, 'result': value})
         assert result.returncode == 0, value
@@ -77,6 +78,7 @@ def main():
     pin = str(secrets.randbelow(800000) + 100000)
     created = False
     original_accessibility = adb('settings', 'get', 'secure', 'accessibility_enabled').strip()
+    original_services = adb('settings', 'get', 'secure', 'enabled_accessibility_services').strip()
     try:
         grant = adb('locksettings', 'set-pin', pin)
         assert 'Pin set to' in grant, 'Could not create a temporary PIN; use an emulator without an existing credential'
@@ -84,11 +86,15 @@ def main():
         set_screen(True)
         set_screen(False)
         observations('secure-off')
+        adb('settings', 'put', 'secure', 'enabled_accessibility_services', '')
         adb('settings', 'put', 'secure', 'accessibility_enabled', '0')
         time.sleep(2)
         observations('secure-off-no-accessibility')
         time.sleep(9)
         observations('secure-off-expired-cache')
+        lifecycle = run(['python3', 'validation/notifications-media/lifecycle.py', '--device', args.device, '--output', str(args.output / 'lifecycle.json')])
+        assert lifecycle.returncode == 0, lifecycle.stderr
+        args.session = json.loads(lifecycle.stdout)['mediaSessionId']
         set_screen(True)
         observations('secure-on', screen_on=True)
         set_screen(False)
@@ -96,6 +102,7 @@ def main():
     finally:
         (args.output / 'lock-matrix.json').write_text(json.dumps(records, indent=2))
         try:
+            adb('settings', 'put', 'secure', 'enabled_accessibility_services', original_services)
             adb('settings', 'put', 'secure', 'accessibility_enabled', original_accessibility)
         finally:
             if created:

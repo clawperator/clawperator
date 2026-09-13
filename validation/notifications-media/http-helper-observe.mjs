@@ -9,7 +9,7 @@ const typed = await runNotificationMedia('get_media_status', { mediaSessionId: s
 assert.equal(typed.result.ok, true);
 assert.equal(typed.payload.deviceState.screenOn, false);
 const execution = { commandId: 'http-observation-proof', taskId: 'http-observation-proof', source: 'validation', expectedFormat: 'android-ui-automator', timeoutMs: 10000, actions: [
-  { id: 'notifications', type: 'list_notifications', params: { applicationId: operatorPackage } },
+  { id: 'notifications', type: 'list_notifications', params: { applicationId: "com.clawperator.fixture.media" } },
   { id: 'sessions', type: 'list_media_sessions' },
   { id: 'status', type: 'get_media_status', params: { mediaSessionId: sessionId } },
 ] };

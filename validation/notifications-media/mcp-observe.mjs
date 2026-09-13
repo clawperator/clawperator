@@ -15,7 +15,7 @@ try {
   await client.connect(transport);
   const result = await client.callTool({ name: 'execute', arguments: {
     deviceId, operatorPackage: 'com.clawperator.operator.dev', actions: [
-      { id: 'notifications', type: 'list_notifications', params: { applicationId: 'com.clawperator.operator.dev' } },
+      { id: 'notifications', type: 'list_notifications', params: { applicationId: 'com.clawperator.fixture.media' } },
       { id: 'sessions', type: 'list_media_sessions' },
       { id: 'status', type: 'get_media_status', params: { mediaSessionId: sessionId } },
     ],

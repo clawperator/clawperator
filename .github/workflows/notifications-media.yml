@@ -21,7 +21,7 @@ jobs:
           npm --prefix apps/node ci
           npm --prefix apps/node run build
           node --test apps/node/dist/test/unit/notificationMedia.test.js
-          ./gradlew :app:assembleDebug :shared:core:toolkit:testDebugUnitTest :shared:data:operator:testDebugUnitTest
+          ./gradlew :app:assembleDebug :notification-media-fixture:assembleDebug :shared:core:toolkit:testDebugUnitTest :shared:data:operator:testDebugUnitTest
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
