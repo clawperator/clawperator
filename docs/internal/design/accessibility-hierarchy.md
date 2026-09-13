@@ -81,8 +81,9 @@ Acceptance completed on the implementation branch:
 The negative-control source edit was restored, both intended APKs rebuilt, and
 the intended development APK reinstalled. The temporary release installation
 was removed and the original development service selection restored. No network
-settings were changed. These results prove local acceptance; a manually dispatched GitHub run remains
-release evidence, not a check on every pull request.
+settings were changed. These results prove local acceptance. A manually
+dispatched GitHub run is optional under the
+[current release requirements](../release-reference.md#v010-acceptance-requirements).
 
 The development upgrade briefly disconnected the service and then reconnected
 without a manual re-enable. The release install encountered a stale/crashed

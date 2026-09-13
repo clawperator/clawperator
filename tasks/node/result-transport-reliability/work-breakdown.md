@@ -35,9 +35,10 @@ Contract and boundaries: [plan.md](plan.md).
    every failure and unrun attempt; a failed open stops subsequent mutation
    attempts. Distinguish transport delivery from action and fixture success.
 4. Update permanent findings and release status with source/build identities,
-   exact attempt accounting and causal limits. The manually dispatched
-   supported-image CI run remains independently required. An explicit scope
-   decision is required to accept or defer an unresolved release blocker.
+   exact attempt accounting and causal limits. Release verification uses the
+   local `./validation/test_all.sh` suite; no GitHub run is required. Its default
+   off-device coverage does not replace the live causal investigation above.
+   An explicit scope decision is required to accept or defer that causal gap.
 
 Completed implementation, local passes and controlled disconnects do not close
 the historical causal gate. Existing evidence can support unchanged surfaces;

@@ -40,6 +40,6 @@ A replacement transport or durable retrieval mechanism requires separate scope.
 Follow [work-breakdown.md](work-breakdown.md) for bounded verification. Close the
 causal gap through demonstrated evidence and repairs, or obtain an explicit
 release-scope decision accepting or deferring it. Preserve the decision and its
-limits in the permanent design record before retiring this pack. The manual
-supported-image CI gate is separately tracked in the
+limits in the permanent design record before retiring this pack. Local release
+verification and its coverage limits are tracked in the
 [release reference](../../../docs/internal/release-reference.md#v010-acceptance-requirements).

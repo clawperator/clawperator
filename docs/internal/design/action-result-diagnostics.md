@@ -104,8 +104,8 @@ and preservation of typed failures through post-processing.
 Device evidence was kept outside version control. No physical-device or
 cross-OEM validation is claimed. Missing-root and disappearing-container races
 are covered by deterministic fixtures rather than induced on a live device.
-The manually dispatched CI hierarchy regression remains a separate release
-gate; this work does not satisfy or waive it.
+Current local verification requirements and device-coverage limits are recorded
+in the [release reference](../release-reference.md#v010-acceptance-requirements).
 
 Sibling runtime skills were audited for scroll enums, terminal/step codes, and
 text receipt consumers. No current skill branches on the changed scroll enums
@@ -168,7 +168,7 @@ mutation was replayed to recover evidence.
 
 This establishes local scroll-transition acceptance. The one clean-start harness
 pass does not establish restored-search preparation or repeated transport
-reliability, and does not replace the manual hierarchy CI gate. No
+reliability. No
 release-variant, physical-device, or cross-OEM transition proof is claimed.
 Sibling runtime skills use the existing scroll actions and explicit containers;
 no new wire values or skill migration/version changes were needed.
@@ -191,4 +191,5 @@ scroll and the Brightness level postcondition. Internet query/MCP/XML parity and
 PNG checks also passed in each run. See the
 [integrated acceptance record](../../../validation/sensitive-hierarchy-access/README.md#integrated-hierarchy-and-transport-acceptance)
 for complete attempt accounting and build identity. This completes local
-integration proof; the manual supported-image release CI gate remains required.
+integration proof on the stated local image. The GitHub regression is optional
+under the current release requirements.

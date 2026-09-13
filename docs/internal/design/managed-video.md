@@ -87,8 +87,8 @@ Final validation passed: Node build and all 1,544 Node tests with no skips, the
 Android debug APK build, and the documentation build (32 navigation pages and
 394 generated-doc links, no organization warnings). The final MCP idle check
 confirmed that the zero-duration observation is retained alongside the partial
-status. The supported-image manual release CI and separate runtime release gates
-remain outside this feature's completion claim.
+status. Separate runtime release acceptance remains outside this feature's
+completion claim; see the [release requirements](../release-reference.md#v010-acceptance-requirements).
 
 
 ## On-screen log recording verification
@@ -212,6 +212,6 @@ Final full-stream validation passed all 1,554 Node tests with no skips, the comp
 validation suite (including real-codec fixtures), the matching debug APK build,
 and the documentation build (32 navigation pages and 394 generated-doc links,
 no organization warnings). An initial Node test invocation overlapped a validation
-build that replaced `dist/`; it was discarded, then the full suite passed after
-the build completed. The separate transport-reliability and manual supported-image release gates
-are unchanged; media verification does not establish result-transport readiness.
+build that replaced `dist/`; it was discarded, then the full suite passed
+after the build completed. Media verification does not establish result-transport
+readiness or close the separate causal investigation.

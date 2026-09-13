@@ -104,13 +104,14 @@ record evidence or an explicit release-scope disposition for these requirements:
    Passing finite series and controlled disconnects establish bounded behavior,
    not the historical cause. Preserve original failures and never replay an
    uncertain mutation to recover evidence.
-2. Run the [manual hierarchy workflow](../../.github/workflows/sensitive-hierarchy.yml)
-   against the release candidate and retain its run URL and artifacts. Both
-   matching APK variants must pass the full Android 15 Internet query/XML
-   regression on the supported English API-35 Google APIs x86_64 revision-9
-   image. Local arm64 passes and focused preparation checks do not replace it.
-   Keep the workflow manual. The documentation audit on 13 September 2026 found
-   no listed runs. See the [harness prerequisites and acceptance evidence](../../validation/sensitive-hierarchy-access/README.md).
+2. Run `./validation/test_all.sh` locally and retain the source revision and
+   suite results. On 13 September 2026 the release owner selected local
+   verification and removed the requirement for a GitHub hierarchy workflow run.
+   The default runner covers Android unit tests, Node tests, evals and repository
+   validation. It does not run live device suites, install APKs or exercise the
+   supported CI emulator image. Preserve those coverage limits alongside the
+   existing [local hierarchy evidence](../../validation/sensitive-hierarchy-access/README.md).
+   The manual GitHub workflow remains available for optional device regression.
 3. Record the final source commit, CLI/APK identities, supported-device limits
    and all declared attempts. Use existing validation where it covers the
    delivered revision; run the combined Node suite, relevant Android unit/build
@@ -125,6 +126,18 @@ passed; its [integration record](../../validation/sensitive-hierarchy-access/REA
 retains build identity and attempt accounting. The later reader-exit recurrence
 remains in the transport findings alongside passing series. Media verification
 and retirement of implementation plans do not close outstanding release gates.
+
+### Local verification on 13 September 2026
+
+`./validation/test_all.sh` completed once with exit 0 against source
+`99c2290b5edbb79c7851821cecad8d6b4567b1d4`, with only release-guidance edits
+pending. Node build, Android unit tests, all 1,571 Node tests (no skips), all
+124 eval tests and repository validation passed. Repository validation included
+real-codec full-stream video checks, offline hierarchy/transport fixtures,
+blocked-term policy, installer and on-screen-log harness checks.
+
+This run did not install APKs, run live device suites or reproduce the historical
+reader-exit cause. Those limits remain separate from the passing local suites.
 
 ## Tag Commands
 

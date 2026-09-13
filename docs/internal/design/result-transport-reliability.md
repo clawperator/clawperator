@@ -1,5 +1,10 @@
 # Result transport reliability
 
+Current release verification uses the local suite; a GitHub run is optional by
+the release owner's 13 September 2026 decision. See the
+[release requirements](../release-reference.md#v010-acceptance-requirements).
+Historical evidence below retains the coverage and failures of each attempt.
+
 ## Contract and ownership
 
 The host result reader owns process lifecycle, stream framing and reassembly.
@@ -146,8 +151,8 @@ the first captured Internet query returned a successful, correlated 24-node
 hierarchy without the switch; the next two captures returned 68 nodes with the
 switch. No transport failure occurred in those three captures. The failed run
 is retained, without retrying to obtain a passing result or weakening the
-fixture. Release readiness remains open for that fixture transition and manual
-CI; original historical transport-cause limits also remain.
+fixture. At that revision, release readiness remained open for the fixture
+transition, historical transport causes and the then-required manual CI run.
 
 Integrated APK SHA-256 values:
 
@@ -172,9 +177,9 @@ binding state; the interrupted transport series was not presented as a pass.
 
 The [full acceptance record](../../../validation/sensitive-hierarchy-access/README.md#integrated-hierarchy-and-transport-acceptance)
 preserves all final cases, earlier failures, setup observations, source and APK
-hashes. This resolves the local combined-harness gap described above. The manual
-supported-image CI release gate and historical causal limits remain explicit;
-a finite series does not prove failure-free transport under every condition.
+hashes. This resolves the local combined-harness gap described above. Historical
+causal limits remain explicit; a finite series does not prove failure-free
+transport under every condition.
 
 ## Recurring reader exit investigation
 
@@ -297,8 +302,8 @@ causal limits; integrity checks and pacing were not weakened or changed.
 Further causal closure needs a fresh failing attempt with host shell-protocol
 completion/disconnect evidence and simultaneous independent device/process
 observations, without redispatching an uncertain mutation. The causal reliability
-gate remains open. The manually dispatched supported CI image remains a separate
-release prerequisite; these local passes do not satisfy it.
+gate remains open. These local passes do not claim verification on the
+supported GitHub CI image; that workflow is now optional.
 
 ### Review repair: bounded draining after exit
 
@@ -375,9 +380,8 @@ Final matching APK SHA-256:
 - Release: `e8df33b54cca7fa4b2614f62b15ded395c76f7c08e19673217351d67bd03f515`.
 
 The clean code review supports these bounded lifecycle repairs. The historical
-post-dispatch exit cause, these retained fixture failures, and the manual
-supported-image CI prerequisite prevent claiming complete reliability or release
-acceptance.
+post-dispatch exit cause and these retained fixture failures prevent claiming
+complete reliability. Current release verification requirements are linked above.
 
 ### Follow-up: controlled connection interruption and evidence repair
 
@@ -457,7 +461,7 @@ The release fixed series ran once and passed all 60 fixture checks with 60
 canonical envelopes and a live independent reader. The two injected debug
 queries are accounted for separately above. No natural transport failure was
 captured in this follow-up. These results neither erase the interrupted debug
-series nor establish complete reliability or manual release acceptance.
+series nor establish complete reliability.
 
 Matching APK SHA-256:
 
@@ -518,7 +522,8 @@ logd or host delivery acknowledgement. The result reader may stop on the last
 result record before that marker arrives, so use the independent observer or
 bounded device-buffer capture when checking publication completion. These
 markers share logcat's loss characteristics; missing markers are inconclusive.
-The historical cause and manual supported-image release gate remain open.
+The historical cause remains open. GitHub verification is optional under the
+current release decision linked above.
 
 
 ### Diagnostic verification and current release limits

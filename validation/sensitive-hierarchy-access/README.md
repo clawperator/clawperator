@@ -67,7 +67,7 @@ screen can be observed again; command, service and transport failures stop the
 run immediately, with no replay. Capture assertions cannot run until preparation
 passes. The Display scroll scenario remains unchanged.
 
-API 35 remains the default and the manual CI release gate. For an explicit
+API 35 remains the default for this device harness. For an explicit
 API 36 comparison, pass `--api 36`. Its Settings homepage has a fixed outer header;
 preparation instead also requires the on-screen `search_action_bar` and first
 `Google` row. This comparison does not qualify the API 35 image or reproduce its
@@ -104,8 +104,11 @@ runs `ci-device.sh` under the emulator runner; it does not stop at APK installat
 
 Run the **Sensitive hierarchy access** workflow manually from GitHub Actions when
 release validation or an explicit device regression is needed. It has no pull
-request or push trigger. Ordinary PR checks do not boot this emulator. The
-manual run remains required release evidence before shipping v0.10.
+request or push trigger. Ordinary PR checks do not boot this emulator. For v0.10,
+the release owner selected local `./validation/test_all.sh` verification on
+13 September 2026; a GitHub run is optional. The default local suite runs offline
+assertions, not this live device harness. See the
+[release requirements](../../docs/internal/release-reference.md#v010-acceptance-requirements).
 
 
 ## Integrated hierarchy and transport acceptance
@@ -190,5 +193,6 @@ the transport design record below; this matrix does not close that causal gate.
 A finite passing sample is not a zero-failure transport guarantee, and original
 historical transport root-cause limits remain in the
 [transport design record](../../docs/internal/design/result-transport-reliability.md).
-The manually dispatched supported-image CI workflow is still required before
-release. This work does not authorize publication or add automatic emulator jobs.
+The supported-image GitHub workflow remains an optional regression tool under
+the local verification decision above. These historical local passes do not
+claim a run on that CI image or close the transport causal gap.
