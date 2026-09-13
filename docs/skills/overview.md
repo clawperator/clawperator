@@ -37,7 +37,9 @@ Authoring skills are a separate category of AI agent programs that live in
 `.agents/skills/` in source form and install separately into
 `~/.clawperator/bundled-skills/` plus host-agent discovery directories. Claude
 Code and Codex receive symlinks into the canonical store. Generic agents
-receive managed real directory copies under `~/.agents/skills/`.
+receive managed real directory copies under `~/.agents/skills/`. When discovery
+directories resolve to the same physical location as the generic agents directory,
+all consumers share its managed copies.
 
 Installer-facing discovery is deliberately split:
 

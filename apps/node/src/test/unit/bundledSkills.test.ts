@@ -1,6 +1,6 @@
 import { afterEach, describe, it } from "node:test";
 import assert from "node:assert";
-import { chmod, lstat, mkdtemp, mkdir, readFile, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { chmod, cp, lstat, mkdtemp, realpath, mkdir, readFile, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { join, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { getCliVersion } from "../../domain/version/compatibility.js";
@@ -8,15 +8,21 @@ import { cmdBundledSkillsInstall, cmdBundledSkillsList } from "../../cli/command
 import {
   copyBundledSkills,
   listPackagedBundledSkills,
+  resolvePackagedBundledSkillsSourceDir,
+  resolveBundledSkillDiscoveryGroups,
   MANAGED_BUNDLED_SKILL_COPY_MARKER,
   MANAGED_BUNDLED_SKILL_COPY_MARKER_CONTENT,
 } from "../../domain/skills/copyBundledSkills.js";
+
+import { checkBundledSkillsStaleness } from "../../domain/doctor/checks/hostChecks.js";
+
+import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 
 const tempRoots: string[] = [];
 const directorySymlinkType = process.platform === "win32" ? "junction" : "dir";
 
 async function makeTempRoot(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "clawperator-bundled-skills-"));
+  const root = await realpath(await mkdtemp(join(tmpdir(), "clawperator-bundled-skills-")));
   tempRoots.push(root);
   return root;
 }
@@ -660,6 +666,8 @@ describe("copyBundledSkills", () => {
 
     assert.deepEqual(result, {
       ok: true,
+      discoveryGroups: await resolveBundledSkillDiscoveryGroups({ homeDir: join(root, "home"), env: {} }),
+      migrations: [],
       skills: ["custom-bundled-skill"],
       installedDir: join(root, "home", ".clawperator", "bundled-skills"),
       agentDiscoveryDirs: [
@@ -824,5 +832,148 @@ describe("listPackagedBundledSkills", () => {
       "clawperator-skill-author-by-recording",
       "clawperator-upgrade",
     ]);
+  });
+});
+
+
+describe("bundled discovery directory aliases", () => {
+  for (const reverse of [false, true]) {
+    it(`updates shared Claude, Codex and agents directories repeatedly (reverse=${reverse})`, async () => {
+      const root = await makeTempRoot();
+      const sourceDir = await createSourceSkill(root, "clawperator-upgrade");
+      const homeDir = join(root, "home");
+      const options = { sourceDir, homeDir, env: {}, cliVersion: "1.2.3" };
+      const physicalDir = join(homeDir, reverse ? ".claude" : ".agents", "skills");
+      const aliasDir = join(homeDir, reverse ? ".agents" : ".claude", "skills");
+      await mkdir(physicalDir, { recursive: true });
+      await mkdir(join(aliasDir, ".."), { recursive: true });
+      await symlink(relative(join(aliasDir, ".."), physicalDir), aliasDir, directorySymlinkType);
+      await mkdir(join(homeDir, ".codex"), { recursive: true });
+      await symlink(aliasDir, join(homeDir, ".codex", "skills"), directorySymlinkType);
+      for (let iteration = 0; iteration < 2; iteration++) {
+        const result = await copyBundledSkills(options);
+        assert.ok(result.ok, JSON.stringify(result));
+        assert.equal(result.discoveryGroups.length, 1);
+        assert.equal(result.discoveryGroups[0].representation, "copy");
+        assert.equal(result.discoveryGroups[0].aliases.length, 3);
+        await assertManagedAgentsCopy(physicalDir, "clawperator-upgrade", "# clawperator-upgrade\n");
+        assert.equal((await checkBundledSkillsStaleness(getDefaultRuntimeConfig(), options)).status, "pass");
+      }
+    });
+  }
+
+  it("keeps symlinks when only Claude and Codex alias one directory", async () => {
+    const root = await makeTempRoot();
+    const sourceDir = await createSourceSkill(root, "clawperator-upgrade");
+    const sharedDir = join(root, "shared");
+    const result = await copyBundledSkills({ sourceDir, homeDir: join(root, "home"), claudeSkillsDir: sharedDir, codexSkillsDir: sharedDir, env: {} });
+    assert.ok(result.ok);
+    assert.equal(result.discoveryGroups[0].representation, "symlink");
+    assert.equal((await lstat(join(sharedDir, "clawperator-upgrade"))).isSymbolicLink(), true);
+  });
+
+  it("creates the missing target of a dangling discovery directory alias", async () => {
+    const root = await makeTempRoot();
+    const homeDir = join(root, "home");
+    const sourceDir = await createSourceSkill(root, "clawperator-upgrade");
+    await mkdir(join(homeDir, ".claude"), { recursive: true });
+    await symlink("../.agents/skills", join(homeDir, ".claude", "skills"), directorySymlinkType);
+    const options = { homeDir, sourceDir, env: {} };
+    const result = await copyBundledSkills(options);
+    assert.ok(result.ok, JSON.stringify(result));
+    assert.equal((await checkBundledSkillsStaleness(getDefaultRuntimeConfig(), options)).status, "pass");
+  });
+
+  it("resolves a missing child below a symlinked ancestor without creating it", async () => {
+    const root = await makeTempRoot();
+    await mkdir(join(root, "physical"));
+    await symlink(join(root, "physical"), join(root, "alias"), directorySymlinkType);
+    const groups = await resolveBundledSkillDiscoveryGroups({
+      claudeSkillsDir: join(root, "alias", "skills"),
+      agentsSkillsDir: join(root, "physical", "skills"),
+      codexSkillsDir: join(root, "codex"),
+    });
+    assert.equal(groups.length, 2);
+    assert.equal(groups[0].representation, "copy");
+    await assert.rejects(stat(join(root, "physical", "skills")));
+  });
+
+  it("backs up exact unmarked first-party copies once and leaves Doctor clean", async () => {
+    const root = await makeTempRoot();
+    const homeDir = join(root, "home");
+    const sourceDir = resolvePackagedBundledSkillsSourceDir({ env: {} });
+    const skillName = "clawperator-upgrade";
+    const legacyPath = join(homeDir, ".agents", "skills", skillName);
+    await cp(join(sourceDir, skillName), legacyPath, { recursive: true });
+    await mkdir(join(homeDir, ".claude"), { recursive: true });
+    await symlink(join(homeDir, ".agents", "skills"), join(homeDir, ".claude", "skills"), directorySymlinkType);
+    const options = { homeDir, sourceDir, env: {}, cliVersion: "1.2.3" };
+    const result = await copyBundledSkills(options);
+    assert.ok(result.ok, JSON.stringify(result));
+    assert.equal(result.migrations.length, 1);
+    assert.equal(await readFile(join(result.migrations[0].backupPath, "SKILL.md"), "utf8"), await readFile(join(sourceDir, skillName, "SKILL.md"), "utf8"));
+    assert.equal((await checkBundledSkillsStaleness(getDefaultRuntimeConfig(), options)).status, "pass");
+    const repeated = await copyBundledSkills(options);
+    assert.ok(repeated.ok);
+    assert.deepEqual(repeated.migrations, []);
+  });
+
+  it("migrates a historical first-party version whose content differs from the package", async () => {
+    const root = await makeTempRoot();
+    const homeDir = join(root, "home");
+    const sourceDir = resolvePackagedBundledSkillsSourceDir({ env: {} });
+    const skillName = "clawperator-skill-author-by-agent-discovery";
+    const legacyPath = join(homeDir, ".claude", "skills", skillName);
+    await cp(join(sourceDir, skillName), legacyPath, { recursive: true });
+    const oldMarkdown = (await readFile(join(legacyPath, "SKILL.md"), "utf8"))
+      .replace("# Clawperator Skill Author By Agent Discovery", "# Skill Author By Agent Discovery");
+    await writeFile(join(legacyPath, "SKILL.md"), oldMarkdown);
+    const result = await copyBundledSkills({ homeDir, sourceDir, env: {} });
+    assert.ok(result.ok, JSON.stringify(result));
+    assert.equal(result.migrations.length, 1);
+    assert.equal(await readFile(join(result.migrations[0].backupPath, "SKILL.md"), "utf8"), oldMarkdown);
+    assert.equal((await lstat(legacyPath)).isSymbolicLink(), true);
+  });
+
+  it("preflights all conflicts before backing up a recognized legacy copy", async () => {
+    const root = await makeTempRoot();
+    const homeDir = join(root, "home");
+    const sourceDir = resolvePackagedBundledSkillsSourceDir({ env: {} });
+    const legacyPath = join(homeDir, ".claude", "skills", "clawperator-upgrade");
+    await cp(join(sourceDir, "clawperator-upgrade"), legacyPath, { recursive: true });
+    await mkdir(join(homeDir, ".codex", "skills", "clawperator-upgrade"), { recursive: true });
+    const result = await copyBundledSkills({ homeDir, sourceDir, env: {} });
+    assert.equal(result.ok, false);
+    assert.equal((await lstat(legacyPath)).isDirectory(), true);
+    await assert.rejects(stat(join(homeDir, ".clawperator", "bundled-skills-backups")));
+  });
+
+  for (const modification of ["edited", "extra", "symlink"]) {
+    it(`preserves a legacy-looking skill with ${modification} content`, async () => {
+      const root = await makeTempRoot();
+      const homeDir = join(root, "home");
+      const sourceDir = resolvePackagedBundledSkillsSourceDir({ env: {} });
+      const legacyPath = join(homeDir, ".claude", "skills", "clawperator-upgrade");
+      await cp(join(sourceDir, "clawperator-upgrade"), legacyPath, { recursive: true });
+      if (modification === "edited") await writeFile(join(legacyPath, "SKILL.md"), "user edits");
+      if (modification === "extra") await writeFile(join(legacyPath, "notes.txt"), "user notes");
+      if (modification === "symlink") {
+        await rm(join(legacyPath, "SKILL.md"));
+        await symlink(join(sourceDir, "clawperator-upgrade", "SKILL.md"), join(legacyPath, "SKILL.md"));
+      }
+      const result = await copyBundledSkills({ homeDir, sourceDir, env: {} });
+      assert.equal(result.ok, false);
+      assert.equal((await lstat(legacyPath)).isDirectory(), true);
+    });
+  }
+
+  it("fails the post-install invariant instead of reporting success for an invalid copy", async () => {
+    const root = await makeTempRoot();
+    const sourceDir = join(root, "source");
+    await mkdir(join(sourceDir, "invalid-skill", "SKILL.md"), { recursive: true });
+    const result = await copyBundledSkills({ sourceDir, homeDir: join(root, "home"), env: {} });
+    assert.ok(!result.ok);
+    assert.match(result.message, /Post-install verification failed:.*invalid-skill.*stale/);
+    await assert.rejects(stat(join(root, "home", ".clawperator", "bundled-skills", "version.txt")));
   });
 });

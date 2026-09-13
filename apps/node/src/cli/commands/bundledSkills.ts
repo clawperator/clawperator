@@ -50,6 +50,8 @@ async function runBundledSkillsInstall(
     claudeSkillsDir: resolveClaudeSkillsDir(options),
     codexSkillsDir: resolveCodexSkillsDir(options),
     agentDiscoveryDirs: result.agentDiscoveryDirs,
+    discoveryGroups: result.discoveryGroups,
+    migrations: result.migrations,
     message: `Bundled-skills ${action === "install" ? "installed" : "updated"}.`,
     envHint: getBundledSkillsEnvHint(options.env),
   }, options);

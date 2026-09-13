@@ -134,14 +134,28 @@ Current command behavior:
 - `clawperator bundled-skills install` copies packaged first-party bundled skills
   into `~/.clawperator/bundled-skills/`, recreates discovery symlinks for
   Claude Code and Codex, and refreshes managed directory copies under
-  `~/.agents/skills/`
+  `~/.agents/skills/`. Discovery directories are resolved to physical paths first;
+  aliases of the same directory share one representation. Any group containing
+  the generic agents location uses managed copies for all consumers.
 - `clawperator bundled-skills update` runs the same copy-and-wire flow but
   reports the result as an update rather than a first install
 - rerunning either command repairs legacy Clawperator-managed symlinks under
   `~/.agents/skills/` by replacing them with managed real directories
 - the installer refuses to overwrite a non-Clawperator entry in any shared
   discovery directory; generic agents directories are considered
-  Clawperator-managed only when they contain `.clawperator-managed`
+  Clawperator-managed when they contain the valid `.clawperator-managed` marker.
+  Unmarked directories that exactly match a known first-party bundled skill
+  version are moved to a unique timestamped directory under
+  `~/.clawperator/bundled-skills-backups/` before replacement. Modified files,
+  extra files, and symlinks inside unmarked copies prevent automatic migration.
+- install and update return `discoveryGroups` with each physical `dir`, logical
+  `aliases` (`label` and `dir`), and selected `representation` (`copy` or `symlink`).
+  `migrations` records each `originalPath` and `backupPath`; it is empty when no
+  backups were needed. Existing `agentDiscoveryDirs` fields remain available.
+- before reporting success, install and update verify every discovery entry
+  using Doctor's ownership check. A failed check returns
+  `BUNDLED_SKILLS_INSTALL_FAILED` with the entry path, representation, and issue;
+  completed migrations are included in the error explanation
 - `clawperator bundled-skills list` reports installed skill names and the
   absolute `SKILL.md` path for each installed bundled skill
 - the current packaged install set contains
@@ -155,6 +169,8 @@ Current doctor behavior:
   `pass` with `Bundled-skills not yet installed.`
 - if the installed bundled-skills state exists but is stale, incomplete, or
   malformed, doctor reports `warn`
+- Doctor resolves the same directory aliases as the installer and accepts managed
+  copies for Claude Code or Codex when their directory aliases the agents location.
 - current warning conditions include:
   - `version.txt` is missing, empty, unreadable, or does not match the current
     CLI version
