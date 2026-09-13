@@ -9,6 +9,11 @@ const observationActions = new Set<string>(notificationMediaActions.slice(0, 3))
 export function isBackgroundObservation(actions: readonly ExecutionAction[]): boolean {
   return actions.length > 0 && actions.every(action => observationActions.has(action.type));
 }
+// Call only after validating the whole execution; notification mutations still require UI readiness.
+const backgroundServiceActions = new Set([...observationActions, "media_pause", "media_play", "media_seek"]);
+export function isBackgroundServiceExecution(actions: readonly ExecutionAction[]): boolean {
+  return actions.length > 0 && actions.every(action => backgroundServiceActions.has(action.type));
+}
 const target = {
   applicationId: z.string().min(1).max(512).refine(value => value.trim().length > 0).optional(),
   mediaSessionId: z.string().min(1).max(128).refine(value => value.trim().length > 0).optional(),

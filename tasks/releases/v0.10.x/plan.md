@@ -98,7 +98,8 @@ does not silently renew it or require unrelated transport implementation in
 these packs. Resolve applicable gates with evidence or an explicit release-owner
 disposition. This does not block starting the new implementation work.
 
-[Notification/media work for v0.11](../v0.11/plan.md) remains separately owned.
+Notification/media contracts and validation evidence are maintained in the
+[permanent design record](../../../docs/internal/design/notifications-and-media.md).
 Do not change its scope, introduce a dependency on those APIs, or bump shared
 versions during task authoring. Other active task packs are not implicitly added
 to this evidence-focused patch queue.

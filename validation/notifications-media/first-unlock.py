@@ -52,6 +52,8 @@ def main():
             ['notifications', 'list'], ['media', 'list'],
             ['media', 'status', '--app', 'com.clawperator.fixture.media'],
             ['doctor', '--capability', 'background-observation'],
+            *[['media', control, '--session', 'pre-unlock-session'] for control in ['pause', 'play']],
+            ['media', 'seek', '--session', 'pre-unlock-session', '--position-ms', '0'],
         ]:
             result = subprocess.run(['node', 'apps/node/dist/cli/index.js', *command, '--device', args.device, '--operator-package', OPERATOR, '--no-daemon'], cwd=ROOT, text=True, capture_output=True, timeout=30)
             value = json.loads(result.stdout)

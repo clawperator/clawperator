@@ -55,16 +55,20 @@ def main():
         adb('settings', 'put', 'secure', 'enabled_accessibility_services', '')
         adb('settings', 'put', 'secure', 'accessibility_enabled', '0')
         time.sleep(2)
-        read = {'id': 'read', 'type': 'list_notifications'}
+        read = {'id': 'read', 'type': 'list_notifications', 'params': {'applicationId': FIXTURE, 'limit': 1, 'maxTextChars': 1}}
         ui = {'id': 'ui', 'type': 'snapshot_ui'}
         mutations = [
-            {'id': 'mutation', 'type': 'media_seek', 'params': {'mediaSessionId': session, 'positionMs': 0}},
             {'id': 'mutation', 'type': 'dismiss_notification', 'params': {'notificationKey': 'test-key'}},
             {'id': 'mutation', 'type': 'invoke_notification_action', 'params': {'notificationKey': 'test-key', 'actionId': 'test-action'}},
         ]
-        cases = [[read], [read, ui], [ui, read], [ui]]
+        controls = [
+            {'id': operation, 'type': 'media_' + operation, 'params': {'mediaSessionId': session, **({'positionMs': 0} if operation == 'seek' else {})}}
+            for operation in ['pause', 'seek', 'play']
+        ]
+        service_cases = [[read], *[[control] for control in controls], *[[read, control] for control in controls], *[[control, read] for control in controls]]
+        cases = [*service_cases, [read, ui], [ui, read], [ui], [*controls, ui], [ui, *controls]]
         for mutation in mutations:
-            cases.extend([[mutation], [read, mutation], [mutation, read]])
+            cases.extend([[mutation], [read, mutation], [mutation, read], [*controls, mutation], [mutation, *controls]])
         for actions in cases:
             command_id = 'ingress-' + str(uuid.uuid4())
             command = {'commandId': command_id, 'taskId': 'ingress-proof', 'source': 'clawperator', 'expectedFormat': 'android-ui-automator', 'timeoutMs': 3000, 'actions': actions}
@@ -80,7 +84,7 @@ def main():
             result = json.loads(matches[-1])
             records.append({'command': command, 'result': result})
             assert result['commandId'] == command_id and result['taskId'] == 'ingress-proof'
-            if actions == [read]:
+            if actions in service_cases:
                 assert result['status'] == 'success', result
             else:
                 assert result['errorCode'] == 'SERVICE_UNAVAILABLE' and not result.get('stepResults'), result
@@ -90,7 +94,7 @@ def main():
         adb('settings', 'put', 'secure', 'accessibility_enabled', original)
         adb('cmd', 'statusbar', 'collapse')
         (args.output / 'evidence.json').write_text(json.dumps(records, indent=2))
-    print('Passed open-shade reads and direct Android mixed/UI ingress rejection without partial results.')
+    print('Passed open-shade service reads/controls and direct Android mixed/UI ingress rejection without partial results.')
 
 
 if __name__ == '__main__':

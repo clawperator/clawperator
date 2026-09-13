@@ -269,3 +269,10 @@ data class UiActionExecutionResult(
 fun List<UiAction>.isBackgroundObservation(): Boolean = isNotEmpty() && all {
     it is UiAction.NotificationMedia && it.type in setOf("list_notifications", "list_media_sessions", "get_media_status")
 }
+
+/** Whole validated executions that need neither accessibility nor an awake/unlocked screen. */
+fun List<UiAction>.isBackgroundServiceExecution(): Boolean = isNotEmpty() && all {
+    it is UiAction.NotificationMedia && it.type in setOf(
+        "list_notifications", "list_media_sessions", "get_media_status", "media_pause", "media_play", "media_seek",
+    )
+}

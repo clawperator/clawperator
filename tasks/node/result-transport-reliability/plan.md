@@ -2,7 +2,10 @@
 
 Implementation and bounded validation are merged through `b7ff0695` (PR #290).
 The historical post-dispatch reader-exit cause remains unresolved. Retain this
-pack for that acceptance gap; do not repeat completed implementation phases.
+pack as deferred follow-up; do not repeat completed implementation phases.
+The release owner has deferred investigation until new information is available;
+it is not a 0.11.0 release blocker. See the
+[0.11.0 disposition](../../../docs/internal/design/result-transport-reliability.md#release-owner-disposition-for-0110).
 
 ## Permanent sources
 

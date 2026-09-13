@@ -1,7 +1,7 @@
-import { afterEach, describe, it } from "node:test";
+import { afterEach, describe, it, mock } from "node:test";
 import assert from "node:assert/strict";
 import { buildNotificationMediaExecution } from "../../domain/notifications/service.js";
-import { isBackgroundObservation } from "../../contracts/notifications.js";
+import { isBackgroundObservation, isBackgroundServiceExecution } from "../../contracts/notifications.js";
 import { cmdDoctor } from "../../cli/commands/doctor.js";
 
 afterEach(() => { process.exitCode = undefined; });
@@ -39,27 +39,51 @@ describe("notification/media contract", () => {
 import { EventEmitter } from "node:events";
 import { FakeProcessRunner } from "./fakes/FakeProcessRunner.js";
 import { runExecution } from "../../domain/executions/runExecution.js";
+import { clearReadinessCacheForTesting, ensureInteractiveAutomationReadyCached } from "../../domain/doctor/checks/deviceInteractivity.js";
 
-it("dispatches service observations without calling interactive readiness", async () => {
-  const execution = buildNotificationMediaExecution("list_notifications");
-  const runner = new FakeProcessRunner();
-  const envelope = { commandId: execution.commandId, taskId: execution.taskId, status: "success", error: null, stepResults: [{ id: "a1", actionType: "list_notifications", success: true, data: { payload: '{}' } }] };
-  let stream: EventEmitter & { stdout: EventEmitter; stderr: EventEmitter; kill: () => void };
-  runner.spawn = (() => {
-    stream = Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), kill() {} });
-    return stream;
-  }) as FakeProcessRunner["spawn"];
-  runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device\tdevice\n", stderr: "" });
-  runner.queueResult({ code: 0, stdout: "package:com.test.operator\n", stderr: "" });
-  runner.queueResult({ code: 0, stdout: "0", stderr: "" });
-  runner.queueResult({ code: 0, stdout: "RUNNING_UNLOCKED", stderr: "" });
-  runner.queueResult({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" }, () => {
-    setTimeout(() => { stream.stdout.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify(envelope)}\n`)); }, 5);
-  });
-  const result = await runExecution(execution, { deviceId: "test-device", operatorPackage: "com.test.operator", runner, logcatBroadcastDelayMs: 0, resultEnvelopeTimeoutMs: 1000,
-    ensureInteractiveAutomationReadyFn: async () => { throw new Error("must not wake or probe interactive readiness"); } });
-  assert.equal(result.ok, true, JSON.stringify(result));
-  assert.equal(runner.calls.some(call => /WAKEUP|KEYCODE_HOME|logcat -c|doctor_ping/.test(call.args.join(" "))), false);
+it("dispatches each service read/control and mixed lists without interactive readiness", async () => {
+  const cases = [
+    buildNotificationMediaExecution("list_notifications"),
+    buildNotificationMediaExecution("list_media_sessions"),
+    buildNotificationMediaExecution("get_media_status", { mediaSessionId: "s" }),
+    buildNotificationMediaExecution("media_pause", { mediaSessionId: "s" }),
+    buildNotificationMediaExecution("media_play", { mediaSessionId: "s" }),
+    buildNotificationMediaExecution("media_seek", { mediaSessionId: "s", positionMs: 0 }),
+  ];
+  cases.push({ ...cases[0], actions: cases.flatMap((execution, index) => execution.actions.map(action => ({ ...action, id: `a${index}` }))) });
+  for (const cache of ["cold", "warm", "expired"]) {
+    for (const execution of cases) {
+      clearReadinessCacheForTesting();
+      const runner = new FakeProcessRunner();
+      const envelope = { commandId: execution.commandId, taskId: execution.taskId, status: "success", error: null, stepResults: execution.actions.map(action => ({ id: action.id, actionType: action.type, success: true, data: { payload: '{}' } })) };
+      let stream: EventEmitter & { stdout: EventEmitter; stderr: EventEmitter; kill: () => void };
+      runner.spawn = (() => {
+        stream = Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), kill() {} });
+        return stream;
+      }) as FakeProcessRunner["spawn"];
+      runner.queueResult({ code: 0, stdout: "List of devices attached\ntest-device\tdevice\n", stderr: "" });
+      runner.queueResult({ code: 0, stdout: "package:com.test.operator\n", stderr: "" });
+      runner.queueResult({ code: 0, stdout: "0", stderr: "" });
+      runner.queueResult({ code: 0, stdout: "RUNNING_UNLOCKED", stderr: "" });
+      runner.queueResult({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" }, () => {
+        setTimeout(() => { stream.stdout.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify(envelope)}\n`)); }, 5);
+      });
+      if (cache !== "cold") {
+        const now = Date.now();
+        const clock = mock.method(Date, "now", () => now - (cache === "expired" ? 9000 : 0));
+        try {
+          await ensureInteractiveAutomationReadyCached(getDefaultRuntimeConfig({ deviceId: "test-device", operatorPackage: "com.test.operator", runner }), {
+            probeInteractiveStateFn: async () => ({ ok: true, state: { screenOn: true, deviceLocked: false, userUnlocked: true } }),
+          });
+        } finally { clock.mock.restore(); }
+      }
+      const result = await runExecution(execution, { deviceId: "test-device", operatorPackage: "com.test.operator", runner, logcatBroadcastDelayMs: 0, resultEnvelopeTimeoutMs: 1000,
+        ensureInteractiveAutomationReadyFn: async () => { throw new Error("must not wake or probe interactive readiness"); } });
+      assert.equal(result.ok, true, JSON.stringify(result));
+      assert.equal(runner.calls.some(call => /WAKEUP|KEYCODE_HOME|logcat -c|doctor_ping/.test(call.args.join(" "))), false);
+    }
+  }
+  clearReadinessCacheForTesting();
 });
 
 import { grantNotificationListenerPermission } from "../../domain/device/grantPermissions.js";
@@ -109,15 +133,22 @@ it("CLI rejects missing, blank, conflicting and invalid service values with JSON
 });
 
 it("returns an explicit pre-unlock error without dispatch, wake or remediation", async () => {
-  const runner = new FakeProcessRunner();
-  runner.spawn = (() => Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), kill() {} })) as FakeProcessRunner["spawn"];
-  for (const stdout of ["List of devices attached\ntest-device\tdevice\n", "package:com.test.operator", "0", "RUNNING_LOCKED"]) {
-    runner.queueResult({ code: 0, stdout, stderr: "" });
+  for (const execution of [
+    buildNotificationMediaExecution("list_notifications"),
+    buildNotificationMediaExecution("media_pause", { mediaSessionId: "s" }),
+    buildNotificationMediaExecution("media_play", { mediaSessionId: "s" }),
+    buildNotificationMediaExecution("media_seek", { mediaSessionId: "s", positionMs: 0 }),
+  ]) {
+    const runner = new FakeProcessRunner();
+    runner.spawn = (() => Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), kill() {} })) as FakeProcessRunner["spawn"];
+    for (const stdout of ["List of devices attached\ntest-device\tdevice\n", "package:com.test.operator", "0", "RUNNING_LOCKED"]) {
+      runner.queueResult({ code: 0, stdout, stderr: "" });
+    }
+    const result = await runExecution(execution, { deviceId: "test-device", operatorPackage: "com.test.operator", runner, logcatBroadcastDelayMs: 0 });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.error.code, "DEVICE_USER_NOT_UNLOCKED");
+    assert.equal(runner.calls.some(call => /broadcast|WAKEUP|HOME|doctor_ping|settings put/.test(call.args.join(" "))), false);
   }
-  const result = await runExecution(buildNotificationMediaExecution("list_notifications"), { deviceId: "test-device", operatorPackage: "com.test.operator", runner, logcatBroadcastDelayMs: 0 });
-  assert.equal(result.ok, false);
-  if (!result.ok) assert.equal(result.error.code, "DEVICE_USER_NOT_UNLOCKED");
-  assert.equal(runner.calls.some(call => /broadcast|WAKEUP|HOME|doctor_ping|settings put/.test(call.args.join(" "))), false);
 });
 
 import { probeUserUnlockState } from "../../domain/device/userUnlockState.js";
@@ -203,5 +234,16 @@ it("never replays N2 mutations when the transport loses their receipt", async ()
     });
     assert.equal(result.ok, false);
     assert.equal(runner.calls.filter(call => call.args.some(arg => arg.includes("am broadcast"))).length, 1);
+  }
+});
+
+it("allows only complete read/media-control executions on the background service path", () => {
+  const eligible = ["list_notifications", "list_media_sessions", "get_media_status", "media_pause", "media_play", "media_seek"].map(type => ({ id: type, type }));
+  for (const action of eligible) assert.equal(isBackgroundServiceExecution([action]), true);
+  assert.equal(isBackgroundServiceExecution(eligible), true);
+  assert.equal(isBackgroundServiceExecution([]), false);
+  for (const type of ["dismiss_notification", "invoke_notification_action", "snapshot", "doctor_ping", "unknown", "MEDIA_PLAY"]) {
+    const action = { id: "other", type };
+    for (const actions of [[action], [action, ...eligible], [...eligible, action]]) assert.equal(isBackgroundServiceExecution(actions), false);
   }
 });
