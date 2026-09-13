@@ -127,4 +127,44 @@ class ResultEnvelopeTransportTest {
         publisher.join()
         assertEquals(resultEnvelopeLogLines(canonical, "command", "task"), lines)
     }
+
+    @Test
+    fun `publication diagnostics identify writes without exposing result content`() = runBlocking {
+        for (canonical in listOf("private UI", "private UI".repeat(1000))) {
+            val diagnostics = mutableListOf<String>()
+            val lines = mutableListOf<String>()
+            publishResultEnvelope(canonical, "command\n", "task", { lines += it }, {}, { diagnostics += it })
+            assertEquals(resultEnvelopeLogLines(canonical, "command\n", "task"), lines)
+            assertEquals(2, diagnostics.size)
+            assertTrue(diagnostics.none { it.contains("private UI") })
+            val records = diagnostics.map { Json.parseToJsonElement(it.substringAfter("[Clawperator-Publication] ")).jsonObject }
+            assertEquals("started", records.first().getValue("event").jsonPrimitive.content)
+            assertEquals("writes_completed", records.last().getValue("event").jsonPrimitive.content)
+            assertEquals("command\n", records.last().getValue("commandId").jsonPrimitive.content)
+            assertEquals("task", records.last().getValue("taskId").jsonPrimitive.content)
+            assertEquals(canonical.encodeToByteArray().size, records.last().getValue("byteLength").jsonPrimitive.int)
+            assertEquals(lines.size, records.last().getValue("writtenRecords").jsonPrimitive.int)
+            assertEquals(if (lines.size > 1) lines.size else 0, records.last().getValue("chunkCount").jsonPrimitive.int)
+        }
+    }
+
+    @Test
+    fun `failed writes do not claim completion and diagnostic errors cannot block publication`() = runBlocking {
+        val diagnostics = mutableListOf<String>()
+        val failure = IllegalStateException("private writer failure")
+        var observed: Exception? = null
+        try {
+            publishResultEnvelope("small", "command", "task", { throw failure }, {}, { diagnostics += it })
+        } catch (error: Exception) {
+            observed = error
+        }
+        assertTrue(observed is IllegalStateException)
+        assertEquals(failure.message, observed?.message)
+        assertEquals(2, diagnostics.size)
+        assertTrue(diagnostics.last().contains("write_failed"))
+        assertTrue(diagnostics.none { it.contains("writes_completed") || it.contains("private writer failure") })
+        val lines = mutableListOf<String>()
+        publishResultEnvelope("small", "command", "task", { lines += it }, {}, { throw IllegalStateException("logger failed") })
+        assertEquals(listOf("small"), lines)
+    }
 }

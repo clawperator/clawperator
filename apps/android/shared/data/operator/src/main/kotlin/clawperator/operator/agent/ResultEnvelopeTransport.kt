@@ -51,10 +51,51 @@ internal suspend fun publishResultEnvelope(
     taskId: String,
     writeLine: (String) -> Unit = { action.log.Log.i(it) },
     pause: suspend () -> Unit = { delay(1) },
+    writeDiagnostic: (String) -> Unit = { action.log.Log.i(it) },
 ) = withContext(NonCancellable + Dispatchers.IO) {
+    val started = System.nanoTime()
     val lines = resultEnvelopeLogLines(canonicalLine, commandId, taskId)
-    lines.forEachIndexed { index, line ->
-        if (index > 0) pause()
-        writeLine(line)
+    val byteLength = canonicalLine.encodeToByteArray().size
+    var writtenRecords = 0
+    fun record(event: String) {
+        try {
+            writeDiagnostic(
+                "[Clawperator-Publication] " + Json.encodeToString(
+                    ResultPublicationEvent(
+                        commandId, taskId, event, byteLength, lines.size,
+                        if (lines.size > 1) lines.size else 0,
+                        writtenRecords, (System.nanoTime() - started) / 1_000_000,
+                    ),
+                ),
+            )
+        } catch (_: Exception) {
+            // Diagnostic failures cannot prevent or replace canonical publication.
+        }
+    }
+    record("started")
+    try {
+        lines.forEachIndexed { index, line ->
+            if (index > 0) pause()
+            writeLine(line)
+            writtenRecords++
+        }
+        // Logger writes returning is not an acknowledgement from a host reader.
+        record("writes_completed")
+    } catch (error: Exception) {
+        record("write_failed")
+        throw error
     }
 }
+
+
+@Serializable
+private data class ResultPublicationEvent(
+    val commandId: String,
+    val taskId: String,
+    val event: String,
+    val byteLength: Int,
+    val recordCount: Int,
+    val chunkCount: Int,
+    val writtenRecords: Int,
+    val elapsedMs: Long,
+)

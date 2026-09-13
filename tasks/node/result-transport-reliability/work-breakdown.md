@@ -157,3 +157,26 @@ See the [review/integration record](../../../docs/internal/design/result-transpo
 
 See the [follow-up evidence](../../../docs/internal/design/result-transport-reliability.md#follow-up-controlled-connection-interruption-and-evidence-repair).
 PR #288 merged as `7cdb31d4`; the causal gate remains open after that merge.
+
+
+### Diagnostic timeline follow-up
+
+[DONE] Added bounded host lifecycle evidence and Android publication-boundary
+markers without changing result authority, dispatch or deadlines. Host failure logs
+must retain metadata only and distinguish intentional cleanup requests from
+observed process termination. Android completion markers mean logging writes
+returned, never delivery. Preserve the historical causal and manual release
+limits described in the [diagnostic contract](../../../docs/internal/design/result-transport-reliability.md#correlated-reader-and-publication-diagnostics).
+
+
+Validation: all 1,571 Node tests, 59 app/Operator Android unit tests, both APK
+builds and documentation route checks passed. Each matching debug/release
+API-35 series ran once and passed 60/60 delivery and fixture checks. Separate
+controlled reader disconnects retained exit 255 before host cleanup, while an
+independent stream validated successful canonical publication and both markers.
+The final release capture also verified persistence at the default log level
+and preservation of timeline metadata through MCP redaction. An initial Android
+test assertion about coroutine exception object identity failed; it was corrected
+to check propagated type/message, and the failed attempt remains in private
+accounting. No natural recurrence was captured, and no causal or release gate
+is closed by these checks.
