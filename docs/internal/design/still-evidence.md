@@ -51,10 +51,13 @@ APIs, uploads, report generation, or video lifecycle scaffolding.
 Still capture and video start share `collectEvidenceMetadata`. A failed read is
 distinct from a successful property inventory with absent emulator flags. The
 inventory parser accepts bracketed Android properties, including multiline boot
-history values, bracketed continuation lines, and CRLF output. Complete property
-headers delimit entries; the final bracket before the next header or end of
-output closes a value. Empty, malformed, or duplicate-key inventories cannot
-establish a device type. Parsed nonempty flag values remain in the
+history values, bracketed continuation lines, and CRLF output. Lines beginning
+with a bracketed name followed by a colon delimit entries and must have valid
+headers. The final bracket before the next entry or end of output closes a value.
+Missing value brackets or incorrect header spacing on these lines invalidate the
+inventory instead of being absorbed into the preceding value. Empty, malformed,
+or duplicate-key inventories cannot establish a device type. Parsed nonempty
+flag values remain in the
 manifest, with null for absent or empty flags.
 
 For a usable inventory, either emulator flag equal to `"1"` wins, even against

@@ -17,18 +17,20 @@ export async function collectEvidenceMetadata(config: RuntimeConfig, remaining: 
   const properties = await read(["shell", "getprop"]);
   const inventory = new Map<string, string>();
   const inventoryText = properties ?? "";
-  const headers = [...inventoryText.matchAll(/^\[([^\]\r\n]*)\]: \[/gm)];
+  const headers = [...inventoryText.matchAll(/^\[([^\]\r\n]*)\][ \t]*:/gm)];
   let inventoryUsable = properties !== null && headers.length > 0;
   if (inventoryText.slice(0, headers[0]?.index).trim().length > 0) inventoryUsable = false;
-  // Values may contain newlines and brackets. Only a complete property header
-  // starts the next entry; its final bracket closes the preceding value.
+  // Values may contain newlines and brackets. Treat property-shaped prefixes
+  // as boundaries too, so malformed headers cannot hide inside another value.
   for (let index = 0; index < headers.length; index++) {
     const header = headers[index];
     const name = header[1];
-    const valueStart = header.index + header[0].length;
+    const headerEnd = header.index + header[0].length;
+    const validHeader = header[0] === `[${name}]:` && inventoryText.slice(headerEnd, headerEnd + 2) === " [";
+    const valueStart = headerEnd + 2;
     const valueEnd = headers[index + 1]?.index ?? inventoryText.length;
     const framedValue = inventoryText.slice(valueStart, valueEnd).replace(/(?:\r?\n)+$/, "");
-    if (!/^[^\[\]\s]+$/.test(name) || !framedValue.endsWith("]") || inventory.has(name)) {
+    if (!validHeader || !/^[^\[\]\s]+$/.test(name) || !framedValue.endsWith("]") || inventory.has(name)) {
       inventoryUsable = false;
       continue;
     }
