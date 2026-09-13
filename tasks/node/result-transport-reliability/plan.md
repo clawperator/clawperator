@@ -64,3 +64,15 @@ build checks passed. The recurring post-dispatch exit did not reproduce, so its
 cause remains unresolved and the pack stays active. See the
 [durable PR-2 record](../../../docs/internal/design/result-transport-reliability.md#pr-2-recurring-reader-exit-investigation)
 for evidence, causal limits and the remaining manual release gate.
+
+## Post-merge follow-up
+
+PR #288 merged as `7cdb31d4`. A subsequent controlled reader-connection
+interruption reproduced exit 255 after Android start while an independent
+reader validated successful result publication. This supports one possible
+mechanism without identifying the historical cause. The follow-up repairs
+stdout-observation diagnostics and failure-capture accounting; it does not
+replace transport or close the causal/manual release gates. The
+[durable follow-up](../../../docs/internal/design/result-transport-reliability.md#follow-up-controlled-connection-interruption-and-evidence-repair)
+retains injected failures and the interrupted debug series separately from
+successful release delivery.

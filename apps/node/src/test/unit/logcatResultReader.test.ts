@@ -282,3 +282,20 @@ it("preserves a signal and rejected framing at the exit-drain deadline", { timeo
     assert.equal(f.stderr.destroyed, true);
   }
 });
+
+it("reports stdout observed when command-start arrives after fallback dispatch", async () => {
+  const f = fake();
+  let dispatches = 0;
+  const result = await waitForResultEnvelope(f.runtime, options, async begin => {
+    begin(); dispatches++;
+    f.stdout.write(`[Clawperator-Command] start commandId=${options.commandId}\n`);
+    f.proc.emit("exit", 255, null);
+    f.proc.emit("close", 255, null);
+    return { success: true };
+  });
+  assert.ok(!result.ok && "error" in result);
+  assert.equal(result.code, "RESULT_TRANSPORT_EXITED");
+  assert.equal(result.diagnostics?.stdoutObserved, true);
+  assert.equal(result.diagnostics?.dispatchAttempted, true);
+  assert.equal(dispatches, 1);
+});

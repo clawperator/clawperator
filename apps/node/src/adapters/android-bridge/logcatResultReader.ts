@@ -421,8 +421,7 @@ export async function waitForResultEnvelope(
         }
       }
       if (!broadcastStarted) {
-        if (!stdoutObserved) {
-          stdoutObserved = true;
+        if (signalBroadcastMaxTimer === undefined) {
           signalBroadcastMaxTimer = setTimeout(() => {
             startBroadcast();
           }, SIGNAL_BROADCAST_MAX_DRAIN_MS);
@@ -439,7 +438,12 @@ export async function waitForResultEnvelope(
         }, SIGNAL_BROADCAST_REPLAY_DRAIN_MS);
       }
     };
-    proc.stdout?.on("data", (chunk: Buffer) => consumeOutput(decoder.write(chunk)));
+    proc.stdout?.on("data", (chunk: Buffer) => {
+      // Output can first arrive after the fallback timer has begun dispatch.
+      // Keep observed evidence independent of the startup-drain timer state.
+      if (chunk.length > 0) stdoutObserved = true;
+      consumeOutput(decoder.write(chunk));
+    });
 
     proc.stderr?.on("data", (chunk: Buffer) => {
       stderrBuffer = (stderrBuffer + chunk.toString()).slice(-8192);

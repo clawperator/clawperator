@@ -382,3 +382,97 @@ post-dispatch exit cause, these retained fixture failures, and the manual
 supported-image CI prerequisite prevent claiming complete reliability or release
 acceptance. PR creation is authorized; release publication is not part of this
 work.
+
+### Follow-up: controlled connection interruption and evidence repair
+
+A further investigation on 13 September 2026 used implementation worktree HEAD
+`e2b4617c`, then the diagnostic repair described below. PR #288 had meanwhile
+merged as `7cdb31d4`; that merge does not close the causal gate. The original
+audit's raw failed query was still available and independently confirmed the
+reported start event, sent dispatch, zero chunks, empty stderr and exit 255.
+Its historical interruption mechanism remains unknown.
+
+Two separately declared read-only queries tested a specific mechanism. A private
+TCP relay forwarded only the selected CLI result reader's connection to the
+existing ADB server. After forwarding the correlated command-start output, it
+closed that connection. Broadcast and independent-reader connections bypassed
+the relay. No ADB server reset, device disconnect, Operator termination or
+mutation replay was used. The first experiment enabled shell tracing; the
+second disabled tracing to check the original empty-stderr symptom after the
+diagnostic repair.
+
+Both injected interruptions returned `RESULT_TRANSPORT_EXITED`, host exit 255,
+null signal, sent dispatch and zero received chunks. The untraced attempt also
+had empty stderr. Independent logcat stayed alive and retained all result
+chunks. The branch-local strict reassembler validated the complete successful
+canonical results: 32 chunks / 32,260 bytes in the first experiment and 34
+chunks / 34,273 bytes in the second. Command/task identities matched each failed
+CLI attempt. The observed logd, adbd and Operator process identities were stable
+before and after the first experiment. Private evidence retains the relay,
+forwarded bytes, injection timestamps, exact invocations, correlated output and
+independent-publication verification.
+
+This demonstrates that interrupting the host reader connection can reproduce
+the symptom while Android completes and publishes correctly. It does not show
+that this caused the historical failure, distinguish its external initiator,
+or prove that every exit 255 has this cause. The deliberate interruptions are
+not counted as naturally recurring failures or successful transport delivery.
+
+The experiment exposed a separate diagnostic defect: `stdoutObserved` remained
+false when the first output arrived after fallback dispatch, even with a
+retained command-start line. A deterministic regression failed on that case.
+The reader now records nonempty stdout arrival independently of startup-drain
+timers. The corrected untraced experiment reported `stdoutObserved: true`.
+Dispatch, deadlines, terminal authority and integrity checks are unchanged.
+
+The manual series now reports canonical-envelope delivery independently of
+Android action, host-exit and fixture verdicts. Reclassification of the saved
+PR-2 failures correctly counted the debug `UI_TREE_UNAVAILABLE` and release
+loading-screen capture as delivered envelopes, with action and fixture failures
+respectively. A no-envelope outcome remains `host_or_transport`, requiring the
+original diagnostics to distinguish host/preflight errors from transport loss.
+Before advancing after a failure, read-only observations save the bounded device
+log buffer, process lists and connection state. Observation timeout and spawn
+errors remain explicit and cannot replace the original attempt. Optional shell
+tracing supplies bounded diagnostics, not a complete protocol recording.
+
+The logcat publication path has no per-command delivery acknowledgement or
+persistent result retrieval mechanism. These experiments show a recoverability
+limit: successful Android publication is insufficient to guarantee delivery to
+an interrupted reader. If the product requires retrieval after disconnection,
+a durable result record fetched by the original command identity is a design
+candidate; it would retrieve evidence without re-executing the action. This
+follow-up does not implement a replacement channel or treat that design as the
+historical root-cause repair. Causal closure still needs a naturally failing
+capture with simultaneous reader/protocol and publication observations.
+
+#### Follow-up attempt accounting
+
+Only the assigned API-35 English emulator was used, with branch-local CLI and
+matching locally built APKs. The debug fixed series delivered its first 40
+canonical results. Attempt 41 failed before CLI startup because an overlapping
+repository validation rebuilt `dist/`; a denied host process-list observation
+then interrupted the harness. Both host failures were retained. The remaining
+19 attempts stayed unrun, and the series was not repeated. Observation failures
+are now handled and covered by timeout/permission-denial regressions; builds
+and subsequent device runs were serialized.
+
+The release fixed series ran once and passed all 60 fixture checks with 60
+canonical envelopes and a live independent reader. The two injected debug
+queries are accounted for separately above. No natural transport failure was
+captured in this follow-up. These results neither erase the interrupted debug
+series nor establish complete reliability or manual release acceptance.
+
+Matching APK SHA-256:
+
+- Debug: `d70263154b535d57b08d0c6935f6bfa43dbe539ece863c84011e5e84ebc99415`.
+- Release: `a454378ffca04a84d42f066879425d9221e043118d9c0edfa8c3b3a411a3be25`.
+
+Both complete debug/release hierarchy fixtures passed once, including five query
+comparisons, XML/MCP/PNG parity and Display & touch. Node build and all 1,566
+Node tests passed. Seven harness regressions cover outcome separation,
+no-replay sequencing and observation failures. A live observation-only check
+retained denied host-process access and still completed all three device
+observations. Both APKs built; Android runtime source was unchanged and its
+unit suite was not rerun in this follow-up. The initial restricted Gradle-cache
+access failure remains in private accounting before the authorized build.

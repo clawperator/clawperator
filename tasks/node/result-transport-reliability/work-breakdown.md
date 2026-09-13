@@ -137,3 +137,23 @@ of the loading screen without the expected sensitive root. Neither series was
 repeated. Both complete hierarchy fixtures and Home cleanup passed; a preceding
 debug invocation rejected by the device lock before commands remains recorded.
 See the [review/integration record](../../../docs/internal/design/result-transport-reliability.md#clean-review-and-latest-main-integration).
+
+### Post-merge diagnostic follow-up
+
+- [DONE] Independently rechecked the retained audit failure. Two controlled
+  reader-only connection interruptions reproduced post-start exit 255 while
+  independent strict reassembly proved successful Android publication. This
+  establishes one possible mechanism, not the historical cause.
+- [DONE] Reproduced and fixed incorrect `stdoutObserved: false` after fallback
+  dispatch. Preserve the existing dispatch and transport-integrity contracts.
+- [DONE] Separate delivery/action/fixture outcomes in the manual harness and
+  capture read-only failure observations before subsequent attempts. Preserve
+  observation errors, including denied process listing, without masking the
+  original failure.
+- [OPEN] Historical causal investigation, a complete uninterrupted debug series
+  for this follow-up, and the manual supported-image release gate. The debug
+  series retained a host build-overlap failure and 19 unrun attempts. Release
+  passed its single 60-command series. No retry-to-green claim is made.
+
+See the [follow-up evidence](../../../docs/internal/design/result-transport-reliability.md#follow-up-controlled-connection-interruption-and-evidence-repair).
+PR #288 merged as `7cdb31d4`; the causal gate remains open after that merge.
