@@ -118,3 +118,20 @@ describe("query and relational selector contracts", () => {
     }
   });
 });
+
+
+describe("empty matcher recovery guidance", () => {
+  it("rejects both aliases for query and click with an actionable structured error", () => {
+    for (const command of ["query", "click"]) {
+      for (const alias of ["--selector", "--matcher-json"]) {
+        for (const globalFirst of [true, false]) {
+          const flags = ["--device", "non-existent", "--operator-package", "com.clawperator.operator.dev"];
+          const result = runCli(globalFirst ? [...flags, command, alias, "{}"] : [command, alias, "{}", ...flags]);
+          assert.equal(result.status, 1);
+          assert.equal(result.payload.code, "EXECUTION_VALIDATION_FAILED");
+          assert.match(result.stdout, /query without a matcher/);
+        }
+      }
+    }
+  });
+});
