@@ -86,6 +86,8 @@ Clawperator is an actuator, not an autonomous planner. Use these entrypoints fir
 
 Full docs at [docs.clawperator.com](https://docs.clawperator.com)
 
+[Release notes](https://github.com/clawperator/clawperator/blob/main/CHANGELOG.md) cover changes in each version.
+
 Website surfaces in this repo:
 - `sites/landing/` builds the marketing/install site at [clawperator.com](https://clawperator.com)
 - `sites/docs/` builds the technical documentation site at [docs.clawperator.com](https://docs.clawperator.com)
