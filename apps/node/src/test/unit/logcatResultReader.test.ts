@@ -137,3 +137,148 @@ it("retains bounded stderr and rejected chunk evidence without replay", async ()
   assert.match(result.error, /expectedIndex=0, receivedIndex=1/);
   assert.equal(dispatches, 1);
 });
+
+it("blocks deferred dispatch between process exit and pipe close while retaining late diagnostics", async () => {
+  const f = fake();
+  let dispatches = 0;
+  const result = await waitForResultEnvelope(f.runtime, options, async begin => {
+    f.proc.emit("exit", 255, null);
+    // Node can report exit before inherited stdout/stderr pipes close.
+    setImmediate(() => {
+      f.stderr.write("late reader diagnostic");
+      f.proc.emit("close", 255, null);
+    });
+    begin();
+    dispatches++;
+    return { success: true };
+  });
+  assert.ok(!result.ok && "error" in result);
+  assert.equal(result.code, "RESULT_TRANSPORT_EXITED");
+  assert.equal(result.diagnostics?.dispatchAttempted, false);
+  assert.equal(result.diagnostics?.stderr, "late reader diagnostic");
+  assert.equal(dispatches, 0);
+});
+
+it("does not start a broadcast when the process exits before its pipes close", async () => {
+  const f = fake();
+  let dispatches = 0;
+  const waiting = waitForResultEnvelope(f.runtime, options, async begin => {
+    begin(); dispatches++; return { success: true };
+  });
+  f.proc.emit("exit", 255, null);
+  await new Promise(resolve => setTimeout(resolve, 20));
+  f.proc.emit("close", 255, null);
+  const result = await waiting;
+  assert.ok(!result.ok && "error" in result);
+  assert.equal(result.code, "RESULT_TRANSPORT_EXITED");
+  assert.equal(dispatches, 0);
+});
+
+it("accepts an already dispatched complete result drained after exit", async () => {
+  const f = fake();
+  const result = await waitForResultEnvelope(f.runtime, options, async begin => {
+    begin();
+    f.proc.emit("exit", 255, null);
+    f.stdout.write(terminal);
+    f.proc.emit("close", 255, null);
+    return { success: true };
+  });
+  assert.ok(result.ok);
+});
+
+it("blocks dispatch after a real subprocess exits while inherited pipes remain open", async () => {
+  const runtime = config();
+  let exited!: Promise<void>;
+  runtime.runner = { ...runtime.runner, spawn: () => {
+    const child = spawn(process.execPath, ["-e", `
+      require('node:child_process').spawn(process.execPath,
+        ['-e', 'setTimeout(() => process.stderr.write("late diagnostic"), 100)'],
+        { stdio: ['ignore', 1, 2] });
+      process.exit(255);
+    `]);
+    exited = new Promise(resolve => child.once("exit", () => resolve()));
+    return child;
+  } };
+  let dispatches = 0;
+  const result = await waitForResultEnvelope(runtime, options, async begin => {
+    await exited;
+    begin(); dispatches++;
+    return { success: true };
+  });
+  assert.ok(!result.ok && "error" in result);
+  assert.equal(result.code, "RESULT_TRANSPORT_EXITED");
+  assert.equal(result.diagnostics?.exitCode, 255);
+  assert.equal(result.diagnostics?.dispatchAttempted, false);
+  assert.equal(result.diagnostics?.stderr, "late diagnostic");
+  assert.equal(dispatches, 0);
+});
+
+it("preserves an independent broadcast error while exited pipes are draining", async () => {
+  const f = fake();
+  const result = await waitForResultEnvelope(f.runtime, options, async begin => {
+    begin();
+    f.proc.emit("exit", 255, null);
+    throw new Error("broadcast connection failed");
+  });
+  assert.ok(!result.ok && "broadcastFailed" in result);
+  assert.equal(result.diagnostics.code, "BROADCAST_FAILED");
+  assert.match(result.diagnostics.message, /broadcast connection failed/);
+});
+
+for (const phase of ["startup", "deferred-preflight", "after-dispatch"]) {
+  it(`bounds inherited output pipes after exit during ${phase}`, { timeout: 1000 }, async () => {
+    const f = fake();
+    let dispatches = 0;
+    const waiting = waitForResultEnvelope(f.runtime, { ...options, timeoutMs: 20 }, async begin => {
+      if (phase === "deferred-preflight") f.proc.emit("exit", 255, null);
+      begin();
+      dispatches++;
+      f.proc.emit("exit", 255, null);
+      f.stderr.write("last reader diagnostic");
+      return { success: true };
+    });
+    if (phase === "startup") f.proc.emit("exit", 255, null);
+    const result = await waiting;
+    assert.ok(!result.ok && "error" in result);
+    assert.equal(result.code, "RESULT_TRANSPORT_EXITED");
+    assert.equal(result.diagnostics?.exitCode, 255);
+    assert.equal(result.diagnostics?.signal, null);
+    assert.equal(result.diagnostics?.outputDrainIncomplete, true);
+    assert.equal(result.diagnostics?.dispatchAttempted, phase === "after-dispatch");
+    assert.equal(dispatches, phase === "after-dispatch" ? 1 : 0);
+    if (phase === "after-dispatch") assert.equal(result.diagnostics?.stderr, "last reader diagnostic");
+    assert.equal(f.stdout.destroyed, true);
+    assert.equal(f.stderr.destroyed, true);
+    assert.equal(f.kills(), 1);
+  });
+}
+
+it("accepts a complete buffered result at the exit-drain deadline", { timeout: 1000 }, async () => {
+  const f = fake();
+  const result = await waitForResultEnvelope(f.runtime, { ...options, timeoutMs: 20 }, async begin => {
+    begin();
+    f.proc.emit("exit", null, "SIGTERM");
+    f.stdout.write(terminal);
+    return { success: true };
+  });
+  assert.ok(result.ok);
+  assert.equal(f.stdout.destroyed, true);
+  assert.equal(f.stderr.destroyed, true);
+});
+
+it("preserves a signal and rejected framing at the exit-drain deadline", { timeout: 1000 }, async () => {
+  for (const malformed of [false, true]) {
+    const f = fake();
+    const result = await waitForResultEnvelope(f.runtime, { ...options, timeoutMs: 20 }, async begin => {
+      begin();
+      f.proc.emit("exit", null, "SIGTERM");
+      if (malformed) f.stdout.write('[Clawperator-Result-Chunk] {"commandId":"transport-command","index":1}');
+      return { success: true };
+    });
+    assert.ok(!result.ok && "error" in result);
+    assert.equal(result.code, malformed ? "RESULT_ENVELOPE_MALFORMED" : "RESULT_TRANSPORT_EXITED");
+    if (!malformed) assert.equal(result.diagnostics?.signal, "SIGTERM");
+    assert.equal(f.stdout.destroyed, true);
+    assert.equal(f.stderr.destroyed, true);
+  }
+});

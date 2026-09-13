@@ -149,6 +149,8 @@ export async function waitForResultEnvelope(
     const decoder = new StringDecoder("utf8");
     const transport = new ResultEnvelopeTransport(commandId);
     let settled = false;
+    let processExit: { code: number | null; signal: string | null } | undefined;
+    const dispatchAfterReaderExitError = new Error("Result reader stopped before broadcast dispatch");
     let stderrBuffer = "";
     let timeoutId: NodeJS.Timeout | undefined;
     let broadcastStartTimer: NodeJS.Timeout | undefined;
@@ -212,6 +214,11 @@ export async function waitForResultEnvelope(
       } catch {
         // ignore
       }
+      if (processExit !== undefined) {
+        // Other writers may retain these pipes after the reader has exited.
+        proc.stdout?.destroy?.();
+        proc.stderr?.destroy?.();
+      }
     };
 
     const abortHandler = () => {
@@ -233,11 +240,33 @@ export async function waitForResultEnvelope(
     }
 
 
+    const finishExited = (code: number | null, signal: string | null, outputDrainIncomplete = false) => {
+      const base = `logcat exited before terminal envelope (code=${code ?? "null"}, signal=${signal ?? "null"})`;
+      const stderr = stderrBuffer.trim();
+      config.logger?.emit({
+        ts: new Date().toISOString(),
+        level: "debug",
+        event: "adb.complete",
+        deviceId: config.deviceId,
+        message: `${commandLine} code=${code ?? "null"} signal=${signal ?? "null"} stdout=[redacted] stderr=${JSON.stringify(stderr)}`,
+      });
+      finalize({ ok: false, code: ERROR_CODES.RESULT_TRANSPORT_EXITED, error: stderr ? `${base}: ${stderr}` : base,
+        diagnostics: { exitCode: code, signal, originalMessage: base,
+          ...(outputDrainIncomplete ? { outputDrainIncomplete: true } : {}) } });
+    };
+
     const startTimeout = () => {
       if (timeoutId !== undefined) {
         return;
       }
       timeoutId = setTimeout(() => {
+        if (processExit !== undefined) {
+          // Keep the dispatch deadline when already running. Before dispatch,
+          // exit starts the same bounded budget so inherited pipes cannot hang.
+          consumeOutput(decoder.end() + (pending.length > 0 ? "\n" : ""));
+          if (!settled) finishExited(processExit.code, processExit.signal, true);
+          return;
+        }
         const diagnostics: TimeoutDiagnostics = {
           code: ERROR_CODES.RESULT_ENVELOPE_TIMEOUT,
           message: `No [Clawperator-Result] envelope within ${timeoutMs}ms`,
@@ -259,7 +288,7 @@ export async function waitForResultEnvelope(
 
     const beginDispatchCapture = () => {
       // A deferred preflight callback must never dispatch after its reader has died.
-      if (settled) throw new Error("Result reader settled before broadcast dispatch");
+      if (settled || processExit !== undefined) throw dispatchAfterReaderExitError;
       if (dispatchCaptureStarted) {
         return;
       }
@@ -270,7 +299,7 @@ export async function waitForResultEnvelope(
     };
 
     const startBroadcast = () => {
-      if (settled || broadcastStarted) {
+      if (settled || processExit !== undefined || broadcastStarted) {
         return;
       }
       broadcastStarted = true;
@@ -308,7 +337,8 @@ export async function waitForResultEnvelope(
             beginDispatchCapture();
           }
         } catch (e) {
-          if (settled) return;
+          // The close handler owns the exit failure and drains remaining diagnostics.
+          if (settled || e === dispatchAfterReaderExitError) return;
           const err = String(e).trim();
           broadcastStatus = `error: ${err}`;
           const diagnostics: BroadcastDiagnostics = {
@@ -444,21 +474,18 @@ export async function waitForResultEnvelope(
       }
     });
 
+    proc.on("exit", (code: number | null, signal: string | null) => {
+      // Block new dispatch immediately, but allow buffered results to drain
+      // within the existing wait budget even if inherited pipes never close.
+      processExit = { code, signal };
+      if (!settled) startTimeout();
+    });
+
     proc.on("close", (code: number | null, signal: string | null) => {
       if (settled) return;
       consumeOutput(decoder.end() + (pending.length > 0 ? "\n" : ""));
       if (settled) return;
-      const base = `logcat exited before terminal envelope (code=${code ?? "null"}, signal=${signal ?? "null"})`;
-      const stderr = stderrBuffer.trim();
-      config.logger?.emit({
-        ts: new Date().toISOString(),
-        level: "debug",
-        event: "adb.complete",
-        deviceId: config.deviceId,
-        message: `${commandLine} code=${code ?? "null"} signal=${signal ?? "null"} stdout=[redacted] stderr=${JSON.stringify(stderr)}`,
-      });
-      finalize({ ok: false, code: ERROR_CODES.RESULT_TRANSPORT_EXITED, error: stderr ? `${base}: ${stderr}` : base,
-        diagnostics: { exitCode: code, signal, originalMessage: base } });
+      finishExited(code, signal);
     });
 
     if (cancelSignal?.aborted) {

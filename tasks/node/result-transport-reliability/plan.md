@@ -1,6 +1,6 @@
 # Make result transport failures typed and diagnosable
 
-R13, follow-up to R6/R10 integration. Status: implemented locally with focused evidence; reliability/release gates remain open. One implementation PR containing investigation, in-scope fixes and evidence.
+R13, follow-up to R6/R10 integration. Status: initial implementation merged in `0c4ed5ce`; PR-2 follow-up required after a new live recurrence at `6367227a`. Reliability/release gates remain open.
 
 ## Outcome and observations
 
@@ -26,7 +26,7 @@ Between failures, doctor, open and ten consecutive full release Settings queries
 
 - `apps/node/src/adapters/android-bridge/logcatResultReader.ts`: process lifecycle and correlated stream reading.
 - `apps/node/src/adapters/android-bridge/resultEnvelopeTransport.ts`: framing and chunk checks.
-- `apps/node/src/domain/executions/runExecution.ts`: currently falls back from absent code to error prose.
+- `apps/node/src/domain/executions/runExecution.ts`: stable error propagation and dispatch uncertainty; preserve the already repaired prose-as-code behavior.
 - `apps/node/src/contracts/errors.ts`, `apps/node/src/test/unit/resultEnvelopeTransport.test.ts`, `apps/node/src/test/unit/runExecution.test.ts`: public errors and regression coverage; add lifecycle tests at the appropriate existing test location.
 - `apps/android/shared/data/operator/src/main/kotlin/clawperator/operator/agent/ResultEnvelopeTransport.kt`: Android chunk publication, if evidence implicates it.
 - `validation/sensitive-hierarchy-access/`: real open/query reproduction and manual release integration; coordinate changes with R12.
@@ -47,3 +47,20 @@ The original live exit-255 and zero-event timeout causes remain unproven; the
 reliability phase and release gates are not marked complete. After integration
 with main, combined debug hierarchy proof passed; release retained a Wi-Fi
 switch fixture-readiness failure. Manual CI remains outstanding.
+
+## New audit recurrence
+
+Independent validation of PR #285 head `6367227a` failed a debug API-35 Internet parity query with `RESULT_TRANSPORT_EXITED`, exit 255, empty stderr and broadcast sent. The reader saw a correlated Android command-start event but no result chunks. Correlation and execution-position-unknown diagnostics were preserved correctly. Thus code normalization works, but the original exit-255 symptom is no longer merely historical/unreproduced.
+
+Fixed 60-command series then passed on both variants. Retain both facts; neither series erases the integrated-harness failure. Diagnose the reader exit with bounded independent host/device observations, distinguish process termination from publication loss and service failure, and add regression coverage for any demonstrated cause. Do not assume Android chunk pacing fixes early reader exit or add automatic mutation replay. Update the existing pack rather than creating a duplicate transport workstream.
+
+## PR-2 bounded outcome
+
+Dispatch safety is repaired for the demonstrated process-exit/pipe-close race,
+and the declared-series harness stops after a failed open to avoid replaying an
+uncertain mutation. Both matching variants passed their single 60-command series
+and complete hierarchy fixture after local commit `b31f497e`. Regression and
+build checks passed. The recurring post-dispatch exit did not reproduce, so its
+cause remains unresolved and the pack stays active. See the
+[durable PR-2 record](../../../docs/internal/design/result-transport-reliability.md#pr-2-recurring-reader-exit-investigation)
+for evidence, causal limits and the remaining manual release gate.

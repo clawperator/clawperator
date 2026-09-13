@@ -65,7 +65,7 @@ capture, followed by two successful 68-node captures with the switch. No retry
 was made; preserve this failure and the manual CI gate. See durable evidence.
 
 
-## Subsequent combined acceptance
+## Earlier combined acceptance (before the independent PR #285 audit)
 
 Merged R11/R12/R13 plus harness fixes through `306b38d` passed all six
 fresh/subpage/search full hierarchy runs across debug/release, and a new fixed
@@ -73,7 +73,67 @@ fresh/subpage/search full hierarchy runs across debug/release, and a new fixed
 was changed beyond merged `0c4ed5ce`. The readiness and stale-binding setup
 repairs, the earlier interrupted release series, and exact build identity are
 preserved in the [acceptance record](../../../validation/sensitive-hierarchy-access/README.md#integrated-r11r12r13-acceptance).
-The local combined-proof gap is closed. Remaining follow-up is the manual
-supported-image release CI gate and the already documented historical causal
-limits; neither authorizes replaying failed mutations or claiming zero failures
+At that revision the local combined-proof gap was closed. The later PR-2
+recurrence below reopens causal follow-up in addition to the manual
+supported-image release CI gate; neither authorizes replaying failed mutations or claiming zero failures
 under all conditions. R12's completed pack is retired.
+
+## PR-2: diagnose the recurring reader exit
+
+Status: bounded investigation, safety repairs and local verification complete; recurring post-dispatch exit-255 cause unresolved. Keep the causal reliability and release gates open. The independent `6367227a` audit reproduced exit 255 during an Internet parity query after confirmed command start, with zero received chunks. Stable public diagnostics passed; causal reliability remains unresolved. The later declared debug/release transport series passed 120/120 commands and must be retained alongside the failure.
+
+Reproduce with the checked-in hierarchy fixture and independent bounded stream/process diagnostics on the same build. Inspect logcat process lifecycle, reader startup/teardown, host cancellation and device logging separately; make only evidence-supported repairs. Capture raw failure context privately and add deterministic tests for the reproduced cause. Preserve existing codes, command IDs, strict chunk integrity and no-replay semantics. Run the original PR's relevant checks and a declared finite series plus the complete hierarchy fixture on both variants. Report unreproduced causes or remaining failures explicitly; a retry-to-green is not completion. Update durable causal findings and release status, then commit the validated scope locally.
+
+R14 is independent. Do not turn this follow-up into media implementation or automatic emulator CI; the supported-image release workflow remains manual.
+
+### PR-2 recorded outcome
+
+- [DONE] Inspected subscription timing, process lifecycle, UTF-8 framing, strict
+  reassembly and paced background publication. ADB source makes a missing remote
+  shell exit packet a plausible explanation for host exit 255, not a proven cause.
+- [DONE] Reproduced dispatch between process `exit` and pipe `close` with two
+  failing regressions and a real inherited-pipe subprocess. Blocked new dispatch
+  at exit while preserving late diagnostics and already dispatched terminal data.
+  Independent broadcast errors retain their classification.
+- [DONE] Prevented the fixed-series harness from issuing a later open after a
+  failed open; retain failed and unrun attempts instead of replaying uncertainty.
+- [DONE] Committed implementation as `b31f497e`, then ran one fixed 60-command
+  series and one complete hierarchy fixture on each matching debug/release build.
+  Both series passed 60/60, both hierarchy fixtures and Home cleanup passed.
+  One pre-repair debug hierarchy baseline also passed. No repeat-to-green runs.
+- [DONE] Node build and 1,528 tests, both APK builds and 463 Android tests,
+  repository validation, docs build and route/link checks passed.
+- [OPEN] No new live post-dispatch exit occurred under independent bounded
+  logging and shell tracing. Its cause remains unproven, as does the historical
+  zero-event timeout. A fresh failing protocol/process capture is needed for
+  causal closure. The manual supported-image CI gate remains required.
+
+Build hashes, timings, exact scope and retained evidence limits are in the
+[PR-2 findings](../../../docs/internal/design/result-transport-reliability.md#pr-2-bounded-live-results).
+Do not retire this pack or mark full reliability/release acceptance complete.
+The initial local phase performed no R14 work, remote synchronization or
+publication. Subsequent user-authorized review integrated upstream main for PR
+creation; the causal and manual release gates remain open.
+
+### PR review gate
+
+- [DONE] The first delegated review found unbounded pre-dispatch draining when
+  inherited pipes remain open. Independently reproduced and fixed in `308d42eb`
+  using the configured wait budget and explicit pipe cleanup.
+- [DONE] Merged main through `0b571d76` and obtained a fresh clean independent
+  code review on `21c58729`; no actionable findings remain in that reviewed diff.
+- [DONE] Integrated Node build and 1,565 tests, 463 Android tests, both APK builds
+  and repository validation passed. Initial host-wrapper/environment failures
+  remain in private attempt accounting.
+
+The clean code review does not close the historical post-dispatch exit cause
+or the manual supported-image release gate. Final live outcomes are recorded
+in the durable findings; failed attempts remain failures.
+
+Final integrated live verification at `21c58729`: both fixed series delivered
+60/60 canonical envelopes, but each passed 59/60 fixture checks. Debug retained
+one authoritative `UI_TREE_UNAVAILABLE`; release retained one successful query
+of the loading screen without the expected sensitive root. Neither series was
+repeated. Both complete hierarchy fixtures and Home cleanup passed; a preceding
+debug invocation rejected by the device lock before commands remains recorded.
+See the [review/integration record](../../../docs/internal/design/result-transport-reliability.md#clean-review-and-latest-main-integration).
