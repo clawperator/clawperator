@@ -556,3 +556,13 @@ Recommended doctor loop:
 - [Errors](errors.md)
 - [Operator App Troubleshooting](../troubleshooting/operator.md)
 - [Version Compatibility](../troubleshooting/compatibility.md)
+
+## Background observation readiness
+
+Use `clawperator doctor --capability background-observation` to verify notification
+and media queries without waking the display, dismissing keyguard, requiring
+accessibility, clearing logs or launching an app. The selected capability appears
+in JSON output. Failure returns a nonzero exit; an empty successful query is ready.
+This mode rejects --full and --fix before side effects. Default doctor (or explicit
+--capability interactive) retains interactive readiness requirements. An interactive
+doctor failure alone does not veto [background observations](notifications.md).

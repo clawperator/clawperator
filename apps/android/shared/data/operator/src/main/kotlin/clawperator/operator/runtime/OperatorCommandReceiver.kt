@@ -14,6 +14,7 @@ import clawperator.operator.agent.AgentCommandParser
 import clawperator.operator.agent.EnvelopeErrorCodes
 import clawperator.operator.agent.buildCanonicalFailureLine
 import clawperator.task.runner.TaskResult
+import clawperator.task.runner.isBackgroundObservation
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -43,10 +44,12 @@ class OperatorCommandReceiver :
                     return
                 }
 
-                val accessibilityService = accessibilityServiceManager.currentAccessibilityService
-                if (accessibilityService == null) {
+                val parsedCommand = agentCommandParser.parse(payload)
+                val background = parsedCommand.getOrNull()?.actions?.isBackgroundObservation() == true
+                val accessibilityService = if (background) null else accessibilityServiceManager.currentAccessibilityService
+                if (!background && accessibilityService == null) {
                     val reason = "Accessibility service is not available"
-                    val parseResult = agentCommandParser.parse(payload)
+                    val parseResult = parsedCommand
                     parseResult
                         .onSuccess { command ->
                             Log.e("[Operator-Receiver] $reason commandId=${command.commandId} taskId=${command.taskId}")
@@ -64,12 +67,12 @@ class OperatorCommandReceiver :
                     return
                 }
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                if (!background && accessibilityService != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     accessibilityService.closeNotificationPanel()
                 }
 
                 coroutineScopes.main.launch {
-                    val parseResult = agentCommandParser.parse(payload)
+                    val parseResult = parsedCommand
                     parseResult
                         .onSuccess { command ->
                             val result = agentCommandExecutor.execute(command)

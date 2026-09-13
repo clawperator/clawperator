@@ -1,6 +1,8 @@
 package clawperator.task.runner
 
 import action.log.Log
+import action.media.NotificationMediaService
+import action.media.NotificationMediaException
 import action.developeroptions.DeveloperOptionsManager
 import action.devicestate.DeviceState
 import action.devicestate.DeviceStateMock
@@ -23,6 +25,7 @@ class UiActionEngineDefault(
     private val deviceState: DeviceState,
     private val recordingManager: RecordingManager = RecordingManagerNoOp,
     private val onScreenLogController: OnScreenLogController = OnScreenLogControllerNoOp,
+    private val notificationMediaService: NotificationMediaService? = null,
 ) : UiActionEngine {
     constructor(
         developerOptionsManager: DeveloperOptionsManager,
@@ -50,11 +53,15 @@ class UiActionEngineDefault(
             for (action in plan.actions) {
                 val warnings = SelectionWarnings()
                 val receipt = ActionReceipt()
+                var serviceDispatched = false
+                val isMediaControl = action is UiAction.NotificationMedia && action.type in setOf("media_play", "media_pause")
                 val recordsDispatch = action is UiAction.Click || action is UiAction.EnterText ||
                     action is UiAction.Scroll || action is UiAction.ScrollUntil || action is UiAction.ScrollAndClick
-                fun evidence() = warnings.stepData() + if (recordsDispatch) receipt.stepData() else emptyMap()
+                fun evidence() = warnings.stepData() +
+                    (if (recordsDispatch) receipt.stepData() else emptyMap()) +
+                    (if (isMediaControl) mapOf("dispatched" to serviceDispatched.toString()) else emptyMap())
                 val stepResult = try {
-                    val result = withContext(warnings + receipt + receipt.observation) { executeSingle(taskScope, action) }
+                    val result = withContext(warnings + receipt + receipt.observation) { executeSingle(taskScope, action) { serviceDispatched = true } }
                     val failureCode = if (!result.success && !result.data.containsKey("errorCode")) {
                         // Returned failures already use data.error as a machine-readable code.
                         mapOf("errorCode" to (result.data["error"] ?: "ACTION_FAILED"))
@@ -94,6 +101,7 @@ class UiActionEngineDefault(
     private suspend fun executeSingle(
         taskScope: TaskScope,
         action: UiAction,
+        onServiceDispatch: () -> Unit = {},
     ): UiActionStepResult {
         Log.d(
             "$TAG step_start id=${action.id} type=${action::class.simpleName}",
@@ -101,6 +109,15 @@ class UiActionEngineDefault(
 
         val result =
             when (action) {
+                is UiAction.NotificationMedia -> {
+                    try {
+                        val service = notificationMediaService ?: throw NotificationMediaException("NOTIFICATION_SERVICE_UNAVAILABLE", "Service is unavailable")
+                        UiActionStepResult(action.id, action.type, data = mapOf("payload" to service.execute(action.type, action.applicationId, action.mediaSessionId, action.limit, action.maxTextChars, action.waitTimeoutMs, onServiceDispatch)))
+                    } catch (error: NotificationMediaException) {
+                        UiActionStepResult(action.id, action.type, success = false, data = mapOf("errorCode" to error.code, "error" to error.message.orEmpty(), "dispatched" to error.dispatched.toString(), "waitTimeoutMs" to action.waitTimeoutMs.toString()))
+                    }
+                }
+
                 is UiAction.OpenUri -> executeOpenUri(taskScope, action)
                 is UiAction.OpenApp -> executeOpenApp(taskScope, action)
                 is UiAction.CloseApp -> executeCloseApp(taskScope, action)
@@ -126,9 +143,7 @@ class UiActionEngineDefault(
             }
 
         Log.d(
-            // TODO(operator): result.data can contain raw read_text content. Keep this for debugging
-            // while agent recipes are being stabilized, then replace with redacted/safe logging.
-            "$TAG step_success id=${action.id} type=${action::class.simpleName} data=${result.data}",
+            "$TAG step_success id=${action.id} type=${action::class.simpleName} success=${result.success}",
         )
         return result
     }
@@ -994,6 +1009,7 @@ private fun TaskScrollTerminationReason.toWireValue(): String =
 
 /** Canonical names also cover failures before an action returns its normal result. */
 private fun UiAction.wireType(): String = when (this) {
+    is UiAction.NotificationMedia -> type
     is UiAction.OpenUri -> "open_uri"
     is UiAction.OpenApp -> "open_app"
     is UiAction.CloseApp -> "close_app"

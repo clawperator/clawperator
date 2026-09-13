@@ -559,3 +559,43 @@ describe("DoctorService logging", () => {
     assert.ok(lines.some(line => line.message?.includes("readiness.apk.presence")));
   });
 });
+
+import { EventEmitter } from "node:events";
+import { runBackgroundObservationDoctor } from "../../../domain/doctor/backgroundObservation.js";
+it("background diagnostics use only host checks and service reads, preserving denied access", async () => {
+  for (const denied of [false, true]) {
+    const runner = new FakeProcessRunner();
+    let stream: EventEmitter & { stdout: EventEmitter; stderr: EventEmitter; kill: () => void };
+    runner.spawn = ((command, args) => {
+      runner.calls.push({ command, args });
+      stream = Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), kill() {} });
+      return stream;
+    }) as FakeProcessRunner["spawn"];
+    runner.run = async (command, args) => {
+      runner.calls.push({ command, args });
+      const text = args.join(" ");
+      let stdout = "";
+      if (args.includes("version")) stdout = "Android Debug Bridge version 1.0.41";
+      else if (args.includes("start-server")) stdout = "";
+      else if (args.includes("devices")) stdout = "List of devices attached\ntest-device\tdevice\n";
+      else if (text.includes("pm list packages")) stdout = "package:com.test.operator";
+      else if (text.includes("dumpsys package")) stdout = `versionName=${getCliVersion()}\nversionCode=1`;
+      else if (text.includes("am broadcast")) {
+        const execution = JSON.parse(text.match(/\{.*\}/)![0]);
+        const type = execution.actions[0].type;
+        assert.ok(["list_notifications", "list_media_sessions"].includes(type));
+        const payload = { schemaVersion: 1, observedElapsedMs: 100, deviceState: { screenOn: false, deviceLocked: true, userUnlocked: true }, total: 0, truncated: false, [type === "list_notifications" ? "notifications" : "sessions"]: [] };
+        const envelope = { commandId: execution.commandId, taskId: execution.taskId, status: denied ? "failed" : "success", error: denied ? "denied" : null,
+          stepResults: [{ id: "a1", actionType: type, success: !denied, data: denied ? { errorCode: "NOTIFICATION_ACCESS_DENIED", error: "denied" } : { payload: JSON.stringify(payload) } }] };
+        setTimeout(() => stream.stdout.emit("data", Buffer.from(`[Clawperator-Result] ${JSON.stringify(envelope)}\n`)), 5);
+        stdout = "Broadcast completed: result=0";
+      } else throw new Error(`Forbidden diagnostic command: ${text}`);
+      return { code: 0, stdout, stderr: "" };
+    };
+    const report = await runBackgroundObservationDoctor(getDefaultRuntimeConfig({ runner, deviceId: "test-device", operatorPackage: "com.test.operator" }));
+    assert.equal(report.ok, !denied, JSON.stringify(report));
+    if (denied) assert.equal(report.checks.at(-1)?.code, "NOTIFICATION_ACCESS_DENIED");
+    else assert.deepEqual(report.checks.at(-1)?.evidence, { screenOn: false, deviceLocked: true, userUnlocked: true });
+    assert.equal(runner.calls.some(call => /WAKEUP|KEYCODE_HOME|doctor_ping|logcat -c|settings put|uiautomator|am start/.test(call.args.join(" "))), false);
+  }
+});

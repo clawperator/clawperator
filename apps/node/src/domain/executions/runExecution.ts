@@ -1,3 +1,4 @@
+import { isBackgroundObservation } from "../../contracts/notifications.js";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -650,23 +651,25 @@ async function performExecution(
       };
     }
 
-    const ensureInteractiveAutomationReadyFn = options.ensureInteractiveAutomationReadyFn ?? ensureInteractiveAutomationReadyCached;
-    const interactiveState = await ensureInteractiveAutomationReadyFn(config, {
-      probeInteractiveStateFn: options.probeInteractiveStateFn,
-    });
-    if (!interactiveState.ok) {
-      cancelEarlyResultWaiter();
-      const publicError = interactiveState.error.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE
-        ? toPublicInteractiveAutomationError(interactiveState.error)
-        : interactiveState.error;
-      return {
-        execution,
-        result: {
-          ok: false,
-          error: publicError,
-          deviceId,
-        },
-      };
+    if (!isBackgroundObservation(execution.actions)) {
+      const ensureInteractiveAutomationReadyFn = options.ensureInteractiveAutomationReadyFn ?? ensureInteractiveAutomationReadyCached;
+      const interactiveState = await ensureInteractiveAutomationReadyFn(config, {
+        probeInteractiveStateFn: options.probeInteractiveStateFn,
+      });
+      if (!interactiveState.ok) {
+        cancelEarlyResultWaiter();
+        const publicError = interactiveState.error.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE
+          ? toPublicInteractiveAutomationError(interactiveState.error)
+          : interactiveState.error;
+        return {
+          execution,
+          result: {
+            ok: false,
+            error: publicError,
+            deviceId,
+          },
+        };
+      }
     }
 
     let dispatchStart = Date.now();

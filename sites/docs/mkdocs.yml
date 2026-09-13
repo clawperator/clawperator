@@ -62,6 +62,8 @@ nav:
       - Snapshot Format: api/snapshot.md
       - Evidence Bundles: api/evidence.md
       - Devices: api/devices.md
+      - Notifications: api/notifications.md
+      - Media Sessions: api/media.md
       - Doctor: api/doctor.md
       - Timeouts: api/timeouts.md
       - Errors: api/errors.md

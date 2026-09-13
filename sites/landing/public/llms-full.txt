@@ -547,6 +547,11 @@ This API requirement applies to the flag, not to queries or XML capture.
 Applications can still have no accessible hierarchy. Sensitivity metadata does
 not change screenshot capture, redaction, or logging behavior.
 
+For screen-off notification/media observation, use
+`clawperator doctor --capability background-observation` after setup. The default
+interactive doctor can fail on a locked screen while these reads remain available.
+See [background readiness](api/doctor.md#background-observation-readiness).
+
 ---
 
 # Host Agent Orientation
@@ -2798,6 +2803,13 @@ For failures, inspect:
 - [API Overview](overview.md)
 - [Snapshot Format](snapshot.md)
 
+## Notification and media actions
+
+See [notifications](notifications.md) for list_notifications and
+[media sessions](media.md) for list_media_sessions, get_media_status, media_pause
+and media_play. These share canonical execution and result correlation across CLI,
+HTTP and MCP. Only observation-only lists bypass interactive readiness.
+
 ---
 
 # On-screen Logs
@@ -3717,7 +3729,7 @@ Use this page as a command index. Detailed behavior, output shapes, and recovery
 | [`serve`](#command-serve) | Execution | `serve [--port <number>] [--host <string>]` | `--port`, `--host` | [Serve API](serve.md) | Start local HTTP/SSE server for remote control |
 | [`mcp`](#command-mcp) | Execution | `mcp serve` | - | [MCP server](mcp.md) | Start the first-party MCP server |
 | [`logs`](#command-logs) | Utilities | `logs` | - | [Logging](logging.md#the-clawperator-logs-command) | Tail the Clawperator log file |
-| [`doctor`](#command-doctor) | Setup | `doctor` | `--fix`, `--full`, `--check-only` | [Doctor contract](doctor.md#doctor-report-contract) | Run environment and runtime checks |
+| [`doctor`](#command-doctor) | Setup | `doctor` | `--fix`, `--full`, `--check-only`, `--capability` | [Doctor contract](doctor.md#doctor-report-contract) | Run environment and runtime checks |
 | [`grant-device-permissions`](#command-grant-device-permissions) | Setup | `grant-device-permissions [--device <id>] [--operator-package <package>]` | - | [Setup recovery](../setup.md#setup-step-regrant-permissions) | Re-grant accessibility and notification permissions |
 | [`version`](#command-version) | Setup | `version` | `--check-compat` | [Version checks](../setup.md#setup-step-verify-readiness-with-doctor) | Show the CLI version |
 
@@ -4106,7 +4118,7 @@ Run environment and runtime checks
 
 - Group: Setup
 - Syntax: `doctor`, `doctor --fix`, `doctor --full`, `doctor --check-only`
-- Primary flags: `--fix`, `--full`, `--check-only`
+- Primary flags: `--fix`, `--full`, `--check-only`, `--capability`
 - Details: [Doctor contract](doctor.md#doctor-report-contract)
 
 <a id="command-grant-device-permissions"></a>
@@ -5276,6 +5288,123 @@ clawperator exec payload.json --device <device_serial>
 
 ---
 
+# Notifications
+
+Read accessible active Android notifications without opening the notification
+shade, waking the display or dismissing keyguard:
+
+```sh
+clawperator notifications list --app <package> --limit 25 --max-text-chars 256
+clawperator doctor --capability background-observation
+```
+
+Notification access must be enabled for the selected Operator and its listener
+must be connected. Operator setup grants access; unavailable access or a
+connection failure returns an error, not an empty list. Android profile and
+sensitive-content restrictions still apply.
+
+`list_notifications` accepts optional `applicationId`, `limit` (1-100, default 25)
+and `maxTextChars` (1-1024, default 256). Omit applicationId for all accessible apps.
+Blank values, unknown parameters and invalid bounds are rejected. The same action
+works through HTTP `/execute` and generic MCP `execute`.
+
+The canonical step's `data.payload` is a JSON string with `schemaVersion: 1`,
+`observedElapsedMs`, `deviceState`, `notifications`, `total` and `truncated`. Node's
+`decodeNotificationMediaPayload` validates and decodes it. Notifications include
+key, applicationId, nullable title/text, postTime, ongoing/clearable/group fields,
+action descriptors, text/action truncation flags and nullable generic progress.
+deviceState records screenOn, deviceLocked and userUnlocked at query completion.
+These endpoint values alone cannot exclude a transient wake; use independent
+state-transition evidence for regression tests. Ongoing notifications and group summaries are included. Results are capped at
+64,000 payload bytes as well as the requested item/text limits; `truncated`
+indicates omitted items. An empty list with total zero is a successful snapshot.
+
+Action descriptors expose opaque actionId, title, requiresInput and
+requiresAuthentication. These describe buttons; invocation and dismissal are
+not currently available. Progress is the notification's generic value/max and
+indeterminate flag, not a playback timestamp. Use [media status](media.md).
+
+Observation-only execution lists may contain list_notifications,
+list_media_sessions and get_media_status in any order. They bypass interactive
+readiness and do not need accessibility or an app window. Mixed lists retain
+normal whole-execution interactive readiness. Use separate read-only executions
+when observing screen-off behavior. Before first unlock after reboot, platform
+service availability can differ from an ordinary locked screen.
+
+Errors include NOTIFICATION_ACCESS_DENIED, NOTIFICATION_LISTENER_DISCONNECTED,
+NOTIFICATION_QUERY_FAILED and NOTIFICATION_SERVICE_UNAVAILABLE. Inspect the
+failed step's errorCode; transport failures remain distinct.
+
+---
+
+# Media sessions
+
+```sh
+clawperator media list
+clawperator media status --session <id>
+clawperator media pause --session <id> --wait-timeout-ms 2000
+clawperator media play --session <id> --wait-timeout-ms 2000
+```
+
+Discover active Android sessions before targeting one. `--app <package>` may
+replace `--session` only when it identifies exactly one session. No implicit
+selection of a recent or playing app occurs. Session handles expire when their
+session ends or the Operator restarts; a replacement from the same package does
+not inherit the handle. The selected controller is pinned throughout each action.
+
+List/status work while the display is off or keyguard locked without waking it.
+Pause/play retain normal interactive readiness. Notification access and a connected
+listener are required. Players without active sessions cannot be controlled here.
+
+| Action | Parameters |
+| --- | --- |
+| list_media_sessions | Optional applicationId, limit (1-100, default 25), maxTextChars (1-1024, default 256) |
+| get_media_status | Exactly one applicationId or mediaSessionId |
+| media_pause / media_play | Exactly one applicationId or mediaSessionId; optional waitTimeoutMs (0-30000, default 0) |
+
+Use these actions through CLI, typed `runNotificationMedia`, HTTP `/execute`, or
+generic MCP `execute`. Canonical `data.payload` is a JSON string with
+schemaVersion 1 and deviceState (screenOn, deviceLocked, userUnlocked). Lists contain sessions/total/truncated; status contains session.
+Use `decodeNotificationMediaPayload` for typed Node decoding. Session metadata
+includes nullable title/artist/durationMs, state and supportedControls.
+
+## Position evidence
+
+`evidence` is `player_report` after a playback-state callback has arrived for the
+selected session. Before that, it is `platform_query`: Android may have already
+extrapolated the queried position and replaced its timestamp. In this case,
+reportedPositionMs, positionUpdatedElapsedMs and positionUpdateAgeMs are null,
+estimatedPositionMs contains the platform value, and positionUnknownReason is
+`original_player_report_unavailable`. Repeating queries cannot manufacture an
+original player report. Session discovery does not wait for a callback.
+
+- reportedPositionMs is the player's last reported value; unknown is null.
+- positionUpdatedElapsedMs preserves the player's original update timestamp.
+- observedElapsedMs is the query time in Android elapsed realtime, not wall time.
+- positionUpdateAgeMs exposes report age. A fresh query need not be a fresh report.
+- estimatedPositionMs extrapolates a valid position using playbackSpeed in
+  advancing states, bounded by zero and known duration. It does not advance paused
+  or buffering reports. Invalid/missing timing or speed yields null with a reason.
+
+An unchanged PLAYING report can keep producing advancing estimates after actual
+playback stops. Neither an estimate nor a state query proves ongoing playback or
+PiP-window persistence. Use independent playback/window evidence for assertions.
+Live streams, ads and remote playback may have app-defined or unavailable timelines.
+
+## Control evidence
+
+Pause/play require the advertised control. With default waitTimeoutMs zero,
+results report dispatched and targetStateObserved plus a new session observation.
+The execution timeout may end a wait earlier. A positive wait requests bounded confirmation of the player's reported target
+state. This establishes reported state, not independent playback progress.
+MEDIA_POSTCONDITION_TIMEOUT retains dispatched=true. Expired sessions, unsupported
+controls and ambiguity return MEDIA_SESSION_EXPIRED, MEDIA_ACTION_UNSUPPORTED or
+MEDIA_SESSION_AMBIGUOUS. Never replay a mutation after uncertain transport.
+
+Seeking and notification buttons are not currently available.
+
+---
+
 # Doctor
 
 ## Purpose
@@ -5834,6 +5963,16 @@ Recommended doctor loop:
 - [Errors](errors.md)
 - [Operator App Troubleshooting](../troubleshooting/operator.md)
 - [Version Compatibility](../troubleshooting/compatibility.md)
+
+## Background observation readiness
+
+Use `clawperator doctor --capability background-observation` to verify notification
+and media queries without waking the display, dismissing keyguard, requiring
+accessibility, clearing logs or launching an app. The selected capability appears
+in JSON output. Failure returns a nonzero exit; an empty successful query is ready.
+This mode rejects --full and --fix before side effects. Default doctor (or explicit
+--capability interactive) retains interactive readiness requirements. An interactive
+doctor failure alone does not veto [background observations](notifications.md).
 
 ---
 
@@ -6473,6 +6612,14 @@ Only the codes defined in `apps/node/src/contracts/errors.ts` are part of the pu
 
 | Code | Derived label | Notes |
 | --- | --- | --- |
+| <a id="error-notification-access-denied"></a>`NOTIFICATION_ACCESS_DENIED` | Notification access denied | - |
+| <a id="error-notification-listener-disconnected"></a>`NOTIFICATION_LISTENER_DISCONNECTED` | Notification listener disconnected | - |
+| <a id="error-notification-query-failed"></a>`NOTIFICATION_QUERY_FAILED` | Notification query failed | - |
+| <a id="error-notification-service-unavailable"></a>`NOTIFICATION_SERVICE_UNAVAILABLE` | Notification service unavailable | - |
+| <a id="error-media-session-expired"></a>`MEDIA_SESSION_EXPIRED` | Media session expired | - |
+| <a id="error-media-session-ambiguous"></a>`MEDIA_SESSION_AMBIGUOUS` | Media session ambiguous | - |
+| <a id="error-media-action-unsupported"></a>`MEDIA_ACTION_UNSUPPORTED` | Media action unsupported | - |
+| <a id="error-media-postcondition-timeout"></a>`MEDIA_POSTCONDITION_TIMEOUT` | Media postcondition timeout | - |
 | <a id="error-ui-tree-unavailable"></a>`UI_TREE_UNAVAILABLE` | Ui tree unavailable | An action could not capture an application hierarchy. See failed-step diagnostics. |
 | <a id="error-snapshot-hierarchy-unavailable"></a>`SNAPSHOT_HIERARCHY_UNAVAILABLE` | Snapshot hierarchy unavailable | - |
 | <a id="error-wait-timeout"></a>`WAIT_TIMEOUT` | Wait timeout | - |

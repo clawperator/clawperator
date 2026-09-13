@@ -456,3 +456,8 @@ This API requirement applies to the flag, not to queries or XML capture.
 
 Applications can still have no accessible hierarchy. Sensitivity metadata does
 not change screenshot capture, redaction, or logging behavior.
+
+For screen-off notification/media observation, use
+`clawperator doctor --capability background-observation` after setup. The default
+interactive doctor can fail on a locked screen while these reads remain available.
+See [background readiness](api/doctor.md#background-observation-readiness).

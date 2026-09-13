@@ -97,6 +97,27 @@ class AgentCommandParserDefault : AgentCommandParser {
         }
 
         return when (normalizedType) {
+            "list_notifications", "list_media_sessions", "get_media_status", "media_pause", "media_play" -> {
+                require(type == normalizedType) { "Service action type must be canonical" }
+                val listing = type == "list_notifications" || type == "list_media_sessions"
+                val controlling = type == "media_pause" || type == "media_play"
+                val allowed = if (listing) setOf("applicationId", "limit", "maxTextChars")
+                    else if (controlling) setOf("applicationId", "mediaSessionId", "waitTimeoutMs")
+                    else setOf("applicationId", "mediaSessionId")
+                require(params.keys.all { it in allowed }) { "$type has unknown params" }
+                fun identifier(key: String, max: Int): String? = params.strictStringOrNull(key)?.also {
+                    require(it.isNotBlank() && it.length <= max) { "$key must be nonblank and at most $max characters" }
+                }
+                val app = identifier("applicationId", 512)
+                val session = identifier("mediaSessionId", 128)
+                require(listing || ((app != null) != (session != null))) { "Provide exactly one applicationId or mediaSessionId" }
+                val limit = params.strictIntOrDefault("limit", 25)
+                val textLimit = params.strictIntOrDefault("maxTextChars", 256)
+                val wait = params.strictLongOrDefault("waitTimeoutMs", 0)
+                require(limit in 1..100 && textLimit in 1..1024 && wait in 0..30000) { "Service action bounds exceeded" }
+                UiAction.NotificationMedia(id, type, app, session, limit, textLimit, wait)
+            }
+
             "open_uri" ->
                 UiAction.OpenUri(
                     id = id,

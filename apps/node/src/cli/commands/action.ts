@@ -1,3 +1,5 @@
+import { buildNotificationMediaExecution } from "../../domain/notifications/service.js";
+import type { NotificationMediaAction } from "../../contracts/notifications.js";
 import { runExecution } from "../../domain/executions/runExecution.js";
 import { buildClickExecution } from "../../domain/actions/click.js";
 import { buildReadExecution } from "../../domain/actions/read.js";
@@ -314,6 +316,14 @@ export async function cmdQuery(options: ActionCommandOptions & import("../../dom
     return await runActionExecution(buildQueryExecution({
       matcher: options.matcher, visibility: options.visibility, limit: options.limit,
     }, options.timeoutMs), options);
+  } catch (error) {
+    return formatError(error, options);
+  }
+}
+
+export async function cmdNotificationMedia(options: ActionCommandOptions & { type: NotificationMediaAction; params: ActionParams }): Promise<string> {
+  try {
+    return await runActionExecution(buildNotificationMediaExecution(options.type, options.params, options.timeoutMs), options);
   } catch (error) {
     return formatError(error, options);
   }
