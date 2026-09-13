@@ -30,8 +30,7 @@ state-transition evidence for regression tests. Ongoing notifications and group 
 indicates omitted items. An empty list with total zero is a successful snapshot.
 
 Action descriptors expose opaque actionId, title, requiresInput and
-requiresAuthentication. These describe buttons; invocation and dismissal are
-not currently available. Progress is the notification's generic value/max and
+requiresAuthentication. Use these handles for the button operation below. Progress is the notification's generic value/max and
 indeterminate flag, not a playback timestamp. Use [media status](media.md).
 
 Observation-only execution lists may contain list_notifications,
@@ -45,3 +44,61 @@ do not unlock it. An unsupported probe leaves platform/runtime failures authorit
 Errors include NOTIFICATION_ACCESS_DENIED, NOTIFICATION_LISTENER_DISCONNECTED,
 NOTIFICATION_QUERY_FAILED and NOTIFICATION_SERVICE_UNAVAILABLE. Inspect the
 failed step's errorCode; transport failures remain distinct.
+
+## Dismissal
+
+```sh
+clawperator notifications dismiss '<key>' --wait-timeout-ms 2000
+```
+
+`dismiss_notification` requires `notificationKey` (nonblank, at most 4096
+characters). Optional `waitTimeoutMs` is an integer from 0 to 30000, default 0.
+Android checks the current listener snapshot and clearability immediately before
+requesting cancellation. The schemaVersion 1 payload contains notificationKey,
+dispatched, removalObserved, waitTimeoutMs, observedElapsedMs and deviceState.
+
+`dispatched: true` means cancellation was requested. Only `removalObserved: true`
+means a subsequent active snapshot omitted the key. With a positive wait the
+service polls until removal or the deadline; a still-present notification returns
+success with removalObserved=false, including when Android refuses cancellation.
+It does not claim deletion. A re-posted notification with the same key may prevent
+confirmation. Observation failure after dispatch returns an error with dispatch
+receipt retained. A missing key returns NOTIFICATION_EXPIRED; a non-clearable
+notification returns NOTIFICATION_NOT_DISMISSIBLE before dispatch.
+
+## Notification buttons
+
+```sh
+clawperator notifications action '<key>' --action '<action-id>'
+```
+
+`invoke_notification_action` requires `notificationKey` and `actionId` (nonblank,
+at most 128 characters). Use the opaque actionId returned by a recent listing.
+The schemaVersion 1 payload contains notificationKey, actionId, dispatched,
+observedElapsedMs and deviceState. Dispatch does not confirm the application's
+side effect.
+
+The service validates the current key and notification revision, then sends the
+exact advertised PendingIntent once. Notification updates, removals, listener
+replacement/reconnection and Operator restart invalidate references. The process
+issues fresh opaque handles for each listing and retains at most 2000 advertised
+button handles; an evicted handle also requires a
+fresh listing. Unadvertised buttons, including truncated ones, cannot be invoked.
+No replacement button is selected after a race. Android can still change state
+between validation and dispatch.
+
+| Error | Meaning |
+| --- | --- |
+| NOTIFICATION_EXPIRED | The key is no longer active |
+| NOTIFICATION_ACTION_EXPIRED | The advertised revision/handle is no longer available or does not match |
+| NOTIFICATION_ACTION_CANCELLED | Android canceled the PendingIntent; dispatched=false |
+| NOTIFICATION_ACTION_INPUT_UNSUPPORTED | The button requires RemoteInput, including data-only input |
+| NOTIFICATION_ACTION_AUTHENTICATION_UNSUPPORTED | The button requires authentication on a platform that exposes this requirement |
+| NOTIFICATION_MEDIA_OPERATION_FAILED | A platform operation failed; inspect dispatched before deciding what to do next |
+
+Dismissal and buttons require interactive readiness and accessibility for the
+whole execution, including mixed read/mutation lists. They do not automatically
+authenticate. Both work through `runNotificationMedia`, HTTP `/execute` and generic
+MCP `execute` with the same canonical action parameters. All step data remains
+string-valued. Failures/cancellation retain dispatched and waitTimeoutMs when a
+step began; a missing transport receipt is uncertain and never triggers replay.

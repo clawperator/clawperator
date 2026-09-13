@@ -1289,7 +1289,7 @@ For failures, inspect:
 
 ## Notification and media actions
 
-See [notifications](notifications.md) for list_notifications and
-[media sessions](media.md) for list_media_sessions, get_media_status, media_pause
-and media_play. These share canonical execution and result correlation across CLI,
+See [notifications](notifications.md) for list_notifications, dismiss_notification and invoke_notification_action; see
+[media sessions](media.md) for list_media_sessions, get_media_status, media_pause,
+media_play and media_seek. These share canonical execution and result correlation across CLI,
 HTTP and MCP. Only observation-only lists bypass interactive readiness.

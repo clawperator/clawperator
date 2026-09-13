@@ -20,6 +20,7 @@ its `android.permission.POST_NOTIFICATIONS` on API 33+. Then run:
 
 ```sh
 python3 validation/notifications-media/run.py --device <device_serial> --output /tmp/notification-proof --secure-lock --controls
+python3 validation/notifications-media/mutations.py --device <device_serial> --output /tmp/notification-proof/mutations
 python3 validation/notifications-media/ingress-shade.py --device <device_serial> --output /tmp/notification-proof/ingress
 python3 validation/notifications-media/first-unlock.py --device <device_serial> --output /tmp/notification-proof/first-unlock
 ```
@@ -45,7 +46,8 @@ restarts only the fixture, so repeated runs do not require reinstallation.
 
 `ingress-shade.py` uses SystemUI's independent state dump to check an open shade.
 It directly exercises Android broadcast ingress with accessibility unavailable,
-proving mixed lists in both orders and UI-only lists fail without a partial prefix.
+proving mixed lists in both orders, each N2 mutation and UI-only lists fail without
+a partial prefix.
 `first-unlock.py` checks specific CLI/doctor/MCP errors before first unlock.
 Each script retains completed evidence on failure. Never infer actual playback
 from an extrapolated position or infer no transient wake from endpoint state alone.
@@ -55,3 +57,34 @@ manual (`workflow_dispatch`) and runs this live sequence. It is not a PR/push
 emulator job. Real browser compatibility is separate: `browser/index.html` uses
 native audio controls and displays HTMLAudioElement.currentTime. Serve it with a
 generated local `tone.wav`; it does not fabricate MediaSession reports.
+
+## Notification mutations and seeking
+
+Run `mutations.py` after `run.py`, sequentially on the selected emulator. It
+restarts the independent fixture using the generated media file, then proves
+notification/session discovery, status, pause, seek, play, button dispatch and
+dismissal. Actual MediaPlayer position, seek/button counters and the system's
+notification dump provide independent evidence. The script does not set a PIN or
+change accessibility; the lock harness removes its own temporary credential and
+restores its initial accessibility settings in `finally`.
+
+The N2 matrix covers removed/non-clearable keys, updated and restarted action
+handles, canceled PendingIntents, RemoteInput, authentication requirements on API
+31+, unsupported/ambiguous sessions, known/unknown/zero duration, ignored seeks,
+zero tolerance, execution timeout receipts, stale PLAYING reports and replacement
+during a seek wait. It runs the same mutations through typed helpers, HTTP and
+generic MCP, checking actual effects and structured stale-reference errors.
+
+The fixture's RemoteInput button uses a mutable explicit PendingIntent because
+Android rejects immutable RemoteInput notification actions. Other fixture buttons
+remain immutable. Replies are never sent. Actual seeks use SEEK_CLOSEST on API
+26+; older fixture platforms use their available seek operation and may round to
+keyframes. API 26 cannot expose the API 31 authentication-required flag, so that
+case is covered live on API 36. API 21 listener compatibility remains a release
+follow-up; offline API 21/28 tests do not satisfy it.
+
+Offline regressions run in normal Node/Android CI, including safe positions,
+whole-execution readiness, exact advertised-intent handles, canceled/input
+buttons, refused cancellations, seek cancellation and transport non-replay.
+The existing manual live workflow includes `mutations.py`; no automatic emulator
+job is added.
