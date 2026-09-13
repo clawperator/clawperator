@@ -914,6 +914,12 @@ clawperator click --id ":id/power_button"`}</code>
             <span className="dot" aria-hidden="true">
               ·
             </span>
+            <a href="https://github.com/clawperator/clawperator/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">
+              release notes
+            </a>
+            <span className="dot" aria-hidden="true">
+              ·
+            </span>
             <a href="https://github.com/clawperator/clawperator" target="_blank" rel="noreferrer">
               github
             </a>
