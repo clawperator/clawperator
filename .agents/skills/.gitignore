@@ -1,8 +1,6 @@
-# Local-only skill symlinks (global ~/.agents/skills/* links for pr-autoloop toolchain)
+# Local-only skill symlinks (global ~/.agents/skills/* links for PR maintenance)
 pr-create
 pr-feedback-digest
-pr-request-copilot-review
-pr-review-loop
 pr-squash-merge
 pr-triage-feedback
 
