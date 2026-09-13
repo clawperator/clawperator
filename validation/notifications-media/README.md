@@ -33,7 +33,9 @@ also restores the original accessibility settings.
 
 The basic run tests actual pause/play, 1x/2x reports, buffering and unknown
 positions, then freezes a PLAYING report while actual playback stops and resumes.
-It queries beyond the readiness-cache TTL with independent power-event counters.
+It verifies that temporary inactivity/reactivation preserves the session handle
+and original report, then queries beyond the readiness-cache TTL with independent
+power-event counters.
 HTTP and typed-helper results are compared with the fixture. `--secure-lock`
 adds CLI, background doctor and generic MCP reads, actually unbound accessibility,
 notification post/update/removal, permission revocation, reconnection and Operator

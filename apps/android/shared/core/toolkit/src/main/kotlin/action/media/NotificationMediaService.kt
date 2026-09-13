@@ -25,7 +25,7 @@ class NotificationMediaException(val code: String, message: String, val dispatch
 
 /** All handles and platform controller calls are owned by the main thread. */
 class NotificationMediaService(private val context: Context) {
-    private data class Session(val id: String, val controller: MediaController, var destroyed: Boolean = false, var callback: MediaController.Callback? = null, var reportedState: PlaybackState? = null, var hasPlayerReport: Boolean = false)
+    private data class Session(val id: String, val controller: MediaController, var destroyed: Boolean = false, var reportedState: PlaybackState? = null, var hasPlayerReport: Boolean = false)
     private val sessions = mutableMapOf<MediaSession.Token, Session>()
     private val destroyedTokens = mutableSetOf<MediaSession.Token>()
     private val sessionManager = context.getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
@@ -48,12 +48,8 @@ class NotificationMediaService(private val context: Context) {
         requireListener()
         val controllers = sessionManager.getActiveSessions(ComponentName(context, NotificationListenerService::class.java))
         val active = controllers.map { it.sessionToken }.toSet()
-        sessions.keys.filter { it !in active }.forEach { token ->
-            sessions.remove(token)?.let { removed ->
-                removed.destroyed = true
-                removed.callback?.let { removed.controller.unregisterCallback(it) }
-            }
-        }
+        // Inactive sessions still exist. Keep their handle and original reports until
+        // onSessionDestroyed, but only return/target tokens currently reported active.
         destroyedTokens.retainAll(active)
         return controllers.filter { it.sessionToken !in destroyedTokens }.map { controller ->
             sessions.getOrPut(controller.sessionToken) {
@@ -70,7 +66,6 @@ class NotificationMediaService(private val context: Context) {
                         controller.unregisterCallback(this)
                     }
                 }
-                session.callback = callback
                 controller.registerCallback(callback, Handler(Looper.getMainLooper()))
                 session
             }
@@ -88,7 +83,7 @@ class NotificationMediaService(private val context: Context) {
 
     private fun ensurePinned(session: Session, dispatched: Boolean = false) {
         if (session.destroyed || activeSessions().none { it === session }) {
-            throw NotificationMediaException("MEDIA_SESSION_EXPIRED", "Selected session ended; a replacement session was not selected.", dispatched)
+            throw NotificationMediaException("MEDIA_SESSION_EXPIRED", "Selected session is no longer active; a replacement session was not selected.", dispatched)
         }
     }
 

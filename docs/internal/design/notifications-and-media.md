@@ -64,9 +64,9 @@ locked/off and control proofs also passed on API 35. Temporary emulator PINs wer
 removed and accessibility settings restored; no personal credential was changed.
 
 Final debug Operator SHA-256:
-`f06c0a3b7a99ff4ebc5c8013394c1302c748144162daa18d2ff6c8e41523bf69`.
+`0d21564b4499485aedc007a4da6eb4c1cbc120359364d58950685518933c1811`.
 Independent fixture APK SHA-256:
-`0af5c8282c3dfef05ddaa14f7bef3d1ea82d928071d7b71718c3901aa11d23bc`.
+`fd4596a1a002dc060cb0ba878c200cf53b8d332871bc586f497be24e407de47b`.
 The standalone fixture survives Operator process death and records actual player
 position, screen/keyguard state, power-event counters and control dispatch counts.
 
@@ -132,3 +132,13 @@ regressions cover truncation and concurrent revision reads. The reviewer confirm
 all findings resolved with no new issues. Post-fix validation passed 20 focused
 Node tests, toolkit/operator Android tests and debug assembly, plus the complete
 locked/off lifecycle/control harness on the final API 36 APK above.
+
+A fresh independent review found that temporary session inactivity incorrectly
+removed its handle and original report. Records and callbacks now survive
+inactivity until actual destruction; only active sessions remain discoverable or
+targetable. The new regression failed on API 21/28 before the fix and passed
+afterward. The final API 36 fixture run above verified inactivity/reactivation
+preserves the handle, evidence kind, position and update timestamp, followed by
+the complete locked/off lifecycle/control sequence. The fresh reviewer confirmed
+the fix with no additional findings. Toolkit/operator unit tests and both debug
+APK builds passed.

@@ -107,6 +107,13 @@ def main():
             time.sleep(0.1)
         first = payload(cli('media', 'status', '--session', session_id))['session']
         assert first['evidence'] == 'player_report', first
+        control('inactive')
+        assert payload(cli('media', 'list', '--app', PACKAGE))['total'] == 0
+        cli('media', 'status', '--session', session_id, expected_error='MEDIA_SESSION_EXPIRED')
+        control('reactivate')
+        reactivated = payload(cli('media', 'status', '--session', session_id))['session']
+        for key in ['mediaSessionId', 'evidence', 'reportedPositionMs', 'positionUpdatedElapsedMs']:
+            assert reactivated[key] == first[key], (first, reactivated)
         actual = sample()
         adb('shell', 'input', 'keyevent', 'KEYCODE_SLEEP')
         time.sleep(1)

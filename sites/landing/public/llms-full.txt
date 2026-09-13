@@ -5351,7 +5351,10 @@ Discover active Android sessions before targeting one. `--app <package>` may
 replace `--session` only when it identifies exactly one session. No implicit
 selection of a recent or playing app occurs. Session handles expire when their
 session ends or the Operator restarts; a replacement from the same package does
-not inherit the handle. The selected controller is pinned throughout each action.
+not inherit the handle. Temporarily inactive sessions are omitted from discovery
+and cannot be targeted (`MEDIA_SESSION_EXPIRED`). Reactivating the same Android
+session restores its existing handle and retained original report. The selected
+controller is pinned throughout each action.
 
 List/status work while the display is off or keyguard locked without waking it.
 Pause/play retain normal interactive readiness. Notification access and a connected

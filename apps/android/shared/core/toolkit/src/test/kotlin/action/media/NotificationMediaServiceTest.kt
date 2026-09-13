@@ -160,4 +160,23 @@ class NotificationMediaServiceTest {
         }
     }
 
+    @Test fun temporaryInactivityPreservesHandleAndOriginalReport() = runTest {
+        val controller = controller("temporarily-inactive")
+        val id = query("list_media_sessions").getJSONArray("sessions").getJSONObject(0).getString("mediaSessionId")
+        shadowOf(controller).callbacks.single().onPlaybackStateChanged(
+            PlaybackState.Builder().setState(PlaybackState.STATE_PLAYING, 1200, 1f, 1).build(),
+        )
+        val manager = shadowOf(context.getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager)
+        manager.clearControllers()
+        assertEquals(0, query("list_media_sessions").getInt("total"))
+        assertEquals("MEDIA_SESSION_EXPIRED", assertFailsWith<NotificationMediaException> { query("get_media_status", id = id) }.code)
+        manager.addController(controller)
+        val resumed = query("get_media_status", id = id).getJSONObject("session")
+        assertEquals(id, resumed.getString("mediaSessionId"))
+        assertEquals("player_report", resumed.getString("evidence"))
+        assertEquals(1200L, resumed.getLong("reportedPositionMs"))
+        assertEquals(1L, resumed.getLong("positionUpdatedElapsedMs"))
+        assertEquals(1, shadowOf(controller).callbacks.size)
+    }
+
 }

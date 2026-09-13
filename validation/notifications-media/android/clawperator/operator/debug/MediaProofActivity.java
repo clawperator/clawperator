@@ -139,6 +139,8 @@ public class MediaProofActivity extends Activity {
             else if ("ignore".equals(operation) || "normal".equals(operation) || "replace-on-pause".equals(operation)) {
                 commandMode = "replace-on-pause".equals(operation) ? "replace" : operation;
             }
+            else if ("inactive".equals(operation)) { session.setActive(false); }
+            else if ("reactivate".equals(operation)) { session.setActive(true); }
             else if ("remove-second".equals(operation)) { if (second != null) second.release(); second = null; }
             else if ("stall".equals(operation)) { report(); publish = false; player.pause(); }
             else if ("unpublished-play".equals(operation)) { publish = false; player.start(); }
