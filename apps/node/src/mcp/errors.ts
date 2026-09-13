@@ -61,6 +61,12 @@ function sanitizeMcpErrorPayload(error: Record<string, unknown>): McpErrorPayloa
   if (typeof error.code === "string" && error.code.length > 0) {
     payload.code = error.code;
   }
+  // Evidence storage preflight deliberately exposes its destination and recovery action.
+  if (error.code === "EVIDENCE_STORAGE_UNWRITABLE") {
+    for (const field of ["path", "recovery", "causeCode"] as const) {
+      if (typeof error[field] === "string" || error[field] === null) payload[field] = error[field];
+    }
+  }
   if (typeof error.hint === "string" && error.hint.length > 0) {
     payload.hint = error.hint;
   }
