@@ -66,3 +66,24 @@ it("a stale owner cannot release a different nonce or session", async () => {
     }
   } finally { await fs.rm(root, { recursive: true, force: true }); }
 });
+
+
+it("POSIX ownership works without an OS account database entry", { skip: process.platform === "win32" }, () => {
+  const child = spawnSync(process.execPath, ["--input-type=module", "-e", `
+    import assert from "node:assert/strict";
+    import os from "node:os";
+    import fs from "node:fs/promises";
+    import { join } from "node:path";
+    import { syncBuiltinESMExports } from "node:module";
+    os.userInfo = () => { throw Object.assign(new Error("uv_os_get_passwd ENOENT"), { code: "ERR_SYSTEM_ERROR" }); };
+    syncBuiltinESMExports();
+    const { videoLockRoot, preflightDirectory } = await import("./dist/domain/evidence/storage.js");
+    assert.equal(videoLockRoot(), "/tmp/clawperator-evidence-locks-" + process.geteuid());
+    const root = await fs.mkdtemp(join(os.tmpdir(), "evidence-numeric-user-test-"));
+    try {
+      await preflightDirectory(root, true);
+      assert.deepEqual(await fs.readdir(root), []);
+    } finally { await fs.rm(root, { recursive: true, force: true }); }
+  `], { encoding: "utf8" });
+  assert.equal(child.status, 0, child.stderr);
+});

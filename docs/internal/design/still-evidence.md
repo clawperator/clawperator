@@ -110,9 +110,10 @@ Video ownership uses exclusive file creation in a fixed per-OS-user directory,
 independent of home/environment overrides and the chosen bundle root. On POSIX
 this is `/tmp/clawperator-evidence-locks-<uid>`; Windows uses the OS account's
 `AppData/Local/Temp/clawperator-evidence-locks`, derived from `os.userInfo()`.
-POSIX rejects symlinks, foreign owners and group/other permissions on that
-directory. The directory is not automatically removed or relocated. Its device
-serial hash keys a nonce/session/absolute-output record. Two starts racing from
+POSIX derives ownership directly from the process effective numeric UID, so
+container users do not need an account database entry. It rejects symlinks,
+foreign owners and group/other permissions on that directory. The directory is
+not automatically removed or relocated. Its device serial hash keys a nonce/session/absolute-output record. Two starts racing from
 different roots still arbitrate the same exclusive creation. Workers retain
 the existing nonce, heartbeat and remote process identity checks. Neither age
 nor a stale heartbeat permits takeover, deletion, or a signal to a saved host

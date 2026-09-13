@@ -14,10 +14,9 @@ export function evidenceRoot(dependencies: { baseDir?: string } = {}): string {
 
 /** Never derive ownership from HOME, TMPDIR, TEMP, or the selected evidence root. */
 export function videoLockRoot(): string {
-  const user = userInfo();
   return process.platform === "win32"
-    ? join(user.homedir, "AppData", "Local", "Temp", "clawperator-evidence-locks")
-    : `/tmp/clawperator-evidence-locks-${user.uid}`;
+    ? join(userInfo().homedir, "AppData", "Local", "Temp", "clawperator-evidence-locks")
+    : `/tmp/clawperator-evidence-locks-${process.geteuid!()}`;
 }
 
 export function storageError(error: unknown, path: string): never {
@@ -38,7 +37,7 @@ export async function preflightDirectory(path: string, privateLockDirectory = fa
     await fs.mkdir(path, { recursive: true, mode: 0o700 });
     if (privateLockDirectory) {
       const stat = await fs.lstat(path);
-      if (!stat.isDirectory() || (process.platform !== "win32" && (stat.uid !== userInfo().uid || (stat.mode & 0o077) !== 0))) {
+      if (!stat.isDirectory() || (process.platform !== "win32" && (stat.uid !== process.geteuid!() || (stat.mode & 0o077) !== 0))) {
         throw new Error("Video lock directory must be a real, private directory owned by the current user");
       }
     }
