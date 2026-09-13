@@ -275,3 +275,36 @@ A confirmation is a player report, not independent evidence of playback progress
 or PiP persistence. Authentication/replies, Direct Boot service operation,
 restricted profiles, arbitrary OEM/Doze behavior and downstream PiP-window
 assertions remain outside N2.
+
+
+## Physical YouTube locked-control limitation
+
+A subsequent 2026-09-13 test used the local 0.11.0 CLI and matching 0.11.0-d
+Operator on a physical API 37 device. open_uri launched the supplied YouTube
+video in com.google.android.youtube. Media discovery found one session advertising
+play/pause/seek, and an unlocked media_play dispatched successfully with the
+player reporting playing.
+
+After the user locked the phone, status reads succeeded with screenOn=false and
+deviceLocked=true. The user independently confirmed audible playback. With the
+user then lighting the lock screen without unlocking, media_pause and media_play
+against that same session both exited 1 with DEVICE_NOT_INTERACTIVE before media
+dispatch. The current readiness predicate requires screenOn, !deviceLocked and
+userUnlocked. Screen-off interactive commands can additionally attempt wake
+fallbacks; this test avoided those fallbacks rather than treating a wake or unlock
+as successful locked control.
+
+All 16 independent keyguard samples across approximately 5.5 seconds showed the
+lock screen active during the attempts. Android's YouTube AudioTrack was started
+before and after, supporting continued playback. Sampling cannot exclude every
+sub-sample transition. The original player position remained 17890 ms with its
+unchanged callback timestamp; advancing estimates were not counted as playback
+progress. Neither pause nor resume effects were proven because both requests
+were rejected. No unlock command was sent.
+
+This exposes a product limitation intentionally retained by N2, not evidence that
+Android or YouTube lacks locked media control. A dedicated N3 will change the
+Node and Android readiness classification for media controls while preserving
+interactive readiness for notification mutations and UI-containing executions.
+N3 must separately prove non-waking locked/off dispatch and actual player effects;
+this finding does not claim that behavior has been implemented.

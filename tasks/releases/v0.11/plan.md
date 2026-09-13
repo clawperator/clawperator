@@ -9,7 +9,7 @@ completion or trigger publication merely by existing.
 
 Status: N1 merged as 45d9667a821379a2385137d788a7eb4f13986c7b (PR #302).
 N2 is implemented and validated locally in bf85701e, ready for one feature PR;
-its merge and V1-V3 release execution remain pending. Current main already has code version 0.11.0 from 917d5a83.
+its merge, N3 locked-media controls and V1-V3 release execution remain pending. Current main already has code version 0.11.0 from 917d5a83.
 Reconcile main, release tags and published state during release preparation.
 Live N1 coverage is API 26/35/36; API 21/28 service tests are offline. V1 must provision a live API 21 image and verify listener binding, reads and
 pause/play with the matching build, or obtain an explicit release-scope
@@ -22,19 +22,23 @@ Reproduction: [independent fixture](../../../validation/notifications-media/READ
 The completed notifications task pack is retired on the N2 implementation branch;
 that cleanup does not claim the feature PR is merged.
 
+N3 requirements: [locked media controls](../../locked-media-controls/plan.md), with
+[execution and acceptance](../../locked-media-controls/work-breakdown.md).
+
 ## Grouped delivery
 
 | Stage | Scope / PR | Dependency | Status |
 | --- | --- | --- | --- |
 | N1 | Fresh notification reads; media discovery/status/pause/play; Android + Node + CLI/HTTP execution + tests + docs | Current main | [DONE] Merged in PR #302 (45d9667a) |
 | N2 | Notification dismiss/buttons; media seek; matching tests/docs and integrated live acceptance | Merged N1 service boundary/contracts | [DONE] Local implementation and API 26/36 acceptance in bf85701e; PR merge pending |
-| V1 | Release preparation PR: reconcile existing 0.11.0 code, release notes, release-package/final acceptance evidence and task cleanup | N1/N2 merged | [TODO] |
+| N3 | Non-waking locked/off media pause/play/seek; physical YouTube and independent fixture evidence | N2 contracts; merge N2 before N3 | [TODO] Dedicated follow-up feature PR |
+| V1 | Release preparation PR: reconcile existing 0.11.0 code, release notes, release-package/final acceptance evidence and task cleanup | N1/N2/N3 merged | [TODO] |
 | V2 | Tag/publish 0.11.0 and verify distribution | V1 merged and inherited release gates resolved | [TODO] |
 | V3 | Post-publication follow-up PR: public version surfaces and next unreleased code version, in separate logical commits | Successful V2 verification | [TODO] |
 
-Bias toward these two feature PRs plus the required release lifecycle changes.
+Bias toward these three feature PRs plus the required release lifecycle changes.
 Do not create separate infrastructure, platform, CLI, documentation or test PRs
-for components of N1/N2. Keep V1-V3 separate from the N2 feature batch and do not
+for components of N1/N2/N3. Keep V1-V3 separate from the N2 feature batch and do not
 duplicate completed version bumps or feature acceptance.
 N1 alone unblocks downstream screen-off/PiP observation work; N2 is not a
 prerequisite for those consumers. Player-reported state and estimated position do
@@ -46,15 +50,20 @@ repeat the completed bump or change published-version claims during feature work
 
 ## Release acceptance
 
-- N1/N2 complete their declared offline and live evidence. Re-run combined checks
+- N1/N2/N3 complete their declared offline and live evidence. Re-run combined checks
   only when needed to verify the final integrated source/build, not as a ritual.
 - Preserve the [validated background readiness behavior](../../../docs/internal/design/notifications-and-media.md#service-boundary-and-readiness), including a cold/expired
   interactive cache, absent accessibility and listener recovery. Background doctor
   reports its own capability with correct exits and no UI/remediation side effects;
   default interactive doctor semantics remain intact.
 - Screen-off/locked notification/media reads meet the observation-only readiness
-  contract without UI side effects. Mixed/UI lists retain existing readiness;
+  contract without UI side effects. N3 extends the non-waking service path to
+  media-only and mixed read/media-control lists. Lists containing UI actions or
+  notification mutations retain whole-execution interactive readiness;
   stale player reports and session replacement races have explicit evidence.
+- N3 proves actual physical YouTube pause/resume against one session while
+  locked, plus fixture pause/seek/play while locked/off without wake or unlock.
+  Keep dispatch, player reports and independent effects separate.
 - Offline tests run automatically; live emulator proof uses an explicit/manual
   workflow, not an every-PR/push emulator job. Retain its result as release evidence.
 - Generic MCP execute preserves the same action payloads and structured errors as
