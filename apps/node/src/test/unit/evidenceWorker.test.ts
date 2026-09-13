@@ -41,7 +41,7 @@ else if(action.startsWith('shell rm ')) fs.unlinkSync(path.join(root,'media'));
 else {console.error('Unexpected fake adb operation: '+action);process.exit(1)}
 `);
   await binary("ffprobe", "console.log(JSON.stringify({streams:[{codec_name:'h264',width:720,height:1280,duration:'0.25'}]}));");
-  await binary("ffmpeg", "console.log('0, 0, 0, 1, 1024, d41d8cd98f00b204e9800998ecf8427e');");
+  await binary("ffmpeg", "console.log('frame=6\\nprogress=end\\n');");
   const parent = join(root, "start.mjs");
   await fs.writeFile(parent, `import {startVideo} from ${JSON.stringify(pathToFileURL(resolve("dist/domain/evidence/video.js")).href)};console.log(JSON.stringify(await startVideo({deviceId:'test-device',operatorPackage:'com.example.operator',durationSeconds:10},{baseDir:process.argv[2]})));`);
   const env = { ...process.env, ADB_PATH: adb, PATH: root + ":" + process.env.PATH };

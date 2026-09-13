@@ -4930,8 +4930,26 @@ failure. Stop reasons are `requested`, `duration_cap`,
 `startup_failure`, or `failure` (null while recording).
 
 The worker pulls `video.partial.mp4`, probes codec, dimensions and positive media
-duration, and decodes a frame with ffmpeg. Pull, probe, and decode each have a
-10-second hard subprocess deadline. Only verified media becomes `video.mp4`.
+duration, and fully decodes the first video stream with ffmpeg through its final
+frame. Verification requires a successful end-of-stream report with at least one
+frame and no error diagnostics. Later corruption cannot pass on the strength of
+an opening frame. Source timing is preserved for variable-frame-rate recordings;
+verification does not resample the video or compare media time with host time.
+Pull and probe each have a 10-second hard deadline; full decoding has a 120-second
+hard deadline. Decoding uses two decoder threads, one output thread, a 256 MiB
+single-allocation limit, and a null output so decoded frames are not buffered by
+Node or saved. Each video subprocess has a combined 16 MiB diagnostic/output
+limit; exceeding a deadline or output limit kills that subprocess and fails
+verification. The allocation limit is not a total process-memory limit.
+Only verified media becomes `video.mp4`.
+
+Stop still waits at most 15 seconds. A pending `COMMAND_TIMEOUT` can therefore
+precede successful finalization; use status or repeat stop for the same session.
+The worker keeps its heartbeat and ownership through final persistence and never
+recaptures after verification failure. Default sizes (long edge at most 1280) and
+explicit 1920x1080 were exercised at 180 seconds and 60 fps. Larger sizes, higher
+frame rates, other codecs, and slower hosts are not guaranteed to meet the fixed
+decode budget; they fail verification if they exceed it.
 Failed verification retains partial bytes and errors. `encoder.stderr.txt` and
 `captures.json` retain encoder diagnostics and the host recorder receipt; neither
 is an invented Operator result. An empty stderr artifact is valid and hashed. Stderr retention is capped at
