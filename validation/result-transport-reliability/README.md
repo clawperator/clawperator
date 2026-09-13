@@ -51,7 +51,8 @@ The Internet fixture is prepared using `android.settings.WIFI_SETTINGS`, then
 verified through the full query's heading, sensitive root and Wi-Fi switch.
 This focused transport check does not replace the hierarchy regression or its
 homepage preparation and scrolling assertions. Run the combined hierarchy
-harness after R11/R12 integration before declaring release readiness.
+[harness](../sensitive-hierarchy-access/README.md) with the integrated homepage
+preparation and scroll handling before declaring release readiness.
 
 Offline tests are included in `validation/test_all.sh --suite
 validation`. Live runs are explicit only. See the [causal findings and recorded

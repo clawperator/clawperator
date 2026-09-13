@@ -16,5 +16,5 @@ probe metadata, caller verdict, hashes, ownership release, and repeated stop.
 
 An optional `VIDEO_FIXTURE_OUTPUT` environment variable names an existing local
 directory in which to retain the small valid/corrupt/VFR fixtures. Do not commit
-media or private live evidence. See the [design](../../docs/internal/design/managed-video.md#full-stream-verification-r14)
+media or private live evidence. See the [design](../../docs/internal/design/managed-video.md#full-stream-verification)
 for resource limits and live validation findings.

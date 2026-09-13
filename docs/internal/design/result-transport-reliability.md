@@ -65,7 +65,7 @@ uses the branch-local 0.10.0 CLI, API-35 arm64 Google APIs Android 15 image,
 English en-US, and fingerprint
 `google/sdk_gphone64_arm64/emu64a:15/AE3A.240806.036/12592187:user/release-keys`.
 Only the selected Operator service was enabled. Builds started from `e1aadca2`
-plus the R13 implementation committed as `cd3e979`. Private metadata records the exact built JavaScript hashes,
+plus the transport implementation committed as `cd3e979`. Private metadata records the exact built JavaScript hashes,
 APK hashes, package metadata, command/task IDs, every output size and duration,
 and bounded raw logcat evidence. No personal device identifiers are committed.
 
@@ -95,7 +95,8 @@ uncertainty semantics, not their original live root causes. Those causal limits,
 the debug startup failure and the finite sample prevent claiming a completely
 resolved reliability gate or a zero-flake transport.
 
-R11/R12 were not integrated for the original series above. The combined hierarchy
+Scroll eligibility and homepage preparation repairs were not integrated for
+the original series above. The combined hierarchy
 regression and manual CI release gate were outstanding at that point; this focused fixture deliberately
 uses the Settings Internet intent and does not waive homepage/scroll assertions.
 No runtime skill contract changed, and no sibling skill migration is required.
@@ -133,7 +134,7 @@ the controlled unit tests. The release variant was not rerun for this follow-up.
 ### Integration with main for PR review
 
 Merged `origin/main` at `28b8b1fa` into the branch containing the reviewed
-background-publication fix `be5f85ac`. This brings R7, R11 and R12 together.
+background-publication fix `be5f85ac`. This integrated compact snapshots, scroll eligibility and homepage preparation.
 The integrated code passed 1,496 Node tests, 463 Android unit tests, both APK
 builds, repository validation and the docs build.
 
@@ -154,7 +155,7 @@ Integrated APK SHA-256 values:
 - Release: `dfd1f5f2aaf1b3b356f260d4f252345977a3f985c36c9127f1944a083c6f0699`.
 
 
-### Completed local R11/R12/R13 integration
+### Completed local hierarchy and transport integration
 
 The final integrated harness at `306b38d` passed all six debug/release
 fresh/subpage/search runs on API 35, including query/MCP/XML parity, PNG and
@@ -169,13 +170,13 @@ then verifies a healthy selected binding and nonempty query. The earlier release
 failure after the readiness fix was retained and diagnosed as unusable service
 binding state; the interrupted transport series was not presented as a pass.
 
-The [full acceptance record](../../../validation/sensitive-hierarchy-access/README.md#integrated-r11r12r13-acceptance)
+The [full acceptance record](../../../validation/sensitive-hierarchy-access/README.md#integrated-hierarchy-and-transport-acceptance)
 preserves all final cases, earlier failures, setup observations, source and APK
 hashes. This resolves the local combined-harness gap described above. The manual
 supported-image CI release gate and historical causal limits remain explicit;
 a finite series does not prove failure-free transport under every condition.
 
-## PR-2 recurring reader exit investigation
+## Recurring reader exit investigation
 
 The independent audit at `6367227a` retained a debug Internet parity query with
 `RESULT_TRANSPORT_EXITED`, exit 255, empty stderr, a sent broadcast and a
@@ -183,8 +184,8 @@ correlated Android command-start event, but no received chunks. Its later fixed
 series passed 60/60 commands on each variant. Both observations remain valid;
 the passing series does not close the causal reliability gate.
 
-PR-2 starts from main at `8d398706`, including PR-1 and the integrated hierarchy
-setup repairs. Inspection separates these mechanisms:
+The recurring-exit investigation started at `8d398706`, including the initial
+transport and integrated hierarchy setup repairs. Inspection separated these mechanisms:
 
 - `NodeProcessRunner.spawn` has no generic process timeout. Reader timeout and
   cancellation settle before killing their child, preserving their specific
@@ -232,7 +233,7 @@ mutation despite an uncertain outcome. Read-only query failures remain recorded
 and are never replaced with successful retries. Offline tests cover both paths;
 `summary.json` records failures, unrun counts and independent-reader exit state.
 
-### PR-2 bounded live results
+### Reader-exit repair bounded live results
 
 On 13 September 2026 the baseline debug full hierarchy fixture passed once
 before the repair. The repaired source was committed as
@@ -268,7 +269,7 @@ The fixed-series harness also kept its existing per-attempt independent tails.
 All independent readers were alive before intentional cleanup. The observed
 logd, adbd and selected Operator process identities were unchanged across each
 run. No live transport failure or service failure occurred in these declared
-PR-2 attempts. Instrumentation may affect timing; these observations do not
+reader-exit repair attempts. Instrumentation may affect timing; these observations do not
 prove that an unobserved short interruption is impossible.
 
 Locally built APK SHA-256:
@@ -285,7 +286,7 @@ invocation/setup failures were retained separately from completed validations.
 
 ### Remaining causal blocker
 
-The bounded PR-2 investigation and safety repairs are complete, but the recurring
+The bounded reader-exit investigation and safety repairs are complete, but the recurring
 post-dispatch exit-255 cause remains unresolved. None of the new live attempts
 reproduced that failure, so there is no failing shell-protocol trace to compare
 with independent device logging and process state. The audit's command-start
@@ -295,16 +296,13 @@ causal limits; integrity checks and pacing were not weakened or changed.
 
 Further causal closure needs a fresh failing attempt with host shell-protocol
 completion/disconnect evidence and simultaneous independent device/process
-observations, without redispatching an uncertain mutation. Keep the R13 pack
-active and the causal reliability gate open. The manually dispatched supported
-CI image remains a separate release prerequisite; these local passes do not
-satisfy it. No automatic emulator workflow, R14 implementation or release publication
-is added by PR-2. Subsequent user-authorized review and PR preparation are
-recorded below.
+observations, without redispatching an uncertain mutation. The causal reliability
+gate remains open. The manually dispatched supported CI image remains a separate
+release prerequisite; these local passes do not satisfy it.
 
 ### Review repair: bounded draining after exit
 
-The delegated code review found a pre-dispatch hang in the initial PR-2 guard:
+The delegated code review found a pre-dispatch hang in the initial exit guard:
 if another process retained the exited reader's output pipes, dispatch was
 blocked but no result timer had started. With a 20 ms configured timeout, a
 controlled reader stayed pending beyond 100 ms until a synthetic close arrived.
@@ -327,9 +325,8 @@ extending the configured deadline or claiming a cause for the live audit exit.
 The drain repair was committed in `308d42eb`. A fresh independent sub-agent
 review of committed `21c58729` against main `0b571d76` found no actionable
 issues and passed 25 reader/transport tests plus four harness checks. This
-clean review was a required gate before opening the PR. The branch incorporates
-the latest upstream Android overlay-permission and video-verification changes;
-no new R14 implementation belongs to this branch's diff.
+clean review covered integration with the Android overlay-permission and
+video-verification changes.
 
 The integrated build passed all 1,565 Node tests and repository validation,
 including the full-stream media fixtures from upstream. Matching debug/release
@@ -380,8 +377,7 @@ Final matching APK SHA-256:
 The clean code review supports these bounded lifecycle repairs. The historical
 post-dispatch exit cause, these retained fixture failures, and the manual
 supported-image CI prerequisite prevent claiming complete reliability or release
-acceptance. PR creation is authorized; release publication is not part of this
-work.
+acceptance.
 
 ### Follow-up: controlled connection interruption and evidence repair
 
@@ -427,7 +423,7 @@ Dispatch, deadlines, terminal authority and integrity checks are unchanged.
 
 The manual series now reports canonical-envelope delivery independently of
 Android action, host-exit and fixture verdicts. Reclassification of the saved
-PR-2 failures correctly counted the debug `UI_TREE_UNAVAILABLE` and release
+reader-exit investigation failures correctly counted the debug `UI_TREE_UNAVAILABLE` and release
 loading-screen capture as delivered envelopes, with action and fixture failures
 respectively. A no-envelope outcome remains `host_or_transport`, requiring the
 original diagnostics to distinguish host/preflight errors from transport loss.
@@ -523,3 +519,19 @@ result record before that marker arrives, so use the independent observer or
 bounded device-buffer capture when checking publication completion. These
 markers share logcat's loss characteristics; missing markers are inconclusive.
 The historical cause and manual supported-image release gate remain open.
+
+
+### Diagnostic verification and current release limits
+
+The diagnostic work merged in `b7ff0695` (PR #290). Validation passed all 1,571
+Node tests, 59 app/Operator Android unit tests, both APK builds and documentation
+route checks. Each matching debug/release
+API-35 series ran once and passed 60/60 delivery and fixture checks. Separate
+controlled reader disconnects retained exit 255 before host cleanup, while an
+independent stream validated successful canonical publication and both markers.
+The final release capture also verified persistence at the default log level
+and preservation of timeline metadata through MCP redaction. An initial Android
+test assertion about coroutine exception object identity failed; it was corrected
+to check propagated type/message, and the failed attempt remains in private
+accounting. No natural recurrence was captured, and no causal or release gate
+is closed by these checks.

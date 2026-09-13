@@ -186,7 +186,7 @@ describe("parseTerminalEnvelope", () => {
 });
 
 for (const errorCode of ["WAIT_TIMEOUT", "ACTION_FAILED", "UI_TREE_UNAVAILABLE", "COMMAND_TIMEOUT"]) {
-  it(`preserves R6 ${errorCode} evidence and string-valued receipts through parser and CLI output`, async () => {
+  it(`preserves ${errorCode} action evidence and string-valued receipts through parser and CLI output`, async () => {
     const { formatRunExecutionResultForCli } = await import("../../cli/output.js");
     const { shouldCliStdoutForceExitCode1 } = await import("../../cli/stdoutExitCode.js");
     const envelope: import("../../contracts/result.js").ResultEnvelope = {

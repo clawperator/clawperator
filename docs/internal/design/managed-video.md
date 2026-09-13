@@ -140,10 +140,11 @@ passed independent artifact hash/byte-count checks. The test explicitly cleared
 its own panel afterward. The documentation build also passed.
 
 
-## Full-stream verification (R14)
+## Full-stream verification
 
-R9 merged in PR #285 (`6fc6c191`); its opening-frame checksum could accept a
-recording damaged later in the stream. R14 replaces that check with full ffmpeg
+The initial managed-video implementation in `6fc6c191` used an opening-frame
+checksum that could accept a recording damaged later in the stream. Full-stream
+verification replaces that check with full ffmpeg
 decoding to a null output. `-map 0:v:0` matches the probed stream, `-xerror` and
 `-err_detect explode` make decoding damage fatal, and error-level stderr is also
 rejected even if the process returns zero. A final `progress=end` report must
@@ -188,7 +189,7 @@ guarantee arbitrary dimensions, higher frame rates, other codecs, or slower host
 The requested size contract is unchanged and budget overruns remain partial.
 
 
-Live R14 validation used only the assigned Android 16 / API 36 emulator, CLI
+Live full-stream validation used only the assigned Android 16 / API 36 emulator, CLI
 0.10.0, and the matching locally built debug Operator 0.10.0-d. The recording
 reached its 60-second cap and finalized complete at 576x1280 with 60,571.956 ms
 of probed media duration and approximately 60,287.6 ms of host duration. An
@@ -207,10 +208,10 @@ single recording above ran. No shared ADB-server operations or other devices
 were used. Private media, snapshots, action failures, and decoder output remain
 outside Git.
 
-Final R14 validation passed all 1,554 Node tests with no skips, the complete
+Final full-stream validation passed all 1,554 Node tests with no skips, the complete
 validation suite (including real-codec fixtures), the matching debug APK build,
 and the documentation build (32 navigation pages and 394 generated-doc links,
 no organization warnings). An initial Node test invocation overlapped a validation
 build that replaced `dist/`; it was discarded, then the full suite passed after
-the build completed. The separate R13 and manual supported-image release gates
+the build completed. The separate transport-reliability and manual supported-image release gates
 are unchanged; media verification does not establish result-transport readiness.

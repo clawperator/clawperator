@@ -73,7 +73,7 @@ Acceptance completed on the implementation branch:
 | Screenshot with unavailable hierarchy | Independent failure PNG decoded successfully |
 | Packaged declaration and manifest binding | Both intended APKs passed; false-declaration APK was rejected |
 | Android build and unit tests | Both variants built and all `testDebugUnitTest` tasks passed with shared Robolectric 4.11.1 |
-| Node build and standard tests | 306 tests passed; the default command does not discover every test file |
+| Node build and standard tests | 306 tests passed with the then-current limited discovery |
 | Focused query/MCP tests | 94 tests passed, including sensitivity transport and older-payload compatibility |
 | Offline harness fixtures | Five tests passed for hierarchy/state/XML failures and old-payload handling |
 | Authored docs | Full docs build and route validation passed |
@@ -99,11 +99,12 @@ checks. It has no PR or push trigger; local validation does not claim a remote
 CI result. No runtime skill consumes a strict NodeSummary schema requiring a
 migration for this additive field.
 
-## Deferred validation and transport work
+## Test discovery and remaining MCP transport work
 
-The [repository test runner follow-up](test-execution.md) owns test consolidation
-and the shell-dependent Node discovery gap. R10's focused query/MCP checks were
-run explicitly; its acceptance does not establish coverage of every Node test.
+The [repository test runner](test-execution.md), merged in `39352855`, recursively
+discovers every built Node test file without shell glob expansion. The focused
+query/MCP checks above were run explicitly before that consolidation; their
+historical counts describe only those checks.
 
 The MCP transport sanitizer removes path-named fields, including `nodePath` and
 `parentPath`, from the parsed query object. The serialized query inside the raw

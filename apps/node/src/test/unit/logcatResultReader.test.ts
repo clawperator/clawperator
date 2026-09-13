@@ -48,7 +48,7 @@ for (const [label, script, exitCode, signal] of [
 
 it("classifies real spawn failure without dispatch", async () => {
   const runtime = config();
-  runtime.runner = { ...runtime.runner, spawn: () => spawn("/nonexistent/r13-adb", []) };
+  runtime.runner = { ...runtime.runner, spawn: () => spawn("/nonexistent/result-reader-adb", []) };
   let dispatches = 0;
   const result = await waitForResultEnvelope(runtime, { ...options, broadcastDelayMs: 100 }, async () => {
     dispatches++; return { success: true };
