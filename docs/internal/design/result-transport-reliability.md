@@ -213,9 +213,9 @@ the original reader: a deferred preflight dispatched in this interval, and the
 startup timer could start a new broadcast after exit.
 
 The reader now marks process death on `exit`. Both broadcast startup and the
-dispatch boundary refuse new work from that point. It still drains pipes until
-`close`, so late stderr, a complete already dispatched terminal result, and
-specific integrity errors retain their authority. A rejected deferred callback
+dispatch boundary refuse new work from that point. It drains pipes until
+`close` or the configured wait deadline, so late stderr, a complete already
+dispatched terminal result, and specific integrity errors retain their authority. A rejected deferred callback
 does not replace the reader's exit failure with `BROADCAST_FAILED`. Controlled
 real-process and event-order tests cover the race; execution/SSE coverage checks
 zero dispatch, correlation and no invented terminal envelope.
@@ -299,3 +299,23 @@ active and the causal reliability gate open. The manually dispatched supported
 CI image remains a separate release prerequisite; these local passes do not
 satisfy it. No automatic emulator workflow, R14 implementation, push, merge or
 publication is part of PR-2.
+
+### Review repair: bounded draining after exit
+
+The delegated code review found a pre-dispatch hang in the initial PR-2 guard:
+if another process retained the exited reader's output pipes, dispatch was
+blocked but no result timer had started. With a 20 ms configured timeout, a
+controlled reader stayed pending beyond 100 ms until a synthetic close arrived.
+
+Exit now starts the configured result-wait budget if dispatch has not started
+it already. An existing dispatch deadline is preserved. At that deadline the
+reader drains the final buffered line, accepts a complete validated terminal
+result or specific malformed framing failure, or returns `RESULT_TRANSPORT_EXITED`
+with the observed exit code/signal and `outputDrainIncomplete: true`. Cleanup
+closes both host output handles so retained writers cannot keep the CLI alive.
+No mutation is dispatched or replayed during this drain.
+
+Regression coverage exercises startup, deferred preflight and post-dispatch
+exit without pipe closure, retained stderr/signal, stream cleanup, final buffered
+success and malformed framing. This bounds the demonstrated hang without
+extending the configured deadline or claiming a cause for the live audit exit.

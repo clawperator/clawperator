@@ -242,6 +242,10 @@ Android acknowledged or completed the action. A reader that dies during
 preflight prevents the deferred broadcast from dispatching, including the interval
 between process exit and output-pipe closure. Already dispatched output is drained
 before classifying closure; a complete validated result remains authoritative.
+Draining keeps the existing result deadline, or starts the configured wait budget
+at exit if dispatch never began. If output pipes remain open at that deadline,
+`RESULT_TRANSPORT_EXITED` includes `outputDrainIncomplete: true`, the observed
+exit status and collected diagnostics; the host closes its remaining pipe handles.
 
 Process failures include `exitCode` and `signal` when known, or
 `processErrorCode` and `originalMessage` for spawn errors. Diagnostics retain a

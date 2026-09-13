@@ -224,3 +224,61 @@ it("preserves an independent broadcast error while exited pipes are draining", a
   assert.equal(result.diagnostics.code, "BROADCAST_FAILED");
   assert.match(result.diagnostics.message, /broadcast connection failed/);
 });
+
+for (const phase of ["startup", "deferred-preflight", "after-dispatch"]) {
+  it(`bounds inherited output pipes after exit during ${phase}`, { timeout: 1000 }, async () => {
+    const f = fake();
+    let dispatches = 0;
+    const waiting = waitForResultEnvelope(f.runtime, { ...options, timeoutMs: 20 }, async begin => {
+      if (phase === "deferred-preflight") f.proc.emit("exit", 255, null);
+      begin();
+      dispatches++;
+      f.proc.emit("exit", 255, null);
+      f.stderr.write("last reader diagnostic");
+      return { success: true };
+    });
+    if (phase === "startup") f.proc.emit("exit", 255, null);
+    const result = await waiting;
+    assert.ok(!result.ok && "error" in result);
+    assert.equal(result.code, "RESULT_TRANSPORT_EXITED");
+    assert.equal(result.diagnostics?.exitCode, 255);
+    assert.equal(result.diagnostics?.signal, null);
+    assert.equal(result.diagnostics?.outputDrainIncomplete, true);
+    assert.equal(result.diagnostics?.dispatchAttempted, phase === "after-dispatch");
+    assert.equal(dispatches, phase === "after-dispatch" ? 1 : 0);
+    if (phase === "after-dispatch") assert.equal(result.diagnostics?.stderr, "last reader diagnostic");
+    assert.equal(f.stdout.destroyed, true);
+    assert.equal(f.stderr.destroyed, true);
+    assert.equal(f.kills(), 1);
+  });
+}
+
+it("accepts a complete buffered result at the exit-drain deadline", { timeout: 1000 }, async () => {
+  const f = fake();
+  const result = await waitForResultEnvelope(f.runtime, { ...options, timeoutMs: 20 }, async begin => {
+    begin();
+    f.proc.emit("exit", null, "SIGTERM");
+    f.stdout.write(terminal);
+    return { success: true };
+  });
+  assert.ok(result.ok);
+  assert.equal(f.stdout.destroyed, true);
+  assert.equal(f.stderr.destroyed, true);
+});
+
+it("preserves a signal and rejected framing at the exit-drain deadline", { timeout: 1000 }, async () => {
+  for (const malformed of [false, true]) {
+    const f = fake();
+    const result = await waitForResultEnvelope(f.runtime, { ...options, timeoutMs: 20 }, async begin => {
+      begin();
+      f.proc.emit("exit", null, "SIGTERM");
+      if (malformed) f.stdout.write('[Clawperator-Result-Chunk] {"commandId":"transport-command","index":1}');
+      return { success: true };
+    });
+    assert.ok(!result.ok && "error" in result);
+    assert.equal(result.code, malformed ? "RESULT_ENVELOPE_MALFORMED" : "RESULT_TRANSPORT_EXITED");
+    if (!malformed) assert.equal(result.diagnostics?.signal, "SIGTERM");
+    assert.equal(f.stdout.destroyed, true);
+    assert.equal(f.stderr.destroyed, true);
+  }
+});
