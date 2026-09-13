@@ -94,11 +94,19 @@ The manifest contains `schemaVersion: 1`, `evidenceId`, `label`, opaque `context
 - `serial`, `operatorPackage`, `cliVersion`, and `operatorVersion`;
 - `apiLevel`, `androidVersion`, `manufacturer`, and `model`;
 - `deviceType`: `emulator` if either `ro.kernel.qemu` or `ro.boot.qemu` is `"1"`,
-  `physical` if a successfully read value is `"0"` and neither is `"1"`, or
-  `unknown` otherwise; `deviceTypeProperties` retains both property observations;
+  including conflicting `"0"`/`"1"` indicators. A successfully read, parseable
+  property inventory is inferred to be `physical` when both flags are absent,
+  empty, or `"0"`. Unexpected nonempty values without a `"1"`, malformed or
+  empty inventories, and failed or timed-out reads produce `unknown`.
+  `deviceTypeProperties` retains nonempty raw values, with null for absent or
+  empty flags;
 - `display.width`, `height`, `density`, and `rotation`. Current `wm` overrides
   take precedence over physical dimensions/density. Rotation uses the primary
   display's input viewport or the older `SurfaceOrientation` value (`0..3`).
+
+Still and video capture use the same classification policy. Emulator flags are
+a heuristic, not hardware attestation. Unknown classification remains a metadata
+failure; this policy does not change historical manifests.
 
 Unavailable metadata is null with an associated error; unknown device type is
 `unknown`. Missing metadata makes otherwise usable evidence partial. Geometry

@@ -46,6 +46,52 @@ Clawperator state directory. Node tests inject their own root, process/capture
 providers, metadata readers, clock, and file operations. There are no macOS-only
 APIs, uploads, report generation, or video lifecycle scaffolding.
 
+## Device classification
+
+Still capture and video start share `collectEvidenceMetadata`. A failed read is
+distinct from a successful property inventory with absent emulator flags. The
+inventory parser accepts bracketed Android properties, including multiline boot
+history values and CRLF output; empty, malformed, or duplicate-key inventories
+cannot establish a device type. Parsed nonempty flag values remain in the
+manifest, with null for absent or empty flags.
+
+For a usable inventory, either emulator flag equal to `"1"` wins, even against
+`"0"` or another unexpected value. If both flags are absent, empty, or `"0"`,
+classification is `physical` by inference. Other nonempty values, failed reads,
+timeouts, and exhausted budgets remain `unknown`, with
+`EVIDENCE_CAPTURE_FAILED`, stage `metadata`, component `deviceType`.
+This is a heuristic, not hardware attestation. Other required metadata failures
+still make usable bundles partial. Schema version 1 and historical manifests
+remain unchanged.
+
+### Physical-device classification validation
+
+On 2026-09-13, source based on `e96e7584` plus this classification fix used
+branch-local CLI 0.10.1 and the matching branch-built 0.10.1-d development APK,
+installed on explicit physical and emulator targets. Android debug assembly
+passed. The physical device's two emulator flags were absent. A new still bundle
+and finalized video bundle both reported `complete`, `physical`, null raw flags,
+and terminal CLI exit 0. Artifact sizes and SHA-256 hashes matched; the still
+hierarchy passed an independent XML parser and the screenshot was visually
+inspected. The H.264 video independently decoded fully with ffmpeg; ffprobe
+reported 572 by 1280 pixels and 5.281122 seconds.
+
+The emulator retained `emulator` classification with both flags equal to `"1"`.
+Its still bundle remained partial, exit 1, solely because hierarchy capture
+returned `SNAPSHOT_HIERARCHY_UNAVAILABLE`. This establishes classification,
+not successful emulator hierarchy capture or resolution of that separate issue.
+Initial partial bundles remain untouched. Those live runs exposed multiline
+boot-history properties on both targets; sanitized LF and CRLF regression
+fixtures now cover them.
+
+The complete Node suite passed 1,615 tests. Regressions cover classification
+precedence, malformed inventories, read failures and budgets, preservation of
+other metadata failures, and real detached-worker finalization and CLI terminal
+status for physical, emulator, and unknown classifications. Video acceptance used
+writable default state; restricted-host state overrides and combined acceptance
+with the writable-state pack remain separate work. Private captures and logs
+remain outside tracked files.
+
 ## Validation and observed limits
 
 Local device checks used a dedicated Android 16 / API 36 emulator with the
