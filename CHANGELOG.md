@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.10.1] - 2026-09-13
+
+This release hardened evidence capture and bundled-skill discovery while adding a validated query consumer and live-verified guidance for scoped UI interaction.
+
+### 🤖 Node API & CLI
+
+- **Added:** Added a runnable `query` consumer that verifies canonical envelopes, result completeness, step identity, schema, counts, and truncation before accepting a capture.
+- **Fixed:** Resolved aliased bundled-skill directories safely when Claude or Codex shares the generic agents directory, preserving user-managed skills and reporting the resolved discovery ownership.
+- **Fixed:** Classified physical devices from a valid Android property inventory when emulator flags are absent, allowing valid still and video evidence bundles to complete while retaining unknown classification failures.
+- **Fixed:** Allowed CLI and managed MCP evidence to use `CLAWPERATOR_EVIDENCE_DIR` when the default state location is unwritable, with structured storage errors and cross-root per-device video ownership.
+
+### 📚 Documentation & Website
+
+- **Added:** Documented safe shared-directory bundled-skill discovery, migration, and ownership reporting.
+- **Added:** Documented the query-consumer example, all-node discovery, and capture-completeness limits.
+- **Added:** Documented physical-device evidence classification when emulator flags are unavailable.
+- **Added:** Added a live-verified walkthrough for scoped duplicate-target selection, destination assertions, and evidence interpretation.
+- **Added:** Documented custom evidence roots, cross-root video ownership, and the corresponding storage-error behavior.
+
+Pull requests:
+- [chore(release): complete 0.10.0 follow-up and prepare 0.10.1](https://github.com/clawperator/clawperator/pull/292)
+- [docs(tasks): plan v0.11 notification and media APIs](https://github.com/clawperator/clawperator/pull/293)
+- [fix(skills): support aliased bundled-skill discovery directories](https://github.com/clawperator/clawperator/pull/294)
+- [docs(tasks): plan v0.10.x physical-device reliability fixes](https://github.com/clawperator/clawperator/pull/295)
+- [feat(query): add a validated query consumer example](https://github.com/clawperator/clawperator/pull/296)
+- [fix(evidence): complete captures when physical devices omit emulator flags](https://github.com/clawperator/clawperator/pull/297)
+- [docs(selectors): verify scoped selection and destination assertions](https://github.com/clawperator/clawperator/pull/298)
+- [fix(evidence): support writable state with cross-root video ownership](https://github.com/clawperator/clawperator/pull/299)
+
 ## [0.10.0] - 2026-09-13
 
 This release changes doctor exit status, explicit selector scoping, scroll result values, and host-failure SSE reporting; callers should apply the migration notes below. It adds structured UI queries, compact snapshots, verified still and video evidence, on-screen diagnostics, and richer action and transport evidence.
