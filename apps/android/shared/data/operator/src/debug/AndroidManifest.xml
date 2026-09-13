@@ -6,6 +6,7 @@
             android:name="clawperator.operator.debug.OnScreenLogProofActivity"
             android:excludeFromRecents="true"
             android:exported="true"
+            android:permission="android.permission.DUMP"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
     </application>
 </manifest>

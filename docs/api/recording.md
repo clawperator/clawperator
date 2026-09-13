@@ -1,5 +1,8 @@
 # Recording Format
 
+For MP4 screen recordings, use [managed video evidence](evidence.md#managed-video).
+The commands on this page record accessibility events.
+
 ## Purpose
 
 Document the current recording workflow, the raw NDJSON schema written by the

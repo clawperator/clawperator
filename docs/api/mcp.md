@@ -726,3 +726,20 @@ the first content item and adds a second JSON text item containing
 `selection_warning` when needed. Unique reads and intentional multi-target
 read-all results keep their existing output unless the explicit container is
 ambiguous. See [duplicate-selection hints](selectors.md#duplicate-selection-hints).
+
+
+<a id="mcp-tool-evidence-video-start"></a>
+<a id="mcp-tool-evidence-video-status"></a>
+<a id="mcp-tool-evidence-video-stop"></a>
+### Managed video tools
+
+`evidence_video_start` starts bounded screen recording with required
+`durationSeconds` (1..180), optional `size`, `label`, `context`, and device/Operator
+selection. An explicit configured session target can supply the device. It
+allocates a managed bundle and returns `sessionId`; it never accepts output paths.
+`evidence_video_status` and `evidence_video_stop` accept only `sessionId`, without
+path or target overrides. Recording/startup confirmation is distinct from verified
+media completion; stop succeeds only when finalization is complete. Pending or
+failed stops and partial/failed captures set `isError: true`.
+See [Managed video](evidence.md#managed-video) for lifecycle, prerequisites,
+artifacts, ownership and recovery contracts.
