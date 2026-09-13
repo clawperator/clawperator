@@ -143,11 +143,11 @@ export async function grantNotificationListenerPermission(
   const grant = await runAdb(config, ["shell", "cmd", "notification", "allow_listener", svc]);
   const grantOutput = grant.stdout + grant.stderr;
   // Older Android images predate NotificationManager's shell grant command.
-  const commandUnavailable = /unknown command|can't find service|not found/i.test(grantOutput);
+  const commandUnavailable = /unknown command|can't find service|not found|no shell command implementation/i.test(grantOutput);
   if (commandUnavailable) {
     const sdk = await runAdb(config, ["shell", "getprop", "ro.build.version.sdk"]);
     const api = Number(sdk.stdout.trim());
-    if (sdk.code === 0 && Number.isInteger(api) && api >= 21 && api < 26) {
+    if (sdk.code === 0 && Number.isInteger(api) && api >= 21 && api <= 26) {
       if (alreadyEnabled) return { ok: true, alreadyEnabled };
       const value = current && current !== "null" ? `${current}:${svc}` : svc;
       const legacy = await runAdb(config, ["shell", "settings", "put", "secure", "enabled_notification_listeners", value]);

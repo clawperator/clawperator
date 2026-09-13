@@ -126,7 +126,7 @@ it("leaves unavailable or unsupported unlock probes to the runtime", async () =>
 });
 
 it("does not report a missing notification shell service as a granted permission", async () => {
-  for (const output of ["cmd: Can't find service: notification", "notification: not found", "Unknown command: allow_listener"]) {
+  for (const output of ["cmd: Can't find service: notification", "notification: not found", "Unknown command: allow_listener", "No shell command implementation."]) {
     const runner = new FakeProcessRunner();
     for (const stdout of ["null", output, "36"]) runner.queueResult({ code: 0, stdout, stderr: "" });
     const result = await grantNotificationListenerPermission(getDefaultRuntimeConfig({ runner }), "com.test.operator");
@@ -134,9 +134,11 @@ it("does not report a missing notification shell service as a granted permission
     assert.equal(runner.calls.some(call => call.args.includes("put")), false);
   }
 });
-it("uses the legacy grant only on supported old Android versions", async () => {
-  const runner = new FakeProcessRunner();
-  for (const stdout of ["null", "Unknown command: allow_listener", "21", ""]) runner.queueResult({ code: 0, stdout, stderr: "" });
-  assert.deepEqual(await grantNotificationListenerPermission(getDefaultRuntimeConfig({ runner }), "com.test.operator"), { ok: true, alreadyEnabled: false });
-  assert.deepEqual(runner.calls.at(-1)?.args.slice(0, 5), ["shell", "settings", "put", "secure", "enabled_notification_listeners"]);
+it("uses the legacy grant on Android versions before the notification shell implementation", async () => {
+  for (const [api, output] of [[21, "Unknown command: allow_listener"], [24, "No shell command implementation."], [25, "No shell command implementation."], [26, "No shell command implementation."]]) {
+    const runner = new FakeProcessRunner();
+    for (const stdout of ["null", String(output), String(api), ""]) runner.queueResult({ code: 0, stdout, stderr: "" });
+    assert.deepEqual(await grantNotificationListenerPermission(getDefaultRuntimeConfig({ runner }), "com.test.operator"), { ok: true, alreadyEnabled: false });
+    assert.deepEqual(runner.calls.at(-1)?.args.slice(0, 5), ["shell", "settings", "put", "secure", "enabled_notification_listeners"]);
+  }
 });

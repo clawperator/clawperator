@@ -49,7 +49,7 @@ actual playback. Controlled player samples provide independent evidence.
 
 Notification provisioning uses NotificationManager's allow_listener shell command,
 even if secure settings already list the component. A settings-only grant left
-the listener disconnected on the tested API 35 image. Older API 21-25 images may
+the listener disconnected on the tested API 35 image. Older API 21-26 images may
 use the legacy secure-setting grant if the shell command is absent; this fallback
 still requires successful execution and is not a claim of a connected listener.
 
@@ -118,3 +118,8 @@ No live API 21 listener-binding claim is made. Old-image/OEM compatibility and
 arbitrary Doze/process restrictions remain limits to consider during release
 verification. Direct Boot service operation is not supported. N2 notification
 mutations/seeking and downstream PiP-window assertions remain separate work.
+
+The PR review also verified that API 24-26 may return
+`No shell command implementation.` with exit status zero. Provisioning recognizes
+that response and uses the legacy grant through API 26; API 27+ missing-command
+responses remain failures. Regression tests cover both behaviors.
