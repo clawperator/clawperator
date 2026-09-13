@@ -18,6 +18,9 @@ Contract and boundaries: [plan.md](plan.md).
 
 ## Remaining work
 
+Deferred by the release owner for 0.11.0 until new information is available.
+Resume the steps below when natural-failure evidence provides a diagnostic lead.
+
 1. Capture a natural recurrence using the merged instrumentation and independent
    bounded observations. Use the original API-35 English hierarchy fixture,
    with matching branch-local CLI/APK and only the selected service active.
