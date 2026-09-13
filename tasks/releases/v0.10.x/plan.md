@@ -5,8 +5,8 @@ Prioritize reliable physical-device evidence and sandboxed recording for the
 required evidence, documentation and local commits are complete. Publication
 has separate gates below.
 
-Status: items 1 and 4 implemented and locally validated; patch publication not
-started. Other items retain their individually recorded status.
+Status: items 1, 3 and 4 implemented and locally validated; item 2 remains
+queued in this checkout. Patch publication has not started.
 This queue follows the retired 0.10.0 release pack. Baseline inspected:
 `626a169d`, code version 0.10.1. Reconcile current versions, tags and work in
 flight before choosing a patch release number.
@@ -24,7 +24,7 @@ Use the sanitized findings in each pack when those local repositories are absent
 | --- | --- | --- | --- | --- |
 | 1 | P1 | [Physical-device evidence classification](../../../docs/internal/design/still-evidence.md#physical-device-classification-validation) | Physical still/video completion and emulator classification verified; no feature dependency | [DONE] locally; not merged or published |
 | 2 | P1 | [Writable video state](../../node/evidence-writable-state/plan.md) | Confirmed sandbox integration failure; retain cross-root device ownership; independent implementation, use row 1 for integrated complete-bundle proof | [TODO] |
-| 3 | P2 | [Scoped selection diagnostics and deterministic assertions](../../node/scoped-selection-guidance/plan.md) | Reduce repeated ambiguity/overlap discovery mistakes; existing scoped behavior passed; independent | [TODO] |
+| 3 | P2 | [Scoped selection diagnostics and deterministic assertions](../../../docs/api/scoped-selection.md) | Diagnostics audited; walkthrough verified on an API 35 emulator; [evidence](../../../docs/internal/design/action-result-diagnostics.md#scoped-selection-presentation-audit-and-live-walkthrough) | [DONE] locally, unpublished |
 | 4 | P2 | [Safe query consumption](../../../docs/api/actions.md#runnable-node-consumer) | Runnable validated consumer and empty-matcher guidance; independent | [DONE] locally; not published |
 
 Item 4 acceptance: Node build and all 1,597 tests, Android debug assembly, docs

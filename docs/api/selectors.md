@@ -1,5 +1,8 @@
 # Selectors
 
+For a complete discovery, strict selection, scroll, assertion, and capture workflow,
+see [scoped selection walkthrough](scoped-selection.md).
+
 ## Purpose
 
 Define the `NodeMatcher` contract used across execution payloads, explain how CLI selector flags map into that contract, and document the mutual-exclusion rules that prevent ambiguous selector input.
