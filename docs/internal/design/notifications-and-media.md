@@ -403,3 +403,13 @@ Live API 21 compatibility, release-package acceptance and V1-V3 release work
 remain prerequisites owned by the release plan. This batch does not claim every
 OEM/Doze policy or third-party player's behavior, Direct Boot support, physical
 YouTube seeking, or PiP-window persistence.
+
+## Bounded report observation
+
+observe_media shares background readiness with get_media_status and pins the same
+session for the whole interval. Per-observation callbacks are removed in finally,
+including cancellation and expiry. Store at most 64 compact callback records but
+count every callback; retain initial/final status independently. No unbounded
+history or replay is introduced. Callback receipt time and the per-handle report
+sequence expose transport freshness separately from the publisher's position time.
+The public contract and interpretation limits live in docs/api/media.md.

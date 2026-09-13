@@ -32,7 +32,9 @@ selected emulator and requires a platform with credential-encrypted user storage
 Both credential tests remove their temporary PIN in cleanup. The locked matrix
 also restores the original accessibility settings.
 
-The basic run tests actual pause/play, 1x/2x reports, buffering and unknown
+The basic run tests bounded observe with fresh reports and a stale-report interval
+while screen-off, including independent player position and wake counters. It
+also tests actual pause/play, 1x/2x reports, buffering and unknown
 positions, then freezes a PLAYING report while actual playback stops and resumes.
 It verifies that temporary inactivity/reactivation preserves the session handle
 and original report, then queries beyond the readiness-cache TTL with independent
