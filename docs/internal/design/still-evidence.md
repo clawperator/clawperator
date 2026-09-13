@@ -92,9 +92,9 @@ The complete Node suite passed 1,615 tests. Regressions cover classification
 precedence, malformed inventories, read failures and budgets, preservation of
 other metadata failures, and real detached-worker finalization and CLI terminal
 status for physical, emulator, and unknown classifications. Video acceptance used
-writable default state; restricted-host state overrides and combined acceptance
-with the writable-state pack remain separate work. Private captures and logs
-remain outside tracked files.
+writable default state; subsequent restricted-host combined acceptance is
+recorded [below](#writable-state-integrated-validation). Private captures and
+logs remain outside tracked files.
 
 A subsequent code review identified valid multiline values containing brackets
 that the initial parser rejected. Regression coverage now includes continuation
@@ -193,54 +193,54 @@ The existing screen/snapshot contracts and runtime skill inputs are unchanged;
 no sibling skill version bump is needed.
 
 
-### Writable-state validation and remaining integration gate
+### Writable-state integrated validation
 
-On 2026-09-13, the dedicated implementation worktree based on `e96e7584` built
-Node CLI 0.10.1 and the matching 0.10.1-d development APK. The APK was installed
-on the explicitly selected physical Android 16 / API 36 device. A macOS sandbox
-explicitly denied writes under the real default home evidence root; an independent
-write probe returned `EPERM`. Without the override, CLI start returned exit 1
-with `EVIDENCE_STORAGE_UNWRITABLE`, the default root path and recovery action.
-No recorder was dispatched by that failure.
+On 2026-09-13, writable-state revision `7a0bdf7e` was integrated with `37b8aac5`
+from main and recorded in merge `2ea7e363`. Branch-local CLI 0.10.1 and the
+matching branch-built 0.10.1-d development APK targeted the explicitly selected
+physical Android 16 / API 36 device. The APK had been built and installed during
+writable-state validation; the integrated changes contained no Android changes.
 
-With a writable override and separate explicit output directory, start returned
-exit 0 and `recording`. Separate CLI processes using the same root and a different
-root both returned exit 1 with `EVIDENCE_RECORDING_ACTIVE`. Status returned exit
-0 from a new environment with an empty evidence-root variable; manifest-path stop
-still finalized the owned session. Its lock was removed, and a new recording
-using the second root started successfully and finalized at its eight-second cap.
+A macOS sandbox explicitly denied writes under the real default home evidence
+root. An independent write probe returned `EPERM`. Without the override, CLI
+start returned exit 1 with `EVIDENCE_STORAGE_UNWRITABLE`, the default root path
+and recovery action, without starting a recorder. With a writable override and
+separate explicit output directory, start returned exit 0 and `recording`.
+Separate CLI processes using the same root and a different root both returned
+exit 1 with `EVIDENCE_RECORDING_ACTIVE`.
 
-The first recording retained 572x1280 H.264 video with three decoded frames,
-about 6.94 seconds of host time and 4.04 seconds of media time. Extracted original
-frames were opened and showed both BEFORE and UPDATED on-screen-log markers.
-The second retained the same geometry, three frames, about 9.13 seconds of host
-time and 1.23 seconds of media time. Independent ffprobe inspection succeeded;
-the worker's full decode checks passed, and every artifact's bytes and SHA-256
-matched the saved manifest.
+Manifest-path status and stop worked from a new environment with an empty
+root variable. Stop returned exit 0 and `complete`, released its lock, and a new
+recording using the second root started and completed at its eight-second cap.
+The first recording retained 572x1280 H.264 media with two decoded frames,
+about 7.17 seconds of host time and 8.12 seconds of media time. Its extracted
+UPDATED frame was opened and visually checked. The fresh recording retained
+about 9.16 seconds of host time and 1.91 seconds of media time. Host and media
+timelines remain independent observations.
 
-A separate MCP stdio start used a managed override directory under the same
-sandbox. The initiating MCP process closed, and new MCP processes found and
-stopped the session using only its ID and the same root. Its verified video
-retained about 5.20 seconds of host time and 1.90 seconds of media time. CLI and
-managed MCP still captures also persisted all requested artifacts. The temporary
-on-screen log was cleared after verification. Private media and command logs
-remain in ignored worktree artifacts, not committed fixtures.
+A managed MCP recording under the same sandbox survived closure of its
+initiating server. Fresh MCP processes found and stopped it using only its
+session ID and the same root, returning `complete` without `isError`. It retained
+about 4.98 seconds of host time and 1.72 seconds of media time. CLI still capture
+returned exit 0 and `complete`; managed MCP still capture likewise returned
+`complete` without `isError`. All five bundles had empty error arrays, complete
+artifacts and physical-device classification. The worker fully decoded each
+video; independent ffprobe inspection succeeded, and every saved artifact's bytes
+and SHA-256 matched its manifest. Temporary on-screen logs were cleared.
 
-All five bundles truthfully remained `partial`: their only error was the existing
-`metadata` / `deviceType` classification failure. CLI terminal status/stop and
-still capture returned exit 1; MCP terminal/capture responses set `isError: true`.
-This proves restricted-host storage, lifecycle, ownership and usable media, not
-complete-bundle acceptance. After the independent device-classification fix is
-integrated, repeat restricted physical CLI/MCP still and video capture, require
-complete manifests, and retain the same cross-root exclusion check before patch
-publication. No release or transport gate is waived by this implementation.
+Earlier isolated writable-state runs had retained metadata-only partial bundles;
+those artifacts remain unchanged. The combined run closes the integration check
+for writable state and device classification. Private media and command logs
+remain in ignored worktree artifacts, not committed fixtures. Publication still
+requires the release workflow's transport disposition, release-Operator checks
+and other applicable gates; this validation does not authorize publication.
 
-The Node build and full suite passed (1,597 tests, no skips); 32 focused lifecycle
-checks then passed after extending relative/default-root and output-preflight
-regressions. Offline coverage includes simultaneous same-root and different-root
-starts, independent devices, default and relative roots with spaces, blank and
-unwritable state, known worker startup failure, stale heartbeat/nonce rejection,
-changed-environment lifecycle, and managed MCP capture/error propagation.
-The documentation build passed with no organization warnings. Windows live
-operation and filesystem cleanup/reboot recovery were not exercised; retained
-ownership always requires manual verification before removal.
+The integrated Node build and all 1,640 tests passed without skips. Coverage
+retains physical/emulator/unknown classification, simultaneous same-root and
+different-root starts, independent devices, default/relative roots with spaces,
+blank/unwritable state, startup failure, worker death, stale ownership,
+changed-environment lifecycle and managed MCP errors. The sub-agent review fix
+also covers POSIX numeric users without account database entries. The docs build
+passed without organization warnings. Windows live operation and filesystem
+cleanup/reboot recovery were not exercised; retained ownership always requires
+manual verification before removal.
