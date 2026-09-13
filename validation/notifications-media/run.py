@@ -75,6 +75,15 @@ def main():
         assert sample()['actualPlaying'] is False
         payload(cli('media', 'play', '--session', session_id, '--wait-timeout-ms', '2000'))
         assert sample()['actualPlaying'] is True
+        moving_before = sample()
+        observed = payload(cli('media', 'observe', '--session', session_id, '--duration-ms', '2000'))
+        moving_after = sample()
+        assert observed['newPlayerReportCount'] > 0 and observed['samples'], observed
+        assert observed['session']['playerReportSequence'] - observed['initialSession']['playerReportSequence'] == observed['newPlayerReportCount']
+        assert observed['endedElapsedMs'] - observed['startedElapsedMs'] >= 2000, observed
+        assert observed['session']['playbackType'] == 'local', observed
+        assert moving_after['actualPositionMs'] != moving_before['actualPositionMs']
+        evidence.append({'boundedObservationActualProgress': {'before': moving_before, 'after': moving_after}})
         # Compare real progression at two speeds before freezing callback reports.
         for operation, expected_speed in [('resume', 1), ('speed-two', 2)]:
             control(operation)
@@ -119,6 +128,12 @@ def main():
         time.sleep(1)
         before = sample()
         assert before['screenOn'] is False, before
+        quiet = payload(cli('media', 'observe', '--session', session_id, '--duration-ms', '1000'))
+        assert quiet['newPlayerReportCount'] == 0 and quiet['samples'] == [], quiet
+        assert quiet['reportedPositionDeltaMs'] == 0, quiet
+        assert quiet['session']['playerReportReceivedElapsedMs'] == quiet['initialSession']['playerReportReceivedElapsedMs']
+        assert quiet['session']['estimatedPositionMs'] > quiet['initialSession']['estimatedPositionMs'], quiet
+        assert quiet['deviceState']['screenOn'] is False, quiet
         for _ in range(3):
             payload(cli('notifications', 'list', '--app', PACKAGE))
             current = payload(cli('media', 'status', '--session', session_id))['session']
