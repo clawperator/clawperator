@@ -6,17 +6,38 @@ import { getCliVersion } from "../version/compatibility.js";
 export async function collectEvidenceMetadata(config: RuntimeConfig, remaining: () => number): Promise<{ device: EvidenceDevice; errors: EvidenceError[] }> {
   const errors: EvidenceError[] = [];
   const failure = (field: string) => errors.push({ code: "EVIDENCE_CAPTURE_FAILED", stage: "metadata", component: field, message: `Metadata unavailable: ${field}` });
-  const read = async (args: string[]): Promise<string> => {
-    if (remaining() <= 0) return "";
+  const read = async (args: string[]): Promise<string | null> => {
+    const budget = remaining();
+    if (budget <= 0) return null;
     try {
-      const result = await runAdb(config, args, { timeoutMs: Math.min(remaining(), 5000), logOutput: false });
-      return result.code === 0 ? result.stdout : "";
-    } catch { return ""; }
+      const result = await runAdb(config, args, { timeoutMs: Math.min(budget, 5000), logOutput: false });
+      return result.code === 0 ? result.stdout : null;
+    } catch { return null; }
   };
   const properties = await read(["shell", "getprop"]);
+  const inventory = new Map<string, string>();
+  const inventoryText = properties ?? "";
+  const headers = [...inventoryText.matchAll(/^\[([^\]\r\n]*)\][ \t]*:/gm)];
+  let inventoryUsable = properties !== null && headers.length > 0;
+  if (inventoryText.slice(0, headers[0]?.index).trim().length > 0) inventoryUsable = false;
+  // Values may contain newlines and brackets. Treat property-shaped prefixes
+  // as boundaries too, so malformed headers cannot hide inside another value.
+  for (let index = 0; index < headers.length; index++) {
+    const header = headers[index];
+    const name = header[1];
+    const headerEnd = header.index + header[0].length;
+    const validHeader = header[0] === `[${name}]:` && inventoryText.slice(headerEnd, headerEnd + 2) === " [";
+    const valueStart = headerEnd + 2;
+    const valueEnd = headers[index + 1]?.index ?? inventoryText.length;
+    const framedValue = inventoryText.slice(valueStart, valueEnd).replace(/(?:\r?\n)+$/, "");
+    if (!validHeader || !/^[^\[\]\s]+$/.test(name) || !framedValue.endsWith("]") || inventory.has(name)) {
+      inventoryUsable = false;
+      continue;
+    }
+    inventory.set(name, framedValue.slice(0, -1));
+  }
   const property = (name: string): string | null => {
-    const line = properties.split(/\r?\n/).find(value => value.startsWith(`[${name}]: [`));
-    const value = line?.slice(name.length + 5, -1);
+    const value = inventory.get(name);
     return value !== undefined && value.length > 0 ? value : null;
   };
   const requiredProperty = (name: string): string | null => {
@@ -32,23 +53,23 @@ export async function collectEvidenceMetadata(config: RuntimeConfig, remaining: 
   const model = requiredProperty("ro.product.model");
   const deviceTypeProperties = { "ro.kernel.qemu": property("ro.kernel.qemu"), "ro.boot.qemu": property("ro.boot.qemu") };
   const values = Object.values(deviceTypeProperties);
-  const deviceType = values.includes("1") ? "emulator" : values.includes("0") ? "physical" : "unknown";
+  const deviceType = !inventoryUsable ? "unknown" : values.includes("1") ? "emulator" : values.every(value => value === null || value === "0") ? "physical" : "unknown";
   if (deviceType === "unknown") failure("deviceType");
   const size = await read(["shell", "wm", "size"]);
-  const dimensions = size.match(/Override size:\s*(\d+)x(\d+)/) ?? size.match(/Physical size:\s*(\d+)x(\d+)/);
+  const dimensions = (size ?? "").match(/Override size:\s*(\d+)x(\d+)/) ?? (size ?? "").match(/Physical size:\s*(\d+)x(\d+)/);
   const width = dimensions && Number(dimensions[1]) > 0 ? Number(dimensions[1]) : null;
   const height = dimensions && Number(dimensions[2]) > 0 ? Number(dimensions[2]) : null;
   if (width === null || height === null) failure("display.size");
   const densityText = await read(["shell", "wm", "density"]);
-  const densityMatch = densityText.match(/Override density:\s*(\d+)/) ?? densityText.match(/Physical density:\s*(\d+)/);
+  const densityMatch = (densityText ?? "").match(/Override density:\s*(\d+)/) ?? (densityText ?? "").match(/Physical density:\s*(\d+)/);
   const density = densityMatch && Number(densityMatch[1]) > 0 ? Number(densityMatch[1]) : null;
   if (density === null) failure("display.density");
   const input = await read(["shell", "dumpsys", "input"]);
-  const rotationMatch = input.match(/Viewport [^\n]*displayId=0,[^\n]*orientation=([0-3])\b/) ?? input.match(/SurfaceOrientation:\s*([0-3])\b/);
+  const rotationMatch = (input ?? "").match(/Viewport [^\n]*displayId=0,[^\n]*orientation=([0-3])\b/) ?? (input ?? "").match(/SurfaceOrientation:\s*([0-3])\b/);
   const rotation = rotationMatch ? Number(rotationMatch[1]) : null;
   if (rotation === null) failure("display.rotation");
   const packageDump = await read(["shell", "dumpsys", "package", config.operatorPackage]);
-  const operatorVersion = packageDump.match(/\bversionName=([^\s]+)/)?.[1] ?? null;
+  const operatorVersion = (packageDump ?? "").match(/\bversionName=([^\s]+)/)?.[1] ?? null;
   if (operatorVersion === null) failure("operatorVersion");
   let cliVersion: string | null = null;
   try { cliVersion = getCliVersion(); } catch { failure("cliVersion"); }

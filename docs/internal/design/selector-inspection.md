@@ -148,3 +148,34 @@ without leaking into another action or execution. It records only the largest
 target/container counts and names `--strict` / `params.strict=true`. It does not
 change dispatch, success, or error policy. Intentional read-all targets and queries
 do not warn. Strict failures retain their existing compact error data.
+
+## Safe query consumption
+
+The runnable [Node consumer](../../../apps/node/src/examples/query-consumer.ts)
+keeps validation local to the example. The existing envelope parser normalizes
+step data to strings, so it is not a strict validator for arbitrary CLI output.
+The example uses Zod with the existing `NodeQueryResult` type to check the
+untrusted outer response and serialized query before accepting an inventory.
+It preserves raw process diagnostics and command/task identifiers on success
+and failure. Usage and completeness limits belong in
+[the query action guide](../../api/actions.md#runnable-node-consumer).
+
+Local acceptance on 2026-09-13 used the branch-local Node 0.10.1 build and the
+matching development Operator 0.10.1-d, built from the same checkout:
+
+- All 1,597 Node tests passed, including malformed payloads, unsupported schemas,
+  failed processes/envelopes/steps, missing or wrong query steps, count mismatch,
+  truncation, nullable states, and empty-matcher recovery with structured exits.
+- Android debug assembly and the full docs build passed. No Android source or
+  wire contract changed; no runtime-skill migration was required.
+- On the selected emulator's Settings screen, an omitted matcher with visibility
+  `all` and limit 1000 returned all 136 nodes. A deliberately absent text matcher
+  returned zero. Both exited 0 and passed consumer validation.
+- Limit 1 returned one of 136 nodes with `truncated=true`; the consumer exited 1
+  and refused completeness. An explicit empty matcher exited 1 with
+  `EXECUTION_VALIDATION_FAILED` and guidance to omit the matcher.
+- Initial emulator state included an app ANR and active keyguard. A failed query
+  returned `UI_TREE_UNAVAILABLE`, which the consumer rejected while preserving
+  its envelope and diagnostics. Restarting the emulator restored the test
+  screen. This is environmental evidence, not a query runtime regression or
+  automatic recovery feature. Physical-device acceptance was not claimed.

@@ -53,7 +53,8 @@ Rules enforced by Node:
 
 - a matcher may contain one field or several fields
 - multiple fields combine into one object, so the runtime receives all of them together
-- empty matcher objects are invalid
+- empty matcher objects are invalid; for all-node discovery, use `query` without
+  `--matcher-json` / `--selector` (see the [safe query consumer](actions.md#runnable-node-consumer))
 - each matcher string value must be at most `512` characters (`LIMITS.MAX_MATCHER_VALUE_LENGTH`)
 - simple CLI selector flags reject blank values; raw predicates require at least one nonblank field
 - selector objects are strict in execution validation, so unknown keys are rejected
