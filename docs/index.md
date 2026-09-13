@@ -6,7 +6,7 @@ Use this page as the routing index into the authored docs. The concrete machine 
 
 ---
 
-**Current release: [0.10.1](https://github.com/clawperator/clawperator/releases/tag/v0.10.1)**
+**Current release: [0.11.0](https://github.com/clawperator/clawperator/releases/tag/v0.11.0)**
 
 ---
 
