@@ -8,37 +8,36 @@ notification/media workstream and release readiness; it does not assert release
 completion or trigger publication merely by existing.
 
 Status: N1 merged as 45d9667a821379a2385137d788a7eb4f13986c7b (PR #302).
-N2 is implemented and validated locally in bf85701e, ready for one feature PR;
-its merge, N3 locked-media controls and V1-V3 release execution remain pending. Current main already has code version 0.11.0 from 917d5a83.
+N2 merged in ac8a474352476937b119ded7ecc739f517f5fc32 (PR #303).
+N3 is implemented and validated locally in 0d4ce6c0; its merge and V1-V3 release
+execution remain pending. Current main already has code version 0.11.0 from 917d5a83.
 Reconcile main, release tags and published state during release preparation.
 Live N1 coverage is API 26/35/36; API 21/28 service tests are offline. V1 must provision a live API 21 image and verify listener binding, reads and
 pause/play with the matching build, or obtain an explicit release-scope
 disposition. Offline coverage does not satisfy that live compatibility gate.
 
 Delivered contracts: [notifications](../../../docs/api/notifications.md) and
-[media](../../../docs/api/media.md). Permanent N1/N2 behavior and sanitized
+[media](../../../docs/api/media.md). Permanent N1/N2/N3 behavior and sanitized
 acceptance evidence: [design record](../../../docs/internal/design/notifications-and-media.md).
 Reproduction: [independent fixture](../../../validation/notifications-media/README.md).
-The completed notifications task pack is retired on the N2 implementation branch;
-that cleanup does not claim the feature PR is merged.
-
-N3 requirements: [locked media controls](../../locked-media-controls/plan.md), with
-[execution and acceptance](../../locked-media-controls/work-breakdown.md).
+The completed notifications and locked-media-controls packs are retired.
+N3 acceptance and limitations live in the [permanent record](../../../docs/internal/design/notifications-and-media.md#n3-locked-media-controls).
+Cleanup does not satisfy the pending N3 merge prerequisite.
 
 ## Grouped delivery
 
 | Stage | Scope / PR | Dependency | Status |
 | --- | --- | --- | --- |
 | N1 | Fresh notification reads; media discovery/status/pause/play; Android + Node + CLI/HTTP execution + tests + docs | Current main | [DONE] Merged in PR #302 (45d9667a) |
-| N2 | Notification dismiss/buttons; media seek; matching tests/docs and integrated live acceptance | Merged N1 service boundary/contracts | [DONE] Local implementation and API 26/36 acceptance in bf85701e; PR merge pending |
-| N3 | Non-waking locked/off media pause/play/seek; physical YouTube and independent fixture evidence | N2 contracts; merge N2 before N3 | [TODO] Dedicated follow-up feature PR |
+| N2 | Notification dismiss/buttons; media seek; matching tests/docs and integrated live acceptance | Merged N1 service boundary/contracts | [DONE] Merged in PR #303 (ac8a4743), with API 26/36 acceptance |
+| N3 | Non-waking locked/off media pause/play/seek; physical YouTube and independent fixture evidence | N2 contracts; merge N2 before N3 | [DONE] Local implementation in 0d4ce6c0; API 26/36 and physical YouTube acceptance complete; PR merge pending |
 | V1 | Release preparation PR: reconcile existing 0.11.0 code, release notes, release-package/final acceptance evidence and task cleanup | N1/N2/N3 merged | [TODO] |
 | V2 | Tag/publish 0.11.0 and verify distribution | V1 merged and inherited release gates resolved | [TODO] |
 | V3 | Post-publication follow-up PR: public version surfaces and next unreleased code version, in separate logical commits | Successful V2 verification | [TODO] |
 
 Bias toward these three feature PRs plus the required release lifecycle changes.
 Do not create separate infrastructure, platform, CLI, documentation or test PRs
-for components of N1/N2/N3. Keep V1-V3 separate from the N2 feature batch and do not
+for components of N1/N2/N3. Keep V1-V3 separate from the feature batches and do not
 duplicate completed version bumps or feature acceptance.
 N1 alone unblocks downstream screen-off/PiP observation work; N2 is not a
 prerequisite for those consumers. Player-reported state and estimated position do
@@ -90,7 +89,7 @@ repeat the completed bump or change published-version claims during feature work
 ## Release execution and scope
 
 Feature implementation and task cleanup do not authorize package publication or
-a main push. N1 is merged; N2 feature implementation does not authorize V1-V3. Explicit release
+a main push. N1 is merged; N3 feature implementation does not authorize V1-V3. Explicit release
 execution uses `.agents/skills/release-orchestrator/SKILL.md` with 0.11.0 and 0.11.1.
 Use its version, release-note, creation, verification and published-version skills
 instead of duplicating their procedures here. The release CHANGELOG entry must be

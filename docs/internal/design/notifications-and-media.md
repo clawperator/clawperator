@@ -8,12 +8,12 @@ dismissal/buttons and media seeking on that merged base. Public contracts live i
 
 ## Service boundary and readiness
 
-Node validates the entire execution before classifying it. Only a nonempty list
-containing exclusively list_notifications, list_media_sessions and
-get_media_status bypasses interactive readiness. Android parses and makes the
+Node validates the entire execution before classifying it. A nonempty list containing exclusively
+list_notifications, list_media_sessions, get_media_status, media_pause, media_play
+and media_seek bypasses interactive readiness. Android parses and makes the
 same classification before accessibility lookup and notification-shade closing.
-Mixed lists retain whole-execution readiness in either order. A failed readiness
-check must not dispatch a read prefix. Existing UI-only behavior remains in place.
+Lists containing notification mutations or UI/other actions retain whole-execution
+readiness in either order. A failed readiness check must not dispatch any prefix. Existing UI-only behavior remains in place.
 
 Background doctor checks the host, selected device, installed Operator/version,
 and actual listener-backed notification/media queries. It does not run doctor_ping,
@@ -173,9 +173,9 @@ verified on API 36; the API 26 media proof uses the independent MediaPlayer fixt
 
 ## N2 mutation invariants
 
-All three new actions use the canonical Android execution path and retain
-whole-execution interactive readiness. They do not extend the background read
-allowlist. Node validation, typed parameters/payload decoding, CLI, HTTP `/execute`
+At N2, all three new actions used the canonical Android execution path with
+whole-execution interactive readiness. N3 extends background service execution
+to media controls; notification mutations still require interactive readiness. Node validation, typed parameters/payload decoding, CLI, HTTP `/execute`
 and generic MCP `execute` share the canonical action contract.
 
 Dismissal checks a fresh listener snapshot and isClearable, dispatches cancellation
@@ -303,8 +303,103 @@ progress. Neither pause nor resume effects were proven because both requests
 were rejected. No unlock command was sent.
 
 This exposes a product limitation intentionally retained by N2, not evidence that
-Android or YouTube lacks locked media control. A dedicated N3 will change the
-Node and Android readiness classification for media controls while preserving
-interactive readiness for notification mutations and UI-containing executions.
-N3 must separately prove non-waking locked/off dispatch and actual player effects;
-this finding does not claim that behavior has been implemented.
+Android or YouTube lacks locked media control. N3 changes that classification as described below; this historical test records
+the pre-N3 limitation and is not evidence of a successful control cycle.
+
+
+## N3 locked media controls
+
+N2 merged in ac8a474352476937b119ded7ecc739f517f5fc32 (PR #303). N3 uses an
+explicit whole-execution service allowlist in both Node and Android. Reads plus
+media_pause/media_play/media_seek bypass the interactive readiness cache and
+accessibility lookup; notification mutations and UI/other lists do not. This
+classification runs after validation. Background doctor remains read-only, and
+the first-user-unlock probe still rejects confirmed RUNNING_LOCKED user storage.
+No media dispatch, controller identity, confirmation or estimate semantics change.
+No wake, home, app launch, shade closing or permission remediation is part of
+eligible execution. Existing runtime skills have no consumers requiring changes.
+
+Runtime implementation is committed in 0d4ce6c0, based on merged N2.
+The matching development CLI/Operator versions remain 0.11.0/0.11.0-d. Operator
+APK SHA-256: ef0ee1e93be21f722ea833a4500a6e9f594c9f214fbe2684a877b63a7dffc76c.
+Fixture APK SHA-256: 5cdb561cb383938bcf9424ddbcdab5a6a1771e7942bdbfcbfbfbda2d582e8571.
+
+### Physical YouTube acceptance
+
+On 2026-09-13, the matching APK was installed on a physical API 37 phone. The
+first app-opening attempt encountered temporarily unavailable accessibility after
+installation. Once the user unlocked for setup and binding recovered, canonical
+open_uri opened the requested video in com.google.android.youtube, independently
+confirmed as the resumed app. Playback started before the user locked the phone.
+No physical credential or accessibility setting was changed for this test.
+
+Both pause and resume used the same discovered mediaSessionId. Each returned
+one successful dispatch with targetStateObserved=true. The pause callback
+reported PAUSED at 146897 ms; the resume callback reported PLAYING at 146897 ms
+with a new original update timestamp. These are player reports, separately from
+estimates. Independent Android audio evidence showed the same AudioTrack changing
+started to paused and back to started. The user confirmed audible stop and resume
+and that the screen stayed off during each operation.
+
+Six independent window-policy samples spanning about 1.79 seconds during pause,
+and seven spanning about 2.02 seconds during resume, all showed keyguard active
+and SCREEN_STATE_OFF. The user picked up the phone between commands, lighting
+its lock screen; they turned it off again before resume without unlocking.
+Sampling cannot exclude every sub-sample transition, so this is bounded evidence
+for each operation, not a claim of uninterrupted screen-off state between them.
+No wake or unlock command was sent during either operation. Real YouTube seeking
+was not required or exercised; independent seek effects belong to the fixture.
+
+
+### N3 emulator and offline acceptance
+
+API 36 and API 26 used explicit device selectors and the matching APKs above,
+sequentially. Each secure lock matrix exercised five states: locked/off, locked/off
+with accessibility unbound, after the cache interval, locked/on without
+accessibility, and relocked/off. Each state performed pause, seek to 10000 ms
+within 100 ms, and play against one selected session. Independent MediaPlayer
+samples verified actual effects and exactly one callback for each requested
+control. Screen-on/off transition counters remained unchanged during each series.
+
+Typed helpers, HTTP /execute and generic MCP execute each performed pause/seek/play
+under locked/on and locked/off with accessibility unbound. HTTP/MCP mixed reads
+with controls and preserved session identity and canonical correlation. Ignored
+seek and replacement during a locked wait returned their specific failures with
+one dispatch; the replacement never satisfied the original command. The fixture
+continues sampling independently, so estimates do not substitute for actual
+position, playback state or counter evidence.
+
+N1 stale-report/inactivity, speed, buffer/unknown-state, listener denial/regrant
+and process-recovery regressions passed on both platforms. N2 dismissal/buttons,
+seek bounds, ignored/stale/replacement waits and transport regressions also
+passed. Open-shade direct ingress accepted service controls without accessibility
+and rejected UI/notification-mutation lists before any prefix. The API 36 reboot
+proof rejected all three controls, reads, doctor and MCP before first user unlock.
+API 26 reports unsupported storage encryption and does not replace that proof.
+Temporary emulator credentials were cleared and accessibility settings restored.
+
+The final Node build passed all 1659 tests, including cold/warm/expired-cache
+execution routing and first-user-unlock rejection. Android debug assembly, app
+unit tests, the full unitTest aggregate (502 cases, zero failures/errors), and
+fixture assembly passed. Documentation and route/link generation passed. Offline
+checks remain automatic; the existing live workflow remains workflow_dispatch only.
+
+Harness findings: fixture publication and notification repost callbacks can lag;
+read-only session polling and settling before acquiring a new button handle make
+setup explicit. A direct-ingress test limits fixture notification output so its
+simple log reader does not confuse chunked results with missing results; larger
+canonical envelopes are exercised through Node transports. Replacement proof
+leaves a controller without callbacks, so a later independent control scenario
+starts a fresh fixture after credential cleanup. Do not rebuild dist/ during
+live execution. One API 26 independent sample read returned an ADB error despite
+printing JSON; bounded fresh-read retry retains failed-read evidence and never
+replays a media mutation. Legacy keyguard can time out during a long lit-screen
+sequence, so its transport series are prepared separately; setup sleep/wake
+transitions occur outside the measured commands. Direct mixed media/UI and
+media/notification-mutation lists are rejected in both orders while locked/on
+and locked/off, with no steps, control-counter change or power transition.
+
+Live API 21 compatibility, release-package acceptance and V1-V3 release work
+remain prerequisites owned by the release plan. This batch does not claim every
+OEM/Doze policy or third-party player's behavior, Direct Boot support, physical
+YouTube seeking, or PiP-window persistence.

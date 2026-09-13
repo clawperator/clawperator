@@ -25,7 +25,8 @@ try {
   for (const transport of ['typed', 'http', 'mcp']) {
     if (transport !== 'typed') {
       execFileSync('adb', ['-s', deviceId, 'shell', 'am', 'broadcast', '--receiver-foreground', '-n', "'" + packageName + "/clawperator.operator.debug.MediaProofActivity$Control'", '--es', 'operation', 'post']);
-      await wait(300);
+      // Allow the repost and listener revision callback to settle before advertising a handle.
+      await wait(1000);
       const listed = await runNotificationMedia('list_notifications', { applicationId: packageName }, { deviceId, operatorPackage });
       item = listed.payload.notifications.find(item => item.key.includes('|8124|'));
     }
