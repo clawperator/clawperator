@@ -150,8 +150,9 @@ rejected even if the process returns zero. A final `progress=end` report must
 contain a positive frame count. Missing EOF, timeout, or exhausted output budget
 cannot authorize promotion. Probe metadata is saved before decoding starts.
 
-`-fps_mode passthrough` and `-enc_time_base -1` retain the source timebase. Without
-that output timing, valid sparse VFR input can trigger duplicate-DTS diagnostics
+`-vsync 0` and `-enc_time_base -1` retain the source timebase. The single-output
+`-vsync` option also works on FFmpeg versions before 5.1, which lack `-fps_mode`.
+Without that output timing, valid sparse VFR input can trigger duplicate-DTS diagnostics
 in the null muxer. We prevent the verifier from inventing those errors rather
 than ignoring decoder diagnostics. No expected frame count is derived from
 average frame rate or wall time, and no decoded pixels are retained by Node.

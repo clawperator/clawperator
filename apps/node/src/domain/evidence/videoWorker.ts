@@ -23,10 +23,11 @@ export async function verifyVideo(runner: ProcessRunner, path: string, requested
   if (actualSize !== requestedSize || !Number.isFinite(mediaDurationMs) || mediaDurationMs <= 0 || typeof stream?.codec_name !== "string") fail("Video dimensions or duration do not match the requested recording");
   // Decode only the probed stream through EOF without retaining decoded pixels.
   // Preserve its timebase: null-output defaults can invent duplicate DTS for VFR media.
+  // The single-output -vsync option also supports hosts predating -fps_mode (FFmpeg 5.1).
   const decoded = await runner.run("ffmpeg", [
     "-v", "error", "-nostdin", "-nostats", "-xerror", "-max_alloc", "268435456",
     "-threads", "2", "-err_detect", "explode", "-i", path, "-map", "0:v:0",
-    "-an", "-sn", "-dn", "-threads", "1", "-fps_mode", "passthrough", "-enc_time_base", "-1",
+    "-an", "-sn", "-dn", "-threads", "1", "-vsync", "0", "-enc_time_base", "-1",
     "-stats_period", "60", "-progress", "pipe:1", "-f", "null", "-",
   ], { timeoutMs: VIDEO_DECODE_TIMEOUT_MS });
   if (decoded.code !== 0 || decoded.error || decoded.stderr.trim()) {

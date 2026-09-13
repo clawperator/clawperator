@@ -338,7 +338,8 @@ for (const failure of ["late-decode", "decode-timeout"]) it(`preserves partial e
       assert.equal(options?.timeoutMs, 120000);
       assert.ok(!args.includes("-frames:v"));
       assert.deepEqual(args.slice(args.indexOf("-map"), args.indexOf("-map") + 2), ["-map", "0:v:0"]);
-      assert.ok(args.includes("passthrough"));
+      assert.deepEqual(args.slice(args.indexOf("-vsync"), args.indexOf("-vsync") + 2), ["-vsync", "0"]);
+      assert.ok(!args.includes("-fps_mode"), "Retain compatibility with FFmpeg before 5.1");
       return { code: failure === "late-decode" ? 1 : null, stdout: "frame=42\nprogress=continue\n",
         stderr: failure === "late-decode" ? "Invalid NAL unit at tail" : "Video subprocess timed out" };
     };

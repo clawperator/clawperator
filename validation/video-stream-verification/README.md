@@ -2,7 +2,7 @@
 
 Run `./validation/test_all.sh --suite validation` for the integrated check, or
 build Node and run `node validation/video-stream-verification/test-video-stream.mjs`.
-Requires ffmpeg/ffprobe with libx264 and `-fps_mode` support. CI installs ffmpeg.
+Requires ffmpeg/ffprobe with libx264. CI installs ffmpeg.
 No device is used by this harness.
 
 Fixtures are generated in a temporary directory and removed after the run:
