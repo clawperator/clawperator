@@ -4,6 +4,15 @@ One implementation PR; independent of the other new packs. Implement the
 [plan's policy and acceptance cases](plan.md), including status propagation to
 both evidence paths. Video-root changes are outside this pack.
 
+## Dependencies and concurrency
+
+Can start and merge independently; writable default state is sufficient for its
+live checks. Work concurrently with the other packs, coordinating evidence
+implementation/tests and shared evidence docs with pack 2. Pack 1 plus pack 2
+are required for the combined restricted-host complete-bundle check, not for
+this pack's independent acceptance. See the
+[release coordination rules](../../releases/v0.10.x/plan.md#dependencies-and-concurrent-work).
+
 ## Required checks
 
 - Run `npm --prefix apps/node run build && npm --prefix apps/node run test`.

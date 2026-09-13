@@ -7,6 +7,14 @@ Use actual CLI output and existing validators to implement the
 [plan's runnable example and empty-matcher diagnostic](plan.md), preserving
 public envelope semantics.
 
+## Dependencies and concurrency
+
+Can start and merge independently of all other packs. Coordinate shared
+selector/help and docs edits with pack 3; this pack owns query validation and
+empty-matcher guidance. Its example must stand alone, whether or not the scoped
+walkthrough has landed. Serialize live runs sharing the same device; see the
+[release coordination rules](../../releases/v0.10.x/plan.md#dependencies-and-concurrent-work).
+
 ## Required checks
 
 - Test the example's acceptance cases and CLI valid/invalid/missing matcher

@@ -8,6 +8,16 @@ Choose and document an atomic ownership mechanism satisfying the
 Implement root resolution, caller/worker propagation and permission preflight
 with that mechanism. Keep metadata failures distinct from ownership failures.
 
+## Dependencies and concurrency
+
+Can start and merge independently of metadata repair. Implement atomic cross-root
+ownership before enabling the override. Before pack 1 is integrated, lifecycle
+and locking checks can pass while bundles retain the known metadata-only partial
+verdict; do not claim complete-bundle acceptance from those runs. After both
+fixes are integrated, verify the combined restricted-host scenario. Coordinate
+evidence code/tests and docs with pack 1; see the
+[release coordination rules](../../releases/v0.10.x/plan.md#dependencies-and-concurrent-work).
+
 ## Required checks
 
 - Add deterministic process/race regressions for the plan's acceptance matrix,

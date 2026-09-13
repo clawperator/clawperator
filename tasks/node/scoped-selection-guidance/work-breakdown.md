@@ -5,6 +5,15 @@ selection diagnostics through CLI/MCP outputs and deliver the
 [plan's walkthrough](plan.md). Change runtime presentation only where inspection
 establishes a gap; a verified docs-only result is a valid outcome.
 
+## Dependencies and concurrency
+
+Can start and merge independently of all other packs. Coordinate action/selector
+presentation and shared docs with pack 4; this pack owns selection diagnostics
+and the walkthrough. Linking to the query example is optional and must wait
+until that target exists, without blocking this walkthrough. Serialize live
+runs sharing the same device; see the
+[release coordination rules](../../releases/v0.10.x/plan.md#dependencies-and-concurrent-work).
+
 ## Required checks
 
 - For Node edits, add regressions for lost warnings and unchanged structured
