@@ -8,6 +8,8 @@ import { evidenceManifestSchema, type EvidenceManifest, type EvidenceArtifact } 
 import { writeEvidenceManifest } from "./manifest.js";
 import { atomicJson, checked, fail, readState, releaseLock, sleep, verifyRemote, videoError } from "./videoSupport.js";
 
+export const VIDEO_DECODE_TIMEOUT_MS = 120_000;
+
 export interface VideoProbeMetadata { codec: string | null; actualSize: string | null; mediaDurationMs: number | null }
 
 export async function verifyVideo(runner: ProcessRunner, path: string, requestedSize: string, onProbe?: (metadata: VideoProbeMetadata) => void): Promise<{ codec: string; actualSize: string; mediaDurationMs: number }> {
@@ -19,8 +21,22 @@ export async function verifyVideo(runner: ProcessRunner, path: string, requested
     actualSize: Number.isInteger(stream?.width) && stream.width > 0 && Number.isInteger(stream?.height) && stream.height > 0 ? actualSize : null,
     mediaDurationMs: Number.isFinite(mediaDurationMs) && mediaDurationMs >= 0 ? mediaDurationMs : null });
   if (actualSize !== requestedSize || !Number.isFinite(mediaDurationMs) || mediaDurationMs <= 0 || typeof stream?.codec_name !== "string") fail("Video dimensions or duration do not match the requested recording");
-  const frame = await checked(runner, "ffmpeg", ["-v", "error", "-xerror", "-i", path, "-frames:v", "1", "-f", "framemd5", "-"]);
-  if (!/^0,\s*[-\d]+,\s*[-\d]+,\s*\d+,\s*[1-9]\d*,\s*[a-f0-9]{32}\s*$/m.test(frame)) fail("Video decoder did not produce a frame");
+  // Decode only the probed stream through EOF without retaining decoded pixels.
+  // Preserve its timebase: null-output defaults can invent duplicate DTS for VFR media.
+  // The single-output -vsync option also supports hosts predating -fps_mode (FFmpeg 5.1).
+  const decoded = await runner.run("ffmpeg", [
+    "-v", "error", "-nostdin", "-nostats", "-xerror", "-max_alloc", "268435456",
+    "-threads", "2", "-err_detect", "explode", "-i", path, "-map", "0:v:0",
+    "-an", "-sn", "-dn", "-threads", "1", "-vsync", "0", "-enc_time_base", "-1",
+    "-stats_period", "60", "-progress", "pipe:1", "-f", "null", "-",
+  ], { timeoutMs: VIDEO_DECODE_TIMEOUT_MS });
+  if (decoded.code !== 0 || decoded.error || decoded.stderr.trim()) {
+    fail(`Full video decode failed: ${decoded.stderr || decoded.error?.message || `exit ${decoded.code}`}`);
+  }
+  const completed = decoded.stdout.trim().split(/progress=continue\r?\n/).at(-1)!;
+  if (!/^frame=\s*[1-9]\d*\s*$/m.test(completed) || !/\bprogress=end$/.test(completed)) {
+    fail("Video decoder did not report complete decoding with at least one frame");
+  }
   return { codec: stream.codec_name, actualSize, mediaDurationMs };
 }
 
