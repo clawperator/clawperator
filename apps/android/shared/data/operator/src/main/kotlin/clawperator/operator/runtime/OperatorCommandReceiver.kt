@@ -49,8 +49,7 @@ class OperatorCommandReceiver :
                 val accessibilityService = if (background) null else accessibilityServiceManager.currentAccessibilityService
                 if (!background && accessibilityService == null) {
                     val reason = "Accessibility service is not available"
-                    val parseResult = parsedCommand
-                    parseResult
+                    parsedCommand
                         .onSuccess { command ->
                             Log.e("[Operator-Receiver] $reason commandId=${command.commandId} taskId=${command.taskId}")
                             Log.i(
@@ -72,8 +71,7 @@ class OperatorCommandReceiver :
                 }
 
                 coroutineScopes.main.launch {
-                    val parseResult = parsedCommand
-                    parseResult
+                    parsedCommand
                         .onSuccess { command ->
                             val result = agentCommandExecutor.execute(command)
                             when (result) {

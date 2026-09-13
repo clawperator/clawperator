@@ -25,7 +25,13 @@ class NotificationMediaException(val code: String, message: String, val dispatch
 
 /** All handles and platform controller calls are owned by the main thread. */
 class NotificationMediaService(private val context: Context) {
-    private data class Session(val id: String, val controller: MediaController, var destroyed: Boolean = false, var reportedState: PlaybackState? = null, var hasPlayerReport: Boolean = false)
+    private data class Session(
+        val id: String,
+        val controller: MediaController,
+        var destroyed: Boolean = false,
+        var reportedState: PlaybackState? = null,
+        var hasPlayerReport: Boolean = false,
+    )
     private val sessions = mutableMapOf<MediaSession.Token, Session>()
     private val destroyedTokens = mutableSetOf<MediaSession.Token>()
     private val sessionManager = context.getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
@@ -107,7 +113,21 @@ class NotificationMediaService(private val context: Context) {
         } else {
             PlaybackPosition(null, state?.position?.takeIf { it >= 0 }, null, null, "original_player_report_unavailable")
         }
-        val names = mapOf(0 to "none", 1 to "stopped", 2 to "paused", 3 to "playing", 4 to "fast_forwarding", 5 to "rewinding", 6 to "buffering", 7 to "error", 8 to "connecting", 9 to "skipping_to_previous", 10 to "skipping_to_next", 11 to "skipping_to_queue_item")
+        val stateName = when (state?.state) {
+            PlaybackState.STATE_NONE -> "none"
+            PlaybackState.STATE_STOPPED -> "stopped"
+            PlaybackState.STATE_PAUSED -> "paused"
+            PlaybackState.STATE_PLAYING -> "playing"
+            PlaybackState.STATE_FAST_FORWARDING -> "fast_forwarding"
+            PlaybackState.STATE_REWINDING -> "rewinding"
+            PlaybackState.STATE_BUFFERING -> "buffering"
+            PlaybackState.STATE_ERROR -> "error"
+            PlaybackState.STATE_CONNECTING -> "connecting"
+            PlaybackState.STATE_SKIPPING_TO_PREVIOUS -> "skipping_to_previous"
+            PlaybackState.STATE_SKIPPING_TO_NEXT -> "skipping_to_next"
+            PlaybackState.STATE_SKIPPING_TO_QUEUE_ITEM -> "skipping_to_queue_item"
+            else -> "unknown"
+        }
         val controls = JSONArray()
         val actions = state?.actions ?: 0L
         if (actions and PlaybackState.ACTION_PLAY != 0L) controls.put("play")
@@ -116,7 +136,7 @@ class NotificationMediaService(private val context: Context) {
         val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)
         val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST)
         return JSONObject().put("mediaSessionId", session.id).put("applicationId", controller.packageName)
-            .put("state", state?.state?.let { names[it] } ?: "unknown")
+            .put("state", stateName)
             .put("title", nullable(title?.take(maxTextChars))).put("artist", nullable(artist?.take(maxTextChars)))
             .put("textTruncated", listOfNotNull(title, artist).any { it.length > maxTextChars })
             .put("durationMs", nullable(duration)).put("supportedControls", controls)
@@ -146,9 +166,12 @@ class NotificationMediaService(private val context: Context) {
                         val text = notification.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
                         val revision = requireListener().revisionFor(sbn.key)
                         val buttons = JSONArray()
+                        var textTruncated = listOfNotNull(title, text).any { it.length > maxTextChars }
                         notification.actions?.take(20)?.forEachIndexed { index, action ->
+                            val actionTitle = action.title?.toString()
+                            if (actionTitle != null && actionTitle.length > maxTextChars) textTruncated = true
                             buttons.put(JSONObject().put("actionId", "$revision:$index")
-                                .put("title", nullable(action.title?.toString()?.take(maxTextChars)))
+                                .put("title", nullable(actionTitle?.take(maxTextChars)))
                                 .put("requiresInput", !action.remoteInputs.isNullOrEmpty())
                                 .put("requiresAuthentication", if (Build.VERSION.SDK_INT >= 31) action.isAuthenticationRequired else false))
                         }
@@ -157,7 +180,7 @@ class NotificationMediaService(private val context: Context) {
                             .put("postTime", sbn.postTime).put("ongoing", sbn.isOngoing).put("clearable", sbn.isClearable)
                             .put("groupKey", nullable(sbn.groupKey)).put("groupSummary", notification.flags and Notification.FLAG_GROUP_SUMMARY != 0)
                             .put("actions", buttons).put("actionsTruncated", (notification.actions?.size ?: 0) > 20)
-                            .put("textTruncated", (listOfNotNull(title, text) + notification.actions.orEmpty().take(20).mapNotNull { it.title?.toString() }).any { it.length > maxTextChars })
+                            .put("textTruncated", textTruncated)
                             .put("progress", if (notification.extras.containsKey(Notification.EXTRA_PROGRESS)) JSONObject()
                                 .put("value", notification.extras.getInt(Notification.EXTRA_PROGRESS))
                                 .put("max", notification.extras.getInt(Notification.EXTRA_PROGRESS_MAX))
@@ -187,12 +210,12 @@ class NotificationMediaService(private val context: Context) {
                         if (pause) session.controller.transportControls.pause() else session.controller.transportControls.play()
                         val target = if (pause) PlaybackState.STATE_PAUSED else PlaybackState.STATE_PLAYING
                         val deadline = SystemClock.elapsedRealtime() + waitTimeoutMs
-                        do {
+                        while (true) {
                             ensurePinned(session, true)
                             if (currentState(session)?.state == target || waitTimeoutMs == 0L) break
                             if (SystemClock.elapsedRealtime() >= deadline) throw NotificationMediaException("MEDIA_POSTCONDITION_TIMEOUT", "Control dispatched, but player did not report the requested state before timeout.", true)
                             delay(50)
-                        } while (true)
+                        }
                         payload.put("dispatched", true).put("waitTimeoutMs", waitTimeoutMs)
                             .put("targetStateObserved", currentState(session)?.state == target)
                             .put("session", status(session, maxTextChars))
