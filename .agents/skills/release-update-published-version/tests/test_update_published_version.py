@@ -52,6 +52,13 @@ class PublishedVersionOutputTests(unittest.TestCase):
         (self.repo_root / "sites/docs/static/llms-full.txt").write_text(text, encoding="utf-8")
         (self.repo_root / "sites/landing/public/llms-full.txt").write_text(text, encoding="utf-8")
 
+    def test_updates_real_markdown_release_badge(self) -> None:
+        path = self.repo_root / "compatibility.md"
+        path.write_text(published_version.current_release_marker_text("0.9.5") + "\n")
+
+        self.assertTrue(published_version.update_compatibility_versioned_apk_downloads(path, "0.10.0"))
+        self.assertEqual(path.read_text(), published_version.current_release_marker_text("0.10.0") + "\n")
+
     def test_verifies_current_release_markers_in_generated_outputs(self) -> None:
         self.write_outputs(TARGET_VERSION)
 

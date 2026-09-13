@@ -1,7 +1,7 @@
 # Action result diagnostics
 
 The public contract is [action receipts and failure evidence](../../api/actions.md#action-receipts-and-failure-evidence).
-R6 builds on merged selector inspection and strict selection, while preserving
+Action diagnostics build on selector inspection and strict selection, while preserving
 per-node sensitivity metadata from hierarchy access.
 
 ## Ownership and invariants
@@ -104,8 +104,8 @@ and preservation of typed failures through post-processing.
 Device evidence was kept outside version control. No physical-device or
 cross-OEM validation is claimed. Missing-root and disappearing-container races
 are covered by deterministic fixtures rather than induced on a live device.
-R10's manually dispatched CI hierarchy regression remains a separate release
-gate; this work does not satisfy or waive it.
+Current local verification requirements and device-coverage limits are recorded
+in the [release reference](../release-reference.md#v010-acceptance-requirements).
 
 Sibling runtime skills were audited for scroll enums, terminal/step codes, and
 text receipt consumers. No current skill branches on the changed scroll enums
@@ -115,7 +115,7 @@ message matching, and parse receipt JSON fields explicitly. The legacy
 snapshot-specific `SNAPSHOT_HIERARCHY_UNAVAILABLE` code is preserved.
 
 
-### Scroll eligibility transition validation (R11)
+### Scroll eligibility transition validation
 
 On 13 September 2026, the baseline at `e1aadca2` reproduced the Android 15 / API 35
 Settings failure with both default selection and a strict explicit outer-container
@@ -124,7 +124,7 @@ scroll revealed it while the outer container remained present but became
 non-scrollable. The action incorrectly failed with `CONTAINER_LOST` and
 `container_identity_changed`.
 
-The R11 implementation was validated with the matching debug Operator `0.10.0-d`
+The scroll eligibility repair was validated with the matching debug Operator `0.10.0-d`
 and branch-local Node CLI `0.10.0` on a dedicated English API-35 emulator:
 
 - `./gradlew :app:assembleDebug unitTest`: 454 tests, no failures, errors, or skips.
@@ -160,15 +160,15 @@ regressions remain enabled.
 Device attempts and captures are retained outside version control. The baseline
 follow-up query timed out. Two broad pre-scenario queries on the final build also
 timed out, and one on-screen pre-scenario query returned
-`RESULT_ENVELOPE_MALFORMED`. Those failures remain R13 evidence; later successful
+`RESULT_ENVELOPE_MALFORMED`. Those failures remain result-transport evidence; later successful
 checks do not erase them. An initial check ran before the reinstalled service was
 ready, and a supplemental raw payload was rejected locally for its omitted
 `expectedFormat`; both were corrected before their successful checks. No uncertain
 mutation was replayed to recover evidence.
 
-This is local R11 acceptance, not release readiness. The one clean-start harness
-pass does not establish R12's restored-search preparation contract or R13's
-repeated reliability contract, and does not replace R10's manual CI gate. No
+This establishes local scroll-transition acceptance. The one clean-start harness
+pass does not establish restored-search preparation or repeated transport
+reliability. No
 release-variant, physical-device, or cross-OEM transition proof is claimed.
 Sibling runtime skills use the existing scroll actions and explicit containers;
 no new wire values or skill migration/version changes were needed.
@@ -179,16 +179,17 @@ After reviewing the node-lifetime fix in `5e73d6c0` and merging upstream through
 preparation tests, and the docs build. API 31/32 platform-identity regressions
 passed independently. The merged API-35 live harness verified Settings
 preparation but later stopped at a query with `logcat exited before terminal
-envelope (code=255, signal=null)`. That invocation remains a failed R13 transport
+envelope (code=255, signal=null)`. That invocation remains a failed transport
 observation; the earlier successful harness invocation does not supersede it.
 
 
 ### Combined hierarchy follow-up
 
-With merged R11/R12/R13 and harness fixes through `306b38d`, all six API 35
+With integrated scroll, preparation and transport repairs through `306b38d`, all six API 35
 fresh/subpage/search runs across debug and release passed the unchanged Display
 scroll and the Brightness level postcondition. Internet query/MCP/XML parity and
 PNG checks also passed in each run. See the
-[integrated acceptance record](../../../validation/sensitive-hierarchy-access/README.md#integrated-r11r12r13-acceptance)
+[integrated acceptance record](../../../validation/sensitive-hierarchy-access/README.md#integrated-hierarchy-and-transport-acceptance)
 for complete attempt accounting and build identity. This completes local
-integration proof; the manual supported-image release CI gate remains required.
+integration proof on the stated local image. The GitHub regression is optional
+under the current release requirements.

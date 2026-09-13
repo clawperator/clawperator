@@ -1,4 +1,5 @@
 
+import { ResultReaderTimeline } from "./resultReaderTimeline.js";
 import { ResultEnvelopeTransport } from "./resultEnvelopeTransport.js";
 import { StringDecoder } from "node:string_decoder";
 import type { RuntimeConfig } from "./runtimeConfig.js";
@@ -149,6 +150,10 @@ export async function waitForResultEnvelope(
     const decoder = new StringDecoder("utf8");
     const transport = new ResultEnvelopeTransport(commandId);
     let settled = false;
+    let settlementCode: string | undefined;
+    let failed = false;
+    const timeline = new ResultReaderTimeline();
+    timeline.record("spawn_requested");
     let processExit: { code: number | null; signal: string | null } | undefined;
     const dispatchAfterReaderExitError = new Error("Result reader stopped before broadcast dispatch");
     let stderrBuffer = "";
@@ -177,17 +182,34 @@ export async function waitForResultEnvelope(
       dispatchAttempted: dispatchCaptureStarted,
       executionPosition: "unknown", stdoutObserved,
       stderr: stderrBuffer, lastCorrelatedEvents: correlatedLines.slice(-lastCorrelatedLines),
-      transport: transport.diagnostics(), ...extra,
+      transport: transport.diagnostics(), reader: timeline.snapshot(), ...extra,
     });
     const remember = (line: string) => {
       correlatedLines.push(line.slice(0, 2048));
       if (correlatedLines.length > lastCorrelatedLines) correlatedLines.shift();
     };
 
+    const logTimeline = (event: string) => {
+      try {
+        config.logger?.emit({
+          ts: new Date().toISOString(), level: failed ? "warn" : "debug", event,
+          commandId, taskId: options.taskId, deviceId: config.deviceId,
+          message: JSON.stringify({ operatorPackage: config.operatorPackage,
+            code: settlementCode, transport: transport.diagnostics(), reader: timeline.snapshot() }),
+        });
+      } catch {
+        // Diagnostic logging must never replace an execution result.
+      }
+    };
+
     const finalize = (result: LogcatResult) => {
       if (settled) return;
       settled = true;
-      flush();
+      failed = !result.ok;
+      settlementCode = result.ok ? "terminal_received"
+        : "error" in result ? result.code : result.diagnostics.code;
+      timeline.record("settled", { reason: settlementCode });
+      flush(settlementCode);
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId);
       }
@@ -205,16 +227,21 @@ export async function waitForResultEnvelope(
         if ("error" in result) result.diagnostics = diagnostics(result.diagnostics);
         else result.diagnostics.details = diagnostics();
       }
+      if (failed) logTimeline("result_reader.failure");
       resolve(result);
     };
 
-    const flush = () => {
+    const flush = (reason: string) => {
+      if (proc === undefined) return;
+      timeline.record("cleanup_requested", { reason, signal: "SIGTERM" });
       try {
-        proc.kill("SIGTERM");
+        const accepted = proc.kill("SIGTERM");
+        timeline.record("cleanup_signal_result", { accepted: accepted === true });
       } catch {
-        // ignore
+        timeline.record("cleanup_signal_error");
       }
       if (processExit !== undefined) {
+        timeline.record("cleanup_pipes_requested");
         // Other writers may retain these pipes after the reader has exited.
         proc.stdout?.destroy?.();
         proc.stderr?.destroy?.();
@@ -231,8 +258,10 @@ export async function waitForResultEnvelope(
 
     try {
       proc = config.runner.spawn(config.adbPath, args);
+      timeline.spawned(proc.pid);
     } catch (error) {
       const cause = error as NodeJS.ErrnoException;
+      timeline.record("spawn_error", { processErrorCode: cause.code ?? null });
       finalize({ ok: false, code: cause.code === "ENOENT" ? ERROR_CODES.ADB_NOT_FOUND : ERROR_CODES.RESULT_TRANSPORT_SPAWN_FAILED,
         error: `logcat spawn failed: ${cause.message ?? String(error)}`,
         diagnostics: { processErrorCode: cause.code, originalMessage: cause.message ?? String(error) } });
@@ -259,7 +288,9 @@ export async function waitForResultEnvelope(
       if (timeoutId !== undefined) {
         return;
       }
+      timeline.record("deadline_started", { timeoutMs });
       timeoutId = setTimeout(() => {
+        timeline.record("deadline_reached");
         if (processExit !== undefined) {
           // Keep the dispatch deadline when already running. Before dispatch,
           // exit starts the same bounded budget so inherited pipes cannot hang.
@@ -294,6 +325,7 @@ export async function waitForResultEnvelope(
       }
       pending = "";
       dispatchCaptureStarted = true;
+      timeline.record("dispatch_started");
       broadcastStatus = "sent";
       startTimeout();
     };
@@ -303,6 +335,7 @@ export async function waitForResultEnvelope(
         return;
       }
       broadcastStarted = true;
+      timeline.record("broadcast_callback_started");
       if (broadcastStartTimer !== undefined) {
         clearTimeout(broadcastStartTimer);
       }
@@ -421,8 +454,7 @@ export async function waitForResultEnvelope(
         }
       }
       if (!broadcastStarted) {
-        if (!stdoutObserved) {
-          stdoutObserved = true;
+        if (signalBroadcastMaxTimer === undefined) {
           signalBroadcastMaxTimer = setTimeout(() => {
             startBroadcast();
           }, SIGNAL_BROADCAST_MAX_DRAIN_MS);
@@ -439,13 +471,23 @@ export async function waitForResultEnvelope(
         }, SIGNAL_BROADCAST_REPLAY_DRAIN_MS);
       }
     };
-    proc.stdout?.on("data", (chunk: Buffer) => consumeOutput(decoder.write(chunk)));
+    proc.stdout?.on("data", (chunk: Buffer) => {
+      timeline.observe("stdout", chunk.length);
+      // Output can first arrive after the fallback timer has begun dispatch.
+      // Keep observed evidence independent of the startup-drain timer state.
+      if (chunk.length > 0) stdoutObserved = true;
+      consumeOutput(decoder.write(chunk));
+    });
 
     proc.stderr?.on("data", (chunk: Buffer) => {
+      timeline.observe("stderr", chunk.length);
       stderrBuffer = (stderrBuffer + chunk.toString()).slice(-8192);
     });
 
+    proc.on("spawn", () => timeline.record("spawn"));
+
     proc.on("error", (error: NodeJS.ErrnoException) => {
+      timeline.record("process_error", { processErrorCode: error.code ?? null });
       if (settled) return;
       if ((error as any).code === "ENOENT") {
         config.logger?.emit({
@@ -475,6 +517,8 @@ export async function waitForResultEnvelope(
     });
 
     proc.on("exit", (code: number | null, signal: string | null) => {
+      timeline.record("exit", { code, signal });
+      if (settled) logTimeline("result_reader.exit");
       // Block new dispatch immediately, but allow buffered results to drain
       // within the existing wait budget even if inherited pipes never close.
       processExit = { code, signal };
@@ -482,7 +526,11 @@ export async function waitForResultEnvelope(
     });
 
     proc.on("close", (code: number | null, signal: string | null) => {
-      if (settled) return;
+      timeline.record("close", { code, signal });
+      if (settled) {
+        logTimeline("result_reader.close");
+        return;
+      }
       consumeOutput(decoder.end() + (pending.length > 0 ? "\n" : ""));
       if (settled) return;
       finishExited(code, signal);

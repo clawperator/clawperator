@@ -94,6 +94,60 @@ Expected stable UX:
 9. Verify npm publish succeeded.
 10. Verify installation on a real device.
 
+## v0.10 Acceptance Requirements
+
+Feature implementation is merged through `b7ff0695`. Before publishing v0.10,
+record evidence or an explicit release-scope disposition for these requirements:
+
+1. Resolve or explicitly accept/defer the historical post-dispatch reader-exit
+   cause described in the [transport findings](design/result-transport-reliability.md#diagnostic-verification-and-current-release-limits).
+   Passing finite series and controlled disconnects establish bounded behavior,
+   not the historical cause. Preserve original failures and never replay an
+   uncertain mutation to recover evidence.
+2. Run `./validation/test_all.sh` locally and retain the source revision and
+   suite results. On 13 September 2026 the release owner selected local
+   verification and removed the requirement for a GitHub hierarchy workflow run.
+   The default runner covers Android unit tests, Node tests, evals and repository
+   validation. It does not run live device suites, install APKs or exercise the
+   supported CI emulator image. Preserve those coverage limits alongside the
+   existing [local hierarchy evidence](../../validation/sensitive-hierarchy-access/README.md).
+   The manual GitHub workflow remains available for optional device regression.
+3. Record the final source commit, CLI/APK identities, supported-device limits
+   and all declared attempts. Use existing validation where it covers the
+   delivered revision; run the combined Node suite, relevant Android unit/build
+   checks, docs build and affected live harnesses for uncovered candidate changes.
+   Verify CLI help, strict/query results, compact snapshots, still bundles,
+   managed-video lifecycle and overlay interaction together. Coordinate any
+   affected sibling skill migrations, versions and smoke checks before claiming
+   compatibility.
+
+The earlier six-case debug/release fresh/subpage/search matrix at `306b38d`
+passed; its [integration record](../../validation/sensitive-hierarchy-access/README.md#integrated-hierarchy-and-transport-acceptance)
+retains build identity and attempt accounting. The later reader-exit recurrence
+remains in the transport findings alongside passing series. Media verification
+and retirement of implementation plans do not close outstanding release gates.
+
+### Release-owner disposition for 0.10.0
+
+On 13 September 2026, the release owner explicitly approved shipping 0.10.0
+with the historical post-dispatch reader-exit investigation deferred. The
+original cause remains unresolved; passing local suites and finite live series
+do not establish failure-free transport. Preserve the recorded failures and
+continue the investigation separately without replaying uncertain mutations.
+This disposition satisfies requirement 1 above for this release only.
+
+### Local verification on 13 September 2026
+
+`./validation/test_all.sh` completed once with exit 0 against source
+`99c2290b5edbb79c7851821cecad8d6b4567b1d4`, with only release-guidance edits
+pending. Node build, Android unit tests, all 1,571 Node tests (no skips), all
+124 eval tests and repository validation passed. Repository validation included
+real-codec full-stream video checks, offline hierarchy/transport fixtures,
+blocked-term policy, installer and on-screen-log harness checks.
+
+This run did not install APKs, run live device suites or reproduce the historical
+reader-exit cause. Those limits remain separate from the passing local suites.
+
 ## Tag Commands
 
 Example release:

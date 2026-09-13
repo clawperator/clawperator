@@ -48,7 +48,7 @@ for (const [label, script, exitCode, signal] of [
 
 it("classifies real spawn failure without dispatch", async () => {
   const runtime = config();
-  runtime.runner = { ...runtime.runner, spawn: () => spawn("/nonexistent/r13-adb", []) };
+  runtime.runner = { ...runtime.runner, spawn: () => spawn("/nonexistent/result-reader-adb", []) };
   let dispatches = 0;
   const result = await waitForResultEnvelope(runtime, { ...options, broadcastDelayMs: 100 }, async () => {
     dispatches++; return { success: true };
@@ -281,4 +281,84 @@ it("preserves a signal and rejected framing at the exit-drain deadline", { timeo
     assert.equal(f.stdout.destroyed, true);
     assert.equal(f.stderr.destroyed, true);
   }
+});
+
+it("reports stdout observed when command-start arrives after fallback dispatch", async () => {
+  const f = fake();
+  let dispatches = 0;
+  const result = await waitForResultEnvelope(f.runtime, options, async begin => {
+    begin(); dispatches++;
+    f.stdout.write(`[Clawperator-Command] start commandId=${options.commandId}\n`);
+    f.proc.emit("exit", 255, null);
+    f.proc.emit("close", 255, null);
+    return { success: true };
+  });
+  assert.ok(!result.ok && "error" in result);
+  assert.equal(result.code, "RESULT_TRANSPORT_EXITED");
+  assert.equal(result.diagnostics?.stdoutObserved, true);
+  assert.equal(result.diagnostics?.dispatchAttempted, true);
+  assert.equal(dispatches, 1);
+});
+
+it("retains a correlated metadata-only failure timeline and late cleanup lifecycle", async () => {
+  const f = fake();
+  const logged: import("../../contracts/logging.js").LogEvent[] = [];
+  f.runtime.logger = { emit: event => { logged.push(event); }, child() { return this; }, logPath: () => undefined };
+  Object.assign(f.proc, { pid: 12345 });
+  const result = await waitForResultEnvelope(f.runtime, { ...options, timeoutMs: 10 }, async begin => {
+    begin();
+    f.stdout.write("private UI text\n");
+    f.stderr.write("private stderr text");
+    return { success: true };
+  });
+  assert.ok(!result.ok && "timeout" in result);
+  const failure = logged.find(event => event.event === "result_reader.failure")!;
+  assert.equal(failure.level, "warn");
+  assert.equal(failure.commandId, options.commandId);
+  assert.equal(failure.taskId, options.taskId);
+  assert.ok(!failure.message.includes("private"));
+  const { reader, transport } = JSON.parse(failure.message);
+  assert.deepEqual(transport, { receivedChunks: 0, receivedBytes: 0 });
+  assert.equal(reader.readerPid, 12345);
+  assert.equal(reader.stdoutBytes, Buffer.byteLength("private UI text\n"));
+  assert.equal(reader.stderrBytes, Buffer.byteLength("private stderr text"));
+  const names = reader.events.map((event: { event: string }) => event.event);
+  assert.ok(names.indexOf("dispatch_started") < names.indexOf("first_stdout"));
+  assert.ok(names.indexOf("deadline_reached") < names.indexOf("cleanup_requested"));
+  assert.equal(reader.events.find((event: { event: string }) => event.event === "cleanup_requested").reason, "RESULT_ENVELOPE_TIMEOUT");
+  assert.deepEqual((result.diagnostics.details?.reader as typeof reader).events, reader.events);
+  f.proc.emit("exit", null, "SIGTERM");
+  f.proc.emit("close", null, "SIGTERM");
+  assert.equal(logged.filter(event => event.event === "result_reader.failure").length, 1);
+  const closed = JSON.parse(logged.find(event => event.event === "result_reader.close")!.message);
+  assert.equal(closed.reader.events.at(-1).event, "close");
+  assert.equal(closed.reader.events.at(-2).event, "exit");
+  assert.ok(!reader.events.some((event: { event: string }) => event.event === "exit"));
+});
+
+it("records unexpected exit before its own cleanup without changing the exit failure", async () => {
+  const f = fake();
+  const result = await waitForResultEnvelope(f.runtime, options, async begin => {
+    begin();
+    f.proc.emit("exit", 255, null);
+    f.proc.emit("close", 255, null);
+    return { success: true };
+  });
+  assert.ok(!result.ok && "error" in result);
+  assert.equal(result.code, "RESULT_TRANSPORT_EXITED");
+  const reader = result.diagnostics?.reader as { events: Array<{ event: string; code?: number }> };
+  const names = reader.events.map(event => event.event);
+  assert.ok(names.indexOf("exit") < names.indexOf("cleanup_requested"));
+  assert.equal(reader.events.find(event => event.event === "exit")?.code, 255);
+});
+
+it("timeline logger failure cannot replace a result", async () => {
+  const f = fake();
+  f.runtime.logger = { emit: event => { if (event.event.startsWith("result_reader.")) throw new Error("unavailable logger"); },
+    child() { return this; }, logPath: () => undefined };
+  const result = await waitForResultEnvelope(f.runtime, options, async begin => {
+    begin(); f.proc.emit("close", 255, null); return { success: true };
+  });
+  assert.ok(!result.ok && "error" in result);
+  assert.equal(result.code, "RESULT_TRANSPORT_EXITED");
 });

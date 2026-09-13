@@ -73,7 +73,7 @@ Acceptance completed on the implementation branch:
 | Screenshot with unavailable hierarchy | Independent failure PNG decoded successfully |
 | Packaged declaration and manifest binding | Both intended APKs passed; false-declaration APK was rejected |
 | Android build and unit tests | Both variants built and all `testDebugUnitTest` tasks passed with shared Robolectric 4.11.1 |
-| Node build and standard tests | 306 tests passed; the default command does not discover every test file |
+| Node build and standard tests | 306 tests passed with the then-current limited discovery |
 | Focused query/MCP tests | 94 tests passed, including sensitivity transport and older-payload compatibility |
 | Offline harness fixtures | Five tests passed for hierarchy/state/XML failures and old-payload handling |
 | Authored docs | Full docs build and route validation passed |
@@ -81,8 +81,9 @@ Acceptance completed on the implementation branch:
 The negative-control source edit was restored, both intended APKs rebuilt, and
 the intended development APK reinstalled. The temporary release installation
 was removed and the original development service selection restored. No network
-settings were changed. These results prove local acceptance; a manually dispatched GitHub run remains
-release evidence, not a check on every pull request.
+settings were changed. These results prove local acceptance. A manually
+dispatched GitHub run is optional under the
+[current release requirements](../release-reference.md#v010-acceptance-requirements).
 
 The development upgrade briefly disconnected the service and then reconnected
 without a manual re-enable. The release install encountered a stale/crashed
@@ -99,11 +100,12 @@ checks. It has no PR or push trigger; local validation does not claim a remote
 CI result. No runtime skill consumes a strict NodeSummary schema requiring a
 migration for this additive field.
 
-## Deferred validation and transport work
+## Test discovery and remaining MCP transport work
 
-The [repository test runner follow-up](test-execution.md) owns test consolidation
-and the shell-dependent Node discovery gap. R10's focused query/MCP checks were
-run explicitly; its acceptance does not establish coverage of every Node test.
+The [repository test runner](test-execution.md), merged in `39352855`, recursively
+discovers every built Node test file without shell glob expansion. The focused
+query/MCP checks above were run explicitly before that consolidation; their
+historical counts describe only those checks.
 
 The MCP transport sanitizer removes path-named fields, including `nodePath` and
 `parentPath`, from the parsed query object. The serialized query inside the raw

@@ -1,5 +1,10 @@
 # Result transport reliability
 
+Current release verification uses the local suite; a GitHub run is optional by
+the release owner's 13 September 2026 decision. See the
+[release requirements](../release-reference.md#v010-acceptance-requirements).
+Historical evidence below retains the coverage and failures of each attempt.
+
 ## Contract and ownership
 
 The host result reader owns process lifecycle, stream framing and reassembly.
@@ -65,7 +70,7 @@ uses the branch-local 0.10.0 CLI, API-35 arm64 Google APIs Android 15 image,
 English en-US, and fingerprint
 `google/sdk_gphone64_arm64/emu64a:15/AE3A.240806.036/12592187:user/release-keys`.
 Only the selected Operator service was enabled. Builds started from `e1aadca2`
-plus the R13 implementation committed as `cd3e979`. Private metadata records the exact built JavaScript hashes,
+plus the transport implementation committed as `cd3e979`. Private metadata records the exact built JavaScript hashes,
 APK hashes, package metadata, command/task IDs, every output size and duration,
 and bounded raw logcat evidence. No personal device identifiers are committed.
 
@@ -95,7 +100,8 @@ uncertainty semantics, not their original live root causes. Those causal limits,
 the debug startup failure and the finite sample prevent claiming a completely
 resolved reliability gate or a zero-flake transport.
 
-R11/R12 were not integrated for the original series above. The combined hierarchy
+Scroll eligibility and homepage preparation repairs were not integrated for
+the original series above. The combined hierarchy
 regression and manual CI release gate were outstanding at that point; this focused fixture deliberately
 uses the Settings Internet intent and does not waive homepage/scroll assertions.
 No runtime skill contract changed, and no sibling skill migration is required.
@@ -133,7 +139,7 @@ the controlled unit tests. The release variant was not rerun for this follow-up.
 ### Integration with main for PR review
 
 Merged `origin/main` at `28b8b1fa` into the branch containing the reviewed
-background-publication fix `be5f85ac`. This brings R7, R11 and R12 together.
+background-publication fix `be5f85ac`. This integrated compact snapshots, scroll eligibility and homepage preparation.
 The integrated code passed 1,496 Node tests, 463 Android unit tests, both APK
 builds, repository validation and the docs build.
 
@@ -145,8 +151,8 @@ the first captured Internet query returned a successful, correlated 24-node
 hierarchy without the switch; the next two captures returned 68 nodes with the
 switch. No transport failure occurred in those three captures. The failed run
 is retained, without retrying to obtain a passing result or weakening the
-fixture. Release readiness remains open for that fixture transition and manual
-CI; original historical transport-cause limits also remain.
+fixture. At that revision, release readiness remained open for the fixture
+transition, historical transport causes and the then-required manual CI run.
 
 Integrated APK SHA-256 values:
 
@@ -154,7 +160,7 @@ Integrated APK SHA-256 values:
 - Release: `dfd1f5f2aaf1b3b356f260d4f252345977a3f985c36c9127f1944a083c6f0699`.
 
 
-### Completed local R11/R12/R13 integration
+### Completed local hierarchy and transport integration
 
 The final integrated harness at `306b38d` passed all six debug/release
 fresh/subpage/search runs on API 35, including query/MCP/XML parity, PNG and
@@ -169,13 +175,13 @@ then verifies a healthy selected binding and nonempty query. The earlier release
 failure after the readiness fix was retained and diagnosed as unusable service
 binding state; the interrupted transport series was not presented as a pass.
 
-The [full acceptance record](../../../validation/sensitive-hierarchy-access/README.md#integrated-r11r12r13-acceptance)
+The [full acceptance record](../../../validation/sensitive-hierarchy-access/README.md#integrated-hierarchy-and-transport-acceptance)
 preserves all final cases, earlier failures, setup observations, source and APK
-hashes. This resolves the local combined-harness gap described above. The manual
-supported-image CI release gate and historical causal limits remain explicit;
-a finite series does not prove failure-free transport under every condition.
+hashes. This resolves the local combined-harness gap described above. Historical
+causal limits remain explicit; a finite series does not prove failure-free
+transport under every condition.
 
-## PR-2 recurring reader exit investigation
+## Recurring reader exit investigation
 
 The independent audit at `6367227a` retained a debug Internet parity query with
 `RESULT_TRANSPORT_EXITED`, exit 255, empty stderr, a sent broadcast and a
@@ -183,8 +189,8 @@ correlated Android command-start event, but no received chunks. Its later fixed
 series passed 60/60 commands on each variant. Both observations remain valid;
 the passing series does not close the causal reliability gate.
 
-PR-2 starts from main at `8d398706`, including PR-1 and the integrated hierarchy
-setup repairs. Inspection separates these mechanisms:
+The recurring-exit investigation started at `8d398706`, including the initial
+transport and integrated hierarchy setup repairs. Inspection separated these mechanisms:
 
 - `NodeProcessRunner.spawn` has no generic process timeout. Reader timeout and
   cancellation settle before killing their child, preserving their specific
@@ -232,7 +238,7 @@ mutation despite an uncertain outcome. Read-only query failures remain recorded
 and are never replaced with successful retries. Offline tests cover both paths;
 `summary.json` records failures, unrun counts and independent-reader exit state.
 
-### PR-2 bounded live results
+### Reader-exit repair bounded live results
 
 On 13 September 2026 the baseline debug full hierarchy fixture passed once
 before the repair. The repaired source was committed as
@@ -268,7 +274,7 @@ The fixed-series harness also kept its existing per-attempt independent tails.
 All independent readers were alive before intentional cleanup. The observed
 logd, adbd and selected Operator process identities were unchanged across each
 run. No live transport failure or service failure occurred in these declared
-PR-2 attempts. Instrumentation may affect timing; these observations do not
+reader-exit repair attempts. Instrumentation may affect timing; these observations do not
 prove that an unobserved short interruption is impossible.
 
 Locally built APK SHA-256:
@@ -285,7 +291,7 @@ invocation/setup failures were retained separately from completed validations.
 
 ### Remaining causal blocker
 
-The bounded PR-2 investigation and safety repairs are complete, but the recurring
+The bounded reader-exit investigation and safety repairs are complete, but the recurring
 post-dispatch exit-255 cause remains unresolved. None of the new live attempts
 reproduced that failure, so there is no failing shell-protocol trace to compare
 with independent device logging and process state. The audit's command-start
@@ -295,16 +301,13 @@ causal limits; integrity checks and pacing were not weakened or changed.
 
 Further causal closure needs a fresh failing attempt with host shell-protocol
 completion/disconnect evidence and simultaneous independent device/process
-observations, without redispatching an uncertain mutation. Keep the R13 pack
-active and the causal reliability gate open. The manually dispatched supported
-CI image remains a separate release prerequisite; these local passes do not
-satisfy it. No automatic emulator workflow, R14 implementation or release publication
-is added by PR-2. Subsequent user-authorized review and PR preparation are
-recorded below.
+observations, without redispatching an uncertain mutation. The causal reliability
+gate remains open. These local passes do not claim verification on the
+supported GitHub CI image; that workflow is now optional.
 
 ### Review repair: bounded draining after exit
 
-The delegated code review found a pre-dispatch hang in the initial PR-2 guard:
+The delegated code review found a pre-dispatch hang in the initial exit guard:
 if another process retained the exited reader's output pipes, dispatch was
 blocked but no result timer had started. With a 20 ms configured timeout, a
 controlled reader stayed pending beyond 100 ms until a synthetic close arrived.
@@ -327,9 +330,8 @@ extending the configured deadline or claiming a cause for the live audit exit.
 The drain repair was committed in `308d42eb`. A fresh independent sub-agent
 review of committed `21c58729` against main `0b571d76` found no actionable
 issues and passed 25 reader/transport tests plus four harness checks. This
-clean review was a required gate before opening the PR. The branch incorporates
-the latest upstream Android overlay-permission and video-verification changes;
-no new R14 implementation belongs to this branch's diff.
+clean review covered integration with the Android overlay-permission and
+video-verification changes.
 
 The integrated build passed all 1,565 Node tests and repository validation,
 including the full-stream media fixtures from upstream. Matching debug/release
@@ -378,7 +380,163 @@ Final matching APK SHA-256:
 - Release: `e8df33b54cca7fa4b2614f62b15ded395c76f7c08e19673217351d67bd03f515`.
 
 The clean code review supports these bounded lifecycle repairs. The historical
-post-dispatch exit cause, these retained fixture failures, and the manual
-supported-image CI prerequisite prevent claiming complete reliability or release
-acceptance. PR creation is authorized; release publication is not part of this
-work.
+post-dispatch exit cause and these retained fixture failures prevent claiming
+complete reliability. Current release verification requirements are linked above.
+
+### Follow-up: controlled connection interruption and evidence repair
+
+A further investigation on 13 September 2026 used implementation worktree HEAD
+`e2b4617c`, then the diagnostic repair described below. PR #288 had meanwhile
+merged as `7cdb31d4`; that merge does not close the causal gate. The original
+audit's raw failed query was still available and independently confirmed the
+reported start event, sent dispatch, zero chunks, empty stderr and exit 255.
+Its historical interruption mechanism remains unknown.
+
+Two separately declared read-only queries tested a specific mechanism. A private
+TCP relay forwarded only the selected CLI result reader's connection to the
+existing ADB server. After forwarding the correlated command-start output, it
+closed that connection. Broadcast and independent-reader connections bypassed
+the relay. No ADB server reset, device disconnect, Operator termination or
+mutation replay was used. The first experiment enabled shell tracing; the
+second disabled tracing to check the original empty-stderr symptom after the
+diagnostic repair.
+
+Both injected interruptions returned `RESULT_TRANSPORT_EXITED`, host exit 255,
+null signal, sent dispatch and zero received chunks. The untraced attempt also
+had empty stderr. Independent logcat stayed alive and retained all result
+chunks. The branch-local strict reassembler validated the complete successful
+canonical results: 32 chunks / 32,260 bytes in the first experiment and 34
+chunks / 34,273 bytes in the second. Command/task identities matched each failed
+CLI attempt. The observed logd, adbd and Operator process identities were stable
+before and after the first experiment. Private evidence retains the relay,
+forwarded bytes, injection timestamps, exact invocations, correlated output and
+independent-publication verification.
+
+This demonstrates that interrupting the host reader connection can reproduce
+the symptom while Android completes and publishes correctly. It does not show
+that this caused the historical failure, distinguish its external initiator,
+or prove that every exit 255 has this cause. The deliberate interruptions are
+not counted as naturally recurring failures or successful transport delivery.
+
+The experiment exposed a separate diagnostic defect: `stdoutObserved` remained
+false when the first output arrived after fallback dispatch, even with a
+retained command-start line. A deterministic regression failed on that case.
+The reader now records nonempty stdout arrival independently of startup-drain
+timers. The corrected untraced experiment reported `stdoutObserved: true`.
+Dispatch, deadlines, terminal authority and integrity checks are unchanged.
+
+The manual series now reports canonical-envelope delivery independently of
+Android action, host-exit and fixture verdicts. Reclassification of the saved
+reader-exit investigation failures correctly counted the debug `UI_TREE_UNAVAILABLE` and release
+loading-screen capture as delivered envelopes, with action and fixture failures
+respectively. A no-envelope outcome remains `host_or_transport`, requiring the
+original diagnostics to distinguish host/preflight errors from transport loss.
+Before advancing after a failure, read-only observations save the bounded device
+log buffer, process lists and connection state. Observation timeout and spawn
+errors remain explicit and cannot replace the original attempt. Optional shell
+tracing supplies bounded diagnostics, not a complete protocol recording.
+
+The logcat publication path has no per-command delivery acknowledgement or
+persistent result retrieval mechanism. These experiments show a recoverability
+limit: successful Android publication is insufficient to guarantee delivery to
+an interrupted reader. If the product requires retrieval after disconnection,
+a durable result record fetched by the original command identity is a design
+candidate; it would retrieve evidence without re-executing the action. This
+follow-up does not implement a replacement channel or treat that design as the
+historical root-cause repair. Causal closure still needs a naturally failing
+capture with simultaneous reader/protocol and publication observations.
+
+#### Follow-up attempt accounting
+
+Only the assigned API-35 English emulator was used, with branch-local CLI and
+matching locally built APKs. The debug fixed series delivered its first 40
+canonical results. Attempt 41 failed before CLI startup because an overlapping
+repository validation rebuilt `dist/`; a denied host process-list observation
+then interrupted the harness. Both host failures were retained. The remaining
+19 attempts stayed unrun, and the series was not repeated. Observation failures
+are now handled and covered by timeout/permission-denial regressions; builds
+and subsequent device runs were serialized.
+
+The release fixed series ran once and passed all 60 fixture checks with 60
+canonical envelopes and a live independent reader. The two injected debug
+queries are accounted for separately above. No natural transport failure was
+captured in this follow-up. These results neither erase the interrupted debug
+series nor establish complete reliability.
+
+Matching APK SHA-256:
+
+- Debug: `d70263154b535d57b08d0c6935f6bfa43dbe539ece863c84011e5e84ebc99415`.
+- Release: `a454378ffca04a84d42f066879425d9221e043118d9c0edfa8c3b3a411a3be25`.
+
+Both complete debug/release hierarchy fixtures passed once, including five query
+comparisons, XML/MCP/PNG parity and Display & touch. Node build and all 1,566
+Node tests passed. Seven harness regressions cover outcome separation,
+no-replay sequencing and observation failures. A live observation-only check
+retained denied host-process access and still completed all three device
+observations. Both APKs built; Android runtime source was unchanged and its
+unit suite was not rerun in this follow-up. The initial restricted Gradle-cache
+access failure remains in private accounting before the authorized build.
+
+
+### Correlated reader and publication diagnostics
+
+The reader keeps a bounded, metadata-only timeline in memory for each command.
+It records process creation and confirmed spawn separately, first stdout/stderr,
+broadcast callback entry, dispatch, deadline start/expiry, exit, close, settlement,
+and cleanup requests/results. Times are monotonic milliseconds since the wait
+began, with a wall-clock start timestamp for cross-process comparison. Output
+counters and last-output times update without adding per-chunk events. The
+32-event limit has an explicit dropped-event counter. Stream metadata uses
+`stdoutBytes`, `stderrBytes`, `lastStdoutElapsedMs` and `lastStderrElapsedMs`,
+so MCP preserves it while continuing to remove raw stdout/stderr fields.
+
+The failure response includes `details.reader`. The existing host logger writes
+`result_reader.failure` at warning level on failure and preserves late exit/close
+observations separately. Command/task/device identities accompany those events;
+the JSON message contains Operator package, settlement code, chunk progress and
+reader metadata.
+This does not copy UI contents, raw stderr or command payloads into new logs.
+Timeline logger failures do not change the result. Existing user-selected log thresholds
+still apply. A host killed before settlement may never flush this in-memory
+record; absence of the log is not evidence that the reader never started.
+
+Compare event order before drawing a causal conclusion. An `exit` before
+`cleanup_requested` was observed before this reader requested termination; it
+does not identify an external initiator. An exit after cleanup may reflect that
+request, but ordering alone does not prove causality. The returned failure is
+an immutable settlement-time snapshot, while late lifecycle log events may
+show the subsequent exit and pipe closure. No deadline or dispatch behavior is
+changed, and no uncertain execution is replayed.
+
+Android emits `[Clawperator-Publication]` followed by a single JSON object with
+`commandId`, `taskId`, `event`, `byteLength`, `recordCount`, `chunkCount`,
+`writtenRecords`, and monotonic `elapsedMs`. Events are `started`,
+`writes_completed`, or `write_failed`. A small unchunked result has one record
+and zero chunks. Identifiers are JSON-escaped; no result payload or exception
+message is copied into these markers. `writtenRecords` counts logging calls
+that returned. Diagnostic-write exceptions cannot block canonical publication,
+and canonical-write exceptions retain their existing failure behavior.
+
+`writes_completed` means only that publication writes returned. It is not a
+logd or host delivery acknowledgement. The result reader may stop on the last
+result record before that marker arrives, so use the independent observer or
+bounded device-buffer capture when checking publication completion. These
+markers share logcat's loss characteristics; missing markers are inconclusive.
+The historical cause remains open. GitHub verification is optional under the
+current release decision linked above.
+
+
+### Diagnostic verification and current release limits
+
+The diagnostic work merged in `b7ff0695` (PR #290). Validation passed all 1,571
+Node tests, 59 app/Operator Android unit tests, both APK builds and documentation
+route checks. Each matching debug/release
+API-35 series ran once and passed 60/60 delivery and fixture checks. Separate
+controlled reader disconnects retained exit 255 before host cleanup, while an
+independent stream validated successful canonical publication and both markers.
+The final release capture also verified persistence at the default log level
+and preservation of timeline metadata through MCP redaction. An initial Android
+test assertion about coroutine exception object identity failed; it was corrected
+to check propagated type/message, and the failed attempt remains in private
+accounting. No natural recurrence was captured, and no causal or release gate
+is closed by these checks.
