@@ -10,6 +10,7 @@ Failed read-only queries are retained while the fixed series continues.
 ```sh
 python3 validation/result-transport-reliability/run.py \
   --device <device_serial> --operator-package com.clawperator.operator.dev \
+  --trace-adb-shell \
   --apk apps/android/app/build/outputs/apk/debug/app-debug.apk \
   --out /tmp/result-transport-debug
 ```
@@ -23,6 +24,28 @@ artifacts. Every attempt records identity, output size, duration and outcome;
 failed attempts remain in the report. `summary.json` records completed, failed and
 unrun counts and whether the independent reader exited before cleanup. Timeouts
 are failures, not retries.
+
+Delivery is counted separately in `canonicalEnvelopesReceived`. Each attempt
+records `canonicalEnvelopeReceived` and a `failureCategory`: `android_action`
+for a delivered failed action, `fixture` for a successful action that misses the
+fixture, `host_exit` for a delivered successful result with a nonzero process
+exit, or `host_or_transport` when no canonical result was delivered. The latter
+does not imply device execution occurred; inspect the retained public code,
+command correlation and raw stderr to distinguish preflight/host errors.
+
+Before the next attempt after any failure, the harness saves a bounded device
+log-buffer dump, host and device process lists, and device connection state.
+Each observation keeps its invocation, timestamp, exit status, stdout/stderr
+and truncation flags. Observation errors, including permission denial, are
+retained without replacing the original failure or stopping safe read-only
+attempts. Independent-reader exit is recorded per attempt as well as at cleanup.
+
+`--trace-adb-shell` sets `ADB_TRACE=shell` only for the series children. The
+runtime preserves its bounded stderr tail on failure; this is diagnostic
+context, not a complete wire capture. Observations occur after the failure and
+cannot prove that no brief interruption occurred. Keep these private artifacts
+outside Git. Serialize builds and live runs: rebuilding Node removes `dist/`
+and can prevent a concurrent CLI attempt from starting.
 
 The Internet fixture is prepared using `android.settings.WIFI_SETTINGS`, then
 verified through the full query's heading, sensitive root and Wi-Fi switch.
