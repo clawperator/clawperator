@@ -58,6 +58,7 @@ nav:
       - Actions: api/actions.md
       - On-screen Logs: api/on-screen-logs.md
       - Selectors: api/selectors.md
+      - Scoped Selection Walkthrough: api/scoped-selection.md
       - CLI Reference: api/cli.md
       - Snapshot Format: api/snapshot.md
       - Evidence Bundles: api/evidence.md
