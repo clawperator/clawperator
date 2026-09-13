@@ -94,6 +94,38 @@ Expected stable UX:
 9. Verify npm publish succeeded.
 10. Verify installation on a real device.
 
+## v0.10 Acceptance Requirements
+
+Feature implementation is merged through `b7ff0695`. Before publishing v0.10,
+record evidence or an explicit release-scope disposition for these requirements:
+
+1. Resolve or explicitly accept/defer the historical post-dispatch reader-exit
+   cause described in the [transport findings](design/result-transport-reliability.md#diagnostic-verification-and-current-release-limits).
+   Passing finite series and controlled disconnects establish bounded behavior,
+   not the historical cause. Preserve original failures and never replay an
+   uncertain mutation to recover evidence.
+2. Run the [manual hierarchy workflow](../../.github/workflows/sensitive-hierarchy.yml)
+   against the release candidate and retain its run URL and artifacts. Both
+   matching APK variants must pass the full Android 15 Internet query/XML
+   regression on the supported English API-35 Google APIs x86_64 revision-9
+   image. Local arm64 passes and focused preparation checks do not replace it.
+   Keep the workflow manual. The documentation audit on 13 September 2026 found
+   no listed runs. See the [harness prerequisites and acceptance evidence](../../validation/sensitive-hierarchy-access/README.md).
+3. Record the final source commit, CLI/APK identities, supported-device limits
+   and all declared attempts. Use existing validation where it covers the
+   delivered revision; run the combined Node suite, relevant Android unit/build
+   checks, docs build and affected live harnesses for uncovered candidate changes.
+   Verify CLI help, strict/query results, compact snapshots, still bundles,
+   managed-video lifecycle and overlay interaction together. Coordinate any
+   affected sibling skill migrations, versions and smoke checks before claiming
+   compatibility.
+
+The earlier six-case debug/release fresh/subpage/search matrix at `306b38d`
+passed; its [integration record](../../validation/sensitive-hierarchy-access/README.md#integrated-hierarchy-and-transport-acceptance)
+retains build identity and attempt accounting. The later reader-exit recurrence
+remains in the transport findings alongside passing series. Media verification
+and retirement of implementation plans do not close outstanding release gates.
+
 ## Tag Commands
 
 Example release:

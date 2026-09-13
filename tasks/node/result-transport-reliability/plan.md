@@ -42,4 +42,4 @@ causal gap through demonstrated evidence and repairs, or obtain an explicit
 release-scope decision accepting or deferring it. Preserve the decision and its
 limits in the permanent design record before retiring this pack. The manual
 supported-image CI gate is separately tracked in the
-[release acceptance plan](../../releases/v0.10/plan.md).
+[release reference](../../../docs/internal/release-reference.md#v010-acceptance-requirements).
