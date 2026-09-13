@@ -37,6 +37,16 @@ stops the sequence. [Action receipts](actions.md#action-receipts-and-failure-evi
 describe dispatch evidence, not a verified application outcome. Do not replay an
 uncertain mutation automatically.
 
+## Evidence storage failures
+
+`EVIDENCE_STORAGE_UNWRITABLE` means an evidence destination or the fixed host
+video lock directory failed a required filesystem operation. CLI/Node and MCP
+errors include the absolute `path`, underlying `causeCode` (or null), `message`,
+and a `recovery` action. Choose a writable `CLAWPERATOR_EVIDENCE_DIR` and new
+output directory, and ensure the host lock directory is accessible. Video
+preflight fails before any recorder is spawned; no permission changes or
+stale-owner takeover occurs. See [evidence storage configuration](evidence.md#evidence-storage-configuration).
+
 ## Two Failure Shapes
 
 Clawperator surfaces failures in two main shapes.

@@ -361,6 +361,31 @@ describe("still evidence capture", () => {
   });
 });
 
+
+it("managed still capture uses the configured root and reports storage recovery through MCP", async () => {
+  const f = await fixture();
+  const previous = process.env.CLAWPERATOR_EVIDENCE_DIR;
+  try {
+    process.env.CLAWPERATOR_EVIDENCE_DIR = join(f.directory, "configured");
+    const dependencies = { ...f.dependencies, baseDir: undefined };
+    const result = await captureEvidence({}, dependencies);
+    assert.ok(result.manifestPath.startsWith(join(process.env.CLAWPERATOR_EVIDENCE_DIR, "bundles")));
+    assert.equal(result.status, "complete");
+    const blocked = join(f.directory, "blocked");
+    await fs.writeFile(blocked, "existing bytes");
+    process.env.CLAWPERATOR_EVIDENCE_DIR = blocked;
+    const response = await getEvidenceMcpTools(undefined, undefined, dependencies)[0].handler({});
+    assert.equal(response.isError, true);
+    assert.equal(response.structuredContent?.code, "EVIDENCE_STORAGE_UNWRITABLE");
+    assert.equal(response.structuredContent?.path, join(blocked, "bundles"));
+    assert.equal(typeof response.structuredContent?.recovery, "string");
+  } finally {
+    if (previous === undefined) delete process.env.CLAWPERATOR_EVIDENCE_DIR;
+    else process.env.CLAWPERATOR_EVIDENCE_DIR = previous;
+    await f.cleanup();
+  }
+});
+
 describe("evidence metadata classification", () => {
   for (const [flags, expected] of [
     ["", "physical"],
