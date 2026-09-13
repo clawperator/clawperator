@@ -1852,7 +1852,8 @@ Usage:
                     [--visibility <on_screen|all>] [--limit <1..1000>]
                     [--device <id>] [--operator-package <pkg>] [--timeout <ms>] [--no-daemon]
 
-Omit the matcher to query all eligible nodes. --matcher-json cannot be combined
+Omit the matcher to query all eligible nodes; --matcher-json '{}' is invalid.
+--matcher-json cannot be combined
 with simple selector flags. --text-contains, --desc and --desc-contains also work.
 Visibility defaults to on_screen; limit defaults to 100. data.query contains
 serialized JSON with totalMatches, truncation and node states, including blank labels.

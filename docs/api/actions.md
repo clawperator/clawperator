@@ -284,6 +284,50 @@ clawperator query --device <device_serial> --operator-package com.clawperator.op
 clawperator query --matcher-json '{"descendant":{"textEquals":"Display"}}'
 ```
 
+### Runnable Node consumer
+
+From a repository checkout, build and run the tested
+[query consumer example](https://github.com/clawperator/clawperator/blob/main/apps/node/src/examples/query-consumer.ts):
+
+```bash
+npm --prefix apps/node ci
+npm --prefix apps/node run build
+node apps/node/dist/examples/query-consumer.js --device <device_serial> --operator-package com.clawperator.operator.dev --visibility all --limit 1000
+```
+
+The example invokes the CLI built in that checkout. It accepts query flags and
+omits the matcher by default for all-node discovery. An explicit
+`--matcher-json '{}'` (or `--selector '{}'`) is invalid; remove that flag and its
+value to discover all eligible nodes. Other node-targeted actions still require
+an appropriate [selector](selectors.md).
+
+Before returning an inventory, the consumer checks the process exit, signal and
+spawn error; canonical terminal evidence; successful envelope and every step;
+and exactly one `query_ui` step with ID `query`. It parses that step's string
+`data.query`, validates schema version 1 and node field types, checks count
+consistency, and rejects truncation. `consumeQuery(output, queryStepId)` can
+select an explicitly named step when adapting the local example to a multi-step
+response. It is example-local validation, not an exported SDK accessor.
+
+Success prints `commandId`, `taskId`, the decoded `query`, and the original
+process output in `diagnostics`. Failure exits with code 1 and prints a message
+and the original output to stderr, including any available envelope and IDs.
+Preserve those diagnostics when investigating failures. Unknown nullable states
+remain null; an omitted `accessibilityDataSensitive` remains unknown.
+
+To observe refusal of a partial inventory on a screen with multiple nodes:
+
+```bash
+node apps/node/dist/examples/query-consumer.js --device <device_serial> --operator-package com.clawperator.operator.dev --visibility all --limit 1
+```
+
+A truncated inventory cannot prove absence or uniqueness. Increase the limit
+(up to 1000) or narrow the matcher, recognizing that a filtered result only
+covers that filter. Even a complete result describes one capture and its
+visibility scope, not future state or completion of navigation. Zero matches
+are valid for that capture. The original response remains available on both
+success and failure; the canonical envelope and string payload are unchanged.
+
 `--matcher-json` and `--selector` name the same JSON input and are mutually
 exclusive with simple selector flags (`--text`, `--text-contains`, `--id`, `--desc`,
 `--desc-contains`, `--role`). Omitting all selector flags matches all eligible nodes.
