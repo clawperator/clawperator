@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.11.1] - 2026-09-13
+
+This release added bounded media observation to collect player reports over time, including while locked or screen-off, while keeping those reports distinct from proof of audible or rendered playback.
+
+### 🤖 Node API & CLI
+
+- **Added:** Added `media observe` across CLI, typed helpers, HTTP and generic MCP with a 1-30000 ms duration, pinned session selection, starting and ending status, callback counts, and up to 64 readable samples with explicit truncation.
+- **Added:** Exposed report sequence and receipt time, buffered position, and local/remote playback type in media status while preserving decoding of older status payloads.
+
+### 📚 Documentation & Website
+
+- **Added:** Documented bounded observation, report evidence limits, timeout and session-expiry behavior, and an agent workflow for inspecting background playback reports.
+
+### 📱 Android Operator APK
+
+- **Added:** Collected playback-state callbacks over a bounded interval without waking locked or screen-off devices, preserving original player timestamps and failing on session expiry instead of following a replacement.
+
+Pull requests:
+- [chore(release): complete 0.11.0 follow-up](https://github.com/clawperator/clawperator/pull/306)
+- [feat(media): observe playback reports over a bounded interval](https://github.com/clawperator/clawperator/pull/307)
+
 ## [0.11.0] - 2026-09-13
 
 This release added background notification observation and media controls across the Node API, Android Operator, and public documentation, including safe read-only use while a device is locked or its screen is off.
