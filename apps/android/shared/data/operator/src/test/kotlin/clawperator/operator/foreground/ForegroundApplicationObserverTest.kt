@@ -231,6 +231,31 @@ class ForegroundApplicationObserverTest {
     }
 
     @Test
+    fun `slow consumer receives latest state rather than queued stale identities`() = runTest {
+        val service = service()
+        var current = first
+        val observer = ForegroundApplicationObserver(backgroundScope) { _, _ -> current }
+        observer.attach(service)
+        val blockedConsumer = CompletableDeferred<Unit>()
+        val states = mutableListOf<ForegroundApplicationState>()
+        backgroundScope.launch {
+            observer.observe().collect {
+                states.add(it)
+                blockedConsumer.await()
+            }
+        }
+        runCurrent()
+        current = second
+        observer.onAccessibilityEvent(service, event())
+        runCurrent()
+        observer.detach(service)
+        runCurrent()
+        blockedConsumer.complete(Unit)
+        runCurrent()
+        assertEquals(listOf<ForegroundApplicationState>(unavailable), states)
+    }
+
+    @Test
     fun `multiple consumers share reads and cancelling one preserves the other`() = runTest {
         val service = service()
         var reads = 0

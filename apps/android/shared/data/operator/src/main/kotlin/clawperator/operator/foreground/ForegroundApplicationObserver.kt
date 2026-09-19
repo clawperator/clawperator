@@ -8,9 +8,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
@@ -42,7 +44,7 @@ class ForegroundApplicationObserver internal constructor(
     internal val isObserving: Boolean
         @MainThread get() = subscribers.isNotEmpty()
 
-    /** Emits explicit unavailable initially, then verified identity. No cached identity is replayed. */
+    /** Emits current identity or unavailable. No cached identity or pending history is replayed. */
     fun observe(displayId: Int = 0): Flow<ForegroundApplicationState> = callbackFlow {
         require(displayId >= 0)
         val subscriber = Subscriber(displayId) { trySend(it) }
@@ -55,7 +57,7 @@ class ForegroundApplicationObserver internal constructor(
                 if (subscribers.isEmpty()) invalidate()
             }
         }
-    }.flowOn(scope.coroutineContext.minusKey(Job)).distinctUntilChanged()
+    }.buffer(Channel.CONFLATED).flowOn(scope.coroutineContext.minusKey(Job)).distinctUntilChanged()
 
     @MainThread
     fun attach(service: AccessibilityService) {
