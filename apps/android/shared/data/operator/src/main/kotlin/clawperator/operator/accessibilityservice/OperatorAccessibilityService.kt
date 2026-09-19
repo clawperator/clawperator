@@ -16,6 +16,7 @@ import clawperator.accessibilityservice.AccessibilityServiceManagerAndroid
 import clawperator.operator.recording.RecordingEventFilter
 import clawperator.operator.onscreenlog.OnScreenLogPanelLifecycle
 import clawperator.routine.RoutineManager
+import clawperator.operator.foreground.ForegroundApplicationObserver
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
@@ -30,6 +31,7 @@ class OperatorAccessibilityService :
     private val coroutineScopes: CoroutineScopes by inject()
     private val recordingEventFilter: RecordingEventFilter by inject()
     private val onScreenLogPanelLifecycle: OnScreenLogPanelLifecycle by inject()
+    private val foregroundApplicationObserver: ForegroundApplicationObserver by inject()
     private var routineLoopJob: Job? = null
     private val recordingDiagnosticHook: RecordingDiagnosticHook? by lazy {
         if (buildConfig.debug) {
@@ -61,6 +63,7 @@ class OperatorAccessibilityService :
             serviceInfo?.apply {
                 // Enhanced flags for better element discovery and interaction
                 flags = flags or
+                    AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
                     AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS or
                     AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or
                     AccessibilityServiceInfo.FLAG_REQUEST_TOUCH_EXPLORATION_MODE or
@@ -74,6 +77,7 @@ class OperatorAccessibilityService :
                 // without snapshot capture.
                 eventTypes = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or
                     AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
+                    AccessibilityEvent.TYPE_WINDOWS_CHANGED or
                     AccessibilityEvent.TYPE_VIEW_CLICKED or
                     AccessibilityEvent.TYPE_VIEW_FOCUSED or
                     AccessibilityEvent.TYPE_VIEW_SCROLLED or
@@ -87,6 +91,7 @@ class OperatorAccessibilityService :
         Log.d("[Operator-AccessibilityService] Enhanced accessibility configured with flags: ${serviceInfo?.flags}")
         accessibilityServiceManager.setCurrentAccessibilityService(this, set = true)
         onScreenLogPanelLifecycle.attach(this)
+        foregroundApplicationObserver.attach(this)
         runRecordingDiagnosticHook(
             hook = recordingDiagnosticHook,
             hookLabel = "for service connected",
@@ -109,6 +114,7 @@ class OperatorAccessibilityService :
 
     override fun onDestroy() {
         Log.d("[Operator-AccessibilityService] onDestroy()")
+        foregroundApplicationObserver.detach(this)
         onScreenLogPanelLifecycle.detach()
         runRecordingDiagnosticHook(
             hook = recordingDiagnosticHook,
@@ -130,6 +136,13 @@ class OperatorAccessibilityService :
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (buildConfig.debug && event != null && foregroundApplicationObserver.isObserving) {
+            android.util.Log.i(
+                "ForegroundObservationEvent",
+                "type=${event.eventType} eventUptimeMs=${event.eventTime} ingressUptimeMs=${android.os.SystemClock.uptimeMillis()} windowId=${event.windowId}",
+            )
+        }
+        foregroundApplicationObserver.onAccessibilityEvent(this, event)
         try {
             recordingEventFilter.onAccessibilityEvent(this, event)
         } catch (t: Throwable) {
