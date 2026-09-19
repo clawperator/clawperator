@@ -11,6 +11,9 @@ import android.view.accessibility.AccessibilityEvent
 import clawperator.accessibilityservice.AccessibilityServiceManagerAndroid
 import clawperator.operator.recording.RecordingEventFilter
 import clawperator.operator.onscreenlog.OnScreenLogPanelLifecycle
+import clawperator.operator.foreground.ForegroundApplicationObserver
+import clawperator.operator.foreground.ForegroundApplicationReader
+import clawperator.uitree.OperatorOverlayIdentityNone
 import clawperator.routine.RoutineId
 import clawperator.routine.RoutineManager
 import clawperator.routine.RoutineRun
@@ -99,6 +102,8 @@ class OperatorAccessibilityServiceTest {
             assertTrue((service.serviceInfo.flags and AccessibilityServiceInfo.FLAG_INPUT_METHOD_EDITOR) != 0)
             assertSame(service, manager.currentAccessibilityServiceFlow.value)
             assertSame(service, panelLifecycle.attachedService)
+            assertTrue((service.serviceInfo.eventTypes and AccessibilityEvent.TYPE_WINDOWS_CHANGED) != 0)
+            assertTrue((service.serviceInfo.flags and AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS) != 0)
 
             service.onConfigurationChanged(Configuration())
             assertEquals(1, panelLifecycle.configurationChanges)
@@ -148,6 +153,7 @@ class OperatorAccessibilityServiceTest {
                 modules(
                     module {
                         single { manager }
+                        single { ForegroundApplicationObserver(ForegroundApplicationReader(OperatorOverlayIdentityNone)) }
                         single<action.buildconfig.BuildConfig> { buildConfig }
                         single { coroutineScopes }
                         single<RoutineManager> { routineManager }

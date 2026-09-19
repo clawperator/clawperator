@@ -128,6 +128,8 @@ import clawperator.operator.agent.AgentCommandExecutor
 import clawperator.operator.agent.AgentCommandExecutorDefault
 import clawperator.operator.agent.AgentCommandParser
 import clawperator.operator.agent.AgentCommandParserDefault
+import clawperator.operator.foreground.ForegroundApplicationObserver
+import clawperator.operator.foreground.ForegroundApplicationReader
 import clawperator.operator.onscreenlog.OnScreenLogPanelController
 import clawperator.operator.onscreenlog.OnScreenLogPanelLifecycle
 import clawperator.operator.recording.RecordingEventFilter
@@ -244,6 +246,8 @@ val AppModule: Module = module {
     single<OnScreenLogController> { get<OnScreenLogPanelController>() }
     single<OnScreenLogPanelLifecycle> { get<OnScreenLogPanelController>() }
     single<OperatorOverlayIdentity> { get<OnScreenLogPanelController>() }
+    single { ForegroundApplicationReader(get()) }
+    single { ForegroundApplicationObserver(get()) }
     single<RecordingManagerDefault> { RecordingManagerDefault(get(), get()) }
     single<RecordingManager> { get<RecordingManagerDefault>() }
     single<RecordingEventSink> { get<RecordingManagerDefault>() }
