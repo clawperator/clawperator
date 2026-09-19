@@ -170,6 +170,8 @@ import clawperator.task.runner.TaskUiScope
 import clawperator.task.runner.TaskUiScopeDefault
 import clawperator.task.runner.RecordingManager
 import clawperator.task.runner.UiActionEngine
+import clawperator.task.runner.ApiToastController
+import clawperator.operator.toast.ApiToastControllerAndroid
 import clawperator.task.runner.UiActionEngineDefault
 import clawperator.task.runner.UiGlobalActionDispatcher
 import clawperator.task.runner.UiGlobalActionDispatcherAndroid
@@ -277,7 +279,8 @@ val AppModule: Module = module {
     single<TaskUiScope> { get<TaskUiScopeDefault>() }
     single<TaskUiScopeDefault> { TaskUiScopeDefault(get(), get(), get(), get(), get(NamedScope.CoroutineScopeIo)) }
     single<UiActionEngine> { get<UiActionEngineDefault>() }
-    single<UiActionEngineDefault> { UiActionEngineDefault(get(), get(), get(), get(), get(), action.media.NotificationMediaService(get())) }
+    single<ApiToastController> { ApiToastControllerAndroid(get()) }
+    single<UiActionEngineDefault> { UiActionEngineDefault(get(), get(), get(), get(), get(), action.media.NotificationMediaService(get()), get()) }
     single<UiGlobalActionDispatcher> { get<UiGlobalActionDispatcherAndroid>() }
     single<UiGlobalActionDispatcherAndroid> { UiGlobalActionDispatcherAndroid(get()) }
     single<TriggerManager> { TriggerManagerDefault(get(), get(), get(), get(), get(), get(NamedScope.CoroutineScopeMain), get(NamedScope.CoroutineScopeIo)) }

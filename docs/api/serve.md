@@ -250,6 +250,9 @@ Then `runExecution()` applies full execution validation. See [Actions](actions.m
 `params.template` carries live overlay templates unchanged to Android, using the
 same validation and styling as literal `params.text`. Exactly one is required.
 
+`show_toast` and `cancel_toast` also use `/execute`, without separate toast routes.
+See [Toast actions](actions.md#action-show-toast) for parameters and submission semantics.
+
 `/execute` is also the generic HTTP transport for `set_on_screen_log` and
 `clear_on_screen_log`. Inside `execution.actions`, it accepts exact lower-case
 `on_screen_log_set` and `on_screen_log_clear` input aliases and normalizes them

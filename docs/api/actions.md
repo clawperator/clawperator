@@ -132,6 +132,8 @@ wait_for_navigation
 read_key_value_pair
 set_on_screen_log
 clear_on_screen_log
+show_toast
+cancel_toast
 ```
 
 Input aliases normalized by Node before validation:
@@ -953,6 +955,81 @@ Example:
 }
 ```
 
+<a id="action-show-toast"></a>
+### `show_toast`
+
+Request a native Android text toast from the Operator. Use it for brief announcements
+such as starting a test run. Each call cancels the previous API-requested toast before
+submitting its replacement. The current API toast is shared across callers for that
+Operator instance and is separate from incidental Operator messages.
+
+| Parameter | Accepted values | Default |
+| --- | --- | --- |
+| `text` | Required string, 1-2048 UTF-16 code units, including a non-whitespace character | None |
+| `duration` | Exactly `"short"` or `"long"` | `"short"` |
+
+Text is preserved verbatim. Unknown fields, parameter aliases, blank text, null values,
+and numeric durations are rejected with `EXECUTION_VALIDATION_FAILED` at the Node boundary.
+There are no toast IDs, queue controls, custom styles, positions, buttons, or millisecond
+durations. Use [on-screen logs](on-screen-logs.md) for persistent information.
+
+```json
+{
+  "id": "announce-start",
+  "type": "show_toast",
+  "params": {
+    "text": "Starting test run",
+    "duration": "short"
+  }
+}
+```
+
+Success means the Operator submitted the request to Android on its main thread. It
+does not prove visibility and does not wait for dismissal. Success step data contains
+exactly `{"submitted":"true","duration":"short"}` (or `"long"`), without echoing text.
+An Android submission exception fails the action with `ACTION_FAILED`.
+
+Android controls the actual duration, layout, and display. Background toasts are
+rate-limited; on Android 12 and newer with current target SDKs, text toasts show the
+app icon and at most two lines. Long input may be truncated. See the
+[Android Toast reference](https://developer.android.com/reference/android/widget/Toast)
+and [toast guidance](https://developer.android.com/guide/topics/ui/notifiers/toasts).
+
+CLI examples:
+
+```bash
+clawperator toast "Starting test run"
+clawperator toast "Test run complete" --duration long
+clawperator toast --cancel
+```
+
+Common flags include `--device <device_serial>`, `--operator-package <package>`,
+`--timeout <ms>`, `--output json|pretty`, and `--no-daemon`. For local development,
+use `--operator-package com.clawperator.operator.dev`. To send text beginning with
+`-`, put options first and use `toast -- "--literal text"`. The CLI validates before
+dispatch and does not automatically replay an uncertain dispatch.
+
+Raw `exec`, HTTP `/execute`, and MCP `execute` accept these actions in the usual
+execution envelope, retaining `commandId`, `taskId`, and action IDs. A toast can be
+the first action in a test sequence; later actions do not wait for it to disappear.
+
+<a id="action-cancel-toast"></a>
+### `cancel_toast`
+
+Cancel the current API-requested toast, including one pending display. Omit `params`
+or pass exactly `{}`. `null` and all parameter fields are invalid. Cancellation is
+idempotent and succeeds when no API toast exists. It does not cancel another app's
+toast or an incidental Operator message. API toast ownership lasts for the Operator
+process; it does not survive a process restart.
+
+```json
+{ "id": "dismiss-announcement", "type": "cancel_toast" }
+```
+
+The CLI form is `clawperator toast --cancel`, exclusive with text and `--duration`.
+Success step data is exactly `{"submitted":"true"}`. This acknowledges completion
+of the cancellation request, not observation that the toast has disappeared.
+
 <a id="action-set-on-screen-log"></a>
 ### `set_on_screen_log`
 
@@ -1283,6 +1360,8 @@ Example:
 | `screenshot` | `take_screenshot` | optional `path` |
 | `close` | `close_app` | `close-app` is a CLI synonym |
 | `sleep` | `sleep` | duration is positional |
+| `toast <text>` | `show_toast` | optional `--duration short\|long` |
+| `toast --cancel` | `cancel_toast` | no text or duration |
 | `open` | `open_app` or `open_uri` | dispatch depends on target string |
 | `press`, `back` | `press_key` | `back` hardcodes `key = "back"` |
 | `scroll` | `scroll` | container flags optional |
@@ -1300,6 +1379,8 @@ Example:
 | `close_app` | `data.application_id` when Node pre-flight succeeded |
 | `set_on_screen_log` | `visible`, `rendered`, `truncated`, normalized style values, and `bounds`; all values are strings and caller text is omitted |
 | `clear_on_screen_log` | `visible` with value `"false"` |
+| `show_toast` | `submitted` with value `"true"`, and `duration` with value `"short"` or `"long"` |
+| `cancel_toast` | `submitted` with value `"true"` |
 | all others | no fixed success keys guaranteed by Node |
 
 Concrete success example for `take_screenshot`:

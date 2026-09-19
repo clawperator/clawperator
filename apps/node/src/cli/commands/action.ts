@@ -1,3 +1,4 @@
+import { buildToastExecution } from "../../domain/actions/toast.js";
 import { buildNotificationMediaExecution } from "../../domain/notifications/service.js";
 import type { NotificationMediaAction } from "../../contracts/notifications.js";
 import { runExecution } from "../../domain/executions/runExecution.js";
@@ -40,6 +41,17 @@ interface ActionCommandOptions {
   logger?: Logger;
   tryDaemonExecutionFn?: typeof tryDaemonExecution;
   runExecutionFn?: typeof runExecution;
+}
+
+export async function cmdToast(options: ActionCommandOptions & {
+  operation: "show" | "cancel";
+  params?: Pick<ActionParams, "text" | "duration">;
+}): Promise<string> {
+  try {
+    return await runActionExecution(buildToastExecution(options.operation, options.params, options.timeoutMs), options);
+  } catch (error) {
+    return formatError(error, options);
+  }
 }
 
 export async function cmdOnScreenLog(options: ActionCommandOptions & {
