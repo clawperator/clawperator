@@ -65,6 +65,8 @@ function findClosestFlagMatch(flag: string, candidates: Iterable<string>): { mat
 const FLAG_VALUE_ARITY = new Map<string, number>([
   ["--start", 2],
   ["--duration-ms", 1],
+  ["--duration", 1],
+  ["--cancel", 0],
   ["--end", 2],
   ...Object.keys(ON_SCREEN_LOG_FLAGS).map(flag => [flag, 1] as [string, number]),
   ["--device", 1],
@@ -376,7 +378,7 @@ async function main(): Promise<void> {
             break;
           }
           const valueArity = FLAG_VALUE_ARITY.get(arg);
-          if (valueArity !== undefined) {
+          if (valueArity !== undefined && knownFlags.has(arg)) {
             if (
               valueArity === 1
               && restBeforeForward[i + 1] === "--"

@@ -1832,6 +1832,63 @@ class UiActionEngineDefaultTest : ActionTest {
         }
 
     @Test
+    fun `toast steps await submission and preserve correlation without claiming visibility`() =
+        actionTest {
+            val calls = mutableListOf<String>()
+            val controller = object : ApiToastController {
+                override suspend fun show(text: String, duration: String) {
+                    kotlinx.coroutines.delay(1)
+                    calls += "$text:$duration"
+                }
+                override suspend fun cancel() {
+                    kotlinx.coroutines.delay(1)
+                    calls += "cancel"
+                }
+            }
+            val engine = UiActionEngineDefault(
+                developerOptionsManager = DeveloperOptionsManagerMock(),
+                globalActionDispatcher = UiGlobalActionDispatcherMock(),
+                deviceState = DeviceStateMock(),
+                apiToastController = controller,
+            )
+            val result = engine.execute(TaskScopeNoOp(), UiActionPlan(
+                commandId = "toast-command", taskId = "toast-task", source = "test",
+                actions = listOf(UiAction.ShowToast("show", "Private message", "long"), UiAction.CancelToast("cancel")),
+            ))
+            assertEquals(listOf("Private message:long", "cancel"), calls)
+            assertEquals("toast-command", result.commandId)
+            assertEquals("toast-task", result.taskId)
+            assertEquals(listOf("show", "cancel"), result.stepResults.map { it.id })
+            assertTrue(result.stepResults.all { it.success })
+            assertEquals(mapOf("submitted" to "true", "duration" to "long"), result.stepResults[0].data)
+            assertEquals(mapOf("submitted" to "true"), result.stepResults[1].data)
+        }
+
+    @Test
+    fun `failed toast submission produces a failed step and stops the sequence`() =
+        actionTest {
+            val controller = object : ApiToastController {
+                override suspend fun show(text: String, duration: String) { error("Submission failed") }
+                override suspend fun cancel() { error("Must not execute after failure") }
+            }
+            val engine = UiActionEngineDefault(
+                developerOptionsManager = DeveloperOptionsManagerMock(),
+                globalActionDispatcher = UiGlobalActionDispatcherMock(),
+                deviceState = DeviceStateMock(),
+                apiToastController = controller,
+            )
+            val result = engine.execute(TaskScopeNoOp(), UiActionPlan(
+                commandId = "toast-command", taskId = "toast-task", source = "test",
+                actions = listOf(UiAction.ShowToast("show", "text"), UiAction.CancelToast("cancel")),
+            ))
+            val step = result.stepResults.single()
+            assertFalse(step.success)
+            assertEquals("show_toast", step.actionType)
+            assertEquals("ACTION_FAILED", step.data["errorCode"])
+            assertFalse(step.data.containsKey("submitted"))
+        }
+
+    @Test
     fun `execute set_on_screen_log returns acknowledged result data without text`() =
         actionTest {
             val normalized =

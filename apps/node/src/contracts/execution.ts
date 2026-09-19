@@ -24,6 +24,8 @@ export interface ActionParams {
   start?: { x: number; y: number };
   end?: { x: number; y: number };
   text?: string;
+  /** show_toast: native Android duration, default short. */
+  duration?: "short" | "long";
   /** set_on_screen_log: Android-resolved template, exclusive with text */
   template?: string;
   /** set_on_screen_log: physical screen edge */

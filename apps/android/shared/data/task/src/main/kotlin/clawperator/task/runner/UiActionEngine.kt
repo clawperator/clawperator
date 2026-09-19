@@ -26,6 +26,7 @@ class UiActionEngineDefault(
     private val recordingManager: RecordingManager = RecordingManagerNoOp,
     private val onScreenLogController: OnScreenLogController = OnScreenLogControllerNoOp,
     private val notificationMediaService: NotificationMediaService? = null,
+    private val apiToastController: ApiToastController? = null,
 ) : UiActionEngine {
     constructor(
         developerOptionsManager: DeveloperOptionsManager,
@@ -138,6 +139,16 @@ class UiActionEngineDefault(
                 is UiAction.ReadText -> executeReadText(taskScope, action)
                 is UiAction.QueryUi -> executeQueryUi(taskScope, action)
                 is UiAction.SnapshotUi -> executeSnapshotUi(taskScope, action)
+                is UiAction.ShowToast -> {
+                    val controller = checkNotNull(apiToastController) { "API toast controller is unavailable" }
+                    controller.show(action.text, action.duration)
+                    UiActionStepResult(action.id, "show_toast", data = mapOf("submitted" to "true", "duration" to action.duration))
+                }
+                is UiAction.CancelToast -> {
+                    val controller = checkNotNull(apiToastController) { "API toast controller is unavailable" }
+                    controller.cancel()
+                    UiActionStepResult(action.id, "cancel_toast", data = mapOf("submitted" to "true"))
+                }
                 is UiAction.SetOnScreenLog -> executeSetOnScreenLog(action)
                 is UiAction.ClearOnScreenLog -> executeClearOnScreenLog(action)
                 is UiAction.StartRecording -> executeStartRecording(action)
@@ -1031,6 +1042,8 @@ private fun UiAction.wireType(): String = when (this) {
     is UiAction.ReadText -> "read_text"
     is UiAction.QueryUi -> "query_ui"
     is UiAction.SnapshotUi -> "snapshot_ui"
+    is UiAction.ShowToast -> "show_toast"
+    is UiAction.CancelToast -> "cancel_toast"
     is UiAction.SetOnScreenLog -> "set_on_screen_log"
     is UiAction.ClearOnScreenLog -> "clear_on_screen_log"
     is UiAction.StartRecording -> "start_recording"

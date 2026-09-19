@@ -150,6 +150,16 @@ sealed interface UiAction {
         val retry: TaskRetry = TaskRetryPresets.UiReadiness,
     ) : UiAction
 
+    data class ShowToast(
+        override val id: String,
+        val text: String,
+        val duration: String = "short",
+    ) : UiAction
+
+    data class CancelToast(
+        override val id: String,
+    ) : UiAction
+
     data class SetOnScreenLog(
         override val id: String,
         val spec: OnScreenLogSpec,

@@ -133,6 +133,11 @@ const setOnScreenLogParamsSchema = z.object({
 const clearOnScreenLogParamsSchema = z.object({}).strict();
 
 function paramsSchemaForAction(actionType: string) {
+  if (actionType === "show_toast") return z.object({
+    text: z.string().min(1).max(2048).refine(value => value.trim().length > 0, "show_toast requires nonblank text"),
+    duration: z.enum(["short", "long"]).optional(),
+  }).strict();
+  if (actionType === "cancel_toast") return z.object({}).strict().optional();
   if (actionType === "swipe") return swipeParamsSchema;
   const serviceSchema = notificationMediaParamsSchema(actionType);
   if (serviceSchema !== undefined) return serviceSchema;
@@ -155,6 +160,8 @@ function hasStructurallyValidActionParams(actionType: string, params: unknown): 
 // directly via broadcastAgentCommand. It is not part of the public agent-facing API.
 const supportedTypes = [
   "list_notifications", "list_media_sessions", "get_media_status", "observe_media", "media_pause", "media_play", "dismiss_notification", "invoke_notification_action", "media_seek",
+  "show_toast",
+  "cancel_toast",
   "open_app",
   "open_uri",
   "close_app",

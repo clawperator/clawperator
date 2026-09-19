@@ -152,6 +152,9 @@ command_details:
   mcp:
     href: mcp.md
     label: MCP server
+  toast:
+    href: actions.md#action-show-toast
+    label: Toast actions
   on-screen-log:
     href: on-screen-logs.md#cli-commands
     label: On-screen logs

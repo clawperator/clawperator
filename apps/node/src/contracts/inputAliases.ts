@@ -136,10 +136,11 @@ function normalizeExecutionActionInput(input: unknown): unknown {
     normalized.type = canonicalActionType;
   }
   if ("params" in normalized) {
-    // The on-screen log actions deliberately have no parameter aliases. Their
+    // Toast and on-screen log actions deliberately have no parameter aliases. Their
     // schema is a strict public boundary, so generic conveniences such as
     // `value` -> `text` must be rejected instead of silently accepted.
     normalized.params =
+      canonicalActionType === "show_toast" || canonicalActionType === "cancel_toast" ||
       canonicalActionType === "set_on_screen_log" || canonicalActionType === "clear_on_screen_log"
         ? normalized.params
         : normalizeActionParamsInput(normalized.params);

@@ -323,6 +323,20 @@ class AgentCommandParserDefault : AgentCommandParser {
                     id = id,
                     retry = params.parseRetryOrDefault(defaultRetry = TaskRetryPresets.UiReadiness),
                 )
+            "show_toast" -> {
+                require(params.keys.all { it in setOf("text", "duration") }) { "show_toast accepts only text and duration" }
+                val text = params.strictStringRequired("text", 2048)
+                // Match JavaScript trim whitespace, including BOM but excluding U+001C..U+001F.
+                val whitespace = "\u0009\u000A\u000B\u000C\u000D\u0020\u00A0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF"
+                require(text.any { it !in whitespace }) { "show_toast requires nonblank text" }
+                val duration = params.strictStringOrNull("duration") ?: "short"
+                require(duration == "short" || duration == "long") { "duration must be short or long" }
+                UiAction.ShowToast(id, text, duration)
+            }
+            "cancel_toast" -> {
+                require(params.isEmpty()) { "cancel_toast accepts omitted params or {} only" }
+                UiAction.CancelToast(id)
+            }
             "set_on_screen_log" ->
                 UiAction.SetOnScreenLog(
                     id = id,

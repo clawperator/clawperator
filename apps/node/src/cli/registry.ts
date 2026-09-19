@@ -2150,6 +2150,73 @@ COMMANDS["close"] = {
   handler: async (ctx) => closeHandler(ctx),
 };
 
+export function parseToastArgs(rest: string[]): {
+  operation: "show" | "cancel";
+  params?: Pick<import("../contracts/execution.js").ActionParams, "text" | "duration">;
+} {
+  const usage = 'Usage: clawperator toast "Starting test run" [--duration short|long], or clawperator toast --cancel';
+  let text: string | undefined;
+  let duration: "short" | "long" | undefined;
+  let cancel = false;
+  for (let i = 0; i < rest.length; i++) {
+    const token = rest[i];
+    if (token === "--cancel") {
+      if (cancel) throw new UsageError(`--cancel must be supplied only once. ${usage}`);
+      cancel = true;
+    } else if (token === "--duration") {
+      if (duration !== undefined) throw new UsageError(`--duration must be supplied only once. ${usage}`);
+      const value = rest[++i];
+      if (value !== "short" && value !== "long") throw new UsageError(`--duration requires short or long. ${usage}`);
+      duration = value;
+    } else {
+      const value = token === "--" ? rest[++i] : token;
+      if (value === undefined || (token !== "--" && token.startsWith("-")) || text !== undefined) {
+        throw new UsageError(`Unexpected toast argument: ${token}. ${usage}`);
+      }
+      text = value;
+      if (token === "--" && i !== rest.length - 1) throw new UsageError(usage);
+    }
+  }
+  if (cancel) {
+    if (text !== undefined || duration !== undefined) throw new UsageError(`--cancel cannot be combined with text or --duration. ${usage}`);
+    return { operation: "cancel" };
+  }
+  if (text === undefined) throw new UsageError(`toast requires text. ${usage}`);
+  return { operation: "show", params: { text, ...(duration !== undefined ? { duration } : {}) } };
+}
+
+COMMANDS["toast"] = {
+  name: "toast",
+  group: "Device Interaction",
+  summary: "Show or cancel an Operator-owned text toast",
+  topLevelBlock: `  toast <text> [--duration short|long] | toast --cancel                Show or cancel a brief on-device message`,
+  documentedFlags: ["--duration", "--cancel", "--no-daemon"],
+  supportedFlags: ["--duration", "--cancel", "--no-daemon"],
+  help: `clawperator toast <text> [--duration short|long]
+
+Usage:
+  clawperator toast "Starting test run"
+  clawperator toast "Test run complete" --duration long
+  clawperator toast --cancel
+
+Options:
+  --duration <short|long>  Native Android duration (default short), not milliseconds
+  --cancel                 Cancel the current API toast; exclusive with text and duration
+  --device <id> --operator-package <pkg> --timeout <ms>
+  --output <json|pretty> --no-daemon
+
+Text must be nonblank and at most 2048 UTF-16 code units. Use -- before text starting with -.
+Each show replaces the previous API toast. Cancellation is harmless when none exists.
+Success acknowledges submission to Android, not visibility. Does not wait for dismissal.
+Android may truncate or rate-limit toasts. Use on-screen-log for persistent information.
+`,
+  handler: async ({ rest, format, deviceId, operatorPackage, timeoutMs, noDaemon, logger }) => {
+    return (await import("./commands/action.js")).cmdToast({
+      ...parseToastArgs(rest), format, deviceId, operatorPackage, timeoutMs, noDaemon, logger,
+    });
+  },
+};
+
 export const ON_SCREEN_LOG_FLAGS = {
   "--text": "text",
   "--template": "template",
