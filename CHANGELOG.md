@@ -4,6 +4,33 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.11.3] - 2026-09-19
+
+This release added coordinate swipes with explicit timing and Operator-owned toast messages across the CLI and execution APIs.
+
+### 🤖 Node API & CLI
+
+- **Added:** Exposed coordinate swipes through the CLI, raw execution/HTTP API, and MCP with required start and end coordinates and a duration of 1-10000 ms. Rejected identical endpoints and invalid timing without automatically replaying gestures.
+- **Added:** Added `show_toast` and `cancel_toast` actions, `toast "message"` with short or long duration, and idempotent `toast --cancel` support.
+
+- **Fixed:** Rejected duplicate `--limit` and `--visibility` flags in query commands with structured errors and nonzero exits.
+
+### 📚 Documentation & Website
+
+- **Added:** Documented swipe inputs, validation, and gesture-dispatch evidence limits across CLI and MCP usage.
+- **Added:** Documented toast actions, duration defaults, cancellation, and submission-only acknowledgement across the execution APIs.
+
+### 📱 Android Operator APK
+
+- **Added:** Executed coordinate swipes with explicit duration and rejected off-display endpoints while preserving dispatch receipts without asserting an app outcome.
+- **Added:** Managed one API-owned toast per Operator process, replacing or cancelling it without affecting incidental app messages. Results acknowledged main-thread submission rather than guaranteed visibility or dismissal.
+
+Pull requests:
+- [feat(gestures): expose coordinate swipes with required duration](https://github.com/clawperator/clawperator/pull/315)
+- [feat(toast): show and cancel Operator-owned toast messages](https://github.com/clawperator/clawperator/pull/316)
+- [fix(git): guard commit identities and unpublished history](https://github.com/clawperator/clawperator/pull/317)
+- [fix(query): reject duplicate limit and visibility flags](https://github.com/clawperator/clawperator/pull/318)
+
 ## [0.11.2] - 2026-09-19
 
 This release added live on-screen log templates that follow the foreground application and display app, device, and system-language metadata.
