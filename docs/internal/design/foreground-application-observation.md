@@ -189,6 +189,22 @@ collection; its timeout cancels collection. `ForegroundObservationProof` logs
 states and window evidence; `ForegroundObservationEvent` logs event/ingress
 uptime only in debug builds while there is a subscriber.
 
+For a quiet live view, filter Logcat by **`ClawperatorForegroundApp`**. This
+dedicated tag emits only the initial delivered state and subsequent distinct
+foreground states, such as `Available(packageName=com.android.chrome,
+displayId=0)` or `Unavailable`. It excludes window dumps, event traces, and
+session lifecycle messages. In ADBuddy, select the target emulator's Logcat
+and enter `ClawperatorForegroundApp` in Search Logcat. With adb, use:
+
+```bash
+adb -s <device_serial> logcat -s ClawperatorForegroundApp:I '*:S'
+```
+
+This debug log is emitted by the bounded proof consumer, not by an always-on
+observer subscription. Start the consumer above before watching; restart it
+when its maximum 10-minute session ends. Accessibility must remain enabled.
+
+
 Open a settled split pair, inspect pane bounds, and mark each intended focus
 change before interacting:
 
