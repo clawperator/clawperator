@@ -11,7 +11,7 @@ import kotlin.math.roundToInt
  * dp and sp only when a connected accessibility service lays out the panel.
  */
 data class OnScreenLogSpec(
-    val text: String,
+    val text: String? = null,
     val anchor: OnScreenLogAnchor = OnScreenLogAnchor.Left,
     val textAlign: OnScreenLogTextAlign = OnScreenLogTextAlign.Left,
     val topOffsetDp: Int = OnScreenLogContract.DEFAULT_TOP_OFFSET_DP,
@@ -21,6 +21,7 @@ data class OnScreenLogSpec(
     val textColor: String = OnScreenLogContract.DEFAULT_TEXT_COLOR,
     val backgroundColor: String = OnScreenLogContract.DEFAULT_BACKGROUND_COLOR,
     val ttlMs: Long = OnScreenLogContract.DEFAULT_TTL_MS,
+    val template: String? = null,
 )
 
 enum class OnScreenLogAnchor(
@@ -49,6 +50,7 @@ data class NormalizedOnScreenLogSpec(
     val textColor: String,
     val backgroundColor: String,
     val ttlMs: Long,
+    val template: String? = null,
 )
 
 /** Raised before a controller mutates a currently visible panel. */
@@ -100,7 +102,11 @@ object OnScreenLogContract {
             character == '\uFEFF'
 
     fun normalize(spec: OnScreenLogSpec): NormalizedOnScreenLogSpec {
-        validateText(spec.text)
+        requireValidation((spec.text != null) != (spec.template != null)) {
+            "exactly one of text or template is required"
+        }
+        validateText(spec.text ?: spec.template!!)
+        spec.template?.let(OnScreenLogTemplate::parse)
         validateRange("topOffsetDp", spec.topOffsetDp, MIN_OFFSET_DP, MAX_OFFSET_DP)
         validateRange("edgeOffsetDp", spec.edgeOffsetDp, MIN_OFFSET_DP, MAX_OFFSET_DP)
         validateRange("widthDp", spec.widthDp, MIN_WIDTH_DP, MAX_WIDTH_DP)
@@ -110,7 +116,8 @@ object OnScreenLogContract {
         }
 
         return NormalizedOnScreenLogSpec(
-            text = spec.text,
+            text = spec.text ?: "Unavailable",
+            template = spec.template,
             anchor = spec.anchor,
             textAlign = spec.textAlign,
             topOffsetDp = spec.topOffsetDp,

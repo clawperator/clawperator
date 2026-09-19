@@ -15,6 +15,7 @@ import android.view.Surface
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityWindowInfo
+import clawperator.operator.foreground.ForegroundApplicationObserver
 import clawperator.task.runner.NormalizedOnScreenLogSpec
 import clawperator.task.runner.OnScreenLogBounds
 import clawperator.task.runner.OnScreenLogContract
@@ -53,6 +54,7 @@ interface OnScreenLogPanelLifecycle {
  * the requested generation has drawn. The timer is cleanup only and never updates panel content.
  */
 class OnScreenLogPanelController internal constructor(
+    private val foregroundObserver: () -> ForegroundApplicationObserver = { error("Foreground observer not configured") },
     private val displayAreaProvider: OnScreenLogDisplayAreaProvider = AndroidOnScreenLogDisplayAreaProvider(),
     private val windowHostFactory: (WindowManager) -> OnScreenLogWindowHost = { windowManager ->
         AndroidOnScreenLogWindowHost(windowManager)
@@ -66,6 +68,8 @@ class OnScreenLogPanelController internal constructor(
 ) : OnScreenLogController,
     OnScreenLogPanelLifecycle,
     OperatorOverlayIdentity {
+    constructor(observer: () -> ForegroundApplicationObserver) : this(foregroundObserver = observer)
+
     constructor() : this(
         displayAreaProvider = AndroidOnScreenLogDisplayAreaProvider(),
         windowHostFactory = { windowManager -> AndroidOnScreenLogWindowHost(windowManager) },
@@ -81,6 +85,9 @@ class OnScreenLogPanelController internal constructor(
     }
 
     private val operationMutex = Mutex()
+    private var templateSession: OnScreenLogTemplateSession? = null
+    private var templateContent: OnScreenLogContent? = null
+    private var templateLifetime = 0L
 
     private var service: AccessibilityService? = null
     private var windowHost: OnScreenLogWindowHost? = null
@@ -151,12 +158,22 @@ class OnScreenLogPanelController internal constructor(
                 return@runOnMain
             }
             applyConfigurationChange()
+            templateSession?.refresh()
         }
     }
 
     override suspend fun set(
         spec: OnScreenLogSpec,
         drawAcknowledgementTimeoutMs: Long,
+    ): OnScreenLogControllerResult = setWithMetadataLoader(spec, drawAcknowledgementTimeoutMs) { context, packageName ->
+        OnScreenLogTemplateSession.loadMetadata(context, packageName)
+    }
+
+    /** Injectable lookup seam for controlled Android lifecycle proof; no wire-level override. */
+    internal suspend fun setWithMetadataLoader(
+        spec: OnScreenLogSpec,
+        drawAcknowledgementTimeoutMs: Long = OnScreenLogContract.MAX_DRAW_ACKNOWLEDGEMENT_MS,
+        lookup: suspend (Context, String) -> OnScreenLogAppMetadata,
     ): OnScreenLogControllerResult =
         operationMutex.withLock {
             // Validate before touching expiry or an existing panel. Invalid replacement preserves state.
@@ -190,16 +207,38 @@ class OnScreenLogPanelController internal constructor(
                         )
                     }
 
+                    val candidateLifetime = templateLifetime + 1
+                    val candidateSession = normalized.template?.let { template ->
+                        OnScreenLogTemplateSession(
+                            currentService, template, foregroundObserver, normalized.fontSizeSp,
+                            publish = { content ->
+                                if (templateLifetime == candidateLifetime && visibleState != null) {
+                                    templateContent = content
+                                    applyConfigurationChange()
+                                }
+                            },
+                            failed = {
+                                if (templateLifetime == candidateLifetime) removePanel("template_refresh_failed")
+                            },
+                            lookup = { packageName -> lookup(currentService, packageName) },
+                        )
+                    }
+                    val candidateContent = candidateSession?.initial()
                     val replacement =
                         try {
-                            preparePanel(currentService, normalized)
+                            preparePanel(currentService, normalized, candidateContent)
                         } catch (error: OnScreenLogLayoutException) {
+                            candidateSession?.close()
                             return@withContext OnScreenLogControllerResult.Failure(
                                 errorCode = OnScreenLogErrorCodes.LAYOUT_INVALID,
                                 message = error.message ?: "Panel does not fit the usable display bounds",
                             )
                         }
 
+                    templateSession?.close()
+                    templateLifetime = candidateLifetime
+                    templateSession = candidateSession
+                    templateContent = candidateContent
                     val nextGeneration = nextGeneration()
                     cancelExpiry()
                     pendingDrawAcknowledgement?.complete(false)
@@ -282,7 +321,7 @@ class OnScreenLogPanelController internal constructor(
                         spec = renderedState.spec,
                         bounds = renderedState.bounds,
                         truncated = renderedState.truncated,
-                    )
+                    ).also { templateSession?.start() }
                 }
             } catch (cancelled: CancellationException) {
                 withContext(NonCancellable + Dispatchers.Main.immediate) {
@@ -463,6 +502,7 @@ class OnScreenLogPanelController internal constructor(
     private fun preparePanel(
         service: AccessibilityService,
         spec: NormalizedOnScreenLogSpec,
+        content: OnScreenLogContent? = templateContent,
     ): PreparedPanel {
         val usableBounds =
             displayAreaProvider.currentUsableBounds(service)
@@ -479,7 +519,7 @@ class OnScreenLogPanelController internal constructor(
                 usableBounds = usableBounds,
                 completeTextLineHeightPx = completeTextLineHeightPx,
             )
-        val prepared = panel.prepare(spec, geometry)
+        val prepared = panel.prepare(spec, geometry, content)
         val bounds =
             OnScreenLogBounds(
                 left = geometry.bounds.left,
@@ -575,6 +615,10 @@ class OnScreenLogPanelController internal constructor(
     }
 
     private fun removePanel(reason: String) {
+        templateLifetime++
+        templateSession?.close()
+        templateSession = null
+        templateContent = null
         nextGeneration()
         cancelExpiry()
         pendingDrawAcknowledgement?.complete(false)

@@ -357,6 +357,7 @@ class AgentCommandParserDefault : AgentCommandParser {
         val allowedKeys =
             setOf(
                 "text",
+                "template",
                 "anchor",
                 "textAlign",
                 "topOffsetDp",
@@ -375,7 +376,8 @@ class AgentCommandParserDefault : AgentCommandParser {
 
         val spec =
             OnScreenLogSpec(
-                text = strictStringRequired("text", OnScreenLogContract.MAX_TEXT_LENGTH),
+                text = if (containsKey("text")) strictStringRequired("text", OnScreenLogContract.MAX_TEXT_LENGTH) else null,
+                template = if (containsKey("template")) strictStringRequired("template", OnScreenLogContract.MAX_TEXT_LENGTH) else null,
                 anchor =
                     when (strictStringOrNull("anchor") ?: "left") {
                         "left" -> OnScreenLogAnchor.Left

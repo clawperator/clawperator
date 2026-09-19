@@ -3,6 +3,13 @@ package clawperator.operator.debug
 import action.log.Log
 import android.app.Activity
 import android.os.Bundle
+import clawperator.operator.onscreenlog.OnScreenLogPanelController
+import clawperator.operator.onscreenlog.OnScreenLogAppMetadata
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import clawperator.task.runner.OnScreenLogAnchor
 import clawperator.task.runner.OnScreenLogController
 import clawperator.task.runner.OnScreenLogControllerResult
@@ -61,6 +68,8 @@ class OnScreenLogProofActivity :
                             ),
                         )
 
+                    "template-missing", "template-long", "template-clear-pending", "template-expire-pending", "template-replace-pending" ->
+                        templateProof(scenario)
                     SCENARIO_CLEAR -> controller.clear()
                     else ->
                         OnScreenLogControllerResult.Failure(
@@ -71,6 +80,36 @@ class OnScreenLogProofActivity :
             Log.i("[OnScreenLogProof] scenario=$scenario result=$result")
             finish()
         }
+    }
+
+    private suspend fun templateProof(scenario: String): OnScreenLogControllerResult {
+        val started = CompletableDeferred<Unit>()
+        val result = (controller as OnScreenLogPanelController).setWithMetadataLoader(
+            OnScreenLogSpec(
+                template = "{{foreground_app.icon}} {{foreground_app.package_name}}\n{{foreground_app.version_code}} | {{foreground_app.version_name}}",
+                widthDp = if (scenario == "template-long") 80 else 500,
+                fontSizeSp = 18,
+                ttlMs = if (scenario == "template-expire-pending") 1000 else 10000,
+            ),
+        ) { _, packageName ->
+            android.util.Log.i("OnScreenLogTemplateProof", "LOOKUP_START scenario=$scenario")
+            started.complete(Unit)
+            if (scenario.endsWith("pending")) withContext(NonCancellable) { delay(2500) }
+            android.util.Log.i("OnScreenLogTemplateProof", "LOOKUP_END scenario=$scenario")
+            if (scenario == "template-long") OnScreenLogAppMetadata(packageName, "4294967297", "long metadata ".repeat(40))
+            else OnScreenLogAppMetadata(packageName)
+        }
+        // Finish first so real application identity can be observed under this translucent activity.
+        finish()
+        if (scenario.endsWith("pending")) {
+            withTimeout(5000) { started.await() }
+            delay(250)
+            when (scenario) {
+                "template-clear-pending" -> controller.clear()
+                "template-replace-pending" -> controller.set(OnScreenLogSpec(text = "REPLACEMENT survives obsolete lookup", ttlMs = 5000))
+            }
+        }
+        return result
     }
 
     private companion object {

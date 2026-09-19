@@ -2465,12 +2465,13 @@ Example:
 <a id="action-set-on-screen-log"></a>
 ### `set_on_screen_log`
 
-Use this raw action to show one static, noninteractive diagnostic label owned by the connected Operator accessibility service. The CLI convenience command is `on-screen-log set --text <text>`. See [On-screen logs](on-screen-logs.md) for lifecycle, capture, and transport details.
+Use this raw action to show one noninteractive diagnostic panel owned by the connected Operator accessibility service. Supply literal `text` or a live Android-resolved `template`. CLI conveniences are `on-screen-log set --text <text>` and `on-screen-log set --template <template>`. See [On-screen logs](on-screen-logs.md) for lifecycle, capture, and transport details.
 
 | Field | Valid values | Default / meaning |
 | --- | --- | --- |
-| Required | `text` | Static plain-text label. |
-| `text` | String with `1..2048` UTF-16 code units, at least one non-whitespace character | Required. LF and TAB are allowed; other control characters are rejected. |
+| Required | Exactly one of `text` or `template` | Literal label or live metadata template. |
+| `text` | String with `1..2048` UTF-16 code units, at least one non-whitespace character | Literal text. LF and TAB are allowed; other control characters are rejected. |
+| `template` | Same input bounds as `text`; only the nine documented placeholders | See [template vocabulary, escaping and expansion bounds](on-screen-logs.md#live-templates). Mutually exclusive with `text`. |
 | `anchor` | Exact `left` or `right` | `left`; physical display edge. |
 | `textAlign` | Exact `left` or `right` | `left`; alignment inside the panel. |
 | `topOffsetDp` | Integer-valued JSON number `0..1000` | `8`; from the usable top edge. |
@@ -2489,7 +2490,7 @@ Rules:
 - every successful set replaces the whole existing panel using supplied values and defaults, rather than patching existing state
 - malformed input is rejected before dispatch and cannot modify a currently visible panel
 
-Success data has the exact string-valued keys `visible`, `rendered`, `truncated`, `anchor`, `text_align`, `top_offset_dp`, `edge_offset_dp`, `width_dp`, `font_size_sp`, `text_color`, `background_color`, `ttl_ms`, and `bounds`. The result does not echo caller text.
+Success data has the exact string-valued keys `visible`, `rendered`, `truncated`, `anchor`, `text_align`, `top_offset_dp`, `edge_offset_dp`, `width_dp`, `font_size_sp`, `text_color`, `background_color`, `ttl_ms`, and `bounds`. The result does not echo caller text or resolved metadata. Bounds and truncation describe the initial draw; live refreshes preserve the original TTL.
 
 Common failures:
 
@@ -2867,8 +2868,8 @@ and UI-containing lists retain whole-execution interactive readiness.
 ## Purpose
 
 `set_on_screen_log` and `clear_on_screen_log` are raw execution actions for a
-small Operator-owned diagnostic panel. The panel is useful for showing a static
-execution label while an action list works in another app.
+small Operator-owned diagnostic panel. Show literal execution labels or configure
+a template once and let Android update application and device metadata locally.
 
 The panel belongs to the connected Operator accessibility service, not to the
 foreground app and not to a host process. It is one visible panel per Operator
@@ -2895,7 +2896,7 @@ MCP tool; existing generic execution transports carry the same raw action list.
 
 | Canonical action | Exact Node input alias | Purpose | Parameters |
 | --- | --- | --- | --- |
-| `set_on_screen_log` | `on_screen_log_set` | Show or replace the current panel. | `text` is required. All other fields are optional. |
+| `set_on_screen_log` | `on_screen_log_set` | Show or replace the current panel. | Exactly one of `text` or `template` is required. Other fields are optional. |
 | `clear_on_screen_log` | `on_screen_log_clear` | Remove the current panel. | Omit `params` or use exactly `{}`. |
 
 At the Node execution boundary, the two aliases above normalize to their
@@ -2945,6 +2946,67 @@ table and validation limits.
 }
 ```
 
+## Live templates
+
+Supply `params.template` instead of `params.text`. Literal `text` never expands
+placeholders, even when it contains `{{...}}`. Android resolves templates; Node,
+Serve and MCP do not poll or resolve metadata.
+
+| Placeholder | Value |
+| --- | --- |
+| `{{foreground_app.icon}}` | Declared application icon, inline at text size; adaptive icons are supported |
+| `{{foreground_app.package_name}}` | Verified foreground application package |
+| `{{foreground_app.version_code}}` | Full installed version code as decimal text |
+| `{{foreground_app.version_name}}` | Declared version name |
+| `{{device.manufacturer}}` | Android manufacturer |
+| `{{device.model}}` | Android model |
+| `{{system.language_code}}` | Primary system locale language, for example `en` |
+| `{{system.language_tag}}` | Primary system locale language tag, for example `en-US` |
+| `{{system.language_name}}` | Language name in its own language, for example `Deutsch` |
+
+For example:
+
+```bash
+clawperator on-screen-log set --template '{{foreground_app.icon}} {{foreground_app.package_name}}
+{{foreground_app.version_code}} | {{foreground_app.version_name}}
+{{system.language_tag}} | {{system.language_name}}' --device <device_serial> --operator-package com.clawperator.operator.dev
+```
+
+Only the nine exact names above are supported. Unknown or malformed placeholders
+fail validation before changing the current panel; errors list supported names.
+Write `{{{{` for literal `{{` and `}}}}` for literal `}}`, for example
+`{{{{device.model}}}}` displays `{{device.model}}`. Single braces are literal.
+There are no expressions, HTML entities, recursive expansion, or HTML rendering.
+Ordinary spaces, LF newlines and TAB characters are supported.
+
+Both input forms require 1-2048 UTF-16 code units and a non-whitespace character;
+control characters other than LF and TAB are rejected. Expanded templates are
+bounded to 8192 UTF-16 units, with each substituted text value bounded to 256.
+Metadata control characters become spaces. Expansion never splits a surrogate
+pair; bounded content ends with an ellipsis. Layout can additionally wrap or
+truncate at the usable display height. An icon occupies one inline position;
+metadata is not reparsed as template syntax.
+
+App fields and the icon come from the same foreground observation. In split-screen,
+the panel follows the focused application, excluding the keyboard and this overlay.
+Home can identify the launcher. System panels retain the last verified app as
+context; starting under a panel has no app context. Locked and unavailable states
+clear app context. `Unavailable` and a neutral gray icon represent missing values;
+a known package remains visible when only its metadata is unavailable. Updates
+are event-driven samples, not a complete or instantaneous focus history.
+
+System-language fields follow the primary system locale independently of the
+Operator's per-app language. Locale changes refresh the panel. Package changes
+invalidate metadata caches. Templates using only device or language fields do
+not subscribe to foreground observation.
+
+Initial success acknowledges the first rendered state, which can contain
+unavailable app metadata while lookup is pending. Refresh does not reset TTL.
+Replacement, clear, expiry and service detach cancel the old subscription and
+lookups. Late results cannot restore a removed panel. A refresh layout or renderer
+failure hides the panel; it cannot report a new execution error after the original
+request has completed. Existing screenshot timing and capture limitations apply.
+
 ## CLI Commands
 
 `on-screen-log set` shows or fully replaces the panel. `on-screen-log clear`
@@ -2958,7 +3020,8 @@ clawperator on-screen-log clear --device <device_serial>
 
 | Set flag | Raw field |
 | --- | --- |
-| `--text` (required) | `text` |
+| `--text` (exclusive with `--template`) | `text` |
+| `--template` (exclusive with `--text`) | `template` |
 | `--anchor` | `anchor` |
 | `--text-align` | `textAlign` |
 | `--top-offset-dp` | `topOffsetDp` |
@@ -3071,7 +3134,8 @@ data keys:
 | `ttl_ms` | Resolved integer input as a string. |
 | `bounds` | Actual pixel rectangle in `[left,top][right,bottom]` form. |
 
-The result never echoes the caller's `text`.
+The result never echoes caller text, templates, or resolved metadata. Bounds and
+`truncated` describe the initial acknowledged state, not future live refreshes.
 
 On a successful `clear_on_screen_log`, step data is exactly:
 
@@ -7379,6 +7443,12 @@ Recovery:
 
 ### On-screen log panel failures
 
+Malformed templates, unknown placeholders, and both or neither of `text` and
+`template` produce `EXECUTION_VALIDATION_FAILED` before dispatch. Unavailable
+application metadata uses the documented fallback values, not an execution
+failure. Refresh failures after initial acknowledgement hide the panel without
+emitting a second execution result. See [live templates](on-screen-logs.md#live-templates).
+
 The on-screen log actions can return these exact per-step failure codes. When
 one of these codes is the first failed step, Node also copies it to
 `envelope.errorCode` during result reconciliation. The
@@ -7821,6 +7891,9 @@ Operator package resolution:
 - otherwise it uses `com.clawperator.operator`
 
 Then `runExecution()` applies full execution validation. See [Actions](actions.md), [Selectors](selectors.md), and [API Overview](overview.md).
+
+`params.template` carries live overlay templates unchanged to Android, using the
+same validation and styling as literal `params.text`. Exactly one is required.
 
 `/execute` is also the generic HTTP transport for `set_on_screen_log` and
 `clear_on_screen_log`. Inside `execution.actions`, it accepts exact lower-case
@@ -9171,6 +9244,8 @@ Validation boundary:
 - exact lower-case `on_screen_log_set` and `on_screen_log_clear` aliases reach
   the canonical executor and normalize to `set_on_screen_log` and
   `clear_on_screen_log`; MCP does not expose separate panel tools
+- `params.template` carries live overlay templates unchanged to Android; supply
+  exactly one of `text` or `template`, with the same styling fields
 - case or whitespace variants and on-screen log parameter aliases are rejected
 
 Use [Actions](actions.md) for canonical action types and params, and

@@ -901,12 +901,13 @@ Example:
 <a id="action-set-on-screen-log"></a>
 ### `set_on_screen_log`
 
-Use this raw action to show one static, noninteractive diagnostic label owned by the connected Operator accessibility service. The CLI convenience command is `on-screen-log set --text <text>`. See [On-screen logs](on-screen-logs.md) for lifecycle, capture, and transport details.
+Use this raw action to show one noninteractive diagnostic panel owned by the connected Operator accessibility service. Supply literal `text` or a live Android-resolved `template`. CLI conveniences are `on-screen-log set --text <text>` and `on-screen-log set --template <template>`. See [On-screen logs](on-screen-logs.md) for lifecycle, capture, and transport details.
 
 | Field | Valid values | Default / meaning |
 | --- | --- | --- |
-| Required | `text` | Static plain-text label. |
-| `text` | String with `1..2048` UTF-16 code units, at least one non-whitespace character | Required. LF and TAB are allowed; other control characters are rejected. |
+| Required | Exactly one of `text` or `template` | Literal label or live metadata template. |
+| `text` | String with `1..2048` UTF-16 code units, at least one non-whitespace character | Literal text. LF and TAB are allowed; other control characters are rejected. |
+| `template` | Same input bounds as `text`; only the nine documented placeholders | See [template vocabulary, escaping and expansion bounds](on-screen-logs.md#live-templates). Mutually exclusive with `text`. |
 | `anchor` | Exact `left` or `right` | `left`; physical display edge. |
 | `textAlign` | Exact `left` or `right` | `left`; alignment inside the panel. |
 | `topOffsetDp` | Integer-valued JSON number `0..1000` | `8`; from the usable top edge. |
@@ -925,7 +926,7 @@ Rules:
 - every successful set replaces the whole existing panel using supplied values and defaults, rather than patching existing state
 - malformed input is rejected before dispatch and cannot modify a currently visible panel
 
-Success data has the exact string-valued keys `visible`, `rendered`, `truncated`, `anchor`, `text_align`, `top_offset_dp`, `edge_offset_dp`, `width_dp`, `font_size_sp`, `text_color`, `background_color`, `ttl_ms`, and `bounds`. The result does not echo caller text.
+Success data has the exact string-valued keys `visible`, `rendered`, `truncated`, `anchor`, `text_align`, `top_offset_dp`, `edge_offset_dp`, `width_dp`, `font_size_sp`, `text_color`, `background_color`, `ttl_ms`, and `bounds`. The result does not echo caller text or resolved metadata. Bounds and truncation describe the initial draw; live refreshes preserve the original TTL.
 
 Common failures:
 

@@ -2096,6 +2096,7 @@ COMMANDS["close"] = {
 
 export const ON_SCREEN_LOG_FLAGS = {
   "--text": "text",
+  "--template": "template",
   "--anchor": "anchor",
   "--text-align": "textAlign",
   "--top-offset-dp": "topOffsetDp",
@@ -2148,8 +2149,8 @@ export function parseOnScreenLogArgs(rest: string[]): {
       params[field] = value;
     }
   }
-  if (operation === "set" && params.text === undefined) {
-    throw new UsageError("on-screen-log set requires --text");
+  if (operation === "set" && (params.text !== undefined) === (params.template !== undefined)) {
+    throw new UsageError("on-screen-log set requires exactly one of --text or --template");
   }
   return operation === "set" ? { operation, params } : { operation };
 }
@@ -2157,11 +2158,12 @@ export function parseOnScreenLogArgs(rest: string[]): {
 const HELP_ON_SCREEN_LOG = `clawperator on-screen-log set|clear
 
 Usage:
-  clawperator on-screen-log set --text <text> [panel options] [common options]
+  clawperator on-screen-log set (--text <text> | --template <template>) [panel options] [common options]
   clawperator on-screen-log clear [common options]
 
 Panel options (set only, each at most once):
-  --text <text>                  Required plain text, 1-2048 UTF-16 code units
+  --text <text>                  Literal text, 1-2048 UTF-16 code units
+  --template <template>          Live Android template, exclusive with --text
   --anchor <left|right>          Physical horizontal edge (default left)
   --text-align <left|right>      Alignment inside the panel (default left)
   --top-offset-dp <number>       0-1000, default 8
