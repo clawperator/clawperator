@@ -4,46 +4,18 @@ Stable scope and contract: [plan.md](plan.md).
 
 ## Task 1 / PR 1: Foreground-application observation
 
-Status: [DONE]. Implemented and validated on 2026-09-19. No implementation dependency.
+Status: [DONE]. Implemented and validated on 2026-09-19.
 
-The observer, existing service ingress, debug Android consumer, and regression
-tests are implemented. The requested Pixel 10 Pro Fold AVD was identified before
-targeting it, and the matching debug APK was installed. A final 20-switch
-Settings/Chrome split-screen run matched every expected transition, including
-rapid alternation, with 103-107 ms event-to-observation latency. Earlier runs
-added 22 passing pane changes. The final latest-state delivery fix also passed
-four ordinary app switches after the Android consumer/service were ready. Soft-key input in both panes, overlay/IME
-exclusion, Home, recents, shade, permission dialog, lock/unlock, and service
-reconnection have live evidence. Failed fixed-coordinate IME input attempts
-are explicitly excluded from passing evidence.
+Delivered the reusable observer, existing accessibility ingress integration,
+bounded Android proof consumer, and regression tests. Android and documentation
+checks passed. Pixel 10 Pro Fold evidence includes 42 split-screen pane focus
+changes, keyboard input in both panes, system transitions, and service reconnect.
+The final 20-switch run measured 103-107 ms event-to-observation latency.
 
-Android app build/tests, operator tests (including 12 observer tests), shared
-snapshot tests, four evidence-parser tests, existing overlay harness checks,
-and the docs build passed. Changed emulator settings were restored and the
-panel/consumer cleared. Task 2 remains not started. See the durable
-[observer design and evidence](../../docs/internal/design/foreground-application-observation.md)
-for exact selection semantics, repeatable proof, and platform limits.
-
-- Add a reusable, subscription-driven observer using existing accessibility
-  ingress. Inspect event masks and capabilities, reconcile initial/current
-  identity, expose unavailable explicitly, and avoid redundant notifications.
-- Handle focus/window changes, transient null roots, service reconnection,
-  subscriber cleanup, and stale concurrent reads. Preserve recording and
-  snapshot contracts. Do not add package metadata or overlay tokens here.
-- Add focused tests for identity selection, unavailable transitions, keyboard
-  and own-overlay exclusion, split-screen focus, initial subscription,
-  disconnect/reconnect, duplicate events, and subscription cancellation.
-- Prove observation on a selected device with a bounded test consumer using
-  production observer code. Do not require a production public endpoint just
-  for proof. Switch apps manually without Node navigation calls or recording
-  active; record identity transitions and latency. Exercise Home, keyboard,
-  recents, shade, permission dialogs, lock/unlock, and split-screen where supported.
-- Document the actual policy, lifetime, and evidence in the permanent observer
-  design document named in the plan. Mark unsupported/unverified cases clearly.
-
-Acceptance: an Android consumer receives initial identity or unavailable state,
-then correct changes without Node polling; stale identities and disposed
-subscriptions do not emit. Existing recording/snapshot behavior remains valid.
+The durable [observer design and evidence](../../docs/internal/design/foreground-application-observation.md)
+records the contract, lifecycle, repeatable proof, excluded failed input attempts,
+and platform limits. Changed emulator settings were restored. Task 2 remains
+not started and can consume this observer without changing snapshot semantics.
 
 ## Task 2 / PR 2: Overlay templates and live metadata
 
