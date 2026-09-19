@@ -153,8 +153,10 @@ Keep `core.hooksPath=.githooks` and do not bypass hooks with `--no-verify`.
 The local terms file is `~/.clawperator/blocked-terms.txt`, with one term per
 non-empty line and `#` comments. `CLAWPERATOR_BLOCKED_TERMS_FILE` overrides
 its location. A missing file permits commits; an unreadable configured file
-blocks them. The hooks scan staged content and the sanitized commit message,
-case-insensitively, matching identifiers or literal phrases as appropriate.
+blocks them. The hooks scan effective author and committer identities, staged
+content, and the sanitized commit message, case-insensitively, matching identifiers
+or literal phrases as appropriate. Before pushing, the hooks also scan raw author
+and committer identities and messages in the outgoing history.
 Verify changes to this policy with `./validation/test_blocked_terms_policy.sh`.
 Before release or force-push events, scan for blocked terms and verify history.
 

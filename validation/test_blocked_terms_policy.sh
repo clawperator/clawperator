@@ -14,15 +14,16 @@ trap cleanup EXIT
 mkdir -p "$test_repo/.githooks" "$test_repo/validation"
 cp "$repo_root/.githooks/pre-commit" "$test_repo/.githooks/pre-commit"
 cp "$repo_root/.githooks/commit-msg" "$test_repo/.githooks/commit-msg"
+cp "$repo_root/.githooks/pre-push" "$test_repo/.githooks/pre-push"
 cp "$repo_root/validation/blocked_terms_policy.sh" "$test_repo/validation/blocked_terms_policy.sh"
 cp "$repo_root/validation/commit_message_policy.sh" "$test_repo/validation/commit_message_policy.sh"
-chmod +x "$test_repo/.githooks/pre-commit" "$test_repo/.githooks/commit-msg"
+chmod +x "$test_repo/.githooks/"*
 
 git -C "$test_repo" init --quiet
 git -C "$test_repo" config user.name "Blocked Terms Test"
 git -C "$test_repo" config user.email "blocked-terms-test@example.invalid"
 git -C "$test_repo" config core.hooksPath .githooks
-git -C "$test_repo" commit --allow-empty --no-verify -m "test: fixture" --quiet
+CLAWPERATOR_BLOCKED_TERMS_FILE="$test_root/missing" git -C "$test_repo" commit --allow-empty -m "test: fixture" --quiet
 blocked_lower="$(printf '%s%s' 'bra' 've')"
 blocked_upper="$(printf '%s' "$blocked_lower" | tr '[:lower:]' '[:upper:]')"
 blocked_mixed="$(printf '%s%s' 'bRa' 'Ve')"
@@ -48,5 +49,48 @@ git -C "$test_repo" add blocked-content.js
 assert_rejected git -C "$test_repo" commit -m "test: staged content"
 git -C "$test_repo" reset --quiet -- blocked-content.js
 rm "$test_repo/blocked-content.js"
+
+assert_rejected env GIT_COMMITTER_EMAIL="person@${blocked_upper}.invalid" git -C "$test_repo" commit --allow-empty -m "test: committer override"
+assert_rejected env GIT_AUTHOR_EMAIL="person@${blocked_lower}.invalid" git -C "$test_repo" commit --allow-empty -m "test: author override"
+assert_rejected git -C "$test_repo" commit --allow-empty --author="Test <person@${blocked_mixed}.invalid>" -m "test: explicit author"
+assert_rejected env GIT_COMMITTER_NAME="$blocked_lower" git -C "$test_repo" commit --allow-empty -m "test: committer name"
+
+git -C "$test_repo" init --bare --quiet "$test_root/remote.git"
+git -C "$test_repo" remote add origin "$test_root/remote.git"
+git -C "$test_repo" push --quiet origin HEAD:refs/heads/clean
+clean_head="$(git -C "$test_repo" rev-parse HEAD)"
+
+# Simulate a commit created before the local terms were configured.
+CLAWPERATOR_BLOCKED_TERMS_FILE="$test_root/missing" GIT_COMMITTER_EMAIL="person@${blocked_lower}.invalid" \
+  git -C "$test_repo" commit --allow-empty -m "test: imported history" --quiet
+git -C "$test_repo" commit --allow-empty -m "test: clean tip" --quiet
+assert_rejected git -C "$test_repo" push origin HEAD:refs/heads/clean
+assert_rejected git -C "$test_repo" push origin HEAD:refs/heads/new
+git -C "$test_repo" tag -a fixture-tag -m "test: tag"
+assert_rejected git -C "$test_repo" push origin refs/tags/fixture-tag
+git -C "$test_repo" push --quiet origin :refs/heads/clean
+git -C "$test_repo" reset --hard --quiet "$clean_head"
+
+# Previously published history is not introduced by a new branch. A stale local
+# remote-tracking ref must not hide an unpublished identity from the server check.
+CLAWPERATOR_BLOCKED_TERMS_FILE="$test_root/missing" git -C "$test_repo" commit --allow-empty -m "test: historical $blocked_lower" --quiet
+CLAWPERATOR_BLOCKED_TERMS_FILE="$test_root/missing" git -C "$test_repo" push --quiet origin HEAD:refs/heads/published
+git -C "$test_repo" commit --allow-empty -m "test: new allowed branch" --quiet
+git -C "$test_repo" push --quiet origin HEAD:refs/heads/allowed-branch
+CLAWPERATOR_BLOCKED_TERMS_FILE="$test_root/missing" GIT_AUTHOR_EMAIL="person@${blocked_lower}.invalid" \
+  git -C "$test_repo" commit --allow-empty -m "test: unpublished author" --quiet
+git -C "$test_repo" update-ref refs/remotes/origin/stale HEAD
+assert_rejected git -C "$test_repo" push origin HEAD:refs/heads/stale-check
+git -C "$test_repo" reset --hard --quiet "$clean_head"
+
+git -C "$test_repo" config user.email "person@${blocked_lower}.invalid"
+assert_rejected git -C "$test_repo" commit --allow-empty -m "test: configured identity"
+git -C "$test_repo" config user.email "blocked-terms-test@example.invalid"
+
+# Both direct message checks and identity checks must fail closed for invalid files.
+mkdir "$test_root/not-a-file"
+printf 'test: allowed\n' > "$test_root/message"
+assert_rejected env CLAWPERATOR_BLOCKED_TERMS_FILE="$test_root/not-a-file" bash "$test_repo/.githooks/commit-msg" "$test_root/message"
+assert_rejected env CLAWPERATOR_BLOCKED_TERMS_FILE="$test_root/not-a-file" git -C "$test_repo" commit --allow-empty -m "test: invalid terms file"
 
 echo "blocked-terms policy tests passed"
