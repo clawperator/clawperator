@@ -1926,6 +1926,11 @@ Example:
     const { rest, format, logger, deviceId, operatorPackage, timeoutMs, noDaemon } = ctx;
     const resolved = resolveElementMatcherFromCli(rest);
     if (!resolved.ok) return formatError(resolved.error, { format });
+    for (const flag of ["--visibility", "--limit"]) {
+      if (rest.indexOf(flag) !== rest.lastIndexOf(flag)) {
+        throw new UsageError(`${flag} must not appear more than once`);
+      }
+    }
     const visibility = getStringOptStrict(rest, "--visibility", ["--visibility", "--limit"]);
     if (visibility !== undefined && visibility !== "on_screen" && visibility !== "all") {
       throw new UsageError("--visibility must be on_screen or all");
