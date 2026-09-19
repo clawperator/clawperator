@@ -1850,6 +1850,10 @@ clawperator query --device <device_serial> --operator-package com.clawperator.op
 clawperator query --matcher-json '{"descendant":{"textEquals":"Display"}}'
 ```
 
+The CLI accepts each of `--limit` and `--visibility` at most once. Repeating
+either flag, even with the same value, returns a structured `USAGE` error and
+exit code `1` before device execution.
+
 ### Runnable Node consumer
 
 From a repository checkout, build and run the tested

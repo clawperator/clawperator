@@ -15,7 +15,7 @@ const cli = fileURLToPath(new URL("../../cli/index.js", import.meta.url));
 
 function runCli(args: string[]) {
   const result = spawnSync(process.execPath, [cli, ...args], { encoding: "utf8", env: { ...process.env, CLAWPERATOR_NO_DAEMON: "1" } });
-  return { ...result, payload: JSON.parse(result.stdout) as { code?: string; error?: { code?: string } } };
+  return { ...result, payload: JSON.parse(result.stdout) as { code?: string; message?: string; error?: { code?: string } } };
 }
 
 const invalidParams = [
@@ -97,12 +97,28 @@ describe("query and relational selector contracts", () => {
     for (const flags of [
       ["--visibility"], ["--visibility", "hidden"], ["--visibility", ""],
       ["--limit"], ["--limit", "0"], ["--limit", "1001"], ["--limit", "1.5"], ["--limit", ""],
-      ["--limit", "1", "--limit", "2"], ["--matcher-json"], ["--matcher-json", "{}"],
+      ["--matcher-json"], ["--matcher-json", "{}"],
       ["--matcher-json", "{"], ["--matcher-json", JSON.stringify(matcher), "--text", "x"],
     ]) {
       const result = runCli(["query", ...flags]);
-      assert.notEqual(result.status, 0, flags.join(" "));
-      assert.equal(typeof result.payload.code, "string", result.stdout);
+      assert.equal(result.status, 1, flags.join(" "));
+      assert.equal(result.payload.code, flags[0] === "--matcher-json" ? "EXECUTION_VALIDATION_FAILED" : "USAGE", result.stdout);
+    }
+  });
+
+  it("CLI rejects duplicate query options before device selection", () => {
+    for (const [flag, first, second] of [
+      ["--limit", "1", "1"], ["--limit", "1", "2"],
+      ["--visibility", "all", "all"], ["--visibility", "all", "on_screen"],
+    ]) {
+      for (const globalFirst of [true, false]) {
+        const globals = ["--device", "non-existent", "--operator-package", "com.clawperator.operator.dev"];
+        const query = ["query", flag, first, flag, second];
+        const result = runCli(globalFirst ? [...globals, ...query] : [...query, ...globals]);
+        assert.equal(result.status, 1, result.stdout);
+        assert.equal(result.payload.code, "USAGE", result.stdout);
+        assert.equal(result.payload.message, `${flag} must not appear more than once`);
+      }
     }
   });
 
