@@ -2,15 +2,15 @@
 
 ## Goal and status
 
-Planning complete; neither implementation task has started. Let a Node caller
-configure an overlay once, with Android resolving device and foreground-app
-values and refreshing them locally. No host polling is required.
+Task 1 is implemented and validated. Task 2 has not started. The overall goal
+is to let a Node caller configure an overlay once, with Android resolving device
+and foreground-app values and refreshing them locally. No host polling is required.
 
 Split this into two sequential implementation tasks, each suitable for one PR:
 
 | Task | Deliverable | Dependency | Status |
 | --- | --- | --- | --- |
-| 1 | Reusable Android foreground-application observer | None | Not started |
+| 1 | Reusable Android foreground-application observer | None | [DONE] |
 | 2 | Overlay templates, inline icons, and live refresh | Task 1 observer contract and implementation | Not started |
 
 Task 2 may build on Task 1 in a stacked branch; integrate Task 1 first. This pack
@@ -20,11 +20,17 @@ commits without automatically expanding into the other task.
 
 ## Current implementation
 
-The accessibility service already receives window-state and other events.
-Its callbacks feed recording and debug diagnostics, not a shared foreground
-state stream. Snapshot metadata reads the active root on demand; navigation
-waits poll it only for the duration of an action. The existing overlay renders
-static text and owns its draw acknowledgement, replacement, and expiry.
+The accessibility service now feeds a reusable subscription-driven foreground
+observer, including window-change ingress for split-screen input focus. It
+provides explicit unavailable state, bounded null-root retries, cancellation,
+and service-reconnect protection. Public snapshot foreground lookup remains
+unchanged. The existing overlay still renders static text and owns its draw
+acknowledgement, replacement, and expiry; Task 2 integration is not implemented.
+
+Durable semantics, test coverage, live evidence, and platform limitations are in
+[foreground application observation](../../docs/internal/design/foreground-application-observation.md).
+Task 1 was live-verified on the requested Pixel 10 Pro Fold AVD with an Android
+consumer of production code, independent of recording and Node navigation.
 
 ## Task boundaries
 

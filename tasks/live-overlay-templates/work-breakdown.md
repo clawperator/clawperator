@@ -4,7 +4,25 @@ Stable scope and contract: [plan.md](plan.md).
 
 ## Task 1 / PR 1: Foreground-application observation
 
-Status: Not started. No implementation dependency.
+Status: [DONE]. Implemented and validated on 2026-09-19. No implementation dependency.
+
+The observer, existing service ingress, debug Android consumer, and regression
+tests are implemented. The requested Pixel 10 Pro Fold AVD was identified before
+targeting it, and the matching debug APK was installed. A final 20-switch
+Settings/Chrome split-screen run matched every expected transition, including
+rapid alternation, with 103-107 ms event-to-observation latency. Earlier runs
+added 22 passing pane changes. The final latest-state delivery fix also passed
+four ordinary app switches after the Android consumer/service were ready. Soft-key input in both panes, overlay/IME
+exclusion, Home, recents, shade, permission dialog, lock/unlock, and service
+reconnection have live evidence. Failed fixed-coordinate IME input attempts
+are explicitly excluded from passing evidence.
+
+Android app build/tests, operator tests (including 12 observer tests), shared
+snapshot tests, four evidence-parser tests, existing overlay harness checks,
+and the docs build passed. Changed emulator settings were restored and the
+panel/consumer cleared. Task 2 remains not started. See the durable
+[observer design and evidence](../../docs/internal/design/foreground-application-observation.md)
+for exact selection semantics, repeatable proof, and platform limits.
 
 - Add a reusable, subscription-driven observer using existing accessibility
   ingress. Inspect event masks and capabilities, reconcile initial/current
@@ -68,7 +86,7 @@ Acceptance cases:
 
 ## Validation and prerequisites
 
-For each task, run Android checks from `apps/android`:
+For each task, run Android checks from the repository root (where `gradlew` lives):
 
 ```bash
 ./gradlew :app:assembleDebug
