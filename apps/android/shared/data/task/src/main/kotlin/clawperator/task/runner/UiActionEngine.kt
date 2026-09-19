@@ -139,16 +139,8 @@ class UiActionEngineDefault(
                 is UiAction.ReadText -> executeReadText(taskScope, action)
                 is UiAction.QueryUi -> executeQueryUi(taskScope, action)
                 is UiAction.SnapshotUi -> executeSnapshotUi(taskScope, action)
-                is UiAction.ShowToast -> {
-                    val controller = checkNotNull(apiToastController) { "API toast controller is unavailable" }
-                    controller.show(action.text, action.duration)
-                    UiActionStepResult(action.id, "show_toast", data = mapOf("submitted" to "true", "duration" to action.duration))
-                }
-                is UiAction.CancelToast -> {
-                    val controller = checkNotNull(apiToastController) { "API toast controller is unavailable" }
-                    controller.cancel()
-                    UiActionStepResult(action.id, "cancel_toast", data = mapOf("submitted" to "true"))
-                }
+                is UiAction.ShowToast -> executeShowToast(action)
+                is UiAction.CancelToast -> executeCancelToast(action)
                 is UiAction.SetOnScreenLog -> executeSetOnScreenLog(action)
                 is UiAction.ClearOnScreenLog -> executeClearOnScreenLog(action)
                 is UiAction.StartRecording -> executeStartRecording(action)
@@ -733,6 +725,30 @@ class UiActionEngineDefault(
                         put("operator_overlay_visible", snapshotResult.operatorOverlayVisible.toString())
                     }
                 },
+        )
+    }
+
+    private suspend fun executeShowToast(
+        action: UiAction.ShowToast,
+    ): UiActionStepResult {
+        val controller = checkNotNull(apiToastController) { "API toast controller is unavailable" }
+        controller.show(action.text, action.duration)
+        return UiActionStepResult(
+            id = action.id,
+            actionType = "show_toast",
+            data = mapOf("submitted" to "true", "duration" to action.duration),
+        )
+    }
+
+    private suspend fun executeCancelToast(
+        action: UiAction.CancelToast,
+    ): UiActionStepResult {
+        val controller = checkNotNull(apiToastController) { "API toast controller is unavailable" }
+        controller.cancel()
+        return UiActionStepResult(
+            id = action.id,
+            actionType = "cancel_toast",
+            data = mapOf("submitted" to "true"),
         )
     }
 
