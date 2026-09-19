@@ -18,10 +18,33 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 
-sealed interface ForegroundApplicationState {
-    data class Available(val packageName: String, val displayId: Int) : ForegroundApplicationState
+data class ForegroundApplicationIdentity(val packageName: String, val displayId: Int)
 
-    data object Unavailable : ForegroundApplicationState
+sealed interface ForegroundApplicationState {
+    val foregroundState: String
+    val foregroundApp: ForegroundApplicationIdentity?
+
+    data class Available(val packageName: String, val displayId: Int) : ForegroundApplicationState {
+        override val foregroundState = "app_focused"
+        override val foregroundApp get() = ForegroundApplicationIdentity(packageName, displayId)
+    }
+
+    data class SystemPanel(
+        val displayId: Int,
+        override val foregroundApp: ForegroundApplicationIdentity? = null,
+    ) : ForegroundApplicationState {
+        override val foregroundState = "system_panel"
+    }
+
+    data object Locked : ForegroundApplicationState {
+        override val foregroundState = "locked"
+        override val foregroundApp = null
+    }
+
+    data object Unavailable : ForegroundApplicationState {
+        override val foregroundState = "unavailable"
+        override val foregroundApp = null
+    }
 }
 
 /** Main-thread lifecycle owner. Collectors may subscribe from any coroutine dispatcher. */
@@ -34,7 +57,36 @@ class ForegroundApplicationObserver internal constructor(
         { service, displayId -> reader.read(service, displayId) },
     )
 
-    private class Subscriber(val displayId: Int, val emit: (ForegroundApplicationState) -> Unit)
+    private class Subscriber(val displayId: Int, val scope: CoroutineScope, val emit: (ForegroundApplicationState) -> Unit) {
+        private var lastVerifiedApp: ForegroundApplicationIdentity? = null
+        private var pendingUnavailable: Job? = null
+
+        fun cancelPending() {
+            pendingUnavailable?.cancel()
+            pendingUnavailable = null
+        }
+
+        fun acceptRead(state: ForegroundApplicationState) {
+            if (state != ForegroundApplicationState.Unavailable) {
+                publish(state)
+            } else if (pendingUnavailable == null) {
+                // New events must not extend the bounded missing-window grace period.
+                pendingUnavailable = scope.launch {
+                    delay(350)
+                    publish(ForegroundApplicationState.Unavailable)
+                }
+            }
+        }
+
+        fun publish(state: ForegroundApplicationState) {
+            cancelPending()
+            val observation = when (state) {
+                is ForegroundApplicationState.SystemPanel -> state.copy(foregroundApp = lastVerifiedApp)
+                else -> state.also { lastVerifiedApp = it.foregroundApp }
+            }
+            emit(observation)
+        }
+    }
 
     private val subscribers = mutableSetOf<Subscriber>()
     private var service: AccessibilityService? = null
@@ -47,13 +99,14 @@ class ForegroundApplicationObserver internal constructor(
     /** Emits current identity or unavailable. No cached identity or pending history is replayed. */
     fun observe(displayId: Int = 0): Flow<ForegroundApplicationState> = callbackFlow {
         require(displayId >= 0)
-        val subscriber = Subscriber(displayId) { trySend(it) }
+        val subscriber = Subscriber(displayId, scope) { trySend(it) }
         subscribers.add(subscriber)
         trySend(ForegroundApplicationState.Unavailable)
         reconcile()
         awaitClose {
             scope.launch {
                 subscribers.remove(subscriber)
+                subscriber.cancelPending()
                 if (subscribers.isEmpty()) invalidate()
             }
         }
@@ -63,7 +116,7 @@ class ForegroundApplicationObserver internal constructor(
     fun attach(service: AccessibilityService) {
         invalidate()
         this.service = service
-        subscribers.forEach { it.emit(ForegroundApplicationState.Unavailable) }
+        subscribers.forEach { it.publish(ForegroundApplicationState.Unavailable) }
         reconcile()
     }
 
@@ -73,7 +126,7 @@ class ForegroundApplicationObserver internal constructor(
         if (this.service !== service) return
         invalidate()
         this.service = null
-        subscribers.forEach { it.emit(ForegroundApplicationState.Unavailable) }
+        subscribers.forEach { it.publish(ForegroundApplicationState.Unavailable) }
     }
 
     @MainThread
@@ -114,7 +167,7 @@ class ForegroundApplicationObserver internal constructor(
                         ForegroundApplicationState.Unavailable
                     }
                     if (generation != requestedGeneration || service !== attached) return@launch
-                    subscribers.filter { it.displayId == displayId }.forEach { it.emit(state) }
+                    subscribers.filter { it.displayId == displayId }.forEach { it.acceptRead(state) }
                     unavailable = unavailable || state == ForegroundApplicationState.Unavailable
                 }
                 if (!unavailable) break

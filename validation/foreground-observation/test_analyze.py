@@ -31,5 +31,13 @@ class EvidenceTest(unittest.TestCase):
         ], 'focus-')
         self.assertFalse(rows[0]['passed'])
 
+    def test_panel_context_is_not_mistaken_for_focused_application(self):
+        rows = analyze([
+            ' 1.000 1 1 I ForegroundExpected: focus-0 expected=example.a',
+            ' 1.100 1 1 I ForegroundObservationProof: STATE uptimeMs=1100 state=SystemPanel(displayId=0, foregroundApp=ForegroundApplicationIdentity(packageName=example.a, displayId=0))',
+        ], 'focus-')
+        self.assertFalse(rows[0]['passed'])
+        self.assertEqual(['SystemPanel'], rows[0]['observed'])
+
     def test_empty_evidence_has_no_passes(self):
         self.assertEqual([], analyze([], 'focus-'))

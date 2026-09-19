@@ -9,28 +9,43 @@ consumers on another display must pass that display's ID.
 
 ## State and resolution policy
 
-The flow starts with `ForegroundApplicationState.Unavailable` until a successful
-current-window read establishes `Available(packageName, displayId)`. Its first
-delivered value can be either state.
-Unavailable is a current state, not a request to reuse the last package.
-Repeated equal states are suppressed per collector. Pending delivery is
-conflated: a slow consumer receives the latest state instead of a backlog of
-obsolete application identities. A fresh subscription does
-not replay cached application identity.
+Each observation contains both `foregroundState` and nullable `foregroundApp`
+(`ForegroundApplicationIdentity(packageName, displayId)`):
+
+| `foregroundState` | Meaning | `foregroundApp` |
+| --- | --- | --- |
+| `app_focused` | A verified application owns input focus | Current verified application |
+| `system_panel` | A system-type window owns focus or is active | Last verified app in this subscription, or null |
+| `locked` | Keyguard is locked | null |
+| `unavailable` | No eligible current window, ambiguous focus, read failure, or disconnected service | null |
+
+The sealed variants are `Available`, `SystemPanel`, `Locked`, and `Unavailable`.
+The flow starts unavailable until a window read establishes the state; its first
+delivered value can already be the resolved state. Repeated equal observations
+are suppressed and pending delivery is conflated, so slow consumers receive the
+latest state without a backlog.
+
+Opening a system panel preserves the last verified application as context,
+not as an assertion that it still receives input. Closing the panel triggers a
+fresh read. Lock, unavailable, and service replacement clear that context.
+History belongs to each subscription and display: a new subscription starting
+with a panel open reports `system_panel` with a null app, even if another
+subscriber remembers an app. No background root or event package is used to
+invent that identity.
 
 Resolution reads accessibility window metadata and the package on current
 application roots, without traversing child nodes or capturing a hierarchy:
 
-1. A locked keyguard yields unavailable.
+1. A locked keyguard yields `locked` with no app.
 2. Restrict windows to the requested display. On API 30 and later, use
    `windowsOnAllDisplays`; older platforms support only default display 0.
 3. Exclude input-method windows and the exact Operator-owned overlay identity
    supplied by `OperatorOverlayIdentity`. Do not exclude the entire Operator
    package: its ordinary activity is an eligible application.
-4. If any remaining active or input-focused window is not `TYPE_APPLICATION`,
-   report unavailable. This prevents a current system panel, split divider,
-   window control, or unrelated accessibility overlay from revealing an app
-   underneath as current. Merely visible, inactive system bars do not block it.
+4. If remaining active or input-focused non-application windows are all
+   `TYPE_SYSTEM`, report `system_panel`. Other blocking types, including an
+   unrelated accessibility overlay, report unavailable. Merely visible,
+   inactive system bars do not block an application.
 5. Prefer the unique input-focused application window. If none is focused,
    accept the unique active application window. Input focus takes precedence
    over a different application's active flag, which can lag during switching.
@@ -41,7 +56,7 @@ application roots, without traversing child nodes or capturing a hierarchy:
 
 Home and recents can report the launcher when it owns a verified application
 window. An application-type permission dialog can report the permission
-controller's package. A system-type panel reports unavailable. There is no
+controller's package. A system-type panel reports `system_panel`. There is no
 package-name denylist and no assumption that every system-owned UI is a panel.
 
 This policy is separate from public snapshot foreground metadata, which still
@@ -76,14 +91,27 @@ collectors survive reconnection and receive a fresh read. Cancellation removes
 the subscriber, and closed channels cannot deliver late results.
 
 Unavailable reads get at most two retries, after 100 ms and another 250 ms.
+After an established observation, transient read failures are published only
+after a 350 ms grace period. New events do not extend this deadline. The previous observation can therefore remain
+visible during this bounded reconciliation window; it is not a fresh focus
+confirmation. This avoids clearing app context during the short missing-window
+gap before the notification shade appears. Startup, lock, and disconnect still
+publish their states immediately. New ingress supersedes pending retries, while a resolved state cancels the
+pending unavailable publication.
 This allows a transient null root to recover without requiring another event.
-Retries stop on success or cancellation. After exhaustion the state stays
+Retries stop on a resolved state (including panel or lock) or cancellation. After exhaustion the state stays
 unavailable until another relevant event or connection/subscription change.
 There is no continuous polling. With no subscribers there are no observer
 window/root reads or retries. The existing service can still do its unrelated
 recording and debug work.
 
 ## Live evidence
+
+The original verification below predates the additional foreground state.
+Its shade/lock `Unavailable` results describe that earlier contract. The current
+contract reports `system_panel` for the shade and `locked` for keyguard, and
+preserves app context only across system panels.
+
 
 Verified on 2026-09-19 using the requested **Pixel 10 Pro Fold AVD**, identified
 by the emulator console AVD name and `hw.device.name=pixel_10_pro_fold` before
@@ -165,6 +193,24 @@ in the intended pane. Its parser regression tests run in the validation CI suite
   observation unchanged until the next relevant event; there is no periodic
   polling fallback.
 
+### Foreground-state follow-up
+
+The updated APK was installed on the same identified Fold AVD and observed
+through the Android consumer. One launcher shade open/close and three Settings
+shade open/close cycles preserved the package while alternating `app_focused`
+and `system_panel`, with no intermediate unavailable publication. A temporary
+non-credential keyguard check produced `locked` with an unknown app; unlocking
+restored a freshly verified app. The original keyguard-disabled setting was
+restored and the shade closed. Raw evidence is retained locally as
+`foreground-state-followup.log` alongside the earlier evidence.
+
+The first attempt exposed a missing-window gap just before shade creation,
+which cleared app context. The bounded grace period fixes that live regression.
+Controlled tests cover that gap, repeated-event deadline enforcement, app
+clearing on unknown/lock/reconnect, subscription/display isolation, and no
+panel retries. Split-screen selection is unchanged and its existing tests pass;
+the original split-screen live runs predate this state extension.
+
 ## Repeating the proof
 
 Build from the repository root with `./gradlew :app:assembleDebug`. Discover the
@@ -191,8 +237,9 @@ uptime only in debug builds while there is a subscriber.
 
 For a quiet live view, filter Logcat by **`ClawperatorForegroundApp`**. This
 dedicated tag emits only the initial delivered state and subsequent distinct
-foreground states, such as `Available(packageName=com.android.chrome,
-displayId=0)` or `Unavailable`. It excludes window dumps, event traces, and
+observations, for example `foreground_state=system_panel
+foreground_app=com.android.chrome displayId=0`. A null app is logged as
+`foreground_app=unknown`. It excludes window dumps, event traces, and
 session lifecycle messages. In ADBuddy, select the target emulator's Logcat
 and enter `ClawperatorForegroundApp` in Search Logcat. With adb, use:
 

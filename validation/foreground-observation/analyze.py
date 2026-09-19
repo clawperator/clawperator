@@ -15,8 +15,9 @@ def analyze(lines, prefix):
             last_event = tuple(map(int, event.groups()))
         state = re.search(r'I ForegroundObservationProof: STATE uptimeMs=(\d+) state=(.*)', line)
         if state:
-            package = re.search(r'packageName=([^,]+)', state[2])
-            states.append((int(state[1]), package[1] if package else 'Unavailable', last_event))
+            package = re.search(r'^Available\(packageName=([^,]+)', state[2])
+            observed = package[1] if package else state[2].split('(', 1)[0]
+            states.append((int(state[1]), observed, last_event))
         action = re.search(r'^\s*([\d.]+)\s+\d+\s+\d+ I ForegroundExpected: (\S+) expected=(\S+)', line)
         if action and action[2].startswith(prefix):
             actions.append((round(float(action[1]) * 1000), action[2], action[3]))

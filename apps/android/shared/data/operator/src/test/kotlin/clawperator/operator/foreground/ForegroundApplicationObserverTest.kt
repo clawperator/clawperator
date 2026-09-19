@@ -73,13 +73,13 @@ class ForegroundApplicationObserverTest {
     }
 
     @Test
-    fun `system panels lock missing roots ambiguous windows and background apps are unavailable`() {
+    fun `system panels and lock are distinguished from unknown foreground`() {
         assertEquals(unavailable, selectForegroundApplication(listOf(window()), 0))
-        assertEquals(unavailable, selectForegroundApplication(listOf(window(focused = true)), 0, locked = true))
+        assertEquals(ForegroundApplicationState.Locked, selectForegroundApplication(listOf(window(focused = true)), 0, locked = true))
         assertEquals(unavailable, selectForegroundApplication(listOf(window(packageName = null, focused = true)), 0))
         assertEquals(unavailable, selectForegroundApplication(listOf(window(packageName = "  ", active = true)), 0))
         assertEquals(unavailable, selectForegroundApplication(listOf(window(focused = true), window(2, focused = true)), 0))
-        assertEquals(unavailable, selectForegroundApplication(listOf(window(focused = true),
+        assertEquals(ForegroundApplicationState.SystemPanel(0), selectForegroundApplication(listOf(window(focused = true),
             window(2, type = AccessibilityWindowInfo.TYPE_SYSTEM, active = true)), 0))
         assertEquals(unavailable, selectForegroundApplication(emptyList(), 0))
     }
@@ -186,9 +186,10 @@ class ForegroundApplicationObserverTest {
         assertEquals(first, states.last())
         observer.onAccessibilityEvent(service, event())
         runCurrent()
-        assertEquals(unavailable, states.last())
+        assertEquals(first, states.last())
         advanceTimeBy(2000)
         runCurrent()
+        assertEquals(unavailable, states.last())
         assertEquals(5, reads)
     }
 
@@ -253,6 +254,122 @@ class ForegroundApplicationObserverTest {
         blockedConsumer.complete(Unit)
         runCurrent()
         assertEquals(listOf<ForegroundApplicationState>(unavailable), states)
+    }
+
+    @Test
+    fun `system panel preserves verified app but lock unavailable and reconnect clear it`() = runTest {
+        val service = service()
+        var current: ForegroundApplicationState = first
+        val observer = ForegroundApplicationObserver(backgroundScope) { _, _ -> current }
+        observer.attach(service)
+        val states = mutableListOf<ForegroundApplicationState>()
+        backgroundScope.launch { observer.observe().collect { states.add(it) } }
+        runCurrent()
+        fun update(state: ForegroundApplicationState) {
+            current = state
+            observer.onAccessibilityEvent(service, event())
+            runCurrent()
+        }
+        val panel = ForegroundApplicationState.SystemPanel(0)
+        update(panel)
+        assertEquals(panel.copy(foregroundApp = first.foregroundApp), states.last())
+        assertEquals("system_panel", states.last().foregroundState)
+        update(second)
+        assertEquals("app_focused", states.last().foregroundState)
+        update(panel)
+        assertEquals(second.foregroundApp, states.last().foregroundApp)
+        update(ForegroundApplicationState.Locked)
+        assertEquals(null, states.last().foregroundApp)
+        update(panel)
+        assertEquals(panel, states.last())
+        update(first)
+        update(unavailable)
+        advanceTimeBy(350)
+        runCurrent()
+        update(panel)
+        assertEquals(panel, states.last())
+        update(first)
+        observer.detach(service)
+        current = panel
+        observer.attach(service)
+        runCurrent()
+        assertEquals(panel, states.last())
+    }
+
+    @Test
+    fun `transient missing window before shade does not discard app context`() = runTest {
+        val service = service()
+        var current: ForegroundApplicationState = first
+        val observer = ForegroundApplicationObserver(backgroundScope) { _, _ -> current }
+        observer.attach(service)
+        val states = mutableListOf<ForegroundApplicationState>()
+        backgroundScope.launch { observer.observe().collect { states.add(it) } }
+        runCurrent()
+        current = unavailable
+        observer.onAccessibilityEvent(service, event())
+        runCurrent()
+        assertEquals(first, states.last())
+        current = ForegroundApplicationState.SystemPanel(0)
+        advanceTimeBy(100)
+        runCurrent()
+        assertEquals(ForegroundApplicationState.SystemPanel(0, first.foregroundApp), states.last())
+        assertEquals(listOf(unavailable, first, states.last()), states)
+    }
+
+    @Test
+    fun `repeated missing-window events cannot extend unavailable deadline`() = runTest {
+        val service = service()
+        var current: ForegroundApplicationState = first
+        val observer = ForegroundApplicationObserver(backgroundScope) { _, _ -> current }
+        observer.attach(service)
+        val states = mutableListOf<ForegroundApplicationState>()
+        backgroundScope.launch { observer.observe().collect { states.add(it) } }
+        runCurrent()
+        current = unavailable
+        repeat(4) {
+            observer.onAccessibilityEvent(service, event())
+            runCurrent()
+            advanceTimeBy(100)
+        }
+        runCurrent()
+        assertEquals(unavailable, states.last())
+        current = ForegroundApplicationState.SystemPanel(0)
+        observer.onAccessibilityEvent(service, event())
+        runCurrent()
+        assertEquals(ForegroundApplicationState.SystemPanel(0), states.last())
+    }
+
+    @Test
+    fun `panel history belongs to subscription and display and panel does not retry`() = runTest {
+        val service = service()
+        var panelOpen = false
+        var reads = 0
+        val observer = ForegroundApplicationObserver(backgroundScope) { _, display ->
+            reads++
+            if (panelOpen) ForegroundApplicationState.SystemPanel(display)
+            else ForegroundApplicationState.Available("example.display$display", display)
+        }
+        observer.attach(service)
+        val states = mutableListOf<ForegroundApplicationState>()
+        val otherDisplay = mutableListOf<ForegroundApplicationState>()
+        val firstJob = backgroundScope.launch { observer.observe().collect { states.add(it) } }
+        backgroundScope.launch { observer.observe(1).collect { otherDisplay.add(it) } }
+        runCurrent()
+        panelOpen = true
+        observer.onAccessibilityEvent(service, event())
+        runCurrent()
+        assertEquals(ForegroundApplicationIdentity("example.display0", 0), states.last().foregroundApp)
+        assertEquals(ForegroundApplicationIdentity("example.display1", 1), otherDisplay.last().foregroundApp)
+        val before = reads
+        advanceTimeBy(1000)
+        runCurrent()
+        assertEquals(before, reads)
+        firstJob.cancelAndJoin()
+        val fresh = mutableListOf<ForegroundApplicationState>()
+        backgroundScope.launch { observer.observe().collect { fresh.add(it) } }
+        runCurrent()
+        assertEquals(ForegroundApplicationState.SystemPanel(0), fresh.last())
+        assertEquals(ForegroundApplicationIdentity("example.display1", 1), otherDisplay.last().foregroundApp)
     }
 
     @Test

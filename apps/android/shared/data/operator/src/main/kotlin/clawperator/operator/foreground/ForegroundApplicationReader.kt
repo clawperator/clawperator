@@ -24,13 +24,16 @@ internal fun selectForegroundApplication(
     displayId: Int,
     locked: Boolean = false,
 ): ForegroundApplicationState {
-    if (locked) return ForegroundApplicationState.Unavailable
+    if (locked) return ForegroundApplicationState.Locked
     val eligible = windows.filter {
         it.displayId == displayId && !it.ownedOverlay && it.type != AccessibilityWindowInfo.TYPE_INPUT_METHOD
     }
-    // A current system panel must not expose the app underneath it as current.
-    if (eligible.any { (it.active || it.focused) && it.type != AccessibilityWindowInfo.TYPE_APPLICATION }) {
-        return ForegroundApplicationState.Unavailable
+    val blockers = eligible.filter { (it.active || it.focused) && it.type != AccessibilityWindowInfo.TYPE_APPLICATION }
+    if (blockers.isNotEmpty()) {
+        // Only a verified system window permits retaining the last app. Unknown overlays do not.
+        return if (blockers.all { it.type == AccessibilityWindowInfo.TYPE_SYSTEM }) {
+            ForegroundApplicationState.SystemPanel(displayId)
+        } else ForegroundApplicationState.Unavailable
     }
     val focused = eligible.filter { it.focused }
     val candidates = if (focused.isNotEmpty()) focused else eligible.filter { it.active }
@@ -44,7 +47,7 @@ internal fun selectForegroundApplication(
 class ForegroundApplicationReader(private val overlayIdentity: OperatorOverlayIdentity) {
     fun read(service: AccessibilityService, displayId: Int): ForegroundApplicationState {
         val keyguard = service.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
-        if (keyguard?.isKeyguardLocked == true) return ForegroundApplicationState.Unavailable
+        if (keyguard?.isKeyguardLocked == true) return ForegroundApplicationState.Locked
         val allWindows = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val byDisplay = service.windowsOnAllDisplays
             (0 until byDisplay.size()).flatMap { byDisplay.valueAt(it).orEmpty() }

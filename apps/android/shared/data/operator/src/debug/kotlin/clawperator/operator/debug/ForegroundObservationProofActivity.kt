@@ -31,7 +31,7 @@ class ForegroundObservationProofActivity : Activity(), KoinComponent {
                 withTimeoutOrNull(durationMs) {
                     observer.observe().collect { state ->
                         Log.i(TAG, "STATE uptimeMs=${SystemClock.uptimeMillis()} state=$state")
-                        Log.i("ClawperatorForegroundApp", state.toString())
+                        Log.i("ClawperatorForegroundApp", "foreground_state=${state.foregroundState} foreground_app=${state.foregroundApp?.packageName ?: "unknown"} displayId=${state.foregroundApp?.displayId ?: 0}")
                         val windows = services.currentAccessibilityServiceFlow.value?.windows.orEmpty()
                         try {
                             windows.forEach { window ->

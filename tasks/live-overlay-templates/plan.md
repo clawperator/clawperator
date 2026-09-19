@@ -52,9 +52,12 @@ Follow the active/focused application window on the overlay's display, excluding
 the Operator-owned overlay and input-method windows. In split-screen, follow
 the interacted-with/focused application. Home can identify the launcher.
 Do not substitute an accessibility event's package directly for verified
-application identity. System panels and lock screen must not cause an arbitrary
-background app to be reported as current: expose unavailable when no eligible
-current application can be established. Do not retain stale identity as current.
+application identity. Each observation pairs `foregroundState` with nullable
+`foregroundApp`. `app_focused` identifies the focused app; `system_panel`
+retains the subscription's last verified app as context while a system panel
+owns focus. A subscription starting under a panel has no app context. `locked`
+and `unavailable` clear app context. Never select an arbitrary background app
+or treat retained panel context as proof of application input focus.
 
 Check these rules against live window evidence, including permission dialogs,
 notification shade, recents, and keyboards; record the exact resolution policy
