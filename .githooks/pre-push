@@ -4,10 +4,32 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 source "$repo_root/validation/blocked_terms_policy.sh"
 
+if blocked_terms_policy_prepare; then
+  :
+else
+  policy_status=$?
+  [[ $policy_status -eq 10 ]] && exit 0
+  exit "$policy_status"
+fi
+
+# Check server-advertised heads, not stale remote-tracking branches. An ordinary
+# new branch should not recheck unrelated history already published on the server.
+remote_heads="$(git ls-remote --heads "$2" </dev/null)"
+published_revisions=()
+while read -r published_oid published_ref; do
+  [[ -z "$published_oid" ]] && continue
+  if git cat-file -e "${published_oid}^{commit}" 2>/dev/null; then
+    published_revisions+=("^$published_oid")
+  fi
+done <<< "$remote_heads"
+
 while read -r local_ref local_oid remote_ref remote_oid; do
   # A deleted ref introduces no commits.
   [[ "$local_oid" =~ ^0+$ ]] && continue
   revisions=("$local_oid")
+  if [[ ${#published_revisions[@]} -gt 0 ]]; then
+    revisions+=("${published_revisions[@]}")
+  fi
   if [[ ! "$remote_oid" =~ ^0+$ ]] && git cat-file -e "${remote_oid}^{commit}" 2>/dev/null; then
     revisions+=("^$remote_oid")
   fi

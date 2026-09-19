@@ -71,6 +71,18 @@ assert_rejected git -C "$test_repo" push origin refs/tags/fixture-tag
 git -C "$test_repo" push --quiet origin :refs/heads/clean
 git -C "$test_repo" reset --hard --quiet "$clean_head"
 
+# Previously published history is not introduced by a new branch. A stale local
+# remote-tracking ref must not hide an unpublished identity from the server check.
+CLAWPERATOR_BLOCKED_TERMS_FILE="$test_root/missing" git -C "$test_repo" commit --allow-empty -m "test: historical $blocked_lower" --quiet
+CLAWPERATOR_BLOCKED_TERMS_FILE="$test_root/missing" git -C "$test_repo" push --quiet origin HEAD:refs/heads/published
+git -C "$test_repo" commit --allow-empty -m "test: new allowed branch" --quiet
+git -C "$test_repo" push --quiet origin HEAD:refs/heads/allowed-branch
+CLAWPERATOR_BLOCKED_TERMS_FILE="$test_root/missing" GIT_AUTHOR_EMAIL="person@${blocked_lower}.invalid" \
+  git -C "$test_repo" commit --allow-empty -m "test: unpublished author" --quiet
+git -C "$test_repo" update-ref refs/remotes/origin/stale HEAD
+assert_rejected git -C "$test_repo" push origin HEAD:refs/heads/stale-check
+git -C "$test_repo" reset --hard --quiet "$clean_head"
+
 git -C "$test_repo" config user.email "person@${blocked_lower}.invalid"
 assert_rejected git -C "$test_repo" commit --allow-empty -m "test: configured identity"
 git -C "$test_repo" config user.email "blocked-terms-test@example.invalid"
