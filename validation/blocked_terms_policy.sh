@@ -103,14 +103,49 @@ blocked_terms_policy_scan_commit_message() {
   if blocked_terms_policy_prepare; then
     blocked_terms_policy_scan_file "the commit message" "$message_file"
     return $?
+  else
+    preparation_status=$?
   fi
 
-  preparation_status=$?
   if [[ $preparation_status -eq 10 ]]; then
     return 0
   fi
 
   return "$preparation_status"
+}
+
+# With no revisions, inspect Git's effective identities, including environment
+# overrides and --author. Otherwise scan raw identities and messages in history.
+blocked_terms_policy_scan_identities() {
+  local preparation_status=0
+  local identity_file
+  local status=0
+
+  if blocked_terms_policy_prepare; then
+    :
+  else
+    preparation_status=$?
+    if [[ $preparation_status -eq 10 ]]; then
+      return 0
+    fi
+    return "$preparation_status"
+  fi
+
+  identity_file="$(mktemp "${TMPDIR:-/tmp}/clawperator-identities.XXXXXX")" || return 1
+  if [[ $# -eq 0 ]]; then
+    if ! git var GIT_AUTHOR_IDENT > "$identity_file" ||
+       ! git var GIT_COMMITTER_IDENT >> "$identity_file"; then
+      status=1
+    fi
+  elif ! git log --format='%an <%ae>%n%cn <%ce>%n%B' "$@" -- > "$identity_file"; then
+    status=1
+  fi
+
+  if [[ $status -eq 0 ]]; then
+    blocked_terms_policy_scan_file "commit identities or history" "$identity_file" || status=$?
+  fi
+  rm -f "$identity_file"
+  return "$status"
 }
 
 blocked_terms_policy_scan_staged_content() {

@@ -10,4 +10,5 @@ fi
 # shellcheck source=/dev/null
 source "$policy_file"
 
+blocked_terms_policy_scan_identities
 blocked_terms_policy_scan_staged_content

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+source "$repo_root/validation/blocked_terms_policy.sh"
+
+while read -r local_ref local_oid remote_ref remote_oid; do
+  # A deleted ref introduces no commits.
+  [[ "$local_oid" =~ ^0+$ ]] && continue
+  revisions=("$local_oid")
+  if [[ ! "$remote_oid" =~ ^0+$ ]] && git cat-file -e "${remote_oid}^{commit}" 2>/dev/null; then
+    revisions+=("^$remote_oid")
+  fi
+  if ! blocked_terms_policy_scan_identities "${revisions[@]}"; then
+    echo "[blocked-terms] push blocked for $local_ref. Correct the commit metadata or message before pushing." >&2
+    exit 1
+  fi
+done
