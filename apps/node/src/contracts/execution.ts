@@ -21,6 +21,8 @@ export interface ActionParams {
   limit?: number;
   coordinate?: { x: number; y: number };
   text?: string;
+  /** set_on_screen_log: Android-resolved template, exclusive with text */
+  template?: string;
   /** set_on_screen_log: physical screen edge */
   anchor?: "left" | "right";
   /** set_on_screen_log: physical text alignment within the panel */

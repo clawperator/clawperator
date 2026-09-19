@@ -1,0 +1,4 @@
+{
+  "valid": ["{{foreground_app.icon}} {{foreground_app.package_name}}\n{{foreground_app.version_code}} {{foreground_app.version_name}}", "{{device.manufacturer}} {{device.model}}", "{{system.language_code}} {{system.language_tag}} {{system.language_name}}", "{{{{foreground_app.icon}}}}", "plain {single} braces", "{{device.model}}{{device.model}}"],
+  "invalid": ["{{system.language}}", "{{unknown}}", "{{device.model}", "{{device.model }}", "{{ device.model}}", "{{}}", "orphan }}", "{{{{device.model}}", "{{device.model}}}}", "{{device.{{model}}}}"]
+}

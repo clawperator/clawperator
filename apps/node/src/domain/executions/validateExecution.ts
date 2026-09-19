@@ -1,3 +1,4 @@
+import { validateOnScreenLogTemplate } from "../../contracts/onScreenLogTemplate.js";
 import { notificationMediaParamsSchema } from "../../contracts/notifications.js";
 import { z } from "zod";
 import { LIMITS } from "../../contracts/limits.js";
@@ -43,6 +44,7 @@ const onScreenLogColorPattern = /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/;
 const onScreenLogWhitespaceOnlyPattern = /^[\u0009-\u000D\u0020\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000\uFEFF]*$/u;
 const onScreenLogAllowedParamKeys = new Set([
   "text",
+  "template",
   "anchor",
   "textAlign",
   "topOffsetDp",
@@ -114,7 +116,8 @@ const actionParamsSchema = z.object({
 }).strict();
 
 const setOnScreenLogParamsSchema = z.object({
-  text: z.string().max(2048),
+  text: z.string().max(2048).optional(),
+  template: z.string().max(2048).optional(),
   anchor: z.enum(["left", "right"]).optional(),
   textAlign: z.enum(["left", "right"]).optional(),
   topOffsetDp: onScreenLogIntegerSchema,
@@ -326,17 +329,24 @@ const executionSchema = z.object({
           );
         }
 
-        if (typeof params?.text !== "string") {
-          addIssue(index, "set_on_screen_log requires params.text", ["params", "text"]);
-        } else {
-          if (params.text.length < 1 || params.text.length > 2048) {
-            addIssue(index, "set_on_screen_log params.text must contain 1..2048 UTF-16 code units", ["params", "text"]);
+        if ((params?.text !== undefined) === (params?.template !== undefined)) {
+          addIssue(index, "set_on_screen_log requires exactly one of params.text or params.template", ["params"]);
+        }
+        for (const field of ["text", "template"] as const) {
+          const value = params?.[field];
+          if (value === undefined) continue;
+          if (value.length < 1 || value.length > 2048) {
+            addIssue(index, `set_on_screen_log params.${field} must contain 1..2048 UTF-16 code units`, ["params", field]);
           }
-          if (!hasOnScreenLogNonWhitespaceCharacter(params.text)) {
-            addIssue(index, "set_on_screen_log params.text must include a non-whitespace character", ["params", "text"]);
+          if (!hasOnScreenLogNonWhitespaceCharacter(value)) {
+            addIssue(index, `set_on_screen_log params.${field} must include a non-whitespace character`, ["params", field]);
           }
-          if (hasForbiddenOnScreenLogControlCharacter(params.text)) {
-            addIssue(index, "set_on_screen_log params.text contains a control character other than LF or TAB", ["params", "text"]);
+          if (hasForbiddenOnScreenLogControlCharacter(value)) {
+            addIssue(index, `set_on_screen_log params.${field} contains a control character other than LF or TAB`, ["params", field]);
+          }
+          if (field === "template") {
+            const error = validateOnScreenLogTemplate(value);
+            if (error) addIssue(index, error, ["params", field]);
           }
         }
 

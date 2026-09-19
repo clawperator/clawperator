@@ -235,7 +235,7 @@ describe("serve API integration", () => {
           id: "set-panel",
           type: "on_screen_log_set",
           params: {
-            text: "FLOW-001: Observe settings",
+            template: "{{foreground_app.icon}} {{foreground_app.package_name}}",
             anchor: "right",
             textAlign: "left",
             topOffsetDp: 0,

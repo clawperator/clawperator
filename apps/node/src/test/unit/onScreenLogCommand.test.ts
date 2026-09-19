@@ -143,3 +143,21 @@ describe("on-screen-log command", () => {
     }
   });
 });
+
+describe("on-screen-log template command", () => {
+  it("carries the template and styles without resolving placeholders", () => {
+    const parsed = parseOnScreenLogArgs(["set", "--template", "{{foreground_app.icon}} {{device.model}}", "--anchor", "right"]);
+    const execution = validateExecution(buildOnScreenLogExecution(parsed.operation, parsed.params));
+    assert.deepEqual(execution.actions[0].params, { template: "{{foreground_app.icon}} {{device.model}}", anchor: "right" });
+  });
+  it("rejects both forms, missing values, repeated flags and invalid placeholders with structured CLI errors", () => {
+    for (const args of [["--template"], ["--template", "x", "--template", "y"], ["--text", "x", "--template", "y"], ["--template", "{{unknown}}"]]) {
+      for (const before of [true, false]) {
+        const common = ["--device", "test-device", "--operator-package", "com.clawperator.operator.dev", "--output", "json"];
+        const result = cli(before ? [...common, "on-screen-log", "set", ...args] : ["on-screen-log", "set", ...args, ...common]);
+        assert.notEqual(result.status, 0);
+        assert.ok(JSON.parse(result.stdout).code);
+      }
+    }
+  });
+});

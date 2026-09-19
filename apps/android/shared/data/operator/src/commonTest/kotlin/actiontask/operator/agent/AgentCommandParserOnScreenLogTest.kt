@@ -13,6 +13,17 @@ class AgentCommandParserOnScreenLogTest {
     private val parser = AgentCommandParserDefault()
 
     @Test
+    fun `parse templates strictly without resolving or accepting both input forms`() {
+        val action = parseSet("""{ "template": "{{foreground_app.icon}} {{device.model}}", "anchor": "right" }""")
+        assertEquals("{{foreground_app.icon}} {{device.model}}", action.spec.template)
+        assertEquals(null, action.spec.text)
+        for (params in listOf("""{}""", """{"text":"x","template":"x"}""", """{"template":null}""",
+            """{"template":1}""", """{"template":"{{unknown}}"}""", """{"template":" "}""")) {
+            assertSetFailure(params)
+        }
+    }
+
+    @Test
     fun `parse set_on_screen_log applies every default`() {
         val action = parseSet("""{ "text": "FLOW-001: Observe settings" }""")
 

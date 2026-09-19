@@ -319,3 +319,21 @@ describe("on-screen log execution failures", () => {
     assert.strictEqual(envelope.errorCode, "SERVICE_UNAVAILABLE");
   });
 });
+
+describe("live overlay templates", () => {
+  it("accepts all tokens and delimiter escapes through the canonical validator", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const fixtures = JSON.parse(await readFile(new URL("../../../../../validation/on-screen-logs/template-fixtures.json", import.meta.url), "utf8"));
+    for (const template of fixtures.valid) {
+      assert.strictEqual(validateExecution(executionFor("set_on_screen_log", { template })).actions[0].params?.template, template);
+    }
+    for (const template of fixtures.invalid) assertValidationFailure(executionFor("set_on_screen_log", { template }));
+  });
+  it("rejects both, neither, blank, oversized and wrong-type templates and preserves literal text", () => {
+    for (const params of [{}, { text: "x", template: "x" }, { template: "" }, { template: " \n" },
+      { template: "x".repeat(2049) }, { template: null }, { template: 1 }, { template: "\u0000" }]) {
+      assertValidationFailure(executionFor("set_on_screen_log", params));
+    }
+    assert.strictEqual(validateExecution(executionFor("set_on_screen_log", { text: "{{unknown}}" })).actions[0].params?.text, "{{unknown}}");
+  });
+});
