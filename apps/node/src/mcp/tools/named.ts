@@ -1,3 +1,5 @@
+import { swipeParamsSchema } from "../../contracts/swipe.js";
+import { buildSwipeExecution } from "../../domain/actions/swipe.js";
 import { z } from "zod";
 import { buildQueryExecution } from "../../domain/actions/query.js";
 import { queryParamsSchema } from "../../domain/executions/validateExecution.js";
@@ -30,6 +32,9 @@ import {
   parseToolArguments,
   runExecutionTool,
 } from "./common.js";
+
+const swipeArgsSchema = swipeParamsSchema.innerType().extend(executionToolOptionsSchema.shape).strict().refine(
+  value => value.start.x !== value.end.x || value.start.y !== value.end.y, "swipe start and end must differ");
 
 const queryArgsSchema = executionToolOptionsSchema.merge(queryParamsSchema).strict();
 
@@ -188,6 +193,20 @@ export function getNamedMcpTools(
         return await runExecutionTool(execution, opts, logger, (result) => {
           return buildSuccessResult(buildExecutionSuccessPayload(result));
         });
+      },
+    },
+    {
+      name: "swipe",
+      description: "Swipe in a straight line between screen pixels, then release. Duration is required. Completion does not prove an app-specific effect.",
+      inputSchema: buildCommonExecutionSchema({
+        start: { type: "object", properties: { x: { type: "integer", minimum: 0, maximum: 2147483647 }, y: { type: "integer", minimum: 0, maximum: 2147483647 } }, required: ["x", "y"], additionalProperties: false },
+        end: { type: "object", properties: { x: { type: "integer", minimum: 0, maximum: 2147483647 }, y: { type: "integer", minimum: 0, maximum: 2147483647 } }, required: ["x", "y"], additionalProperties: false },
+        durationMs: { type: "integer", minimum: 1, maximum: 10000 },
+      }, ["start", "end", "durationMs"]),
+      handler: async (args) => {
+        const opts = mergeWithSessionDefaults(parseToolArguments(swipeArgsSchema, args), session);
+        const execution = applyMcpExecutionMetadata(buildSwipeExecution({ start: opts.start, end: opts.end, durationMs: opts.durationMs }), "swipe", opts.timeoutMs);
+        return await runExecutionTool(execution, opts, logger, result => buildSuccessResult(buildExecutionSuccessPayload(result)));
       },
     },
     {

@@ -30,6 +30,77 @@ class UiTreeManagerAndroidTest {
     }
 
     @Test
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun `swipe dispatches exact path and duration and reports callback outcome`() = runTest {
+        for (completed in listOf(true, false)) {
+            val service = org.robolectric.Robolectric.buildService(ReceiptService::class.java).create().get()
+            val services = clawperator.accessibilityservice.AccessibilityServiceManagerAndroid().apply {
+                setCurrentAccessibilityService(service, true)
+            }
+            val shadow = Shadow.extract<org.robolectric.shadows.ShadowAccessibilityService>(service)
+            shadow.setCanDispatchGestures(true)
+            val observations = mutableListOf<Triple<Any?, String, Boolean>>()
+            val observer = UiDispatchObservation { target, method, accepted -> observations += Triple(target, method, accepted) }
+            val action = async(observer) { UiTreeManagerAndroid(services).swipeAt(10, 20, 100, 200, 321) }
+            testScheduler.runCurrent()
+            assertEquals(Triple(null, "coordinate_gesture", true), observations.last())
+            assertFalse(action.isCompleted)
+            val dispatched = shadow.gesturesDispatched.single()
+            val stroke = dispatched.description().getStroke(0)
+            assertEquals(321L, stroke.duration)
+            val path = android.graphics.PathMeasure(stroke.path, false)
+            val position = FloatArray(2)
+            path.getPosTan(0f, position, null)
+            assertEquals(10f, position[0])
+            assertEquals(20f, position[1])
+            path.getPosTan(path.length, position, null)
+            assertEquals(100f, position[0])
+            assertEquals(200f, position[1])
+            if (completed) dispatched.callback().onCompleted(dispatched.description())
+            else dispatched.callback().onCancelled(dispatched.description())
+            assertEquals(completed, action.await())
+            assertEquals(1, shadow.gesturesDispatched.size)
+        }
+    }
+
+    @Test
+    fun `swipe rejects out of display coordinates and invalid durations without dispatch`() = runTest {
+        val service = org.robolectric.Robolectric.buildService(ReceiptService::class.java).create().get()
+        val services = clawperator.accessibilityservice.AccessibilityServiceManagerAndroid().apply {
+            setCurrentAccessibilityService(service, true)
+        }
+        val shadow = Shadow.extract<org.robolectric.shadows.ShadowAccessibilityService>(service)
+        shadow.setCanDispatchGestures(true)
+        val manager = UiTreeManagerAndroid(services)
+        assertFalse(manager.swipeAt(-1, 20, 100, 200, 300))
+        assertFalse(manager.swipeAt(10, 20, Int.MAX_VALUE, 200, 300))
+        assertFalse(manager.swipeAt(10, 20, 10, 20, 300))
+        assertFalse(manager.swipeAt(10, 20, 100, 200, 0))
+        assertFalse(manager.swipeAt(10, 20, 100, 200, 10001))
+        assertTrue(shadow.gesturesDispatched.isEmpty())
+        shadow.setCanDispatchGestures(false)
+        assertFalse(manager.swipeAt(10, 20, 100, 200, 300))
+    }
+
+    @Test
+    fun `swipe callback after coroutine cancellation is harmless`() = runTest {
+        val service = org.robolectric.Robolectric.buildService(ReceiptService::class.java).create().get()
+        val services = clawperator.accessibilityservice.AccessibilityServiceManagerAndroid().apply {
+            setCurrentAccessibilityService(service, true)
+        }
+        val shadow = Shadow.extract<org.robolectric.shadows.ShadowAccessibilityService>(service)
+        shadow.setCanDispatchGestures(true)
+        val action = async { UiTreeManagerAndroid(services).swipeAt(10, 20, 100, 200, 300) }
+        testScheduler.runCurrent()
+        val dispatched = shadow.gesturesDispatched.single()
+        action.cancel()
+        action.join()
+        dispatched.callback().onCompleted(dispatched.description())
+        assertTrue(action.isCancelled)
+        assertEquals(1, shadow.gesturesDispatched.size)
+    }
+
+    @Test
     fun `click receipt names accepted ancestor and never asserts screen change`() = runTest {
         val service = org.robolectric.Robolectric.buildService(ReceiptService::class.java).create().get()
         val services = clawperator.accessibilityservice.AccessibilityServiceManagerAndroid().apply {

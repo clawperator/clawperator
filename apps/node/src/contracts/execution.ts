@@ -20,6 +20,9 @@ export interface ActionParams {
   visibility?: "on_screen" | "all";
   limit?: number;
   coordinate?: { x: number; y: number };
+  /** swipe: required endpoints in screen pixels; durationMs is also required. */
+  start?: { x: number; y: number };
+  end?: { x: number; y: number };
   text?: string;
   /** set_on_screen_log: Android-resolved template, exclusive with text */
   template?: string;

@@ -61,6 +61,7 @@ For app automation commands, default to:
 | `close_app` | `applicationId: string` | Node runs `adb shell am force-stop` pre-flight, normalizes the step result only when that close succeeds, and otherwise returns a structured execution failure |
 | `enter_text` | `matcher: NodeMatcher`, `text: string`, `submit?: boolean`, `clear?: boolean` | CLI: `type` (synonym: `fill`). Android keeps the public action stable and chooses the text-entry route internally. It prefers `ACTION_SET_TEXT` when available, falls back to the API 33 accessibility input-connection path for custom editors when needed, preserves replace-style behavior on both routes, and treats `submit` as best-effort rather than a new hard-failure condition. |
 | `click` | `matcher: NodeMatcher`, `clickType?: "default"\|"long_click"\|"focus"` | CLI: `click` (synonym: `tap`) |
+| `swipe` | `start: {x, y}`, `end: {x, y}`, `durationMs: integer 1..10000` (all required) | CLI: `swipe --start <x> <y> --end <x> <y> --duration-ms <ms>`. Straight-line movement and release; no hold or automatic retry. Completion does not verify the app effect |
 | `read_text` | `matcher: NodeMatcher`, `validator?: "temperature"`, `retry?: object` | CLI: `read`. Result in `data.text`. Other validator values are rejected by the runtime |
 | `wait_for_node` | `matcher: NodeMatcher`, `retry?: object` | CLI: `wait`. Waits with internal retry |
 | `snapshot` | `retry?: object` | CLI: `snapshot`. Snapshot content in `data.text` as `hierarchy_xml`, plus best-effort `foreground_package` / `has_overlay` metadata |

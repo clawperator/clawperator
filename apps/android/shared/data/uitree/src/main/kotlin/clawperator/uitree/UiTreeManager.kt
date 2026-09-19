@@ -3,6 +3,9 @@ package clawperator.uitree
 import clawperator.uitree.UiTreeClickTypes
 
 interface UiTreeManager {
+    /** Swipes once between default-display screen pixels, awaiting completion. */
+    suspend fun swipeAt(startX: Int, startY: Int, endX: Int, endY: Int, durationMs: Long): Boolean
+
     /**
      * Programmatically clicks the [uiNode] using the specified click types.
      * Returns true if any of the requested click actions was successfully dispatched.

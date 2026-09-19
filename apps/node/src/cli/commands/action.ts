@@ -20,6 +20,16 @@ import { formatError, formatRunExecutionResultForCli } from "../output.js";
 import type { Logger } from "../../adapters/logger.js";
 import { tryDaemonExecution } from "../daemonProxy.js";
 import { validateExecution, validatePayloadSize } from "../../domain/executions/validateExecution.js";
+import { buildSwipeExecution } from "../../domain/actions/swipe.js";
+import type { SwipeParams } from "../../contracts/swipe.js";
+
+export async function cmdActionSwipe(options: ActionCommandOptions & SwipeParams): Promise<string> {
+  try {
+    return await runActionExecution(buildSwipeExecution({ start: options.start, end: options.end, durationMs: options.durationMs }, options.timeoutMs), options);
+  } catch (error) {
+    return formatError(error, options);
+  }
+}
 
 interface ActionCommandOptions {
   format: OutputOptions["format"];

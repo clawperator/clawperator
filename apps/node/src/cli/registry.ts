@@ -1575,6 +1575,62 @@ COMMANDS["screenshot"] = {
   },
 };
 
+COMMANDS["swipe"] = {
+  name: "swipe",
+  group: "Device Interaction",
+  documentedFlags: ["--start", "--end", "--duration-ms", "--no-daemon"],
+  supportedFlags: ["--start", "--end", "--duration-ms", "--no-daemon"],
+  summary: "Swipe between screen coordinates with an explicit duration",
+  help: `clawperator swipe - Swipe between screen coordinates
+
+Usage:
+  clawperator swipe --start <x> <y> --end <x> <y> --duration-ms <ms>
+
+All three flags are required. Coordinates are non-negative integer screen pixels,
+with origin at the top left, and must be inside the current default display.
+Start and end must differ. Duration must be an integer from 1 to 10000 milliseconds.
+The finger moves immediately in a straight line and releases at the end.
+Success means gesture completion, not confirmation of an app-specific effect.
+
+Example:
+  clawperator swipe --start 100 500 --end 800 500 --duration-ms 300
+`,
+  topLevelBlock: `  swipe --start <x> <y> --end <x> <y> --duration-ms <ms>
+                                            Swipe between screen coordinates`,
+  handler: async (ctx) => {
+    const values = new Map<string, number[]>();
+    const arities = new Map([["--start", 2], ["--end", 2], ["--duration-ms", 1]]);
+    const invalid = (message: string) => formatError({
+      code: ERROR_CODES.EXECUTION_VALIDATION_FAILED,
+      message: `${message}\nExample: clawperator swipe --start 100 500 --end 800 500 --duration-ms 300`,
+    }, { format: ctx.format });
+    for (let i = 0; i < ctx.rest.length; i++) {
+      const flag = ctx.rest[i];
+      if (flag === "--no-daemon") continue;
+      const arity = arities.get(flag);
+      if (arity === undefined) return invalid(`Unexpected swipe argument: ${flag}`);
+      if (values.has(flag)) return invalid(`${flag} must not appear more than once`);
+      const tokens = ctx.rest.slice(i + 1, i + 1 + arity);
+      if (tokens.length !== arity || tokens.some(token => !/^\d+$/.test(token))) {
+        return invalid(`${flag} requires ${arity} non-negative integer value(s)`);
+      }
+      values.set(flag, tokens.map(Number));
+      i += arity;
+    }
+    for (const flag of arities.keys()) {
+      if (!values.has(flag)) return invalid(`${flag} is required`);
+    }
+    const [startX, startY] = values.get("--start")!;
+    const [endX, endY] = values.get("--end")!;
+    return (await import("./commands/action.js")).cmdActionSwipe({
+      start: { x: startX, y: startY }, end: { x: endX, y: endY },
+      durationMs: values.get("--duration-ms")![0],
+      format: ctx.format, deviceId: ctx.deviceId, operatorPackage: ctx.operatorPackage,
+      noDaemon: ctx.noDaemon, logger: ctx.logger, timeoutMs: ctx.timeoutMs,
+    });
+  },
+};
+
 COMMANDS["click"] = {
   name: "click",
   synonyms: ["tap"],
