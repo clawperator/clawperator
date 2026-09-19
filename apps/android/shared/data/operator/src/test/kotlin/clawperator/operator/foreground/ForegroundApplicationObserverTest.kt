@@ -317,6 +317,26 @@ class ForegroundApplicationObserverTest {
     }
 
     @Test
+    fun `last bounded retry resolves panel before unavailable deadline clears context`() = runTest {
+        val service = service()
+        var current: ForegroundApplicationState = first
+        val observer = ForegroundApplicationObserver(backgroundScope) { _, _ -> current }
+        observer.attach(service)
+        val states = mutableListOf<ForegroundApplicationState>()
+        backgroundScope.launch { observer.observe().collect { states.add(it) } }
+        runCurrent()
+        current = unavailable
+        observer.onAccessibilityEvent(service, event())
+        runCurrent()
+        advanceTimeBy(200)
+        runCurrent()
+        current = ForegroundApplicationState.SystemPanel(0)
+        advanceTimeBy(200)
+        runCurrent()
+        assertEquals(listOf(unavailable, first, ForegroundApplicationState.SystemPanel(0, first.foregroundApp)), states)
+    }
+
+    @Test
     fun `repeated missing-window events cannot extend unavailable deadline`() = runTest {
         val service = service()
         var current: ForegroundApplicationState = first

@@ -155,7 +155,7 @@ class ForegroundApplicationObserver internal constructor(
         val requestedGeneration = generation
         reconciliation = scope.launch {
             // Retry transient missing roots within a bounded window, never continuously poll.
-            for (retryDelay in listOf(0L, 100L, 250L)) {
+            for (retryDelay in listOf(0L, 100L, 200L)) {
                 if (retryDelay > 0) delay(retryDelay)
                 var unavailable = false
                 for (displayId in subscribers.map { it.displayId }.distinct()) {

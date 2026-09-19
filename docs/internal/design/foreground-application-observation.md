@@ -90,7 +90,8 @@ old service cannot detach its replacement. Detach emits unavailable; existing
 collectors survive reconnection and receive a fresh read. Cancellation removes
 the subscriber, and closed channels cannot deliver late results.
 
-Unavailable reads get at most two retries, after 100 ms and another 250 ms.
+Unavailable reads get at most two retries, after 100 ms and another 200 ms. The final retry starts before the
+350 ms unavailable deadline so recovery can preserve the application context.
 After an established observation, transient read failures are published only
 after a 350 ms grace period. New events do not extend this deadline. The previous observation can therefore remain
 visible during this bounded reconciliation window; it is not a fresh focus
