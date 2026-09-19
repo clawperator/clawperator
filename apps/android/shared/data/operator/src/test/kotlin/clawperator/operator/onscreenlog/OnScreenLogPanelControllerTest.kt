@@ -36,6 +36,37 @@ import org.robolectric.annotation.Config
 @Config(manifest = Config.NONE, application = Application::class, sdk = [Build.VERSION_CODES.P])
 class OnScreenLogPanelControllerTest {
     @Test
+    fun `device template refresh retains absolute expiry and does not resurrect after clear`() {
+        val fixture = controllerFixture()
+        val result = render(fixture.controller, OnScreenLogSpec(template = "{{device.model}}", ttlMs = 1000))
+        assertIs<OnScreenLogControllerResult.Rendered>(result)
+        fixture.clock.nowMs = 500
+        fixture.controller.onConfigurationChanged()
+        assertTrue(fixture.controller.isOperatorOverlayVisible)
+        fixture.clock.nowMs = 1000
+        fixture.scheduler.onlyScheduledRunnable().run()
+        assertFalse(fixture.controller.isOperatorOverlayVisible)
+        fixture.controller.onConfigurationChanged()
+        assertFalse(fixture.controller.isOperatorOverlayVisible)
+        render(fixture.controller, OnScreenLogSpec(template = "{{device.model}}"))
+        runBlocking { fixture.controller.clear() }
+        fixture.controller.onConfigurationChanged()
+        assertFalse(fixture.controller.isOperatorOverlayVisible)
+    }
+
+    @Test
+    fun `template layout failure on refresh closes the panel`() {
+        val fixture = controllerFixture()
+        render(fixture.controller, OnScreenLogSpec(template = "{{device.model}}"))
+        fixture.displayAreaProvider.bounds = OnScreenLogBounds(0, 0, 100, 40)
+        fixture.controller.onConfigurationChanged()
+        assertFalse(fixture.controller.isOperatorOverlayVisible)
+        fixture.displayAreaProvider.bounds = OnScreenLogBounds(0, 0, 1080, 2200)
+        fixture.controller.onConfigurationChanged()
+        assertFalse(fixture.controller.isOperatorOverlayVisible)
+    }
+
+    @Test
     fun `invalid replacement preserves the acknowledged panel`() {
         val fixture = controllerFixture()
         render(fixture.controller, OnScreenLogSpec(text = "first label"))

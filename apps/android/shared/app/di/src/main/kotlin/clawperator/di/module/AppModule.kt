@@ -242,7 +242,7 @@ val AppModule: Module = module {
     single<OperatorCommandStatusReporter> { OperatorCommandStatusReporterDefault(get()) }
     single<AgentCommandParser> { AgentCommandParserDefault() }
     single<AgentCommandExecutor> { AgentCommandExecutorDefault(get(), get()) }
-    single<OnScreenLogPanelController> { OnScreenLogPanelController() }
+    single<OnScreenLogPanelController> { OnScreenLogPanelController { get<ForegroundApplicationObserver>() } }
     single<OnScreenLogController> { get<OnScreenLogPanelController>() }
     single<OnScreenLogPanelLifecycle> { get<OnScreenLogPanelController>() }
     single<OperatorOverlayIdentity> { get<OnScreenLogPanelController>() }

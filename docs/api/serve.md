@@ -247,6 +247,9 @@ Operator package resolution:
 
 Then `runExecution()` applies full execution validation. See [Actions](actions.md), [Selectors](selectors.md), and [API Overview](overview.md).
 
+`params.template` carries live overlay templates unchanged to Android, using the
+same validation and styling as literal `params.text`. Exactly one is required.
+
 `/execute` is also the generic HTTP transport for `set_on_screen_log` and
 `clear_on_screen_log`. Inside `execution.actions`, it accepts exact lower-case
 `on_screen_log_set` and `on_screen_log_clear` input aliases and normalizes them

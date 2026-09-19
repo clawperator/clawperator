@@ -334,6 +334,12 @@ Recovery:
 
 ### On-screen log panel failures
 
+Malformed templates, unknown placeholders, and both or neither of `text` and
+`template` produce `EXECUTION_VALIDATION_FAILED` before dispatch. Unavailable
+application metadata uses the documented fallback values, not an execution
+failure. Refresh failures after initial acknowledgement hide the panel without
+emitting a second execution result. See [live templates](on-screen-logs.md#live-templates).
+
 The on-screen log actions can return these exact per-step failure codes. When
 one of these codes is the first failed step, Node also copies it to
 `envelope.errorCode` during result reconciliation. The

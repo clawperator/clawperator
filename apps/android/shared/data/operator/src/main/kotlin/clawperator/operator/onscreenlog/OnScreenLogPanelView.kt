@@ -52,6 +52,7 @@ internal open class OnScreenLogPanelView(
     fun prepare(
         spec: NormalizedOnScreenLogSpec,
         geometry: OnScreenLogPanelGeometry,
+        content: OnScreenLogContent? = null,
     ): Prepared {
         val contentWidthPx = geometry.bounds.width - (geometry.paddingPx * 2)
         if (contentWidthPx <= 0) {
@@ -59,7 +60,8 @@ internal open class OnScreenLogPanelView(
         }
         val maximumContentHeightPx = geometry.maxHeightPx - (geometry.paddingPx * 2)
         val paint = createTextPaint(spec, geometry.fontSizePx / spec.fontSizeSp)
-        val fullLayout = createLayout(spec.text, paint, contentWidthPx, spec.textAlign)
+        val text = content?.text ?: spec.text
+        val fullLayout = createLayout(text, paint, contentWidthPx, spec.textAlign)
         val maximumLines = completeLineCount(fullLayout, maximumContentHeightPx)
         if (maximumLines < 1) {
             throw OnScreenLogLayoutException("usable vertical space cannot contain one complete text line plus padding")
@@ -71,7 +73,7 @@ internal open class OnScreenLogPanelView(
                 fullLayout
             } else {
                 createTruncatedLayout(
-                    text = spec.text,
+                    text = text,
                     paint = paint,
                     contentWidthPx = contentWidthPx,
                     textAlign = spec.textAlign,
@@ -91,7 +93,7 @@ internal open class OnScreenLogPanelView(
             paddingPx = geometry.paddingPx,
             widthPx = geometry.bounds.width,
             heightPx = heightPx,
-            truncated = truncated,
+            truncated = truncated || content?.truncated == true,
         )
     }
 
@@ -148,7 +150,7 @@ internal open class OnScreenLogPanelView(
         }
 
     private fun createLayout(
-        text: String,
+        text: CharSequence,
         paint: TextPaint,
         contentWidthPx: Int,
         textAlign: OnScreenLogTextAlign,
@@ -171,7 +173,7 @@ internal open class OnScreenLogPanelView(
         }
 
     private fun createTruncatedLayout(
-        text: String,
+        text: CharSequence,
         paint: TextPaint,
         contentWidthPx: Int,
         textAlign: OnScreenLogTextAlign,
@@ -191,12 +193,12 @@ internal open class OnScreenLogPanelView(
             val finalVisibleLine = maximumLines - 1
             val prefixEnd = fullLayout.getLineStart(finalVisibleLine)
             val visibleLineEnd = fullLayout.getLineEnd(finalVisibleLine)
-            val prefix = displayText.substring(0, prefixEnd)
-            val finalLine = displayText.substring(prefixEnd, visibleLineEnd).trimEnd('\n', '\r')
+            val prefix = displayText.subSequence(0, prefixEnd)
+            val finalLine = displayText.subSequence(prefixEnd, visibleLineEnd).trimEnd('\n', '\r')
             val ellipsizedFinalLine =
-                TextUtils.ellipsize("$finalLine…", paint, contentWidthPx.toFloat(), TextUtils.TruncateAt.END)
+                TextUtils.ellipsize(android.text.SpannableStringBuilder(finalLine).append("…"), paint, contentWidthPx.toFloat(), TextUtils.TruncateAt.END)
             createLayoutBeforeApi23(
-                text = prefix + ellipsizedFinalLine,
+                text = android.text.SpannableStringBuilder(prefix).append(ellipsizedFinalLine),
                 paint = paint,
                 contentWidthPx = contentWidthPx,
                 textAlign = textAlign,
@@ -207,15 +209,18 @@ internal open class OnScreenLogPanelView(
      * API 21-22 lacks StaticLayout.Builder#setTextDirection. Prefixing each paragraph with an
      * invisible LRM keeps the requested left/right alignment physical rather than locale-relative.
      */
-    private fun legacyLeftToRightText(text: String): String =
-        buildString(text.length + 1) {
+    private fun legacyLeftToRightText(text: CharSequence): CharSequence =
+        android.text.SpannableStringBuilder().apply {
             append('\u200E')
-            text.forEach { character ->
-                append(character)
+            var start = 0
+            text.forEachIndexed { index, character ->
                 if (character == '\n') {
+                    append(text, start, index + 1)
                     append('\u200E')
+                    start = index + 1
                 }
             }
+            append(text, start, text.length)
         }
 
     @Suppress("DEPRECATION")
@@ -253,7 +258,7 @@ internal open class OnScreenLogPanelView(
 
     @androidx.annotation.RequiresApi(Build.VERSION_CODES.M)
     private fun createLayoutApi23(
-        text: String,
+        text: CharSequence,
         paint: TextPaint,
         contentWidthPx: Int,
         textAlign: OnScreenLogTextAlign,

@@ -3,8 +3,8 @@
 ## Purpose
 
 `set_on_screen_log` and `clear_on_screen_log` are raw execution actions for a
-small Operator-owned diagnostic panel. The panel is useful for showing a static
-execution label while an action list works in another app.
+small Operator-owned diagnostic panel. Show literal execution labels or configure
+a template once and let Android update application and device metadata locally.
 
 The panel belongs to the connected Operator accessibility service, not to the
 foreground app and not to a host process. It is one visible panel per Operator
@@ -31,7 +31,7 @@ MCP tool; existing generic execution transports carry the same raw action list.
 
 | Canonical action | Exact Node input alias | Purpose | Parameters |
 | --- | --- | --- | --- |
-| `set_on_screen_log` | `on_screen_log_set` | Show or replace the current panel. | `text` is required. All other fields are optional. |
+| `set_on_screen_log` | `on_screen_log_set` | Show or replace the current panel. | Exactly one of `text` or `template` is required. Other fields are optional. |
 | `clear_on_screen_log` | `on_screen_log_clear` | Remove the current panel. | Omit `params` or use exactly `{}`. |
 
 At the Node execution boundary, the two aliases above normalize to their
@@ -81,6 +81,67 @@ table and validation limits.
 }
 ```
 
+## Live templates
+
+Supply `params.template` instead of `params.text`. Literal `text` never expands
+placeholders, even when it contains `{{...}}`. Android resolves templates; Node,
+Serve and MCP do not poll or resolve metadata.
+
+| Placeholder | Value |
+| --- | --- |
+| `{{foreground_app.icon}}` | Declared application icon, inline at text size; adaptive icons are supported |
+| `{{foreground_app.package_name}}` | Verified foreground application package |
+| `{{foreground_app.version_code}}` | Full installed version code as decimal text |
+| `{{foreground_app.version_name}}` | Declared version name |
+| `{{device.manufacturer}}` | Android manufacturer |
+| `{{device.model}}` | Android model |
+| `{{system.language_code}}` | Primary system locale language, for example `en` |
+| `{{system.language_tag}}` | Primary system locale language tag, for example `en-US` |
+| `{{system.language_name}}` | Language name in its own language, for example `Deutsch` |
+
+For example:
+
+```bash
+clawperator on-screen-log set --template '{{foreground_app.icon}} {{foreground_app.package_name}}
+{{foreground_app.version_code}} | {{foreground_app.version_name}}
+{{system.language_tag}} | {{system.language_name}}' --device <device_serial> --operator-package com.clawperator.operator.dev
+```
+
+Only the nine exact names above are supported. Unknown or malformed placeholders
+fail validation before changing the current panel; errors list supported names.
+Write `{{{{` for literal `{{` and `}}}}` for literal `}}`, for example
+`{{{{device.model}}}}` displays `{{device.model}}`. Single braces are literal.
+There are no expressions, HTML entities, recursive expansion, or HTML rendering.
+Ordinary spaces, LF newlines and TAB characters are supported.
+
+Both input forms require 1-2048 UTF-16 code units and a non-whitespace character;
+control characters other than LF and TAB are rejected. Expanded templates are
+bounded to 8192 UTF-16 units, with each substituted text value bounded to 256.
+Metadata control characters become spaces. Expansion never splits a surrogate
+pair; bounded content ends with an ellipsis. Layout can additionally wrap or
+truncate at the usable display height. An icon occupies one inline position;
+metadata is not reparsed as template syntax.
+
+App fields and the icon come from the same foreground observation. In split-screen,
+the panel follows the focused application, excluding the keyboard and this overlay.
+Home can identify the launcher. System panels retain the last verified app as
+context; starting under a panel has no app context. Locked and unavailable states
+clear app context. `Unavailable` and a neutral gray icon represent missing values;
+a known package remains visible when only its metadata is unavailable. Updates
+are event-driven samples, not a complete or instantaneous focus history.
+
+System-language fields follow the primary system locale independently of the
+Operator's per-app language. Locale changes refresh the panel. Package changes
+invalidate metadata caches. Templates using only device or language fields do
+not subscribe to foreground observation.
+
+Initial success acknowledges the first rendered state, which can contain
+unavailable app metadata while lookup is pending. Refresh does not reset TTL.
+Replacement, clear, expiry and service detach cancel the old subscription and
+lookups. Late results cannot restore a removed panel. A refresh layout or renderer
+failure hides the panel; it cannot report a new execution error after the original
+request has completed. Existing screenshot timing and capture limitations apply.
+
 ## CLI Commands
 
 `on-screen-log set` shows or fully replaces the panel. `on-screen-log clear`
@@ -94,7 +155,8 @@ clawperator on-screen-log clear --device <device_serial>
 
 | Set flag | Raw field |
 | --- | --- |
-| `--text` (required) | `text` |
+| `--text` (exclusive with `--template`) | `text` |
+| `--template` (exclusive with `--text`) | `template` |
 | `--anchor` | `anchor` |
 | `--text-align` | `textAlign` |
 | `--top-offset-dp` | `topOffsetDp` |
@@ -207,7 +269,8 @@ data keys:
 | `ttl_ms` | Resolved integer input as a string. |
 | `bounds` | Actual pixel rectangle in `[left,top][right,bottom]` form. |
 
-The result never echoes the caller's `text`.
+The result never echoes caller text, templates, or resolved metadata. Bounds and
+`truncated` describe the initial acknowledged state, not future live refreshes.
 
 On a successful `clear_on_screen_log`, step data is exactly:
 

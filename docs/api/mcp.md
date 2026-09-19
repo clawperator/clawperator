@@ -315,6 +315,8 @@ Validation boundary:
 - exact lower-case `on_screen_log_set` and `on_screen_log_clear` aliases reach
   the canonical executor and normalize to `set_on_screen_log` and
   `clear_on_screen_log`; MCP does not expose separate panel tools
+- `params.template` carries live overlay templates unchanged to Android; supply
+  exactly one of `text` or `template`, with the same styling fields
 - case or whitespace variants and on-screen log parameter aliases are rejected
 
 Use [Actions](actions.md) for canonical action types and params, and
