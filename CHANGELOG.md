@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.11.2] - 2026-09-19
+
+This release added live on-screen log templates that follow the foreground application and display app, device, and system-language metadata.
+
+### 🤖 Node API & CLI
+
+- **Added:** Added mutually exclusive text and template inputs for on-screen logs, including CLI `--template` support and validation of nine Android-resolved placeholders.
+
+### 📚 Documentation & Website
+
+- **Added:** Added release-notes redirects on both websites and links from the landing-page footer and README.
+- **Added:** Documented live overlay templates, supported placeholders, validation errors, and HTTP and MCP usage.
+- **Changed:** Updated published documentation and installer version markers for the preceding 0.11.1 release.
+
+### 📱 Android Operator APK
+
+- **Added:** Observed foreground application focus across split-screen panes, excluded the keyboard and Operator overlay, preserved verified app context under system panels, and cleared it when locked or unavailable.
+- **Added:** Rendered live overlay templates with foreground app icons, package names and versions, device metadata, and system language while preserving literal text, touch-through behavior, and the original expiry time.
+
+Pull requests:
+- [feat(sites): add release notes redirects and links](https://github.com/clawperator/clawperator/pull/308)
+- [chore(release): complete 0.11.1 follow-up](https://github.com/clawperator/clawperator/pull/310)
+- [feat(android): observe foreground application window focus](https://github.com/clawperator/clawperator/pull/311)
+- [feat(android): render live overlay templates with application metadata](https://github.com/clawperator/clawperator/pull/312)
+
 ## [0.11.1] - 2026-09-13
 
 This release added bounded media observation to collect player reports over time, including while locked or screen-off, while keeping those reports distinct from proof of audible or rendered playback.
