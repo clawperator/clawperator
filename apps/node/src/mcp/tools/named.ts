@@ -33,6 +33,16 @@ import {
   runExecutionTool,
 } from "./common.js";
 
+const swipePointJsonSchema = {
+  type: "object",
+  properties: {
+    x: { type: "integer", minimum: 0, maximum: 2147483647 },
+    y: { type: "integer", minimum: 0, maximum: 2147483647 },
+  },
+  required: ["x", "y"],
+  additionalProperties: false,
+};
+
 const swipeArgsSchema = swipeParamsSchema.innerType().extend(executionToolOptionsSchema.shape).strict().refine(
   value => value.start.x !== value.end.x || value.start.y !== value.end.y, "swipe start and end must differ");
 
@@ -199,8 +209,8 @@ export function getNamedMcpTools(
       name: "swipe",
       description: "Swipe in a straight line between screen pixels, then release. Duration is required. Completion does not prove an app-specific effect.",
       inputSchema: buildCommonExecutionSchema({
-        start: { type: "object", properties: { x: { type: "integer", minimum: 0, maximum: 2147483647 }, y: { type: "integer", minimum: 0, maximum: 2147483647 } }, required: ["x", "y"], additionalProperties: false },
-        end: { type: "object", properties: { x: { type: "integer", minimum: 0, maximum: 2147483647 }, y: { type: "integer", minimum: 0, maximum: 2147483647 } }, required: ["x", "y"], additionalProperties: false },
+        start: swipePointJsonSchema,
+        end: swipePointJsonSchema,
         durationMs: { type: "integer", minimum: 1, maximum: 10000 },
       }, ["start", "end", "durationMs"]),
       handler: async (args) => {
