@@ -28,6 +28,10 @@ import kotlin.time.Duration
 class TaskUiScopeTest(
     private var currentUiTree: UiTree,
 ) : TaskUiScope {
+    override suspend fun swipe(start: action.math.geometry.Point, end: action.math.geometry.Point, durationMs: Long) {
+        error("Swipe not configured in test")
+    }
+
     override suspend fun queryUi(
         matcher: NodeMatcher?,
         visibility: String,

@@ -604,16 +604,16 @@ suspend fun AccessibilityService.dispatchSwipe(
         val cb =
             object : AccessibilityService.GestureResultCallback() {
                 override fun onCompleted(gestureDescription: GestureDescription?) {
-                    cont.resume(true)
+                    if (cont.isActive) cont.resume(true)
                 }
 
                 override fun onCancelled(gestureDescription: GestureDescription?) {
-                    cont.resume(false)
+                    if (cont.isActive) cont.resume(false)
                 }
             }
         val accepted = dispatchGesture(gesture, cb, null)
         observation?.accepted(accepted)
-        if (!accepted) cont.resume(false)
+        if (!accepted && cont.isActive) cont.resume(false)
     }
 }
 

@@ -12,6 +12,17 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 class ActionDiagnosticsTest : ActionTest {
+    @Test fun `swipe dispatches once without hierarchy and never retries failure`() = actionTest {
+        for (accepted in listOf(true, false)) {
+            val fixture = Fixture(listOf(null), backgroundScope, accepted)
+            val result = runCatching { fixture.ui.swipe(action.math.geometry.Point(10, 20), action.math.geometry.Point(100, 20), 300) }
+            assertEquals(accepted, result.isSuccess)
+            if (!accepted) assertEquals("GESTURE_FAILED", (result.exceptionOrNull() as UiActionFailure).code)
+            assertEquals(1, fixture.dispatches)
+            assertEquals(0, fixture.captures)
+        }
+    }
+
     private fun node(id: String, label: String = id, children: List<UiNode> = emptyList(), scroll: Boolean = false) = UiNode(
         id = UiNodeId(id), resourceId = id, role = UiRole.Button, label = label,
         className = "test.Node", bounds = Rect(0f, 0f, 100f, 100f),

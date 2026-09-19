@@ -31,6 +31,15 @@ class TaskUiScopeDefault(
     private val uiTreeManager: UiTreeManager,
     private val coroutineScopeIo: CoroutineScope,
 ) : TaskUiScope {
+    override suspend fun swipe(start: Point, end: Point, durationMs: Long) {
+        require(start.x >= 0 && start.y >= 0 && end.x >= 0 && end.y >= 0) { "swipe coordinates must be non-negative" }
+        require(start != end) { "swipe start and end must differ" }
+        require(durationMs in 1L..10000L) { "swipe durationMs must be in [1, 10000]" }
+        if (!uiTreeManager.swipeAt(start.x, start.y, end.x, end.y, durationMs)) {
+            throw UiActionFailure("GESTURE_FAILED", "Swipe could not complete; check display bounds, accessibility service availability, and gesture cancellation")
+        }
+    }
+
     override suspend fun queryUi(
         matcher: NodeMatcher?,
         visibility: String,

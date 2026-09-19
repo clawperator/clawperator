@@ -53,6 +53,13 @@ sealed interface UiAction {
         val container: NodeMatcher? = null,
     ) : UiAction
 
+    data class Swipe(
+        override val id: String,
+        val start: Point,
+        val end: Point,
+        val durationMs: Long,
+    ) : UiAction
+
     data class Click(
         override val id: String,
         val matcher: NodeMatcher? = null,

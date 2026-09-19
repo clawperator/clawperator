@@ -12,6 +12,8 @@ import kotlin.time.Duration.Companion.seconds
  * Provides methods for UI inspection and interaction with retry support.
  */
 interface TaskUiScope {
+    suspend fun swipe(start: Point, end: Point, durationMs: Long)
+
     suspend fun queryUi(
         matcher: NodeMatcher? = null,
         visibility: String = "on_screen",

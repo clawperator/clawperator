@@ -31,7 +31,7 @@ Define the canonical `ExecutionAction.type` values, the exact parameters each ac
 
 ## Action receipts and failure evidence
 
-An accepted click, text operation, or scroll dispatch is evidence of the Android
+An accepted click, text operation, swipe, or scroll dispatch is evidence of the Android
 attempt. It does not verify navigation, persisted state, or any application
 postcondition. Follow it with a wait, query, read, or snapshot that checks the
 specific expected state. A wait for a label already present before the click
@@ -426,6 +426,61 @@ Example:
   }
 }
 ```
+
+<a id="action-swipe"></a>
+### `swipe`
+
+Move one finger immediately along a straight line between two screen coordinates,
+then release. This does not require a UI node or scrollable container. It has no
+initial hold and does not perform drag and drop.
+
+| Field | Valid values |
+| --- | --- |
+| `start` | required object with only integer `x` and `y`, each in `[0, 2147483647]` |
+| `end` | required object with only integer `x` and `y`, each in `[0, 2147483647]`; must differ from `start` |
+| `durationMs` | required integer in `[1, 10000]`; no default |
+
+Coordinates are physical screen pixels on the default display in its current
+orientation, with origin at the top left. Both endpoints must be inside the
+current display (`x < width`, `y < height`); Android checks these bounds before
+dispatch. The action accepts no selector, container, retry, or additional params.
+Gesture injection requires Android 7.0 (API 24) or later and an available
+accessibility service.
+
+```bash
+clawperator swipe --start 100 500 --end 800 500 --duration-ms 300
+```
+
+Raw execution action (also usable through HTTP `POST /execute`):
+
+```json
+{
+  "id": "swipe-1",
+  "type": "swipe",
+  "params": {
+    "start": { "x": 100, "y": 500 },
+    "end": { "x": 800, "y": 500 },
+    "durationMs": 300
+  }
+}
+```
+
+Success means Android's gesture completion callback fired. It does not prove
+that a snackbar was dismissed or content moved; inspect the resulting app state
+with a query or snapshot. The action dispatches once without automatic replay.
+
+Successful step data includes `start` and `end` as JSON-encoded coordinate
+objects, `duration_ms` as a string, and the standard `dispatch_method`,
+`dispatch_accepted`, and `elapsed_ms` receipt fields. A dispatched swipe uses
+`dispatch_method: "coordinate_gesture"`.
+
+Missing, invalid, or extra parameters fail Node validation with
+`EXECUTION_VALIDATION_FAILED`. Android reports `GESTURE_FAILED` if coordinates
+are outside the display, gesture injection is unavailable, or the gesture is
+rejected or cancelled. A gesture accepted and later cancelled retains
+`dispatch_accepted: "true"` on the failed step. Command timeout/cancellation
+retains dispatch evidence and does not replay the gesture; a gesture already
+accepted by Android may finish after the caller stops waiting.
 
 <a id="action-scroll"></a>
 ### `scroll`
