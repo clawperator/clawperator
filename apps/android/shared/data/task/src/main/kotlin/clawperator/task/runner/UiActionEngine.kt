@@ -55,7 +55,7 @@ class UiActionEngineDefault(
                 val receipt = ActionReceipt()
                 var serviceDispatched = false
                 val isMediaControl = action is UiAction.NotificationMedia && action.type in setOf("media_play", "media_pause", "media_seek", "dismiss_notification", "invoke_notification_action")
-                val recordsDispatch = action is UiAction.Click || action is UiAction.EnterText ||
+                val recordsDispatch = action is UiAction.Swipe || action is UiAction.Click || action is UiAction.EnterText ||
                     action is UiAction.Scroll || action is UiAction.ScrollUntil || action is UiAction.ScrollAndClick
                 fun evidence() = warnings.stepData() +
                     (if (recordsDispatch) receipt.stepData() else emptyMap()) +
@@ -123,6 +123,14 @@ class UiActionEngineDefault(
                 is UiAction.OpenApp -> executeOpenApp(taskScope, action)
                 is UiAction.CloseApp -> executeCloseApp(taskScope, action)
                 is UiAction.WaitForNode -> executeWaitForNode(taskScope, action)
+                is UiAction.Swipe -> {
+                    taskScope.ui { swipe(action.start, action.end, action.durationMs) }
+                    UiActionStepResult(action.id, "swipe", data = mapOf(
+                        "start" to "{\"x\":${action.start.x},\"y\":${action.start.y}}",
+                        "end" to "{\"x\":${action.end.x},\"y\":${action.end.y}}",
+                        "duration_ms" to action.durationMs.toString(),
+                    ))
+                }
                 is UiAction.Click -> executeClick(taskScope, action)
                 is UiAction.ScrollAndClick -> executeScrollAndClick(taskScope, action)
                 is UiAction.Scroll -> executeScroll(taskScope, action)
@@ -1015,6 +1023,7 @@ private fun UiAction.wireType(): String = when (this) {
     is UiAction.OpenApp -> "open_app"
     is UiAction.CloseApp -> "close_app"
     is UiAction.WaitForNode -> "wait_for_node"
+    is UiAction.Swipe -> "swipe"
     is UiAction.Click -> "click"
     is UiAction.ScrollAndClick -> "scroll_and_click"
     is UiAction.Scroll -> "scroll"

@@ -40,6 +40,7 @@ export const CANONICAL_ACTION_TYPES = [
   "stop_recording",
   "wait_for_node",
   "click",
+  "swipe",
   "scroll_and_click",
   "scroll",
   "scroll_until",

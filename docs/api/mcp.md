@@ -406,6 +406,23 @@ Example URI launch:
 }
 ```
 
+<a id="mcp-tool-swipe"></a>
+### `swipe`
+
+Swipe between absolute screen coordinates, then release. `start`, `end`, and
+`durationMs` are all required; there is no duration default. See the
+[swipe action contract](actions.md#action-swipe) for bounds, timing, results,
+and failures. Common `deviceId`, `operatorPackage`, and `timeoutMs` options apply.
+
+```json
+{
+  "start": { "x": 100, "y": 500 },
+  "end": { "x": 800, "y": 500 },
+  "durationMs": 300,
+  "deviceId": "<device_serial>"
+}
+```
+
 <a id="mcp-tool-click"></a>
 ### `click`
 

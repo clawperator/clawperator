@@ -38,6 +38,20 @@ class UiTreeManagerAndroid(
         }
     }
 
+    override suspend fun swipeAt(startX: Int, startY: Int, endX: Int, endY: Int, durationMs: Long): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return false
+        val service = accessibilityServiceManager.currentAccessibilityService ?: return false
+        val metrics = android.util.DisplayMetrics()
+        @Suppress("DEPRECATION")
+        (service.getSystemService(android.content.Context.WINDOW_SERVICE) as android.view.WindowManager).defaultDisplay.getRealMetrics(metrics)
+        if (startX !in 0 until metrics.widthPixels || endX !in 0 until metrics.widthPixels ||
+            startY !in 0 until metrics.heightPixels || endY !in 0 until metrics.heightPixels ||
+            (startX == endX && startY == endY) || durationMs !in 1L..10000L) return false
+        return dispatch(null, "coordinate_gesture") {
+            service.dispatchSwipe(startX.toFloat(), startY.toFloat(), endX.toFloat(), endY.toFloat(), durationMs)
+        }
+    }
+
     override suspend fun triggerClick(
         uiNode: UiNode,
         clickTypes: UiTreeClickTypes,

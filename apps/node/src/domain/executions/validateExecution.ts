@@ -1,5 +1,6 @@
 import { validateOnScreenLogTemplate } from "../../contracts/onScreenLogTemplate.js";
 import { notificationMediaParamsSchema } from "../../contracts/notifications.js";
+import { swipeParamsSchema } from "../../contracts/swipe.js";
 import { z } from "zod";
 import { LIMITS } from "../../contracts/limits.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -132,6 +133,7 @@ const setOnScreenLogParamsSchema = z.object({
 const clearOnScreenLogParamsSchema = z.object({}).strict();
 
 function paramsSchemaForAction(actionType: string) {
+  if (actionType === "swipe") return swipeParamsSchema;
   const serviceSchema = notificationMediaParamsSchema(actionType);
   if (serviceSchema !== undefined) return serviceSchema;
   if (actionType === "query_ui") return queryParamsSchema.optional();
@@ -160,6 +162,7 @@ const supportedTypes = [
   "stop_recording",
   "wait_for_node",
   "click",
+  "swipe",
   "scroll_and_click",
   "scroll",
   "scroll_until",

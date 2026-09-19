@@ -185,6 +185,29 @@ class AgentCommandParserDefault : AgentCommandParser {
                         container = params.parseMatcherOrNull("container"),
                     )
                 }
+            "swipe" -> {
+                require(params.keys == setOf("start", "end", "durationMs")) { "swipe requires only start, end, and durationMs" }
+                fun point(key: String): Point {
+                    val value = params[key] as? JsonObject ?: error("$key must be an object")
+                    require(value.keys == setOf("x", "y")) { "$key requires only x and y" }
+                    fun coordinate(axis: String): Int {
+                        val primitive = value[axis] as? JsonPrimitive ?: error("$key.$axis must be an integer")
+                        require(!primitive.isString) { "$key.$axis must be an integer" }
+                        val number = primitive.intOrNull ?: error("$key.$axis must be an integer")
+                        require(number >= 0) { "$key.$axis must be non-negative" }
+                        return number
+                    }
+                    return Point(coordinate("x"), coordinate("y"))
+                }
+                val start = point("start")
+                val end = point("end")
+                require(start != end) { "swipe start and end must differ" }
+                val durationValue = params["durationMs"] as? JsonPrimitive ?: error("durationMs must be an integer")
+                require(!durationValue.isString) { "durationMs must be an integer" }
+                val durationMs = durationValue.longOrNull ?: error("durationMs must be an integer")
+                require(durationMs in 1L..10000L) { "durationMs must be in [1, 10000]" }
+                UiAction.Swipe(id, start, end, durationMs)
+            }
             "scroll_and_click" ->
                 UiAction.ScrollAndClick(
                     id = id,
