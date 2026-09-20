@@ -1,6 +1,6 @@
 ---
 name: clawperator-skill-author-by-agent-discovery
-description: "Clawperator first-party bundled skill. Route a no-match Clawperator request through bounded discovery before choosing one truthful next step: reuse an existing skill, proceed to recording, continue bounded discovery, fulfill one-shot, escalate, or decline."
+description: "Choose an evidence-backed next step when no installed Clawperator runtime skill covers the goal or the app route needs bounded discovery before authoring."
 ---
 
 # Clawperator Skill Author By Agent Discovery
@@ -8,7 +8,7 @@ description: "Clawperator first-party bundled skill. Route a no-match Clawperato
 Guide a host-facing agent through Clawperator's no-match route from "no
 installed runtime skill clearly fits" to "one truthful next step."
 
-This is the zero-results front door. It does not author a durable runtime
+This is the no-goal-match front door. It does not author a durable runtime
 skill. Its job is to inspect the current host and app surface, produce one
 structured discovery artifact, and choose exactly one next step.
 
@@ -35,18 +35,18 @@ This skill owns bounded discovery and routing only.
 - Do not invent new Clawperator runtime probes or new CLI nouns in this
   workflow.
 
-## Required Reading During Use
+## References by decision
 
-Read these durable sources before making discovery or routing decisions:
+Use the relevant canonical contract when its detail is needed:
 
-- `https://docs.clawperator.com/host-agents/`
-- `https://docs.clawperator.com/skills/authoring/`
-- `https://docs.clawperator.com/skills/overview/`
-- `https://docs.clawperator.com/quickstart/`
-- `https://github.com/clawperator/clawperator/blob/main/docs/internal/design/skill-design.md`
+- Host readiness and routing: `https://docs.clawperator.com/host-agents/`
+- Authoring handoff and proving: `https://docs.clawperator.com/skills/authoring/`
+- Runtime-skill categories and coverage: `https://docs.clawperator.com/skills/overview/`
+- Direct-command usage: `https://docs.clawperator.com/quickstart/`
+- Reusable skill design: `https://github.com/clawperator/clawperator/blob/main/docs/internal/design/skill-design.md`
 
-Reuse those contracts. Do not invent a parallel discovery artifact or a second
-proving workflow.
+Keep the discovery artifact below and the canonical proving workflow; do not
+invent parallel contracts.
 
 ## Inputs To Gather Up Front
 
@@ -68,6 +68,9 @@ fake discovery. Route the work into a local shell context first.
 ## Non-Negotiable Rules
 
 - Check installed runtime skills first.
+- Match the requested outcome, inputs, supported route, outputs and verification,
+  not package-name overlap. Record missing goal coverage as `partial_match`; a
+  Settings landing-screen skill does not satisfy OS version/build extraction.
 - If there is a clear installed runtime-skill match, route
   `use_existing_skill` and stop.
 - Produce exactly one top-level discovery artifact.
@@ -125,7 +128,7 @@ the following top-level keys.
 
 | Key | Expected shape |
 | --- | --- |
-| `recommended_next_step` | One of `use_existing_skill`, `proceed_to_recording`, `iterate_discovery`, `one_shot_direct_automation`, `escalate_to_human`, `decline` |
+| `recommended_next_step` | One of `use_existing_skill`, `proceed_to_orchestrated_authoring`, `proceed_to_recording`, `iterate_discovery`, `one_shot_direct_automation`, `escalate_to_human`, `decline` |
 | `existing_skill_verdict` | Object with `status` set to `match`, `partial_match`, or `none`, plus the queried registry paths or commands |
 | `target_app_package` | Object with app label, package id, and any sub-route observed |
 | `route_confidence` | Object with `level` set to `high`, `medium`, or `low`, plus supporting evidence |
@@ -133,7 +136,7 @@ the following top-level keys.
 | `evidence_collected` | Object inventorying captured artifacts and failed probes |
 | `discovery_budget_used` | Object recording `snapshots`, `screenshots`, and `elapsed_wall_time_s` |
 | `skill_classification` | Include only when `recommended_next_step = proceed_to_recording`; value must be `shared-general` or `personalized-local` |
-| `handoff_target` | One of `clawperator-skill-author-by-recording`, `raw-clawperator`, `human`, `none` |
+| `handoff_target` | One of `clawperator-agent-control-loop`, `clawperator-skill-author-by-recording`, `raw-clawperator`, `human`, `none` |
 | `handoff_reasoning` | Short justification for the chosen route |
 
 Required truth rules:
@@ -152,8 +155,9 @@ Use this first-match-wins table exactly:
 | Situation | Required route |
 | --- | --- |
 | Installed runtime skill is a clear match | `use_existing_skill` |
-| No skill exists, route is understood, and reusable authoring is justified | `proceed_to_recording` |
-| No skill exists, route is still uncertain, and discovery budget remains | `iterate_discovery` |
+| No full goal match, user explicitly requested orchestrated authoring, and bounded evidence supports its scope | `proceed_to_orchestrated_authoring` |
+| No full goal match, route is understood, and reusable authoring is justified | `proceed_to_recording` |
+| No full goal match, route is still uncertain, and discovery budget remains | `iterate_discovery` |
 | One-shot fulfillment is better than a reusable skill | `one_shot_direct_automation` |
 | Mutation risk is too high or user intent is underspecified | `escalate_to_human` |
 | Request cannot be served truthfully | `decline` |
@@ -235,6 +239,12 @@ Apply the route directly:
 
 - `use_existing_skill`
   - name the skill id and stop
+- `proceed_to_orchestrated_authoring`
+  - set `handoff_target` to `clawperator-agent-control-loop` and hand off the
+    explicit user request, goal-coverage gaps, evidence, budgets and limitations
+  - use its [delegation and authoring reference](../clawperator-agent-control-loop/references/delegation.md)
+    and canonical authoring workflow after this discovery pass ends
+  - do not write the durable skill inside discovery or claim unproved navigation
 - `proceed_to_recording`
   - hand off to `clawperator-skill-author-by-recording`
   - pass forward the user goal, package id, observed sub-route, mutation notes,
@@ -243,7 +253,8 @@ Apply the route directly:
   - stop with a bounded next-probe recommendation in `handoff_reasoning`
   - do not keep looping indefinitely inside the same pass
 - `one_shot_direct_automation`
-  - route to raw `clawperator` execution only
+  - route to raw `clawperator` execution using
+    [the control loop](../clawperator-agent-control-loop/SKILL.md) for adaptive work
   - do not author a durable skill
 - `escalate_to_human`
   - explain what must be clarified or approved first

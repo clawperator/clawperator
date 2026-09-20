@@ -766,7 +766,7 @@ describe("cmdBundledSkillsList", () => {
       skills: [],
       count: 0,
       installedDir: join(root, "missing-install-dir"),
-      message: "No installed bundled-skills found. Run clawperator bundled-skills install to get clawperator-agent-orientation, clawperator-upgrade, clawperator-skill-author-by-agent-discovery, and clawperator-skill-author-by-recording.",
+      message: "No installed bundled-skills found. Run clawperator bundled-skills install to get clawperator-agent-orientation, clawperator-agent-control-loop, clawperator-upgrade, clawperator-skill-author-by-agent-discovery, and clawperator-skill-author-by-recording.",
     });
   });
 
@@ -838,6 +838,7 @@ describe("listPackagedBundledSkills", () => {
   it("lists all packaged first-party bundled skills from the repo tree", async () => {
     const skills = await listPackagedBundledSkills();
     assert.deepEqual(skills, [
+      "clawperator-agent-control-loop",
       "clawperator-agent-orientation",
       "clawperator-skill-author-by-agent-discovery",
       "clawperator-skill-author-by-recording",
@@ -1011,10 +1012,13 @@ describe("bundled discovery directory aliases", () => {
   });
 
   it("migrates a historical first-party version whose content differs from the package", async () => {
-    const { homeDir, sourceDir, legacyPath } = await createLegacySkillFixture("clawperator-skill-author-by-agent-discovery");
-    const oldMarkdown = (await readFile(join(legacyPath, "SKILL.md"), "utf8"))
-      .replace("# Clawperator Skill Author By Agent Discovery", "# Skill Author By Agent Discovery");
-    await writeFile(join(legacyPath, "SKILL.md"), oldMarkdown);
+    const { root, homeDir, sourceDir: packagedSource, legacyPath } = await createLegacySkillFixture("clawperator-upgrade");
+    const sourceDir = join(root, "updated-package");
+    await cp(packagedSource, sourceDir, { recursive: true });
+    const oldMarkdown = await readFile(join(legacyPath, "SKILL.md"), "utf8");
+    // Change the proposed package, keeping the recognized historical copy exact.
+    // Deriving a historical fixture by editing current guidance breaks on updates.
+    await writeFile(join(sourceDir, "clawperator-upgrade", "SKILL.md"), oldMarkdown + "\nUpdated package guidance.\n");
     const result = await copyBundledSkills({ homeDir, sourceDir, env: {} });
     assert.ok(result.ok, JSON.stringify(result));
     assert.equal(result.migrations.length, 1);
