@@ -447,6 +447,7 @@ describe("finalizeSuccessfulScreenshotCapture", () => {
       success: false,
       data: {
         error: "UNSUPPORTED_RUNTIME_SCREENSHOT",
+        errorCode: "UNSUPPORTED_RUNTIME_SCREENSHOT",
         message: "Runtime screenshot not supported",
       },
     };
@@ -454,7 +455,8 @@ describe("finalizeSuccessfulScreenshotCapture", () => {
     finalizeSuccessfulScreenshotCapture(screenStep, "/tmp/capture.png");
 
     assert.strictEqual(screenStep.success, true);
-    assert.deepStrictEqual(screenStep.data, { path: "/tmp/capture.png" });
+    assert.deepStrictEqual(screenStep.data, { path: "/tmp/capture.png", captureSource: "host", capturedAt: screenStep.data.capturedAt });
+    assert.ok(!Number.isNaN(Date.parse(screenStep.data.capturedAt)));
   });
 
   it("preserves existing success state and metadata for already-supported screenshots", () => {
@@ -470,6 +472,8 @@ describe("finalizeSuccessfulScreenshotCapture", () => {
     assert.strictEqual(screenStep.success, true);
     assert.deepStrictEqual(screenStep.data, {
       source: "adb-fallback",
+      captureSource: "host",
+      capturedAt: screenStep.data.capturedAt,
       path: "/tmp/capture.png",
     });
   });

@@ -2695,7 +2695,14 @@ Semantics:
 
 Success data:
 
-- `data.path` after Node finalizes the screenshot capture
+- `data.path` after Node verifies and writes the host screenshot
+- `data.captureSource: "host"` and `data.capturedAt` (host ISO timestamp after persistence)
+
+The host capture occurs after the runtime envelope, not at the runtime step's
+exact instant. A successful fallback clears the superseded
+`UNSUPPORTED_RUNTIME_SCREENSHOT` error, errorCode, and message while preserving
+other metadata. A failed capture or artifact write produces
+`EVIDENCE_CAPTURE_FAILED`; it does not become success or expose a stale path.
 
 Common failures:
 

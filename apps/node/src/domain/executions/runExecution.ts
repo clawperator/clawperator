@@ -1,3 +1,4 @@
+import { PNG } from "pngjs";
 import { probeUserUnlockState } from "../device/userUnlockState.js";
 import { isBackgroundServiceExecution } from "../../contracts/notifications.js";
 import { writeFile } from "node:fs/promises";
@@ -355,11 +356,11 @@ export function finalizeSuccessfulScreenshotCapture(
 
   if (screenStep.data.error === "UNSUPPORTED_RUNTIME_SCREENSHOT") {
     screenStep.success = true;
-    const { error: _error, message: _message, ...remainingData } = screenStep.data;
+    const { error: _error, errorCode: _errorCode, message: _message, ...remainingData } = screenStep.data;
     screenStep.data = remainingData;
   }
 
-  screenStep.data = { ...screenStep.data, path: screenshotPath };
+  screenStep.data = { ...screenStep.data, path: screenshotPath, captureSource: "host", capturedAt: new Date().toISOString() };
 }
 
 /**
@@ -795,10 +796,24 @@ async function performExecution(
             taskId: execution.taskId,
           });
 
+          if (buffer.length < 24 || buffer.readUInt32BE(16) * buffer.readUInt32BE(20) > 32_000_000) {
+            throw new Error("Screenshot exceeds PNG decoding limits");
+          }
+          PNG.sync.read(buffer, { checkCRC: true });
           await writeFile(screenshotPath, buffer);
           finalizeSuccessfulScreenshotCapture(screenStep, screenshotPath);
         } catch (e) {
-          console.warn(`⚠️ Failed to capture screenshot via adb: ${String(e)}`);
+          const screenStep = result.envelope.stepResults.find(step => step.actionType === "take_screenshot");
+          if (screenStep !== undefined) {
+            screenStep.success = false;
+            const { path: _path, ...previousData } = screenStep.data;
+            screenStep.data = { ...previousData,
+              runtimeError: previousData.error ?? "",
+              error: ERROR_CODES.EVIDENCE_CAPTURE_FAILED,
+              errorCode: ERROR_CODES.EVIDENCE_CAPTURE_FAILED,
+              message: (typeof e === "object" && e !== null && "message" in e ? String(e.message) : String(e)).slice(0, 1024), failurePhase: "post_processing", dispatchState: "dispatched",
+            };
+          }
         }
       }
 
