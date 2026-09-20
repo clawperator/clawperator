@@ -33,7 +33,7 @@ export interface InteractiveAutomationReadyError {
 }
 
 export type InteractiveStateProbeResult =
-  | { ok: true; state: InternalInteractiveState }
+  | { ok: true; state: InternalInteractiveState; probeEvidence?: Record<string, unknown> }
   | { ok: false; code: ErrorCode; message: string; details?: Record<string, unknown> };
 
 export type InteractiveAutomationReadyResult =
@@ -61,6 +61,7 @@ export interface EnsureDeviceAwakeResult {
   attempts: WakeAttempt[];
   state?: InternalInteractiveState;
   error?: InteractiveStateProbeFailure;
+  probeEvidence?: Record<string, unknown>;
 }
 
 interface WakeCommand {
@@ -227,6 +228,7 @@ export async function probeInteractiveState(
     return {
       ok: true,
       state: parseDoctorPingInteractiveState(doctorPingStep),
+      probeEvidence: result.probeEvidence,
     };
   } catch (error) {
     return {
@@ -261,11 +263,13 @@ export async function ensureDeviceAwake(
     };
   }
 
+  let probeEvidence = initialProbe.probeEvidence;
   if (initialProbe.state.screenOn) {
     return {
       status: isInteractiveAutomationReady(initialProbe.state) ? "already_awake" : "awake_but_locked",
       attempts: [],
       state: initialProbe.state,
+      ...(probeEvidence !== undefined ? { probeEvidence } : {}),
     };
   }
 
@@ -296,6 +300,7 @@ export async function ensureDeviceAwake(
       };
     }
 
+    probeEvidence = postAttemptProbe.probeEvidence;
     lastObservedState = postAttemptProbe.state;
     if (didWakeCommandFail(adbResult)) {
       if (postAttemptProbe.state.screenOn) {
@@ -303,6 +308,7 @@ export async function ensureDeviceAwake(
           status: isInteractiveAutomationReady(postAttemptProbe.state) ? "awake" : "awake_but_locked",
           attempts,
           state: postAttemptProbe.state,
+          ...(probeEvidence !== undefined ? { probeEvidence } : {}),
         };
       }
 
@@ -320,6 +326,7 @@ export async function ensureDeviceAwake(
       status: isInteractiveAutomationReady(postAttemptProbe.state) ? "awake" : "awake_but_locked",
       attempts,
       state: postAttemptProbe.state,
+      ...(probeEvidence !== undefined ? { probeEvidence } : {}),
     };
   }
 
@@ -328,6 +335,7 @@ export async function ensureDeviceAwake(
       status: "transport_failed",
       attempts,
       state: lastObservedState,
+      ...(probeEvidence !== undefined ? { probeEvidence } : {}),
       error: lastTransportFailure,
     };
   }
@@ -336,6 +344,7 @@ export async function ensureDeviceAwake(
     status: "still_asleep",
     attempts,
     state: lastObservedState,
+    ...(probeEvidence !== undefined ? { probeEvidence } : {}),
   };
 }
 
@@ -353,55 +362,37 @@ export async function ensureInteractiveAutomationReady(
     settleDelayMs: options?.settleDelayMs,
   });
 
-  switch (wakeResult.status) {
-    case "already_awake":
-    case "awake":
-      if (wakeResult.state && isInteractiveAutomationReady(wakeResult.state)) {
-        return { ok: true, state: wakeResult.state };
-      }
-      if (wakeResult.state) {
-        return {
-          ok: false,
-          error: buildDeviceNotInteractiveError(wakeResult.state),
-        };
-      }
-      return {
-        ok: false,
-        error: {
-          code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
-          message: "Device is not interactive and no interactive-state evidence was available.",
-        },
-      };
-    case "awake_but_locked":
-    case "still_asleep":
-      if (wakeResult.state) {
-        return {
-          ok: false,
-          error: buildDeviceNotInteractiveError(wakeResult.state),
-        };
-      }
-      return {
-        ok: false,
-        error: {
-          code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
-          message: "Device is not interactive and no interactive-state evidence was available.",
-        },
-      };
-    case "probe_failed":
-    case "transport_failed":
-      return {
-        ok: false,
-        error: {
+  if ((wakeResult.status === "already_awake" || wakeResult.status === "awake") &&
+      wakeResult.state && isInteractiveAutomationReady(wakeResult.state)) {
+    return { ok: true, state: wakeResult.state };
+  }
+
+  const error: InteractiveAutomationReadyError =
+    wakeResult.status === "probe_failed" || wakeResult.status === "transport_failed"
+      ? {
           code: wakeResult.error?.code ?? ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
           message: wakeResult.error?.message ?? "Could not prepare the device for interactive automation.",
-          details: {
-            ...wakeResult.error?.details,
-            ...(wakeResult.state ? toInteractiveStateEvidence(wakeResult.state) : {}),
-            wakeAttempts: wakeResult.attempts.map(attempt => ({ method: attempt.method, exitCode: attempt.adbResult.code })),
-          },
-        },
-      };
-  }
+        }
+      : wakeResult.state
+        ? buildDeviceNotInteractiveError(wakeResult.state)
+        : {
+            code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+            message: "Device is not interactive and no interactive-state evidence was available.",
+          };
+  return {
+    ok: false,
+    error: {
+      ...error,
+      details: {
+        phase: "readiness",
+        dispatchState: "not_dispatched",
+        ...wakeResult.probeEvidence,
+        ...wakeResult.error?.details,
+        ...(wakeResult.state ? toInteractiveStateEvidence(wakeResult.state) : {}),
+        wakeAttempts: wakeResult.attempts.map(attempt => ({ method: attempt.method, exitCode: attempt.adbResult.code })),
+      },
+    },
+  };
 }
 
 export function buildReadinessCacheKey(resolvedDeviceId: string, operatorPackage: string): string {
@@ -477,13 +468,17 @@ export function buildDeviceNotInteractiveError(
   };
 }
 
-export function toPublicInteractiveAutomationError<T extends { code: string; message: string; details?: unknown }>(
+export function toPublicInteractiveAutomationError<T extends { code: string; message: string; details?: Record<string, unknown> }>(
   error: T
-): Omit<T, "details" | "message"> & { message: string } {
+): Omit<T, "details" | "message"> & { message: string; details?: Record<string, unknown> } {
   if (error.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE) {
-    const { details: _details, message: _message, ...rest } = error;
+    const { details, message: _message, ...rest } = error;
+    // Keep recovery evidence while preserving the public omission of internal state.
+    const { screenOn: _screenOn, deviceLocked: _deviceLocked, userUnlocked: _userUnlocked, ...diagnostics } =
+      typeof details === "object" && details !== null ? details as Record<string, unknown> : {};
     return {
       ...rest,
+      ...(Object.keys(diagnostics).length > 0 ? { details: diagnostics } : {}),
       message: "Device is not interactive. Interactive automation requires an awake, usable device state.",
     };
   }

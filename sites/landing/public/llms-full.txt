@@ -7864,8 +7864,10 @@ result envelope. The existing `[Clawperator-Result]` envelope remains unchanged.
 `not_dispatched` does not mean safe to retry: host `close_app` preflight may already
 have force-stopped an app, and readiness may have attempted to wake the device.
 After uncertain mutation results, observe and verify state before repeating them.
-Readiness wrappers retain probe evidence rather than substituting the requested
-command's identity. Existing failures and validation errors retain their codes.
+Readiness wrappers retain the final probe's evidence rather than substituting the
+requested command's identity. This includes successful probes that leave the
+device asleep or locked: `DEVICE_NOT_INTERACTIVE` preserves probe correlation
+and attempted wake methods while omitting the internal state booleans. Existing failures and validation errors retain their codes.
 
 Snapshot extraction failures carry string-valued `failurePhase: "post_processing"`
 and `dispatchState: "dispatched"` on the affected step. Inspect the actual failed

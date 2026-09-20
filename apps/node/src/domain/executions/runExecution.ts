@@ -691,7 +691,7 @@ async function performExecution(
           execution,
           result: {
             ok: false,
-            error: publicError,
+            error: { ...publicError },
             deviceId,
           },
         };

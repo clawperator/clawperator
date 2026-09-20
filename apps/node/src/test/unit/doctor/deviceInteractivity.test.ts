@@ -262,7 +262,10 @@ describe("probeInteractiveState", () => {
     });
 
     const result = await probeInteractiveState(config, mockWait as any);
+    assert.ok(result.ok);
+    assert.match(String(result.probeEvidence?.probeCommandId), /^doctor-handshake-/);
     assert.deepStrictEqual(result, {
+      probeEvidence: result.probeEvidence,
       ok: true,
       state: {
         screenOn: false,
@@ -712,6 +715,9 @@ describe("ensureInteractiveAutomationReady", () => {
         code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
         message: "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=false deviceLocked=false userUnlocked=true",
         details: {
+          phase: "readiness",
+          dispatchState: "not_dispatched",
+          wakeAttempts: [],
           screenOn: false,
           deviceLocked: false,
           userUnlocked: true,
@@ -749,6 +755,8 @@ describe("ensureInteractiveAutomationReady", () => {
         code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
         message: "Wake attempt cmd_power_wakeup failed before the device screen turned on: transport error",
         details: {
+          phase: "readiness",
+          dispatchState: "not_dispatched",
           wakeAttempts: [],
           screenOn: false,
           deviceLocked: false,
@@ -783,6 +791,9 @@ describe("ensureInteractiveAutomationReady", () => {
         code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
         message: "Device is not interactive. Interactive automation requires an awake, usable device state. screenOn=true deviceLocked=true userUnlocked=true",
         details: {
+          phase: "readiness",
+          dispatchState: "not_dispatched",
+          wakeAttempts: [],
           screenOn: true,
           deviceLocked: true,
           userUnlocked: true,

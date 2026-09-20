@@ -1,3 +1,4 @@
+import { cmdSkillsRun } from "../../cli/commands/skills.js";
 import { cmdObserveSnapshot } from "../../cli/commands/observe.js";
 import { shouldCliStdoutForceExitCode1 } from "../../cli/stdoutExitCode.js";
 import { executionRunner } from "./fakes/executionResultRunner.js";
@@ -152,6 +153,72 @@ describe("requested dispatch evidence", () => {
         assert.equal(details.dispatchState, acknowledged ? "dispatched" : "unknown");
         assert.equal(details.commandId, "requested-dispatch");
         assert.equal("envelope" in result, false);
+      }
+    });
+  }
+});
+
+
+describe("unusable device readiness evidence", () => {
+  for (const scenario of ["remains_asleep", "wakes_locked"] as const) {
+    it(`preserves successful probe and wake effects through public wrappers: ${scenario}`, async () => {
+      const runner = new FakeProcessRunner();
+      runner.run = async () => ({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" });
+      const config = getDefaultRuntimeConfig({ runner, deviceId: "test-device", operatorPackage: "com.test.operator" });
+      const probeIds: string[] = [];
+      const readiness = await ensureInteractiveAutomationReady(config, {
+        settleDelayMs: 0,
+        probeInteractiveStateFn: cfg => probeInteractiveState(cfg, async (_config, options, broadcast) => {
+          probeIds.push(options.commandId);
+          await broadcast!(() => {});
+          const screenOn = scenario === "wakes_locked" && probeIds.length > 1;
+          return {
+            ok: true, terminalSource: "clawperator_result",
+            envelope: {
+              commandId: options.commandId, taskId: "doctor-handshake", status: "success", error: null,
+              stepResults: [{ id: "h1", actionType: "doctor_ping", success: true,
+                data: { screen_on: String(screenOn), device_locked: "true", user_unlocked: "true" } }],
+            },
+          };
+        }),
+      });
+      assert.equal(readiness.ok, false);
+      if (readiness.ok) return;
+      const expectedAttempts = scenario === "remains_asleep" ? 3 : 1;
+      assert.equal(probeIds.length, expectedAttempts + 1);
+      const expectedEvidence = {
+        phase: "readiness", dispatchState: "not_dispatched",
+        probeCommandId: probeIds.at(-1), probeTaskId: "doctor-handshake", probeDispatchState: "dispatched",
+      };
+      const assertEvidence = (details: Record<string, unknown>) => {
+        for (const [key, value] of Object.entries(expectedEvidence)) assert.equal(details[key], value);
+        assert.equal((details.wakeAttempts as unknown[]).length, expectedAttempts);
+        assert.equal(details.screenOn, undefined);
+        assert.equal(details.deviceLocked, undefined);
+        assert.equal(details.userUnlocked, undefined);
+      };
+      const wrapper = JSON.parse(await cmdSkillsRun("test-skill", [], undefined, undefined, undefined, {
+        format: "json", skipValidate: true,
+        resolveInteractiveSkillTargetImpl: async () => ({ ok: false, error: readiness.error }),
+        runSkillImpl: async () => { throw new Error("Skill must not run"); },
+      }));
+      assert.equal(wrapper.status, "failed");
+      assert.equal(wrapper.code, "DEVICE_NOT_INTERACTIVE");
+      assertEvidence(wrapper.details);
+
+      const executionProcess = new FakeProcessRunner();
+      executionProcess.queueResult({ code: 0, stdout: "List of devices attached\ntest-device\tdevice\n", stderr: "" });
+      executionProcess.queueResult({ code: 0, stdout: "package:com.test.operator\n", stderr: "" });
+      executionProcess.spawn = (() => Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), kill() {} })) as FakeProcessRunner["spawn"];
+      const result = await runExecution({ commandId: "requested", taskId: "requested-task", source: "test", expectedFormat: "android-ui-automator", timeoutMs: 1000, actions: [{ id: "snap", type: "snapshot" }] }, {
+        deviceId: "test-device", operatorPackage: "com.test.operator", runner: executionProcess,
+        ensureInteractiveAutomationReadyFn: async () => readiness,
+      });
+      assert.equal(result.ok, false);
+      if (!result.ok) {
+        assert.equal(result.error.code, "DEVICE_NOT_INTERACTIVE");
+        assertEvidence(result.error.details as Record<string, unknown>);
+        assert.equal((result.error.details as Record<string, unknown>).commandId, "requested");
       }
     });
   }

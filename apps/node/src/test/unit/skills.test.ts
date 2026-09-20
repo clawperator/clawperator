@@ -7022,7 +7022,9 @@ describe("cmdSkillsRun preflight gate", () => {
     assert.strictEqual(result.ok, false);
     if (!result.ok) {
       assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
-      assert.strictEqual(result.error.details, undefined);
+      assert.deepStrictEqual(result.error.details, {
+        phase: "readiness", dispatchState: "not_dispatched", wakeAttempts: [],
+      });
       assert.strictEqual(result.error.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
     }
   });
