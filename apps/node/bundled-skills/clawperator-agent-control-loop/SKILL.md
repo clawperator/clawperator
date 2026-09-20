@@ -1,14 +1,19 @@
 ---
 name: clawperator-agent-control-loop
-description: Run a bounded, provider-neutral observe, decide, act, and verify loop with Clawperator when an Android goal needs adaptive navigation or evidence extraction. Also guides explicitly requested orchestrated skill authoring after bounded discovery.
+description: Execute Android goals that need adaptive navigation or verified extraction with Clawperator. Use also for explicitly requested orchestrated skill authoring after bounded discovery.
 ---
 
 # Clawperator Agent Control Loop
 
-The agent owns decisions and verification. Clawperator is the deterministic
-actuator. Start with `clawperator-agent-orientation` to select and check the CLI,
-device and Operator; retain that explicit pair on every device command. Discover
-runtime skills first and inspect actual goal coverage before choosing this loop.
+Complete the requested Android goal with independently verified results, or return
+a supported partial or failed outcome when a blocker or budget prevents completion.
+For authorized orchestrated authoring, continue through implementation, metadata
+validation and live proof using the authoring reference below.
+
+The agent owns decisions and verification; Clawperator executes. Use
+`clawperator-agent-orientation` if the CLI, device and Operator have not already
+been selected and checked. Discover runtime skills and inspect actual goal
+coverage before choosing this loop. No provider credential is required.
 
 ## Execute the goal
 
@@ -34,7 +39,7 @@ runtime skills first and inspect actual goal coverage before choosing this loop.
    report failure phase, last useful evidence and remaining unknowns. Stop at a
    blocking sign-in, consent ambiguity, unavailable target or exhausted budget.
 
-## Read only the reference needed
+## Conditional references
 
 - [Observation and targeting](references/observation.md): incomplete views,
   offscreen/moved controls, nested rows, ambiguous selectors or visual questions.
@@ -42,6 +47,3 @@ runtime skills first and inspect actual goal coverage before choosing this loop.
   interruptions, prior effects and retained diagnostics.
 - [Delegation and authoring](references/delegation.md): optional model proposals,
   Settings examples, or an explicit request to author an orchestrated skill.
-
-This skill does not require a provider credential. A host agent can decide
-locally and use the same evidence and verification requirements.

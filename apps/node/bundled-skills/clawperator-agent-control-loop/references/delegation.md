@@ -18,13 +18,15 @@ UI extraction, candidate validation, recovery and independent terminal proof.
 Inspect their current instructions and helpers before reusing commands. Their
 app routes, timing limits and provider choice are not core contracts.
 
-For an explicit request to author an orchestrated skill, first check runtime
-skills for actual outcome coverage and perform bounded discovery if needed.
-After discovery hands off, use this loop with the canonical
+For explicitly requested orchestrated authoring, use the goal-coverage findings
+and evidence from discovery; fill any missing discovery context within its budget.
+Continue with this loop, the canonical
 [authoring workflow](https://docs.clawperator.com/skills/authoring/) and the
 Settings examples. Define inputs, result evidence, budgets, checkpoints and honest
 failure output; keep app policy in the companion skills repository and wrappers
-thin. Validate metadata and prove live navigation and terminal evidence. Do not
+thin. Implement the skill, validate metadata, and prove live navigation and terminal
+evidence. Repair failures within the authorized scope and budgets; report any
+remaining blocker rather than presenting an unproved skill as complete. Do not
 infer authoring permission from an ordinary one-shot request. Recording remains
 the route for recording-based authoring; discovery itself does not write skills.
 

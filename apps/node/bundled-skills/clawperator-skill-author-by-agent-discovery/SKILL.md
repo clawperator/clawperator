@@ -1,6 +1,6 @@
 ---
 name: clawperator-skill-author-by-agent-discovery
-description: "Clawperator first-party bundled skill. Route a no-match Clawperator request through bounded discovery before choosing one truthful next step: reuse an existing skill, hand off explicit orchestrated authoring, proceed to recording, continue bounded discovery, fulfill one-shot, escalate, or decline."
+description: "Choose an evidence-backed next step when no installed Clawperator runtime skill covers the goal or the app route needs bounded discovery before authoring."
 ---
 
 # Clawperator Skill Author By Agent Discovery
@@ -35,18 +35,18 @@ This skill owns bounded discovery and routing only.
 - Do not invent new Clawperator runtime probes or new CLI nouns in this
   workflow.
 
-## Required Reading During Use
+## References by decision
 
-Read these durable sources before making discovery or routing decisions:
+Use the relevant canonical contract when its detail is needed:
 
-- `https://docs.clawperator.com/host-agents/`
-- `https://docs.clawperator.com/skills/authoring/`
-- `https://docs.clawperator.com/skills/overview/`
-- `https://docs.clawperator.com/quickstart/`
-- `https://github.com/clawperator/clawperator/blob/main/docs/internal/design/skill-design.md`
+- Host readiness and routing: `https://docs.clawperator.com/host-agents/`
+- Authoring handoff and proving: `https://docs.clawperator.com/skills/authoring/`
+- Runtime-skill categories and coverage: `https://docs.clawperator.com/skills/overview/`
+- Direct-command usage: `https://docs.clawperator.com/quickstart/`
+- Reusable skill design: `https://github.com/clawperator/clawperator/blob/main/docs/internal/design/skill-design.md`
 
-Reuse those contracts. Do not invent a parallel discovery artifact or a second
-proving workflow.
+Keep the discovery artifact below and the canonical proving workflow; do not
+invent parallel contracts.
 
 ## Inputs To Gather Up Front
 
