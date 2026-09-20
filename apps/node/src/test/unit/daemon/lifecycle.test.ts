@@ -249,7 +249,7 @@ describe("daemon process state", () => {
     assert.equal(readFileSync(getDaemonSocketPath(undefined, { baseDir }), "utf8"), "replacement socket");
   });
 
-  it("stopDaemon removes stale metadata without killing a non-daemon process", async () => {
+  it("stopDaemon removes stale metadata without unlinking a socket owned by a non-daemon process", async () => {
     const baseDir = await makeTempBaseDir();
     await writePidMetadata(baseDir, 9876, 100);
     await writeFile(getDaemonSocketPath(undefined, { baseDir }), "", "utf8");
@@ -268,7 +268,42 @@ describe("daemon process state", () => {
     assert.equal(await stopDaemon(undefined, options), "not_running");
     assert.equal(killCalled, false);
     assert.equal(existsSync(getDaemonPidPath(undefined, { baseDir })), false);
-    assert.equal(existsSync(getDaemonSocketPath(undefined, { baseDir })), false);
+    assert.equal(existsSync(getDaemonSocketPath(undefined, { baseDir })), true);
+  });
+
+  it("stopDaemon preserves a responding socket when metadata points to a dead process", async () => {
+    const baseDir = await makeTempBaseDir();
+    const socketPath = getDaemonSocketPath(undefined, { baseDir });
+    await writePidMetadata(baseDir, 9876, 100);
+    const server = createHttpServer((req, res) => {
+      if (req.url === "/ping") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(socketPath, resolve);
+    });
+    httpServers.push(server);
+
+    assert.equal(await stopDaemon(undefined, {
+      baseDir,
+      processController: {
+        isAlive: () => false,
+        kill: () => undefined,
+      },
+    }), "not_running");
+    assert.equal(existsSync(getDaemonPidPath(undefined, { baseDir })), false);
+    assert.equal(existsSync(socketPath), true);
+
+    const raw = await cmdDaemonStatus({ format: "json", baseDir });
+    const parsed = JSON.parse(raw) as { ok?: boolean; daemon?: { status?: string } };
+    assert.equal(parsed.ok, true);
+    assert.equal(parsed.daemon?.status, "unowned");
   });
 });
 
@@ -282,7 +317,7 @@ describe("daemon command output", () => {
     assert.equal(parsed.daemon?.status, "not_running");
   });
 
-  it("status does not report running for a responding socket without daemon metadata", async () => {
+  it("status reports an unowned responding socket without daemon metadata", async () => {
     const baseDir = await makeTempBaseDir();
     const socketPath = getDaemonSocketPath(undefined, { baseDir });
     const server = createHttpServer((req, res) => {
@@ -304,11 +339,11 @@ describe("daemon command output", () => {
     const parsed = JSON.parse(raw) as { ok?: boolean; daemon?: { status?: string; pid?: unknown } };
 
     assert.equal(parsed.ok, true);
-    assert.equal(parsed.daemon?.status, "not_running");
+    assert.equal(parsed.daemon?.status, "unowned");
     assert.equal("pid" in (parsed.daemon ?? {}), false);
   });
 
-  it("status does not report running when PID metadata belongs to a non-daemon process", async () => {
+  it("status reports an unowned socket when PID metadata belongs to a non-daemon process", async () => {
     const baseDir = await makeTempBaseDir();
     const socketPath = getDaemonSocketPath(undefined, { baseDir });
     await writePidMetadata(baseDir, 9876, 100);
@@ -339,7 +374,7 @@ describe("daemon command output", () => {
     const parsed = JSON.parse(raw) as { ok?: boolean; daemon?: { status?: string; pid?: unknown } };
 
     assert.equal(parsed.ok, true);
-    assert.equal(parsed.daemon?.status, "not_running");
+    assert.equal(parsed.daemon?.status, "unowned");
     assert.equal("pid" in (parsed.daemon ?? {}), false);
   });
 

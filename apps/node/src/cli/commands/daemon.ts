@@ -136,10 +136,6 @@ async function waitForOwnedDaemon(
   return false;
 }
 
-async function isOwnedDaemonAlive(socketPath: string, options: DaemonCommandOptions): Promise<boolean> {
-  return await isSocketAlive(socketPath) && await isDaemonRunning(options.deviceId, options);
-}
-
 function daemonSuccess<T>(data: T, options: { format: OutputOptions["format"] }): string {
   return formatSuccess(data, { format: options.format });
 }
@@ -330,8 +326,13 @@ export async function cmdDaemonStop(options: DaemonCommandOptions): Promise<stri
 
 export async function cmdDaemonStatus(options: DaemonCommandOptions): Promise<string> {
   const socketPath = getDaemonSocketPath(options.deviceId, options);
-  if (!(await isOwnedDaemonAlive(socketPath, options))) {
+  const socketAlive = await isSocketAlive(socketPath);
+  if (!socketAlive) {
     return daemonSuccess({ ok: true, daemon: { status: "not_running", socketPath } }, options);
+  }
+
+  if (!(await isDaemonRunning(options.deviceId, options))) {
+    return daemonSuccess({ ok: true, daemon: { status: "unowned", socketPath } }, options);
   }
 
   const metadata = readDaemonPidMetadata(options.deviceId, options);
