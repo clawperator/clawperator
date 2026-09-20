@@ -167,7 +167,7 @@ const resultEnvelopeSchema: z.ZodType<ResultEnvelope, z.ZodTypeDef, unknown> = z
   hint: z.string().optional(),
   diagnostics: z.object({
     logging: z.object({
-      status: z.enum(["available", "disabled", "write_failed", "unavailable"]),
+      status: z.enum(["available", "disabled", "write_failed"]),
       code: z.literal("LOGGING_WRITE_FAILED").optional(),
       logPath: z.string().optional(),
     }),

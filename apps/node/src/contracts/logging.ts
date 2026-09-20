@@ -45,14 +45,13 @@ export interface LogEvent {
 // ---------------------------------------------------------------------------
 
 export interface LoggingStatus {
-  status: "available" | "disabled" | "write_failed" | "unavailable";
+  status: "available" | "disabled" | "write_failed";
   code?: "LOGGING_WRITE_FAILED";
   logPath?: string;
 }
 
 export interface ClawperatorLogger {
-  /** Optional for injected legacy loggers; absence means status is unavailable. */
-  status?(): LoggingStatus;
+  status(): LoggingStatus;
   emit(event: LogEvent): void;
   child(defaultContext: Partial<LogEvent>): ClawperatorLogger;
   /** Last successfully persisted file while the sink is enabled, not a configured destination. */

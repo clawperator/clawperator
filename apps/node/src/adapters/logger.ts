@@ -176,7 +176,6 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
   return buildLogger(inheritedSkillRunId !== undefined ? { skillRunId: inheritedSkillRunId } : undefined);
 }
 
-/** Older injected loggers cannot establish persistence from a configured path alone. */
 export function getLoggingStatus(logger?: ClawperatorLogger): LoggingStatus {
-  return logger === undefined ? { status: "disabled" } : logger.status?.() ?? { status: "unavailable" };
+  return logger === undefined ? { status: "disabled" } : logger.status();
 }

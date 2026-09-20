@@ -199,18 +199,18 @@ it("reports disabled and failed logging without claiming an unpersisted artifact
   try {
     const disabled = createClawperatorLogger({ logDir: root, fileLogging: false });
     disabled.emit({ ts: "now", level: "error", event: "test", message: "test" });
-    assert.deepStrictEqual(disabled.status?.(), { status: "disabled" });
+    assert.deepStrictEqual(disabled.status(), { status: "disabled" });
     assert.equal(disabled.logPath(), undefined);
     const logger = createClawperatorLogger({ logDir: join(root, "logs") });
-    assert.deepStrictEqual(logger.status?.(), { status: "available" });
+    assert.deepStrictEqual(logger.status(), { status: "available" });
     logger.emit({ ts: "now", level: "error", event: "test", message: "first" });
     const persisted = logger.logPath();
     assert.ok(persisted);
-    assert.equal(logger.child({ taskId: "task" }).status?.().logPath, persisted);
+    assert.equal(logger.child({ taskId: "task" }).status().logPath, persisted);
     await rm(join(root, "logs"), { recursive: true });
     await writeFile(join(root, "logs"), "blocked");
     logger.emit({ ts: "now", level: "error", event: "test", message: "second" });
-    assert.deepStrictEqual(logger.status?.(), { status: "write_failed", code: "LOGGING_WRITE_FAILED" });
+    assert.deepStrictEqual(logger.status(), { status: "write_failed", code: "LOGGING_WRITE_FAILED" });
     assert.equal(logger.logPath(), undefined);
   } finally { await rm(root, { recursive: true, force: true }); }
 });

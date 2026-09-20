@@ -648,11 +648,11 @@ An unfinished source or absent closing marker does not establish truncation,
 serialization failure, a transport fault, or version incompatibility.
 
 `envelope.diagnostics.logging` reports `status: available`, `disabled`,
-`write_failed`, or `unavailable`. Available means the file sink is enabled and has
+or `write_failed`. Available means the file sink is enabled and has
 not failed; it does not prove a write has occurred. `logPath` appears only after
 successful persistence. Disabled means intentionally disabled or no logger was
 supplied. Write-failed includes the safe code `LOGGING_WRITE_FAILED` and no path.
-Unavailable means an injected logger cannot report status. MCP retains the status
+Every logger implements the status contract. MCP retains the status
 and extraction facts but strips local log paths through its existing privacy filter. Child loggers share
 persistence and failure state. Logging failure never replaces the primary
 execution outcome, and warnings remain on stderr. A configured destination alone

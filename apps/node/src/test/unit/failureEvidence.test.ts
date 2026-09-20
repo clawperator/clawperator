@@ -200,6 +200,7 @@ it("late broadcast acknowledgement cannot rewind screenshot post-processing evid
       // Fail capture only after the delayed acknowledgement updates execution evidence.
       if (event.event === "broadcast.dispatched") capture.emit("close", 1);
     },
+    status() { return { status: "disabled" }; },
     child() { return logger; },
     logPath() { return undefined; },
   };

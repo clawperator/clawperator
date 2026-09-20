@@ -8219,6 +8219,10 @@ describe("runSkill logging", () => {
       child() {
         return this;
       },
+      status(): import("../../contracts/logging.js").LoggingStatus {
+        return disabled ? { status: "write_failed", code: "LOGGING_WRITE_FAILED" }
+          : { status: "available", logPath: "/tmp/clawperator-later-disabled.log" };
+      },
       logPath() {
         return disabled ? undefined : "/tmp/clawperator-later-disabled.log";
       },
