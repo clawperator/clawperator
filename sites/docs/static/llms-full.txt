@@ -12747,14 +12747,29 @@ Default runtime values:
 | operator package | `com.clawperator.operator` |
 | JSON output | default output mode |
 
+### Wrapper status and exit behavior
+
+Every `cmdSkillsRun` outcome includes `status`: `success`, `failed`, or
+`indeterminate`, including validation and readiness failures. Strict parsers must
+accept the added `status` on framed success. Nested `skillResult.status` remains
+the child-authored domain conclusion and is not interchangeable with wrapper status.
+
+The CLI exits 0 for wrapper success and 1 for failed or indeterminate outcomes.
+A zero-exit legacy script without a frame remains process success with
+`skillResult: null`, unless declared verification is unproved (indeterminate).
+A malformed frame fails with `SKILL_RESULT_PARSE_FAILED`; launch failure is
+`SKILL_EXECUTION_FAILED`. A valid domain failure remains visible in `skillResult`;
+a declared-verification run reporting domain failure also fails the wrapper.
+
 ### Successful Framed Result
 
 Default JSON success with a parsed `SkillResult` omits duplicate top-level
-`status`, `skillId`, `exitCode`, and `output`. Read `skillResult.result` for
+`skillId`, `exitCode`, and `output`, and always includes wrapper `status`. Read `skillResult.result` for
 the domain answer.
 
 ```json
 {
+  "status": "success",
   "skillResult": {
     "result": { "kind": "text", "text": "ok" },
     "status": "success",
@@ -14772,7 +14787,7 @@ First-time agent pitfall:
 
 - pretty mode streams live output and prints a banner first
 - JSON mode returns one parseable wrapper object
-- success JSON omits top-level `status`, `skillId`, `exitCode`, and
+- success JSON includes wrapper `status` and omits top-level `skillId`, `exitCode`, and
   `output`; read the domain answer from `skillResult.result`
 
 ## Step 4: Verify Output
@@ -15371,7 +15386,7 @@ Success JSON exposes the parsed `SkillResult` and timing:
 | `skillResult` | parsed structured skill result |
 | `durationMs` | total wrapper runtime |
 
-Default **JSON** success responses omit `status`, `skillId`, `exitCode`, and
+Default **JSON** success responses include wrapper `status` and omit `skillId`, `exitCode`, and
 `output` at the top level and expose the answer under `skillResult.result` (see
 the table in [Skill result trust order and JSON wrapper
 policy](#skill-result-trust-order-and-json-wrapper-policy)).
@@ -15439,7 +15454,7 @@ Verification pattern:
 
 | Wrapper path | `skillResult` | Top-level `status` | `skillId` | `exitCode` | `output` |
 | --- | --- | --- | --- | --- | --- |
-| **Success** | not `null` | omitted | omitted | omitted | omitted |
+| **Success** | not `null` | `success` | omitted | omitted | omitted |
 | **Indeterminate** (verification not proved) | not `null` | present | omitted | omitted | omitted |
 | **SKILL_OUTPUT_ASSERTION_FAILED** | may be not `null` | error shape | present in error | n/a for success | **present** (diagnostic; shows what the skill printed) |
 | **Execution / parse / other failures** | often `null` | error | varies | in error when relevant | n/a; failures use `stdout` and `stderr` for process streams |
@@ -15467,7 +15482,7 @@ The unified logger captures skill output as `skills.run.output` events, enabling
 ## Runtime success examples
 
 **Success (default JSON):** top level has only the nested object plus timing;
-**no** duplicate `status`, `skillId`, `exitCode`, or `output`. The domain
+wrapper `status: "success"` and **no** duplicate `skillId`, `exitCode`, or `output`. The domain
 answer is under `skillResult.result`.
 
 ```json

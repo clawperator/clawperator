@@ -306,14 +306,29 @@ Default runtime values:
 | operator package | `com.clawperator.operator` |
 | JSON output | default output mode |
 
+### Wrapper status and exit behavior
+
+Every `cmdSkillsRun` outcome includes `status`: `success`, `failed`, or
+`indeterminate`, including validation and readiness failures. Strict parsers must
+accept the added `status` on framed success. Nested `skillResult.status` remains
+the child-authored domain conclusion and is not interchangeable with wrapper status.
+
+The CLI exits 0 for wrapper success and 1 for failed or indeterminate outcomes.
+A zero-exit legacy script without a frame remains process success with
+`skillResult: null`, unless declared verification is unproved (indeterminate).
+A malformed frame fails with `SKILL_RESULT_PARSE_FAILED`; launch failure is
+`SKILL_EXECUTION_FAILED`. A valid domain failure remains visible in `skillResult`;
+a declared-verification run reporting domain failure also fails the wrapper.
+
 ### Successful Framed Result
 
 Default JSON success with a parsed `SkillResult` omits duplicate top-level
-`status`, `skillId`, `exitCode`, and `output`. Read `skillResult.result` for
+`skillId`, `exitCode`, and `output`, and always includes wrapper `status`. Read `skillResult.result` for
 the domain answer.
 
 ```json
 {
+  "status": "success",
   "skillResult": {
     "result": { "kind": "text", "text": "ok" },
     "status": "success",

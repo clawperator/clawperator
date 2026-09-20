@@ -308,7 +308,10 @@ async function main(): Promise<void> {
     global = getGlobalOpts(argv);
   } catch (error) {
     if (error instanceof UsageError) {
-      console.log(JSON.stringify({ code: "USAGE", message: error.message }));
+      const skillRunRequested = argvForGlobalMeta.some((token, index) => token === "skills" && argvForGlobalMeta[index + 1] === "run");
+      console.log(JSON.stringify({ code: "USAGE", message: error.message,
+        ...(skillRunRequested ? { status: "failed" } : {}),
+      }));
       process.exit(1);
     }
     throw error;
@@ -460,6 +463,13 @@ async function main(): Promise<void> {
     }
   }
 
+  if (cmd === "skills" && rest[0] === "run" && result !== undefined) {
+    const parsed = JSON.parse(result) as Record<string, unknown>;
+    if (typeof parsed.code === "string" && parsed.status === undefined) {
+      result = JSON.stringify({ ...parsed, status: "failed" }, null, global.output === "pretty" ? 2 : undefined);
+      process.exitCode = 1;
+    }
+  }
   if (result !== undefined) {
     console.log(result);
   }

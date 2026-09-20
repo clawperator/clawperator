@@ -6351,7 +6351,7 @@ console.log(JSON.stringify({
 
     assert.strictEqual(parsed.skillResult?.skillId, TEST_SKILL_RESULT);
     assert.strictEqual(parsed.skillResult?.source?.kind, "script");
-    assert.strictEqual(parsed.status, undefined);
+    assert.strictEqual(parsed.status, "success");
     assert.strictEqual(parsed.skillId, undefined);
     assert.strictEqual(parsed.exitCode, undefined);
     assert.strictEqual(parsed.output, undefined);
@@ -6659,6 +6659,7 @@ console.log(JSON.stringify({
     ]);
     assert.strictEqual(code, 1, stdout);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.equal(JSON.parse(stdout).status, "failed");
     assert.strictEqual(parsed.code, "EXECUTION_VALIDATION_FAILED");
     assert.strictEqual(parsed.message, "timeoutMs must be a finite number");
   });
@@ -6670,6 +6671,7 @@ console.log(JSON.stringify({
     ]);
     assert.strictEqual(code, 1, stdout);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.equal(JSON.parse(stdout).status, "failed");
     assert.strictEqual(parsed.code, "EXECUTION_VALIDATION_FAILED");
     assert.strictEqual(parsed.message, "timeoutMs must be a finite number");
   });
@@ -6680,6 +6682,7 @@ console.log(JSON.stringify({
     ]);
     assert.strictEqual(code, 1, stdout);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.equal(JSON.parse(stdout).status, "failed");
     assert.strictEqual(parsed.code, "USAGE");
     assert.strictEqual(parsed.message, "--timeout requires a value");
   });
@@ -6690,6 +6693,7 @@ console.log(JSON.stringify({
     ]);
     assert.strictEqual(code, 1, stdout);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.equal(JSON.parse(stdout).status, "failed");
     assert.strictEqual(parsed.code, "USAGE");
     assert.strictEqual(parsed.message, "--expect-contains requires a value");
   });
@@ -6700,6 +6704,7 @@ console.log(JSON.stringify({
     ]);
     assert.strictEqual(code, 1, stdout);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.equal(JSON.parse(stdout).status, "failed");
     assert.strictEqual(parsed.code, "USAGE");
     assert.strictEqual(parsed.message, "--expect-contains requires a value");
   });
@@ -6717,6 +6722,7 @@ console.log(JSON.stringify({
   it("CLI skills run returns usage when skill_id is missing even with --timeout", async () => {
     const { stdout } = await runCli(["skills", "run", "--timeout", "5000", "--output", "json"]);
     const parsed = JSON.parse(stdout) as { code?: string; message?: string };
+    assert.equal(JSON.parse(stdout).status, "failed");
     assert.strictEqual(parsed.code, "USAGE");
     assert.ok(parsed.message?.includes("--timeout"));
   });
@@ -7304,7 +7310,7 @@ describe("cmdSkillsRun preflight gate", () => {
     );
     const parsed = JSON.parse(stdout) as Record<string, unknown>;
     assert.ok(parsed.skillResult);
-    assert.strictEqual(parsed.status, undefined);
+    assert.strictEqual(parsed.status, "success");
     assert.strictEqual(parsed.skillId, undefined);
     assert.strictEqual(parsed.exitCode, undefined);
     assert.strictEqual(parsed.output, undefined);
@@ -7522,7 +7528,7 @@ describe("cmdSkillsRun preflight gate", () => {
           error: {
             code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
             message: "adb shell broke",
-            details: { command: "cmd power wakeup" },
+            details: { command: "cmd power wakeup", probeCommandId: "doctor-handshake-separate", probeDispatchState: "unknown", phase: "readiness", dispatchState: "not_dispatched" },
             deviceId: "resolved-device-123",
           },
         }),
@@ -7537,7 +7543,8 @@ describe("cmdSkillsRun preflight gate", () => {
     };
     assert.strictEqual(runCalls, 0);
     assert.strictEqual(parsed.code, ERROR_CODES.DEVICE_SHELL_UNAVAILABLE);
-    assert.deepStrictEqual(parsed.details, { command: "cmd power wakeup" });
+    assert.deepStrictEqual(parsed.details, { command: "cmd power wakeup", probeCommandId: "doctor-handshake-separate", probeDispatchState: "unknown", phase: "readiness", dispatchState: "not_dispatched" });
+    assert.equal(JSON.parse(stdout).status, "failed");
     assert.strictEqual(parsed.deviceId, "resolved-device-123");
     assert.strictEqual(parsed.message, "adb shell broke");
   });

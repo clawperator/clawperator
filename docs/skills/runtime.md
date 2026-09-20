@@ -233,7 +233,7 @@ Success JSON exposes the parsed `SkillResult` and timing:
 | `skillResult` | parsed structured skill result |
 | `durationMs` | total wrapper runtime |
 
-Default **JSON** success responses omit `status`, `skillId`, `exitCode`, and
+Default **JSON** success responses include wrapper `status` and omit `skillId`, `exitCode`, and
 `output` at the top level and expose the answer under `skillResult.result` (see
 the table in [Skill result trust order and JSON wrapper
 policy](#skill-result-trust-order-and-json-wrapper-policy)).
@@ -301,7 +301,7 @@ Verification pattern:
 
 | Wrapper path | `skillResult` | Top-level `status` | `skillId` | `exitCode` | `output` |
 | --- | --- | --- | --- | --- | --- |
-| **Success** | not `null` | omitted | omitted | omitted | omitted |
+| **Success** | not `null` | `success` | omitted | omitted | omitted |
 | **Indeterminate** (verification not proved) | not `null` | present | omitted | omitted | omitted |
 | **SKILL_OUTPUT_ASSERTION_FAILED** | may be not `null` | error shape | present in error | n/a for success | **present** (diagnostic; shows what the skill printed) |
 | **Execution / parse / other failures** | often `null` | error | varies | in error when relevant | n/a; failures use `stdout` and `stderr` for process streams |
@@ -329,7 +329,7 @@ The unified logger captures skill output as `skills.run.output` events, enabling
 ## Runtime success examples
 
 **Success (default JSON):** top level has only the nested object plus timing;
-**no** duplicate `status`, `skillId`, `exitCode`, or `output`. The domain
+wrapper `status: "success"` and **no** duplicate `skillId`, `exitCode`, or `output`. The domain
 answer is under `skillResult.result`.
 
 ```json
