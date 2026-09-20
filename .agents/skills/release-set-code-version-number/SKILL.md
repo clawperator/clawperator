@@ -20,6 +20,19 @@ Example:
 .agents/skills/release-set-code-version-number/scripts/set_code_version.py 0.4.0 0.4.1
 ```
 
+The default path updates the lockfile directly, reuses the existing
+`apps/node/node_modules` installation, builds the Node package, and runs the
+version compatibility tests. Use `--full` after the versions when you need a
+clean dependency install and the complete Node test suite:
+
+```bash
+.agents/skills/release-set-code-version-number/scripts/set_code_version.py 0.4.0 0.4.1 --full
+```
+
+Before validation, the script removes ignored `.DS_Store` artifacts from
+`apps/node/bundled-skills`, where they would otherwise be packaged as skills
+or make the packaging test fail.
+
 This skill updates code-facing surfaces only:
 - `apps/node/package.json`
 - `apps/node/package-lock.json`
@@ -46,10 +59,12 @@ Confirm the bump only touched code-facing surfaces and did not leak into public 
 
 ## Required Validation
 
-The script runs Node dependency installation, build, and tests before committing.
-Inspect that result rather than repeating the same checks after an unchanged
-successful run. If the audit requires a follow-up edit, rebuild and rerun the
-affected tests. A failed validation leaves the bump incomplete.
+The default script run builds Node and runs the version compatibility tests
+before committing. Use `--full` for dependency installation and the complete
+Node test suite. Inspect the validation result rather than repeating the same
+checks after an unchanged successful run. If the audit requires a follow-up
+edit, rebuild and rerun the affected tests. A failed validation leaves the
+bump incomplete.
 
 ## Commit Behavior
 
