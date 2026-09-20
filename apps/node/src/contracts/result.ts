@@ -1,3 +1,4 @@
+import type { LoggingStatus } from "./logging.js";
 import type { ExecutionFailureEvidence } from "./errors.js";
 
 /**
@@ -13,7 +14,33 @@ export type TerminalSource = "clawperator_result";
  */
 export type DispatchMethod = "accessibility_action" | "coordinate_gesture" | "none";
 
-export type StepResultData = Record<string, string>;
+/** Safe facts only: never copy parser messages, tag names or source excerpts here. */
+export interface SnapshotExtractionDiagnostics {
+  receivedBytes: number;
+  sourceValidationCategory: string;
+  line?: number;
+  column?: number;
+  position?: number;
+  closingHierarchySeen?: boolean;
+  terminationReason?: "next_snapshot" | "same_tag_event" | "closing_hierarchy" | "end_of_capture";
+}
+
+export interface StepResultData {
+  [key: string]: string | SnapshotExtractionDiagnostics | undefined;
+  extractionDiagnostics?: SnapshotExtractionDiagnostics;
+  text?: string;
+  error?: string;
+  errorCode?: string;
+  message?: string;
+  extractionReason?: string;
+  path?: string;
+  payload?: string;
+  sessionId?: string;
+  selection_warning?: string;
+  warn?: string;
+  capturedAt?: string;
+  value?: string;
+}
 
 export interface StepResult {
   id: string;
@@ -37,6 +64,7 @@ export interface ResultEnvelope {
   hint?: string;
   /** Host evidence added only when processing a received envelope fails. */
   failureEvidence?: ExecutionFailureEvidence;
+  diagnostics?: { logging: LoggingStatus };
 }
 
 export const RESULT_ENVELOPE_PREFIX = "[Clawperator-Result]";

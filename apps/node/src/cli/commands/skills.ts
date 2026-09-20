@@ -430,7 +430,7 @@ export async function cmdSkillsRun(
     tailCommand: preRunLogs.tailCommand,
     message: preRunLogs.path !== undefined
       ? `Skill ${skillId} run ${skillRunId} logging to ${preRunLogs.path}; observe with: ${preRunLogs.tailCommand}`
-      : `Skill ${skillId} run ${skillRunId} started with file logging unavailable`,
+      : `Skill ${skillId} run ${skillRunId} started without a persisted log artifact`,
   });
   preRunLogs = currentPreRunLogs();
 

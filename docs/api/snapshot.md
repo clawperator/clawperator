@@ -612,8 +612,10 @@ being attached to a later snapshot step. A missing entire marker still has no
 independent step identifier; attachment uses the existing positional ordering.
 
 When file logging is enabled, `snapshot.extraction.failed` retains the command,
-task, zero-based occurrence, reason, and at most 1024 source characters locally.
-The failed step includes `data.diagnosticLogPath` when a log file is available.
+task, zero-based occurrence, reason, safe extraction facts, and at most 1024 UTF-8
+source bytes locally (without splitting a Unicode code point).
+The failed step includes `data.diagnosticLogPath` only after a successful log
+write and while the logger has not encountered a write failure.
 The partial tree is never returned as valid observation text. A deliberate
 compact presentation limit applies only after valid source capture; it is not an
 extraction failure.
@@ -622,3 +624,58 @@ Compatibility correction: raw consumers that previously accepted incomplete XML
 must now handle failed steps and exit code 1. Switching to compact output is not
 required for this protection. Query JSON remains serialized inside string-valued
 step data.
+
+
+### Extraction diagnostics and recovery
+
+Failed source extraction adds the object `data.extractionDiagnostics`. Unlike
+Android string-valued step fields, this is a host-added structured object:
+
+| Field | Meaning |
+| --- | --- |
+| `receivedBytes` | UTF-8 byte count of the reconstructed, trimmed XML input, before validation; zero for missing input. This is not transport wire size. |
+| `sourceValidationCategory` | The same source category as `data.extractionReason`. |
+| `line`, `column`, `position` | Parser location at rejection, when available. Line is one-based, column is zero-based in Unicode characters, and position is a zero-based UTF-16 offset. Omitted for pre-parser size/empty checks and invalid-root checks. |
+| `closingHierarchySeen` | Whether the reconstructed source contains a closing `hierarchy` marker. This does not establish well-formedness; a self-closing root needs no closing marker. Omitted when no extraction record exists. |
+| `terminationReason` | `closing_hierarchy` for a standalone closing line, `same_tag_event` for an intervening bracketed event on the same log tag, `next_snapshot` for a new capture marker, or `end_of_capture` for the end of supplied log lines. Omitted when no extraction record exists. |
+
+Positions are nonnegative safe integers. No parser message, tag name, or source
+excerpt appears in these public facts. Missing fields mean unavailable, not zero.
+An unfinished source or absent closing marker does not establish truncation,
+serialization failure, a transport fault, or version incompatibility.
+
+`envelope.diagnostics.logging` reports `status: available`, `disabled`,
+`write_failed`, or `unavailable`. Available means the file sink is enabled and has
+not failed; it does not prove a write has occurred. `logPath` appears only after
+successful persistence. Disabled means intentionally disabled or no logger was
+supplied. Write-failed includes the safe code `LOGGING_WRITE_FAILED` and no path.
+Unavailable means an injected logger cannot report status. MCP retains the status
+and extraction facts but strips local log paths through its existing privacy filter. Child loggers share
+persistence and failure state. Logging failure never replaces the primary
+execution outcome, and warnings remain on stderr. A configured destination alone
+is not a diagnostic artifact. Local previews may contain private UI text.
+
+For recovery, an orchestrator should:
+
+1. Inspect the failed step, failure phase, requested/probe dispatch evidence, and
+   earlier action effects. A successful preceding scroll or click remains an
+   effect even when its subsequent observation fails.
+2. Retain the original failure and invalidate actionable stale candidates,
+   including nested adapter candidates. Keep prior values only as historical
+   evidence until independently verified.
+3. If eligible and within an explicit budget, acquire a fresh read-only
+   observation. Never replay the preceding mutation or mixed execution payload.
+4. Verify the destination and task evidence after acquisition. A valid new capture
+   alone does not prove task completion.
+5. On recurrence, inspect extraction diagnostics and logging availability;
+   investigate readiness or compatibility only when supported by evidence, and
+   return a truthful failure if recovery is exhausted.
+
+The Settings example orchestrators implement one recovery per run for a retained
+`snapshot` failure with `malformed_xml`, `post_processing`, and `dispatched`,
+within ten seconds and the remaining run/delegation budget. Unknown dispatch,
+DTD rejection, size/depth limits, compatibility and host setup errors do not use
+that policy. Core does not retry. Compact projection failures remain host
+presentation failures with their original envelope retained, distinct from
+invalid source capture and Android action failure. These diagnostics do not
+prevent malformed source or identify the incident's underlying cause.

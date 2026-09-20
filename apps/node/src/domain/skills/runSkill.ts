@@ -677,7 +677,7 @@ export async function runSkill(
       tailCommand,
       message: initialLogPath !== undefined
         ? `Skill ${skillId} run ${skillRunId} logging to ${initialLogPath}; observe with: ${tailCommand}`
-        : `Skill ${skillId} run ${skillRunId} started with file logging unavailable`,
+        : `Skill ${skillId} run ${skillRunId} started without a persisted log artifact`,
     });
   }
 

@@ -35,7 +35,7 @@ function buildRecordingAlreadyInProgressHint(options: {
 function addRecordingAlreadyInProgressHintToEnvelope(
   envelope: {
     stepResults?: Array<{
-      data?: Record<string, string>;
+      data?: import("../../contracts/result.js").StepResultData;
     }>;
     hint?: string;
   },

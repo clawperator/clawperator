@@ -44,7 +44,14 @@ export interface LogEvent {
 // ClawperatorLogger interface
 // ---------------------------------------------------------------------------
 
+export interface LoggingStatus {
+  status: "available" | "disabled" | "write_failed" | "unavailable";
+  code?: "LOGGING_WRITE_FAILED";
+  logPath?: string;
+}
+
 export interface ClawperatorLogger {
+  status?(): LoggingStatus;
   emit(event: LogEvent): void;
   child(defaultContext: Partial<LogEvent>): ClawperatorLogger;
   logPath(): string | undefined;

@@ -29,7 +29,8 @@ describe("doctor log destination", () => {
     process.env.CLAWPERATOR_LOG_DIR = join(root, "changed");
     const check = await checkLogDestination(logger);
     assert.equal(check.evidence?.logDir, explicit);
-    assert.equal(check.evidence?.logPath, logger.logPath());
+    assert.equal(check.evidence?.logPath, getLoggerDestination(logger).logPath);
+    assert.equal(logger.logPath(), undefined);
     delete process.env.CLAWPERATOR_LOG_DIR;
     assert.equal(resolveLogDestination().logDir, join(homedir(), ".clawperator/logs"));
   });

@@ -7185,7 +7185,7 @@ describe("cmdSkillsRun preflight gate", () => {
       const lines = parseLogEvents(contents);
       const logLocationLine = lines.find((line) => line.event === "skills.run.log_location");
       assert.strictEqual(logLocationLine?.skillRunId, parsed.logs?.skillRunId);
-      assert.strictEqual(logLocationLine?.logPath, parsed.logs?.path);
+      assert.strictEqual(logLocationLine?.logPath, undefined);
     } finally {
       await rm(logDir, { recursive: true, force: true });
     }
@@ -8173,8 +8173,8 @@ describe("runSkill logging", () => {
     assert.strictEqual(startLine?.skillRunId, logLocationLine?.skillRunId);
     assert.strictEqual(outputLines[0]?.skillRunId, logLocationLine?.skillRunId);
     assert.strictEqual(completeLine?.skillRunId, logLocationLine?.skillRunId);
-    assert.strictEqual(logLocationLine?.logPath, logger.logPath());
-    assert.strictEqual(logLocationLine?.tailCommand, `tail -f '${logger.logPath()}'`);
+    assert.strictEqual(logLocationLine?.logPath, undefined);
+    assert.strictEqual(logLocationLine?.tailCommand, undefined);
     assert.strictEqual(result.skillRunId, logLocationLine?.skillRunId);
     assert.strictEqual(result.logPath, logger.logPath());
   });

@@ -159,3 +159,13 @@ describe("compact snapshot", () => {
     }
   });
 });
+
+it("does not expose raw parser messages from compact presentation", () => {
+  assert.throws(() => projectCompactSnapshot('<hierarchy><node private="secret"/></private_secret>', ids), (error: unknown) => {
+    const failure = error as { code: string; message: string };
+    assert.equal(failure.code, 'SNAPSHOT_EXTRACTION_FAILED');
+    assert.equal(failure.message, 'Cannot project snapshot into compact presentation');
+    assert.ok(!JSON.stringify(failure).includes('secret'));
+    return true;
+  });
+});

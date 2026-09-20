@@ -592,3 +592,16 @@ the earlier execution, and they do not reconstruct unavailable preflight evidenc
 Snapshot extraction failures carry string-valued `failurePhase: "post_processing"`
 and `dispatchState: "dispatched"` on the affected step. Inspect the actual failed
 step and retained evidence rather than assuming the Android action itself failed.
+
+
+### Snapshot source failure diagnostics
+
+`SNAPSHOT_EXTRACTION_FAILED` retains exit code 1 and the existing extraction
+reasons. Failed source steps omit `data.text` and add safe structured
+`data.extractionDiagnostics`; received envelopes carry
+`diagnostics.logging`. Pre-envelope host errors carry `diagnostics.logging`
+on the error itself. Logging failures remain secondary, including for a successful
+device operation. See [snapshot diagnostics and recovery](snapshot.md#extraction-diagnostics-and-recovery)
+for exact fields, bounds, unavailable values, and artifact guarantees. Inspect
+earlier effects and separate probe identity before deciding on recovery; malformed
+XML alone does not establish a transport, serializer, or compatibility cause.

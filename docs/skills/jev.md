@@ -128,3 +128,22 @@ provide concrete implementations. Their instructions own setup, app-specific
 candidates, limits and terminal verification. Those choices are examples, not
 requirements for every Jev integration. See [Development workflow](development.md)
 for skill validation and iteration.
+
+
+## Observation failure recovery
+
+The Settings examples preserve specific failed-step codes, source reasons,
+command/task and probe correlation, and bounded optional core extraction facts.
+Their explicit recovery policy allows one fresh observation for an eligible
+`malformed_xml` failure within the remaining delegation/run budget, capped at ten
+seconds. Core never retries the preceding action. Failed refresh or uncertain
+dispatch invalidates both public and nested candidate menus; a provider rejection
+before action does not alone invalidate current evidence.
+
+Inspect earlier action effects and preserve the failed envelope before recovery.
+After a fresh capture, verify the destination, collected values, overlay review
+and terminal result. Acquisition success is not task success. On recurrence or
+exhausted budget, return control with stale state and the original failure.
+Child-local logging is checked inside the actual helper sandbox before device
+commands; later logging failure remains secondary. The exact core field and
+availability contract is in [snapshot diagnostics and recovery](../api/snapshot.md#extraction-diagnostics-and-recovery).

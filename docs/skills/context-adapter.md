@@ -160,3 +160,21 @@ and full-run time. Smaller payloads can help context budgets, but do not prove
 better decisions or faster Android capture. The Settings helper records
 projection time, source/projection bytes, snapshot command time and separate
 viewport screenshot time; provider latency and full-run summaries remain separate.
+
+
+## Failed refresh and stale evidence
+
+Orchestrators must invalidate executable candidates after dispatched actions,
+failed observation refresh, or uncertain dispatch. Clear both the public menu and
+nested adapter evidence menu. Retain capture identity and collected values as
+historical evidence, and preserve pending overlay review metadata without making
+stale candidates actionable. A provider failure before action does not by itself
+make a still-current capture stale; age and transition rules still apply.
+
+Inspect the original failed step, earlier effects and requested/probe dispatch
+evidence before deciding whether a bounded fresh read-only observation is eligible.
+Never repeat a preceding mutation implicitly. A fresh capture restores observation
+validity only: check the destination and independently verify final task evidence.
+Use [snapshot diagnostics and recovery](../api/snapshot.md#extraction-diagnostics-and-recovery)
+for core fields, safe diagnostic bounds, logger availability and the Settings
+examples' explicit one-recovery policy. The adapter and core do not decide retries.

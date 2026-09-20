@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import {
   CLAWPERATOR_SKILL_RUN_ID_ENV_VAR,
   type LogEvent,
+  type LoggingStatus,
   type LogLevel,
   type ClawperatorLogger,
   LEVEL_ORDER,
@@ -63,6 +64,7 @@ export interface CreateClawperatorLoggerOptions {
   logLevel?: string;
   outputFormat?: "json" | "pretty";
   inheritSkillRunId?: boolean;
+  fileLogging?: boolean;
 }
 
 const loggerDirectories = new WeakMap<ClawperatorLogger, string>();
@@ -92,20 +94,21 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
   const { logDir } = resolveLogDestination(options?.logDir);
   const threshold = normalizeLogLevel(options?.logLevel ?? process.env.CLAWPERATOR_LOG_LEVEL);
   const outputFormat = options?.outputFormat ?? "json";
-  const state = { warned: false, fileDisabled: false };
+  const state = { warned: false, fileDisabled: false, persistedPath: undefined as string | undefined };
 
   function shouldLogToFile(level: LogLevel): boolean {
     return (LEVEL_ORDER.get(level) ?? 1) >= (LEVEL_ORDER.get(threshold) ?? 1);
   }
 
   function writeToFile(event: LogEvent): void {
-    if (state.fileDisabled) {
+    if (state.fileDisabled || options?.fileLogging === false) {
       return;
     }
     const path = formatLogPath(logDir);
     try {
       mkdirSync(logDir, { recursive: true });
       appendFileSync(path, `${JSON.stringify(event)}\n`, "utf8");
+      state.persistedPath = path;
     } catch (error) {
       const message =
         error instanceof Error
@@ -150,11 +153,17 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
         return buildLogger(mergedContext);
       },
 
+      status(): LoggingStatus {
+        if (options?.fileLogging === false) return { status: "disabled" };
+        if (state.fileDisabled) return { status: "write_failed", code: "LOGGING_WRITE_FAILED" };
+        return { status: "available", ...(state.persistedPath !== undefined ? { logPath: state.persistedPath } : {}) };
+      },
+
       logPath(): string | undefined {
-        if (state.fileDisabled) {
+        if (state.fileDisabled || options?.fileLogging === false) {
           return undefined;
         }
-        return formatLogPath(logDir);
+        return state.persistedPath;
       },
     };
     loggerDirectories.set(logger, logDir);
@@ -165,4 +174,9 @@ export function createClawperatorLogger(options?: CreateClawperatorLoggerOptions
     ? undefined
     : normalizeSkillRunId(process.env[CLAWPERATOR_SKILL_RUN_ID_ENV_VAR]);
   return buildLogger(inheritedSkillRunId !== undefined ? { skillRunId: inheritedSkillRunId } : undefined);
+}
+
+/** Older injected loggers cannot establish persistence from a configured path alone. */
+export function getLoggingStatus(logger?: ClawperatorLogger): LoggingStatus {
+  return logger === undefined ? { status: "disabled" } : logger.status?.() ?? { status: "unavailable" };
 }

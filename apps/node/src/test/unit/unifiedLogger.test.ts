@@ -3,7 +3,7 @@ import assert from "node:assert";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createClawperatorLogger } from "../../adapters/logger.js";
+import { createClawperatorLogger, getLoggerDestination } from "../../adapters/logger.js";
 import { CLAWPERATOR_SKILL_RUN_ID_ENV_VAR, type LogEvent } from "../../contracts/logging.js";
 
 describe("createClawperatorLogger", () => {
@@ -62,8 +62,7 @@ describe("createClawperatorLogger", () => {
 
   async function readLogLines(logDir: string): Promise<LogEvent[]> {
     const logger = createClawperatorLogger({ logDir, logLevel: "debug" });
-    const path = logger.logPath();
-    if (!path) return [];
+    const path = getLoggerDestination(logger).logPath;
     try {
       const contents = await readFile(path, "utf8");
       return contents
@@ -377,6 +376,8 @@ describe("createClawperatorLogger", () => {
       const logDir = join(tempRoot, "logs");
       const logger = createClawperatorLogger({ logDir });
 
+      assert.equal(logger.logPath(), undefined);
+      logger.emit(makeEvent());
       const path = logger.logPath();
       assert.ok(path);
       assert.match(path, /clawperator-\d{4}-\d{2}-\d{2}\.log$/);

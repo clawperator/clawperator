@@ -298,7 +298,7 @@ describe("applySnapshotMaxCharsToEnvelope", () => {
     const result = applySnapshotMaxCharsToEnvelope(
       envelope,
       envelope.stepResults[0],
-      envelope.stepResults[0].data.text,
+      envelope.stepResults[0].data.text!,
       10,
     );
 
