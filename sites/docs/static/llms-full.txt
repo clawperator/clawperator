@@ -605,29 +605,82 @@ commands or `clawperator skills` when the host does not need MCP.
 
 ## When To Read This Page
 
-Read this page after [Setup](setup.md) succeeds.
+Use this page to orient an installed host. Select the CLI and target before
+checking device readiness.
 
-Machine-checkable prerequisite:
+### Select the CLI and target
 
-```bash
-clawperator doctor
-```
-
-Continue only when:
-
-- exit code is `0`
-- `criticalOk` is `true`
-
-If you have not reached that state yet, finish [Setup](setup.md) first.
-
-Before any device-touching command, identify the target device:
+Respect an explicitly requested CLI. For installed-release workflows, use the
+installed `clawperator`; the presence of a newer checkout is not evidence that
+it needs an upgrade. For repository development, build with
+`npm --prefix apps/node run build` and invoke `node apps/node/dist/cli/index.js`
+from the repository root. Replace `clawperator` in the examples with the chosen
+invocation. Inspect its `--version`, `--help`, and command-specific help before
+using features that may be newer than the installed release.
 
 ```bash
 clawperator devices
 ```
 
-If more than one device is connected, carry `--device <device_serial>` through
-later `snapshot`, `skills run`, and direct-action commands.
+With zero reachable devices, stop device work and follow [Setup](setup.md).
+Report unauthorized or offline targets rather than substituting another device.
+With one reachable device, confirm it matches the intended target. With multiple
+devices, resolve the requested serial or ask the user. Carry that explicit
+`--device <device_serial>` through device-specific checks and actions in every case.
+
+### Select an installed Operator
+
+Inspect packages on the selected device before recommending installation:
+
+```bash
+adb -s <device_serial> shell pm list packages com.clawperator.operator
+clawperator version --check-compat --device <device_serial> --operator-package <operator_package> --output json
+```
+
+The package listing is a substring search; distinguish exact names. Public releases
+normally use `com.clawperator.operator`; repository development defaults to
+`com.clawperator.operator.dev`. Run the compatibility check for each relevant
+installed candidate using the selected CLI. It reports `compatible` and the CLI/APK
+versions; current compatibility requires equal versions after normalizing the
+trailing debug `-d` suffix. See [Version Compatibility](troubleshooting/compatibility.md).
+
+A mismatched debug package does not imply an installed release package is unusable.
+Use a compatible package appropriate to the task, while respecting an explicitly
+required variant. Do not silently change the user's CLI or Operator choice.
+A failed package query is not proof that the package is absent.
+
+### Check readiness for the selected pair
+
+```bash
+clawperator doctor --device <device_serial> --operator-package <operator_package> --output json
+```
+
+Continue device work only with exit code `0` and `criticalOk: true`. Inspect the
+failed check, error code, and skipped prerequisites to choose targeted recovery
+from [Setup](setup.md) or [Errors](api/errors.md). Do not default to reinstalling,
+upgrading, `--fix`, or `--full`. Doctor includes device probes and may attempt
+waking; it is not a passive host-only check. Keep the explicit device and package
+on later `snapshot`, `skills run`, and direct-action commands, or configure the
+same pair for MCP using [MCP Server](api/mcp.md).
+
+Host-agent readiness is separate. A missing Codex executable or unsupported model
+must be resolved for a route that requires it; neither establishes a Clawperator
+transport failure. Doctor's device success does not prove a model can run.
+
+### Interpret the first result
+
+The agent decides what to do and verifies the user outcome. Clawperator executes
+validated actions and returns structured evidence. A completed command does not
+alone prove a complete observation or a verified user outcome. Check source
+completeness and coverage using [Snapshot](api/snapshot.md), then inspect the
+resulting app state.
+
+For readiness, dispatch, result-wait, and post-processing failures, use
+[Execution failure evidence](api/errors.md#execution-failure-evidence). Preserve
+requested-command and readiness-probe identities separately. Even work marked
+`not_dispatched` can have earlier preflight effects. Observe before retrying an
+uncertain mutation; retained results may show execution despite a later
+post-processing failure.
 
 ## First Route After Install
 

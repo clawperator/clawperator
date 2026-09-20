@@ -39,32 +39,53 @@ Use these instead of parsing the HTML docs site.
 
 ## Workflow
 
-### 1. Verify readiness first
+### 1. Select the CLI, device, and Operator before checking readiness
 
-Run:
+Respect an explicitly requested CLI. For installed-release use, keep the installed
+`clawperator`; a newer checkout does not make it broken. For development, build
+with `npm --prefix apps/node run build` and use
+`node apps/node/dist/cli/index.js` from the repository root. In all examples below,
+replace `clawperator` with that selected invocation. Inspect its `--version`,
+`--help`, and relevant command help; do not assume checkout-only features exist
+in an installed release.
+
+First run `clawperator devices`. Resolve the intended target from the request:
+
+- No reachable target: stop device work and report missing, unauthorized, or
+  offline devices using `https://docs.clawperator.com/setup/`.
+- One reachable device: use it only if it matches the intended target.
+- Multiple devices: use the requested serial or ask which target is intended;
+  never silently pick the first device or substitute another for an unavailable one.
+
+Carry `--device <device_serial>` even with one device. Inspect installed variants
+before proposing installation:
 
 ```bash
-clawperator doctor
+adb -s <device_serial> shell pm list packages com.clawperator.operator
+clawperator version --check-compat --device <device_serial> --operator-package <operator_package> --output json
 ```
 
-Continue only when:
-
-- exit code is `0`
-- `criticalOk` is `true`
-
-If `criticalOk` is `false`, stop immediately. Tell the agent to finish setup
-at `https://docs.clawperator.com/setup/` before continuing. Do not guess or
-attempt a workaround.
-
-Then identify the target device before any device-touching probe:
+Use exact package names from the listing: release `com.clawperator.operator`,
+development default `com.clawperator.operator.dev`. Check each relevant installed
+candidate with the selected CLI. An incompatible debug package does not invalidate
+a compatible release package. Respect an explicitly required variant; do not
+silently switch it. Select a compatible variant appropriate to the task, then run:
 
 ```bash
-clawperator devices
+clawperator doctor --device <device_serial> --operator-package <operator_package> --output json
 ```
 
-If more than one device is connected, choose one serial and carry
-`--device <device_serial>` through every later command that talks to the
-device. Do not rely on implicit device selection.
+Continue device work only with exit code `0` and `criticalOk: true`. Inspect failed
+checks and skipped prerequisites before choosing targeted setup or recovery;
+upgrades, reinstalls, `doctor --fix`, and `--full` are not default remedies.
+Doctor can run device probes and attempt waking; it is not just host inspection.
+Keep the selected device/package on later device commands and in runtime-skill
+or MCP configuration. See `https://docs.clawperator.com/host-agents/` for selection
+details. Use `clawperator-upgrade` when a whole-product upgrade is actually wanted.
+
+Check host-agent readiness separately when the chosen route needs it. A missing
+Codex executable or unsupported model is a host-agent issue, not evidence of a
+Clawperator transport failure; doctor success does not prove model compatibility.
 
 ### 2. Choose one front door, not several
 
@@ -96,7 +117,7 @@ Do not run every surface "just to look around". Use one route-specific probe:
 | zero-results authoring route | `clawperator bundled-skills list` |
 | proving workflow | `clawperator bundled-skills list` |
 | MCP | `clawperator mcp serve` |
-| raw CLI / direct actions | `clawperator snapshot --device <device_serial>` |
+| raw CLI / direct actions | `clawperator snapshot --device <device_serial> --operator-package <operator_package>` |
 
 Rules:
 
@@ -109,8 +130,21 @@ Rules:
 
 ### 4. Explain the operating loop in one sentence
 
-Clawperator observes with `snapshot`, decides using runtime skills or direct
-actions, and acts on the device with the smallest truthful command surface.
+The agent observes, decides, and verifies the user outcome; Clawperator executes
+validated actions and returns structured evidence.
+
+Command completion alone proves neither a complete observation nor the requested
+outcome. Check observation completeness and resulting app state before claiming
+success. On failure, read `details.phase` (host errors) or
+`envelope.failureEvidence.phase` (received execution envelopes): `readiness`,
+`dispatch`, `result_wait`, or `post_processing`. Read `dispatchState` separately:
+`not_dispatched`, `dispatched`, or `unknown`. Requested `commandId`/`taskId` and
+readiness `probeCommandId`/`probeTaskId`/`probeDispatchState` are separate evidence.
+`not_dispatched` can still have earlier preflight effects (`earlierEffects`) or
+wake attempts; missing evidence does not prove no effects. After an uncertain
+mutation, observe state before retrying. Post-processing failure can retain a real
+result; it does not prove the action never ran. For recovery detail, use
+`https://docs.clawperator.com/api/errors/#execution-failure-evidence`.
 
 ### 5. End with one explicit next step
 
