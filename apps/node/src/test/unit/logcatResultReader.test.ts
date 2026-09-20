@@ -303,7 +303,7 @@ it("reports stdout observed when command-start arrives after fallback dispatch",
 it("retains a correlated metadata-only failure timeline and late cleanup lifecycle", async () => {
   const f = fake();
   const logged: import("../../contracts/logging.js").LogEvent[] = [];
-  f.runtime.logger = { emit: event => { logged.push(event); }, child() { return this; }, logPath: () => undefined };
+  f.runtime.logger = { emit: event => { logged.push(event); }, status: () => ({ status: "disabled" }), child() { return this; }, logPath: () => undefined };
   Object.assign(f.proc, { pid: 12345 });
   const result = await waitForResultEnvelope(f.runtime, { ...options, timeoutMs: 10 }, async begin => {
     begin();
@@ -355,7 +355,7 @@ it("records unexpected exit before its own cleanup without changing the exit fai
 it("timeline logger failure cannot replace a result", async () => {
   const f = fake();
   f.runtime.logger = { emit: event => { if (event.event.startsWith("result_reader.")) throw new Error("unavailable logger"); },
-    child() { return this; }, logPath: () => undefined };
+    status: () => ({ status: "disabled" }), child() { return this; }, logPath: () => undefined };
   const result = await waitForResultEnvelope(f.runtime, options, async begin => {
     begin(); f.proc.emit("close", 255, null); return { success: true };
   });

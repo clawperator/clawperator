@@ -167,7 +167,7 @@ Notes:
 - `errorCode` is optional on the envelope. When it is absent, inspect `error` and the failed step for details.
 - envelope `errorCode` may contain Android-emitted values such as `SERVICE_UNAVAILABLE` that are not part of Node's public `errors.ts` enum
 - per-step failures do not use the envelope `errorCode`; they usually expose the actionable code in `stepResults[i].data.error`
-- `StepResult.data` values are strings, so treat `data.error` and `data.message` as string fields
+- Android `StepResult.data` values are strings, including `data.error` and `data.message`. Host-added `data.extractionDiagnostics` is a structured object
 - Node post-processing can turn some Android-internal failure markers into success results, for example normalizing `UNSUPPORTED_RUNTIME_CLOSE` into a successful `close_app` step when adb pre-flight already succeeded
 
 ## Recovery Patterns
@@ -592,3 +592,16 @@ the earlier execution, and they do not reconstruct unavailable preflight evidenc
 Snapshot extraction failures carry string-valued `failurePhase: "post_processing"`
 and `dispatchState: "dispatched"` on the affected step. Inspect the actual failed
 step and retained evidence rather than assuming the Android action itself failed.
+
+
+### Snapshot source failure diagnostics
+
+`SNAPSHOT_EXTRACTION_FAILED` retains exit code 1 and the existing extraction
+reasons. Failed source steps omit `data.text` and add safe structured
+`data.extractionDiagnostics`; received envelopes carry
+`diagnostics.logging`. Pre-envelope host errors carry `diagnostics.logging`
+on the error itself. Logging failures remain secondary, including for a successful
+device operation. See [snapshot diagnostics and recovery](snapshot.md#extraction-diagnostics-and-recovery)
+for exact fields, bounds, unavailable values, and artifact guarantees. Inspect
+earlier effects and separate probe identity before deciding on recovery; malformed
+XML alone does not establish a transport, serializer, or compatibility cause.

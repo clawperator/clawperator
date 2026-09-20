@@ -44,9 +44,17 @@ export interface LogEvent {
 // ClawperatorLogger interface
 // ---------------------------------------------------------------------------
 
+export interface LoggingStatus {
+  status: "available" | "disabled" | "write_failed";
+  code?: "LOGGING_WRITE_FAILED";
+  logPath?: string;
+}
+
 export interface ClawperatorLogger {
+  status(): LoggingStatus;
   emit(event: LogEvent): void;
   child(defaultContext: Partial<LogEvent>): ClawperatorLogger;
+  /** Last successfully persisted file while the sink is enabled, not a configured destination. */
   logPath(): string | undefined;
 }
 

@@ -1,3 +1,9 @@
+import { rmSync, writeFileSync } from "node:fs";
+import { buildMcpErrorResult } from "../../mcp/errors.js";
+import { createClawperatorLogger } from "../../adapters/logger.js";
+import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { cmdSkillsRun } from "../../cli/commands/skills.js";
 import { cmdObserveSnapshot } from "../../cli/commands/observe.js";
 import { shouldCliStdoutForceExitCode1 } from "../../cli/stdoutExitCode.js";
@@ -128,6 +134,8 @@ describe("public snapshot source failures", () => {
       assert.equal(output.envelope.status, "failed");
       assert.equal(output.envelope.stepResults[0].data.extractionReason, "malformed_xml");
       assert.equal(output.envelope.stepResults[0].data.text, undefined);
+      assert.equal(output.envelope.stepResults[0].data.extractionDiagnostics.sourceValidationCategory, "malformed_xml");
+      assert.equal(output.envelope.diagnostics.logging.status, "disabled");
       assert.equal(output.envelope.stepResults[0].data.failurePhase, "post_processing");
       assert.equal(shouldCliStdoutForceExitCode1(stdout, false), true);
     });
@@ -222,4 +230,101 @@ describe("unusable device readiness evidence", () => {
       }
     });
   }
+});
+
+describe("bounded extraction diagnostics", () => {
+  it("reports UTF-8 bytes and safe parser location without source in public facts", () => {
+    const source = '<hierarchy><node text="秘密🔒"/></wrong>';
+    const [record] = extractSnapshotRecordsFromLogs([marker(source)]);
+    assert.equal(record.extractionDiagnostics?.receivedBytes, Buffer.byteLength(source));
+    assert.equal(record.extractionDiagnostics?.sourceValidationCategory, "malformed_xml");
+    assert.equal(record.extractionDiagnostics?.terminationReason, "end_of_capture");
+    assert.equal(record.extractionDiagnostics?.closingHierarchySeen, false);
+    assert.ok(Number.isSafeInteger(record.extractionDiagnostics?.position));
+    assert.ok(!JSON.stringify(record.extractionDiagnostics).includes("秘密"));
+    assert.equal(record.snapshot, "");
+  });
+  it("bounds the local preview in bytes without splitting multibyte code points", () => {
+    const [record] = extractSnapshotRecordsFromLogs([marker('<hierarchy>' + '🔒'.repeat(400))]);
+    assert.equal(Buffer.byteLength(record.diagnosticPreview!), 1023);
+    assert.ok(!record.diagnosticPreview!.includes('\ufffd'));
+  });
+  it("omits positions when validation ends before parsing", () => {
+    for (const xml of ['', 'é'.repeat(4 * 1024 * 1024 + 1)]) {
+      const [record] = extractSnapshotRecordsFromLogs([marker(xml)]);
+      assert.equal(record.extractionDiagnostics?.position, undefined);
+      assert.equal(record.extractionDiagnostics?.line, undefined);
+      assert.equal(record.extractionDiagnostics?.column, undefined);
+      assert.equal(record.extractionDiagnostics?.receivedBytes, Buffer.byteLength(xml));
+    }
+  });
+  it("distinguishes observed boundaries without assigning a transport cause", () => {
+    const cases = [
+      { lines: [marker('<hierarchy><node>'), marker('<hierarchy/>')], reason: 'next_snapshot', closing: false },
+      { lines: [marker('<hierarchy><node>'), 'D/TaskScope: [TaskScope] done'], reason: 'same_tag_event', closing: false },
+      { lines: [marker('<hierarchy><node>'), 'D/TaskScope: </hierarchy>'], reason: 'closing_hierarchy', closing: true },
+    ];
+    for (const {lines, reason, closing} of cases) {
+      const [record] = extractSnapshotRecordsFromLogs(lines);
+      assert.equal(record.extractionDiagnostics?.terminationReason, reason);
+      assert.equal(record.extractionDiagnostics?.closingHierarchySeen, closing);
+      assert.equal(record.validationError, 'malformed_xml');
+    }
+  });
+});
+
+
+describe("logging preserves primary execution outcomes", () => {
+  for (const malformed of [false, true]) for (const writeFails of [false, true, "diagnostic"] as const) {
+    it(`preserves malformed=${malformed} with logging writeFails=${writeFails}`, async () => {
+      const root = await mkdtemp(join(tmpdir(), "extraction-logging-"));
+      try {
+        const logDir = join(root, "logs");
+        if (writeFails === true) await writeFile(logDir, "not a directory");
+        const failedLogging = writeFails === true || (writeFails === "diagnostic" && malformed);
+        const logger = createClawperatorLogger({ logDir });
+        const envelope: ResultEnvelope = { commandId: "requested", taskId: "task", status: "success", error: null, stepResults: [{ id: "snap", actionType: "snapshot", success: true, data: {} }] };
+        const result = await runExecution({ commandId: "requested", taskId: "task", source: "test", expectedFormat: "android-ui-automator", timeoutMs: 1000, actions: [{ id: "snap", type: "snapshot" }] }, {
+          deviceId: "test-device", operatorPackage: "com.test.operator",
+          logger: writeFails === "diagnostic" ? { ...logger, emit(event) {
+            if (event.event === "snapshot.extraction.failed") {
+              assert.ok(logger.logPath());
+              rmSync(logDir, { recursive: true });
+              writeFileSync(logDir, "blocked after device result");
+            }
+            logger.emit(event);
+          } } : logger,
+          runner: executionRunner(envelope, malformed ? '<hierarchy><node text="private"/>' : '<hierarchy/>'),
+          ensureInteractiveAutomationReadyFn: ready, logcatBroadcastDelayMs: 0,
+        });
+        assert.ok(result.ok);
+        assert.equal(result.envelope.status, malformed ? "failed" : "success");
+        assert.equal(result.envelope.commandId, "requested");
+        assert.equal(result.envelope.taskId, "task");
+        assert.equal(result.envelope.diagnostics?.logging.status, failedLogging ? "write_failed" : "available");
+        const step = result.envelope.stepResults[0];
+        if (malformed) {
+          assert.equal(step.data.error, "SNAPSHOT_EXTRACTION_FAILED");
+          assert.equal(step.data.text, undefined);
+          assert.equal(step.data.extractionReason, "malformed_xml");
+          const transport = buildMcpErrorResult({ code: "SNAPSHOT_EXTRACTION_FAILED", envelope: result.envelope });
+          assert.deepEqual((transport.structuredContent?.envelope as ResultEnvelope).stepResults[0].data.extractionDiagnostics, step.data.extractionDiagnostics);
+          assert.equal((transport.structuredContent?.envelope as ResultEnvelope).diagnostics?.logging.status, failedLogging ? "write_failed" : "available");
+          assert.equal((transport.structuredContent?.envelope as ResultEnvelope).stepResults[0].data.diagnosticLogPath, undefined);
+          assert.ok(!JSON.stringify(result).includes("private"));
+          if (!failedLogging) {
+            assert.equal(step.data.diagnosticLogPath, logger.logPath());
+            assert.match(await readFile(logger.logPath()!, "utf8"), /snapshot.extraction.failed/);
+          } else assert.equal(step.data.diagnosticLogPath, undefined);
+        }
+        if (failedLogging) assert.equal(result.envelope.diagnostics?.logging.logPath, undefined);
+      } finally { await rm(root, { recursive: true, force: true }); }
+    });
+  }
+});
+
+
+it("preserves logging status through pre-envelope MCP errors while removing local paths", () => {
+  const result = buildMcpErrorResult({ code: "RESULT_ENVELOPE_TIMEOUT", message: "No envelope", diagnostics: { logging: { status: "available", logPath: "/private/log" } } });
+  assert.deepEqual(result.structuredContent?.diagnostics, { logging: { status: "available" } });
 });

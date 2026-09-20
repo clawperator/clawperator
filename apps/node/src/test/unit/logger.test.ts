@@ -154,7 +154,7 @@ describe("createClawperatorLogger (compat tests)", () => {
   it("defaults to ~/.clawperator/logs when no log dir is configured", async () => {
     const logger = createClawperatorLogger({ logLevel: "info" });
 
-    assert.strictEqual(logger.logPath(), currentLogPath(tempRoot));
+    assert.strictEqual(logger.logPath(), undefined);
 
     logger.emit({
       ts: "2026-03-22T00:00:00.000Z",
@@ -163,6 +163,7 @@ describe("createClawperatorLogger (compat tests)", () => {
       message: "default path",
     });
 
+    assert.strictEqual(logger.logPath(), currentLogPath(tempRoot));
     const contents = await readFile(logger.logPath()!, "utf8");
     assert.match(contents, /test\.default-path/);
   });
@@ -191,4 +192,25 @@ describe("createClawperatorLogger (compat tests)", () => {
     assert.match(stderrLines[0], /logging disabled after write failure/);
     assert.strictEqual(logger.logPath(), undefined);
   });
+});
+
+it("reports disabled and failed logging without claiming an unpersisted artifact", async () => {
+  const root = await mkdtemp(join(tmpdir(), "logging-status-"));
+  try {
+    const disabled = createClawperatorLogger({ logDir: root, fileLogging: false });
+    disabled.emit({ ts: "now", level: "error", event: "test", message: "test" });
+    assert.deepStrictEqual(disabled.status(), { status: "disabled" });
+    assert.equal(disabled.logPath(), undefined);
+    const logger = createClawperatorLogger({ logDir: join(root, "logs") });
+    assert.deepStrictEqual(logger.status(), { status: "available" });
+    logger.emit({ ts: "now", level: "error", event: "test", message: "first" });
+    const persisted = logger.logPath();
+    assert.ok(persisted);
+    assert.equal(logger.child({ taskId: "task" }).status().logPath, persisted);
+    await rm(join(root, "logs"), { recursive: true });
+    await writeFile(join(root, "logs"), "blocked");
+    logger.emit({ ts: "now", level: "error", event: "test", message: "second" });
+    assert.deepStrictEqual(logger.status(), { status: "write_failed", code: "LOGGING_WRITE_FAILED" });
+    assert.equal(logger.logPath(), undefined);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

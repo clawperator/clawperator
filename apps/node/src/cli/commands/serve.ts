@@ -649,7 +649,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
         tailCommand: preRunLogs.tailCommand,
         message: preRunLogs.path !== undefined
           ? `Skill ${routeSkillId} run ${skillRunId} logging to ${preRunLogs.path}; observe with: ${preRunLogs.tailCommand}`
-          : `Skill ${routeSkillId} run ${skillRunId} started with file logging unavailable`,
+          : `Skill ${routeSkillId} run ${skillRunId} started without a persisted log artifact`,
       });
       preRunLogs = currentPreRunLogs();
 

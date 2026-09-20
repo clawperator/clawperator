@@ -126,7 +126,10 @@ it("attaches complete host evidence to a real envelope on post-processing failur
     const evidence = result.envelope.failureEvidence;
     if (valid) { assert.equal(evidence, undefined); assert.equal(result.envelope.status, "success"); continue; }
     assert.equal(result.envelope.status, "failed");
-    assert.deepEqual(emittedSkillResultSchema.shape.execEnvelopes.parse([result.envelope])?.[0].failureEvidence, evidence);
+    const retainedEnvelope = emittedSkillResultSchema.shape.execEnvelopes.parse([result.envelope])?.[0];
+    assert.deepEqual(retainedEnvelope?.failureEvidence, evidence);
+    assert.deepEqual(retainedEnvelope?.stepResults[0].data.extractionDiagnostics, result.envelope.stepResults[0].data.extractionDiagnostics);
+    assert.deepEqual(retainedEnvelope?.diagnostics, result.envelope.diagnostics);
     assert.equal(evidence?.phase, "post_processing");
     assert.equal(evidence?.dispatchState, "dispatched");
     assert.equal(evidence?.commandId, execution.commandId);
@@ -197,6 +200,7 @@ it("late broadcast acknowledgement cannot rewind screenshot post-processing evid
       // Fail capture only after the delayed acknowledgement updates execution evidence.
       if (event.event === "broadcast.dispatched") capture.emit("close", 1);
     },
+    status() { return { status: "disabled" }; },
     child() { return logger; },
     logPath() { return undefined; },
   };

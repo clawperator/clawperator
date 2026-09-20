@@ -73,6 +73,9 @@ function sanitizeMcpErrorPayload(error: Record<string, unknown>): McpErrorPayloa
   if ("details" in error) {
     payload.details = sanitizeMcpTransportValue(error.details);
   }
+  if ("diagnostics" in error) {
+    payload.diagnostics = sanitizeMcpTransportValue(error.diagnostics);
+  }
   if ("envelope" in error) {
     payload.envelope = sanitizeMcpTransportValue(error.envelope);
   }

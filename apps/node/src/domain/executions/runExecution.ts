@@ -1,3 +1,4 @@
+import { getLoggingStatus } from "../../adapters/logger.js";
 import { PNG } from "pngjs";
 import { probeUserUnlockState } from "../device/userUnlockState.js";
 import { isBackgroundServiceExecution } from "../../contracts/notifications.js";
@@ -18,7 +19,7 @@ import { getOperatorPackageApkPath } from "../version/compatibility.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
 import type { TimeoutDiagnostics, ExecutionFailureEvidence } from "../../contracts/errors.js";
-import { extractSnapshotRecordsFromLogs, validateSnapshotXml, hasLegacyUntaggedSnapshotMarker } from "./snapshotHelper.js";
+import { extractSnapshotRecordsFromLogs, inspectSnapshotXml, validateSnapshotXml, hasLegacyUntaggedSnapshotMarker } from "./snapshotHelper.js";
 import { emitResult, emitExecution } from "../observe/events.js";
 import { LIMITS } from "../../contracts/limits.js";
 import { ERROR_CODES, isClawperatorError } from "../../contracts/errors.js";
@@ -197,11 +198,12 @@ export function markExtractionFailedSnapshotSteps(
         : ERROR_CODES.SNAPSHOT_EXTRACTION_FAILED;
       const message = options.sawLegacyUntaggedSnapshotMarker
         ? "Snapshot hierarchy logs used the legacy untagged marker. Install a matching Operator APK that emits commandId-tagged snapshot logs, or use a compatible CLI."
-        : "UI hierarchy extraction produced missing or invalid XML for this step. Check clawperator version compatibility and logcat extraction health.";
+        : "UI hierarchy source validation failed. Inspect earlier action effects, invalidate stale candidates, and use bounded orchestrator observation recovery. See https://docs.clawperator.com/api/snapshot/.";
       step.data = {
         ...remainingData,
         error,
         extractionReason,
+        extractionDiagnostics: step.data.extractionDiagnostics ?? inspectSnapshotXml(step.data.text ?? "").diagnostics,
         ...(options.logPath !== undefined ? { diagnosticLogPath: options.logPath } : {}),
         ...(error === ERROR_CODES.SNAPSHOT_EXTRACTION_FAILED ? {
           failurePhase: "post_processing", dispatchState: "dispatched",
@@ -213,7 +215,7 @@ export function markExtractionFailedSnapshotSteps(
           ? `[clawperator] WARN: snapshot step "${step.id}" saw legacy untagged snapshot logs. ` +
             `Install a matching Operator APK or run 'clawperator version --check-compat' to diagnose.\n`
           : `[clawperator] WARN: snapshot step "${step.id}" UI hierarchy extraction produced missing or invalid XML. ` +
-            `Run 'clawperator doctor' or 'clawperator version --check-compat' to diagnose.\n`
+            `Source category: ${extractionReason}. Inspect earlier effects before bounded observation recovery; see https://docs.clawperator.com/api/snapshot/.\n`
       );
     }
   }
@@ -774,7 +776,7 @@ async function performExecution(
           if (record.validationError !== undefined) options.logger?.emit({
             ts: new Date().toISOString(), level: "error", event: "snapshot.extraction.failed",
             commandId: execution.commandId, taskId: execution.taskId, deviceId,
-            message: JSON.stringify({ occurrence, reason: record.validationError, preview: record.diagnosticPreview }),
+            message: JSON.stringify({ occurrence, reason: record.validationError, diagnostics: record.extractionDiagnostics, preview: record.diagnosticPreview }),
           });
         }
         const snapshotSteps = result.envelope.stepResults.filter(step => isSnapshotActionType(step.actionType) && step.success);
@@ -782,12 +784,13 @@ async function performExecution(
           const record = records[records.length - offset];
           if (record.validationError !== undefined) {
             snapshotSteps[snapshotSteps.length - offset].data.extractionReason = record.validationError;
+            snapshotSteps[snapshotSteps.length - offset].data.extractionDiagnostics = record.extractionDiagnostics;
           }
         }
         attachSnapshotsToStepResults(result.envelope.stepResults, snapshots);
         markExtractionFailedSnapshotSteps(result.envelope.stepResults, options.warn, {
           sawLegacyUntaggedSnapshotMarker: hasLegacyUntaggedSnapshotMarker(snapshotLogLines),
-          logPath: options.logger?.logPath(),
+          logPath: getLoggingStatus(options.logger).logPath,
         });
         // Attach data.warn to any snapshot immediately following a click with no sleep.
         addSettleWarnings(result.envelope.stepResults, execution);
@@ -839,6 +842,7 @@ async function performExecution(
         }
       }
 
+      result.envelope.diagnostics = { logging: getLoggingStatus(options.logger) };
       emitResult(deviceId, result.envelope);
       return {
         execution,
@@ -907,10 +911,13 @@ export async function runExecution(
 ): Promise<RunExecutionResult> {
   const evidence: ExecutionFailureEvidence = {
     phase: "readiness", dispatchState: "not_dispatched", startedAt: new Date().toISOString(),
-    ...(options.logger ? { logPath: options.logger.logPath() } : {}),
   };
   const { execution, result } = await performExecution(executionInput, options, evidence);
+  const logging = getLoggingStatus(options.logger);
+  if (logging.logPath !== undefined) evidence.logPath = logging.logPath;
+  if (result.ok) result.envelope.diagnostics = { logging };
   if (!result.ok) {
+    result.error.diagnostics = { logging };
     const details = result.error.details as Record<string, unknown> | undefined;
     result.error.details = { ...details, ...evidence,
       ...(details?.earlierEffects !== undefined ? { earlierEffects: details.earlierEffects } : {}),

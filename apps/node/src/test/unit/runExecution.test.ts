@@ -456,7 +456,7 @@ describe("finalizeSuccessfulScreenshotCapture", () => {
 
     assert.strictEqual(screenStep.success, true);
     assert.deepStrictEqual(screenStep.data, { path: "/tmp/capture.png", captureSource: "host", capturedAt: screenStep.data.capturedAt });
-    assert.ok(!Number.isNaN(Date.parse(screenStep.data.capturedAt)));
+    assert.ok(!Number.isNaN(Date.parse(screenStep.data.capturedAt!)));
   });
 
   it("preserves existing success state and metadata for already-supported screenshots", () => {
@@ -1197,6 +1197,7 @@ describe("runExecution", () => {
         actual_format: "hierarchy_xml",
         error: "VERSION_INCOMPATIBLE",
         extractionReason: "missing_payload",
+        extractionDiagnostics: { receivedBytes: 0, sourceValidationCategory: "missing_payload" },
         message: "Snapshot hierarchy logs used the legacy untagged marker. Install a matching Operator APK that emits commandId-tagged snapshot logs, or use a compatible CLI.",
       });
     }
@@ -2941,9 +2942,6 @@ describe("runExecution logging", () => {
 
   it("adds the logger path to timeout errors as an absolute file path", async () => {
     const logger = createClawperatorLogger({ logDir: join(tempRoot, "logs"), logLevel: "info" });
-    const logPath = logger.logPath();
-    assert.ok(logPath);
-
     logger.emit({
       ts: "2026-03-22T00:00:00.000Z",
       level: "info",
@@ -2953,6 +2951,8 @@ describe("runExecution logging", () => {
       deviceId: "device-123",
       message: "Operator APK is installed",
     });
+    const logPath = logger.logPath();
+    assert.ok(logPath);
 
     const error = buildTimeoutError(
       {

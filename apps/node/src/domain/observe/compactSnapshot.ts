@@ -117,8 +117,8 @@ export function projectCompactSnapshot(xml: string, ids: Pick<ResultEnvelope, "c
   });
   parser.on("closetag", () => { stack.pop(); });
   try { parser.write(xml).close(); }
-  catch (error) {
-    throw { code: "SNAPSHOT_EXTRACTION_FAILED", message: `Cannot project snapshot: ${String(error)}` };
+  catch {
+    throw { code: "SNAPSHOT_EXTRACTION_FAILED", message: "Cannot project snapshot into compact presentation" };
   }
   return { schemaVersion: 1 as const, ...ids, totalNodes, returnedNodes: nodes.length,
     omittedNodes: totalNodes - nodes.length, truncated: fieldTruncated || totalNodes > nodes.length, nodes };
@@ -131,7 +131,7 @@ export async function presentSnapshot(envelope: ResultEnvelope, options: Snapsho
   const startedAt = new Date().toISOString();
   let rawArtifactPath: string | undefined;
   try {
-    if (!step) throw { code: "SNAPSHOT_EXTRACTION_FAILED", message: "Snapshot XML is unavailable" };
+    if (!step || step.data.text === undefined) throw { code: "SNAPSHOT_EXTRACTION_FAILED", message: "Snapshot XML is unavailable" };
     if (options.rawPath !== undefined || options.saveRaw) {
       try {
         const destination = options.rawPath !== undefined ? resolve(options.rawPath)

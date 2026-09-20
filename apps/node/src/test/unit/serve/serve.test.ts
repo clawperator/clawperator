@@ -13,6 +13,7 @@ import type { Logger } from "../../../adapters/logger.js";
 const servers: Server[] = [];
 const tempDirs: string[] = [];
 const noopLogger: Logger = {
+  status: () => ({ status: "disabled" }),
   emit: () => undefined,
   child: () => noopLogger,
   logPath: () => undefined,

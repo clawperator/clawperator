@@ -1,3 +1,4 @@
+import type { SnapshotExtractionDiagnostics } from "../../contracts/result.js";
 import { SaxesParser } from "saxes";
 
 /**
@@ -13,6 +14,8 @@ export interface ExtractedSnapshotRecord {
   commandId?: string;
   validationError?: string;
   diagnosticPreview?: string;
+  extractionDiagnostics?: SnapshotExtractionDiagnostics;
+  terminationReason?: SnapshotExtractionDiagnostics["terminationReason"];
 }
 
 export function extractSnapshotsFromLogs(lines: string[]): string[] {
@@ -38,6 +41,7 @@ export function extractSnapshotRecordsFromLogs(lines: string[]): ExtractedSnapsh
         snapshots.push({
           snapshot: currentSnapshot,
           commandId: currentSnapshotCommandId,
+          terminationReason: "next_snapshot",
         });
       }
 
@@ -64,6 +68,7 @@ export function extractSnapshotRecordsFromLogs(lines: string[]): ExtractedSnapsh
       snapshots.push({
         snapshot: currentSnapshot,
         commandId: currentSnapshotCommandId,
+        terminationReason: "same_tag_event",
       });
       currentSnapshotLines = null;
       currentSnapshotTag = null;
@@ -77,6 +82,7 @@ export function extractSnapshotRecordsFromLogs(lines: string[]): ExtractedSnapsh
       snapshots.push({
         snapshot: currentSnapshot,
         commandId: currentSnapshotCommandId,
+        terminationReason: "closing_hierarchy",
       });
       currentSnapshotLines = null;
       currentSnapshotTag = null;
@@ -89,14 +95,19 @@ export function extractSnapshotRecordsFromLogs(lines: string[]): ExtractedSnapsh
     snapshots.push({
       snapshot: trailingSnapshot,
       commandId: currentSnapshotCommandId,
+      terminationReason: "end_of_capture",
     });
   }
 
-  return snapshots.map(record => {
-    const validationError = validateSnapshotXml(record.snapshot);
+  return snapshots.map(({ terminationReason, ...record }) => {
+    const { reason: validationError, diagnostics } = inspectSnapshotXml(record.snapshot);
     return validationError === undefined ? record : {
       ...record, snapshot: "", validationError,
-      diagnosticPreview: record.snapshot.slice(0, 1024),
+      extractionDiagnostics: { ...diagnostics,
+        closingHierarchySeen: /<\/hierarchy\s*>/.test(record.snapshot),
+        terminationReason,
+      },
+      diagnosticPreview: boundedUtf8Preview(record.snapshot, 1024),
     };
   });
 }
@@ -173,24 +184,49 @@ function parseSnapshotMarkerMessage(message: string): ParsedSnapshotMarker | nul
   };
 }
 
+export function boundedUtf8Preview(source: string, maximumBytes: number): string {
+  let bytes = 0;
+  let result = "";
+  for (const point of source) {
+    const size = Buffer.byteLength(point, "utf8");
+    if (bytes + size > maximumBytes) break;
+    result += point;
+    bytes += size;
+  }
+  return result;
+}
+
 /** Bounded SAX validation; declarations and external entities are never resolved. */
-export function validateSnapshotXml(xml: string): string | undefined {
-  if (xml.length === 0) return "missing_payload";
-  if (Buffer.byteLength(xml, "utf8") > 8 * 1024 * 1024) return "payload_limit";
+export function inspectSnapshotXml(xml: string): { reason?: string; diagnostics: SnapshotExtractionDiagnostics } {
+  const diagnostics: SnapshotExtractionDiagnostics = {
+    receivedBytes: Buffer.byteLength(xml, "utf8"), sourceValidationCategory: "valid",
+  };
+  const failed = (reason: string) => ({ reason, diagnostics: { ...diagnostics, sourceValidationCategory: reason } });
+  if (xml.length === 0) return failed("missing_payload");
+  if (diagnostics.receivedBytes > 8 * 1024 * 1024) return failed("payload_limit");
   let depth = 0;
   let root: string | undefined;
+  let reason = "malformed_xml";
   const parser = new SaxesParser();
-  parser.on("doctype", () => { throw new Error("doctype_forbidden"); });
-  parser.on("error", () => { throw new Error("malformed_xml"); });
+  parser.on("doctype", () => { reason = "doctype_forbidden"; throw new Error(); });
+  parser.on("error", () => { throw new Error(); });
   parser.on("opentag", tag => {
     if (depth === 0) root = tag.name;
-    if (++depth > 256) throw new Error("depth_limit");
+    if (++depth > 256) { reason = "depth_limit"; throw new Error(); }
   });
   parser.on("closetag", () => { depth--; });
   try {
     parser.write(xml).close();
-    return root === "hierarchy" ? undefined : "invalid_root";
-  } catch (error) {
-    return error instanceof Error ? error.message : "malformed_xml";
+    return root === "hierarchy" ? { diagnostics } : failed("invalid_root");
+  } catch {
+    for (const key of ["line", "column", "position"] as const) {
+      const value = parser[key];
+      if (Number.isSafeInteger(value) && value >= 0) diagnostics[key] = value;
+    }
+    return failed(reason);
   }
+}
+
+export function validateSnapshotXml(xml: string): string | undefined {
+  return inspectSnapshotXml(xml).reason;
 }

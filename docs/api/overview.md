@@ -247,7 +247,7 @@ Stable field anchors:
 | --- | --- |
 | `status` | Top-level outcome after Node post-processing. `"failed"` means at least one step failed or the runtime returned a top-level failure. |
 | `stepResults[].success` | Per-step success bit. |
-| `stepResults[].data` | Action-specific string map. Keys and values are strings after parsing and post-processing. |
+| `stepResults[].data` | Action-specific fields remain strings. Host-added `extractionDiagnostics` is a bounded structured object; see [snapshot diagnostics](snapshot.md#extraction-diagnostics-and-recovery). |
 | `error` | Human-readable top-level failure summary. |
 | `errorCode` | Stable top-level code when available. Prefer this over matching `error`. Current runtime envelopes may also surface Android-emitted strings such as `SERVICE_UNAVAILABLE`, so do not assume this field is limited to the Node enum in `errors.ts`. |
 | `hint` | Optional recovery hint injected by Node. |
