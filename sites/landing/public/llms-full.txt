@@ -2695,7 +2695,14 @@ Semantics:
 
 Success data:
 
-- `data.path` after Node finalizes the screenshot capture
+- `data.path` after Node verifies and writes the host screenshot
+- `data.captureSource: "host"` and `data.capturedAt` (host ISO timestamp after persistence)
+
+The host capture occurs after the runtime envelope, not at the runtime step's
+exact instant. A successful fallback clears the superseded
+`UNSUPPORTED_RUNTIME_SCREENSHOT` error, errorCode, and message while preserving
+other metadata. A failed capture or artifact write produces
+`EVIDENCE_CAPTURE_FAILED`; it does not become success or expose a stale path.
 
 Common failures:
 
@@ -5053,7 +5060,7 @@ If a `snapshot` step initially succeeds but Node cannot attach `data.text`, Node
   "success": false,
   "data": {
     "error": "SNAPSHOT_EXTRACTION_FAILED",
-    "message": "UI hierarchy extraction produced no output for this step. Check clawperator version compatibility and logcat extraction health."
+    "message": "UI hierarchy extraction produced missing or invalid XML for this step. Check clawperator version compatibility and logcat extraction health."
   }
 }
 ```
@@ -5161,6 +5168,35 @@ Operationally:
 - [Selectors](selectors.md)
 - [Errors](errors.md)
 - [Navigation Patterns](navigation.md)
+
+## Source completeness
+
+Raw and compact consumers receive the same source validation before presentation.
+Node accepts one well-formed `hierarchy` XML document, including an empty
+`<hierarchy/>`. Missing payloads, unfinished documents, malformed nesting,
+multiple roots, DTD declarations, and unknown entities fail extraction. Validation
+is limited to 8 MiB of UTF-8 source and 256 nested elements; it never resolves
+external entities.
+
+The affected step has `success: false`, `data.error: "SNAPSHOT_EXTRACTION_FAILED"`,
+and no `data.text`. `data.extractionReason` is one of `missing_payload`,
+`malformed_xml`, `invalid_root`, `doctype_forbidden`, `payload_limit`, or
+`depth_limit`. The envelope becomes failed and the CLI exits 1. Command IDs and
+invalid occurrence positions are retained, preventing an earlier capture from
+being attached to a later snapshot step. A missing entire marker still has no
+independent step identifier; attachment uses the existing positional ordering.
+
+When file logging is enabled, `snapshot.extraction.failed` retains the command,
+task, zero-based occurrence, reason, and at most 1024 source characters locally.
+The failed step includes `data.diagnosticLogPath` when a log file is available.
+The partial tree is never returned as valid observation text. A deliberate
+compact presentation limit applies only after valid source capture; it is not an
+extraction failure.
+
+Compatibility correction: raw consumers that previously accepted incomplete XML
+must now handle failed steps and exit code 1. Switching to compact output is not
+required for this protection. Query JSON remains serialized inside string-valued
+step data.
 
 ---
 
@@ -7803,6 +7839,39 @@ unavailable, follow [setup](../setup.md#sensitive-hierarchy-access) to enable it
 A visible screenshot does not guarantee an accessible hierarchy. Do not infer
 that another window is the requested application or repeatedly retry a
 persistently unavailable screen.
+
+## Execution failure evidence
+
+Host execution errors add evidence in `details` without fabricating an Operator
+result envelope. The existing `[Clawperator-Result]` envelope remains unchanged.
+
+| Field | Meaning |
+| --- | --- |
+| `phase` | `readiness`, `dispatch`, `result_wait`, or `post_processing` |
+| `commandId`, `taskId` | Requested execution identifiers, when validated and allocated |
+| `dispatchState` | `not_dispatched`, `dispatched`, or `unknown` for requested work |
+| `probeCommandId`, `probeTaskId` | Separate readiness probe identifiers, when issued |
+| `probeDispatchState` | The same three-state vocabulary for the probe |
+| `earlierEffects` | Confirmed host effects, currently `{ actionId, effect: "force_stop" }` |
+| `startedAt`, `completedAt` | Host execution timestamps |
+| `probeStartedAt`, `probeCompletedAt` | Probe timestamps |
+| `logPath` | Local diagnostic log reference, when logging is available |
+| `transport` | Retained bounded probe transport diagnostics, when available |
+| `wakeAttempts` | Attempted wake methods and their transport exit codes |
+
+`dispatched` means the broadcast was acknowledged, not that the action completed.
+`unknown` means dispatch was attempted without a conclusive acknowledgement.
+`not_dispatched` does not mean safe to retry: host `close_app` preflight may already
+have force-stopped an app, and readiness may have attempted to wake the device.
+After uncertain mutation results, observe and verify state before repeating them.
+Readiness wrappers retain the final probe's evidence rather than substituting the
+requested command's identity. This includes successful probes that leave the
+device asleep or locked: `DEVICE_NOT_INTERACTIVE` preserves probe correlation
+and attempted wake methods while omitting the internal state booleans. Existing failures and validation errors retain their codes.
+
+Snapshot extraction failures carry string-valued `failurePhase: "post_processing"`
+and `dispatchState: "dispatched"` on the affected step. Inspect the actual failed
+step and retained evidence rather than assuming the Android action itself failed.
 
 ---
 
@@ -12747,14 +12816,29 @@ Default runtime values:
 | operator package | `com.clawperator.operator` |
 | JSON output | default output mode |
 
+### Wrapper status and exit behavior
+
+Every `cmdSkillsRun` outcome includes `status`: `success`, `failed`, or
+`indeterminate`, including validation and readiness failures. Strict parsers must
+accept the added `status` on framed success. Nested `skillResult.status` remains
+the child-authored domain conclusion and is not interchangeable with wrapper status.
+
+The CLI exits 0 for wrapper success and 1 for failed or indeterminate outcomes.
+A zero-exit legacy script without a frame remains process success with
+`skillResult: null`, unless declared verification is unproved (indeterminate).
+A malformed frame fails with `SKILL_RESULT_PARSE_FAILED`; launch failure is
+`SKILL_EXECUTION_FAILED`. A valid domain failure remains visible in `skillResult`;
+a declared-verification run reporting domain failure also fails the wrapper.
+
 ### Successful Framed Result
 
 Default JSON success with a parsed `SkillResult` omits duplicate top-level
-`status`, `skillId`, `exitCode`, and `output`. Read `skillResult.result` for
+`skillId`, `exitCode`, and `output`, and always includes wrapper `status`. Read `skillResult.result` for
 the domain answer.
 
 ```json
 {
+  "status": "success",
   "skillResult": {
     "result": { "kind": "text", "text": "ok" },
     "status": "success",
@@ -14772,7 +14856,7 @@ First-time agent pitfall:
 
 - pretty mode streams live output and prints a banner first
 - JSON mode returns one parseable wrapper object
-- success JSON omits top-level `status`, `skillId`, `exitCode`, and
+- success JSON includes wrapper `status` and omits top-level `skillId`, `exitCode`, and
   `output`; read the domain answer from `skillResult.result`
 
 ## Step 4: Verify Output
@@ -15371,7 +15455,7 @@ Success JSON exposes the parsed `SkillResult` and timing:
 | `skillResult` | parsed structured skill result |
 | `durationMs` | total wrapper runtime |
 
-Default **JSON** success responses omit `status`, `skillId`, `exitCode`, and
+Default **JSON** success responses include wrapper `status` and omit `skillId`, `exitCode`, and
 `output` at the top level and expose the answer under `skillResult.result` (see
 the table in [Skill result trust order and JSON wrapper
 policy](#skill-result-trust-order-and-json-wrapper-policy)).
@@ -15439,7 +15523,7 @@ Verification pattern:
 
 | Wrapper path | `skillResult` | Top-level `status` | `skillId` | `exitCode` | `output` |
 | --- | --- | --- | --- | --- | --- |
-| **Success** | not `null` | omitted | omitted | omitted | omitted |
+| **Success** | not `null` | `success` | omitted | omitted | omitted |
 | **Indeterminate** (verification not proved) | not `null` | present | omitted | omitted | omitted |
 | **SKILL_OUTPUT_ASSERTION_FAILED** | may be not `null` | error shape | present in error | n/a for success | **present** (diagnostic; shows what the skill printed) |
 | **Execution / parse / other failures** | often `null` | error | varies | in error when relevant | n/a; failures use `stdout` and `stderr` for process streams |
@@ -15467,7 +15551,7 @@ The unified logger captures skill output as `skills.run.output` events, enabling
 ## Runtime success examples
 
 **Success (default JSON):** top level has only the nested object plus timing;
-**no** duplicate `status`, `skillId`, `exitCode`, or `output`. The domain
+wrapper `status: "success"` and **no** duplicate `skillId`, `exitCode`, or `output`. The domain
 answer is under `skillResult.result`.
 
 ```json

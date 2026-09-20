@@ -199,3 +199,17 @@ export function isClawperatorError(e: unknown): e is ClawperatorError {
     typeof (e as ClawperatorError).message === "string"
   );
 }
+
+/** Additive host evidence; dispatch acknowledgement does not prove action completion. */
+export type FailurePhase = "readiness" | "dispatch" | "result_wait" | "post_processing";
+export type DispatchState = "not_dispatched" | "dispatched" | "unknown";
+export interface ExecutionFailureEvidence extends Record<string, unknown> {
+  phase: FailurePhase;
+  dispatchState: DispatchState;
+  commandId?: string;
+  taskId?: string;
+  earlierEffects?: Array<{ actionId: string; effect: "force_stop" }>;
+  startedAt: string;
+  completedAt?: string;
+  logPath?: string;
+}

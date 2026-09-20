@@ -442,6 +442,7 @@ export async function cmdSkillsRun(
   if (options.deviceId !== undefined) {
     if (options.deviceId.trim().length === 0) {
       return formatError({
+        status: "failed",
         code: "INVALID_DEVICE_ID",
         message: "'deviceId' must be a non-empty string when provided",
         logs: preRunLogs,
@@ -458,6 +459,7 @@ export async function cmdSkillsRun(
     const validation = await validateSkillImpl(skillId, undefined, { dryRun: true });
     if (!validation.ok) {
       return formatError({
+        status: "failed",
         code: validation.code,
         message: validation.message,
         details: validation.details,
@@ -479,6 +481,7 @@ export async function cmdSkillsRun(
         ...(interactiveError.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE
           ? toPublicInteractiveAutomationError(interactiveError)
           : interactiveError),
+        status: "failed",
         logs: currentPreRunLogs(),
       },
       options
@@ -576,6 +579,7 @@ export async function cmdSkillsRun(
     if (options.format === "json" && result.skillResult !== null) {
       return formatSuccess(
         {
+          status: result.status,
           skillResult: result.skillResult,
           durationMs: result.durationMs,
           logs: buildSkillRunLogs(result),

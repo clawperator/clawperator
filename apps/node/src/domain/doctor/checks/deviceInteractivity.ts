@@ -3,7 +3,7 @@ import { runAdb, type AdbResult } from "../../../adapters/android-bridge/adbClie
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope, type LogcatResult } from "../../../adapters/android-bridge/logcatResultReader.js";
 import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
-import { ERROR_CODES, type ErrorCode } from "../../../contracts/errors.js";
+import { ERROR_CODES, type ErrorCode, type DispatchState } from "../../../contracts/errors.js";
 import { type StepResult } from "../../../contracts/result.js";
 
 export type WaitForResultEnvelopeFn = typeof waitForResultEnvelope;
@@ -23,17 +23,18 @@ export interface InteractiveStateEvidence extends Record<string, unknown> {
 export interface InteractiveStateProbeFailure {
   code: ErrorCode;
   message: string;
+  details?: Record<string, unknown>;
 }
 
 export interface InteractiveAutomationReadyError {
   code: ErrorCode;
   message: string;
-  details?: InteractiveStateEvidence;
+  details?: Record<string, unknown>;
 }
 
 export type InteractiveStateProbeResult =
-  | { ok: true; state: InternalInteractiveState }
-  | { ok: false; code: ErrorCode; message: string };
+  | { ok: true; state: InternalInteractiveState; probeEvidence?: Record<string, unknown> }
+  | { ok: false; code: ErrorCode; message: string; details?: Record<string, unknown> };
 
 export type InteractiveAutomationReadyResult =
   | { ok: true; state: InternalInteractiveState }
@@ -60,6 +61,7 @@ export interface EnsureDeviceAwakeResult {
   attempts: WakeAttempt[];
   state?: InternalInteractiveState;
   error?: InteractiveStateProbeFailure;
+  probeEvidence?: Record<string, unknown>;
 }
 
 interface WakeCommand {
@@ -98,7 +100,7 @@ const WAKE_COMMANDS: WakeCommand[] = [
 export async function runDoctorPingCommand(
   config: RuntimeConfig,
   waitForEnvelope: WaitForResultEnvelopeFn = waitForResultEnvelope
-): Promise<LogcatResult> {
+): Promise<LogcatResult & { probeEvidence: Record<string, unknown> }> {
   const commandId = `doctor-handshake-${Date.now()}-${randomUUID()}`;
   const payload = JSON.stringify({
     commandId,
@@ -109,14 +111,42 @@ export async function runDoctorPingCommand(
     timeoutMs: 5000,
   });
 
-  return waitForEnvelope(
-    config,
-    { commandId, timeoutMs: 7000 },
-    async (beginDispatchCapture) => {
-      beginDispatchCapture();
-      return broadcastAgentCommand(config, payload);
-    }
-  );
+  const startedAt = new Date().toISOString();
+  let dispatchState: DispatchState = "not_dispatched";
+  let result: LogcatResult;
+  try {
+    result = await waitForEnvelope(
+      config,
+      { commandId, taskId: "doctor-handshake", timeoutMs: 7000 },
+      async (beginDispatchCapture) => {
+        beginDispatchCapture();
+        dispatchState = "unknown";
+        const broadcast = await broadcastAgentCommand(config, payload);
+        if (broadcast.success) dispatchState = "dispatched";
+        return broadcast;
+      }
+    );
+  } catch (error) {
+    result = {
+      ok: false,
+      code: ERROR_CODES.RESULT_TRANSPORT_FAILED,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+  return {
+    ...result,
+    probeEvidence: {
+      probeCommandId: commandId,
+      probeTaskId: "doctor-handshake",
+      probeDispatchState: dispatchState,
+      phase: "readiness",
+      dispatchState: "not_dispatched",
+      probeStartedAt: startedAt,
+      probeCompletedAt: new Date().toISOString(),
+      logPath: config.logger?.logPath(),
+      ...("diagnostics" in result ? { transport: result.diagnostics } : {}),
+    },
+  };
 }
 
 export function parseDoctorPingInteractiveState(stepResult: StepResult): InternalInteractiveState {
@@ -140,17 +170,10 @@ export async function probeInteractiveState(
   const result = await runDoctorPingCommand(config, waitForEnvelope);
 
   if (!result.ok) {
-    if ("timeout" in result && result.timeout) {
+    if (("timeout" in result && result.timeout) || ("broadcastFailed" in result && result.broadcastFailed)) {
       return {
         ok: false,
-        code: result.diagnostics.code,
-        message: result.diagnostics.message,
-      };
-    }
-
-    if ("broadcastFailed" in result && result.broadcastFailed) {
-      return {
-        ok: false,
+        details: result.probeEvidence,
         code: result.diagnostics.code,
         message: result.diagnostics.message,
       };
@@ -159,6 +182,7 @@ export async function probeInteractiveState(
     if ("error" in result) {
       return {
         ok: false,
+        details: result.probeEvidence,
         code: (result.code as ErrorCode | undefined) ?? ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
         message: result.error,
       };
@@ -166,6 +190,7 @@ export async function probeInteractiveState(
 
     return {
       ok: false,
+      details: result.probeEvidence,
       code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
       message: "doctor_ping failed before a usable result envelope was available.",
     };
@@ -174,6 +199,7 @@ export async function probeInteractiveState(
   if (result.envelope.status !== "success") {
     return {
       ok: false,
+      details: result.probeEvidence,
       code: ERROR_CODES.DEVICE_ACCESSIBILITY_NOT_RUNNING,
       message: `Operator returned an error: ${result.envelope.error ?? "Unknown error"}`,
     };
@@ -183,6 +209,7 @@ export async function probeInteractiveState(
   if (!doctorPingStep) {
     return {
       ok: false,
+      details: result.probeEvidence,
       code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
       message: "doctor_ping step result was missing from the result envelope.",
     };
@@ -191,6 +218,7 @@ export async function probeInteractiveState(
   if (!doctorPingStep.success) {
     return {
       ok: false,
+      details: result.probeEvidence,
       code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
       message: "doctor_ping step result was unsuccessful.",
     };
@@ -200,10 +228,12 @@ export async function probeInteractiveState(
     return {
       ok: true,
       state: parseDoctorPingInteractiveState(doctorPingStep),
+      probeEvidence: result.probeEvidence,
     };
   } catch (error) {
     return {
       ok: false,
+      details: result.probeEvidence,
       code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
       message: error instanceof Error ? error.message : String(error),
     };
@@ -228,15 +258,18 @@ export async function ensureDeviceAwake(
       error: {
         code: initialProbe.code,
         message: initialProbe.message,
+        ...(initialProbe.details !== undefined ? { details: initialProbe.details } : {}),
       },
     };
   }
 
+  let probeEvidence = initialProbe.probeEvidence;
   if (initialProbe.state.screenOn) {
     return {
       status: isInteractiveAutomationReady(initialProbe.state) ? "already_awake" : "awake_but_locked",
       attempts: [],
       state: initialProbe.state,
+      ...(probeEvidence !== undefined ? { probeEvidence } : {}),
     };
   }
 
@@ -262,10 +295,12 @@ export async function ensureDeviceAwake(
         error: {
           code: postAttemptProbe.code,
           message: postAttemptProbe.message,
+          ...(postAttemptProbe.details !== undefined ? { details: postAttemptProbe.details } : {}),
         },
       };
     }
 
+    probeEvidence = postAttemptProbe.probeEvidence;
     lastObservedState = postAttemptProbe.state;
     if (didWakeCommandFail(adbResult)) {
       if (postAttemptProbe.state.screenOn) {
@@ -273,6 +308,7 @@ export async function ensureDeviceAwake(
           status: isInteractiveAutomationReady(postAttemptProbe.state) ? "awake" : "awake_but_locked",
           attempts,
           state: postAttemptProbe.state,
+          ...(probeEvidence !== undefined ? { probeEvidence } : {}),
         };
       }
 
@@ -290,6 +326,7 @@ export async function ensureDeviceAwake(
       status: isInteractiveAutomationReady(postAttemptProbe.state) ? "awake" : "awake_but_locked",
       attempts,
       state: postAttemptProbe.state,
+      ...(probeEvidence !== undefined ? { probeEvidence } : {}),
     };
   }
 
@@ -298,6 +335,7 @@ export async function ensureDeviceAwake(
       status: "transport_failed",
       attempts,
       state: lastObservedState,
+      ...(probeEvidence !== undefined ? { probeEvidence } : {}),
       error: lastTransportFailure,
     };
   }
@@ -306,6 +344,7 @@ export async function ensureDeviceAwake(
     status: "still_asleep",
     attempts,
     state: lastObservedState,
+    ...(probeEvidence !== undefined ? { probeEvidence } : {}),
   };
 }
 
@@ -323,51 +362,37 @@ export async function ensureInteractiveAutomationReady(
     settleDelayMs: options?.settleDelayMs,
   });
 
-  switch (wakeResult.status) {
-    case "already_awake":
-    case "awake":
-      if (wakeResult.state && isInteractiveAutomationReady(wakeResult.state)) {
-        return { ok: true, state: wakeResult.state };
-      }
-      if (wakeResult.state) {
-        return {
-          ok: false,
-          error: buildDeviceNotInteractiveError(wakeResult.state),
-        };
-      }
-      return {
-        ok: false,
-        error: {
-          code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
-          message: "Device is not interactive and no interactive-state evidence was available.",
-        },
-      };
-    case "awake_but_locked":
-    case "still_asleep":
-      if (wakeResult.state) {
-        return {
-          ok: false,
-          error: buildDeviceNotInteractiveError(wakeResult.state),
-        };
-      }
-      return {
-        ok: false,
-        error: {
-          code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
-          message: "Device is not interactive and no interactive-state evidence was available.",
-        },
-      };
-    case "probe_failed":
-    case "transport_failed":
-      return {
-        ok: false,
-        error: {
+  if ((wakeResult.status === "already_awake" || wakeResult.status === "awake") &&
+      wakeResult.state && isInteractiveAutomationReady(wakeResult.state)) {
+    return { ok: true, state: wakeResult.state };
+  }
+
+  const error: InteractiveAutomationReadyError =
+    wakeResult.status === "probe_failed" || wakeResult.status === "transport_failed"
+      ? {
           code: wakeResult.error?.code ?? ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
           message: wakeResult.error?.message ?? "Could not prepare the device for interactive automation.",
-          details: wakeResult.state ? toInteractiveStateEvidence(wakeResult.state) : undefined,
-        },
-      };
-  }
+        }
+      : wakeResult.state
+        ? buildDeviceNotInteractiveError(wakeResult.state)
+        : {
+            code: ERROR_CODES.DEVICE_NOT_INTERACTIVE,
+            message: "Device is not interactive and no interactive-state evidence was available.",
+          };
+  return {
+    ok: false,
+    error: {
+      ...error,
+      details: {
+        phase: "readiness",
+        dispatchState: "not_dispatched",
+        ...wakeResult.probeEvidence,
+        ...wakeResult.error?.details,
+        ...(wakeResult.state ? toInteractiveStateEvidence(wakeResult.state) : {}),
+        wakeAttempts: wakeResult.attempts.map(attempt => ({ method: attempt.method, exitCode: attempt.adbResult.code })),
+      },
+    },
+  };
 }
 
 export function buildReadinessCacheKey(resolvedDeviceId: string, operatorPackage: string): string {
@@ -443,13 +468,17 @@ export function buildDeviceNotInteractiveError(
   };
 }
 
-export function toPublicInteractiveAutomationError<T extends { code: string; message: string; details?: unknown }>(
+export function toPublicInteractiveAutomationError<T extends { code: string; message: string; details?: Record<string, unknown> }>(
   error: T
-): Omit<T, "details" | "message"> & { message: string } {
+): Omit<T, "details" | "message"> & { message: string; details?: Record<string, unknown> } {
   if (error.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE) {
-    const { details: _details, message: _message, ...rest } = error;
+    const { details, message: _message, ...rest } = error;
+    // Keep recovery evidence while preserving the public omission of internal state.
+    const { screenOn: _screenOn, deviceLocked: _deviceLocked, userUnlocked: _userUnlocked, ...diagnostics } =
+      typeof details === "object" && details !== null ? details as Record<string, unknown> : {};
     return {
       ...rest,
+      ...(Object.keys(diagnostics).length > 0 ? { details: diagnostics } : {}),
       message: "Device is not interactive. Interactive automation requires an awake, usable device state.",
     };
   }

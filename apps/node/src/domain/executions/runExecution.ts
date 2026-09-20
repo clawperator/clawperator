@@ -1,3 +1,4 @@
+import { PNG } from "pngjs";
 import { probeUserUnlockState } from "../device/userUnlockState.js";
 import { isBackgroundServiceExecution } from "../../contracts/notifications.js";
 import { writeFile } from "node:fs/promises";
@@ -16,8 +17,8 @@ import { ensureInteractiveAutomationReady, ensureInteractiveAutomationReadyCache
 import { getOperatorPackageApkPath } from "../version/compatibility.js";
 import { tryAcquire, release, getConflictError } from "./executionStore.js";
 import type { ResultEnvelope, TerminalSource } from "../../contracts/result.js";
-import type { TimeoutDiagnostics } from "../../contracts/errors.js";
-import { extractSnapshotsForCommand, hasLegacyUntaggedSnapshotMarker } from "./snapshotHelper.js";
+import type { TimeoutDiagnostics, ExecutionFailureEvidence } from "../../contracts/errors.js";
+import { extractSnapshotRecordsFromLogs, validateSnapshotXml, hasLegacyUntaggedSnapshotMarker } from "./snapshotHelper.js";
 import { emitResult, emitExecution } from "../observe/events.js";
 import { LIMITS } from "../../contracts/limits.js";
 import { ERROR_CODES } from "../../contracts/errors.js";
@@ -182,10 +183,13 @@ export function attachSnapshotsToStepResults(stepResults: ResultEnvelope["stepRe
 export function markExtractionFailedSnapshotSteps(
   stepResults: ResultEnvelope["stepResults"],
   warn?: (message: string) => void,
-  options: { sawLegacyUntaggedSnapshotMarker?: boolean } = {}
+  options: { sawLegacyUntaggedSnapshotMarker?: boolean; logPath?: string } = {}
 ): void {
   for (const step of stepResults) {
-    if (isSnapshotActionType(step.actionType) && step.success && step.data.text === undefined) {
+    if (!isSnapshotActionType(step.actionType) || !step.success) continue;
+    const extractionReason = step.data.extractionReason ??
+      (step.data.text === undefined ? "missing_payload" : validateSnapshotXml(step.data.text));
+    if (extractionReason !== undefined) {
       step.success = false;
       const { text: _text, ...remainingData } = step.data;
       const error = options.sawLegacyUntaggedSnapshotMarker
@@ -193,17 +197,22 @@ export function markExtractionFailedSnapshotSteps(
         : ERROR_CODES.SNAPSHOT_EXTRACTION_FAILED;
       const message = options.sawLegacyUntaggedSnapshotMarker
         ? "Snapshot hierarchy logs used the legacy untagged marker. Install a matching Operator APK that emits commandId-tagged snapshot logs, or use a compatible CLI."
-        : "UI hierarchy extraction produced no output for this step. Check clawperator version compatibility and logcat extraction health.";
+        : "UI hierarchy extraction produced missing or invalid XML for this step. Check clawperator version compatibility and logcat extraction health.";
       step.data = {
         ...remainingData,
         error,
+        extractionReason,
+        ...(options.logPath !== undefined ? { diagnosticLogPath: options.logPath } : {}),
+        ...(error === ERROR_CODES.SNAPSHOT_EXTRACTION_FAILED ? {
+          failurePhase: "post_processing", dispatchState: "dispatched",
+        } : {}),
         message,
       };
       warn?.(
         options.sawLegacyUntaggedSnapshotMarker
           ? `[clawperator] WARN: snapshot step "${step.id}" saw legacy untagged snapshot logs. ` +
             `Install a matching Operator APK or run 'clawperator version --check-compat' to diagnose.\n`
-          : `[clawperator] WARN: snapshot step "${step.id}" UI hierarchy extraction produced no output. ` +
+          : `[clawperator] WARN: snapshot step "${step.id}" UI hierarchy extraction produced missing or invalid XML. ` +
             `Run 'clawperator doctor' or 'clawperator version --check-compat' to diagnose.\n`
       );
     }
@@ -347,11 +356,11 @@ export function finalizeSuccessfulScreenshotCapture(
 
   if (screenStep.data.error === "UNSUPPORTED_RUNTIME_SCREENSHOT") {
     screenStep.success = true;
-    const { error: _error, message: _message, ...remainingData } = screenStep.data;
+    const { error: _error, errorCode: _errorCode, message: _message, ...remainingData } = screenStep.data;
     screenStep.data = remainingData;
   }
 
-  screenStep.data = { ...screenStep.data, path: screenshotPath };
+  screenStep.data = { ...screenStep.data, path: screenshotPath, captureSource: "host", capturedAt: new Date().toISOString() };
 }
 
 /**
@@ -413,6 +422,7 @@ export async function runCloseAppPreflight(
           code: adbResult.code === 127 ? ERROR_CODES.ADB_NOT_FOUND : ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
           message: `close_app pre-flight force-stop failed for ${applicationId}`,
           details: {
+            earlierEffects: [...successfulCloseActionIds].map(actionId => ({ actionId, effect: "force_stop" })),
             applicationId,
             adbExitCode: adbResult.code,
             stdout: adbResult.stdout,
@@ -455,7 +465,8 @@ function buildCloseAppOnlySuccessEnvelope(execution: Execution): ResultEnvelope 
  */
 async function performExecution(
   executionInput: unknown,
-  options: RunExecutionOptions = {}
+  options: RunExecutionOptions,
+  evidence: ExecutionFailureEvidence
 ): Promise<PerformExecutionResult> {
   const config = getDefaultRuntimeConfig({
     deviceId: options.deviceId,
@@ -471,6 +482,8 @@ async function performExecution(
   } catch (e) {
     return { result: { ok: false, error: e as { code: string; message: string; [k: string]: unknown } } };
   }
+
+  Object.assign(evidence, { commandId: execution.commandId, taskId: execution.taskId });
 
   const resultEnvelopeTimeoutError = validateNonNegativeFiniteNumber(
     options.resultEnvelopeTimeoutMs,
@@ -637,6 +650,8 @@ async function performExecution(
       return { execution, result: { ok: false, error: closeAppPreflight.error, deviceId } };
     }
 
+    evidence.earlierEffects = [...closeAppPreflight.successfulCloseActionIds].map(actionId => ({ actionId, effect: "force_stop" }));
+
     if (isCloseAppOnlyExecution(execution)) {
       cancelEarlyResultWaiter();
       const envelope = buildCloseAppOnlySuccessEnvelope(execution);
@@ -676,18 +691,24 @@ async function performExecution(
           execution,
           result: {
             ok: false,
-            error: publicError,
+            error: { ...publicError },
             deviceId,
           },
         };
       }
     }
 
+    evidence.phase = "dispatch";
     let dispatchStart = Date.now();
     const runBroadcast: BroadcastFn = async (beginDispatchCapture) => {
+      evidence.phase = "dispatch";
       beginDispatchCapture();
+      evidence.dispatchState = "unknown";
+      evidence.dispatchStartedAt = new Date().toISOString();
       const broadcast = await broadcastAgentCommand(config, payload);
       if (broadcast.success) {
+        evidence.dispatchState = "dispatched";
+        evidence.phase = "result_wait";
         options.logger?.emit({
           ts: new Date().toISOString(),
           level: "info",
@@ -720,6 +741,7 @@ async function performExecution(
         );
 
     if (result.ok) {
+      evidence.phase = "post_processing";
       options.logger?.emit({
         ts: new Date().toISOString(),
         level: "info",
@@ -735,10 +757,26 @@ async function performExecution(
       const hasSnapshot = result.envelope.stepResults.some(s => isSnapshotActionType(s.actionType));
       if (hasSnapshot) {
         const snapshotLogLines = result.snapshotLogLines ?? [];
-        const snapshots = extractSnapshotsForCommand(snapshotLogLines, execution.commandId);
+        const records = extractSnapshotRecordsFromLogs(snapshotLogLines).filter(record => record.commandId === execution.commandId);
+        const snapshots = records.map(record => record.snapshot);
+        for (const [occurrence, record] of records.entries()) {
+          if (record.validationError !== undefined) options.logger?.emit({
+            ts: new Date().toISOString(), level: "error", event: "snapshot.extraction.failed",
+            commandId: execution.commandId, taskId: execution.taskId, deviceId,
+            message: JSON.stringify({ occurrence, reason: record.validationError, preview: record.diagnosticPreview }),
+          });
+        }
+        const snapshotSteps = result.envelope.stepResults.filter(step => isSnapshotActionType(step.actionType) && step.success);
+        for (let offset = 1; offset <= Math.min(records.length, snapshotSteps.length); offset++) {
+          const record = records[records.length - offset];
+          if (record.validationError !== undefined) {
+            snapshotSteps[snapshotSteps.length - offset].data.extractionReason = record.validationError;
+          }
+        }
         attachSnapshotsToStepResults(result.envelope.stepResults, snapshots);
         markExtractionFailedSnapshotSteps(result.envelope.stepResults, options.warn, {
           sawLegacyUntaggedSnapshotMarker: hasLegacyUntaggedSnapshotMarker(snapshotLogLines),
+          logPath: options.logger?.logPath(),
         });
         // Attach data.warn to any snapshot immediately following a click with no sleep.
         addSettleWarnings(result.envelope.stepResults, execution);
@@ -758,10 +796,24 @@ async function performExecution(
             taskId: execution.taskId,
           });
 
+          if (buffer.length < 24 || buffer.readUInt32BE(16) * buffer.readUInt32BE(20) > 32_000_000) {
+            throw new Error("Screenshot exceeds PNG decoding limits");
+          }
+          PNG.sync.read(buffer, { checkCRC: true });
           await writeFile(screenshotPath, buffer);
           finalizeSuccessfulScreenshotCapture(screenStep, screenshotPath);
         } catch (e) {
-          console.warn(`⚠️ Failed to capture screenshot via adb: ${String(e)}`);
+          const screenStep = result.envelope.stepResults.find(step => step.actionType === "take_screenshot");
+          if (screenStep !== undefined) {
+            screenStep.success = false;
+            const { path: _path, ...previousData } = screenStep.data;
+            screenStep.data = { ...previousData,
+              runtimeError: previousData.error ?? "",
+              error: ERROR_CODES.EVIDENCE_CAPTURE_FAILED,
+              errorCode: ERROR_CODES.EVIDENCE_CAPTURE_FAILED,
+              message: (typeof e === "object" && e !== null && "message" in e ? String(e.message) : String(e)).slice(0, 1024), failurePhase: "post_processing", dispatchState: "dispatched",
+            };
+          }
         }
       }
 
@@ -818,6 +870,11 @@ async function performExecution(
         deviceId,
       },
     };
+  } catch (error) {
+    return { execution, result: { ok: false, deviceId, error: {
+      code: ERROR_CODES.RESULT_TRANSPORT_FAILED,
+      message: error instanceof Error ? error.message : String(error),
+    } } };
   } finally {
     if (!broadcastReleased) {
       cancelEarlyResultWaiter();
@@ -834,7 +891,17 @@ export async function runExecution(
   executionInput: unknown,
   options: RunExecutionOptions = {}
 ): Promise<RunExecutionResult> {
-  const { execution, result } = await performExecution(executionInput, options);
+  const evidence: ExecutionFailureEvidence = {
+    phase: "readiness", dispatchState: "not_dispatched", startedAt: new Date().toISOString(),
+    ...(options.logger ? { logPath: options.logger.logPath() } : {}),
+  };
+  const { execution, result } = await performExecution(executionInput, options, evidence);
+  if (!result.ok) {
+    const details = result.error.details as Record<string, unknown> | undefined;
+    result.error.details = { ...details, ...evidence,
+      ...(details?.earlierEffects !== undefined ? { earlierEffects: details.earlierEffects } : {}),
+      completedAt: new Date().toISOString() };
+  }
   
   // We emit the execution outcome even if resolution failed, as long as we have SOME deviceId 
   // (either from options or resolved during the process).

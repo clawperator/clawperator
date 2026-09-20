@@ -657,7 +657,7 @@ describe("serve API integration", () => {
       } | null;
     };
     assert.strictEqual(body.ok, true);
-    assert.strictEqual(body.status, undefined);
+    assert.strictEqual(body.status, "success");
     assert.strictEqual(body.skillId, undefined);
     assert.strictEqual(body.output, undefined);
     assert.strictEqual(body.exitCode, undefined);
@@ -788,7 +788,7 @@ describe("serve API integration", () => {
       } | null;
     };
     assert.strictEqual(body.ok, true);
-    assert.strictEqual(body.status, undefined);
+    assert.strictEqual(body.status, "success");
     assert.strictEqual(body.skillId, undefined);
     assert.strictEqual(body.output, undefined);
     assert.strictEqual(body.exitCode, undefined);

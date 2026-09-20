@@ -776,6 +776,7 @@ export function createServeApp(options: ServeAppOptions): express.Application {
         if (result.skillResult !== null) {
           res.json({
             ok: true,
+            status: result.status,
             skillResult: result.skillResult,
             durationMs: result.durationMs,
             logs: buildSkillRunLogs(result),

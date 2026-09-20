@@ -300,7 +300,7 @@ First-time agent pitfall:
 
 - pretty mode streams live output and prints a banner first
 - JSON mode returns one parseable wrapper object
-- success JSON omits top-level `status`, `skillId`, `exitCode`, and
+- success JSON includes wrapper `status` and omits top-level `skillId`, `exitCode`, and
   `output`; read the domain answer from `skillResult.result`
 
 ## Step 4: Verify Output
