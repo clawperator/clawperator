@@ -27,7 +27,9 @@ describe("bundled skill packaging", () => {
 
   it("keeps the packaged bundled-skills tree as real directories with SKILL.md files", async () => {
     const bundledSkillsDir = join(packageRoot, "bundled-skills");
-    const entries = (await readdir(bundledSkillsDir)).sort((left, right) => left.localeCompare(right));
+    const entries = (await readdir(bundledSkillsDir))
+      .filter(entry => entry !== ".DS_Store")
+      .sort((left, right) => left.localeCompare(right));
 
     assert.deepEqual(entries, [
       "clawperator-agent-orientation",
