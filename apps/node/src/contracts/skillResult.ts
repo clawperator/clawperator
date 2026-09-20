@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { ResultEnvelope, StepResult } from "./result.js";
+import type { ResultEnvelope, StepResult, StepResultData } from "./result.js";
 
 export const SKILL_RESULT_FRAME_PREFIX = "[Clawperator-Skill-Result]";
 export const SKILL_RESULT_CONTRACT_VERSION = "1.0.0";
@@ -123,13 +123,28 @@ const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(jsonValueSchema)])
 );
 
-function normalizeEnvelopeStepResultData(raw: unknown): Record<string, string> {
+const extractionDiagnosticsSchema = z.object({
+  receivedBytes: z.number().int().nonnegative().safe(),
+  sourceValidationCategory: z.string().regex(/^[A-Za-z0-9_.:-]{1,128}$/),
+  line: z.number().int().nonnegative().safe().optional(),
+  column: z.number().int().nonnegative().safe().optional(),
+  position: z.number().int().nonnegative().safe().optional(),
+  closingHierarchySeen: z.boolean().optional(),
+  terminationReason: z.enum(["next_snapshot", "same_tag_event", "closing_hierarchy", "end_of_capture"]).optional(),
+});
+
+function normalizeEnvelopeStepResultData(raw: unknown): StepResultData {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return {};
   }
 
-  const normalized: Record<string, string> = {};
+  const normalized: StepResultData = {};
   for (const [key, value] of Object.entries(raw)) {
+    if (key === "extractionDiagnostics") {
+      const diagnostic = extractionDiagnosticsSchema.safeParse(value);
+      if (diagnostic.success) normalized.extractionDiagnostics = diagnostic.data;
+      continue;
+    }
     normalized[key] = typeof value === "string" ? value : String(value);
   }
   return normalized;
@@ -150,6 +165,13 @@ const resultEnvelopeSchema: z.ZodType<ResultEnvelope, z.ZodTypeDef, unknown> = z
   error: z.string().nullable().optional(),
   errorCode: z.string().nullable().optional(),
   hint: z.string().optional(),
+  diagnostics: z.object({
+    logging: z.object({
+      status: z.enum(["available", "disabled", "write_failed", "unavailable"]),
+      code: z.literal("LOGGING_WRITE_FAILED").optional(),
+      logPath: z.string().optional(),
+    }),
+  }).optional(),
   failureEvidence: z.object({
     phase: z.enum(["readiness", "dispatch", "result_wait", "post_processing"]),
     dispatchState: z.enum(["not_dispatched", "dispatched", "unknown"]),

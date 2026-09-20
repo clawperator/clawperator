@@ -167,7 +167,7 @@ Notes:
 - `errorCode` is optional on the envelope. When it is absent, inspect `error` and the failed step for details.
 - envelope `errorCode` may contain Android-emitted values such as `SERVICE_UNAVAILABLE` that are not part of Node's public `errors.ts` enum
 - per-step failures do not use the envelope `errorCode`; they usually expose the actionable code in `stepResults[i].data.error`
-- `StepResult.data` values are strings, so treat `data.error` and `data.message` as string fields
+- Android `StepResult.data` values are strings, including `data.error` and `data.message`. Host-added `data.extractionDiagnostics` is a structured object
 - Node post-processing can turn some Android-internal failure markers into success results, for example normalizing `UNSUPPORTED_RUNTIME_CLOSE` into a successful `close_app` step when adb pre-flight already succeeded
 
 ## Recovery Patterns

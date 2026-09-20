@@ -1,3 +1,4 @@
+import { rmSync, writeFileSync } from "node:fs";
 import { buildMcpErrorResult } from "../../mcp/errors.js";
 import { createClawperatorLogger } from "../../adapters/logger.js";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
@@ -274,16 +275,25 @@ describe("bounded extraction diagnostics", () => {
 
 
 describe("logging preserves primary execution outcomes", () => {
-  for (const malformed of [false, true]) for (const writeFails of [false, true]) {
+  for (const malformed of [false, true]) for (const writeFails of [false, true, "diagnostic"] as const) {
     it(`preserves malformed=${malformed} with logging writeFails=${writeFails}`, async () => {
       const root = await mkdtemp(join(tmpdir(), "extraction-logging-"));
       try {
         const logDir = join(root, "logs");
-        if (writeFails) await writeFile(logDir, "not a directory");
+        if (writeFails === true) await writeFile(logDir, "not a directory");
+        const failedLogging = writeFails === true || (writeFails === "diagnostic" && malformed);
         const logger = createClawperatorLogger({ logDir });
         const envelope: ResultEnvelope = { commandId: "requested", taskId: "task", status: "success", error: null, stepResults: [{ id: "snap", actionType: "snapshot", success: true, data: {} }] };
         const result = await runExecution({ commandId: "requested", taskId: "task", source: "test", expectedFormat: "android-ui-automator", timeoutMs: 1000, actions: [{ id: "snap", type: "snapshot" }] }, {
-          deviceId: "test-device", operatorPackage: "com.test.operator", logger,
+          deviceId: "test-device", operatorPackage: "com.test.operator",
+          logger: writeFails === "diagnostic" ? { ...logger, emit(event) {
+            if (event.event === "snapshot.extraction.failed") {
+              assert.ok(logger.logPath());
+              rmSync(logDir, { recursive: true });
+              writeFileSync(logDir, "blocked after device result");
+            }
+            logger.emit(event);
+          } } : logger,
           runner: executionRunner(envelope, malformed ? '<hierarchy><node text="private"/>' : '<hierarchy/>'),
           ensureInteractiveAutomationReadyFn: ready, logcatBroadcastDelayMs: 0,
         });
@@ -291,7 +301,7 @@ describe("logging preserves primary execution outcomes", () => {
         assert.equal(result.envelope.status, malformed ? "failed" : "success");
         assert.equal(result.envelope.commandId, "requested");
         assert.equal(result.envelope.taskId, "task");
-        assert.equal(result.envelope.diagnostics?.logging.status, writeFails ? "write_failed" : "available");
+        assert.equal(result.envelope.diagnostics?.logging.status, failedLogging ? "write_failed" : "available");
         const step = result.envelope.stepResults[0];
         if (malformed) {
           assert.equal(step.data.error, "SNAPSHOT_EXTRACTION_FAILED");
@@ -299,15 +309,15 @@ describe("logging preserves primary execution outcomes", () => {
           assert.equal(step.data.extractionReason, "malformed_xml");
           const transport = buildMcpErrorResult({ code: "SNAPSHOT_EXTRACTION_FAILED", envelope: result.envelope });
           assert.deepEqual((transport.structuredContent?.envelope as ResultEnvelope).stepResults[0].data.extractionDiagnostics, step.data.extractionDiagnostics);
-          assert.equal((transport.structuredContent?.envelope as ResultEnvelope).diagnostics?.logging.status, writeFails ? "write_failed" : "available");
+          assert.equal((transport.structuredContent?.envelope as ResultEnvelope).diagnostics?.logging.status, failedLogging ? "write_failed" : "available");
           assert.equal((transport.structuredContent?.envelope as ResultEnvelope).stepResults[0].data.diagnosticLogPath, undefined);
           assert.ok(!JSON.stringify(result).includes("private"));
-          if (!writeFails) {
+          if (!failedLogging) {
             assert.equal(step.data.diagnosticLogPath, logger.logPath());
             assert.match(await readFile(logger.logPath()!, "utf8"), /snapshot.extraction.failed/);
           } else assert.equal(step.data.diagnosticLogPath, undefined);
         }
-        if (writeFails) assert.equal(result.envelope.diagnostics?.logging.logPath, undefined);
+        if (failedLogging) assert.equal(result.envelope.diagnostics?.logging.logPath, undefined);
       } finally { await rm(root, { recursive: true, force: true }); }
     });
   }

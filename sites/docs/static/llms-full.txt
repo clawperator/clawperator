@@ -1451,7 +1451,7 @@ Stable field anchors:
 | --- | --- |
 | `status` | Top-level outcome after Node post-processing. `"failed"` means at least one step failed or the runtime returned a top-level failure. |
 | `stepResults[].success` | Per-step success bit. |
-| `stepResults[].data` | Action-specific string map. Keys and values are strings after parsing and post-processing. |
+| `stepResults[].data` | Action-specific fields remain strings. Host-added `extractionDiagnostics` is a bounded structured object; see [snapshot diagnostics](snapshot.md#extraction-diagnostics-and-recovery). |
 | `error` | Human-readable top-level failure summary. |
 | `errorCode` | Stable top-level code when available. Prefer this over matching `error`. Current runtime envelopes may also surface Android-emitted strings such as `SERVICE_UNAVAILABLE`, so do not assume this field is limited to the Node enum in `errors.ts`. |
 | `hint` | Optional recovery hint injected by Node. |
@@ -5267,6 +5267,9 @@ Android string-valued step fields, this is a host-added structured object:
 | `closingHierarchySeen` | Whether the reconstructed source contains a closing `hierarchy` marker. This does not establish well-formedness; a self-closing root needs no closing marker. Omitted when no extraction record exists. |
 | `terminationReason` | `closing_hierarchy` for a standalone closing line, `same_tag_event` for an intervening bracketed event on the same log tag, `next_snapshot` for a new capture marker, or `end_of_capture` for the end of supplied log lines. Omitted when no extraction record exists. |
 
+Retained SkillResult `execEnvelopes` preserve this diagnostic object and envelope
+logging status rather than coercing them into strings.
+
 Positions are nonnegative safe integers. No parser message, tag name, or source
 excerpt appears in these public facts. Missing fields mean unavailable, not zero.
 An unfinished source or absent closing marker does not establish truncation,
@@ -7585,7 +7588,7 @@ Notes:
 - `errorCode` is optional on the envelope. When it is absent, inspect `error` and the failed step for details.
 - envelope `errorCode` may contain Android-emitted values such as `SERVICE_UNAVAILABLE` that are not part of Node's public `errors.ts` enum
 - per-step failures do not use the envelope `errorCode`; they usually expose the actionable code in `stepResults[i].data.error`
-- `StepResult.data` values are strings, so treat `data.error` and `data.message` as string fields
+- Android `StepResult.data` values are strings, including `data.error` and `data.message`. Host-added `data.extractionDiagnostics` is a structured object
 - Node post-processing can turn some Android-internal failure markers into success results, for example normalizing `UNSUPPORTED_RUNTIME_CLOSE` into a successful `close_app` step when adb pre-flight already succeeded
 
 ## Recovery Patterns

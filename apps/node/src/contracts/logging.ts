@@ -51,9 +51,11 @@ export interface LoggingStatus {
 }
 
 export interface ClawperatorLogger {
+  /** Optional for injected legacy loggers; absence means status is unavailable. */
   status?(): LoggingStatus;
   emit(event: LogEvent): void;
   child(defaultContext: Partial<LogEvent>): ClawperatorLogger;
+  /** Last successfully persisted file while the sink is enabled, not a configured destination. */
   logPath(): string | undefined;
 }
 
