@@ -123,7 +123,7 @@ it("attaches complete host evidence to a real envelope on post-processing failur
     const envelope: ResultEnvelope = { commandId: execution.commandId, taskId: execution.taskId, status: "success", error: null, stepResults: [{ id: "snap", actionType: "snapshot_ui", success: true, data: {} }] };
     const result = await runExecution(execution, { ...options, runner: executionRunner(envelope, valid ? "<hierarchy/>" : "<hierarchy>"), ensureInteractiveAutomationReadyFn: ready });
     assert.ok(result.ok);
-    const evidence = (result.envelope as unknown as Record<string, unknown>).failureEvidence as Record<string, unknown> | undefined;
+    const evidence = result.envelope.failureEvidence;
     if (valid) { assert.equal(evidence, undefined); assert.equal(result.envelope.status, "success"); continue; }
     assert.equal(result.envelope.status, "failed");
     assert.deepEqual(emittedSkillResultSchema.shape.execEnvelopes.parse([result.envelope])?.[0].failureEvidence, evidence);
