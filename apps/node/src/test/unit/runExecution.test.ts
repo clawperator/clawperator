@@ -3026,6 +3026,10 @@ describe("transport failure execution evidence", () => {
         assert.equal(details.commandId, "transport-command");
         assert.equal(details.taskId, "transport-task");
         assert.equal(details.dispatchAttempted, afterDispatch);
+        if (!afterDispatch) {
+          assert.equal(details.dispatchState, "not_dispatched");
+          assert.equal(details.dispatchStartedAt, undefined);
+        }
         assert.equal(details.executionPosition, "unknown");
         assert.equal(broadcasts, afterDispatch ? 1 : 0);
         assert.equal(terminalEvents.length, 0);

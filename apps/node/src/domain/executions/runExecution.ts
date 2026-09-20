@@ -702,9 +702,9 @@ async function performExecution(
     let dispatchStart = Date.now();
     const runBroadcast: BroadcastFn = async (beginDispatchCapture) => {
       evidence.phase = "dispatch";
+      beginDispatchCapture();
       evidence.dispatchState = "unknown";
       evidence.dispatchStartedAt = new Date().toISOString();
-      beginDispatchCapture();
       const broadcast = await broadcastAgentCommand(config, payload);
       if (broadcast.success) {
         evidence.dispatchState = "dispatched";
