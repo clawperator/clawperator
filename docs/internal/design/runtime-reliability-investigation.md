@@ -244,3 +244,45 @@ that directory's ignored `raw/` subtree. Validation at the investigated revision
 Node build and 1723 tests passed; matching debug APK built and passed emulator
 compatibility/readiness and the live comparisons. This documentation-only
 closeout adds no runtime behavior or new transport guarantee.
+
+
+## R1-R4 closeout verification
+
+R1 and R4a/R4b landed together in `2a50b4f2742501799a6fcba2931450ff82f81744`
+(PR #322). R2 landed in `aab6ac67533f1543e0d847c424057855c2419313` (PR #323).
+Both are ancestors of the main revision inspected for this closeout,
+`aab6ac67533f1543e0d847c424057855c2419313`. The closeout does not duplicate them.
+
+R4a preserves the nested skill result while including wrapper `status` on
+framed success, legacy success, failed, indeterminate, and early validation or
+readiness outcomes. Wrapper status describes execution/verification; nested
+status remains the skill's conclusion. Legacy exit-0 scripts may omit a frame;
+agent-driven scripts require one. Malformed frames fail. See the exact
+[wrapper and exit contract](../../skills/cli.md#wrapper-status-and-exit-behavior).
+The existing `skills.test.ts` covers these paths, frame parsing, launch failures,
+declared verification and real CLI exit behavior.
+
+R4b decodes bounded PNG bytes with CRC checking, then awaits artifact persistence
+before clearing the superseded unsupported-runtime error, errorCode and message.
+It retains other metadata and records host capture source and persistence time.
+Invalid, empty or failed captures and failed artifact writes remain failures.
+See [screenshot semantics](../../api/actions.md#take_screenshot),
+`screenshotFallback.test.ts` and the screenshot finalization cases in
+`runExecution.test.ts`. This is artifact/result consistency, not a fix for a
+probe that never returned a result. String-valued step data and Operator envelopes
+are unchanged.
+
+R4a/R4b acceptance is verified against landed implementation and focused tests;
+no runtime repair was required. The R3 investigation is complete with the
+unresolved disposition above. Its 1723-test, APK and emulator evidence belongs
+to the tested revision `aab6ac67`, not a fresh physical-device validation of this
+documentation closeout. Closeout publication is separate: the documentation is
+carried on `investigate/r3-readiness-probes` and its associated PR, pending merge.
+No release or Samsung reliability claim follows from publication.
+
+The recommendation pack and acceptance ledger in the usage-notes repository
+(`0.12.x-recommendations/closeout-validation.md`) preserve the measurements,
+publication limits and next discriminating experiment. A1 first-run orientation
+is the next implementation task; O1, A2, A3 and V2 remain separate future work.
+There is no R1-R4 task pack under `tasks/` to retire. The older result-transport
+pack has independent unfinished causal acceptance and remains intact.
