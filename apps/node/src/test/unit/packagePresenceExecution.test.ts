@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { ChildProcess } from "node:child_process";
+import { NodeProcessRunner } from "../../adapters/android-bridge/processRunner.js";
 import { startServer } from "../../cli/commands/serve.js";
 import { runExecution, type RunExecutionResult } from "../../domain/executions/runExecution.js";
 import { createClawperatorLogger } from "../../adapters/logger.js";
@@ -17,7 +19,14 @@ const cases = [
 ];
 
 for (const scenario of cases) {
-  it(`preserves ${scenario.name} through execution and daemon HTTP snapshot`, async () => {
+  it(`preserves ${scenario.name} through execution and daemon HTTP snapshot`, async (t) => {
+    const readerClosures: Promise<void>[] = [];
+    const spawn = NodeProcessRunner.prototype.spawn;
+    t.mock.method(NodeProcessRunner.prototype, "spawn", function (this: NodeProcessRunner, ...args: Parameters<typeof spawn>) {
+      const child = spawn.apply(this, args) as ChildProcess;
+      readerClosures.push(new Promise<void>(resolve => child.once("close", () => resolve())));
+      return child;
+    });
     const dir = await mkdtemp(join(tmpdir(), "package-presence-"));
     const previousPath = process.env.PATH;
     const callsPath = join(dir, "calls");
@@ -105,6 +114,9 @@ else if (args.includes("packages")) {
       assert.equal(calls.filter(args => args.includes("packages")).length, scenario.mode === "primary" ? 2 : 4);
     } finally {
       if (server) await new Promise<void>((resolve, reject) => server!.close(error => error ? reject(error) : resolve()));
+      // Cancellation returns before reader exit/close diagnostics finish writing.
+      // Keep the log directory alive until those child callbacks have drained.
+      await Promise.all(readerClosures);
       if (previousPath === undefined) delete process.env.PATH;
       else process.env.PATH = previousPath;
       await rm(dir, { recursive: true, force: true });
