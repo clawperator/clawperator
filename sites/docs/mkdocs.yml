@@ -80,6 +80,7 @@ nav:
       - Skills CLI: skills/cli.md
       - Authoring: skills/authoring.md
       - Development Workflow: skills/development.md
+      - Context Adapter: skills/context-adapter.md
       - Jev Integration: skills/jev.md
       - Device Prep and Runtime: skills/runtime.md
       - Personalized Skills: skills/personalized-skills.md

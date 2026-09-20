@@ -6,6 +6,9 @@ Document the current authoring contract for local skills: zero-results
 discovery, recording-based proving, scaffolded files, `SKILL.md`, run scripts,
 artifact compilation, and validation.
 
+For bounded, evidence-preserving model input, see the
+[Context adapter](context-adapter.md) in the companion skills repository.
+
 For optional model delegation, see [Using Jev in orchestrated skills](jev.md).
 It covers the agent/provider boundary, proposal validation, and recovery evidence.
 
