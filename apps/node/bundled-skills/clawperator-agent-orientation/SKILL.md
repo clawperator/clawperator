@@ -1,6 +1,6 @@
 ---
 name: clawperator-agent-orientation
-description: Select a target, verify readiness, and choose an entry point when an agent first uses an installed Clawperator host.
+description: First-run orientation for Android automation with Clawperator. Use when Clawperator is installed but the agent is unfamiliar with selecting the CLI, Android device, and Operator package, checking readiness, or choosing between runtime skills, discovery, recording, MCP, and direct actions.
 ---
 
 # Clawperator Agent Orientation
