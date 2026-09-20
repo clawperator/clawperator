@@ -298,13 +298,18 @@ async function ensureDaemonReady(
   return false;
 }
 
-function proxyLostResult(error: unknown): RunExecutionResult {
+function proxyLostResult(error: unknown, execution: unknown, startedAt: string): RunExecutionResult {
   return {
     ok: false,
     error: {
       code: ERROR_CODES.DAEMON_PROXY_ERROR,
       message: "Daemon response lost; action may have executed",
-      details: { error: String(error) },
+      details: {
+        error: String(error), phase: "result_wait", dispatchState: "unknown",
+        ...(isObject(execution) && typeof execution.commandId === "string" ? { commandId: execution.commandId } : {}),
+        ...(isObject(execution) && typeof execution.taskId === "string" ? { taskId: execution.taskId } : {}),
+        startedAt, completedAt: new Date().toISOString(),
+      },
     },
   };
 }
@@ -388,6 +393,7 @@ export async function tryDaemonExecution(
     return null;
   }
 
+  const startedAt = new Date().toISOString();
   try {
     const skillRunId = getInheritedSkillRunId();
     const postResult = await (deps.httpPostFn ?? httpPost)(socketPath, "/execute", {
@@ -400,7 +406,7 @@ export async function tryDaemonExecution(
       if (!postResult.dispatched || options.allowPostDispatchFallback === true) {
         return null;
       }
-      return proxyLostResult(postResult.error);
+      return proxyLostResult(postResult.error, execution, startedAt);
     }
     try {
       return parseDaemonRunExecutionResult(postResult.body);
@@ -408,9 +414,9 @@ export async function tryDaemonExecution(
       if (options.allowPostDispatchFallback === true) {
         return null;
       }
-      return proxyLostResult(error);
+      return proxyLostResult(error, execution, startedAt);
     }
   } catch (error) {
-    return proxyLostResult(error);
+    return proxyLostResult(error, execution, startedAt);
   }
 }

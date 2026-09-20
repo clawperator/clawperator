@@ -128,6 +128,7 @@ export function projectCompactSnapshot(xml: string, ids: Pick<ResultEnvelope, "c
 export async function presentSnapshot(envelope: ResultEnvelope, options: SnapshotPresentationOptions) {
   validateSnapshotPresentationOptions(options);
   const step = envelope.stepResults.find(item => item.actionType === "snapshot" && item.success && item.data.text !== undefined);
+  const startedAt = new Date().toISOString();
   let rawArtifactPath: string | undefined;
   try {
     if (!step) throw { code: "SNAPSHOT_EXTRACTION_FAILED", message: "Snapshot XML is unavailable" };
@@ -153,6 +154,13 @@ export async function presentSnapshot(envelope: ResultEnvelope, options: Snapsho
       }) }, compact,
     };
   } catch (error) {
-    throw { ...(error as object), envelope, ...(rawArtifactPath !== undefined ? { rawArtifactPath } : {}) };
+    throw { ...(error as object), envelope,
+      details: {
+        phase: "post_processing", dispatchState: "dispatched",
+        commandId: envelope.commandId, taskId: envelope.taskId,
+        startedAt, completedAt: new Date().toISOString(),
+      },
+      ...(rawArtifactPath !== undefined ? { rawArtifactPath } : {}),
+    };
   }
 }

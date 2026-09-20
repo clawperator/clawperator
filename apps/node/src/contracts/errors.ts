@@ -209,6 +209,12 @@ export interface ExecutionFailureEvidence extends Record<string, unknown> {
   commandId?: string;
   taskId?: string;
   earlierEffects?: Array<{ actionId: string; effect: "force_stop" }>;
+  probeCommandId?: string;
+  probeTaskId?: string;
+  probeDispatchState?: DispatchState;
+  probeStartedAt?: string;
+  probeCompletedAt?: string;
+  dispatchStartedAt?: string;
   startedAt: string;
   completedAt?: string;
   logPath?: string;
