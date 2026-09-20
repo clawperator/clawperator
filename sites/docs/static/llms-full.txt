@@ -9042,8 +9042,8 @@ All daemon lifecycle commands return JSON on stdout by default. `--output pretty
 | Command | Purpose | Success status values |
 | --- | --- | --- |
 | `clawperator daemon start [--device <id>] [--operator-package <package>]` | Spawn `daemon run` as a detached background process and wait for `/ping`. | `started`, `already_running` |
-| `clawperator daemon stop [--device <id>]` | Send `SIGTERM` to the PID in the metadata file and remove PID/socket files. | `stopped`, `not_running` |
-| `clawperator daemon status [--device <id>]` | Check `/ping`, read metadata, call `/version`, and report state. | `running`, `not_running` |
+| `clawperator daemon stop [--device <id>]` | Send `SIGTERM` to a verified managed PID and remove its PID/socket files. | `stopped`, `not_running` |
+| `clawperator daemon status [--device <id>]` | Check `/ping`, read metadata, call `/version`, and report state. | `running`, `not_running`, `unowned` |
 | `clawperator daemon restart [--device <id>] [--operator-package <package>]` | Stop, then start. | `started`, `already_running` |
 
 Internal command:
@@ -9087,7 +9087,7 @@ The daemon directory is created with mode `0700`. The PID metadata file is JSON:
 }
 ```
 
-`daemon status` uses `startedAt` to compute `daemon.uptimeSeconds`. Lifecycle commands also use the ownership fields to avoid treating an unrelated reused PID as the managed daemon.
+`daemon status` uses `startedAt` to compute `daemon.uptimeSeconds`. Lifecycle commands also use the ownership fields to avoid treating an unrelated reused PID as the managed daemon. If a socket responds to `/ping` but its metadata does not identify a live managed daemon, status reports `unowned`; it does not claim that the daemon is absent or take ownership of the listener.
 
 Daemon lifecycle lock files are created next to the PID metadata and socket. A lock file includes the owning process PID so later daemon commands can reclaim a stale lock when that process no longer exists.
 
@@ -9148,6 +9148,18 @@ Not running:
   "ok": true,
   "daemon": {
     "status": "not_running",
+    "socketPath": "/Users/<local_user>/.clawperator/daemon/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
+  }
+}
+```
+
+Unowned responding socket:
+
+```json
+{
+  "ok": true,
+  "daemon": {
+    "status": "unowned",
     "socketPath": "/Users/<local_user>/.clawperator/daemon/daemon-id-ZW11bGF0b3ItNTU1NA.sock"
   }
 }
@@ -9222,7 +9234,8 @@ Proxy selection rules:
 5. If the socket exists but connection is refused, the proxy deletes the stale socket and starts a new daemon.
 6. If `/version` does not match the current CLI version and build identity, the proxy stops the old daemon and starts a new one.
 7. If the daemon is ready and the version and build identity match, the command sends the execution payload to `POST /execute`.
-8. If the daemon cannot become ready before dispatch, the command runs direct for that call.
+8. If a responding socket is not owned by the managed daemon, the command runs direct for that call and leaves the listener untouched.
+9. If the daemon cannot become ready before dispatch, the command runs direct for that call.
 
 The proxy sends the caller's effective Operator package in the request body. Precedence is:
 
@@ -9291,6 +9304,7 @@ Fallback policy:
 | `daemon start` spawns `daemon run` but `/ping` does not become reachable within `3000` ms | `DAEMON_START_FAILED` | `1` | Inspect `~/.clawperator/daemon/daemon-<daemon_key>.log`, then retry `clawperator daemon start --device <id>`. |
 | `daemon start` cannot spawn the background process | `DAEMON_START_FAILED` | `1` | Verify the branch-local CLI entrypoint exists and retry from the same checkout. |
 | `daemon stop` cannot signal or clean up the process | `DAEMON_STOP_FAILED` | `1` | Inspect the PID metadata file and socket path, stop the process manually if needed, then retry `daemon stop`. |
+| `daemon status` reports `unowned` | none | `0` | A responding socket is present but is not verified as this managed daemon. Do not delete its socket or signal its process; inspect its owner or use the checkout that started it. |
 | `exec` or a flat mutating action was dispatched through the daemon but the response was lost | `DAEMON_PROXY_ERROR` | `1` | Do not blindly retry. Inspect device state first because the action may already have executed. |
 
 Top-level daemon failures use the same CLI error shape as other Node-side failures:

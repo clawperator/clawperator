@@ -144,6 +144,13 @@ function removeDaemonFiles(rawDeviceId: string | undefined, options?: DaemonPath
   rmSync(getDaemonSocketPath(rawDeviceId, options), { force: true });
 }
 
+function removeDaemonPidMetadata(rawDeviceId: string | undefined, metadata: DaemonMetadata, options?: DaemonPathsOptions): void {
+  const pidPath = getDaemonPidPath(rawDeviceId, options);
+  if (metadataMatches(readDaemonMetadata(pidPath), metadata)) {
+    rmSync(pidPath, { force: true });
+  }
+}
+
 function metadataMatches(left: DaemonMetadata | undefined, right: DaemonMetadata): boolean {
   return left?.pid === right.pid &&
     left.startedAt === right.startedAt &&
@@ -253,16 +260,17 @@ export async function stopDaemon(
 
     const controller = getProcessController(options);
     if (!controller.isAlive(metadata.pid)) {
-      if (metadataMatches(readDaemonMetadata(pidPath), metadata)) {
-        removeDaemonFiles(rawDeviceId, options);
-      }
+      // A stale PID file does not prove ownership of the socket path. Another
+      // process may have bound it after this daemon exited, so only clear our
+      // metadata. Daemon start can later remove a confirmed stale socket.
+      removeDaemonPidMetadata(rawDeviceId, metadata, options);
       return "not_running";
     }
 
     if (!isDaemonProcess(metadata, controller)) {
-      if (metadataMatches(readDaemonMetadata(pidPath), metadata)) {
-        removeDaemonFiles(rawDeviceId, options);
-      }
+      // Do not unlink a socket belonging to an unverified process, including
+      // a reused PID or another Clawperator checkout.
+      removeDaemonPidMetadata(rawDeviceId, metadata, options);
       return "not_running";
     }
 
