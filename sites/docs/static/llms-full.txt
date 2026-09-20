@@ -7843,31 +7843,59 @@ persistently unavailable screen.
 ## Execution failure evidence
 
 Host execution errors add evidence in `details` without fabricating an Operator
-result envelope. The existing `[Clawperator-Result]` envelope remains unchanged.
+result envelope. Command/task correlation and the `[Clawperator-Result]` wire
+format remain compatible. When a received envelope fails host snapshot extraction
+or screenshot capture, Node adds the same evidence as `envelope.failureEvidence`;
+the affected step also retains its string-valued `failurePhase` and `dispatchState`.
+Successful envelopes do not gain this field.
 
 | Field | Meaning |
 | --- | --- |
-| `phase` | `readiness`, `dispatch`, `result_wait`, or `post_processing` |
+| `phase` | `readiness` (validation, preflight, or probe), `dispatch` (requested broadcast), `result_wait` (waiting for a result), or `post_processing` (processing received evidence) |
 | `commandId`, `taskId` | Requested execution identifiers, when validated and allocated |
 | `dispatchState` | `not_dispatched`, `dispatched`, or `unknown` for requested work |
-| `probeCommandId`, `probeTaskId` | Separate readiness probe identifiers, when issued |
+| `probeCommandId`, `probeTaskId` | Separate readiness probe identifiers, when allocated; `probeDispatchState` distinguishes whether dispatch occurred |
 | `probeDispatchState` | The same three-state vocabulary for the probe |
 | `earlierEffects` | Confirmed host effects, currently `{ actionId, effect: "force_stop" }` |
-| `startedAt`, `completedAt` | Host execution timestamps |
+| `startedAt`, `completedAt` | Host ISO timestamps for the operation reporting the failure |
+| `dispatchStartedAt` | Requested broadcast attempt timestamp, when attempted |
 | `probeStartedAt`, `probeCompletedAt` | Probe timestamps |
 | `logPath` | Local diagnostic log reference, when logging is available |
 | `transport` | Retained bounded probe transport diagnostics, when available |
 | `wakeAttempts` | Attempted wake methods and their transport exit codes |
 
-`dispatched` means the broadcast was acknowledged, not that the action completed.
-`unknown` means dispatch was attempted without a conclusive acknowledgement.
+`dispatched` means the broadcast was acknowledged or a correlated terminal result
+arrived. It does not by itself establish action success or the desired app state.
+`unknown` means the caller lacks conclusive requested-command dispatch evidence.
 `not_dispatched` does not mean safe to retry: host `close_app` preflight may already
 have force-stopped an app, and readiness may have attempted to wake the device.
 After uncertain mutation results, observe and verify state before repeating them.
+CLI JSON, HTTP execution responses, daemon parsing, skill-result envelopes, and
+execution events preserve these fields. MCP preserves correlation and evidence while continuing to omit
+local paths, raw stdout/stderr, and other sensitive diagnostic keys. Use command
+and probe IDs to locate logs when a path is omitted.
+
 Readiness wrappers retain the final probe's evidence rather than substituting the
 requested command's identity. This includes successful probes that leave the
 device asleep or locked: `DEVICE_NOT_INTERACTIVE` preserves probe correlation
-and attempted wake methods while omitting the internal state booleans. Existing failures and validation errors retain their codes.
+and attempted wake methods while omitting the internal state booleans. A successful
+fresh probe is also retained if requested dispatch, result waiting, or host
+post-processing subsequently fails. A readiness cache hit does not invent a new
+probe or relabel an old probe as belonging to this execution. Existing failures
+and validation errors retain their codes.
+
+`earlierEffects` lists confirmed successful force-stops, including those preceding
+a later preflight exception. It is not a complete side-effect audit: an
+unacknowledged force-stop can itself have taken effect. Missing effects or probe
+fields mean no such evidence was retained, not proof that no effects occurred.
+
+A lost daemon response reports `DAEMON_PROXY_ERROR`, `phase: "result_wait"`, and
+`dispatchState: "unknown"`. This phase describes the caller waiting for the daemon;
+the daemon's internal phase, probe identity, and earlier effects are unknown.
+Sending an HTTP request does not prove that the Android command was dispatched.
+Snapshot presentation or artifact-write errors report `post_processing` in
+`details` and retain the real envelope. Their timestamps cover presentation, not
+the earlier execution, and they do not reconstruct unavailable preflight evidence.
 
 Snapshot extraction failures carry string-valued `failurePhase: "post_processing"`
 and `dispatchState: "dispatched"` on the affected step. Inspect the actual failed

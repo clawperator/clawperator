@@ -1,3 +1,5 @@
+import type { ExecutionFailureEvidence } from "./errors.js";
+
 /**
  * How the terminal result was obtained. Canonical-only: Node accepts only [Clawperator-Result].
  */
@@ -33,6 +35,8 @@ export interface ResultEnvelope {
    */
   errorCode?: string | null;
   hint?: string;
+  /** Host evidence added only when processing a received envelope fails. */
+  failureEvidence?: ExecutionFailureEvidence;
 }
 
 export const RESULT_ENVELOPE_PREFIX = "[Clawperator-Result]";

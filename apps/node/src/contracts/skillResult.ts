@@ -150,6 +150,22 @@ const resultEnvelopeSchema: z.ZodType<ResultEnvelope, z.ZodTypeDef, unknown> = z
   error: z.string().nullable().optional(),
   errorCode: z.string().nullable().optional(),
   hint: z.string().optional(),
+  failureEvidence: z.object({
+    phase: z.enum(["readiness", "dispatch", "result_wait", "post_processing"]),
+    dispatchState: z.enum(["not_dispatched", "dispatched", "unknown"]),
+    startedAt: z.string(),
+    completedAt: z.string().optional(),
+    commandId: z.string().optional(),
+    taskId: z.string().optional(),
+    earlierEffects: z.array(z.object({ actionId: z.string(), effect: z.literal("force_stop") })).optional(),
+    probeCommandId: z.string().optional(),
+    probeTaskId: z.string().optional(),
+    probeDispatchState: z.enum(["not_dispatched", "dispatched", "unknown"]).optional(),
+    probeStartedAt: z.string().optional(),
+    probeCompletedAt: z.string().optional(),
+    dispatchStartedAt: z.string().optional(),
+    logPath: z.string().optional(),
+  }).passthrough().optional(),
 });
 
 const skillCheckpointEvidenceSchema: z.ZodType<SkillCheckpointEvidence> = z.discriminatedUnion("kind", [

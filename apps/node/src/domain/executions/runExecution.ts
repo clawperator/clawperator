@@ -21,7 +21,7 @@ import type { TimeoutDiagnostics, ExecutionFailureEvidence } from "../../contrac
 import { extractSnapshotRecordsFromLogs, validateSnapshotXml, hasLegacyUntaggedSnapshotMarker } from "./snapshotHelper.js";
 import { emitResult, emitExecution } from "../observe/events.js";
 import { LIMITS } from "../../contracts/limits.js";
-import { ERROR_CODES } from "../../contracts/errors.js";
+import { ERROR_CODES, isClawperatorError } from "../../contracts/errors.js";
 import type { RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import type { Logger } from "../../adapters/logger.js";
 import { buildResultEnvelopeTimeoutHint } from "./timeoutGuidance.js";
@@ -404,10 +404,9 @@ export function finalizeSuccessfulCloseAppSteps(
 
 export async function runCloseAppPreflight(
   execution: Execution,
-  config: RuntimeConfig
+  config: RuntimeConfig,
+  successfulCloseActionIds = new Set<string>()
 ): Promise<{ ok: true; successfulCloseActionIds: Set<string> } | { ok: false; error: { code: string; message: string; [k: string]: unknown } }> {
-  const successfulCloseActionIds = new Set<string>();
-
   for (const action of execution.actions) {
     if (action.type !== "close_app" || !action.params?.applicationId) {
       continue;
@@ -643,14 +642,19 @@ async function performExecution(
 
   try {
     // Host-side close_app preflight is safe even when the device is not yet interactive.
-    const closeAppPreflight = await runCloseAppPreflight(execution, config);
+    const successfulCloseActionIds = new Set<string>();
+    let closeAppPreflight: Awaited<ReturnType<typeof runCloseAppPreflight>>;
+    try {
+      closeAppPreflight = await runCloseAppPreflight(execution, config, successfulCloseActionIds);
+    } finally {
+      // Keep confirmed effects even if a later force-stop throws.
+      evidence.earlierEffects = [...successfulCloseActionIds].map(actionId => ({ actionId, effect: "force_stop" }));
+    }
     if (!closeAppPreflight.ok) {
       cancelEarlyResultWaiter();
       invalidateReadinessCacheForErrorCode(deviceId, config.operatorPackage, closeAppPreflight.error.code);
       return { execution, result: { ok: false, error: closeAppPreflight.error, deviceId } };
     }
-
-    evidence.earlierEffects = [...closeAppPreflight.successfulCloseActionIds].map(actionId => ({ actionId, effect: "force_stop" }));
 
     if (isCloseAppOnlyExecution(execution)) {
       cancelEarlyResultWaiter();
@@ -682,6 +686,10 @@ async function performExecution(
       const interactiveState = await ensureInteractiveAutomationReadyFn(config, {
         probeInteractiveStateFn: options.probeInteractiveStateFn,
       });
+      if (interactiveState.ok) {
+        const { phase: _phase, dispatchState: _dispatchState, ...probeEvidence } = interactiveState.probeEvidence ?? {};
+        Object.assign(evidence, probeEvidence);
+      }
       if (!interactiveState.ok) {
         cancelEarlyResultWaiter();
         const publicError = interactiveState.error.code === ERROR_CODES.DEVICE_NOT_INTERACTIVE
@@ -741,6 +749,8 @@ async function performExecution(
         );
 
     if (result.ok) {
+      // A correlated terminal result proves delivery even if the ADB acknowledgement is still pending.
+      evidence.dispatchState = "dispatched";
       evidence.phase = "post_processing";
       options.logger?.emit({
         ts: new Date().toISOString(),
@@ -818,6 +828,9 @@ async function performExecution(
       }
 
       reconcileEnvelopeStatusAfterPostProcessing(result.envelope);
+      if (result.envelope.stepResults.some(step => !step.success && step.data.failurePhase === "post_processing")) {
+        result.envelope.failureEvidence = { ...evidence, completedAt: new Date().toISOString() };
+      }
       injectServiceUnavailableHint(result.envelope, deviceId);
       if (result.envelope.status === "failed") {
         for (const errorCode of getReadinessInvalidationErrorCodes(result.envelope)) {
@@ -871,7 +884,7 @@ async function performExecution(
       },
     };
   } catch (error) {
-    return { execution, result: { ok: false, deviceId, error: {
+    return { execution, result: { ok: false, deviceId, error: isClawperatorError(error) ? { ...error } : {
       code: ERROR_CODES.RESULT_TRANSPORT_FAILED,
       message: error instanceof Error ? error.message : String(error),
     } } };

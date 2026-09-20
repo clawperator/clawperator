@@ -526,6 +526,15 @@ describe("tryDaemonExecution", () => {
     if (result?.ok === false) {
       assert.equal(result.error.code, ERROR_CODES.DAEMON_PROXY_ERROR);
     }
+    assert.ok(result && !result.ok);
+    const details = result.error.details as Record<string, unknown>;
+    assert.equal(details.phase, "result_wait");
+    assert.equal(details.dispatchState, "unknown");
+    assert.equal(details.commandId, execution.commandId);
+    assert.equal(details.taskId, execution.taskId);
+    assert.equal(details.probeCommandId, undefined);
+    assert.equal(details.earlierEffects, undefined);
+
   });
 
   it("returns DAEMON_PROXY_ERROR for non-idempotent malformed daemon responses", async () => {

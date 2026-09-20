@@ -3,7 +3,7 @@ import { runAdb, type AdbResult } from "../../../adapters/android-bridge/adbClie
 import { broadcastAgentCommand } from "../../../adapters/android-bridge/broadcastAgentCommand.js";
 import { waitForResultEnvelope, type LogcatResult } from "../../../adapters/android-bridge/logcatResultReader.js";
 import { type RuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
-import { ERROR_CODES, type ErrorCode, type DispatchState } from "../../../contracts/errors.js";
+import { ERROR_CODES, type ErrorCode, type DispatchState, isClawperatorError } from "../../../contracts/errors.js";
 import { type StepResult } from "../../../contracts/result.js";
 
 export type WaitForResultEnvelopeFn = typeof waitForResultEnvelope;
@@ -37,7 +37,7 @@ export type InteractiveStateProbeResult =
   | { ok: false; code: ErrorCode; message: string; details?: Record<string, unknown> };
 
 export type InteractiveAutomationReadyResult =
-  | { ok: true; state: InternalInteractiveState }
+  | { ok: true; state: InternalInteractiveState; probeEvidence?: Record<string, unknown> }
   | { ok: false; error: InteractiveAutomationReadyError };
 
 export type WakeAttemptMethod =
@@ -130,7 +130,8 @@ export async function runDoctorPingCommand(
     result = {
       ok: false,
       code: ERROR_CODES.RESULT_TRANSPORT_FAILED,
-      error: error instanceof Error ? error.message : String(error),
+      error: error instanceof Error || isClawperatorError(error) ? error.message : String(error),
+      ...(isClawperatorError(error) && error.details !== undefined ? { diagnostics: error.details } : {}),
     };
   }
   return {
@@ -138,7 +139,7 @@ export async function runDoctorPingCommand(
     probeEvidence: {
       probeCommandId: commandId,
       probeTaskId: "doctor-handshake",
-      probeDispatchState: dispatchState,
+      probeDispatchState: result.ok ? "dispatched" : dispatchState,
       phase: "readiness",
       dispatchState: "not_dispatched",
       probeStartedAt: startedAt,
@@ -364,7 +365,16 @@ export async function ensureInteractiveAutomationReady(
 
   if ((wakeResult.status === "already_awake" || wakeResult.status === "awake") &&
       wakeResult.state && isInteractiveAutomationReady(wakeResult.state)) {
-    return { ok: true, state: wakeResult.state };
+    return {
+      ok: true,
+      state: wakeResult.state,
+      ...(wakeResult.probeEvidence !== undefined || wakeResult.attempts.length > 0 ? {
+        probeEvidence: {
+          ...wakeResult.probeEvidence,
+          wakeAttempts: wakeResult.attempts.map(attempt => ({ method: attempt.method, exitCode: attempt.adbResult.code })),
+        },
+      } : {}),
+    };
   }
 
   const error: InteractiveAutomationReadyError =

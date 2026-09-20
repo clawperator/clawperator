@@ -93,6 +93,14 @@ repetition. Historical records lack some of these fields and cannot be
 retroactively treated as complete traces. Injected regression failures prove
 propagation, not repair of the physical transport cause.
 
+The sanitized `apps/node/src/test/fixtures/readiness-timeout.json` excerpt keeps
+one `samsung-a4` screenshot timeout and the paired probe/request reader-failure
+timestamps. Its command IDs are replaced. The audit did not retain a broadcast
+acknowledgement; the regression test injects one explicitly to exercise propagation
+and does not infer it from the historical log. R2 coverage also exercises loss of
+successful probe correlation during a later requested-command failure, preflight
+exceptions after a force-stop, host post-processing, and public serialization.
+
 ## Snapshot transport boundary
 
 `TaskScopeDefault.logUiTree` emits a command-tagged hierarchy through `Log.d`,
