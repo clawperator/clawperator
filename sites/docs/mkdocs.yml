@@ -80,6 +80,8 @@ nav:
       - Skills CLI: skills/cli.md
       - Authoring: skills/authoring.md
       - Development Workflow: skills/development.md
+      - Settings Version Example: skills/settings-version-details.md
+      - Jev Decision Companion: skills/settings-version-jev.md
       - Device Prep and Runtime: skills/runtime.md
       - Personalized Skills: skills/personalized-skills.md
   - Troubleshooting:
