@@ -126,15 +126,26 @@ export async function runDoctorPingCommand(
       }
     );
   } catch (error) {
-    result = { ok: false, code: ERROR_CODES.RESULT_TRANSPORT_FAILED,
-      error: error instanceof Error ? error.message : String(error) };
+    result = {
+      ok: false,
+      code: ERROR_CODES.RESULT_TRANSPORT_FAILED,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
-  return { ...result, probeEvidence: {
-    probeCommandId: commandId, probeTaskId: "doctor-handshake", probeDispatchState: dispatchState,
-    phase: "readiness", dispatchState: "not_dispatched",
-    probeStartedAt: startedAt, probeCompletedAt: new Date().toISOString(), logPath: config.logger?.logPath(),
-    ...("diagnostics" in result ? { transport: result.diagnostics } : {}),
-  } };
+  return {
+    ...result,
+    probeEvidence: {
+      probeCommandId: commandId,
+      probeTaskId: "doctor-handshake",
+      probeDispatchState: dispatchState,
+      phase: "readiness",
+      dispatchState: "not_dispatched",
+      probeStartedAt: startedAt,
+      probeCompletedAt: new Date().toISOString(),
+      logPath: config.logger?.logPath(),
+      ...("diagnostics" in result ? { transport: result.diagnostics } : {}),
+    },
+  };
 }
 
 export function parseDoctorPingInteractiveState(stepResult: StepResult): InternalInteractiveState {
@@ -158,19 +169,10 @@ export async function probeInteractiveState(
   const result = await runDoctorPingCommand(config, waitForEnvelope);
 
   if (!result.ok) {
-    if ("timeout" in result && result.timeout) {
+    if (("timeout" in result && result.timeout) || ("broadcastFailed" in result && result.broadcastFailed)) {
       return {
         ok: false,
-      details: result.probeEvidence,
-        code: result.diagnostics.code,
-        message: result.diagnostics.message,
-      };
-    }
-
-    if ("broadcastFailed" in result && result.broadcastFailed) {
-      return {
-        ok: false,
-      details: result.probeEvidence,
+        details: result.probeEvidence,
         code: result.diagnostics.code,
         message: result.diagnostics.message,
       };
@@ -179,7 +181,7 @@ export async function probeInteractiveState(
     if ("error" in result) {
       return {
         ok: false,
-      details: result.probeEvidence,
+        details: result.probeEvidence,
         code: (result.code as ErrorCode | undefined) ?? ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
         message: result.error,
       };
