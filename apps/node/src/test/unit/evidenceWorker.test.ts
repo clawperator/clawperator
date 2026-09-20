@@ -7,12 +7,16 @@ import { join, resolve, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { randomUUID } from "node:crypto";
 
 const execute = promisify(execFile);
 
 for (const [flags, deviceType] of [["", "physical"], ["\\n[ro.kernel.qemu]: [1]", "emulator"], ["\\n[ro.kernel.qemu]: [unexpected]", "unknown"]] as const) {
 it(`classification ${deviceType}: real detached worker survives its initiating process and concurrent stops finalize once`, { skip: process.platform === "win32" ? "Executable fixtures use POSIX shebangs" : false }, async () => {
   const root = await fs.mkdtemp(join(tmpdir(), "video-worker-process-test-"));
+  // Video locks are host-wide, even across worktrees and evidence directories.
+  const deviceId = `test-device-${randomUUID()}`;
+  const secondDeviceId = `second-${deviceId}`;
   const binary = async (name: string, body: string) => {
     const path = join(root, name);
     await fs.writeFile(path, '#!/usr/bin/env node\n' + body, { mode: 0o700 });
@@ -23,7 +27,7 @@ const fs=require('node:fs'),path=require('node:path');const root=__dirname;
 const args=process.argv.slice(2);const action=args.slice(args[0]==='-s'?2:0).join(' ');
 const recorder=path.join(root,"recorder-"+(args[1]||"none")+".json");
 const read=()=>JSON.parse(fs.readFileSync(recorder,'utf8'));
-if(action==='devices') console.log('List of devices attached\\ntest-device\\tdevice\\nsecond-test-device\\tdevice');
+if(action==='devices') console.log(${JSON.stringify(`List of devices attached\n${deviceId}\tdevice\n${secondDeviceId}\tdevice`)});
 else if(action==='shell screenrecord --help') console.error('--size --time-limit Default is 180.');
 else if(action==='shell getprop') console.log('[ro.build.version.sdk]: [36]\\n[ro.build.version.release]: [16]\\n[ro.product.model]: [test]\\n[ro.product.manufacturer]: [test]${flags}');
 else if(action==='shell wm size') console.log('Physical size: 720x1280');
@@ -46,13 +50,13 @@ else {console.error('Unexpected fake adb operation: '+action);process.exit(1)}
   await binary("ffprobe", "console.log(JSON.stringify({streams:[{codec_name:'h264',width:720,height:1280,duration:'0.25'}]}));");
   await binary("ffmpeg", "console.log('frame=6\\nprogress=end\\n');");
   const parent = join(root, "start.mjs");
-  await fs.writeFile(parent, `import {startVideo} from ${JSON.stringify(pathToFileURL(resolve("dist/domain/evidence/video.js")).href)};console.log(JSON.stringify(await startVideo({deviceId:process.argv[2]||'test-device',operatorPackage:'com.example.operator',durationSeconds:20}).catch(error=>error)));`);
+  await fs.writeFile(parent, `import {startVideo} from ${JSON.stringify(pathToFileURL(resolve("dist/domain/evidence/video.js")).href)};console.log(JSON.stringify(await startVideo({deviceId:process.argv[2]||${JSON.stringify(deviceId)},operatorPackage:'com.example.operator',durationSeconds:20}).catch(error=>error)));`);
   const env = { ...process.env, ADB_PATH: adb, PATH: root + ":" + process.env.PATH, CLAWPERATOR_EVIDENCE_DIR: relative(process.cwd(), join(root, "state with spaces")) };
   let manifestPath: string | undefined;
   try {
     // execFile resolves only when the initiating process has exited.
     const started = JSON.parse((await execute(process.execPath, [parent], { env, timeout: 8000 })).stdout);
-    assert.equal(started.status, "recording");
+    assert.equal(started.status, "recording", JSON.stringify(started));
     manifestPath = started.manifestPath;
     const cli = (operation: string) => execute(process.execPath, ["dist/cli/index.js", "evidence", "video", operation, "--session", manifestPath!], { env, timeout: 17000 }).then(result => ({ ...result, exitCode: 0 })).catch(error => {
       if (deviceType !== "unknown" || error.code !== 1) throw error;
@@ -81,8 +85,8 @@ else {console.error('Unexpected fake adb operation: '+action);process.exit(1)}
     assert.equal(await fs.readFile(manifestPath!, "utf8"), original);
     const state = JSON.parse(await fs.readFile(join(resolve(manifestPath!, ".."), "session.json"), "utf8"));
     await assert.rejects(fs.stat(state.lockPath));
-    const independent = JSON.parse((await execute(process.execPath, [parent, "second-test-device"], { env, timeout: 8000 })).stdout);
-    assert.equal(independent.status, "recording");
+    const independent = JSON.parse((await execute(process.execPath, [parent, secondDeviceId], { env, timeout: 8000 })).stdout);
+    assert.equal(independent.status, "recording", JSON.stringify(independent));
     const firstDevice = JSON.parse((await execute(process.execPath, [parent], { env, timeout: 8000 })).stdout);
     assert.equal(firstDevice.status, "recording");
     for (const session of [independent, firstDevice]) {
@@ -116,7 +120,7 @@ else {console.error('Unexpected fake adb operation: '+action);process.exit(1)}
     assert.equal(doomed.status, "recording");
     manifestPath = doomed.manifestPath;
     const doomedState = await readState(resolve(manifestPath!, ".."));
-    const recorder = JSON.parse(await fs.readFile(join(root, "recorder-test-device.json"), "utf8"));
+    const recorder = JSON.parse(await fs.readFile(join(root, `recorder-${deviceId}.json`), "utf8"));
     assert.equal(recorder.remote, doomedState.remotePath, "Only terminate processes created by this fixture");
     assert.ok(doomedState.hostPid && doomedState.hostStartedAt);
     try {
