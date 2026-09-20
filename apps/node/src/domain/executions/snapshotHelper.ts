@@ -1,3 +1,5 @@
+import { SaxesParser } from "saxes";
+
 /**
  * Shared logic for extracting UI snapshot text from logcat lines.
  */
@@ -9,6 +11,8 @@ export function extractSnapshotFromLogs(lines: string[]): string | null {
 export interface ExtractedSnapshotRecord {
   snapshot: string;
   commandId?: string;
+  validationError?: string;
+  diagnosticPreview?: string;
 }
 
 export function extractSnapshotsFromLogs(lines: string[]): string[] {
@@ -30,7 +34,7 @@ export function extractSnapshotRecordsFromLogs(lines: string[]): ExtractedSnapsh
     const marker = parseSnapshotMarkerMessage(message);
     if (tag !== null && marker !== null) {
       const currentSnapshot = currentSnapshotLines?.join("\n").trim();
-      if (currentSnapshot) {
+      if (currentSnapshot !== undefined) {
         snapshots.push({
           snapshot: currentSnapshot,
           commandId: currentSnapshotCommandId,
@@ -57,12 +61,10 @@ export function extractSnapshotRecordsFromLogs(lines: string[]): ExtractedSnapsh
     const trimmed = message.trim();
     if (trimmed.startsWith("[") && !trimmed.startsWith("<?xml") && !trimmed.startsWith("<")) {
       const currentSnapshot = currentSnapshotLines.join("\n").trim();
-      if (currentSnapshot) {
-        snapshots.push({
-          snapshot: currentSnapshot,
-          commandId: currentSnapshotCommandId,
-        });
-      }
+      snapshots.push({
+        snapshot: currentSnapshot,
+        commandId: currentSnapshotCommandId,
+      });
       currentSnapshotLines = null;
       currentSnapshotTag = null;
       currentSnapshotCommandId = undefined;
@@ -72,12 +74,10 @@ export function extractSnapshotRecordsFromLogs(lines: string[]): ExtractedSnapsh
     currentSnapshotLines.push(message);
     if (trimmed === "</hierarchy>") {
       const currentSnapshot = currentSnapshotLines.join("\n").trim();
-      if (currentSnapshot) {
-        snapshots.push({
-          snapshot: currentSnapshot,
-          commandId: currentSnapshotCommandId,
-        });
-      }
+      snapshots.push({
+        snapshot: currentSnapshot,
+        commandId: currentSnapshotCommandId,
+      });
       currentSnapshotLines = null;
       currentSnapshotTag = null;
       currentSnapshotCommandId = undefined;
@@ -85,14 +85,20 @@ export function extractSnapshotRecordsFromLogs(lines: string[]): ExtractedSnapsh
   }
 
   const trailingSnapshot = currentSnapshotLines?.join("\n").trim();
-  if (trailingSnapshot) {
+  if (trailingSnapshot !== undefined) {
     snapshots.push({
       snapshot: trailingSnapshot,
       commandId: currentSnapshotCommandId,
     });
   }
 
-  return snapshots;
+  return snapshots.map(record => {
+    const validationError = validateSnapshotXml(record.snapshot);
+    return validationError === undefined ? record : {
+      ...record, snapshot: "", validationError,
+      diagnosticPreview: record.snapshot.slice(0, 1024),
+    };
+  });
 }
 
 export function extractSnapshotsForCommand(lines: string[], expectedCommandId: string): string[] {
@@ -165,4 +171,26 @@ function parseSnapshotMarkerMessage(message: string): ParsedSnapshotMarker | nul
     commandId: newFormatMatch[1],
     firstLineRemainder: newFormatMatch[2]?.trim() ?? "",
   };
+}
+
+/** Bounded SAX validation; declarations and external entities are never resolved. */
+export function validateSnapshotXml(xml: string): string | undefined {
+  if (xml.length === 0) return "missing_payload";
+  if (Buffer.byteLength(xml, "utf8") > 8 * 1024 * 1024) return "payload_limit";
+  let depth = 0;
+  let root: string | undefined;
+  const parser = new SaxesParser();
+  parser.on("doctype", () => { throw new Error("doctype_forbidden"); });
+  parser.on("error", () => { throw new Error("malformed_xml"); });
+  parser.on("opentag", tag => {
+    if (depth === 0) root = tag.name;
+    if (++depth > 256) throw new Error("depth_limit");
+  });
+  parser.on("closetag", () => { depth--; });
+  try {
+    parser.write(xml).close();
+    return root === "hierarchy" ? undefined : "invalid_root";
+  } catch (error) {
+    return error instanceof Error ? error.message : "malformed_xml";
+  }
 }

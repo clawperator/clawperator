@@ -485,7 +485,7 @@ If a `snapshot` step initially succeeds but Node cannot attach `data.text`, Node
   "success": false,
   "data": {
     "error": "SNAPSHOT_EXTRACTION_FAILED",
-    "message": "UI hierarchy extraction produced no output for this step. Check clawperator version compatibility and logcat extraction health."
+    "message": "UI hierarchy extraction produced missing or invalid XML for this step. Check clawperator version compatibility and logcat extraction health."
   }
 }
 ```
@@ -593,3 +593,32 @@ Operationally:
 - [Selectors](selectors.md)
 - [Errors](errors.md)
 - [Navigation Patterns](navigation.md)
+
+## Source completeness
+
+Raw and compact consumers receive the same source validation before presentation.
+Node accepts one well-formed `hierarchy` XML document, including an empty
+`<hierarchy/>`. Missing payloads, unfinished documents, malformed nesting,
+multiple roots, DTD declarations, and unknown entities fail extraction. Validation
+is limited to 8 MiB of UTF-8 source and 256 nested elements; it never resolves
+external entities.
+
+The affected step has `success: false`, `data.error: "SNAPSHOT_EXTRACTION_FAILED"`,
+and no `data.text`. `data.extractionReason` is one of `missing_payload`,
+`malformed_xml`, `invalid_root`, `doctype_forbidden`, `payload_limit`, or
+`depth_limit`. The envelope becomes failed and the CLI exits 1. Command IDs and
+invalid occurrence positions are retained, preventing an earlier capture from
+being attached to a later snapshot step. A missing entire marker still has no
+independent step identifier; attachment uses the existing positional ordering.
+
+When file logging is enabled, `snapshot.extraction.failed` retains the command,
+task, zero-based occurrence, reason, and at most 1024 source characters locally.
+The failed step includes `data.diagnosticLogPath` when a log file is available.
+The partial tree is never returned as valid observation text. A deliberate
+compact presentation limit applies only after valid source capture; it is not an
+extraction failure.
+
+Compatibility correction: raw consumers that previously accepted incomplete XML
+must now handle failed steps and exit code 1. Switching to compact output is not
+required for this protection. Query JSON remains serialized inside string-valued
+step data.

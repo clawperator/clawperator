@@ -531,3 +531,34 @@ unavailable, follow [setup](../setup.md#sensitive-hierarchy-access) to enable it
 A visible screenshot does not guarantee an accessible hierarchy. Do not infer
 that another window is the requested application or repeatedly retry a
 persistently unavailable screen.
+
+## Execution failure evidence
+
+Host execution errors add evidence in `details` without fabricating an Operator
+result envelope. The existing `[Clawperator-Result]` envelope remains unchanged.
+
+| Field | Meaning |
+| --- | --- |
+| `phase` | `readiness`, `dispatch`, `result_wait`, or `post_processing` |
+| `commandId`, `taskId` | Requested execution identifiers, when validated and allocated |
+| `dispatchState` | `not_dispatched`, `dispatched`, or `unknown` for requested work |
+| `probeCommandId`, `probeTaskId` | Separate readiness probe identifiers, when issued |
+| `probeDispatchState` | The same three-state vocabulary for the probe |
+| `earlierEffects` | Confirmed host effects, currently `{ actionId, effect: "force_stop" }` |
+| `startedAt`, `completedAt` | Host execution timestamps |
+| `probeStartedAt`, `probeCompletedAt` | Probe timestamps |
+| `logPath` | Local diagnostic log reference, when logging is available |
+| `transport` | Retained bounded probe transport diagnostics, when available |
+| `wakeAttempts` | Attempted wake methods and their transport exit codes |
+
+`dispatched` means the broadcast was acknowledged, not that the action completed.
+`unknown` means dispatch was attempted without a conclusive acknowledgement.
+`not_dispatched` does not mean safe to retry: host `close_app` preflight may already
+have force-stopped an app, and readiness may have attempted to wake the device.
+After uncertain mutation results, observe and verify state before repeating them.
+Readiness wrappers retain probe evidence rather than substituting the requested
+command's identity. Existing failures and validation errors retain their codes.
+
+Snapshot extraction failures carry string-valued `failurePhase: "post_processing"`
+and `dispatchState: "dispatched"` on the affected step. Inspect the actual failed
+step and retained evidence rather than assuming the Android action itself failed.

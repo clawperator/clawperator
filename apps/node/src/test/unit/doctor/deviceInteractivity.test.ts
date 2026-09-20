@@ -299,6 +299,7 @@ describe("probeInteractiveState", () => {
 
     const result = await probeInteractiveState(config, mockWait as any);
     assert.deepStrictEqual(result, {
+      details: !result.ok ? result.details : undefined,
       ok: false,
       code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
       message: "doctor_ping returned an invalid boolean for screen_on: missing",
@@ -333,6 +334,7 @@ describe("probeInteractiveState", () => {
 
     const result = await probeInteractiveState(config, mockWait as any);
     assert.deepStrictEqual(result, {
+      details: !result.ok ? result.details : undefined,
       ok: false,
       code: ERROR_CODES.RESULT_ENVELOPE_MALFORMED,
       message: "doctor_ping step result was unsuccessful.",
@@ -747,6 +749,7 @@ describe("ensureInteractiveAutomationReady", () => {
         code: ERROR_CODES.DEVICE_SHELL_UNAVAILABLE,
         message: "Wake attempt cmd_power_wakeup failed before the device screen turned on: transport error",
         details: {
+          wakeAttempts: [],
           screenOn: false,
           deviceLocked: false,
           userUnlocked: true,

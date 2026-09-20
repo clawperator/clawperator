@@ -124,15 +124,15 @@ describe("markExtractionFailedSnapshotSteps", () => {
     assert.deepStrictEqual(stepResults[0].data, { text: "<hierarchy/>" });
   });
 
-  it("does not treat an existing empty-string text field as missing", () => {
+  it("rejects an empty-string payload as missing", () => {
     const stepResults: StepResult[] = [
       { id: "snap-1", actionType: "snapshot", success: true, data: { text: "" } },
     ];
 
     markExtractionFailedSnapshotSteps(stepResults);
 
-    assert.strictEqual(stepResults[0].success, true);
-    assert.deepStrictEqual(stepResults[0].data, { text: "" });
+    assert.strictEqual(stepResults[0].success, false);
+    assert.strictEqual(stepResults[0].data.error, "SNAPSHOT_EXTRACTION_FAILED");
   });
 
   it("does not modify snapshot steps that are already failed", () => {
@@ -615,6 +615,7 @@ describe("runCloseAppPreflight", () => {
       assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_SHELL_UNAVAILABLE);
       assert.match(result.error.message, /close_app pre-flight force-stop failed/);
       assert.deepStrictEqual(result.error.details, {
+        earlierEffects: [],
         applicationId: "com.example.app",
         adbExitCode: 1,
         stdout: "",
@@ -755,7 +756,7 @@ describe("runExecution", () => {
     if (!result.ok) {
       assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
       assert.strictEqual(result.deviceId, "test-device-1");
-      assert.strictEqual(result.error.details, undefined);
+      assert.strictEqual((result.error.details as Record<string, unknown>).dispatchState, "not_dispatched");
       assert.strictEqual(result.error.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
     }
     assert.ok(!runner.calls.some(call => call.args.some(arg => arg.includes("am broadcast"))));
@@ -807,7 +808,7 @@ describe("runExecution", () => {
     assert.strictEqual(result.ok, false);
     if (!result.ok) {
       assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_NOT_INTERACTIVE);
-      assert.strictEqual(result.error.details, undefined);
+      assert.strictEqual((result.error.details as Record<string, unknown>).dispatchState, "not_dispatched");
       assert.strictEqual(result.error.message, "Device is not interactive. Interactive automation requires an awake, usable device state.");
     }
     assert.ok(!runner.calls.some(call => call.args.some(arg => arg.includes("am broadcast"))));
@@ -851,11 +852,13 @@ describe("runExecution", () => {
     if (!result.ok) {
       assert.strictEqual(result.error.code, ERROR_CODES.DEVICE_SHELL_UNAVAILABLE);
       assert.strictEqual(result.error.message, "adb shell broke");
-      assert.deepStrictEqual(result.error.details, {
-        screenOn: false,
-        deviceLocked: false,
-        userUnlocked: true,
-      });
+      const details = result.error.details as Record<string, unknown>;
+      assert.equal(details.screenOn, false);
+      assert.equal(details.deviceLocked, false);
+      assert.equal(details.userUnlocked, true);
+      assert.equal(details.phase, "readiness");
+      assert.equal(details.dispatchState, "not_dispatched");
+      assert.equal(details.commandId, execution.commandId);
       assert.strictEqual(result.deviceId, "test-device-1");
     }
     assert.ok(!runner.calls.some(call => call.args.some(arg => arg.includes("am broadcast"))));
@@ -892,8 +895,7 @@ describe("runExecution", () => {
       return proc;
     }) as FakeProcessRunner["spawn"];
 
-    await assert.rejects(
-      runExecution(execution, {
+    const thrownResult = await runExecution(execution, {
         deviceId: "test-device-1",
         operatorPackage: "com.test.operator.dev",
         runner,
@@ -901,9 +903,9 @@ describe("runExecution", () => {
         ensureInteractiveAutomationReadyFn: async () => {
           throw new Error("readiness exploded");
         },
-      }),
-      /readiness exploded/
-    );
+      });
+    assert.equal(thrownResult.ok, false);
+    if (!thrownResult.ok) assert.match(thrownResult.error.message, /readiness exploded/);
 
     assert.strictEqual(logcatKilled, true);
     assert.ok(!runner.calls.some(call => call.args.some(arg => arg.includes("am broadcast"))));
@@ -1190,6 +1192,7 @@ describe("runExecution", () => {
       assert.deepStrictEqual(result.envelope.stepResults[0].data, {
         actual_format: "hierarchy_xml",
         error: "VERSION_INCOMPATIBLE",
+        extractionReason: "missing_payload",
         message: "Snapshot hierarchy logs used the legacy untagged marker. Install a matching Operator APK that emits commandId-tagged snapshot logs, or use a compatible CLI.",
       });
     }
@@ -3045,10 +3048,12 @@ it("blocks both mixed observation/UI orders before any action dispatch", async (
     runner.queueResult({ code: 0, stdout: "package:com.test.operator\n", stderr: "" });
     runner.spawn = (() => Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), kill() {} })) as FakeProcessRunner["spawn"];
     let readinessCalls = 0;
-    await assert.rejects(runExecution({ commandId: "mixed", taskId: "mixed", source: "test", expectedFormat: "android-ui-automator", timeoutMs: 1000, actions }, {
+    const blocked = await runExecution({ commandId: "mixed", taskId: "mixed", source: "test", expectedFormat: "android-ui-automator", timeoutMs: 1000, actions }, {
       deviceId: "test-device", operatorPackage: "com.test.operator", runner, logcatBroadcastDelayMs: 0,
       ensureInteractiveAutomationReadyFn: async () => { readinessCalls++; throw new Error("interactive prerequisite unavailable"); },
-    }), /interactive prerequisite unavailable/);
+    });
+    assert.equal(blocked.ok, false);
+    if (!blocked.ok) assert.match(blocked.error.message, /interactive prerequisite unavailable/);
     assert.equal(readinessCalls, 1);
     assert.equal(runner.calls.some(call => call.args.some(arg => arg.includes("am broadcast"))), false);
   }
