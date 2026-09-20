@@ -716,7 +716,8 @@ async function performExecution(
       const broadcast = await broadcastAgentCommand(config, payload);
       if (broadcast.success) {
         evidence.dispatchState = "dispatched";
-        evidence.phase = "result_wait";
+        // A terminal result may already have started asynchronous post-processing.
+        if (evidence.phase === "dispatch") evidence.phase = "result_wait";
         options.logger?.emit({
           ts: new Date().toISOString(),
           level: "info",

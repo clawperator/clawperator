@@ -171,3 +171,41 @@ it("a correlated terminal result proves dispatch even before broadcast acknowled
   assert.ok(result.ok, JSON.stringify(result));
   assert.equal(result.envelope.failureEvidence?.dispatchState, "dispatched");
 });
+
+it("late broadcast acknowledgement cannot rewind screenshot post-processing evidence", async () => {
+  const process = runner();
+  const logcat = Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), kill() {} });
+  const capture = Object.assign(new EventEmitter(), { stdout: new EventEmitter(), stderr: new EventEmitter(), kill() {} });
+  let startCapture!: () => void;
+  const captureStarted = new Promise<void>(resolve => { startCapture = resolve; });
+  process.spawn = ((_command, args) => {
+    if (args.includes("logcat")) return logcat;
+    assert.ok(args.includes("screencap"));
+    startCapture();
+    return capture;
+  }) as FakeProcessRunner["spawn"];
+  const envelope: ResultEnvelope = {
+    commandId: execution.commandId, taskId: execution.taskId, status: "success", error: null,
+    stepResults: [{ id: "screen", actionType: "take_screenshot", success: true, data: {} }],
+  };
+  process.queueResult({ code: 0, stdout: "Broadcast completed: result=0", stderr: "" }, async () => {
+    logcat.stdout.emit("data", Buffer.from(`D/Result: [Clawperator-Result] ${JSON.stringify(envelope)}\n`));
+    await captureStarted;
+  });
+  const logger: import("../../adapters/logger.js").Logger = {
+    emit(event) {
+      // Fail capture only after the delayed acknowledgement updates execution evidence.
+      if (event.event === "broadcast.dispatched") capture.emit("close", 1);
+    },
+    child() { return logger; },
+    logPath() { return undefined; },
+  };
+  const result = await runExecution({ ...execution, actions: [{ id: "screen", type: "take_screenshot" }] }, {
+    ...options, runner: process, logger, ensureInteractiveAutomationReadyFn: ready,
+  });
+  assert.ok(result.ok);
+  assert.equal(result.envelope.status, "failed");
+  assert.equal(result.envelope.stepResults[0].data.failurePhase, "post_processing");
+  assert.equal(result.envelope.failureEvidence?.phase, "post_processing");
+  assert.equal(result.envelope.failureEvidence?.dispatchState, "dispatched");
+});
