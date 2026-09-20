@@ -15386,7 +15386,8 @@ budget. Missing text in a partial view is never proof of absence.
 ## Targets and lifecycle
 
 Click candidates require a nonblank text selector unique across **all** source
-nodes, including hidden nodes, and a visible enabled clickable node or ancestor.
+nodes, including hidden nodes and content-description fallback labels, and a
+visible enabled clickable node or ancestor.
 Scroll candidates require a unique resource ID and a scrollable node. Disabled
 or hidden ancestry and known sensitive context block eligibility. The adapter
 checks valid bounds, positive intersection with the supplied viewport and known
@@ -15455,8 +15456,11 @@ Task filtering is not a general privacy guarantee. Raw evidence and provider
 logs may contain private data and must remain local and ignored.
 
 Prefer existing targeted observation when it can answer the task directly.
-`read-value --label` associates a label and value; query `text` and returned
-`label` are different contracts. Query results use numeric bounds and are
+`read-value --label` associates a label and value. Query `--text` maps to
+`textEquals`, which compares the native `label`: nonblank node text, otherwise
+nonblank content description, otherwise an empty string. Compact `text` is the
+XML text attribute, not that combined label. Selector uniqueness must therefore
+include description-only nodes that can match the same native label. Query results use numeric bounds and are
 serialized in `step.data.query`, whereas compact lives at top level and uses
 XML bounds strings. This adapter does not silently unify them. See
 [Observation](../api/snapshot.md) for the existing APIs.
