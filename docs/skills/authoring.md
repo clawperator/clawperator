@@ -6,8 +6,8 @@ Document the current authoring contract for local skills: zero-results
 discovery, recording-based proving, scaffolded files, `SKILL.md`, run scripts,
 artifact compilation, and validation.
 
-For a worked example with live UI evidence, bounded model decisions and truthful
-failure output, see [Android Settings version details](settings-version-details.md).
+For optional model delegation, see [Using Jev in orchestrated skills](jev.md).
+It covers the agent/provider boundary, proposal validation, and recovery evidence.
 
 ## Preferred Authoring Route
 
