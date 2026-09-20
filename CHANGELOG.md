@@ -4,6 +4,49 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.12.0] - 2026-09-20
+
+**Breaking:** Raw snapshots now rejected missing or malformed XML, and successful framed skill responses gained an explicit wrapper `status`. This release added a provider-neutral agent control loop and improved Node capture diagnostics, failure evidence, and daemon ownership handling.
+
+### 🤖 Node API & CLI
+
+- **Added:** Bundled a provider-neutral observe, decide, act, and verify control-loop skill for adaptive Android goals and explicitly requested orchestrated skill authoring, with bounded recovery and optional delegation.
+- **Added:** Exposed bounded snapshot extraction facts, including parser positions, received size, capture boundaries, and explicit diagnostic logging availability across CLI, daemon, MCP, and skill results.
+- **Breaking:** **Changed:** Rejected missing or malformed snapshot XML before raw or compact presentation, returning failed steps and exit code 1. Added wrapper `status` to framed skill success responses; consumers must distinguish it from nested domain status. Verified screenshot PNGs and artifact writes before accepting host fallback success.
+- **Fixed:** Preserved requested and probe correlation, failure phase, dispatch uncertainty, earlier host effects, and diagnostic evidence through public failure responses without fabricating Operator results.
+- **Fixed:** Selected the CLI, device, and installed Operator before first-run readiness checks, and distinguished host-model readiness from device readiness in bundled orientation guidance.
+- **Fixed:** Preserved package-query failures and Operator variant mismatches instead of reporting them as missing installations.
+- **Fixed:** Reported responding sockets without verified managed ownership as `unowned` and preserved their listeners when removing stale daemon metadata.
+
+### 📚 Documentation & Website
+
+- **Added:** Documented optional Jev delegation, bounded proposals, credentials, privacy filtering, and failure recovery for Android automation skills.
+- **Added:** Documented the provider-neutral compact observation context contract, including ancestry, coverage, capture-local selectors, payload limits, and recovery boundaries.
+- **Added:** Documented bounded snapshot diagnostics, logging availability, stale evidence, and recovery without replaying prior mutations.
+- **Added:** Documented the bundled agent control loop and its orientation, discovery, verification, and authoring routes.
+- **Changed:** Documented snapshot validation, screenshot provenance, and skill wrapper status compatibility changes.
+- **Changed:** Clarified failure phases, dispatch uncertainty, and observation before repeating mutations.
+- **Changed:** Clarified required terminal frames for agent-driven skill scripts and kept investigation history separate from public runtime contracts.
+- **Changed:** Aligned host-agent setup guidance with device and Operator selection before readiness checks.
+- **Changed:** Documented package-query error preservation and installation guidance only for confirmed absence.
+- **Changed:** Documented daemon socket ownership and preservation of unowned listeners.
+
+Pull requests:
+- [chore(release): complete 0.11.3 follow-up](https://github.com/clawperator/clawperator/pull/320)
+- [perf(release): speed up code version bumps](https://github.com/clawperator/clawperator/pull/321)
+- [fix(runtime): make capture results and failure evidence trustworthy](https://github.com/clawperator/clawperator/pull/322)
+- [fix(runtime): preserve failure phase and dispatch evidence](https://github.com/clawperator/clawperator/pull/323)
+- [docs(runtime): keep investigation history in the research repository](https://github.com/clawperator/clawperator/pull/324)
+- [docs(skills): select Android targets before first-run readiness checks](https://github.com/clawperator/clawperator/pull/325)
+- [docs(skills): explain Jev integration for Android automation](https://github.com/clawperator/clawperator/pull/326)
+- [docs(skills): document provider-neutral observation context](https://github.com/clawperator/clawperator/pull/327)
+- [fix(skills): ignore Finder metadata in packaging test](https://github.com/clawperator/clawperator/pull/328)
+- [feat(diagnostics): expose bounded snapshot extraction facts](https://github.com/clawperator/clawperator/pull/329)
+- [feat(skills): add provider-neutral agent control loop](https://github.com/clawperator/clawperator/pull/330)
+- [fix(execution): preserve Operator package query failures](https://github.com/clawperator/clawperator/pull/331)
+- [fix(deps): resolve eight flagged transitive dependencies](https://github.com/clawperator/clawperator/pull/332)
+- [fix(daemon): preserve unowned socket listeners](https://github.com/clawperator/clawperator/pull/333)
+
 ## [0.11.3] - 2026-09-19
 
 This release added coordinate swipes with explicit timing and Operator-owned toast messages across the CLI and execution APIs.
