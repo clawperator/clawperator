@@ -1,4 +1,4 @@
 interface:
   display_name: "Clawperator Agent Orientation"
   short_description: "Orient an unfamiliar agent to the correct Clawperator front door"
-  default_prompt: "Use $clawperator-agent-orientation for first-run routing. Respect the selected CLI and inspect its version/help. Discover devices before device-specific checks, resolve the intended target, inspect installed Operator variants and compatibility, then run doctor with explicit device and Operator package. Separate host-agent readiness from device readiness. The agent decides; Clawperator executes validated actions and returns evidence. Follow the skill's failure-evidence guidance before retrying uncertain work. Choose one runtime-skill, discovery, recording, MCP, or direct-action route and end with one next step and canonical doc link."
+  default_prompt: "Use $clawperator-agent-orientation to establish the intended CLI/device/Operator selection and choose one next entry point. Follow its selection-before-readiness order and evidence requirements. Finish with the readiness result, one concrete next step, and its canonical reference, or the specific blocker and recovery reference."
