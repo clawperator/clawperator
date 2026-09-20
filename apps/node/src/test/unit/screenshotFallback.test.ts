@@ -42,4 +42,3 @@ describe("verified screenshot fallback", () => {
     });
   }
 });
-
