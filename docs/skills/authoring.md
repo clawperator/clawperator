@@ -13,6 +13,28 @@ capture details.
 For optional model delegation, see [Using Jev in orchestrated skills](jev.md).
 It covers the agent/provider boundary, proposal validation, and recovery evidence.
 
+## Adaptive execution and goal coverage
+
+After orientation, use `clawperator-agent-control-loop` for bounded adaptive
+navigation and independently verified extraction. It checks completeness,
+coverage, freshness and UI relationships, executes on the explicit target, and
+verifies each destination. Conditional references cover ambiguous selectors,
+nested rows, selective screenshots, failed-step recovery and optional delegation.
+No model provider credential is required by this bundled guidance.
+
+Match runtime skills by requested outcome, supported inputs, outputs and evidence,
+not package overlap. A Settings landing-screen skill does not cover OS version
+and build-number extraction. Partial coverage remains a discovery gap.
+
+For an explicit orchestrated-authoring request with sufficient bounded evidence,
+discovery can return `proceed_to_orchestrated_authoring` with `handoff_target`
+`clawperator-agent-control-loop`. Discovery stops before authoring; the control
+loop then uses the canonical authoring workflow and the Settings examples linked
+from [Jev integration](jev.md). Recording-based authoring retains
+`proceed_to_recording` and its dedicated proving workflow. One-shot requests do
+not authorize durable skill creation. Discovery retains its five-snapshot,
+three-screenshot and 90-second limits.
+
 ## Preferred Authoring Route
 
 Use this order:
@@ -67,6 +89,7 @@ Expected signals:
 - top-level `installedDir`
 - each listed agent-skill includes `name` and `skillPath`
 - `skills[].name` includes `clawperator-agent-orientation`
+- `skills[].name` includes `clawperator-agent-control-loop`
 - `skills[].name` includes `clawperator-upgrade`
 - `skills[].name` includes `clawperator-skill-author-by-agent-discovery`
 - `skills[].name` includes `clawperator-skill-author-by-recording`
@@ -125,6 +148,7 @@ Current packaged first-party bundled skills:
 | --- | --- | --- |
 | `clawperator-agent-orientation` | first-run orientation | Routes an unfamiliar host agent to the correct Clawperator front door and canonical docs without redefining the contracts. |
 | `clawperator-upgrade` | whole-product upgrade route | Checks `clawperator --version`, verifies Node 24+, npm reachability, and Java 17/21, then uses `npm install -g clawperator@latest`, `clawperator install`, and `clawperator doctor`. Uses `install.sh` only as recovery when the CLI is not reachable or the bootstrap prerequisites need repair. |
+| `clawperator-agent-control-loop` | adaptive execution and explicit orchestrated authoring | Bounded observe, decide, act and verify guidance with optional provider delegation. |
 | `clawperator-skill-author-by-agent-discovery` | zero-results front door | Produces one discovery artifact, chooses exactly one next step, and does not author a durable runtime skill directly. |
 | `clawperator-skill-author-by-recording` | proving workflow | Records a real device flow, authors one skill shape, and runs one self-test that surfaces the emitted `SkillResult`. |
 

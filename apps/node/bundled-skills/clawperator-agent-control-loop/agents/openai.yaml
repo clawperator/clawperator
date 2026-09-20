@@ -1,0 +1,4 @@
+interface:
+  display_name: "Clawperator Agent Control Loop"
+  short_description: "Observe, act and independently verify Android outcomes"
+  default_prompt: "Use $clawperator-agent-control-loop after orientation and goal-aware runtime-skill discovery. Declare budgets, choose actions from current evidence, execute on the explicit device and Operator, and independently verify results. Inspect failed steps and prior effects before bounded recovery; never implicitly replay mutations. Model delegation is optional. Return supported values or an honest partial/failed outcome with retained evidence."

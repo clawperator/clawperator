@@ -401,6 +401,7 @@ Notes:
   - Shows the absolute SKILL.md path for each installed bundled skill
   - Use this when you need to inspect the installed host-agent helpers on this machine
   - 'clawperator-agent-orientation' is the first-run orientation skill for unfamiliar hosts
+  - 'clawperator-agent-control-loop' guides bounded adaptive execution and explicit orchestrated authoring after goal-aware discovery
   - 'clawperator-upgrade' is the whole-product upgrade route that checks clawperator --version, verifies Node 24+, npm reachability, and Java 17/21, then uses npm install -g clawperator@latest, clawperator install, and clawperator doctor when the CLI is already viable
   - 'clawperator-skill-author-by-agent-discovery' is the zero-results front door
   - 'clawperator-skill-author-by-recording' remains the proving workflow after discovery returns 'proceed_to_recording'

@@ -75,7 +75,7 @@ export async function cmdBundledSkillsList(
         skills: [],
         count: 0,
         installedDir: installDir,
-        message: "No installed bundled-skills found. Run clawperator bundled-skills install to get clawperator-agent-orientation, clawperator-upgrade, clawperator-skill-author-by-agent-discovery, and clawperator-skill-author-by-recording.",
+        message: "No installed bundled-skills found. Run clawperator bundled-skills install to get clawperator-agent-orientation, clawperator-agent-control-loop, clawperator-upgrade, clawperator-skill-author-by-agent-discovery, and clawperator-skill-author-by-recording.",
       }, options);
     }
 

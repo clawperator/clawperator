@@ -82,11 +82,15 @@ matches the task:
 | Runtime discovery found no relevant match | `clawperator bundled-skills list`, then `clawperator-skill-author-by-agent-discovery` | `https://docs.clawperator.com/host-agents/` |
 | Discovery returned `proceed_to_recording`, or a known app route needs proving | `clawperator bundled-skills list`, then `clawperator-skill-author-by-recording` | `https://docs.clawperator.com/skills/authoring/` |
 | The host supports stdio MCP and has chosen it as transport | `clawperator mcp serve` | `https://docs.clawperator.com/api/mcp/` |
+| Adaptive navigation or independently verified extraction is needed | `clawperator-agent-control-loop` after goal-aware runtime discovery | `https://docs.clawperator.com/skills/authoring/` |
 | A known direct action or payload is needed | Observe first with `clawperator snapshot --device <device_serial> --operator-package <operator_package>` | `https://docs.clawperator.com/quickstart/` |
 
 Use `skills list` first only for inventory. Inspect bundled helpers before runtime
 skill discovery only when authoring is already the known route. Run the selected
-probe rather than surveying every surface. For authoring, prefer daemon-backed
+probe rather than surveying every surface. A package match is insufficient: inspect
+the skill goal, outputs and verification. A Settings landing-screen skill does not
+cover OS version/build extraction. For adaptive one-shot execution or explicit
+orchestrated authoring, use [the control loop](../clawperator-agent-control-loop/SKILL.md). For authoring, prefer daemon-backed
 polling with observable UI readiness conditions over arbitrary fixed sleeps.
 
 ### 3. Interpret evidence before claiming success or retrying

@@ -19,6 +19,28 @@ upgrade sequence when the host is already viable, and falls back to
 `install.sh` only as recovery when the CLI is not reachable or the bootstrap
 prerequisites still need repair.
 
+## Adaptive execution and goal coverage
+
+After orientation, use `clawperator-agent-control-loop` for bounded adaptive
+navigation and independently verified extraction. It checks completeness,
+coverage, freshness and UI relationships, executes on the explicit target, and
+verifies each destination. Conditional references cover ambiguous selectors,
+nested rows, selective screenshots, failed-step recovery and optional delegation.
+No model provider credential is required by this bundled guidance.
+
+Match runtime skills by requested outcome, supported inputs, outputs and evidence,
+not package overlap. A Settings landing-screen skill does not cover OS version
+and build-number extraction. Partial coverage remains a discovery gap.
+
+For an explicit orchestrated-authoring request with sufficient bounded evidence,
+discovery can return `proceed_to_orchestrated_authoring` with `handoff_target`
+`clawperator-agent-control-loop`. Discovery stops before authoring; the control
+loop then uses the canonical authoring workflow and the Settings examples linked
+from [Jev integration](skills/jev.md). Recording-based authoring retains
+`proceed_to_recording` and its dedicated proving workflow. One-shot requests do
+not authorize durable skill creation. Discovery retains its five-snapshot,
+three-screenshot and 90-second limits.
+
 ## Public Setup Skill
 
 Use the public setup skill before this page when the host is not installed,
