@@ -590,28 +590,36 @@ async function performExecution(
 
   if (apkCheck.status === "fail") {
     cancelEarlyResultWaiter();
+    const isMissing = apkCheck.code === ERROR_CODES.OPERATOR_NOT_INSTALLED;
+    const installCommand = isMissing
+      ? `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device ${deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`
+      : undefined;
+    const message = isMissing
+      ? `Operator APK (${config.operatorPackage}) is not installed on ${deviceId}. Install it with: ${installCommand}`
+      : `${apkCheck.summary}${apkCheck.detail !== undefined ? ` ${apkCheck.detail}` : ""}`;
     options.logger?.emit({
       ts: new Date().toISOString(),
       level: "error",
-      event: "preflight.apk.missing",
+      event: isMissing ? "preflight.apk.missing" : "preflight.apk.failed",
       commandId: execution.commandId,
       taskId: execution.taskId,
       deviceId,
-      message: `Operator APK (${config.operatorPackage}) is not installed on ${deviceId}`,
+      message: `${apkCheck.code}: ${message}`,
     });
-    const installCommand = `clawperator operator setup --apk ${getOperatorPackageApkPath(config.operatorPackage)} --device ${deviceId}${config.operatorPackage !== "com.clawperator.operator" ? ` --operator-package ${config.operatorPackage}` : ""}`;
     return {
       execution,
       result: {
         ok: false,
         error: {
-          code: ERROR_CODES.OPERATOR_NOT_INSTALLED,
-          message: `Operator APK (${config.operatorPackage}) is not installed on ${deviceId}. Install it with: ${installCommand}`,
+          code: apkCheck.code!,
+          message,
           details: {
             checkId: apkCheck.id,
             summary: apkCheck.summary,
             detail: apkCheck.detail,
-            installCommand,
+            evidence: apkCheck.evidence,
+            fix: apkCheck.fix,
+            ...(installCommand !== undefined ? { installCommand } : {}),
           },
         },
         deviceId,
