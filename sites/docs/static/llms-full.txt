@@ -15307,8 +15307,8 @@ Repeat until:
 
 # Using Jev in orchestrated skills
 
-An orchestrating agent can use Jev to propose a bounded decision from the current
-Android observation. The agent owns the task and recovery policy; local skill
+An orchestrating agent can use [Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev)
+to propose a bounded decision from the current Android observation. The agent owns the task and recovery policy; local skill
 code validates the proposal; Clawperator executes the chosen action and returns
 evidence. Jev is an optional dependency of that skill, not of the Clawperator
 CLI, Node API, or Android Operator.
