@@ -12854,7 +12854,8 @@ the child-authored domain conclusion and is not interchangeable with wrapper sta
 The CLI exits 0 for wrapper success and 1 for failed or indeterminate outcomes.
 A zero-exit legacy script without a frame remains process success with
 `skillResult: null`, unless declared verification is unproved (indeterminate).
-A malformed frame fails with `SKILL_RESULT_PARSE_FAILED`; launch failure is
+An agent-driven script that exits 0 without its required terminal frame fails
+with `SKILL_RESULT_PARSE_FAILED`. A malformed frame fails with the same code; launch failure is
 `SKILL_EXECUTION_FAILED`. A valid domain failure remains visible in `skillResult`;
 a declared-verification run reporting domain failure also fails the wrapper.
 
