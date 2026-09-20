@@ -7804,7 +7804,9 @@ include the panel.
 
 ### `OPERATOR_NOT_INSTALLED`
 
-Use this when the requested operator package is not installed on the selected device.
+Execution reports this only after successful package queries establish absence of
+both the requested Operator package and its alternate variant. The error includes
+an installation command. A failed query does not establish absence.
 
 Typical recovery:
 
@@ -7816,9 +7818,22 @@ If you are doing local branch validation, prefer the debug package:
 
 - `com.clawperator.operator.dev`
 
+### `DEVICE_SHELL_UNAVAILABLE`
+
+When an installed-package query fails, execution preserves this code and the
+readiness check's summary, detail and evidence (queried package and exit code,
+when available). It does not recommend installation. Inspect the device shell
+failure and run `clawperator doctor` before retrying.
+
+Package-presence failures in direct execution and daemon responses retain
+`phase=readiness`, `dispatchState=not_dispatched`, command/task correlation and
+logging diagnostics. Logs use `preflight.apk.failed` for query failures and
+variant mismatches; `preflight.apk.missing` is reserved for confirmed absence.
+
 ### `OPERATOR_VARIANT_MISMATCH`
 
-Doctor reports this as a failed selected-package check, skips the handshake, and
+Execution preserves this code and the check's variant-selection guidance in
+`error.details.fix`. Doctor reports this as a failed selected-package check, skips the handshake, and
 returns false readiness. It never switches packages implicitly.
 
 Use this when the device has an installed Operator APK, but it is the other known package variant than the one requested.
