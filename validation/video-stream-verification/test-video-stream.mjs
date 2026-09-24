@@ -1,3 +1,4 @@
+import { verifyDimensionChanges } from './scrcpy-fixture.mjs';
 import { verifyWorkerFailure } from './worker-fixture.mjs';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, rm, copyFile } from 'node:fs/promises';
@@ -22,6 +23,7 @@ async function generate(name, size, duration, filter) {
   return path;
 }
 try {
+  await verifyDimensionChanges(root, runner);
   const valid = await generate('valid', '320x240', 3);
   assert.equal((await verifyVideo(runner, valid, '320x240')).mediaDurationMs, 3000);
   const probe = JSON.parse(await run('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_packets', '-of', 'json', valid]));

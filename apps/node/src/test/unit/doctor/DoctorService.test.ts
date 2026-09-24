@@ -5,10 +5,19 @@ import { delimiter, join } from "node:path";
 import { tmpdir } from "node:os";
 import { DoctorService } from "../../../domain/doctor/DoctorService.js";
 import { getDefaultRuntimeConfig } from "../../../adapters/android-bridge/runtimeConfig.js";
-import { FakeProcessRunner } from "../fakes/FakeProcessRunner.js";
+import { FakeProcessRunner as BaseFakeProcessRunner } from "../fakes/FakeProcessRunner.js";
 import { ERROR_CODES } from "../../../contracts/errors.js";
 import { createClawperatorLogger } from "../../../adapters/logger.js";
 import { getCliVersion } from "../../../domain/version/compatibility.js";
+
+// Existing readiness fixtures assume optional video tooling is healthy.
+class FakeProcessRunner extends BaseFakeProcessRunner {
+  override async run(command: string, args: string[]) {
+    if (command === "scrcpy") return { code: 0, stdout: "--capture-orientation --no-window --no-audio --no-control --video-codec --max-size --record-format --time-limit", stderr: "" };
+    if (command === "ffmpeg" || command === "ffprobe") return { code: 0, stdout: "libx264", stderr: "" };
+    return super.run(command, args);
+  }
+}
 
 function withTempBundledSkillsDir<T>(config: T, baseDir: string): T {
   (config as T & { bundledSkillsDir?: string }).bundledSkillsDir = join(baseDir, "bundled-skills");

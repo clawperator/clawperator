@@ -1,5 +1,6 @@
 import type { RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { formatCommandLine } from "../../adapters/android-bridge/adbClient.js";
+import { readActiveDisplay } from "./activeDisplay.js";
 
 /** Targeted host capture shared by execution post-processing and evidence bundles. */
 export async function captureScreenshot(
@@ -9,7 +10,12 @@ export async function captureScreenshot(
   if (!config.deviceId) throw new Error("Screenshot capture requires a resolved device");
   if (options.timeoutMs <= 0) throw { code: "COMMAND_TIMEOUT", message: "Screenshot budget exhausted" };
   if (options.signal?.aborted) throw options.signal.reason;
-  const args = ["-s", config.deviceId, "exec-out", "screencap", "-p"];
+  const selectionStarted = performance.now();
+  const display = await readActiveDisplay(config, Math.min(options.timeoutMs, 2000));
+  const remainingMs = options.timeoutMs - (performance.now() - selectionStarted);
+  if (remainingMs <= 0) throw { code: "COMMAND_TIMEOUT", message: "Screenshot budget exhausted during display selection" };
+  if (options.signal?.aborted) throw options.signal.reason;
+  const args = ["-s", config.deviceId, "exec-out", "screencap", "-p", ...(display ? ["-d", display.physicalId] : [])];
   const command = formatCommandLine(config.adbPath, args);
   const start = performance.now();
   const metadata = { commandId: options.commandId, taskId: options.taskId, deviceId: config.deviceId };
@@ -31,7 +37,7 @@ export async function captureScreenshot(
     const timer = setTimeout(() => {
       failure = { code: "COMMAND_TIMEOUT", message: "Screenshot capture timed out" };
       proc.kill("SIGKILL");
-    }, options.timeoutMs);
+    }, remainingMs);
     proc.stdout?.on("data", (chunk: Buffer) => {
       bytes += chunk.length;
       if (bytes > 64 * 1024 * 1024) {

@@ -297,7 +297,7 @@ Doctor runs checks in this order:
 | --- | --- | --- |
 | 0 (advisory) | `host.logs.writable` | first; probes the daily log destination without truncating it |
 | 1 | `host.node.version`, `host.adb.presence` | always |
-| 1 (advisory) | `host.skill-agent-cli.default`, `host.skill-agent-cli.skills`, `host.bundled-skills.staleness` | after `host.adb.presence` passes; advisory only, never halt on failure |
+| 1 (advisory) | `host.video.dependencies`, `host.skill-agent-cli.default`, `host.skill-agent-cli.skills`, `host.bundled-skills.staleness` | after `host.adb.presence` passes; advisory only, never halt on failure |
 | 1 | `host.adb.server` | after `host.adb.presence` passes |
 | 2 | `host.java.version`, `build.android.assemble` | only with `--full` |
 | 3 | `device.discovery` | always |
@@ -406,6 +406,20 @@ For a failing check, pretty output includes:
 - `Docs: <fix.docsUrl>` when present
 - on-device guidance grouped under `On device (<screen>):`
 
+## Optional video dependencies
+
+`host.video.dependencies` probes scrcpy, ffmpeg, and ffprobe on the host PATH.
+Missing, unusable, or unsupported tools produce a warning; normal readiness and
+its exit status still depend on the required checks. `evidence.capability` is
+`video-recording`, and `evidence.dependencies` lists the unmet dependencies with
+`dependency`, `reason`, and `requirement`. An empty list means the host probes
+passed, not that device recording has been verified.
+
+Remediation is manual: `doctor --fix` does not install these optional tools.
+[Video prerequisites and recovery](evidence.md#video-dependencies) describe the
+required capabilities and structured video-start error. Still screenshots use
+ADB and do not require these tools.
+
 ## Check Reference
 
 | Check ID | Statuses seen in current code | Typical codes | What it verifies |
@@ -413,6 +427,7 @@ For a failing check, pretty output includes:
 | `host.logs.writable` | `pass`, `warn` | `LOG_DIRECTORY_UNWRITABLE` | actual daily log file can be opened for append; evidence includes `logDir`, `logPath`, `writable`; advisory only |
 | `host.node.version` | `pass`, `fail` | `NODE_TOO_OLD` | Node.js major version is at least 24 |
 | `host.adb.presence` | `pass`, `fail` | `ADB_NOT_FOUND` | adb exists and can report a version |
+| `host.video.dependencies` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | optional video host tools: scrcpy capture-orientation support, ffmpeg libx264, and runnable ffprobe; advisory only |
 | `host.adb.server` | `pass`, `fail` | `ADB_SERVER_FAILED` | adb server can start |
 | `host.skill-agent-cli.default` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | default orchestrated-skill agent CLI is a valid executable name and exists on PATH |
 | `host.skill-agent-cli.skills` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | all installed orchestrated skills can resolve their configured agent CLI executable |
