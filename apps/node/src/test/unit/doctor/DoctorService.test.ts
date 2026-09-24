@@ -14,7 +14,7 @@ import { getCliVersion } from "../../../domain/version/compatibility.js";
 class FakeProcessRunner extends BaseFakeProcessRunner {
   override async run(command: string, args: string[]) {
     if (command === "scrcpy") return { code: 0, stdout: "--capture-orientation --no-window --no-audio --no-control --video-codec --max-size --record-format --time-limit", stderr: "" };
-    if (command === "ffmpeg" || command === "ffprobe") return { code: 0, stdout: "libx264", stderr: "" };
+    if (command === "ffmpeg" || command === "ffprobe") return { code: 0, stdout: "ffmpeg version 6.1", stderr: "" };
     return super.run(command, args);
   }
 }

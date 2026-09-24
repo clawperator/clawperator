@@ -7,6 +7,7 @@ import { spawnSync } from "node:child_process";
 import { NodeProcessRunner, type ProcessResult } from "../../adapters/android-bridge/processRunner.js";
 import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import { inspectVideoDependencies, SCRCPY_REQUIRED_FLAGS } from "../../domain/evidence/videoDependencies.js";
+import { supportsFfmpegVideo } from "../../domain/evidence/ffmpegCapabilities.js";
 import { checkVideoDependencies } from "../../domain/doctor/checks/videoChecks.js";
 import { getVideoMcpTools } from "../../mcp/tools/evidence.js";
 
@@ -18,7 +19,7 @@ class DependencyRunner extends NodeProcessRunner {
     if (failure) return failure;
     if (command === "adb") return { code: 0, stdout: "List of devices attached\ntest-device\tdevice\n", stderr: "" };
     assert.equal(options?.timeoutMs, 5000);
-    return { code: 0, stdout: command === "scrcpy" ? SCRCPY_REQUIRED_FLAGS.join(" ") : "libx264", stderr: "" };
+    return { code: 0, stdout: command === "scrcpy" ? SCRCPY_REQUIRED_FLAGS.join(" ") : "ffmpeg version 6.1", stderr: "" };
   }
 }
 
@@ -90,4 +91,24 @@ it("CLI returns exit 1 with all missing dependencies in JSON and pretty output",
       assert.ok(!(await readdir(root)).includes("bundle"));
     }
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+
+it("rejects old versions and modern builds lacking actual timing capabilities", async () => {
+  const runner = new DependencyRunner();
+  for (const version of ["4.4", "5.1", "6.0", "unknown"]) {
+    assert.equal(await supportsFfmpegVideo(runner, `ffmpeg version ${version}`), false);
+  }
+  for (const version of ["6.1", "8.1.3", "9.0.2"]) {
+    assert.equal(await supportsFfmpegVideo(runner, `ffmpeg version ${version}`), true);
+  }
+  const run = runner.run.bind(runner);
+  runner.run = async (command, args, options) => args.includes("-f")
+    ? { code: 1, stdout: "", stderr: "Unrecognized option fps_mode" }
+    : run(command, args, options);
+  const issues = await inspectVideoDependencies(runner);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].dependency, "ffmpeg");
+  assert.equal(issues[0].reason, "unsupported");
+  assert.match(issues[0].requirement, /6.1.*fps_mode.*enc_time_base/);
 });

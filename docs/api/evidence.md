@@ -190,7 +190,7 @@ lifecycle. It does not change accessibility-event `record start/stop` commands.
 ### Optional host dependencies
 
 Install [scrcpy](https://github.com/Genymobile/scrcpy#readme) 3.0 or newer,
-`ffprobe`, and `ffmpeg` with the `libx264` encoder on the host before starting
+`ffprobe`, and `ffmpeg` 6.1 or newer with the `libx264` encoder on the host before starting
 video. All three commands must be available on `PATH`. Clawperator checks their
 capabilities before dispatch and does not bundle or install these tools.
 On macOS, install them with `brew install scrcpy ffmpeg`. On other hosts, install
@@ -217,9 +217,33 @@ the same payload. The error includes:
 
 `missing` means executable lookup failed (ENOENT or exit 127); `unavailable`
 means another execution failure or timeout; `unsupported` means required scrcpy
-flags or the libx264 encoder are absent. Repair the environment before retrying;
+flags are absent, FFmpeg is older than 6.1, or its timing/encoder capability probe fails. Repair the environment before retrying;
 repeating the same capture does not install dependencies. This replaces the
 previous generic `EVIDENCE_CAPTURE_FAILED` prerequisite error.
+
+FFmpeg 6.1 is the minimum supported release. Newer releases must also pass the
+runtime capability probe; an executable's version alone does not prove support.
+Doctor and video start run a two-frame in-memory libx264 encode with
+`-fps_mode passthrough -enc_time_base demux`. This checks the installed encoder
+and exact timing option values without recording a device or creating media files.
+Builds must include the `lavfi` input, `color` filter and `null` output used by
+this probe. Install a full FFmpeg distribution if a reduced build fails it.
+Both segment encoding and full decode verification use those same timing options:
+frames pass through without rate conversion, and the encoder retains the demuxer
+timebase. Frame-count checks and strict full-stream decoding remain required.
+
+For Clawperator 0.12.1, FFmpeg 8.1.3 is a tested temporary workaround for the
+legacy arguments rejected by 9.0.2. This does not establish compatibility with
+all FFmpeg 8 releases or make 8.1.3 the minimum. To select an installed alternative
+without changing the host default, use a process-local environment:
+
+```bash
+PATH="$(brew --prefix ffmpeg@8)/bin:$PATH" clawperator evidence video start --device <device_serial> --output-dir /absolute/new/video-bundle --duration-seconds 25
+```
+
+Confirm the selected executable's version. Use the same environment for startup
+and any independently launched verification commands; the detached worker inherits
+its startup PATH. No host installation or global PATH changes are made by Clawperator.
 
 Still screenshots require only ADB: capture explicitly selects the active physical
 display, including a foldable's outer screen. Older Android dumps without

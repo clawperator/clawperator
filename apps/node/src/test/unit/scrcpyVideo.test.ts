@@ -68,7 +68,7 @@ describe("scrcpy geometry", () => {
   });
 });
 
-for (const failure of [undefined, "late-decode", "second-encode", "scan", "disconnect", "hung", "artifact", "lost-frame", "signal-error"] as const) {
+for (const failure of [undefined, "late-decode", "second-encode", "missing-encode", "scan", "disconnect", "hung", "artifact", "lost-frame", "signal-error"] as const) {
   it(`scrcpy worker preserves ownership and evidence: ${failure ?? "success with three clips"}`, async () => {
     const root = await fs.mkdtemp(join(tmpdir(), "scrcpy-worker-"));
     const sessionId = randomUUID();
@@ -110,8 +110,9 @@ for (const failure of [undefined, "late-decode", "second-encode", "scan", "disco
           return ok(JSON.stringify({ streams: [{ codec_name: "h264", width, height, duration: "1" }] }));
         }
         if (args.includes("-vf")) {
-          assert.equal(args[args.indexOf("-enc_time_base") + 1], "-1", "Preserve close VFR timestamps instead of rounding to a nominal frame rate");
+          assert.equal(args[args.indexOf("-enc_time_base") + 1], "demux", "Preserve close VFR timestamps instead of rounding to a nominal frame rate");
           const path = args.at(-1)!;
+          if (failure === "missing-encode") return { code: 1, stdout: "", stderr: "Unrecognized option" };
           await fs.writeFile(path, "encoded media");
           sizes.set(path, args[args.indexOf("-vf") + 1].slice(6).split(",")[0]);
           if (failure === "second-encode" && path.includes("0002")) return { code: 1, stdout: "", stderr: "encoder failed" };
@@ -139,6 +140,11 @@ for (const failure of [undefined, "late-decode", "second-encode", "scan", "disco
       } else {
         assert.ok(manifest.errors.length);
         assert.equal(await fs.readFile(join(root, "capture.partial.mkv"), "utf8"), "source media");
+      }
+      if (failure === "missing-encode") {
+        assert.ok(manifest.errors.every(error => !error.message.includes("ENOENT")));
+        assert.equal(manifest.errors.filter(error => error.message.includes("Unrecognized option")).length, 3);
+        assert.ok(manifest.artifacts.some(artifact => artifact.path === "capture.partial.mkv"));
       }
       if (failure === "late-decode") {
         const receipt = JSON.parse(await fs.readFile(join(root, "captures.json"), "utf8"));

@@ -1478,7 +1478,7 @@ Options:
 
 Captures screenshot first, then raw XML; they are not atomic or automatically settled.
 Complete capture exits 0. Partial/failed capture exits 1 and retains available evidence.
-Video requires scrcpy 3.0+, ffprobe, and ffmpeg with libx264 on PATH (installed separately).
+Video requires scrcpy 3.0+, ffprobe, and ffmpeg 6.1+ with libx264 and passthrough/demux timing support on PATH (installed separately).
 Missing or unsupported dependencies return HOST_DEPENDENCY_MISSING with recovery instructions.
 Run clawperator doctor --device <id> and inspect host.video.dependencies before recording.
 Still screenshots require only ADB. Start confirms a live recorder; only final verification means complete.
