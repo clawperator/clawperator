@@ -8,10 +8,6 @@ import { verifyVideo, VIDEO_DECODE_TIMEOUT_MS, type VideoProbeMetadata } from ".
 import type { VideoWorkerClock } from "./videoWorker.js";
 import { writeEvidenceManifest } from "./manifest.js";
 
-const requiredFlags = ["--capture-orientation", "--no-window", "--no-audio", "--no-control", "--video-codec", "--max-size", "--record-format", "--time-limit"];
-export function verifyScrcpyHelp(help: string): void {
-  if (requiredFlags.some(flag => !help.includes(flag))) fail("Video recording requires scrcpy 3.0 or newer with capture orientation locking; upgrade the scrcpy installed on PATH");
-}
 export function scrcpyArguments(state: VideoState): string[] {
   return [`--serial=${state.deviceId}`, "--no-window", "--no-audio", "--no-control", "--capture-orientation=@",
     "--video-codec=h264", `--max-size=${state.maxEdge ?? 1280}`, "--record-format=mkv",

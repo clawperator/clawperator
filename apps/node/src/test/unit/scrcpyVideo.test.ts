@@ -9,7 +9,7 @@ import { getDefaultRuntimeConfig } from "../../adapters/android-bridge/runtimeCo
 import type { ProcessRunner } from "../../adapters/android-bridge/processRunner.js";
 import { parseActiveDisplay } from "../../domain/observe/activeDisplay.js";
 import { captureScreenshot } from "../../domain/observe/captureScreenshot.js";
-import { runScrcpyVideoWorker, scrcpyArguments, verifyScrcpyHelp, videoSegments } from "../../domain/evidence/scrcpyVideo.js";
+import { runScrcpyVideoWorker, scrcpyArguments, videoSegments } from "../../domain/evidence/scrcpyVideo.js";
 import { atomicJson, type VideoState } from "../../domain/evidence/videoSupport.js";
 import { evidenceManifestSchema } from "../../contracts/evidence.js";
 
@@ -54,10 +54,6 @@ describe("active foldable display selection", () => {
 });
 
 describe("scrcpy geometry", () => {
-  it("requires rotation-aware installed scrcpy flags", () => {
-    assert.throws(() => verifyScrcpyHelp("--record"));
-    verifyScrcpyHelp("--capture-orientation --no-window --no-audio --no-control --video-codec --max-size --record-format --time-limit");
-  });
   it("keeps rotated content in one canvas and splits each fold size transition", () => {
     assert.deepEqual(videoSegments({ frames: [frame(0, 720, 1280), frame(1, 720, 1280), frame(2, 1000, 1000), frame(3, 720, 1280)] }), [
       { start: 0, end: 2, width: 720, height: 1280, frames: 2 },

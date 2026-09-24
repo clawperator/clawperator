@@ -209,7 +209,7 @@ describe("video start preflight and CLI", () => {
         runner.run = async (command, args) => command === missingTool
           ? { code: 127, stdout: "", stderr: "missing prerequisite" }
           : originalRun(command, args);
-        await assert.rejects(startVideo({ deviceId: "preflight-test-device", durationSeconds: 10 }, { config, baseDir: root }), (e: any) => e.code === "EVIDENCE_CAPTURE_FAILED" && e.message.includes(missingTool));
+        await assert.rejects(startVideo({ deviceId: "preflight-test-device", durationSeconds: 10 }, { config, baseDir: root }), (e: any) => e.code === "HOST_DEPENDENCY_MISSING" && e.message.includes(missingTool));
         await assert.rejects(fs.stat(lock));
       }
       runner.run = originalRun;

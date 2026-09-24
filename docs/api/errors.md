@@ -47,6 +47,16 @@ postcondition timeouts. These controls retain dispatch evidence on failed waits
 and execution cancellation. A missing receipt remains transport uncertainty;
 never infer that an action was not sent or automatically replay it.
 
+## Video dependency failures
+
+Video start returns `HOST_DEPENDENCY_MISSING` when scrcpy, ffmpeg, or ffprobe is
+missing, fails to run, or lacks required capture capabilities. Inspect
+`details.dependencies` for each executable, reason, and requirement; follow
+`hint` to repair the host PATH or installation before retrying. No recorder or
+output bundle is created. This is an optional `host.video.dependencies` warning
+in doctor, not a failure of normal device readiness. See
+[video prerequisites](evidence.md#video-dependencies) for the full error contract.
+
 ## Evidence storage failures
 
 `EVIDENCE_STORAGE_UNWRITABLE` means an evidence destination or the fixed host

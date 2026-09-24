@@ -184,11 +184,43 @@ root to resume it. Changing the root does not migrate or delete old bundles.
 
 Video uses the same bundle schema and adds a persistent, bounded recording
 lifecycle. It does not change accessibility-event `record start/stop` commands.
+
+<a id="video-dependencies"></a>
+
+### Optional host dependencies
+
 Install [scrcpy](https://github.com/Genymobile/scrcpy#readme) 3.0 or newer,
 `ffprobe`, and `ffmpeg` with the `libx264` encoder on the host before starting
 video. All three commands must be available on `PATH`. Clawperator checks their
-capabilities before dispatch and does not bundle or install scrcpy. Missing or
-unsupported tools return `EVIDENCE_CAPTURE_FAILED` before reserving the device.
+capabilities before dispatch and does not bundle or install these tools.
+On macOS, install them with `brew install scrcpy ffmpeg`. On other hosts, install
+scrcpy and an FFmpeg distribution that includes ffprobe and libx264, then expose
+the executables on the PATH used by the CLI or MCP server.
+
+`clawperator doctor --device <device_serial>` reports `host.video.dependencies`
+as an advisory warning when any requirement is unmet. This does not block normal
+device readiness or install anything, including with `--fix`. A passing check
+verifies host tooling only, not that a device can encode or record its screen.
+
+Video start returns `HOST_DEPENDENCY_MISSING` before reserving the device or
+creating an output bundle when dependencies are missing, fail to run, or lack
+required capabilities. CLI exits 1; MCP returns `isError: true`. Node rejects with
+the same payload. The error includes:
+
+- `message`: names every failing executable and requirement.
+- `hint`: installation and PATH guidance, a macOS install command, and the doctor
+  command to rerun before retrying.
+- `details.capability`: `video-recording`.
+- `details.dependencies`: entries with `dependency` (`scrcpy`, `ffmpeg`, or
+  `ffprobe`), `reason` (`missing`, `unavailable`, or `unsupported`), and `requirement`.
+- `details.docsUrl`: this dependency guide.
+
+`missing` means executable lookup failed (ENOENT or exit 127); `unavailable`
+means another execution failure or timeout; `unsupported` means required scrcpy
+flags or the libx264 encoder are absent. Repair the environment before retrying;
+repeating the same capture does not install dependencies. This replaces the
+previous generic `EVIDENCE_CAPTURE_FAILED` prerequisite error.
+
 Still screenshots require only ADB: capture explicitly selects the active physical
 display, including a foldable's outer screen.
 

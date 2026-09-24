@@ -360,6 +360,16 @@ If you force-stop the Operator package during debugging and the next handshake
 or snapshot stops working, use this same recovery step before trusting the
 runtime again, then re-run `clawperator doctor`.
 
+## Optional video recording tools
+
+Video recording additionally requires separately installed scrcpy 3.0 or newer,
+ffprobe, and ffmpeg with the libx264 encoder on the host PATH. Clawperator does
+not bundle or install them. On macOS: `brew install scrcpy ffmpeg`.
+`doctor` warns under `host.video.dependencies` when they are unavailable; this
+advisory does not block ordinary device readiness. Screenshots still require
+only ADB. See [video dependency setup and recovery](api/evidence.md#video-dependencies)
+for CLI, Node, and MCP error details.
+
 <a id="setup-step-verify-readiness-with-doctor"></a>
 ## 5. Verify readiness with doctor
 
@@ -5521,11 +5531,43 @@ root to resume it. Changing the root does not migrate or delete old bundles.
 
 Video uses the same bundle schema and adds a persistent, bounded recording
 lifecycle. It does not change accessibility-event `record start/stop` commands.
+
+<a id="video-dependencies"></a>
+
+### Optional host dependencies
+
 Install [scrcpy](https://github.com/Genymobile/scrcpy#readme) 3.0 or newer,
 `ffprobe`, and `ffmpeg` with the `libx264` encoder on the host before starting
 video. All three commands must be available on `PATH`. Clawperator checks their
-capabilities before dispatch and does not bundle or install scrcpy. Missing or
-unsupported tools return `EVIDENCE_CAPTURE_FAILED` before reserving the device.
+capabilities before dispatch and does not bundle or install these tools.
+On macOS, install them with `brew install scrcpy ffmpeg`. On other hosts, install
+scrcpy and an FFmpeg distribution that includes ffprobe and libx264, then expose
+the executables on the PATH used by the CLI or MCP server.
+
+`clawperator doctor --device <device_serial>` reports `host.video.dependencies`
+as an advisory warning when any requirement is unmet. This does not block normal
+device readiness or install anything, including with `--fix`. A passing check
+verifies host tooling only, not that a device can encode or record its screen.
+
+Video start returns `HOST_DEPENDENCY_MISSING` before reserving the device or
+creating an output bundle when dependencies are missing, fail to run, or lack
+required capabilities. CLI exits 1; MCP returns `isError: true`. Node rejects with
+the same payload. The error includes:
+
+- `message`: names every failing executable and requirement.
+- `hint`: installation and PATH guidance, a macOS install command, and the doctor
+  command to rerun before retrying.
+- `details.capability`: `video-recording`.
+- `details.dependencies`: entries with `dependency` (`scrcpy`, `ffmpeg`, or
+  `ffprobe`), `reason` (`missing`, `unavailable`, or `unsupported`), and `requirement`.
+- `details.docsUrl`: this dependency guide.
+
+`missing` means executable lookup failed (ENOENT or exit 127); `unavailable`
+means another execution failure or timeout; `unsupported` means required scrcpy
+flags or the libx264 encoder are absent. Repair the environment before retrying;
+repeating the same capture does not install dependencies. This replaces the
+previous generic `EVIDENCE_CAPTURE_FAILED` prerequisite error.
+
 Still screenshots require only ADB: capture explicitly selects the active physical
 display, including a foldable's outer screen.
 
@@ -6563,7 +6605,7 @@ Doctor runs checks in this order:
 | --- | --- | --- |
 | 0 (advisory) | `host.logs.writable` | first; probes the daily log destination without truncating it |
 | 1 | `host.node.version`, `host.adb.presence` | always |
-| 1 (advisory) | `host.skill-agent-cli.default`, `host.skill-agent-cli.skills`, `host.bundled-skills.staleness` | after `host.adb.presence` passes; advisory only, never halt on failure |
+| 1 (advisory) | `host.video.dependencies`, `host.skill-agent-cli.default`, `host.skill-agent-cli.skills`, `host.bundled-skills.staleness` | after `host.adb.presence` passes; advisory only, never halt on failure |
 | 1 | `host.adb.server` | after `host.adb.presence` passes |
 | 2 | `host.java.version`, `build.android.assemble` | only with `--full` |
 | 3 | `device.discovery` | always |
@@ -6672,6 +6714,20 @@ For a failing check, pretty output includes:
 - `Docs: <fix.docsUrl>` when present
 - on-device guidance grouped under `On device (<screen>):`
 
+## Optional video dependencies
+
+`host.video.dependencies` probes scrcpy, ffmpeg, and ffprobe on the host PATH.
+Missing, unusable, or unsupported tools produce a warning; normal readiness and
+its exit status still depend on the required checks. `evidence.capability` is
+`video-recording`, and `evidence.dependencies` lists the unmet dependencies with
+`dependency`, `reason`, and `requirement`. An empty list means the host probes
+passed, not that device recording has been verified.
+
+Remediation is manual: `doctor --fix` does not install these optional tools.
+[Video prerequisites and recovery](evidence.md#video-dependencies) describe the
+required capabilities and structured video-start error. Still screenshots use
+ADB and do not require these tools.
+
 ## Check Reference
 
 | Check ID | Statuses seen in current code | Typical codes | What it verifies |
@@ -6679,6 +6735,7 @@ For a failing check, pretty output includes:
 | `host.logs.writable` | `pass`, `warn` | `LOG_DIRECTORY_UNWRITABLE` | actual daily log file can be opened for append; evidence includes `logDir`, `logPath`, `writable`; advisory only |
 | `host.node.version` | `pass`, `fail` | `NODE_TOO_OLD` | Node.js major version is at least 24 |
 | `host.adb.presence` | `pass`, `fail` | `ADB_NOT_FOUND` | adb exists and can report a version |
+| `host.video.dependencies` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | optional video host tools: scrcpy capture-orientation support, ffmpeg libx264, and runnable ffprobe; advisory only |
 | `host.adb.server` | `pass`, `fail` | `ADB_SERVER_FAILED` | adb server can start |
 | `host.skill-agent-cli.default` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | default orchestrated-skill agent CLI is a valid executable name and exists on PATH |
 | `host.skill-agent-cli.skills` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | all installed orchestrated skills can resolve their configured agent CLI executable |
@@ -7400,6 +7457,16 @@ or out-of-range positions, unsupported controls, expired/ambiguous sessions and
 postcondition timeouts. These controls retain dispatch evidence on failed waits
 and execution cancellation. A missing receipt remains transport uncertainty;
 never infer that an action was not sent or automatically replay it.
+
+## Video dependency failures
+
+Video start returns `HOST_DEPENDENCY_MISSING` when scrcpy, ffmpeg, or ffprobe is
+missing, fails to run, or lacks required capture capabilities. Inspect
+`details.dependencies` for each executable, reason, and requirement; follow
+`hint` to repair the host PATH or installation before retrying. No recorder or
+output bundle is created. This is an optional `host.video.dependencies` warning
+in doctor, not a failure of normal device readiness. See
+[video prerequisites](evidence.md#video-dependencies) for the full error contract.
 
 ## Evidence storage failures
 
@@ -9570,7 +9637,7 @@ For the underlying selector contract, see [Selectors](selectors.md).
 | `scroll_until` | Scroll in the given direction until a matching node is visible, optionally clicking it afterward. |
 | `scroll_and_click` | Scroll in the given direction until a matching node is visible, optionally clicking it afterward. |
 | `evidence_capture` | Capture a local screenshot and raw hierarchy bundle with correlated metadata and explicit partial failures. |
-| `evidence_video_start` | Start a bounded screen recording in a managed bundle; recording is startup confirmation, not verified media. |
+| `evidence_video_start` | Start a bounded screen recording in a managed bundle; recording is startup confirmation, not verified media. Requires separately installed scrcpy 3.0+, ffprobe, and ffmpeg with libx264 on the server PATH. Unmet dependencies return HOST_DEPENDENCY_MISSING with dependency details and recovery instructions. |
 | `evidence_video_status` | Read a managed video session and detect unavailable ownership. |
 | `evidence_video_stop` | Request owned video finalization and wait up to 15 seconds; pending is not success. |
 

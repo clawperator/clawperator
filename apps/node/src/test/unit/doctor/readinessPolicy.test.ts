@@ -18,6 +18,7 @@ class ReadinessRunner extends FakeProcessRunner {
   repairSucceeds = true;
   async run(command: string, args: string[]) {
     this.calls.push({ command, args });
+    if (["scrcpy", "ffmpeg", "ffprobe"].includes(command)) return { code: 127, stdout: "", stderr: "not installed" };
     const action = args.join(" ");
     if (command === "bash") {
       if (this.repairSucceeds) this.installed = true;
@@ -93,6 +94,7 @@ describe("selected Operator readiness policy", () => {
       assert.equal(report.criticalOk, true);
       assert.deepEqual(report.skippedChecks, []);
       assert.equal(handshakes(), 1);
+      assert.ok(report.checks.some(check => check.id === "host.video.dependencies" && check.status === "warn"));
       assert.ok(report.checks.some(check => check.id === "host.skill-agent-cli.default" && check.status === "warn"));
       assert.equal(report.checks.some(check => check.id === "readiness.smoke"), full);
     });

@@ -270,6 +270,16 @@ If you force-stop the Operator package during debugging and the next handshake
 or snapshot stops working, use this same recovery step before trusting the
 runtime again, then re-run `clawperator doctor`.
 
+## Optional video recording tools
+
+Video recording additionally requires separately installed scrcpy 3.0 or newer,
+ffprobe, and ffmpeg with the libx264 encoder on the host PATH. Clawperator does
+not bundle or install them. On macOS: `brew install scrcpy ffmpeg`.
+`doctor` warns under `host.video.dependencies` when they are unavailable; this
+advisory does not block ordinary device readiness. Screenshots still require
+only ADB. See [video dependency setup and recovery](api/evidence.md#video-dependencies)
+for CLI, Node, and MCP error details.
+
 <a id="setup-step-verify-readiness-with-doctor"></a>
 ## 5. Verify readiness with doctor
 

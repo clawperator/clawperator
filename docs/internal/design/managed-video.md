@@ -6,6 +6,10 @@ recording or Android action envelopes. Host prerequisites are an installed
 scrcpy with capture-orientation locking, ffprobe, and ffmpeg with libx264.
 No scrcpy executable or server is shipped by Clawperator. Screenshots remain
 ADB-only and select the active physical display.
+`videoDependencies.ts` owns the shared host probes for video start and doctor's
+advisory `host.video.dependencies` check. Unmet requirements reject video start
+with `HOST_DEPENDENCY_MISSING`, structured dependency reasons, and repair guidance
+before acquiring ownership. Doctor never installs these optional dependencies.
 
 ## Capture and display geometry
 

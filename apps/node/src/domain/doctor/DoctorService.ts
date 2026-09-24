@@ -31,6 +31,7 @@ import {
 import { isCriticalDoctorCheck, requiredDoctorCheckIds, type RequiredDoctorCheckId } from "./criticalChecks.js";
 import type { Logger } from "../../adapters/logger.js";
 import { checkLogDestination } from "./checks/logChecks.js";
+import { checkVideoDependencies } from "./checks/videoChecks.js";
 
 export interface RunDoctorOptions {
   config: RuntimeConfig;
@@ -102,6 +103,7 @@ export class DoctorService {
       checks.push(check);
       if (check.status !== "pass") break;
       if (id === "host.adb.presence") {
+        checks.push(await checkVideoDependencies(config));
         checks.push(await checkDefaultOrchestratedSkillAgentCli(config));
         checks.push(await checkInstalledOrchestratedSkillAgentCliAvailability(config));
         checks.push(await checkBundledSkillsStaleness(config, {

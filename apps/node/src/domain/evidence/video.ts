@@ -12,8 +12,8 @@ import { validateEvidenceCaptureOptions, type EvidenceCaptureOptions } from "./c
 import { collectEvidenceMetadata } from "./metadata.js";
 import { writeEvidenceManifest } from "./manifest.js";
 import { readActiveDisplay } from "../observe/activeDisplay.js";
-import { atomicJson, checked, chooseVideoSize, fail, lockName, readState, releaseLock, sleep, terminal, videoError, type VideoState } from "./videoSupport.js";
-import { verifyScrcpyHelp } from "./scrcpyVideo.js";
+import { atomicJson, chooseVideoSize, fail, lockName, readState, releaseLock, sleep, terminal, videoError, type VideoState } from "./videoSupport.js";
+import { inspectVideoDependencies, videoDependencyError } from "./videoDependencies.js";
 
 export interface VideoStartOptions extends EvidenceCaptureOptions { durationSeconds: number; size?: string }
 export interface VideoSessionOptions { session: string; deviceId?: string; operatorPackage?: string }
@@ -34,13 +34,8 @@ export async function startVideo(options: VideoStartOptions, dependencies: Video
   validateEvidenceCaptureOptions({ operatorPackage: config.operatorPackage });
   const runtime = { ...config, deviceId: options.deviceId!, runner: dependencies.config?.runner ?? new VideoProcessRunner() };
   await resolveDevice(runtime);
-  await checked(runtime.runner, "ffprobe", ["-version"]);
-  await checked(runtime.runner, "ffmpeg", ["-version"]);
-  const help = await runtime.runner.run("scrcpy", ["--help"], { timeoutMs: 5000 });
-  if (help.code !== 0 || help.error) fail("Video recording requires scrcpy on PATH. Install scrcpy 3.0 or newer; Clawperator does not bundle or install it.");
-  verifyScrcpyHelp(help.stdout + help.stderr);
-  const encoders = await checked(runtime.runner, "ffmpeg", ["-hide_banner", "-encoders"]);
-  if (!/\blibx264\b/.test(encoders)) fail("Video recording requires an ffmpeg build with the libx264 encoder");
+  const dependencyIssues = await inspectVideoDependencies(runtime.runner);
+  if (dependencyIssues.length > 0) throw videoDependencyError(dependencyIssues);
   const captureDisplay = await readActiveDisplay(runtime, 2000);
   const metadata = await collectEvidenceMetadata(runtime, () => 5000);
   const display = metadata.device.display;
