@@ -99,10 +99,9 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
     lines.push("Next actions:");
     const shellSteps = new Set(report.checks.flatMap(check => check.fix?.steps.filter(step => step.kind === "shell").map(step => step.value) ?? []));
     for (const action of report.nextActions) {
-      const isShellCommand = shellSteps.has(action) || action.startsWith("Try: clawperator ");
       const displayedAction = action.startsWith("Try: clawperator ")
         ? `Try: \`${action.slice("Try: ".length)}\``
-        : isShellCommand ? `\`${action}\`` : formatDoctorText(action);
+        : shellSteps.has(action) ? `\`${action}\`` : formatDoctorText(action);
       lines.push(`  - ${displayedAction}`);
     }
   }
