@@ -169,7 +169,7 @@ describe("video worker and persistent lifecycle", () => {
 
 
 describe("video start preflight and CLI", () => {
-  it("rejects an occupied device lock after accepting screenrecord help from stderr", async () => {
+  it("rejects an occupied device lock after checking installed scrcpy capabilities", async () => {
     const root = await fs.mkdtemp(join(tmpdir(), "video-start-test-"));
     const calls: string[][] = [];
     const runner: ProcessRunner = {
@@ -179,7 +179,8 @@ describe("video start preflight and CLI", () => {
         const action = args.slice(args[0] === "-s" ? 2 : 0).join(" ");
         let stdout = "", stderr = "";
         if (action === "devices") stdout = "List of devices attached\npreflight-test-device\tdevice\n";
-        if (action === "shell screenrecord --help") stderr = "--size --time-limit Default is 180.";
+        if (command === "scrcpy") stderr = "--capture-orientation --no-window --no-audio --no-control --video-codec --max-size --record-format --time-limit";
+        if (command === "ffmpeg" && args.includes("-encoders")) stdout = "libx264";
         if (action === "shell getprop") stdout = "[ro.build.version.sdk]: [36]\n[ro.build.version.release]: [16]\n[ro.product.model]: [test]\n[ro.product.manufacturer]: [test]\n[ro.kernel.qemu]: [1]\n";
         if (action === "shell wm size") stdout = "Physical size: 720x1280";
         if (action === "shell wm density") stdout = "Physical density: 320";
@@ -204,7 +205,7 @@ describe("video start preflight and CLI", () => {
         (e: any) => e.code === "EVIDENCE_STORAGE_UNWRITABLE" && e.path === missingOutput && typeof e.recovery === "string");
       await assert.rejects(fs.stat(lock), "Output preflight failure must release its acquired ownership");
       const originalRun = runner.run;
-      for (const missingTool of ["ffprobe", "ffmpeg"]) {
+      for (const missingTool of ["ffprobe", "ffmpeg", "scrcpy"]) {
         runner.run = async (command, args) => command === missingTool
           ? { code: 127, stdout: "", stderr: "missing prerequisite" }
           : originalRun(command, args);

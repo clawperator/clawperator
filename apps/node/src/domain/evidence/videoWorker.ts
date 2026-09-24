@@ -7,38 +7,10 @@ import type { ProcessRunner } from "../../adapters/android-bridge/processRunner.
 import { evidenceManifestSchema, type EvidenceManifest, type EvidenceArtifact } from "../../contracts/evidence.js";
 import { writeEvidenceManifest } from "./manifest.js";
 import { atomicJson, checked, fail, readState, releaseLock, sleep, verifyRemote, videoError } from "./videoSupport.js";
+import { runScrcpyVideoWorker } from "./scrcpyVideo.js";
 
-export const VIDEO_DECODE_TIMEOUT_MS = 120_000;
-
-export interface VideoProbeMetadata { codec: string | null; actualSize: string | null; mediaDurationMs: number | null }
-
-export async function verifyVideo(runner: ProcessRunner, path: string, requestedSize: string, onProbe?: (metadata: VideoProbeMetadata) => void): Promise<{ codec: string; actualSize: string; mediaDurationMs: number }> {
-  const probe = JSON.parse(await checked(runner, "ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,width,height,duration:format=duration", "-of", "json", path]));
-  const stream = probe.streams?.[0];
-  const actualSize = `${stream?.width}x${stream?.height}`;
-  const mediaDurationMs = Number(stream?.duration ?? probe.format?.duration) * 1000;
-  onProbe?.({ codec: typeof stream?.codec_name === "string" ? stream.codec_name : null,
-    actualSize: Number.isInteger(stream?.width) && stream.width > 0 && Number.isInteger(stream?.height) && stream.height > 0 ? actualSize : null,
-    mediaDurationMs: Number.isFinite(mediaDurationMs) && mediaDurationMs >= 0 ? mediaDurationMs : null });
-  if (actualSize !== requestedSize || !Number.isFinite(mediaDurationMs) || mediaDurationMs <= 0 || typeof stream?.codec_name !== "string") fail("Video dimensions or duration do not match the requested recording");
-  // Decode only the probed stream through EOF without retaining decoded pixels.
-  // Preserve its timebase: null-output defaults can invent duplicate DTS for VFR media.
-  // The single-output -vsync option also supports hosts predating -fps_mode (FFmpeg 5.1).
-  const decoded = await runner.run("ffmpeg", [
-    "-v", "error", "-nostdin", "-nostats", "-xerror", "-max_alloc", "268435456",
-    "-threads", "2", "-err_detect", "explode", "-i", path, "-map", "0:v:0",
-    "-an", "-sn", "-dn", "-threads", "1", "-vsync", "0", "-enc_time_base", "-1",
-    "-stats_period", "60", "-progress", "pipe:1", "-f", "null", "-",
-  ], { timeoutMs: VIDEO_DECODE_TIMEOUT_MS });
-  if (decoded.code !== 0 || decoded.error || decoded.stderr.trim()) {
-    fail(`Full video decode failed: ${decoded.stderr || decoded.error?.message || `exit ${decoded.code}`}`);
-  }
-  const completed = decoded.stdout.trim().split(/progress=continue\r?\n/).at(-1)!;
-  if (!/^frame=\s*[1-9]\d*\s*$/m.test(completed) || !/\bprogress=end$/.test(completed)) {
-    fail("Video decoder did not report complete decoding with at least one frame");
-  }
-  return { codec: stream.codec_name, actualSize, mediaDurationMs };
-}
+import { verifyVideo } from "./videoVerification.js";
+export { verifyVideo, VIDEO_DECODE_TIMEOUT_MS, type VideoProbeMetadata } from "./videoVerification.js";
 
 export interface VideoWorkerClock { now(): number; monotonic(): number; sleep(ms: number): Promise<void> }
 const systemClock: VideoWorkerClock = { now: () => Date.now(), monotonic: () => performance.now(), sleep };
@@ -46,6 +18,7 @@ const systemClock: VideoWorkerClock = { now: () => Date.now(), monotonic: () => 
 /** The sole session writer. Callers request stop through a nonce-bound file, never a host PID. */
 export async function runVideoWorker(outputDir: string, runner: ProcessRunner = new VideoProcessRunner(), clock: VideoWorkerClock = systemClock, readArtifact: typeof fs.readFile = fs.readFile): Promise<void> {
   const state = await readState(outputDir);
+  if (state.backend === "scrcpy") return runScrcpyVideoWorker(state, runner, clock, readArtifact);
   const manifest: EvidenceManifest = evidenceManifestSchema.parse(JSON.parse(await fs.readFile(join(outputDir, "manifest.json"), "utf8")));
   const lock = JSON.parse(await fs.readFile(state.lockPath, "utf8"));
   if (lock.nonce !== state.nonce || lock.sessionId !== state.sessionId || manifest.status !== "starting") fail("Worker does not own a starting session");

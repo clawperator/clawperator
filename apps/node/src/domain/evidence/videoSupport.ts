@@ -13,6 +13,8 @@ export const videoStateSchema = z.object({
   hostPid: z.number().int().positive().nullable(), hostStartedAt: z.string().nullable(),
   remotePid: z.number().int().positive().nullable(), remoteStart: z.string().regex(/^\d+$/).nullable(),
   remotePath: z.string(), deadline: z.number(), updatedAt: z.number(), recoveryRequired: z.boolean(),
+  backend: z.literal("scrcpy").optional(),
+  maxEdge: z.number().int().min(2).optional(),
 }).strict();
 export type VideoState = z.infer<typeof videoStateSchema>;
 export const terminal = (status: string) => ["complete", "partial", "failed"].includes(status);

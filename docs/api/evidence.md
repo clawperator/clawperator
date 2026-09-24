@@ -184,9 +184,13 @@ root to resume it. Changing the root does not migrate or delete old bundles.
 
 Video uses the same bundle schema and adds a persistent, bounded recording
 lifecycle. It does not change accessibility-event `record start/stop` commands.
-Install `ffprobe` and `ffmpeg` on the host before starting video; still evidence
-does not require them. Both tools and the selected device's `screenrecord`
-capabilities are checked before a recording is dispatched.
+Install [scrcpy](https://github.com/Genymobile/scrcpy#readme) 3.0 or newer,
+`ffprobe`, and `ffmpeg` with the `libx264` encoder on the host before starting
+video. All three commands must be available on `PATH`. Clawperator checks their
+capabilities before dispatch and does not bundle or install scrcpy. Missing or
+unsupported tools return `EVIDENCE_CAPTURE_FAILED` before reserving the device.
+Still screenshots require only ADB: capture explicitly selects the active physical
+display, including a foldable's outer screen.
 
 ```bash
 clawperator evidence video start --device <device_serial> --operator-package com.clawperator.operator.dev --output-dir /absolute/new/video-bundle --duration-seconds 30
@@ -196,7 +200,8 @@ ffprobe -v error -show_streams /absolute/new/video-bundle/video.mp4
 ```
 
 Start requires an explicit device and an integer `--duration-seconds` from 1 to
-180. The duration is enforced by Android even if the host worker disappears.
+180. The duration is enforced by the scrcpy process even if the Node worker
+disappears. It is also bounded by the worker while the worker is alive.
 The common `--timeout` option applies only to still capture; video uses the fixed
 startup, stop, and media subprocess budgets below.
 The output directory must be absolute and new. Optional `--label` and
@@ -206,13 +211,28 @@ retry, wake, navigation, overlay change, audio, or application assertion.
 By default, the current display dimensions are scaled down to a longest edge of
 at most 1280 pixels, with both edges rounded down to positive even numbers.
 `--size WIDTHxHEIGHT` accepts positive even dimensions within 1% of the current
-display aspect ratio. Rotation is sampled before start. Rotation during recording
-is not continuously tracked or corrected. Encoder fallback to different dimensions
-fails final verification; file existence alone is never proof of usable video.
+display aspect ratio. The recording canvas stays in its initial orientation.
+When Android rotates, content rotates within that canvas at full size instead
+of shrinking into a portrait letterbox. Landscape content can therefore appear
+sideways in a recording that started in portrait; device rotation settings are
+not changed.
+
+Folding or unfolding can change the capture dimensions. Capture continues without
+restarting, and finalization creates a separate MP4 for each consecutive size
+span. The first clip is `video.mp4`; later clips are `video-0002.mp4`,
+`video-0003.mp4`, and so on. Read every `kind: "video"` artifact in manifest order.
+Each clip has fixed dimensions, its own codec headers, and timestamps starting
+at zero. Later sizes preserve their aspect ratio and stay within the initial
+longest-edge limit (1280 by default, or the longest edge of `--size`). The initial
+clip honors the exact requested size. No framing or padding is added.
+
+The source is captured as H.264, then each span is encoded as H.264 MP4 and fully
+verified. This final encoding requires host CPU time; stop can return pending
+while it runs. File existence alone is never proof of usable video.
 
 The detached Node worker survives the start CLI process. Start waits at most five
-seconds for its recorder PID acknowledgement and a verified live recorder without
-an observed startup error. This confirms startup, not a decoded frame. A startup
+seconds for the live scrcpy process to open its capture file. This confirms
+startup, not a decoded frame. A startup
 acknowledgement timeout returns `ok: false`, `code: "COMMAND_TIMEOUT"`, and the
 session path, and requests that the worker stop. Status remains available.
 
@@ -237,34 +257,44 @@ Host duration uses a monotonic clock and is measured independently of the decode
 media timeline. Idle screens can produce shorter media timelines; neither duration
 is a substitute for the other. A zero-duration idle recording remains partial,
 even if one frame decodes. Available probe metadata is retained on verification
-failure. Stop reasons are `requested`, `duration_cap`,
+failure. For multiple clips, `mediaDurationMs` is the sum of verified clip
+durations and `actualSize` is null when clip sizes differ. `captures.json` lists
+each span's source start/end time, frame count, output path, and verified media
+properties. Stop reasons are `requested`, `duration_cap`,
 `startup_failure`, or `failure` (null while recording).
 
-The worker pulls `video.partial.mp4`, probes codec, dimensions and positive media
-duration, and fully decodes the first video stream with ffmpeg through its final
-frame. Verification requires a successful end-of-stream report with at least one
-frame and no error diagnostics. Later corruption cannot pass on the strength of
-an opening frame. Source timing is preserved for variable-frame-rate recordings;
-verification does not resample the video or compare media time with host time.
-Pull and probe each have a 10-second hard deadline; full decoding has a 120-second
-hard deadline. Decoding uses two decoder threads, one output thread, a 256 MiB
-single-allocation limit, and a null output so decoded frames are not buffered by
-Node or saved. Each video subprocess has a combined 16 MiB diagnostic/output
-limit; exceeding a deadline or output limit kills that subprocess and fails
-verification. The allocation limit is not a total process-memory limit.
-Only verified media becomes `video.mp4`.
+The worker records `capture.partial.mkv` locally, inspects decoded frame dimensions
+through the entire source, and encodes each span into a `.partial.mp4` file.
+It probes each clip's codec, exact output dimensions and positive media duration,
+then fully decodes the first video stream with ffmpeg through its final frame.
+Verification requires a successful end-of-stream report with exactly the source
+span's frame count and no error diagnostics. Later corruption cannot pass on the strength of an
+opening frame. Source timing is preserved for variable-frame-rate recordings;
+verification does not compare media time with host time.
+
+Probe has a 10-second deadline. Source frame inspection, each clip encode, and
+each full decode have separate 120-second hard deadlines. Encoding and decoding
+use at most two codec threads. Verification also uses a 256 MiB single-allocation
+limit and null output. Each video subprocess has a combined 16 MiB output limit;
+exceeding a deadline or output limit kills that subprocess and fails verification.
+Only verified clips lose their `.partial` suffix. The intermediate MKV is removed
+only after every clip is verified and its artifact can be read. On failure it is
+retained as partial evidence; it is not a promise of correctly framed playback
+across display size changes. Successfully verified clips remain available if
+another clip fails.
 
 Stop still waits at most 15 seconds. A pending `COMMAND_TIMEOUT` can therefore
 precede successful finalization; use status or repeat stop for the same session.
 The worker keeps its heartbeat and ownership through final persistence and never
-recaptures after verification failure. Default sizes (long edge at most 1280) and
-explicit 1920x1080 were exercised at 180 seconds and 60 fps. Larger sizes, higher
-frame rates, other codecs, and slower hosts are not guaranteed to meet the fixed
-decode budget; they fail verification if they exceed it.
+recaptures after verification failure. Larger sizes, higher frame rates, many
+fold transitions, and slower hosts increase finalization time. Exceeding a
+subprocess budget fails verification instead of publishing unverified media.
 Failed verification retains partial bytes and errors. `encoder.stderr.txt` and
 `captures.json` retain encoder diagnostics and the host recorder receipt; neither
-is an invented Operator result. An empty stderr artifact is valid and hashed. Stderr retention is capped at
-1 MiB; truncation is reported as a partial artifact and bundle error.
+is an invented Operator result. `encoder.stderr.txt` includes both scrcpy output
+streams, since informational messages can use either. An empty diagnostic
+artifact is valid and hashed. Retention is capped at 1 MiB; truncation is reported
+as a partial artifact and bundle error.
 Every requested artifact must be readable and complete before the bundle can
 report success. Artifact-read failures retain their underlying error; an unreadable
 video fails the bundle, while an unreadable receipt or stderr makes usable video
@@ -287,26 +317,26 @@ Before upgrading from a version using root-local locks, stop its recordings and
 resolve retained ownership using that version's saved manifests. Mixed-version
 recorders do not share the new lock location. Existing manifest-path status/stop
 remains readable and uses its saved ownership path.
-`session.json` keeps the random nonce, host PID/start identity, remote PID/start
-identity, remote path, target, deadline and recovery state separate from the
-manifest. A nonce-bound heartbeat identifies the original worker. No stored host
-PID is used to signal a process. Before sending SIGINT, the worker checks the
-remote recorder command, unique output path and process start identity.
+`session.json` keeps the random nonce, host worker PID/start identity, recorder
+backend, target, deadline and recovery state separate from the manifest. A
+nonce-bound heartbeat identifies the original worker. The worker signals only
+the scrcpy child handle it created. No stored host PID authorizes a signal.
+Older screenrecord session state remains readable for status and stop; new
+recordings always require scrcpy.
 
 `EVIDENCE_RECORDING_ACTIVE` refuses a second session on the same device.
 `EVIDENCE_SESSION_NOT_FOUND` indicates an unknown or invalid session.
 `EVIDENCE_RECOVERY_REQUIRED` means ownership cannot be verified. Status reports
 an unavailable worker as failed while retaining its last persisted manifest and
-lock, rather than fabricating a finalized recording. Inspect `session.json`, the
-remote file and recorder identity before manual recovery; never remove a lock
-based on age alone or signal a PID without checking its identity. The device-side
-duration cap bounds a surviving recorder. No automatic stale-lock takeover occurs.
-If recorder termination wins a race with stop, an observed normal exit still
-proceeds through pull and media verification; an uncertain failure never permits
-signaling again. A confirmed failure to spawn the host worker records a failed
-startup manifest and releases its own lock because no recorder was started.
-Remote temporary media is removed only after successful pull and verification;
-failed captures retain their remote path for recovery.
+lock. Inspect the saved session and verify any surviving recorder before manual
+recovery; never remove a lock based on age alone or signal a PID without checking
+its identity. scrcpy's own duration cap bounds a surviving recorder process.
+No automatic stale-lock takeover occurs. A confirmed failure to spawn the host
+worker records a failed startup manifest and releases its own lock because no
+recorder was started. An unresponsive recorder retains the lock for recovery.
+
+Live recording has been verified on macOS with scrcpy 4.1 and Android emulators.
+Windows graceful stop and other scrcpy versions remain unproven.
 
 ### Video MCP and Node API
 

@@ -11,7 +11,9 @@ import { evidenceManifestSchema, type EvidenceManifest } from "../../contracts/e
 import { validateEvidenceCaptureOptions, type EvidenceCaptureOptions } from "./capture.js";
 import { collectEvidenceMetadata } from "./metadata.js";
 import { writeEvidenceManifest } from "./manifest.js";
-import { atomicJson, checked, chooseVideoSize, fail, lockName, readState, releaseLock, sleep, terminal, verifyScreenrecordHelp, videoError, type VideoState } from "./videoSupport.js";
+import { readActiveDisplay } from "../observe/activeDisplay.js";
+import { atomicJson, checked, chooseVideoSize, fail, lockName, readState, releaseLock, sleep, terminal, videoError, type VideoState } from "./videoSupport.js";
+import { verifyScrcpyHelp } from "./scrcpyVideo.js";
 
 export interface VideoStartOptions extends EvidenceCaptureOptions { durationSeconds: number; size?: string }
 export interface VideoSessionOptions { session: string; deviceId?: string; operatorPackage?: string }
@@ -34,14 +36,17 @@ export async function startVideo(options: VideoStartOptions, dependencies: Video
   await resolveDevice(runtime);
   await checked(runtime.runner, "ffprobe", ["-version"]);
   await checked(runtime.runner, "ffmpeg", ["-version"]);
-  const help = await runtime.runner.run(runtime.adbPath, ["-s", runtime.deviceId, "shell", "screenrecord", "--help"], { timeoutMs: 5000 });
-  if (help.code !== 0) fail("Could not query screenrecord capabilities");
-  verifyScreenrecordHelp(help.stdout + help.stderr, options.durationSeconds);
+  const help = await runtime.runner.run("scrcpy", ["--help"], { timeoutMs: 5000 });
+  if (help.code !== 0 || help.error) fail("Video recording requires scrcpy on PATH. Install scrcpy 3.0 or newer; Clawperator does not bundle or install it.");
+  verifyScrcpyHelp(help.stdout + help.stderr);
+  const encoders = await checked(runtime.runner, "ffmpeg", ["-hide_banner", "-encoders"]);
+  if (!/\blibx264\b/.test(encoders)) fail("Video recording requires an ffmpeg build with the libx264 encoder");
+  const captureDisplay = await readActiveDisplay(runtime, 2000);
   const metadata = await collectEvidenceMetadata(runtime, () => 5000);
   const display = metadata.device.display;
   if (display.rotation === null) fail("Current display rotation is unavailable");
   const rotated = display.rotation % 2 === 1;
-  const size = chooseVideoSize((rotated ? display.height : display.width) ?? 0, (rotated ? display.width : display.height) ?? 0, options.size);
+  const size = chooseVideoSize(captureDisplay?.width ?? (rotated ? display.height : display.width) ?? 0, captureDisplay?.height ?? (rotated ? display.width : display.height) ?? 0, options.size);
   const sessionId = randomUUID(), nonce = randomUUID();
   await preflightDirectory(root);
   const lockRoot = videoLockRoot();
@@ -51,7 +56,8 @@ export async function startVideo(options: VideoStartOptions, dependencies: Video
   const state: VideoState = { sessionId, nonce, deviceId: runtime.deviceId, operatorPackage: runtime.operatorPackage, adbPath: runtime.adbPath,
     outputDir, lockPath, managed: options.outputDir === undefined, durationSeconds: options.durationSeconds, size,
     hostPid: null, hostStartedAt: null, remotePid: null, remoteStart: null, remotePath: `/data/local/tmp/clawperator-video-${sessionId}.mp4`,
-    deadline: Date.now() + options.durationSeconds * 1000 + 5000, updatedAt: Date.now(), recoveryRequired: false };
+    deadline: Date.now() + options.durationSeconds * 1000 + 5000, updatedAt: Date.now(), recoveryRequired: false,
+    backend: "scrcpy", maxEdge: options.size === undefined ? 1280 : Math.max(...size.split("x").map(Number)) };
   await acquireVideoLock(lockPath, { sessionId, nonce, outputDir });
   let workerDispatched = false;
   let startupManifest: EvidenceManifest | undefined;

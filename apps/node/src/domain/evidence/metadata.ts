@@ -2,6 +2,7 @@ import { runAdb } from "../../adapters/android-bridge/adbClient.js";
 import type { RuntimeConfig } from "../../adapters/android-bridge/runtimeConfig.js";
 import type { EvidenceDevice, EvidenceError } from "../../contracts/evidence.js";
 import { getCliVersion } from "../version/compatibility.js";
+import { parseActiveDisplay } from "../observe/activeDisplay.js";
 
 export async function collectEvidenceMetadata(config: RuntimeConfig, remaining: () => number): Promise<{ device: EvidenceDevice; errors: EvidenceError[] }> {
   const errors: EvidenceError[] = [];
@@ -56,9 +57,12 @@ export async function collectEvidenceMetadata(config: RuntimeConfig, remaining: 
   const deviceType = !inventoryUsable ? "unknown" : values.includes("1") ? "emulator" : values.every(value => value === null || value === "0") ? "physical" : "unknown";
   if (deviceType === "unknown") failure("deviceType");
   const size = await read(["shell", "wm", "size"]);
+  let activeDisplay = null;
+  try { activeDisplay = parseActiveDisplay(await read(["shell", "dumpsys", "display"]) ?? ""); }
+  catch { failure("display.active"); }
   const dimensions = (size ?? "").match(/Override size:\s*(\d+)x(\d+)/) ?? (size ?? "").match(/Physical size:\s*(\d+)x(\d+)/);
-  const width = dimensions && Number(dimensions[1]) > 0 ? Number(dimensions[1]) : null;
-  const height = dimensions && Number(dimensions[2]) > 0 ? Number(dimensions[2]) : null;
+  const width = activeDisplay ? (activeDisplay.rotation % 2 ? activeDisplay.height : activeDisplay.width) : dimensions && Number(dimensions[1]) > 0 ? Number(dimensions[1]) : null;
+  const height = activeDisplay ? (activeDisplay.rotation % 2 ? activeDisplay.width : activeDisplay.height) : dimensions && Number(dimensions[2]) > 0 ? Number(dimensions[2]) : null;
   if (width === null || height === null) failure("display.size");
   const densityText = await read(["shell", "wm", "density"]);
   const densityMatch = (densityText ?? "").match(/Override density:\s*(\d+)/) ?? (densityText ?? "").match(/Physical density:\s*(\d+)/);
@@ -66,7 +70,7 @@ export async function collectEvidenceMetadata(config: RuntimeConfig, remaining: 
   if (density === null) failure("display.density");
   const input = await read(["shell", "dumpsys", "input"]);
   const rotationMatch = (input ?? "").match(/Viewport [^\n]*displayId=0,[^\n]*orientation=([0-3])\b/) ?? (input ?? "").match(/SurfaceOrientation:\s*([0-3])\b/);
-  const rotation = rotationMatch ? Number(rotationMatch[1]) : null;
+  const rotation = activeDisplay?.rotation ?? (rotationMatch ? Number(rotationMatch[1]) : null);
   if (rotation === null) failure("display.rotation");
   const packageDump = await read(["shell", "dumpsys", "package", config.operatorPackage]);
   const operatorVersion = (packageDump ?? "").match(/\bversionName=([^\s]+)/)?.[1] ?? null;

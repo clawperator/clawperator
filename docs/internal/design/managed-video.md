@@ -1,219 +1,140 @@
 # Managed video evidence
 
 The public contract is [Managed video](../../api/evidence.md#managed-video).
-Video extends the shared still-evidence schema without changing raw screenshot,
-snapshot, or accessibility-event recording contracts. No runtime skill migration
-or Android action is required. The host implementation uses Node, targeted ADB,
-ffprobe and ffmpeg; it does not use macOS-specific APIs.
+Video shares the still-evidence schema and does not change accessibility-event
+recording or Android action envelopes. Host prerequisites are an installed
+scrcpy with capture-orientation locking, ffprobe, and ffmpeg with libx264.
+No scrcpy executable or server is shipped by Clawperator. Screenshots remain
+ADB-only and select the active physical display.
+
+## Capture and display geometry
+
+`observe/activeDisplay.ts` reads the active primary viewport from `dumpsys
+display`. The logical primary display remains 0 when a foldable switches from
+its inner display to its outer display, but the physical ID changes. Physical
+IDs are decimal strings: converting them to JavaScript numbers loses precision.
+Screenshot capture passes that ID to `screencap -d`. A recognized but inactive,
+ambiguous or malformed viewport fails instead of choosing an arbitrary display.
+Older dumps without viewport records retain the platform's default selection.
+Display selection consumes the screenshot's existing timeout budget.
+
+`scrcpyVideo.ts` captures logical display 0 continuously, with no playback window,
+audio, control or clipboard access. `--capture-orientation=@` locks the canvas to
+its initial orientation without changing Android rotation settings. Content can
+rotate within the canvas, retaining its size instead of fitting landscape into
+a portrait letterbox. This deliberately permits sideways content in the file.
+
+Folding can change encoder dimensions even with orientation locked. A single
+MP4 with changing H.264 dimensions can have stale container geometry in players.
+The worker records an intermediate Matroska file, inspects every decoded frame,
+and partitions consecutive equal-size spans. Each span is encoded into a separate
+MP4 with correct codec headers and timestamps reset to zero. Capture is never
+restarted to split a file, so folding does not introduce a recorder restart gap.
+The first output is `video.mp4`; subsequent outputs use numbered names. The
+manifest already supports multiple video artifacts. `captures.json` records
+source span times, decoded frame counts, clip paths and probe results.
+
+The initial size retains the existing even-dimension/aspect validation. scrcpy
+may align its encoder dimensions; final encoding produces the exact requested
+initial size. A startup aspect change beyond 2% fails instead of stretching a
+new display into the old request. Later spans keep their aspect ratio and fit
+the requested longest-edge limit. No padding, framing, or audio is introduced.
 
 ## Ownership and persistence
 
-`domain/evidence/video.ts` validates requests, checks host/device capabilities,
-reads metadata, preflights storage, acquires a fixed per-user host device lock, and starts a detached Node
-worker. The worker is packaged beside the domain modules in `dist/` and owns all
-manifest writes after startup. Output directories are exclusive. UUIDs generate
-remote paths, and only validated dimensions/durations enter the remote script.
-Caller labels and context never become shell commands.
-[Writable evidence roots and ownership](still-evidence.md#writable-evidence-roots-and-video-ownership)
-define root configuration, lock placement and upgrade/recovery limits.
+`video.ts` validates inputs and prerequisites before acquiring the fixed per-user,
+per-device lock and starting a detached Node worker. See
+[Evidence storage](still-evidence.md#writable-evidence-roots-and-video-ownership)
+for root configuration and upgrade/recovery limits. Output directories remain
+exclusive, and caller values are passed as argument arrays, never shell code.
+The worker passes the configured ADB path to scrcpy through its environment.
 
-`videoWorker.ts` uses the PID emitted by a shell that immediately execs
-screenrecord. It verifies the exact command arguments and `/proc` start identity
-before acknowledging startup or signaling stop. Stop verifies again immediately
-before SIGINT. The worker keeps its own ADB child handle; it never signals a
-persisted host PID. A random session nonce, worker start identity and heartbeat
-identify the original worker without relying on platform-specific process APIs.
-The Android duration cap remains independent of host lifetime.
+The worker owns the scrcpy child handle and signals that handle only. Saved PIDs
+are diagnostic data, never authority to signal or reclaim ownership. A nonce,
+worker start identity and heartbeat identify the original worker. Stop uses an
+atomic nonce-bound request file. Status/stop remain idempotent across initiating
+CLI exits, concurrent callers, and completed sessions. Heartbeats continue
+through encoding, verification and artifact publication.
 
-Status reads the shared schema and session state. A stale/missing heartbeat after
-the startup grace period reports recovery required and retains the lock and last
-manifest. It does not fabricate terminal evidence or reclaim locks based on age.
-The worker releases its lock only when it has observed recorder termination with
-sufficient certainty. Crashes or ambiguous disconnects require manual ownership
-verification. A known terminal manifest remains immutable, including under repeated
-or concurrent stop requests. Atomic nonce-bound request files avoid multiple
-callers racing manifest publication.
+Startup acknowledges a live recorder that has opened its capture file; it does
+not promise decoded media yet. scrcpy has its own duration limit, independent
+of the Node worker, and the worker also requests stop at its deadline. An
+unresponsive recorder is killed using its owned handle and retains the lock for
+manual recovery. A stale worker heartbeat likewise retains ownership. No
+age-based takeover or process-name termination is permitted.
 
-Media verification requires positive probed duration, exact requested dimensions,
-and full decoding of the selected first video stream through EOF, with a positive
-frame count and no decoder error diagnostics. The video is renamed only after
-these checks. Encoder stderr (including an empty successful stream) and host capture
-receipts are hashed artifacts. Retained stderr is capped and truncation is an
-explicit partial failure. Remote cleanup follows successful pull and verification;
-otherwise the recovery state preserves its unique path.
+Sessions created before the scrcpy backend retain their original state and
+screenrecord worker path. New starts never silently fall back to screenrecord.
+That legacy path still verifies exact remote arguments and process start identity
+before signaling. It is retained for persisted-session compatibility, not as
+rotation or foldable support.
 
-## Validation and limits
+## Verification and partial evidence
 
-The selected Android 16 / API 36 emulator advertised `screenrecord` v1.4 with
-size and duration options. Its successful help output used stderr, so capability
-checks accept both output streams while still requiring exit zero. Host ffprobe
-and ffmpeg were available. The matching branch debug Operator 0.10.0-d was built,
-installed and granted permissions; CLI 0.10.0 was used throughout. Other connected
-devices were not targeted.
+Source frame inspection must finish without decoder diagnostics. Every output
+clip must have positive media duration, exact expected dimensions, and a full
+successful decode through EOF with exactly the source span's frame count and
+no error output. The source encoder timebase is preserved so closely spaced
+VFR timestamps cannot round together during MP4 encoding.
+Only then is its `.partial.mp4` file promoted. A later clip failure preserves
+already verified clips and the intermediate capture; the bundle remains partial.
+Artifact reads and hashes must succeed before the bundle can be complete.
+Caller context, including a failed original verdict, is preserved unchanged.
 
-An initial 12-second CLI recording finalized at its duration cap with verified
-574x1280 H.264 media. A separate explicit-stop recording completed, but its
-app-open timed out and scrolls found no container; it does not count as navigation
-proof. A second app-open with the matching APK also timed out. These failures are
-preserved as preparation observations, not relabeled as video success or repaired
-inside this media feature.
+The source MKV is deleted only after every clip is verified and readable. It is
+retained as partial evidence on failure, since its changing dimensions are not a
+promise of correct playback in ordinary players. Diagnostic streams share a
+1 MiB retention limit, with truncation reported as a partial artifact. Each
+media subprocess has a 16 MiB combined output limit. Probe has a 10-second
+budget; source inspection, each encode and each full decode have separate
+120-second budgets. Encoding uses two codec threads; decode verification uses
+two decoder threads, one output thread and a 256 MiB maximum single allocation.
+These are not whole-session time or memory limits.
 
-After observing the restored Settings search screen and navigating back, an
-independent screenshot confirmed the Settings homepage. The final navigation
-recording entered Network & internet, confirmed that screen in a snapshot, returned
-and scrolled the Settings list. Decoded frames showed both screens. Explicit stop
-from another CLI process finalized the recording. All artifact hashes and byte
-counts matched the saved files. The 60-second cap was stopped after approximately
-50.9 seconds of host time; the verified media timeline was approximately 43.8
-seconds. Both durations are retained independently, not treated as equivalent.
+Output encoding preserves variable frame timing. Idle periods can make media
+duration shorter than wall-clock capture duration. A zero-duration clip remains
+partial. Aggregate media duration sums verified clips; aggregate size is null
+when verified clips have different dimensions. Stop waits only 15 seconds and
+may return pending while the original worker continues finalization.
 
-Offline coverage uses fake process adapters and a clock for recorder startup,
-identity mismatch, cap overrun, disconnect, corrupt decoding, dimension fallback,
-pull failure, stale workers, locks, CLI validation/exit codes, and MCP path/target
-restrictions. A real detached-worker subprocess test uses executable fake media
-and ADB tools to prove survival after the initiating process exits and concurrent,
-idempotent stop. That fixture is POSIX-only; Windows live operation is not proven.
-Live media checks supply the independent pixel/decoder proof that fake tools cannot.
-Private logs, screenshots and recordings remain outside tracked files.
+## Regression coverage
 
-A managed idle capture started through MCP, survived closure of that MCP server,
-and was inspected/stopped through a fresh server using only its session ID. It
-hit its 12-second cap after approximately 12.5 seconds on the host, but ffprobe
-reported a zero-duration H.264 stream containing one decodable frame. The result
-correctly remained partial with `isError: true`, retained media and remote path,
-and preserved the caller's failed verdict. This is evidence of an idle encoder
-limitation, not a positive-duration playback proof. Regression coverage now keeps
-available probe dimensions, codec and zero duration even when verification fails.
+Unit coverage checks physical display IDs, inactive/ambiguous viewports,
+screenshot cancellation, missing scrcpy, orientation-lock arguments, frame-size
+partitioning, corrupt source/output, later-clip failure, unreadable artifacts,
+and an unresponsive recorder. Detached-process fixtures cover CLI survival,
+concurrent stop, separate-device ownership and stale-worker recovery.
 
-Final validation passed: Node build and all 1,544 Node tests with no skips, the
-Android debug APK build, and the documentation build (32 navigation pages and
-394 generated-doc links, no organization warnings). The final MCP idle check
-confirmed that the zero-duration observation is retained alongside the partial
-status. Separate runtime release acceptance remains outside this feature's
-completion claim; see the [release requirements](../release-reference.md#v010-acceptance-requirements).
+`validation/video-stream-verification/scrcpy-fixture.mjs` constructs real H.264
+with three dimension spans, runs the production worker with only recorder
+transport faked, and verifies all frames survive in three correctly sized MP4s.
+It is part of the existing video-stream harness and CI validation route. The
+same harness retains late-packet corruption, truncated-tail, VFR timing and
+maximum-duration full-decode checks. Fake process results alone are not proof
+of valid media or correct framing.
 
+## Live validation
 
-## On-screen log recording verification
+Validation used external scrcpy 4.1 on macOS, the branch-local CLI, and matching
+0.12.1-d debug Operators on an Android 16/API 36 phone emulator and an Android
+17/API 37 foldable emulator. The phone recording preserved Settings content
+through portrait, landscape, and portrait again in one 574x1280 clip. Decoded
+frames showed sideways full-size landscape content and subsequent portrait
+navigation, rather than frozen playback or additional capture padding.
 
-A follow-up on the same dedicated API 36 emulator verified the merged on-screen
-log API against actual video pixels. The panel was initially absent. A separate
-`on-screen-log set` displayed a purple, right-anchored BEFORE label before video
-start. While recording, separate acknowledged set commands replaced it with a
-blue, left-anchored UPDATED label and then a green, right-anchored FINAL label.
-All three generations appeared with the intended text, color and position in the
-decoded MP4 frames. No recorder-side overlay composition or API change was needed.
+YouTube fullscreen was exercised on both emulators. The phone video buffered
+inside YouTube, so that run establishes fullscreen rotation and captured UI
+changes, not uninterrupted streaming playback. A separate Settings run provided
+the phone's independent rotation/navigation proof. The foldable played YouTube
+through fullscreen, closing and reopening, producing three verified clips at
+1234x1280, 584x1280, and 1234x1280 with all 735 captured frames retained. PNG
+screenshots independently showed the active inner and outer displays. A separate
+foldable run verified programmatic rotation plus fold/unfold transitions.
 
-The owned recording stopped successfully with verified 574x1280 H.264 media.
-Artifact hashes and byte counts matched the saved files. Host capture lasted
-approximately 10.26 seconds; the media timeline was 6.716 seconds and contained
-six frames. The final update appeared in the last decoded frame at 6.704 seconds.
-One-second sampling omitted that final generation, so validation inspected the
-original decoded frames rather than relying only on a resampled contact sheet.
-This retains the documented idle-encoder timing limitation.
-
-After stop, a separate screenshot still showed the green FINAL panel and snapshot
-metadata reported `operator_overlay_visible: "true"`. Capture had not cleared or
-replaced the caller-owned panel. The test then explicitly cleared its own panel;
-a following snapshot reported `operator_overlay_visible: "false"`. Recording,
-frames, command receipts and post-stop screenshots remain in private local
-artifacts rather than tracked source.
-
-
-## Review follow-up
-
-An independent full-branch review identified three lifecycle defects, all repaired:
-normal recorder exit during stop identity verification or signaling skipped media
-finalization; failed artifact reads could leave overall status complete; and a
-host-worker spawn error could leave an owned device lock with no worker.
-
-Stop now continues to media verification only after observing a normal recorder
-close in the race, without repeating a signal. Artifact read errors enter the
-manifest errors and every requested artifact must be complete for success.
-Heartbeats continue through artifact reads and final persistence. Host-worker
-ownership begins at the confirmed spawn event; synchronous and asynchronous spawn
-failures persist a failed startup manifest and release only the nonce-owned lock.
-Regression cases cover each failure, and the reviewer found no remaining
-actionable issues in the follow-up review.
-
-Validation after these repairs passed the Node build, 52 focused evidence tests,
-and the full 1,549-test Node suite. A fresh selected-device recording started and
-stopped successfully, retained the updated on-screen log in decoded frames, and
-passed independent artifact hash/byte-count checks. The test explicitly cleared
-its own panel afterward. The documentation build also passed.
-
-
-## Full-stream verification
-
-The initial managed-video implementation in `6fc6c191` used an opening-frame
-checksum that could accept a recording damaged later in the stream. Full-stream
-verification replaces that check with full ffmpeg
-decoding to a null output. `-map 0:v:0` matches the probed stream, `-xerror` and
-`-err_detect explode` make decoding damage fatal, and error-level stderr is also
-rejected even if the process returns zero. A final `progress=end` report must
-contain a positive frame count. Missing EOF, timeout, or exhausted output budget
-cannot authorize promotion. Probe metadata is saved before decoding starts.
-
-`-vsync 0` and `-enc_time_base -1` retain the source timebase. The single-output
-`-vsync` option also works on FFmpeg versions before 5.1, which lack `-fps_mode`.
-Without that output timing, valid sparse VFR input can trigger duplicate-DTS diagnostics
-in the null muxer. We prevent the verifier from inventing those errors rather
-than ignoring decoder diagnostics. No expected frame count is derived from
-average frame rate or wall time, and no decoded pixels are retained by Node.
-
-The decode deadline is fixed at 120 seconds, including process startup, regardless
-of probed duration. Decoder threads are capped at two and output threads at one;
-ffmpeg's maximum individual allocation is 256 MiB, not an aggregate RSS cap.
-All video subprocess stdout/stderr capture remains capped at 16 MiB combined.
-Progress emits at a 60-second interval plus completion. A deadline or overflow
-sends SIGKILL to the owned subprocess; collection stops after settlement. Pull
-and probe retain their individual 10-second deadlines. Stop's 15-second caller
-wait can return pending while the worker continues verification with heartbeats;
-repeated stop does not restart decoding or recording.
-
-The generated real-codec regression in
-`validation/video-stream-verification/test-video-stream.mjs` corrupts the AVCC
-NAL length in a packet after 2.5 seconds of a three-second H.264 MP4. Probe and
-opening-frame decoding still succeed, but full verification fails. The worker
-fixture uses those real bytes and real ffmpeg, faking only recorder transport:
-partial bytes/hash, codec, size, duration, caller verdict, and diagnostics survive;
-no promoted file or recapture occurs, and repeated stop is immutable. Other
-fixtures cover a truncated tail, valid CFR, and valid bursty VFR. Unit tests cover
-missing EOF/frames, zero duration, timeouts, output overflow, exit-zero diagnostics,
-CLI/MCP partial status, stop races, artifact read failures, and heartbeats through
-decode and final artifact persistence.
-
-At the 180-second recording cap, 60-fps H.264 fixtures fully decoded at 720x1280,
-1280x720, and 1920x1080 in approximately 5.0, 6.5, and 10.3 seconds respectively
-on the validation host. The harness enforces the production deadline and runs in
-the shared validation suite and PR CI with ffmpeg installed. This measures the
-default maximum in both orientations and one explicit full-HD size; it does not
-guarantee arbitrary dimensions, higher frame rates, other codecs, or slower hosts.
-The requested size contract is unchanged and budget overruns remain partial.
-
-
-Live full-stream validation used only the assigned Android 16 / API 36 emulator, CLI
-0.10.0, and the matching locally built debug Operator 0.10.0-d. The recording
-reached its 60-second cap and finalized complete at 576x1280 with 60,571.956 ms
-of probed media duration and approximately 60,287.6 ms of host duration. An
-independent full `framemd5` decode succeeded for all 116 frames; the last frame
-started at 44.920589 seconds and held through the remaining media timeline.
-Inspected opening, middle, and final decoded frames showed the Settings list,
-Display & touch page, and return to the list. Artifact hashes/byte counts matched,
-the original failed caller verdict remained unchanged, and two terminal stop
-calls returned complete without changing the manifest.
-
-A subsequent Network & internet click returned `NODE_NOT_FOUND` on the scrolled
-Settings list. That failed action was retained and does not count as navigation
-proof or justify a recapture. An initial start was denied access to local lock
-storage before recorder startup; after that host permission was available, the
-single recording above ran. No shared ADB-server operations or other devices
-were used. Private media, snapshots, action failures, and decoder output remain
-outside Git.
-
-Final full-stream validation passed all 1,554 Node tests with no skips, the complete
-validation suite (including real-codec fixtures), the matching debug APK build,
-and the documentation build (32 navigation pages and 394 generated-doc links,
-no organization warnings). An initial Node test invocation overlapped a validation
-build that replaced `dist/`; it was discarded, then the full suite passed
-after the build completed. Media verification does not establish result-transport
-readiness or close the separate causal investigation.
+A longer live YouTube capture exposed timestamp rounding during final encoding.
+Preserving the source encoder timebase repaired the failure; replaying that same
+capture preserved all 1,228 frames. The generated dimension-change fixture now
+includes closely spaced VFR timestamps, and production verification requires
+exact per-span frame counts. Private media and action receipts remain outside
+tracked source. Windows graceful stop, physical foldables, and other scrcpy
+versions are not covered by these live checks.
