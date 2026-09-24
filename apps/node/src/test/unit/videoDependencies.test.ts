@@ -96,10 +96,10 @@ it("CLI returns exit 1 with all missing dependencies in JSON and pretty output",
 
 it("rejects old versions and modern builds lacking actual timing capabilities", async () => {
   const runner = new DependencyRunner();
-  for (const version of ["4.4", "5.1", "6.0", "unknown"]) {
+  for (const version of ["4.4", "5.1", "6.0", "n5.1", "n6.0", "unknown"]) {
     assert.equal(await supportsFfmpegVideo(runner, `ffmpeg version ${version}`), false);
   }
-  for (const version of ["6.1", "8.1.3", "9.0.2"]) {
+  for (const version of ["6.1", "8.1.3", "9.0.2", "n6.1", "n7.1", "n9.0.2"]) {
     assert.equal(await supportsFfmpegVideo(runner, `ffmpeg version ${version}`), true);
   }
   const run = runner.run.bind(runner);

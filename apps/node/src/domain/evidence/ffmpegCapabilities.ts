@@ -5,7 +5,7 @@ export const FFMPEG_VIDEO_TIMING_ARGS = ["-fps_mode", "passthrough", "-enc_time_
 export const FFMPEG_VIDEO_REQUIREMENT = "FFmpeg 6.1 or newer with libx264, -fps_mode passthrough, and -enc_time_base demux";
 
 export async function supportsFfmpegVideo(runner: ProcessRunner, versionOutput: string): Promise<boolean> {
-  const version = versionOutput.match(/ffmpeg version (\d+)\.(\d+)(?:\D|$)/);
+  const version = versionOutput.match(/ffmpeg version n?(\d+)\.(\d+)(?:\D|$)/);
   if (!version || Number(version[1]) < 6 || (Number(version[1]) === 6 && Number(version[2]) < 1)) return false;
   // Exercise the installed encoder and actual option values without recording a device or writing a file.
   const probe = await runner.run("ffmpeg", [
