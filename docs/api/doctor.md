@@ -402,9 +402,12 @@ For a failing check, pretty output includes:
 - `summary`
 - `detail` when present
 - `fix.title`
-- each `fix.steps[].value`
+- each `fix.steps[].value`, with shell commands wrapped in Markdown backticks
 - `Docs: <fix.docsUrl>` when present
 - on-device guidance grouped under `On device (<screen>):`
+
+The `Next actions:` section also wraps shell commands in backticks. JSON output
+keeps executable shell step values unchanged so callers can use them directly.
 
 ## Optional video dependencies
 

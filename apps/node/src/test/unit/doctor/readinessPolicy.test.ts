@@ -145,7 +145,7 @@ describe("selected Operator readiness policy", () => {
       const output = await cmdDoctor({ format, checkOnly: true }, { doctorService: { run: async () => report } });
       assert.equal(process.exitCode, 1);
       if (format === "json") assert.deepEqual(JSON.parse(output).skippedChecks, report.skippedChecks);
-      else assert.match(output, /\[SKIP\] readiness.handshake/);
+      else assert.match(output, /\[SKIP\] `readiness.handshake`/);
     }
   });
 
