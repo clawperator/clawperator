@@ -2,7 +2,7 @@ import type { ProcessRunner } from "../../adapters/android-bridge/processRunner.
 
 // Pass every frame through and retain demuxer precision, including closely spaced VFR frames.
 export const FFMPEG_VIDEO_TIMING_ARGS = ["-fps_mode", "passthrough", "-enc_time_base", "demux"];
-export const FFMPEG_VIDEO_REQUIREMENT = "FFmpeg 6.1 or newer with libx264, -fps_mode passthrough, and -enc_time_base demux";
+export const FFMPEG_VIDEO_REQUIREMENT = "ffmpeg 6.1 or newer with libx264, -fps_mode passthrough, and -enc_time_base demux";
 
 export async function supportsFfmpegVideo(runner: ProcessRunner, versionOutput: string): Promise<boolean> {
   const version = versionOutput.match(/ffmpeg version n?(\d+)\.(\d+)(?:\D|$)/);

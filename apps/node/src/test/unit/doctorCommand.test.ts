@@ -274,6 +274,28 @@ describe("cmdDoctor", () => {
     assert.match(output, /Use `--operator-package com\.clawperator\.operator\.dev`/);
   });
 
+  it("uses the lowercase ffmpeg executable name in pretty video guidance", async () => {
+    const output = await cmdDoctor({ format: "pretty" }, {
+      doctorService: { run: async () => ({
+        ok: true,
+        checks: [{
+          id: "host.video.dependencies",
+          status: "warn",
+          summary: "ffmpeg 6.1 is required.",
+          fix: {
+            title: "Install video tools",
+            platform: "any",
+            steps: [{ kind: "manual", value: "Install scrcpy 3.0 or newer and ffmpeg 6.1 or newer." }],
+          },
+        }],
+      }) },
+    });
+
+    assert.match(output, /`ffmpeg` 6\.1 is required/);
+    assert.match(output, /Install `scrcpy` 3\.0 or newer and `ffmpeg` 6\.1 or newer/);
+    assert.doesNotMatch(output, /FFmpeg/);
+  });
+
   it("uses docsUrl values that map to pages present in mkdocs nav", async () => {
     const mkdocsText = await readFile(join(repoRoot, "sites/docs/mkdocs.yml"), "utf8");
     const docsUrlToNavPath = new Map<string, string>([

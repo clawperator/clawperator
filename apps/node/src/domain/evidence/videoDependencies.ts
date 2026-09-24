@@ -3,7 +3,7 @@ import { FFMPEG_VIDEO_REQUIREMENT, supportsFfmpegVideo } from "./ffmpegCapabilit
 import { ERROR_CODES } from "../../contracts/errors.js";
 
 export const VIDEO_DEPENDENCIES_DOCS = "https://docs.clawperator.com/api/evidence/#video-dependencies";
-export const VIDEO_DEPENDENCIES_HINT = "Install scrcpy 3.0 or newer and FFmpeg 6.1 or newer (including ffprobe and libx264, with -fps_mode passthrough and -enc_time_base demux support), and expose all three executables on the PATH used by Clawperator. On macOS: brew install scrcpy ffmpeg. Then rerun clawperator doctor --device <device_serial> and retry video start only after host.video.dependencies passes. Clawperator does not bundle or install these tools. Still screenshots require only ADB.";
+export const VIDEO_DEPENDENCIES_HINT = "Install scrcpy 3.0 or newer and ffmpeg 6.1 or newer (including ffprobe and libx264, with -fps_mode passthrough and -enc_time_base demux support), and expose all three executables on the PATH used by Clawperator. On macOS: brew install scrcpy ffmpeg. Then rerun clawperator doctor --device <device_serial> and retry video start only after host.video.dependencies passes. Clawperator does not bundle or install these tools. Still screenshots require only ADB.";
 export const SCRCPY_REQUIRED_FLAGS = ["--capture-orientation", "--no-window", "--no-audio", "--no-control", "--video-codec", "--max-size", "--record-format", "--time-limit"];
 
 export interface VideoDependencyIssue {
@@ -17,7 +17,7 @@ export async function inspectVideoDependencies(runner: ProcessRunner): Promise<V
   const probes = [
     { dependency: "scrcpy", args: ["--help"], requirement: "scrcpy 3.0+ with capture orientation locking", supports: (text: string) => SCRCPY_REQUIRED_FLAGS.every(flag => text.includes(flag)) },
     { dependency: "ffmpeg", args: ["-version"], requirement: FFMPEG_VIDEO_REQUIREMENT, supports: (text: string) => supportsFfmpegVideo(runner, text) },
-    { dependency: "ffprobe", args: ["-version"], requirement: "ffprobe from FFmpeg", supports: (_text: string) => true },
+    { dependency: "ffprobe", args: ["-version"], requirement: "ffprobe from ffmpeg", supports: (_text: string) => true },
   ] as const;
   const results = await Promise.all(probes.map(async probe => {
     let reason: VideoDependencyIssue["reason"] | undefined;

@@ -151,6 +151,6 @@ function formatDoctorText(value: string): string {
     .replace(/'([A-Za-z][\w.-]*)'/g, (_match, code: string) => `\`${code}\``);
   return withCommands.split(/(`[^`]*`)/g).map(segment => segment.startsWith("`")
     ? segment
-    : segment.replace(/\b(?:CLAWPERATOR_[A-Z_]+|PATH|skill\.json(?:\.agent\.cliPath)?|skills-registry\.json|SKILL\.md|doctor_ping|host\.video\.dependencies|com\.clawperator\.operator(?:\.dev)?|adb|ffmpeg|ffprobe|scrcpy|libx264|FFmpeg)\b|--[a-z][\w-]*|-(?:fps_mode|enc_time_base)\s+\w+/g, code => `\`${code}\``)
+    : segment.replace(/\b(?:CLAWPERATOR_[A-Z_]+|PATH|skill\.json(?:\.agent\.cliPath)?|skills-registry\.json|SKILL\.md|doctor_ping|host\.video\.dependencies|com\.clawperator\.operator(?:\.dev)?|adb|ffmpeg|ffprobe|scrcpy|libx264)\b|--[a-z][\w-]*|-(?:fps_mode|enc_time_base)\s+\w+/g, code => `\`${code}\``)
   ).join("");
 }
