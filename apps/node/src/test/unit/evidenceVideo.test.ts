@@ -180,7 +180,7 @@ describe("video start preflight and CLI", () => {
         let stdout = "", stderr = "";
         if (action === "devices") stdout = "List of devices attached\npreflight-test-device\tdevice\n";
         if (command === "scrcpy") stderr = "--capture-orientation --no-window --no-audio --no-control --video-codec --max-size --record-format --time-limit";
-        if (command === "ffmpeg" && args.includes("-encoders")) stdout = "libx264";
+        if (command === "ffmpeg" && args.includes("-version")) stdout = "ffmpeg version 6.1";
         if (action === "shell getprop") stdout = "[ro.build.version.sdk]: [36]\n[ro.build.version.release]: [16]\n[ro.product.model]: [test]\n[ro.product.manufacturer]: [test]\n[ro.kernel.qemu]: [1]\n";
         if (action === "shell wm size") stdout = "Physical size: 720x1280";
         if (action === "shell wm density") stdout = "Physical density: 320";
@@ -344,8 +344,7 @@ for (const failure of ["late-decode", "decode-timeout"]) it(`preserves partial e
       assert.equal(options?.timeoutMs, 120000);
       assert.ok(!args.includes("-frames:v"));
       assert.deepEqual(args.slice(args.indexOf("-map"), args.indexOf("-map") + 2), ["-map", "0:v:0"]);
-      assert.deepEqual(args.slice(args.indexOf("-vsync"), args.indexOf("-vsync") + 2), ["-vsync", "0"]);
-      assert.ok(!args.includes("-fps_mode"), "Retain compatibility with FFmpeg before 5.1");
+      assert.deepEqual(args.slice(args.indexOf("-fps_mode"), args.indexOf("-fps_mode") + 4), ["-fps_mode", "passthrough", "-enc_time_base", "demux"]);
       return { code: failure === "late-decode" ? 1 : null, stdout: "frame=42\nprogress=continue\n",
         stderr: failure === "late-decode" ? "Invalid NAL unit at tail" : "Video subprocess timed out" };
     };

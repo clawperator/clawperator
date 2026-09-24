@@ -409,6 +409,8 @@ For a failing check, pretty output includes:
 ## Optional video dependencies
 
 `host.video.dependencies` probes scrcpy, ffmpeg, and ffprobe on the host PATH.
+FFmpeg must be 6.1 or newer and successfully encode two synthetic frames with
+libx264 and the actual passthrough/demux timing options before this check passes.
 Missing, unusable, or unsupported tools produce a warning; normal readiness and
 its exit status still depend on the required checks. `evidence.capability` is
 `video-recording`, and `evidence.dependencies` lists the unmet dependencies with
@@ -427,7 +429,7 @@ ADB and do not require these tools.
 | `host.logs.writable` | `pass`, `warn` | `LOG_DIRECTORY_UNWRITABLE` | actual daily log file can be opened for append; evidence includes `logDir`, `logPath`, `writable`; advisory only |
 | `host.node.version` | `pass`, `fail` | `NODE_TOO_OLD` | Node.js major version is at least 24 |
 | `host.adb.presence` | `pass`, `fail` | `ADB_NOT_FOUND` | adb exists and can report a version |
-| `host.video.dependencies` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | optional video host tools: scrcpy capture-orientation support, ffmpeg libx264, and runnable ffprobe; advisory only |
+| `host.video.dependencies` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | optional video host tools: scrcpy capture-orientation support, FFmpeg 6.1+ with a working libx264/timing capability probe, and runnable ffprobe; advisory only |
 | `host.adb.server` | `pass`, `fail` | `ADB_SERVER_FAILED` | adb server can start |
 | `host.skill-agent-cli.default` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | default orchestrated-skill agent CLI is a valid executable name and exists on PATH |
 | `host.skill-agent-cli.skills` | `pass`, `warn` | `HOST_DEPENDENCY_MISSING` | all installed orchestrated skills can resolve their configured agent CLI executable |

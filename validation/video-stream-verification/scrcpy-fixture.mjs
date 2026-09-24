@@ -26,6 +26,8 @@ export async function verifyDimensionChanges(root, runner) {
   await writeFile(raw, Buffer.concat(chunks));
   // Closely spaced VFR frames reproduce nominal-timebase rounding seen during live rotation.
   await run('ffmpeg', ['-v', 'error', '-fflags', '+genpts', '-r', '60', '-i', raw, '-c', 'copy', '-bsf:v', "setts=time_base=1/1000:pts='if(eq(mod(N,60),30),floor((N-1)*1001/60)+1,floor(N*1001/60))':dts=PTS", source]);
+  const sourceFrames = JSON.parse(await run('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_frames',
+    '-show_entries', 'frame=best_effort_timestamp_time', '-of', 'json', source])).frames;
   const outputDir = join(root, 'scrcpy-worker');
   await mkdir(outputDir);
   const sessionId = randomUUID();
@@ -66,6 +68,11 @@ export async function verifyDimensionChanges(root, runner) {
     assert.equal(probe.frames.length, 60, 'Every captured frame must survive the split');
     assert.deepEqual([...new Set(probe.frames.map(frame => `${frame.width}x${frame.height}`))], [index === 1 ? '240x320' : '320x240']);
     assert.equal(Number(probe.frames[0].best_effort_timestamp_time), 0);
+    const sourceStart = Number(sourceFrames[index * 60].best_effort_timestamp_time);
+    for (const [frameIndex, frame] of probe.frames.entries()) {
+      const expected = Number(sourceFrames[index * 60 + frameIndex].best_effort_timestamp_time) - sourceStart;
+      assert.ok(Math.abs(Number(frame.best_effort_timestamp_time) - expected) < 0.00001, 'Preserve every source timestamp after rebasing');
+    }
   }
   assert.equal(spawns, 1, 'Folding must not restart capture');
   await assert.rejects(stat(join(outputDir, 'capture.partial.mkv')));

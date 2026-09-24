@@ -34,7 +34,7 @@ export function getVideoMcpTools(session: SessionDefaults = createSessionDefault
     durationSeconds: z.number().int().min(1).max(180), size: z.string().optional(), label: z.string().max(2048).optional(), context: z.record(z.unknown()).optional() }).strict();
   const sessionSchema = z.object({ sessionId: z.string().uuid() }).strict();
   const result = (value: Awaited<ReturnType<typeof videoStatus>>) => ({ content: [{ type: "text" as const, text: JSON.stringify(value) }], structuredContent: { ...value }, ...(value.ok ? {} : { isError: true }) });
-  return [{ name: "evidence_video_start", description: "Start a bounded screen recording in a managed bundle; recording is startup confirmation, not verified media. Requires separately installed scrcpy 3.0+, ffprobe, and ffmpeg with libx264 on the server PATH. Unmet dependencies return HOST_DEPENDENCY_MISSING with dependency details and recovery instructions.",
+  return [{ name: "evidence_video_start", description: "Start a bounded screen recording in a managed bundle; recording is startup confirmation, not verified media. Requires separately installed scrcpy 3.0+, ffprobe, and ffmpeg 6.1+ with libx264 and passthrough/demux timing support on the server PATH. Unmet dependencies return HOST_DEPENDENCY_MISSING with dependency details and recovery instructions.",
     inputSchema: { type: "object", additionalProperties: false, required: ["durationSeconds"], properties: {
       deviceId: { type: "string" }, operatorPackage: { type: "string" }, durationSeconds: { type: "integer", minimum: 1, maximum: 180 },
       size: { type: "string" }, label: { type: "string", maxLength: 2048 }, context: { type: "object" } } },

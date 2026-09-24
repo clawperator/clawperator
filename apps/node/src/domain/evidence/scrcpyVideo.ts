@@ -1,3 +1,4 @@
+import { FFMPEG_VIDEO_TIMING_ARGS } from "./ffmpegCapabilities.js";
 import * as fs from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -75,7 +76,7 @@ export async function runScrcpyVideoWorker(state: VideoState, runner: ProcessRun
     try { return JSON.parse(await fs.readFile(join(outputDir, "stop.json"), "utf8")).nonce === state.nonce; }
     catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return false; throw error; }
   };
-  const artifact = async (path: string, kind: EvidenceArtifact["kind"], mimeType: string, error?: EvidenceError) => {
+  const artifact = async (path: string, kind: EvidenceArtifact["kind"], mimeType: string, error?: EvidenceError, allowMissing = false) => {
     try {
       const data = await readArtifact(join(outputDir, path));
       if (!data.length && kind !== "encoder_stderr") throw new Error("No artifact bytes available");
@@ -83,8 +84,9 @@ export async function runScrcpyVideoWorker(state: VideoState, runner: ProcessRun
         status: error ? "partial" : "complete", startedAt: manifest.startedAt, finishedAt: new Date().toISOString(),
         durationMs: Math.max(0, clock.monotonic() - started), ...(error ? { error } : {}) });
     } catch (caught) {
-      const failure = videoError(caught, "artifact");
-      manifest.errors.push(failure);
+      const missingOutput = allowMissing && error !== undefined && (caught as NodeJS.ErrnoException).code === "ENOENT";
+      const failure = missingOutput ? error : videoError(caught, "artifact");
+      if (!missingOutput) manifest.errors.push(failure);
       manifest.artifacts.push({ kind, path: null, bytes: null, sha256: null, mimeType, status: "failed", error: failure,
         startedAt: manifest.startedAt, finishedAt: new Date().toISOString(), durationMs: Math.max(0, clock.monotonic() - started) });
     }
@@ -156,7 +158,7 @@ export async function runScrcpyVideoWorker(state: VideoState, runner: ProcessRun
         const encoded = await runner.run("ffmpeg", ["-v", "error", "-nostdin", "-nostats", "-xerror", "-threads", "2",
           "-i", source, "-ss", String(segment.start), ...(segment.end === undefined ? [] : ["-t", String(segment.end - segment.start)]),
           "-map", "0:v:0", "-an", "-sn", "-dn", "-vf", `scale=${size.replace("x", ":")},setsar=1`,
-          "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-threads", "2", "-vsync", "0", "-enc_time_base", "-1", join(outputDir, partial)],
+          "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-threads", "2", ...FFMPEG_VIDEO_TIMING_ARGS, join(outputDir, partial)],
         { timeoutMs: VIDEO_DECODE_TIMEOUT_MS });
         if (encoded.code !== 0 || encoded.error || encoded.stderr.trim()) fail(`Video segment encoding failed: ${encoded.stderr || encoded.error?.message || encoded.code}`);
         const metadata = await verifyVideo(runner, join(outputDir, partial), size, value => { probed = value; }, segment.frames);
@@ -169,7 +171,7 @@ export async function runScrcpyVideoWorker(state: VideoState, runner: ProcessRun
         const failure = videoError(error, "segment");
         manifest.errors.push(failure);
         receipts.push({ path: partial, ...segment, ...probed, error: failure });
-        await artifact(partial, "video", "video/mp4", failure);
+        await artifact(partial, "video", "video/mp4", failure, true);
       }
     }
     manifest.video!.mediaDurationMs = mediaDurationMs;

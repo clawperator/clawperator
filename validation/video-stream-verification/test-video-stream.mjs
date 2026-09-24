@@ -18,7 +18,7 @@ async function run(command, args, timeoutMs = 120000) {
 async function generate(name, size, duration, filter) {
   const path = join(root, name + '.mp4');
   await run('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', `testsrc2=size=${size}:rate=60:duration=${duration}`,
-    ...(filter ? ['-vf', filter] : []), '-vsync', 'vfr', '-c:v', 'libx264', '-threads', '2', '-preset', 'ultrafast',
+    ...(filter ? ['-vf', filter] : []), '-fps_mode', 'vfr', '-c:v', 'libx264', '-threads', '2', '-preset', 'ultrafast',
     '-g', '60', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', path], 300000);
   return path;
 }

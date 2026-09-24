@@ -44,7 +44,7 @@ fs.writeFileSync(output,'simulated video');
 process.on('SIGINT',()=>process.exit(0));setTimeout(()=>process.exit(0),Number(value('--time-limit'))*1000);
 `);
   await binary("ffprobe", "console.log(JSON.stringify(process.argv.includes('-show_frames')?{frames:[{width:720,height:1280,best_effort_timestamp_time:'0'},{width:720,height:1280,best_effort_timestamp_time:'0.25'}]}:{streams:[{codec_name:'h264',width:720,height:1280,duration:'0.25'}]}));");
-  await binary("ffmpeg", "if(process.argv.includes('-encoders')) console.log('libx264'); else {if(process.argv.at(-1).endsWith('.mp4'))require('node:fs').writeFileSync(process.argv.at(-1),'simulated video'); console.log('frame=2\\nprogress=end\\n');}");
+  await binary("ffmpeg", "if(process.argv.includes('-version')) console.log('ffmpeg version 6.1'); else {if(process.argv.at(-1).endsWith('.mp4'))require('node:fs').writeFileSync(process.argv.at(-1),'simulated video'); console.log('frame=2\\nprogress=end\\n');}");
   const parent = join(root, "start.mjs");
   await fs.writeFile(parent, `import {startVideo} from ${JSON.stringify(pathToFileURL(resolve("dist/domain/evidence/video.js")).href)};console.log(JSON.stringify(await startVideo({deviceId:process.argv[2]||${JSON.stringify(deviceId)},operatorPackage:'com.example.operator',durationSeconds:20}).catch(error=>error)));`);
   const env = { ...process.env, ADB_PATH: adb, PATH: root + ":" + process.env.PATH, CLAWPERATOR_EVIDENCE_DIR: relative(process.cwd(), join(root, "state with spaces")) };

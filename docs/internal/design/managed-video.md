@@ -3,7 +3,7 @@
 The public contract is [Managed video](../../api/evidence.md#managed-video).
 Video shares the still-evidence schema and does not change accessibility-event
 recording or Android action envelopes. Host prerequisites are an installed
-scrcpy with capture-orientation locking, ffprobe, and ffmpeg with libx264.
+scrcpy with capture-orientation locking, ffprobe, and ffmpeg 6.1+ with libx264.
 No scrcpy executable or server is shipped by Clawperator. Screenshots remain
 ADB-only and select the active physical display.
 `videoDependencies.ts` owns the shared host probes for video start and doctor's
@@ -143,3 +143,35 @@ includes closely spaced VFR timestamps, and production verification requires
 exact per-span frame counts. Private media and action receipts remain outside
 tracked source. Windows graceful stop, physical foldables, and other scrcpy
 versions are not covered by these live checks.
+
+## FFmpeg timing compatibility
+
+Encoding and verification share `-fps_mode passthrough -enc_time_base demux`.
+The demuxer timebase preserves closely spaced VFR timestamps; passthrough alone
+would still permit encoder rounding. The old `-vsync 0 -enc_time_base -1` pair
+is no longer used. This deliberately replaces support for hosts predating
+`-fps_mode` with a minimum of FFmpeg 6.1 and a real encoder capability probe.
+See [FFmpeg's timing option definitions](https://ffmpeg.org/ffmpeg.html#Advanced-options).
+
+Doctor and startup share a two-frame synthetic encode, including libx264 and
+the precise production timing option values. A missing encoder, removed option,
+unsupported timebase value, or reduced build that cannot run the probe fails
+before recording. Full decode still fails on stderr, incomplete progress,
+corruption or wrong frame counts. If encoding creates no MP4, its original error
+is retained on the failed artifact without a secondary missing-file error;
+unrelated artifact read failures remain errors. Raw Matroska evidence is preserved.
+
+Validated locally with isolated macOS arm64 builds of FFmpeg/ffprobe 6.1, 8.1.3
+and 9.0.2, all linked to libx264. Each passed the complete real-codec harness:
+three changing display-size spans, closely spaced VFR timestamps, exact frame
+counts and rebased timestamps, corrupt and truncated tails, and maximum-duration
+full decoding. FFmpeg 9.0.2 independently rejected both legacy `-vsync` and
+negative `-enc_time_base -1`; the modern pair passed on all three versions.
+
+Fresh Settings rotation recordings on an Android 16 phone emulator with the
+matching 0.12.2-d Operator finalized with 160 frames on 6.1, 151 on 8.1.3 and
+137 on 9.0.2. All source timestamps matched the final clips after rebasing,
+all artifact hashes and sizes verified, and inspected frames showed full-size
+landscape between portrait views. No global FFmpeg installation was changed.
+These runs do not establish physical Pixel or Windows behavior. Synthetic
+multi-size recordings exercise folding-related finalization for each version.
