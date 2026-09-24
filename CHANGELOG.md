@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.12.2] - 2026-09-25
+
+**Breaking:** Video recording now requires ffmpeg 6.1 or newer with a working libx264 encoder. This release checks video encoding support before capture, preserves frame timing and the original recording when finalization fails, and makes doctor guidance easier to read.
+
+### 🤖 Node API & CLI
+
+- **Breaking:** **Changed:** Required ffmpeg 6.1 or newer and a successful encoder capability probe before video recording. Older or unsupported installations return `HOST_DEPENDENCY_MISSING` with recovery guidance before capture starts.
+- **Fixed:** Preserved every video frame and its timing through variable-frame-rate input and display-size changes, while retaining strict decoding and frame-count checks. If MP4 finalization fails, preserved the original Matroska recording and reported the encoder error without adding a misleading missing-file error.
+- **Fixed:** Wrapped commands, flags, package names, and other code references in Markdown backticks in doctor's pretty diagnostics while leaving structured JSON command values unchanged.
+
+### 📚 Documentation & Website
+
+- **Changed:** Updated public release and installer version markers to the published 0.12.1 release.
+- **Changed:** Documented the ffmpeg 6.1 video prerequisite, capability checks, and recording recovery behavior.
+- **Changed:** Clarified how code references appear in doctor pretty output and that JSON command values remain executable.
+
+Pull requests:
+- [chore(release): complete 0.12.1 follow-up](https://github.com/clawperator/clawperator/pull/339)
+- [fix(evidence)!: modernize video encoding and verification](https://github.com/clawperator/clawperator/pull/340)
+- [fix(doctor): format code references in pretty diagnostics](https://github.com/clawperator/clawperator/pull/341)
+
 ## [0.12.1] - 2026-09-25
 
 **Breaking:** New video recordings require separately installed scrcpy 3.0 or newer, ffprobe, and ffmpeg with libx264. This release preserves continuous capture through rotation and folding, produces verified clips for each display-size span, and selects the active physical display for screenshots.
