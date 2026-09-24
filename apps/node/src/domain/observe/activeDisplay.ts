@@ -10,7 +10,8 @@ export interface ActiveDisplay {
 /** Physical IDs exceed JavaScript's safe integer range. Keep them as decimal strings. */
 export function parseActiveDisplay(dump: string): ActiveDisplay | null {
   const viewports = dump.match(/DisplayViewport\{[^}]+\}/g) ?? [];
-  if (viewports.length === 0) return null;
+  // Older Android dumps have no activity field; preserve default capture selection.
+  if (!viewports.some(viewport => /\bisActive=/.test(viewport))) return null;
   const primary = viewports.filter(viewport => /\bvalid=true\b/.test(viewport)
     && /\bisActive=true\b/.test(viewport) && /\bdisplayId=0\b/.test(viewport));
   if (primary.length !== 1) throw { code: "EVIDENCE_CAPTURE_FAILED", message: "Active primary display is unavailable or ambiguous" };

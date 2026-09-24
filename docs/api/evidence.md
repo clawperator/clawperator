@@ -222,7 +222,8 @@ repeating the same capture does not install dependencies. This replaces the
 previous generic `EVIDENCE_CAPTURE_FAILED` prerequisite error.
 
 Still screenshots require only ADB: capture explicitly selects the active physical
-display, including a foldable's outer screen.
+display, including a foldable's outer screen. Older Android dumps without
+viewport activity metadata retain default display selection.
 
 ```bash
 clawperator evidence video start --device <device_serial> --operator-package com.clawperator.operator.dev --output-dir /absolute/new/video-bundle --duration-seconds 30

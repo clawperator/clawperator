@@ -26,7 +26,7 @@ describe("active foldable display selection", () => {
   });
   it("rejects ambiguous, inactive, or malformed viewports and supports older dumps without viewports", () => {
     assert.equal(parseActiveDisplay("older dump"), null);
-    for (const dump of [display("1", false), display("1", true) + display("2", true), display("1", true).replace("local:1", "virtual:1")]) {
+    for (const dump of [display("1", false), display("1", false) + display("2", true).replace("isActive=true, ", ""), display("1", true) + display("2", true), display("1", true).replace("local:1", "virtual:1")]) {
       assert.throws(() => parseActiveDisplay(dump));
     }
   });
@@ -45,6 +45,10 @@ describe("active foldable display selection", () => {
     const config = getDefaultRuntimeConfig({ deviceId: "test", runner });
     assert.equal((await captureScreenshot(config, { timeoutMs: 1000 })).toString(), "pixels");
     assert.deepEqual(captured, ["-s", "test", "exec-out", "screencap", "-p", "-d", "9007199254740995"]);
+    // Android 10 viewport records predate activity metadata and retain default capture.
+    runner.run = async () => ({ code: 0, stdout: display("1", true).replace("isActive=true, ", ""), stderr: "" });
+    assert.equal((await captureScreenshot(config, { timeoutMs: 1000 })).toString(), "pixels");
+    assert.deepEqual(captured, ["-s", "test", "exec-out", "screencap", "-p"]);
     const abort = new AbortController();
     runner.run = async () => { abort.abort(new Error("cancelled during selection")); return { code: 0, stdout: "", stderr: "" }; };
     captured = [];

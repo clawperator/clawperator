@@ -19,7 +19,8 @@ its inner display to its outer display, but the physical ID changes. Physical
 IDs are decimal strings: converting them to JavaScript numbers loses precision.
 Screenshot capture passes that ID to `screencap -d`. A recognized but inactive,
 ambiguous or malformed viewport fails instead of choosing an arbitrary display.
-Older dumps without viewport records retain the platform's default selection.
+Older dumps without viewport activity metadata retain the platform's default
+selection, including Android 10 records that omit `isActive`.
 Display selection consumes the screenshot's existing timeout budget.
 
 `scrcpyVideo.ts` captures logical display 0 continuously, with no playback window,
