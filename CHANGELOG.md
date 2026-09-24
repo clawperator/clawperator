@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to follow Semantic Versioning.
 
+## [0.12.1] - 2026-09-25
+
+**Breaking:** New video recordings require separately installed scrcpy 3.0 or newer, ffprobe, and ffmpeg with libx264. This release preserves continuous capture through rotation and folding, produces verified clips for each display-size span, and selects the active physical display for screenshots.
+
+### 🤖 Node API & CLI
+
+- **Breaking:** **Changed:** Required the video recording tools on `PATH` and returned `HOST_DEPENDENCY_MISSING` with structured requirements and recovery guidance when they are unavailable. Folding can produce multiple video artifacts, which consumers must read to cover the complete recording.
+- **Fixed:** Kept one continuous video capture through rotation and folding without dropping frames, and verified the resulting MP4 clips for each display-size span. Rotation retains the initial canvas and may show full-size sideways content.
+- **Fixed:** Captured screenshots from the active physical display while retaining default capture behavior for legacy Android dumps without activity metadata.
+
+### 📚 Documentation & Website
+
+- **Changed:** Documented video tool prerequisites, recording artifacts, host dependency errors, and active-display capture behavior in setup, API, and error guidance.
+
+Pull requests:
+- [chore(release): complete 0.12.0 follow-up](https://github.com/clawperator/clawperator/pull/336)
+- [test(evidence): isolate worker fixture device identities](https://github.com/clawperator/clawperator/pull/335)
+- [fix(evidence)!: preserve capture across rotation and folding](https://github.com/clawperator/clawperator/pull/337)
+
 ## [0.12.0] - 2026-09-20
 
 **Breaking:** Raw snapshots now rejected missing or malformed XML, and successful framed skill responses gained an explicit wrapper `status`. This release added a provider-neutral agent control loop and improved Node capture diagnostics, failure evidence, and daemon ownership handling.
