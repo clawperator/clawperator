@@ -217,6 +217,63 @@ describe("cmdDoctor", () => {
     assert.match(output, /Docs: https:\/\/docs\.clawperator\.com\/troubleshooting\/operator\//);
   });
 
+  it("formats shell commands in pretty checks and next actions without changing JSON values", async () => {
+    const report = {
+      ok: false,
+      criticalOk: false,
+      checks: [{
+        id: "host.adb.presence",
+        status: "fail" as const,
+        summary: "adb not found in PATH.",
+        fix: {
+          title: "Install Android Platform Tools",
+          platform: "any" as const,
+          steps: [
+            { kind: "shell" as const, value: "adb start-server" },
+            { kind: "manual" as const, value: "macOS: brew install --cask android-platform-tools" },
+          ],
+        },
+      }],
+      nextActions: ["adb start-server", "macOS: brew install --cask android-platform-tools"],
+    };
+    const doctorService = { run: async () => report };
+
+    const pretty = await cmdDoctor({ format: "pretty" }, { doctorService });
+    assert.match(pretty, /- `adb start-server`/);
+    assert.match(pretty, /- macOS: `brew install --cask android-platform-tools`/);
+    assert.match(pretty, /`adb` not found in `PATH`/);
+    assert.doesNotMatch(pretty, /``adb start-server``/);
+
+    const json = JSON.parse(await cmdDoctor({ format: "json" }, { doctorService }));
+    assert.strictEqual(json.checks[0].fix.steps[0].value, "adb start-server");
+    assert.strictEqual(json.checks[0].fix.steps[1].value, "macOS: brew install --cask android-platform-tools");
+    assert.strictEqual(json.nextActions[0], "adb start-server");
+  });
+
+  it("formats commands embedded in manual recovery text", async () => {
+    const output = await cmdDoctor({ format: "pretty" }, {
+      doctorService: { run: async () => ({
+        ok: false,
+        checks: [{
+          id: "readiness.version.compatibility",
+          status: "fail",
+          summary: "Installed APK version mismatch.",
+          fix: {
+            title: "Align CLI and APK versions",
+            platform: "any",
+            steps: [
+              { kind: "manual", value: "Reinstall the CLI: npm install -g clawperator@latest" },
+              { kind: "manual", value: "Use --operator-package com.clawperator.operator.dev" },
+            ],
+          },
+        }],
+      }) },
+    });
+
+    assert.match(output, /Reinstall the CLI: `npm install -g clawperator@latest`/);
+    assert.match(output, /Use `--operator-package com\.clawperator\.operator\.dev`/);
+  });
+
   it("uses docsUrl values that map to pages present in mkdocs nav", async () => {
     const mkdocsText = await readFile(join(repoRoot, "sites/docs/mkdocs.yml"), "utf8");
     const docsUrlToNavPath = new Map<string, string>([

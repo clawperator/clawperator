@@ -59,8 +59,8 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
   lines.push("");
   lines.push(`Clawperator Doctor Diagnostics (${report.capability ?? "interactive"})`);
   lines.push("");
-  lines.push(`  Device:           ${report.deviceId ?? "(auto-detect)"}`);
-  lines.push(`  Operator package: ${report.operatorPackage ?? "(default)"}`);
+  lines.push(`  Device:           ${report.deviceId !== undefined ? `\`${report.deviceId}\`` : "(auto-detect)"}`);
+  lines.push(`  Operator package: ${report.operatorPackage !== undefined ? `\`${report.operatorPackage}\`` : "(default)"}`);
   lines.push("");
 
   if (criticalChecks.length > 0) {
@@ -85,7 +85,7 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
   }
 
   for (const skipped of report.skippedChecks ?? []) {
-    lines.push(`  [SKIP] ${skipped.id}: ${skipped.reason} Blocked by: ${skipped.blockedBy.join(", ")}`);
+    lines.push(`  [SKIP] \`${skipped.id}\`: ${skipped.reason} Blocked by: ${skipped.blockedBy.map(id => `\`${id}\``).join(", ")}`);
   }
 
   if (report.criticalOk ?? report.ok) {
@@ -97,8 +97,13 @@ function renderPrettyDoctorReport(report: DoctorReport): string {
   if (report.nextActions && report.nextActions.length > 0) {
     lines.push("");
     lines.push("Next actions:");
+    const shellSteps = new Set(report.checks.flatMap(check => check.fix?.steps.filter(step => step.kind === "shell").map(step => step.value) ?? []));
     for (const action of report.nextActions) {
-      lines.push(`  - ${action}`);
+      const isShellCommand = shellSteps.has(action) || action.startsWith("Try: clawperator ");
+      const displayedAction = action.startsWith("Try: clawperator ")
+        ? `Try: \`${action.slice("Try: ".length)}\``
+        : isShellCommand ? `\`${action}\`` : formatDoctorText(action);
+      lines.push(`  - ${displayedAction}`);
     }
   }
 
@@ -112,14 +117,14 @@ function getDoctorExitCode(report: DoctorReport): number {
 
 function renderCheck(lines: string[], check: DoctorCheckResult): void {
   const status = check.status === "pass" ? "[OK]" : check.status === "warn" ? "[WARN]" : "[FAIL]";
-  lines.push(`  ${status} ${check.summary}`);
+  lines.push(`  ${status} ${formatDoctorText(check.summary)}`);
   if (check.status !== "pass" && check.detail) {
-    lines.push(`    ${check.detail}`);
+    lines.push(`    ${formatDoctorText(check.detail)}`);
   }
   if (check.status !== "pass" && check.fix) {
     lines.push(`    ${check.fix.title}:`);
     for (const step of check.fix.steps) {
-      lines.push(`      - ${step.value}`);
+      lines.push(`      - ${step.kind === "shell" ? `\`${step.value}\`` : formatDoctorText(step.value)}`);
     }
     if (check.fix.docsUrl) {
       lines.push(`      Docs: ${check.fix.docsUrl}`);
@@ -128,7 +133,24 @@ function renderCheck(lines: string[], check: DoctorCheckResult): void {
   if (check.status !== "pass" && check.deviceGuidance) {
     lines.push(`    On device (${check.deviceGuidance.screen}):`);
     for (const step of check.deviceGuidance.steps) {
-      lines.push(`      - ${step}`);
+      lines.push(`      - ${formatDoctorText(step)}`);
     }
   }
+}
+
+function formatDoctorText(value: string): string {
+  // Keep report values unchanged for JSON and format only the human-readable view.
+  const commandPrefixes = /^(Reinstall the CLI: |Verify adb shell access with: |Verify the checksum: |Install the matching APK: |Inspect the package dump with: )(.*)$/;
+  const prefixedCommand = commandPrefixes.exec(value);
+  if (prefixedCommand) return `${prefixedCommand[1]}\`${prefixedCommand[2]}\``;
+
+  const withCommands = value
+    .replace(/\[Clawperator-Result\]/g, "`[Clawperator-Result]`")
+    .replace(/\b(?:brew install --cask android-platform-tools|sudo apt update && sudo apt install android-tools-adb|brew install scrcpy ffmpeg|clawperator skills install|clawperator doctor --device <device_serial>)(?=\b|[\s.,])/g, command => `\`${command}\``)
+    .replace(/--operator-package [\w.]+/g, code => `\`${code}\``)
+    .replace(/'([A-Za-z][\w.-]*)'/g, (_match, code: string) => `\`${code}\``);
+  return withCommands.split(/(`[^`]*`)/g).map(segment => segment.startsWith("`")
+    ? segment
+    : segment.replace(/\b(?:CLAWPERATOR_[A-Z_]+|PATH|skill\.json(?:\.agent\.cliPath)?|skills-registry\.json|SKILL\.md|doctor_ping|host\.video\.dependencies|com\.clawperator\.operator(?:\.dev)?|adb|ffmpeg|ffprobe|scrcpy|libx264|FFmpeg)\b|--[a-z][\w-]*|-(?:fps_mode|enc_time_base)\s+\w+/g, code => `\`${code}\``)
+  ).join("");
 }
